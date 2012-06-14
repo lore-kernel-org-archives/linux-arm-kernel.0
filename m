@@ -1,65 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Jun 2012 16:45:33 +0200
-Subject: [RFC] i.MX DRM devicetree binding
-In-Reply-To: <20120614161016.20c79038@archvile>
-References: <20120614130756.GS30400@pengutronix.de>
- <20120614161016.20c79038@archvile>
-Message-ID: <20120614144533.GV30400@pengutronix.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 14 Jun 2012 16:53:03 +0200
+Subject: [PATCH v4 0/8] ARM: OMAP2+: PM: introduce the power domains
+ functional states
+Message-ID: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 04:10:16PM +0200, David Jander wrote:
-> On Thu, 14 Jun 2012 15:07:56 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > +
-> > +Required properties:
-> > +- compatible: Should be "fsl,imx-parallel-display"
-> > +- crtc: the crtc this display is connected to, see below
-> > +Optional properties:
-> > +- interface_pix_fmt: How this display is connected to the
-> > +  crtc. Currently supported types: "rgb24", "rgb565"
-> > +- edid: verbatim EDID data block describing attached display.
-> 
-> I never really understood why one should put EDID data in a device-tree. It
-> carries a lot of irrelevant information and is in a quite hostile format. The
-> only reason it exists actually is historically grown "intelligency" built into
-> VESA compatible CRT monitors for PC's.... what do _we_ have to do with that?
-> There isn't even a decent tool to generate this data on linux.
-> On top of that, the examples I have seen of EDID blobs in device-trees so far
-> are just plain wrong and even contain device id's from "Samsung SyncMaster"
-> and other such stuff that IMHO has no place here.
-> 
-> But we need an alternative way of communicating timing parameters. Can't we
-> use something more ad-hoc, like the data one would give to DRM_MODE() in
-> drm_crtc.h?
+Here is a re-spin after some comments after an internal review and some testing on
+OMAP4 with device OFF support.
 
-Generally +1 for this.
+Implement the functional states for the power domains:
+- unify the API to use the functional states,
+- protect the power domain state change by a mutex in
+  omap_set_pwrdm_state,
+- introduce the functional states for power domains power states and
+  logic power states, and the conversion functions between the
+  functional and internal states,
+- program the logic power state of power domains from the functional
+  states, in omap_set_pwrdm_state
+- convert the OMAP2/3/4 PM code to use the updated API,
+- provide the power domains statistics by functional states,
+- provide ftrace tracepoints with the functional state.
 
-I Just don't want to open up another front for now, but I am willing to
-support a generic (not i.MX specific) format to describe display timings
-in devicetree.
+Based on mainline kernel 3.5.0-rc2.
 
-The only discussion I know about was here:
+Tested on OMAP3 Beagleboard, with suspend and cpuidle in RET and
+OFF modes.
 
-https://lists.ozlabs.org/pipermail/linuxppc-dev/2010-February/080683.html
 
-The outcome was that the suggested format was not entirely generic and
-that it would be better to use some existing format rather than
-inventing something new. I disagree here. The thing called modeline,
-drm_display_mode or fb_videomode is well established and it is known
-which parameters (most) displays need, so it should be possible to have
-a generic display description in the devicetree.
+History:
+ v4:
+ - reworked the code after internal review and testing with OMAP3&4 device
+   OFF,
+ - fixed the tracepoints generation code,
+ - introduce a function that returns power domains achievable functional
+   states, in order to return a valid state for power domains that only
+   support some of the power states. Although it has been tested OK the
+   code is in RFC state.
 
-However, we need EDID data parsing anyway in the kernel and being able
-to overwrite the (maybe broken monitor supplied) EDID data in the
-devicetree might become handy. So having this way of supplying EDID data
-is good to have even if there is a generic display description.
+ v3:
+ - fix a bug in OMAP3 cpuidle which prevented the IO wake-ups in PER
 
-Sascha
+ v2:
+ - add the logic power states,
+ - provide the power domains statistics by functional states
+
+ v1:
+ - initial implementation, in RFC state
+ 
+
+Jean Pihet (8):
+  ARM: OMAP2+: PM: protect the power domain state change by a mutex
+  ARM: OMAP2+: PM: introduce power domains functional states
+  ARM: OMAP2+: PM: use the functional power states API
+  ARM: OMAP2+: PM: introduce power domains logic and memory functional
+    states
+  ARM: OMAP2+: PM: introduce power domains achievable functional states
+  ARM: OMAP2+: PM: use the functional power states API for logic and
+    memory
+  ARM: OMAP2+: PM: use power domain functional state in stats counters
+  ARM: OMAP2+: PM debug: trace the functional power domains states
+
+ arch/arm/mach-omap2/cpuidle34xx.c          |   61 +++---
+ arch/arm/mach-omap2/cpuidle44xx.c          |   28 +--
+ arch/arm/mach-omap2/omap-hotplug.c         |    2 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c  |   39 ++--
+ arch/arm/mach-omap2/pm-debug.c             |   15 +-
+ arch/arm/mach-omap2/pm.c                   |   62 -----
+ arch/arm/mach-omap2/pm.h                   |    1 -
+ arch/arm/mach-omap2/pm24xx.c               |   15 +-
+ arch/arm/mach-omap2/pm34xx.c               |   78 +++---
+ arch/arm/mach-omap2/pm44xx.c               |   18 +-
+ arch/arm/mach-omap2/powerdomain-common.c   |  100 ++++++++
+ arch/arm/mach-omap2/powerdomain.c          |  367 ++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/powerdomain.h          |  101 ++++++--
+ arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |    7 +
+ arch/arm/mach-omap2/powerdomain44xx.c      |    3 +
+ 15 files changed, 653 insertions(+), 244 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.7.6
