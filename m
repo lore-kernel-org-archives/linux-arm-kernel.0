@@ -1,26 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jun 2012 12:17:46 +0100
-Subject: [PATCH 06/17] i2c: omap: improve 1p153 errata handling
-In-Reply-To: <1339669250-9183-7-git-send-email-balbi@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 14 Jun 2012 16:48:56 +0530
+Subject: [PATCH 15/17] i2c: omap: always return IRQ_HANDLED
+In-Reply-To: <1339669250-9183-16-git-send-email-balbi@ti.com>
 References: <1339669250-9183-1-git-send-email-balbi@ti.com>
- <1339669250-9183-7-git-send-email-balbi@ti.com>
-Message-ID: <20120614111746.GB31187@n2100.arm.linux.org.uk>
+ <1339669250-9183-16-git-send-email-balbi@ti.com>
+Message-ID: <CAMQu2gzbK+ObetarwRiEz9A7=awEffAhrMMAqSMfiv4H6BZAuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 01:20:39PM +0300, Felipe Balbi wrote:
-> -static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
-> +static int errata_omap3_1p153(struct omap_i2c_dev *dev)
->  {
-> -	unsigned long timeout = 10000;
-> +	unsigned long	timeout = 10000;
-> +	u16		stat;
+On Thu, Jun 14, 2012 at 3:50 PM, Felipe Balbi <balbi@ti.com> wrote:
+> otherwise we could get our IRQ line disabled due
+> to many spurious IRQs.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+> ?drivers/i2c/busses/i2c-omap.c | ? ?2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index fc5b8bc..5b78a73 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1015,7 +1015,7 @@ omap_i2c_isr(int this_irq, void *dev_id)
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?} while (stat);
+>
+> - ? ? ? return count ? IRQ_HANDLED : IRQ_NONE;
+> + ? ? ? return IRQ_HANDLED;
 
-Eww, no, not more of this "lets add tabs to align auto variable
-declarations".  This is detrimental when you add another variable whose
-type is longer than the current indentation - you have to reformat the
-entire block.
+no sure if this is correct. if you have IRQ flood and instead of _actually_
+handling it, if you return handled, you still have interrupt pending, right?
 
-It's really not worth it.  Stick to just using one space, like the rest
-of the kernel code.  Like the code which Linus writes.  And thereby help
-to avoid future "pointless churn" whinges.
+ if (count++ == 100) {
+                        dev_warn(dev->dev, "Too much work in one IRQ\n");
+                        break;
+                }
+ofcourse we do get warning message already, so as such the change
+should be fine.
+
+Just want to understand the change bit more.
+
+Regards
+Santosh
+
+
+
+Regards
+santosh
