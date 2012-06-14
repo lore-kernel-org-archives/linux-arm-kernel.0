@@ -1,64 +1,41 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 14 Jun 2012 16:28:00 +0530
-Subject: [PATCH v2 0/4] ARM: OMAP2+: dmtimer: cleanup related to devm API
- and clk usage
-In-Reply-To: <CAC83ZvLOoUwthcv0seXeqJcuvxvhP7P500T66RHCCWvrsaPr2A@mail.gmail.com>
-References: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
- <CAC83ZvLOoUwthcv0seXeqJcuvxvhP7P500T66RHCCWvrsaPr2A@mail.gmail.com>
-Message-ID: <CAMQu2gxDbi191EdA0_acaJwhuAddXJ44FzVQJ=5c1Fh0PFDG4w@mail.gmail.com>
+Date: Thu, 14 Jun 2012 16:31:02 +0530
+Subject: [PATCH 06/17] i2c: omap: improve 1p153 errata handling
+In-Reply-To: <1339669250-9183-7-git-send-email-balbi@ti.com>
+References: <1339669250-9183-1-git-send-email-balbi@ti.com>
+ <1339669250-9183-7-git-send-email-balbi@ti.com>
+Message-ID: <CAMQu2gxY6x+JFw1ncimpVSxutJ_+4zscGHzVpg85W-4SPfUJRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Thu, Jun 14, 2012 at 3:50 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Make it not depend on ISR's local variables
+> in order to make it easier to re-factor the
+> transmit data loop.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+> ?drivers/i2c/busses/i2c-omap.c | ? 47 +++++++++++++++++++++++++++++------------
+> ?1 file changed, 34 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 0661ca1..52861c2 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -768,21 +768,24 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
+> ?* data to DATA_REG. Otherwise some data bytes can be lost while transferring
+> ?* them from the memory to the I2C interface.
+> ?*/
+> -static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+> +static int errata_omap3_1p153(struct omap_i2c_dev *dev)
+> ?{
+> - ? ? ? unsigned long timeout = 10000;
+> + ? ? ? unsigned long ? timeout = 10000;
 
-On Thu, Jun 14, 2012 at 4:24 PM, DebBarma, Tarun Kanti
-<tarun.kanti@ti.com> wrote:
-> On Fri, Apr 20, 2012 at 6:09 PM, Tarun Kanti DebBarma
-> <tarun.kanti@ti.com> wrote:
->> The devm API usage in probe() simplifies error handling operation.
->> Since iclk is not used in the driver it is removed from wherever
->> not needed.
->> Corrected the timer fck name mis-match between clock44xx_data.c and
->> omap_hwmod_44xx_data.c.
->> Added omap_hwmod_get_main_clk() API. There is no more need to construct
->> clock names using sprintf() to be used in clk_get() during initialization.
->>
->> Reference:
->> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
->> Commit: e816b57a337ea3b755de72bec38c10c864f23015 (Linux 3.4-rc3)
->>
->> Series is available here for reference:
->> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev dmtimer_cleanup_for_3.5
->>
->> Tested on following platforms:
->> OMAP5, OMAP4430SDP, OMAP3430SDP, OMAP2430SDP.
->> Could not test on OMAP2420 due to unavailability of board.
->>
->> v2:
->> - Use devm_request_and_ioremap() instead of request_mem_region() and ioremap()
->> - Add omap_hwmod_get_main_clk() API
->> - Reverted changes of clock names from OMAP2 and OMAP3 platforms
->>
->> Cc: Cousson, Benoit <b-cousson@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Tarun Kanti DebBarma (4):
->> ?ARM: OMAP: dmtimer: use devm_ API and do some cleanup in probe()
->> ?ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
->> ?ARM: OMAP2+: dmtimer: cleanup iclk usage
->> ?ARM: OMAP2+: dmtimer: cleanup fclk usage
-> [ping]
-> Only one of the patches in the series (ARM: OMAP2+: dmtimer: cleanup iclk usage)
-> has been taken. I just applied the remaining patches on top of Linux 3.5-rc2 and
-> tested on OMAP3 and OMAP4. Can the remaining patches be taken as well?
+Not related to this patch but this 10000 timeout magic
+needs to be fixed as well.
 
-Just to let you know that this cleanup is essential for Benoit's OMAP4
-hwmod cleanup
-and OMAP5 minimal support series.
+The patch looks fine.
 
 Regards
 santosh
