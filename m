@@ -1,102 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 13 Jun 2012 23:57:56 -0300
-Subject: MXS getting AUART to work with DT.
-In-Reply-To: <4FD7EFFC.8010204@grid-net.com>
-References: <4FD7EFFC.8010204@grid-net.com>
-Message-ID: <CAOMZO5BDFD3hHt+HW_sdh-3hCEwgJJA9C0ecAJZSOUCw_725Jw@mail.gmail.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Thu, 14 Jun 2012 12:17:26 +0800
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <4FD8CED9.6030901@broadcom.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD8CED9.6030901@broadcom.com>
+Message-ID: <6B4D417B830BC44B8026029FD256F7F1C377BFFE89@HKMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 10:42 PM, Subodh Nijsure <snijsure@grid-net.com> wrote:
-> Hi,
+Hi, Franky
+
+On Thu, Jun 14, 2012 at 01:33:13, Franky Lin wrote:
+>Hi Wei,
 >
-> I am testing my mx28 hardware with arm-soc/for-next branch. I have made
-> ?additions shown below to my dt file.
+>On 06/13/2012 03:40 AM, Wei Ni wrote:
+>> In the brcmfmac init routine, it call sdio_register_driver() to 
+>> register driver, if the wifi device is powered on, then the mmc
+>> driver will enumerate it, and call the probe callback routine.
+>>
+>> On the Cardhu, the wifi's power is controlled by two gpios 
+>> (power-gpio and reset-gpio), the default state is power-off.
+>> So we need to power on it before calling sdio_register_driver(),
+>> if not, the mmc driver can't enumerate it, and will not call
+>> the probe routine.
+>> This power on sequence is:
+>> set power-gpio to 1 ;
+>> mdelay(100) ;
+>> set reset-gpio to 1 ;
+>> mdelay(200);
+>>
+>> My question is where to power on the wifi. We may have three places 
+>> to power on it:
+>> 1. power on it in the brcmfmac driver before calling
+>> sdio_register_driver(). But I think this power sequence is special for 
+>> tegra30 cardhu, it's not good to add it in the generic wifi driver, 
+>> because different board may use the different way to power on the wifi.
+>> 2. power on it in the mmc driver. In our tegra SD driver, it has 
+>> power-gpios property, which allow the slot to be powered. But this power is 
+>> for mmc slot, could we add this wifi power sequence in the tegra SD driver?
+>> 3. hard-coded into DT. Set these gpios in the DT, something like 
+>> pinmux settings, but in this way, it's not good to put the mdelay() value
+>> in the DT.
 >
-> What I see is only ttyAPP0 device gets created but not the ttyAPP1, do folks
-> who know DT much better than I, see any issues with this DT definition
-> below?
+>We introduced oob interrupt support in 3.5 [1]. We are using a virtual 
+>platform device to retrieve board specific oob interrupt GPIO setting.
+>You should be able to implement the power control in this way as well.
+>Brcmfmac gets the GPIOs through platform device interface, powers up 
+>the chip and triggers a card detection. Then 4329 should be enumerated 
+>by MMC stack. The reason we didn't implement this is the card detection.
+>Some design doesn't have hardware card detection since the WiFi chip is 
+>already on board. And the current MMC stack doesn't have virtual card 
+>detection interface.
 
-Would something like the patch below be needed?
+Wei: Yes, in OOB mode, it's easy to add a device node in the DT, to pass
+the gpio property to brcmfmac driver. But the NO-OOB mode doesn?t use the
+virtual platform device, so we can't pass the gpio to driver. We need to find
+a way to support these two mode both.
+Could we use the virtual platform device both for OOB and NO-OOB mode? so that
+we can implement power control in these two mode, and we can add a flags to
+control if need to power on or not.
+BTW, does that power on sequence is generally for 4329?
 
----
- arch/arm/boot/dts/imx28.dtsi   |    5 +++++
- drivers/tty/serial/mxs-auart.c |    9 +++++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 4634cb8..d524377 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -404,30 +404,35 @@
- 			};
-
- 			auart0: serial at 8006a000 {
-+				compatible = "fsl,mxs-auart";
- 				reg = <0x8006a000 0x2000>;
- 				interrupts = <112 70 71>;
- 				status = "disabled";
- 			};
-
- 			auart1: serial at 8006c000 {
-+				compatible = "fsl,mxs-auart";
- 				reg = <0x8006c000 0x2000>;
- 				interrupts = <113 72 73>;
- 				status = "disabled";
- 			};
-
- 			auart2: serial at 8006e000 {
-+				compatible = "fsl,mxs-auart";
- 				reg = <0x8006e000 0x2000>;
- 				interrupts = <114 74 75>;
- 				status = "disabled";
- 			};
-
- 			auart3: serial at 80070000 {
-+				compatible = "fsl,mxs-auart";
- 				reg = <0x80070000 0x2000>;
- 				interrupts = <115 76 77>;
- 				status = "disabled";
- 			};
-
- 			auart4: serial at 80072000 {
-+				compatible = "fsl,mxs-auart";
- 				reg = <0x80072000 0x2000>;
- 				interrupts = <116 78 79>;
- 				status = "disabled";
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index ec56d83..6540f28 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -33,6 +33,8 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-
- #include <asm/cacheflush.h>
-
-@@ -769,12 +771,19 @@ static int __devexit mxs_auart_remove(struct
-platform_device *pdev)
- 	return 0;
- }
-
-+static struct of_device_id mxs_auart_dt_ids[] = {
-+	{.compatible = "fsl,mxs-auart", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_auart_of_match);
-+
- static struct platform_driver mxs_auart_driver = {
- 	.probe = mxs_auart_probe,
- 	.remove = __devexit_p(mxs_auart_remove),
- 	.driver = {
- 		.name = "mxs-auart",
- 		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(mxs_auart_dt_ids),
- 	},
- };
-
--- 
-1.7.1
+>
+>Franky
+>
+>[1]: http://www.spinics.net/lists/linux-wireless/msg89335.html
