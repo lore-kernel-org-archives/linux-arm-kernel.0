@@ -1,72 +1,200 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jun 2012 15:07:12 +0100
-Subject: [PATCH] SPI: OMAP: fix over-eager devm_xxx() conversion (was: Re:
- [CFT 07/11] spi: omap2-mcspi: add DMA engine support)
-In-Reply-To: <20120614125012.GG31187@n2100.arm.linux.org.uk>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaZv-0003tz-6F@rmk-PC.arm.linux.org.uk>
- <20120614115335.GE31187@n2100.arm.linux.org.uk>
- <20120614120842.GF31187@n2100.arm.linux.org.uk>
- <20120614125012.GG31187@n2100.arm.linux.org.uk>
-Message-ID: <20120614140712.GH31187@n2100.arm.linux.org.uk>
+From: david.jander@protonic.nl (David Jander)
+Date: Thu, 14 Jun 2012 16:10:16 +0200
+Subject: [RFC] i.MX DRM devicetree binding
+In-Reply-To: <20120614130756.GS30400@pengutronix.de>
+References: <20120614130756.GS30400@pengutronix.de>
+Message-ID: <20120614161016.20c79038@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: [PATCH] SPI: OMAP: fix over-eager devm_xxx() conversion
+On Thu, 14 Jun 2012 15:07:56 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-1a77b127ae (OMAP : SPI : use devm_* functions) converted the SPI
-device controller state to use devm_kzalloc().  Unfortunately, this
-is used against an unbound struct device, which results in the
-following when the device is eventually bound to its driver:
+> Hi All,
+> 
+> The following is an attempt to come up with a devicetree binding for
+> DRM graphics on i.MX SoCs. I'm posting this seperate from the actual
+> code to not bury this in big patches.
+> 
+> The bindings should cover most of the problems we had while implementing
+> the possible IPU <-> (LVDS, HDMI, parallel) Display connections.
+> 
+> Contrary to some other devicetree bindings I have seen we decided not
+> to make the displays subnodes of the graphics unit because the (LVDS,
+> HDMI) encoders are outside the graphics units and also on i.MX6 there
+> are 2 IPUs and displays can be muxed between these IPUs.
 
-------------[ cut here ]------------
-WARNING: at /home/rmk/git/linux-rmk/drivers/base/dd.c:257 driver_probe_device+0x78/0x21c()
-Modules linked in:
-Backtrace:
-[<c0017d0c>] (dump_backtrace+0x0/0x10c) from [<c033e208>] (dump_stack+0x18/0x1c) r7:00000000 r6:c01ff28c r5:c040050c r4:00000101
-[<c033e1f0>] (dump_stack+0x0/0x1c) from [<c00337ec>] (warn_slowpath_common+0x58/0x70)
-[<c0033794>] (warn_slowpath_common+0x0/0x70) from [<c0033828>] (warn_slowpath_null+0x24/0x2c)
-[<c0033804>] (warn_slowpath_null+0x0/0x2c) from [<c01ff28c>] (driver_probe_device+0x78/0x21c)
-[<c01ff214>] (driver_probe_device+0x0/0x21c) from [<c01ff49c>] (__driver_attach+0x6c/0x90)
-[<c01ff430>] (__driver_attach+0x0/0x90) from [<c01fda70>] (bus_for_each_dev+0x58/0x98)
-[<c01fda18>] (bus_for_each_dev+0x0/0x98) from [<c01ff0f4>] (driver_attach+0x20/0x28)
-[<c01ff0d4>] (driver_attach+0x0/0x28) from [<c01fe2f4>] (bus_add_driver+0xb4/0x230)
-[<c01fe240>] (bus_add_driver+0x0/0x230) from [<c01ffb24>] (driver_register+0xac/0x138)
-[<c01ffa78>] (driver_register+0x0/0x138) from [<c0215d4c>] (spi_register_driver+0x4c/0x60)
-[<c0215d00>] (spi_register_driver+0x0/0x60) from [<c045414c>] (ks8851_init+0x14/0x1c)
-[<c0454138>] (ks8851_init+0x0/0x1c) from [<c0008770>] (do_one_initcall+0x9c/0x164)
-[<c00086d4>] (do_one_initcall+0x0/0x164) from [<c0436410>] (kernel_init+0x128/0x210)
-[<c04362e8>] (kernel_init+0x0/0x210) from [<c0038754>] (do_exit+0x0/0x72c)
----[ end trace 4dcda79f5e89dd84 ]---
-ks8851 spi1.0: message enable is 0
-ks8851 spi1.0: eth0: revision 0, MAC 08:00:28:01:4d:c6, IRQ 194, has EEPROM
+Sounds great!
 
-Fix this by partially reverting the original commit.
+> Comments and suggestions welcome.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/spi/spi-omap2-mcspi.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Here you are:
 
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index 9d3409a..6263b0f 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -829,7 +829,7 @@ static int omap2_mcspi_setup(struct spi_device *spi)
- 	mcspi_dma = &mcspi->dma_channels[spi->chip_select];
- 
- 	if (!cs) {
--		cs = devm_kzalloc(&spi->dev , sizeof *cs, GFP_KERNEL);
-+		cs = kzalloc(sizeof *cs, GFP_KERNEL);
- 		if (!cs)
- 			return -ENOMEM;
- 		cs->base = mcspi->base + spi->chip_select * 0x14;
-@@ -869,6 +869,7 @@ static void omap2_mcspi_cleanup(struct spi_device *spi)
- 		cs = spi->controller_state;
- 		list_del(&cs->node);
- 
-+		kfree(cs);
- 	}
- 
- 	if (spi->chip_select < spi->master->num_chipselect) {
+> Sascha
+> 
+> 8<--------------------------------------
+> 
+> DRM i.MX: Add devicetree binding documentation
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  .../devicetree/bindings/drm/fsl-imx-drm.txt        |  126 ++++++++++++++++++++
+>  1 file changed, 126 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/fsl-imx-drm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/drm/fsl-imx-drm.txt
+> new file mode 100644
+> index 0000000..6766e03
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/drm/fsl-imx-drm.txt
+> @@ -0,0 +1,126 @@
+> +Freescale i.MX IPUv3
+> +====================
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,<chip>-ipu"
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +- interrupts: Should contain sync interrupt and error interrupt,
+> +  in this order.
+> +- #crtc-cells: 1, See below
+> +
+> +example:
+> +
+> +ipu: ipu at 18000000 {
+> +	#crtc-cells = <1>;
+> +	compatible = "fsl,imx53-ipu";
+> +	reg = <0x18000000 0x080000000>;
+> +	interrupts = <11 10>;
+> +};
+> +
+> +Freescale i.MX LCDC controller
+> +==============================
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,<chip>-lcdc"
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +- interrupts: Should contain interrupt
+> +- #crtc-cells: 0, See below
+> +
+> +example:
+> +
+> +lcdc: lcdc at 10021000 {
+> +	#crtc-cells = <0>;
+> +	compatible = "fsl,imx27-lcdc", "fsl,imx21-lcdc";
+> +	reg = <0x10021000 0x4000>;
+> +	interrupts = <61>;
+> +};
+> +
+> +Parallel display support
+> +========================
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx-parallel-display"
+> +- crtc: the crtc this display is connected to, see below
+> +Optional properties:
+> +- interface_pix_fmt: How this display is connected to the
+> +  crtc. Currently supported types: "rgb24", "rgb565"
+> +- edid: verbatim EDID data block describing attached display.
+
+I never really understood why one should put EDID data in a device-tree. It
+carries a lot of irrelevant information and is in a quite hostile format. The
+only reason it exists actually is historically grown "intelligency" built into
+VESA compatible CRT monitors for PC's.... what do _we_ have to do with that?
+There isn't even a decent tool to generate this data on linux.
+On top of that, the examples I have seen of EDID blobs in device-trees so far
+are just plain wrong and even contain device id's from "Samsung SyncMaster"
+and other such stuff that IMHO has no place here.
+
+But we need an alternative way of communicating timing parameters. Can't we
+use something more ad-hoc, like the data one would give to DRM_MODE() in
+drm_crtc.h?
+
+> +- ddc: phandle describing the i2c bus handling the display data
+> +  channel
+> +
+> +example:
+> +
+> +display at di0 {
+> +	compatible = "fsl,imx-parallel-display";
+> +	edid = [edid-data];
+> +	crtc = <&ipu 0>;
+> +	interface_pix_fmt = "rgb24";
+> +};
+> +
+> +LVDS display bridge (LDB)
+> +=========================
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,<chip>-ldb"
+> +- channel0-crtcs, channel1-crtcs: the crtcs the ldb is connected to, see
+> +  below
+> +Optional properties:
+> +- channel0-edid, channel1-edid: verbatim EDID data blocks describing the
+> +  displays attached to channel0 and channel1.
+> +- channel0-ddc, channel1-ddc: phandles describing the i2c busses handling
+> +  the display data channels for channel0 and channel1.
+
+Same rant here... missing a humane way of specifying timing data.
+
+> +
+> +lvds at 53fa8008 {
+> +	compatible = "fsl,imx6q-ldb";
+> +	channel0-edid = [edid-data];
+> +	channel1-ddc = <&i2c0>;
+> +	channel0-crtcs = <&ipu0 0>, <&ipu0 1>, <&ipu1 0>, <&ipu1 1>;
+> +	channel1-crtcs = <&ipu0 0>, <&ipu0 1>, <&ipu1 0>, <&ipu1 1>;
+> +};
+> +
+> +Specifying CRTCs connected to display output devices
+> +====================================================
+> +
+> +Display output device nodes should specify which CRTCs they can be
+> +connected to in their crtcs property, containing a 'crtc-list':
+> +
+> +	crtc-list ::= <single-crtc> [crtc-list]
+> +	single-crtc ::= <crtc-phandle> <crtc-specifier>
+> +	crtc-phandle : phandle to device node providing the crtc
+> +	crtc-specifier : Array of #crtc-cells specifying specific crtc
+> +			 (controller specific, 1 on imx-ipuv3)
+> +
+> +In the following example, two image processing units ipu0 and ipu1
+> +provide two CRTCs each, indexed with a single cell. The hdmi connector
+> +can be connected to either CRTC of ipu1, and the lvds connector is
+> +fixed to the second CRTC of ipu0.
+> +
+> +	ipu0: ipu0 {
+> +		#crtc-cells = <1>;
+> +	};
+> +	ipu1: ipu1 {
+> +		#crtc-cells = <1>;
+> +	};
+> +	[...]
+> +	hdmi: hdmi {
+> +		ddc = <&i2c2>;
+> +		crtcs = <&ipu1 0 &ipu1 1>;
+> +	};
+> +	lvds: lvds {
+> +		edid = [edid-data];
+> +		crtcs = <&ipu0 1>;
+> +	};
+> +
+> +Note that the crtc-specifier length is controller dependent. A simple
+> +lcdc controller with a single CRTC should use #crtc-cells = <0>:
+> +
+> +	lcdc: lcdc {
+> +		#crtc-cells = <0>;
+> +	};
+> +	[...]
+> +	parallel-display {
+> +		crtcs = <&lcdc>
+> +	};
+> +
+
+Best regards,
+
+-- 
+David Jander
+Protonic Holland.
