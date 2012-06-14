@@ -1,27 +1,43 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 14 Jun 2012 11:28:52 +0100
-Subject: [PATCH] i2c: let the core register devices from devicetree
-In-Reply-To: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
-References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1339669732.6598.7.camel@hornet>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Jun 2012 15:59:20 +0530
+Subject: [PATCH v3 0/4] dt: device tree support for TI EMIF driver for 3.6 
+Message-ID: <1339669764-27244-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-13 at 23:12 +0200, Wolfram Sang wrote:
-> Currently, every driver has to do it on its own, but it should be done
-> in the core, like we already do with board_info structs.
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> ---
->  drivers/i2c/busses/i2c-versatile.c          |    1 -
->  drivers/i2c/i2c-core.c                      |    3 +++
+Tony,
 
-For what it's worth
+Here is the EMIF driver DT support which was kept on hold for the driver
+to get merged. The series has been already reviewed on the list.
 
-Tested-by: Pawel Moll <pawel.moll@arm.com>
+This series adds device tree support for TI EMIF SDRAM controller
+driver. For this, a binding has been added for representing AC timing
+parameters and other details of LPDDR2 memories.
 
-on Versatile Express.
+v3:
+Rebased against the 3.5-rc2. The series is aslo available
+at:
+git://github.com/SantoshShilimkar/linux.git for_3.6/emif_dt
 
-Regards
+Aneesh V (4):
+  dt: device tree bindings for LPDDR2 memories
+  dt: emif: device tree bindings for TI's EMIF sdram controller
+  arm: dts: EMIF and LPDDR2 device tree data for OMAP4 boards
+  memory: emif: add device tree support to emif driver
 
-Pawe?
+ .../devicetree/bindings/lpddr2/lpddr2-timings.txt  |   52 ++++
+ .../devicetree/bindings/lpddr2/lpddr2.txt          |  102 +++++++
+ .../bindings/memory-controllers/ti/emif.txt        |   55 ++++
+ arch/arm/boot/dts/elpida_ecb240abacn.dtsi          |   67 +++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   13 +
+ arch/arm/boot/dts/omap4-sdp.dts                    |   13 +
+ arch/arm/boot/dts/omap4.dtsi                       |   18 ++
+ drivers/memory/emif.c                              |  285 +++++++++++++++++++-
+ 8 files changed, 604 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/lpddr2/lpddr2-timings.txt
+ create mode 100644 Documentation/devicetree/bindings/lpddr2/lpddr2.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+ create mode 100644 arch/arm/boot/dts/elpida_ecb240abacn.dtsi
+
+-- 
+1.7.9.5
