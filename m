@@ -1,197 +1,434 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Jun 2012 13:59:36 +0800
-Subject: [PATCH 05/16] ARM: imx: move irq_domain_add_legacy call into tzic
- driver
+Date: Thu, 14 Jun 2012 13:59:38 +0800
+Subject: [PATCH 07/16] dma: ipu: remove the use of ipu_platform_data
 In-Reply-To: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
 References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1339653587-4832-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move irq_domain_add_legacy call from imx5*-dt.c into tzic init function
-and have the tzic driver adopt irqdomain support for both DT and non-DT
-boot.
-
-Now tzic init function calls irq_alloc_descs to get irq_base and adds
-a lenacy irqdomain with the irq_base, so that the mapping between tzic
-irq and Linux irq number can be handled by irqdomain.
+The struct ipu_platform_data is used by platform code to pass
+MXC_IPU_IRQ_START to ipu-core driver.  We can save it by having
+ipu-core driver call irq_alloc_descs to get the irq_base.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Vinod Koul <vinod.koul@intel.com>
 ---
- arch/arm/mach-imx/imx51-dt.c |   15 ---------------
- arch/arm/mach-imx/imx53-dt.c |   15 ---------------
- arch/arm/plat-mxc/tzic.c     |   28 ++++++++++++++++++++--------
- 3 files changed, 20 insertions(+), 38 deletions(-)
+ arch/arm/mach-imx/devices-imx31.h               |    4 ++--
+ arch/arm/mach-imx/devices-imx35.h               |    4 ++--
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c  |    6 +-----
+ arch/arm/mach-imx/mach-armadillo5x0.c           |    6 +-----
+ arch/arm/mach-imx/mach-mx31_3ds.c               |    6 +-----
+ arch/arm/mach-imx/mach-mx31moboard.c            |    6 +-----
+ arch/arm/mach-imx/mach-mx35_3ds.c               |   10 +---------
+ arch/arm/mach-imx/mach-pcm037.c                 |    6 +-----
+ arch/arm/mach-imx/mach-pcm043.c                 |    6 +-----
+ arch/arm/mach-imx/mach-vpr200.c                 |    6 +-----
+ arch/arm/mach-imx/mx31lilly-db.c                |    6 +-----
+ arch/arm/plat-mxc/devices/platform-ipu-core.c   |    5 ++---
+ arch/arm/plat-mxc/include/mach/devices-common.h |    4 +---
+ arch/arm/plat-mxc/include/mach/ipu.h            |    4 ----
+ drivers/dma/ipu/ipu_idmac.c                     |    8 +++-----
+ drivers/dma/ipu/ipu_irq.c                       |   14 +++++++++-----
+ 16 files changed, 28 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-index 3bdabbc..d4067fe 100644
---- a/arch/arm/mach-imx/imx51-dt.c
-+++ b/arch/arm/mach-imx/imx51-dt.c
-@@ -11,7 +11,6 @@
-  */
+diff --git a/arch/arm/mach-imx/devices-imx31.h b/arch/arm/mach-imx/devices-imx31.h
+index 488e241..911c2da 100644
+--- a/arch/arm/mach-imx/devices-imx31.h
++++ b/arch/arm/mach-imx/devices-imx31.h
+@@ -42,8 +42,8 @@ extern const struct imx_imx_uart_1irq_data imx31_imx_uart_data[];
+ #define imx31_add_imx_uart4(pdata)	imx31_add_imx_uart(4, pdata)
  
- #include <linux/irq.h>
--#include <linux/irqdomain.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/pinctrl/machine.h>
-@@ -45,18 +44,6 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
- 	{ /* sentinel */ }
+ extern const struct imx_ipu_core_data imx31_ipu_core_data;
+-#define imx31_add_ipu_core(pdata)	\
+-	imx_add_ipu_core(&imx31_ipu_core_data, pdata)
++#define imx31_add_ipu_core()		\
++	imx_add_ipu_core(&imx31_ipu_core_data)
+ #define imx31_alloc_mx3_camera(pdata)	\
+ 	imx_alloc_mx3_camera(&imx31_ipu_core_data, pdata)
+ #define imx31_add_mx3_sdc_fb(pdata)	\
+diff --git a/arch/arm/mach-imx/devices-imx35.h b/arch/arm/mach-imx/devices-imx35.h
+index 7b99ef0..6fb9072 100644
+--- a/arch/arm/mach-imx/devices-imx35.h
++++ b/arch/arm/mach-imx/devices-imx35.h
+@@ -50,8 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx35_imx_uart_data[];
+ #define imx35_add_imx_uart2(pdata)	imx35_add_imx_uart(2, pdata)
+ 
+ extern const struct imx_ipu_core_data imx35_ipu_core_data;
+-#define imx35_add_ipu_core(pdata)	\
+-	imx_add_ipu_core(&imx35_ipu_core_data, pdata)
++#define imx35_add_ipu_core()		\
++	imx_add_ipu_core(&imx35_ipu_core_data)
+ #define imx35_alloc_mx3_camera(pdata)	\
+ 	imx_alloc_mx3_camera(&imx35_ipu_core_data, pdata)
+ #define imx35_add_mx3_sdc_fb(pdata)	\
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+index 557f6c4..6e9dd12 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+@@ -95,10 +95,6 @@ static const struct fb_videomode fb_modedb[] = {
+ 	},
  };
  
--static int __init imx51_tzic_add_irq_domain(struct device_node *np,
--				struct device_node *interrupt_parent)
--{
--	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
--	return 0;
--}
--
--static const struct of_device_id imx51_irq_match[] __initconst = {
--	{ .compatible = "fsl,imx51-tzic", .data = imx51_tzic_add_irq_domain, },
--	{ /* sentinel */ }
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
 -};
 -
- static const struct of_device_id imx51_iomuxc_of_match[] __initconst = {
- 	{ .compatible = "fsl,imx51-iomuxc-babbage", .data = imx51_babbage_common_init, },
- 	{ /* sentinel */ }
-@@ -68,8 +55,6 @@ static void __init imx51_dt_init(void)
- 	const struct of_device_id *of_id;
- 	void (*func)(void);
+ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.name		= "CMO-QVGA",
+ 	.mode		= fb_modedb,
+@@ -287,7 +283,7 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
+ 		printk(KERN_ERR "error setting mbimxsd pads !\n");
  
--	of_irq_init(imx51_irq_match);
--
- 	pinctrl_provide_dummies();
+ 	imx35_add_imx_uart1(&uart_pdata);
+-	imx35_add_ipu_core(&mx3_ipu_data);
++	imx35_add_ipu_core();
+ 	imx35_add_mx3_sdc_fb(&mx3fb_pdata);
  
- 	node = of_find_matching_node(NULL, imx51_iomuxc_of_match);
-diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
-index 17fca3c..fdd9080 100644
---- a/arch/arm/mach-imx/imx53-dt.c
-+++ b/arch/arm/mach-imx/imx53-dt.c
-@@ -15,7 +15,6 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/irq.h>
--#include <linux/irqdomain.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/pinctrl/machine.h>
-@@ -52,18 +51,6 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
- 	{ /* sentinel */ }
+ 	imx35_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
+diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
+index f83c5c6..2c6ab32 100644
+--- a/arch/arm/mach-imx/mach-armadillo5x0.c
++++ b/arch/arm/mach-imx/mach-armadillo5x0.c
+@@ -367,10 +367,6 @@ static const struct fb_videomode fb_modedb[] = {
+ 	},
  };
  
--static int __init imx53_tzic_add_irq_domain(struct device_node *np,
--				struct device_node *interrupt_parent)
--{
--	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
--	return 0;
--}
--
--static const struct of_device_id imx53_irq_match[] __initconst = {
--	{ .compatible = "fsl,imx53-tzic", .data = imx53_tzic_add_irq_domain, },
--	{ /* sentinel */ }
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
 -};
 -
- static const struct of_device_id imx53_iomuxc_of_match[] __initconst = {
- 	{ .compatible = "fsl,imx53-iomuxc-ard", .data = imx53_ard_common_init, },
- 	{ .compatible = "fsl,imx53-iomuxc-evk", .data = imx53_evk_common_init, },
-@@ -91,8 +78,6 @@ static void __init imx53_dt_init(void)
- 	const struct of_device_id *of_id;
- 	void (*func)(void);
+ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.name		= "CRT-VGA",
+ 	.mode		= fb_modedb,
+@@ -517,7 +513,7 @@ static void __init armadillo5x0_init(void)
+ 	imx31_add_mxc_mmc(0, &sdhc_pdata);
  
--	of_irq_init(imx53_irq_match);
+ 	/* Register FB */
+-	imx31_add_ipu_core(&mx3_ipu_data);
++	imx31_add_ipu_core();
+ 	imx31_add_mx3_sdc_fb(&mx3fb_pdata);
+ 
+ 	/* Register NOR Flash */
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index ecdba04..618935e 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -274,10 +274,6 @@ static const struct fb_videomode fb_modedb[] = {
+ 	},
+ };
+ 
+-static struct ipu_platform_data mx3_ipu_data = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
 -
- 	pinctrl_provide_dummies();
+ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.name		= "Epson-VGA",
+ 	.mode		= fb_modedb,
+@@ -743,7 +739,7 @@ static void __init mx31_3ds_init(void)
+ 	imx31_add_mxc_mmc(0, &sdhc1_pdata);
  
- 	node = of_find_matching_node(NULL, imx53_iomuxc_of_match);
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index 98308ec..abc90e4 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -15,6 +15,8 @@
- #include <linux/device.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of.h>
+ 	imx31_add_spi_imx0(&spi0_pdata);
+-	imx31_add_ipu_core(&mx3_ipu_data);
++	imx31_add_ipu_core();
+ 	imx31_add_mx3_sdc_fb(&mx3fb_pdata);
  
- #include <asm/mach/irq.h>
- #include <asm/exception.h>
-@@ -49,6 +51,7 @@
- #define TZIC_ID0	0x0FD0	/* Indentification Register 0 */
+ 	/* CSI */
+diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+index f0d26db..54d9e5d 100644
+--- a/arch/arm/mach-imx/mach-mx31moboard.c
++++ b/arch/arm/mach-imx/mach-mx31moboard.c
+@@ -473,10 +473,6 @@ static const struct gpio_led_platform_data mx31moboard_led_pdata __initconst = {
+ 	.leds		= mx31moboard_leds,
+ };
  
- void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
-+static struct irq_domain *domain;
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static struct platform_device *devices[] __initdata = {
+ 	&mx31moboard_flash,
+ };
+@@ -494,7 +490,7 @@ static int __init mx31moboard_init_cam(void)
+ 	int dma, ret = -ENOMEM;
+ 	struct platform_device *pdev;
  
- #define TZIC_NUM_IRQS 128
+-	imx31_add_ipu_core(&mx3_ipu_data);
++	imx31_add_ipu_core();
  
-@@ -77,15 +80,14 @@ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
- static void tzic_irq_suspend(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	int idx = gc->irq_base >> 5;
-+	int idx = d->hwirq >> 5;
+ 	pdev = imx31_alloc_mx3_camera(&camera_pdata);
+ 	if (IS_ERR(pdev))
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index fa1ea74..ad63e6e 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -80,10 +80,6 @@ static const struct fb_videomode fb_modedb[] = {
+ 	 },
+ };
  
- 	__raw_writel(gc->wake_active, tzic_base + TZIC_WAKEUP0(idx));
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.name = "Ceramate-CLAA070VC01",
+ 	.mode = fb_modedb,
+@@ -297,10 +293,6 @@ err:
+ 	return ret;
  }
  
- static void tzic_irq_resume(struct irq_data *d)
- {
--	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	int idx = gc->irq_base >> 5;
-+	int idx = d->hwirq >> 5;
+-static const struct ipu_platform_data mx35_3ds_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static struct i2c_board_info mx35_3ds_i2c_camera = {
+ 	I2C_BOARD_INFO("ov2640", 0x30),
+ };
+@@ -596,7 +588,7 @@ static void __init mx35_3ds_init(void)
+ 	i2c_register_board_info(
+ 		0, i2c_devices_3ds, ARRAY_SIZE(i2c_devices_3ds));
  
- 	__raw_writel(__raw_readl(tzic_base + TZIC_ENSET0(idx)),
- 		     tzic_base + TZIC_WAKEUP0(idx));
-@@ -102,11 +104,10 @@ static struct mxc_extra_irq tzic_extra_irq = {
- #endif
+-	imx35_add_ipu_core(&mx35_3ds_ipu_data);
++	imx35_add_ipu_core();
+ 	platform_device_register(&mx35_3ds_ov2640);
+ 	imx35_3ds_init_camera();
+ 
+diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
+index 551a035..ded4ed9 100644
+--- a/arch/arm/mach-imx/mach-pcm037.c
++++ b/arch/arm/mach-imx/mach-pcm037.c
+@@ -441,10 +441,6 @@ static struct platform_device *devices[] __initdata = {
+ 	&pcm037_mt9v022,
  };
  
--static __init void tzic_init_gc(unsigned int irq_start)
-+static __init void tzic_init_gc(int idx, unsigned int irq_start)
- {
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
--	int idx = irq_start >> 5;
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static const struct fb_videomode fb_modedb[] = {
+ 	{
+ 		/* 240x320 @ 60 Hz Sharp */
+@@ -648,7 +644,7 @@ static void __init pcm037_init(void)
  
- 	gc = irq_alloc_generic_chip("tzic", 1, irq_start, tzic_base,
- 				    handle_level_irq);
-@@ -140,7 +141,8 @@ asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
- 			while (stat) {
- 				handled = 1;
- 				irqofs = fls(stat) - 1;
--				handle_IRQ(irqofs + i * 32, regs);
-+				handle_IRQ(irq_find_mapping(domain,
-+						irqofs + i * 32), regs);
- 				stat &= ~(1 << irqofs);
- 			}
- 		}
-@@ -154,6 +156,8 @@ asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
+ 	imx31_add_mxc_nand(&pcm037_nand_board_info);
+ 	imx31_add_mxc_mmc(0, &sdhc_pdata);
+-	imx31_add_ipu_core(&mx3_ipu_data);
++	imx31_add_ipu_core();
+ 	imx31_add_mx3_sdc_fb(&mx3fb_pdata);
+ 
+ 	/* CSI */
+diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
+index 73585f5..133908f 100644
+--- a/arch/arm/mach-imx/mach-pcm043.c
++++ b/arch/arm/mach-imx/mach-pcm043.c
+@@ -76,10 +76,6 @@ static const struct fb_videomode fb_modedb[] = {
+ 	},
+ };
+ 
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.name		= "Sharp-LQ035Q7",
+ 	.mode		= fb_modedb,
+@@ -376,7 +372,7 @@ static void __init pcm043_init(void)
+ 
+ 	imx35_add_imx_i2c0(&pcm043_i2c0_data);
+ 
+-	imx35_add_ipu_core(&mx3_ipu_data);
++	imx35_add_ipu_core();
+ 	imx35_add_mx3_sdc_fb(&mx3fb_pdata);
+ 
+ 	if (otg_mode_host) {
+diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
+index e36eb2c..1aa5622 100644
+--- a/arch/arm/mach-imx/mach-vpr200.c
++++ b/arch/arm/mach-imx/mach-vpr200.c
+@@ -87,10 +87,6 @@ static const struct fb_videomode fb_modedb[] = {
+ 	}
+ };
+ 
+-static const struct ipu_platform_data mx3_ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+ 	.name		= "PT0708048",
+ 	.mode		= fb_modedb,
+@@ -290,7 +286,7 @@ static void __init vpr200_board_init(void)
+ 	imx35_add_imx_uart0(NULL);
+ 	imx35_add_imx_uart2(NULL);
+ 
+-	imx35_add_ipu_core(&mx3_ipu_data);
++	imx35_add_ipu_core();
+ 	imx35_add_mx3_sdc_fb(&mx3fb_pdata);
+ 
+ 	imx35_add_fsl_usb2_udc(&otg_device_pdata);
+diff --git a/arch/arm/mach-imx/mx31lilly-db.c b/arch/arm/mach-imx/mx31lilly-db.c
+index 2df625b..29e890f 100644
+--- a/arch/arm/mach-imx/mx31lilly-db.c
++++ b/arch/arm/mach-imx/mx31lilly-db.c
+@@ -162,10 +162,6 @@ static const struct imxmmc_platform_data mmc_pdata __initconst = {
+ };
+ 
+ /* Framebuffer support */
+-static const struct ipu_platform_data ipu_data __initconst = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+ static const struct fb_videomode fb_modedb = {
+ 	/* 640x480 TFT panel (IPS-056T) */
+ 	.name		= "CRT-VGA",
+@@ -199,7 +195,7 @@ static void __init mx31lilly_init_fb(void)
+ 		return;
+ 	}
+ 
+-	imx31_add_ipu_core(&ipu_data);
++	imx31_add_ipu_core();
+ 	imx31_add_mx3_sdc_fb(&fb_pdata);
+ 	gpio_direction_output(LCD_VCC_EN_GPIO, 1);
+ }
+diff --git a/arch/arm/plat-mxc/devices/platform-ipu-core.c b/arch/arm/plat-mxc/devices/platform-ipu-core.c
+index 79d340a..d1e33cc 100644
+--- a/arch/arm/plat-mxc/devices/platform-ipu-core.c
++++ b/arch/arm/plat-mxc/devices/platform-ipu-core.c
+@@ -30,8 +30,7 @@ const struct imx_ipu_core_data imx35_ipu_core_data __initconst =
+ static struct platform_device *imx_ipu_coredev __initdata;
+ 
+ struct platform_device *__init imx_add_ipu_core(
+-		const struct imx_ipu_core_data *data,
+-		const struct ipu_platform_data *pdata)
++		const struct imx_ipu_core_data *data)
+ {
+ 	/* The resource order is important! */
+ 	struct resource res[] = {
+@@ -55,7 +54,7 @@ struct platform_device *__init imx_add_ipu_core(
+ 	};
+ 
+ 	return imx_ipu_coredev = imx_add_platform_device("ipu-core", -1,
+-			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
++			res, ARRAY_SIZE(res), NULL, 0);
+ }
+ 
+ struct platform_device *__init imx_alloc_mx3_camera(
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 1b2258d..a7f5bb1 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -183,7 +183,6 @@ struct platform_device *__init imx_add_imx_udc(
+ 		const struct imx_imx_udc_data *data,
+ 		const struct imxusb_platform_data *pdata);
+ 
+-#include <mach/ipu.h>
+ #include <mach/mx3fb.h>
+ #include <mach/mx3_camera.h>
+ struct imx_ipu_core_data {
+@@ -192,8 +191,7 @@ struct imx_ipu_core_data {
+ 	resource_size_t errirq;
+ };
+ struct platform_device *__init imx_add_ipu_core(
+-		const struct imx_ipu_core_data *data,
+-		const struct ipu_platform_data *pdata);
++		const struct imx_ipu_core_data *data);
+ struct platform_device *__init imx_alloc_mx3_camera(
+ 		const struct imx_ipu_core_data *data,
+ 		const struct mx3_camera_pdata *pdata);
+diff --git a/arch/arm/plat-mxc/include/mach/ipu.h b/arch/arm/plat-mxc/include/mach/ipu.h
+index a9221f1..539e559 100644
+--- a/arch/arm/plat-mxc/include/mach/ipu.h
++++ b/arch/arm/plat-mxc/include/mach/ipu.h
+@@ -110,10 +110,6 @@ enum ipu_rotate_mode {
+ 	IPU_ROTATE_90_LEFT = 7,
+ };
+ 
+-struct ipu_platform_data {
+-	unsigned int	irq_base;
+-};
+-
+ /*
+  * Enumeration of DI ports for ADC.
   */
- void __init tzic_init_irq(void __iomem *irqbase)
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index 5ec7204..c7573e5 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -1663,7 +1663,6 @@ static void __exit ipu_idmac_exit(struct ipu *ipu)
+ 
+ static int __init ipu_probe(struct platform_device *pdev)
  {
-+	struct device_node *np;
-+	int irq_base;
- 	int i;
+-	struct ipu_platform_data *pdata = pdev->dev.platform_data;
+ 	struct resource *mem_ipu, *mem_ic;
+ 	int ret;
  
- 	tzic_base = irqbase;
-@@ -175,8 +179,16 @@ void __init tzic_init_irq(void __iomem *irqbase)
+@@ -1671,7 +1670,7 @@ static int __init ipu_probe(struct platform_device *pdev)
  
- 	/* all IRQ no FIQ Warning :: No selection */
+ 	mem_ipu	= platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	mem_ic	= platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!pdata || !mem_ipu || !mem_ic)
++	if (!mem_ipu || !mem_ic)
+ 		return -EINVAL;
  
--	for (i = 0; i < TZIC_NUM_IRQS; i += 32)
--		tzic_init_gc(i);
-+	irq_base = irq_alloc_descs(-1, 0, TZIC_NUM_IRQS, numa_node_id());
-+	WARN_ON(irq_base < 0);
+ 	ipu_data.dev = &pdev->dev;
+@@ -1688,10 +1687,9 @@ static int __init ipu_probe(struct platform_device *pdev)
+ 		goto err_noirq;
+ 
+ 	ipu_data.irq_err = ret;
+-	ipu_data.irq_base = pdata->irq_base;
+ 
+-	dev_dbg(&pdev->dev, "fn irq %u, err irq %u, irq-base %u\n",
+-		ipu_data.irq_fn, ipu_data.irq_err, ipu_data.irq_base);
++	dev_dbg(&pdev->dev, "fn irq %u, err irq %u\n",
++		ipu_data.irq_fn, ipu_data.irq_err);
+ 
+ 	/* Remap IPU common registers */
+ 	ipu_data.reg_ipu = ioremap(mem_ipu->start, resource_size(mem_ipu));
+diff --git a/drivers/dma/ipu/ipu_irq.c b/drivers/dma/ipu/ipu_irq.c
+index a71f55e..fa95bcc 100644
+--- a/drivers/dma/ipu/ipu_irq.c
++++ b/drivers/dma/ipu/ipu_irq.c
+@@ -14,6 +14,7 @@
+ #include <linux/clk.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/module.h>
+ 
+ #include <mach/ipu.h>
+ 
+@@ -354,10 +355,12 @@ static struct irq_chip ipu_irq_chip = {
+ /* Install the IRQ handler */
+ int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+ {
+-	struct ipu_platform_data *pdata = dev->dev.platform_data;
+-	unsigned int irq, irq_base, i;
++	unsigned int irq, i;
++	int irq_base = irq_alloc_descs(-1, 0, CONFIG_MX3_IPU_IRQS,
++				       numa_node_id());
+ 
+-	irq_base = pdata->irq_base;
++	if (irq_base < 0)
++		return irq_base;
+ 
+ 	for (i = 0; i < IPU_IRQ_NR_BANKS; i++)
+ 		irq_bank[i].ipu = ipu;
+@@ -387,15 +390,16 @@ int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+ 	irq_set_handler_data(ipu->irq_err, ipu);
+ 	irq_set_chained_handler(ipu->irq_err, ipu_irq_err);
+ 
++	ipu->irq_base = irq_base;
 +
-+	np = of_find_compatible_node(NULL, NULL, "fsl,tzic");
-+	domain = irq_domain_add_legacy(np, TZIC_NUM_IRQS, irq_base, 0,
-+				       &irq_domain_simple_ops, NULL);
-+	WARN_ON(!domain);
-+
-+	for (i = 0; i < 4; i++, irq_base += 32)
-+		tzic_init_gc(i, irq_base);
+ 	return 0;
+ }
  
- #ifdef CONFIG_FIQ
- 	/* Initialize FIQ */
+ void ipu_irq_detach_irq(struct ipu *ipu, struct platform_device *dev)
+ {
+-	struct ipu_platform_data *pdata = dev->dev.platform_data;
+ 	unsigned int irq, irq_base;
+ 
+-	irq_base = pdata->irq_base;
++	irq_base = ipu->irq_base;
+ 
+ 	irq_set_chained_handler(ipu->irq_fn, NULL);
+ 	irq_set_handler_data(ipu->irq_fn, NULL);
 -- 
 1.7.5.4
