@@ -1,24 +1,44 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 14 Jun 2012 11:21:13 +0100
-Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
-In-Reply-To: <20120614101819.GR30400@pengutronix.de>
-References: <20120522234621.GA3610@windriver.com>
- <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
- <20120613221040.GJ30400@pengutronix.de>
- <20120614100425.GC28714@n2100.arm.linux.org.uk>
- <20120614101819.GR30400@pengutronix.de>
-Message-ID: <CAOh2x=n64SMQ5OGkUC7NgMNCnRQYRgyc4mes4bDD0TUOMtn1BQ@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 14 Jun 2012 10:21:33 +0000
+Subject: [PATCH v5 14/14] ARM: OMAP2+: gpmc: writeprotect helper
+In-Reply-To: <20120614093625.GF12766@atomide.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <85c5dc5fa3203cc60a12d4b2350e45da07d7f5fd.1339419492.git.afzal@ti.com>
+ <4FD78D93.9080906@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99884F@DBDE01.ent.ti.com>
+ <4FD8BFC5.2050007@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999720@DBDE01.ent.ti.com>
+ <20120614093625.GF12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99988D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 11:18 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Damn, you are right. I wasn't aware the netx has a AMBA cell and just
-> grepped for netx in drivers/video.
-> In this case I suggest to just return NULL for every clock.
+Hi,
 
-And dropping fb's clk code would still be the right solution, as dummy
-clk routines will
-do that for you.
+On Thu, Jun 14, 2012 at 15:06:25, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [120614 01:59]:
+> > On Wed, Jun 13, 2012 at 21:58:53, Hunter, Jon wrote:
 
---
-viresh
+> > > devices should indicate if they use the write-protect pin and we should
+> > > either have this "enable on boot" as a global setting not specific to a
+> > > child device or ensure that multiple devices using the wp have the same
+> > > configuration of the wp on boot. In other words, if one device says
+> > > enable on boot and the other does not, then warn.
+> > 
+> > Which one of Jon's above suggestions would you prefer,
+> > 
+> > i.e.
+> > writeprotect as a global setting for all devices
+> > Or
+> > Ensure that multiple devices using wp have same configuration
+> > 
+> > Or anything else you have in mind ?
+> 
+> If it's shared it can cause undesired effects on the mounted rootfs
+> if one device changes it. So some kind of checking for a shared case
+> should be available before a device is allowed to change it.
+
+Ok, I will add a check for shared case.
+
+Regards
+Afzal
