@@ -1,53 +1,80 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 14 Jun 2012 18:17:11 +0530
-Subject: [PATCH 22/29] ARM: omap: clk: Use plat/clock.c only for OMAP1
-In-Reply-To: <1339678038-23082-1-git-send-email-rnayak@ti.com>
-References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
-Message-ID: <1339678038-23082-23-git-send-email-rnayak@ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 14 Jun 2012 12:47:13 +0000
+Subject: [PATCH v6 00/17] Add PWM framework and device tree support
+In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA21A9F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/plat-omap/Makefile |    3 ++-
- arch/arm/plat-omap/clock.c  |    2 --
- 2 files changed, 2 insertions(+), 3 deletions(-)
+On Tue, Apr 10, 2012 at 20:36:23, Thierry Reding wrote:
+> This patch series adds very rudimentary device-tree support for PWM
+> devices. With all of these patches applied (plus one board-specific
+> patch that is not included), I'm able to control the backlight on the
+> device I'm working on using the sysfs interface provided by the pwm-bl
+> driver and the backlight class.
+> 
+> This series is based on Sascha Hauer's series of patches[0] to add a
+> generic PWM framework. The first patch in this series is taken from
+> Sascha's branch, while the second patch enables each PWM chip to provide
+> multiple PWM devices (the Blackfin and PXA drivers have been ported to
+> the framework for reference). Currently a global namespace is still
+> provided to keep backwards-compatibility with the legacy PWM API. In
+> order to achieve this, the number of global PWM devices is limited to
+> 1024. However, patch 2 introduces per-chip indexing of PWM devices in
+> the core and patch 4 adds an API to request a PWM device using a lookup
+> table registered by board setup code. They are supposed to eventually
+> replace pwm_request() and allow to get rid of the global namespace. The
+> device tree support code does not use the global namespace.
+> 
+..snip..
+..snip..
 
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index ed8605f..83c4aa3 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -3,12 +3,13 @@
- #
- 
- # Common support
--obj-y := common.o sram.o clock.o devices.o dma.o mux.o \
-+obj-y := common.o sram.o devices.o dma.o mux.o \
- 	 usb.o fb.o counter_32k.o
- obj-m :=
- obj-n :=
- obj-  :=
- 
-+obj-$(CONFIG_ARCH_OMAP1) += clock.o
- # omap_device support (OMAP2+ only at the moment)
- obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
- obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index d311b7c..62ec5c4 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -10,7 +10,6 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--#ifndef CONFIG_COMMON_CLK
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/list.h>
-@@ -568,4 +567,3 @@ err_out:
- late_initcall(clk_debugfs_init);
- 
- #endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
--#endif /* CONFIG_COMMON_CLK */
--- 
-1.7.1
+> 
+> The whole series is based on the linux-next tree from 20120405. I think
+> I've addressed all of the concerns raised in the first five versions. I
+> have also pushed this version of the series to the PWM subsystem
+> repository[1].
+> 
+> Thierry
+> 
+> [0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
+> [1]: http://gitorious.org/linux-pwm/linux-pwm/trees/pwm-v6
+> 
+> Sascha Hauer (4):
+>   pwm: Add PWM framework support
+>   ARM i.MX: Move i.MX pwm driver to pwm framework
+>   ARM Samsung: Move s3c pwm driver to pwm framework
+>   ARM vt8500: Move vt8500 pwm driver to pwm framework
+> 
+> Shawn Guo (1):
+>   pwm: add pwm-mxs support
+> 
+> Simon Que (1):
+>   ARM: tegra: Fix PWM clock programming
+> 
+> Thierry Reding (11):
+>   pwm: Allow chips to support multiple PWMs
+>   pwm: Add debugfs interface
+>   pwm: Add table-based lookup for static mappings
+>   pwm: Add device tree support
+>   ARM: tegra: Provide clock for only one PWM controller
+>   pwm: Add NVIDIA Tegra SoC support
+>   pwm: tegra: Add device tree support
+>   pwm: Move Blackfin PWM driver to PWM framework
+>   pwm: Move PXA PWM driver to PWM framework
+>   pwm-backlight: Add rudimentary device tree support
+>   pwm: Take over maintainership of the PWM subsystem
+> 
+
+I am planning to add PWM support in Linux for TI AM335x SOC. 
+I am taking your new PWM framework as reference.
+
+I see a lot of ack's for the patches. I see that you are maintaining these patches in a separate repo.
+However, I couldn't find any of these 
+patches in the mainline kernel (including recent 3.5-rc2). 
+Do you have any plans for pushing this again to mainline kernel. 
+
+
+Regards, 
+Gururaja
