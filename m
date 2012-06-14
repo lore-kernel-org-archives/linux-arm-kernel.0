@@ -1,59 +1,64 @@
-From: neilb@suse.de (NeilBrown)
-Date: Thu, 14 Jun 2012 10:15:41 +1000
-Subject: [GIT PULL] gpio/omap: cleanups for v3.5
-In-Reply-To: <874nrmtf47.fsf@ti.com>
-References: <874nrmtf47.fsf@ti.com>
-Message-ID: <20120614101541.39f50aee@notabene.brown>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 14 Jun 2012 08:36:53 +0800
+Subject: [Patch v5 03/13] USB: notify phy when root hub port connect change
+In-Reply-To: <Pine.LNX.4.44L0.1206131418290.1401-100000@iolanthe.rowland.org>
+References: <1339590863-10564-4-git-send-email-richard.zhao@freescale.com>
+ <Pine.LNX.4.44L0.1206131418290.1401-100000@iolanthe.rowland.org>
+Message-ID: <20120614003653.GA29684@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2012 17:30:48 -0700 Kevin Hilman <khilman@ti.com> wrote:
-
-> Hi Grant,
+On Wed, Jun 13, 2012 at 02:25:17PM -0400, Alan Stern wrote:
+> On Wed, 13 Jun 2012, Richard Zhao wrote:
 > 
-> Here's the final round of GPIO cleanups for v3.5.  This branch is based
-> on my for_3.5/fixes/gpio branch you just pulled.
+> > Phy may need to change settings when port connect change.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  drivers/usb/core/hub.c |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+> > index 04fb834..e1a6d31 100644
+> > --- a/drivers/usb/core/hub.c
+> > +++ b/drivers/usb/core/hub.c
+> > @@ -20,6 +20,7 @@
+> >  #include <linux/usb.h>
+> >  #include <linux/usbdevice_fs.h>
+> >  #include <linux/usb/hcd.h>
+> > +#include <linux/usb/otg.h>
+> >  #include <linux/usb/quirks.h>
+> >  #include <linux/kthread.h>
+> >  #include <linux/mutex.h>
+> > @@ -4034,6 +4035,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
+> >  		}
+> >  	}
+> >  
+> > +	if (unlikely(hcd->phy && !hdev->level)) {
 > 
-> Kevin
+> This is okay, but it's more common to test for root hubs with 
+> "!hdev->parent".
+So it will be like:
+if (unlikely(hcd->phy && !hdev->parent)) {
 
-Hi.
+And,
+I didn't check (portchange & USB_PORT_STAT_C_CONNECTION), because if
+the device is connected on boot, there'll be no USB_PORT_STAT_C_CONNECTION.
+Is it acceptable?
 
- I'm not sure if it was this series or the following cleanups which broke
- things for me, but I've been trying 3.5-rc2 on my GTA04 and the serial
- console (ttyO2) dies as soon as the omap-gpio driver initialises.
+Thanks
+Richard
 
- After some digging I came up with this patch to gpio-omap.c
-
-@@ -1124,6 +1124,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, bank);
- 
-+	if (bank->get_context_loss_count)
-+		bank->context_loss_count =
-+				bank->get_context_loss_count(bank->dev);
- 	pm_runtime_enable(bank->dev);
- 	pm_runtime_irq_safe(bank->dev);
- 	pm_runtime_get_sync(bank->dev);
-
-which fixes it.
-
-What was happening  was that when omap_gpio_probe calls pm_runtime_get_sync,
-it calls 
-  _od_runtime_resume -> pm_generic_runtime_resume -> omap_gpio_runtime_resume
-  -> omap_gpio_restore_context
-
-and then the serial port stops.
-I reasoned that the context probably hadn't been set up yet, so restoring
-from it broke things.
-Initialising bank->context_loss_count seems sensible and would ensure that
-we didn't try to restore the context until it has actually been lost.
-
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/a6c9c2c9/attachment.sig>
+> > +		if (portstatus & USB_PORT_STAT_CONNECTION)
+> > +			usb_phy_notify_connect(hcd->phy, port1);
+> > +		else
+> > +			usb_phy_notify_disconnect(hcd->phy, port1);
+> > +	}
+> > +
+> >  	/* Return now if debouncing failed or nothing is connected or
+> >  	 * the device was "removed".
+> >  	 */
+> 
+> Alan Stern
+> 
+> 
