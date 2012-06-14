@@ -1,90 +1,190 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 14 Jun 2012 14:53:29 +0200
-Subject: [PATCH v6 00/17] Add PWM framework and device tree support
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA21A9F@DBDE01.ent.ti.com>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
- <1BAFE6F6C881BF42822005164F1491C33EA21A9F@DBDE01.ent.ti.com>
-Message-ID: <20120614125329.GA7678@avionic-0098.mockup.avionic-design.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 14 Jun 2012 15:59:42 +0300
+Subject: [PATCH] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix issues.
+In-Reply-To: <1339673500-5218-1-git-send-email-Russ.Dill@ti.com>
+References: <1339673500-5218-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <4FD9E03E.8030102@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 12:47:13PM +0000, Hebbar, Gururaja wrote:
-> On Tue, Apr 10, 2012 at 20:36:23, Thierry Reding wrote:
-> > This patch series adds very rudimentary device-tree support for PWM
-> > devices. With all of these patches applied (plus one board-specific
-> > patch that is not included), I'm able to control the backlight on the
-> > device I'm working on using the sysfs interface provided by the pwm-bl
-> > driver and the backlight class.
-> > 
-> > This series is based on Sascha Hauer's series of patches[0] to add a
-> > generic PWM framework. The first patch in this series is taken from
-> > Sascha's branch, while the second patch enables each PWM chip to provide
-> > multiple PWM devices (the Blackfin and PXA drivers have been ported to
-> > the framework for reference). Currently a global namespace is still
-> > provided to keep backwards-compatibility with the legacy PWM API. In
-> > order to achieve this, the number of global PWM devices is limited to
-> > 1024. However, patch 2 introduces per-chip indexing of PWM devices in
-> > the core and patch 4 adds an API to request a PWM device using a lookup
-> > table registered by board setup code. They are supposed to eventually
-> > replace pwm_request() and allow to get rid of the global namespace. The
-> > device tree support code does not use the global namespace.
-> > 
-> ..snip..
-> ..snip..
-> 
-> > 
-> > The whole series is based on the linux-next tree from 20120405. I think
-> > I've addressed all of the concerns raised in the first five versions. I
-> > have also pushed this version of the series to the PWM subsystem
-> > repository[1].
-> > 
-> > Thierry
-> > 
-> > [0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
-> > [1]: http://gitorious.org/linux-pwm/linux-pwm/trees/pwm-v6
-> > 
-> > Sascha Hauer (4):
-> >   pwm: Add PWM framework support
-> >   ARM i.MX: Move i.MX pwm driver to pwm framework
-> >   ARM Samsung: Move s3c pwm driver to pwm framework
-> >   ARM vt8500: Move vt8500 pwm driver to pwm framework
-> > 
-> > Shawn Guo (1):
-> >   pwm: add pwm-mxs support
-> > 
-> > Simon Que (1):
-> >   ARM: tegra: Fix PWM clock programming
-> > 
-> > Thierry Reding (11):
-> >   pwm: Allow chips to support multiple PWMs
-> >   pwm: Add debugfs interface
-> >   pwm: Add table-based lookup for static mappings
-> >   pwm: Add device tree support
-> >   ARM: tegra: Provide clock for only one PWM controller
-> >   pwm: Add NVIDIA Tegra SoC support
-> >   pwm: tegra: Add device tree support
-> >   pwm: Move Blackfin PWM driver to PWM framework
-> >   pwm: Move PXA PWM driver to PWM framework
-> >   pwm-backlight: Add rudimentary device tree support
-> >   pwm: Take over maintainership of the PWM subsystem
-> > 
-> 
-> I am planning to add PWM support in Linux for TI AM335x SOC. 
-> I am taking your new PWM framework as reference.
-> 
-> I see a lot of ack's for the patches. I see that you are maintaining these patches in a separate repo.
-> However, I couldn't find any of these 
-> patches in the mainline kernel (including recent 3.5-rc2). 
-> Do you have any plans for pushing this again to mainline kernel. 
+Hi Russ,
 
-Yes, as a matter of fact I'm in the process of getting the series ready for
-inclusion into linux-next. I expect them to go into 3.6.
+On 06/14/12 14:31, Russ Dill wrote:
+> 'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
+> an issue where the ULPI PHYs were not held in reset while initializing
+> the EHCI controller. However, it also changes behavior in
+> omap-usb-host.c omap_usbhs_init by releasing reset while the
+> configuration in that function was done.
+> 
+> This change caused a regression on BB-xM where USB would not function
+> if 'usb start' had been run from u-boot before booting. A change was
+> made to release reset a little bit earlier which fixed the issue on
+> BB-xM and did not cause any regressions on 3430 sdp, the board for
+> which the fix was originally made.
+> 
+> This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
+> before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+> 
+> The original fix to hold the EHCI controller in reset during
+> initialization was correct, however it appears that changing
+> omap_usbhs_init to not hold the PHYs in reset during it's
+> configuration was incorrect. This patch first reverts both fixes, and
+> then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
+> reset as the original patch had done. It also is sure to incorporate
+> the _cansleep change that has been made in the meantime.
+> 
+> I've tested this on Beagleboard xM, I'd really like to get an ack from
+> the 3430 sdp and OMAP5 guys before getting this merged.
+> 
+> Signed-off-by: Russ Dill <Russ.Dill@gmail.com>
+> ---
+>  drivers/mfd/omap-usb-host.c  |   45 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/host/ehci-omap.c |   18 ++++++++---------
+>  2 files changed, 53 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 7e96bb2..10984e2 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/spinlock.h>
+> +#include <linux/gpio.h>
+>  #include <plat/cpu.h>
+>  #include <plat/usb.h>
+>  #include <linux/pm_runtime.h>
+> @@ -502,6 +503,19 @@ static void omap_usbhs_init(struct device *dev)
+>  	pm_runtime_get_sync(dev);
+>  	spin_lock_irqsave(&omap->lock, flags);
+>  
+> +	if (pdata->ehci_data->phy_reset) {
+> +		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> +			gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
+> +					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
+> +
+> +		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> +			gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
+> +					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
+> +
+> +		/* Hold the PHY in RESET for enough time till DIR is high */
+> +		udelay(10);
+> +	}
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/14e9da76/attachment-0001.sig>
+Hmmm.... I think this hunk should come before the spin_lock_irqsave() call,
+as it might sleep with I2C GPIO extenders...
+
+> +
+>  	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
+>  	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
+>  
+> @@ -580,10 +594,39 @@ static void omap_usbhs_init(struct device *dev)
+>  			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
+>  	}
+>  
+> +	if (pdata->ehci_data->phy_reset) {
+> +		/* Hold the PHY in RESET for enough time till
+> +		 * PHY is settled and ready
+> +		 */
+> +		udelay(10);
+> +
+> +		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> +			gpio_set_value_cansleep
+> +				(pdata->ehci_data->reset_gpio_port[0], 1);
+> +
+> +		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> +			gpio_set_value_cansleep
+> +				(pdata->ehci_data->reset_gpio_port[1], 1);
+> +	}
+
+Same here, after the the spin_unlock_irqrestore() call?
+
+> +
+>  	spin_unlock_irqrestore(&omap->lock, flags);
+>  	pm_runtime_put_sync(dev);
+>  }
+>  
+> +static void omap_usbhs_deinit(struct device *dev)
+> +{
+> +	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+> +	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
+> +
+> +	if (pdata->ehci_data->phy_reset) {
+> +		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> +			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
+> +
+> +		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> +			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
+> +	}
+> +}
+> +
+>  
+>  /**
+>   * usbhs_omap_probe - initialize TI-based HCDs
+> @@ -767,6 +810,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+>  	goto end_probe;
+>  
+>  err_alloc:
+> +	omap_usbhs_deinit(&pdev->dev);
+>  	iounmap(omap->tll_base);
+>  
+>  err_tll:
+> @@ -818,6 +862,7 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
+>  {
+>  	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
+>  
+> +	omap_usbhs_deinit(&pdev->dev);
+>  	iounmap(omap->tll_base);
+>  	iounmap(omap->uhh_base);
+>  	clk_put(omap->init_60m_fclk);
+> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+> index a44294d..d0815b6 100644
+> --- a/drivers/usb/host/ehci-omap.c
+> +++ b/drivers/usb/host/ehci-omap.c
+> @@ -192,14 +192,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> +	/* Hold PHYs in reset while initializing EHCI controller */
+>  	if (pdata->phy_reset) {
+>  		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+> -			gpio_request_one(pdata->reset_gpio_port[0],
+> -					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
+> +			gpio_set_value_cansleep(pdata->reset_gpio_port[0], 0);
+>  
+>  		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+> -			gpio_request_one(pdata->reset_gpio_port[1],
+> -					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
+> +			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 0);
+>  
+>  		/* Hold the PHY in RESET for enough time till DIR is high */
+>  		udelay(10);
+> @@ -241,6 +240,11 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+>  	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
+>  
+>  	ehci_reset(omap_ehci);
+> +	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> +	if (ret) {
+> +		dev_err(dev, "failed to add hcd with err %d\n", ret);
+> +		goto err_add_hcd;
+> +	}
+>  
+>  	if (pdata->phy_reset) {
+>  		/* Hold the PHY in RESET for enough time till
+> @@ -255,12 +259,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+>  			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 1);
+>  	}
+>  
+> -	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> -	if (ret) {
+> -		dev_err(dev, "failed to add hcd with err %d\n", ret);
+> -		goto err_add_hcd;
+> -	}
+> -
+>  	/* root ports should always stay powered */
+>  	ehci_port_power(omap_ehci, 1);
+>  
+
+-- 
+Regards,
+Igor.
