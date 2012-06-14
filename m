@@ -1,51 +1,32 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 14 Jun 2012 09:21:41 +0800
-Subject: [Patch v5 06/13] usb: chipidea: add imx platform driver
-In-Reply-To: <20120613220700.GI30400@pengutronix.de>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-7-git-send-email-richard.zhao@freescale.com>
- <20120613214622.GE30400@pengutronix.de>
- <201206132357.35099.marex@denx.de>
- <20120613220700.GI30400@pengutronix.de>
-Message-ID: <20120614012141.GC29684@b20223-02.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 13 Jun 2012 22:23:22 -0300
+Subject: MXS getting AUART to work with DT.
+In-Reply-To: <4FD7EFFC.8010204@grid-net.com>
+References: <4FD7EFFC.8010204@grid-net.com>
+Message-ID: <CAOMZO5C93a3Cckr_HXm8moW0gafud92qvTXJ=np7MJ3JriR-sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 12:07:00AM +0200, Sascha Hauer wrote:
-> On Wed, Jun 13, 2012 at 11:57:34PM +0200, Marek Vasut wrote:
-> > Dear Sascha Hauer,
-> > 
-> > > > +
-> > > > +	if (!pdev->dev.dma_mask) {
-> > > > +		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-> > > > +				      sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> > > > +		if (!pdev->dev.dma_mask) {
-> > > > +			ret = -ENOMEM;
-> > > > +			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
-> > > > +			goto err;
-> > > > +		}
-> > > > +		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-> > > > +		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
-> > > > +	}
-> > > 
-> > > Do you need this? I assume not.
-> > 
-> > Ain't this the dma mask crap without which the usb stuff won't work?
-> 
-> Yes, the device needs this, but afaik the of platform code will set this
-> for you. You only have to do this manually for devices which you
-> allocate yourself.
-Unfortunately, devices device tree populated don't set dma_mask.
-It always hit if (!pdev->dev.dma_mask). I'm not the only one suffer it.
+Hi Subodh,
 
-Thanks
-Richard
-> 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
+On Tue, Jun 12, 2012 at 10:42 PM, Subodh Nijsure <snijsure@grid-net.com> wrote:
+> Hi,
+>
+> I am testing my mx28 hardware with arm-soc/for-next branch. I have made
+> ?additions shown below to my dt file.
+>
+> What I see is only ttyAPP0 device gets created but not the ttyAPP1, do folks
+> who know DT much better than I, see any issues with this DT definition
+> below?
+
+I just enabled CONFIG_SERIAL_MXS_AUART and booted my mx28evk (non-DT
+case) that registers
+auart0 and auart2, but I don't see any ttyAPPx node.
+
+Is there anything I am missing?
+
+I would like to get ttyAPP0/2 working first on non-DT case.
+
+Thanks,
+
+Fabio Estevam
