@@ -1,32 +1,57 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 08:48:01 +0000
-Subject: [PATCH v5 10/14] ARM: OMAP2+: gpmc: waitpin helper
-In-Reply-To: <4FD8B55E.6010701@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <bba49a35f81f33fbdfeda78a71cbe4aa3417d6a2.1339419492.git.afzal@ti.com>
- <4FD6783D.9030208@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997F7C@DBDE01.ent.ti.com>
- <4FD78748.2080504@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998955@DBDE01.ent.ti.com>
- <4FD8B55E.6010701@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9996FC@DBDE01.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 14 Jun 2012 10:47:48 +0200
+Subject: [Linaro-mm-sig] [PATCHv2 0/6] ARM: DMA-mapping: new extensions for
+ buffer sharing
+In-Reply-To: <20120613190131.GO4829@phenom.ffwll.local>
+References: <1339588218-24398-1-git-send-email-m.szyprowski@samsung.com>
+ <20120613141211.GJ5979@phenom.dumpdata.com>
+ <20120613190131.GO4829@phenom.ffwll.local>
+Message-ID: <002901cd4a0a$667e1600$337a4200$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hello,
 
-On Wed, Jun 13, 2012 at 21:14:30, Hunter, Jon wrote:
-> On 06/13/2012 02:37 AM, Mohammed, Afzal wrote:
+On Wednesday, June 13, 2012 9:02 PM Daniel Vetter wrote:
 
-> > In that case we would be directly depending on user flag whose value may
-> > or may not change and I don't think it is good to directly depend on it
-> > for waitpin # calculation.
+> On Wed, Jun 13, 2012 at 10:12:12AM -0400, Konrad Rzeszutek Wilk wrote:
+> > On Wed, Jun 13, 2012 at 01:50:12PM +0200, Marek Szyprowski wrote:
+
+> (snipped)
+
+> > > The third extension solves the performance issues which we observed with
+> > > some advanced buffer sharing use cases, which require creating a dma
+> > > mapping for the same memory buffer for more than one device. From the
+> > > DMA-mapping perspective this requires to call one of the
+> > > dma_map_{page,single,sg} function for the given memory buffer a few
+> > > times, for each of the devices. Each dma_map_* call performs CPU cache
+> > > synchronization, what might be a time consuming operation, especially
+> > > when the buffers are large. We would like to avoid any useless and time
+> > > consuming operations, so that was the main reason for introducing
+> > > another attribute for DMA-mapping subsystem: DMA_ATTR_SKIP_CPU_SYNC,
+> > > which lets dma-mapping core to skip CPU cache synchronization in certain
+> > > cases.
 > 
-> You are already dependent on it. In other words, you are going to set
+> Ah, here's the use-case I've missed ;-) I'm a bit vary of totally insane
+> platforms that have additional caches only on the device side, and only
+> for some devices. Well, tlbs belong to that, but the iommu needs to handle
+> that anyway.
+> 
+> I think it would be good to add a blurb to the documentation that any
+> device-side flushing (of tlbs or special caches or whatever) still needs
+> to happen and that this is only a performance optimization to avoid the
+> costly cpu cache flushing. This way the dma-buf exporter could keep track
+> of whether it's 'device-coherent' and set that flag if the cpu caches don't
+> need to be flushed.
+> 
+> Maybe also make it clear that implementing this bit is optional (like your
+> doc already mentions for NO_KERNEL_MAPPING).
 
-What I meant is we are not dependent on absolute value of flag to
-find waitpin, and I disagree in depending on its absolute value,
-which can change, while flag would be the same.
+Ok, I can add additional comment, but support for all dma attributes is optional
+(attributes are considered only as hints that might improve performance for some
+use cases on some hw platforms).
 
-Regards
-Afzal
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
