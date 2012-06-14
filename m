@@ -1,73 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jun 2012 09:53:37 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E999C13@DBDE01.ent.ti.com>
-References: <20120613113217.GK12766@atomide.com>
- <20120613115445.GM12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
- <20120614101901.GI12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
- <20120614115207.GL12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999AA4@DBDE01.ent.ti.com>
- <20120614122930.GM12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999C13@DBDE01.ent.ti.com>
-Message-ID: <20120614165337.GO12766@atomide.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 14 Jun 2012 19:07:32 +0200
+Subject: [PATCH 4/14] ARM: LPC32xx: Add DMA configuration to platform data
+In-Reply-To: <20120611111029.GF11168@n2100.arm.linux.org.uk>
+References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
+ <1339412537-24485-5-git-send-email-stigge@antcom.de>
+ <20120611111029.GF11168@n2100.arm.linux.org.uk>
+Message-ID: <4FDA1A54.3020206@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120614 05:57]:
-> Hi Tony,
-> 
-> On Thu, Jun 14, 2012 at 17:59:31, Tony Lindgren wrote:
-> > * Mohammed, Afzal <afzal@ti.com> [120614 05:00]:
-> > > On Thu, Jun 14, 2012 at 17:22:08, Tony Lindgren wrote:
-> > > > * Mohammed, Afzal <afzal@ti.com> [120614 03:43]:
-> > > > > +       t.clk_activation = fclk_offset_ns;
-> > > > > +
-> > > > 
-> > > > This too should be fclk_offset, not fclk_offset_ns.
-> > > 
-> > > As gpmc_cs_set_timing convert it to ticks from ns,
-> > > shouldn't we put it in ns ? 
-> > 
-> > Hmm I see, something's wrong though.. Some of these we really
-> > want to specify as ticks instead of ns. Your patch was using
-> > 1 tick value as 1 ns value, which won't work. When I changed
-> > it back to what I thought was ticks, it just happened to work
-> > probably because of rounding. That's probably the reason why
-> > some of these have been set directly with gpmc_cs_write_reg
-> > as that sets tick values directly.
-> 
-> For onenand,
-> 
-> fclk_offset = gpmc_ns_to_ticks(fclk_offset_ns);
-> 
-> By using directly fclk_offset_ns, we transfer job of doing
-> the same to gpmc_cs_set_timings (which does gpmc_ns_to_ticks
-> over fclk_offset_ns & then do << 25)
-> 
-> Hence passing fclk_offset_ns in effect should be same as,
-> 
-> GPMC_CONFIG1_CLKACTIVATIONTIME(fclk_offset)
-> 
-> If onenand is not working with it, then there is something that
-> is invisible here.
+Hi Russell,
 
-Yup, you're right, for onenand it should be in ns.
- 
-> Were you able to get it working with the changed value for
-> usb or onenand ?
+thanks for your note!
 
-Yes seems to work after applying the two patches that I somehow
-skipped and with fclk_offset_ns.
- 
-> In case possible, can you check enabling DEBUG and see what
-> timings are logged
+On 11/06/12 13:10, Russell King - ARM Linux wrote:
+> On Mon, Jun 11, 2012 at 01:02:07PM +0200, Roland Stigge wrote:
+>> +static int pl08x_get_signal(struct pl08x_dma_chan *ch)
+>> +{
+>> +	return ch->cd->min_signal;
+>> +}
+>> +
+>> +static void pl08x_put_signal(struct pl08x_dma_chan *ch)
+>> +{
+>> +}
+> 
+> These change in my unstable/dma-pl08x branch, patches have been posted
+> already, but I don't deem them to be totally stable yet.  Waiting on
+> OMAP people to get their mainline kernel restored to a buildable state
+> so I can continue my DMA engine work.
 
-Sounds like the tusb6010 non-ns tick value is the only remaining
-issue.
+We have a few options here:
 
-Regards,
+1) Take the patch as I posted it (needs adjustments as soon as the API
+changed and becomes stable)
 
-Tony
+2) Remove the DMA related patches from the LPC32xx series for now (which
+would be unfortunate)
+
+3) Let me build upon some tree that already looks worthwhile to play
+with already (which one?)
+
+What would you suggest?
+
+Thanks in advance,
+
+Roland
