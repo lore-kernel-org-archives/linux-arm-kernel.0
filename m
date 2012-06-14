@@ -1,61 +1,19 @@
-From: santosh.shilimkar@ti.com (a0393909)
-Date: Thu, 14 Jun 2012 15:31:54 +0530
-Subject: [PATCH 0/6] ARM: OMAP: hwmod: remove runtime cpu_is checking
-In-Reply-To: <alpine.DEB.2.00.1204300835550.10308@utopia.booyaka.com>
-References: <1335557140-10854-1-git-send-email-khilman@ti.com>
- <alpine.DEB.2.00.1204300835550.10308@utopia.booyaka.com>
-Message-ID: <4FD9B692.4080208@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jun 2012 11:04:25 +0100
+Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
+In-Reply-To: <20120613221040.GJ30400@pengutronix.de>
+References: <20120522234621.GA3610@windriver.com>
+ <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
+ <20120613221040.GJ30400@pengutronix.de>
+Message-ID: <20120614100425.GC28714@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On Thu, Jun 14, 2012 at 12:10:40AM +0200, Sascha Hauer wrote:
+> As the netx does not have fb support in mainline you can just drop this
+> one aswell. It has no use.
 
-On 04/30/2012 08:11 PM, Paul Walmsley wrote:
-> Hi Kevin,
->
-> On Fri, 27 Apr 2012, Kevin Hilman wrote:
->
->> This series attempts to remove all the runtime cpu_is* checking in
->> omap_hwmod.c in favor of using function pointers initialized at init
->> time.
->>
->> This series was motivated by the addition of support for the AM335x
->> series which was done by adding several more cpu_is* checks, and
->> provided the proverbial straw that broke the camel's back.
->>
->> In addition to the cleanup, this provides a much cleaner way of adding
->> additional SoC support since it no longer requires adding additional
->> runtime cpu_is* checks.
->>
->> Boot tested on OMAP3530/Overo and OMAP4430/Panda.
->
-> Thanks Kevin, this series should bridge the gap nicely between the current
-> code, and the point in time that we're able to move these functions into
-> PRM/CM device driver code.  And allow us to avoid adding more cpu_is_*()
-> when we merge Vaibhav's hwmod changes.
->
-> As you've probably seen, the patches have been updated here.  The function
-> pointers have been made file-static rather than per-hwmod; this should
-> conserve some memory and cache.  Since they don't change on a per-hwmod
-> basis, this should be safe.  Also added quite a bit of kerneldoc --
-> basically I have an internal rule here now to ensure this exists on all
-> functions and structures that are added, so it would be great to have this
-> on future code :-)
->
-> The updated series is at git://git.pwsan.com/linux-2.6 in
-> the "hwmod_soc_conditional_cleanup_3.5" branch.  Please let me know if
-> you have any comments.  It's only compile-tested here so far.  I'll be
-> rebasing my local copy of Vaibhav's series on it and will plan to send it
-> upstream for 3.5.
->
-I guess this series missed 3.5 merge window. I was re-basing the OMAP5
-minimal support against the 3.5-rc2 and one of the dependency for that
-series is $subject series.
+Are you sure?
 
-Tony,
-How do we get the dependent series merged early enough so that OMAP5
-support can be merged in linux-omap master to avoid any late build
-breaks.
-
-Regards
-santosh
+Grepping for clcd in arch/arm/mach-netx shows that nxdb500 and nxeb500hmi
+seem to have all the necessary stuff to support the AMBA CLCD driver.
