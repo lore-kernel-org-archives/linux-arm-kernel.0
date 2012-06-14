@@ -1,113 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jun 2012 11:48:19 +0000
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FD914F6.6000402@ti.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206090004.10086.arnd@arndb.de> <4FD914F6.6000402@ti.com>
-Message-ID: <201206141148.20371.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Jun 2012 14:46:39 +0300
+Subject: [PATCH 09/17] i2c: omap: ack IRQ in parts
+In-Reply-To: <CAMQu2gw4B_5eFSAq_o+MamNDDwoZi2CitmC+dM=+pi3R1Z2QCA@mail.gmail.com>
+References: <1339669250-9183-1-git-send-email-balbi@ti.com>
+ <1339669250-9183-10-git-send-email-balbi@ti.com>
+ <CAMQu2gw4B_5eFSAq_o+MamNDDwoZi2CitmC+dM=+pi3R1Z2QCA@mail.gmail.com>
+Message-ID: <20120614114638.GQ13602@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 June 2012, Jon Hunter wrote:
+On Thu, Jun 14, 2012 at 04:41:45PM +0530, Shilimkar, Santosh wrote:
+> On Thu, Jun 14, 2012 at 3:50 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > According to flow diagrams on OMAP TRMs,
+> > we should ACK the IRQ as they happen.
+> >
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> > ?drivers/i2c/busses/i2c-omap.c | ? 29 +++++++++++++++++------------
+> > ?1 file changed, 17 insertions(+), 12 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> > index f978b14..c00ba7d 100644
+> > --- a/drivers/i2c/busses/i2c-omap.c
+> > +++ b/drivers/i2c/busses/i2c-omap.c
+> > @@ -894,21 +894,20 @@ omap_i2c_isr(int this_irq, void *dev_id)
+> > ? ? ? ? ? ? ? ?}
+> >
+> > ?complete:
+> > - ? ? ? ? ? ? ? /*
+> > - ? ? ? ? ? ? ? ?* Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
+> > - ? ? ? ? ? ? ? ?* acked after the data operation is complete.
+> > - ? ? ? ? ? ? ? ?* Ref: TRM SWPU114Q Figure 18-31
+> > - ? ? ? ? ? ? ? ?*/
+> > - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, stat &
+> > - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
+> > - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
+> > -
+> > - ? ? ? ? ? ? ? if (stat & OMAP_I2C_STAT_NACK)
+> > + ? ? ? ? ? ? ? if (stat & OMAP_I2C_STAT_NACK) {
+> > + ? ? ? ? ? ? ? ? ? ? ? dev_err(dev->dev, "No Acknowledge\n");
+> > ? ? ? ? ? ? ? ? ? ? ? ?err |= OMAP_I2C_STAT_NACK;
+> > + ? ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+> > + ? ? ? ? ? ? ? ? ? ? ? omap_i2c_complete_cmd(dev, err);
+> > + ? ? ? ? ? ? ? ? ? ? ? return IRQ_HANDLED;
+> > + ? ? ? ? ? ? ? }
+> >
+> Do you think making I2C IRQ ack + complete as one small static inline function
+> can save clean the code further. I see it has been used in multiple paths.
 
-> > As I said previously, I think just encoding the direction but not
-> > the client specific ID (meaning we would have to disambiguate
-> > the more complex cases that Stephen mentioned using a dma-names
-> > property) would be the best because it keeps the common case simple,
-> > but I could live with other things going in there too.
-> 
-> Ok, so you are saying that there are some DMA controllers where there is
-> no channel/request ID and only a direction is needed? So an even simpler
-> case than what I had imagined.
+done in a later patch
 
-No, that was not the case I was thinking about.
-
-> So in that case, I don't see why the first cell after the phandle could
-> not be an index which could be either a direction or request-id and then
-> the next cell after that be a secondary match variable.
-> 
-> So simple case with just a index (either req-id or direction) ...
-> 
-> dmas = <&dmac0 index>
-> 
-> More complex case ...
-> 
-> dmas = <&dmac0 index match>
-> 
-> For example, for OMAP index = req-id and match = direction ...
-> 
-> dmas = <&dmac0 req-id direction>
-> 
-> Or am I way off the page?
-
-The intention was instead to remove the need for the /index/ in those
-cases, because having a client-specific index in here makes it inconsistent
-with other similar bindings (reg, interrupts, gpios, ...) that people
-are familiar with. They use an implicit index by counting the
-fields in the respective properties.
-
-The existing method we have for avoiding index numbers is to use
-named fields, like
-
-	dmas = <&dmac0 matchA>, <dmac1 matchB>, <dmac2 matchC>;
-	dma-names = "rx", "rx", "tx";
-
-This is similar to how we use named interrupt and mmio resources, but
-it requires that we always request the dma lines by name, which is
-slightly more complex than we might want it to be.
-
-Because the vast majority of cases just use a single channel, or one
-channel per direction, my idea was to encode the direction in the
-dmas property, which lets us request a dma channel by direction from
-the driver side, without explicitly encoding the name.
-
-This would let us handle the following cases very easily:
-
-1. one read-write channel
-
-	dmas = <&dmac 0x3 match>;
-
-2. a choice of two read-write channels:
-
-	dmas = <&dmacA 0x3 matchA>, <&dmacB 0x3 matchB>;
-
-3. one read-channel, one write channel:
-
-	dmas = <&dmac 0x1 match-read>, <&dmac 0x2 match-write>;
-
-4. a choice of two read channels and one write channel:
-
-	dmas = <&dmacA 0x1 match-readA>, <&dmacA 0x2 match-write> 
-			<&dmacB match-readB>;
-
-And only the cases where we have more multiple channels that differ
-in more aspects would require named properties:
-
-5. two different channels
-
-	dmas = <&dmac 0x3 match-rwdata>, <&dmac 0x1 match-status>;
-	dma-names = "rwdata", "status";
-
-6. same as 5, but with a choice of channels:
-
-	dmas = <&dmacA 0x3 match-rwdataA>, <&dmacA 0x1 match-status>;
-		<dmacB 0x3 match-rwdataB>;
-	dma-names = "rwdata", "status", "rwdata";
-
-
-With a definition like that, we can implement a very simple device
-driver interface for the common cases, and a slightly more complex
-one for the more complex cases:
-
-1. chan = of_dma_request_channel(dev->of_node, 0);
-2. chan = of_dma_request_channel(dev->of_node, 0);
-3. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
-   txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
-4. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
-   txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
-5. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
-   auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
-6. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
-   auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/21a64ab8/attachment.sig>
