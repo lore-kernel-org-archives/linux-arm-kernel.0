@@ -1,129 +1,51 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Thu, 14 Jun 2012 16:18:29 +0800
-Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
- level
-In-Reply-To: <4FD99B91.9030705@compulab.co.il>
-References: <zumeng.chen@gmail.com>
- <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
- <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
- <4FD96CBF.5040106@windriver.com> <4FD98856.8070601@compulab.co.il>
- <4FD98DDA.9050806@windriver.com> <4FD99B91.9030705@compulab.co.il>
-Message-ID: <4FD99E55.80603@windriver.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 14 Jun 2012 10:37:19 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <201206132021.09774.arnd@arndb.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <4FD84133.4060401@firmworks.com>
+ <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
+ <201206132021.09774.arnd@arndb.de>
+Message-ID: <20120614083719.GC31283@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?06?14? 16:06, Igor Grinberg ??:
-> On 06/14/12 10:08, Zumeng Chen wrote:
->> ? 2012?06?14? 14:44, Igor Grinberg ??:
->>> On 06/14/12 07:46, Zumeng Chen wrote:
->>>>> ? 2012?06?13? 20:18, Hiremath, Vaibhav ??:
->>>>>>> On Wed, Jun 13, 2012 at 07:14:10, Zumeng Chen wrote:
->>>>>>>>> From: Zumeng Chen<zumeng.chen@windriver.com>
->>>>>>>>>
->>>>>>>>> If we don't set proper debouce time for ads7846, then there are
->>>>>>>>> flooded interrupt counters of ads7846 responding to one time
->>>>>>>>> touch on screen, so the driver couldn't work well.
->>>>>>>>>
->>>>>>>>> And since most OMAP3 series boards pass NULL pointer of board_pdata
->>>>>>>>> to omap_ads7846_init, so it's more proper to set it in driver level
->>>>>>>>> after having gpio_request done.
->>>>>>>>>
->>>>>>>>> This patch has been validated on 3530evm.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
->>>>>>>>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
->>>>>>>>> ---
->>>>>>>>>    drivers/input/touchscreen/ads7846.c |    4 ++++
->>>>>>>>>    1 files changed, 4 insertions(+), 0 deletions(-)
->>>>>>>>>
->>>>>>>>> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
->>>>>>>>> index f02028e..459ff29 100644
->>>>>>>>> --- a/drivers/input/touchscreen/ads7846.c
->>>>>>>>> +++ b/drivers/input/touchscreen/ads7846.c
->>>>>>>>> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
->>>>>>>>>            }
->>>>>>>>>
->>>>>>>>>            ts->gpio_pendown = pdata->gpio_pendown;
->>>>>>>>> +#ifdef CONFIG_ARCH_OMAP3
->>>>>>>>> +        /* 310 means about 10 microsecond for omap3 */
->>>>>>>>> +        gpio_set_debounce(pdata->gpio_pendown, 310);
->>>>>>>>> +#endif
->>>>>>>>>
->>>>>>> Zumeng,
->>>>>>>
->>>>>>> With my sign-off you are changing the original code, that too
->>>>>>> without my sign-off and ack.
->>>>>>> I wouldn't mind you to submit patches from my tree, but the expectation is
->>>>>>> if you are changing the original code, it should be under your sign-off.
->>>>> Thanks, good to learn. I'll remove in next time.
->>>>>>> Coming to the patch, #ifdef in driver is not recommended, and this 10msec
->>>>>>> delay is specific to OMAP GPIO and driver should not be aware of this,
->>>>>>> that's where you will find the original patch handling it in board file.
->>>>> According to the git blame of the board-omap3evm.c I think
->>>>> 96974a24 did a good thing to all the related codes for omap3
->>>>> boards. So I think we can call board and driver as BSP level :-)
->>>>>
->>>>> If #ifdef in driver can save many codes, I guess it's deserved.
->>> No, platform/board specific ifdefs in the generic driver code are never
->>> deserved.
->>> How about the attached patch, does it fix the problem for you?
->> Sorry Igor, I just read your patch, yes, most are there, and we
->> just have to set get_pendown_state as you early said. Really
->> *thanks* for your drive :)
-> No, with my patch, you don't need the get_pendown_state() and
-> you don't need to change the board-omap3evm.c ADS7846 related code.
-> So, I'm going to submit my patch properly.
-Feel free to do that
+On Wed, Jun 13, 2012 at 08:21:08PM +0000, Arnd Bergmann wrote:
+> On Wednesday 13 June 2012, Thierry Reding wrote:
+> >                 pci at 80000000 {
+> >                         reg = <0x80000000 0x00001000>;
+> >                         status = "disabled";
+> > 
+> >                         #address-cells = <3>;
+> >                         #size-cells = <2>;
+> > 
+> >                         ranges = <0x80400000 0x80400000 0x00008000   /* I/O */
+> >                                   0x90000000 0x90000000 0x08000000   /* non-prefetchable memory */
+> >                                   0xa0000000 0xa0000000 0x08000000>; /* prefetchable memory */
+> > 
+> >                         nvidia,ctrl-offset = <0x0>;
+> >                         nvidia,num-lanes = <2>;
+> >                 };
+> > 
+> 
+> I believe you will need an "interrupt-map" property here, to map the host
+> interrupts to the INTA-INTD lines of the attached devices.
 
->> Regards,
->> Zumeng
->>> -- Regards, Igor.
->>> ads7846.patch
->>>
->>>
->>> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
->>> index 1706ebc..c187586 100644
->>> --- a/arch/arm/mach-omap2/common-board-devices.c
->>> +++ b/arch/arm/mach-omap2/common-board-devices.c
->>> @@ -63,28 +63,30 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
->>>   	struct spi_board_info *spi_bi =&ads7846_spi_board_info;
->>>   	int err;
->>>
->>> -	if (board_pdata&&  board_pdata->get_pendown_state) {
->>> -		err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
->>> -		if (err) {
->>> -			pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
->>> -			return;
->>> -		}
->>> -		gpio_export(gpio_pendown, 0);
->>> -
->>> -		if (gpio_debounce)
->>> -			gpio_set_debounce(gpio_pendown, gpio_debounce);
->>> +	err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
->>> +	if (err) {
->>> +		pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
->>> +		return;
->>>   	}
->>>   	
->>> +	if (gpio_debounce)
->>> +		gpio_set_debounce(gpio_pendown, gpio_debounce);
->>> +
->>>   	spi_bi->bus_num	= bus_num;
->>>   	spi_bi->irq	= gpio_to_irq(gpio_pendown);
->>>
->>>   	if (board_pdata) {
->>>   		board_pdata->gpio_pendown = gpio_pendown;
->>>   		spi_bi->platform_data = board_pdata;
->>> +		if (board_pdata->get_pendown_state)
->>> +			gpio_export(gpio_pendown, 0);
->>>   	} else {
->>>   		ads7846_config.gpio_pendown = gpio_pendown;
->>>   	}
->>>
->>> +	if (!board_pdata || (board_pdata&&  !board_pdata->get_pendown_state))
->>> +		gpio_free(gpio_pendown);
->>> +
->>>   	spi_register_board_info(&ads7846_spi_board_info, 1);
->>>   }
->>>   #else
+Legacy interrupts are something I cannot test at all because I have no
+hardware that supports them.
+
+> I'm not sure whether we want to have a device_type="pciex" property here.
+> powerpc and sparc seem to use that information, to distinguish a pcie
+> bus from pci or cardbus.
+
+That'd be rather useless information given that the Tegra is unlikely to
+support either PCI or CardBus at some point.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/b90536c5/attachment-0001.sig>
