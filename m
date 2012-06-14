@@ -1,79 +1,26 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 14 Jun 2012 18:51:05 +0200
-Subject: [PATCH v2 15/23] ARM: LPC32xx: Fix lpc32xx.dtsi status property:
- "disable" -> "disabled"
+Date: Thu, 14 Jun 2012 18:51:06 +0200
+Subject: [PATCH v2 16/23] ARM: LPC32xx: Build arch dtbs
 In-Reply-To: <1339692673-7848-1-git-send-email-stigge@antcom.de>
 References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339692673-7848-16-git-send-email-stigge@antcom.de>
+Message-ID: <1339692673-7848-17-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches fixes some status = "disable" strings to "disabled", the correct
-way of disabling nodes in the devicetree.
+From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
+Add ea3250.dtb and phy3250.dtb to the list of dtbs to be built
+
+Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 ---
- arch/arm/boot/dts/lpc32xx.dtsi |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-lpc32xx/Makefile.boot |    1 +
+ 1 file changed, 1 insertion(+)
 
---- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
-+++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -35,14 +35,14 @@
- 		slc: flash at 20020000 {
- 			compatible = "nxp,lpc3220-slc";
- 			reg = <0x20020000 0x1000>;
--			status = "disable";
-+			status = "disabled";
- 		};
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/Makefile.boot
++++ linux-2.6/arch/arm/mach-lpc32xx/Makefile.boot
+@@ -2,3 +2,4 @@
+ params_phys-y	:= 0x80000100
+ initrd_phys-y	:= 0x82000000
  
- 		mlc: flash at 200a8000 {
- 			compatible = "nxp,lpc3220-mlc";
- 			reg = <0x200a8000 0x11000>;
- 			interrupts = <11 0>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		dma at 31000000 {
-@@ -58,21 +58,21 @@
- 			compatible = "nxp,ohci-nxp", "usb-ohci";
- 			reg = <0x31020000 0x300>;
- 			interrupts = <0x3b 0>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		usbd at 31020000 {
- 			compatible = "nxp,lpc3220-udc";
- 			reg = <0x31020000 0x300>;
- 			interrupts = <0x3d 0>, <0x3e 0>, <0x3c 0>, <0x3a 0>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		clcd at 31040000 {
- 			compatible = "arm,pl110", "arm,primecell";
- 			reg = <0x31040000 0x1000>;
- 			interrupts = <0x0e 0>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		mac: ethernet at 31060000 {
-@@ -261,14 +261,14 @@
- 				compatible = "nxp,lpc3220-adc";
- 				reg = <0x40048000 0x1000>;
- 				interrupts = <0x27 0>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			tsc at 40048000 {
- 				compatible = "nxp,lpc3220-tsc";
- 				reg = <0x40048000 0x1000>;
- 				interrupts = <0x27 0>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			key at 40050000 {
++dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
