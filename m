@@ -1,121 +1,82 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 14 Jun 2012 17:05:53 +0200
-Subject: [PATCH 02/10] ARM: OMAP2+: hwmod: manage the wake-up latency
- constraints
+Date: Thu, 14 Jun 2012 17:05:54 +0200
+Subject: [PATCH 03/10] ARM: OMAP2+: PM QoS: manage the per-device latency
+ constraints in hwmod
 In-Reply-To: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
 References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1339686361-11526-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1339686361-11526-4-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP PM code implements a handler for the per-device PM QoS framework.
-The handler queries the omap_hwmod layer in order to manage the power domains
-wake-up latency constraints. Hwmod retrieves the correct power domain
-and if it exists it calls the corresponding power domain function.
+Call the per-device PM QoS functions of the power domain code from the
+hwmod layer, in order to apply the constraints requested to a device.
 
-Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
-latency constraints on MPU, CORE and PER.
+While at it, correct the functions kerneldoc.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-[paul at pwsan.com: cleaned some documentation; split set/remove constraint
- functions; modified to return -EINVAL until underlying code is ready]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   54 +++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    5 ++
- 2 files changed, 58 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   22 ++++++----------------
+ 1 files changed, 6 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index bf86f7e..cc173d9 100644
+index cc173d9..4f43e0c 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -145,6 +145,7 @@
- #include "powerdomain.h"
- #include <plat/clock.h>
- #include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
- #include <plat/prcm.h>
- 
- #include "cm2xxx_3xxx.h"
-@@ -3301,10 +3302,61 @@ ohsps_unlock:
+@@ -3302,15 +3302,13 @@ ohsps_unlock:
  }
  
  /**
-+ * omap_hwmod_set_wakeuplat_constraint - set/release a wake-up latency
-+ * constraint
-+ * @oh: struct omap_hwmod* to which the target device belongs to.
-+ * @cookie: identifier of the constraints list for @oh.
-+ * @min_latency: the minimum allowed wake-up latency for @oh.
-+ *
-+ * Sets a wakeup latency contraint.  (To remove a wakeup latency
-+ * constraint, call omap_hwmod_remove_wakeuplat_constraint()).
-+ * Returns the return value from pwrdm_wakeuplat_remove_constraint(),
-+ * or -EINVAL in case of invalid parameters.
-+ */
-+int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
-+					long min_latency)
-+{
-+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
-+
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	/*
-+	 * XXX Update to use pwrdm_wakeuplat_update_constraint() when
-+	 * that code is ready
-+	 */
-+	return -EINVAL;
-+}
-+
-+/**
-+ * omap_hwmod_remove_wakeuplat_constraint - release a wake-up latency
-+ * constraint
-+ * @oh: struct omap_hwmod* to which the target device belongs to.
-+ * @cookie: identifier of the constraints list for @oh.
-+ *
-+ * Removes a wakeup latency contraint.  Returns the return value from
-+ * pwrdm_wakeuplat_update_constraint(), or -EINVAL in case of invalid
-+ * parameters.
-+ */
-+int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
-+{
-+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
-+
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	/*
-+	 * XXX Update to use pwrdm_wakeuplat_remove_constraint() when
-+	 * that code is ready
-+	 */
-+	return -EINVAL;
-+}
-+
-+/**
-  * omap_hwmod_get_context_loss_count - get lost context count
-  * @oh: struct omap_hwmod *
+- * omap_hwmod_set_wakeuplat_constraint - set/release a wake-up latency
++ * omap_hwmod_set_wakeuplat_constraint - Set or update a wake-up latency
+  * constraint
+  * @oh: struct omap_hwmod* to which the target device belongs to.
+  * @cookie: identifier of the constraints list for @oh.
+  * @min_latency: the minimum allowed wake-up latency for @oh.
   *
-- * Query the powerdomain of of @oh to get the context loss
-+ * Query the powerdomain of @oh to get the context loss
-  * count for this device.
+- * Sets a wakeup latency contraint.  (To remove a wakeup latency
+- * constraint, call omap_hwmod_remove_wakeuplat_constraint()).
+- * Returns the return value from pwrdm_wakeuplat_remove_constraint(),
++ * Returns the return value from pwrdm_wakeuplat_update_constraint(),
+  * or -EINVAL in case of invalid parameters.
+  */
+ int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
+@@ -3321,21 +3319,17 @@ int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
+ 	if (!pwrdm)
+ 		return -EINVAL;
+ 
+-	/*
+-	 * XXX Update to use pwrdm_wakeuplat_update_constraint() when
+-	 * that code is ready
+-	 */
+-	return -EINVAL;
++	return pwrdm_wakeuplat_update_constraint(pwrdm, cookie, min_latency);
+ }
+ 
+ /**
+- * omap_hwmod_remove_wakeuplat_constraint - release a wake-up latency
++ * omap_hwmod_remove_wakeuplat_constraint - Release a wake-up latency
+  * constraint
+  * @oh: struct omap_hwmod* to which the target device belongs to.
+  * @cookie: identifier of the constraints list for @oh.
   *
-  * Returns the context loss count of the powerdomain assocated with @oh
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index c835b71..3aa10df 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -623,6 +623,11 @@ int omap_hwmod_for_each_by_class(const char *classname,
- 				 void *user);
+  * Removes a wakeup latency contraint.  Returns the return value from
+- * pwrdm_wakeuplat_update_constraint(), or -EINVAL in case of invalid
++ * pwrdm_wakeuplat_remove_constraint(), or -EINVAL in case of invalid
+  * parameters.
+  */
+ int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
+@@ -3345,11 +3339,7 @@ int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
+ 	if (!pwrdm)
+ 		return -EINVAL;
  
- int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
-+
-+int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
-+					long min_latency);
-+int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie);
-+
- int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+-	/*
+-	 * XXX Update to use pwrdm_wakeuplat_remove_constraint() when
+-	 * that code is ready
+-	 */
+-	return -EINVAL;
++	return pwrdm_wakeuplat_remove_constraint(pwrdm, cookie);
+ }
  
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
+ /**
 -- 
 1.7.7.6
