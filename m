@@ -1,170 +1,245 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 14 Jun 2012 16:53:09 +0200
-Subject: [PATCH 6/8] ARM: OMAP2+: PM: use the functional power states API for
- logic and memory
+Date: Thu, 14 Jun 2012 16:53:08 +0200
+Subject: [PATCH 5/8] ARM: OMAP2+: PM: introduce power domains achievable
+ functional states
 In-Reply-To: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
 References: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1339685591-11177-7-git-send-email-j-pihet@ti.com>
+Message-ID: <1339685591-11177-6-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the power domains logic state is derived from the power domain
-functional state and is now programmed from omap_set_pwrdm_state,
-the calls to pwrdm_set_logic_retst are removed and the mpu_logic_state
-field is removed from the private data of the cpuidle and suspend code.
+Note: the patch is in RFC state because the state machine for setting
+the next power domain states needs more discussion. Validated on OMAP3&4
+with cpuidle and suspend/resume, though.
+
+Power domains have varied capabilities. When attempting a low power
+state such as OFF/RET, a specific min requested state may not be
+supported on the power domain. This is because a combination
+of system power states where the parent PD's state is not in line
+with expectation can result in system instabilities.
+
+This patch provides a function that returns the achievable functional
+power state for a power domain and its use by omap_set_pwrdm_state.
+The achievable power state is first looked for in the lower power
+states in order to maximize the power savings, then if not found
+in the higher power states.
+
+Inspired from Tero's work on OMAP4 device OFF support and generalized
+to the functional power states.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c         |   11 ++---------
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |    6 +-----
- arch/arm/mach-omap2/pm24xx.c              |    5 +----
- arch/arm/mach-omap2/pm44xx.c              |   10 ++--------
- 4 files changed, 6 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |  156 +++++++++++++++++++++++++++++++------
+ arch/arm/mach-omap2/powerdomain.h |    1 +
+ 2 files changed, 134 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 50c9082..221039a 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -27,7 +27,6 @@
- /* Machine specific information */
- struct omap4_idle_statedata {
- 	u32 cpu_state;
--	u32 mpu_logic_state;
- 	u32 mpu_state;
- };
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index ce2685a..f94174b 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -554,6 +554,108 @@ int pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
+ 	return ret;
+ }
  
-@@ -35,17 +34,14 @@ static struct omap4_idle_statedata omap4_idle_data[] = {
- 	{
- 		.cpu_state = PWRDM_FUNC_PWRST_ON,
- 		.mpu_state = PWRDM_FUNC_PWRST_ON,
--		.mpu_logic_state = PWRDM_POWER_RET,
- 	},
- 	{
- 		.cpu_state = PWRDM_FUNC_PWRST_OFF,
- 		.mpu_state = PWRDM_FUNC_PWRST_CSWR,
--		.mpu_logic_state = PWRDM_POWER_RET,
- 	},
- 	{
- 		.cpu_state = PWRDM_FUNC_PWRST_OFF,
--		.mpu_state = PWRDM_FUNC_PWRST_CSWR,
--		.mpu_logic_state = PWRDM_POWER_OFF,
-+		.mpu_state = PWRDM_FUNC_PWRST_OSWR,
- 	},
- };
- 
-@@ -95,16 +91,13 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
- 	if (cx->cpu_state == PWRDM_FUNC_PWRST_OFF)
- 		cpu_pm_enter();
- 
--	pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
- 	omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
- 
- 	/*
- 	 * Call idle CPU cluster PM enter notifier chain
- 	 * to save GIC and wakeupgen context.
- 	 */
--	if (((cx->mpu_state == PWRDM_FUNC_PWRST_CSWR) ||
--	     (cx->mpu_state == PWRDM_FUNC_PWRST_OSWR)) &&
--	    (cx->mpu_logic_state == PWRDM_POWER_OFF))
-+	if (cx->mpu_state == PWRDM_FUNC_PWRST_OSWR)
- 			cpu_cluster_pm_enter();
- 
- 	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index dd94a0e..c79cc0f 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -232,7 +232,6 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
++/**
++ * pwrdm_get_achievable_func_pwrst() - Provide achievable functional state
++ * @pwrdm: struct powerdomain * to set
++ * @func_pwrst: minimum functional state we would like to hit
++ * (one of the PWRDM_FUNC_* macros)
++ *
++ * Power domains have varied capabilities. When attempting a low power
++ * state such as OFF/RET, a specific min requested state may not be
++ * supported on the power domain. This is because a combination
++ * of system power states where the parent PD's state is not in line
++ * with expectation can result in system instabilities.
++ *
++ * The achievable power state is first looked for in the lower power
++ * states in order to maximize the power savings, then if not found
++ * in the higher power states.
++ *
++ * Returns the achievable functional power state, or -EINVAL in case of
++ * invalid parameters.
++ */
++int pwrdm_get_achievable_func_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
++{
++	int pwrst = pwrdm_func_to_pwrst(pwrdm, func_pwrst);
++	int logic = pwrdm_func_to_logic_pwrst(pwrdm, func_pwrst);
++	int new_func_pwrst, new_pwrst, new_logic;
++	int found;
++
++	if (!pwrdm || IS_ERR(pwrdm)) {
++		pr_debug("%s: invalid params: pwrdm=%p, func_pwrst=%0x\n",
++			 __func__, pwrdm, func_pwrst);
++		return -EINVAL;
++	}
++
++	if ((pwrst < 0) || (logic < 0)) {
++		pr_debug("%s: invalid params for pwrdm %s, func_pwrst=%0x\n",
++			 __func__, pwrdm->name, func_pwrst);
++		return PWRDM_FUNC_PWRST_ON;
++	}
++
++	/*
++	 * Power state: if the requested state is not supported,
++	 * try the lower power states.
++	 */
++	found = 1;
++	new_pwrst = pwrst;
++	while (!(pwrdm->pwrsts & (1 << new_pwrst))) {
++		if (new_pwrst == PWRDM_POWER_OFF) {
++			found = 0;
++			break;
++		}
++		new_pwrst--;
++	}
++
++	/*
++	 * If no lower power state found, fallback to the higher
++	 * power states.
++	 * PWRDM_POWER_ON is always valid.
++	 */
++	if (!found) {
++		new_pwrst = pwrst;
++		while (!(pwrdm->pwrsts & (1 << new_pwrst))) {
++			if (new_pwrst == PWRDM_POWER_ON)
++				break;
++			new_pwrst++;
++		}
++	}
++
++	/*
++	 * Logic RET state: if the requested state is not supported,
++	 * try the lower logic states.
++	 */
++	found = 1;
++	new_logic = logic;
++	while (!(pwrdm->pwrsts_logic_ret & (1 << new_logic))) {
++		if (new_logic == PWRDM_LOGIC_MEM_PWRST_OFF) {
++			found = 0;
++			break;
++		}
++		new_logic--;
++	}
++
++	/*
++	 * If no lower logic state found, fallback to the higher
++	 * logic states.
++	 * PWRDM_LOGIC_MEM_PWRST_RET is always valid.
++	 */
++	if (!found) {
++		new_logic = logic;
++		while (!(pwrdm->pwrsts_logic_ret & (1 << new_logic))) {
++			if (new_logic == PWRDM_LOGIC_MEM_PWRST_RET)
++				break;
++			new_logic++;
++		}
++	}
++
++	new_func_pwrst = pwrdm_pwrst_to_func(pwrdm, new_pwrst, new_logic);
++
++	pr_debug("%s(%s, func_pwrst=%0x) returns %0x\n", __func__,
++		 pwrdm->name, func_pwrst, new_func_pwrst);
++
++	return new_func_pwrst;
++}
++
+ /* Types of sleep_switch used in omap_set_pwrdm_state */
+ #define FORCEWAKEUP_SWITCH	0
+ #define LOWPOWERSTATE_SWITCH	1
+@@ -563,36 +665,32 @@ int pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
+  * @pwrdm: struct powerdomain * to set
+  * @func_pwrst: power domain functional state, one of the PWRDM_FUNC_* macros
+  *
+- * This programs the pwrdm next functional state, sets the dependencies
+- * and waits for the state to be applied.
++ * This looks for the more suited (or achievable) next functional power
++ * state, programs it, sets the dependencies and waits for the state to
++ * be applied to the power domain.
+  */
+ int omap_set_pwrdm_state(struct powerdomain *pwrdm,
+ 			 enum pwrdm_func_state func_pwrst)
  {
- 	unsigned int save_state = 0;
- 	unsigned int wakeup_cpu;
--	int mpuss_state;
+-	u8 curr_pwrst, next_pwrst;
+-	int pwrst = pwrdm_func_to_pwrst(pwrdm, func_pwrst);
+-	int logic = pwrdm_func_to_logic_pwrst(pwrdm, func_pwrst);
+ 	int sleep_switch = -1, ret = 0, hwsup = 0;
++	int new_func_pwrst, next_func_pwrst, pwrst, logic;
++	u8 curr_pwrst;
  
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
- 		return -ENXIO;
-@@ -265,10 +264,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 	 * In MPUSS OSWR or device OFF, interrupt controller context is lost.
- 	 */
- 	mpuss_clear_prev_logic_pwrst();
--	mpuss_state = pwrdm_read_next_func_pwrst(mpuss_pd);
--	if (((mpuss_state == PWRDM_FUNC_PWRST_CSWR) ||
--	     (mpuss_state == PWRDM_FUNC_PWRST_OSWR)) &&
--	    (pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
-+	if (pwrdm_read_next_func_pwrst(mpuss_pd) == PWRDM_FUNC_PWRST_OSWR)
- 		save_state = 2;
- 
- 	cpu_clear_prev_logic_pwrst(cpu);
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 0bed51e..fdb0767 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -93,7 +93,6 @@ static int omap2_enter_full_retention(void)
- 	 * Set MPU powerdomain's next power state to RETENTION;
- 	 * preserve logic state during retention
- 	 */
--	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
- 	omap_set_pwrdm_state(mpu_pwrdm, PWRDM_FUNC_PWRST_CSWR);
- 
- 	/* Workaround to kill USB */
-@@ -248,7 +247,7 @@ static void __init prcm_setup_regs(void)
- 	 */
- 	num_mem_banks = pwrdm_get_mem_bank_count(core_pwrdm);
- 	for (i = 0; i < num_mem_banks; i++)
--		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
-+		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_LOGIC_MEM_PWRST_RET);
- 
- 	/* Set CORE powerdomain's next power state to RETENTION */
- 	omap_set_pwrdm_state(core_pwrdm, PWRDM_FUNC_PWRST_CSWR);
-@@ -257,11 +256,9 @@ static void __init prcm_setup_regs(void)
- 	 * Set MPU powerdomain's next power state to RETENTION;
- 	 * preserve logic state during retention
- 	 */
--	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
- 	omap_set_pwrdm_state(mpu_pwrdm, PWRDM_FUNC_PWRST_CSWR);
- 
- 	/* Force-power down DSP, GFX powerdomains */
--
- 	pwrdm = clkdm_get_pwrdm(dsp_clkdm);
- 	omap_set_pwrdm_state(pwrdm, PWRDM_FUNC_PWRST_OFF);
- 	clkdm_sleep(dsp_clkdm);
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 98bb699..eb12d25 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -28,7 +28,6 @@ struct power_state {
- 	u32 next_state;
- #ifdef CONFIG_SUSPEND
- 	u32 saved_state;
--	u32 saved_logic_state;
- #endif
- 	struct list_head node;
- };
-@@ -43,16 +42,12 @@ static int omap4_pm_suspend(void)
- 	u32 cpu_id = smp_processor_id();
- 
- 	/* Save current powerdomain state */
--	list_for_each_entry(pwrst, &pwrst_list, node) {
-+	list_for_each_entry(pwrst, &pwrst_list, node)
- 		pwrst->saved_state = pwrdm_read_next_func_pwrst(pwrst->pwrdm);
--		pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
--	}
- 
- 	/* Set targeted power domain states by suspend */
--	list_for_each_entry(pwrst, &pwrst_list, node) {
-+	list_for_each_entry(pwrst, &pwrst_list, node)
- 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
--		pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_OFF);
--	}
- 
- 	/*
- 	 * For MPUSS to hit power domain retention(CSWR or OSWR),
-@@ -75,7 +70,6 @@ static int omap4_pm_suspend(void)
- 			ret = -1;
- 		}
- 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
--		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->saved_logic_state);
+-	if (!pwrdm || IS_ERR(pwrdm) || (pwrst < 0) || (logic < 0)) {
+-		pr_debug("%s: invalid params: pwrdm=%p, func_pwrst=%0x\n",
+-			 __func__, pwrdm, func_pwrst);
++	if (!pwrdm || IS_ERR(pwrdm)) {
++		pr_debug("%s: invalid params: pwrdm=%p\n", __func__, pwrdm);
+ 		return -EINVAL;
  	}
- 	if (ret)
- 		pr_crit("Could not enter target state in pm_suspend\n");
+ 
+-	pr_debug("%s: set func_pwrst %0x to pwrdm %s\n",
+-		 __func__, func_pwrst, pwrdm->name);
++	pr_debug("%s(%s, func_pwrst=%0x)\n", __func__, pwrdm->name, func_pwrst);
+ 
+ 	mutex_lock(&pwrdm->lock);
+ 
+-	while (!(pwrdm->pwrsts & (1 << pwrst))) {
+-		if (pwrst == PWRDM_POWER_OFF)
+-			goto out;
+-		pwrst--;
+-	}
++	new_func_pwrst = pwrdm_get_achievable_func_pwrst(pwrdm, func_pwrst);
++	pwrst = pwrdm_func_to_pwrst(pwrdm, new_func_pwrst);
++	logic = pwrdm_func_to_logic_pwrst(pwrdm, new_func_pwrst);
+ 
+-	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
+-	if (next_pwrst == pwrst)
++	next_func_pwrst = pwrdm_read_next_func_pwrst(pwrdm);
++	if (new_func_pwrst == next_func_pwrst)
+ 		goto out;
+ 
+ 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
+@@ -607,13 +705,25 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm,
+ 		}
+ 	}
+ 
+-	if (logic != pwrdm_read_logic_retst(pwrdm))
+-		pwrdm_set_logic_retst(pwrdm, logic);
++	pr_debug("%s: set func_pwrst %0x (%0x,%0x) to pwrdm %s\n",
++		 __func__, new_func_pwrst, pwrst, logic, pwrdm->name);
++
++	/* Trace the pwrdm desired target state */
++	trace_power_domain_target(pwrdm->name, new_func_pwrst,
++				  smp_processor_id());
++
++	/* Program next power state */
++	if (pwrst != pwrdm_func_to_pwrst(pwrdm, next_func_pwrst)) {
++		ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
++		if (ret)
++			pr_err("%s: unable to set power state of powerdomain: %s\n",
++			       __func__, pwrdm->name);
++	}
+ 
+-	ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
+-	if (ret)
+-		pr_err("%s: unable to set power state of powerdomain: %s\n",
+-		       __func__, pwrdm->name);
++	/* Program RET logic state */
++	if ((pwrst == PWRDM_POWER_RET) &&
++	    (logic != pwrdm_func_to_logic_pwrst(pwrdm, next_func_pwrst)))
++		pwrdm_set_logic_retst(pwrdm, logic);
+ 
+ 	switch (sleep_switch) {
+ 	case FORCEWAKEUP_SWITCH:
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index d08c25d..9dd68ab 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -247,6 +247,7 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
+ int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+ int omap2_pwrdm_func_to_logic_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+ int omap2_pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic);
++int pwrdm_get_achievable_func_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+ 
+ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
+ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
 -- 
 1.7.7.6
