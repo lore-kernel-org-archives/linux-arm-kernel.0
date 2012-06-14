@@ -1,80 +1,113 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Jun 2012 14:45:50 +0300
-Subject: [PATCH 04/17] i2c: omap: simplify omap_i2c_ack_stat()
-In-Reply-To: <20120614111333.GA31187@n2100.arm.linux.org.uk>
-References: <1339669250-9183-1-git-send-email-balbi@ti.com>
- <1339669250-9183-5-git-send-email-balbi@ti.com>
- <20120614111333.GA31187@n2100.arm.linux.org.uk>
-Message-ID: <20120614114546.GP13602@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jun 2012 11:48:19 +0000
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FD914F6.6000402@ti.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201206090004.10086.arnd@arndb.de> <4FD914F6.6000402@ti.com>
+Message-ID: <201206141148.20371.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 13 June 2012, Jon Hunter wrote:
 
-On Thu, Jun 14, 2012 at 12:13:33PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 14, 2012 at 01:20:37PM +0300, Felipe Balbi wrote:
-> > stat & BIT(1) is the same as BIT(1), so let's
-> > simplify things a bit by removing "stat &" from
-> > all omap_i2c_ack_stat() calls.
+> > As I said previously, I think just encoding the direction but not
+> > the client specific ID (meaning we would have to disambiguate
+> > the more complex cases that Stephen mentioned using a dma-names
+> > property) would be the best because it keeps the common case simple,
+> > but I could live with other things going in there too.
 > 
-> This doesn't feel right, and the explanation is definitely wrong.
+> Ok, so you are saying that there are some DMA controllers where there is
+> no channel/request ID and only a direction is needed? So an even simpler
+> case than what I had imagined.
+
+No, that was not the case I was thinking about.
+
+> So in that case, I don't see why the first cell after the phandle could
+> not be an index which could be either a direction or request-id and then
+> the next cell after that be a secondary match variable.
 > 
-> "stat & BIT(1)" is not the same as "BIT(1)" _unless_ you're saying that
-> stat always has BIT(1) already set.  Can you guarantee that in this code?
-> If so, how?
+> So simple case with just a index (either req-id or direction) ...
 > 
-> What happens if you read the status register, and it has bit 1 clear.
-> immediately after the read, the status register bit 1 becomes set, and
-> then you write bit 1 set (because you've dropped the stat & BIT(1) from
-> the code.)
+> dmas = <&dmac0 index>
 > 
-> Is it not going to acknowledge that bit-1-set but because you haven't
-> read it, you're going to miss that event?
+> More complex case ...
 > 
-> This feels like a buggy change to me.
+> dmas = <&dmac0 index match>
+> 
+> For example, for OMAP index = req-id and match = direction ...
+> 
+> dmas = <&dmac0 req-id direction>
+> 
+> Or am I way off the page?
 
-I fail to see that situation would happen with this driver. See what it
-does (extremely simplified):
+The intention was instead to remove the need for the /index/ in those
+cases, because having a client-specific index in here makes it inconsistent
+with other similar bindings (reg, interrupts, gpios, ...) that people
+are familiar with. They use an implicit index by counting the
+fields in the respective properties.
 
-if (stat & NACK) {
-	...
-	omap_i2c_ack_stat(dev, stat & NACK);
-}
+The existing method we have for avoiding index numbers is to use
+named fields, like
 
-if (stat & RDR) {
-	...
-	omap_i2c_ack_stat(dev, stat & RDR);
-}
+	dmas = <&dmac0 matchA>, <dmac1 matchB>, <dmac2 matchC>;
+	dma-names = "rx", "rx", "tx";
 
-and so on. The tricky place is only WRT errata handling, for example:
+This is similar to how we use named interrupt and mmio resources, but
+it requires that we always request the dma lines by name, which is
+slightly more complex than we might want it to be.
 
-if (*stat & (NACK | AL)) {
-	omap_i2c_ack_stat(dev, *stat & (XRDY | XDR));
-	...
-}
+Because the vast majority of cases just use a single channel, or one
+channel per direction, my idea was to encode the direction in the
+dmas property, which lets us request a dma channel by direction from
+the driver side, without explicitly encoding the name.
 
-but in this case, the errata says we must clear XRDY and XDR if that
-errata triggers, so if they just got enabled or not, it doesn't matter.
+This would let us handle the following cases very easily:
 
-Another tricky place is RDR | RRDY (likewise for XDR | XRDY):
+1. one read-write channel
 
-if (stat & (RDR | RRDY)) {
-	...
-	omap_i2c_ack_stat(dev, stat & (RDR | RRDY));
-}
+	dmas = <&dmac 0x3 match>;
 
-again here there will be no issues because those IRQs never fire
-simultaneously and one will only after after we have handled the
-previous, that's because the same FIFO is used anyway and we won't shift
-data into FIFO until we tell the IP "hey, I'm done with the FIFO, you
-can shift more data". Right ?
+2. a choice of two read-write channels:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/db62ffcb/attachment-0001.sig>
+	dmas = <&dmacA 0x3 matchA>, <&dmacB 0x3 matchB>;
+
+3. one read-channel, one write channel:
+
+	dmas = <&dmac 0x1 match-read>, <&dmac 0x2 match-write>;
+
+4. a choice of two read channels and one write channel:
+
+	dmas = <&dmacA 0x1 match-readA>, <&dmacA 0x2 match-write> 
+			<&dmacB match-readB>;
+
+And only the cases where we have more multiple channels that differ
+in more aspects would require named properties:
+
+5. two different channels
+
+	dmas = <&dmac 0x3 match-rwdata>, <&dmac 0x1 match-status>;
+	dma-names = "rwdata", "status";
+
+6. same as 5, but with a choice of channels:
+
+	dmas = <&dmacA 0x3 match-rwdataA>, <&dmacA 0x1 match-status>;
+		<dmacB 0x3 match-rwdataB>;
+	dma-names = "rwdata", "status", "rwdata";
+
+
+With a definition like that, we can implement a very simple device
+driver interface for the common cases, and a slightly more complex
+one for the more complex cases:
+
+1. chan = of_dma_request_channel(dev->of_node, 0);
+2. chan = of_dma_request_channel(dev->of_node, 0);
+3. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
+   txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
+4. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
+   txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
+5. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
+   auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
+6. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
+   auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
+
+	Arnd
