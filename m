@@ -1,49 +1,40 @@
-From: matt@grid-net.com (Matt Burtch)
-Date: Thu, 14 Jun 2012 16:49:18 +0000
-Subject: MXS getting AUART to work with DT.
-In-Reply-To: <CAOMZO5Bc2ag4WLV+YwqpR7OOfMatd9CBBdT8koFabkPVcQacFw@mail.gmail.com>
-References: <4FD7EFFC.8010204@grid-net.com>
- <CAOMZO5BDFD3hHt+HW_sdh-3hCEwgJJA9C0ecAJZSOUCw_725Jw@mail.gmail.com>
- <4FD96B3E.6080806@grid-net.com>,
- <CAOMZO5Bc2ag4WLV+YwqpR7OOfMatd9CBBdT8koFabkPVcQacFw@mail.gmail.com>
-Message-ID: <2CC96C7FBBE82548A0B1766B8D8348AD9C169E@mx2.grid-net.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 14 Jun 2012 18:50:51 +0200
+Subject: [PATCH v2 01/23] ARM: LPC32xx: Add NAND flash timing to PHY3250 board
+ dts
+In-Reply-To: <1339692673-7848-1-git-send-email-stigge@antcom.de>
+References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
+Message-ID: <1339692673-7848-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is the patch I put together to get the AUART recognized with the dt.  I'm pretty new to dt development, so this was a quick first pass. I'm sure there are more proper ways to get the device id and pass literals between the dt and probe function...but this works for now.
+This patch adds necessary NAND flash timings to the board specific dts file of
+the PHY3250 reference board of the LPC32xx SoC.
 
-Regards,
--Matt Burtch
-________________________________________
-From: Fabio Estevam [festevam at gmail.com]
-Sent: Wednesday, June 13, 2012 9:54 PM
-To: Subodh Nijsure
-Cc: linux-arm-kernel at lists.infradead.org; Marek Va?ut; Shawn Guo; Matt Burtch
-Subject: Re: MXS getting AUART to work with DT.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Tested-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-On Thu, Jun 14, 2012 at 1:40 AM, Subodh Nijsure <snijsure@grid-net.com> wrote:
+---
+ arch/arm/boot/dts/phy3250.dts |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-> With this change you will only see AUART0 being created all subsequent
-> attempts fail.  I think we need to have dt specific probe, my colleague Matt
-> Burtch has implemented that dt specific probe for AUART will request him to
-> send his diff tomorrow AM.
->
-> I think something is broken in 3.5 as far as I can tell AUART goes it had
-> worked for me in 3.4, I am novice at device-tree and was not sure if its
-> because of DT or something else.
-
-Ok, just tested linux-next and I see that mxs-auart probes correctly
-for the non-dt kernel.
-
-We need to fix mxs-auart for dt now.
-
-Regards,
-
-Fabio Estevam
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: mxs-auart.patch
-Type: text/x-patch
-Size: 3155 bytes
-Desc: mxs-auart.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/9fae73f8/attachment-0001.bin>
+--- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
++++ linux-2.6/arch/arm/boot/dts/phy3250.dts
+@@ -54,6 +54,17 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 
++			nxp,wdr-clks = <14>;
++			nxp,wwidth = <40000000>;
++			nxp,whold = <100000000>;
++			nxp,wsetup = <100000000>;
++			nxp,rdr-clks = <14>;
++			nxp,rwidth = <40000000>;
++			nxp,rhold = <66666666>;
++			nxp,rsetup = <100000000>;
++			nand-on-flash-bbt;
++			gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
++
+ 			mtd0 at 00000000 {
+ 				label = "phy3250-boot";
+ 				reg = <0x00000000 0x00064000>;
