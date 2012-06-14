@@ -1,199 +1,150 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Jun 2012 13:59:44 +0800
-Subject: [PATCH 13/16] ARM: imx: remove unneeded mach/irq.h inclusion
+Date: Thu, 14 Jun 2012 13:59:40 +0800
+Subject: [PATCH 09/16] ARM: imx: pass gpio than irq number into mxc_expio_init
 In-Reply-To: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
 References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1339653587-4832-14-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1339653587-4832-10-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unneeded mach/irq.h inclusion from imx platform code.
+Change mxc_expio_init interface a little bit to have gpio than irq
+number passed in.  With the change, gpio_to_irq can be called inside
+mxc_expio_init to get irq number, so that MXC_IRQ_TO_GPIO can be
+removed.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/mach-apf9328.c  |    1 -
- arch/arm/mach-imx/mach-mx1ads.c   |    1 -
- arch/arm/mach-imx/mach-mx27_3ds.c |    1 -
- arch/arm/mach-imx/mach-mx31lite.c |    1 -
- arch/arm/mach-imx/mach-mx35_3ds.c |    1 -
- arch/arm/mach-imx/mach-pca100.c   |    1 -
- arch/arm/mach-imx/mach-qong.c     |    1 -
- arch/arm/mach-imx/mach-scb9328.c  |    1 -
- arch/arm/mach-imx/mach-vpr200.c   |    1 -
- arch/arm/mach-imx/mm-imx1.c       |    1 -
- arch/arm/mach-imx/mm-imx21.c      |    1 -
- arch/arm/mach-imx/mm-imx25.c      |    1 -
- arch/arm/mach-imx/mm-imx27.c      |    1 -
- arch/arm/mach-imx/mm-imx3.c       |    1 -
- 14 files changed, 0 insertions(+), 14 deletions(-)
+ arch/arm/mach-imx/mach-mx27_3ds.c               |    3 +--
+ arch/arm/mach-imx/mach-mx31_3ds.c               |    3 +--
+ arch/arm/mach-imx/mach-mx35_3ds.c               |    4 +---
+ arch/arm/mach-imx/mach-mx51_3ds.c               |    3 +--
+ arch/arm/plat-mxc/3ds_debugboard.c              |    8 ++++----
+ arch/arm/plat-mxc/include/mach/3ds_debugboard.h |    2 +-
+ 6 files changed, 9 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
-index 5062fcb..7b99a79 100644
---- a/arch/arm/mach-imx/mach-apf9328.c
-+++ b/arch/arm/mach-imx/mach-apf9328.c
-@@ -27,7 +27,6 @@
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
--#include <mach/irqs.h>
- #include <mach/iomux-mx1.h>
- 
- #include "devices-imx1.h"
-diff --git a/arch/arm/mach-imx/mach-mx1ads.c b/arch/arm/mach-imx/mach-mx1ads.c
-index 7274e79..667f359 100644
---- a/arch/arm/mach-imx/mach-mx1ads.c
-+++ b/arch/arm/mach-imx/mach-mx1ads.c
-@@ -26,7 +26,6 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx1.h>
--#include <mach/irqs.h>
- 
- #include "devices-imx1.h"
- 
 diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index eeff0b6..71f7c58 100644
+index 18b9bca..eeff0b6 100644
 --- a/arch/arm/mach-imx/mach-mx27_3ds.c
 +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -40,7 +40,6 @@
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
- #include <mach/ulpi.h>
--#include <mach/irqs.h>
- #include <mach/3ds_debugboard.h>
+@@ -48,7 +48,6 @@
+ #define SD1_EN_GPIO		IMX_GPIO_NR(2, 25)
+ #define OTG_PHY_RESET_GPIO	IMX_GPIO_NR(2, 23)
+ #define SPI2_SS0		IMX_GPIO_NR(4, 21)
+-#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(3, 28))
+ #define PMIC_INT		IMX_GPIO_NR(3, 14)
+ #define SPI1_SS0		IMX_GPIO_NR(4, 28)
+ #define SD1_CD			IMX_GPIO_NR(2, 26)
+@@ -500,7 +499,7 @@ static void __init mx27pdk_init(void)
+ 	spi_register_board_info(mx27_3ds_spi_devs,
+ 						ARRAY_SIZE(mx27_3ds_spi_devs));
  
- #include "devices-imx27.h"
-diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
-index 4977378..c8785b3 100644
---- a/arch/arm/mach-imx/mach-mx31lite.c
-+++ b/arch/arm/mach-imx/mach-mx31lite.c
-@@ -43,7 +43,6 @@
- #include <mach/common.h>
- #include <mach/board-mx31lite.h>
- #include <mach/iomux-mx3.h>
--#include <mach/irqs.h>
- #include <mach/ulpi.h>
+-	if (mxc_expio_init(MX27_CS5_BASE_ADDR, EXPIO_PARENT_INT))
++	if (mxc_expio_init(MX27_CS5_BASE_ADDR, IMX_GPIO_NR(3, 28)))
+ 		pr_warn("Init of the debugboard failed, all devices on the debugboard are unusable.\n");
+ 	imx27_add_imx_i2c(0, &mx27_3ds_i2c0_data);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index 618935e..f37d9b5 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -730,8 +730,7 @@ static void __init mx31_3ds_init(void)
+ 	if (!otg_mode_host)
+ 		imx31_add_fsl_usb2_udc(&usbotg_pdata);
  
- #include "devices-imx31.h"
+-	if (mxc_expio_init(MX31_CS5_BASE_ADDR,
+-			   gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1))))
++	if (mxc_expio_init(MX31_CS5_BASE_ADDR, IOMUX_TO_GPIO(MX31_PIN_GPIO1_1)))
+ 		printk(KERN_WARNING "Init of the debug board failed, all "
+ 				    "devices on the debug board are unusable.\n");
+ 	imx31_add_imx2_wdt(NULL);
 diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 596f237..e785254 100644
+index ad63e6e..596f237 100644
 --- a/arch/arm/mach-imx/mach-mx35_3ds.c
 +++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -46,7 +46,6 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
--#include <mach/irqs.h>
- #include <mach/3ds_debugboard.h>
- #include <video/platform_lcd.h>
+@@ -132,8 +132,6 @@ static struct platform_device mx35_3ds_lcd = {
+ 	.dev.platform_data = &mx35_3ds_lcd_data,
+ };
  
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index 8b1dfa2..d620a95 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -36,7 +36,6 @@
- #include <mach/hardware.h>
- #include <mach/iomux-mx27.h>
- #include <asm/mach/time.h>
--#include <mach/irqs.h>
- #include <mach/ulpi.h>
+-#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
+-
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -580,7 +578,7 @@ static void __init mx35_3ds_init(void)
+ 	imx35_add_mxc_nand(&mx35pdk_nand_board_info);
+ 	imx35_add_sdhci_esdhc_imx(0, NULL);
  
- #include "devices-imx27.h"
-diff --git a/arch/arm/mach-imx/mach-qong.c b/arch/arm/mach-imx/mach-qong.c
-index b6f11d2..39ceb8c 100644
---- a/arch/arm/mach-imx/mach-qong.c
-+++ b/arch/arm/mach-imx/mach-qong.c
-@@ -22,7 +22,6 @@
- #include <linux/gpio.h>
- 
- #include <mach/hardware.h>
--#include <mach/irqs.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-diff --git a/arch/arm/mach-imx/mach-scb9328.c b/arch/arm/mach-imx/mach-scb9328.c
-index 5001164..67ff38e 100644
---- a/arch/arm/mach-imx/mach-scb9328.c
-+++ b/arch/arm/mach-imx/mach-scb9328.c
-@@ -22,7 +22,6 @@
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
--#include <mach/irqs.h>
- #include <mach/iomux-mx1.h>
- 
- #include "devices-imx1.h"
-diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
-index 1aa5622..09864bb 100644
---- a/arch/arm/mach-imx/mach-vpr200.c
-+++ b/arch/arm/mach-imx/mach-vpr200.c
-@@ -31,7 +31,6 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
--#include <mach/irqs.h>
- 
- #include <linux/i2c.h>
- #include <linux/i2c/at24.h>
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-index fcafd3d..6d60d51 100644
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ b/arch/arm/mach-imx/mm-imx1.c
-@@ -24,7 +24,6 @@
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
--#include <mach/irqs.h>
- #include <mach/iomux-v1.h>
- 
- static struct map_desc imx_io_desc[] __initdata = {
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index 5f43905..d056dad 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
+-	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
++	if (mxc_expio_init(MX35_CS5_BASE_ADDR, IMX_GPIO_NR(1, 1)))
+ 		pr_warn("Init of the debugboard failed, all "
+ 				"devices on the debugboard are unusable.\n");
+ 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
+diff --git a/arch/arm/mach-imx/mach-mx51_3ds.c b/arch/arm/mach-imx/mach-mx51_3ds.c
+index 3c5b163..ebb9188 100644
+--- a/arch/arm/mach-imx/mach-mx51_3ds.c
++++ b/arch/arm/mach-imx/mach-mx51_3ds.c
 @@ -26,7 +26,6 @@
- #include <mach/devices-common.h>
- #include <asm/pgtable.h>
- #include <asm/mach/map.h>
--#include <mach/irqs.h>
- #include <mach/iomux-v1.h>
  
- /* MX21 memory map definition */
-diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
-index 6ff3714..388928f 100644
---- a/arch/arm/mach-imx/mm-imx25.c
-+++ b/arch/arm/mach-imx/mm-imx25.c
-@@ -29,7 +29,6 @@
- #include <mach/hardware.h>
- #include <mach/mx25.h>
- #include <mach/iomux-v3.h>
--#include <mach/irqs.h>
+ #include "devices-imx51.h"
  
- /*
-  * This table defines static virtual address mappings for I/O regions.
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index 2566255..e7e24af 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -26,7 +26,6 @@
- #include <mach/devices-common.h>
- #include <asm/pgtable.h>
- #include <asm/mach/map.h>
--#include <mach/irqs.h>
- #include <mach/iomux-v1.h>
+-#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 6))
+ #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
  
- /* MX27 memory map definition */
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 967ed5b..3ccd167 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -30,7 +30,6 @@
- #include <mach/devices-common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-v3.h>
--#include <mach/irqs.h>
+ static iomux_v3_cfg_t mx51_3ds_pads[] = {
+@@ -148,7 +147,7 @@ static void __init mx51_3ds_init(void)
+ 	spi_register_board_info(mx51_3ds_spi_nor_device,
+ 				ARRAY_SIZE(mx51_3ds_spi_nor_device));
  
- #include "crmregs-imx3.h"
+-	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
++	if (mxc_expio_init(MX51_CS5_BASE_ADDR, IMX_GPIO_NR(1, 6)))
+ 		printk(KERN_WARNING "Init of the debugboard failed, all "
+ 				    "devices on the board are unusable.\n");
  
+diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
+index 5cac2c5..3b48a08 100644
+--- a/arch/arm/plat-mxc/3ds_debugboard.c
++++ b/arch/arm/plat-mxc/3ds_debugboard.c
+@@ -49,7 +49,6 @@
+ #define MCU_BOARD_ID_REG	0x68
+ 
+ #define MXC_IRQ_TO_EXPIO(irq)   ((irq) - MXC_BOARD_IRQ_START)
+-#define MXC_IRQ_TO_GPIO(irq)	((irq) - MXC_INTERNAL_IRQS)
+ 
+ #define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+ #define MXC_MAX_EXP_IO_LINES	16
+@@ -155,8 +154,9 @@ static struct regulator_consumer_supply dummy_supplies[] = {
+ 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
+ };
+ 
+-int __init mxc_expio_init(u32 base, u32 p_irq)
++int __init mxc_expio_init(u32 base, u32 intr_gpio)
+ {
++	u32 p_irq = gpio_to_irq(intr_gpio);
+ 	int i;
+ 
+ 	brd_io = ioremap(BOARD_IO_ADDR(base), SZ_4K);
+@@ -178,8 +178,8 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
+ 	/*
+ 	 * Configure INT line as GPIO input
+ 	 */
+-	gpio_request(MXC_IRQ_TO_GPIO(p_irq), "expio_pirq");
+-	gpio_direction_input(MXC_IRQ_TO_GPIO(p_irq));
++	gpio_request(intr_gpio, "expio_pirq");
++	gpio_direction_input(intr_gpio);
+ 
+ 	/* disable the interrupt and clear the status */
+ 	__raw_writew(0, brd_io + INTR_MASK_REG);
+diff --git a/arch/arm/plat-mxc/include/mach/3ds_debugboard.h b/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
+index a384fdd..9fd6cb3 100644
+--- a/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
++++ b/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
+@@ -13,6 +13,6 @@
+ #ifndef __ASM_ARCH_MXC_3DS_DB_H__
+ #define __ASM_ARCH_MXC_3DS_DB_H__
+ 
+-extern int __init mxc_expio_init(u32 base, u32 p_irq);
++extern int __init mxc_expio_init(u32 base, u32 intr_gpio);
+ 
+ #endif /* __ASM_ARCH_MXC_3DS_DB_H__ */
 -- 
 1.7.5.4
