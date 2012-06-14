@@ -1,39 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 13 Jun 2012 20:08:47 -0400
-Subject: Pogoplug E02 ARM (Kirkwood 88F6281 SoC) target vs 3.5 kernel
-In-Reply-To: <CAAeQ1eZbER5k7fw2L0UWpKqiXJLCg2WwUPrRzf40rmv7EKcZ-w@mail.gmail.com>
-References: <CAAeQ1eZbER5k7fw2L0UWpKqiXJLCg2WwUPrRzf40rmv7EKcZ-w@mail.gmail.com>
-Message-ID: <20120614000847.GJ14756@titan.lakedaemon.net>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Thu, 14 Jun 2012 00:15:25 +0000
+Subject: [Patch v5 09/13] ARM: imx6q: add usbphy clocks
+In-Reply-To: <20120613215406.GF30400@pengutronix.de>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-10-git-send-email-richard.zhao@freescale.com>,
+ <20120613215406.GF30400@pengutronix.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803BE0ADB@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 01:40:06AM +0200, Jacco Onderdijk wrote:
-> I noticed when going from 3.4.2 to 3.5 kernel that the kernel is not
-> booting properly. I read in a Google plus post
-> 
-> <https://plus.google.com/100126049429601461708/posts/Yx63UM6Ubix>
-> 
-> that board files can be ported to DTS. I am an owner of several
-> pogoplug e02 targets (Kirkwood 88F6281 SoC) and i want to help porting
-> this target to the 3.5 kernel.
-> 
-> Here <http://forum.doozan.com/read.php?2,8153,8337#msg-8337> is a log
-> of a 3.4.2 kernel booting the Pogoplug E02.
-> 
-> How can i help, for example with testing or something else?
+>Could you recheck with your hardware guys which input clocks
+> this device really has. On earlier i.MX there are up to three
+> clocks this module needs. Sooner or later we want to use this driver on
+> the other i.MX aswell, and then we'll need support for the other clocks
+> here, no matter if they are software controllable on i.MX6 or not.
 
-Awesome, I'm glad you're interested in helping out.  First, always CC:
-the linux-arm-kernel mailinglist (I've added it in this reply) so that
-everyone can be kept up to date.
+Only two clocks are needed for i.mx6, one is AHB clock usb gate which
+is used to visit registers, and other is PHY clock which is used to data transfer.
 
-Second, take a look at how the first kirkwood conversion happened (the
-dreamplug) in git commit 3d468b6.  Basically, the first thing to do, is
-to use the devicetree to tell the kernel what board it is booting on.
-This replaces the mach_type.  After you have that working, start using
-the devicetree to configure the various devices.
-
-If you have any detailed questions, feel free to ask.
-
-hth,
-
-Jason.
+The i.mx23, i.mx28 and i.mx6q use FSL Internal PHY, it doesn't need serial clock. 
+ 
