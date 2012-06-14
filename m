@@ -1,30 +1,42 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 14 Jun 2012 15:40:09 +0800
-Subject: [PATCH 16/16] ARM: imx: enable SPARSE_IRQ for imx platform
-In-Reply-To: <1339653587-4832-17-git-send-email-shawn.guo@linaro.org>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-17-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAN1soZw5NZq1RP3z6w1P+5PQTjuT-hPucCwbiG3CQk0UpCacbQ@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 14 Jun 2012 10:52:57 +0300
+Subject: [PATCH v4] usb: chipidea: permit driver bindings pass phy pointer
+In-Reply-To: <20120612231438.GA6177@kroah.com>
+References: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
+ <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
+ <20120612231438.GA6177@kroah.com>
+Message-ID: <8762au8h46.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 1:59 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> As all irqchips on imx have been changed to allocate their irq_descs,
-> and all unneeded mach/irqs.h inclusions on imx have been cleaned up,
-> now it's time to select SPARSE_IRQ for imx/mxc.
+Greg KH <gregkh@linuxfoundation.org> writes:
+
+> On Fri, Jun 08, 2012 at 08:37:06PM +0800, Richard Zhao wrote:
+>> Sometimes, the driver bindings may know what phy they use.
+>> For example, when using device tree, the usb controller may have a
+>> phandler pointing to usb phy.
+>> 
+>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> Reviewed-by: Marek Vasut <marex@denx.de>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>> ---
+>> Changes since laster version:
+>> - hcd transceiver renamed to phy
 >
-> The SPARSE_IRQ support forces irqs allocation starting from 16. ?All
-> those static irq number definition for SoCs need to shift 16 to keep
-> non-DT boot works.
+> Ick, I see patches all over this thread, and other threads, and I have
+> no idea what to apply anywhere...
 >
-Do we really need to shift 16 to keep non-DT boot works?
+> So, consider all chipidea patches dropped from my queue now, can you
+> please resend them to me, with the accumulated acks and reviewed-by
+> line, so that I can queue them up?
 
-I think that we can allocate "new irq numbers - NR_IRQS_LEGACY" in interrupt
-controller in DT mode. And we needn't shift NR_IRQS_LEGACY in non-DT mode,
-since irq numbers are already specified in .nr_irqs of machine description.
+So will you pick these patches to your tree or should I apply them to
+mine or what is the plan? I kind of have a tree [1] for chipidea stuff
+where I have been collecting patches, to send a pull request to you for
+3.6.
 
-Maybe you can reference code in arch/arm/mach-mm/irq.c &
-arch/arm/mach-mm/brownstone.c.
+[1] git://github.com/virtuoso/linux-ci.git ci
 
-Regards
-Haojian
+Regards,
+--
+Alex
