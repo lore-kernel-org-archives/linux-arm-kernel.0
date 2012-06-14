@@ -1,73 +1,54 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 14 Jun 2012 06:31:16 +0000
-Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in
- driver level
-In-Reply-To: <4FD96CBF.5040106@windriver.com>
-References: <zumeng.chen@gmail.com>
- <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
- <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
- <4FD96CBF.5040106@windriver.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA4FC98@DBDE01.ent.ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 14 Jun 2012 08:31:20 +0200
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <4FD90352.9090606@wwwdotorg.org>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+Message-ID: <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 10:16:55, Zumeng Chen wrote:
-> ? 2012?06?13? 20:18, Hiremath, Vaibhav ??:
-> > On Wed, Jun 13, 2012 at 07:14:10, Zumeng Chen wrote:
-> >> From: Zumeng Chen<zumeng.chen@windriver.com>
-> >>
-> >> If we don't set proper debouce time for ads7846, then there are
-> >> flooded interrupt counters of ads7846 responding to one time
-> >> touch on screen, so the driver couldn't work well.
-> >>
-> >> And since most OMAP3 series boards pass NULL pointer of board_pdata
-> >> to omap_ads7846_init, so it's more proper to set it in driver level
-> >> after having gpio_request done.
-> >>
-> >> This patch has been validated on 3530evm.
-> >>
-> >> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
-> >> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
-> >> ---
-> >>   drivers/input/touchscreen/ads7846.c |    4 ++++
-> >>   1 files changed, 4 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
-> >> index f02028e..459ff29 100644
-> >> --- a/drivers/input/touchscreen/ads7846.c
-> >> +++ b/drivers/input/touchscreen/ads7846.c
-> >> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
-> >>   		}
-> >>
-> >>   		ts->gpio_pendown = pdata->gpio_pendown;
-> >> +#ifdef CONFIG_ARCH_OMAP3
-> >> +		/* 310 means about 10 microsecond for omap3 */
-> >> +		gpio_set_debounce(pdata->gpio_pendown, 310);
-> >> +#endif
-> >>
-> > Zumeng,
-> >
-> > With my sign-off you are changing the original code, that too
-> > without my sign-off and ack.
-> > I wouldn't mind you to submit patches from my tree, but the expectation is
-> > if you are changing the original code, it should be under your sign-off.
-> Thanks, good to learn. I'll remove in next time.
-> > Coming to the patch, #ifdef in driver is not recommended, and this 10msec
-> > delay is specific to OMAP GPIO and driver should not be aware of this,
-> > that's where you will find the original patch handling it in board file.
-> According to the git blame of the board-omap3evm.c I think
-> 96974a24 did a good thing to all the related codes for omap3
-> boards. So I think we can call board and driver as BSP level :-)
+On Wed, Jun 13, 2012 at 03:17:06PM -0600, Stephen Warren wrote:
+> On 06/13/2012 04:40 AM, Wei Ni wrote:
+> > Hi, all
+> > I'm working on the tegra30 wifi upstream issue.
+> > 
+> > The tegra30 board (Cardhu) use Broadcom 4329 as wifi device, and use brcmfmac as the wifi driver.
+> > 
+> > In the brcmfmac init routine, it call sdio_register_driver() to register driver, if the wifi device is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
+> > 
+> > On the Cardhu, the wifi's power is controlled by two gpios (power-gpio and reset-gpio), the default state is power-off. So we need to power on it before calling sdio_register_driver(), if not, the mmc driver can't enumerate it, and will not call the probe routine.
+> > This power on sequence is: 
+> > set power-gpio to 1 ;
+> > mdelay(100) ;
+> > set reset-gpio to 1 ;
+> > mdelay(200);
+> > 
+> > My question is where to power on the wifi. We may have three places to power on it:
+> > 1. power on it in the brcmfmac driver before calling sdio_register_driver(). But I think this power sequence is special for tegra30 cardhu, it's not good to add it in the generic wifi driver, because different board may use the different way to power on the wifi.
+> > 2. power on it in the mmc driver. In our tegra SD driver, it has power-gpios property, which allow the slot to be powered. But this power is for mmc slot, could we add this wifi power sequence in the tegra SD driver?
+> > 3. hard-coded into DT. Set these gpios in the DT, something like pinmux settings, but in this way, it's not good to put the mdelay() value in the DT.
+> > 
+> > I have no good idea for it, does anyone has suggestion?
 > 
-> If #ifdef in driver can save many codes, I guess it's deserved.
+> The core of the issue is that:
 > 
+> * Tegra30 support is via device tree.
+> * We have an SDIO bus, and the WiFi device attached to that bus is
+> enumerable.
+> * Since the WiFi device is enumerable, no node exists in the DT to
+> represent it.
+> * However, the driver for the WiFi device needs certain information,
+> such as the reset GPIO ID and perhaps power GPIO.
 
-No, not really.
+PCI devices are also enumerable and yet they can be matched up with nodes in
+the device tree. Perhaps something similar could be added for the SDIO bus?
 
-In the same commit, the debounce time is already handled as an argument to 
-the function omap_ads7846_init(), and that?s the way it should be.
-So no need for #ifdefs in driver...
-
-Thanks,
-Vaibhav
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/adb86368/attachment.sig>
