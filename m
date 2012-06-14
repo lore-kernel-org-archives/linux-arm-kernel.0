@@ -1,167 +1,132 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 14 Jun 2012 17:06:00 +0200
-Subject: [PATCH 09/10] ARM: OMAP: convert I2C driver to PM QoS for latency
- constraints
+Date: Thu, 14 Jun 2012 17:05:58 +0200
+Subject: [PATCH 07/10] ARM: OMAP3: update cpuidle latency and threshold figures
 In-Reply-To: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
 References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1339686361-11526-10-git-send-email-j-pihet@ti.com>
+Message-ID: <1339686361-11526-8-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
-API to the new PM QoS API.
-Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
-class of PM QoS. The resulting MPU constraints are used by cpuidle to
-decide the next power state of the MPU subsystem.
+Update the data from the measurements performed at HW and SW levels.
 
-The I2C device latency timing is derived from the FIFO size and the
-clock speed and so is applicable to all OMAP SoCs.
+Cf. http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
+for a detailed explanation on where are the numbers coming from.
+
+ToDo:
+- Measure the wake-up latencies for all power domains for OMAP3
+- Correct some numbers when sys_clkreq and sys_offmode are supported
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/i2c.c      |   21 ---------------------
- drivers/i2c/busses/i2c-omap.c |   28 +++++++++++++++++-----------
- include/linux/i2c-omap.h      |    1 -
- 3 files changed, 17 insertions(+), 33 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |   52 +++++++++++++++++++++++++++----------
+ 1 files changed, 38 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-index db071bc..dba8338 100644
---- a/arch/arm/plat-omap/i2c.c
-+++ b/arch/arm/plat-omap/i2c.c
-@@ -26,7 +26,6 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/i2c-omap.h>
- #include <linux/slab.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-@@ -34,7 +33,6 @@
- #include <mach/irqs.h>
- #include <plat/mux.h>
- #include <plat/i2c.h>
--#include <plat/omap-pm.h>
- #include <plat/omap_device.h>
- 
- #define OMAP_I2C_SIZE		0x3f
-@@ -129,16 +127,6 @@ static inline int omap1_i2c_add_bus(int bus_id)
- 
- 
- #ifdef CONFIG_ARCH_OMAP2PLUS
--/*
-- * XXX This function is a temporary compatibility wrapper - only
-- * needed until the I2C driver can be converted to call
-- * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
-- */
--static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
--{
--	omap_pm_set_max_mpu_wakeup_lat(dev, t);
--}
--
- static inline int omap2_i2c_add_bus(int bus_id)
- {
- 	int l;
-@@ -170,15 +158,6 @@ static inline int omap2_i2c_add_bus(int bus_id)
- 	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
- 	pdata->flags = dev_attr->flags;
- 
--	/*
--	 * When waiting for completion of a i2c transfer, we need to
--	 * set a wake up latency constraint for the MPU. This is to
--	 * ensure quick enough wakeup from idle, when transfer
--	 * completes.
--	 * Only omap3 has support for constraints
--	 */
--	if (cpu_is_omap34xx())
--		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
- 	pdev = omap_device_build(name, bus_id, oh, pdata,
- 			sizeof(struct omap_i2c_bus_platform_data),
- 			NULL, 0, 0);
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 801df60..72d7076 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -43,6 +43,7 @@
- #include <linux/slab.h>
- #include <linux/i2c-omap.h>
- #include <linux/pm_runtime.h>
-+#include <linux/pm_qos.h>
- 
- /* I2C controller revisions */
- #define OMAP_I2C_OMAP1_REV_2		0x20
-@@ -183,8 +184,7 @@ struct omap_i2c_dev {
- 	struct completion	cmd_complete;
- 	struct resource		*ioarea;
- 	u32			latency;	/* maximum mpu wkup latency */
--	void			(*set_mpu_wkup_lat)(struct device *dev,
--						    long latency);
-+	struct pm_qos_request	pm_qos_request;
- 	u32			speed;		/* Speed of bus in kHz */
- 	u32			dtrev;		/* extra revision from DT */
- 	u32			flags;
-@@ -634,8 +634,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 	if (r < 0)
- 		goto out;
- 
--	if (dev->set_mpu_wkup_lat != NULL)
--		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
-+	/*
-+	 * When waiting for completion of a i2c transfer, we need to
-+	 * set a wake up latency constraint for the MPU. This is to
-+	 * ensure quick enough wakeup from idle, when transfer
-+	 * completes.
-+	 */
-+	if (dev->latency)
-+		pm_qos_add_request(&dev->pm_qos_request,
-+				   PM_QOS_CPU_DMA_LATENCY,
-+				   dev->latency);
- 
- 	for (i = 0; i < num; i++) {
- 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
-@@ -643,8 +651,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 			break;
- 	}
- 
--	if (dev->set_mpu_wkup_lat != NULL)
--		dev->set_mpu_wkup_lat(dev->dev, -1);
-+	if (dev->latency)
-+		pm_qos_remove_request(&dev->pm_qos_request);
- 
- 	if (r == 0)
- 		r = num;
-@@ -1032,7 +1040,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	} else if (pdata != NULL) {
- 		dev->speed = pdata->clkrate;
- 		dev->flags = pdata->flags;
--		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
- 		dev->dtrev = pdata->rev;
- 	}
- 
-@@ -1081,10 +1088,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		else
- 			dev->b_hw = 1; /* Enable hardware fixes */
- 
--		/* calculate wakeup latency constraint for MPU */
--		if (dev->set_mpu_wkup_lat != NULL)
--			dev->latency = (1000000 * dev->fifo_size) /
--				       (1000 * dev->speed / 8);
-+		/* calculate wakeup latency constraint */
-+		dev->latency = (1000000 * dev->fifo_size) /
-+			       (1000 * dev->speed / 8);
- 	}
- 
- 	/* reset ASAP, clearing any IRQs */
-diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-index 92a0dc7..df804ba 100644
---- a/include/linux/i2c-omap.h
-+++ b/include/linux/i2c-omap.h
-@@ -34,7 +34,6 @@ struct omap_i2c_bus_platform_data {
- 	u32		clkrate;
- 	u32		rev;
- 	u32		flags;
--	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
- };
- 
- #endif
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 9319f94..9438385 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -295,6 +295,30 @@ DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+  *
+  * - target_residency: required amount of time in the C state
+  *  to break even on energy cost
++ *
++ * The MPU latency and threshold values for the C-states are the worst case
++ * values from the HW and SW, as described in details at
++ * http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement#cpuidle_results
++ *
++ * Measurements conditions and remarks:
++ *  . the measurements have been performed at OPP50
++ *  . the sys_offmode signal is not supported and so not used for the
++ *    measurements. Instead the latency and threshold values for C9 are
++ *    corrected with the value for Triton 2, which is 11.5ms
++ *  . the sys_clkreq signal is not used and so a correction is needed - TBD
++ *  . the sys_clkoff signal is supported, this value need to be corrected with
++ *    the correct value of SYSCLK on/off timings (1ms for sysclk on, 2.5ms
++ *    for sysclk off)
++ *  . the setup time of DPLLs is included in the measured values. However
++ *    this is only valid for DPLLs that are enabled to auto-idle at
++ *    measurement time. There currently is no provision for the dynamic
++ *    nature of the auto-idle setting
++ *  . in order to force the cpuidle algorithm to chose the power efficient
++ *    C-states (C1, C3, C5, C7) in preference, the other C-states have a
++ *    threshold value equal to the next power efficient C-state
++ *
++ * The latency and threshold values can be overriden by data from the board
++ * files, using omap3_pm_init_cpuidle.
+  */
+ struct cpuidle_driver omap3_idle_driver = {
+ 	.name = 	"omap3_idle",
+@@ -302,56 +326,56 @@ struct cpuidle_driver omap3_idle_driver = {
+ 	.states = {
+ 		{
+ 			.enter		  = omap3_enter_idle,
+-			.exit_latency	  = 2 + 2,
+-			.target_residency = 5,
++			.exit_latency	  = 73 + 78,
++			.target_residency = 152,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C1",
+ 			.desc		  = "MPU ON + CORE ON",
+ 		},
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+-			.exit_latency	  = 10 + 10,
+-			.target_residency = 30,
++			.exit_latency	  = 165 + 88,
++			.target_residency = 345,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C2",
+ 			.desc		  = "MPU ON + CORE ON",
+ 		},
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+-			.exit_latency	  = 50 + 50,
+-			.target_residency = 300,
++			.exit_latency	  = 163 + 182,
++			.target_residency = 345,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C3",
+ 			.desc		  = "MPU RET + CORE ON",
+ 		},
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+-			.exit_latency	  = 1500 + 1800,
+-			.target_residency = 4000,
++			.exit_latency	  = 2852 + 605,
++			.target_residency = 150000,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C4",
+ 			.desc		  = "MPU OFF + CORE ON",
+ 		},
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+-			.exit_latency	  = 2500 + 7500,
+-			.target_residency = 12000,
++			.exit_latency	  = 800 + 366,
++			.target_residency = 2120,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C5",
+ 			.desc		  = "MPU RET + CORE RET",
+ 		},
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+-			.exit_latency	  = 3000 + 8500,
+-			.target_residency = 15000,
++			.exit_latency	  = 4080 + 801,
++			.target_residency = 215000,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C6",
+ 			.desc		  = "MPU OFF + CORE RET",
+ 		},
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+-			.exit_latency	  = 10000 + 30000,
+-			.target_residency = 30000,
++			.exit_latency	  = 4300 + 13000,
++			.target_residency = 215000,
+ 			.flags		  = CPUIDLE_FLAG_TIME_VALID,
+ 			.name		  = "C7",
+ 			.desc		  = "MPU OFF + CORE OFF",
 -- 
 1.7.7.6
