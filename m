@@ -1,22 +1,59 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Thu, 14 Jun 2012 00:15:25 +0000
-Subject: [Patch v5 09/13] ARM: imx6q: add usbphy clocks
-In-Reply-To: <20120613215406.GF30400@pengutronix.de>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-10-git-send-email-richard.zhao@freescale.com>,
- <20120613215406.GF30400@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803BE0ADB@039-SN2MPN1-023.039d.mgd.msft.net>
+From: neilb@suse.de (NeilBrown)
+Date: Thu, 14 Jun 2012 10:15:41 +1000
+Subject: [GIT PULL] gpio/omap: cleanups for v3.5
+In-Reply-To: <874nrmtf47.fsf@ti.com>
+References: <874nrmtf47.fsf@ti.com>
+Message-ID: <20120614101541.39f50aee@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Could you recheck with your hardware guys which input clocks
-> this device really has. On earlier i.MX there are up to three
-> clocks this module needs. Sooner or later we want to use this driver on
-> the other i.MX aswell, and then we'll need support for the other clocks
-> here, no matter if they are software controllable on i.MX6 or not.
+On Fri, 11 May 2012 17:30:48 -0700 Kevin Hilman <khilman@ti.com> wrote:
 
-Only two clocks are needed for i.mx6, one is AHB clock usb gate which
-is used to visit registers, and other is PHY clock which is used to data transfer.
+> Hi Grant,
+> 
+> Here's the final round of GPIO cleanups for v3.5.  This branch is based
+> on my for_3.5/fixes/gpio branch you just pulled.
+> 
+> Kevin
 
-The i.mx23, i.mx28 and i.mx6q use FSL Internal PHY, it doesn't need serial clock. 
+Hi.
+
+ I'm not sure if it was this series or the following cleanups which broke
+ things for me, but I've been trying 3.5-rc2 on my GTA04 and the serial
+ console (ttyO2) dies as soon as the omap-gpio driver initialises.
+
+ After some digging I came up with this patch to gpio-omap.c
+
+@@ -1124,6 +1124,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
  
+ 	platform_set_drvdata(pdev, bank);
+ 
++	if (bank->get_context_loss_count)
++		bank->context_loss_count =
++				bank->get_context_loss_count(bank->dev);
+ 	pm_runtime_enable(bank->dev);
+ 	pm_runtime_irq_safe(bank->dev);
+ 	pm_runtime_get_sync(bank->dev);
+
+which fixes it.
+
+What was happening  was that when omap_gpio_probe calls pm_runtime_get_sync,
+it calls 
+  _od_runtime_resume -> pm_generic_runtime_resume -> omap_gpio_runtime_resume
+  -> omap_gpio_restore_context
+
+and then the serial port stops.
+I reasoned that the context probably hadn't been set up yet, so restoring
+from it broke things.
+Initialising bank->context_loss_count seems sensible and would ensure that
+we didn't try to restore the context until it has actually been lost.
+
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/a6c9c2c9/attachment.sig>
