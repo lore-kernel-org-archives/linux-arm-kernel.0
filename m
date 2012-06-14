@@ -1,66 +1,176 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Thu, 14 Jun 2012 19:27:50 +0800
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <4FD90352.9090606@wwwdotorg.org>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
-Message-ID: <6B4D417B830BC44B8026029FD256F7F1C377BFFE8A@HKMAIL01.nvidia.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Thu, 14 Jun 2012 04:31:40 -0700
+Subject: [PATCH] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix issues.
+Message-ID: <1339673500-5218-1-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 05:17:06, Stephen Warren wrote:
->On 06/13/2012 04:40 AM, Wei Ni wrote:
->> Hi, all
->> I'm working on the tegra30 wifi upstream issue.
->>
->> The tegra30 board (Cardhu) use Broadcom 4329 as wifi device, and use brcmfmac as the wifi driver.
->>
->> In the brcmfmac init routine, it call sdio_register_driver() to register driver, if the wifi device is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
->>
->> On the Cardhu, the wifi's power is controlled by two gpios 
->> (power-gpio and reset-gpio), the default state is power-off. So we need to power on it before calling sdio_register_driver(), if not, the mmc driver can't enumerate it, and will not call the probe routine.
->> This power on sequence is:
->> set power-gpio to 1 ;
->> mdelay(100) ;
->> set reset-gpio to 1 ;
->> mdelay(200);
->>
->> My question is where to power on the wifi. We may have three places to power on it:
->> 1. power on it in the brcmfmac driver before calling 
->> sdio_register_driver(). But I think this power sequence is special for tegra30 cardhu, it's not good to add it in the generic wifi driver, because different board may use the different way to power on the wifi.
->> 2. power on it in the mmc driver. In our tegra SD driver, it has 
->> power-gpios property, which allow the slot to be powered. But this power is for mmc slot, could we add this wifi power sequence in the tegra SD driver?
->> 3. hard-coded into DT. Set these gpios in the DT, something like pinmux settings, but in this way, it's not good to put the mdelay() value in the DT.
->>
->> I have no good idea for it, does anyone has suggestion?
->
->The core of the issue is that:
->
->* Tegra30 support is via device tree.
->* We have an SDIO bus, and the WiFi device attached to that bus is enumerable.
->* Since the WiFi device is enumerable, no node exists in the DT to represent it.
->* However, the driver for the WiFi device needs certain information, 
->such as the reset GPIO ID and perhaps power GPIO.
->
->For the power GPIO, it seems reasonable to either use the existing 
->Tegra SD controller's power-gpios DT property, or replace that property 
->with a real regulator binding. The SD driver would then control this. 
->Still, that approach would mean the WiFi driver wouldn't be able to control power to the device directly, which might not be a good thing.
->
->However, I'm not sure that the reset GPIO is also something that should 
->be controlled by the SD card driver; it seems like it's much more closely related to the WiFi device/driver.
->
->I wonder if the power and reset GPIO shouldn't be represented as a 
->combined custom regulator type, which knows how to sequence multiple GPIOs.
->
->Perhaps SDIO "client" devices also need a way to communicate with their 
->"host port" to obtain services such as power and reset control?
->
->This is all very similar to the WiFi rfkill discussion we have re: the 
->Toshiba AC100 a little while back, although that was USB rather than SDIO.
+'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
+an issue where the ULPI PHYs were not held in reset while initializing
+the EHCI controller. However, it also changes behavior in
+omap-usb-host.c omap_usbhs_init by releasing reset while the
+configuration in that function was done.
 
-In the rfkill-gpio, it already have the reset-gpio and shutdown-gpio.
-I test it, add a device node in the DT to pass the gpio properties.
-It will use these gpios to power up/off , but its default power sequence is different with the 4329.
-It block==0, it mean power up, it will set reset-gpio first, then set power-gpio next.
-I think it should set power-gpio first, is it right?
+This change caused a regression on BB-xM where USB would not function
+if 'usb start' had been run from u-boot before booting. A change was
+made to release reset a little bit earlier which fixed the issue on
+BB-xM and did not cause any regressions on 3430 sdp, the board for
+which the fix was originally made.
+
+This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
+before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+
+The original fix to hold the EHCI controller in reset during
+initialization was correct, however it appears that changing
+omap_usbhs_init to not hold the PHYs in reset during it's
+configuration was incorrect. This patch first reverts both fixes, and
+then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
+reset as the original patch had done. It also is sure to incorporate
+the _cansleep change that has been made in the meantime.
+
+I've tested this on Beagleboard xM, I'd really like to get an ack from
+the 3430 sdp and OMAP5 guys before getting this merged.
+
+Signed-off-by: Russ Dill <Russ.Dill@gmail.com>
+---
+ drivers/mfd/omap-usb-host.c  |   45 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/ehci-omap.c |   18 ++++++++---------
+ 2 files changed, 53 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 7e96bb2..10984e2 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -25,6 +25,7 @@
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/spinlock.h>
++#include <linux/gpio.h>
+ #include <plat/cpu.h>
+ #include <plat/usb.h>
+ #include <linux/pm_runtime.h>
+@@ -502,6 +503,19 @@ static void omap_usbhs_init(struct device *dev)
+ 	pm_runtime_get_sync(dev);
+ 	spin_lock_irqsave(&omap->lock, flags);
+ 
++	if (pdata->ehci_data->phy_reset) {
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
++			gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
++					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
++			gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
++					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
++
++		/* Hold the PHY in RESET for enough time till DIR is high */
++		udelay(10);
++	}
++
+ 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
+ 	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
+ 
+@@ -580,10 +594,39 @@ static void omap_usbhs_init(struct device *dev)
+ 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
+ 	}
+ 
++	if (pdata->ehci_data->phy_reset) {
++		/* Hold the PHY in RESET for enough time till
++		 * PHY is settled and ready
++		 */
++		udelay(10);
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
++			gpio_set_value_cansleep
++				(pdata->ehci_data->reset_gpio_port[0], 1);
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
++			gpio_set_value_cansleep
++				(pdata->ehci_data->reset_gpio_port[1], 1);
++	}
++
+ 	spin_unlock_irqrestore(&omap->lock, flags);
+ 	pm_runtime_put_sync(dev);
+ }
+ 
++static void omap_usbhs_deinit(struct device *dev)
++{
++	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
++	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
++
++	if (pdata->ehci_data->phy_reset) {
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
++			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
++			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
++	}
++}
++
+ 
+ /**
+  * usbhs_omap_probe - initialize TI-based HCDs
+@@ -767,6 +810,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+ 	goto end_probe;
+ 
+ err_alloc:
++	omap_usbhs_deinit(&pdev->dev);
+ 	iounmap(omap->tll_base);
+ 
+ err_tll:
+@@ -818,6 +862,7 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
+ {
+ 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
+ 
++	omap_usbhs_deinit(&pdev->dev);
+ 	iounmap(omap->tll_base);
+ 	iounmap(omap->uhh_base);
+ 	clk_put(omap->init_60m_fclk);
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index a44294d..d0815b6 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -192,14 +192,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/* Hold PHYs in reset while initializing EHCI controller */
+ 	if (pdata->phy_reset) {
+ 		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+-			gpio_request_one(pdata->reset_gpio_port[0],
+-					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
++			gpio_set_value_cansleep(pdata->reset_gpio_port[0], 0);
+ 
+ 		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+-			gpio_request_one(pdata->reset_gpio_port[1],
+-					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
++			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 0);
+ 
+ 		/* Hold the PHY in RESET for enough time till DIR is high */
+ 		udelay(10);
+@@ -241,6 +240,11 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
+ 
+ 	ehci_reset(omap_ehci);
++	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
++	if (ret) {
++		dev_err(dev, "failed to add hcd with err %d\n", ret);
++		goto err_add_hcd;
++	}
+ 
+ 	if (pdata->phy_reset) {
+ 		/* Hold the PHY in RESET for enough time till
+@@ -255,12 +259,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 1);
+ 	}
+ 
+-	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+-	if (ret) {
+-		dev_err(dev, "failed to add hcd with err %d\n", ret);
+-		goto err_add_hcd;
+-	}
+-
+ 	/* root ports should always stay powered */
+ 	ehci_port_power(omap_ehci, 1);
+ 
+-- 
+1.7.10.4
