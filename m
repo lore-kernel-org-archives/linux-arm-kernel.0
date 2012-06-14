@@ -1,30 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 14 Jun 2012 01:54:53 -0300
-Subject: MXS getting AUART to work with DT.
-In-Reply-To: <4FD96B3E.6080806@grid-net.com>
-References: <4FD7EFFC.8010204@grid-net.com>
- <CAOMZO5BDFD3hHt+HW_sdh-3hCEwgJJA9C0ecAJZSOUCw_725Jw@mail.gmail.com>
- <4FD96B3E.6080806@grid-net.com>
-Message-ID: <CAOMZO5Bc2ag4WLV+YwqpR7OOfMatd9CBBdT8koFabkPVcQacFw@mail.gmail.com>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Thu, 14 Jun 2012 12:57:08 +0800
+Subject: [PATCH 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <20120613125543.GU12766@atomide.com>
+References: <zumeng.chen@gmail.com>
+ <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
+ <1339423216-1323-6-git-send-email-zumeng.chen@gmail.com>
+ <20120612064757.GE12766@atomide.com>
+ <CA+Y31wdGaMDrT6ySE1y2Z5sw5ah8fE7im_=BvH=s+U+P619O=g@mail.gmail.com>
+ <20120613125543.GU12766@atomide.com>
+Message-ID: <4FD96F24.3080304@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 1:40 AM, Subodh Nijsure <snijsure@grid-net.com> wrote:
-
-> With this change you will only see AUART0 being created all subsequent
-> attempts fail. ?I think we need to have dt specific probe, my colleague Matt
-> Burtch has implemented that dt specific probe for AUART will request him to
-> send his diff tomorrow AM.
->
-> I think something is broken in 3.5 as far as I can tell AUART goes it had
-> worked for me in 3.4, I am novice at device-tree and was not sure if its
-> because of DT or something else.
-
-Ok, just tested linux-next and I see that mxs-auart probes correctly
-for the non-dt kernel.
-
-We need to fix mxs-auart for dt now.
+? 2012?06?13? 20:55, Tony Lindgren ??:
+> * Zumeng Chen<zumeng.chen@gmail.com>  [120612 09:41]:
+>> 2012/6/12 Tony Lindgren<tony@atomide.com>
+>>
+>>> * Zumeng Chen<zumeng.chen@gmail.com>  [120611 07:05]:
+>>>> If we don't set proper debouce time for ads7846, then there are
+>>>> flooded interrupt counters of ads7846 responding to one time
+>>>> touch on screen, so the driver couldn't work well.
+>>>>
+>>>> And since most OMAP3 series boards pass NULL pointer of board_pdata
+>>>> to omap_ads7846_init, so it's more proper to set it in driver level
+>>>> after having gpio_request done.
+>>>>
+>>>> This patch has been validated on 3530evm.
+>>>>
+>>>> Signed-off-by: Zumeng Chen<zumeng.chen@gmail.com>
+>>>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
+>>>> Signed-off-by: Tony Lindgren<tony@atomide.com>
+>>> Please remove my Signed-off-by, where does that come from?
+>>>
+>> HI Tony,
+>>
+>> This comes from git://arago-project.org/git/projects/linux-omap3.git
+>> The commit ID is 53c5ec31, we set gpio_debounce in arch/board
+>> level.
+> Weird, I have no recollection of doing anything with that file..
+> Just remove my Signed-off-by please.
+NP, Tony, done, sorry for inconvenience.
 
 Regards,
-
-Fabio Estevam
+Zumeng
+> Tony
