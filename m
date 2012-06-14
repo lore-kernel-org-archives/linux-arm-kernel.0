@@ -1,79 +1,37 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 14 Jun 2012 12:11:47 -0700
-Subject: [PATCH 04/29] ARM: omap: clk: use clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <1339678038-23082-5-git-send-email-rnayak@ti.com>
-References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
- <1339678038-23082-5-git-send-email-rnayak@ti.com>
-Message-ID: <20120614191147.GP19410@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 14 Jun 2012 21:19:31 +0200
+Subject: Follow-up to remaining issue with alignment of __log_buf in printk.c
+Message-ID: <87aa05vgzg.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120614-18:16, Rajendra Nayak wrote:
-> As we move to Common clk framework use clk_prepare_enable()
-> instead of clk_enable() and similarly clk_disable_unprepare()
-> instead of clk_disable()
-> 
-> Based on initial changes from Mike turquette.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-Hi Rajendra,
+Hi Stephen and others,
 
-This change looks good except for two questions I have below, related to
-calling prepare in an interrupt context.  If those are non-issues then
-please add my:
+I have a XScale PXA based board with has the alignement issue which makes the
+kernel trap during its early stage.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+I wonder what is the status now, is there a fix available ?
 
-(or my Reviewed-by... I can never remember which one is correct)
+I have tracked what happens on PXA. The pxa is an ARM v5TE chip. The new printk
+version you submitted is translated to the following assembly on the line :
+        msg->ts_nsec = local_clock();
+Into:
+=> 0xc001bbe0 <log_store+496>:	strd	r0, [r4, r5]
 
-snip
+In ARMv5, the "strd" assembly opcode expects the address to be 64bits aligned,
+hence the bug.
 
-> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-> index 5fb47a1..e5f8e48 100644
-> --- a/arch/arm/mach-omap2/display.c
-> +++ b/arch/arm/mach-omap2/display.c
-> @@ -471,7 +471,7 @@ int omap_dss_reset(struct omap_hwmod *oh)
->  
->  	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
->  		if (oc->_clk)
-> -			clk_enable(oc->_clk);
-> +			clk_prepare_enable(oc->_clk);
->  
->  	dispc_disable_outputs();
->  
-> @@ -498,7 +498,7 @@ int omap_dss_reset(struct omap_hwmod *oh)
->  
->  	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
->  		if (oc->_clk)
-> -			clk_disable(oc->_clk);
-> +			clk_disable_unprepare(oc->_clk);
->  
->  	r = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
->  
+Now the solutions I have seen so far in the mailing lists :
+ - #define LOG_ALIGN (__alignof__(u64))
+   Does always work.
+ - #define LOG_ALIGN (__alignof__(struct log))
+   Doesn't work with my toolchain, as __alignof__(struct log) is 4, not 8
 
-omap_dss_reset gets used by hwmod/omap_device, right?  Does the reset
-path ever get called in an interrupt context?  If so clk_prepare might
-sleep, which is bad.
+What are you intending to do to solve the ARMv5 issue ? Are you waiting for
+someone to submit a patch ?
 
-snip
+Cheers.
 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index bf86f7e..b46ae17 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -693,7 +693,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
->  	pr_debug("omap_hwmod: %s: enabling clocks\n", oh->name);
->  
->  	if (oh->_clk)
-> -		clk_enable(oh->_clk);
-> +		clk_prepare_enable(oh->_clk);
->  
-
-The same question above applies to basically all of the hwmod function
-changes below.  I don't know if runtime pm invokes these in an interrupt
-context or not, but it is something to think about.
-
-Regards,
-Mike
+-- 
+Robert
