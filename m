@@ -1,286 +1,111 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 13 Jun 2012 22:40:00 -0600
-Subject: [PATCH] i2c: let the core register devices from devicetree
-In-Reply-To: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
-References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20120614044000.63E583E3FA3@localhost>
+From: snijsure@grid-net.com (Subodh Nijsure)
+Date: Wed, 13 Jun 2012 21:40:30 -0700
+Subject: MXS getting AUART to work with DT.
+In-Reply-To: <CAOMZO5BDFD3hHt+HW_sdh-3hCEwgJJA9C0ecAJZSOUCw_725Jw@mail.gmail.com>
+References: <4FD7EFFC.8010204@grid-net.com>
+ <CAOMZO5BDFD3hHt+HW_sdh-3hCEwgJJA9C0ecAJZSOUCw_725Jw@mail.gmail.com>
+Message-ID: <4FD96B3E.6080806@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jun 2012 23:12:10 +0200, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> Currently, every driver has to do it on its own, but it should be done
-> in the core, like we already do with board_info structs.
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-
-FWIW, and without any actual compiling or testing:
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-On this topic, I'd also like to see all of drivers/of/of_i2c.c move
-into drivers/i2c.  I've done the same for spi and gpio and I think the
-result is cleaner.
-
-g.
-
+On 06/13/2012 07:57 PM, Fabio Estevam wrote:
+> On Tue, Jun 12, 2012 at 10:42 PM, Subodh Nijsure<snijsure@grid-net.com>  wrote:
+>> Hi,
+>>
+>> I am testing my mx28 hardware with arm-soc/for-next branch. I have made
+>>   additions shown below to my dt file.
+>>
+>> What I see is only ttyAPP0 device gets created but not the ttyAPP1, do folks
+>> who know DT much better than I, see any issues with this DT definition
+>> below?
+> Would something like the patch below be needed?
+>
 > ---
-> 
-> Based on v3.5-rc2. Only build tested, I don't have a OF based device
-> around at the moment.
-> 
-> @Peter: Why does ocores do the device registration manually via
-> platform_data instead of using board_info?
-> 
->  drivers/i2c/busses/i2c-cpm.c                |    5 -----
->  drivers/i2c/busses/i2c-designware-platdrv.c |    1 -
->  drivers/i2c/busses/i2c-gpio.c               |    2 --
->  drivers/i2c/busses/i2c-ibm_iic.c            |    3 ---
->  drivers/i2c/busses/i2c-imx.c                |    2 --
->  drivers/i2c/busses/i2c-mpc.c                |    1 -
->  drivers/i2c/busses/i2c-mxs.c                |    2 --
->  drivers/i2c/busses/i2c-ocores.c             |    2 --
->  drivers/i2c/busses/i2c-omap.c               |    2 --
->  drivers/i2c/busses/i2c-pnx.c                |    2 --
->  drivers/i2c/busses/i2c-pxa.c                |    1 -
->  drivers/i2c/busses/i2c-s3c2410.c            |    1 -
->  drivers/i2c/busses/i2c-sh_mobile.c          |    1 -
->  drivers/i2c/busses/i2c-tegra.c              |    2 --
->  drivers/i2c/busses/i2c-versatile.c          |    1 -
->  drivers/i2c/busses/i2c-xiic.c               |    2 --
->  drivers/i2c/i2c-core.c                      |    3 +++
->  17 files changed, 3 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-cpm.c b/drivers/i2c/busses/i2c-cpm.c
-> index c1e1096..749e63c 100644
-> --- a/drivers/i2c/busses/i2c-cpm.c
-> +++ b/drivers/i2c/busses/i2c-cpm.c
-> @@ -673,11 +673,6 @@ static int __devinit cpm_i2c_probe(struct platform_device *ofdev)
->  	dev_dbg(&ofdev->dev, "hw routines for %s registered.\n",
->  		cpm->adap.name);
->  
-> -	/*
-> -	 * register OF I2C devices
-> -	 */
-> -	of_i2c_register_devices(&cpm->adap);
-> -
->  	return 0;
->  out_shut:
->  	cpm_i2c_shutdown(cpm);
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 0506fef..cf3b23c 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -147,7 +147,6 @@ static int __devinit dw_i2c_probe(struct platform_device *pdev)
->  		dev_err(&pdev->dev, "failure adding adapter\n");
->  		goto err_free_irq;
->  	}
-> -	of_i2c_register_devices(adap);
->  
->  	return 0;
->  
-> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-> index e62d2d9..75e26b9 100644
-> --- a/drivers/i2c/busses/i2c-gpio.c
-> +++ b/drivers/i2c/busses/i2c-gpio.c
-> @@ -195,8 +195,6 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_add_bus;
->  
-> -	of_i2c_register_devices(adap);
-> -
->  	platform_set_drvdata(pdev, priv);
->  
->  	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
-> diff --git a/drivers/i2c/busses/i2c-ibm_iic.c b/drivers/i2c/busses/i2c-ibm_iic.c
-> index 806e225..8894ab6 100644
-> --- a/drivers/i2c/busses/i2c-ibm_iic.c
-> +++ b/drivers/i2c/busses/i2c-ibm_iic.c
-> @@ -759,9 +759,6 @@ static int __devinit iic_probe(struct platform_device *ofdev)
->  	dev_info(&ofdev->dev, "using %s mode\n",
->  		 dev->fast_mode ? "fast (400 kHz)" : "standard (100 kHz)");
->  
-> -	/* Now register all the child nodes */
-> -	of_i2c_register_devices(adap);
-> -
->  	return 0;
->  
->  error_cleanup:
-> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> index 8d6b504..16d9356 100644
-> --- a/drivers/i2c/busses/i2c-imx.c
-> +++ b/drivers/i2c/busses/i2c-imx.c
-> @@ -568,8 +568,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->  		goto fail5;
->  	}
->  
-> -	of_i2c_register_devices(&i2c_imx->adapter);
-> -
->  	/* Set up platform driver data */
->  	platform_set_drvdata(pdev, i2c_imx);
->  
-> diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
-> index b76731e..a86049a 100644
-> --- a/drivers/i2c/busses/i2c-mpc.c
-> +++ b/drivers/i2c/busses/i2c-mpc.c
-> @@ -675,7 +675,6 @@ static int __devinit fsl_i2c_probe(struct platform_device *op)
->  		dev_err(i2c->dev, "failed to add adapter\n");
->  		goto fail_add;
->  	}
-> -	of_i2c_register_devices(&i2c->adap);
->  
->  	return result;
->  
-> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-> index 04eb441..2bc0ec6 100644
-> --- a/drivers/i2c/busses/i2c-mxs.c
-> +++ b/drivers/i2c/busses/i2c-mxs.c
-> @@ -379,8 +379,6 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
->  		return err;
->  	}
->  
-> -	of_i2c_register_devices(adap);
-> -
->  	return 0;
->  }
->  
-> diff --git a/drivers/i2c/busses/i2c-ocores.c b/drivers/i2c/busses/i2c-ocores.c
-> index 75194c5..a6a11cb 100644
-> --- a/drivers/i2c/busses/i2c-ocores.c
-> +++ b/drivers/i2c/busses/i2c-ocores.c
-> @@ -344,8 +344,6 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
->  	if (pdata) {
->  		for (i = 0; i < pdata->num_devices; i++)
->  			i2c_new_device(&i2c->adap, pdata->devices + i);
-> -	} else {
-> -		of_i2c_register_devices(&i2c->adap);
->  	}
->  
->  	return 0;
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 801df60..c290091 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1121,8 +1121,6 @@ omap_i2c_probe(struct platform_device *pdev)
->  		goto err_free_irq;
->  	}
->  
-> -	of_i2c_register_devices(adap);
-> -
->  	return 0;
->  
->  err_free_irq:
-> diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
-> index 99389d2..c64d960 100644
-> --- a/drivers/i2c/busses/i2c-pnx.c
-> +++ b/drivers/i2c/busses/i2c-pnx.c
-> @@ -730,8 +730,6 @@ static int __devinit i2c_pnx_probe(struct platform_device *pdev)
->  		goto out_irq;
->  	}
->  
-> -	of_i2c_register_devices(&alg_data->adapter);
-> -
->  	dev_dbg(&pdev->dev, "%s: Master at %#8x, irq %d.\n",
->  		alg_data->adapter.name, res->start, alg_data->irq);
->  
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index a997c7d..9475235 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -1194,7 +1194,6 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  		printk(KERN_INFO "I2C: Failed to add bus\n");
->  		goto eadapt;
->  	}
-> -	of_i2c_register_devices(&i2c->adap);
->  
->  	platform_set_drvdata(dev, i2c);
->  
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index 0195915..ad3a79b 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -1058,7 +1058,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
->  		goto err_cpufreq;
->  	}
->  
-> -	of_i2c_register_devices(&i2c->adap);
->  	platform_set_drvdata(pdev, i2c);
->  
->  	pm_runtime_enable(&pdev->dev);
-> diff --git a/drivers/i2c/busses/i2c-sh_mobile.c b/drivers/i2c/busses/i2c-sh_mobile.c
-> index 8110ca4..9acd286 100644
-> --- a/drivers/i2c/busses/i2c-sh_mobile.c
-> +++ b/drivers/i2c/busses/i2c-sh_mobile.c
-> @@ -670,7 +670,6 @@ static int sh_mobile_i2c_probe(struct platform_device *dev)
->  	dev_info(&dev->dev, "I2C adapter %d with bus speed %lu Hz\n",
->  		 adap->nr, pd->bus_speed);
->  
-> -	of_i2c_register_devices(adap);
->  	return 0;
->  
->   err_all:
-> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> index 8b2e555..67388cc 100644
-> --- a/drivers/i2c/busses/i2c-tegra.c
-> +++ b/drivers/i2c/busses/i2c-tegra.c
-> @@ -684,8 +684,6 @@ static int __devinit tegra_i2c_probe(struct platform_device *pdev)
->  		goto err_free_irq;
->  	}
->  
-> -	of_i2c_register_devices(&i2c_dev->adapter);
-> -
->  	return 0;
->  err_free_irq:
->  	free_irq(i2c_dev->irq, i2c_dev);
-> diff --git a/drivers/i2c/busses/i2c-versatile.c b/drivers/i2c/busses/i2c-versatile.c
-> index eec20db..14a1432 100644
-> --- a/drivers/i2c/busses/i2c-versatile.c
-> +++ b/drivers/i2c/busses/i2c-versatile.c
-> @@ -108,7 +108,6 @@ static int i2c_versatile_probe(struct platform_device *dev)
->  	ret = i2c_bit_add_numbered_bus(&i2c->adap);
->  	if (ret >= 0) {
->  		platform_set_drvdata(dev, i2c);
-> -		of_i2c_register_devices(&i2c->adap);
->  		return 0;
->  	}
->  
-> diff --git a/drivers/i2c/busses/i2c-xiic.c b/drivers/i2c/busses/i2c-xiic.c
-> index 641d0e5..d76bb71 100644
-> --- a/drivers/i2c/busses/i2c-xiic.c
-> +++ b/drivers/i2c/busses/i2c-xiic.c
-> @@ -754,8 +754,6 @@ static int __devinit xiic_i2c_probe(struct platform_device *pdev)
->  			i2c_new_device(&i2c->adap, pdata->devices + i);
->  	}
->  
-> -	of_i2c_register_devices(&i2c->adap);
-> -
->  	return 0;
->  
->  add_adapter_failed:
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index a6ad32b..4791833 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -39,6 +39,7 @@
->  #include <linux/irqflags.h>
->  #include <linux/rwsem.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/of_i2c.h>
->  #include <asm/uaccess.h>
->  
->  #include "i2c-core.h"
-> @@ -880,6 +881,8 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
->  #endif
->  
->  	/* create pre-declared device nodes */
-> +	of_i2c_register_devices(adap);
+>   arch/arm/boot/dts/imx28.dtsi   |    5 +++++
+>   drivers/tty/serial/mxs-auart.c |    9 +++++++++
+>   2 files changed, 14 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 4634cb8..d524377 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -404,30 +404,35 @@
+>   			};
+>
+>   			auart0: serial at 8006a000 {
+> +				compatible = "fsl,mxs-auart";
+>   				reg =<0x8006a000 0x2000>;
+>   				interrupts =<112 70 71>;
+>   				status = "disabled";
+>   			};
+>
+>   			auart1: serial at 8006c000 {
+> +				compatible = "fsl,mxs-auart";
+>   				reg =<0x8006c000 0x2000>;
+>   				interrupts =<113 72 73>;
+>   				status = "disabled";
+>   			};
+>
+>   			auart2: serial at 8006e000 {
+> +				compatible = "fsl,mxs-auart";
+>   				reg =<0x8006e000 0x2000>;
+>   				interrupts =<114 74 75>;
+>   				status = "disabled";
+>   			};
+>
+>   			auart3: serial at 80070000 {
+> +				compatible = "fsl,mxs-auart";
+>   				reg =<0x80070000 0x2000>;
+>   				interrupts =<115 76 77>;
+>   				status = "disabled";
+>   			};
+>
+>   			auart4: serial at 80072000 {
+> +				compatible = "fsl,mxs-auart";
+>   				reg =<0x80072000 0x2000>;
+>   				interrupts =<116 78 79>;
+>   				status = "disabled";
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index ec56d83..6540f28 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -33,6 +33,8 @@
+>   #include<linux/delay.h>
+>   #include<linux/io.h>
+>   #include<linux/pinctrl/consumer.h>
+> +#include<linux/of.h>
+> +#include<linux/of_address.h>
+>
+>   #include<asm/cacheflush.h>
+>
+> @@ -769,12 +771,19 @@ static int __devexit mxs_auart_remove(struct
+> platform_device *pdev)
+>   	return 0;
+>   }
+>
+> +static struct of_device_id mxs_auart_dt_ids[] = {
+> +	{.compatible = "fsl,mxs-auart", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_auart_of_match);
 > +
->  	if (adap->nr < __i2c_first_dynamic_bus_num)
->  		i2c_scan_static_board_info(adap);
->  
-> -- 
-> 1.7.10
-> 
+>   static struct platform_driver mxs_auart_driver = {
+>   	.probe = mxs_auart_probe,
+>   	.remove = __devexit_p(mxs_auart_remove),
+>   	.driver = {
+>   		.name = "mxs-auart",
+>   		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(mxs_auart_dt_ids),
+>   	},
+>   };
+>
+With this change you will only see AUART0 being created all subsequent 
+attempts fail.  I think we need to have dt specific probe, my colleague 
+Matt Burtch has implemented that dt specific probe for AUART will 
+request him to send his diff tomorrow AM.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+I think something is broken in 3.5 as far as I can tell AUART goes it 
+had worked for me in 3.4, I am novice at device-tree and was not sure if 
+its because of DT or something else.
+
+-Subodh
