@@ -1,34 +1,32 @@
 From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 08:42:37 +0000
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <20120614083957.GC12766@atomide.com>
-References: <4FD6586A.9060706@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
- <4FD782F7.9010003@ti.com> <20120613120717.GP12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
- <20120613134032.GW12766@atomide.com> <20120613134408.GY12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998F2F@DBDE01.ent.ti.com>
- <20120614063524.GB12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99952D@DBDE01.ent.ti.com>
- <20120614083957.GC12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9996A8@DBDE01.ent.ti.com>
+Date: Thu, 14 Jun 2012 08:44:01 +0000
+Subject: [PATCH v5 05/14] ARM: OMAP2+: gpmc: resource creation helpers
+In-Reply-To: <4FD8B2D8.9000603@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
+ <4FD65BA5.4020205@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997EE1@DBDE01.ent.ti.com>
+ <4FD7841D.1000202@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9987E3@DBDE01.ent.ti.com>
+ <4FD8B2D8.9000603@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9996BE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Jon,
 
-On Thu, Jun 14, 2012 at 14:09:58, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120613 23:44]:
+On Wed, Jun 13, 2012 at 21:03:44, Hunter, Jon wrote:
+> On 06/13/2012 12:29 AM, Mohammed, Afzal wrote:
 
-> > Sorry, I got confused, we need revision to be available while setting
-> > time also, so you meant to store it as a variable or read revision
-> > at probe as well as during setting time ?
+> > Irq & memory resource creation functions returns number of resources,
+> > if memory function only is modified, that will cause loss of uniformity
+> > w.r.t irq function, even though both does similar things.
 > 
-> You can set up GPMC specific flags during init, something like
-> OMAP_GPMC_HAS_XYZ, or you can set up function pointers if only
-> some features are available on some revisions.
+> Ok, I see what you mean but from a readability standpoint it looked odd.
+> The other function is returning "n" where as this is just returning 1 on
+> success but it is not clear that this actually means 1 resource.
 
-Ok, got it
+Ok, I will add comments to make it clear
 
 Regards
 Afzal
