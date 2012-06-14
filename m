@@ -1,108 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 14 Jun 2012 12:18:42 +0300
-Subject: [PATCHv3 03/20] ARM: OMAP4: PM: add support for device off
-In-Reply-To: <CAORVsuUJOpQu1qE7qmK9PS79JZJ065egqcpfgmsWNHwnhLUdvw@mail.gmail.com>
-References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
- <1339515095-9908-4-git-send-email-t-kristo@ti.com>
- <CAORVsuUJOpQu1qE7qmK9PS79JZJ065egqcpfgmsWNHwnhLUdvw@mail.gmail.com>
-Message-ID: <1339665522.2091.164.camel@sokoban>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 14 Jun 2012 11:18:58 +0200
+Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for
+ DT boards
+In-Reply-To: <201206140812.34399.arnd@arndb.de>
+References: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
+ <201206140812.34399.arnd@arndb.de>
+Message-ID: <20120614091858.GD4799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-13 at 17:21 +0200, Jean Pihet wrote:
-> Hi Tero,
-> 
-> I have a few remarks regarding the genericity of this code. I think it
-> is better if the code in powerdomain.c stays generic and that the
-> platform specific checks and operations be moved in the specific
-> functions (via the pwrdm_ops struct).
-
-Well, I was thinking about this, however it looks like I need to copy
-over most of the implementation of omap_set_pwrdm_state and
-get_next_achievable_state if I want to do that, or alternatively
-overload the underlying omap4 pwrdm code which does not seem that good
-solution either.
-
-> 
-> On Tue, Jun 12, 2012 at 5:31 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> > On OMAP4+, device wide off-mode has its own enable mechanism in addition
-> > to powerdomain target states. This patch adds support for this on top
-> > of functional power states by overloading the OFF state for core pwrdm.
-> > On pwrdm level, the deepest power state supported by core pwrdm is OSWR.
-> > When user (e.g. suspend) programs core pwrdm target as OFF, the functional
-> > power state for the domain will be OSWR with the additional device off
-> > enabled. Previous power state information will reflect this also.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/powerdomain.c           |   17 +++++++++
-> >  arch/arm/mach-omap2/powerdomain.h           |   13 +++++++-
-> >  arch/arm/mach-omap2/powerdomain44xx.c       |   48 +++++++++++++++++++++++++++
-> >  arch/arm/mach-omap2/powerdomains44xx_data.c |    3 +-
-> >  4 files changed, 79 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> > index ac63f86..78a9308 100644
-> > --- a/arch/arm/mach-omap2/powerdomain.c
-> > +++ b/arch/arm/mach-omap2/powerdomain.c
-> > @@ -677,6 +677,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
-> >        int sleep_switch = -1, ret = 0, hwsup = 0;
-> >        int new_func_pwrst, next_func_pwrst, pwrst, logic;
-> >        u8 curr_pwrst;
-> > +       bool extra_off_enable = false;
-> > +       bool has_extra_off = false;
-> >
-> >        if (!pwrdm || IS_ERR(pwrdm)) {
-> >                pr_debug("%s: invalid params: pwrdm=%p\n", __func__, pwrdm);
-> > @@ -687,6 +689,13 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
-> >
-> >        mutex_lock(&pwrdm->lock);
-> >
-> > +       /* Check if powerdomain has extra off mode handling */
-> > +       if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
-> > +               has_extra_off = true;
-> > +               if (func_pwrst == PWRDM_FUNC_PWRST_OFF)
-> > +                       extra_off_enable = true;
-> > +       }
-> Could those checks be moved in the OMAP4 specific functions, so that
-> the power domain code stays generic?
-
-I'll try to do that and see what happens. The problem I tried to tackle
-with this implementation is that even when core next state is programmed
-to func OFF, we must program the powerdomain itself to OSWR, which the
-current functional pwrst framework does not support too well.... or as
-you say, I need to re-write the omap4 pwrdm state handling code itself
-which kind of eats the benefit of the functional power states away.
-
-> 
+On Thu, Jun 14, 2012 at 08:12:34AM +0000, Arnd Bergmann wrote:
+> On Sunday 10 June 2012, Andrew Lunn wrote:
+> > +static int __init kirkwood_add_irq_domain(struct device_node *np,
+> > +                                         struct device_node *interrupt_parent)
+> > +{
+> > +       kirkwood_init_irq();
+> > +       irq_domain_add_legacy(np, 64, 0, 0, &irq_domain_simple_ops, NULL);
+> > +       return 0;
+> > +}
 > > +
-> >        new_func_pwrst = pwrdm_get_achievable_func_pwrst(pwrdm, func_pwrst);
-> >        pwrst = pwrdm_func_to_pwrst(pwrdm, new_func_pwrst);
-> >        logic = pwrdm_func_to_logic_pwrst(pwrdm, new_func_pwrst);
-> > @@ -741,6 +750,9 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
-> >                break;
-> >        }
-> >
-> > +       if (has_extra_off && arch_pwrdm->pwrdm_enable_off)
-> > +               arch_pwrdm->pwrdm_enable_off(pwrdm, extra_off_enable);
+> > +static const struct of_device_id kirkwood_irq_match[] = {
+> > +       { .compatible = "marvell,orion-intc",
+> > +         .data = kirkwood_add_irq_domain, },
+> > +       {},
+> > +};
 > > +
-> >  out:
-> >        mutex_unlock(&pwrdm->lock);
-> >        return ret;
-> > @@ -810,6 +822,11 @@ int pwrdm_read_next_func_pwrst(struct powerdomain *pwrdm)
-> >        int next_pwrst = pwrdm_read_next_pwrst(pwrdm);
-> >        int next_logic = pwrdm_read_logic_retst(pwrdm);
-> >
-> > +       if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE &&
-> > +           arch_pwrdm->pwrdm_read_next_off &&
-> > +           arch_pwrdm->pwrdm_read_next_off(pwrdm))
-> > +               return PWRDM_FUNC_PWRST_OFF;
+> > +static void __init kirkwood_dt_init_irq(void)
+> > +{
+> > +       of_irq_init(kirkwood_irq_match);
+> > +}
 > > +
-> Same comment here. The OMAP4 specific function for
-> pwrdm_read_next_pwrst could return PWRDM_FUNC_PWRST_OFF.
+> 
+> I think if you compute the number of interrupts in the domain from the number of
+> registers that are described in the device tree, call orion_irq_init()
+> based on those registers, and use irq domains for the gpio stuff as Rob suggested,
+> this init_irq function can become completely generic to all orion platforms.
 
-Same issue.
+I'm reworking the GPIO stuff at the moment, moving it to use IRQ
+domains for its interrupts. That code will be generic to all Orion
+platforms. I'm modeling the code on the AT91 GPIO handler, since that
+has a similar structure, one hardware interrupt for a number of GPIO
+lines, which is in software demultiplexed and triggers secondary level
+interrupts. The major difference is that AT91 has one hardware
+interrupt for a GPIO chip with 32 lines, where as Orion has 4 hardware
+interrupt lines, so maybe four interrupt domains, for one GPIO chip
+with 32 lines.
 
-Anyway, I'll try to fiddle with the code bit more and see what happens.
+Non-GPIO interrupts are more of a problem. Underneath it uses the
+generic-chip interrupt code. The patchset to add _domain versions of
+these calls is stalled. So i think for the moment, we need to stay
+with the domain bolted on top, until generic-chip gets domain
+support. I would also expect that generic-chip also gets a common DT
+binding which any SoC can use.
 
--Tero
+My aim at the moment is to get something which works well enough that
+we can add DT support to other drivers. Without interrupts, we are not
+going to get very far. We can later rip it out what i create now and
+replace it once generic-chip becomes domain and DT aware, and there
+should be no effect on other drivers.
+
+       Andrew
