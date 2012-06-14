@@ -1,61 +1,90 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 14 Jun 2012 12:43:31 +0100
-Subject: [PATCH v2] ARM: vexpress: Enable SPARSE_IRQ
-In-Reply-To: <1339673581.3044.10.camel@linaro1.home>
-References: <1339607602-3846-1-git-send-email-tixy@linaro.org>
- <20120614085553.GB28714@n2100.arm.linux.org.uk>
- <1339673581.3044.10.camel@linaro1.home>
-Message-ID: <1339674211.3044.14.camel@linaro1.home>
+From: wni@nvidia.com (Wei Ni)
+Date: Thu, 14 Jun 2012 19:44:07 +0800
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C377BFFE8A@HKMAIL01.nvidia.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8A@HKMAIL01.nvidia.com>
+Message-ID: <6B4D417B830BC44B8026029FD256F7F1C377BFFE8B@HKMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable vexpress to be included in multiplatform kernels containing
-boards which require SPARSE_IRQ, we need to also support this option.
-This turns out to be very simple...
+On Thu, Jun 14, 2012 at 19:27:50, Wei Ni wrote:
+>On Thu, Jun 14, 2012 at 05:17:06, Stephen Warren wrote:
+>>On 06/13/2012 04:40 AM, Wei Ni wrote:
+>>> Hi, all
+>>> I'm working on the tegra30 wifi upstream issue.
+>>>
+>>> The tegra30 board (Cardhu) use Broadcom 4329 as wifi device, and use brcmfmac as the wifi driver.
+>>>
+>>> In the brcmfmac init routine, it call sdio_register_driver() to 
+>>> register driver, if the wifi device
+>is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
+>>>
+>>> On the Cardhu, the wifi's power is controlled by two gpios 
+>>> (power-gpio and reset-gpio), the default state is power-off. So we 
+>>> need to power on it before
+>calling sdio_register_driver(), if not, the mmc driver can't enumerate 
+>it, and will not call the probe routine.
+>>> This power on sequence is:
+>>> set power-gpio to 1 ;
+>>> mdelay(100) ;
+>>> set reset-gpio to 1 ;
+>>> mdelay(200);
+>>>
+>>> My question is where to power on the wifi. We may have three places to power on it:
+>>> 1. power on it in the brcmfmac driver before calling 
+>>> sdio_register_driver(). But I think this power sequence is special 
+>>> for tegra30 cardhu, it's not
+>good to add it in the generic wifi driver, because different board may 
+>use the different way to power on the wifi.
+>>> 2. power on it in the mmc driver. In our tegra SD driver, it has 
+>>> power-gpios property, which allow the slot to be powered. But this 
+>>> power is for mmc slot, could we
+>add this wifi power sequence in the tegra SD driver?
+>>> 3. hard-coded into DT. Set these gpios in the DT, something like 
+>>> pinmux settings, but in this way,
+>it's not good to put the mdelay() value in the DT.
+>>>
+>>> I have no good idea for it, does anyone has suggestion?
+>>
+>>The core of the issue is that:
+>>
+>>* Tegra30 support is via device tree.
+>>* We have an SDIO bus, and the WiFi device attached to that bus is enumerable.
+>>* Since the WiFi device is enumerable, no node exists in the DT to represent it.
+>>* However, the driver for the WiFi device needs certain information, 
+>>such as the reset GPIO ID and perhaps power GPIO.
+>>
+>>For the power GPIO, it seems reasonable to either use the existing 
+>>Tegra SD controller's power-gpios DT property, or replace that 
+>>property with a real regulator binding. The SD driver would then control this.
+>>Still, that approach would mean the WiFi driver wouldn't be able to 
+>>control power to the device
+>directly, which might not be a good thing.
+>>
+>>However, I'm not sure that the reset GPIO is also something that 
+>>should be controlled by the SD card driver; it seems like it's much 
+>>more closely related to the WiFi
+>device/driver.
+>>
+>>I wonder if the power and reset GPIO shouldn't be represented as a 
+>>combined custom regulator type, which knows how to sequence multiple GPIOs.
+>>
+>>Perhaps SDIO "client" devices also need a way to communicate with 
+>>their "host port" to obtain services such as power and reset control?
+>>
+>>This is all very similar to the WiFi rfkill discussion we have re: the 
+>>Toshiba AC100 a little while back, although that was USB rather than SDIO.
+>
+>In the rfkill-gpio, it already have the reset-gpio and shutdown-gpio.
+>I test it, add a device node in the DT to pass the gpio properties.
+>It will use these gpios to power up/off , but its default power sequence is different with the 4329.
+>It block==0, it mean power up, it will set reset-gpio first, then set power-gpio next.
+>I think it should set power-gpio first, is it right?
+>
+I test with the rfkill-gpio's default power sequence just now, it also can power up the device.
+It seems we can use this rfkill-gpio driver.
 
-We remove NR_IRQS from mach/irq.h as that is unused with SPARSE_IRQ
-and include this header directly in ct-ca9x4.c as it will no longer
-be included via asm/irq.h.
-
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
- arch/arm/mach-vexpress/include/mach/irqs.h |    2 --
- arch/arm/mach-vexpress/ct-ca9x4.c          |    1 +
- arch/arm/Kconfig                           |    1 +
- 3 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-vexpress/include/mach/irqs.h b/arch/arm/mach-vexpress/include/mach/irqs.h
-index 4b10ee7..b64611d 100644
---- a/arch/arm/mach-vexpress/include/mach/irqs.h
-+++ b/arch/arm/mach-vexpress/include/mach/irqs.h
-@@ -1,4 +1,2 @@
- #define IRQ_LOCALTIMER		29
- #define IRQ_LOCALWDOG		30
--
--#define NR_IRQS	256
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 3ef3fda..0f477a5 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -26,6 +26,7 @@
- 
- #include "core.h"
- 
-+#include <mach/irqs.h>
- #include <mach/motherboard.h>
- 
- #include <plat/clcd.h>
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 6f3370e..9dd9701 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -314,6 +314,7 @@ config ARCH_VEXPRESS
- 	select NO_IOPORT
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLCD
-+	select SPARSE_IRQ
- 	help
- 	  This enables support for the ARM Ltd Versatile Express boards.
- 
--- 
-1.7.10
+nvpublic
