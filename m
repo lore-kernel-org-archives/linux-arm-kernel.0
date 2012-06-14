@@ -1,43 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Jun 2012 14:48:05 +0300
-Subject: [PATCH 06/17] i2c: omap: improve 1p153 errata handling
-In-Reply-To: <20120614111746.GB31187@n2100.arm.linux.org.uk>
-References: <1339669250-9183-1-git-send-email-balbi@ti.com>
- <1339669250-9183-7-git-send-email-balbi@ti.com>
- <20120614111746.GB31187@n2100.arm.linux.org.uk>
-Message-ID: <20120614114804.GS13602@arwen.pp.htv.fi>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Jun 2012 04:52:08 -0700
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
+References: <4FD63DBF.9000200@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+ <4FD77E35.3050703@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
+ <20120613113217.GK12766@atomide.com>
+ <20120613115445.GM12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
+ <20120614101901.GI12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
+Message-ID: <20120614115207.GL12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jun 14, 2012 at 12:17:46PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 14, 2012 at 01:20:39PM +0300, Felipe Balbi wrote:
-> > -static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
-> > +static int errata_omap3_1p153(struct omap_i2c_dev *dev)
-> >  {
-> > -	unsigned long timeout = 10000;
-> > +	unsigned long	timeout = 10000;
-> > +	u16		stat;
+* Mohammed, Afzal <afzal@ti.com> [120614 03:43]:
+> Hi Tony,
 > 
-> Eww, no, not more of this "lets add tabs to align auto variable
-> declarations".  This is detrimental when you add another variable whose
-> type is longer than the current indentation - you have to reformat the
-> entire block.
+> On Thu, Jun 14, 2012 at 15:49:02, Tony Lindgren wrote:
 > 
-> It's really not worth it.  Stick to just using one space, like the rest
-> of the kernel code.  Like the code which Linus writes.  And thereby help
-> to avoid future "pointless churn" whinges.
+> > Well I took a look at the values, and it seems the only difference is the
+> > static GPMC_CONFIG1_CLKACTIVATIONTIME(1) that your patch now overwrites 0.
+> 
+> It seems change below should be part of $subject.
+> 
+> Please let me know your comments
+> 
+> Regards
+> Afzal
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+> index fd4c48d..938896c 100644
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -321,6 +321,8 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
+>         t.rd_cycle = gpmc_ticks_to_ns(fclk_offset + (latency + 1) * div +
+>                      ticks_cez);
+> 
+> +       t.clk_activation = fclk_offset_ns;
+> +
 
-fair enough, no need to get so over the top like that, it's just a tab.
-Will fix it.
+This too should be fclk_offset, not fclk_offset_ns.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/3663b33e/attachment.sig>
+Tony
