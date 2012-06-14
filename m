@@ -1,64 +1,70 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 14 Jun 2012 08:36:53 +0800
-Subject: [Patch v5 03/13] USB: notify phy when root hub port connect change
-In-Reply-To: <Pine.LNX.4.44L0.1206131418290.1401-100000@iolanthe.rowland.org>
-References: <1339590863-10564-4-git-send-email-richard.zhao@freescale.com>
- <Pine.LNX.4.44L0.1206131418290.1401-100000@iolanthe.rowland.org>
-Message-ID: <20120614003653.GA29684@b20223-02.ap.freescale.net>
+Date: Thu, 14 Jun 2012 09:12:12 +0800
+Subject: [Patch v5 05/13] usb: otg: add basic mxs phy driver support
+In-Reply-To: <201206132356.16093.marex@denx.de>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-6-git-send-email-richard.zhao@freescale.com>
+ <20120613213312.GD30400@pengutronix.de>
+ <201206132356.16093.marex@denx.de>
+Message-ID: <20120614011211.GB29684@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 02:25:17PM -0400, Alan Stern wrote:
-> On Wed, 13 Jun 2012, Richard Zhao wrote:
+On Wed, Jun 13, 2012 at 11:56:15PM +0200, Marek Vasut wrote:
+> Dear Sascha Hauer,
 > 
-> > Phy may need to change settings when port connect change.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  drivers/usb/core/hub.c |    8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> > index 04fb834..e1a6d31 100644
-> > --- a/drivers/usb/core/hub.c
-> > +++ b/drivers/usb/core/hub.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/usb.h>
-> >  #include <linux/usbdevice_fs.h>
-> >  #include <linux/usb/hcd.h>
-> > +#include <linux/usb/otg.h>
-> >  #include <linux/usb/quirks.h>
-> >  #include <linux/kthread.h>
-> >  #include <linux/mutex.h>
-> > @@ -4034,6 +4035,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
-> >  		}
-> >  	}
-> >  
-> > +	if (unlikely(hcd->phy && !hdev->level)) {
+> > On Wed, Jun 13, 2012 at 08:34:15PM +0800, Richard Zhao wrote:
+> > > mxs phy is used in Freescale i.MX SoCs, for example
+> > > imx23, imx28, imx6Q. This patch adds the basic host
+> > > support.
+> > > 
+> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Peter Chen <peter.chen@freescale.com>
+> > > Acked-by: Felipe Balbi <balbi@ti.com>
+> [...]
 > 
-> This is okay, but it's more common to test for root hubs with 
-> "!hdev->parent".
-So it will be like:
-if (unlikely(hcd->phy && !hdev->parent)) {
-
-And,
-I didn't check (portchange & USB_PORT_STAT_C_CONNECTION), because if
-the device is connected on boot, there'll be no USB_PORT_STAT_C_CONNECTION.
-Is it acceptable?
+> > > +	/* Remove CLKGATE and SFTRST */
+> > > +	writel_relaxed(BM_USBPHY_CTRL_CLKGATE | BM_USBPHY_CTRL_SFTRST,
+> > > +			base + HW_USBPHY_CTRL_CLR);
+> > > +	udelay(10);
+> > 
+> > Is stmp_reset_block() suitable for what you want to do here?
+> 
+> IIRC it is.
+Thanks.
+> 
+> > > +	base = devm_request_and_ioremap(&pdev->dev, res);
+> > > +	if (!base)
+> > > +		return -EBUSY;
+> > > +
+> > > +	clk = devm_clk_get(&pdev->dev, NULL);
+> > > +	if (IS_ERR(clk)) {
+> > > +		dev_err(&pdev->dev, "can't get the clock!");
+> > 
+> > Please add the return value to these kind of messages.
+Make sense.
+> > 
+> > > +		return PTR_ERR(clk);
+> > > +	}
+> > > +
+> > > +	mxs_phy = devm_kzalloc(&pdev->dev, sizeof(*mxs_phy), GFP_KERNEL);
+> > > +	if (!mxs_phy) {
+> > > +		dev_err(&pdev->dev, "Failed to allocate USB PHY structure!\n");
+> > 
+> > This message is rather useless. It is really not expected for kzalloc
+> > to fail. If it fails here you really have problems elsewhere and this
+> > message won't help you debugging it.
+At least it shows the point it fails and people can look back what code
+has been run.
 
 Thanks
 Richard
-
-> > +		if (portstatus & USB_PORT_STAT_CONNECTION)
-> > +			usb_phy_notify_connect(hcd->phy, port1);
-> > +		else
-> > +			usb_phy_notify_disconnect(hcd->phy, port1);
-> > +	}
-> > +
-> >  	/* Return now if debouncing failed or nothing is connected or
-> >  	 * the device was "removed".
-> >  	 */
 > 
-> Alan Stern
+> It's not useless, but it'll hardly ever be displayed if you run out of memory so 
+> badly this kzalloc() will fail.
 > 
+> > Sascha
+> 
+> Best regards,
 > 
