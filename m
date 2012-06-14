@@ -1,35 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jun 2012 01:56:52 -0700
-Subject: [PATCH 6/9] ARM: OMAP2+: gpmc-smsc911x: Adapt to use gpmc driver
-In-Reply-To: <fa4fd074305f914d38603443b857422f95680725.1339419379.git.afzal@ti.com>
-References: <cover.1339419379.git.afzal@ti.com>
- <fa4fd074305f914d38603443b857422f95680725.1339419379.git.afzal@ti.com>
-Message-ID: <20120614085650.GD12766@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 14 Jun 2012 11:01:11 +0200
+Subject: [Linaro-mm-sig] [PATCHv2 1/6] common: DMA-mapping: add
+ DMA_ATTR_NO_KERNEL_MAPPING attribute
+In-Reply-To: <20120613185202.GM4829@phenom.ffwll.local>
+References: <1339588218-24398-1-git-send-email-m.szyprowski@samsung.com>
+ <1339588218-24398-2-git-send-email-m.szyprowski@samsung.com>
+ <20120613185202.GM4829@phenom.ffwll.local>
+Message-ID: <003601cd4a0c$431d7780$c9586680$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [120611 08:20]:
-> +__init gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg)
-> +{
-> +	int ret;
-> +	struct gpmc_device_pdata *gpmc_pdev;
-> +	struct gpmc_cs_data *gpmc_cs;
-> +
-> +	gpmc_pdev = kzalloc(sizeof(*gpmc_pdev), GFP_KERNEL);
-> +	if (gpmc_pdev == NULL)
-> +		return gpmc_pdev;
-> +
-> +	gpmc_cs = kzalloc(sizeof(*gpmc_cs), GFP_KERNEL);
-> +	if (gpmc_pdev == NULL) {
-> +		kfree(gpmc_pdev);
-> +		return NULL;
-> +	}
+Hello,
 
-Here your should check for if (!gpmc_cs), not gpmc_cs. Might
-be worth checking all your patches for similar copy and paste
-typos.
+On Wednesday, June 13, 2012 8:52 PM Daniel Vetter wrote:
 
-Where do gpmc_pdev and gpmc_cs get used? Where are they
-stored to the pdata?
+> On Wed, Jun 13, 2012 at 01:50:13PM +0200, Marek Szyprowski wrote:
+> > This patch adds DMA_ATTR_NO_KERNEL_MAPPING attribute which lets the
+> > platform to avoid creating a kernel virtual mapping for the allocated
+> > buffer. On some architectures creating such mapping is non-trivial task
+> > and consumes very limited resources (like kernel virtual address space
+> > or dma consistent address space). Buffers allocated with this attribute
+> > can be only passed to user space by calling dma_mmap_attrs().
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Looks like a nice little extension to support dma-buf for the common case,
+> so:
+> 
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> 
+> One question is whether we should go right ahead and add kmap support for
+> this, too (with a default implementation that simply returns a pointer to
+> the coherent&contigous dma mem), but I guess that can wait until a
+> use-case pops up.
 
-Tony
+I will wait with this until there will be real use cases. Let's get the
+patch into mainline first.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
