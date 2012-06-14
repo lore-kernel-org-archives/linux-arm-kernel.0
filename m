@@ -1,63 +1,90 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 12:53:30 +0000
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <20120614122930.GM12766@atomide.com>
-References: <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com> <20120613115445.GM12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
- <20120614101901.GI12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
- <20120614115207.GL12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999AA4@DBDE01.ent.ti.com>
- <20120614122930.GM12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E999C13@DBDE01.ent.ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 14 Jun 2012 14:55:06 +0200
+Subject: [PATCHv2 08/12] ARM: OMAP4: hwmod data: add SL2IF hardreset line
+In-Reply-To: <20120611004614.20034.50895.stgit@dusk>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004614.20034.50895.stgit@dusk>
+Message-ID: <4FD9DF2A.3010000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Paul,
 
-On Thu, Jun 14, 2012 at 17:59:31, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120614 05:00]:
-> > On Thu, Jun 14, 2012 at 17:22:08, Tony Lindgren wrote:
-> > > * Mohammed, Afzal <afzal@ti.com> [120614 03:43]:
-> > > > +       t.clk_activation = fclk_offset_ns;
-> > > > +
-> > > 
-> > > This too should be fclk_offset, not fclk_offset_ns.
-> > 
-> > As gpmc_cs_set_timing convert it to ticks from ns,
-> > shouldn't we put it in ns ? 
-> 
-> Hmm I see, something's wrong though.. Some of these we really
-> want to specify as ticks instead of ns. Your patch was using
-> 1 tick value as 1 ns value, which won't work. When I changed
-> it back to what I thought was ticks, it just happened to work
-> probably because of rounding. That's probably the reason why
-> some of these have been set directly with gpmc_cs_write_reg
-> as that sets tick values directly.
+On 6/11/2012 2:46 AM, Paul Walmsley wrote:
+> On boot, the sl2if module can't be enabled.  The following message is
+> logged:
+>
+> omap_hwmod: sl2if: cannot be enabled for reset (3)
+>
+> This is probably because the SL2IF is still being held in hardreset.
+> The SL2IF's hardreset line is shared with one of the IVAHD's hardreset
+> lines; see for example Table 3-536 "RM_IVAHD_RSTCTRL" in the OMAP4430
+> TRM Rev. AA (SWPU231AA).  To work around this, add the SL2IF's
+> hardreset line to the hwmod data.  This is correct from a hardware
+> perspective and also will prevent the hwmod from attempting to enable
+> the SL2IF during reset.  The driver for this IP block will need to
+> handle its integration until the appropriate way to handle the IVAHD
+> integration can be elucidated.
 
-For onenand,
+I don't think we should allow that at hwmod level. This line is already 
+handled by the IVAHD hwmod. We will then have some potential issue since 
+nothing will prevent the concurrent access.
+Moreover that IP is only used by the IVAHD and thus should be handled by 
+the same driver. The SL2 being inside the IVA subsystem, it should be 
+reset when the IVA will be reset and thus does not require an individual 
+control.
 
-fclk_offset = gpmc_ns_to_ticks(fclk_offset_ns);
 
-By using directly fclk_offset_ns, we transfer job of doing
-the same to gpmc_cs_set_timings (which does gpmc_ns_to_ticks
-over fclk_offset_ns & then do << 25)
+I guess, we should just mark the dependency with some external power 
+resource to avoid the fmwk to try to enable that automatically.
 
-Hence passing fclk_offset_ns in effect should be same as,
+It is similar to DSS sub IPs and to some extend McPDM for my point of view.
 
-GPMC_CONFIG1_CLKACTIVATIONTIME(fclk_offset)
+Maybe we should rename HWMOD_EXT_OPT_MAIN_CLK with something more 
+generic like HWMOD_EXT_POWER_DEP to highlight the dependency with an 
+external resource. It can be a external clock or another module.
 
-If onenand is not working with it, then there is something that
-is invisible here.
+Regards,
+Benoit
 
-Were you able to get it working with the changed value for
-usb or onenand ?
 
-In case possible, can you check enabling DEBUG and see what
-timings are logged
-
-Regards
-Afzal
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    7 +++++++
+>   1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 7700d6d..037424f 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -2597,15 +2597,22 @@ static struct omap_hwmod_class omap44xx_sl2if_hwmod_class = {
+>   	.name	= "sl2if",
+>   };
+>
+> +static struct omap_hwmod_rst_info omap44xx_sl2if_resets[] = {
+> +	{ .name = "logic", .rst_shift = 2 },
+> +};
+> +
+>   /* sl2if */
+>   static struct omap_hwmod omap44xx_sl2if_hwmod = {
+>   	.name		= "sl2if",
+>   	.class		= &omap44xx_sl2if_hwmod_class,
+>   	.clkdm_name	= "ivahd_clkdm",
+> +	.rst_lines	= omap44xx_sl2if_resets,
+> +	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_sl2if_resets),
+>   	.prcm = {
+>   		.omap4 = {
+>   			.clkctrl_offs = OMAP4_CM_IVAHD_SL2_CLKCTRL_OFFSET,
+>   			.context_offs = OMAP4_RM_IVAHD_SL2_CONTEXT_OFFSET,
+> +			.rstctrl_offs = OMAP4_RM_IVAHD_RSTCTRL_OFFSET,
+>   			.modulemode   = MODULEMODE_HWCTRL,
+>   		},
+>   	},
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
