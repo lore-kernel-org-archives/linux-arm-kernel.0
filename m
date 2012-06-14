@@ -1,51 +1,55 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 14 Jun 2012 10:37:19 +0200
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <201206132021.09774.arnd@arndb.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <4FD84133.4060401@firmworks.com>
- <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
- <201206132021.09774.arnd@arndb.de>
-Message-ID: <20120614083719.GC31283@avionic-0098.mockup.avionic-design.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 14 Jun 2012 09:39:04 +0100
+Subject: [PATCH V3 2/3] i2c-nomadik: turn the platform driver to an amba
+ driver
+In-Reply-To: <20120614081758.GA19648@mail.gnudd.com>
+References: <201206140804.39083.arnd@arndb.de>
+ <cover.1339447570.git.rubini@gnudd.com>
+ <4a198618063924b68182279ffd56c335d621f542.1339447570.git.rubini@gnudd.com>
+ <20120614081758.GA19648@mail.gnudd.com>
+Message-ID: <4FD9A328.9080000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 08:21:08PM +0000, Arnd Bergmann wrote:
-> On Wednesday 13 June 2012, Thierry Reding wrote:
-> >                 pci at 80000000 {
-> >                         reg = <0x80000000 0x00001000>;
-> >                         status = "disabled";
-> > 
-> >                         #address-cells = <3>;
-> >                         #size-cells = <2>;
-> > 
-> >                         ranges = <0x80400000 0x80400000 0x00008000   /* I/O */
-> >                                   0x90000000 0x90000000 0x08000000   /* non-prefetchable memory */
-> >                                   0xa0000000 0xa0000000 0x08000000>; /* prefetchable memory */
-> > 
-> >                         nvidia,ctrl-offset = <0x0>;
-> >                         nvidia,num-lanes = <2>;
-> >                 };
-> > 
-> 
-> I believe you will need an "interrupt-map" property here, to map the host
-> interrupts to the INTA-INTD lines of the attached devices.
+On 14/06/12 09:17, Alessandro Rubini wrote:
+>> You change only one half of ux500 here: the part where the device
+>> gets defined statically, but not not the definition in the
+>> device-tree.
+>
+> Yes, I'm aware. That's why I added Lee Jones as Cc:, on Linusw's
+> suggestion.  Lee told me to go ahead and he'll fix the DT stuff.
 
-Legacy interrupts are something I cannot test at all because I have no
-hardware that supports them.
+I did?
 
-> I'm not sure whether we want to have a device_type="pciex" property here.
-> powerpc and sparc seem to use that information, to distinguish a pcie
-> bus from pci or cardbus.
+I have already DT:ed this driver. There are 3 patches on the MLs currently.
 
-That'd be rather useless information given that the Tegra is unlikely to
-support either PCI or CardBus at some point.
+> [PATCH 1/3] i2c: Add Device Tree support to the Nomadik I2C driver
+> [PATCH 2/3] ARM: ux500: Add i2c configurations to the Device Tree for DB8500 based devices
+> [PATCH 3/3] Documentation: Device Tree binding information for i2c-nomadik driver
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/b90536c5/attachment-0001.sig>
+I'm more than happy for you to base your patches on these and make the 
+necessary changes. Off hand, I think the only changes you'll need to 
+make is the probing from DT itself.
+
+So something like:
+
+> --- a/arch/arm/boot/dts/db8500.dtsi
+> +++ b/arch/arm/boot/dts/db8500.dtsi
+> @@ -449,7 +449,7 @@
+>                 };
+>
+>                 i2c at 80004000 {
+> -                       compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
+> +                       compatible = "st,nomadik-i2c", "arm,primecell";
+>                         reg = <0x80004000 0x1000>;
+>                         interrupts = <0 21 0x4>;
+>                         #address-cells = <1>;
+
+... for each of the controllers.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
