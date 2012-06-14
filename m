@@ -1,63 +1,48 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 09:26:24 +0000
-Subject: [PATCH 5/9] ARM: OMAP2+: gpmc-smc91x: Adapt to use gpmc driver
-In-Reply-To: <20120613134323.GX12766@atomide.com>
-References: <cover.1339419379.git.afzal@ti.com>
- <0bdbc293fc98613011d37ec59559ba6d475eadf2.1339419379.git.afzal@ti.com>
- <20120613122950.GR12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998EC1@DBDE01.ent.ti.com>
- <20120613134323.GX12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9997BD@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Jun 2012 02:29:57 -0700
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+Message-ID: <20120614092957.GE12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Wed, Jun 13, 2012 at 19:13:24, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120613 06:43]:
-
-> > Do you mean for all the gpmc-* helpers existing initialization
-> > needs to be modified to use the new interface, the previous version
-> > was doing so. But then that will cause all boards using the same
-> > gpmc-* helper to be converted at once (tusb6010 is not an issue as
-> > only one board uses it), then the problem will be that there would
-> > be a few commits where gpmc may not work properly.
-> > 
-> > And for a particular board, either it has to use old interface
-> > or either the new interface, it cannot use both.
-> > 
-> > Consider the case of this one, smc91x, all sdp boards use it,
-> > that requires nand, onenand, nor gpmc-* helpers to be converted
-> > before board migration for say 3430sdp board, that would mean
-> > that 2430sdp board would be broken w.r.t gpmc at that commit as
-> > board modifications are not yet done for 2430. That in turn means
-> > all the boards using nand, onenand would be broken at that point.
+* Afzal Mohammed <afzal@ti.com> [120611 07:21]:
+> Configure busturnaround, cycle2cycledelay, waitmonitoringtime,
+> clkactivationtime in gpmc_cs_set_timings(). This is done so
+> that boards can configure these parameters of gpmc in Kernel
+> instead of relying on bootloader.
 > 
-> What I mean is keep the old interface in gpmc.c, then convert
-> users one at a time to the new interface, and remove the old
-> interface code from the users. But yeah you're right, it may
-> not be immediately doable for the smc91x case before we dump
-> out the register values. But at least tusb6010 should be able
-> to just convert to use the new interface and drop the old code.
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c             |    6 ++++++
+>  arch/arm/plat-omap/include/plat/gpmc.h |    6 ++++++
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 578fd4c..517953f 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -313,6 +313,12 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
+>  
+>  	GPMC_SET_ONE(GPMC_CS_CONFIG5, 24, 27, page_burst_access);
+>  
+> +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 0, 3, bus_turnaround);
+> +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 8, 11, cycle2cycle_delay);
+> +
+> +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 18, 19, wait_monitoring);
+> +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 25, 26, clk_activation);
+> +
 
-Yesterday, I overlooked the fact that n8x0 have onenand in addition
-to tusb6010. As that is the case, to have boards work properly,
-we may need to keep old interface along with new interface for at
-least a few commits even for tusb6010.
+Thinking about this, the CONFIG1 bits have been set with
+gpmc_cs_write_reg because these are part of the static configuration
+and do not need to be dynamically calculated as they are tick based.
+For example, tusb6010 sets GPMC_CONFIG1_CLKACTIVATIONTIME(1) during init.
 
-Straightaway if existing tusb6010 interface is modified (without
-having new interface alongside), it will create problem for n8x0
-as it has onenand still using old interface. And a board at a time
-cannot use both.
+Writing these over and over again during DVFS does not make sense, they
+should be only initialized once.
 
-And if we proceed in the reverse, i.e. convert onenand to use
-new interface first (w/o having new interface alongside),
-still n8x0 would have problems as tusb6010 would be using the old
-interface then
+Regards,
 
-So it seems, both interface has to live side-by-side till all
-boards are converted (or at least till all boards using the
-peripheral in question has to get converted to use new interface)
-
-Regards
-Afzal
+Tony
