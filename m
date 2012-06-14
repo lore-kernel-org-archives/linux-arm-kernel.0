@@ -1,46 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jun 2012 04:23:22 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9997F4@DBDE01.ent.ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
- <20120614092957.GE12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9997F4@DBDE01.ent.ti.com>
-Message-ID: <20120614112322.GJ12766@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jun 2012 12:23:23 +0100
+Subject: [PATCH 15/17] i2c: omap: always return IRQ_HANDLED
+In-Reply-To: <CAMQu2gzbK+ObetarwRiEz9A7=awEffAhrMMAqSMfiv4H6BZAuw@mail.gmail.com>
+References: <1339669250-9183-1-git-send-email-balbi@ti.com>
+ <1339669250-9183-16-git-send-email-balbi@ti.com>
+ <CAMQu2gzbK+ObetarwRiEz9A7=awEffAhrMMAqSMfiv4H6BZAuw@mail.gmail.com>
+Message-ID: <20120614112323.GD31187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120614 02:46]:
-> Hi Tony,
+On Thu, Jun 14, 2012 at 04:48:56PM +0530, Shilimkar, Santosh wrote:
+> On Thu, Jun 14, 2012 at 3:50 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > otherwise we could get our IRQ line disabled due
+> > to many spurious IRQs.
+> >
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> > ?drivers/i2c/busses/i2c-omap.c | ? ?2 +-
+> > ?1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> > index fc5b8bc..5b78a73 100644
+> > --- a/drivers/i2c/busses/i2c-omap.c
+> > +++ b/drivers/i2c/busses/i2c-omap.c
+> > @@ -1015,7 +1015,7 @@ omap_i2c_isr(int this_irq, void *dev_id)
+> > ? ? ? ? ? ? ? ?}
+> > ? ? ? ?} while (stat);
+> >
+> > - ? ? ? return count ? IRQ_HANDLED : IRQ_NONE;
+> > + ? ? ? return IRQ_HANDLED;
 > 
-> On Thu, Jun 14, 2012 at 14:59:57, Tony Lindgren wrote:
-> > * Afzal Mohammed <afzal@ti.com> [120611 07:21]:
-> 
-> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 0, 3, bus_turnaround);
-> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 8, 11, cycle2cycle_delay);
-> > > +
-> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 18, 19, wait_monitoring);
-> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 25, 26, clk_activation);
-> > > +
-> > 
-> > Thinking about this, the CONFIG1 bits have been set with
-> > gpmc_cs_write_reg because these are part of the static configuration
-> > and do not need to be dynamically calculated as they are tick based.
-> > For example, tusb6010 sets GPMC_CONFIG1_CLKACTIVATIONTIME(1) during init.
-> 
-> But aren't we deciding number of ticks based on clock period ?
-> If we take case of onenand, based on the knowledge of clock period,
-> number of ticks are calculated.
-> 
-> And similarly to decide cycle2cycledelay, busturnaround, we decide number
-> of ticks based on peripheral datasheet timings & gpmc clock, hence
-> shouldn't it also be dynamically calculated similar to timings that were
-> existing earlier.
+> no sure if this is correct. if you have IRQ flood and instead of _actually_
+> handling it, if you return handled, you still have interrupt pending, right?
 
-Hmm indeed onenand is setting that dynamically. OK, let's try your
-approach and make sure we patch in the missing values so we don't
-overwrite the values set with gpmc_cs_write_reg.
+The point of returning IRQ_NONE is to indicate to the interrupt layer that
+the interrupt you received was not processed by any interrupt handler, and
+therefore to provide a way of preventing the system being brought to a halt
+though a stuck interrupt line.
 
-Regards,
-
-Tony
+So, if you do process an interrupt, you should always return IRQ_HANDLED
+even if you couldn't complete its processing (eg, because you've serviced
+it 100 times.)
