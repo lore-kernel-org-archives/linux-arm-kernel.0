@@ -1,176 +1,116 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Jun 2012 15:07:56 +0200
-Subject: [RFC] i.MX DRM devicetree binding
-Message-ID: <20120614130756.GS30400@pengutronix.de>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Thu, 14 Jun 2012 21:09:21 +0800
+Subject: common clock framework
+In-Reply-To: <20120522191120.GB4386@gmail.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+ <20120504082110.GB16535@pengutronix.de>
+ <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
+ <CAG9bXv=T7v_MBUOmCsp4n0SNmYY_DOEkhQXAp0rTGpdi6KkXNA@mail.gmail.com>
+ <20120506234958.GA14559@gmail.com>
+ <AAD1C6EB06EE3649B35B7E026785068D1A74B2C256@SC-VEXCH2.marvell.com>
+ <A63A0DC671D719488CD1A6CD8BDC16CF1A0F044EB4@SC-VEXCH4.marvell.com>
+ <53612FE6B944314AAADB181E45A45B6413D3FF9F37@sc-vexch3.marvell.com>
+ <AAD1C6EB06EE3649B35B7E026785068D1A74B2C270@SC-VEXCH2.marvell.com>
+ <20120522191120.GB4386@gmail.com>
+Message-ID: <CALZhoSTCPF-JvrOa5vZsWWnGRQWVSSbJnnGrhg6S-SBBEqAb3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Mike,
 
-The following is an attempt to come up with a devicetree binding for
-DRM graphics on i.MX SoCs. I'm posting this seperate from the actual
-code to not bury this in big patches.
+On Wed, May 23, 2012 at 3:11 AM, Mike Turquette <mturquette@ti.com> wrote:
+> On 20120518-01:41, Chao Xie wrote:
+>> Hi
+>> Since the issues are not described very clearly, so I want to clarify it.
+>
+> Is is possible for you to wrap your lines to a reasonable length? ?I've
+> done it for you in the email below.
+>
+>> Issue 1. clock with mux, divisor and trigger
+>> The clock A will have a single register that some bits control the
+>> mux, some bits control the divisor, and a bit is a trigger. It means
+>> that setting mux and divisor bits will only take effect when trigger
+>> bit is set. ?There are 2 models that we can abstract this kind of
+>> clock.
+>> a. make three clocks.
+>> clock A <= clock div <= clock mux
+>> clock mux control the mux bits while clock div control the divisor
+>> bits, while clock a control trigger bit. ?For example mux has two
+>> inputs 312MHZ and 1066MHZ, while divisor can be 1 or 2. At beginning
+>> clock mux is from 312M and clock div is 1. Clock A can only have clock
+>> as 312MHZ and 533MHZ. ?so when invoke clk_set_rate(A, 512MHZ), it will
+>> try to upstream and find the "top" clock that can satisfy the 512MHZ.
+>> the "top" clock is clock mux. After find the "top" clock, the current
+>> code will have the following flows.
+>>
+>> clk_notify(PRE_RATE_CHANGE)
+>> ? ? ==> clk_change_rate(mux)
+>> ? ? ? ? ==> mux->setrate: it will set mux bits
+>> ? ? ? ? ==> polling all children, and for each one, invoke clk_change_rate
+>> ? ? ? ? ? ?==> clk_change_rate(div)
+>> ? ? ? ? ? ? ? ==> div->setrate: it will set div bits
+>> ? ? ? ? ? ? ? ==> polling all children, and for each one, invoke clk_change_rate
+>> ? ? ? ? ? ? ? ? ? ==>A->setrate: it will set trigger bit
+>> From above that the function looks well, but there will be some
+>> problem. ?Clock mux change the mux bits will not finally switch the
+>> input from 312MHZ to 533MHZ. The switch is controlled by "trigger"
+>> bit. So clock mux should have .setrate implementation as you suggest
+>> as
+>> ? ? ? 1. enable new parent
+>> ? ? ? 2. set mux bits
+>> ? ? ? 3. __clk_reparent
+>> ? ? ? 4. disable old parent
+>> The clock mux implementation looks like omap dpll implementation.
+>> But there are two bugs.
+>> ? ?a) "Disable old parent" is only SW setting, we depends on trigger
+>> ? ?to do it. So if for clock mux and clock div we all have trigger set
+>> ? ?when set mux bits and div bits. It will import a temporary clock
+>> ? ?1066MHZ(input = 1066, div = 1), it will harm the device. In fact,
+>> ? ?there is why there is a trigger bit here. It will forbid there is
+>> ? ?no temporary clock.
+>
+> Let me make sure I understand you here. ?You are concerned that the
+> .set_rate implementations for each clock (div and mux) will set the
+> trigger bit, causing intermediate clock rates. ?Do I have that correct?
+>
 
-The bindings should cover most of the problems we had while implementing
-the possible IPU <-> (LVDS, HDMI, parallel) Display connections.
+Yes, that is correct, we don't want the trigger bit to set multiple times.
 
-Contrary to some other devicetree bindings I have seen we decided not
-to make the displays subnodes of the graphics unit because the (LVDS,
-HDMI) encoders are outside the graphics units and also on i.MX6 there
-are 2 IPUs and displays can be muxed between these IPUs.
 
-Comments and suggestions welcome.
+> If that is the case then one solution is to not have your div and mux
+> .set_rate implementations set the trigger bit. ?Instead always propagate
+> up to "clk A", the trigger clock so that the whole operation is atomic.
+>
+> The only problem with this scenario is if you ever change only the div
+> (and not the mux) and there is no parent propagation up to "clk A". ?Is
+> this a possibility on your platform?
 
-Sascha
+I think it may has some problem here. We need to adjust "clk A"'s parent's
+speed when we need change "clk A" speed.
 
-8<--------------------------------------
+However, we could handle it by another way by caching the register
+modification and no really touch the hw register in the div/mux clk node.
+So we also could propagation to A's parent, while have no trouble like
+set trigger bit multi-times.
 
-DRM i.MX: Add devicetree binding documentation
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- .../devicetree/bindings/drm/fsl-imx-drm.txt        |  126 ++++++++++++++++++++
- 1 file changed, 126 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/fsl-imx-drm.txt
+>
+>> ? ?b) if clk_change_rate(A) will invoke cpu_notify(POST_RATE_CHANGE),
+>> ? ?while __clk_reparent will invoke __clk_recalc_rates, and in
+>> ? ?__clk_recalc_rates, it will polling every children, and for each
+>> ? ?one will invoke __clk_recalc_rates too. For __clk_recalc_rates, it
+>> ? ?will invoke cpu_notify(POST_RATE_CHANGE), and it means that the
+>> ? ?notification of POST_RATE_CHANGE will be invoke twice. I think the
+>> ? ?omap dpll implementation will have this bug too.
+>>
+>
+> This has come up on the list recently. ?I think one solution is to
+> remove the call to __clk_recalc_rates from __clk_reparent. ?To be honest
+> __clk_reparent has grown beyond it's original intent.
 
-diff --git a/Documentation/devicetree/bindings/drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/drm/fsl-imx-drm.txt
-new file mode 100644
-index 0000000..6766e03
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/fsl-imx-drm.txt
-@@ -0,0 +1,126 @@
-+Freescale i.MX IPUv3
-+====================
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-ipu"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain sync interrupt and error interrupt,
-+  in this order.
-+- #crtc-cells: 1, See below
-+
-+example:
-+
-+ipu: ipu at 18000000 {
-+	#crtc-cells = <1>;
-+	compatible = "fsl,imx53-ipu";
-+	reg = <0x18000000 0x080000000>;
-+	interrupts = <11 10>;
-+};
-+
-+Freescale i.MX LCDC controller
-+==============================
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-lcdc"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain interrupt
-+- #crtc-cells: 0, See below
-+
-+example:
-+
-+lcdc: lcdc at 10021000 {
-+	#crtc-cells = <0>;
-+	compatible = "fsl,imx27-lcdc", "fsl,imx21-lcdc";
-+	reg = <0x10021000 0x4000>;
-+	interrupts = <61>;
-+};
-+
-+Parallel display support
-+========================
-+
-+Required properties:
-+- compatible: Should be "fsl,imx-parallel-display"
-+- crtc: the crtc this display is connected to, see below
-+Optional properties:
-+- interface_pix_fmt: How this display is connected to the
-+  crtc. Currently supported types: "rgb24", "rgb565"
-+- edid: verbatim EDID data block describing attached display.
-+- ddc: phandle describing the i2c bus handling the display data
-+  channel
-+
-+example:
-+
-+display at di0 {
-+	compatible = "fsl,imx-parallel-display";
-+	edid = [edid-data];
-+	crtc = <&ipu 0>;
-+	interface_pix_fmt = "rgb24";
-+};
-+
-+LVDS display bridge (LDB)
-+=========================
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-ldb"
-+- channel0-crtcs, channel1-crtcs: the crtcs the ldb is connected to, see
-+  below
-+Optional properties:
-+- channel0-edid, channel1-edid: verbatim EDID data blocks describing the
-+  displays attached to channel0 and channel1.
-+- channel0-ddc, channel1-ddc: phandles describing the i2c busses handling
-+  the display data channels for channel0 and channel1.
-+
-+lvds at 53fa8008 {
-+	compatible = "fsl,imx6q-ldb";
-+	channel0-edid = [edid-data];
-+	channel1-ddc = <&i2c0>;
-+	channel0-crtcs = <&ipu0 0>, <&ipu0 1>, <&ipu1 0>, <&ipu1 1>;
-+	channel1-crtcs = <&ipu0 0>, <&ipu0 1>, <&ipu1 0>, <&ipu1 1>;
-+};
-+
-+Specifying CRTCs connected to display output devices
-+====================================================
-+
-+Display output device nodes should specify which CRTCs they can be
-+connected to in their crtcs property, containing a 'crtc-list':
-+
-+	crtc-list ::= <single-crtc> [crtc-list]
-+	single-crtc ::= <crtc-phandle> <crtc-specifier>
-+	crtc-phandle : phandle to device node providing the crtc
-+	crtc-specifier : Array of #crtc-cells specifying specific crtc
-+			 (controller specific, 1 on imx-ipuv3)
-+
-+In the following example, two image processing units ipu0 and ipu1
-+provide two CRTCs each, indexed with a single cell. The hdmi connector
-+can be connected to either CRTC of ipu1, and the lvds connector is
-+fixed to the second CRTC of ipu0.
-+
-+	ipu0: ipu0 {
-+		#crtc-cells = <1>;
-+	};
-+	ipu1: ipu1 {
-+		#crtc-cells = <1>;
-+	};
-+	[...]
-+	hdmi: hdmi {
-+		ddc = <&i2c2>;
-+		crtcs = <&ipu1 0 &ipu1 1>;
-+	};
-+	lvds: lvds {
-+		edid = [edid-data];
-+		crtcs = <&ipu0 1>;
-+	};
-+
-+Note that the crtc-specifier length is controller dependent. A simple
-+lcdc controller with a single CRTC should use #crtc-cells = <0>:
-+
-+	lcdc: lcdc {
-+		#crtc-cells = <0>;
-+	};
-+	[...]
-+	parallel-display {
-+		crtcs = <&lcdc>
-+	};
-+
--- 
-1.7.10
+Could we have something like flag judgment here?
+If some flag is set, then do __clk_recalc_rates inside __clk_reparent.
+By this way, we could have more flexible to handle complex scenario.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Lei
