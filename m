@@ -1,46 +1,61 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 07:07:52 +0000
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FD8ACD9.1010507@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
- <4FD77EF1.8000600@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
- <20120613120208.GN12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998E2F@DBDE01.ent.ti.com>
- <4FD8ACD9.1010507@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99959E@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 Jun 2012 15:13:28 +0800
+Subject: [PATCH 06/16] ARM: imx: move irq_domain_add_legacy call into
+ avic driver
+In-Reply-To: <1339653587-4832-7-git-send-email-shawn.guo@linaro.org>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120614071326.GC31565@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Wed, Jun 13, 2012 at 20:38:09, Hunter, Jon wrote:
-> On 06/13/2012 08:05 AM, Mohammed, Afzal wrote:
-
-> > Do you mean that gpmc driver should have the capability to calculate peripheral
-> > timings at runtime based on frequency ?, I am not sure how this can be handled
-> > by gpmc driver as calculation for different peripherals are done in different
-> > way, requiring gpmc driver to know about connected peripheral, that would imply
-> > that gpmc driver would not be peripheral agnostic.
+On Thu, Jun 14, 2012 at 01:59:37PM +0800, Shawn Guo wrote:
+> Move irq_domain_add_legacy call from imx27-dt.c into avic init function
+> and have the avic driver adopt irqdomain support for both DT and non-DT
+> boot.
 > 
-> I guess I still don't agree with this. From the gpmc timing point of
-> view it should not care what device is connected, it just needs to know
-> the associated timings. Therefore, the gpmc driver just needs the time
-> associated with the different timings fields in the various GPMC_CONFIGx
-> registers and then convert to clocks based upon the gpmc fclk. The only
-> item that is device specific here is the actual timing values and these
-> can be passed to the driver.
+> Now avic init function calls irq_alloc_descs to get irq_base and adds
+> a lenacy irqdomain with the irq_base, so that the mapping between avic
+> irq and Linux irq number can be handled by irqdomain.
 > 
-> Furthermore, gpmc_cs_set_timings function is completely device agnostic.
-> Why can we not call this from within the driver? Why does it need to be
-> called outside the driver?
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/imx27-dt.c |   15 ---------------
+>  arch/arm/plat-mxc/avic.c     |   26 +++++++++++++++++++-------
+>  2 files changed, 19 insertions(+), 22 deletions(-)
+> 
+The following changes should be amended.
 
-As mentioned in one of my previous mails, input to gpmc_cs_set_timings
-sometimes are a function of gpmc clock, and that function can vary with
-the type of peripheral connected.
+Regards,
+Shawn
 
-Regards
-Afzal
+--8<---
+
+diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
+index 4fe1d9b..e612cc1 100644
+--- a/arch/arm/plat-mxc/avic.c
++++ b/arch/arm/plat-mxc/avic.c
+@@ -59,9 +59,12 @@ static u32 avic_saved_mask_reg[2];
+ #ifdef CONFIG_MXC_IRQ_PRIOR
+ static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
+ {
++       struct irq_data *d = irq_get_irq_data(irq);
+        unsigned int temp;
+        unsigned int mask = 0x0F << irq % 8 * 4;
+
++       irq = d->hwirq;
++
+        if (irq >= AVIC_NUM_IRQS)
+                return -EINVAL;
+
+@@ -78,8 +81,11 @@ static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
+ #ifdef CONFIG_FIQ
+ static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
+ {
++       struct irq_data *d = irq_get_irq_data(irq);
+        unsigned int irqt;
+
++       irq = d->hwirq;
++
+        if (irq >= AVIC_NUM_IRQS)
+                return -EINVAL;
