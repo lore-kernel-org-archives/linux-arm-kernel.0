@@ -1,44 +1,35 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 12:21:34 +0000
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E999B05@DBDE01.ent.ti.com>
-References: <4FD63DBF.9000200@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
- <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com> <20120613115445.GM12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
- <20120614101901.GI12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
- <20120614114905.GK12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999B05@DBDE01.ent.ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E999B34@DBDE01.ent.ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 14 Jun 2012 15:27:23 +0300
+Subject: [PATCH 0/3] ARM: OMAP2/3: Move McBSP fck alias to hwmod data
+Message-ID: <1339676846-12791-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hello,
 
-On Thu, Jun 14, 2012 at 17:39:41, Mohammed, Afzal wrote:
-> On Thu, Jun 14, 2012 at 17:19:06, Tony Lindgren wrote:
+To keep the McBSP fck alias handling in sync among OMAP versions.
+Change the legacy implementation for OMAP2/3 regarding to McBSP fck alias.
+OMAP4 (and OMAP5) uses the hwmod data to specify the aliases for the fcks and
+it is also needed for the coming McBSP DT support.
 
-> > For onenand I'm getting the following error:
-> > 
-> > omap2-onenand omap2-onenand: Cannot request GPMC CS 
-> 
-> I am a bit confused with this message, for onenand, we only have,
-> 
-> pr_err("%s: Cannot request GPMC CS\n", __func__);
-> 
-> dev_err is used only for nand
+Tested on OMAP3 BeagleBoard, compile tested it for OMAP2.
 
-This error can happen if my patches are not present,
+Regards,
+Peter
 
-dev_err for onenand driver was removed by,
+---
+Peter Ujfalusi (3):
+  ARM: OMAP2: Move McBSP fck clock alias to hwmod data for OMAP2420
+  ARM: OMAP2: Move McBSP fck clock alias to hwmod data for OMAP2430
+  ARM: OMAP3: Move McBSP fck clock alias to hwmod data
 
-[mtd: onenand: omap2: obtain memory from resource],
+ arch/arm/mach-omap2/clock2420_data.c       |    4 ----
+ arch/arm/mach-omap2/clock2430_data.c       |   10 ----------
+ arch/arm/mach-omap2/clock3xxx_data.c       |   10 ----------
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    9 +++++++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   15 +++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   21 +++++++++++++++++++++
+ 6 files changed, 45 insertions(+), 24 deletions(-)
 
-seems, mtd patches are not in your present branch
-
-Regards
-Afzal
+-- 
+1.7.8.6
