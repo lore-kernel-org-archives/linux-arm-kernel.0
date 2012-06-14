@@ -1,20 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jun 2012 09:55:53 +0100
-Subject: [PATCH 0/2] ARM: vexpress: Enable SPARSE_IRQ selection
-In-Reply-To: <1339607602-3846-1-git-send-email-tixy@linaro.org>
-References: <1339607602-3846-1-git-send-email-tixy@linaro.org>
-Message-ID: <20120614085553.GB28714@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Jun 2012 01:56:52 -0700
+Subject: [PATCH 6/9] ARM: OMAP2+: gpmc-smsc911x: Adapt to use gpmc driver
+In-Reply-To: <fa4fd074305f914d38603443b857422f95680725.1339419379.git.afzal@ti.com>
+References: <cover.1339419379.git.afzal@ti.com>
+ <fa4fd074305f914d38603443b857422f95680725.1339419379.git.afzal@ti.com>
+Message-ID: <20120614085650.GD12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 06:13:20PM +0100, Jon Medhurst (Tixy) wrote:
-> To enable vexpress to be included in multiplatform kernels containing
-> boards which require SPARSE_IRQ, we need to also support this option.
-> This turns out to be very simple...
-> 
-> [PATCH 1/2] ARM: vexpress: Remove IRQ defines from mach/irq.h
-> [PATCH 2/2] ARM: vexpress: Enable selection of SPARSE_IRQ
+* Afzal Mohammed <afzal@ti.com> [120611 08:20]:
+> +__init gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg)
+> +{
+> +	int ret;
+> +	struct gpmc_device_pdata *gpmc_pdev;
+> +	struct gpmc_cs_data *gpmc_cs;
+> +
+> +	gpmc_pdev = kzalloc(sizeof(*gpmc_pdev), GFP_KERNEL);
+> +	if (gpmc_pdev == NULL)
+> +		return gpmc_pdev;
+> +
+> +	gpmc_cs = kzalloc(sizeof(*gpmc_cs), GFP_KERNEL);
+> +	if (gpmc_pdev == NULL) {
+> +		kfree(gpmc_pdev);
+> +		return NULL;
+> +	}
 
-So you're relying on the GIC IRQs starting at 0, and so that the local
-timer interrupt stays at 29 ?  And the local timer interrupt is now
-just some random number buried in some C file.
+Here your should check for if (!gpmc_cs), not gpmc_cs. Might
+be worth checking all your patches for similar copy and paste
+typos.
+
+Where do gpmc_pdev and gpmc_cs get used? Where are they
+stored to the pdata?
+
+Tony
