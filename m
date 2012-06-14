@@ -1,41 +1,71 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 13:32:58 +0000
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FD9E5AF.6010201@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
- <4FD77EF1.8000600@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
- <4FD8A906.8080202@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
- <4FD9E5AF.6010201@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 14 Jun 2012 13:36:48 +0000
+Subject: [PATCH v6 00/17] Add PWM framework and device tree support
+In-Reply-To: <20120614125329.GA7678@avionic-0098.mockup.avionic-design.de>
+References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
+ <1BAFE6F6C881BF42822005164F1491C33EA21A9F@DBDE01.ent.ti.com>
+ <20120614125329.GA7678@avionic-0098.mockup.avionic-design.de>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA21C02@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Thu, Jun 14, 2012 at 18:52:55, Hunter, Jon wrote:
-> On 06/14/2012 02:03 AM, Mohammed, Afzal wrote:
-> > On Wed, Jun 13, 2012 at 20:21:50, Hunter, Jon wrote:
-
-> >> If the clk handle for the gpmc is passed to the gpmc driver, then there
-> >> is no reason why the driver cannot do this.
+On Thu, Jun 14, 2012 at 18:23:29, Thierry Reding wrote:
+> On Thu, Jun 14, 2012 at 12:47:13PM +0000, Hebbar, Gururaja wrote:
+> > On Tue, Apr 10, 2012 at 20:36:23, Thierry Reding wrote:
+> > > This patch series adds very rudimentary device-tree support for PWM
+> > > devices. With all of these patches applied (plus one board-specific
+> > > patch that is not included), I'm able to control the backlight on the
+> > > device I'm working on using the sysfs interface provided by the pwm-bl
+> > > driver and the backlight class.
+> > > 
+> > > This series is based on Sascha Hauer's series of patches[0] to add a
+> > > generic PWM framework. The first patch in this series is taken from
+> > > Sascha's branch, while the second patch enables each PWM chip to provide
+> > > multiple PWM devices (the Blackfin and PXA drivers have been ported to
+> > > the framework for reference). Currently a global namespace is still
+> > > provided to keep backwards-compatibility with the legacy PWM API. In
+> > > order to achieve this, the number of global PWM devices is limited to
+> > > 1024. However, patch 2 introduces per-chip indexing of PWM devices in
+> > > the core and patch 4 adds an API to request a PWM device using a lookup
+> > > table registered by board setup code. They are supposed to eventually
+> > > replace pwm_request() and allow to get rid of the global namespace. The
+> > > device tree support code does not use the global namespace.
+> > > 
+> > ..snip..
+> > ..snip..
 > > 
-> > I believe passing clk details through platform data is an abuse of
-> > clock framework.
+> > > 
+> > > The whole series is based on the linux-next tree from 20120405. I think
+> > > I've addressed all of the concerns raised in the first five versions. I
+> > > have also pushed this version of the series to the PWM subsystem
+> > > repository[1].
+> > > 
+> > > Thierry
+> > > 
+> > > [0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
+> > > [1]: http://gitorious.org/linux-pwm/linux-pwm/trees/pwm-v6
+> > > 
+
+..snip..
+..snip..
+
+> > > 
+> > 
+> > I am planning to add PWM support in Linux for TI AM335x SOC. 
+> > I am taking your new PWM framework as reference.
+> > 
+> > I see a lot of ack's for the patches. I see that you are maintaining these patches in a separate repo.
+> > However, I couldn't find any of these 
+> > patches in the mainline kernel (including recent 3.5-rc2). 
+> > Do you have any plans for pushing this again to mainline kernel. 
 > 
-> Why? You currently have a global variable storing the clock handle. It
-> can be quite common for drivers to know the clock frequencies of their
-> functional clocks. How else can drivers calculate timings?
+> Yes, as a matter of fact I'm in the process of getting the series ready for
+> inclusion into linux-next. I expect them to go into 3.6.
+> 
+> Thierry
+> 
 
+Thanks. Eagerly looking forward to it.
 
-Please see Russell King's comments,
-
-[1] http://permalink.gmane.org/gmane.linux.ports.ppc.embedded/27634
-[2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg05365.html
-
-Regards
-Afzal
+Thanks & Regards, 
+Gururaja
