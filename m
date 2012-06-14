@@ -1,61 +1,129 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Jun 2012 13:20:45 +0300
-Subject: [PATCH 12/17] i2c: omap: switch to platform_get_irq()
+Date: Thu, 14 Jun 2012 13:20:44 +0300
+Subject: [PATCH 11/17] i2c: omap: switch to devm_* API
 In-Reply-To: <1339669250-9183-1-git-send-email-balbi@ti.com>
 References: <1339669250-9183-1-git-send-email-balbi@ti.com>
-Message-ID: <1339669250-9183-13-git-send-email-balbi@ti.com>
+Message-ID: <1339669250-9183-12-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-that's a nice helper from drivers core which
-will give us the exact IRQ number, instead
-of a pointer to an IRQ resource.
+that helps deleting some boiler plate code
+and lets driver-core manage our resources
+for us.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   43 +++++++++++------------------------------
+ 1 file changed, 11 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d805270..43d3289 100644
+index c20c45f..d805270 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1045,11 +1045,12 @@ omap_i2c_probe(struct platform_device *pdev)
+@@ -1045,7 +1045,7 @@ omap_i2c_probe(struct platform_device *pdev)
  {
  	struct omap_i2c_dev	*dev;
  	struct i2c_adapter	*adap;
--	struct resource		*mem, *irq;
-+	struct resource		*mem;
+-	struct resource		*mem, *irq, *ioarea;
++	struct resource		*mem, *irq;
  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
  	struct device_node	*node = pdev->dev.of_node;
  	const struct of_device_id *match;
- 	irq_handler_t isr;
-+	int irq;
- 	int r;
- 
- 	/* NOTE: driver uses the static register mapping */
-@@ -1059,10 +1060,10 @@ omap_i2c_probe(struct platform_device *pdev)
+@@ -1058,23 +1058,17 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "no mem resource?\n");
+ 		return -ENODEV;
+ 	}
++
+ 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	if (!irq) {
+ 		dev_err(&pdev->dev, "no irq resource?\n");
  		return -ENODEV;
  	}
  
--	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	if (!irq) {
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
- 		dev_err(&pdev->dev, "no irq resource?\n");
--		return -ENODEV;
-+		return irq;
+-	ioarea = request_mem_region(mem->start, resource_size(mem),
+-			pdev->name);
+-	if (!ioarea) {
+-		dev_err(&pdev->dev, "I2C region already claimed\n");
+-		return -EBUSY;
+-	}
+-
+-	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
++	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+-		r = -ENOMEM;
+-		goto err_release_region;
++		dev_err(&pdev->dev, "not enough memory\n");
++		return -ENOMEM;
  	}
  
- 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
-@@ -1090,7 +1091,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	}
+ 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
+@@ -1097,10 +1091,10 @@ omap_i2c_probe(struct platform_device *pdev)
  
  	dev->dev = &pdev->dev;
--	dev->irq = irq->start;
-+	dev->irq = irq;
- 	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
+ 	dev->irq = irq->start;
+-	dev->base = ioremap(mem->start, resource_size(mem));
++	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
  	if (!dev->base) {
- 		dev_err(&pdev->dev, "ioremap failed\n");
+-		r = -ENOMEM;
+-		goto err_free_mem;
++		dev_err(&pdev->dev, "ioremap failed\n");
++		return -ENOMEM;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, dev);
+@@ -1151,7 +1145,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
+ 								   omap_i2c_isr;
+-	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
++	r = devm_request_irq(&pdev->dev, dev->irq, isr, 0, pdev->name, dev);
+ 
+ 	if (r) {
+ 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
+@@ -1177,24 +1171,16 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	r = i2c_add_numbered_adapter(adap);
+ 	if (r) {
+ 		dev_err(dev->dev, "failure adding adapter\n");
+-		goto err_free_irq;
++		goto err_unuse_clocks;
+ 	}
+ 
+ 	of_i2c_register_devices(adap);
+ 
+ 	return 0;
+ 
+-err_free_irq:
+-	free_irq(dev->irq, dev);
+ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+-	iounmap(dev->base);
+-err_free_mem:
+-	platform_set_drvdata(pdev, NULL);
+-	kfree(dev);
+-err_release_region:
+-	release_mem_region(mem->start, resource_size(mem));
+ 
+ 	return r;
+ }
+@@ -1203,17 +1189,10 @@ static int
+ omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+-	struct resource		*mem;
+ 
+-	platform_set_drvdata(pdev, NULL);
+-
+-	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+-	iounmap(dev->base);
+-	kfree(dev);
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mem->start, resource_size(mem));
++
+ 	return 0;
+ }
+ 
 -- 
 1.7.10.4
