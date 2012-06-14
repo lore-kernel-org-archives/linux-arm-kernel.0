@@ -1,28 +1,27 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 14 Jun 2012 10:11:00 -0400 (EDT)
-Subject: [Patch v5 03/13] USB: notify phy when root hub port connect change
-In-Reply-To: <20120614003653.GA29684@b20223-02.ap.freescale.net>
-Message-ID: <Pine.LNX.4.44L0.1206141003100.1701-100000@iolanthe.rowland.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 14 Jun 2012 14:33:26 +0000
+Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
+ non-omap1 platforms
+In-Reply-To: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
+References: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5096A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jun 2012, Richard Zhao wrote:
+On Mon, Jun 11, 2012 at 18:52:54, Hiremath, Vaibhav wrote:
+> As omap1 and omap2 will never be compiled together, due to
+> different compiler flags, so we can simply make
+> cpu_class_is_omap2() = true, for all non-omap1 platforms.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> ---
+>  arch/arm/plat-omap/include/plat/cpu.h |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
+> 
 
-> > > +	if (unlikely(hcd->phy && !hdev->level)) {
-> > 
-> > This is okay, but it's more common to test for root hubs with 
-> > "!hdev->parent".
-> So it will be like:
-> if (unlikely(hcd->phy && !hdev->parent)) {
+Tony,
 
-Yes.
+Ping???
 
-> And,
-> I didn't check (portchange & USB_PORT_STAT_C_CONNECTION), because if
-> the device is connected on boot, there'll be no USB_PORT_STAT_C_CONNECTION.
-> Is it acceptable?
-
-Yes.  In fact the hub_port_debounce() routine turns off
-USB_PORT_STAT_C_CONNECTION anyway.
-
-Alan Stern
+Thanks,
+Vaibhav
