@@ -1,43 +1,46 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 15 Jun 2012 00:22:43 +0200
-Subject: Follow-up to remaining issue with alignment of __log_buf in
- printk.c
-References: <87aa05vgzg.fsf@free.fr> <4FDA3BB4.9040607@wwwdotorg.org>
-Message-ID: <87y5np1qks.fsf@free.fr>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Thu, 14 Jun 2012 18:16:14 -0400
+Subject: Converting kirkwood-goflexnet to DTS
+In-Reply-To: <20120614141706.GA6676@lunn.ch>
+References: <20120614141706.GA6676@lunn.ch>
+Message-ID: <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Finally some progress.  Using the printk patch along with earlyprintk
+and the config tweaks as suggested, my kernel at least now shows why
+it's dying:
 
-> Isn't that a bug in the toolchain; isn't the alignment of a struct
-> required to be the greatest alignment of any of its members? Otherwise,
-> this problem could arise with any usage of that struct.
+--------------------------
+## Booting kernel from Legacy Image at 00800000 ...
+   Image Name:   Linux-3.5.0-rc2-ARCH
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3015272 Bytes = 2.9 MiB
+   Load Address: 00008000
+   Entry Point:  00008000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
 
-I'm not a compiler expert, but I think EABI requires 64-bit data types to be
-8-bytes aligned. If that assertion is true, then clearly my eabi compiler is a
-little liar with its __alignof__(struct log) result.
-And I think also that ISO C standard requires a structure to be aligned by
-default to the <quote>least perfect multiple of the lowest common multiple of
-the alignments of all the members of the struct</quote>. Which here means 8
-bytes ...
+Starting kernel ...
 
-> I suppose this could be worked around with something like:
-> #define LOG_ALIGN max(__alignof__(struct log), __alignof__(u64))
+Uncompressing Linux... done, booting the kernel.
 
-Well, I wonder what is the correct approach here. In the end, the compiler
-should be fixed ... But meanwhile, your proposition would solve the PXA
-problem. The real deal is to know whether we want a compiler work-around in
-printk.c ... and that's rather a policy issue than a technical one.
+Error: unrecognized/unsupported machine ID (r1 = 0x00000c11).
 
-I wonder what others think about it ... let's wait for another pair of point of
-views.
+Available machine support:
 
-Cheers.
+ID (hex)        NAME
+ffffffff        Marvell Kirkwood (Flattened Device Tree)
 
--- 
-Robert
+Please check your kernel config and/or bootloader.
+--------------------------
 
-PS: For Andrew, I saw your patch. It won't solve my problem as my compiler
-believes __alignof__(struct log) == 4 ... bad luck for me.
+Obviously, I've missed something with my work as my machine is not
+showing up as a supported unit in that list.  At least the machine ID
+being detected is correct, so that's a plus.
 
-PPS: My toolchain is arm-2011.09
+I should be able to crack this and have another test kernel in 4
+hours, I'm hoping with good results.
+
+Josh C
