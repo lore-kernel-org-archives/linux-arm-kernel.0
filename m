@@ -1,71 +1,302 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 14 Jun 2012 13:36:48 +0000
-Subject: [PATCH v6 00/17] Add PWM framework and device tree support
-In-Reply-To: <20120614125329.GA7678@avionic-0098.mockup.avionic-design.de>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
- <1BAFE6F6C881BF42822005164F1491C33EA21A9F@DBDE01.ent.ti.com>
- <20120614125329.GA7678@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA21C02@DBDE01.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Jun 2012 15:43:24 +0200
+Subject: [PATCH 2/5] DRM i.MX: Add parallel display support
+In-Reply-To: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1339681407-28721-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 18:23:29, Thierry Reding wrote:
-> On Thu, Jun 14, 2012 at 12:47:13PM +0000, Hebbar, Gururaja wrote:
-> > On Tue, Apr 10, 2012 at 20:36:23, Thierry Reding wrote:
-> > > This patch series adds very rudimentary device-tree support for PWM
-> > > devices. With all of these patches applied (plus one board-specific
-> > > patch that is not included), I'm able to control the backlight on the
-> > > device I'm working on using the sysfs interface provided by the pwm-bl
-> > > driver and the backlight class.
-> > > 
-> > > This series is based on Sascha Hauer's series of patches[0] to add a
-> > > generic PWM framework. The first patch in this series is taken from
-> > > Sascha's branch, while the second patch enables each PWM chip to provide
-> > > multiple PWM devices (the Blackfin and PXA drivers have been ported to
-> > > the framework for reference). Currently a global namespace is still
-> > > provided to keep backwards-compatibility with the legacy PWM API. In
-> > > order to achieve this, the number of global PWM devices is limited to
-> > > 1024. However, patch 2 introduces per-chip indexing of PWM devices in
-> > > the core and patch 4 adds an API to request a PWM device using a lookup
-> > > table registered by board setup code. They are supposed to eventually
-> > > replace pwm_request() and allow to get rid of the global namespace. The
-> > > device tree support code does not use the global namespace.
-> > > 
-> > ..snip..
-> > ..snip..
-> > 
-> > > 
-> > > The whole series is based on the linux-next tree from 20120405. I think
-> > > I've addressed all of the concerns raised in the first five versions. I
-> > > have also pushed this version of the series to the PWM subsystem
-> > > repository[1].
-> > > 
-> > > Thierry
-> > > 
-> > > [0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
-> > > [1]: http://gitorious.org/linux-pwm/linux-pwm/trees/pwm-v6
-> > > 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/gpu/drm/imx/Kconfig                |    4 +
+ drivers/gpu/drm/imx/Makefile               |    1 +
+ drivers/gpu/drm/imx/imx-parallel-display.c |  255 ++++++++++++++++++++++++++++
+ 3 files changed, 260 insertions(+)
+ create mode 100644 drivers/gpu/drm/imx/imx-parallel-display.c
 
-..snip..
-..snip..
-
-> > > 
-> > 
-> > I am planning to add PWM support in Linux for TI AM335x SOC. 
-> > I am taking your new PWM framework as reference.
-> > 
-> > I see a lot of ack's for the patches. I see that you are maintaining these patches in a separate repo.
-> > However, I couldn't find any of these 
-> > patches in the mainline kernel (including recent 3.5-rc2). 
-> > Do you have any plans for pushing this again to mainline kernel. 
-> 
-> Yes, as a matter of fact I'm in the process of getting the series ready for
-> inclusion into linux-next. I expect them to go into 3.6.
-> 
-> Thierry
-> 
-
-Thanks. Eagerly looking forward to it.
-
-Thanks & Regards, 
-Gururaja
+diff --git a/drivers/gpu/drm/imx/Kconfig b/drivers/gpu/drm/imx/Kconfig
+index f77a605..fdd0f5d 100644
+--- a/drivers/gpu/drm/imx/Kconfig
++++ b/drivers/gpu/drm/imx/Kconfig
+@@ -14,3 +14,7 @@ config DRM_IMX_FB_HELPER
+ 	  The DRM framework can provide a legacy /dev/fb0 framebuffer
+ 	  for your device. This is necessary to get a framebuffer console
+ 	  and also for appplications using the legacy framebuffer API
++
++config DRM_IMX_PARALLEL_DISPLAY
++	tristate "Support for parallel displays"
++	depends on DRM_IMX
+diff --git a/drivers/gpu/drm/imx/Makefile b/drivers/gpu/drm/imx/Makefile
+index ff825f7..f5a793f 100644
+--- a/drivers/gpu/drm/imx/Makefile
++++ b/drivers/gpu/drm/imx/Makefile
+@@ -3,4 +3,5 @@ imxdrm-objs := imx-drm-core.o imx-fb.o
+ 
+ obj-$(CONFIG_DRM_IMX) += imxdrm.o
+ 
++obj-$(CONFIG_DRM_IMX_PARALLEL_DISPLAY) += imx-parallel-display.o
+ obj-$(CONFIG_DRM_IMX_FB_HELPER) += imx-fbdev.o
+diff --git a/drivers/gpu/drm/imx/imx-parallel-display.c b/drivers/gpu/drm/imx/imx-parallel-display.c
+new file mode 100644
+index 0000000..9403cf1
+--- /dev/null
++++ b/drivers/gpu/drm/imx/imx-parallel-display.c
+@@ -0,0 +1,255 @@
++/*
++ * i.MX drm driver - parallel display implementation
++ *
++ * Copyright (C) 2012 Sascha Hauer, Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include <linux/module.h>
++#include <drm/drmP.h>
++#include <drm/drm_fb_helper.h>
++#include <drm/drm_crtc_helper.h>
++#include <linux/videodev2.h>
++
++#include "imx-drm.h"
++
++#define con_to_imxpd(x) container_of(x, struct imx_parallel_display, connector)
++#define enc_to_imxpd(x) container_of(x, struct imx_parallel_display, encoder)
++
++struct imx_parallel_display {
++	struct drm_connector connector;
++	struct imx_drm_connector *imx_drm_connector;
++	struct drm_encoder encoder;
++	struct imx_drm_encoder *imx_drm_encoder;
++	struct device *dev;
++	void *edid;
++	int edid_len;
++	u32 interface_pix_fmt;
++};
++
++static enum drm_connector_status imx_pd_connector_detect(
++		struct drm_connector *connector, bool force)
++{
++	return connector_status_connected;
++}
++
++static void imx_pd_connector_destroy(struct drm_connector *connector)
++{
++	/* do not free here */
++}
++
++static int imx_pd_connector_get_modes(struct drm_connector *connector)
++{
++	struct imx_parallel_display *imxpd = con_to_imxpd(connector);
++	int ret;
++
++	if (!imxpd->edid)
++		return 0;
++
++	drm_mode_connector_update_edid_property(connector, imxpd->edid);
++	ret = drm_add_edid_modes(connector, imxpd->edid);
++	connector->display_info.raw_edid = NULL;
++
++	return ret;
++}
++
++static int imx_pd_connector_mode_valid(struct drm_connector *connector,
++			  struct drm_display_mode *mode)
++{
++	return 0;
++}
++
++static struct drm_encoder *imx_pd_connector_best_encoder(
++		struct drm_connector *connector)
++{
++	struct imx_parallel_display *imxpd = con_to_imxpd(connector);
++
++	return &imxpd->encoder;
++}
++
++static void imx_pd_encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++}
++
++static bool imx_pd_encoder_mode_fixup(struct drm_encoder *encoder,
++			   struct drm_display_mode *mode,
++			   struct drm_display_mode *adjusted_mode)
++{
++	return true;
++}
++
++static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
++{
++	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
++
++	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_NONE,
++			imxpd->interface_pix_fmt);
++}
++
++static void imx_pd_encoder_commit(struct drm_encoder *encoder)
++{
++}
++
++static void imx_pd_encoder_mode_set(struct drm_encoder *encoder,
++			 struct drm_display_mode *mode,
++			 struct drm_display_mode *adjusted_mode)
++{
++}
++
++static void imx_pd_encoder_disable(struct drm_encoder *encoder)
++{
++}
++
++static void imx_pd_encoder_destroy(struct drm_encoder *encoder)
++{
++	/* do not free here */
++}
++
++static struct drm_connector_funcs imx_pd_connector_funcs = {
++	.dpms = drm_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = imx_pd_connector_detect,
++	.destroy = imx_pd_connector_destroy,
++};
++
++static struct drm_connector_helper_funcs imx_pd_connector_helper_funcs = {
++	.get_modes = imx_pd_connector_get_modes,
++	.best_encoder = imx_pd_connector_best_encoder,
++	.mode_valid = imx_pd_connector_mode_valid,
++};
++
++static struct drm_encoder_funcs imx_pd_encoder_funcs = {
++	.destroy = imx_pd_encoder_destroy,
++};
++
++static struct drm_encoder_helper_funcs imx_pd_encoder_helper_funcs = {
++	.dpms = imx_pd_encoder_dpms,
++	.mode_fixup = imx_pd_encoder_mode_fixup,
++	.prepare = imx_pd_encoder_prepare,
++	.commit = imx_pd_encoder_commit,
++	.mode_set = imx_pd_encoder_mode_set,
++	.disable = imx_pd_encoder_disable,
++};
++
++static int imx_pd_register(struct imx_parallel_display *imxpd)
++{
++	int ret;
++
++	drm_mode_connector_attach_encoder(&imxpd->connector, &imxpd->encoder);
++
++	imxpd->connector.funcs = &imx_pd_connector_funcs;
++	imxpd->encoder.funcs = &imx_pd_encoder_funcs;
++
++	imxpd->encoder.encoder_type = DRM_MODE_ENCODER_NONE;
++	imxpd->connector.connector_type = DRM_MODE_CONNECTOR_VGA;
++
++	drm_encoder_helper_add(&imxpd->encoder, &imx_pd_encoder_helper_funcs);
++	ret = imx_drm_add_encoder(&imxpd->encoder, &imxpd->imx_drm_encoder,
++			THIS_MODULE);
++	if (ret) {
++		dev_err(imxpd->dev, "adding encoder failed with %d\n", ret);
++		return ret;
++	}
++
++	drm_connector_helper_add(&imxpd->connector,
++			&imx_pd_connector_helper_funcs);
++
++	ret = imx_drm_add_connector(&imxpd->connector,
++			&imxpd->imx_drm_connector, THIS_MODULE);
++	if (ret) {
++		imx_drm_remove_encoder(imxpd->imx_drm_encoder);
++		dev_err(imxpd->dev, "adding connector failed with %d\n", ret);
++		return ret;
++	}
++
++	imxpd->connector.encoder = &imxpd->encoder;
++
++	return 0;
++}
++
++static int __devinit imx_pd_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	const u8 *edidp;
++	struct imx_parallel_display *imxpd;
++	int ret;
++	u32 crtcs[2];
++	const char *fmt;
++	struct device_node *crtc_node;
++
++	imxpd = devm_kzalloc(&pdev->dev, sizeof(*imxpd), GFP_KERNEL);
++	if (!imxpd)
++		return -ENOMEM;
++
++	edidp = of_get_property(np, "edid", &imxpd->edid_len);
++	if (edidp)
++		imxpd->edid = kmemdup(edidp, imxpd->edid_len, GFP_KERNEL);
++
++	ret = of_property_read_string(np, "interface_pix_fmt", &fmt);
++	if (!ret) {
++		if (!strcmp(fmt, "rgb24"))
++			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB24;
++		else if (!strcmp(fmt, "rgb565"))
++			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
++	}
++
++	imxpd->dev = &pdev->dev;
++
++	ret = imx_pd_register(imxpd);
++	if (ret)
++		return ret;
++
++	ret = imx_drm_encoder_add_possible_crtcs(imxpd->imx_drm_encoder, np);
++
++	platform_set_drvdata(pdev, imxpd);
++
++	return 0;
++}
++
++static int __devexit imx_pd_remove(struct platform_device *pdev)
++{
++	struct imx_parallel_display *imxpd = platform_get_drvdata(pdev);
++	struct drm_connector *connector = &imxpd->connector;
++	struct drm_encoder *encoder = &imxpd->encoder;
++
++	drm_mode_connector_detach_encoder(connector, encoder);
++
++	imx_drm_remove_connector(imxpd->imx_drm_connector);
++	imx_drm_remove_encoder(imxpd->imx_drm_encoder);
++
++	return 0;
++}
++
++static const struct of_device_id imx_pd_dt_ids[] = {
++	{ .compatible = "fsl,imx-parallel-display", .data = NULL, },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver imx_pd_driver = {
++	.probe		= imx_pd_probe,
++	.remove		= __devexit_p(imx_pd_remove),
++	.driver		= {
++		.of_match_table = imx_pd_dt_ids,
++		.name	= "imx-parallel-display",
++		.owner	= THIS_MODULE,
++	},
++};
++
++module_platform_driver(imx_pd_driver);
++
++MODULE_DESCRIPTION("i.MX parallel display driver");
++MODULE_AUTHOR("Sascha Hauer, Pengutronix");
++MODULE_LICENSE("GPL");
+-- 
+1.7.10
