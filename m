@@ -1,54 +1,36 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 14 Jun 2012 08:31:20 +0200
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <4FD90352.9090606@wwwdotorg.org>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
-Message-ID: <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Jun 2012 23:32:19 -0700
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998F70@DBDE01.ent.ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+ <4FD63DBF.9000200@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+ <4FD77E35.3050703@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
+ <20120613113217.GK12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998D51@DBDE01.ent.ti.com>
+ <20120613124215.GT12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998F70@DBDE01.ent.ti.com>
+Message-ID: <20120614063218.GZ12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 03:17:06PM -0600, Stephen Warren wrote:
-> On 06/13/2012 04:40 AM, Wei Ni wrote:
-> > Hi, all
-> > I'm working on the tegra30 wifi upstream issue.
-> > 
-> > The tegra30 board (Cardhu) use Broadcom 4329 as wifi device, and use brcmfmac as the wifi driver.
-> > 
-> > In the brcmfmac init routine, it call sdio_register_driver() to register driver, if the wifi device is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
-> > 
-> > On the Cardhu, the wifi's power is controlled by two gpios (power-gpio and reset-gpio), the default state is power-off. So we need to power on it before calling sdio_register_driver(), if not, the mmc driver can't enumerate it, and will not call the probe routine.
-> > This power on sequence is: 
-> > set power-gpio to 1 ;
-> > mdelay(100) ;
-> > set reset-gpio to 1 ;
-> > mdelay(200);
-> > 
-> > My question is where to power on the wifi. We may have three places to power on it:
-> > 1. power on it in the brcmfmac driver before calling sdio_register_driver(). But I think this power sequence is special for tegra30 cardhu, it's not good to add it in the generic wifi driver, because different board may use the different way to power on the wifi.
-> > 2. power on it in the mmc driver. In our tegra SD driver, it has power-gpios property, which allow the slot to be powered. But this power is for mmc slot, could we add this wifi power sequence in the tegra SD driver?
-> > 3. hard-coded into DT. Set these gpios in the DT, something like pinmux settings, but in this way, it's not good to put the mdelay() value in the DT.
-> > 
-> > I have no good idea for it, does anyone has suggestion?
+* Mohammed, Afzal <afzal@ti.com> [120613 07:09]:
+> Hi Tony,
 > 
-> The core of the issue is that:
+> On Wed, Jun 13, 2012 at 18:12:15, Tony Lindgren wrote:
 > 
-> * Tegra30 support is via device tree.
-> * We have an SDIO bus, and the WiFi device attached to that bus is
-> enumerable.
-> * Since the WiFi device is enumerable, no node exists in the DT to
-> represent it.
-> * However, the driver for the WiFi device needs certain information,
-> such as the reset GPIO ID and perhaps power GPIO.
+> > > Or should additional timings be achieved without affecting old
+> > > interface, but that it seems would necessitate more code
+> > > duplication.
+> > 
+> > We should just keep the same timings as before, with values
+> > added for the newly added registers.
+> 
+> What I understood from above is to get values bootloader used to
+> set for those new timings & put in Kernel, right ?
 
-PCI devices are also enumerable and yet they can be matched up with nodes in
-the device tree. Perhaps something similar could be added for the SDIO bus?
+Yeah and eventually to the .dts files.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/adb86368/attachment.sig>
+Tony
