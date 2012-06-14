@@ -1,30 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jun 2012 12:13:33 +0100
-Subject: [PATCH 04/17] i2c: omap: simplify omap_i2c_ack_stat()
-In-Reply-To: <1339669250-9183-5-git-send-email-balbi@ti.com>
+Date: Thu, 14 Jun 2012 12:17:46 +0100
+Subject: [PATCH 06/17] i2c: omap: improve 1p153 errata handling
+In-Reply-To: <1339669250-9183-7-git-send-email-balbi@ti.com>
 References: <1339669250-9183-1-git-send-email-balbi@ti.com>
- <1339669250-9183-5-git-send-email-balbi@ti.com>
-Message-ID: <20120614111333.GA31187@n2100.arm.linux.org.uk>
+ <1339669250-9183-7-git-send-email-balbi@ti.com>
+Message-ID: <20120614111746.GB31187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 01:20:37PM +0300, Felipe Balbi wrote:
-> stat & BIT(1) is the same as BIT(1), so let's
-> simplify things a bit by removing "stat &" from
-> all omap_i2c_ack_stat() calls.
+On Thu, Jun 14, 2012 at 01:20:39PM +0300, Felipe Balbi wrote:
+> -static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+> +static int errata_omap3_1p153(struct omap_i2c_dev *dev)
+>  {
+> -	unsigned long timeout = 10000;
+> +	unsigned long	timeout = 10000;
+> +	u16		stat;
 
-This doesn't feel right, and the explanation is definitely wrong.
+Eww, no, not more of this "lets add tabs to align auto variable
+declarations".  This is detrimental when you add another variable whose
+type is longer than the current indentation - you have to reformat the
+entire block.
 
-"stat & BIT(1)" is not the same as "BIT(1)" _unless_ you're saying that
-stat always has BIT(1) already set.  Can you guarantee that in this code?
-If so, how?
-
-What happens if you read the status register, and it has bit 1 clear.
-immediately after the read, the status register bit 1 becomes set, and
-then you write bit 1 set (because you've dropped the stat & BIT(1) from
-the code.)
-
-Is it not going to acknowledge that bit-1-set but because you haven't
-read it, you're going to miss that event?
-
-This feels like a buggy change to me.
+It's really not worth it.  Stick to just using one space, like the rest
+of the kernel code.  Like the code which Linus writes.  And thereby help
+to avoid future "pointless churn" whinges.
