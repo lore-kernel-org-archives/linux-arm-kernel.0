@@ -1,65 +1,39 @@
-From: viresh.kumar2@arm.com (Viresh Kumar)
-Date: Thu, 14 Jun 2012 09:11:13 +0100
-Subject: [PATCH] ARM: netx: Reuse dummy clk routines for non CONFIG_HAVE_CLK
- case
-Message-ID: <5c52038c3c8ec3cc6a5468139e886d5e8a1a1f5c.1339661188.git.viresh.kumar2@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jun 2012 08:12:34 +0000
+Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for
+ DT boards
+In-Reply-To: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
+Message-ID: <201206140812.34399.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-netx had its own implementation of clk routines like, clk_get{put},
-clk_enable{disable}, etc. And with introduction of following patchset:
+On Sunday 10 June 2012, Andrew Lunn wrote:
+> +static int __init kirkwood_add_irq_domain(struct device_node *np,
+> +                                         struct device_node *interrupt_parent)
+> +{
+> +       kirkwood_init_irq();
+> +       irq_domain_add_legacy(np, 64, 0, 0, &irq_domain_simple_ops, NULL);
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id kirkwood_irq_match[] = {
+> +       { .compatible = "marvell,orion-intc",
+> +         .data = kirkwood_add_irq_domain, },
+> +       {},
+> +};
+> +
+> +static void __init kirkwood_dt_init_irq(void)
+> +{
+> +       of_irq_init(kirkwood_irq_match);
+> +}
+> +
 
-https://lkml.org/lkml/2012/4/24/154
+I think if you compute the number of interrupts in the domain from the number of
+registers that are described in the device tree, call orion_irq_init()
+based on those registers, and use irq domains for the gpio stuff as Rob suggested,
+this init_irq function can become completely generic to all orion platforms.
 
-we get compilation error for multiple definition of these routines.
+That is what I tried to do with an earlier patch, which was flawed for other reasons.
 
-Sascha had following suggestion to deal with it:
-
-http://www.spinics.net/lists/arm-kernel/msg179369.html
-
-So, removing this code completely.
-
-Signed-off-by: Viresh Kumar <viresh.kumar2@arm.com>
----
- arch/arm/mach-netx/fb.c | 23 -----------------------
- 1 file changed, 23 deletions(-)
-
-diff --git a/arch/arm/mach-netx/fb.c b/arch/arm/mach-netx/fb.c
-index 2cdf6ef..d122ee6 100644
---- a/arch/arm/mach-netx/fb.c
-+++ b/arch/arm/mach-netx/fb.c
-@@ -69,29 +69,6 @@ void netx_clcd_remove(struct clcd_fb *fb)
-                              fb->fb.screen_base, fb->fb.fix.smem_start);
- }
-
--void clk_disable(struct clk *clk)
--{
--}
--
--int clk_set_rate(struct clk *clk, unsigned long rate)
--{
--       return 0;
--}
--
--int clk_enable(struct clk *clk)
--{
--       return 0;
--}
--
--struct clk *clk_get(struct device *dev, const char *id)
--{
--       return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
--}
--
--void clk_put(struct clk *clk)
--{
--}
--
- static AMBA_AHB_DEVICE(fb, "fb", 0, 0x00104000, { NETX_IRQ_LCD }, NULL);
-
- int netx_fb_init(struct clcd_board *board, struct clcd_panel *panel)
---
-1.7.11.rc1.9.gf623ca1
-
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+	Arnd
