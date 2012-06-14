@@ -1,36 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jun 2012 23:32:19 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998F70@DBDE01.ent.ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
- <4FD63DBF.9000200@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
- <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998D51@DBDE01.ent.ti.com>
- <20120613124215.GT12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998F70@DBDE01.ent.ti.com>
-Message-ID: <20120614063218.GZ12766@atomide.com>
+Date: Wed, 13 Jun 2012 23:34:12 -0700
+Subject: [PATCH v5 03/14] ARM: OMAP2+: gpmc: driver migration helper
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998EFD@DBDE01.ent.ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <a121156faf6c758d4e37447ab832f6f825cc5bc8.1339419492.git.afzal@ti.com>
+ <4FD6555D.4000508@ti.com> <20120613120457.GO12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998CF2@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998EFD@DBDE01.ent.ti.com>
+Message-ID: <20120614063412.GA12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120613 07:09]:
+* Mohammed, Afzal <afzal@ti.com> [120613 06:50]:
 > Hi Tony,
 > 
-> On Wed, Jun 13, 2012 at 18:12:15, Tony Lindgren wrote:
-> 
-> > > Or should additional timings be achieved without affecting old
-> > > interface, but that it seems would necessitate more code
-> > > duplication.
+> On Wed, Jun 13, 2012 at 17:48:15, Mohammed, Afzal wrote:
+> > On Wed, Jun 13, 2012 at 17:34:58, Tony Lindgren wrote:
+>  
+> > > There should no longer be any need to initialize GPMC early. It should
+> > > behave like any other device driver, and also work as a loadable module.
 > > 
-> > We should just keep the same timings as before, with values
-> > added for the newly added registers.
+> > Once driver migration is complete for all the boards, we can remove the
+> > initcall and make it loadable.
+> > 
+> > But till that time as we need to support both old & new interface,
+> > I feel this is necessary as old interface would happen in arch initcall,
+> > and old gpmc_init is now gpmc_probe, and hence it needs to get executed
+> > before arch initcall, necessitating this.
 > 
-> What I understood from above is to get values bootloader used to
-> set for those new timings & put in Kernel, right ?
+> Seems you missed this in the flood of mails, please let me know your
+> comments on this. This is a commit that has to be reverted once driver
+> migration is complete for all boards.
 
-Yeah and eventually to the .dts files.
+Yes sounds good to me.
 
 Tony
