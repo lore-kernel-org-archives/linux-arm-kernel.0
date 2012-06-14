@@ -1,32 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jun 2012 10:25:09 +0000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120614083719.GC31283@avionic-0098.mockup.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <201206132021.09774.arnd@arndb.de>
- <20120614083719.GC31283@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201206141025.09325.arnd@arndb.de>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 14 Jun 2012 18:25:34 +0800
+Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
+In-Reply-To: <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
+References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+ <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
+ <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+ <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
+Message-ID: <CACVXFVP3Nh-hc73FJQEi5vCj1hH6K24umGB93fnmYtfW0Wg=kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 June 2012, Thierry Reding wrote:
-> > 
-> > I believe you will need an "interrupt-map" property here, to map the host
-> > interrupts to the INTA-INTD lines of the attached devices.
+Also attach my .config.
+
+On Wed, Jun 13, 2012 at 11:28 PM, T Krishnamoorthy, Balaji
+<balajitk@ti.com> wrote:
+> On Mon, Jun 11, 2012 at 12:50 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>>
+>> On Mon, Jun 11, 2012 at 2:21 PM, T Krishnamoorthy, Balaji
+>> <balajitk@ti.com> wrote:
+>> > Hi Ming Lei,
+>> > Can you let me know if you noticed any write/timeout errors ?
+>>
+>> Nothing error logs found during writing.
+> Hi,
 >
-> Legacy interrupts are something I cannot test at all because I have no
-> hardware that supports them.
-
-Hmm, I thought all PCIe hardware has to support them when you do not
-enable MSI. What hardware do you have then?
-
-> > I'm not sure whether we want to have a device_type="pciex" property here.
-> > powerpc and sparc seem to use that information, to distinguish a pcie
-> > bus from pci or cardbus.
-> 
-> That'd be rather useless information given that the Tegra is unlikely to
-> support either PCI or CardBus at some point.
-
-But the generic code does not know that.
-
-	Arnd
+> Couldn't reproduce the issue with BeagleXM rev C, Might be a combination
+> of rev and SD card. How often do you see mis-match in file content?
+>
+> Can you please try the inlined patch to get more info?
+>
+> ---
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 9a7a60a..77aabe6 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -60,6 +60,7 @@
+> ?#define OMAP_HSMMC_STAT ? ? ? ? ? ? ? ?0x0130
+> ?#define OMAP_HSMMC_IE ? ? ? ? ?0x0134
+> ?#define OMAP_HSMMC_ISE ? ? ? ? 0x0138
+> +#define OMAP_HSMMC_AC12 ? ? ? ? ? ? ? ?0x013C
+> ?#define OMAP_HSMMC_CAPA ? ? ? ? ? ? ? ?0x0140
+>
+> ?#define VS18 ? ? ? ? ? ? ? ? ? (1 << 26)
+> @@ -177,6 +178,7 @@ struct omap_hsmmc_host {
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? reqs_blocked;
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? use_reg;
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? req_in_progress;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? autocmd_err;
+> ? ? ? ?unsigned int ? ? ? ? ? ?flags;
+> ? ? ? ?struct omap_hsmmc_next ?next_data;
+>
+> @@ -983,6 +985,7 @@ static void omap_hsmmc_do_irq(struct
+> omap_hsmmc_host *host, int status)
+> ?{
+> ? ? ? ?struct mmc_data *data;
+> ? ? ? ?int end_cmd = 0, end_trans = 0;
+> + ? ? ? u32 autocmd12;
+>
+> ? ? ? ?if (!host->req_in_progress) {
+> ? ? ? ? ? ? ? ?do {
+> @@ -998,6 +1001,13 @@ static void omap_hsmmc_do_irq(struct
+> omap_hsmmc_host *host, int status)
+>
+> ? ? ? ?if (status & ERR) {
+> ? ? ? ? ? ? ? ?omap_hsmmc_dbg_report_irq(host, status);
+> + ? ? ? ? ? ? ? if (status & (1 << 24)) {
+> + ? ? ? ? ? ? ? ? ? ? ? host->autocmd_err = 1;
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(mmc_dev(host->mmc), "AutoCMD error STAT 0x%x\n", status);
+> + ? ? ? ? ? ? ? ? ? ? ? autocmd12 = OMAP_HSMMC_READ(host->base, AC12);
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(mmc_dev(host->mmc), "AutoCMD error 0x%x\n", autocmd12);
+> + ? ? ? ? ? ? ? }
+> +
+> ? ? ? ? ? ? ? ?if ((status & CMD_TIMEOUT) ||
+> ? ? ? ? ? ? ? ? ? ? ? ?(status & CMD_CRC)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?if (host->cmd) {
+> ---
+>>
+>> Below is one of my test case.
+>>
+>> root at beagleboard:~# upk
+>> updateing kernel...
+>> flush storage...
+>> root at beagleboard:~# cat bin/upk
+>> #!/bin/sh
+>>
+>> echo "updateing kernel..."
+>> cp -f /mnt/nfs/t/uImage /media/mmcblk0p1/
+>>
+>> echo "flush storage..."
+>> sync
+>> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
+>> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
+>> root at beagleboard:~# umount /media/mmcblk0p1
+>> root at beagleboard:~# mount -t vfat /dev/mmcblk0p1 /media/mmcblk0p1
+>> root at beagleboard:~#
+>> root at beagleboard:~#
+>> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
+>> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
+>>
+>>
+>> Thanks,
+>> --
+>> Ming Lei
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config
+Type: application/octet-stream
+Size: 69963 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/9b71a0e7/attachment-0001.obj>
