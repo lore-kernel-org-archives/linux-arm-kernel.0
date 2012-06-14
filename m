@@ -1,28 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Jun 2012 16:49:06 +0800
-Subject: [PATCH v3 0/4] DT clock bindings
-In-Reply-To: <4FD76CF6.8090801@gmail.com>
-References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
- <20120612154735.GB19410@gmail.com> <4FD76CF6.8090801@gmail.com>
-Message-ID: <20120614084904.GF31565@S2101-09.ap.freescale.net>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Thu, 14 Jun 2012 14:24:31 +0530
+Subject: Fwd: [RFC PATCH 00/15] ARM: perf: support multiple PMUs
+In-Reply-To: <20120613170214.GD11458@mudshark.cambridge.arm.com>
+References: <4B9A4BAF850C914D8DED94776A2C477E0B853A2F@nasanexd01b.na.qualcomm.com>
+ <4E52A852.9090809@codeaurora.org>
+ <20110822201546.GD22755@e102144-lin.cambridge.arm.com>
+ <CAMzctLkwJCrgKoeYET=OYcfOifKuTEWoWfcRgWts4Y6aspZEUA@mail.gmail.com>
+ <20120613114326.GA14399@bnru02>
+ <20120613170214.GD11458@mudshark.cambridge.arm.com>
+Message-ID: <20120614085430.GA28552@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 11:23:18AM -0500, Rob Herring wrote:
-> Right. This is why I have reposted and copied those whom commented on my
-> pull request. I think at least some of Saravana's concerns boiled down
-> to not requiring using DT clock bindings and not requiring driver
-> changes to move to DT bindings. Both of these are met with this series.
-> A platform can still use clkdev tables for binding clocks to devices and
-> does not have to use DT for clocks. Drivers generally should not require
-> any changes that I'm aware of, but if there are any concrete examples
-> I'd like to know.
+On Wed, Jun 13, 2012 at 19:02:14 +0200, Will Deacon wrote:
+> On Wed, Jun 13, 2012 at 12:43:27PM +0100, Srinidhi Kasagar wrote:
+> > > The series is based on Will Deacon's perf-updates branch at:
+> > >        git://linux-arm.org/linux-2.6-wd.git perf-updates
+> > > 
+> > > An example driver using the framework (supporting the PMU present in
+> > > L220/PL310 level 2 cache controllers) can be found at:
+> > >        git://linux-arm.org/linux-2.6-wd.git perf-l2x0-wip
+> > > 
+> > Do you still maintain this tree? Looks it is empty. I'm wondering if
+> > we can make use of this to instrument the PMU counters of L2/pl310.
 > 
-> Yes, I think this should go thru you.
+> There's an old branch here, but this stuff is pretty bit-rotted and needs
+> reworking as part of the big.LITTLE support:
 > 
-I still have a little doubt about how this binding will best work for
-imx clock.  I'm trying to cook a RFC patch discussing.
+> http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=shortlog;h=refs/heads/perf/l2x0
 
--- 
-Regards,
-Shawn
+Thanks, will look at it.
+
+/srinidhi
