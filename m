@@ -1,80 +1,116 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 14 Jun 2012 12:47:13 +0000
-Subject: [PATCH v6 00/17] Add PWM framework and device tree support
-In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA21A9F@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jun 2012 13:50:13 +0100
+Subject: [CFT 07/11] spi: omap2-mcspi: add DMA engine support
+In-Reply-To: <20120614120842.GF31187@n2100.arm.linux.org.uk>
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1ScaZv-0003tz-6F@rmk-PC.arm.linux.org.uk>
+ <20120614115335.GE31187@n2100.arm.linux.org.uk>
+ <20120614120842.GF31187@n2100.arm.linux.org.uk>
+Message-ID: <20120614125012.GG31187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 20:36:23, Thierry Reding wrote:
-> This patch series adds very rudimentary device-tree support for PWM
-> devices. With all of these patches applied (plus one board-specific
-> patch that is not included), I'm able to control the backlight on the
-> device I'm working on using the sysfs interface provided by the pwm-bl
-> driver and the backlight class.
+On Thu, Jun 14, 2012 at 01:08:43PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 14, 2012 at 12:53:35PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Jun 07, 2012 at 12:08:35PM +0100, Russell King wrote:
+> > > Add DMA engine support to the OMAP SPI driver.  This supplements the
+> > > private DMA API implementation contained within this driver, and the
+> > > driver can be independently switched at build time between using DMA
+> > > engine and the private DMA API for the transmit and receive sides.
+> > > 
+> > > Tested-by: Shubhrajyoti <shubhrajyoti@ti.com>
+> > > Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > Right, now that we have working OMAP in mainline again...
 > 
-> This series is based on Sascha Hauer's series of patches[0] to add a
-> generic PWM framework. The first patch in this series is taken from
-> Sascha's branch, while the second patch enables each PWM chip to provide
-> multiple PWM devices (the Blackfin and PXA drivers have been ported to
-> the framework for reference). Currently a global namespace is still
-> provided to keep backwards-compatibility with the legacy PWM API. In
-> order to achieve this, the number of global PWM devices is limited to
-> 1024. However, patch 2 introduces per-chip indexing of PWM devices in
-> the core and patch 4 adds an API to request a PWM device using a lookup
-> table registered by board setup code. They are supposed to eventually
-> replace pwm_request() and allow to get rid of the global namespace. The
-> device tree support code does not use the global namespace.
+> Another warning:
 > 
-..snip..
-..snip..
+> ------------[ cut here ]------------
+> WARNING: at /home/rmk/git/linux-rmk/drivers/base/dd.c:257 driver_probe_device+0x78/0x21c()
+> Modules linked in:
+> Backtrace:
+> [<c0017d0c>] (dump_backtrace+0x0/0x10c) from [<c033e208>] (dump_stack+0x18/0x1c) r7:00000000 r6:c01ff28c r5:c040050c r4:00000101
+> [<c033e1f0>] (dump_stack+0x0/0x1c) from [<c00337ec>] (warn_slowpath_common+0x58/0x70)
+> [<c0033794>] (warn_slowpath_common+0x0/0x70) from [<c0033828>] (warn_slowpath_null+0x24/0x2c)
+>  r8:c04aa4d8 r7:c04aa63c r6:de70ce00 r5:de70ce34 r4:de70ce00
+> [<c0033804>] (warn_slowpath_null+0x0/0x2c) from [<c01ff28c>] (driver_probe_device+0x78/0x21c)
+> [<c01ff214>] (driver_probe_device+0x0/0x21c) from [<c01ff49c>] (__driver_attach+0x6c/0x90)
+>  r7:de443ec8 r6:c04aa63c r5:de70ce34 r4:de70ce00
+> [<c01ff430>] (__driver_attach+0x0/0x90) from [<c01fda70>] (bus_for_each_dev+0x58/0x98)
+>  r6:c04aa63c r5:c01ff430 r4:00000000
+> [<c01fda18>] (bus_for_each_dev+0x0/0x98) from [<c01ff0f4>] (driver_attach+0x20/0x28)
+>  r7:de6c9e80 r6:c04aa63c r5:c04aa63c r4:c0465b80
+> [<c01ff0d4>] (driver_attach+0x0/0x28) from [<c01fe2f4>] (bus_add_driver+0xb4/0x230)
+> [<c01fe240>] (bus_add_driver+0x0/0x230) from [<c01ffb24>] (driver_register+0xac/0x138)
+> [<c01ffa78>] (driver_register+0x0/0x138) from [<c0215d4c>] (spi_register_driver+0x4c/0x60)
+>  r8:0000005b r7:c045f848 r6:00000006 r5:00000018 r4:c0465b80
+> [<c0215d00>] (spi_register_driver+0x0/0x60) from [<c045414c>] (ks8851_init+0x14/0x1c)
+> [<c0454138>] (ks8851_init+0x0/0x1c) from [<c0008770>] (do_one_initcall+0x9c/0x164)
+> [<c00086d4>] (do_one_initcall+0x0/0x164) from [<c0436410>] (kernel_init+0x128/0x210)
+> [<c04362e8>] (kernel_init+0x0/0x210) from [<c0038754>] (do_exit+0x0/0x72c)
+> ---[ end trace 4dcda79f5e89dd84 ]---
+> ks8851 spi1.0: message enable is 0
+> ks8851 spi1.0: eth0: revision 0, MAC 08:00:28:01:4d:c6, IRQ 194, has EEPROM
+> 
+> The relevant line:
+> 
+>         WARN_ON(!list_empty(&dev->devres_head));
+> 
+> Which suggests that someone is using devres against the struct device for
+> the KS8851 device before the driver is bound.  That's a bug, plain and
+> simple.  I've not yet been able to track down what it is or where it's
+> being done, but it is something that has been introduced during the last
+> merge window.
+> 
+> devm_* APIs should only be used by _drivers_ against the struct device
+> that they are driving - because the lifetime of these things is bounded
+> by the point at which the driver is bound to that struct device, to the
+> point that it is unbound from that struct device (and at that point,
+> all devm_* stuff against the struct device gets destroyed.)
 
-> 
-> The whole series is based on the linux-next tree from 20120405. I think
-> I've addressed all of the concerns raised in the first five versions. I
-> have also pushed this version of the series to the PWM subsystem
-> repository[1].
-> 
-> Thierry
-> 
-> [0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
-> [1]: http://gitorious.org/linux-pwm/linux-pwm/trees/pwm-v6
-> 
-> Sascha Hauer (4):
->   pwm: Add PWM framework support
->   ARM i.MX: Move i.MX pwm driver to pwm framework
->   ARM Samsung: Move s3c pwm driver to pwm framework
->   ARM vt8500: Move vt8500 pwm driver to pwm framework
-> 
-> Shawn Guo (1):
->   pwm: add pwm-mxs support
-> 
-> Simon Que (1):
->   ARM: tegra: Fix PWM clock programming
-> 
-> Thierry Reding (11):
->   pwm: Allow chips to support multiple PWMs
->   pwm: Add debugfs interface
->   pwm: Add table-based lookup for static mappings
->   pwm: Add device tree support
->   ARM: tegra: Provide clock for only one PWM controller
->   pwm: Add NVIDIA Tegra SoC support
->   pwm: tegra: Add device tree support
->   pwm: Move Blackfin PWM driver to PWM framework
->   pwm: Move PXA PWM driver to PWM framework
->   pwm-backlight: Add rudimentary device tree support
->   pwm: Take over maintainership of the PWM subsystem
-> 
+This commit introduced the bug:
 
-I am planning to add PWM support in Linux for TI AM335x SOC. 
-I am taking your new PWM framework as reference.
+commit 1a77b127ae147f5827043a9896d7f4cb248b402e
+Author: Shubhrajyoti D <shubhrajyoti@ti.com>
+Date:   Sat Mar 17 12:44:01 2012 +0530
 
-I see a lot of ack's for the patches. I see that you are maintaining these patches in a separate repo.
-However, I couldn't find any of these 
-patches in the mainline kernel (including recent 3.5-rc2). 
-Do you have any plans for pushing this again to mainline kernel. 
+    OMAP : SPI : use devm_* functions
 
+    The various devm_* functions allocate memory that is released when a driver
+    detaches. This patch uses devm_request_and_ioremap
+    to request memory in probe function. Since the freeing is not
+    needed the calls are deleted from remove function.Also use
+    use devm_kzalloc for the cs memory allocation.
 
-Regards, 
-Gururaja
+    Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+
+and sure enough, reverting this makes the warning go away.
+
+Specifically, it is this part which is the culpret:
+
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index 7745f91..cb2c0e3 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -789,7 +789,7 @@ static int omap2_mcspi_setup(struct spi_device *spi)
+        mcspi_dma = &mcspi->dma_channels[spi->chip_select];
+
+        if (!cs) {
+-               cs = kzalloc(sizeof *cs, GFP_KERNEL);
++               cs = devm_kzalloc(&spi->dev , sizeof *cs, GFP_KERNEL);
+                if (!cs)
+                        return -ENOMEM;
+                cs->base = mcspi->base + spi->chip_select * 0x14;
+@@ -831,7 +831,6 @@ static void omap2_mcspi_cleanup(struct spi_device *spi)
+                cs = spi->controller_state;
+                list_del(&cs->node);
+
+-               kfree(spi->controller_state);
+        }
+
+        if (spi->chip_select < spi->master->num_chipselect) {
+
+because, at the time when omap2_mcspi_setup() is called, spi->dev is
+not bound, and so is outside of the devres valid lifetime of that
+struct device.
