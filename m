@@ -1,91 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Jun 2012 15:59:22 +0530
-Subject: [PATCH v3 2/4] dt: emif: device tree bindings for TI's EMIF sdram
- controller
-In-Reply-To: <1339669764-27244-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1339669764-27244-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1339669764-27244-3-git-send-email-santosh.shilimkar@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 14 Jun 2012 12:31:27 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <201206141025.09325.arnd@arndb.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <201206132021.09774.arnd@arndb.de>
+ <20120614083719.GC31283@avionic-0098.mockup.avionic-design.de>
+ <201206141025.09325.arnd@arndb.de>
+Message-ID: <20120614103127.GA15904@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aneesh V <aneesh@ti.com>
+On Thu, Jun 14, 2012 at 10:25:09AM +0000, Arnd Bergmann wrote:
+> On Thursday 14 June 2012, Thierry Reding wrote:
+> > > 
+> > > I believe you will need an "interrupt-map" property here, to map the host
+> > > interrupts to the INTA-INTD lines of the attached devices.
+> >
+> > Legacy interrupts are something I cannot test at all because I have no
+> > hardware that supports them.
+> 
+> Hmm, I thought all PCIe hardware has to support them when you do not
+> enable MSI. What hardware do you have then?
 
-EMIF - External Memory Interface - is an SDRAM controller used in
-TI SoCs. EMIF supports, based on the IP revision, one or more of
-DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
-of the EMIF IP and memory parts attached to it.
+The TEC (Tamonten Evaluation Carrier) has an FPGA which is connected to one
+of the Tegra PCIe ports and it only supports MSIs.
 
-Reviewed-by: Benoit Cousson <b-cousson@ti.com>
-Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Aneesh V <aneesh@ti.com>
-[santosh.shilimkar at ti.com: Rebased against 3.5-rc]
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- .../bindings/memory-controllers/ti/emif.txt        |   55 ++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> > > I'm not sure whether we want to have a device_type="pciex" property here.
+> > > powerpc and sparc seem to use that information, to distinguish a pcie
+> > > bus from pci or cardbus.
+> > 
+> > That'd be rather useless information given that the Tegra is unlikely to
+> > support either PCI or CardBus at some point.
+> 
+> But the generic code does not know that.
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-new file mode 100644
-index 0000000..938f8e1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-@@ -0,0 +1,55 @@
-+* EMIF family of TI SDRAM controllers
-+
-+EMIF - External Memory Interface - is an SDRAM controller used in
-+TI SoCs. EMIF supports, based on the IP revision, one or more of
-+DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
-+of the EMIF IP and memory parts attached to it.
-+
-+Required properties:
-+- compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-+  is the IP revision of the specific EMIF instance.
-+
-+- phy-type	: <u32> indicating the DDR phy type. Following are the
-+  allowed values
-+  <1>	: Attila PHY
-+  <2>	: Intelli PHY
-+
-+- device-handle	: phandle to a "lpddr2" node representing the memory part
-+
-+- ti,hwmods	: For TI hwmods processing and omap device creation
-+  the value shall be "emif<n>" where <n> is the number of the EMIF
-+  instance with base 1.
-+
-+Optional properties:
-+- cs1-used		: Have this property if CS1 of this EMIF
-+  instance has a memory part attached to it. If there is a memory
-+  part attached to CS1, it should be the same type as the one on CS0,
-+  so there is no need to give the details of this memory part.
-+
-+- cal-resistor-per-cs	: Have this property if the board has one
-+  calibration resistor per chip-select.
-+
-+- hw-caps-read-idle-ctrl: Have this property if the controller
-+  supports read idle window programming
-+
-+- hw-caps-dll-calib-ctrl: Have this property if the controller
-+  supports dll calibration control
-+
-+- hw-caps-ll-interface	: Have this property if the controller
-+  has a low latency interface and corresponding interrupt events
-+
-+- hw-caps-temp-alert	: Have this property if the controller
-+  has capability for generating SDRAM temperature alerts
-+
-+Example:
-+
-+emif1: emif at 0x4c000000 {
-+	compatible	= "ti,emif-4d";
-+	ti,hwmods	= "emif2";
-+	phy-type	= <1>;
-+	device-handle	= <&elpida_ECB240ABACN>;
-+	cs1-used;
-+	hw-caps-read-idle-ctrl;
-+	hw-caps-ll-interface;
-+	hw-caps-temp-alert;
-+};
--- 
-1.7.9.5
+True. Still there's not much generic code on ARM, so maybe it'd be better to
+add it along with the corresponding code?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/ab4a7c31/attachment.sig>
