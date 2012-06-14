@@ -1,45 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Jun 2012 15:55:30 +0800
-Subject: [PATCH 16/16] ARM: imx: enable SPARSE_IRQ for imx platform
-In-Reply-To: <CAN1soZw5NZq1RP3z6w1P+5PQTjuT-hPucCwbiG3CQk0UpCacbQ@mail.gmail.com>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-17-git-send-email-shawn.guo@linaro.org>
- <CAN1soZw5NZq1RP3z6w1P+5PQTjuT-hPucCwbiG3CQk0UpCacbQ@mail.gmail.com>
-Message-ID: <20120614075529.GE31565@S2101-09.ap.freescale.net>
+From: viresh.kumar2@arm.com (Viresh Kumar)
+Date: Thu, 14 Jun 2012 09:11:13 +0100
+Subject: [PATCH] ARM: netx: Reuse dummy clk routines for non CONFIG_HAVE_CLK
+ case
+Message-ID: <5c52038c3c8ec3cc6a5468139e886d5e8a1a1f5c.1339661188.git.viresh.kumar2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 03:40:09PM +0800, Haojian Zhuang wrote:
-> On Thu, Jun 14, 2012 at 1:59 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > As all irqchips on imx have been changed to allocate their irq_descs,
-> > and all unneeded mach/irqs.h inclusions on imx have been cleaned up,
-> > now it's time to select SPARSE_IRQ for imx/mxc.
-> >
-> > The SPARSE_IRQ support forces irqs allocation starting from 16. ?All
-> > those static irq number definition for SoCs need to shift 16 to keep
-> > non-DT boot works.
-> >
-> Do we really need to shift 16 to keep non-DT boot works?
-> 
-Yes, for my case.
+mach-netx had its own implementation of clk routines like, clk_get{put},
+clk_enable{disable}, etc. And with introduction of following patchset:
 
-> I think that we can allocate "new irq numbers - NR_IRQS_LEGACY" in interrupt
-> controller in DT mode.
+https://lkml.org/lkml/2012/4/24/154
 
-In DT mode, I need to do nothing about it, because with irqdomain
-support, DT core will translate the hardware irq number encoded in
-device tree to Linux irq.  That said, platform_get_irq will
-automatically return me Linux irq number.
+we get compilation error for multiple definition of these routines.
 
-> And we needn't shift NR_IRQS_LEGACY in non-DT mode,
-> since irq numbers are already specified in .nr_irqs of machine description.
-> 
-I took a different (IMO, cleaner) approach than setting .nr_irqs in
-mach_desc.  With all irqdescs dynamically allocated, I do not need
-to set .nr_irqs to have irq core preallocate all these irqs.  IMO,
-that's the point of SPARSE_IRQ.  To me, the .nr_irqs approach is just a
-quick and dirty path to SPARSE_IRQ, but we gain nothing from that
-except getting rid of platform NR_IRQS definition.
+Sascha had following suggestion to deal with it:
 
-Regards,
-Shawn
+http://www.spinics.net/lists/arm-kernel/msg179369.html
+
+So, removing this code completely.
+
+Signed-off-by: Viresh Kumar <viresh.kumar2@arm.com>
+---
+ arch/arm/mach-netx/fb.c | 23 -----------------------
+ 1 file changed, 23 deletions(-)
+
+diff --git a/arch/arm/mach-netx/fb.c b/arch/arm/mach-netx/fb.c
+index 2cdf6ef..d122ee6 100644
+--- a/arch/arm/mach-netx/fb.c
++++ b/arch/arm/mach-netx/fb.c
+@@ -69,29 +69,6 @@ void netx_clcd_remove(struct clcd_fb *fb)
+                              fb->fb.screen_base, fb->fb.fix.smem_start);
+ }
+
+-void clk_disable(struct clk *clk)
+-{
+-}
+-
+-int clk_set_rate(struct clk *clk, unsigned long rate)
+-{
+-       return 0;
+-}
+-
+-int clk_enable(struct clk *clk)
+-{
+-       return 0;
+-}
+-
+-struct clk *clk_get(struct device *dev, const char *id)
+-{
+-       return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
+-}
+-
+-void clk_put(struct clk *clk)
+-{
+-}
+-
+ static AMBA_AHB_DEVICE(fb, "fb", 0, 0x00104000, { NETX_IRQ_LCD }, NULL);
+
+ int netx_fb_init(struct clcd_board *board, struct clcd_panel *panel)
+--
+1.7.11.rc1.9.gf623ca1
+
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
