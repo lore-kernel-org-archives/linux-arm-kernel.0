@@ -1,77 +1,41 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Thu, 14 Jun 2012 09:28:24 -0400
-Subject: Converting kirkwood-goflexnet to DTS
-In-Reply-To: <20120613191029.GI14756@titan.lakedaemon.net>
-References: <CAMW5Ufar3+RFwwmPd5xS_aNBKz6VLyDnw_3_aJDOR-xRz1kkTw@mail.gmail.com>
- <20120613191029.GI14756@titan.lakedaemon.net>
-Message-ID: <CAMW5UfYMxSKmGAvZ5ucNyr8AL0zBAj5jpt+s8YhogKaWdv2mAw@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 14 Jun 2012 13:32:58 +0000
+Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <4FD9E5AF.6010201@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
+ <4FD64D6D.3020401@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
+ <4FD77EF1.8000600@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
+ <4FD8A906.8080202@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
+ <4FD9E5AF.6010201@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 3:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+Hi Jon,
 
-> I would recommend looking at how we did the first board, the dreamplug.
-> Files of interest are:
->
-> arch/arm/boot/dts/kirkwood.dtsi
-> arch/arm/boot/dts/kirkwood-dreamplug.dts
-> arch/arm/mach-kirkwood/board-dt.c
-> arch/arm/mach-kirkwood/board-dreamplug.c
-> arch/arm/mach-kirkwood/Kconfig
-> arch/arm/mach-kirkwood/Makefile
-> arch/arm/mach-kirkwood/Makefile.boot
->
-> commit 3d468b6 seems to be a good place to start.
->
-> For your first patch series, use the dtb to tell the kernel what board
-> it is on. ?Once that's working, then you just start coverting over
-> drivers one by one. ?Several are already done.
->
-> hth,
->
-> Jason.
+On Thu, Jun 14, 2012 at 18:52:55, Hunter, Jon wrote:
+> On 06/14/2012 02:03 AM, Mohammed, Afzal wrote:
+> > On Wed, Jun 13, 2012 at 20:21:50, Hunter, Jon wrote:
 
-First pass didn't boot, no kernel messages.  I'm going to go through
-the ArchLinux ARM superpatch to see if there are any items not
-directly pegged to the GoFlex that might be involved next, as well as
-cutting my conf down to just what's needed for the GFN to cut down my
-build times.  While I'm doing that, what do I NEED to configure for
-proper DTS support?
+> >> If the clk handle for the gpmc is passed to the gpmc driver, then there
+> >> is no reason why the driver cannot do this.
+> > 
+> > I believe passing clk details through platform data is an abuse of
+> > clock framework.
+> 
+> Why? You currently have a global variable storing the clock handle. It
+> can be quite common for drivers to know the clock frequencies of their
+> functional clocks. How else can drivers calculate timings?
 
-CONFIG_ARCH_KIRKWOOD=y
 
-CONFIG_ARCH_KIRKWOOD_DT=y
-CONFIG_MACH_DREAMPLUG_DT=n
-CONFIG_MACH_ICONNECT_DT=n
-CONFIG_MACH_DLINK_KIRKWOOD_DT=n
-CONFIG_MACH_IB62X0_DT=n
-CONFIG_MACH_GOFLEX_DT=y
+Please see Russell King's comments,
 
-CONFIG_USE_OF=y
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_ARM_ATAG_DTB_COMPAT=y
-CONFIG_CMDLINE=""
-CONFIG_ATAGS_PROC=y
+[1] http://permalink.gmane.org/gmane.linux.ports.ppc.embedded/27634
+[2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg05365.html
 
-CONFIG_USE_OF=y
-CONFIG_MTD_OF_PARTS=y
-# CONFIG_MTD_PHYSMAP_OF is not set
-CONFIG_OF=y
-# CONFIG_OF_SELFTEST is not set
-CONFIG_OF_FLATTREE=y
-CONFIG_OF_EARLY_FLATTREE=y
-CONFIG_OF_ADDRESS=y
-CONFIG_OF_IRQ=y
-CONFIG_OF_DEVICE=y
-CONFIG_OF_I2C=m
-CONFIG_OF_NET=y
-CONFIG_OF_MDIO=y
-CONFIG_OF_PCI=y
-CONFIG_OF_PCI_IRQ=y
-CONFIG_OF_MTD=y
-# CONFIG_SERIAL_OF_PLATFORM is not set
-CONFIG_OF_GPIO=y
-
-Am I missing anything?
-
-Joshua Coombs
+Regards
+Afzal
