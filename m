@@ -1,183 +1,167 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 14 Jun 2012 17:05:56 +0200
-Subject: [PATCH 05/10] ARM: OMAP3: cpuidle: next C-state decision depends on
- the PM QoS MPU and CORE constraints
+Date: Thu, 14 Jun 2012 17:06:00 +0200
+Subject: [PATCH 09/10] ARM: OMAP: convert I2C driver to PM QoS for latency
+ constraints
 In-Reply-To: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
 References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1339686361-11526-6-git-send-email-j-pihet@ti.com>
+Message-ID: <1339686361-11526-10-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MPU latency figures for cpuidle include the MPU itself and also
-the peripherals needed for the MPU to execute instructions (e.g.
-main memory, caches, IRQ controller, MMU etc). On OMAP3 those
-peripherals belong to the MPU and CORE power domains and so the
-cpuidle C-states are a combination of MPU and CORE states.
+Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
+API to the new PM QoS API.
+Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
+class of PM QoS. The resulting MPU constraints are used by cpuidle to
+decide the next power state of the MPU subsystem.
 
-This patch implements the relation between the cpuidle and per-
-device PM QoS frameworks in the OMAP3 specific idle callbacks.
-
-The chosen C-state shall satisfy the following conditions:
- . the 'valid' field is enabled,
- . it satisfies the enable_off_mode flag,
- . the next state for MPU and CORE power domains is not lower than the
-   next state calculated by the per-device PM QoS.
-
-Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-on MPU, CORE and PER.
+The I2C device latency timing is derived from the FIFO size and the
+clock speed and so is applicable to all OMAP SoCs.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   64 ++++++++++++++++++++++++-------------
- 1 files changed, 42 insertions(+), 22 deletions(-)
+ arch/arm/plat-omap/i2c.c      |   21 ---------------------
+ drivers/i2c/busses/i2c-omap.c |   28 +++++++++++++++++-----------
+ include/linux/i2c-omap.h      |    1 -
+ 3 files changed, 17 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index ef8d7d4..1f33b8e 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -92,8 +92,8 @@ static int _cpuidle_deny_idle(struct powerdomain *pwrdm,
- }
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index db071bc..dba8338 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -26,7 +26,6 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c-omap.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
+@@ -34,7 +33,6 @@
+ #include <mach/irqs.h>
+ #include <plat/mux.h>
+ #include <plat/i2c.h>
+-#include <plat/omap-pm.h>
+ #include <plat/omap_device.h>
  
- static int __omap3_enter_idle(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--				int index)
-+			      struct cpuidle_driver *drv,
-+			      int index)
+ #define OMAP_I2C_SIZE		0x3f
+@@ -129,16 +127,6 @@ static inline int omap1_i2c_add_bus(int bus_id)
+ 
+ 
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+-/*
+- * XXX This function is a temporary compatibility wrapper - only
+- * needed until the I2C driver can be converted to call
+- * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
+- */
+-static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
+-{
+-	omap_pm_set_max_mpu_wakeup_lat(dev, t);
+-}
+-
+ static inline int omap2_i2c_add_bus(int bus_id)
  {
- 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
- 	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
-@@ -150,10 +150,14 @@ return_sleep_time:
-  *
-  * Called from the CPUidle framework to program the device to the
-  * specified target state selected by the governor.
-+ *
-+ * Note: this function does not check for any pending activity or dependency
-+ * between power domains states, so the caller shall check the parameters
-+ * correctness.
-  */
- static inline int omap3_enter_idle(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--				int index)
-+				   struct cpuidle_driver *drv,
-+				   int index)
- {
- 	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
- }
-@@ -168,8 +172,10 @@ static inline int omap3_enter_idle(struct cpuidle_device *dev,
-  * to the caller. Else, this function searches for a lower c-state which is
-  * still valid (as defined in omap3_power_states[]) and returns its index.
-  *
-- * A state is valid if the 'valid' field is enabled and
-- * if it satisfies the enable_off_mode condition.
-+ * A state is valid if:
-+ * . it satisfies the enable_off_mode flag,
-+ * . the next state for MPU and CORE power domains is not lower than the
-+ *   state programmed by the per-device PM QoS.
-  */
- static int next_valid_state(struct cpuidle_device *dev,
- 			    struct cpuidle_driver *drv, int index)
-@@ -177,6 +183,8 @@ static int next_valid_state(struct cpuidle_device *dev,
- 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
- 	u32 mpu_deepest_state = PWRDM_FUNC_PWRST_CSWR;
- 	u32 core_deepest_state = PWRDM_FUNC_PWRST_CSWR;
-+	u32 mpu_pm_qos_next_state = mpu_pd->wkup_lat_next_state;
-+	u32 core_pm_qos_next_state = core_pd->wkup_lat_next_state;
- 	int idx;
- 	int next_index = -1;
- 
-@@ -193,7 +201,9 @@ static int next_valid_state(struct cpuidle_device *dev,
- 
- 	/* Check if current state is valid */
- 	if ((cx->mpu_state >= mpu_deepest_state) &&
--	    (cx->core_state >= core_deepest_state))
-+	    (cx->core_state >= core_deepest_state) &&
-+	    (cx->mpu_state >= mpu_pm_qos_next_state) &&
-+	    (cx->core_state >= core_pm_qos_next_state))
- 		return index;
- 
- 	/*
-@@ -203,7 +213,9 @@ static int next_valid_state(struct cpuidle_device *dev,
- 	for (idx = index - 1; idx >= 0; idx--) {
- 		cx =  &omap3_idle_data[idx];
- 		if ((cx->mpu_state >= mpu_deepest_state) &&
--		    (cx->core_state >= core_deepest_state)) {
-+		    (cx->core_state >= core_deepest_state) &&
-+		    (cx->mpu_state >= mpu_pm_qos_next_state) &&
-+		    (cx->core_state >= core_pm_qos_next_state)) {
- 			next_index = idx;
- 			break;
- 		}
-@@ -224,12 +236,15 @@ static int next_valid_state(struct cpuidle_device *dev,
-  * @drv: cpuidle driver
-  * @index: array index of target state to be programmed
-  *
-- * This function checks for any pending activity and then programs
-- * the device to the specified or a safer state.
-+ * Called from the CPUidle framework to program the device to the
-+ * specified target state selected by the governor.
-+ *
-+ * This function checks for any pending activity or dependency between
-+ * power domains states and then programs the device to the specified
-+ * or a safer state.
-  */
- static int omap3_enter_idle_bm(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--			       int index)
-+			       struct cpuidle_driver *drv, int index)
- {
- 	int new_state_idx;
- 	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
-@@ -245,19 +260,13 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 		goto select_state;
- 	}
+ 	int l;
+@@ -170,15 +158,6 @@ static inline int omap2_i2c_add_bus(int bus_id)
+ 	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
+ 	pdata->flags = dev_attr->flags;
  
 -	/*
--	 * FIXME: we currently manage device-specific idle states
--	 *        for PER and CORE in combination with CPU-specific
--	 *        idle states.  This is wrong, and device-specific
--	 *        idle management needs to be separated out into
--	 *        its own code.
+-	 * When waiting for completion of a i2c transfer, we need to
+-	 * set a wake up latency constraint for the MPU. This is to
+-	 * ensure quick enough wakeup from idle, when transfer
+-	 * completes.
+-	 * Only omap3 has support for constraints
 -	 */
-+	new_state_idx = next_valid_state(dev, drv, index);
+-	if (cpu_is_omap34xx())
+-		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+ 	pdev = omap_device_build(name, bus_id, oh, pdata,
+ 			sizeof(struct omap_i2c_bus_platform_data),
+ 			NULL, 0, 0);
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 801df60..72d7076 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -43,6 +43,7 @@
+ #include <linux/slab.h>
+ #include <linux/i2c-omap.h>
+ #include <linux/pm_runtime.h>
++#include <linux/pm_qos.h>
  
- 	/*
- 	 * Prevent PER off if CORE is not in retention or off as this
- 	 * would disable PER wakeups completely.
- 	 */
--	cx = &omap3_idle_data[index];
-+	cx = &omap3_idle_data[new_state_idx];
- 	core_next_state = cx->core_state;
- 	per_next_state = per_saved_state = pwrdm_read_next_func_pwrst(per_pd);
- 	if ((per_next_state == PWRDM_FUNC_PWRST_OFF) &&
-@@ -268,8 +277,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	if (per_next_state != per_saved_state)
- 		omap_set_pwrdm_state(per_pd, per_next_state);
+ /* I2C controller revisions */
+ #define OMAP_I2C_OMAP1_REV_2		0x20
+@@ -183,8 +184,7 @@ struct omap_i2c_dev {
+ 	struct completion	cmd_complete;
+ 	struct resource		*ioarea;
+ 	u32			latency;	/* maximum mpu wkup latency */
+-	void			(*set_mpu_wkup_lat)(struct device *dev,
+-						    long latency);
++	struct pm_qos_request	pm_qos_request;
+ 	u32			speed;		/* Speed of bus in kHz */
+ 	u32			dtrev;		/* extra revision from DT */
+ 	u32			flags;
+@@ -634,8 +634,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 	if (r < 0)
+ 		goto out;
  
--	new_state_idx = next_valid_state(dev, drv, index);
--
- select_state:
- 	ret = omap3_enter_idle(dev, drv, new_state_idx);
+-	if (dev->set_mpu_wkup_lat != NULL)
+-		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
++	/*
++	 * When waiting for completion of a i2c transfer, we need to
++	 * set a wake up latency constraint for the MPU. This is to
++	 * ensure quick enough wakeup from idle, when transfer
++	 * completes.
++	 */
++	if (dev->latency)
++		pm_qos_add_request(&dev->pm_qos_request,
++				   PM_QOS_CPU_DMA_LATENCY,
++				   dev->latency);
  
-@@ -282,6 +289,19 @@ select_state:
+ 	for (i = 0; i < num; i++) {
+ 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
+@@ -643,8 +651,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 			break;
+ 	}
  
- DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+-	if (dev->set_mpu_wkup_lat != NULL)
+-		dev->set_mpu_wkup_lat(dev->dev, -1);
++	if (dev->latency)
++		pm_qos_remove_request(&dev->pm_qos_request);
  
-+/*
-+ * Note about the latency related fields of the cpuidle_driver struct:
-+ *
-+ * - exit_latency = sleep + wake-up latencies of the MPU,
-+ *  which include the MPU itself and the peripherals needed
-+ *  for the MPU to execute instructions (e.g. main memory,
-+ *  caches, IRQ controller, MMU etc). Some of those peripherals
-+ *  can belong to other power domains than the MPU subsystem and so
-+ *  the corresponding latencies must be included in this figure
-+ *
-+ * - target_residency: required amount of time in the C state
-+ *  to break even on energy cost
-+ */
- struct cpuidle_driver omap3_idle_driver = {
- 	.name = 	"omap3_idle",
- 	.owner = 	THIS_MODULE,
+ 	if (r == 0)
+ 		r = num;
+@@ -1032,7 +1040,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	} else if (pdata != NULL) {
+ 		dev->speed = pdata->clkrate;
+ 		dev->flags = pdata->flags;
+-		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+ 		dev->dtrev = pdata->rev;
+ 	}
+ 
+@@ -1081,10 +1088,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		else
+ 			dev->b_hw = 1; /* Enable hardware fixes */
+ 
+-		/* calculate wakeup latency constraint for MPU */
+-		if (dev->set_mpu_wkup_lat != NULL)
+-			dev->latency = (1000000 * dev->fifo_size) /
+-				       (1000 * dev->speed / 8);
++		/* calculate wakeup latency constraint */
++		dev->latency = (1000000 * dev->fifo_size) /
++			       (1000 * dev->speed / 8);
+ 	}
+ 
+ 	/* reset ASAP, clearing any IRQs */
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index 92a0dc7..df804ba 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -34,7 +34,6 @@ struct omap_i2c_bus_platform_data {
+ 	u32		clkrate;
+ 	u32		rev;
+ 	u32		flags;
+-	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
+ };
+ 
+ #endif
 -- 
 1.7.7.6
