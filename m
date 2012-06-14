@@ -1,36 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 14 Jun 2012 13:12:34 +0100
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120614121234.GC3913@opensource.wolfsonmicro.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 14 Jun 2012 12:21:34 +0000
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E999B05@DBDE01.ent.ti.com>
+References: <4FD63DBF.9000200@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+ <4FD77E35.3050703@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
+ <20120613113217.GK12766@atomide.com> <20120613115445.GM12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
+ <20120614101901.GI12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
+ <20120614114905.GK12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999B05@DBDE01.ent.ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E999B34@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 08:31:20AM +0200, Thierry Reding wrote:
-> On Wed, Jun 13, 2012 at 03:17:06PM -0600, Stephen Warren wrote:
+Hi Tony,
 
-> > The core of the issue is that:
+On Thu, Jun 14, 2012 at 17:39:41, Mohammed, Afzal wrote:
+> On Thu, Jun 14, 2012 at 17:19:06, Tony Lindgren wrote:
 
-> > * Tegra30 support is via device tree.
-> > * We have an SDIO bus, and the WiFi device attached to that bus is
-> > enumerable.
-> > * Since the WiFi device is enumerable, no node exists in the DT to
-> > represent it.
-> > * However, the driver for the WiFi device needs certain information,
-> > such as the reset GPIO ID and perhaps power GPIO.
+> > For onenand I'm getting the following error:
+> > 
+> > omap2-onenand omap2-onenand: Cannot request GPMC CS 
+> 
+> I am a bit confused with this message, for onenand, we only have,
+> 
+> pr_err("%s: Cannot request GPMC CS\n", __func__);
+> 
+> dev_err is used only for nand
 
-> PCI devices are also enumerable and yet they can be matched up with nodes in
-> the device tree. Perhaps something similar could be added for the SDIO bus?
+This error can happen if my patches are not present,
 
-This seems to make the most sense - pushing this through the regulator
-API is just a bodge.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/b30854cc/attachment.sig>
+dev_err for onenand driver was removed by,
+
+[mtd: onenand: omap2: obtain memory from resource],
+
+seems, mtd patches are not in your present branch
+
+Regards
+Afzal
