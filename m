@@ -1,25 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 13 Jun 2012 17:55:47 -0600 (MDT)
-Subject: [PATCH 00/11] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
-In-Reply-To: <1339162255.2091.56.camel@sokoban>
-References: <20120607060901.25532.68354.stgit@dusk>
- <1339162255.2091.56.camel@sokoban>
-Message-ID: <alpine.DEB.2.00.1206131755130.30212@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 13 Jun 2012 20:08:47 -0400
+Subject: Pogoplug E02 ARM (Kirkwood 88F6281 SoC) target vs 3.5 kernel
+In-Reply-To: <CAAeQ1eZbER5k7fw2L0UWpKqiXJLCg2WwUPrRzf40rmv7EKcZ-w@mail.gmail.com>
+References: <CAAeQ1eZbER5k7fw2L0UWpKqiXJLCg2WwUPrRzf40rmv7EKcZ-w@mail.gmail.com>
+Message-ID: <20120614000847.GJ14756@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On Thu, Jun 14, 2012 at 01:40:06AM +0200, Jacco Onderdijk wrote:
+> I noticed when going from 3.4.2 to 3.5 kernel that the kernel is not
+> booting properly. I read in a Google plus post
+> 
+> <https://plus.google.com/100126049429601461708/posts/Yx63UM6Ubix>
+> 
+> that board files can be ported to DTS. I am an owner of several
+> pogoplug e02 targets (Kirkwood 88F6281 SoC) and i want to help porting
+> this target to the 3.5 kernel.
+> 
+> Here <http://forum.doozan.com/read.php?2,8153,8337#msg-8337> is a log
+> of a 3.4.2 kernel booting the Pogoplug E02.
+> 
+> How can i help, for example with testing or something else?
 
-On Fri, 8 Jun 2012, Tero Kristo wrote:
+Awesome, I'm glad you're interested in helping out.  First, always CC:
+the linux-arm-kernel mailinglist (I've added it in this reply) so that
+everyone can be kept up to date.
 
-> Tested this set on top of v3.5-rc1 with omap3 / omap4 suspend + my omap4
-> core retention / dev-off patches. There are a couple of minor issues,
-> like the bug in patch 5, and the fact that counter_32k hwmod data is
-> broken for omap4. This fix is needed on omap4 to fix the counter_32k, if
-> this is not done, device off does not work:
+Second, take a look at how the first kirkwood conversion happened (the
+dreamplug) in git commit 3d468b6.  Basically, the first thing to do, is
+to use the devicetree to tell the kernel what board it is booting on.
+This replaces the mach_type.  After you have that working, start using
+the devicetree to configure the various devices.
 
-Thanks for the testing and the reminder.  Will send the next version of 
-this soon to address more comments from Tony.
+If you have any detailed questions, feel free to ask.
 
+hth,
 
-- Paul
+Jason.
