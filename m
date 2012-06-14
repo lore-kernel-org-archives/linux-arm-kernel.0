@@ -1,61 +1,84 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 14 Jun 2012 11:09:58 -0600 (MDT)
-Subject: [PATCHv2 08/12] ARM: OMAP4: hwmod data: add SL2IF hardreset line
-In-Reply-To: <4FD9DF2A.3010000@ti.com>
-References: <20120611004502.20034.8840.stgit@dusk>
- <20120611004614.20034.50895.stgit@dusk> <4FD9DF2A.3010000@ti.com>
-Message-ID: <alpine.DEB.2.00.1206141052240.30212@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Jun 2012 19:12:14 +0200
+Subject: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik I2C driver
+In-Reply-To: <4FD8BAD2.50703@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD8BAD2.50703@linaro.org>
+Message-ID: <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Wed, Jun 13, 2012 at 6:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Thu, 14 Jun 2012, Cousson, Benoit wrote:
+> Here we apply the bindings required for successful Device Tree
+> probing of the i2c-nomadik driver. We also apply a fall-back
+> configuration in case either one is not provided, or a required
+> element is missing from the one supplied.
+>
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> I don't think we should allow that at hwmod level. This line is already
-> handled by the IVAHD hwmod. We will then have some potential issue since
-> nothing will prevent the concurrent access.
-> Moreover that IP is only used by the IVAHD and thus should be handled by the
-> same driver. The SL2 being inside the IVA subsystem, it should be reset when
-> the IVA will be reset and thus does not require an individual control.
+This looks more like I'd expect it, good job! :-D
 
-If a hardreset line will affect an IP block, then the line should be 
-listed as one of the IP block's hardreset lines.  Otherwise, the hwmod 
-data will not accurately reflect the hardware -- the ultimate goal.
+> +static int __devinit
+> +nmk_i2c_of_probe(struct device_node *np, struct nmk_i2c_controller *pdata)
+> +{
+> + ? ? ? of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
+> + ? ? ? if (!pdata->clk_freq) {
+> + ? ? ? ? ? ? ? pr_warn("%s: Clock frequency not found\n", np->full_name);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? of_property_read_u32(np, "stericsson,slsu", (u32*)&pdata->slsu);
+> + ? ? ? if (!pdata->slsu) {
+> + ? ? ? ? ? ? ? pr_warn("%s: Data line delay not found\n", np->full_name);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? of_property_read_u32(np, "stericsson,tft", (u32*)&pdata->tft);
+> + ? ? ? if (!pdata->tft) {
+> + ? ? ? ? ? ? ? pr_warn("%s: Tx FIFO threshold not found\n", np->full_name);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? of_property_read_u32(np, "stericsson,rft", (u32*)&pdata->rft);
+> + ? ? ? if (!pdata->rft) {
+> + ? ? ? ? ? ? ? pr_warn("%s: Rx FIFO threshold not found\n", np->full_name);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? of_property_read_u32(np, "stericsson,timeout", (u32*)&pdata->timeout);
+> + ? ? ? if (!pdata->timeout) {
+> + ? ? ? ? ? ? ? pr_warn("%s: Timeout not found\n", np->full_name);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? if (of_get_property(np, "stericsson,i2c_freq_mode_fast", NULL))
+> + ? ? ? ? ? ? ? pdata->sm = I2C_FREQ_MODE_FAST;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? pdata->sm = I2C_FREQ_MODE_STANDARD;
+> +
+> + ? ? ? return 0;
+> +}
 
-> I guess, we should just mark the dependency with some external power resource
-> to avoid the fmwk to try to enable that automatically.
+Will this compile fine if CONFIG_OF is not selected?
 
-Right now, the presence of a hardreset line will effectively cause the 
-hwmod code to ignore the IP block from a reset and enable point of view.  
-So the IP block won't be enabled automatically right now anyway, since we 
-still don't have a clear sense of how to handle those.
+> ? ? ? ?/* fetch the controller configuration from machine */
+> ? ? ? ?dev->cfg.clk_freq = pdata->clk_freq;
+> - ? ? ? dev->cfg.slsu ? = pdata->slsu;
+> - ? ? ? dev->cfg.tft ? ?= pdata->tft;
+> - ? ? ? dev->cfg.rft ? ?= pdata->rft;
+> - ? ? ? dev->cfg.sm ? ? = pdata->sm;
+> -
+> - ? ? ? i2c_set_adapdata(adap, dev);
+> + ? ? ? dev->cfg.slsu ? ? = pdata->slsu;
+> + ? ? ? dev->cfg.tft ? ? ?= pdata->tft;
+> + ? ? ? dev->cfg.rft ? ? ?= pdata->rft;
+> + ? ? ? dev->cfg.sm ? ? ? = pdata->sm; ?i2c_set_adapdata(adap, dev);
 
-> It is similar to DSS sub IPs and to some extend McPDM for my point of view.
+This looks like an unrelated whitespace fix, but OK...
 
-These seem like different cases to me.
-
-The DSS has no hardreset and the sub-IPs have their own softreset bits.  
-As far as I know, the main reason why we can't have individual reset 
-functions for the DSS sub-IPs is because we don't have hierarchical IP 
-block enable/disable implemented in the hwmod code, not any real hardware 
-constraint.
-
-McPDM has a functional clock dependency on an external (non-SoC) device 
-that's only controllable via I2C.  And, the McPDM can block the ABE 
-clockdomain from going idle.  That's just wacky.
-
-So those cases seem quite different to me.  One is a software issue.  And 
-the other is an off-chip (non-OMAP) dependency, unlike the SL2IF/IVAHD 
-issue in which all the needed resources are still on-chip.
-
-> Maybe we should rename HWMOD_EXT_OPT_MAIN_CLK with something more 
-> generic like HWMOD_EXT_POWER_DEP to highlight the dependency with an 
-> external resource. It can be a external clock or another module.
-
-Yes, I agree that it would be convenient to have some flag, either on the 
-hwmod or the hardreset line, to indicate that some of the reset lines are 
-shared.
-
-
-- Paul
+Yours,
+Linus Walleij
