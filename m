@@ -1,39 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jun 2012 08:12:34 +0000
-Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for
- DT boards
-In-Reply-To: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
-References: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
-Message-ID: <201206140812.34399.arnd@arndb.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 14 Jun 2012 11:16:21 +0300
+Subject: [PATCH] ARM: OMAP: fix the ads7846 init code
+Message-ID: <1339661781-5086-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 10 June 2012, Andrew Lunn wrote:
-> +static int __init kirkwood_add_irq_domain(struct device_node *np,
-> +                                         struct device_node *interrupt_parent)
-> +{
-> +       kirkwood_init_irq();
-> +       irq_domain_add_legacy(np, 64, 0, 0, &irq_domain_simple_ops, NULL);
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id kirkwood_irq_match[] = {
-> +       { .compatible = "marvell,orion-intc",
-> +         .data = kirkwood_add_irq_domain, },
-> +       {},
-> +};
-> +
-> +static void __init kirkwood_dt_init_irq(void)
-> +{
-> +       of_irq_init(kirkwood_irq_match);
-> +}
-> +
+In case a board provides the gpio_pendown and not board_pdata,
+the GPIO debounce is not taken care of.
+Fix this by taking care of GPIO debounce in any case.
 
-I think if you compute the number of interrupts in the domain from the number of
-registers that are described in the device tree, call orion_irq_init()
-based on those registers, and use irq domains for the gpio stuff as Rob suggested,
-this init_irq function can become completely generic to all orion platforms.
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/mach-omap2/common-board-devices.c |   22 ++++++++++++----------
+ 1 files changed, 12 insertions(+), 10 deletions(-)
 
-That is what I tried to do with an earlier patch, which was flawed for other reasons.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
+index 1706ebc..c187586 100644
+--- a/arch/arm/mach-omap2/common-board-devices.c
++++ b/arch/arm/mach-omap2/common-board-devices.c
+@@ -63,28 +63,30 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+ 	struct spi_board_info *spi_bi = &ads7846_spi_board_info;
+ 	int err;
+ 
+-	if (board_pdata && board_pdata->get_pendown_state) {
+-		err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
+-		if (err) {
+-			pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
+-			return;
+-		}
+-		gpio_export(gpio_pendown, 0);
+-
+-		if (gpio_debounce)
+-			gpio_set_debounce(gpio_pendown, gpio_debounce);
++	err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
++	if (err) {
++		pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
++		return;
+ 	}
+ 
++	if (gpio_debounce)
++		gpio_set_debounce(gpio_pendown, gpio_debounce);
++
+ 	spi_bi->bus_num	= bus_num;
+ 	spi_bi->irq	= gpio_to_irq(gpio_pendown);
+ 
+ 	if (board_pdata) {
+ 		board_pdata->gpio_pendown = gpio_pendown;
+ 		spi_bi->platform_data = board_pdata;
++		if (board_pdata->get_pendown_state)
++			gpio_export(gpio_pendown, 0);
+ 	} else {
+ 		ads7846_config.gpio_pendown = gpio_pendown;
+ 	}
+ 
++	if (!board_pdata || (board_pdata && !board_pdata->get_pendown_state))
++		gpio_free(gpio_pendown);
++
+ 	spi_register_board_info(&ads7846_spi_board_info, 1);
+ }
+ #else
+-- 
+1.7.3.4
