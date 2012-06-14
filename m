@@ -1,80 +1,72 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 14 Jun 2012 15:59:02 +0200
-Subject: Converting kirkwood-goflexnet to DTS
-In-Reply-To: <CAMW5UfYMxSKmGAvZ5ucNyr8AL0zBAj5jpt+s8YhogKaWdv2mAw@mail.gmail.com>
- (Josh Coombs's message of "Thu, 14 Jun 2012 09:28:24 -0400")
-References: <CAMW5Ufar3+RFwwmPd5xS_aNBKz6VLyDnw_3_aJDOR-xRz1kkTw@mail.gmail.com>
- <20120613191029.GI14756@titan.lakedaemon.net>
- <CAMW5UfYMxSKmGAvZ5ucNyr8AL0zBAj5jpt+s8YhogKaWdv2mAw@mail.gmail.com>
-Message-ID: <87zk86vvtl.fsf@lebrac.rtp-net.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jun 2012 15:07:12 +0100
+Subject: [PATCH] SPI: OMAP: fix over-eager devm_xxx() conversion (was: Re:
+ [CFT 07/11] spi: omap2-mcspi: add DMA engine support)
+In-Reply-To: <20120614125012.GG31187@n2100.arm.linux.org.uk>
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1ScaZv-0003tz-6F@rmk-PC.arm.linux.org.uk>
+ <20120614115335.GE31187@n2100.arm.linux.org.uk>
+ <20120614120842.GF31187@n2100.arm.linux.org.uk>
+ <20120614125012.GG31187@n2100.arm.linux.org.uk>
+Message-ID: <20120614140712.GH31187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Josh Coombs <josh.coombs@gmail.com> writes:
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+Subject: [PATCH] SPI: OMAP: fix over-eager devm_xxx() conversion
 
-> On Wed, Jun 13, 2012 at 3:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->
->> I would recommend looking at how we did the first board, the dreamplug.
->> Files of interest are:
->>
->> arch/arm/boot/dts/kirkwood.dtsi
->> arch/arm/boot/dts/kirkwood-dreamplug.dts
->> arch/arm/mach-kirkwood/board-dt.c
->> arch/arm/mach-kirkwood/board-dreamplug.c
->> arch/arm/mach-kirkwood/Kconfig
->> arch/arm/mach-kirkwood/Makefile
->> arch/arm/mach-kirkwood/Makefile.boot
->>
->> commit 3d468b6 seems to be a good place to start.
->>
->> For your first patch series, use the dtb to tell the kernel what board
->> it is on. ?Once that's working, then you just start coverting over
->> drivers one by one. ?Several are already done.
->>
->> hth,
->>
->> Jason.
->
-> First pass didn't boot, no kernel messages.  I'm going to go through
-> the ArchLinux ARM superpatch to see if there are any items not
-> directly pegged to the GoFlex that might be involved next, as well as
-> cutting my conf down to just what's needed for the GFN to cut down my
-> build times.  While I'm doing that, what do I NEED to configure for
-> proper DTS support?
->
-> CONFIG_ARCH_KIRKWOOD=y
->
-> CONFIG_ARCH_KIRKWOOD_DT=y
-> CONFIG_MACH_DREAMPLUG_DT=n
-> CONFIG_MACH_ICONNECT_DT=n
-> CONFIG_MACH_DLINK_KIRKWOOD_DT=n
-> CONFIG_MACH_IB62X0_DT=n
-> CONFIG_MACH_GOFLEX_DT=y
->
-> CONFIG_USE_OF=y
-> CONFIG_ARM_APPENDED_DTB=y
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> CONFIG_CMDLINE=""
-> CONFIG_ATAGS_PROC=y
->
-> CONFIG_USE_OF=y
-> CONFIG_MTD_OF_PARTS=y
-> # CONFIG_MTD_PHYSMAP_OF is not set
-> CONFIG_OF=y
-> # CONFIG_OF_SELFTEST is not set
-> CONFIG_OF_FLATTREE=y
-> CONFIG_OF_EARLY_FLATTREE=y
-> CONFIG_OF_ADDRESS=y
-> CONFIG_OF_IRQ=y
-> CONFIG_OF_DEVICE=y
-> CONFIG_OF_I2C=m
-> CONFIG_OF_NET=y
-> CONFIG_OF_MDIO=y
-> CONFIG_OF_PCI=y
-> CONFIG_OF_PCI_IRQ=y
-> CONFIG_OF_MTD=y
-> # CONFIG_SERIAL_OF_PLATFORM is not set
+1a77b127ae (OMAP : SPI : use devm_* functions) converted the SPI
+device controller state to use devm_kzalloc().  Unfortunately, this
+is used against an unbound struct device, which results in the
+following when the device is eventually bound to its driver:
 
-You should enable this one if you want to use the serial port.
+------------[ cut here ]------------
+WARNING: at /home/rmk/git/linux-rmk/drivers/base/dd.c:257 driver_probe_device+0x78/0x21c()
+Modules linked in:
+Backtrace:
+[<c0017d0c>] (dump_backtrace+0x0/0x10c) from [<c033e208>] (dump_stack+0x18/0x1c) r7:00000000 r6:c01ff28c r5:c040050c r4:00000101
+[<c033e1f0>] (dump_stack+0x0/0x1c) from [<c00337ec>] (warn_slowpath_common+0x58/0x70)
+[<c0033794>] (warn_slowpath_common+0x0/0x70) from [<c0033828>] (warn_slowpath_null+0x24/0x2c)
+[<c0033804>] (warn_slowpath_null+0x0/0x2c) from [<c01ff28c>] (driver_probe_device+0x78/0x21c)
+[<c01ff214>] (driver_probe_device+0x0/0x21c) from [<c01ff49c>] (__driver_attach+0x6c/0x90)
+[<c01ff430>] (__driver_attach+0x0/0x90) from [<c01fda70>] (bus_for_each_dev+0x58/0x98)
+[<c01fda18>] (bus_for_each_dev+0x0/0x98) from [<c01ff0f4>] (driver_attach+0x20/0x28)
+[<c01ff0d4>] (driver_attach+0x0/0x28) from [<c01fe2f4>] (bus_add_driver+0xb4/0x230)
+[<c01fe240>] (bus_add_driver+0x0/0x230) from [<c01ffb24>] (driver_register+0xac/0x138)
+[<c01ffa78>] (driver_register+0x0/0x138) from [<c0215d4c>] (spi_register_driver+0x4c/0x60)
+[<c0215d00>] (spi_register_driver+0x0/0x60) from [<c045414c>] (ks8851_init+0x14/0x1c)
+[<c0454138>] (ks8851_init+0x0/0x1c) from [<c0008770>] (do_one_initcall+0x9c/0x164)
+[<c00086d4>] (do_one_initcall+0x0/0x164) from [<c0436410>] (kernel_init+0x128/0x210)
+[<c04362e8>] (kernel_init+0x0/0x210) from [<c0038754>] (do_exit+0x0/0x72c)
+---[ end trace 4dcda79f5e89dd84 ]---
+ks8851 spi1.0: message enable is 0
+ks8851 spi1.0: eth0: revision 0, MAC 08:00:28:01:4d:c6, IRQ 194, has EEPROM
 
-Arnaud
+Fix this by partially reverting the original commit.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/spi/spi-omap2-mcspi.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index 9d3409a..6263b0f 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -829,7 +829,7 @@ static int omap2_mcspi_setup(struct spi_device *spi)
+ 	mcspi_dma = &mcspi->dma_channels[spi->chip_select];
+ 
+ 	if (!cs) {
+-		cs = devm_kzalloc(&spi->dev , sizeof *cs, GFP_KERNEL);
++		cs = kzalloc(sizeof *cs, GFP_KERNEL);
+ 		if (!cs)
+ 			return -ENOMEM;
+ 		cs->base = mcspi->base + spi->chip_select * 0x14;
+@@ -869,6 +869,7 @@ static void omap2_mcspi_cleanup(struct spi_device *spi)
+ 		cs = spi->controller_state;
+ 		list_del(&cs->node);
+ 
++		kfree(cs);
+ 	}
+ 
+ 	if (spi->chip_select < spi->master->num_chipselect) {
