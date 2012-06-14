@@ -1,42 +1,32 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 14 Jun 2012 10:52:57 +0300
-Subject: [PATCH v4] usb: chipidea: permit driver bindings pass phy pointer
-In-Reply-To: <20120612231438.GA6177@kroah.com>
-References: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
- <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
- <20120612231438.GA6177@kroah.com>
-Message-ID: <8762au8h46.fsf@ashishki-desk.ger.corp.intel.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Thu, 14 Jun 2012 08:53:49 +0100
+Subject: [PATCH] i2c: let the core register devices from devicetree
+In-Reply-To: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <CAOh2x=n3uzc3K1oMtOKicuiQoZLYu4QVTY0gEPmSFsw3_R=u9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH <gregkh@linuxfoundation.org> writes:
-
-> On Fri, Jun 08, 2012 at 08:37:06PM +0800, Richard Zhao wrote:
->> Sometimes, the driver bindings may know what phy they use.
->> For example, when using device tree, the usb controller may have a
->> phandler pointing to usb phy.
->> 
->> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> Reviewed-by: Marek Vasut <marex@denx.de>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> ---
->> Changes since laster version:
->> - hcd transceiver renamed to phy
+On Wed, Jun 13, 2012 at 10:12 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> Currently, every driver has to do it on its own, but it should be done
+> in the core, like we already do with board_info structs.
 >
-> Ick, I see patches all over this thread, and other threads, and I have
-> no idea what to apply anywhere...
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+
+
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index 0506fef..cf3b23c 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -147,7 +147,6 @@ static int __devinit dw_i2c_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "failure adding adapter\n");
+> ? ? ? ? ? ? ? ?goto err_free_irq;
+> ? ? ? ?}
+> - ? ? ? of_i2c_register_devices(adap);
 >
-> So, consider all chipidea patches dropped from my queue now, can you
-> please resend them to me, with the accumulated acks and reviewed-by
-> line, so that I can queue them up?
+> ? ? ? ?return 0;
 
-So will you pick these patches to your tree or should I apply them to
-mine or what is the plan? I kind of have a tree [1] for chipidea stuff
-where I have been collecting patches, to send a pull request to you for
-3.6.
+For SPEAr,
 
-[1] git://github.com/virtuoso/linux-ci.git ci
-
-Regards,
---
-Alex
+Reviewed-by: Viresh Kumar <viresh.linux@gmail.com>
