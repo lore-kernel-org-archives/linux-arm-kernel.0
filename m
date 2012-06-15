@@ -1,159 +1,170 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 15 Jun 2012 13:49:27 +0200
-Subject: [PATCH v2 2/3] serial: mxs-auart: Allow device tree probing
-In-Reply-To: <1339759950-5507-2-git-send-email-festevam@gmail.com>
-References: <1339759950-5507-1-git-send-email-festevam@gmail.com>
- <1339759950-5507-2-git-send-email-festevam@gmail.com>
-Message-ID: <201206151349.27261.marex@denx.de>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Fri, 15 Jun 2012 17:20:43 +0530
+Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD8BAD2.50703@linaro.org>
+ <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
+ <4FDAFA17.6050502@linaro.org>
+ <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
+Message-ID: <20120615115042.GA27480@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
-
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+[...]
 > 
-> Allow device tree probing.
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Alan Cox <alan@linux.intel.com>
-> Cc: <linux-serial@vger.kernel.org>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Tue, 17 Apr 2012 16:04:13 +0100
+> Subject: [PATCH 1/1] i2c: Add Device Tree support to the Nomadik I2C driver
+> 
+> Here we apply the bindings required for successful Device Tree
+> probing of the i2c-nomadik driver. We also apply a fall-back
+> configuration in case either one is not provided, or a required
+> element is missing from the one supplied.
+> 
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
-> Changes since v1:
-> - Merged patches 3 and 5 from v1 into this one
->  .../bindings/tty/serial/fsl-mxs-auart.txt          |   13 +++++
->  drivers/tty/serial/mxs-auart.c                     |   55
-> +++++++++++++++++++- 2 files changed, 67 insertions(+), 1 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+>  drivers/i2c/busses/i2c-nomadik.c |   82 +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 80 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt new file
-> mode 100644
-> index 0000000..1b28b1c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> @@ -0,0 +1,13 @@
-> +* Freescale MXS Application UART (AUART)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,mxs-uart"
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Should contain the auart interrupt
-> +
-> +Example:
-> +auart0: serial at 8006a000 {
-> +	compatible = "fsl,mxs-auart";
-> +	reg = <0x8006a000 0x2000>;
-> +	interrupts = <112 70 71>;
-> +};
-> diff --git a/drivers/tty/serial/mxs-auart.c
-> b/drivers/tty/serial/mxs-auart.c index ec56d83..21e2ce7 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -33,6 +33,7 @@
->  #include <linux/delay.h>
+> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+> index a92440d..58e8114 100644
+> --- a/drivers/i2c/busses/i2c-nomadik.c
+> +++ b/drivers/i2c/busses/i2c-nomadik.c
+> @@ -23,6 +23,7 @@
 >  #include <linux/io.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/of_device.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
 > 
->  #include <asm/cacheflush.h>
+>  #include <plat/i2c.h>
 > 
-> @@ -675,6 +676,44 @@ static struct uart_driver auart_driver = {
->  #endif
+> @@ -899,15 +900,86 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+>        .functionality  = nmk_i2c_functionality
 >  };
 > 
-> +#ifdef CONFIG_OF
+> +static struct nmk_i2c_controller u8500_i2c = {
+> +       /*
+> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
+> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+> +        */
+> +       .slsu           = 0xe,
+> +       .tft            = 1,      /* Tx FIFO threshold */
+> +       .rft            = 8,      /* Rx FIFO threshold */
+> +       .clk_freq       = 100000, /* std. mode operation */
+> +       .timeout        = 200,    /* Slave response timeout(ms) */
+> +       .sm             = I2C_FREQ_MODE_FAST,
 
-Isn't CONFIG_OF always enabled?
+How is this possible? you are setting clk_freq as 100kb/s and mode
+as fast mode which is supposed to be 400kb/s.
 
-> +/*
-> + * This function returns 1 if pdev isn't a device instatiated by dt, 0 if
-> it + * could successfully get all information from dt or a negative errno.
-> + */
-> +static int serial_mxs_probe_dt(struct mxs_auart_port *s,
-> +		struct platform_device *pdev)
+> +};
+> +
+> +static int __devinit
+> +nmk_i2c_of_probe(struct device_node *np, struct nmk_i2c_controller *pdata)
 > +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int ret;
+> +       of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
+> +       if (!pdata->clk_freq) {
+> +               pr_warn("%s: Clock frequency not found\n", np->full_name);
+> +               return -EINVAL;
+> +       }
 > +
-> +	if (!np)
-> +		/* no device tree device */
-> +		return 1;
+> +       of_property_read_u32(np, "stericsson,slsu", (u32*)&pdata->slsu);
+> +       if (!pdata->slsu) {
+> +               pr_warn("%s: Data line delay not found\n", np->full_name);
+> +               return -EINVAL;
+> +       }
 > +
-> +	ret = of_alias_get_id(np, "serial");
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to get alias id: %d\n", ret);
-> +		return ret;
-> +	}
-> +	s->port.line = ret;
+> +       of_property_read_u32(np, "stericsson,tft", (u32*)&pdata->tft);
+> +       if (!pdata->tft) {
+> +               pr_warn("%s: Tx FIFO threshold not found\n", np->full_name);
+> +               return -EINVAL;
+> +       }
 > +
-> +	return 0;
-> +}
-> +#else
-> +static inline int serial_mxs_probe_dt(struct mxs_auart_port *s,
-> +		struct platform_device *pdev)
-> +{
-> +	return 1;
-> +}
-> +#endif
+> +       of_property_read_u32(np, "stericsson,rft", (u32*)&pdata->rft);
+> +       if (!pdata->rft) {
+> +               pr_warn("%s: Rx FIFO threshold not found\n", np->full_name);
+> +               return -EINVAL;
+> +       }
+> +
+> +       of_property_read_u32(np, "stericsson,timeout", (u32*)&pdata->timeout);
+> +       if (!pdata->timeout) {
+> +               pr_warn("%s: Timeout not found\n", np->full_name);
+> +               return -EINVAL;
+> +       }
+> +
+> +       if (of_get_property(np, "stericsson,i2c_freq_mode_fast", NULL))
+> +               pdata->sm = I2C_FREQ_MODE_FAST;
+> +       else
+> +               pdata->sm = I2C_FREQ_MODE_STANDARD;
 
-So drop this whole ifdef stuff ...
+The controller has more modes like fast mode plus and high speed mode. You can't make
+assumptions like this.
 
 > +
-> +static void mxs_auart_probe_pdev(struct mxs_auart_port *s,
-> +		struct platform_device *pdev)
-> +{
-> +	s->port.line = pdev->id < 0 ? 0 : pdev->id;
+> +       return 0;
 > +}
 > +
->  static int __devinit mxs_auart_probe(struct platform_device *pdev)
+>  static int __devinit nmk_i2c_probe(struct platform_device *pdev)
 >  {
->  	struct mxs_auart_port *s;
-> @@ -689,6 +728,14 @@ static int __devinit mxs_auart_probe(struct
-> platform_device *pdev) goto out;
->  	}
+>        int ret = 0;
+>        struct resource *res;
+> -       struct nmk_i2c_controller *pdata =
+> -                       pdev->dev.platform_data;
+> +       struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
+> +       struct device_node *np = pdev->dev.of_node;
+>        struct nmk_i2c_dev      *dev;
+>        struct i2c_adapter *adap;
 > 
-> +	ret = serial_mxs_probe_dt(s, pdev);
-> +	if (ret > 0)
-> +		mxs_auart_probe_pdev(s, pdev);
-> +	else if (ret < 0) {
-> +		ret = -EINVAL;
-> +		goto out_free;
-> +	}
+> +       if (np) {
+> +               if (!pdata) {
+> +                       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +                       if (!pdata) {
+> +                               ret = -ENOMEM;
+> +                               goto err_no_mem;
+> +                       }
+> +               }
+> +               ret = nmk_i2c_of_probe(np, pdata);
+> +               if (ret)
+> +                       kfree(pdata);
+> +       }
 > +
->  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->  	if (IS_ERR(pinctrl)) {
->  		ret = PTR_ERR(pinctrl);
-> @@ -711,7 +758,6 @@ static int __devinit mxs_auart_probe(struct
-> platform_device *pdev) s->port.membase = ioremap(r->start,
-> resource_size(r));
->  	s->port.ops = &mxs_auart_ops;
->  	s->port.iotype = UPIO_MEM;
-> -	s->port.line = pdev->id < 0 ? 0 : pdev->id;
->  	s->port.fifosize = 16;
->  	s->port.uartclk = clk_get_rate(s->clk);
->  	s->port.type = PORT_IMX;
-> @@ -769,12 +815,19 @@ static int __devexit mxs_auart_remove(struct
-> platform_device *pdev) return 0;
+> +       if (!pdata)
+> +               /* No i2c configuration found, using the default. */
+> +               pdata = &u8500_i2c;
+
+There are redundant fallback configurations exists in the driver. You might need to remove 
+those, if you want to fallback here.
+
+> +
+>        dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+>        if (!dev) {
+>                dev_err(&pdev->dev, "cannot allocate memory\n");
+> @@ -1038,11 +1110,17 @@ static int __devexit nmk_i2c_remove(struct platform_device *pdev)
+>        return 0;
 >  }
 > 
-> +static struct of_device_id mxs_auart_dt_ids[] = {
-> +	{.compatible = "fsl,mxs-auart", },
-> +	{ /* sentinel */ }
+> +static const struct of_device_id nmk_gpio_match[] = {
+> +       { .compatible = "st,nomadik-i2c", },
+> +       {},
 > +};
-> +MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
 > +
->  static struct platform_driver mxs_auart_driver = {
->  	.probe = mxs_auart_probe,
->  	.remove = __devexit_p(mxs_auart_remove),
->  	.driver = {
->  		.name = "mxs-auart",
->  		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(mxs_auart_dt_ids),
->  	},
->  };
+>  static struct platform_driver nmk_i2c_driver = {
+>        .driver = {
+>                .owner = THIS_MODULE,
+>                .name = DRIVER_NAME,
+>                .pm = &nmk_i2c_pm,
+> +               .of_match_table = nmk_gpio_match,
+>        },
+>        .probe = nmk_i2c_probe,
+>        .remove = __devexit_p(nmk_i2c_remove),
+> --
+> 1.7.9.5
+> 
 
-Best regards,
-Marek Vasut
+/srinidhi 
