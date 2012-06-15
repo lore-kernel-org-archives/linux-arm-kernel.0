@@ -1,56 +1,45 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 15 Jun 2012 10:22:17 +0000
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FDA3464.4040704@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
- <4FD77EF1.8000600@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
- <4FD8A906.8080202@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
- <4FD9E5AF.6010201@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
- <4FDA3464.4040704@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99A511@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jun 2012 11:32:33 +0100
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <4FDA341C.8010501@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD6F0E8.5040606@linaro.org>
+ <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
+ <4FD83AAD.2010701@linaro.org>
+ <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
+ <4FD88761.9050703@linaro.org> <20120614183636.GB30185@sirena.org.uk>
+ <4FDA341C.8010501@linaro.org>
+Message-ID: <20120615103233.GA19046@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Thu, Jun 14, 2012 at 07:57:32PM +0100, Lee Jones wrote:
+> On 14/06/12 19:36, Mark Brown wrote:
+>> On Wed, Jun 13, 2012 at 01:28:17PM +0100, Lee Jones wrote:
+>>
+>>> Device Tree. However, we have just as much control by keeping them
+>>> in separate structs in the C file and selecting the right one using
+>>> the compatible sting.
+>>
+>> You're not understanding Linus' point.  The compatible string isn't
+>> useful here because properties like the maximum clock rate of the bus
+>> depend on the board design, not the silicon.  The controller may be
+>> perfectly happy to run at a given rate but other devices on the bus or
+>> the electrical engineering of the PCB itself may restrict this further.
+>
+> And you're not understanding mine. ;)
+>
+> You can have multiple compatible strings for a single driver. Which one  
+> you reference from the Device Tree will dictate which group of settings  
+> are used, including variation of clock rates.
 
-On Fri, Jun 15, 2012 at 00:28:44, Hunter, Jon wrote:
-> On 06/14/2012 08:32 AM, Mohammed, Afzal wrote:
-> > On Thu, Jun 14, 2012 at 18:52:55, Hunter, Jon wrote:
+However, if you list these settings separately, rather than selecting them
+based on a compatible string, it means when other board designs come along,
+you don't have to modify the kernel code to provide yet another compatible
+to settings translation in the code - you can keep all that information
+entirely within DT with no kernel code mods.
 
-> >> Why? You currently have a global variable storing the clock handle. It
-> >> can be quite common for drivers to know the clock frequencies of their
-> >> functional clocks. How else can drivers calculate timings?
-> > 
-> > 
-> > Please see Russell King's comments,
-> > 
-> > [1] http://permalink.gmane.org/gmane.linux.ports.ppc.embedded/27634
-> > [2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg05365.html
-> 
-> Thanks. So I still think you need to get rid of the global variable for
-> storing the gpmc fclk, that is really my point.
-> 
-> So if you look at commit [1] mentioned by Russell in the above thread,
-> the appropriate thing to do would be to create a gpmc clock alias for
-> all OMAP2+ devices and then you could simply call the following from the
-> gpmc probe ...
-> 
-> 	gpmc_fck = clk_get(&pdev->dev, "fck");
-> 
-> You could then store somewhere in one of the gpmc structures.
-
-Here clock is required even before driver is probed, i.e for platform to
-calculate timings, that has to be passed through platform data.
-
-I understand the necessity for clk rate information in driver, but seems
-unless we have a generic way to scale timings for all the kinds of
-peripheral, having it may not be of much help.
-
-Regards
-Afzal
+I thought that was partly the point of DT...
