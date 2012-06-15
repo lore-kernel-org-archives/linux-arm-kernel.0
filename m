@@ -1,46 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 14 Jun 2012 23:32:53 -0500
-Subject: [PATCH v3 1/4] clk: add DT clock binding support
-In-Reply-To: <20120615031747.GG31565@S2101-09.ap.freescale.net>
-References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
- <1339512111-11172-2-git-send-email-robherring2@gmail.com>
- <20120615031747.GG31565@S2101-09.ap.freescale.net>
-Message-ID: <4FDABAF5.3090201@gmail.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Fri, 15 Jun 2012 00:53:45 -0400
+Subject: Converting kirkwood-goflexnet to DTS
+In-Reply-To: <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+References: <20120614141706.GA6676@lunn.ch>
+ <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+Message-ID: <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2012 10:17 PM, Shawn Guo wrote:
-> On Tue, Jun 12, 2012 at 09:41:48AM -0500, Rob Herring wrote:
->> +struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
->> +{
->> +	struct of_clk_provider *provider;
->> +	struct clk *clk = NULL;
-> 
-> Both clk and clkdev treat NULL as a valid clock and return ERR_PTR for
-> error case, while all the codes in this patch just return NULL for
-> error and check (clk != NULL) for valid clock.
+On Thu, Jun 14, 2012 at 6:16 PM, Josh Coombs <josh.coombs@gmail.com> wrote:
+> Finally some progress. ?Using the printk patch along with earlyprintk
+> and the config tweaks as suggested, my kernel at least now shows why
+> it's dying:
+>
+> --------------------------
+> ## Booting kernel from Legacy Image at 00800000 ...
+> ? Image Name: ? Linux-3.5.0-rc2-ARCH
+> ? Image Type: ? ARM Linux Kernel Image (uncompressed)
+> ? Data Size: ? ?3015272 Bytes = 2.9 MiB
+> ? Load Address: 00008000
+> ? Entry Point: ?00008000
+> ? Verifying Checksum ... OK
+> ? Loading Kernel Image ... OK
+> OK
+>
+> Starting kernel ...
+>
+> Uncompressing Linux... done, booting the kernel.
+>
+> Error: unrecognized/unsupported machine ID (r1 = 0x00000c11).
+>
+> Available machine support:
+>
+> ID (hex) ? ? ? ?NAME
+> ffffffff ? ? ? ?Marvell Kirkwood (Flattened Device Tree)
+>
+> Please check your kernel config and/or bootloader.
+> --------------------------
 
-Because Grant hates ERR_PTR... :)
+I'm still stuck with the same error.  I'm working against 5.2rc2 with
+the Orion/kirkwood printk.c patch.
 
-> 
-> Should we force the consistent behavior between DT and non-DT on this?
+I'm not 100% on proper etiquette here so rather than spam first and
+get scolded, I've pastebined the relevant info.
 
-Yes, I agree and will change it.
+My current patchset is here: http://pastie.org/4090298
+The stripped kernel conf I'm using is here: http://pastie.org/4090323
 
-Rob
+I'm including all but the iconnect flattened tree board types in my
+config, included DTS early testing, and am appending the DTS
+definitions to the end of the kernel as I don't expect my uboot to
+play nice, so I'm rather surprised to not see any of the boards show
+up as supported with that boot error.  I feel like this has got to be
+a kernel conf issue, or I'm missing a step in preparing a DTS based
+kernel.
 
-> 
->> +
->> +	/* Check if we have such a provider in our array */
->> +	mutex_lock(&of_clk_lock);
->> +	list_for_each_entry(provider, &of_clk_providers, link) {
->> +		if (provider->node == clkspec->np)
->> +			clk = provider->get(clkspec, provider->data);
->> +		if (clk)
->> +			break;
->> +	}
->> +	mutex_unlock(&of_clk_lock);
->> +
->> +	return clk;
->> +}
-> 
+I also know my board definition will need cleanup to support both the
+GoFlex Net and Home but went this way just to test the concept first.
+
+Josh C
