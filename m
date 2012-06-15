@@ -1,24 +1,38 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 14 Jun 2012 16:17:06 +0200
+Date: Fri, 15 Jun 2012 08:30:27 +0200
 Subject: Converting kirkwood-goflexnet to DTS
-Message-ID: <20120614141706.GA6676@lunn.ch>
+Message-ID: <20120615063027.GA27717@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Josh
 
-Welcome to the fun...
+My guess is you have a problem with the DT blob.
 
-# CONFIG_SERIAL_OF_PLATFORM is not set
+How are you appending the DTS blob?
 
-You need this one, if you want the serial ports to work...  Also,
-don't be surprised when they do work, even though IRQ=0!
+I have the kernel option:
 
-It is a good idea to build the kernel with earlyprintk support and to
-pass it as a kernel parameter.
+CONFIG_ARM_APPENDED_DTB=y
 
-Also, -rc2 is FUBAR on all Orion platforms, unless you have:
+I compile the .dts/.dtsi with:
 
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/170442
+$ make kirkwood-ts219-6282.dtb
+  DTC     arch/arm/boot/kirkwood-ts219-6282.dtb
+DTC: dts->dtb  on file "arch/arm/boot/dts/kirkwood-ts219-6282.dts"
 
-	Andrew
+and then attach the blob to the kernel and place it on my tftp server
+with:
+
+#!/bin/bash
+
+tmp=$(tempfile)
+
+cat arch/arm/boot/zImage > $tmp
+cat arch/arm/boot/kirkwood-ts219-6282.dtb >> $tmp
+mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -d $tmp /srv/tftp/uImage-dev
+rm $tmp
+
+And then load and boot it using u-boot.
+
+    Andrew
