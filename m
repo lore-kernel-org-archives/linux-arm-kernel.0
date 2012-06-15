@@ -1,25 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 14 Jun 2012 22:38:58 -0300
-Subject: MXS getting AUART to work with DT.
-In-Reply-To: <2CC96C7FBBE82548A0B1766B8D8348AD9C169E@mx2.grid-net.com>
-References: <4FD7EFFC.8010204@grid-net.com>
- <CAOMZO5BDFD3hHt+HW_sdh-3hCEwgJJA9C0ecAJZSOUCw_725Jw@mail.gmail.com>
- <4FD96B3E.6080806@grid-net.com>
- <CAOMZO5Bc2ag4WLV+YwqpR7OOfMatd9CBBdT8koFabkPVcQacFw@mail.gmail.com>
- <2CC96C7FBBE82548A0B1766B8D8348AD9C169E@mx2.grid-net.com>
-Message-ID: <CAOMZO5D_n-XY58gxsxassd5EYbMjiACgpqVpHXq7G5pB2Shopw@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 15 Jun 2012 09:55:34 +0800
+Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
+In-Reply-To: <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
+References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+ <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
+ <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+ <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
+Message-ID: <CACVXFVPPt10nEP+N=QnOoyQgNhgtdruUFC8wQUSf2itQLdJTZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+On Wed, Jun 13, 2012 at 11:28 PM, T Krishnamoorthy, Balaji
+>
+> Couldn't reproduce the issue with BeagleXM rev C, Might be a combination
+> of rev and SD card. How often do you see mis-match in file content?
 
-On Thu, Jun 14, 2012 at 1:49 PM, Matt Burtch <matt@grid-net.com> wrote:
-> Here is the patch I put together to get the AUART recognized with the dt. ?I'm pretty new to dt development, so this was a quick first pass. I'm sure there are more proper ways to get the device id and pass literals between the dt and probe function...but this works for now.
+Every time after writing file on file system. After umount and mount again,
+the file will be found mismatch with original.
 
-Ok, I managed to fix it properly now.
+>From TRM of OMAP3/OMAP4/DM37x, the below is mentioned about
+the Auto CMD12 Enable bit.
 
-Will submit the patches tomorrow.
+         - SDIO does not support this feature.
+         - SD card only.
 
-Regards,
+So I am wondering if it is suitable to always enable the bit for
+multiple block transfer in host controller driver. You mean that
+only SD card is supported by OMAP3/4 and DM37x MMC?
 
-Fabio Estevam
+I am just confused with the above, even though it may be not
+related with the problem reported here.
+
+
+Thanks,
+--
+Ming Lei
