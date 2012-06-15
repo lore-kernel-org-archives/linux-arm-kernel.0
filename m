@@ -1,67 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Jun 2012 11:00:25 +0100
-Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
- driver
-In-Reply-To: <20120615093231.GB3898@opensource.wolfsonmicro.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD6F0E8.5040606@linaro.org>
- <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
- <4FD83AAD.2010701@linaro.org>
- <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
- <4FD88761.9050703@linaro.org> <20120614183636.GB30185@sirena.org.uk>
- <4FDA341C.8010501@linaro.org>
- <20120615093231.GB3898@opensource.wolfsonmicro.com>
-Message-ID: <4FDB07B9.5010303@linaro.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 15 Jun 2012 15:33:17 +0530
+Subject: [PATCH] kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
+In-Reply-To: <1339571937.2759.13.camel@computer2.home>
+References: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
+ <1339571937.2759.13.camel@computer2.home>
+Message-ID: <CAH+eYFDhXCJRrgX+KTX0bPU89DyGfmb+bD8Cvm-3_iyCuk_==w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/12 10:32, Mark Brown wrote:
-> On Thu, Jun 14, 2012 at 07:57:32PM +0100, Lee Jones wrote:
->> On 14/06/12 19:36, Mark Brown wrote:
->
->>> You're not understanding Linus' point.  The compatible string isn't
->>> useful here because properties like the maximum clock rate of the bus
->>> depend on the board design, not the silicon.  The controller may be
->>> perfectly happy to run at a given rate but other devices on the bus or
->>> the electrical engineering of the PCB itself may restrict this further.
->
->> And you're not understanding mine. ;)
->
-> I think we are (or at least I do)...
->
->> You can have multiple compatible strings for a single driver. Which
->> one you reference from the Device Tree will dictate which group of
->> settings are used, including variation of clock rates.
->
-> I'm certainly well aware of that.  The problem is that the compatible
-> strings should identify a particular IP or piece of silicon and be
-> unchanging properties of that hardware - for example, working out how
-> big a FIFO in a device is from the compatible information is totally
-> sensible and reasonable.  Things like the I2C bus clock speed on the
-> other hand depend not on the individual device but on how it's been
-> integrated into the system so you'd end up saying things like
-> "nomadik-i2c-100khz-bus" in the compatible string which isn't great.
->
-> If there's something like variation in the maximum speed that can be
-> supported by the different silicon the driver handles then working that
-> out from compatible and using it as the default is sensible but that's
-> not the same thing as providing customisation of the system bus
-> frequency to the user and if there's only one of those two that's
-> configurable it should be the system bus frequency.
+On Wed, Jun 13, 2012 at 12:48 PM, Tixy <tixy@yxit.co.uk> wrote:
+> I agree with this analysis. However, it is possible to have a kernel
+> built to support both ARM v6 and v7 (e.g OMAP2+) in which case
+> __LINUX_ARM_ARCH__ == 6 will be true but the code could be running on v7
+> hardware. Therefore a compile time check for ARM architecture isn't
+> sufficient to fix the problem.
 
-All agreed. I think we're singing off the same hymn-sheet here. :)
+How about the following check instead?  At least one other place uses
+it.
 
-I was just saying that it was possible to pick a selection of 
-configurations from a compatible string alone. I also mentioned that on 
-reflection it would be neater to specify the properties individually 
-from Device Tree in case of small variations in configuration, 
-preventing us from using compatible strings like the one you mentioned.
+8<---
+>From f1e1794c0c12e39e99d4169c934fd43feb889d7b Mon Sep 17 00:00:00 2001
+From: Rabin Vincent <rabin.vincent@stericsson.com>
+Date: Mon, 11 Jun 2012 16:55:37 +0530
+Subject: [PATCH] ARM: kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
 
+'sub pc, pc, #1b-2b+8-2' results in address<1:0> == '10'.
+
+sub pc, pc, #const (== ADR pc, #const) performs an interworking branch
+(BXWritePC()) on ARMv7+ and a simple branch (BranchWritePC()) on earlier
+versions.
+
+In ARM state, BXWritePC() is UNPREDICTABLE when address<1:0> == '10'.
+
+In ARM state on ARMv6+, BranchWritePC() ignores address<1:0>.  Before
+ARMv6, BranchWritePC() is UNPREDICTABLE if address<1:0> != '00'
+
+So the instruction is UNPREDICTABLE both before and after v6.
+
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/kernel/kprobes-test-arm.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/kprobes-test-arm.c
+b/arch/arm/kernel/kprobes-test-arm.c
+index ba32b39..38c1a3b 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -187,8 +187,8 @@ void kprobe_arm_test_cases(void)
+ 	TEST_BF_R ("mov	pc, r",0,2f,"")
+ 	TEST_BF_RR("mov	pc, r",0,2f,", asl r",1,0,"")
+ 	TEST_BB(   "sub	pc, pc, #1b-2b+8")
+-#if __LINUX_ARM_ARCH__ >= 6
+-	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before ARMv6 */
++#if __LINUX_ARM_ARCH__ == 6 && !defined(CONFIG_CPU_V7)
++	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before and
+after ARMv6 */
+ #endif
+ 	TEST_BB_R( "sub	pc, pc, r",14, 1f-2f+8,"")
+ 	TEST_BB_R( "rsb	pc, r",14,1f-2f+8,", pc")
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
