@@ -1,74 +1,87 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Fri, 15 Jun 2012 14:36:25 +0100
-Subject: [PATCH] kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
-In-Reply-To: <CAH+eYFDhXCJRrgX+KTX0bPU89DyGfmb+bD8Cvm-3_iyCuk_==w@mail.gmail.com>
-References: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
- <1339571937.2759.13.camel@computer2.home>
- <CAH+eYFDhXCJRrgX+KTX0bPU89DyGfmb+bD8Cvm-3_iyCuk_==w@mail.gmail.com>
-Message-ID: <1339767385.2961.7.camel@computer2.home>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Fri, 15 Jun 2012 19:07:29 +0530
+Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <4FDB3642.5030804@linaro.org>
+References: <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD8BAD2.50703@linaro.org>
+ <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
+ <4FDAFA17.6050502@linaro.org>
+ <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
+ <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
+ <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
+Message-ID: <20120615133729.GA12716@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-06-15 at 15:33 +0530, Rabin Vincent wrote:
-> On Wed, Jun 13, 2012 at 12:48 PM, Tixy <tixy@yxit.co.uk> wrote:
-> > I agree with this analysis. However, it is possible to have a kernel
-> > built to support both ARM v6 and v7 (e.g OMAP2+) in which case
-> > __LINUX_ARM_ARCH__ == 6 will be true but the code could be running on v7
-> > hardware. Therefore a compile time check for ARM architecture isn't
-> > sufficient to fix the problem.
-> 
-> How about the following check instead?  At least one other place uses
-> it.
+On Fri, Jun 15, 2012 at 15:18:58 +0200, Lee Jones wrote:
+> On 15/06/12 14:05, Srinidhi Kasagar wrote:
+> > On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
+> >> On 15/06/12 12:50, Srinidhi Kasagar wrote:
+> >>> [...]
+> >>>>
+> >>>>
+> >>>> From: Lee Jones<lee.jones@linaro.org>
+> >>>> Date: Tue, 17 Apr 2012 16:04:13 +0100
+> >>>> Subject: [PATCH 1/1] i2c: Add Device Tree support to the Nomadik I2C driver
+> >>>>
+> >>>> Here we apply the bindings required for successful Device Tree
+> >>>> probing of the i2c-nomadik driver. We also apply a fall-back
+> >>>> configuration in case either one is not provided, or a required
+> >>>> element is missing from the one supplied.
+> >>>>
+> >>>> Cc: linux-i2c at vger.kernel.org
+> >>>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> >>>> ---
+> >>>>    drivers/i2c/busses/i2c-nomadik.c |   82 +++++++++++++++++++++++++++++++++++++-
+> >>>>    1 file changed, 80 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+> >>>> index a92440d..58e8114 100644
+> >>>> --- a/drivers/i2c/busses/i2c-nomadik.c
+> >>>> +++ b/drivers/i2c/busses/i2c-nomadik.c
+> >>>> @@ -23,6 +23,7 @@
+> >>>>    #include<linux/io.h>
+> >>>>    #include<linux/regulator/consumer.h>
+> >>>>    #include<linux/pm_runtime.h>
+> >>>> +#include<linux/of.h>
+> >>>>
+> >>>>    #include<plat/i2c.h>
+> >>>>
+> >>>> @@ -899,15 +900,86 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+> >>>>          .functionality  = nmk_i2c_functionality
+> >>>>    };
+> >>>>
+> >>>> +static struct nmk_i2c_controller u8500_i2c = {
+> >>>> +       /*
+> >>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
+> >>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+> >>>> +        */
+> >>>> +       .slsu           = 0xe,
 
-Can't you point out the other place which uses it, I couldn't find it.
+And BTW, I forgot to mention: This slsu stuff is not needed at all.
+It is required only in case of slave mode operation, which the
+driver does not support. You can perhaps consider deprecating
+this parameter from device tree list as well as from platform data.
 
-The proposed patch below would work, but feels slightly off as it
-assumes that no one will build a kernel to support V6 and V8, but
-without V7. That does seem highly unlikely though, so I personally
-wouldn't object to the patch.
+> >>>> +       .tft            = 1,      /* Tx FIFO threshold */
+> >>>> +       .rft            = 8,      /* Rx FIFO threshold */
+> >>>> +       .clk_freq       = 100000, /* std. mode operation */
+> >>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
+> >>>> +       .sm             = I2C_FREQ_MODE_FAST,
+> >>>
+> >>> How is this possible? you are setting clk_freq as 100kb/s and mode
+> >>> as fast mode which is supposed to be 400kb/s.
+> >>
+> >> That's not how I read it:
+> >
+> > But it is not readable. It confuses people.
+> 
+> I understood it. :)
+> 
+> If you think it's unclear speak to the author, Linus. He's CC'ed.
 
--- 
-Tixy
+It is!
 
-> 
-> 8<---
-> From f1e1794c0c12e39e99d4169c934fd43feb889d7b Mon Sep 17 00:00:00 2001
-> From: Rabin Vincent <rabin.vincent@stericsson.com>
-> Date: Mon, 11 Jun 2012 16:55:37 +0530
-> Subject: [PATCH] ARM: kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
-> 
-> 'sub pc, pc, #1b-2b+8-2' results in address<1:0> == '10'.
-> 
-> sub pc, pc, #const (== ADR pc, #const) performs an interworking branch
-> (BXWritePC()) on ARMv7+ and a simple branch (BranchWritePC()) on earlier
-> versions.
-> 
-> In ARM state, BXWritePC() is UNPREDICTABLE when address<1:0> == '10'.
-> 
-> In ARM state on ARMv6+, BranchWritePC() ignores address<1:0>.  Before
-> ARMv6, BranchWritePC() is UNPREDICTABLE if address<1:0> != '00'
-> 
-> So the instruction is UNPREDICTABLE both before and after v6.
-> 
-> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
-> ---
->  arch/arm/kernel/kprobes-test-arm.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/kprobes-test-arm.c
-> b/arch/arm/kernel/kprobes-test-arm.c
-> index ba32b39..38c1a3b 100644
-> --- a/arch/arm/kernel/kprobes-test-arm.c
-> +++ b/arch/arm/kernel/kprobes-test-arm.c
-> @@ -187,8 +187,8 @@ void kprobe_arm_test_cases(void)
->  	TEST_BF_R ("mov	pc, r",0,2f,"")
->  	TEST_BF_RR("mov	pc, r",0,2f,", asl r",1,0,"")
->  	TEST_BB(   "sub	pc, pc, #1b-2b+8")
-> -#if __LINUX_ARM_ARCH__ >= 6
-> -	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before ARMv6 */
-> +#if __LINUX_ARM_ARCH__ == 6 && !defined(CONFIG_CPU_V7)
-> +	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before and
-> after ARMv6 */
->  #endif
->  	TEST_BB_R( "sub	pc, pc, r",14, 1f-2f+8,"")
->  	TEST_BB_R( "rsb	pc, r",14,1f-2f+8,", pc")
+/srinidhi
