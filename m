@@ -1,64 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Jun 2012 16:58:06 +0100
-Subject: [PATCH v3 3/4] ARM: audit: move syscall auditing until after ptrace
- SIGTRAP handling
-In-Reply-To: <1339775887-32103-1-git-send-email-will.deacon@arm.com>
-References: <1339775887-32103-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1339775887-32103-4-git-send-email-will.deacon@arm.com>
+Date: Fri, 15 Jun 2012 16:58:03 +0100
+Subject: [PATCH v3 0/4] syscall_trace fixes and cleanups
+Message-ID: <1339775887-32103-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When auditing system calls on ARM, the audit code is called before
-notifying the parent process in the case that the current task is being
-ptraced. At this point, the parent (debugger) may choose to change the
-system call being issued via the SET_SYSCALL ptrace request, causing
-the wrong system call to be reported to the audit tools.
+Hello,
 
-This patch moves the audit calls after the ptrace SIGTRAP handling code
-in the syscall tracing implementation.
+This is version 3 of the patches originally posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/ptrace.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+  v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/097748.html
+  v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/103281.html
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 5700a7a..5256068 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -912,16 +912,11 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- {
- 	unsigned long ip;
- 
--	if (why)
--		audit_syscall_exit(regs);
--	else
--		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
--				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
--
- 	if (why == 0 && test_and_clear_thread_flag(TIF_SYSCALL_RESTARTSYS))
- 		scno = __NR_restart_syscall - __NR_SYSCALL_BASE;
-+
- 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
--		return scno;
-+		goto out_no_trace;
- 
- 	current_thread_info()->syscall = scno;
- 
-@@ -938,6 +933,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 		current_thread_info()->syscall = -1;
- 
- 	regs->ARM_ip = ip;
-+	scno = current_thread_info()->syscall;
- 
--	return current_thread_info()->syscall;
-+out_no_trace:
-+	if (why)
-+		audit_syscall_exit(regs);
-+	else
-+		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
-+				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
-+	return scno;
- }
+The only changes from v2 are that the series is now based on -rc2 and
+I've added Al and Eric to CC. Functionally it is identical.
+
+All feedback welcome,
+
+Will
+
+
+Will Deacon (4):
+  audit: arm: only allow syscall auditing for pure EABI userspace
+  ARM: entry: don't bother with syscall tracing on ret_from_fork path
+  ARM: audit: move syscall auditing until after ptrace SIGTRAP handling
+  ARM: ptrace: provide separate functions for tracing syscall
+    {entry,exit}
+
+ arch/arm/kernel/entry-common.S |   20 +++++-------------
+ arch/arm/kernel/ptrace.c       |   42 ++++++++++++++++++++++++++++-----------
+ init/Kconfig                   |    2 +-
+ 3 files changed, 37 insertions(+), 27 deletions(-)
+
 -- 
 1.7.4.1
