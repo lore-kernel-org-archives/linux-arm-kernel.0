@@ -1,174 +1,57 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 15 Jun 2012 17:48:22 +0200
-Subject: [PATCH v3 2/2] serial: mxs-auart: Allow device tree probing
-In-Reply-To: <1339774557-23588-2-git-send-email-fabio.estevam@freescale.com>
-References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
- <1339774557-23588-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <201206151748.22324.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 15 Jun 2012 09:49:10 -0600
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+Message-ID: <4FDB5976.20809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+On 06/15/2012 12:09 AM, Wei Ni wrote:
+> On Thu, Jun 14, 2012 at 23:54:22, Stephen Warren wrote:
+>>>>> The core of the issue is that:
+>>>
+>>>>> * Tegra30 support is via device tree. * We have an SDIO bus, and 
+>>>>> the WiFi device attached to that bus is enumerable. * Since the 
+>>>>> WiFi device is enumerable, no node exists in the DT to represent 
+>>>>> it. * However, the driver for the WiFi device needs certain 
+>>>>> information, such as the reset GPIO ID and perhaps power GPIO.
+>>>
+>>>> PCI devices are also enumerable and yet they can be matched up with 
+>>>> nodes in the device tree. Perhaps something similar could be added 
+>>>> for the SDIO bus?
+>>>
+>>> This seems to make the most sense - pushing this through the 
+>>> regulator API is just a bodge.
+>>
+>> Yes, that seems reasonable.
+>>
+>> Presumably the power GPIO should be a fixed regulator though, since it 
+>> is a power control not just a plain old GPIO? That said, the current driver apparently deals with this as a GPIO already.
+>>
+>> The reset GPIO can separately/directly controlled by the WiFi driver though.
+> 
+> I talked with Franky, this power sequence is generally for 4329, so it mean this sequence can be put into the wifi driver.
+> We can use the virtual platform device both for OOB and non OOB.
+> I will send out patches later.
 
-> Allow device tree probing.
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Alan Cox <alan@linux.intel.com>
-> Cc: <linux-serial@vger.kernel.org>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Can you please expand on what a "virtual platform device" is; device
+tree typically represents real hardware rather than anything "virtual".
 
-Acked-by: Marek Vasut <marex@denx.de>
+Now if this means adding a child node under the SDIO controller to
+represent the attached device, and storing any settings required by that
+device in that child node, that's probably a reasonable basic approach.
 
-> ---
-> Changes since v2:
-> - Change compatible string
-> - Add aliases information in bindings doc
-> - Remove unneeded mxs_auart_probe_pdev function
-> - Remove "ifdef CONFIG_OF"
-> - Remove of_match_ptr wrapper
-> Changes since v1:
-> - Merged patches 3 and 5 from v1 into this one
->  .../bindings/tty/serial/fsl-mxs-auart.txt          |   27 +++++++++++
->  drivers/tty/serial/mxs-auart.c                     |   49
-> +++++++++++++++++++- 2 files changed, 75 insertions(+), 1 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt new file
-> mode 100644
-> index 0000000..2ee903f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> @@ -0,0 +1,27 @@
-> +* Freescale MXS Application UART (AUART)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<soc>-auart". The supported SoCs include
-> +  imx23 and imx28.
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Should contain the auart interrupt numbers
-> +
-> +Example:
-> +auart0: serial at 8006a000 {
-> +	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
-> +	reg = <0x8006a000 0x2000>;
-> +	interrupts = <112 70 71>;
-> +};
-> +
-> +Note: Each auart port should have an alias correctly numbered in "aliases"
-> +node.
-> +
-> +Example:
-> +
-> +aliases {
-> +	serial0 = &auart0;
-> +	serial1 = &auart1;
-> +	serial2 = &auart2;
-> +	serial3 = &auart3;
-> +	serial4 = &auart4;
-> +};
-> diff --git a/drivers/tty/serial/mxs-auart.c
-> b/drivers/tty/serial/mxs-auart.c index ec56d83..87bbe9c 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -33,6 +33,7 @@
->  #include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/of_device.h>
-> 
->  #include <asm/cacheflush.h>
-> 
-> @@ -675,6 +676,30 @@ static struct uart_driver auart_driver = {
->  #endif
->  };
-> 
-> +/*
-> + * This function returns 1 if pdev isn't a device instatiated by dt, 0 if
-> it + * could successfully get all information from dt or a negative errno.
-> + */
-> +static int serial_mxs_probe_dt(struct mxs_auart_port *s,
-> +		struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int ret;
-> +
-> +	if (!np)
-> +		/* no device tree device */
-> +		return 1;
-> +
-> +	ret = of_alias_get_id(np, "serial");
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to get alias id: %d\n", ret);
-> +		return ret;
-> +	}
-> +	s->port.line = ret;
-> +
-> +	return 0;
-> +}
-> +
->  static int __devinit mxs_auart_probe(struct platform_device *pdev)
->  {
->  	struct mxs_auart_port *s;
-> @@ -689,6 +714,12 @@ static int __devinit mxs_auart_probe(struct
-> platform_device *pdev) goto out;
->  	}
-> 
-> +	ret = serial_mxs_probe_dt(s, pdev);
-> +	if (ret > 0)
-> +		s->port.line = pdev->id < 0 ? 0 : pdev->id;
-> +	else if (ret < 0)
-> +		goto out_free;
-> +
->  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->  	if (IS_ERR(pinctrl)) {
->  		ret = PTR_ERR(pinctrl);
-> @@ -711,7 +742,6 @@ static int __devinit mxs_auart_probe(struct
-> platform_device *pdev) s->port.membase = ioremap(r->start,
-> resource_size(r));
->  	s->port.ops = &mxs_auart_ops;
->  	s->port.iotype = UPIO_MEM;
-> -	s->port.line = pdev->id < 0 ? 0 : pdev->id;
->  	s->port.fifosize = 16;
->  	s->port.uartclk = clk_get_rate(s->clk);
->  	s->port.type = PORT_IMX;
-> @@ -769,13 +799,29 @@ static int __devexit mxs_auart_remove(struct
-> platform_device *pdev) return 0;
->  }
-> 
-> +static struct platform_device_id mxs_auart_devtype[] = {
-> +	{
-> +		.name = "mxs-auart",
-> +		/* sentinel */
-> +	}
-> +};
-> +MODULE_DEVICE_TABLE(platform, mxs_auart_devtype);
-> +
-> +static struct of_device_id mxs_auart_dt_ids[] = {
-> +	{ .compatible = "fsl,imx23-auart", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
-> +
->  static struct platform_driver mxs_auart_driver = {
->  	.probe = mxs_auart_probe,
->  	.remove = __devexit_p(mxs_auart_remove),
->  	.driver = {
->  		.name = "mxs-auart",
->  		.owner = THIS_MODULE,
-> +		.of_match_table = mxs_auart_dt_ids,
->  	},
-> +		.id_table = mxs_auart_devtype,
->  };
-> 
->  static int __init mxs_auart_init(void)
-> @@ -807,3 +853,4 @@ module_init(mxs_auart_init);
->  module_exit(mxs_auart_exit);
->  MODULE_LICENSE("GPL");
->  MODULE_DESCRIPTION("Freescale MXS application uart driver");
-> +MODULE_ALIAS("platform:mxs-auart");
-
-Best regards,
-Marek Vasut
+BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That
+seems reasonable to represent as a GPIO rather than a regulator since it
+connects directly into the WiFi device as a GPIO, and its use within the
+WiFi device can indeed be governed purely internally to the WiFi
+driver/HW. However, if this is some GPIO that controls the power to e.g.
+VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then
+it'd be better represented as a regulator, since the control point is
+outside the WiFi device.
