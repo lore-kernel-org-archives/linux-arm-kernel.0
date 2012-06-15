@@ -1,35 +1,31 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 15 Jun 2012 17:30:56 +0800
-Subject: [PATCH 06/16] ARM: imx: move irq_domain_add_legacy call into
- avic driver
-In-Reply-To: <20120614071326.GC31565@S2101-09.ap.freescale.net>
+Date: Fri, 15 Jun 2012 17:37:14 +0800
+Subject: [PATCH 07/16] dma: ipu: remove the use of ipu_platform_data
+In-Reply-To: <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
 References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-7-git-send-email-shawn.guo@linaro.org>
- <20120614071326.GC31565@S2101-09.ap.freescale.net>
-Message-ID: <20120615093055.GD8383@shlinux2.ap.freescale.net>
+ <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120615093713.GE8383@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 03:13:28PM +0800, Shawn Guo wrote:
-> On Thu, Jun 14, 2012 at 01:59:37PM +0800, Shawn Guo wrote:
-> > Move irq_domain_add_legacy call from imx27-dt.c into avic init function
-> > and have the avic driver adopt irqdomain support for both DT and non-DT
-> > boot.
-> > 
-> > Now avic init function calls irq_alloc_descs to get irq_base and adds
-> > a lenacy irqdomain with the irq_base, so that the mapping between avic
-> > irq and Linux irq number can be handled by irqdomain.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/imx27-dt.c |   15 ---------------
-> >  arch/arm/plat-mxc/avic.c     |   26 +++++++++++++++++++-------
-> >  2 files changed, 19 insertions(+), 22 deletions(-)
-> > 
-> The following changes should be amended.
-> 
-
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+On Thu, Jun 14, 2012 at 01:59:38PM +0800, Shawn Guo wrote:
+.......
+> @@ -354,10 +355,12 @@ static struct irq_chip ipu_irq_chip = {
+>  /* Install the IRQ handler */
+>  int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+>  {
+> -	struct ipu_platform_data *pdata = dev->dev.platform_data;
+> -	unsigned int irq, irq_base, i;
+> +	unsigned int irq, i;
+> +	int irq_base = irq_alloc_descs(-1, 0, CONFIG_MX3_IPU_IRQS,
+> +				       numa_node_id());
+>  
+> -	irq_base = pdata->irq_base;
+> +	if (irq_base < 0)
+> +		return irq_base;
+>  
+Need not add irqdomain for this irq range?
+Can we still service this irq properly without irqdomain mapping?
 
 Regards
 Dong Aisheng
