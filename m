@@ -1,85 +1,203 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 15 Jun 2012 06:52:36 +0000
-Subject: [PATCH 2/3] ARM: OMAP2+: onenand: cleanup for gpmc driver
- conversion
-In-Reply-To: <4FDA252C.4020708@ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <2d6f0fb31cde98cd700d7a4268683b4aeeee87f2.1339419244.git.afzal@ti.com>
- <4FD63AAE.90008@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D47@DBDE01.ent.ti.com>
- <4FD77CC8.4000003@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998781@DBDE01.ent.ti.com>
- <4FD8C217.2050006@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9993EF@DBDE01.ent.ti.com>
- <4FDA252C.4020708@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99A307@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 15 Jun 2012 09:03:52 +0200
+Subject: [PATCH 2/3 v2] clk: add versatile ICST307 driver
+Message-ID: <1339743832-27776-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+The ICST307 VCO clock has a shared driver in the ARM
+architecture. This patch provides a wrapper into the common
+clock framework so we can use the implementation in the
+ARM architecture without duplicating the code until all
+ARM platforms using this VCO are moved over. At that point
+we can merge the driver from the ARM platform into the
+generic file altogether.
 
-On Thu, Jun 14, 2012 at 23:23:48, Hunter, Jon wrote:
-> On 06/14/2012 12:40 AM, Mohammed, Afzal wrote:
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Mike Turquette <mturquette@ti.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Create a versatile subdirectory, and put the clock in there,
+  as only the ARM reference designs use this clock right now.
+  Also create a Kconfig entry for the versatile stuff.
+- Rename clock register function to *_register
+---
+ drivers/clk/Kconfig              |    2 +
+ drivers/clk/Makefile             |    1 +
+ drivers/clk/versatile/Kconfig    |    8 +++
+ drivers/clk/versatile/Makefile   |    2 +
+ drivers/clk/versatile/clk-icst.c |  100 ++++++++++++++++++++++++++++++++++++++
+ drivers/clk/versatile/clk-icst.h |   10 ++++
+ 6 files changed, 123 insertions(+)
+ create mode 100644 drivers/clk/versatile/Kconfig
+ create mode 100644 drivers/clk/versatile/Makefile
+ create mode 100644 drivers/clk/versatile/clk-icst.c
+ create mode 100644 drivers/clk/versatile/clk-icst.h
 
-> > During gpmc driver probe, it will configure all the connected peripherals,
-> > if configuration details are not present at that point of time, gpmc driver
-> > will cry out saying that configuration & timings has not been configured,
-> > (please see holler if no configuration patch). 
-> 
-> Sorry, I am not sure if I am missing something here, but isn't the
-> chip-select requested during the gpmc probe? If so then we should not be
-> programming the gpmc registers at all until the chip-select has been
-> allocated. Hence, after the probe seems more appropriate.
-
-This patch by itself has no much meaning other than preparing for driver
-conversion so that driver conversion series would be simpler, if you read
-it with gpmc driver conversion series and adapting peripherals to gpmc
-driver series, hopefully you can make out what I am trying to express
-
-with gpmc driver, first chip select request happens, then programming
-gpmc registers happen, but note that both happen in probe
-
-> >> I am not convinced we need to. Furthermore with your change you do not
-> >> actually set async mode in the onenand until _set_sync() is called.
-> > 
-> > Yes, setting async mode in onenand is done in set_sync function, and it is
-> > always called by onenand driver indirectly.
-> > 
-> > Seems if setting async mode in onenand is taken out of set_sync & placed
-> > it before set_sync invocation in gpmc_onenand_setup, intention will be
-> > clear, right ? (even though sequence wise same thing is happening now)
-> 
-> Exactly.
-
-Ok, v2 will have this change
-
-> >> Yes but as far as I can see, it seems that this is the intent of the
-> >> onenand_setup() function to perform the necessary initialisation.
-> > 
-> > I believe doing it in gpmc_onenand_init is better, due to the reasons
-> > mentioned above as well as because function name will correspond to what
-> > it is doing, i.e. initialization
-> 
-> If the chip-select is allocating during the probe, then I don't agree.
-
-I believe you were referring to gpmc driver probe, not onenand probe,
-the changes has been done such that both old and new driver interface
-can make use of most of existing code.
-
-And only old interface will call gpmc_onenand_init, and with that gpmc
-driver interface is not coming into picture, while with new gpmc driver
-interface, function used would be different one as in [1]
-
-> > Yes, on omap3evm, with help of local patches (as mainline doesn't have
-> > those). It was mentioned in cover letter of gpmc driver conversion series
-> 
-> Great. Sorry but with 20+ patch spread across 3 series it is not always
-> easy to find the details. So ideally it should be mentioned in this
-> cover letter too.
-
-I am sorry for that
-
-Regards
-Afzal
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69919.html
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 4864407..6742ad9 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -34,4 +34,6 @@ config COMMON_CLK_DEBUG
+ 	  clk_flags, clk_prepare_count, clk_enable_count &
+ 	  clk_notifier_count.
+ 
++source "drivers/clk/versatile/Kconfig"
++
+ endmenu
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index b9a5158..3cf5da7 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -5,3 +5,4 @@ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+ # SoCs specific
+ obj-$(CONFIG_ARCH_MXS)		+= mxs/
+ obj-$(CONFIG_PLAT_SPEAR)	+= spear/
++obj-$(CONFIG_CLK_VERSATILE)	+= versatile/
+diff --git a/drivers/clk/versatile/Kconfig b/drivers/clk/versatile/Kconfig
+new file mode 100644
+index 0000000..169b1bc
+--- /dev/null
++++ b/drivers/clk/versatile/Kconfig
+@@ -0,0 +1,8 @@
++config CLK_VERSATILE
++	bool "Clocks for the ARM Versatile family"
++	depends on COMMON_CLK
++
++config CLK_ICST
++	bool "ICST307 VCO clock driver"
++	depends on COMMON_CLK
++	depends on ICST
+diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
+new file mode 100644
+index 0000000..c70e18e
+--- /dev/null
++++ b/drivers/clk/versatile/Makefile
+@@ -0,0 +1,2 @@
++# Makefile for Versatile-specific clocks
++obj-$(CONFIG_CLK_ICST)		+= clk-icst.o
+diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+new file mode 100644
+index 0000000..f555b50
+--- /dev/null
++++ b/drivers/clk/versatile/clk-icst.c
+@@ -0,0 +1,100 @@
++/*
++ * Driver for the ICST307 VCO clock found in the ARM Reference designs.
++ * We wrap the custom interface from <asm/hardware/icst.h> into the generic
++ * clock framework.
++ *
++ * TODO: when all ARM reference designs are migrated to generic clocks, the
++ * ICST clock code from the ARM tree should probably be merged into this
++ * file.
++ */
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/err.h>
++#include <linux/clk-provider.h>
++
++#include "clk-icst.h"
++
++/**
++ * struct clk_icst - ICST VCO clock wrapper
++ * @hw: corresponding clock hardware entry
++ * @params: parameters for this ICST instance
++ * @rate: current rate
++ * @setvco: function to commit ICST settings to hardware
++ */
++struct clk_icst {
++	struct clk_hw hw;
++	const struct icst_params *params;
++	unsigned long rate;
++	struct icst_vco (*getvco)(void);
++	void (*setvco)(struct icst_vco);
++};
++
++#define to_icst(_hw) container_of(_hw, struct clk_icst, hw)
++
++static unsigned long icst_recalc_rate(struct clk_hw *hw,
++				      unsigned long parent_rate)
++{
++	struct clk_icst *icst = to_icst(hw);
++	struct icst_vco vco;
++
++	vco = icst->getvco();
++	icst->rate = icst_hz(icst->params, vco);
++	return icst->rate;
++}
++
++static long icst_round_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long *prate)
++{
++	struct clk_icst *icst = to_icst(hw);
++	struct icst_vco vco;
++
++	vco = icst_hz_to_vco(icst->params, rate);
++	return icst_hz(icst->params, vco);
++}
++
++static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
++			 unsigned long parent_rate)
++{
++	struct clk_icst *icst = to_icst(hw);
++	struct icst_vco vco;
++
++	vco = icst_hz_to_vco(icst->params, rate);
++	icst->rate = icst_hz(icst->params, vco);
++	icst->setvco(vco);
++	return 0;
++}
++
++static const struct clk_ops icst_ops = {
++	.recalc_rate = icst_recalc_rate,
++	.round_rate = icst_round_rate,
++	.set_rate = icst_set_rate,
++};
++
++struct clk * __init icst_clk_register(struct device *dev,
++				      const struct clk_icst_desc *desc)
++{
++	struct clk *clk;
++	struct clk_icst *icst;
++	struct clk_init_data init;
++
++	icst = kzalloc(sizeof(struct clk_icst), GFP_KERNEL);
++	if (!icst) {
++		pr_err("could not allocate ICST clock!\n");
++		return ERR_PTR(-ENOMEM);
++	}
++	init.name = "icst";
++	init.ops = &icst_ops;
++	init.flags = CLK_IS_ROOT;
++	init.parent_names = NULL;
++	init.num_parents = 0;
++	icst->hw.init = &init;
++	icst->params = desc->params;
++	icst->getvco = desc->getvco;
++	icst->setvco = desc->setvco;
++
++	clk = clk_register(dev, &icst->hw);
++	if (IS_ERR(clk))
++		kfree(icst);
++
++	return clk;
++}
+diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
+new file mode 100644
+index 0000000..71b4c56
+--- /dev/null
++++ b/drivers/clk/versatile/clk-icst.h
+@@ -0,0 +1,10 @@
++#include <asm/hardware/icst.h>
++
++struct clk_icst_desc {
++	const struct icst_params *params;
++	struct icst_vco (*getvco)(void);
++	void (*setvco)(struct icst_vco);
++};
++
++struct clk *icst_clk_register(struct device *dev,
++			      const struct clk_icst_desc *desc);
+-- 
+1.7.10.2
