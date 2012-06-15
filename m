@@ -1,73 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Jun 2012 09:42:56 +0100
-Subject: [PATCH 1/1] ARM: ux500: Fix build errors/warnings when MACH_UX500_DT
- is not set
-Message-ID: <1339749776-9468-1-git-send-email-lee.jones@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 15 Jun 2012 10:54:31 +0200
+Subject: [PATCH 0/2] Exynos4: power domain fixes for v3.5-rc
+Message-ID: <1339750473-32699-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When MACH_UX500_DT and all related Device Tree configurations are forced
-off the warning and error below prevent the kernel from compiling. This
-simple patch fixes both issues and allows for full build and boot of
-ST-Ericsson's low-cost development board, Snowball.
+Hello,
 
-Warnings fixed:
-  arch/arm/mach-ux500/board-mop500.c:680:32: warning: ?snowball_of_platform_devs? defined but not used
+This is a resend of my power domain fixes for Samsung Exynos platform.
+They fix issues introduced by switching to gen_pd based driver in commit
+91cfbd4ee0 ('ARM: EXYNOS: Hook up power domains to generic power domain
+infrastructure') and restore runtime pm functionality for multimedia
+drivers (s5p-fimc, s5p-mfc, s5p-tv, exynos-drm). Tested on Universal
+C210 and NURI boards, but the issues were also reported for Origen
+boards and others. If possible, please consider these patches as fixes
+(runtime pm is broken without them) and merge to v3.5-rc line.
 
-Errors fixed:
-  arch/arm/mach-ux500/timer.c: In function ?ux500_timer_init?:
-  arch/arm/mach-ux500/timer.c:66:3: error: implicit declaration of function ?of_find_matching_node?
-  arch/arm/mach-ux500/timer.c:66:6: warning: assignment makes pointer from integer without a cast
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |   10 +++++-----
- arch/arm/mach-ux500/timer.c        |    2 ++
- 2 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9c74ac5..73fb6e8 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -677,11 +677,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- 	&ab8500_device,
- };
- 
--static struct platform_device *snowball_of_platform_devs[] __initdata = {
--	&snowball_led_dev,
--	&snowball_key_dev,
--};
--
- static void __init mop500_init_machine(void)
- {
- 	struct device *parent = NULL;
-@@ -821,6 +816,11 @@ MACHINE_END
- 
- #ifdef CONFIG_MACH_UX500_DT
- 
-+static struct platform_device *snowball_of_platform_devs[] __initdata = {
-+	&snowball_led_dev,
-+	&snowball_key_dev,
-+};
-+
- struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires DMA and call-back bindings. */
- 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 741e71f..66e7f00 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -63,8 +63,10 @@ static void __init ux500_timer_init(void)
- 
- 	/* TODO: Once MTU has been DT:ed place code above into else. */
- 	if (of_have_populated_dt()) {
-+#ifdef CONFIG_OF
- 		np = of_find_matching_node(NULL, prcmu_timer_of_match);
- 		if (!np)
-+#endif
- 			goto dt_fail;
- 
- 		tmp_base = of_iomap(np, 0);
+Patch summary:
+
+Marek Szyprowski (2):
+  ARM: Exynos4: read initial state of power domain from hw registers
+  ARM: Exynos4: pm_domains: register devices in 'need_restore' state
+
+ arch/arm/mach-exynos/pm_domains.c |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
+
 -- 
-1.7.9.5
+1.7.1.569.g6f426
