@@ -1,105 +1,109 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 15 Jun 2012 11:18:53 +0200 (CEST)
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201206150900.50866.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <Pine.LNX.4.64.1206141537190.30810@axis700.grange> <4FDA5D0A.1040105@ti.com>
- <201206150900.50866.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.64.1206151107480.11729@axis700.grange>
+From: eduardo.valentin@ti.com (Valentin, Eduardo)
+Date: Fri, 15 Jun 2012 12:22:26 +0300
+Subject: [RFC PATCH 03/11] arm: omap: device: create a device for system
+ control module
+In-Reply-To: <4FD9EC1B.6010506@dev.rtsoft.ru>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-4-git-send-email-eduardo.valentin@ti.com>
+ <4FBF7B74.4020302@ti.com> <20120529094400.GA3505@besouro>
+ <4FD9EC1B.6010506@dev.rtsoft.ru>
+Message-ID: <CAGF5oy-_6FnZN-0h4JwNhOcABadEq9ZsL7U4gpYndvjsBAZnrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hello Konstantin,
 
-On Fri, 15 Jun 2012, Arnd Bergmann wrote:
+Sorry for the delayed reply.
 
-> On Thursday 14 June 2012, Jon Hunter wrote:
-> 
-> > > Generic DMACs can perform memory-to-memory DMA, USB DMACs cannot.
-> > > 
-> > > Generic DMACs can serve any slave (peripheral) request line on any their 
-> > > physical channel, USB DMACs only serve fixed USB controller instances. To 
-> > > configure (connect) a certain physical DMA channel to s specific 
-> > > peripheral request line, a certain value has to be written to a 
-> > > configuration register of that physical DMA channel.
-> > 
-> > Do you still need to specify a request line for the USB DMACs or are
-> > these fixed? In other words, what purpose would the DMA binding serve
-> > for the USB DMACs?
-> 
-> If I understood Guennadi right, the DMA engines are the same kind as the
-> other ones, so we really want to use the same bindings for each instance.
+On Thu, Jun 14, 2012 at 4:50 PM, Konstantin Baydarov
+<kbaidarov@dev.rtsoft.ru> wrote:
+> ?Hi.
+>
+> On 05/29/2012 01:44 PM, Eduardo Valentin wrote:
+>> On Fri, May 25, 2012 at 02:30:44PM +0200, Cousson Benoit wrote:
+>>> On 5/25/2012 10:25 AM, Eduardo Valentin wrote:
+>>>> From: Kishon Vijay Abraham I<kishon@ti.com>
+>>>>
+>>>> Extracts the device data from hwmod database and create a platform device
+>>>> using omap device build.
+>>>>
+>>>> The device build is done during postcore_initcall.
+>>> Do you still need that since you are supporting only DT?
+>>> The device will be built automatically in the DT case.
+>> In fact this is not needed for DT only probing. Dropping this one.
+> Yes, platform device(struct platform_device) will be built automatically, but omap device(struct omap_device) will not be built.
 
-Exactly, at least they are compatible and are presently handles by the 
-same dma-engine driver. There are some differences in the register layout, 
-I think, which we might need to handle at some point, maybe by specifying 
-different "compatible" identifiers or by some other means.
+The platform_device will be built as well as the omap_device. There
+are hooks at the platform_device creation that will proceed with the
+omap_device deployment. Please check:
+arch/arm/plat-omap/omap_device.c: _omap_device_notifier_call and
+omap_device_build_from_dt
 
-> > > To add to complexity, on other SoCs (e.g., SuperH sh7724) some of generic 
-> > > DMACs (DMAC0) have external DMA request pins, others don't.
-> > 
-> > OMAP also has this. To me an request line going to an external pin can
-> > be handled in the same way as one going to a internal peripheral.
-> > However, what happens to that pin externally is a different story.
-> 
-> Right, I don't see a problem here with any of the proposed binding.
-> 
-> > > I'm sure there's more to that, but that's about the scope, that's 
-> > > currently supported or wants to be supported by the driver.
-> > > 
-> > > Currently we do the slave-switching in the following way: platform data 
-> > > for each DMAC instance references a table of supported peripherals with 
-> > > their IDs and configuration register values. Each peripheral, that wishes 
-> > > to use DMA, provides its slave ID to the DMAC driver, by which it checks, 
-> > > whether this peripheral is supported and, if so, finds its configuration, 
-> > > picks up the next free channel and configures it.
-> > > 
-> > > So, with the above in mind, IIUC, the above DT binding proposal would 
-> > > require us to reference all 3 generic DMAC instances in each slave dmas 
-> > > property? 
-> > 
-> > You could if you wanted to have the ability to select 1 out of the 3.
-> > However, I would not say it is a hard requirement. You could just
-> > provide one. Or you could list all 3, but use some form of match
-> > variable to indicate a default DMAC for a given peripheral.
-> 
-> Right. From the description above, it seems that shmobile is actually
-> simpler than some of the others because the slave ID is always the
-> same for each of the controllers.
+> Also when omap device is allocated(omap_device_alloc) hwmod_clocks are registered, but in case of ctrl_module_core device - no new clock are registered.
+> So, is it fine to drop omap device and skip omap_device_build() call?
 
-Exactly.
+As explained above, when booting with DT, you will get both, pdev and omap_dev.
 
-> In the common case, you could have one device connected to the third
-> slave ID of the first controller but the fifth slave ID of the
-> second controller. In this case, you really have to specify each
-> controller with its slave ID separately, even if that means a lot
-> of duplicate data for shmobile.
+>
+> ?BR,
+> ? ?Konstantin Baydarov.
 
-So, you don't think it's worth making a short-cut possible to specify a 
-DMAC type instead of each instance phandle? It really would mean __a lot__ 
-of duplication - with 3 generic controllers on (some) current chips and 
-possibly more on those, that I'm not aware about.
+All best,
 
-> I'm not sure I understand what the "configuration register values"
-> above are.
+Eduardo
 
-As I explained in an earlier mail, those include transfer size and other 
-parameters, but cannot be completely calculated in device drivers, because 
-they also vary between SoCs.
+>
+>>
+>>> Regards,
+>>> Benoit
+>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>>>> Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
+>>>> ---
+>>>> ?arch/arm/mach-omap2/devices.c | ? 26 ++++++++++++++++++++++++++
+>>>> ?1 files changed, 26 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+>>>> index 152c266..9332673 100644
+>>>> --- a/arch/arm/mach-omap2/devices.c
+>>>> +++ b/arch/arm/mach-omap2/devices.c
+>>>> @@ -40,6 +40,32 @@
+>>>> ?#define L3_MODULES_MAX_LEN 12
+>>>> ?#define L3_MODULES 3
+>>>>
+>>>> +static int omap_init_control(void)
+>>>> +{
+>>>> + ? struct omap_hwmod ? ? ? ? ? ? ? *oh;
+>>>> + ? struct platform_device ? ? ? ? ?*pdev;
+>>>> + ? const char ? ? ? ? ? ? ? ? ? ? ?*oh_name, *name;
+>>>> +
+>>>> + ? oh_name = "ctrl_module_core";
+>>>> + ? name = "omap-control-core";
+>>>> +
+>>>> + ? oh = omap_hwmod_lookup(oh_name);
+>>>> + ? if (!oh) {
+>>>> + ? ? ? ? ? pr_err("Could not lookup hwmod for %s\n", oh_name);
+>>>> + ? ? ? ? ? return PTR_ERR(oh);
+>>>> + ? }
+>>>> +
+>>>> + ? pdev = omap_device_build(name, -1, oh, NULL, 0, NULL, 0, true);
+>>>> + ? if (IS_ERR(pdev)) {
+>>>> + ? ? ? ? ? pr_err("Could not build omap_device for %s %s\n",
+>>>> + ? ? ? ? ? ? ? ? ?name, oh_name);
+>>>> + ? ? ? ? ? return PTR_ERR(pdev);
+>>>> + ? }
+>>>> +
+>>>> + ? return 0;
+>>>> +}
+>>>> +postcore_initcall(omap_init_control);
+>>>> +
+>>>> ?static int __init omap3_l3_init(void)
+>>>> ?{
+>>>> ? ? struct omap_hwmod *oh;
+>
 
-> Most likely, those should all be part of the slave ID,
-> which would then span multiple 32-bit values in the "dmas" property.
 
-Yes, we could do that.
 
-> Conveniently, that also takes care of removing the DMAC platform data.
+-- 
 
-Right, my only concern so far is a huge redundancy, that accepting and 
-using the proposed scheme would incur.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Eduardo Valentin
