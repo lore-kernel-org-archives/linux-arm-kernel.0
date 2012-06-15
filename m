@@ -1,37 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 15 Jun 2012 14:53:11 +0200
-Subject: [PATCH v2 3/3] ARM: mxs_defconfig: Let AUART driver be built by
- default
-In-Reply-To: <4FDB2F82.804@grid-net.com>
-References: <1339759950-5507-1-git-send-email-festevam@gmail.com>
- <20120615123342.GJ31565@S2101-09.ap.freescale.net>
- <4FDB2F82.804@grid-net.com>
-Message-ID: <201206151453.11469.marex@denx.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 15 Jun 2012 14:58:55 +0200
+Subject: Converting kirkwood-goflexnet to DTS
+In-Reply-To: <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
+ (Josh Coombs's message of "Fri, 15 Jun 2012 08:40:48 -0400")
+References: <20120614141706.GA6676@lunn.ch>
+ <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+ <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
+ <20120615104140.24bf25f3@skate>
+ <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
+Message-ID: <87r4tgvii8.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Subodh Nijsure,
+Josh Coombs <josh.coombs@gmail.com> writes:
 
-> On 06/15/2012 05:33 AM, Shawn Guo wrote:
-> > On Fri, Jun 15, 2012 at 08:32:30AM -0300, Fabio Estevam wrote:
-> >> From: Fabio Estevam<fabio.estevam@freescale.com>
-> >> 
-> >> Let AUART driver be built by default.
-> >> 
-> >> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
-> > 
-> > Applied, thanks.
-> 
-> Applied to what? arm-soc/for-next ?
+> Thomas, Andrew,
+>
+> You were both correct.  After one additional test failure last night
+> and a lot more reading I reached the same conclusion, I was foolishly
+> thinking .dtbs would be automatically appended to the kernel when
+> configured to support that method of including them.
+>
+> What I did this morning:
+>
+> make
+> make kirkwood-goflexnet.dtb
+> cat arch/arm/boot/kirkwood-goflexnet.dtb >> arch/arm/boot/zImage
+> make uImage
+>
+> That resulted in: http://pastie.org/4092019
+>
+[   18.294288] [<c055f99c>] (kirkwood_init+0x50/0x7c) from [<c056023c>] (goflexnet_init+0x8/0x7c)
 
-git://git.linaro.org/people/shawnguo/linux-2.6.git
+seems wrong. You don't have to call kirkwood_init() in DT case afaik.
 
-OR (probably later)
-
-git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-
-> 
-> /Subodh
-
-Best regards,
-Marek Vasut
+Arnaud
