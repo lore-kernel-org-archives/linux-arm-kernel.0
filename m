@@ -1,9 +1,10 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 15 Jun 2012 13:47:43 +0200
-Subject: [PATCH v2 1/3] ARM: dts: mx28evk: Add auart0 and auart3 support
-In-Reply-To: <1339759950-5507-1-git-send-email-festevam@gmail.com>
+Date: Fri, 15 Jun 2012 13:49:27 +0200
+Subject: [PATCH v2 2/3] serial: mxs-auart: Allow device tree probing
+In-Reply-To: <1339759950-5507-2-git-send-email-festevam@gmail.com>
 References: <1339759950-5507-1-git-send-email-festevam@gmail.com>
-Message-ID: <201206151347.43333.marex@denx.de>
+ <1339759950-5507-2-git-send-email-festevam@gmail.com>
+Message-ID: <201206151349.27261.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,119 +12,148 @@ Dear Fabio Estevam,
 
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Add auart0 and auart3 support.
+> Allow device tree probing.
 > 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Alan Cox <alan@linux.intel.com>
+> Cc: <linux-serial@vger.kernel.org>
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Reviewed-by: Marek Vasut <marex@denx.de>
-
 > ---
 > Changes since v1:
-> - Merged patches 1 and 2 from v1 into this one
->  arch/arm/boot/dts/imx28-evk.dts |   12 ++++++++++++
->  arch/arm/boot/dts/imx28.dtsi    |   26 ++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+), 0 deletions(-)
+> - Merged patches 3 and 5 from v1 into this one
+>  .../bindings/tty/serial/fsl-mxs-auart.txt          |   13 +++++
+>  drivers/tty/serial/mxs-auart.c                     |   55
+> +++++++++++++++++++- 2 files changed, 67 insertions(+), 1 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
 > 
-> diff --git a/arch/arm/boot/dts/imx28-evk.dts
-> b/arch/arm/boot/dts/imx28-evk.dts index ee520a5..4353f48 100644
-> --- a/arch/arm/boot/dts/imx28-evk.dts
-> +++ b/arch/arm/boot/dts/imx28-evk.dts
-> @@ -73,6 +73,18 @@
->  				pinctrl-0 = <&duart_pins_a>;
->  				status = "okay";
->  			};
+> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+> b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt new file
+> mode 100644
+> index 0000000..1b28b1c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+> @@ -0,0 +1,13 @@
+> +* Freescale MXS Application UART (AUART)
 > +
-> +			auart0: serial at 8006a000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&auart0_pins_a>;
-> +				status = "okay";
-> +			};
+> +Required properties:
+> +- compatible : Should be "fsl,mxs-uart"
+> +- reg : Address and length of the register set for the device
+> +- interrupts : Should contain the auart interrupt
 > +
-> +			auart3: serial at 80070000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&auart3_pins_a>;
-> +				status = "okay";
-> +			};
->  		};
->  	};
+> +Example:
+> +auart0: serial at 8006a000 {
+> +	compatible = "fsl,mxs-auart";
+> +	reg = <0x8006a000 0x2000>;
+> +	interrupts = <112 70 71>;
+> +};
+> diff --git a/drivers/tty/serial/mxs-auart.c
+> b/drivers/tty/serial/mxs-auart.c index ec56d83..21e2ce7 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/io.h>
+>  #include <linux/pinctrl/consumer.h>
+> +#include <linux/of_device.h>
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 4634cb8..f26e0d6 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -22,6 +22,11 @@
->  		gpio4 = &gpio4;
->  		saif0 = &saif0;
->  		saif1 = &saif1;
-> +		serial0 = &auart0;
-> +		serial1 = &auart1;
-> +		serial2 = &auart2;
-> +		serial3 = &auart3;
-> +		serial4 = &auart4;
->  	};
+>  #include <asm/cacheflush.h>
 > 
->  	cpus {
-> @@ -167,6 +172,22 @@
->  					fsl,pull-up = <0>;
->  				};
+> @@ -675,6 +676,44 @@ static struct uart_driver auart_driver = {
+>  #endif
+>  };
 > 
-> +				auart0_pins_a: auart0 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x3000 0x3010 0x3020 
-0x3030>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
+> +#ifdef CONFIG_OF
+
+Isn't CONFIG_OF always enabled?
+
+> +/*
+> + * This function returns 1 if pdev isn't a device instatiated by dt, 0 if
+> it + * could successfully get all information from dt or a negative errno.
+> + */
+> +static int serial_mxs_probe_dt(struct mxs_auart_port *s,
+> +		struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int ret;
 > +
-> +				auart3_pins_a: auart3 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x30c0 0x30d0 0x30e0 
-0x30f0>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
+> +	if (!np)
+> +		/* no device tree device */
+> +		return 1;
 > +
->  				mac0_pins_a: mac0 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <0x4000 0x4010 0x4020
-> @@ -404,30 +425,35 @@
->  			};
+> +	ret = of_alias_get_id(np, "serial");
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to get alias id: %d\n", ret);
+> +		return ret;
+> +	}
+> +	s->port.line = ret;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static inline int serial_mxs_probe_dt(struct mxs_auart_port *s,
+> +		struct platform_device *pdev)
+> +{
+> +	return 1;
+> +}
+> +#endif
+
+So drop this whole ifdef stuff ...
+
+> +
+> +static void mxs_auart_probe_pdev(struct mxs_auart_port *s,
+> +		struct platform_device *pdev)
+> +{
+> +	s->port.line = pdev->id < 0 ? 0 : pdev->id;
+> +}
+> +
+>  static int __devinit mxs_auart_probe(struct platform_device *pdev)
+>  {
+>  	struct mxs_auart_port *s;
+> @@ -689,6 +728,14 @@ static int __devinit mxs_auart_probe(struct
+> platform_device *pdev) goto out;
+>  	}
 > 
->  			auart0: serial at 8006a000 {
-> +				compatible = "fsl,mxs-auart";
->  				reg = <0x8006a000 0x2000>;
->  				interrupts = <112 70 71>;
->  				status = "disabled";
->  			};
+> +	ret = serial_mxs_probe_dt(s, pdev);
+> +	if (ret > 0)
+> +		mxs_auart_probe_pdev(s, pdev);
+> +	else if (ret < 0) {
+> +		ret = -EINVAL;
+> +		goto out_free;
+> +	}
+> +
+>  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>  	if (IS_ERR(pinctrl)) {
+>  		ret = PTR_ERR(pinctrl);
+> @@ -711,7 +758,6 @@ static int __devinit mxs_auart_probe(struct
+> platform_device *pdev) s->port.membase = ioremap(r->start,
+> resource_size(r));
+>  	s->port.ops = &mxs_auart_ops;
+>  	s->port.iotype = UPIO_MEM;
+> -	s->port.line = pdev->id < 0 ? 0 : pdev->id;
+>  	s->port.fifosize = 16;
+>  	s->port.uartclk = clk_get_rate(s->clk);
+>  	s->port.type = PORT_IMX;
+> @@ -769,12 +815,19 @@ static int __devexit mxs_auart_remove(struct
+> platform_device *pdev) return 0;
+>  }
 > 
->  			auart1: serial at 8006c000 {
-> +				compatible = "fsl,mxs-auart";
->  				reg = <0x8006c000 0x2000>;
->  				interrupts = <113 72 73>;
->  				status = "disabled";
->  			};
-> 
->  			auart2: serial at 8006e000 {
-> +				compatible = "fsl,mxs-auart";
->  				reg = <0x8006e000 0x2000>;
->  				interrupts = <114 74 75>;
->  				status = "disabled";
->  			};
-> 
->  			auart3: serial at 80070000 {
-> +				compatible = "fsl,mxs-auart";
->  				reg = <0x80070000 0x2000>;
->  				interrupts = <115 76 77>;
->  				status = "disabled";
->  			};
-> 
->  			auart4: serial at 80072000 {
-> +				compatible = "fsl,mxs-auart";
->  				reg = <0x80072000 0x2000>;
->  				interrupts = <116 78 79>;
->  				status = "disabled";
+> +static struct of_device_id mxs_auart_dt_ids[] = {
+> +	{.compatible = "fsl,mxs-auart", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
+> +
+>  static struct platform_driver mxs_auart_driver = {
+>  	.probe = mxs_auart_probe,
+>  	.remove = __devexit_p(mxs_auart_remove),
+>  	.driver = {
+>  		.name = "mxs-auart",
+>  		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(mxs_auart_dt_ids),
+>  	},
+>  };
 
 Best regards,
 Marek Vasut
