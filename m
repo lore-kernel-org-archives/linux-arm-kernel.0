@@ -1,46 +1,31 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Jun 2012 10:33:53 -0500
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <alpine.DEB.2.00.1206141819130.25628@utopia.booyaka.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
- <4FD77EF1.8000600@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
- <4FD8A906.8080202@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9994A6@DBDE01.ent.ti.com>
- <4FDA4EE6.1070106@ti.com>
- <alpine.DEB.2.00.1206141819130.25628@utopia.booyaka.com>
-Message-ID: <4FDB55E1.6060207@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 15 Jun 2012 23:34:07 +0800
+Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <201206131800.38622.marex@denx.de>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <4FD8AD42.6010702@gmail.com>
+ <20120613152841.GA23590@richard-laptop>
+ <201206131800.38622.marex@denx.de>
+Message-ID: <20120615153404.GM31565@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 06/14/2012 07:20 PM, Paul Walmsley wrote:
-> On Thu, 14 Jun 2012, Jon Hunter wrote:
+On Wed, Jun 13, 2012 at 06:00:38PM +0200, Marek Vasut wrote:
+> Write a driver that does the GPIO setup in some generic way? Wasn't there 
+> something about this stuff going on? Shawn, you had some comments /wrt the M28 
+> DTS. This might be what you meant?
 > 
->> What does make this a bit more difficult is the function
->> gpmc_round_ns_to_ticks(). It appears to convert nanoseconds to ticks and
->> back to nanoseconds. I am guessing to account for some rounding error. I
->> am curious what impact this function is having on the timing. Ideally
->> this should be handle in gpmc_cs_set_timings().
-> 
-> I don't have the code in front of me at the moment, nor my old GPMC timing 
-> spreadsheet, so this comment may be superfluous.  But since kernel 
-> arithmetic needs to be in integers, it might be necessary to do some of 
-> the timing calculations in picosecond units to avoid roundoff issues.
+No.  What Richard is looking for is a way to set/clear gpio, while
+what I was commenting on M28 DTS is the way to configure a pin into
+gpio mode.  In this series, Richard chose to use "hog" feature to
+configure the pin into gpio mode, which means defining a pinctrl state
+for pin controller node itself, then at pinctrl subsystem init time,
+pinctrl core will configure these "hog" pins properly.
 
-A lot of the GPMC timing functions are converting to pico-seconds and
-then rounding up to nano-seconds. So I think that the calculations are ok.
+The "hog" method makes some sense for Richard's case, where the pin
+has no clear device/driver owner, and when gpio_request call can not
+configure the requested pin into gpio mode automatically yet.
 
-The real problem is, that as Afzal has highlighted, is that there is no
-common method between GPMC peripherals (onenand, smsc, etc) for
-populating the gpmc timings structure. This is going to cause a bit of a
-headache for migrating them over to DT. So what we need to do and maybe
-this is another series, separate from Afzal's series, is really clean-up
-the populating of the timings.
-
-Cheers
-Jon
+-- 
+Regards,
+Shawn
