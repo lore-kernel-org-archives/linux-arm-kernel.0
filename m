@@ -1,36 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Jun 2012 12:56:41 +0100
-Subject: ARM syscall restarting with TIF_SYSCALL_RESTARTSYS
-Message-ID: <20120615115641.GA11507@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 15 Jun 2012 09:01:17 -0300
+Subject: [PATCH v2 2/3] serial: mxs-auart: Allow device tree probing
+In-Reply-To: <201206151349.27261.marex@denx.de>
+References: <1339759950-5507-1-git-send-email-festevam@gmail.com>
+ <1339759950-5507-2-git-send-email-festevam@gmail.com>
+ <201206151349.27261.marex@denx.de>
+Message-ID: <CAOMZO5CWtJO6Ka0sM+ZNrK+dTLDQ9eXFj-XvFXdkZND1_F40NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+Hi Marek,
 
-With the recent changes the syscall restarting on ARM is done via the
-TIF_SYSCALL_RESTARTSYS flag which causes the override of the syscall
-number in syscall_trace(). I think there is a scenario where this could
-fail:
+On Fri, Jun 15, 2012 at 8:49 AM, Marek Vasut <marex@denx.de> wrote:
 
-1. app does a syscall
-2. syscall interrupted and returns -ERESTART_RESTARTBLOCK. There is no
-   signal to deliver
-3. do_signal() sets TIF_SYSCALL_RESTARTSYS and ARM_pc to restart_addr
-4. Linux returns to the SVC instruction (restart_addr) in user space
-   but, before SVC is re-executed, it gets an interrupt
-5. When returning from interrupt, a signal is to be delivered.
-   do_signal() does not clear TIF_SYSCALL_RESTARTSYS since it is
-   returning from interrupt
-6. Signal handler calls sigreturn() but the syscall number gets
-   overridden by syscall_trace() since TIF_SYSCALL_RESTARTSYS is set
+>> +#ifdef CONFIG_OF
+>
+> Isn't CONFIG_OF always enabled?
 
-The solution I see is to do the restarting within the kernel without
-returning to user and risk getting another signal (I think Russell
-mentioned this in the past).
+Not always necessarily. You can boot mx23/mx28 via non-DT kernel.
 
-Are my assumptions above correct or did I miss anything?
-
-Thanks.
-
--- 
-Catalin
+The serial imx driver also does the same thing about this.
