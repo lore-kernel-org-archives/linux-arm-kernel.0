@@ -1,33 +1,43 @@
 From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 15 Jun 2012 10:50:10 +0000
-Subject: [PATCH v5 10/14] ARM: OMAP2+: gpmc: waitpin helper
-In-Reply-To: <4FDA5252.2050401@ti.com>
+Date: Fri, 15 Jun 2012 10:56:00 +0000
+Subject: [PATCH v5 00/14] GPMC driver conversion
+In-Reply-To: <20120613123305.GS12766@atomide.com>
 References: <cover.1339419492.git.afzal@ti.com>
- <bba49a35f81f33fbdfeda78a71cbe4aa3417d6a2.1339419492.git.afzal@ti.com>
- <4FD6783D.9030208@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997F7C@DBDE01.ent.ti.com>
- <4FD78748.2080504@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998955@DBDE01.ent.ti.com>
- <4FD8B55E.6010701@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9996FC@DBDE01.ent.ti.com>
- <4FDA5252.2050401@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99A569@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998065@DBDE01.ent.ti.com>
+ <20120613123305.GS12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99A59D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hi Tony,
 
-On Fri, Jun 15, 2012 at 02:36:26, Hunter, Jon wrote:
-> On 06/14/2012 03:48 AM, Mohammed, Afzal wrote:
+On Wed, Jun 13, 2012 at 18:03:05, Tony Lindgren wrote:
 
-> > What I meant is we are not dependent on absolute value of flag to
-> > find waitpin, and I disagree in depending on its absolute value,
-> > which can change, while flag would be the same.
+> Cool, yeah looks like the old interface almost works. I had to undo the
+> new additions for tusb6010 DMA to work as below. Then Jon has some good
+> comments. I also made few comments to the GPMC using driver changes.
+
+Thanks and sorry for the trouble it caused you
+
+I will post next version based on the comments
+
+> In general, please keep in mind that eventually we want this to be
+> a regular device driver that also works as a loadable module.
+
+Yes, that is my intention, at the end of driver conversion, it should
+be able to work as a module.
+
 > 
-> As long as we can avoid having multiple #defines for the same thing, I
-> don't mind how it is done.
+> And we need the device tree bindings for GPMC so we can start dropping
+> board-*.c files as the GPMC seems to be last remaining blocker for
+> making rarely used legacy boards DT only. So it might be worth
+> playing with that so we don't again have to redo some parts.
 
-I feel such a dependency is fragile
+We would prefer to do it one step at a time, have driver conversion changes
+first in, and then work on DT migration. Once these changes are in we have a
+base to work on for further DT migration.
+
+Please let me know your opinion
 
 Regards
 Afzal
