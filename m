@@ -1,224 +1,121 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Jun 2012 14:18:58 +0100
-Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120615130544.GA28537@bnru02>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD8BAD2.50703@linaro.org>
- <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
- <4FDAFA17.6050502@linaro.org>
- <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
- <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
- <20120615130544.GA28537@bnru02>
-Message-ID: <4FDB3642.5030804@linaro.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 15 Jun 2012 15:28:28 +0200
+Subject: [PATCHv2 02/12] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <alpine.DEB.2.00.1206141706420.25628@utopia.booyaka.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004555.20034.87035.stgit@dusk> <4FDA15AA.6090704@ti.com>
+ <alpine.DEB.2.00.1206141136080.30212@utopia.booyaka.com>
+ <4FDA45F5.9090300@ti.com>
+ <alpine.DEB.2.00.1206141706420.25628@utopia.booyaka.com>
+Message-ID: <4FDB387C.7030003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/12 14:05, Srinidhi Kasagar wrote:
-> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
->> On 15/06/12 12:50, Srinidhi Kasagar wrote:
->>> [...]
+Hi Paul,
+
+On 6/15/2012 2:18 AM, Paul Walmsley wrote:
+> On Thu, 14 Jun 2012, Cousson, Benoit wrote:
+>
+>> On 6/14/2012 8:04 PM, Paul Walmsley wrote:
+>>> On Thu, 14 Jun 2012, Cousson, Benoit wrote:
+>
+> (attribution lost)
+>
+>>>>> Furthermore, the PRCM will never request target idle for this IP block
+>>>>> while the kernel is running, due to the sleep dependency that prevents
+>>>>> the WKUP clockdomain from idling while the CORE_L3 clockdomain is
+>>>>> active.  So we can safely leave the 32k sync timer in target-no-idle
+>>>>> mode, even while we continue to access it.
 >>>>
->>>>
->>>> From: Lee Jones<lee.jones@linaro.org>
->>>> Date: Tue, 17 Apr 2012 16:04:13 +0100
->>>> Subject: [PATCH 1/1] i2c: Add Device Tree support to the Nomadik I2C driver
->>>>
->>>> Here we apply the bindings required for successful Device Tree
->>>> probing of the i2c-nomadik driver. We also apply a fall-back
->>>> configuration in case either one is not provided, or a required
->>>> element is missing from the one supplied.
->>>>
->>>> Cc: linux-i2c at vger.kernel.org
->>>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->>>> ---
->>>>    drivers/i2c/busses/i2c-nomadik.c |   82 +++++++++++++++++++++++++++++++++++++-
->>>>    1 file changed, 80 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
->>>> index a92440d..58e8114 100644
->>>> --- a/drivers/i2c/busses/i2c-nomadik.c
->>>> +++ b/drivers/i2c/busses/i2c-nomadik.c
->>>> @@ -23,6 +23,7 @@
->>>>    #include<linux/io.h>
->>>>    #include<linux/regulator/consumer.h>
->>>>    #include<linux/pm_runtime.h>
->>>> +#include<linux/of.h>
->>>>
->>>>    #include<plat/i2c.h>
->>>>
->>>> @@ -899,15 +900,86 @@ static const struct i2c_algorithm nmk_i2c_algo = {
->>>>          .functionality  = nmk_i2c_functionality
->>>>    };
->>>>
->>>> +static struct nmk_i2c_controller u8500_i2c = {
->>>> +       /*
->>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
->>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
->>>> +        */
->>>> +       .slsu           = 0xe,
->>>> +       .tft            = 1,      /* Tx FIFO threshold */
->>>> +       .rft            = 8,      /* Rx FIFO threshold */
->>>> +       .clk_freq       = 100000, /* std. mode operation */
->>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
->>>> +       .sm             = I2C_FREQ_MODE_FAST,
+>>>> Do you mean force-idle? Because accessing a module in no-idle is always
+>>>> possible.
 >>>
->>> How is this possible? you are setting clk_freq as 100kb/s and mode
->>> as fast mode which is supposed to be 400kb/s.
+>>> Thanks, that's indeed a description bug.
 >>
->> That's not how I read it:
+>> I'm not sure to follow you? My point was it should be: "So we can safely leave
+>> the 32k sync timer in force-idle mode, even while we continue to access it."
+>> This is what the WA is doing.
 >
-> But it is not readable. It confuses people.
+> I am expressing appreciation to you for pointing out something incorrect
+> in the patch description, which has been fixed in the current version of
+> the patch.
 
-I understood it. :)
+OK, thanks for the clarification, I was confused by the sentence :-(.
 
-If you think it's unclear speak to the author, Linus. He's CC'ed.
+>>> SIDLE_NO is the option that makes more sense to me.>>>
+>>> Consider an IP block with SIDLE_NO and SIDLE_FORCE but without
+>>> SIDLE_SMART.  When an initiator will access it, the default setting should
+>>> be SIDLE_NO, for the reason that you identified above: "because accessing
+>>> a module in no-idle is always possible."  On the other hand, we don't know
+>>> when it's safe to access a module in SIDLE_FORCE unless we have additional
+>>> information as to how the IP block handles the SIdleReq signal internally,
+>>> and the characteristics of the clock domain in which it's integrated.
+>
+> ...
+>
+>> This is the modulemode and clkdm static dependency / dynamic on OMAP3/4 that
+>> will guaranty that the OCP clock will be enabled upon any access to this
+>> L4_WKUP clock domain IPs. This has nothing to do with the SIDLE mode.
+>
+> I want to implement a behavior that does not implicitly assume that an IP
+> block without smart-idle will only exist inside clockdomains which are
+> guaranteed to be active when the kernel is running.  That might be true
+> for current WBU chips, but it seems unwise to make that assumption in
+> general.
 
->>> enum i2c_freq_mode {
->>>          I2C_FREQ_MODE_STANDARD,         /* up to 100 Kb/s */
->>>          I2C_FREQ_MODE_FAST,             /* up to 400 Kb/s */
->>>          I2C_FREQ_MODE_HIGH_SPEED,       /* up to 3.4 Mb/s */
->>>          I2C_FREQ_MODE_FAST_PLUS,        /* up to 1 Mb/s */
->>> };
+1- The fact that the IP does not support smart-idle does not change 
+anything regarding the clock domain behavior.
+2- So far the assumption is true for all the existing OMAP devices. 
+Let's not anticipate something that will potentially never ever happen.
+
+>>> It might be reasonable to remove the HWMOD_SWSUP_SIDLE flag from the 32k
+>>> counter and just test again for HWMOD_ALWAYS_FORCE_SIDLE in the module
+>>> disable.  I'll take a look at this.
 >>
->> The operative words here are "up to".
->
-> I know, then none of these modes does not make sense.
- >
->>>> +};
->>>> +
->>>> +static int __devinit
->>>> +nmk_i2c_of_probe(struct device_node *np, struct nmk_i2c_controller *pdata)
->>>> +{
->>>> +       of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
->>>> +       if (!pdata->clk_freq) {
->>>> +               pr_warn("%s: Clock frequency not found\n", np->full_name);
->>>> +               return -EINVAL;
->>>> +       }
->>>> +
->>>> +       of_property_read_u32(np, "stericsson,slsu", (u32*)&pdata->slsu);
->>>> +       if (!pdata->slsu) {
->>>> +               pr_warn("%s: Data line delay not found\n", np->full_name);
->>>> +               return -EINVAL;
->>>> +       }
->>>> +
->>>> +       of_property_read_u32(np, "stericsson,tft", (u32*)&pdata->tft);
->>>> +       if (!pdata->tft) {
->>>> +               pr_warn("%s: Tx FIFO threshold not found\n", np->full_name);
->>>> +               return -EINVAL;
->>>> +       }
->>>> +
->>>> +       of_property_read_u32(np, "stericsson,rft", (u32*)&pdata->rft);
->>>> +       if (!pdata->rft) {
->>>> +               pr_warn("%s: Rx FIFO threshold not found\n", np->full_name);
->>>> +               return -EINVAL;
->>>> +       }
->>>> +
->>>> +       of_property_read_u32(np, "stericsson,timeout", (u32*)&pdata->timeout);
->>>> +       if (!pdata->timeout) {
->>>> +               pr_warn("%s: Timeout not found\n", np->full_name);
->>>> +               return -EINVAL;
->>>> +       }
->>>> +
->>>> +       if (of_get_property(np, "stericsson,i2c_freq_mode_fast", NULL))
->>>> +               pdata->sm = I2C_FREQ_MODE_FAST;
->>>> +       else
->>>> +               pdata->sm = I2C_FREQ_MODE_STANDARD;
->>>
->>> The controller has more modes like fast mode plus and high speed mode. You can't make
->>> assumptions like this.
+>> Both should be removed as explained before. There is clearly no need for
+>> HWMOD_ALWAYS_FORCE_SIDLE.
 >>
->> These are currently unsupported. Read the comments in the file:
->
-> I wrote this code, I remember these comments very well :)
-
-Yes, I saw. I thought that perhaps you'd forgotten. ;)
-
->>> 	/*
->>> 	 * set the speed mode. Currently we support
->>> 	 * only standard and fast mode of operation
->>> 	 * TODO - support for fast mode plus (up to 1Mb/s)
->>> 	 * and high speed (up to 3.4 Mb/s)
->>> 	 */
+>> We are already explicitly listing the limitation through the idlemodes
+>> attribute. Only SIDLE_FORCE and SIDLE_NO are supported, so we already
+>> know that SIDLE_FORCE is the proper way to fix that limitation for the
+>> current OMAPs. Since there is no other IP with such limitation, we know
+>> as well that there will be no side effect. If, in the future, some more
+>> IPs will have that limitation and will not work as expected, it will
+>> mean that some other HW bugs will be there, and only these ones will
+>> have to be flagged.
 >>
->> I can add a similar comment here if it make you feel better?
+>> But my point is let's keep it simple and not try to anticipate future
+>> bugs. This flag is not require today, let's not add it.
 >
-> Please.
-
-No problem.
-
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +
->>>>    static int __devinit nmk_i2c_probe(struct platform_device *pdev)
->>>>    {
->>>>          int ret = 0;
->>>>          struct resource *res;
->>>> -       struct nmk_i2c_controller *pdata =
->>>> -                       pdev->dev.platform_data;
->>>> +       struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
->>>> +       struct device_node *np = pdev->dev.of_node;
->>>>          struct nmk_i2c_dev      *dev;
->>>>          struct i2c_adapter *adap;
->>>>
->>>> +       if (np) {
->>>> +               if (!pdata) {
->>>> +                       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
->>>> +                       if (!pdata) {
->>>> +                               ret = -ENOMEM;
->>>> +                               goto err_no_mem;
->>>> +                       }
->>>> +               }
->>>> +               ret = nmk_i2c_of_probe(np, pdata);
->>>> +               if (ret)
->>>> +                       kfree(pdata);
->>>> +       }
->>>> +
->>>> +       if (!pdata)
->>>> +               /* No i2c configuration found, using the default. */
->>>> +               pdata =&u8500_i2c;
->>>
->>> There are redundant fallback configurations exists in the driver. You might need to remove
->>> those, if you want to fallback here.
->>
->> I only see a fall-back for clk_freq. Are there others?
+> Which of these two behaviors do you feel is more "future-proof," in
+> general:
 >
-> No, I can see that it only exists in setup_i2c_controller(). Please fix.
+> 1. Implementing a target idle policy that could break if a hardware
+>     designer were to skip adding a target smart-idle mode to a module in
+>     a clockdomain that might go idle while the kernel was active?
 
-I can remove it, no problem.
+That's not fully accurate. Even with smart-idle implemented in this 
+module, it will still go to idle automatically without any clock domain 
+dependency properly handled.
 
->>>> +
->>>>          dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
->>>>          if (!dev) {
->>>>                  dev_err(&pdev->dev, "cannot allocate memory\n");
->>>> @@ -1038,11 +1110,17 @@ static int __devexit nmk_i2c_remove(struct platform_device *pdev)
->>>>          return 0;
->>>>    }
->>>>
->>>> +static const struct of_device_id nmk_gpio_match[] = {
->>>> +       { .compatible = "st,nomadik-i2c", },
->>>> +       {},
->>>> +};
->>>> +
->>>>    static struct platform_driver nmk_i2c_driver = {
->>>>          .driver = {
->>>>                  .owner = THIS_MODULE,
->>>>                  .name = DRIVER_NAME,
->>>>                  .pm =&nmk_i2c_pm,
->>>> +               .of_match_table = nmk_gpio_match,
->>>>          },
->>>>          .probe = nmk_i2c_probe,
->>>>          .remove = __devexit_p(nmk_i2c_remove),
->>>> --
->>>> 1.7.9.5
->>>>
+The goal of this fix is to adapt the SIDLE management for such module, 
+it will not solve the overall idle management that is anyway handled at 
+clock domain level whatever the SIDLE implementation.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 2. Implementing a target idle policy that is guaranteed to allow
+>     initiator accesses to succeed by definition?
+
+It will not, as explained before. This is the clock domain settings that 
+will make the whole thing working properly.
+
+> considering that the implementation cost of either approach is identical?
+
+My point is simple, we should not add any new custom flag when all the 
+information to detect such exception are already there in the current 
+data and represent accurately what the HW is doing.
+
+So far every IPs that do not support SIDLE_SMART can/should use 
+SIDLE_FORCE instead.
+
+Regards,
+Benoit
