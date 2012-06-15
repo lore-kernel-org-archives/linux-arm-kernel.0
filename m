@@ -1,53 +1,43 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Fri, 15 Jun 2012 13:23:36 +0800
-Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
-In-Reply-To: <20120614184356.GC30185@sirena.org.uk>
-References: <1339578251-15009-1-git-send-email-zhouqiao@marvell.com>
- <1339578251-15009-2-git-send-email-zhouqiao@marvell.com>
- <201206141227.48867.arnd@arndb.de> <20120614184356.GC30185@sirena.org.uk>
-Message-ID: <4FDAC6D8.6070202@marvell.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 15 Jun 2012 05:42:46 +0000
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <20120614165337.GO12766@atomide.com>
+References: <20120613113217.GK12766@atomide.com>
+ <20120613115445.GM12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
+ <20120614101901.GI12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
+ <20120614115207.GL12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999AA4@DBDE01.ent.ti.com>
+ <20120614122930.GM12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999C13@DBDE01.ent.ti.com>
+ <20120614165337.GO12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99A28B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2012 02:43 AM, Mark Brown wrote:
-> On Thu, Jun 14, 2012 at 12:27:48PM +0000, Arnd Bergmann wrote:
->> On Wednesday 13 June 2012, Qiao Zhou wrote:
->
->>> +static struct mfd_cell onkey_devs[] = {
->>> +	{
->>> +	 .name = "88pm80x-onkey",
->>> +	 .num_resources = 1,
->>> +	 .resources =&onkey_resources[0],
->>> +	 .id = -1,
->>> +	 },
->>> +};
->
->> I wonder if it really makes sense to use the mfd_cell abstraction here, when each
->> array only contains a single device. Why not just use
->> platform_device_register_simple()?
->
-> mfd_cell does some other stuff like let you pass in bases for the various
-> resource ranges when you register which looks to be being used here.
->
->>> +static irqreturn_t pm805_irq(int irq, void *data)
->>> +{
->>> +	struct pm80x_chip *chip = data;
->>> +	struct pm80x_subchip *pm805_chip = chip->pm805_chip;
->>> +	struct pm80x_irq_data *irq_data;
->>> +	struct i2c_client *i2c;
->>> +	int i, read_reg = -1, value = 0;
->
->> The functions for pm800 and pm805 look almost identical. Have you tried
->> consolidating them so you can use the same irqchip and code with different
->> init data structures?
->
-> Since you use regmap perhaps you can use regmap_irq and just convert
-> them into data?
-Mark,
+Hi Tony,
 
-thanks for your suggestion, and would update accordingly.
+On Thu, Jun 14, 2012 at 22:23:37, Tony Lindgren wrote:
+ 
+> Sounds like the tusb6010 non-ns tick value is the only remaining
+> issue.
 
--- 
+t.clk_activation = gpmc_ticks_to_ns(1);
 
-Best Regards
-Qiao
+was used so that gpmc_cs_set_timings would do gpmc_ns_to_ticks over
+it & hence effectively 1 tick would get programmed in the register
+for clock activation.
+
+A value of 1 for clk_activation also should work due to rounding
+effect.
+
+But I am unable to find reason for failure upon using
+gpmc_ticks_to_ns(1), which seems to me right thing to be used.
+Let me try to invoke tusb6010 functions in beagle board,
+observe timings so that at least I will get an idea
+what is going on here (even though it is guaranteed to crash)
+
+Regards
+Afzal
