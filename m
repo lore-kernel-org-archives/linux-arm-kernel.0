@@ -1,30 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Jun 2012 05:51:02 -0700
-Subject: [PATCH v5 00/14] GPMC driver conversion
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99A59D@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998065@DBDE01.ent.ti.com>
- <20120613123305.GS12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99A59D@DBDE01.ent.ti.com>
-Message-ID: <20120615125102.GT12766@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 15 Jun 2012 14:53:41 +0200
+Subject: Converting kirkwood-goflexnet to DTS
+In-Reply-To: <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
+References: <20120614141706.GA6676@lunn.ch>
+ <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+ <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
+ <20120615104140.24bf25f3@skate>
+ <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
+Message-ID: <20120615145341.1b40f84a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120615 04:00]:
-> 
-> On Wed, Jun 13, 2012 at 18:03:05, Tony Lindgren wrote:
-> > 
-> > And we need the device tree bindings for GPMC so we can start dropping
-> > board-*.c files as the GPMC seems to be last remaining blocker for
-> > making rarely used legacy boards DT only. So it might be worth
-> > playing with that so we don't again have to redo some parts.
-> 
-> We would prefer to do it one step at a time, have driver conversion changes
-> first in, and then work on DT migration. Once these changes are in we have a
-> base to work on for further DT migration.
-> 
-> Please let me know your opinion
+Josh,
 
-Sounds good to me.
+Le Fri, 15 Jun 2012 08:40:48 -0400,
+Josh Coombs <josh.coombs@gmail.com> a ?crit :
 
-Tony
+> You were both correct.  After one additional test failure last night
+> and a lot more reading I reached the same conclusion, I was foolishly
+> thinking .dtbs would be automatically appended to the kernel when
+> configured to support that method of including them.
+
+Yeah, but the DTB append feature is only a development/debugging
+feature provided to allow DT-related development with non-DT capable
+bootloaders. However, my understanding is that it is assumed that
+people should ultimately use DT-capable bootloaders.
+
+> That resulted in: http://pastie.org/4092019
+> 
+> Boots, with some serious errors, doesn't seem to mount a FS and stops.
+>  Reducing my kernel arguments down to "console=ttyS0,115200
+> earlyprintk rootfs=/dev/sda1 rootdelay=10" I see the same errors, but
+> I also show the key hardware involved being detected, and the nand
+> partitioning looks correct.  My status LED goes solid green, so it
+> appears something is working right.  I'll dig into goflexnet_init next
+> to try and determine what is wrong in there.
+
+Haven't looked at the details, but aren't certain devices registered
+multiple times?
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
