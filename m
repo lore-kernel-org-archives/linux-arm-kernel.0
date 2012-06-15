@@ -1,31 +1,119 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 15 Jun 2012 23:34:07 +0800
-Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <201206131800.38622.marex@denx.de>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <4FD8AD42.6010702@gmail.com>
- <20120613152841.GA23590@richard-laptop>
- <201206131800.38622.marex@denx.de>
-Message-ID: <20120615153404.GM31565@S2101-09.ap.freescale.net>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 15 Jun 2012 12:35:56 -0300
+Subject: [PATCH v3 1/2] ARM: dts: mx28evk: Add auart0 and auart3 support
+Message-ID: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 06:00:38PM +0200, Marek Vasut wrote:
-> Write a driver that does the GPIO setup in some generic way? Wasn't there 
-> something about this stuff going on? Shawn, you had some comments /wrt the M28 
-> DTS. This might be what you meant?
-> 
-No.  What Richard is looking for is a way to set/clear gpio, while
-what I was commenting on M28 DTS is the way to configure a pin into
-gpio mode.  In this series, Richard chose to use "hog" feature to
-configure the pin into gpio mode, which means defining a pinctrl state
-for pin controller node itself, then at pinctrl subsystem init time,
-pinctrl core will configure these "hog" pins properly.
+Add auart0 and auart3 support.
 
-The "hog" method makes some sense for Richard's case, where the pin
-has no clear device/driver owner, and when gpio_request call can not
-configure the requested pin into gpio mode automatically yet.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Fix compatible property
+Changes since v1:
+- Merged patches 1 and 2 from v1 into this one
+ arch/arm/boot/dts/imx28-evk.dts |   12 ++++++++++++
+ arch/arm/boot/dts/imx28.dtsi    |   26 ++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index ee520a5..4353f48 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -73,6 +73,18 @@
+ 				pinctrl-0 = <&duart_pins_a>;
+ 				status = "okay";
+ 			};
++
++			auart0: serial at 8006a000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart0_pins_a>;
++				status = "okay";
++			};
++
++			auart3: serial at 80070000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart3_pins_a>;
++				status = "okay";
++			};
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 4634cb8..f26e0d6 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -22,6 +22,11 @@
+ 		gpio4 = &gpio4;
+ 		saif0 = &saif0;
+ 		saif1 = &saif1;
++		serial0 = &auart0;
++		serial1 = &auart1;
++		serial2 = &auart2;
++		serial3 = &auart3;
++		serial4 = &auart4;
+ 	};
+ 
+ 	cpus {
+@@ -167,6 +172,22 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				auart0_pins_a: auart0 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <0x3000 0x3010 0x3020 0x3030>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				auart3_pins_a: auart3 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <0x30c0 0x30d0 0x30e0 0x30f0>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 				mac0_pins_a: mac0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <0x4000 0x4010 0x4020
+@@ -404,30 +425,35 @@
+ 			};
+ 
+ 			auart0: serial@8006a000 {
++				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+ 				reg = <0x8006a000 0x2000>;
+ 				interrupts = <112 70 71>;
+ 				status = "disabled";
+ 			};
+ 
+ 			auart1: serial at 8006c000 {
++				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+ 				reg = <0x8006c000 0x2000>;
+ 				interrupts = <113 72 73>;
+ 				status = "disabled";
+ 			};
+ 
+ 			auart2: serial at 8006e000 {
++				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+ 				reg = <0x8006e000 0x2000>;
+ 				interrupts = <114 74 75>;
+ 				status = "disabled";
+ 			};
+ 
+ 			auart3: serial at 80070000 {
++				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+ 				reg = <0x80070000 0x2000>;
+ 				interrupts = <115 76 77>;
+ 				status = "disabled";
+ 			};
+ 
+ 			auart4: serial at 80072000 {
++				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+ 				reg = <0x80072000 0x2000>;
+ 				interrupts = <116 78 79>;
+ 				status = "disabled";
 -- 
-Regards,
-Shawn
+1.7.1
