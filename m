@@ -1,27 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 15 Jun 2012 13:54:18 +0200
-Subject: [PATCH v3 1/9] clocksource: time-armada-370-xp: Marvell Armada
- 370/XP SoC timer driver
-In-Reply-To: <4FDB1EC5.8090602@free-electrons.com>
-References: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
- <1339746250-26650-2-git-send-email-gregory.clement@free-electrons.com>
- <20120615104547.GK26034@lunn.ch>
- <4FDB1EC5.8090602@free-electrons.com>
-Message-ID: <20120615115418.GM26034@lunn.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Jun 2012 12:56:41 +0100
+Subject: ARM syscall restarting with TIF_SYSCALL_RESTARTSYS
+Message-ID: <20120615115641.GA11507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> About calling it orion, it should be mvebu I think.
+Hi Al,
 
-I guess that's another discussion. All current device drivers, except
-Ethernet and I2C are called orion. Orion currently means anything
-shared by orion5x, kirkwood, dove, mv78xx0. It seems unlikely we are
-going to rename all the device drivers. So calling it mvebu will just
-add to the confusion, not reduce the confusion. I personally would
-say, anything inside mach-mvebu which is shared by multiple SoCs, can
-be prefixed mvebu_. However, anything outside mach-mvebu should remain
-orion_.
+With the recent changes the syscall restarting on ARM is done via the
+TIF_SYSCALL_RESTARTSYS flag which causes the override of the syscall
+number in syscall_trace(). I think there is a scenario where this could
+fail:
 
-But that is just my opinion....
+1. app does a syscall
+2. syscall interrupted and returns -ERESTART_RESTARTBLOCK. There is no
+   signal to deliver
+3. do_signal() sets TIF_SYSCALL_RESTARTSYS and ARM_pc to restart_addr
+4. Linux returns to the SVC instruction (restart_addr) in user space
+   but, before SVC is re-executed, it gets an interrupt
+5. When returning from interrupt, a signal is to be delivered.
+   do_signal() does not clear TIF_SYSCALL_RESTARTSYS since it is
+   returning from interrupt
+6. Signal handler calls sigreturn() but the syscall number gets
+   overridden by syscall_trace() since TIF_SYSCALL_RESTARTSYS is set
 
-    Andrew
+The solution I see is to do the restarting within the kernel without
+returning to user and risk getting another signal (I think Russell
+mentioned this in the past).
+
+Are my assumptions above correct or did I miss anything?
+
+Thanks.
+
+-- 
+Catalin
