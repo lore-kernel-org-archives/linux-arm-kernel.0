@@ -1,63 +1,36 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 15 Jun 2012 15:33:17 +0530
-Subject: [PATCH] kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
-In-Reply-To: <1339571937.2759.13.camel@computer2.home>
-References: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
- <1339571937.2759.13.camel@computer2.home>
-Message-ID: <CAH+eYFDhXCJRrgX+KTX0bPU89DyGfmb+bD8Cvm-3_iyCuk_==w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 15 Jun 2012 12:07:34 +0200
+Subject: [PATCH v3 3/9] arm: mach-mvebu: add source files
+In-Reply-To: <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
+ <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20120615100734.GJ26034@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 12:48 PM, Tixy <tixy@yxit.co.uk> wrote:
-> I agree with this analysis. However, it is possible to have a kernel
-> built to support both ARM v6 and v7 (e.g OMAP2+) in which case
-> __LINUX_ARM_ARCH__ == 6 will be true but the code could be running on v7
-> hardware. Therefore a compile time check for ARM architecture isn't
-> sufficient to fix the problem.
+> +/* System controller registers */
+> +#define MVEBU_RSTOUTN_MASK_OFFSET	  0x60
+> +#define   MVEBU_RSTOUTN_MASK_RESET_OUT_EN  0x1
+> +#define MVEBU_SYSTEM_SOFT_RESET_OFFSET	  0x64
+> +#define   MVEBU_SYSTEM_SOFT_RESET          0x1
 
-How about the following check instead?  At least one other place uses
-it.
+$ grep -hr "#define RSTOUTn "*
+#define RSTOUTn_MASK            (BRIDGE_VIRT_BASE | 0x0108)
+#define RSTOUTn_MASK            (ORION5X_BRIDGE_VIRT_BASE | 0x108)
+#define RSTOUTn_MASK            (BRIDGE_VIRT_BASE | 0x0108)
+#define RSTOUTn_MASK            (BRIDGE_VIRT_BASE | 0x0108)
 
-8<---
->From f1e1794c0c12e39e99d4169c934fd43feb889d7b Mon Sep 17 00:00:00 2001
-From: Rabin Vincent <rabin.vincent@stericsson.com>
-Date: Mon, 11 Jun 2012 16:55:37 +0530
-Subject: [PATCH] ARM: kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
+$ grep -rh "#define SYSTEM_SOFT_RESET" *
+#define SYSTEM_SOFT_RESET       (BRIDGE_VIRT_BASE | 0x010c)
+#define SYSTEM_SOFT_RESET       (BRIDGE_VIRT_BASE | 0x010c)
+#define SYSTEM_SOFT_RESET       (BRIDGE_VIRT_BASE | 0x010c)
+/* Orion5x also puts it at 0x10c, but has a different name! */
 
-'sub pc, pc, #1b-2b+8-2' results in address<1:0> == '10'.
+So, it looks like the Marvell ASIC engineers moved it for the latest
+SoCs. Could you add a child property of marvell,system-controller
+which indicates where within the system controller the reset
+subcontroller is? Since the two registers are always next to each
+other, we just need one address.
 
-sub pc, pc, #const (== ADR pc, #const) performs an interworking branch
-(BXWritePC()) on ARMv7+ and a simple branch (BranchWritePC()) on earlier
-versions.
-
-In ARM state, BXWritePC() is UNPREDICTABLE when address<1:0> == '10'.
-
-In ARM state on ARMv6+, BranchWritePC() ignores address<1:0>.  Before
-ARMv6, BranchWritePC() is UNPREDICTABLE if address<1:0> != '00'
-
-So the instruction is UNPREDICTABLE both before and after v6.
-
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/kernel/kprobes-test-arm.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-test-arm.c
-b/arch/arm/kernel/kprobes-test-arm.c
-index ba32b39..38c1a3b 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -187,8 +187,8 @@ void kprobe_arm_test_cases(void)
- 	TEST_BF_R ("mov	pc, r",0,2f,"")
- 	TEST_BF_RR("mov	pc, r",0,2f,", asl r",1,0,"")
- 	TEST_BB(   "sub	pc, pc, #1b-2b+8")
--#if __LINUX_ARM_ARCH__ >= 6
--	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before ARMv6 */
-+#if __LINUX_ARM_ARCH__ == 6 && !defined(CONFIG_CPU_V7)
-+	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before and
-after ARMv6 */
- #endif
- 	TEST_BB_R( "sub	pc, pc, r",14, 1f-2f+8,"")
- 	TEST_BB_R( "rsb	pc, r",14,1f-2f+8,", pc")
--- 
-1.7.9.5
+Thanks
+	Andrew
