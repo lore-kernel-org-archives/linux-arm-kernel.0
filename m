@@ -1,181 +1,166 @@
 From: gregory.clement@free-electrons.com (Gregory Clement)
-Date: Fri, 15 Jun 2012 09:44:01 +0200
-Subject: [PATCH v3] arm: Add basic support for new Marvell Armada 370 and
- Armada XP SoC
-Message-ID: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 15 Jun 2012 09:44:04 +0200
+Subject: [PATCH v3 3/9] arm: mach-mvebu: add source files
+In-Reply-To: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-You'll find in this patch set the third version of the initial support
-for a new family of ARMv7-compatible Marvell SoCs.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+---
+ arch/arm/mach-mvebu/Kconfig             |    7 +++
+ arch/arm/mach-mvebu/Makefile            |    1 +
+ arch/arm/mach-mvebu/Makefile.boot       |    1 +
+ arch/arm/mach-mvebu/common.h            |   20 ++++++++
+ arch/arm/mach-mvebu/system-controller.c |   78 +++++++++++++++++++++++++++++++
+ 5 files changed, 107 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/Kconfig
+ create mode 100644 arch/arm/mach-mvebu/Makefile
+ create mode 100644 arch/arm/mach-mvebu/Makefile.boot
+ create mode 100644 arch/arm/mach-mvebu/common.h
+ create mode 100644 arch/arm/mach-mvebu/system-controller.c
 
-As for the previous release, both the Armada 370 and the Armada XP
-SoCs are supported in this directory, and we are able to build a
-single kernel image that boots on both SoCs. Both SoCs use the PJ4B
-processor, a Marvell-developed ARM core that implements the ARMv7
-instruction set. We are currently using Marvell evaluation boards for
-both of those SoCs, and the support for those boards is added in this
-patch set.
-
-We remained focused on a limited preliminary support which only
-includes the necessary code for timer and IRQ support, the serial
-controller is a standard 16550-compatible one. The diffstat looks
-like:
-
- Documentation/devicetree/bindings/arm/armada_370_xp-mpic.txt  |   23 +
- Documentation/devicetree/bindings/arm/armada_370_xp-timer.txt |   11 +
- Documentation/devicetree/bindings/arm/armada_370_xp.txt       |   24 +
- MAINTAINERS                                                   |    8 +
- arch/arm/Kconfig                                              |   15 +
- arch/arm/Makefile                                             |    1 +
- arch/arm/boot/dts/armada-370-db.dts                           |   42 ++
- arch/arm/boot/dts/armada-370-xp.dtsi                          |   68 +++
- arch/arm/boot/dts/armada-370.dtsi                             |   35 ++
- arch/arm/boot/dts/armada-xp-db.dts                            |   50 ++
- arch/arm/boot/dts/armada-xp.dtsi                              |   55 ++
- arch/arm/configs/mvebu_defconfig                              |   46 ++
- arch/arm/mach-mvebu/Kconfig                                   |   15 +
- arch/arm/mach-mvebu/Makefile                                  |    2 +
- arch/arm/mach-mvebu/Makefile.boot                             |    1 +
- arch/arm/mach-mvebu/armada-370-xp.c                           |   63 +++
- arch/arm/mach-mvebu/common.h                                  |   23 +
- arch/arm/mach-mvebu/include/mach/armada-370-xp.h              |   22 +
- arch/arm/mach-mvebu/include/mach/debug-macro.S                |   24 +
- arch/arm/mach-mvebu/include/mach/timex.h                      |   13 +
- arch/arm/mach-mvebu/include/mach/uncompress.h                 |   43 ++
- arch/arm/mach-mvebu/irq-armada-370-xp.c                       |  133 +++++
- arch/arm/mach-mvebu/system-controller.c                       |   78 +++
- drivers/clocksource/Kconfig                                   |    3 +
- drivers/clocksource/Makefile                                  |    3 +-
- drivers/clocksource/time-armada-370-xp.c                      |  242 +++++++++
- include/linux/time-armada-370-xp.h                            |   18 +
- 27 files changed, 1060 insertions(+), 1 deletion(-)
-
-This patch set, and the support for those SoCs, started as a collaborative
-effort from Marvell engineers (who have done the initial development work)
-and Free Electrons engineers (who are reshaping the code for mainline
-submission, adding device tree support, etc.). And for this new version we
-got contributions from Ben Dooks from Codethink.
-
-The patch set is based on your arm-soc/for-next branch (updated on Monday
-11th June).
-
-Changes between v2 and v3:
-
- * The timer support code has been moved to drivers/clocksource/ and
-   the necessary related changes have been made
-
- * There is now a minimal "system-controller" driver that gets
-   instantiated through DT entries. This driver allows to expose the
-   features made available through a set of miscellaneous registers
-   that do not belong to any specific device in the SoC. For the
-   moment, we only use it to implement the .restart() hook.
-
- * The defconfig has been changed to allow the support for up to four
-   8250-compatible serial ports, since Armada XP has four such
-   ports. The DTS file has been modified to enable those four ports,
-   and they have all been tested successfully on the Armada XP DB
-   development platform.
-
- * Moved the "arm: mach-mvebu: add compilation/configuration change"
-   patch towards the end of the patch set
-
- * Marked the "serial" device as "disabled" in the .dtsi file, and
-   enable the ones that are actually used in the board specific .dts
-   file.
-
- * Dropped the _dt suffix as the device tree support is implicit now.
-
- * Don't use anymore a MVEBU_REGS_PHYS_BASE define and reintroduce a
-   ARMADA_370_XP_REGS_PHYS_BASE define.
-
-Changes between v1 and v2:
-
- * Use the mach-mvebu directory as suggested on the mailing-list. So
-   far, this directory only contains the support for Armada 370/XP,
-   but the plan is that it should ultimately contain the support for
-   all other SoCs produced by the Marvell Engineering Business Unit.
-
- * Converted most the "armada" word by the "mvebu", but as some code
-   remains specific to the Armada 370 and Armada XP SOC, then created
-   also the aramada_370_xp suffix for this part. This suffix was
-   dedicated for the irq and timer part. It was also used for the
-   register related to the reset part. And of course it was also used
-   for the device tree part.
-
- * Merged axp-dt.c and a370-dt.c files in one single
-   armada_370_xp-dt.c file.
-
- * Deleted most of the mapping address in include/mach/armada.h and
-   split it in two headers file:
-
-  - mvebu.h which contains the virtual and physical mapping for the
-    internal registers of the mvebu SOC. This ones are mainly used for
-    the early print during boot.
-
-  - armada_370_xp which contains the registers offset and mask for
-    resetting the CPU.
-
- * Removed unused headers such as
-  - hardware.h by directly including accurate header when needed
-  - gpio.h by removing the dependencies to PLAT-ORION
-  - io.h no more needed for CPI
-  - irqs.h by using SPARSE_IRQ
-  - system.h no more needed for new SOC
-
- * Removed the PCI related code as it was not necessary for the
-  initial submission
-
- * Removed all the PLAT-ORION dependencies remaining
-
- * Ensured property reading checks for error when getting data from
-   device tree in the timer file. This was a patch from Ben Dooks with
-   the following comments:
-
-  "The call to of_property_read_u32() only checks for the value that
-   the clk variable is set to being non-zero, and not the return value
-   of the call itself.
-
-   This caused a system without the clock-frequency attribute to fail
-   to boot as it used a random value on the stack to setup the system
-   timers and thus cause an interrupt storm.
-
-   Also ensure clk is set to zero, to avoid warnings."
-
- * Converted irq controller code to use SPARSE_IRQ
-
- * Added the following bug fixes and improvements in irq.c from Ben
-   Dooks
-
-  - MPIC: BUG_ON() if the of_iomap() fails: Ensure that if either
-    resource is missing, we stop the kernel in a reasonably fatal way.
-
-  - MPIC: Move main register base to base of MPIC registers: The
-    current kernel driver had the MPIC base at the base of the block
-    containing the MPIC and not the MPIC itself. Change this value in
-    the driver and the .dtsi file
-
-    Also change the register size in the .dtsi to be the size of the
-    register range for the MIPC and not the block it is in.
-
-  - MPIC: Move per-cpu register base: The current kernel driver had
-    the MPIC per-cpu register base at the base of the per-cpu register
-    block and not at the base of the specific per-cpu interrupt
-    registers.
-
-    Move the driver and .dtsi to use the correct base and size.
-
-  - MPIC: number fetch should use irqd_to_hwirq(): The mask and unmask
-    routines are assuming that d->irq is a 1:1 mapping with the
-    interrupt hardware. Use the irqd_to_hwirq() call to map the
-    irq_data to the hardware irq number directly.
-
-  - MPIC: read number of interrupts from control register: Read the
-    number of MPIC interrupts from the controller and only register
-    that many.
-
-Best regards,
-
-Gregory Clement
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+new file mode 100644
+index 0000000..72d39e5
+--- /dev/null
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -0,0 +1,7 @@
++if ARCH_MVEBU
++
++menu "Marvell SOC with device tree"
++
++endmenu
++
++endif
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+new file mode 100644
+index 0000000..7366ae7
+--- /dev/null
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -0,0 +1 @@
++obj-y += system-controller.o
+diff --git a/arch/arm/mach-mvebu/Makefile.boot b/arch/arm/mach-mvebu/Makefile.boot
+new file mode 100644
+index 0000000..b327175
+--- /dev/null
++++ b/arch/arm/mach-mvebu/Makefile.boot
+@@ -0,0 +1 @@
++zreladdr-y := 0x00008000
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+new file mode 100644
+index 0000000..f0eaa21
+--- /dev/null
++++ b/arch/arm/mach-mvebu/common.h
+@@ -0,0 +1,20 @@
++/*
++ * Core functions for Marvell System On Chip
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ARCH_MVEBU_COMMON_H
++#define __ARCH_MVEBU_COMMON_H
++
++void mvebu_restart(char mode, const char *cmd);
++
++#endif
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+new file mode 100644
+index 0000000..bd6f28f
+--- /dev/null
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -0,0 +1,78 @@
++/*
++ * System controller support for Armada 370 and XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada 370 and Armada XP SoCs both have a range of
++ * miscellaneous registers, that do not belong to a particular device,
++ * but rather provide system-level features. This basic
++ * system-controller driver provides a device tree binding for those
++ * registers, and implements utility functions offering various
++ * features related to those registers.
++ *
++ * For now, the feature set is limited to restarting the platform by a
++ * soft-reset, but it might be extended in the future.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++
++static void __iomem *system_controller_base;
++
++/* System controller registers */
++#define MVEBU_RSTOUTN_MASK_OFFSET	  0x60
++#define   MVEBU_RSTOUTN_MASK_RESET_OUT_EN  0x1
++#define MVEBU_SYSTEM_SOFT_RESET_OFFSET	  0x64
++#define   MVEBU_SYSTEM_SOFT_RESET          0x1
++
++void mvebu_restart(char mode, const char *cmd)
++{
++	if (!system_controller_base) {
++		pr_warn("Cannot restart, system-controller not available\n");
++		return;
++	}
++
++	/*
++	* Enable soft reset to assert RSTOUTn.
++	*/
++	writel(MVEBU_RSTOUTN_MASK_RESET_OUT_EN, system_controller_base +
++	       MVEBU_RSTOUTN_MASK_OFFSET);
++	/*
++	* Assert soft reset.
++	*/
++	writel(MVEBU_SYSTEM_SOFT_RESET, system_controller_base +
++	       MVEBU_SYSTEM_SOFT_RESET_OFFSET);
++	while (1)
++		;
++}
++
++static int __init mvebu_system_controller_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "marvell,system-controller");
++	if (!np) {
++		pr_warn("No marvell,system-controller found\n");
++		return -ENODEV;
++	}
++
++	system_controller_base = of_iomap(np, 0);
++	if (!system_controller_base) {
++		pr_warn("Cannot remap system-controller\n");
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++arch_initcall(mvebu_system_controller_init);
+-- 
+1.7.9.5
