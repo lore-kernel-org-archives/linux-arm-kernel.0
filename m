@@ -1,33 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jun 2012 09:12:56 +0000
-Subject: [PATCH v3 3/9] arm: mach-mvebu: add source files
-In-Reply-To: <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 15 Jun 2012 11:14:07 +0200
+Subject: [PATCH v3 1/9] clocksource: time-armada-370-xp: Marvell Armada
+ 370/XP SoC timer driver
+In-Reply-To: <201206150909.41173.arnd@arndb.de>
 References: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
- <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201206150912.57190.arnd@arndb.de>
+ <1339746250-26650-2-git-send-email-gregory.clement@free-electrons.com>
+ <201206150909.41173.arnd@arndb.de>
+Message-ID: <4FDAFCDF.90602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 June 2012, Gregory Clement wrote:
-> +static int __init mvebu_system_controller_init(void)
-> +{
-> +       struct device_node *np;
-> +
-> +       np = of_find_compatible_node(NULL, NULL, "marvell,system-controller");
-> +       if (!np) {
-> +               pr_warn("No marvell,system-controller found\n");
-> +               return -ENODEV;
-> +       }
+On 06/15/2012 11:09 AM, Arnd Bergmann wrote:
+> On Friday 15 June 2012, Gregory Clement wrote:
+>> Timer 0 is used as free-running clocksource, while timer 1 is used as
+>> clock_event_device.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> 
+> Looks fine to me, but you forgot to Cc the clocksource maintainers.
+> This will need an Ack from John and/or Thomas.
 
-Much better than before, but there are now two problems:
+You're right! I planned to add them, but I used the wrong command line
+when I pushed the patches :(
 
-* You look for a generic "marvell,system-controller" node, which does not tell
-  you at all which kind it is. I'm sure that inside of Marvell there has been more
-  than one peripheral that can be described as a system controller, so please
-  be more specific here.
+> 
+> 	Arnd
 
-* You should not issue a warning if the device is not found. The initialization
-  comes from a platform independent arch_initcall, so in a future combined
-  kernel, it will be executed on all machines including non-Marvell ones.
 
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
++33 602 196 044
