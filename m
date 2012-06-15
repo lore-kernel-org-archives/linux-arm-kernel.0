@@ -1,26 +1,22 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 15 Jun 2012 20:22:08 +0800
-Subject: [PATCH 10/16] ARM: imx: add a legacy irqdomain for 3ds_debugboard
-In-Reply-To: <1339653587-4832-11-git-send-email-shawn.guo@linaro.org>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-11-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120615122207.GH8383@shlinux2.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 15 Jun 2012 20:33:43 +0800
+Subject: [PATCH v2 3/3] ARM: mxs_defconfig: Let AUART driver be built by
+ default
+In-Reply-To: <1339759950-5507-3-git-send-email-festevam@gmail.com>
+References: <1339759950-5507-1-git-send-email-festevam@gmail.com>
+ <1339759950-5507-3-git-send-email-festevam@gmail.com>
+Message-ID: <20120615123342.GJ31565@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 01:59:41PM +0800, Shawn Guo wrote:
-> Call irq_alloc_descs to get the irq_base for 3ds_debugboard, and add
-> a legacy irqdomain using the irq_base, so that the mapping between
-> 3ds_debugboard hardware irq and Linux irq number can be dynamically
-> handled by irqdomain.  As the result, the use of MXC_BOARD_IRQ_START
-> can be completely removed from 3ds_debugboard.c.
+On Fri, Jun 15, 2012 at 08:32:30AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/plat-mxc/3ds_debugboard.c |   42 +++++++++++++++++++++--------------
->  1 files changed, 25 insertions(+), 17 deletions(-)
+> Let AUART driver be built by default.
 > 
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Regards
-Dong Aisheng
+Applied, thanks.
+
+Regards,
+Shawn
