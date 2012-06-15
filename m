@@ -1,37 +1,56 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 15 Jun 2012 09:55:34 +0800
-Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
-In-Reply-To: <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
-References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
- <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
- <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
- <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
-Message-ID: <CACVXFVPPt10nEP+N=QnOoyQgNhgtdruUFC8wQUSf2itQLdJTZQ@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 15 Jun 2012 10:46:26 +0800
+Subject: [PATCH v4] usb: chipidea: permit driver bindings pass phy pointer
+In-Reply-To: <20120614154624.GF17140@kroah.com>
+References: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
+ <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
+ <20120612231438.GA6177@kroah.com>
+ <8762au8h46.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120614154624.GF17140@kroah.com>
+Message-ID: <20120615024625.GA26563@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 11:28 PM, T Krishnamoorthy, Balaji
->
-> Couldn't reproduce the issue with BeagleXM rev C, Might be a combination
-> of rev and SD card. How often do you see mis-match in file content?
+On Thu, Jun 14, 2012 at 08:46:24AM -0700, Greg KH wrote:
+> On Thu, Jun 14, 2012 at 10:52:57AM +0300, Alexander Shishkin wrote:
+> > Greg KH <gregkh@linuxfoundation.org> writes:
+> > 
+> > > On Fri, Jun 08, 2012 at 08:37:06PM +0800, Richard Zhao wrote:
+> > >> Sometimes, the driver bindings may know what phy they use.
+> > >> For example, when using device tree, the usb controller may have a
+> > >> phandler pointing to usb phy.
+> > >> 
+> > >> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > >> Reviewed-by: Marek Vasut <marex@denx.de>
+> > >> Acked-by: Felipe Balbi <balbi@ti.com>
+> > >> ---
+> > >> Changes since laster version:
+> > >> - hcd transceiver renamed to phy
+> > >
+> > > Ick, I see patches all over this thread, and other threads, and I have
+> > > no idea what to apply anywhere...
+> > >
+> > > So, consider all chipidea patches dropped from my queue now, can you
+> > > please resend them to me, with the accumulated acks and reviewed-by
+> > > line, so that I can queue them up?
+> > 
+> > So will you pick these patches to your tree or should I apply them to
+> > mine or what is the plan? I kind of have a tree [1] for chipidea stuff
+> > where I have been collecting patches, to send a pull request to you for
+> > 3.6.
+> 
+> I do not accept pull requests for this code, sorry, I need patches in
+> email.  You and Richard work it out how you are going to handle this and
+> then, send me patches that you both agree on.
+So, Alex, Could you send out patch you queued? And I'll send out v6
+patch series which depends on that. Is it ok for driver part?
 
-Every time after writing file on file system. After umount and mount again,
-the file will be found mismatch with original.
+For arm platform part, it may need further discussion.
 
->From TRM of OMAP3/OMAP4/DM37x, the below is mentioned about
-the Auto CMD12 Enable bit.
-
-         - SDIO does not support this feature.
-         - SD card only.
-
-So I am wondering if it is suitable to always enable the bit for
-multiple block transfer in host controller driver. You mean that
-only SD card is supported by OMAP3/4 and DM37x MMC?
-
-I am just confused with the above, even though it may be not
-related with the problem reported here.
-
-
-Thanks,
---
-Ming Lei
+Thanks
+Richard
+> 
+> thanks,
+> 
+> greg k-h
+> 
