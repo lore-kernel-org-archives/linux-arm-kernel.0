@@ -1,77 +1,274 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jun 2012 11:27:24 +0000
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <Pine.LNX.4.64.1206151107480.11729@axis700.grange>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206150900.50866.arnd@arndb.de>
- <Pine.LNX.4.64.1206151107480.11729@axis700.grange>
-Message-ID: <201206151127.24386.arnd@arndb.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Fri, 15 Jun 2012 13:28:30 +0200
+Subject: [PATCH 5/8] ARM: OMAP2+: PM: introduce power domains achievable
+ functional states
+In-Reply-To: <1339685591-11177-6-git-send-email-j-pihet@ti.com>
+References: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
+ <1339685591-11177-6-git-send-email-j-pihet@ti.com>
+Message-ID: <CAORVsuXbvkWHLm9mK3EgKSKFo400VoR6QSZbrS8hu1u8cV3e3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 June 2012, Guennadi Liakhovetski wrote:
-> > In the common case, you could have one device connected to the third
-> > slave ID of the first controller but the fifth slave ID of the
-> > second controller. In this case, you really have to specify each
-> > controller with its slave ID separately, even if that means a lot
-> > of duplicate data for shmobile.
-> 
-> So, you don't think it's worth making a short-cut possible to specify a 
-> DMAC type instead of each instance phandle? It really would mean __a lot__ 
-> of duplication - with 3 generic controllers on (some) current chips and 
-> possibly more on those, that I'm not aware about.
+Hi,
 
-It's certainly possible to make that short-cut, but I'm not convinced
-if it's worth it. One thing you can do is create a meta-device for
-all of the identical DMA controllers, and refer to that one from the
-devices, but make it a separate device node from the actual controllers,
-of which you can have more than one. This makes the binding for your
-dma controller more complex but reduces the amount of data required
-in the other device nodes.
+Here are some remarks I got after an internal review. I think those
+points need to be discussed with a broader audience.
 
-In case of sh7372, this could look something like
+On Thu, Jun 14, 2012 at 4:53 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Note: the patch is in RFC state because the state machine for setting
+> the next power domain states needs more discussion. Validated on OMAP3&4
+> with cpuidle and suspend/resume, though.
+>
+> Power domains have varied capabilities. When attempting a low power
+> state such as OFF/RET, a specific min requested state may not be
+> supported on the power domain. This is because a combination
+> of system power states where the parent PD's state is not in line
+> with expectation can result in system instabilities.
+>
+> This patch provides a function that returns the achievable functional
+> power state for a power domain and its use by omap_set_pwrdm_state.
+> The achievable power state is first looked for in the lower power
+> states in order to maximize the power savings, then if not found
+> in the higher power states.
+>
+> Inspired from Tero's work on OMAP4 device OFF support and generalized
+> to the functional power states.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> ---
+> ?arch/arm/mach-omap2/powerdomain.c | ?156 +++++++++++++++++++++++++++++++------
+> ?arch/arm/mach-omap2/powerdomain.h | ? ?1 +
+> ?2 files changed, 134 insertions(+), 23 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index ce2685a..f94174b 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -554,6 +554,108 @@ int pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
+> ? ? ? ?return ret;
+> ?}
+>
+> +/**
+> + * pwrdm_get_achievable_func_pwrst() - Provide achievable functional state
+> + * @pwrdm: struct powerdomain * to set
+> + * @func_pwrst: minimum functional state we would like to hit
+> + * (one of the PWRDM_FUNC_* macros)
+> + *
+> + * Power domains have varied capabilities. When attempting a low power
+> + * state such as OFF/RET, a specific min requested state may not be
+> + * supported on the power domain. This is because a combination
+> + * of system power states where the parent PD's state is not in line
+> + * with expectation can result in system instabilities.
+> + *
+> + * The achievable power state is first looked for in the lower power
+> + * states in order to maximize the power savings, then if not found
+> + * in the higher power states.
+> + *
+> + * Returns the achievable functional power state, or -EINVAL in case of
+> + * invalid parameters.
+> + */
+> +int pwrdm_get_achievable_func_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
+> +{
+> + ? ? ? int pwrst = pwrdm_func_to_pwrst(pwrdm, func_pwrst);
+> + ? ? ? int logic = pwrdm_func_to_logic_pwrst(pwrdm, func_pwrst);
+> + ? ? ? int new_func_pwrst, new_pwrst, new_logic;
+> + ? ? ? int found;
+> +
+> + ? ? ? if (!pwrdm || IS_ERR(pwrdm)) {
+> + ? ? ? ? ? ? ? pr_debug("%s: invalid params: pwrdm=%p, func_pwrst=%0x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ?__func__, pwrdm, func_pwrst);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? if ((pwrst < 0) || (logic < 0)) {
+> + ? ? ? ? ? ? ? pr_debug("%s: invalid params for pwrdm %s, func_pwrst=%0x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ?__func__, pwrdm->name, func_pwrst);
+> + ? ? ? ? ? ? ? return PWRDM_FUNC_PWRST_ON;
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Power state: if the requested state is not supported,
+> + ? ? ? ?* try the lower power states.
+> + ? ? ? ?*/
+> + ? ? ? found = 1;
+> + ? ? ? new_pwrst = pwrst;
+> + ? ? ? while (!(pwrdm->pwrsts & (1 << new_pwrst))) {
+> + ? ? ? ? ? ? ? if (new_pwrst == PWRDM_POWER_OFF) {
+> + ? ? ? ? ? ? ? ? ? ? ? found = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? new_pwrst--;
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* If no lower power state found, fallback to the higher
+> + ? ? ? ?* power states.
+> + ? ? ? ?* PWRDM_POWER_ON is always valid.
+> + ? ? ? ?*/
+> + ? ? ? if (!found) {
+> + ? ? ? ? ? ? ? new_pwrst = pwrst;
+> + ? ? ? ? ? ? ? while (!(pwrdm->pwrsts & (1 << new_pwrst))) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (new_pwrst == PWRDM_POWER_ON)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? new_pwrst++;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Logic RET state: if the requested state is not supported,
+> + ? ? ? ?* try the lower logic states.
+> + ? ? ? ?*/
+> + ? ? ? found = 1;
+> + ? ? ? new_logic = logic;
+> + ? ? ? while (!(pwrdm->pwrsts_logic_ret & (1 << new_logic))) {
+> + ? ? ? ? ? ? ? if (new_logic == PWRDM_LOGIC_MEM_PWRST_OFF) {
+> + ? ? ? ? ? ? ? ? ? ? ? found = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? new_logic--;
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* If no lower logic state found, fallback to the higher
+> + ? ? ? ?* logic states.
+> + ? ? ? ?* PWRDM_LOGIC_MEM_PWRST_RET is always valid.
+> + ? ? ? ?*/
+> + ? ? ? if (!found) {
+> + ? ? ? ? ? ? ? new_logic = logic;
+> + ? ? ? ? ? ? ? while (!(pwrdm->pwrsts_logic_ret & (1 << new_logic))) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (new_logic == PWRDM_LOGIC_MEM_PWRST_RET)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? new_logic++;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
 
-	dma: dmac-mux {
-		compatible = "renesas,sh-dma-mux";
-		#dma-cells = <4>; /* slave-id, addr, chcr, mid-rid */
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
+"
+1. The while loops need optimization. - This can definitely be
+simplified and made non-risky; this also needs some more error
+handling
+2. About the power domains state machine: you have only one power
+state to move in and out of: it is called ON. If you do ON->CSWR->ON
+etc. attempting to program ON->CSWR->OSWR is NOT supported in OMAP and
+is an invitation for production team to sit and debug for a while
+before finding the use of invalid power states
+"
 
-		dmae at 0xfe008020{
-			compatible = "renesas,sh-dma";
-			reg = <0xfe008020 0xfe00828f
-				0xfe009000 0xfe00900b>
-			interrupts = <0x20c0 0x2000 0x2020 0x2040 0x2060 0x2080 0x20a0>;
-		};
+Point 2 is a good point. The solution would be to implement a state
+machine in this function and/or omap_set_pwrdm_state, possibly using a
+platform specific handling function.
 
-		dmae at 0xfe018020{
-			compatible = "renesas,sh-dma";
-			reg = <0xfe018020 0xfe01828f
-				0xfe019000 0xfe01900b>
-			interrupts = <0x21c0 0x2100 0x2120 0x2140 0x2160 0x2180 0x21a0>;
-		};
+Any thought?
 
-		dmae at 0xfe028020{
-			compatible = "renesas,sh-dma";
-			reg = <0xfe028020 0xfe02828f
-				0xfe029000 0xfe02900b>
-			interrupts = <0x22c0 0x2200 0x2220 0x2240 0x2260 0x2280 0x22a0>;
-		};
-	};
+Regards,
+Jean
 
-This way, a slave would refer to the dmac-mux node and while
-the device driver binds to the child nodes.
-
-> > I'm not sure I understand what the "configuration register values"
-> > above are.
-> 
-> As I explained in an earlier mail, those include transfer size and other 
-> parameters, but cannot be completely calculated in device drivers, because 
-> they also vary between SoCs.
-
-Yes, but they can be part of the device tree source, because when writing
-that, you know both the requirements of the device and the capabilities
-of the controller.
-
-	Arnd
+> + ? ? ? new_func_pwrst = pwrdm_pwrst_to_func(pwrdm, new_pwrst, new_logic);
+> +
+> + ? ? ? pr_debug("%s(%s, func_pwrst=%0x) returns %0x\n", __func__,
+> + ? ? ? ? ? ? ? ?pwrdm->name, func_pwrst, new_func_pwrst);
+> +
+> + ? ? ? return new_func_pwrst;
+> +}
+> +
+> ?/* Types of sleep_switch used in omap_set_pwrdm_state */
+> ?#define FORCEWAKEUP_SWITCH ? ? 0
+> ?#define LOWPOWERSTATE_SWITCH ? 1
+> @@ -563,36 +665,32 @@ int pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
+> ?* @pwrdm: struct powerdomain * to set
+> ?* @func_pwrst: power domain functional state, one of the PWRDM_FUNC_* macros
+> ?*
+> - * This programs the pwrdm next functional state, sets the dependencies
+> - * and waits for the state to be applied.
+> + * This looks for the more suited (or achievable) next functional power
+> + * state, programs it, sets the dependencies and waits for the state to
+> + * be applied to the power domain.
+> ?*/
+> ?int omap_set_pwrdm_state(struct powerdomain *pwrdm,
+> ? ? ? ? ? ? ? ? ? ? ? ? enum pwrdm_func_state func_pwrst)
+> ?{
+> - ? ? ? u8 curr_pwrst, next_pwrst;
+> - ? ? ? int pwrst = pwrdm_func_to_pwrst(pwrdm, func_pwrst);
+> - ? ? ? int logic = pwrdm_func_to_logic_pwrst(pwrdm, func_pwrst);
+> ? ? ? ?int sleep_switch = -1, ret = 0, hwsup = 0;
+> + ? ? ? int new_func_pwrst, next_func_pwrst, pwrst, logic;
+> + ? ? ? u8 curr_pwrst;
+>
+> - ? ? ? if (!pwrdm || IS_ERR(pwrdm) || (pwrst < 0) || (logic < 0)) {
+> - ? ? ? ? ? ? ? pr_debug("%s: invalid params: pwrdm=%p, func_pwrst=%0x\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ?__func__, pwrdm, func_pwrst);
+> + ? ? ? if (!pwrdm || IS_ERR(pwrdm)) {
+> + ? ? ? ? ? ? ? pr_debug("%s: invalid params: pwrdm=%p\n", __func__, pwrdm);
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?}
+>
+> - ? ? ? pr_debug("%s: set func_pwrst %0x to pwrdm %s\n",
+> - ? ? ? ? ? ? ? ?__func__, func_pwrst, pwrdm->name);
+> + ? ? ? pr_debug("%s(%s, func_pwrst=%0x)\n", __func__, pwrdm->name, func_pwrst);
+>
+> ? ? ? ?mutex_lock(&pwrdm->lock);
+>
+> - ? ? ? while (!(pwrdm->pwrsts & (1 << pwrst))) {
+> - ? ? ? ? ? ? ? if (pwrst == PWRDM_POWER_OFF)
+> - ? ? ? ? ? ? ? ? ? ? ? goto out;
+> - ? ? ? ? ? ? ? pwrst--;
+> - ? ? ? }
+> + ? ? ? new_func_pwrst = pwrdm_get_achievable_func_pwrst(pwrdm, func_pwrst);
+> + ? ? ? pwrst = pwrdm_func_to_pwrst(pwrdm, new_func_pwrst);
+> + ? ? ? logic = pwrdm_func_to_logic_pwrst(pwrdm, new_func_pwrst);
+>
+> - ? ? ? next_pwrst = pwrdm_read_next_pwrst(pwrdm);
+> - ? ? ? if (next_pwrst == pwrst)
+> + ? ? ? next_func_pwrst = pwrdm_read_next_func_pwrst(pwrdm);
+> + ? ? ? if (new_func_pwrst == next_func_pwrst)
+> ? ? ? ? ? ? ? ?goto out;
+>
+> ? ? ? ?curr_pwrst = pwrdm_read_pwrst(pwrdm);
+> @@ -607,13 +705,25 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm,
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+> - ? ? ? if (logic != pwrdm_read_logic_retst(pwrdm))
+> - ? ? ? ? ? ? ? pwrdm_set_logic_retst(pwrdm, logic);
+> + ? ? ? pr_debug("%s: set func_pwrst %0x (%0x,%0x) to pwrdm %s\n",
+> + ? ? ? ? ? ? ? ?__func__, new_func_pwrst, pwrst, logic, pwrdm->name);
+> +
+> + ? ? ? /* Trace the pwrdm desired target state */
+> + ? ? ? trace_power_domain_target(pwrdm->name, new_func_pwrst,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? smp_processor_id());
+> +
+> + ? ? ? /* Program next power state */
+> + ? ? ? if (pwrst != pwrdm_func_to_pwrst(pwrdm, next_func_pwrst)) {
+> + ? ? ? ? ? ? ? ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
+> + ? ? ? ? ? ? ? if (ret)
+> + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: unable to set power state of powerdomain: %s\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, pwrdm->name);
+> + ? ? ? }
+>
+> - ? ? ? ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? pr_err("%s: unable to set power state of powerdomain: %s\n",
+> - ? ? ? ? ? ? ? ? ? ? ?__func__, pwrdm->name);
+> + ? ? ? /* Program RET logic state */
+> + ? ? ? if ((pwrst == PWRDM_POWER_RET) &&
+> + ? ? ? ? ? (logic != pwrdm_func_to_logic_pwrst(pwrdm, next_func_pwrst)))
+> + ? ? ? ? ? ? ? pwrdm_set_logic_retst(pwrdm, logic);
+>
+> ? ? ? ?switch (sleep_switch) {
+> ? ? ? ?case FORCEWAKEUP_SWITCH:
+> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+> index d08c25d..9dd68ab 100644
+> --- a/arch/arm/mach-omap2/powerdomain.h
+> +++ b/arch/arm/mach-omap2/powerdomain.h
+> @@ -247,6 +247,7 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
+> ?int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+> ?int omap2_pwrdm_func_to_logic_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+> ?int omap2_pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic);
+> +int pwrdm_get_achievable_func_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+>
+> ?int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
+> ?int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
+> --
+> 1.7.7.6
+>
