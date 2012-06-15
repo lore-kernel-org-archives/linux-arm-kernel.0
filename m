@@ -1,61 +1,87 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Fri, 15 Jun 2012 00:53:45 -0400
-Subject: Converting kirkwood-goflexnet to DTS
-In-Reply-To: <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
-References: <20120614141706.GA6676@lunn.ch>
- <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
-Message-ID: <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 15 Jun 2012 10:26:26 +0530
+Subject: [PATCH 04/29] ARM: omap: clk: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <20120614191147.GP19410@gmail.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-5-git-send-email-rnayak@ti.com>
+ <20120614191147.GP19410@gmail.com>
+Message-ID: <4FDAC07A.7020702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 6:16 PM, Josh Coombs <josh.coombs@gmail.com> wrote:
-> Finally some progress. ?Using the printk patch along with earlyprintk
-> and the config tweaks as suggested, my kernel at least now shows why
-> it's dying:
+On Friday 15 June 2012 12:41 AM, Mike Turquette wrote:
+> On 20120614-18:16, Rajendra Nayak wrote:
+>> As we move to Common clk framework use clk_prepare_enable()
+>> instead of clk_enable() and similarly clk_disable_unprepare()
+>> instead of clk_disable()
+>>
+>> Based on initial changes from Mike turquette.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
 >
-> --------------------------
-> ## Booting kernel from Legacy Image at 00800000 ...
-> ? Image Name: ? Linux-3.5.0-rc2-ARCH
-> ? Image Type: ? ARM Linux Kernel Image (uncompressed)
-> ? Data Size: ? ?3015272 Bytes = 2.9 MiB
-> ? Load Address: 00008000
-> ? Entry Point: ?00008000
-> ? Verifying Checksum ... OK
-> ? Loading Kernel Image ... OK
-> OK
+> Hi Rajendra,
 >
-> Starting kernel ...
+> This change looks good except for two questions I have below, related to
+> calling prepare in an interrupt context.  If those are non-issues then
+> please add my:
 >
-> Uncompressing Linux... done, booting the kernel.
+> Acked-by: Mike Turquette<mturquette@linaro.org>
 >
-> Error: unrecognized/unsupported machine ID (r1 = 0x00000c11).
+> (or my Reviewed-by... I can never remember which one is correct)
 >
-> Available machine support:
+> snip
 >
-> ID (hex) ? ? ? ?NAME
-> ffffffff ? ? ? ?Marvell Kirkwood (Flattened Device Tree)
+>> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+>> index 5fb47a1..e5f8e48 100644
+>> --- a/arch/arm/mach-omap2/display.c
+>> +++ b/arch/arm/mach-omap2/display.c
+>> @@ -471,7 +471,7 @@ int omap_dss_reset(struct omap_hwmod *oh)
+>>
+>>   	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i>  0; i--, oc++)
+>>   		if (oc->_clk)
+>> -			clk_enable(oc->_clk);
+>> +			clk_prepare_enable(oc->_clk);
+>>
+>>   	dispc_disable_outputs();
+>>
+>> @@ -498,7 +498,7 @@ int omap_dss_reset(struct omap_hwmod *oh)
+>>
+>>   	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i>  0; i--, oc++)
+>>   		if (oc->_clk)
+>> -			clk_disable(oc->_clk);
+>> +			clk_disable_unprepare(oc->_clk);
+>>
+>>   	r = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
+>>
 >
-> Please check your kernel config and/or bootloader.
-> --------------------------
+> omap_dss_reset gets used by hwmod/omap_device, right?  Does the reset
+> path ever get called in an interrupt context?  If so clk_prepare might
+> sleep, which is bad.
 
-I'm still stuck with the same error.  I'm working against 5.2rc2 with
-the Orion/kirkwood printk.c patch.
+right, I completely missed this. Will take a look at these and others
+too. thanks.
 
-I'm not 100% on proper etiquette here so rather than spam first and
-get scolded, I've pastebined the relevant info.
-
-My current patchset is here: http://pastie.org/4090298
-The stripped kernel conf I'm using is here: http://pastie.org/4090323
-
-I'm including all but the iconnect flattened tree board types in my
-config, included DTS early testing, and am appending the DTS
-definitions to the end of the kernel as I don't expect my uboot to
-play nice, so I'm rather surprised to not see any of the boards show
-up as supported with that boot error.  I feel like this has got to be
-a kernel conf issue, or I'm missing a step in preparing a DTS based
-kernel.
-
-I also know my board definition will need cleanup to support both the
-GoFlex Net and Home but went this way just to test the concept first.
-
-Josh C
+regards,
+Rajendra
+>
+> snip
+>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index bf86f7e..b46ae17 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -693,7 +693,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
+>>   	pr_debug("omap_hwmod: %s: enabling clocks\n", oh->name);
+>>
+>>   	if (oh->_clk)
+>> -		clk_enable(oh->_clk);
+>> +		clk_prepare_enable(oh->_clk);
+>>
+>
+> The same question above applies to basically all of the hwmod function
+> changes below.  I don't know if runtime pm invokes these in an interrupt
+> context or not, but it is something to think about.
+>
+> Regards,
+> Mike
