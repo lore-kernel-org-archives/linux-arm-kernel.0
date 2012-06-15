@@ -1,44 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 15 Jun 2012 07:54:24 +0200
-Subject: [GIT PULL] DMA-mapping fixes for v3.5-rc3
-Message-ID: <1339739664-31736-1-git-send-email-m.szyprowski@samsung.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Fri, 15 Jun 2012 14:09:41 +0800
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <4FDA092E.10301@wwwdotorg.org>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+Message-ID: <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, Jun 14, 2012 at 23:54:22, Stephen Warren wrote:
+>>>> The core of the issue is that:
+>>
+>>>> * Tegra30 support is via device tree. * We have an SDIO bus, and 
+>>>> the WiFi device attached to that bus is enumerable. * Since the 
+>>>> WiFi device is enumerable, no node exists in the DT to represent 
+>>>> it. * However, the driver for the WiFi device needs certain 
+>>>> information, such as the reset GPIO ID and perhaps power GPIO.
+>>
+>>> PCI devices are also enumerable and yet they can be matched up with 
+>>> nodes in the device tree. Perhaps something similar could be added 
+>>> for the SDIO bus?
+>>
+>> This seems to make the most sense - pushing this through the 
+>> regulator API is just a bodge.
+>
+>Yes, that seems reasonable.
+>
+>Presumably the power GPIO should be a fixed regulator though, since it 
+>is a power control not just a plain old GPIO? That said, the current driver apparently deals with this as a GPIO already.
+>
+>The reset GPIO can separately/directly controlled by the WiFi driver though.
 
-I would like to ask for pulling a set of minor fixes for dma-mapping
-code (ARM and x86) required for Contiguous Memory Allocator (CMA)
-patches merged in v3.5-rc1.
+I talked with Franky, this power sequence is generally for 4329, so it mean this sequence can be put into the wifi driver.
+We can use the virtual platform device both for OOB and non OOB.
+I will send out patches later.
 
-The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
-
-  Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
-
-with the top-most commit c080e26edc3a2a3cdfa4c430c663ee1c3bbd8fae
-
-  x86: dma-mapping: fix broken allocation when dma_mask has been provided
-
-are available in the git repository at:
-  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git fixes-for-linus
-
-Marek Szyprowski (3):
-      ARM: mm: fix type of the arm_dma_limit global variable
-      ARM: dma-mapping: fix debug messages in dmabounce code
-      x86: dma-mapping: fix broken allocation when dma_mask has been provided
-
-Sachin Kamat (1):
-      ARM: dma-mapping: Add missing static storage class specifier
-
- arch/arm/common/dmabounce.c |   16 ++++++++--------
- arch/arm/mm/dma-mapping.c   |    4 ++--
- arch/arm/mm/init.c          |    2 +-
- arch/arm/mm/mm.h            |    2 +-
- arch/x86/kernel/pci-dma.c   |    3 ++-
- 5 files changed, 14 insertions(+), 13 deletions(-)
-
-Thanks!
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
+---
+nvpublic
