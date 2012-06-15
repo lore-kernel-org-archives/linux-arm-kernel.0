@@ -1,90 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Jun 2012 17:22:37 +0100
-Subject: [PATCH v2 2/2] ARM: dcache: select DCACHE_WORD_ACCESS for
- little-endian ARMv6+ CPUs
-In-Reply-To: <1339777357-32479-1-git-send-email-will.deacon@arm.com>
-References: <1339777357-32479-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1339777357-32479-3-git-send-email-will.deacon@arm.com>
+From: frankyl@broadcom.com (Franky Lin)
+Date: Fri, 15 Jun 2012 09:24:41 -0700
+Subject: Where to power on the wifi device before loading the
+ driver.
+In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+Message-ID: <4FDB61C9.9020505@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DCACHE_WORD_ACCESS uses the word-at-a-time API for optimised string
-comparisons in the vfs layer.
+On 06/14/2012 11:09 PM, Wei Ni wrote:
+> I talked with Franky, this power sequence is generally for 4329, so it mean this sequence can be put into the wifi driver.
 
-This patch implements support for load_unaligned_zeropad for ARM CPUs
-with native support for unaligned memory accesses (v6+) when running
-little-endian.
+Hold on. It's generally for 4329. But fullmac supports 4329/4330 along 
+with USB dongle chips. Also more chips are incoming. I dont think it's a 
+good idea to add *this* power sequence into brcmfmac.
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig                      |    1 +
- arch/arm/include/asm/word-at-a-time.h |   41 +++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 77a2fad..bba8a56 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -47,6 +47,7 @@ config ARM
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_STRNCPY_FROM_USER
- 	select GENERIC_STRNLEN_USER
-+	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
-index 74b2d45..4d52f92 100644
---- a/arch/arm/include/asm/word-at-a-time.h
-+++ b/arch/arm/include/asm/word-at-a-time.h
-@@ -48,6 +48,47 @@ static inline unsigned long find_zero(unsigned long mask)
- 	return ret;
- }
- 
-+#ifdef CONFIG_DCACHE_WORD_ACCESS
-+
-+#define zero_bytemask(mask) (mask)
-+
-+/*
-+ * Load an unaligned word from kernel space.
-+ *
-+ * In the (very unlikely) case of the word being a page-crosser
-+ * and the next page not being mapped, take the exception and
-+ * return zeroes in the non-existing part.
-+ */
-+static inline unsigned long load_unaligned_zeropad(const void *addr)
-+{
-+	unsigned long ret, offset;
-+
-+	/* Load word from unaligned pointer addr */
-+	asm(
-+	"1:	ldr	%0, [%2]\n"
-+	"2:\n"
-+	"	.pushsection .fixup,\"ax\"\n"
-+	"	.align 2\n"
-+	"3:	and	%1, %2, #0x3\n"
-+	"	bic	%2, %2, #0x3\n"
-+	"	ldr	%0, [%2]\n"
-+	"	lsl	%1, %1, #0x3\n"
-+	"	lsr	%0, %0, %1\n"
-+	"	b	2b\n"
-+	"	.popsection\n"
-+	"	.pushsection __ex_table,\"a\"\n"
-+	"	.align	3\n"
-+	"	.long	1b, 3b\n"
-+	"	.popsection"
-+	: "=&r" (ret), "=&r" (offset)
-+	: "r" (addr), "Qo" (*(unsigned long *)addr));
-+
-+	return ret;
-+}
-+
-+
-+#endif	/* DCACHE_WORD_ACCESS */
-+
- #else	/* __ARMEB__ */
- #include <asm-generic/word-at-a-time.h>
- #endif
--- 
-1.7.4.1
+Franky
