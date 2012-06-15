@@ -1,88 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 15 Jun 2012 10:41:40 +0200
-Subject: Converting kirkwood-goflexnet to DTS
-In-Reply-To: <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
-References: <20120614141706.GA6676@lunn.ch>
- <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
- <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
-Message-ID: <20120615104140.24bf25f3@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Jun 2012 09:42:56 +0100
+Subject: [PATCH 1/1] ARM: ux500: Fix build errors/warnings when MACH_UX500_DT
+ is not set
+Message-ID: <1339749776-9468-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When MACH_UX500_DT and all related Device Tree configurations are forced
+off the warning and error below prevent the kernel from compiling. This
+simple patch fixes both issues and allows for full build and boot of
+ST-Ericsson's low-cost development board, Snowball.
 
-Le Fri, 15 Jun 2012 00:53:45 -0400,
-Josh Coombs <josh.coombs@gmail.com> a ?crit :
+Warnings fixed:
+  arch/arm/mach-ux500/board-mop500.c:680:32: warning: ?snowball_of_platform_devs? defined but not used
 
-> > Uncompressing Linux... done, booting the kernel.
-> >
-> > Error: unrecognized/unsupported machine ID (r1 = 0x00000c11).
-> >
-> > Available machine support:
-> >
-> > ID (hex) ? ? ? ?NAME
-> > ffffffff ? ? ? ?Marvell Kirkwood (Flattened Device Tree)
-> >
-> > Please check your kernel config and/or bootloader.
-> > --------------------------
-> 
-> I'm still stuck with the same error.  I'm working against 5.2rc2 with
-> the Orion/kirkwood printk.c patch.
-> 
-> I'm not 100% on proper etiquette here so rather than spam first and
-> get scolded, I've pastebined the relevant info.
-> 
-> My current patchset is here: http://pastie.org/4090298
-> The stripped kernel conf I'm using is here: http://pastie.org/4090323
-> 
-> I'm including all but the iconnect flattened tree board types in my
-> config, included DTS early testing, and am appending the DTS
-> definitions to the end of the kernel as I don't expect my uboot to
-> play nice, so I'm rather surprised to not see any of the boards show
-> up as supported with that boot error.  I feel like this has got to be
-> a kernel conf issue, or I'm missing a step in preparing a DTS based
-> kernel.
-> 
-> I also know my board definition will need cleanup to support both the
-> GoFlex Net and Home but went this way just to test the concept first.
+Errors fixed:
+  arch/arm/mach-ux500/timer.c: In function ?ux500_timer_init?:
+  arch/arm/mach-ux500/timer.c:66:3: error: implicit declaration of function ?of_find_matching_node?
+  arch/arm/mach-ux500/timer.c:66:6: warning: assignment makes pointer from integer without a cast
 
-Seems like your kernel isn't seeing the appended DTB, and therefore
-falls back at looking at r1 for a machine ID. Can you detail the
-command line you're using to build your kernel?
+Cc: stable at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   10 +++++-----
+ arch/arm/mach-ux500/timer.c        |    2 ++
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-What I'm doing is:
-
- 1) Build the zImage
-
- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j4
-
- 2) Build the DTB
-
- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- armada-xp-db.dtb
-
- 3) Concatenate zImage+DTB
-
- arch/arm/boot/zImage arch/arm/boot/armada-xp-db.dtb  > zImage-armada-xp.dtb
-
- 4) Run mkimage on it
-
- /bin/bash scripts/mkuboot.sh -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n 'Linux-marvell' -d zImage-armada-xp.dtb arch/arm/boot/uImage.armada-xp
-
- 5) Boot arch/arm/boot/uImage.armada-xp
-
-Of course, in the final step, you need to adjust the -a and -e options
-as needed for your platform. But apparently, your platform uses the
-same addresses.
-
-Are you doing something similar to prepare your uImage? As far as I
-know, the kernel build process does not automatically append the DTB,
-so you have to do it manually as detailed above.
-
-Regards,
-
-Thomas
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 9c74ac5..73fb6e8 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -677,11 +677,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ 	&ab8500_device,
+ };
+ 
+-static struct platform_device *snowball_of_platform_devs[] __initdata = {
+-	&snowball_led_dev,
+-	&snowball_key_dev,
+-};
+-
+ static void __init mop500_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+@@ -821,6 +816,11 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_UX500_DT
+ 
++static struct platform_device *snowball_of_platform_devs[] __initdata = {
++	&snowball_led_dev,
++	&snowball_key_dev,
++};
++
+ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires DMA and call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index 741e71f..66e7f00 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -63,8 +63,10 @@ static void __init ux500_timer_init(void)
+ 
+ 	/* TODO: Once MTU has been DT:ed place code above into else. */
+ 	if (of_have_populated_dt()) {
++#ifdef CONFIG_OF
+ 		np = of_find_matching_node(NULL, prcmu_timer_of_match);
+ 		if (!np)
++#endif
+ 			goto dt_fail;
+ 
+ 		tmp_base = of_iomap(np, 0);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
