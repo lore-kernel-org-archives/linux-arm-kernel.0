@@ -1,36 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 15 Jun 2012 12:07:34 +0200
-Subject: [PATCH v3 3/9] arm: mach-mvebu: add source files
-In-Reply-To: <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
- <1339746250-26650-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120615100734.GJ26034@lunn.ch>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 15 Jun 2012 10:22:17 +0000
+Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <4FDA3464.4040704@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
+ <4FD64D6D.3020401@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
+ <4FD77EF1.8000600@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
+ <4FD8A906.8080202@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
+ <4FD9E5AF.6010201@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
+ <4FDA3464.4040704@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99A511@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/* System controller registers */
-> +#define MVEBU_RSTOUTN_MASK_OFFSET	  0x60
-> +#define   MVEBU_RSTOUTN_MASK_RESET_OUT_EN  0x1
-> +#define MVEBU_SYSTEM_SOFT_RESET_OFFSET	  0x64
-> +#define   MVEBU_SYSTEM_SOFT_RESET          0x1
+Hi Jon,
 
-$ grep -hr "#define RSTOUTn "*
-#define RSTOUTn_MASK            (BRIDGE_VIRT_BASE | 0x0108)
-#define RSTOUTn_MASK            (ORION5X_BRIDGE_VIRT_BASE | 0x108)
-#define RSTOUTn_MASK            (BRIDGE_VIRT_BASE | 0x0108)
-#define RSTOUTn_MASK            (BRIDGE_VIRT_BASE | 0x0108)
+On Fri, Jun 15, 2012 at 00:28:44, Hunter, Jon wrote:
+> On 06/14/2012 08:32 AM, Mohammed, Afzal wrote:
+> > On Thu, Jun 14, 2012 at 18:52:55, Hunter, Jon wrote:
 
-$ grep -rh "#define SYSTEM_SOFT_RESET" *
-#define SYSTEM_SOFT_RESET       (BRIDGE_VIRT_BASE | 0x010c)
-#define SYSTEM_SOFT_RESET       (BRIDGE_VIRT_BASE | 0x010c)
-#define SYSTEM_SOFT_RESET       (BRIDGE_VIRT_BASE | 0x010c)
-/* Orion5x also puts it at 0x10c, but has a different name! */
+> >> Why? You currently have a global variable storing the clock handle. It
+> >> can be quite common for drivers to know the clock frequencies of their
+> >> functional clocks. How else can drivers calculate timings?
+> > 
+> > 
+> > Please see Russell King's comments,
+> > 
+> > [1] http://permalink.gmane.org/gmane.linux.ports.ppc.embedded/27634
+> > [2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg05365.html
+> 
+> Thanks. So I still think you need to get rid of the global variable for
+> storing the gpmc fclk, that is really my point.
+> 
+> So if you look at commit [1] mentioned by Russell in the above thread,
+> the appropriate thing to do would be to create a gpmc clock alias for
+> all OMAP2+ devices and then you could simply call the following from the
+> gpmc probe ...
+> 
+> 	gpmc_fck = clk_get(&pdev->dev, "fck");
+> 
+> You could then store somewhere in one of the gpmc structures.
 
-So, it looks like the Marvell ASIC engineers moved it for the latest
-SoCs. Could you add a child property of marvell,system-controller
-which indicates where within the system controller the reset
-subcontroller is? Since the two registers are always next to each
-other, we just need one address.
+Here clock is required even before driver is probed, i.e for platform to
+calculate timings, that has to be passed through platform data.
 
-Thanks
-	Andrew
+I understand the necessity for clk rate information in driver, but seems
+unless we have a generic way to scale timings for all the kinds of
+peripheral, having it may not be of much help.
+
+Regards
+Afzal
