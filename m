@@ -1,39 +1,37 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 15 Jun 2012 14:37:45 +0200
-Subject: [PATCH v2 00/23] ARM: LPC32xx specific updates for next
-In-Reply-To: <CAAAP30HU7k2QC9K15V3grZvXDzy8apzBGSo8it+M4KF5wGWLZw@mail.gmail.com>
-References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
- <201206151207.07108.arnd@arndb.de>
- <CAAAP30HU7k2QC9K15V3grZvXDzy8apzBGSo8it+M4KF5wGWLZw@mail.gmail.com>
-Message-ID: <4FDB2C99.50503@antcom.de>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Fri, 15 Jun 2012 08:40:48 -0400
+Subject: Converting kirkwood-goflexnet to DTS
+In-Reply-To: <20120615104140.24bf25f3@skate>
+References: <20120614141706.GA6676@lunn.ch>
+ <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+ <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
+ <20120615104140.24bf25f3@skate>
+Message-ID: <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thomas, Andrew,
 
-On 06/15/2012 02:12 PM, Alexandre Pereira da Silva wrote:
-> On Fri, Jun 15, 2012 at 9:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> It all looks good from my point of view, so I think we can pull it
->> for 3.6 if no other comments come.
-> 
-> Arn,
-> 
-> Please exclude "ARM: LPC32xx: Remove duplicate usb host clock init".
-> It's causing problems in some LPC32XX boards.
+You were both correct.  After one additional test failure last night
+and a lot more reading I reached the same conclusion, I was foolishly
+thinking .dtbs would be automatically appended to the kernel when
+configured to support that method of including them.
 
-Right - it would break USB e.g. on the EA3250 board since USB would work
-only if the bootloader already did some initialization which is silently
-done by PHY3250 where we didn't recognize the problem.
+What I did this morning:
 
-So please just take patches 01..22 from the lpc32xx-next branch.
+make
+make kirkwood-goflexnet.dtb
+cat arch/arm/boot/kirkwood-goflexnet.dtb >> arch/arm/boot/zImage
+make uImage
 
-I just removed patch 23 from git.antcom.de, so you can easily just pull
-the branch.
+That resulted in: http://pastie.org/4092019
 
-Further, as Russell already pointed out, the DMA API will probably
-change, but I expect that we will quickly adjust to it so no need to
-worry about that.
+Boots, with some serious errors, doesn't seem to mount a FS and stops.
+ Reducing my kernel arguments down to "console=ttyS0,115200
+earlyprintk rootfs=/dev/sda1 rootdelay=10" I see the same errors, but
+I also show the key hardware involved being detected, and the nand
+partitioning looks correct.  My status LED goes solid green, so it
+appears something is working right.  I'll dig into goflexnet_init next
+to try and determine what is wrong in there.
 
-Thanks,
-
-Roland
+Josh C
