@@ -1,39 +1,46 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 15 Jun 2012 19:00:21 +0200
-Subject: [PATCH v3 2/2] serial: mxs-auart: Allow device tree probing
-In-Reply-To: <CAOMZO5AFaWGEfEhVs1TVc0c_Wp6aB7FT5zKHEoiucLnuWGg8zA@mail.gmail.com>
-References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
- <201206151816.55567.marex@denx.de>
- <CAOMZO5AFaWGEfEhVs1TVc0c_Wp6aB7FT5zKHEoiucLnuWGg8zA@mail.gmail.com>
-Message-ID: <201206151900.21740.marex@denx.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 15 Jun 2012 14:23:04 -0300
+Subject: [PATCH 1/4] serial: imx: Remove unneeded '#ifdef CONFIG_OF'
+Message-ID: <1339780987-11063-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+CONFIG_OF is always selected for imx SoCs so it is safe
+to drop the '#ifdef CONFIG_OF'.
 
-> On Fri, Jun 15, 2012 at 1:16 PM, Marek Vasut <marex@denx.de> wrote:
-> > Dear Fabio Estevam,
-> > 
-> >> On Fri, Jun 15, 2012 at 1:06 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> >> >> +MODULE_DEVICE_TABLE(platform, mxs_auart_devtype);
-> >> > 
-> >> > ...
-> >> > 
-> >> >> +             .id_table = mxs_auart_devtype,
-> >> > 
-> >> > I do not think we need these.
-> >> 
-> >> WIthout this, the non-dt kernel does not probe correctly.
-> > 
-> > But we don't support non-DT kernel anymore.
-> 
-> but I don't want my patch to break something that has been working for
-> a long time.
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: <linux-serial@vger.kernel.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/tty/serial/imx.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-But we don't care if the non-DT case gets broken anyway *. It's unsupported and 
-will be removed.
-
-* that's how I understand it.
-
-Best regards,
-Marek Vasut
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 0af4eec..4bfa95d 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1399,7 +1399,6 @@ static int serial_imx_resume(struct platform_device *dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_OF
+ /*
+  * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
+  * could successfully get all information from dt or a negative errno.
+@@ -1433,13 +1432,6 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+ 
+ 	return 0;
+ }
+-#else
+-static inline int serial_imx_probe_dt(struct imx_port *sport,
+-		struct platform_device *pdev)
+-{
+-	return 1;
+-}
+-#endif
+ 
+ static void serial_imx_probe_pdata(struct imx_port *sport,
+ 		struct platform_device *pdev)
+-- 
+1.7.1
