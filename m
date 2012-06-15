@@ -1,64 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 15 Jun 2012 13:38:45 +0200
-Subject: [PATCH v3 1/9] clocksource: time-armada-370-xp: Marvell Armada
- 370/XP SoC timer driver
-In-Reply-To: <20120615104547.GK26034@lunn.ch>
-References: <1339746250-26650-1-git-send-email-gregory.clement@free-electrons.com>
- <1339746250-26650-2-git-send-email-gregory.clement@free-electrons.com>
- <20120615104547.GK26034@lunn.ch>
-Message-ID: <4FDB1EC5.8090602@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Jun 2012 12:43:57 +0100
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <20120615103233.GA19046@n2100.arm.linux.org.uk>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD6F0E8.5040606@linaro.org>
+ <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
+ <4FD83AAD.2010701@linaro.org>
+ <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
+ <4FD88761.9050703@linaro.org> <20120614183636.GB30185@sirena.org.uk>
+ <4FDA341C.8010501@linaro.org> <20120615103233.GA19046@n2100.arm.linux.org.uk>
+Message-ID: <4FDB1FFD.7040204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2012 12:45 PM, Andrew Lunn wrote:
->> +void __init armada_370_xp_timer_init(void)
->> +{
->> +	u32 u;
->> +	struct device_node *np;
->> +	unsigned int timer_clk;
->> +	int ret;
->> +	np = of_find_compatible_node(NULL, NULL, "marvell,timer");
->> +	timer_base = of_iomap(np, 0);
->> +	WARN_ON(!timer_base);
->> +
->> +	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
->> +		/* The fixed 25MHz timer is available so let's use it */
->> +		u = readl(timer_base + TIMER_CTRL_OFF);
->> +		writel(u | TIMER0_25MHZ | TIMER1_25MHZ,
->> +		       timer_base + TIMER_CTRL_OFF);
->> +		timer_clk = 25000000;
->> +	} else {
->> +		u32 clk = 0;
->> +		ret = of_property_read_u32(np, "clock-frequency", &clk);
->> +		WARN_ON(!clk || ret < 0);
->> +		u = readl(timer_base + TIMER_CTRL_OFF);
->> +		writel(u & ~(TIMER0_25MHZ | TIMER1_25MHZ),
->> +		       timer_base + TIMER_CTRL_OFF);
->> +		timer_clk = clk / TIMER_DIVIDER;
->> +	}
-> 
-> Hi Gregory
-> 
-> This all looks very similar to plat-orion/timer.c. The biggest
-> difference is the support for this 25Mhz timer mode. Maybe, so long as
-> this property is not used, the code will work for all orion platforms.
-> If so, we should drop all the armada_370_xp prefixes and just call it
-> orion.
-> 
-> I will try to test it on a Kirkwood today/tomorrow.
+On 15/06/12 11:32, Russell King - ARM Linux wrote:
+> On Thu, Jun 14, 2012 at 07:57:32PM +0100, Lee Jones wrote:
+>> On 14/06/12 19:36, Mark Brown wrote:
+>>> On Wed, Jun 13, 2012 at 01:28:17PM +0100, Lee Jones wrote:
+>>>
+>>>> Device Tree. However, we have just as much control by keeping them
+>>>> in separate structs in the C file and selecting the right one using
+>>>> the compatible sting.
+>>>
+>>> You're not understanding Linus' point.  The compatible string isn't
+>>> useful here because properties like the maximum clock rate of the bus
+>>> depend on the board design, not the silicon.  The controller may be
+>>> perfectly happy to run at a given rate but other devices on the bus or
+>>> the electrical engineering of the PCB itself may restrict this further.
+>>
+>> And you're not understanding mine. ;)
+>>
+>> You can have multiple compatible strings for a single driver. Which one
+>> you reference from the Device Tree will dictate which group of settings
+>> are used, including variation of clock rates.
+>
+> However, if you list these settings separately, rather than selecting them
+> based on a compatible string, it means when other board designs come along,
+> you don't have to modify the kernel code to provide yet another compatible
+> to settings translation in the code - you can keep all that information
+> entirely within DT with no kernel code mods.
+>
+> I thought that was partly the point of DT...
 
-I wait for your results, and if it works for you then I drop all the
-armada_370_xp prefixes. About calling it orion, it should be mvebu I
-think.
-
-
-> 
->    Andrew
-
+Right. See my most recent emails on the subject. :)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
-+33 602 196 044
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
