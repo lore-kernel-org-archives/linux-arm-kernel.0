@@ -1,95 +1,127 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 15 Jun 2012 11:09:05 +0200
-Subject: [PATCH v2 0/7] ARM: at91: add sparse irq support and introduce aic5
-Message-ID: <1339751352-24296-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Fri, 15 Jun 2012 11:09:06 +0200
+Subject: [PATCH v2 1/7] ARM: at91: aic add dt support for external irqs
+In-Reply-To: <1339751352-24296-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1339751352-24296-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1339751352-24296-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches introduces AIC5 support with the goal to have only one
-kernel image for all SOCs. That's why sparse irq support was added.
-AIC5 can manage up to 128 irq lines. It introduces a new register map and
-a source select register to select the IRQ line we want to configure.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-v2 changes:
-- add Jean-Christophe patches since my patches are based on abd there have
-not been submitted yet
-- I missed some machine descriptors in the first version, it
-is corrected with this new one.
-- correct sparse irq support and remove mach/irqs.h.
-- correct issue on AIC5 support (missing allocation).
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ .../devicetree/bindings/arm/atmel-aic.txt          |    1 +
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    1 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |    1 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    1 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    1 +
+ arch/arm/mach-at91/at91sam9x5.c                    |    2 --
+ arch/arm/mach-at91/irq.c                           |   12 ++++++++++++
+ 7 files changed, 17 insertions(+), 2 deletions(-)
 
-Jean-Christophe PLAGNIOL-VILLARD (2):
-  ARM: at91: aic add dt support for external irqs
-  ARM: at91: add of default irq priorities support
-
-Ludovic Desroches (5):
-  ARM: at91: at91 based machines specify their own irq handler at run
-    time
-  ARM: at91: fix irq_alloc_descs parameters for sparse irq
-  ARM: at91: sparse irq support
-  ARM: at91: remove mach/irqs.h
-  ARM: at91: add AIC5 support
-
- .../devicetree/bindings/arm/atmel-aic.txt          |    3 +
- arch/arm/boot/dts/at91sam9260.dtsi                 |   35 ++
- arch/arm/boot/dts/at91sam9263.dtsi                 |   35 ++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   35 ++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   35 ++
- arch/arm/mach-at91/Kconfig                         |    2 +
- arch/arm/mach-at91/at91rm9200.c                    |    1 +
- arch/arm/mach-at91/at91sam9260.c                   |    1 +
- arch/arm/mach-at91/at91sam9261.c                   |    1 +
- arch/arm/mach-at91/at91sam9263.c                   |    1 +
- arch/arm/mach-at91/at91sam9g45.c                   |    1 +
- arch/arm/mach-at91/at91sam9rl.c                    |    1 +
- arch/arm/mach-at91/at91sam9x5.c                    |   44 ---
- arch/arm/mach-at91/at91x40.c                       |    1 +
- arch/arm/mach-at91/board-1arm.c                    |    3 +
- arch/arm/mach-at91/board-afeb-9260v1.c             |    3 +
- arch/arm/mach-at91/board-cam60.c                   |    3 +
- arch/arm/mach-at91/board-carmeva.c                 |    3 +
- arch/arm/mach-at91/board-cpu9krea.c                |    3 +
- arch/arm/mach-at91/board-cpuat91.c                 |    3 +
- arch/arm/mach-at91/board-csb337.c                  |    3 +
- arch/arm/mach-at91/board-csb637.c                  |    3 +
- arch/arm/mach-at91/board-dt.c                      |    2 +
- arch/arm/mach-at91/board-eb01.c                    |    3 +
- arch/arm/mach-at91/board-eb9200.c                  |    3 +
- arch/arm/mach-at91/board-ecbat91.c                 |    3 +
- arch/arm/mach-at91/board-eco920.c                  |    3 +
- arch/arm/mach-at91/board-flexibity.c               |    3 +
- arch/arm/mach-at91/board-foxg20.c                  |    3 +
- arch/arm/mach-at91/board-gsia18s.c                 |    3 +
- arch/arm/mach-at91/board-kafa.c                    |    3 +
- arch/arm/mach-at91/board-kb9202.c                  |    3 +
- arch/arm/mach-at91/board-neocore926.c              |    3 +
- arch/arm/mach-at91/board-pcontrol-g20.c            |    3 +
- arch/arm/mach-at91/board-picotux200.c              |    3 +
- arch/arm/mach-at91/board-qil-a9260.c               |    3 +
- arch/arm/mach-at91/board-rm9200dk.c                |    3 +
- arch/arm/mach-at91/board-rm9200ek.c                |    3 +
- arch/arm/mach-at91/board-rsi-ews.c                 |    3 +
- arch/arm/mach-at91/board-sam9-l9260.c              |    3 +
- arch/arm/mach-at91/board-sam9260ek.c               |    3 +
- arch/arm/mach-at91/board-sam9261ek.c               |    3 +
- arch/arm/mach-at91/board-sam9263ek.c               |    3 +
- arch/arm/mach-at91/board-sam9g20ek.c               |    5 +
- arch/arm/mach-at91/board-sam9m10g45ek.c            |    3 +
- arch/arm/mach-at91/board-sam9rlek.c                |    3 +
- arch/arm/mach-at91/board-snapper9260.c             |    3 +
- arch/arm/mach-at91/board-stamp9g20.c               |    5 +
- arch/arm/mach-at91/board-usb-a926x.c               |    7 +
- arch/arm/mach-at91/board-yl-9200.c                 |    3 +
- arch/arm/mach-at91/generic.h                       |    2 +
- arch/arm/mach-at91/gpio.c                          |    1 +
- arch/arm/mach-at91/include/mach/at91_aic.h         |   30 ++
- arch/arm/mach-at91/include/mach/entry-macro.S      |   27 --
- arch/arm/mach-at91/include/mach/irqs.h             |   41 --
- arch/arm/mach-at91/irq.c                           |  404 +++++++++++++++++---
- arch/arm/mach-at91/pm.c                            |    1 +
- 57 files changed, 655 insertions(+), 162 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-at91/include/mach/irqs.h
-
+diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+index aabca4f..1953b0c 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+@@ -15,6 +15,7 @@ Required properties:
+       Valid combinations are 1, 2, 3, 4, 8.
+       Default flag for internal sources should be set to 4 (active high).
+ - reg: Should contain AIC registers location and length
++- atmel,external-irqs: u32 array of external irqs.
+ 
+ Examples:
+ 	/*
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index f449efc..f2c9643 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -56,6 +56,7 @@
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+ 				reg = <0xfffff000 0x200>;
++				atmel,external-irqs = <29 30 31>;
+ 			};
+ 
+ 			ramc0: ramc at ffffea00 {
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 0209913..c803636 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -52,6 +52,7 @@
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+ 				reg = <0xfffff000 0x200>;
++				atmel,external-irqs = <30 31>;
+ 			};
+ 
+ 			pmc: pmc at fffffc00 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 7dbccaf..2d01ce2 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -57,6 +57,7 @@
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+ 				reg = <0xfffff000 0x200>;
++				atmel,external-irqs = <31>;
+ 			};
+ 
+ 			ramc0: ramc at ffffe400 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 6b3ef43..6a0a0fb 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -55,6 +55,7 @@
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+ 				reg = <0xfffff000 0x200>;
++				atmel,external-irqs = <31>;
+ 			};
+ 
+ 			ramc0: ramc at ffffe800 {
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 1b144b4..537710b 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -312,8 +312,6 @@ static void __init at91sam9x5_map_io(void)
+ 
+ void __init at91sam9x5_initialize(void)
+ {
+-	at91_extern_irq = (1 << AT91SAM9X5_ID_IRQ0);
+-
+ 	/* Register GPIO subsystem (using DT) */
+ 	at91_gpio_init(NULL, 0);
+ }
+diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+index 2d5d4c8..df8605f 100644
+--- a/arch/arm/mach-at91/irq.c
++++ b/arch/arm/mach-at91/irq.c
+@@ -194,6 +194,10 @@ static struct irq_domain_ops at91_aic_irq_ops = {
+ int __init at91_aic_of_init(struct device_node *node,
+ 				     struct device_node *parent)
+ {
++	struct property *prop;
++	const __be32 *p;
++	u32 val;
++
+ 	at91_aic_base = of_iomap(node, 0);
+ 	at91_aic_np = node;
+ 
+@@ -202,6 +206,14 @@ int __init at91_aic_of_init(struct device_node *node,
+ 	if (!at91_aic_domain)
+ 		panic("Unable to add AIC irq domain (DT)\n");
+ 
++	at91_extern_irq = 0;
++	of_property_for_each_u32(node, "atmel,external-irqs", prop, p, val) {
++		if (val > 31)
++			pr_warn("AIC: external irq %d > 31 skip it\n", val);
++		else
++			at91_extern_irq |= (1 << val);
++	}
++
+ 	irq_set_default_host(at91_aic_domain);
+ 
+ 	at91_aic_hw_init(NR_AIC_IRQS);
 -- 
 1.7.5.4
