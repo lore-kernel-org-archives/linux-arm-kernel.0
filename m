@@ -1,44 +1,104 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Fri, 15 Jun 2012 18:55:32 -0400
-Subject: Converting kirkwood-goflexnet to DTS
-In-Reply-To: <87r4tgvii8.fsf@lebrac.rtp-net.org>
-References: <20120614141706.GA6676@lunn.ch>
- <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
- <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
- <20120615104140.24bf25f3@skate>
- <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
- <87r4tgvii8.fsf@lebrac.rtp-net.org>
-Message-ID: <CAMW5UfZt_5ebcbRPfKn+aYkjzHcx5k7yV_PDmhdJaCMZos4Xsw@mail.gmail.com>
+From: zchen@windriver.com (zumeng.chen)
+Date: Sat, 16 Jun 2012 08:15:19 +0800
+Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <4FD98BD0.7090901@windriver.com>
+References: <zumeng.chen@gmail.com>
+ <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
+ <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
+ <4FD96CBF.5040106@windriver.com>
+ <79CD15C6BA57404B839C016229A409A83EA4FC98@DBDE01.ent.ti.com>
+ <4FD98BD0.7090901@windriver.com>
+Message-ID: <4FDBD017.2010606@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> What I did this morning:
+On 2012?06?14? 14:59, Zumeng Chen wrote:
+> ? 2012?06?14? 14:31, Hiremath, Vaibhav ??:
+>> On Thu, Jun 14, 2012 at 10:16:55, Zumeng Chen wrote:
+>>> ? 2012?06?13? 20:18, Hiremath, Vaibhav ??:
+>>>> On Wed, Jun 13, 2012 at 07:14:10, Zumeng Chen wrote:
+>>>>> From: Zumeng Chen<zumeng.chen@windriver.com>
+>>>>>
+>>>>> If we don't set proper debouce time for ads7846, then there are
+>>>>> flooded interrupt counters of ads7846 responding to one time
+>>>>> touch on screen, so the driver couldn't work well.
+>>>>>
+>>>>> And since most OMAP3 series boards pass NULL pointer of board_pdata
+>>>>> to omap_ads7846_init, so it's more proper to set it in driver level
+>>>>> after having gpio_request done.
+>>>>>
+>>>>> This patch has been validated on 3530evm.
+>>>>>
+>>>>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
+>>>>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
+>>>>> ---
+>>>>>   drivers/input/touchscreen/ads7846.c |    4 ++++
+>>>>>   1 files changed, 4 insertions(+), 0 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+>>>>> index f02028e..459ff29 100644
+>>>>> --- a/drivers/input/touchscreen/ads7846.c
+>>>>> +++ b/drivers/input/touchscreen/ads7846.c
+>>>>> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+>>>>>   		}
+>>>>>
+>>>>>   		ts->gpio_pendown = pdata->gpio_pendown;
+>>>>> +#ifdef CONFIG_ARCH_OMAP3
+>>>>> +		/* 310 means about 10 microsecond for omap3 */
+>>>>> +		gpio_set_debounce(pdata->gpio_pendown, 310);
+>>>>> +#endif
+>>>>>
+>>>> Zumeng,
+>>>>
+>>>> With my sign-off you are changing the original code, that too
+>>>> without my sign-off and ack.
+>>>> I wouldn't mind you to submit patches from my tree, but the expectation is
+>>>> if you are changing the original code, it should be under your sign-off.
+>>> Thanks, good to learn. I'll remove in next time.
+>>>> Coming to the patch, #ifdef in driver is not recommended, and this 10msec
+>>>> delay is specific to OMAP GPIO and driver should not be aware of this,
+>>>> that's where you will find the original patch handling it in board file.
+>>> According to the git blame of the board-omap3evm.c I think
+>>> 96974a24 did a good thing to all the related codes for omap3
+>>> boards. So I think we can call board and driver as BSP level :-)
+>>>
+>>> If #ifdef in driver can save many codes, I guess it's deserved.
+>>>
+>> No, not really.
 >>
->> make
->> make kirkwood-goflexnet.dtb
->> cat arch/arm/boot/kirkwood-goflexnet.dtb >> arch/arm/boot/zImage
->> make uImage
->>
->> That resulted in: http://pastie.org/4092019
->>
-> [ ? 18.294288] [<c055f99c>] (kirkwood_init+0x50/0x7c) from [<c056023c>] (goflexnet_init+0x8/0x7c)
+>> In the same commit, the debounce time is already handled as an argument to 
+>> the function omap_ads7846_init(), and that?s the way it should be.
+> That means you'd like to implement the same get_pendown_state for every
+> omap3 board? Currently, board_pdata is NULL.
 >
-> seems wrong. You don't have to call kirkwood_init() in DT case afaik.
+> And actually, the reason why I agree 96974a24 is that get_pendown_state
+> for all omap3 boards is the common chip level gpio operations. so I think
+> we should set debounce for them in one common point.
 >
-> Arnaud
+> But since Igor and you don't like them, I have created and tested the
+> attachment
+> patch, and I'd like Mike to check if convenience too
+> But obviously there are more codes than mine before :-)
+Tony & Mike,
 
-You're correct Arnaud, chalk that up to another rookie mistake on my
-part.  So close now.  Correcting goflexnet_init, I now only get one
-bit of noise during init, seems to be related to cfq?  The kernel sees
-my drives and volumes, but it's still not proceeding to mount a rootfs
-and proceed with the boot.
+How about your comments on this issue? Do you think the following is
+acceptable VS my last email _attachment_.
 
-http://pastie.org/4095067
++#ifdef CONFIG_ARCH_OMAP3
++		/* 310 means about 10 microsecond for omap3 */
++		gpio_set_debounce(pdata->gpio_pendown, 310);
++#endif
 
-My next line of thought is to tweak my kernel conf so I'm just using
-noop, and to specify my rootfs as a compiled in kernel arg to see if
-there is something going on with how uboot args are getting passed on.
- I'd expect it to complain about a missing rootfs if it wasn't getting
-that string but I'm not sure how else to verify correct behavior.
 
-Josh C
+Regards,
+Zumeng
+
+
+> Regards,
+> Zumeng
+>> So no need for #ifdefs in driver...
+>>
+>> Thanks,
+>> Vaibhav
