@@ -1,45 +1,48 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Fri, 15 Jun 2012 20:55:58 -0500
-Subject: [PATCH 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
-Message-ID: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
+Date: Fri, 15 Jun 2012 20:55:59 -0500
+Subject: [PATCH 1/6] ARM: OMAP: iommu: fix including iommu.h without IOMMU_API
+ selected
+In-Reply-To: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
+References: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
+Message-ID: <1339811764-5337-2-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduced hwmod support for OMAP3 (iva, isp) and OMAP4 (ipu, dsp),
-along with the corresponding runtime PM and routines to deassert reset
-lines, enable/disable clocks and configure sysc registers.
+If included without IOMMU_API being selected it will break
+compilation:
 
-Due to compatibility an ifdef needs to be propagated (previously on
-iommu resource info) to hwmod data in OMAP3, so users of iommu and
-tidspbridge can avoid issues of two modules managing mmu data/irqs/resets;
-this until tidspbridge can be safely migrated to iommu framework.
+arch/arm/plat-omap/include/plat/iommu.h:
+	In function 'dev_to_omap_iommu':
+arch/arm/plat-omap/include/plat/iommu.h:148:
+	error: 'struct dev_archdata' has no member named 'iommu'
 
-Although IOMMU hwmod patches were already submitted in the past,
-this series adds few more changes, like:
-- New reset handling, based on a series that needs to be accepted first.
-- Fix for compile break if IOMMU_API is not selected.
+This will be seen, when hwmod includes iommu.h to get the
+structure for attributes.
 
-Previous work can be found at:
+Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+---
+ arch/arm/plat-omap/include/plat/iommu.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60133.html
-
-Omar Ramirez Luna (6):
-  ARM: OMAP: iommu: fix including iommu.h without IOMMU_API selected
-  ARM: OMAP3: hwmod data: add mmu data for iva and isp
-  ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
-  ARM: OMAP3/4: iommu: migrate to hwmod framework
-  ARM: OMAP2+: iommu: add reset handling
-  ARM: OMAP3/4: iommu: adapt to runtime pm
-
- arch/arm/mach-omap2/devices.c              |    2 +-
- arch/arm/mach-omap2/iommu2.c               |   36 ------
- arch/arm/mach-omap2/omap-iommu.c           |  166 ++++++---------------------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  115 +++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  136 ++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/iommu.h    |   25 ++++-
- arch/arm/plat-omap/include/plat/iommu2.h   |    2 -
- drivers/iommu/omap-iommu.c                 |   68 ++++++-----
- 8 files changed, 346 insertions(+), 204 deletions(-)
-
+diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
+index 88be3e6..e58d571 100644
+--- a/arch/arm/plat-omap/include/plat/iommu.h
++++ b/arch/arm/plat-omap/include/plat/iommu.h
+@@ -126,6 +126,7 @@ struct omap_iommu_arch_data {
+ 	struct omap_iommu *iommu_dev;
+ };
+ 
++#ifdef CONFIG_IOMMU_API
+ /**
+  * dev_to_omap_iommu() - retrieves an omap iommu object from a user device
+  * @dev: iommu client device
+@@ -136,6 +137,7 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
+ 
+ 	return arch_data->iommu_dev;
+ }
++#endif
+ 
+ /* IOMMU errors */
+ #define OMAP_IOMMU_ERR_TLB_MISS		(1 << 0)
 -- 
 1.7.4.1
