@@ -1,40 +1,38 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 16 Jun 2012 10:35:09 +0800
-Subject: How to use linear mapping without DT?
-In-Reply-To: <4FDB639D.4060103@atmel.com>
-References: <4FD9B4DC.80706@atmel.com>
- <20120615160155.GN31565@S2101-09.ap.freescale.net>
- <4FDB639D.4060103@atmel.com>
-Message-ID: <20120616023507.GC29663@S2101-09.ap.freescale.net>
+Date: Sat, 16 Jun 2012 11:01:08 +0800
+Subject: [PATCH 07/16] dma: ipu: remove the use of ipu_platform_data
+In-Reply-To: <20120615093713.GE8383@shlinux2.ap.freescale.net>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
+ <20120615093713.GE8383@shlinux2.ap.freescale.net>
+Message-ID: <20120616030106.GD29663@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2012 at 06:32:29PM +0200, ludovic.desroches wrote:
-> I've seen your patch series and I am wondering what is the
-> difference between these two solutions:
-> - not using nr_irqs: you will have NR_IRQS_LEGACY irqdescs allocated
-> and you will allocate the irqdescs for your controller just after by
-> calling irq_alloc_descs so you will have to manage the
-> NR_IRQS_LEGACY offset.
-> - using nr_irqs: you will have all your irqdescs allocated and won't
-> have to manage the NR_IRQS_LEGACY offset.
+On Fri, Jun 15, 2012 at 05:37:14PM +0800, Dong Aisheng wrote:
+> On Thu, Jun 14, 2012 at 01:59:38PM +0800, Shawn Guo wrote:
+> .......
+> > @@ -354,10 +355,12 @@ static struct irq_chip ipu_irq_chip = {
+> >  /* Install the IRQ handler */
+> >  int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+> >  {
+> > -	struct ipu_platform_data *pdata = dev->dev.platform_data;
+> > -	unsigned int irq, irq_base, i;
+> > +	unsigned int irq, i;
+> > +	int irq_base = irq_alloc_descs(-1, 0, CONFIG_MX3_IPU_IRQS,
+> > +				       numa_node_id());
+> >  
+> > -	irq_base = pdata->irq_base;
+> > +	if (irq_base < 0)
+> > +		return irq_base;
+> >  
+> Need not add irqdomain for this irq range?
+> Can we still service this irq properly without irqdomain mapping?
 > 
-First of all, NR_IRQS_LEGACY shifting is a good thing we are actually
-looking for because we want to reserve virq number 0 for no-interrupt
-case. [1]
+Yes, I think it should still work, because the driver has the mapping
+management on its own,  though someday we need to replace its own
+mapping with irqdomain anyway when we move the driver to device tree.
 
-Secondly, with .nr_irqs approach, you will have to somehow maintain
-irq_base for each irqchip, which is needed when adding legacy domain.
-Calling irq_alloc_descs will just return you the irq_base.
-
-Lastly, irq_alloc_descs approach can save irqdesc than .nr_irq in some
-cases, where not all the irqchips get instantiated for every single
-boot.  That's said, .nr_irqs has to be set the possible maximum numbers
-for the machine, while some irqchips, e.g. peripheral/device inside
-ones, are not always instantiated.  irq_alloc_descs approach will save
-irqdescs for such cases.
-
+-- 
 Regards,
 Shawn
-
-[1] http://thread.gmane.org/gmane.linux.kernel.next/18991/focus=10108
