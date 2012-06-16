@@ -1,43 +1,23 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 16 Jun 2012 16:14:59 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 16 Jun 2012 15:26:52 +0100
 Subject: [PATCH] mmc: mmci.c: Defer probe() in case of missing GPIOs
-Message-ID: <1339856099-9313-1-git-send-email-stigge@antcom.de>
+In-Reply-To: <1339856099-9313-1-git-send-email-stigge@antcom.de>
+References: <1339856099-9313-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120616142652.GC7628@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the GPIOs used by the MMCI driver are not registered yet when the driver is
-probe()d, they can't be used. This happens if the mmci driver is probed before
-the respective GPIO controller (e.g. on the LPC32xx EA3250 board, the PCA9532
-GPIO controller would be initialized via DT after mmci). Therefore, we defer
-mmci in this case.
+On Sat, Jun 16, 2012 at 04:14:59PM +0200, Roland Stigge wrote:
+> If the GPIOs used by the MMCI driver are not registered yet when the
+> driver is probe()d, they can't be used. This happens if the mmci driver
+> is probed before the respective GPIO controller (e.g. on the LPC32xx
+> EA3250 board, the PCA9532 GPIO controller would be initialized via DT
+> after mmci). Therefore, we defer mmci in this case.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+This code is wrong.  There are platforms where plat->gpio_cd is negative
+(because there isn't an associated GPIO) and we still expect the driver
+to successfully bind.  In that case, the driver gets the CD and WP
+information via the status callback.
 
----
- drivers/mmc/host/mmci.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
---- linux-2.6.orig/drivers/mmc/host/mmci.c
-+++ linux-2.6/drivers/mmc/host/mmci.c
-@@ -1424,6 +1424,10 @@ static int __devinit mmci_probe(struct a
- 	writel(0, host->base + MMCIMASK1);
- 	writel(0xfff, host->base + MMCICLEAR);
- 
-+	if (plat->gpio_cd < 0) {
-+		ret = -EPROBE_DEFER;
-+		goto err_gpio_cd;
-+	}
- 	if (gpio_is_valid(plat->gpio_cd)) {
- 		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
- 		if (ret == 0)
-@@ -1447,6 +1451,10 @@ static int __devinit mmci_probe(struct a
- 		if (ret >= 0)
- 			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
- 	}
-+	if (plat->gpio_wp < 0) {
-+		ret = -EPROBE_DEFER;
-+		goto err_gpio_wp;
-+	}
- 	if (gpio_is_valid(plat->gpio_wp)) {
- 		ret = gpio_request(plat->gpio_wp, DRIVER_NAME " (wp)");
- 		if (ret == 0)
+So this is an incompatible change with existing (and required) driver
+behaviour.
