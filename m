@@ -1,82 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 16 Jun 2012 11:33:34 +0100
-Subject: [PATCH] SPI: OMAP: fix over-eager devm_xxx() conversion (was:
- Re: [CFT 07/11] spi: omap2-mcspi: add DMA engine support)
-In-Reply-To: <20120614140712.GH31187@n2100.arm.linux.org.uk>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaZv-0003tz-6F@rmk-PC.arm.linux.org.uk>
- <20120614115335.GE31187@n2100.arm.linux.org.uk>
- <20120614120842.GF31187@n2100.arm.linux.org.uk>
- <20120614125012.GG31187@n2100.arm.linux.org.uk>
- <20120614140712.GH31187@n2100.arm.linux.org.uk>
-Message-ID: <20120616103334.GA27445@n2100.arm.linux.org.uk>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Sat, 16 Jun 2012 14:51:13 +0200
+Subject: kernel fault in get_dump_page on at91
+Message-ID: <4FDC8141.2030209@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, I'm going to queue this up in my tree for -rc as no one seems to
-be listening to any of the emails I've sent on Thursday.
 
-On Thu, Jun 14, 2012 at 03:07:12PM +0100, Russell King - ARM Linux wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: [PATCH] SPI: OMAP: fix over-eager devm_xxx() conversion
-> 
-> 1a77b127ae (OMAP : SPI : use devm_* functions) converted the SPI
-> device controller state to use devm_kzalloc().  Unfortunately, this
-> is used against an unbound struct device, which results in the
-> following when the device is eventually bound to its driver:
-> 
-> ------------[ cut here ]------------
-> WARNING: at /home/rmk/git/linux-rmk/drivers/base/dd.c:257 driver_probe_device+0x78/0x21c()
-> Modules linked in:
-> Backtrace:
-> [<c0017d0c>] (dump_backtrace+0x0/0x10c) from [<c033e208>] (dump_stack+0x18/0x1c) r7:00000000 r6:c01ff28c r5:c040050c r4:00000101
-> [<c033e1f0>] (dump_stack+0x0/0x1c) from [<c00337ec>] (warn_slowpath_common+0x58/0x70)
-> [<c0033794>] (warn_slowpath_common+0x0/0x70) from [<c0033828>] (warn_slowpath_null+0x24/0x2c)
-> [<c0033804>] (warn_slowpath_null+0x0/0x2c) from [<c01ff28c>] (driver_probe_device+0x78/0x21c)
-> [<c01ff214>] (driver_probe_device+0x0/0x21c) from [<c01ff49c>] (__driver_attach+0x6c/0x90)
-> [<c01ff430>] (__driver_attach+0x0/0x90) from [<c01fda70>] (bus_for_each_dev+0x58/0x98)
-> [<c01fda18>] (bus_for_each_dev+0x0/0x98) from [<c01ff0f4>] (driver_attach+0x20/0x28)
-> [<c01ff0d4>] (driver_attach+0x0/0x28) from [<c01fe2f4>] (bus_add_driver+0xb4/0x230)
-> [<c01fe240>] (bus_add_driver+0x0/0x230) from [<c01ffb24>] (driver_register+0xac/0x138)
-> [<c01ffa78>] (driver_register+0x0/0x138) from [<c0215d4c>] (spi_register_driver+0x4c/0x60)
-> [<c0215d00>] (spi_register_driver+0x0/0x60) from [<c045414c>] (ks8851_init+0x14/0x1c)
-> [<c0454138>] (ks8851_init+0x0/0x1c) from [<c0008770>] (do_one_initcall+0x9c/0x164)
-> [<c00086d4>] (do_one_initcall+0x0/0x164) from [<c0436410>] (kernel_init+0x128/0x210)
-> [<c04362e8>] (kernel_init+0x0/0x210) from [<c0038754>] (do_exit+0x0/0x72c)
-> ---[ end trace 4dcda79f5e89dd84 ]---
-> ks8851 spi1.0: message enable is 0
-> ks8851 spi1.0: eth0: revision 0, MAC 08:00:28:01:4d:c6, IRQ 194, has EEPROM
-> 
-> Fix this by partially reverting the original commit.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/spi/spi-omap2-mcspi.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-> index 9d3409a..6263b0f 100644
-> --- a/drivers/spi/spi-omap2-mcspi.c
-> +++ b/drivers/spi/spi-omap2-mcspi.c
-> @@ -829,7 +829,7 @@ static int omap2_mcspi_setup(struct spi_device *spi)
->  	mcspi_dma = &mcspi->dma_channels[spi->chip_select];
->  
->  	if (!cs) {
-> -		cs = devm_kzalloc(&spi->dev , sizeof *cs, GFP_KERNEL);
-> +		cs = kzalloc(sizeof *cs, GFP_KERNEL);
->  		if (!cs)
->  			return -ENOMEM;
->  		cs->base = mcspi->base + spi->chip_select * 0x14;
-> @@ -869,6 +869,7 @@ static void omap2_mcspi_cleanup(struct spi_device *spi)
->  		cs = spi->controller_state;
->  		list_del(&cs->node);
->  
-> +		kfree(cs);
->  	}
->  
->  	if (spi->chip_select < spi->master->num_chipselect) {
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi,
+
+It seems generating a coredump on an at91rm9200 with kernels 3.4 and 3.5
+causes an oops.
+
+The function get_dump_page calls vivt_flush_cache_page which tests if
+the current cpu belongs to mm_cpumask(vma->vm_mm), but vma->vm_mm is
+NULL for the vector page.
+
+Setting gate_vma.vm_mm to &init_mm seems to avoid the issue, but I am
+not sure this is the right thing to do.
+
+Regards.
+
+-- 
+                                                                Gilles.
