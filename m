@@ -1,24 +1,80 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Sat, 16 Jun 2012 14:51:13 +0200
-Subject: kernel fault in get_dump_page on at91
-Message-ID: <4FDC8141.2030209@xenomai.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 16 Jun 2012 15:27:22 +0200
+Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <4FD867CC.30302@compulab.co.il>
+References: <zumeng.chen@gmail.com> <4FD8577B.1010408@windriver.com>
+ <4FD867CC.30302@compulab.co.il>
+Message-ID: <201206161527.22560.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Igor Grinberg,
 
-Hi,
+> On 06/13/12 12:03, Zumeng Chen wrote:
+> > ? 2012?06?13? 15:51, Igor Grinberg ??:
+> >> On 06/13/12 04:44, Zumeng Chen wrote:
+> >>> From: Zumeng Chen<zumeng.chen@windriver.com>
+> >>> 
+> >>> If we don't set proper debouce time for ads7846, then there are
+> >>> flooded interrupt counters of ads7846 responding to one time
+> >>> touch on screen, so the driver couldn't work well.
+> >>> 
+> >>> And since most OMAP3 series boards pass NULL pointer of board_pdata
+> >>> to omap_ads7846_init, so it's more proper to set it in driver level
+> >>> after having gpio_request done.
+> >>> 
+> >>> This patch has been validated on 3530evm.
+> >>> 
+> >>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
+> >>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
+> >>> ---
+> >>> 
+> >>>   drivers/input/touchscreen/ads7846.c |    4 ++++
+> >>>   1 files changed, 4 insertions(+), 0 deletions(-)
+> >>> 
+> >>> diff --git a/drivers/input/touchscreen/ads7846.c
+> >>> b/drivers/input/touchscreen/ads7846.c index f02028e..459ff29 100644
+> >>> --- a/drivers/input/touchscreen/ads7846.c
+> >>> +++ b/drivers/input/touchscreen/ads7846.c
+> >>> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct
+> >>> spi_device *spi, struct ads784
+> >>> 
+> >>>           }
+> >>>           
+> >>>           ts->gpio_pendown = pdata->gpio_pendown;
+> >>> 
+> >>> +#ifdef CONFIG_ARCH_OMAP3
+> >>> +        /* 310 means about 10 microsecond for omap3 */
+> >>> +        gpio_set_debounce(pdata->gpio_pendown, 310);
+> >>> +#endif
+> >> 
+> >> Unless this concerns many boards/archs/platforms,
+> > 
+> > Yes, this is the case.
+> > 
+> >> I'd suggest you to implement
+> >> the get_pendown_state() method in the board file.
+> > 
+> > it seems they are different way between gpio and
+> > get_pendown_state, and gpio way is used for omap3
+> > to drive ads7846, so I guess we may have to do like this.
+> 
+> No, this is not (and does not have to be) OMAP wide.
+> The decision for this is made on per-board basis.
 
-It seems generating a coredump on an at91rm9200 with kernels 3.4 and 3.5
-causes an oops.
++1 agreed
 
-The function get_dump_page calls vivt_flush_cache_page which tests if
-the current cpu belongs to mm_cpumask(vma->vm_mm), but vma->vm_mm is
-NULL for the vector page.
+> > Regards,
+> > Zumeng
+> > 
+> >> If more users will need this, it can be facilitated in the driver.
+> >> (and of course not with the ugly ifdefs...)
+> >> 
+> >>>       } else {
+> >>>       
+> >>>           dev_err(&spi->dev, "no get_pendown_state nor
+> >>>           gpio_pendown?\n");
 
-Setting gate_vma.vm_mm to &init_mm seems to avoid the issue, but I am
-not sure this is the right thing to do.
-
-Regards.
-
--- 
-                                                                Gilles.
+Best regards,
+Marek Vasut
