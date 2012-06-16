@@ -1,129 +1,83 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Fri, 15 Jun 2012 20:54:39 -0500
-Subject: [PATCH 1/3] ARM: OMAP: hwmod: partially un-reset hwmods might not be
- properly enabled
+Date: Fri, 15 Jun 2012 20:54:40 -0500
+Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
 In-Reply-To: <1339811681-5256-1-git-send-email-omar.luna@linaro.org>
 References: <1339811681-5256-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1339811681-5256-2-git-send-email-omar.luna@linaro.org>
+Message-ID: <1339811681-5256-3-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some IP blocks might not be using/controlling more than one
-reset line, this check loosens the restriction to fully use
-hwmod framework for those drivers.
-
-E.g.: ipu has reset lines: mmu_cache, cpu0 and cpu1.
-- cpu1 might not be used and hence (with previous check)
-  won't be fully enabled by hwmod code.
-
-While at it, prevent _omap4_module_disable if all the hardreset
-lines on an IP block are not under reset.
+For a reset sequence to complete cleanly, a module needs its
+associated clocks to be enabled, otherwise the timeout check
+in prcm code can print a false failure (failed to hardreset)
+that occurs because the clocks aren't powered ON and the status
+bit checked can't transition without them.
 
 Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   37 ++++++++++++++++++++++---------------
- 1 files changed, 22 insertions(+), 15 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   33 ++++++++++++++++++++++++++++++++-
+ 1 files changed, 32 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index bf86f7e..5f0811a 100644
+index 5f0811a..8a7e5bc 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1537,25 +1537,28 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
- }
- 
- /**
-- * _are_any_hardreset_lines_asserted - return true if part of @oh is hard-reset
-+ * _are_all_hardreset_lines_asserted - return true if the @oh is hard-reset
-  * @oh: struct omap_hwmod *
-  *
-- * If any hardreset line associated with @oh is asserted, then return true.
-- * Otherwise, if @oh has no hardreset lines associated with it, or if
-- * no hardreset lines associated with @oh are asserted, then return false.
-+ * If all hardreset lines associated with @oh are asserted, then return true.
-+ * Otherwise, if part of @oh is out hardreset or if no hardreset lines
-+ * associated with @oh are asserted, then return false.
-  * This function is used to avoid executing some parts of the IP block
-- * enable/disable sequence if a hardreset line is set.
-+ * enable/disable sequence if its hardreset line is set.
-  */
--static bool _are_any_hardreset_lines_asserted(struct omap_hwmod *oh)
-+static bool _are_all_hardreset_lines_asserted(struct omap_hwmod *oh)
+@@ -1472,7 +1472,7 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
  {
--	int i;
-+	int i, rst_cnt = 0;
+ 	struct omap_hwmod_rst_info ohri;
+-	int ret;
++	int ret, hwsup = 0;
  
- 	if (oh->rst_lines_cnt == 0)
- 		return false;
+ 	if (!oh)
+ 		return -EINVAL;
+@@ -1481,6 +1481,23 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
  
- 	for (i = 0; i < oh->rst_lines_cnt; i++)
- 		if (_read_hardreset(oh, oh->rst_lines[i].name) > 0)
--			return true;
-+			rst_cnt++;
++	if (oh->clkdm) {
++		/*
++		 * A clockdomain must be in SW_SUP otherwise reset
++		 * might not be completed. The clockdomain can be set
++		 * in HW_AUTO only when the module become ready.
++		 */
++		hwsup = clkdm_in_hwsup(oh->clkdm);
++		ret = clkdm_hwmod_enable(oh->clkdm, oh);
++		if (ret) {
++			WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
++			     oh->name, oh->clkdm->name, ret);
++			return ret;
++		}
++	}
 +
-+	if (oh->rst_lines_cnt == rst_cnt)
-+		return true;
++	_enable_clocks(oh);
++
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
+ 						   ohri.rst_shift,
+@@ -1497,9 +1514,23 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 		return -EINVAL;
+ 	}
  
- 	return false;
++	_disable_clocks(oh);
++
+ 	if (ret == -EBUSY)
+ 		pr_warning("omap_hwmod: %s: failed to hardreset\n", oh->name);
+ 
++	if (!ret) {
++		/*
++		 * Set the clockdomain to HW_AUTO, assuming that the
++		 * previous state was HW_AUTO.
++		 */
++		if (oh->clkdm && hwsup)
++			clkdm_allow_idle(oh->clkdm);
++	} else {
++		if (oh->clkdm)
++			clkdm_hwmod_disable(oh->clkdm, oh);
++	}
++
+ 	return ret;
  }
-@@ -1578,6 +1581,13 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
- 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
- 		return -EINVAL;
  
-+	/*
-+	 * Since integration code might still be doing something, only
-+	 * disable if all lines are under hardreset.
-+	 */
-+	if (!_are_all_hardreset_lines_asserted(oh))
-+		return 0;
-+
- 	pr_debug("omap_hwmod: %s: %s\n", oh->name, __func__);
- 
- 	omap4_cminst_module_disable(oh->clkdm->prcm_partition,
-@@ -1585,9 +1595,6 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
- 				    oh->clkdm->clkdm_offs,
- 				    oh->prcm.omap4.clkctrl_offs);
- 
--	if (_are_any_hardreset_lines_asserted(oh))
--		return 0;
--
- 	v = _omap4_wait_target_disable(oh);
- 	if (v)
- 		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
-@@ -1779,7 +1786,7 @@ static int _enable(struct omap_hwmod *oh)
- 	}
- 
- 	/*
--	 * If an IP block contains HW reset lines and any of them are
-+	 * If an IP block contains HW reset lines and all of them are
- 	 * asserted, we let integration code associated with that
- 	 * block handle the enable.  We've received very little
- 	 * information on what those driver authors need, and until
-@@ -1787,7 +1794,7 @@ static int _enable(struct omap_hwmod *oh)
- 	 * posted to the public lists, this is probably the best we
- 	 * can do.
- 	 */
--	if (_are_any_hardreset_lines_asserted(oh))
-+	if (_are_all_hardreset_lines_asserted(oh))
- 		return 0;
- 
- 	/* Mux pins for device runtime if populated */
-@@ -1863,7 +1870,7 @@ static int _idle(struct omap_hwmod *oh)
- 		return -EINVAL;
- 	}
- 
--	if (_are_any_hardreset_lines_asserted(oh))
-+	if (_are_all_hardreset_lines_asserted(oh))
- 		return 0;
- 
- 	if (oh->class->sysc)
-@@ -1948,7 +1955,7 @@ static int _shutdown(struct omap_hwmod *oh)
- 		return -EINVAL;
- 	}
- 
--	if (_are_any_hardreset_lines_asserted(oh))
-+	if (_are_all_hardreset_lines_asserted(oh))
- 		return 0;
- 
- 	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
 -- 
 1.7.4.1
