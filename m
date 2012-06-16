@@ -1,80 +1,132 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 16 Jun 2012 15:27:22 +0200
-Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
- level
-In-Reply-To: <4FD867CC.30302@compulab.co.il>
-References: <zumeng.chen@gmail.com> <4FD8577B.1010408@windriver.com>
- <4FD867CC.30302@compulab.co.il>
-Message-ID: <201206161527.22560.marek.vasut@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 16 Jun 2012 16:10:51 +0200
+Subject: [PATCH] leds: Add DT support for leds-pca9532
+Message-ID: <1339855851-9171-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Igor Grinberg,
+This patch adds DT support for leds-pca9532.
 
-> On 06/13/12 12:03, Zumeng Chen wrote:
-> > ? 2012?06?13? 15:51, Igor Grinberg ??:
-> >> On 06/13/12 04:44, Zumeng Chen wrote:
-> >>> From: Zumeng Chen<zumeng.chen@windriver.com>
-> >>> 
-> >>> If we don't set proper debouce time for ads7846, then there are
-> >>> flooded interrupt counters of ads7846 responding to one time
-> >>> touch on screen, so the driver couldn't work well.
-> >>> 
-> >>> And since most OMAP3 series boards pass NULL pointer of board_pdata
-> >>> to omap_ads7846_init, so it's more proper to set it in driver level
-> >>> after having gpio_request done.
-> >>> 
-> >>> This patch has been validated on 3530evm.
-> >>> 
-> >>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
-> >>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
-> >>> ---
-> >>> 
-> >>>   drivers/input/touchscreen/ads7846.c |    4 ++++
-> >>>   1 files changed, 4 insertions(+), 0 deletions(-)
-> >>> 
-> >>> diff --git a/drivers/input/touchscreen/ads7846.c
-> >>> b/drivers/input/touchscreen/ads7846.c index f02028e..459ff29 100644
-> >>> --- a/drivers/input/touchscreen/ads7846.c
-> >>> +++ b/drivers/input/touchscreen/ads7846.c
-> >>> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct
-> >>> spi_device *spi, struct ads784
-> >>> 
-> >>>           }
-> >>>           
-> >>>           ts->gpio_pendown = pdata->gpio_pendown;
-> >>> 
-> >>> +#ifdef CONFIG_ARCH_OMAP3
-> >>> +        /* 310 means about 10 microsecond for omap3 */
-> >>> +        gpio_set_debounce(pdata->gpio_pendown, 310);
-> >>> +#endif
-> >> 
-> >> Unless this concerns many boards/archs/platforms,
-> > 
-> > Yes, this is the case.
-> > 
-> >> I'd suggest you to implement
-> >> the get_pendown_state() method in the board file.
-> > 
-> > it seems they are different way between gpio and
-> > get_pendown_state, and gpio way is used for omap3
-> > to drive ads7846, so I guess we may have to do like this.
-> 
-> No, this is not (and does not have to be) OMAP wide.
-> The decision for this is made on per-board basis.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-+1 agreed
+---
+ Documentation/devicetree/bindings/leds/leds-pca9532.txt |   43 ++++++++++++++
+ drivers/leds/leds-pca9532.c                             |   47 ++++++++++++++++
+ 2 files changed, 90 insertions(+)
 
-> > Regards,
-> > Zumeng
-> > 
-> >> If more users will need this, it can be facilitated in the driver.
-> >> (and of course not with the ugly ifdefs...)
-> >> 
-> >>>       } else {
-> >>>       
-> >>>           dev_err(&spi->dev, "no get_pendown_state nor
-> >>>           gpio_pendown?\n");
-
-Best regards,
-Marek Vasut
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/leds/leds-pca9532.txt
+@@ -0,0 +1,43 @@
++NXP PCA9532 LED (incl. GPIO) controller
++
++Required properties:
++- compatible: must be "nxp,pca9532"
++- reg: I2C address
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be 2:
++   1) pin number
++   2) optional parameters:
++      - bit 0 specifies polarity (0 for normal, 1 for inverted)
++- nxp,typecodes: groups of 2 bits for each of the 16 pins:
++  0: None
++  1: LED
++  2: Beep
++  3: GPIO
++- nxp,statecodes: groups of 2 bits for each of the 16 pins:
++  0: off
++  1: on
++  2: pwm0
++  3: pwm1
++
++Optional properties:
++- nxp,psc: array of 2 numbers: PSC values for the two PWM channels (see datasheet)
++- nxp,pwm: array of 2 numbers: PWM values for the two PWM channels (see datasheet)
++
++Example:
++
++	pca9532: pca9532 at 60 {
++		compatible = "nxp,pca9532";
++		gpio-controller;
++		#gpio-cells = <2>;
++		nxp,typecodes = <0xffffffff>;
++		nxp,statecodes = <0x00000000>;
++		reg = <0x60>;
++	};
++
++	sd at 20098000 {
++		wp-gpios = <&pca9532 5 0>;
++		cd-gpios = <&pca9532 4 0>;
++		cd-inverted;
++		bus-width = <4>;
++		status = "okay";
++	};
+--- linux-2.6.orig/drivers/leds/leds-pca9532.c
++++ linux-2.6/drivers/leds/leds-pca9532.c
+@@ -21,6 +21,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/leds-pca9532.h>
+ #include <linux/gpio.h>
++#include <linux/of.h>
+ 
+ /* m =  num_leds*/
+ #define PCA9532_REG_INPUT(i)	((i) >> 3)
+@@ -444,6 +445,47 @@ exit:
+ 	return err;
+ }
+ 
++#ifdef CONFIG_OF
++static struct pca9532_platform_data *pca9532_parse_dt(struct device *dev)
++{
++	struct device_node *np = dev->of_node;
++	struct pca9532_platform_data *pca9532_pdata;
++	u32 typecodes, statecodes;
++	u32 pwm[2];
++	u32 psc[2];
++	int i;
++
++	pca9532_pdata = devm_kzalloc(dev, sizeof(*pca9532_pdata), GFP_KERNEL);
++	if (!pca9532_pdata) {
++		dev_err(dev, "could not allocate memory for platform data\n");
++		return NULL;
++	}
++
++	if (!of_property_read_u32(np, "nxp,typecodes", &typecodes)) {
++		for (i = 0; i < 16; i++)
++			pca9532_pdata->leds[i].type =
++				(typecodes >> (2 * i)) & 0x3;
++	}
++	if (!of_property_read_u32(np, "nxp,statecodes", &statecodes)) {
++		for (i = 0; i < 16; i++)
++			pca9532_pdata->leds[i].state =
++				(statecodes >> (2 * i)) & 0x3;
++	}
++	if (!of_property_read_u32_array(np, "nxp,pwm", &pwm[0], 2)) {
++		for (i = 0; i < 2; i++)
++			pca9532_pdata->pwm[i] = pwm[i];
++	}
++	if (!of_property_read_u32_array(np, "nxp,psc", &psc[0], 2)) {
++		for (i = 0; i < 2; i++)
++			pca9532_pdata->psc[i] = psc[i];
++	}
++
++	pca9532_pdata->gpio_base = -1; /* dynamically assign gpio base */
++
++	return pca9532_pdata;
++}
++#endif
++
+ static int pca9532_probe(struct i2c_client *client,
+ 	const struct i2c_device_id *id)
+ {
+@@ -451,6 +493,11 @@ static int pca9532_probe(struct i2c_clie
+ 	struct pca9532_platform_data *pca9532_pdata = client->dev.platform_data;
+ 	int err;
+ 
++#ifdef CONFIG_OF
++	if (!pca9532_pdata && client->dev.of_node)
++		pca9532_pdata = pca9532_parse_dt(&client->dev);
++#endif
++
+ 	if (!pca9532_pdata)
+ 		return -EIO;
+ 
