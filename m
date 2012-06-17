@@ -1,27 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 17 Jun 2012 21:14:19 +0100
-Subject: [PATCH] regulator: Add ramp_delay to regulator constraints to
- get used as a configurable parameter.
-In-Reply-To: <1339416668-17028-1-git-send-email-yadi.brar@samsung.com>
-References: <1339416668-17028-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <20120617201419.GU4267@opensource.wolfsonmicro.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 18 Jun 2012 01:06:20 +0200
+Subject: [PATCH] ARM: ux500: bump i2c bus speed to 400kHz
+In-Reply-To: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
+References: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201206180106.21108.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 05:41:08PM +0530, Yadwinder Singh Brar wrote:
-> For some hardwares ramp_delay for BUCKs is a configurable parameter which can
-> be configured through DT or board file.This patch adds ramp_delay to regulator
-> constraints and allow user to configure it for regulators which supports this
-> feature, through DT or board file. It will provide two ways of setting the
-> ramp_delay for a regulator:
+Dear Linus Walleij,
 
-Applied, thanks - sorry about the delay, you submitted the day before I
-flew back from China.  I rewrote the subject line to fit in 80 columns,
-otherwise things like git log and pull requests look odd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120617/7d19f02e/attachment.sig>
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Some recent discussion revealed inconsistency in the board file
+> for the MOP500 family. The board can very well do 400kHz on
+> the I2C busses, so make it do that.
+
+Shouldn't this be controlled by DT? Some of the i2c devices can't do 400kHz.
+
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500.c |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ux500/board-mop500.c
+> b/arch/arm/mach-ux500/board-mop500.c index 9c74ac5..e441bd7 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -354,13 +354,13 @@ static struct nmk_i2c_controller u8500_i2c##id##_data
+> = { \ /*
+>   * The board uses 4 i2c controllers, initialize all of
+>   * them with slave data setup time of 250 ns,
+> - * Tx & Rx FIFO threshold values as 8 and standard
+> + * Tx & Rx FIFO threshold values as 1 resp. 8 and fast
+>   * mode of operation
+>   */
+> -U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+> -U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+> -U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+> -U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+> +U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+> +U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+> +U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+> +U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+> 
+>  static void __init mop500_i2c_init(struct device *parent)
+>  {
+
+Best regards,
+Marek Vasut
