@@ -1,33 +1,148 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 17 Jun 2012 12:11:33 +0200
-Subject: [PATCH v3 2/2] mmc: mmci.c: Remove wrong error handling of gpio 0
-In-Reply-To: <1339927893-8842-1-git-send-email-stigge@antcom.de>
-References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339927893-8842-3-git-send-email-stigge@antcom.de>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 17 Jun 2012 13:14:09 +0200
+Subject: [PATCH] ARM: mx23: Add initial support for olinuxino board
+In-Reply-To: <1339914539-4154-1-git-send-email-festevam@gmail.com>
+References: <1339914539-4154-1-git-send-email-festevam@gmail.com>
+Message-ID: <201206171314.09561.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zero is a valid GPIO and shouldn't be handled as an error return code from
-of_get_named_gpio(). It was a leftover from old code before getting
-pdata->gpio_*() was modified.
+Dear Fabio Estevam,
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- drivers/mmc/host/mmci.c |    5 -----
- 1 file changed, 5 deletions(-)
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> mx23-olinuxino is a low cost board designed by Olimex.
+> 
+> It has the following features:
+> 
+> - Freescale iMX233 ARM926J processor at 454MHz
+> -64 MB RAM
+> -SD-card connector
+> -TV PAL/NTSC video output
+> -2 USB High Speed Hosts
+> -Ethernet 100 Mbit
+> -Stereo Audio Input
+> -Stereo Headphones Audio Output
+> 
+> More information at:
+> http://www.olimex.com/dev/imx233-olinuxino-maxi.html
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt |    4 ++
+>  arch/arm/boot/dts/imx23-olinuxino.dts         |   45
+> +++++++++++++++++++++++++ arch/arm/boot/dts/imx23.dtsi                  | 
+>  14 ++++++++
+>  arch/arm/mach-mxs/mach-mxs.c                  |    1 +
+>  4 files changed, 64 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx23-olinuxino.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+> b/Documentation/devicetree/bindings/arm/fsl.txt index ac9e751..ca2bc1c
+> 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -5,6 +5,10 @@ i.MX23 Evaluation Kit
+>  Required root node properties:
+>      - compatible = "fsl,imx23-evk", "fsl,imx23";
+> 
+> +i.MX23 Olinuxino Low Cost Board
+> +Required root node properties:
+> +    - compatible = "fsl,imx23-olinuxino", "fsl,imx23";
+> +
+>  i.MX28 Evaluation Kit
+>  Required root node properties:
+>      - compatible = "fsl,imx28-evk", "fsl,imx28";
+> diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts
+> b/arch/arm/boot/dts/imx23-olinuxino.dts new file mode 100644
+> index 0000000..3c56010
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + *
+> + * Author: Fabio Estevam <fabio.estevam@freescale.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx23.dtsi"
+> +
+> +/ {
+> +	model = "i.MX23 Olinuxino Low Cost Board";
+> +	compatible = "fsl,imx23-olinuxino", "fsl,imx23";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;
+> +	};
+> +
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			ssp0: ssp at 80010000 {
+> +				compatible = "fsl,imx23-mmc";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_sck_cfg>;
+> +				bus-width = <4>;
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			duart: serial at 80070000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&duart_pins_a>;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> index 8c5f999..89044f0 100644
+> --- a/arch/arm/boot/dts/imx23.dtsi
+> +++ b/arch/arm/boot/dts/imx23.dtsi
+> @@ -134,6 +134,20 @@
+>  					fsl,pinmux-ids = <0x2010 0x2060>;
+>  					fsl,pull-up = <0>;
+>  				};
+> +
+> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <0x2000 0x2020 0x2030
+> +						0x2040 0x2050>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
+> +
+> +				mmc0_sck_cfg: mmc0_sck_cfg {
+> +					fsl,pinmux-ids = <0x2010>;
+> +					fsl,pull-up = <0>;
+> +				};
+>  			};
+> 
+>  			digctl at 8001c000 {
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 8cac94b..a321753 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -92,6 +92,7 @@ static void __init mxs_machine_init(void)
+> 
+>  static const char *imx23_dt_compat[] __initdata = {
+>  	"fsl,imx23-evk",
+> +	"fsl,imx23-olinuxino",
 
---- linux-2.6.orig/drivers/mmc/host/mmci.c
-+++ linux-2.6/drivers/mmc/host/mmci.c
-@@ -1216,12 +1216,7 @@ static void mmci_dt_populate_generic_pda
- 	int bus_width = 0;
- 
- 	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
--	if (!pdata->gpio_wp)
--		pdata->gpio_wp = -1;
--
- 	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
--	if (!pdata->gpio_cd)
--		pdata->gpio_cd = -1;
- 
- 	if (of_get_property(np, "cd-inverted", NULL))
- 		pdata->cd_invert = true;
+Is this addition needed?
+
+>  	"fsl,imx23",
+>  	NULL,
+>  };
+
+Best regards,
+Marek Vasut
