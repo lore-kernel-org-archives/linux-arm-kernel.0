@@ -1,22 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 16 Jun 2012 18:43:14 -0700
-Subject: [PATCH] arm: versatile: fix and enable PCI I/O space
-In-Reply-To: <1339423438-25836-1-git-send-email-robherring2@gmail.com>
-References: <1339423438-25836-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120617014314.GA11547@quad.lixom.net>
+Date: Sat, 16 Jun 2012 22:19:32 -0700
+Subject: [PATCH] ARM: Kirkwood: Fix clk problems modular ethernet driver
+In-Reply-To: <1339591965-4741-1-git-send-email-andrew@lunn.ch>
+References: <1339591965-4741-1-git-send-email-andrew@lunn.ch>
+Message-ID: <CAOesGMix-2Mj_smw3t6oJFWNR-mXwXK3soPsne5U0xa7bu0pDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 09:03:58AM -0500, Rob Herring wrote:
+Hi,
 
-> Arnd, Olof,
-> 
-> This should be applied for 3.5. There is a more simple fix to just
-> restore IO_RESOURCE_LIMIT to 0xffffffff, but I think that moves in
-> the wrong direction. This patch is needed to unify the I/O space
-> mapping.
+On Wed, Jun 13, 2012 at 5:52 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> When the ethernet driver was built as a module, it would lock the
+> machine when loaded. At boot the ethernet clks are unused, so get
+> turned off. ?Later, when the module is loaded, the probe function
+> would access the hardware before the clock was restarted, and the
+> machine would lock. It has also been determined that when the clk is
+> turned off, the interface forgets its MAC address, which for most
+> systems, is set by the boot loader.
+>
+> When the machine setup file creates a platform device for the
+> interface, prepare and enable the clock for the interface. This will
+> ensure it is not turned off. However, if the setup file only
+> instantiates one platform device, the other will have its clk
+> disabled, thus maybe saving a little power.
+>
+> Report-by: Simon Baatz <gmbnomis@gmail.com>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Tested-by: Simon Baatz <gmbnomis@gmail.com>
 
-Applied, fixing a trivial stray whitespace.
+Thanks, applied to fixes.
 
 
 -Olof
