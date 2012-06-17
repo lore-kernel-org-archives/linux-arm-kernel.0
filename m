@@ -1,27 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 17 Jun 2012 10:52:33 -0700
-Subject: [PATCH v2] ARM: iconnect: Remove include of removed
- linux/spi/orion_spi.h
-In-Reply-To: <1339148205-29285-1-git-send-email-andrew@lunn.ch>
-References: <1339148205-29285-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CAOesGMjL2PdvRG12T_fgPkd5ym2d4RjjtNTni1ZihDj=Uiu-Lg@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sun, 17 Jun 2012 19:57:17 +0200
+Subject: [PATCH] ARM: ux500: bump i2c bus speed to 400kHz
+Message-ID: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On Fri, Jun 8, 2012 at 2:36 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> v3.5-rc1 fails to build when DT and iconnect is enabled because of
-> this now none existant include file.
->
-> Also remove the other two SPI include files, which are not needed
-> with the move to DT.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+Some recent discussion revealed inconsistency in the board file
+for the MOP500 family. The board can very well do 400kHz on
+the I2C busses, so make it do that.
 
-Looks like I missed this one the first time around, but applied it to
-fixes now. Thanks!
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-
--Olof
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 9c74ac5..e441bd7 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -354,13 +354,13 @@ static struct nmk_i2c_controller u8500_i2c##id##_data = { \
+ /*
+  * The board uses 4 i2c controllers, initialize all of
+  * them with slave data setup time of 250 ns,
+- * Tx & Rx FIFO threshold values as 8 and standard
++ * Tx & Rx FIFO threshold values as 1 resp. 8 and fast
+  * mode of operation
+  */
+-U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+-U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+-U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+-U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+ 
+ static void __init mop500_i2c_init(struct device *parent)
+ {
+-- 
+1.7.9.2
