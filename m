@@ -1,45 +1,27 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 17 Jun 2012 19:57:17 +0200
-Subject: [PATCH] ARM: ux500: bump i2c bus speed to 400kHz
-Message-ID: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 17 Jun 2012 20:01:21 +0200
+Subject: [PATCH v3 1/2] mmc: mmci.c: Defer probe() in case of yet
+ uninitialized GPIOs
+In-Reply-To: <1339927893-8842-2-git-send-email-stigge@antcom.de>
+References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
+ <1339927893-8842-2-git-send-email-stigge@antcom.de>
+Message-ID: <CACRpkdaVciTXZ0XY5RvWzHPwh5iXQ7DVSD48K7prgmY0WdyF9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Sun, Jun 17, 2012 at 12:11 PM, Roland Stigge <stigge@antcom.de> wrote:
 
-Some recent discussion revealed inconsistency in the board file
-for the MOP500 family. The board can very well do 400kHz on
-the I2C busses, so make it do that.
+> If the GPIOs used by the MMCI driver are not registered yet when the driver is
+> probe()d, they can't be used. This happens if the mmci driver is probed before
+> the respective GPIO controller (e.g. on the LPC32xx EA3250 board, the PCA9532
+> GPIO controller would be initialized via DT after mmci). Therefore, we defer
+> mmci in this case.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9c74ac5..e441bd7 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -354,13 +354,13 @@ static struct nmk_i2c_controller u8500_i2c##id##_data = { \
- /*
-  * The board uses 4 i2c controllers, initialize all of
-  * them with slave data setup time of 250 ns,
-- * Tx & Rx FIFO threshold values as 8 and standard
-+ * Tx & Rx FIFO threshold values as 1 resp. 8 and fast
-  * mode of operation
-  */
--U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
--U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
--U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
--U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
- 
- static void __init mop500_i2c_init(struct device *parent)
- {
--- 
-1.7.9.2
+Pls put this into Russell's patch tracker.
+
+Yours,
+Linus Walleij
