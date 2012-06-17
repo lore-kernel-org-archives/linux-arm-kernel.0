@@ -1,40 +1,25 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 17 Jun 2012 13:51:05 +0200
-Subject: [PATCH] leds: Add DT support for leds-pca9532
-In-Reply-To: <4FDCA0FC.5000409@wwwdotorg.org>
-References: <1339855851-9171-1-git-send-email-stigge@antcom.de>
- <4FDCA0FC.5000409@wwwdotorg.org>
-Message-ID: <4FDDC4A9.1040706@antcom.de>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sun, 17 Jun 2012 08:40:23 -0400
+Subject: Converting kirkwood-goflexnet to DTS
+In-Reply-To: <CAMW5UfZt_5ebcbRPfKn+aYkjzHcx5k7yV_PDmhdJaCMZos4Xsw@mail.gmail.com>
+References: <20120614141706.GA6676@lunn.ch>
+ <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+ <CAMW5UfYwZkXzGbJTZ7tBr+eA5_+Jcri3FzsoaptXJV94j2okzw@mail.gmail.com>
+ <20120615104140.24bf25f3@skate>
+ <CAMW5UfaxqBXSToFGxiPu0GWFAeBddT-_XH8-Xv0A9L=XhDy7BQ@mail.gmail.com>
+ <87r4tgvii8.fsf@lebrac.rtp-net.org>
+ <CAMW5UfZt_5ebcbRPfKn+aYkjzHcx5k7yV_PDmhdJaCMZos4Xsw@mail.gmail.com>
+Message-ID: <CAMW5Ufb1B6jETa47Z59uR_Rk0==kZ9c5OvjSz2KRbphSs8A6pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Decided to backtrack a bit.  I rolled my setup into 3.4.2 to see what
+happens as I'm currently running that version via a non-DTS based
+patch right now.  Same behavior, the kernel initializes but stops
+before attaching a root device and firing up init.
 
-On 16/06/12 17:06, Stephen Warren wrote:
->> +- nxp,typecodes: groups of 2 bits for each of the 16 pins:
->> +  0: None
->> +  1: LED
->> +  2: Beep
->> +  3: GPIO
->> +- nxp,statecodes: groups of 2 bits for each of the 16 pins:
->> +  0: off
->> +  1: on
->> +  2: pwm0
->> +  3: pwm1
->> +
->> +Optional properties:
->> +- nxp,psc: array of 2 numbers: PSC values for the two PWM channels (see datasheet)
->> +- nxp,pwm: array of 2 numbers: PWM values for the two PWM channels (see datasheet)
-> 
-> Shouldn't that all be exposed using a combination of the pinctrl
-> bindings that are in 3.5, and the PWM bindings that should be coming in 3.6?
+I've got a couple more hacks to try next to see if I can pinpoint
+what's keeping my GoFlex from working when other similar Kirkwoods
+seem to play with DTS kernels just fine.
 
-Thanks for the note! I found a pwm tree that should have this at
-
-http://gitorious.org/linux-pwm/linux-pwm
-
-but it gives me server errors. Is there a place where I can have a look?
-
-Thanks in advance,
-
-Roland
+Josh Coombs
