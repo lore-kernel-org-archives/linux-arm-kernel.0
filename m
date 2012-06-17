@@ -1,37 +1,46 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 17 Jun 2012 12:11:31 +0200
-Subject: [PATCH] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER if GPIO
- not yet available
-Message-ID: <1339927893-8842-1-git-send-email-stigge@antcom.de>
+Date: Sun, 17 Jun 2012 12:11:32 +0200
+Subject: [PATCH v3 1/2] mmc: mmci.c: Defer probe() in case of yet
+ uninitialized GPIOs
+In-Reply-To: <1339927893-8842-1-git-send-email-stigge@antcom.de>
+References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
+Message-ID: <1339927893-8842-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
-respective GPIO is not (yet) available. This is useful if driver's probe()
-functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
-can be probed again later on.
-
-The function still returns -EINVAL on other errors (parse error or node doesn't
-exist). This way, the case of an optional/intentionally missing GPIO is handled
-appropriately.
+If the GPIOs used by the MMCI driver are not registered yet when the driver is
+probe()d, they can't be used. This happens if the mmci driver is probed before
+the respective GPIO controller (e.g. on the LPC32xx EA3250 board, the PCA9532
+GPIO controller would be initialized via DT after mmci). Therefore, we defer
+mmci in this case.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- drivers/gpio/gpiolib-of.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/mmc/host/mmci.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
---- linux-2.6.orig/drivers/gpio/gpiolib-of.c
-+++ linux-2.6/drivers/gpio/gpiolib-of.c
-@@ -62,7 +62,10 @@ static int of_gpiochip_find_and_xlate(st
- int of_get_named_gpio_flags(struct device_node *np, const char *propname,
-                            int index, enum of_gpio_flags *flags)
- {
--	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
-+	/* Return -EPROBE_DEFER to support probe() functions to be called
-+	 * later when the GPIO actually becomes available
-+	 */
-+	struct gg_data gg_data = { .flags = flags, .out_gpio = -EPROBE_DEFER };
- 	int ret;
+--- linux-2.6.orig/drivers/mmc/host/mmci.c
++++ linux-2.6/drivers/mmc/host/mmci.c
+@@ -1424,6 +1424,10 @@ static int __devinit mmci_probe(struct a
+ 	writel(0, host->base + MMCIMASK1);
+ 	writel(0xfff, host->base + MMCICLEAR);
  
- 	/* .of_xlate might decide to not fill in the flags, so clear it. */
++	if (plat->gpio_cd == -EPROBE_DEFER) {
++		ret = -EPROBE_DEFER;
++		goto err_gpio_cd;
++	}
+ 	if (gpio_is_valid(plat->gpio_cd)) {
+ 		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
+ 		if (ret == 0)
+@@ -1447,6 +1451,10 @@ static int __devinit mmci_probe(struct a
+ 		if (ret >= 0)
+ 			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
+ 	}
++	if (plat->gpio_wp == -EPROBE_DEFER) {
++		ret = -EPROBE_DEFER;
++		goto err_gpio_wp;
++	}
+ 	if (gpio_is_valid(plat->gpio_wp)) {
+ 		ret = gpio_request(plat->gpio_wp, DRIVER_NAME " (wp)");
+ 		if (ret == 0)
