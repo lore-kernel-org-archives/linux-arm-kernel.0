@@ -1,50 +1,25 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 17 Jun 2012 16:06:19 +0200
-Subject: [PATCH 2/2] ARM: mach-mxs: Remove board entries in dt_board_compat
-In-Reply-To: <1339941856-2836-2-git-send-email-festevam@gmail.com>
-References: <1339941856-2836-1-git-send-email-festevam@gmail.com>
- <1339941856-2836-2-git-send-email-festevam@gmail.com>
-Message-ID: <201206171606.19868.marex@denx.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Sun, 17 Jun 2012 16:06:41 +0200
+Subject: [PATCH] arm: fix iconnect build
+In-Reply-To: <20120617125651.GH8450@1wt.eu> (Willy Tarreau's message of "Sun,
+ 17 Jun 2012 14:56:51 +0200")
+References: <20120617125651.GH8450@1wt.eu>
+Message-ID: <87mx42uj66.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+Willy Tarreau <w@1wt.eu> writes:
 
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> There is no need for adding board related entries into dt_board_compat.
-> 
-> Leave only the SoC entry.
-> 
-> This way we do not need to patch a C file when adding dt support for a new
-> board.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-mxs.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 8cac94b..0f36b22 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -91,13 +91,11 @@ static void __init mxs_machine_init(void)
->  }
-> 
->  static const char *imx23_dt_compat[] __initdata = {
-> -	"fsl,imx23-evk",
->  	"fsl,imx23",
->  	NULL,
->  };
-> 
->  static const char *imx28_dt_compat[] __initdata = {
-> -	"fsl,imx28-evk",
+> Hi,
 
-Don't you need this one as there's some hook?
+Hi,
 
->  	"fsl,imx28",
->  	NULL,
->  };
+>
+> iconnect does not build in 3.5-rc3 due to missing file orion-spi.h.
+> The following trivial patch fixes it.
 
-Best regards,
-Marek Vasut
+A patch has already been sent for this:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/103238.html
+
+Thanks,
+Arnaud
