@@ -1,35 +1,81 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 17 Jun 2012 19:28:45 +0200
-Subject: [PATCH 1/1] ARM: ux500: Fix build errors/warnings when
- MACH_UX500_DT is not set
-In-Reply-To: <1339749776-9468-1-git-send-email-lee.jones@linaro.org>
-References: <1339749776-9468-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaLNOFdQZ3i0+7gSCKBreHsxaO93X9HwTbLBz7L=gLFcg@mail.gmail.com>
+Date: Sun, 17 Jun 2012 19:43:13 +0200
+Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <4FDB3642.5030804@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD8BAD2.50703@linaro.org>
+ <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
+ <4FDAFA17.6050502@linaro.org>
+ <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
+ <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
+ <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
+Message-ID: <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2012 at 10:42 AM, Lee Jones <lee.jones@linaro.org> wrote:
+Gah, what a thread...
 
-> When MACH_UX500_DT and all related Device Tree configurations are forced
-> off the warning and error below prevent the kernel from compiling. This
-> simple patch fixes both issues and allows for full build and boot of
-> ST-Ericsson's low-cost development board, Snowball.
+On Fri, Jun 15, 2012 at 3:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 15/06/12 14:05, Srinidhi Kasagar wrote:
+>> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
+>>> On 15/06/12 12:50, Srinidhi Kasagar wrote:
+
+>>>>> +static struct nmk_i2c_controller u8500_i2c = {
+>>>>> + ? ? ? /*
+>>>>> + ? ? ? ?* Slave data setup time; 250ns, 100ns, and 10ns, which
+>>>>> + ? ? ? ?* is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+>>>>> + ? ? ? ?*/
+>>>>> + ? ? ? .slsu ? ? ? ? ? = 0xe,
+>>>>> + ? ? ? .tft ? ? ? ? ? ?= 1, ? ? ?/* Tx FIFO threshold */
+>>>>> + ? ? ? .rft ? ? ? ? ? ?= 8, ? ? ?/* Rx FIFO threshold */
+>>>>> + ? ? ? .clk_freq ? ? ? = 100000, /* std. mode operation */
+>>>>> + ? ? ? .timeout ? ? ? ?= 200, ? ?/* Slave response timeout(ms) */
+>>>>> + ? ? ? .sm ? ? ? ? ? ? = I2C_FREQ_MODE_FAST,
+>>>>
+>>>> How is this possible? you are setting clk_freq as 100kb/s and mode
+>>>> as fast mode which is supposed to be 400kb/s.
+>>>
+>>> That's not how I read it:
+>>
+>>
+>> But it is not readable. It confuses people.
 >
-> Warnings fixed:
-> ?arch/arm/mach-ux500/board-mop500.c:680:32: warning: ?snowball_of_platform_devs? defined but not used
+> I understood it. :)
 >
-> Errors fixed:
-> ?arch/arm/mach-ux500/timer.c: In function ?ux500_timer_init?:
-> ?arch/arm/mach-ux500/timer.c:66:3: error: implicit declaration of function ?of_find_matching_node?
-> ?arch/arm/mach-ux500/timer.c:66:6: warning: assignment makes pointer from integer without a cast
->
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> If you think it's unclear speak to the author, Linus. He's CC'ed.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Author of what? The i2c driver was written by Srinidhi. (The
+MODULE_AUTHOR() clause should be a good hint...)
 
-Thanks for fixing, will you send this upstream to the ARM SoC tree please?
-(I've screwed up too many DT patches trying to funnel them, probably becayse I
-don't yet use DT myself.)
+But it's true that board data for the ux500 kernel use
+100000 Hz and I2C_FREQ_MODE_FAST, in the board-mop500.c
+file, like this:
 
+U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+U8500_I2C_CONTROLLER(2, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+U8500_I2C_CONTROLLER(3, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
+
+This is indeed a bit odd. But obviously it works... But reading some
+fixes in another tree it seems it should look like this:
+
+/*
+ * The board uses 4 i2c controllers, initialize all of
+ * them with slave data setup time of 250 ns,
+ * Tx & Rx FIFO threshold values as 1 and standard
+ * mode of operation
+ */
+U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+U8500_I2C_CONTROLLER(2, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+U8500_I2C_CONTROLLER(3, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
+
+Which makes *much* more sense.
+
+I'll cook a separate patch for this or something.
+
+Thanks,
 Linus Walleij
