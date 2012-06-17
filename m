@@ -1,30 +1,22 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 16 Jun 2012 21:04:17 +0200
-Subject: [PATCH v2] mmc: mmci.c: Defer probe() in case of yet uninitialized
- GPIOs
-In-Reply-To: <201206161723.23768.arnd@arndb.de>
-References: <1339865375-22314-1-git-send-email-stigge@antcom.de>
- <201206161723.23768.arnd@arndb.de>
-Message-ID: <4FDCD8B1.5000407@antcom.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 16 Jun 2012 18:43:14 -0700
+Subject: [PATCH] arm: versatile: fix and enable PCI I/O space
+In-Reply-To: <1339423438-25836-1-git-send-email-robherring2@gmail.com>
+References: <1339423438-25836-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120617014314.GA11547@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/06/12 19:23, Arnd Bergmann wrote:
-> On Saturday 16 June 2012, Roland Stigge wrote:
->> +       if (of_get_property(np, "wp-gpios", NULL)) {
->> +               pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
->> +               if (pdata->gpio_wp == -ENODEV)
->> +                       pdata->gpio_wp = -EPROBE_DEFER;
->> +       } else {
->> +               pdata->gpio_wp = -ENODEV;
->> +       }
+On Mon, Jun 11, 2012 at 09:03:58AM -0500, Rob Herring wrote:
+
+> Arnd, Olof,
 > 
-> This is still very ugly and there is a certain danfer that we might
-> have to duplicate this across more drivers. Can't we make
-> of_get_named_gpio_flags return -EPROBE_DEFER in cases where we can't
-> find the GPIO number yet but still have a chance of returning it at
-> a later point?
+> This should be applied for 3.5. There is a more simple fix to just
+> restore IO_RESOURCE_LIMIT to 0xffffffff, but I think that moves in
+> the wrong direction. This patch is needed to unify the I/O space
+> mapping.
 
-OK, will post a new patch.
+Applied, fixing a trivial stray whitespace.
 
-Roland
+
+-Olof
