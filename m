@@ -1,116 +1,105 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 18 Jun 2012 20:00:19 +0530
-Subject: [PATCHv8 04/13] I2C: OMAP: Recover from Bus Busy condition
+Date: Mon, 18 Jun 2012 20:00:22 +0530
+Subject: [PATCHv8 07/13] I2C: OMAP: use devm_* functions
 In-Reply-To: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340029828-20751-5-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340029828-20751-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikram Pandita <vikram.pandita@ti.com>
+The various devm_* functions allocate memory that is released when a driver
+detaches. This patch uses devm_kzalloc, devm_request_and_ioremap for data
+that is allocated in the probe function of a platform device and is only
+freed in the remove function.
 
-In case a peripheral is driving SDA bus low (ie. a start condition), provide
-a constant clock output using the test mode of the OMAP I2C controller to
-try and clear the bus. Soft reset I2C controller after attempting the bus clear
-to ensure that controller is in a good state.
-
-Based upon Vikram Pandita's patch from TI Android 3.0.
-I acknowledge the contributions and suggestions of Jon and Hemant.
-
-A couple differences from the original patch ...
-1. Add a new function for bus clear
-2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
-   output a permanent clock. This bit needs to be set and typically it would
-   be set by the unidle function but this is not the case for all OMAP
-   generations.
-3. Program the SYSTEST setting only the bits we care about. However, restore
-   SYSTEST registers to there original state as some OMAP generations do not
-   implement perform a soft-reset.
-4. Clear the CON register after performing the bus clear, so when we call the
-   init function the controller is disabled and the init function will
-   re-enable later.
-
-Original patch can be found here:
-http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
-
-Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   33 ++++++++++++++++++++++++++++++---
- 1 files changed, 30 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   33 +++++++++------------------------
+ 1 files changed, 9 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 5da91b5..7ab9fe1 100644
+index 5c3a299..326b99c 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -148,16 +148,15 @@ enum {
- #define OMAP_I2C_SCLH_HSSCLH	8
- 
- /* I2C System Test Register (OMAP_I2C_SYSTEST): */
--#ifdef DEBUG
- #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
- #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
- #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
--#define OMAP_I2C_SYSTEST_TMODE_SHIFT	(12)		/* Test mode select */
-+#define OMAP_I2C_SYSTEST_TMODE_TEST	(2 << 12)	/* Test mode select */
-+#define OMAP_I2C_SYSTEST_TMODE_LOOP	(3 << 12)	/* Test mode select */
- #define OMAP_I2C_SYSTEST_SCL_I		(1 << 3)	/* SCL line sense in */
- #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
- #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
- #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
--#endif
- 
- /* OCP_SYSCONFIG bit definitions */
- #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
-@@ -311,6 +310,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
- 							dev->syscstate);
- 		}
+@@ -975,7 +975,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev;
+ 	struct i2c_adapter	*adap;
+-	struct resource		*mem, *irq, *ioarea;
++	struct resource		*mem, *irq;
+ 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+ 	struct device_node	*node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
+@@ -994,17 +994,16 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
-+	return 0;
+ 
+-	ioarea = request_mem_region(mem->start, resource_size(mem),
+-			pdev->name);
+-	if (!ioarea) {
+-		dev_err(&pdev->dev, "I2C region already claimed\n");
+-		return -EBUSY;
++	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
++	if (!dev) {
++		dev_err(&pdev->dev, "Menory allocation failed\n");
++		return -ENOMEM;
+ 	}
+ 
+-	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
+-	if (!dev) {
+-		r = -ENOMEM;
+-		goto err_release_region;
++	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
++	if (!dev->base) {
++		dev_err(&pdev->dev, "I2C region already claimed\n");
++		return -ENOMEM;
+ 	}
+ 
+ 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
+@@ -1028,11 +1027,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	dev->dev = &pdev->dev;
+ 	dev->irq = irq->start;
+-	dev->base = ioremap(mem->start, resource_size(mem));
+-	if (!dev->base) {
+-		r = -ENOMEM;
+-		goto err_free_mem;
+-	}
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 
+@@ -1127,13 +1121,9 @@ err_free_irq:
+ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+-	iounmap(dev->base);
+ 	pm_runtime_disable(&pdev->dev);
+ err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(dev);
+-err_release_region:
+-	release_mem_region(mem->start, resource_size(mem));
+ 
+ 	return r;
+ }
+@@ -1141,7 +1131,6 @@ err_release_region:
+ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+-	struct resource		*mem;
+ 	int ret;
+ 
+ 	platform_set_drvdata(pdev, NULL);
+@@ -1155,10 +1144,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+-	iounmap(dev->base);
+-	kfree(dev);
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mem->start, resource_size(mem));
+ 	return 0;
  }
  
- static int omap_i2c_init(struct omap_i2c_dev *dev)
-@@ -468,6 +468,31 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
- }
- 
- /*
-+ * Bus Clear
-+ */
-+static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
-+{
-+	u16 w;
-+
-+	/*
-+	 * Per the I2C specification, if we are stuck in a bus busy state
-+	 * we can attempt a bus clear to try and recover the bus by sending
-+	 * at least 9 clock pulses on SCL. Put the I2C in a test mode so it
-+	 * will output a continuous clock on SCL.
-+	 */
-+	w = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, (OMAP_I2C_SYSTEST_ST_EN
-+			   | OMAP_I2C_SYSTEST_TMODE_TEST));
-+	msleep(1);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, w);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	omap_i2c_reset(dev);
-+	omap_i2c_init(dev);
-+	return omap_i2c_wait_for_bb(dev);
-+}
-+
-+/*
-  * Low level master read/write transaction.
-  */
- static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
-@@ -594,6 +619,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- 	r = omap_i2c_wait_for_bb(dev);
- 	if (r < 0)
-+		r = omap_i2c_bus_clear(dev);
-+	if (r < 0)
- 		goto out;
- 
- 	if (dev->set_mpu_wkup_lat != NULL)
 -- 
 1.7.5.4
