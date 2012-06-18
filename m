@@ -1,31 +1,23 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Mon, 18 Jun 2012 08:22:03 +0530
-Subject: How to add new params to DT?
-In-Reply-To: <201206151429.40979.arnd@arndb.de>
-References: <D958900912E20642BCBC71664EFECE3E6DDA5E802A@BGMAIL02.nvidia.com>
- <201206151429.40979.arnd@arndb.de>
-Message-ID: <D958900912E20642BCBC71664EFECE3E6DDA5E8126@BGMAIL02.nvidia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 17 Jun 2012 22:27:33 -0600 (MDT)
+Subject: [PATCH 00/29] Move OMAP2+ over to use COMMON clock
+In-Reply-To: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1206172225450.10859@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Arnd, Will check that.
+On Thu, 14 Jun 2012, Rajendra Nayak wrote:
 
-Thanks,
-Venu
+> OMAP3 has suspend broken in mainline, so I tested it on an
+> older kernel (3.4-rc4 using my RFC series)
+> Idle and OFF mode however seem to be broken for a long time,
+> I wasn;t able to get it working even on 3.4 major.
+> See my logs '3630 Beagle-Xm broken idle/off on 3.4' if
+> I am doing anything wrong. I have CPUidle enabled in the
+> kernel config.
+
+http://www.spinics.net/lists/arm-kernel/msg173688.html
 
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, June 15, 2012 8:00 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Venu Byravarasu
-> Subject: Re: How to add new params to DT?
-> 
-> On Friday 15 June 2012, Venu Byravarasu wrote:
-> > How to add new params to device tree structure?
-> > can someone plz provide pointers/docs related to this?
-> >
-> 
-> Look at Documentation/devicetree
-> 
-> 	Arnd
+- Paul
