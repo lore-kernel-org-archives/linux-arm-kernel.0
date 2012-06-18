@@ -1,43 +1,20 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 22:18:58 +0200
-Subject: [PATCH RESEND] gpio: LPC32xx: Driver cleanup
-Message-ID: <1340050738-22988-1-git-send-email-stigge@antcom.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 18 Jun 2012 14:19:42 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct
+ dpll_data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA25E11@DBDE01.ent.ti.com>
+References: <1336716163-2960-1-git-send-email-hvaibhav@ti.com>
+ <87zk9apfjo.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA25E11@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1206181419250.11642@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since LPC32xx is now switched over to devicetree based GPIO, the unused
-lpc32xx_gpio_init() can be removed.
+On Tue, 15 May 2012, Hiremath, Vaibhav wrote:
 
-Further, the driver title changed since it referred to the wrong file.
+> Paul,
+> Can you please add above statement, when you merge it into your repo?
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Added this, and added Santosh's ack, and queued for 3.6.
 
----
-Applies to v3.5-rc3
-
- drivers/gpio/gpio-lpc32xx.c |    9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
-
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -1,5 +1,5 @@
- /*
-- * arch/arm/mach-lpc32xx/gpiolib.c
-+ * GPIO driver for LPC32xx SoC
-  *
-  * Author: Kevin Wells <kevin.wells@nxp.com>
-  *
-@@ -457,13 +457,6 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 	},
- };
- 
--/* Empty now, can be removed later when mach-lpc32xx is finally switched over
-- * to DT support
-- */
--void __init lpc32xx_gpio_init(void)
--{
--}
--
- static int lpc32xx_of_xlate(struct gpio_chip *gc,
- 			    const struct of_phandle_args *gpiospec, u32 *flags)
- {
+- Paul
