@@ -1,38 +1,80 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Jun 2012 15:01:50 -0600
-Subject: [PATCH] ARM: tegra: make tegra_cpu_reset_handler_enable() __init
-Message-ID: <1340053310-20855-1-git-send-email-swarren@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 18 Jun 2012 17:10:15 -0400 (EDT)
+Subject: [RFC PATCH 7/8] ARM: vmlinux.lds: Setup physical load address
+ not virtual
+In-Reply-To: <4FDF804A.5080404@monstr.eu>
+References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
+ <1340019011-18642-8-git-send-email-monstr@monstr.eu>
+ <alpine.LFD.2.02.1206181000540.23555@xanadu.home>
+ <CAHTX3dJS9zNejv-oLGpbZdXdkJndwR1pcBd9yn3OAobGy3ZLjA@mail.gmail.com>
+ <alpine.LFD.2.02.1206181433130.23555@xanadu.home> <4FDF804A.5080404@monstr.eu>
+Message-ID: <alpine.LFD.2.02.1206181655410.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Mon, 18 Jun 2012, Michal Simek wrote:
 
-This solves a section mismatch warning. I hadn't noticed this before,
-because my compiler was inlining tegra_cpu_reset_handler_enable() inside
-tegra_cpu_reset_handler_init(), which is already __init, but I switched
-compilers and it stopped doing that.
+> On 06/18/2012 09:02 PM, Nicolas Pitre wrote:
+> > On Mon, 18 Jun 2012, Michal Simek wrote:
+> > 
+> > > 2012/6/18 Nicolas Pitre<nicolas.pitre@linaro.org>
+> > > 
+> > > > On Mon, 18 Jun 2012, Michal Simek wrote:
+> > > > 
+> > > > > Setup correct virtual and physical address in ELF LOAD section.
+> > > > 
+> > > > We are moving to a single kernel binary for multiple targets, including
+> > > > targets with different physical load addresses.  The kernel code figures
+> > > > out at run time what the actual physical address is when
+> > > > CONFIG_ARM_PATCH_PHYS_VIRT is set which is the default these days.  In
+> > > > other words, we don't know the physical offset at build time in that
+> > > > case and CONFIG_PHYS_OFFSET is simply not defined.
+> > > > 
+> > > 
+> > > ok. good to know and nice features. In that case I expect that you are
+> > > using any binary format and you copy it to memory and run it. Code
+> > > find out where it runs and based on that setup things.
+> > 
+> > Exact.
+> 
+> ok. One more question about this feature. What is the alignment for 
+> it? I mean I have done the similar feature for Xilinx ppc440 and 
+> alignment depends on MMU TLB size.
 
-Cc: <stable@kernel.org> # v3.4
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Arnd, Olof, do you want me to put this in a pull request, or can you apply
-it directly for 3.5?
+Currently the alignment is 16MB as this is the granularity that a single 
+add or sub instruction can cover with an immediate argument.  This is 
+highly specific to the ARM instruction set.  At some point we needed 2MB 
+alignment which required two adds or subs, but that requirement has now 
+been removed.
 
- arch/arm/mach-tegra/reset.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> > If you want to use the ELF image, then you need to hardcode the physical
+> > memory location in its header, and that's something we want to get away
+> > from because it prevents a single kernel binary image from being used on
+> > different targets with different memory layouts.  Same issue with
+> > u-Boot's legacy uImage format.
+> 
+> And are you able to get these information away from ELF? Or you just 
+> need to set it up to any default value. I would expect to 0x0.
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 4d6a2ee..5beb7eb 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -33,7 +33,7 @@
- 
- static bool is_enabled;
- 
--static void tegra_cpu_reset_handler_enable(void)
-+static void __init tegra_cpu_reset_handler_enable(void)
- {
- 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	void __iomem *evp_cpu_reset =
--- 
-1.7.0.4
+We just don't use the ELF image format with bootloaders.
+
+> > > I haven't played with CONFIG_ARM_PATCH_PHYS_VIRT option but what is elf
+> > > entry point for this case?
+> > 
+> > For the kernel image itself it is the kernel virtual address.
+> 
+> Is it used somewhere? Or is it just setup to virtual address and no 
+> code use it? I mean that kernel virtual entry point.
+
+Nothing uses it.  The official ARM kernel image format is a binary image 
+and its entry point is the very beginning of it.
+
+> I expect that if CONFIG_ARM_PATCH_PHYS_VIRT=y then CONFIG_PHYS_OFFSET 
+> is not setup Then LOAD_OFFSET should be equal to CONFIG_PAGE_OFFSET.
+
+No. CONFIG_PAGE_OFFSET is the virtual address that the kernel uses for 
+the beginning of its memory view.  That is not where the kernel is 
+loaded.
+
+
+Nicolas
