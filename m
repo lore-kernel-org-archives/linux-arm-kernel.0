@@ -1,95 +1,35 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 19:22:56 +0200
-Subject: [PATCH] sound/gpio: of_get_named_gpio() return -EPROBE_DEFER if GPIO
- deferred
-Message-ID: <1340040176-16553-1-git-send-email-stigge@antcom.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 18 Jun 2012 14:25:20 -0300
+Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
+In-Reply-To: <201206181913.06886.marex@denx.de>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
+ <201206181913.06886.marex@denx.de>
+Message-ID: <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
-respective GPIO is not (yet) available. This is useful if driver's probe()
-functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
-can be probed again later on.
+On Mon, Jun 18, 2012 at 2:13 PM, Marek Vasut <marex@denx.de> wrote:
 
-The function still returns -EINVAL on other errors (parse error or node doesn't
-exist). This way, the case of an optional/intentionally missing GPIO is handled
-appropriately.
+> Do you have root TT enabled? If the pendrive isn't detected at all, it's
 
-For this change, two sound drivers (tegra_{alc5632,wm8903}) need to be
-adjusted.
+USB_EHCI_ROOT_HUB_TT is enabled.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- drivers/gpio/gpiolib-of.c       |    5 ++++-
- sound/soc/tegra/tegra_alc5632.c |    2 +-
- sound/soc/tegra/tegra_wm8903.c  |   10 +++++-----
- 3 files changed, 10 insertions(+), 7 deletions(-)
+> probably the PHY not enabling (disabling?) the discon detector upon init. But
+> the PHY driver is from my code, so that should work. Do you see any response at
+> all upon connecting the stick?
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index d18068a..9f84fad 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -62,7 +62,10 @@ static int of_gpiochip_find_and_xlate(struct gpio_chip *gc, void *data)
- int of_get_named_gpio_flags(struct device_node *np, const char *propname,
-                            int index, enum of_gpio_flags *flags)
- {
--	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
-+	/* Return -EPROBE_DEFER to support probe() functions to be called
-+	 * later when the GPIO actually becomes available
-+	 */
-+	struct gg_data gg_data = { .flags = flags, .out_gpio = -EPROBE_DEFER };
- 	int ret;
- 
- 	/* .of_xlate might decide to not fill in the flags, so clear it. */
-diff --git a/sound/soc/tegra/tegra_alc5632.c b/sound/soc/tegra/tegra_alc5632.c
-index d684df2..e463529 100644
---- a/sound/soc/tegra/tegra_alc5632.c
-+++ b/sound/soc/tegra/tegra_alc5632.c
-@@ -177,7 +177,7 @@ static __devinit int tegra_alc5632_probe(struct platform_device *pdev)
- 	}
- 
- 	alc5632->gpio_hp_det = of_get_named_gpio(np, "nvidia,hp-det-gpios", 0);
--	if (alc5632->gpio_hp_det == -ENODEV)
-+	if (alc5632->gpio_hp_det == -EPROBE_DEFER)
- 		return -EPROBE_DEFER;
- 
- 	ret = snd_soc_of_parse_card_name(card, "nvidia,model");
-diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
-index 0c5bb33..d4f14e4 100644
---- a/sound/soc/tegra/tegra_wm8903.c
-+++ b/sound/soc/tegra/tegra_wm8903.c
-@@ -284,27 +284,27 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
- 	} else if (np) {
- 		pdata->gpio_spkr_en = of_get_named_gpio(np,
- 						"nvidia,spkr-en-gpios", 0);
--		if (pdata->gpio_spkr_en == -ENODEV)
-+		if (pdata->gpio_spkr_en == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 
- 		pdata->gpio_hp_mute = of_get_named_gpio(np,
- 						"nvidia,hp-mute-gpios", 0);
--		if (pdata->gpio_hp_mute == -ENODEV)
-+		if (pdata->gpio_hp_mute == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 
- 		pdata->gpio_hp_det = of_get_named_gpio(np,
- 						"nvidia,hp-det-gpios", 0);
--		if (pdata->gpio_hp_det == -ENODEV)
-+		if (pdata->gpio_hp_det == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 
- 		pdata->gpio_int_mic_en = of_get_named_gpio(np,
- 						"nvidia,int-mic-en-gpios", 0);
--		if (pdata->gpio_int_mic_en == -ENODEV)
-+		if (pdata->gpio_int_mic_en == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 
- 		pdata->gpio_ext_mic_en = of_get_named_gpio(np,
- 						"nvidia,ext-mic-en-gpios", 0);
--		if (pdata->gpio_ext_mic_en == -ENODEV)
-+		if (pdata->gpio_ext_mic_en == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 	}
- 
--- 
-1.7.10
+Nothing shows up in the console after connecting the stick.
+
+Attached my .config file.
+
+Thanks,
+
+Fabio Estevam
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config_usb
+Type: application/octet-stream
+Size: 45496 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120618/f378b5b1/attachment-0001.obj>
