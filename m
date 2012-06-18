@@ -1,58 +1,47 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 18 Jun 2012 16:13:46 +0400
-Subject: [RFC PATCH v2 09/11] ARM: DT: Add support to system control module
- for OMAP4
-In-Reply-To: <4FDF11D6.6050205@dev.rtsoft.ru>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <4FDF11D6.6050205@dev.rtsoft.ru>
-Message-ID: <4FDF1B7A.6010608@mvista.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 18 Jun 2012 14:56:48 +0200
+Subject: [PATCH] spi: spi-pl022: Adjust probe() to of_get_named_gpio()
+ returning -EPROBE_DEFER
+In-Reply-To: <CAAAP30GAwQZtjAjtX=Q8K0Szo83QwqCZNtr09GxrgcvcR-CKeA@mail.gmail.com>
+References: <1340011219-31657-1-git-send-email-stigge@antcom.de>
+ <CACRpkdYTE0imxEAdq0=wJO49iBAj=8xGjn_PevFm1Bsr3MvUQg@mail.gmail.com>
+ <CAAAP30GAwQZtjAjtX=Q8K0Szo83QwqCZNtr09GxrgcvcR-CKeA@mail.gmail.com>
+Message-ID: <4FDF2590.4010901@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 06/18/2012 01:51 PM, Alexandre Pereira da Silva wrote:
+> On Mon, Jun 18, 2012 at 8:47 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Mon, Jun 18, 2012 at 11:20 AM, Roland Stigge <stigge@antcom.de> wrote:
+>>
+>>> The patch to gpiolib-of.c providing -EPROBE_DEFER as a hint to defer
+>>> of_get_named_gpio*() to a later probe() breaks spi-pl022.c.
+>>>
+>>> This patch adjusts to this change, using -EPROBE_DEFER as indication to defer.
+>>>
+>>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> 
+>>> Should this patch be joined with gpiolib-of's patch to of_get_named_gpio()? Or
+>>> should they just be issued as a series?
+>>
+>> If it's not bisectable unless you change this in the same patch then join
+>> them. Else I'd put them in a series and try to figure out a good tree for
+>> merging them.
+> 
+> Ok, so lets keep the original patch as is for now.
 
-On 18-06-2012 15:32, Konstantin Baydarov wrote:
+When Linus Acked both patches for *spi-pl022* (dt + gpio/defer fix), and
+they are not yet applied, please merge them. No need to introduce
+intermediate breakage.
 
-> This patch adds device tree entries on OMAP4 based boards
-> for System Control Module (SCM).
+You can keep my Signed or Acked line for exactly this.
 
-> TODO:
-> The IOMEM windows of ctrl_module_core, bandgap, usbphy overlap, so
-> probably only specific registers should be specified in dts for
-> bandgap and usb phy entries.
+We'll keep the patch for *gpiolib-of* separate, of course.
 
-> Signed-off-by: Konstantin Baydarov<kbaidarov@dev.rtsoft.ru>
-> Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
-> ---
->   arch/arm/boot/dts/omap4.dtsi |   17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> Index: linux-2.6/arch/arm/boot/dts/omap4.dtsi
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/boot/dts/omap4.dtsi
-> +++ linux-2.6/arch/arm/boot/dts/omap4.dtsi
-> @@ -272,5 +272,22 @@
->   			ti,hwmods = "mmc5";
->   			ti,needs-special-reset;
->   		};
-> +
-> +		ctrl_module_core: ctrl_module_core at 4a002000 {
-> +			compatible = "ti,omap4-control";
-> +			#address-cells =<1>;
-> +			#size-cells =<1>;
-> +			ranges;
-> +			ti,hwmods = "ctrl_module_core";
-> +			reg =<0x4a002000 0x1000>;
-> +			bandgap at 4a002000 {
-> +				compatible = "ti,omap4-bandgap";
-> +				reg =<0x4a002000 0x1000>;
-> +			};
-> +			usb at 4a002000 {
-> +				compatible = "ti,omap4-usb-phy";
-> +				reg =<0x4a002000 0x1000>;
+Thanks,
 
-    Two devices at the same address? Also, shouldn't values in the "reg" 
-property be relative to the value in the parent's "reg" property? Are they 
-needed at all here?
-
-WBR, Sergei
+Roland
