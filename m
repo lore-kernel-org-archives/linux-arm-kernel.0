@@ -1,29 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 18 Jun 2012 18:04:08 +0100
-Subject: [PATCH 1/2] sound: tegra_wm8903: Adjust to of_get_named_gpio()
- change
-In-Reply-To: <4FDF5E9E.6060803@antcom.de>
-References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
- <20120618164659.GV3974@opensource.wolfsonmicro.com>
- <4FDF5E9E.6060803@antcom.de>
-Message-ID: <20120618170408.GW3974@opensource.wolfsonmicro.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 18 Jun 2012 14:10:45 -0300
+Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
+In-Reply-To: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 07:00:14PM +0200, Roland Stigge wrote:
+Hi Richard,
 
-> Basically, yes. But this would mean that doing via gpio, we would need
-> to pull other stuff from the sound tree over to gpio to build upon
-> because "my" tegra_* sound patches won't apply to the gpio branch currently.
+On Wed, Jun 13, 2012 at 9:34 AM, Richard Zhao
+<richard.zhao@freescale.com> wrote:
+> The work is based on ?ci13xxx rework done by Alexander Shishkin.
+>
+> Status:
+> ?- this version only support host
+> ?- usbotg controler works at host role
+>
+> Changes since last version:
+> ?- collect ack received.
+>
+> Richard Zhao (13):
+> ?usb: otg: add notify_connect/notify_disconnect callback
+> ?USB: move transceiver from ehci_hcd and ohci_hcd to hcd and rename it
+> ? ?as phy
+> ?USB: notify phy when root hub port connect change
+> ?usb: chipidea: permit driver bindings pass phy pointer
+> ?usb: otg: add basic mxs phy driver support
+> ?usb: chipidea: add imx platform driver
+> ?ARM: imx6q: correct device name of usbphy and usb controller clock
+> ? ?export
+> ?ARM: imx6q: add config-on-boot gpios
+> ?ARM: imx6q: add usbphy clocks
+> ?ARM: imx6q: disable usb charger detector
+> ?ARM: dts: imx6q-sabrelite: add usb devices
+> ?ARM: mxs: clk_register_clkdev mx28 usb clocks
+> ?ARM: dts: imx28-evk: add usb devices
 
-Oh, yes.  Stephen's gone and reorganised all that code which means it's
-not a trivial merge.  Ho hum.  I'm happy to apply them if folks are
-comfortable with it, I guess ideally I'd be able to pull a branch with
-the gpio changes in and then apply on top of that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120618/135b3d89/attachment.sig>
+I am trying your patch series on a mx28evk and I am not able to have
+my USB pen drive detected.
+
+I tried enabling all the required config options in .config.
+
+Could you please share your .config?
+
+Thanks,
+
+Fabio Estevam
