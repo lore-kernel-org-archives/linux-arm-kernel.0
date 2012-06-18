@@ -1,35 +1,23 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 11:20:19 +0200
-Subject: [PATCH] spi: spi-pl022: Adjust probe() to of_get_named_gpio()
- returning -EPROBE_DEFER
-Message-ID: <1340011219-31657-1-git-send-email-stigge@antcom.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 18 Jun 2012 10:32:51 +0100
+Subject: [PATCH 08/14] mfd: Add IRQ domain support for the AB8500
+In-Reply-To: <4FDEEEBD.5070108@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
+ <20120614183231.GA30185@sirena.org.uk>
+ <4FDEEEBD.5070108@linaro.org>
+Message-ID: <20120618093250.GA3974@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch to gpiolib-of.c providing -EPROBE_DEFER as a hint to defer
-of_get_named_gpio*() to a later probe() breaks spi-pl022.c.
+On Mon, Jun 18, 2012 at 10:02:53AM +0100, Lee Jones wrote:
+> Do this look better to you Mark?
 
-This patch adjusts to this change, using -EPROBE_DEFER as indication to defer.
-
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-
----
-Applies to 3.5-rc3
-
-Should this patch be joined with gpiolib-of's patch to of_get_named_gpio()? Or
-should they just be issued as a series?
-
- drivers/spi/spi-pl022.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- linux-2.6.orig/drivers/spi/spi-pl022.c
-+++ linux-2.6/drivers/spi/spi-pl022.c
-@@ -2075,7 +2075,7 @@ pl022_probe(struct amba_device *adev, co
- 	for (i = 0; i < num_cs; i++) {
- 		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
- 
--		if (cs_gpio == -ENODEV) {
-+		if (cs_gpio == -EPROBE_DEFER) {
- 			status = -EPROBE_DEFER;
- 			goto err_no_gpio;
- 		}
+Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120618/0798d0c6/attachment.sig>
