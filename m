@@ -1,115 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Jun 2012 22:31:30 +0800
-Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
- number
-In-Reply-To: <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120618143128.GF19249@S2101-09.ap.freescale.net>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Mon, 18 Jun 2012 20:00:27 +0530
+Subject: [PATCHv8 12/13] I2C: OMAP: add blank lines
+In-Reply-To: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340029828-20751-13-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Felipe Balbi <balbi@ti.com>
 
-Do you have any comment, or may I have your ack on this patch?
+trivial patch to aid readability. No functional
+changes.
 
-Regards,
-Shawn
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-On Thu, Jun 14, 2012 at 01:59:46PM +0800, Shawn Guo wrote:
-> The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
-> makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
-> a nubmer of platforms have FIQ_START defined in mach/irqs.h.
-> 
->   arch/arm/mach-at91/include/mach/irqs.h:#define FIQ_START AT91_ID_FIQ
->   arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
->   arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
->   arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
->   arch/arm/plat-omap/include/plat/irqs.h:#define FIQ_START                1024
-> 
-> If SPARSE_IRQ is enabled for any of these platforms, the following
-> compile error will be seen.
-> 
->   arch/arm/kernel/fiq.c: In function ?enable_fiq?:
->   arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
->   arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
->   arch/arm/kernel/fiq.c: In function ?disable_fiq?:
->   arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
-> 
-> Though FIQ_START is defined in above 5 platforms, a grep on the whole
-> tree only reports the following users of enable_fiq/disable_fiq.
-> 
->   arch/arm/mach-rpc/dma.c
->   drivers/media/video/mx1_camera.c
->   sound/soc/fsl/imx-pcm-fiq.c
-> 
-> That said, only rpc and imx are actually using enable_fiq/disable_fiq.
-> 
-> The patch changes enable_fiq/disable_fiq a little bit to have the
-> absolute fiq number than offset passed into by parameter "fiq".  While
-> fiq on imx starts from 0, only rpc needs a fix-up to adapt the change.
-> 
-> With this change, all those FIQ_START definitions in platform irqs.h
-> can be removed now, but we chose to leave the decision to platform
-> maintainers, it should be removed or just left there as a document
-> on where fiq starts on the platform.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/kernel/fiq.c                 |    4 ++--
->  arch/arm/mach-rpc/include/mach/irqs.h |   12 ++++++------
->  2 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-> index c32f845..5953bea 100644
-> --- a/arch/arm/kernel/fiq.c
-> +++ b/arch/arm/kernel/fiq.c
-> @@ -124,12 +124,12 @@ void release_fiq(struct fiq_handler *f)
->  
->  void enable_fiq(int fiq)
->  {
-> -	enable_irq(fiq + FIQ_START);
-> +	enable_irq(fiq);
->  }
->  
->  void disable_fiq(int fiq)
->  {
-> -	disable_irq(fiq + FIQ_START);
-> +	disable_irq(fiq);
->  }
->  
->  EXPORT_SYMBOL(set_fiq_handler);
-> diff --git a/arch/arm/mach-rpc/include/mach/irqs.h b/arch/arm/mach-rpc/include/mach/irqs.h
-> index 6868e17..4962bdd 100644
-> --- a/arch/arm/mach-rpc/include/mach/irqs.h
-> +++ b/arch/arm/mach-rpc/include/mach/irqs.h
-> @@ -31,15 +31,15 @@
->  #define IRQ_DMAS0		20
->  #define IRQ_DMAS1		21
->  
-> -#define FIQ_FLOPPYDATA		0
-> -#define FIQ_ECONET		2
-> -#define FIQ_SERIALPORT		4
-> -#define FIQ_EXPANSIONCARD	6
-> -#define FIQ_FORCE		7
-> -
->  /*
->   * This is the offset of the FIQ "IRQ" numbers
->   */
->  #define FIQ_START		64
->  
-> +#define FIQ_FLOPPYDATA		(FIQ_START + 0)
-> +#define FIQ_ECONET		(FIQ_START + 2)
-> +#define FIQ_SERIALPORT		(FIQ_START + 4)
-> +#define FIQ_EXPANSIONCARD	(FIQ_START + 6)
-> +#define FIQ_FORCE		(FIQ_START + 7)
-> +
->  #define NR_IRQS			128
-> -- 
-> 1.7.5.4
-> 
-> 
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 0e0ab8f..6a79089 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -818,6 +818,7 @@ complete:
+ 			dev_err(dev->dev, "Arbitration lost\n");
+ 			err |= OMAP_I2C_STAT_AL;
+ 		}
++
+ 		/*
+ 		 * ProDB0017052: Clear ARDY bit twice
+ 		 */
+@@ -830,6 +831,7 @@ complete:
+ 			omap_i2c_complete_cmd(dev, err);
+ 			return IRQ_HANDLED;
+ 		}
++
+ 		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
+ 			u8 num_bytes = 1;
+ 
+@@ -876,6 +878,7 @@ complete:
+ 				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
+ 			continue;
+ 		}
++
+ 		if (stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR)) {
+ 			u8 num_bytes = 1;
+ 			if (dev->fifo_size) {
+@@ -923,10 +926,12 @@ complete:
+ 				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
+ 			continue;
+ 		}
++
+ 		if (stat & OMAP_I2C_STAT_ROVR) {
+ 			dev_err(dev->dev, "Receive overrun\n");
+ 			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
+ 		}
++
+ 		if (stat & OMAP_I2C_STAT_XUDF) {
+ 			dev_err(dev->dev, "Transmit underflow\n");
+ 			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
+-- 
+1.7.5.4
