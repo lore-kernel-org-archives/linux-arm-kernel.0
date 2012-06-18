@@ -1,79 +1,93 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Mon, 18 Jun 2012 13:28:38 +0530
-Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <4FDED62D.6030008@linaro.org>
-References: <4FD8BAD2.50703@linaro.org>
- <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
- <4FDAFA17.6050502@linaro.org>
- <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
- <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
- <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
- <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
- <4FDED62D.6030008@linaro.org>
-Message-ID: <20120618075834.GA14293@bnru02>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 18 Jun 2012 09:59:45 +0200
+Subject: mach/io.h cleanup and removal question
+In-Reply-To: <4FD207C9.5010006@gmail.com>
+References: <20120608102040.GA26034@lunn.ch>
+ <20120608114316.GC15555@n2100.arm.linux.org.uk>
+ <4FD207C9.5010006@gmail.com>
+Message-ID: <20120618075945.GJ4799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 09:18:05 +0200, Lee Jones wrote:
-> On 17/06/12 18:43, Linus Walleij wrote:
-> > Gah, what a thread...
-> >
-> > On Fri, Jun 15, 2012 at 3:18 PM, Lee Jones<lee.jones@linaro.org>  wrote:
-> >> On 15/06/12 14:05, Srinidhi Kasagar wrote:
-> >>> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
-> >>>> On 15/06/12 12:50, Srinidhi Kasagar wrote:
-> >
-> >>>>>> +static struct nmk_i2c_controller u8500_i2c = {
-> >>>>>> +       /*
-> >>>>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
-> >>>>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
-> >>>>>> +        */
-> >>>>>> +       .slsu           = 0xe,
-> >>>>>> +       .tft            = 1,      /* Tx FIFO threshold */
-> >>>>>> +       .rft            = 8,      /* Rx FIFO threshold */
-> >>>>>> +       .clk_freq       = 100000, /* std. mode operation */
-> >>>>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
-> >>>>>> +       .sm             = I2C_FREQ_MODE_FAST,
-> >>>>>
-> >>>>> How is this possible? you are setting clk_freq as 100kb/s and mode
-> >>>>> as fast mode which is supposed to be 400kb/s.
-> >>>>
-> >>>> That's not how I read it:
-> >>>
-> >>> But it is not readable. It confuses people.
+On Fri, Jun 08, 2012 at 09:10:17AM -0500, Rob Herring wrote:
+> On 06/08/2012 06:43 AM, Russell King - ARM Linux wrote:
+> > On Fri, Jun 08, 2012 at 12:20:40PM +0200, Andrew Lunn wrote:
+> >> Your patchset for mach/io.h cleanup and remove, causes problems on
+> >> Orion5x.
 > >>
-> >> I understood it. :)
+> >> mach/io.h for orion5x had a:
 > >>
-> >> If you think it's unclear speak to the author, Linus. He's CC'ed.
-> >
-> > Author of what? The i2c driver was written by Srinidhi. (The
-> > MODULE_AUTHOR() clause should be a good hint...)
+> >> #define IO_SPACE_LIMIT		0xffffffff
+> >>
+> >> which got removed. This results in a panic at boot:
+> >>
+> >>         /*
+> >>          * IORESOURCE_IO
+> >>          */
+> >>         sys->io_offset = 0;
+> >>         res[0].name = "PCIe I/O Space";
+> >>         res[0].flags = IORESOURCE_IO;
+> >>         res[0].start = ORION5X_PCIE_IO_BUS_BASE;
+> >>         res[0].end = res[0].start + ORION5X_PCIE_IO_SIZE - 1;
+> >>         if (request_resource(&ioport_resource, &res[0]))
+> >>                 panic("Request PCIe IO resource failed\n");
+> >>
+> >> ORION5X_PCIE_IO_SIZE is 1MB, so the allocation fails because of the
+> >> 64K default.
+> >>
+> >> arch/arm/include/asm/io.h has the comment:
+> >>
+> >> /*
+> >>  * This is the limit of PC card/PCI/ISA IO space, which is by default
+> >>  * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
+> >>  * zero to prevent ISA/PCI drivers claiming IO space (and potentially
+> >>  * oopsing.)
+> >>  *
+> >>  * Only set this larger if you really need inb() et.al. to operate over
+> >>  * a larger address space.  Note that SOC_COMMON ioremaps each sockets
+> >>  * IO space area, and so inb() et.al. must be defined to operate as per
+> >>  * readb() et.al. on such platforms.
+> >>  */
+> >>
+> >> Now, i know nothing about how PCI works... So i have a question:
+> >>
+> >> Which is better, put back parts of io.h so allowing the 1MB
+> >> request_resource, or reduce ORION5X_PCIE_IO_SIZE to 64KB, since from
+> >> the comment it is unlikely an PCI card needs more than 64KB?
+> > 
+> > Well, the comment about SOC_COMMON doesn't apply as you're not using that.
+> > 
+> > Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
+> > requirement to support a larger IO space.
 > 
-> Actually, we appear to have our wires crossed. You wrote the board data 
-> stuff below, which changes the mode from STANDARD to FAST, no doubt 
-> using Srinidhi's struct explanation comments found in 
-> arch/arm/plat-nomadik/include/plat/i2c.h.
-> 
->  > I'll cook a separate patch for this or something.
-> 
-> Cool, thanks Linus.
-> 
-> But you're correct in what you say Linus. Srinidhi, the comments which 
-> are you say are confusing are the bits you are the author of: 
-> e208c447bd728920e4f3d438a706344ea31249b9?
+> Agreed. The next step is moving all i/o space to a fixed virtual address
+> and for this we want to make i/o windows 64K.
 
-yes, it is of course evident that it's my commit from git.
-I think you are not catching my point. What I mean is:
-fast mode devices are downward compatible and can communicate
-with the devices with standard only mode. Those comments in that
-enum says exactly that (with "up to" keyword). However the code
-which configures the bus in fast mode and restrict the frequency
-to operate in 100 kb/s without any reason, and this creates
-confusion..
+Hi Rob
 
-Perhaps, I think we need to remove one of these
-parameters as configurable options and derive out the
-frequency based on the mode of operation..
+Reducing the window size to 64K stops the panic at boot, as expected.
 
-/srinidhi
+> 
+> However, I think you may also have a problem with
+> ORION5X_PCIE_IO_BUS_BASE and the resource start. The i/o resource start
+> should really be 0 and then the __io() macro should add the virtual i/o
+> base address. However, Russell has mentioned previously that some chips
+> may not work correctly with i/o space at 0 (PCI bus addresses, not host).
+> 
+> Do you have cards with i/o that you can test or know what devices are
+> used with this platform?
+
+I don't have any cards. I've also no idea what cards are used with
+these devices. I guess they are mostly WiFi cards, since Orion5x is
+normally used in NAS boxes, and there is one box supported which is an
+WiFi AP.
+
+Since the panic kills all orion5x systems, i want to at least fix
+that. So i will post the patch to reduce the window size to 64K.  I
+guess for the moment we have to leave PCI potentially broken, and see
+if anybody complains.
+
+Is this O.K?
+
+   Thanks
+	Andrew
