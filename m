@@ -1,173 +1,112 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 18 Jun 2012 11:11:13 +0530
-Subject: [PATCH] Watchdog: OMAP: Fix the runtime pm code to avoid module
- getting stuck intransition state.
-In-Reply-To: <1339996996-3257-1-git-send-email-lokeshvutla@ti.com>
-References: <1339996996-3257-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <CAMQu2gwUgPewy98L+yF5bcdrqXRLZftb3utLNg5HV1jBscGpTQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 17 Jun 2012 22:50:36 -0700
+Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree
+ based pinctrl driver
+In-Reply-To: <4FDB6000.5080703@wwwdotorg.org>
+References: <20120611135826.GB12766@atomide.com>
+ <4FDA6FCD.1020605@wwwdotorg.org>
+ <20120615094938.GQ12766@atomide.com>
+ <4FDB6000.5080703@wwwdotorg.org>
+Message-ID: <20120618055036.GU12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(You should cc linux-omap too.  CC'ing linux-omap)
+* Stephen Warren <swarren@wwwdotorg.org> [120615 09:21]:
+> On 06/15/2012 03:49 AM, Tony Lindgren wrote:
+> 
+> (Arnd, Grant, Rob, CC'ing you mainly re: the very last set of comments
+> in this email; can you take a look at Tony's patch and comment on the
+> binding)
 
-On Mon, Jun 18, 2012 at 10:53 AM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
-> OMAP watchdong driver is adapted to runtime PM like a general device
-> driver but it is not appropriate. It is causing couple of functional
-> issues.
->
-> 1. On OMAP4 SYSCLK can't be gated, because of issue with WDTIMER2 module,
-> which constantly stays in "in transition" state. Value of register
-> CM_WKUP_WDTIMER2_CLKCTRL is always 0x00010000 in this case.
-> Issue occurs immediately after first idle, when hwmod framework tries
-> to disable WDTIMER2 functional clock - "wd_timer2_fck". After this
-> module falls to "in transition" state, and SYSCLK gating is blocked.
->
-> 2. Due to runtime PM, watchdog timer may be completely disabled.
-> In current code base watchdog timer is not disabled only because of
-> issue 1. Otherwise state of WDTIMER2 module will be "Disabled", and there
-> will be no interrupts from omap_wdt. In other words watchdog will not
-> work at all.
->
-> Watchdong is a special IP and it should not be disabled otherwise
-> purpose of it itself is defeated. Watchdog functional clock should
-> never be disabled. This patch updates the runtime PM handling in
-> driver so that runtime PM is limited only during probe/shutdown
-> and suspend/resume.
->
-> The patch fixes issue 1 and 2
->
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> ---
-> Tested on OMAP4430SDP.
->
-> Issue #1 can be easily reproduced on mainline kernel.
-> - Take latest mainline kernel and create uImage using omap2plus_defconfig
-> - Write a program to open watchdog,like
-> void main(void)
-> {
-> ? ? ? ?int fd = open("/dev/watchdog", O_WRONLY);
->
-> ? ? ? ?if (fd == -1) {
-> ? ? ? ? ? ? ? ?perror("Watchdog device interface is not available!\n");
-> ? ? ? ?}
-> }
-> - Build with arm compiler and copy it to your file syatem
-> - Boot the image and run the executable.
->
->
-> ?drivers/watchdog/omap_wdt.c | ? 17 -----------------
-> ?1 files changed, 0 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-> index 8285d65..27ab8db 100644
-> --- a/drivers/watchdog/omap_wdt.c
-> +++ b/drivers/watchdog/omap_wdt.c
-> @@ -126,8 +126,6 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
-> ? ? ? ?u32 pre_margin = GET_WLDR_VAL(timer_margin);
-> ? ? ? ?void __iomem *base = wdev->base;
->
-> - ? ? ? pm_runtime_get_sync(wdev->dev);
-> -
-> ? ? ? ?/* just count up at 32 KHz */
-> ? ? ? ?while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x04)
-> ? ? ? ? ? ? ? ?cpu_relax();
-> @@ -135,8 +133,6 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
-> ? ? ? ?__raw_writel(pre_margin, base + OMAP_WATCHDOG_LDR);
-> ? ? ? ?while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x04)
-> ? ? ? ? ? ? ? ?cpu_relax();
-> -
-> - ? ? ? pm_runtime_put_sync(wdev->dev);
-> ?}
->
-> ?/*
-> @@ -166,8 +162,6 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
-> ? ? ? ?omap_wdt_ping(wdev); /* trigger loading of new timeout value */
-> ? ? ? ?omap_wdt_enable(wdev);
->
-> - ? ? ? pm_runtime_put_sync(wdev->dev);
-> -
-> ? ? ? ?return nonseekable_open(inode, file);
-> ?}
->
-> @@ -179,8 +173,6 @@ static int omap_wdt_release(struct inode *inode, struct file *file)
-> ? ? ? ? * ? ? ?Shut off the timer unless NOWAYOUT is defined.
-> ? ? ? ? */
-> ?#ifndef CONFIG_WATCHDOG_NOWAYOUT
-> - ? ? ? pm_runtime_get_sync(wdev->dev);
-> -
-> ? ? ? ?omap_wdt_disable(wdev);
->
-> ? ? ? ?pm_runtime_put_sync(wdev->dev);
-> @@ -199,11 +191,9 @@ static ssize_t omap_wdt_write(struct file *file, const char __user *data,
->
-> ? ? ? ?/* Refresh LOAD_TIME. */
-> ? ? ? ?if (len) {
-> - ? ? ? ? ? ? ? pm_runtime_get_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?spin_lock(&wdt_lock);
-> ? ? ? ? ? ? ? ?omap_wdt_ping(wdev);
-> ? ? ? ? ? ? ? ?spin_unlock(&wdt_lock);
-> - ? ? ? ? ? ? ? pm_runtime_put_sync(wdev->dev);
-> ? ? ? ?}
-> ? ? ? ?return len;
-> ?}
-> @@ -236,18 +226,15 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(int __user *)arg);
-> ? ? ? ? ? ? ? ?return put_user(0, (int __user *)arg);
-> ? ? ? ?case WDIOC_KEEPALIVE:
-> - ? ? ? ? ? ? ? pm_runtime_get_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?spin_lock(&wdt_lock);
-> ? ? ? ? ? ? ? ?omap_wdt_ping(wdev);
-> ? ? ? ? ? ? ? ?spin_unlock(&wdt_lock);
-> - ? ? ? ? ? ? ? pm_runtime_put_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?return 0;
-> ? ? ? ?case WDIOC_SETTIMEOUT:
-> ? ? ? ? ? ? ? ?if (get_user(new_margin, (int __user *)arg))
-> ? ? ? ? ? ? ? ? ? ? ? ?return -EFAULT;
-> ? ? ? ? ? ? ? ?omap_wdt_adjust_timeout(new_margin);
->
-> - ? ? ? ? ? ? ? pm_runtime_get_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?spin_lock(&wdt_lock);
-> ? ? ? ? ? ? ? ?omap_wdt_disable(wdev);
-> ? ? ? ? ? ? ? ?omap_wdt_set_timeout(wdev);
-> @@ -255,7 +242,6 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
->
-> ? ? ? ? ? ? ? ?omap_wdt_ping(wdev);
-> ? ? ? ? ? ? ? ?spin_unlock(&wdt_lock);
-> - ? ? ? ? ? ? ? pm_runtime_put_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?/* Fall */
-> ? ? ? ?case WDIOC_GETTIMEOUT:
-> ? ? ? ? ? ? ? ?return put_user(timer_margin, (int __user *)arg);
-> @@ -363,7 +349,6 @@ static void omap_wdt_shutdown(struct platform_device *pdev)
-> ? ? ? ?struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
->
-> ? ? ? ?if (wdev->omap_wdt_users) {
-> - ? ? ? ? ? ? ? pm_runtime_get_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?omap_wdt_disable(wdev);
-> ? ? ? ? ? ? ? ?pm_runtime_put_sync(wdev->dev);
-> ? ? ? ?}
-> @@ -403,7 +388,6 @@ static int omap_wdt_suspend(struct platform_device *pdev, pm_message_t state)
-> ? ? ? ?struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
->
-> ? ? ? ?if (wdev->omap_wdt_users) {
-> - ? ? ? ? ? ? ? pm_runtime_get_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?omap_wdt_disable(wdev);
-> ? ? ? ? ? ? ? ?pm_runtime_put_sync(wdev->dev);
-> ? ? ? ?}
-> @@ -419,7 +403,6 @@ static int omap_wdt_resume(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?pm_runtime_get_sync(wdev->dev);
-> ? ? ? ? ? ? ? ?omap_wdt_enable(wdev);
-> ? ? ? ? ? ? ? ?omap_wdt_ping(wdev);
-> - ? ? ? ? ? ? ? pm_runtime_put_sync(wdev->dev);
-> ? ? ? ?}
->
-> ? ? ? ?return 0;
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes please take a look.
+ 
+> > Care to clarify a bit what you had in mind there?
+> 
+> Basically I meant:
+> 
+> 1) Remove anything TI-/OMAP-specific from the generic binding document
+> 
+> 2) For any TI-/OMAP-specific additions, create a binding document that
+> describes those separately to the generic binding documentation.
+> 
+> However, given that there are no TI-/OMAP-specific additions; OMAP2 just
+> uses the base generic bindings exactly as defined, I don't think you
+> actually need to create an TI-/OMAP-specific document, since there's
+> nothing for it to document.
+
+OK so basically you just want the pinctrl-single binding document to be
+generic. Yes I'll do that.
+ 
+> > It's best to describe the hardware in case we need to set up some hardware
+> > specific things in the driver.
+> 
+> There's a difference between the (set of) compatible value(s) that
+> appears in the .dts file, and the compatible value(s) that the driver
+> binds to.
+> 
+> Since this driver is purely implementing the pinctrl-single binding, I
+> believe only that should be listed in the driver's of_match table.
+> 
+> However, since the .dts file is describing HW that is both a specific
+> OMAP instance, and compatible with pinctrl-single, the .dts file can
+> certainly list both. If in the future, the driver ever needs to
+> specifically know the difference between the specific OMAP versions, or
+> OMAP-vs-something-else, the compatible value will be there already in
+> the .dts file, so this will all work. However, I'd argue that if the
+> driver has to ever know that, it's probably not appropriate to say it's
+> compatible with pinctrl-single any more...
+
+Yes OK I see what you mean now. Sounds good to me, and if/when we need
+some hardware specific things, we'll add specific parsing for the other
+compatible values.
+ 
+> >> One final comment: A little while before Linaro Connect in San
+> >> Francisco, we were all having difficulty coming up with any kind of DT
+> >> binding for pinctrl. I had suggested the possibility of creating a
+> >> binding which just said "write value X to register Y, write value P to
+> >> register Q, ...". This was rejected at connect, because a raw list of
+> >> register writes didn't document anything or describe semantics - it was
+> >> too much of a binary blob. This driver seems to be doing almost the
+> >> exact same thing. In order to avoid that assertion, it'd need to truly
+> >> have individual representations of which pins exist, which pingroups
+> >> exist, which functions exist, and which functions can be selected onto
+> >> which pins/pingroups. That would be a radically different binding. I
+> >> wonder what's changed such that this kind of driver wasn't acceptable
+> >> then, but is now?
+> > 
+> > Well that's why I had two bindings earlier: The current binding for the
+> > bulk pins that's faster to parse, and a more verbose binding for drivers that
+> > allows naming the functions.
+> > 
+> > In your previous comments at [1] you seemed to prefer this current binding
+> > based on the "Why not only allow (1)?" comment. Maybe you had something else
+> > in mind, care to clarify that a bit too?
+> 
+> Well, first I thought about semantics vs. just banging a register list a
+> tiny bit more, and remembered the previous discussion.
+> 
+> But my comment at [1] wasn't so much about "why not just have a raw
+> register list", but more regarding why support two different
+> representations within the same binding; it wasn't really clear to me
+> from reading the original email what the difference between the two
+> representations; why have two representations, why/when-to use one vs.
+> the other, that the difference was about providing a "semantic" list of
+> pins/pingroups/functions vs. providing a "raw" register list.
+
+I too would prefer more verbose .dts files. Unfortunately the parsing of
+several hundred board specific pins adds quite a bit of overhead.
+ 
+> IIRC, the pushback on a raw "bang these registers" representation came
+> from Grant and/or Arnd. It'd be a good idea if they (and indeed Rob)
+> could comment on this binding proposal. If they're OK with this kind of
+> pretty raw representation, I'm not going to object, but I have a feeling
+> they might not like it?
+
+Yes let's see if anybody has better ideas.
+
+Regards,
+
+Tony
+
+ 
+> > [1] http://article.gmane.org/gmane.linux.kernel/1291838
