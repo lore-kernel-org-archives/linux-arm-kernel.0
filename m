@@ -1,35 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 Jun 2012 14:25:20 -0300
-Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <201206181913.06886.marex@denx.de>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
- <201206181913.06886.marex@denx.de>
-Message-ID: <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Jun 2012 11:26:28 -0600
+Subject: [PATCH] sound/gpio: of_get_named_gpio() return -EPROBE_DEFER
+ if GPIO deferred
+In-Reply-To: <1340040176-16553-1-git-send-email-stigge@antcom.de>
+References: <1340040176-16553-1-git-send-email-stigge@antcom.de>
+Message-ID: <4FDF64C4.8060308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 2:13 PM, Marek Vasut <marex@denx.de> wrote:
+On 06/18/2012 11:22 AM, Roland Stigge wrote:
+> of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
+> respective GPIO is not (yet) available. This is useful if driver's probe()
+> functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
+> can be probed again later on.
+> 
+> The function still returns -EINVAL on other errors (parse error or node doesn't
+> exist). This way, the case of an optional/intentionally missing GPIO is handled
+> appropriately.
+> 
+> For this change, two sound drivers (tegra_{alc5632,wm8903}) need to be
+> adjusted.
 
-> Do you have root TT enabled? If the pendrive isn't detected at all, it's
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-USB_EHCI_ROOT_HUB_TT is enabled.
-
-> probably the PHY not enabling (disabling?) the discon detector upon init. But
-> the PHY driver is from my code, so that should work. Do you see any response at
-> all upon connecting the stick?
-
-Nothing shows up in the console after connecting the stick.
-
-Attached my .config file.
-
-Thanks,
-
-Fabio Estevam
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config_usb
-Type: application/octet-stream
-Size: 45496 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120618/f378b5b1/attachment-0001.obj>
+(That applies to the two separate sound patches too, if needed!)
