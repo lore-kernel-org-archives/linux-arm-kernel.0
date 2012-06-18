@@ -1,169 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Jun 2012 21:33:40 +0800
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Jun 2012 15:36:15 +0200
 Subject: [PATCH v4 2/2] serial: mxs-auart: Allow device tree probing
-In-Reply-To: <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
+In-Reply-To: <20120618133338.GD19249@S2101-09.ap.freescale.net>
 References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
  <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120618133338.GD19249@S2101-09.ap.freescale.net>
+ <20120618133338.GD19249@S2101-09.ap.freescale.net>
+Message-ID: <201206181536.16011.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 10:06:09AM -0300, Fabio Estevam wrote:
-> Allow device tree probing.
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Alan Cox <alan@linux.intel.com>
-> Cc: <linux-serial@vger.kernel.org>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v3:
-> - Remove unneeded mxs_auart_devtype
-> Changes since v2:
-> - Change compatible string
-> - Add aliases information in bindings doc
-> - Remove unneeded mxs_auart_probe_pdev function
-> - Remove "ifdef CONFIG_OF"
-> - Remove of_match_ptr wrapper
-> Changes since v1:
-> - Merged patches 3 and 5 from v1 into this one
+Dear Shawn Guo,
 
-Hi Greg,
-
-May I have your ack to have the patch go through arm-soc tree, so that
-we can possibly start converting those non-DT board files over to DT?
-
-Regards,
-Shawn
-
->  .../bindings/tty/serial/fsl-mxs-auart.txt          |   27 +++++++++++++
->  drivers/tty/serial/mxs-auart.c                     |   40 +++++++++++++++++++-
->  2 files changed, 66 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+> On Mon, Jun 18, 2012 at 10:06:09AM -0300, Fabio Estevam wrote:
+> > Allow device tree probing.
+> > 
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Alan Cox <alan@linux.intel.com>
+> > Cc: <linux-serial@vger.kernel.org>
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > Changes since v3:
+> > - Remove unneeded mxs_auart_devtype
+> > Changes since v2:
+> > - Change compatible string
+> > - Add aliases information in bindings doc
+> > - Remove unneeded mxs_auart_probe_pdev function
+> > - Remove "ifdef CONFIG_OF"
+> > - Remove of_match_ptr wrapper
+> > Changes since v1:
+> > - Merged patches 3 and 5 from v1 into this one
 > 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> new file mode 100644
-> index 0000000..2ee903f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> @@ -0,0 +1,27 @@
-> +* Freescale MXS Application UART (AUART)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<soc>-auart". The supported SoCs include
-> +  imx23 and imx28.
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Should contain the auart interrupt numbers
-> +
-> +Example:
-> +auart0: serial at 8006a000 {
-> +	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
-> +	reg = <0x8006a000 0x2000>;
-> +	interrupts = <112 70 71>;
-> +};
-> +
-> +Note: Each auart port should have an alias correctly numbered in "aliases"
-> +node.
-> +
-> +Example:
-> +
-> +aliases {
-> +	serial0 = &auart0;
-> +	serial1 = &auart1;
-> +	serial2 = &auart2;
-> +	serial3 = &auart3;
-> +	serial4 = &auart4;
-> +};
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index ec56d83..103087d 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -33,6 +33,7 @@
->  #include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/of_device.h>
->  
->  #include <asm/cacheflush.h>
->  
-> @@ -675,6 +676,30 @@ static struct uart_driver auart_driver = {
->  #endif
->  };
->  
-> +/*
-> + * This function returns 1 if pdev isn't a device instatiated by dt, 0 if it
-> + * could successfully get all information from dt or a negative errno.
-> + */
-> +static int serial_mxs_probe_dt(struct mxs_auart_port *s,
-> +		struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int ret;
-> +
-> +	if (!np)
-> +		/* no device tree device */
-> +		return 1;
-> +
-> +	ret = of_alias_get_id(np, "serial");
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to get alias id: %d\n", ret);
-> +		return ret;
-> +	}
-> +	s->port.line = ret;
-> +
-> +	return 0;
-> +}
-> +
->  static int __devinit mxs_auart_probe(struct platform_device *pdev)
->  {
->  	struct mxs_auart_port *s;
-> @@ -689,6 +714,12 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
->  		goto out;
->  	}
->  
-> +	ret = serial_mxs_probe_dt(s, pdev);
-> +	if (ret > 0)
-> +		s->port.line = pdev->id < 0 ? 0 : pdev->id;
-> +	else if (ret < 0)
-> +		goto out_free;
-> +
->  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->  	if (IS_ERR(pinctrl)) {
->  		ret = PTR_ERR(pinctrl);
-> @@ -711,7 +742,6 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
->  	s->port.membase = ioremap(r->start, resource_size(r));
->  	s->port.ops = &mxs_auart_ops;
->  	s->port.iotype = UPIO_MEM;
-> -	s->port.line = pdev->id < 0 ? 0 : pdev->id;
->  	s->port.fifosize = 16;
->  	s->port.uartclk = clk_get_rate(s->clk);
->  	s->port.type = PORT_IMX;
-> @@ -769,12 +799,19 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static struct of_device_id mxs_auart_dt_ids[] = {
-> +	{ .compatible = "fsl,imx23-auart", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
-> +
->  static struct platform_driver mxs_auart_driver = {
->  	.probe = mxs_auart_probe,
->  	.remove = __devexit_p(mxs_auart_remove),
->  	.driver = {
->  		.name = "mxs-auart",
->  		.owner = THIS_MODULE,
-> +		.of_match_table = mxs_auart_dt_ids,
->  	},
->  };
->  
-> @@ -807,3 +844,4 @@ module_init(mxs_auart_init);
->  module_exit(mxs_auart_exit);
->  MODULE_LICENSE("GPL");
->  MODULE_DESCRIPTION("Freescale MXS application uart driver");
-> +MODULE_ALIAS("platform:mxs-auart");
-> -- 
-> 1.7.1
+> Hi Greg,
 > 
+> May I have your ack to have the patch go through arm-soc tree, so that
+> we can possibly start converting those non-DT board files over to DT?
 > 
+> Regards,
+> Shawn
+
+Good, I should be back on 20th to the denx board.
