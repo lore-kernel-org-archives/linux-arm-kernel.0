@@ -1,49 +1,43 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 22:14:42 +0200
-Subject: [PATCH RESEND] net: lpc_eth: Driver cleanup
-Message-ID: <1340050482-22666-1-git-send-email-stigge@antcom.de>
+Date: Mon, 18 Jun 2012 22:18:58 +0200
+Subject: [PATCH RESEND] gpio: LPC32xx: Driver cleanup
+Message-ID: <1340050738-22988-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes some nowadays superfluous definitions (one unused define and
-an obsolete function forward declaration) and corrects a netdev_err() to
-netdev_dbg().
+Since LPC32xx is now switched over to devicetree based GPIO, the unused
+lpc32xx_gpio_init() can be removed.
+
+Further, the driver title changed since it referred to the wrong file.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
 ---
- Applies to: v3.5-rc3
+Applies to v3.5-rc3
 
- drivers/net/ethernet/nxp/lpc_eth.c |    6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/gpio/gpio-lpc32xx.c |    9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
---- linux-2.6.orig/drivers/net/ethernet/nxp/lpc_eth.c
-+++ linux-2.6/drivers/net/ethernet/nxp/lpc_eth.c
-@@ -52,7 +52,6 @@
- 
- #define MODNAME "lpc-eth"
- #define DRV_VERSION "1.00"
--#define PHYDEF_ADDR 0x00
- 
- #define ENET_MAXF_SIZE 1536
- #define ENET_RX_DESC 48
-@@ -416,9 +415,6 @@ static bool use_iram_for_net(struct devi
- #define TXDESC_CONTROL_LAST		(1 << 30)
- #define TXDESC_CONTROL_INT		(1 << 31)
- 
--static int lpc_eth_hard_start_xmit(struct sk_buff *skb,
--				   struct net_device *ndev);
--
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -1,5 +1,5 @@
  /*
-  * Structure of a TX/RX descriptors and RX status
-  */
-@@ -1442,7 +1438,7 @@ static int lpc_eth_drv_probe(struct plat
- 			res->start);
- 	netdev_dbg(ndev, "IO address size      :%d\n",
- 			res->end - res->start + 1);
--	netdev_err(ndev, "IO address (mapped)  :0x%p\n",
-+	netdev_dbg(ndev, "IO address (mapped)  :0x%p\n",
- 			pldat->net_base);
- 	netdev_dbg(ndev, "IRQ number           :%d\n", ndev->irq);
- 	netdev_dbg(ndev, "DMA buffer size      :%d\n", pldat->dma_buff_size);
+- * arch/arm/mach-lpc32xx/gpiolib.c
++ * GPIO driver for LPC32xx SoC
+  *
+  * Author: Kevin Wells <kevin.wells@nxp.com>
+  *
+@@ -457,13 +457,6 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 	},
+ };
+ 
+-/* Empty now, can be removed later when mach-lpc32xx is finally switched over
+- * to DT support
+- */
+-void __init lpc32xx_gpio_init(void)
+-{
+-}
+-
+ static int lpc32xx_of_xlate(struct gpio_chip *gc,
+ 			    const struct of_phandle_args *gpiospec, u32 *flags)
+ {
