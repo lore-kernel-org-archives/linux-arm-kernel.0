@@ -1,44 +1,35 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 Jun 2012 13:30:07 +0200
-Subject: [RFC PATCH 4/8] ARM: smp: Move cpu initialization directly to
- ipi_cpu_stop
+Date: Mon, 18 Jun 2012 13:30:08 +0200
+Subject: [RFC PATCH 5/8] AMP: smp: Extend number of IPIs
 In-Reply-To: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
 References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
-Message-ID: <1340019011-18642-5-git-send-email-monstr@monstr.eu>
+Message-ID: <1340019011-18642-6-git-send-email-monstr@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just preparation patch for dynamic IPI allocation.
+GIC supports up to 16 IPIs.
 
 Signed-off-by: Michal Simek <monstr@monstr.eu>
----
- arch/arm/kernel/smp.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2c7217d..47406ee 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -468,8 +468,10 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
- /*
-  * ipi_cpu_stop - handle IPI from smp_send_stop()
-  */
--static void ipi_cpu_stop(unsigned int cpu)
-+static void ipi_cpu_stop(void)
- {
-+	unsigned int cpu = smp_processor_id();
-+
- 	if (system_state == SYSTEM_BOOTING ||
- 	    system_state == SYSTEM_RUNNING) {
- 		raw_spin_lock(&stop_lock);
-@@ -528,7 +530,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+---
+Please correct me if this code is also designed for different
+interrupt controller which doesn't support 16 IPIs.
+---
+ arch/arm/include/asm/hardirq.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 436e60b..3e9ded5 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
  
- 	case IPI_CPU_STOP:
- 		irq_enter();
--		ipi_cpu_stop(cpu);
-+		ipi_cpu_stop();
- 		irq_exit();
- 		break;
+-#define NR_IPI	5
++#define NR_IPI	16
  
+ typedef struct {
+ 	unsigned int __softirq_pending;
 -- 
 1.7.0.4
