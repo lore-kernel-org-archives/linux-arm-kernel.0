@@ -1,158 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Jun 2012 23:37:26 +0800
-Subject: [PATCH v4] ARM: mx23: Add initial support for olinuxino board
-In-Reply-To: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
-References: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120618153724.GH19249@S2101-09.ap.freescale.net>
+From: John.Linn@xilinx.com (John Linn)
+Date: Mon, 18 Jun 2012 09:45:10 -0600
+Subject: [PATCH] arm: zynq: Support GIC OF initialization
+In-Reply-To: <4FDF1ACC.2040208@monstr.eu>
+References: <1340017873-18170-1-git-send-email-monstr@monstr.eu>
+ <4FDF19CF.8010303@gmail.com> <4FDF1ACC.2040208@monstr.eu>
+Message-ID: <4fb922e3-9501-4684-9b84-85aad0652dce@CH1EHSMHS021.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applied with a fix-up below.
+> -----Original Message-----
+> From: Michal Simek [mailto:monstr at monstr.eu]
+> Sent: Monday, June 18, 2012 5:11 AM
+> To: Rob Herring
+> Cc: linux-kernel at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org;
+> linux at arm.linux.org.uk; John Linn; arnd at arndb.de
+> Subject: Re: [PATCH] arm: zynq: Support GIC OF initialization
+> 
+> On 06/18/2012 02:06 PM, Rob Herring wrote:
+> > On 06/18/2012 06:11 AM, Michal Simek wrote:
+> >> Zynq is OF driven platfrom which requires OF initialization.
+> >>
+> >> Signed-off-by: Michal Simek<monstr@monstr.eu>
+> >> ---
+> >>   arch/arm/mach-zynq/common.c |    7 ++++++-
+> >>   1 files changed, 6 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-
+> zynq/common.c
+> >> index 17d68d6..7941544 100644
+> >> --- a/arch/arm/mach-zynq/common.c
+> >> +++ b/arch/arm/mach-zynq/common.c
+> >> @@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
+> >>   	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+> >>   }
+> >>
+> >> +static const struct of_device_id zynq_dt_irq_match[] __initconst =
+{
+> >> +	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
+> >> +	{ }
+> >> +};
+> >> +
+> >>   /**
+> >>    * xilinx_irq_init() - Interrupt controller initialization for
+the
+> GIC.
+> >>    */
+> >>   static void __init xilinx_irq_init(void)
+> >>   {
+> >> -	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
+> >
+> > And delete the corresponding defines?
+> 
+> Agree, Will create v2.
+> 
+> BTW: Who is responsible for zynq? I think John Linn and who is
+> maintainer I should ask for pulling.
 
-On Mon, Jun 18, 2012 at 10:51:52AM -0300, Fabio Estevam wrote:
-> mx23-olinuxino is a low cost board designed by Olimex.
-> 
-> It has the following features:
-> 
-> - Freescale iMX233 ARM926J processor at 454MHz
-> -64 MB RAM
+In the past I've acked some patches and they were picked up by others
+into the Soc tree I believe.
 
-It says 64 MB ...
+Thanks,
+John
 
-> -SD-card connector
-> -TV PAL/NTSC video output
-> -2 USB High Speed Hosts
-> -Ethernet 100 Mbit
-> -Stereo Audio Input
-> -Stereo Headphones Audio Output
 > 
-> More information at:
-> http://www.olimex.com/dev/imx233-olinuxino-maxi.html
+> Thanks,
+> Michal
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v3:
-> - Fix the compatible string in imx23_dt_compat
-> Changes since v2:
-> - Add an olimex.txt file
-> - Change the compatible board string to 'olimex,imx23-olinuxino'
-> - Keep the board entry in imx23_dt_compat
-> Changes since v1:
-> - Drop "fsl,imx23-olinuxino" from mach-mxs.c
->  Documentation/devicetree/bindings/arm/olimex.txt |    6 +++
->  arch/arm/boot/dts/imx23-olinuxino.dts            |   44 ++++++++++++++++++++++
->  arch/arm/boot/dts/imx23.dtsi                     |   14 +++++++
->  arch/arm/mach-mxs/mach-mxs.c                     |    1 +
->  4 files changed, 65 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/olimex.txt
->  create mode 100644 arch/arm/boot/dts/imx23-olinuxino.dts
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/olimex.txt b/Documentation/devicetree/bindings/arm/olimex.txt
-> new file mode 100644
-> index 0000000..007fb5c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/olimex.txt
-> @@ -0,0 +1,6 @@
-> +Olimex i.MX Platforms Device Tree Bindings
-> +------------------------------------------
-> +
-> +i.MX23 Olinuxino Low Cost Board
-> +Required root node properties:
-> +    - compatible = "olimex,imx23-olinuxino", "fsl,imx23";
-> diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-> new file mode 100644
-> index 0000000..7abdd40
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + *
-> + * Author: Fabio Estevam <fabio.estevam@freescale.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx23.dtsi"
-> +
-> +/ {
-> +	model = "i.MX23 Olinuxino Low Cost Board";
-> +	compatible = "olimex,imx23-olinuxino", "fsl,imx23";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x08000000>;
+> 
+> 
+> --
+> Michal Simek, Ing. (M.Eng)
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel 2.6 Microblaze Linux -
+> http://www.monstr.eu/fdt/
+> Microblaze U-BOOT custodian
 
-... so I changed 0x080000000 to 0x04000000 here.
 
-Regards,
-Shawn
-
-> +	};
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			ssp0: ssp at 80010000 {
-> +				compatible = "fsl,imx23-mmc";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_sck_cfg>;
-> +				bus-width = <4>;
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		apbx at 80040000 {
-> +			duart: serial at 80070000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&duart_pins_a>;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-> index 8c5f999..6fc3f54 100644
-> --- a/arch/arm/boot/dts/imx23.dtsi
-> +++ b/arch/arm/boot/dts/imx23.dtsi
-> @@ -134,6 +134,20 @@
->  					fsl,pinmux-ids = <0x2010 0x2060>;
->  					fsl,pull-up = <0>;
->  				};
-> +
-> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x2000 0x2020 0x2030
-> +						0x2040 0x2050>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
-> +
-> +				mmc0_sck_cfg: mmc0_sck_cfg {
-> +					fsl,pinmux-ids = <0x2010>;
-> +					fsl,pull-up = <0>;
-> +				};
->  			};
->  
->  			digctl at 8001c000 {
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 8cac94b..a321753 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -92,6 +92,7 @@ static void __init mxs_machine_init(void)
->  
->  static const char *imx23_dt_compat[] __initdata = {
->  	"fsl,imx23-evk",
-> +	"olimex,imx23-olinuxino",
->  	"fsl,imx23",
->  	NULL,
->  };
-> -- 
-> 1.7.1
-> 
-> 
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
