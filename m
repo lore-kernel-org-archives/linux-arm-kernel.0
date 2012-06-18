@@ -1,41 +1,95 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 18 Jun 2012 10:20:42 -0700
-Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
- probing
-In-Reply-To: <201206181109.15250.sr@denx.de>
-References: <1336725678-29327-1-git-send-email-sr@denx.de>
- <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
- <201206060846.07829.sr@denx.de> <201206181109.15250.sr@denx.de>
-Message-ID: <20120618172042.GA29647@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 18 Jun 2012 19:22:56 +0200
+Subject: [PATCH] sound/gpio: of_get_named_gpio() return -EPROBE_DEFER if GPIO
+ deferred
+Message-ID: <1340040176-16553-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120618-11:09, Stefan Roese wrote:
-> On Wednesday 06 June 2012 08:46:07 Stefan Roese wrote:
-> > On Wednesday 16 May 2012 07:56:49 viresh kumar wrote:
-> > > > > Acked-by: Viresh Kumar <viresh.kumar@st.com>
-> > > > 
-> > > > Do you want me to take this?  Spear didn't originally go through me
-> > > > but I can take it if that is the intent.
-> > > 
-> > > Sure. Go ahead.
-> > 
-> > Ping.
-> 
-> Ping again (this is a real show-stopper for SPEAr600 in v3.5!).
-> 
+of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
+respective GPIO is not (yet) available. This is useful if driver's probe()
+functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
+can be probed again later on.
 
-Hi Stefan,
+The function still returns -EINVAL on other errors (parse error or node doesn't
+exist). This way, the case of an optional/intentionally missing GPIO is handled
+appropriately.
 
-I've taken this into my clk-next branch already.  Sorry if I did not
-communicate that well enough.  I will request for clk-next to be
-included into linux-next later this week.  Hopefully this patch will
-start showing up in linux-next in a matter of days.
+For this change, two sound drivers (tegra_{alc5632,wm8903}) need to be
+adjusted.
 
-Let me know if there is anything else I can do.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+---
+ drivers/gpio/gpiolib-of.c       |    5 ++++-
+ sound/soc/tegra/tegra_alc5632.c |    2 +-
+ sound/soc/tegra/tegra_wm8903.c  |   10 +++++-----
+ 3 files changed, 10 insertions(+), 7 deletions(-)
 
-Thanks,
-Mike
-
-> Thanks,
-> Stefan
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index d18068a..9f84fad 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -62,7 +62,10 @@ static int of_gpiochip_find_and_xlate(struct gpio_chip *gc, void *data)
+ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
+                            int index, enum of_gpio_flags *flags)
+ {
+-	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
++	/* Return -EPROBE_DEFER to support probe() functions to be called
++	 * later when the GPIO actually becomes available
++	 */
++	struct gg_data gg_data = { .flags = flags, .out_gpio = -EPROBE_DEFER };
+ 	int ret;
+ 
+ 	/* .of_xlate might decide to not fill in the flags, so clear it. */
+diff --git a/sound/soc/tegra/tegra_alc5632.c b/sound/soc/tegra/tegra_alc5632.c
+index d684df2..e463529 100644
+--- a/sound/soc/tegra/tegra_alc5632.c
++++ b/sound/soc/tegra/tegra_alc5632.c
+@@ -177,7 +177,7 @@ static __devinit int tegra_alc5632_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	alc5632->gpio_hp_det = of_get_named_gpio(np, "nvidia,hp-det-gpios", 0);
+-	if (alc5632->gpio_hp_det == -ENODEV)
++	if (alc5632->gpio_hp_det == -EPROBE_DEFER)
+ 		return -EPROBE_DEFER;
+ 
+ 	ret = snd_soc_of_parse_card_name(card, "nvidia,model");
+diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
+index 0c5bb33..d4f14e4 100644
+--- a/sound/soc/tegra/tegra_wm8903.c
++++ b/sound/soc/tegra/tegra_wm8903.c
+@@ -284,27 +284,27 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
+ 	} else if (np) {
+ 		pdata->gpio_spkr_en = of_get_named_gpio(np,
+ 						"nvidia,spkr-en-gpios", 0);
+-		if (pdata->gpio_spkr_en == -ENODEV)
++		if (pdata->gpio_spkr_en == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 
+ 		pdata->gpio_hp_mute = of_get_named_gpio(np,
+ 						"nvidia,hp-mute-gpios", 0);
+-		if (pdata->gpio_hp_mute == -ENODEV)
++		if (pdata->gpio_hp_mute == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 
+ 		pdata->gpio_hp_det = of_get_named_gpio(np,
+ 						"nvidia,hp-det-gpios", 0);
+-		if (pdata->gpio_hp_det == -ENODEV)
++		if (pdata->gpio_hp_det == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 
+ 		pdata->gpio_int_mic_en = of_get_named_gpio(np,
+ 						"nvidia,int-mic-en-gpios", 0);
+-		if (pdata->gpio_int_mic_en == -ENODEV)
++		if (pdata->gpio_int_mic_en == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 
+ 		pdata->gpio_ext_mic_en = of_get_named_gpio(np,
+ 						"nvidia,ext-mic-en-gpios", 0);
+-		if (pdata->gpio_ext_mic_en == -ENODEV)
++		if (pdata->gpio_ext_mic_en == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 	}
+ 
+-- 
+1.7.10
