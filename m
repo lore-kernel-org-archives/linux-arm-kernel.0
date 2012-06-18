@@ -1,39 +1,75 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 18 Jun 2012 20:00:24 +0530
-Subject: [PATCHv8 09/13] I2C: OMAP: Do not initialise the completion everytime
+Date: Mon, 18 Jun 2012 20:00:28 +0530
+Subject: [PATCHv8 13/13] I2C: OMAP: simplify omap_i2c_ack_stat()
 In-Reply-To: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340029828-20751-10-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340029828-20751-14-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use INIT_COMPLETION instead of init_completion in transfer.
+From: Felipe Balbi <balbi@ti.com>
 
+stat & BIT(1) is the same as BIT(1), so let's
+simplify things a bit by removing "stat &" from
+all omap_i2c_ack_stat() calls.
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   19 ++++++++++---------
+ 1 files changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6f8e7d9..e24eb1f 100644
+index 6a79089..bac6305 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -521,7 +521,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
- 	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
+@@ -763,7 +763,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
  
--	init_completion(&dev->cmd_complete);
-+	INIT_COMPLETION(dev->cmd_complete);
- 	dev->cmd_err = 0;
+ 	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
+ 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+-			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
+ 			return -ETIMEDOUT;
+ 		}
+@@ -824,10 +824,11 @@ complete:
+ 		 */
+ 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
+ 					OMAP_I2C_STAT_AL)) {
+-			omap_i2c_ack_stat(dev, stat &
+-				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
+-				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
+-				OMAP_I2C_STAT_ARDY));
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
++						OMAP_I2C_STAT_RDR |
++						OMAP_I2C_STAT_XRDY |
++						OMAP_I2C_STAT_XDR |
++						OMAP_I2C_STAT_ARDY));
+ 			omap_i2c_complete_cmd(dev, err);
+ 			return IRQ_HANDLED;
+ 		}
+@@ -874,8 +875,8 @@ complete:
+ 					}
+ 				}
+ 			}
+-			omap_i2c_ack_stat(dev,
+-				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
++						OMAP_I2C_STAT_RDR));
+ 			continue;
+ 		}
  
- 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
-@@ -1029,6 +1029,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	dev->irq = irq->start;
+@@ -922,8 +923,8 @@ complete:
  
- 	platform_set_drvdata(pdev, dev);
-+	init_completion(&dev->cmd_complete);
- 
- 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
+ 			}
+-			omap_i2c_ack_stat(dev,
+-				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
++						OMAP_I2C_STAT_XDR));
+ 			continue;
+ 		}
  
 -- 
 1.7.5.4
