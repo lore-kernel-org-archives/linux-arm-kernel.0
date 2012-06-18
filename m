@@ -1,36 +1,25 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 18:42:22 +0200
-Subject: [PATCH 2/2] sound: tegra_alc5632: Adjust to of_get_named_gpio() change
-In-Reply-To: <1340037743-12924-1-git-send-email-stigge@antcom.de>
-References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340037743-12924-2-git-send-email-stigge@antcom.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Jun 2012 17:44:02 +0100
+Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
+ number
+In-Reply-To: <20120618143128.GF19249@S2101-09.ap.freescale.net>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
+ <20120618143128.GF19249@S2101-09.ap.freescale.net>
+Message-ID: <20120618164402.GA18630@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_get_named_gpio() was changed to return -EPROBE_DEFER in case of
-gpios not probed yet. This patch adjusts tegra_alc5632 to this.
+On Mon, Jun 18, 2012 at 10:31:30PM +0800, Shawn Guo wrote:
+> Hi Russell,
+> 
+> Do you have any comment, or may I have your ack on this patch?
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Yes, I haven't seen it, and now that I have I don't like it.
 
----
-Applies to git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git,
-branch for-next
+FIQs should be an entirely separate number space from IRQs, as we
+may want to totally decouple them from the IRQ stuff (we probably
+should have already done this when genirq came along.)
 
- sound/soc/tegra/tegra_alc5632.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/tegra/tegra_alc5632.c b/sound/soc/tegra/tegra_alc5632.c
-index d684df2..e463529 100644
---- a/sound/soc/tegra/tegra_alc5632.c
-+++ b/sound/soc/tegra/tegra_alc5632.c
-@@ -177,7 +177,7 @@ static __devinit int tegra_alc5632_probe(struct platform_device *pdev)
- 	}
- 
- 	alc5632->gpio_hp_det = of_get_named_gpio(np, "nvidia,hp-det-gpios", 0);
--	if (alc5632->gpio_hp_det == -ENODEV)
-+	if (alc5632->gpio_hp_det == -EPROBE_DEFER)
- 		return -EPROBE_DEFER;
- 
- 	ret = snd_soc_of_parse_card_name(card, "nvidia,model");
--- 
-1.7.10
+About the only stuff FIQs use is the enable/disable_irq as a short
+cut to dealing with the mask registers.
