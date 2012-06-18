@@ -1,40 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 18 Jun 2012 09:39:33 -0500
-Subject: [PATCH] ARM:Orion5x: Fix panic at boot for PCI IO reservation
-In-Reply-To: <20120618141901.GQ4799@lunn.ch>
-References: <1340006794-18097-1-git-send-email-andrew@lunn.ch>
- <20120618141901.GQ4799@lunn.ch>
-Message-ID: <4FDF3DA5.4030602@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Jun 2012 08:50:38 -0600
+Subject: [PATCH] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER
+ if GPIO not yet available
+In-Reply-To: <4FDEF293.9080305@antcom.de>
+References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
+ <4FDE8D27.6030508@wwwdotorg.org> <4FDEF293.9080305@antcom.de>
+Message-ID: <4FDF403E.9090302@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 09:19 AM, Andrew Lunn wrote:
-> On Mon, Jun 18, 2012 at 10:06:34AM +0200, Andrew Lunn wrote:
->> Orion5x, and all other orion based systems have a PCI(E) IO window
->> size of 1Mbyte. Recent changes to mach/io.h mean that by default the
->> kernel does not allow such large windows, it refuses to reserve that
->> much resource space, triggering a panic.
+On 06/18/2012 03:19 AM, Roland Stigge wrote:
+> On 06/18/2012 04:06 AM, Stephen Warren wrote:
+>> On 06/17/2012 04:11 AM, Roland Stigge wrote:
+>>> of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
+>>> respective GPIO is not (yet) available. This is useful if driver's probe()
+>>> functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
+>>> can be probed again later on.
+>>>
+>>> The function still returns -EINVAL on other errors (parse error or node doesn't
+>>> exist). This way, the case of an optional/intentionally missing GPIO is handled
+>>> appropriately.
 >>
->> Reduce the PCI(E) IO window size to the normal 64K.
+>> While I agree this is a correct change, it is going to break some
+>> existing code - at least sound/soc/tegra/tegra_{wm8903.c,alc5632.c}.
 > 
-> It turns out this patch does not work...
-> 
-> There are two PCI devices on Orion5x. So the first one takes all the
-> available 64K IO space and the second one fails it allocation.
-> 
-> We need to put back parts of mach/io.h to increase the available size to
-> 128Kbytes.
-> 
-> It has been said in another email, the plan is to put the IO window at
-> one fixed address. How will this work for devices with multiple PCI
-> busses? Most Orion chips for have two separate PCI busses.
+> Can you please tell in which way the patch breaks those drivers?
+> However, I can see that those drivers solved the same problem in a
+> different way (deferring of_get_named_gpio(), via the sound init()). So
+> they could be adjusted to take advantage of new -EPROBE_DEFER.
 
-It supports up to 16 64K windows mapped into a 1MB area. So
-IO_RESOURCE_LIMIT will be 1MB in that case.
-
-If the h/w can support i/o at 0, then it would be good make __io(x) be
-the form of ((x) + <host phys base>). Unfortunately, it seems the only
-way to figure this out is change it and see if it breaks people which
-isn't very nice.
-
-Rob
+The drivers I mentioned test the return code of of_get_named_gpio() to
+see if it's -ENODEV, which means that DT property for that GPIO exists
+but the driver for it isn't available yet, so the property can't be
+parsed. In this case, the sound drivers defer their own probe. If
+of_get_named_gpio() is modified to return -EPROBE_DEFER directly, then
+it won't be returning -ENODEV, and hence the sound drivers' check for
+-ENODEV won't fire, and hence the sound drivers will just continue their
+probe assuming that the particular GPIOs are not present on the board
+(since they are all optional, so anything other than an explicit
+deferral error from of_get_named_gpio() is not treated as an error).
+This will break sound on those platforms.
