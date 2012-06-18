@@ -1,25 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jun 2012 17:44:02 +0100
-Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
- number
-In-Reply-To: <20120618143128.GF19249@S2101-09.ap.freescale.net>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
- <20120618143128.GF19249@S2101-09.ap.freescale.net>
-Message-ID: <20120618164402.GA18630@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 18 Jun 2012 17:46:59 +0100
+Subject: [PATCH 1/2] sound: tegra_wm8903: Adjust to of_get_named_gpio()
+ change
+In-Reply-To: <1340037743-12924-1-git-send-email-stigge@antcom.de>
+References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120618164659.GV3974@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 10:31:30PM +0800, Shawn Guo wrote:
-> Hi Russell,
-> 
-> Do you have any comment, or may I have your ack on this patch?
+On Mon, Jun 18, 2012 at 06:42:21PM +0200, Roland Stigge wrote:
+> of_get_named_gpio() was changed to return -EPROBE_DEFER in case of
+> gpios not probed yet. This patch adjusts tegra_wm8903 to this.
 
-Yes, I haven't seen it, and now that I have I don't like it.
+So, I saw from the other thread that this didn't actually happen yet - I
+guess the best thing is to merge this along with the changes for
+introducing -EPROBE_DEFER.
 
-FIQs should be an entirely separate number space from IRQs, as we
-may want to totally decouple them from the IRQ stuff (we probably
-should have already done this when genirq came along.)
-
-About the only stuff FIQs use is the enable/disable_irq as a short
-cut to dealing with the mask registers.
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120618/4d0d66e5/attachment-0001.sig>
