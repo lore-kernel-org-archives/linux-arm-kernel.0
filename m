@@ -1,41 +1,27 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 18 Jun 2012 13:28:34 +0200
-Subject: [PATCH] ARM: ux500: bump i2c bus speed to 400kHz
-In-Reply-To: <CACRpkdZENi8PCdjmr-Ypey95HjDmEZmpJtqEC49SbwPBCfqr7Q@mail.gmail.com>
-References: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
- <201206180106.21108.marek.vasut@gmail.com>
- <CACRpkdZENi8PCdjmr-Ypey95HjDmEZmpJtqEC49SbwPBCfqr7Q@mail.gmail.com>
-Message-ID: <201206181328.34644.marek.vasut@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Jun 2012 13:29:43 +0200
+Subject: [PATCH 2/3] ARM: ux500: Add i2c configurations to the Device Tree
+ for DB8500 based devices
+In-Reply-To: <4FD8BAE4.4050606@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD8BAE4.4050606@linaro.org>
+Message-ID: <CACRpkda2pH1by2hajpP20CJgdg+mWFF=QaGbeNdY=c8iOVtLUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Linus Walleij,
+On Wed, Jun 13, 2012 at 6:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> On Mon, Jun 18, 2012 at 1:06 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> From: Linus Walleij <linus.walleij@linaro.org>
-> >> 
-> >> Some recent discussion revealed inconsistency in the board file
-> >> for the MOP500 family. The board can very well do 400kHz on
-> >> the I2C busses, so make it do that.
-> > 
-> > Shouldn't this be controlled by DT?
-> 
-> They can be controlled by Device Tree after Lee's patch I think.
-> 
-> > Some of the i2c devices can't do 400kHz.
-> 
-> Which ones? This works find on the MOP500/HREF board, are you referring
-> to Snowball devices?
+> + ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <100000>;
+> + ? ? ? ? ? ? ? ? ? ? ? stericsson,slsu = <0xe>;
+> + ? ? ? ? ? ? ? ? ? ? ? stericsson,tft = <1>;
+> + ? ? ? ? ? ? ? ? ? ? ? stericsson,rft = <8>;
+> + ? ? ? ? ? ? ? ? ? ? ? stericsson,timeout = <200>;
+> + ? ? ? ? ? ? ? ? ? ? ? stericsson,i2c_freq_mode_fast;
 
-I had issues with some omnivision cameras, but they were indeed quite old. My 
-rant was rather about not closing the door for 100kHz if it was ever needed. But 
-like you said above, if it can be changed after applying the aforementioned 
-patch, that's ok.
+In the context of my patch to the board file, we conclude that the
+clock-frequency should be set to 400000 instead.
 
-Thanks for clearing this up, sorry for pestering you.
-
-> Yours,
-> Linus Walleij
-
-Best regards,
-Marek Vasut
+Yours,
+Linus Walleij
