@@ -1,9 +1,9 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Jun 2012 16:00:52 +0200
-Subject: [PATCH v3] ARM: mx23: Add initial support for olinuxino board
-In-Reply-To: <1340027129-8407-1-git-send-email-fabio.estevam@freescale.com>
-References: <1340027129-8407-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <201206181600.53000.marex@denx.de>
+Date: Mon, 18 Jun 2012 16:01:24 +0200
+Subject: [PATCH v4] ARM: mx23: Add initial support for olinuxino board
+In-Reply-To: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
+References: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <201206181601.24237.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,7 +26,12 @@ Dear Fabio Estevam,
 > http://www.olimex.com/dev/imx233-olinuxino-maxi.html
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Acked-by: Marek Vasut <marex@denx.de>
+
 > ---
+> Changes since v3:
+> - Fix the compatible string in imx23_dt_compat
 > Changes since v2:
 > - Add an olimex.txt file
 > - Change the compatible board string to 'olimex,imx23-olinuxino'
@@ -137,10 +142,7 @@ Dear Fabio Estevam,
 > 
 >  static const char *imx23_dt_compat[] __initdata = {
 >  	"fsl,imx23-evk",
-> +	"fsl,imx23-olinuxino",
-
-olimex,imx23-olinuxino ...
-
+> +	"olimex,imx23-olinuxino",
 >  	"fsl,imx23",
 >  	NULL,
 >  };
