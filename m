@@ -1,37 +1,41 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 19:15:46 +0200
-Subject: [PATCH 1/2] sound: tegra_wm8903: Adjust to of_get_named_gpio()
- change
-In-Reply-To: <20120618170408.GW3974@opensource.wolfsonmicro.com>
-References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
- <20120618164659.GV3974@opensource.wolfsonmicro.com>
- <4FDF5E9E.6060803@antcom.de>
- <20120618170408.GW3974@opensource.wolfsonmicro.com>
-Message-ID: <4FDF6242.3040400@antcom.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 18 Jun 2012 10:20:42 -0700
+Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
+ probing
+In-Reply-To: <201206181109.15250.sr@denx.de>
+References: <1336725678-29327-1-git-send-email-sr@denx.de>
+ <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
+ <201206060846.07829.sr@denx.de> <201206181109.15250.sr@denx.de>
+Message-ID: <20120618172042.GA29647@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 07:04 PM, Mark Brown wrote:
-> On Mon, Jun 18, 2012 at 07:00:14PM +0200, Roland Stigge wrote:
+On 20120618-11:09, Stefan Roese wrote:
+> On Wednesday 06 June 2012 08:46:07 Stefan Roese wrote:
+> > On Wednesday 16 May 2012 07:56:49 viresh kumar wrote:
+> > > > > Acked-by: Viresh Kumar <viresh.kumar@st.com>
+> > > > 
+> > > > Do you want me to take this?  Spear didn't originally go through me
+> > > > but I can take it if that is the intent.
+> > > 
+> > > Sure. Go ahead.
+> > 
+> > Ping.
 > 
->> Basically, yes. But this would mean that doing via gpio, we would
->> need to pull other stuff from the sound tree over to gpio to
->> build upon because "my" tegra_* sound patches won't apply to the
->> gpio branch currently.
+> Ping again (this is a real show-stopper for SPEAr600 in v3.5!).
 > 
-> Oh, yes.  Stephen's gone and reorganised all that code which means
-> it's not a trivial merge.  Ho hum.  I'm happy to apply them if
-> folks are comfortable with it, I guess ideally I'd be able to pull
-> a branch with the gpio changes in and then apply on top of that.
 
-Depending on what else changes will come via gpio for 3.6, maybe you
-don't even need to merge gpio to sound?
+Hi Stefan,
 
-Can you please coordinate between sound and gpio?
+I've taken this into my clk-next branch already.  Sorry if I did not
+communicate that well enough.  I will request for clk-next to be
+included into linux-next later this week.  Hopefully this patch will
+start showing up in linux-next in a matter of days.
 
-Thanks in advance!
+Let me know if there is anything else I can do.
 
-Roland
+Thanks,
+Mike
 
-PS: I'm posting a combined patch suitable for the sound subsystem.
-Please tell me if you also need the gpiolib-of patch singled out.
+> Thanks,
+> Stefan
