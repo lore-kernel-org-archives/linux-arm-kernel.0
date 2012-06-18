@@ -1,27 +1,28 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Jun 2012 14:00:33 +0800
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <4FDB61C9.9020505@broadcom.com>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
- <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB61C9.9020505@broadcom.com>
-Message-ID: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61E@HKMAIL01.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Jun 2012 08:01:05 +0200
+Subject: [PATCH] ARM: ux500: bump i2c bus speed to 400kHz
+In-Reply-To: <201206180106.21108.marek.vasut@gmail.com>
+References: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
+ <201206180106.21108.marek.vasut@gmail.com>
+Message-ID: <CACRpkdZENi8PCdjmr-Ypey95HjDmEZmpJtqEC49SbwPBCfqr7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 16, 2012 at 00:24:41, Franky Lin wrote:
->On 06/14/2012 11:09 PM, Wei Ni wrote:
->> I talked with Franky, this power sequence is generally for 4329, so it mean this sequence can be put into the wifi driver.
+On Mon, Jun 18, 2012 at 1:06 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Some recent discussion revealed inconsistency in the board file
+>> for the MOP500 family. The board can very well do 400kHz on
+>> the I2C busses, so make it do that.
 >
->Hold on. It's generally for 4329. But fullmac supports 4329/4330 along 
->with USB dongle chips. Also more chips are incoming. I dont think it's a good idea to add *this* power sequence into brcmfmac.
+> Shouldn't this be controlled by DT?
 
-Ok we need find other ways for it. Thanks for your comments.
+They can be controlled by Device Tree after Lee's patch I think.
 
-Wei
----
-nvpublic
+> Some of the i2c devices can't do 400kHz.
+
+Which ones? This works find on the MOP500/HREF board, are you referring
+to Snowball devices?
+
+Yours,
+Linus Walleij
