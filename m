@@ -1,93 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 18 Jun 2012 09:59:45 +0200
-Subject: mach/io.h cleanup and removal question
-In-Reply-To: <4FD207C9.5010006@gmail.com>
-References: <20120608102040.GA26034@lunn.ch>
- <20120608114316.GC15555@n2100.arm.linux.org.uk>
- <4FD207C9.5010006@gmail.com>
-Message-ID: <20120618075945.GJ4799@lunn.ch>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 18 Jun 2012 13:33:19 +0530
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <96C9D994977DD0439FB6D3FE3B13DD907DE14CB4DF@BGMAIL01.nvidia.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+ <4FDB5976.20809@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+ <96C9D994977DD0439FB6D3FE3B13DD907DE14CB4DF@BGMAIL01.nvidia.com>
+Message-ID: <96C9D994977DD0439FB6D3FE3B13DD907DE14CB4E8@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 09:10:17AM -0500, Rob Herring wrote:
-> On 06/08/2012 06:43 AM, Russell King - ARM Linux wrote:
-> > On Fri, Jun 08, 2012 at 12:20:40PM +0200, Andrew Lunn wrote:
-> >> Your patchset for mach/io.h cleanup and remove, causes problems on
-> >> Orion5x.
-> >>
-> >> mach/io.h for orion5x had a:
-> >>
-> >> #define IO_SPACE_LIMIT		0xffffffff
-> >>
-> >> which got removed. This results in a panic at boot:
-> >>
-> >>         /*
-> >>          * IORESOURCE_IO
-> >>          */
-> >>         sys->io_offset = 0;
-> >>         res[0].name = "PCIe I/O Space";
-> >>         res[0].flags = IORESOURCE_IO;
-> >>         res[0].start = ORION5X_PCIE_IO_BUS_BASE;
-> >>         res[0].end = res[0].start + ORION5X_PCIE_IO_SIZE - 1;
-> >>         if (request_resource(&ioport_resource, &res[0]))
-> >>                 panic("Request PCIe IO resource failed\n");
-> >>
-> >> ORION5X_PCIE_IO_SIZE is 1MB, so the allocation fails because of the
-> >> 64K default.
-> >>
-> >> arch/arm/include/asm/io.h has the comment:
-> >>
-> >> /*
-> >>  * This is the limit of PC card/PCI/ISA IO space, which is by default
-> >>  * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
-> >>  * zero to prevent ISA/PCI drivers claiming IO space (and potentially
-> >>  * oopsing.)
-> >>  *
-> >>  * Only set this larger if you really need inb() et.al. to operate over
-> >>  * a larger address space.  Note that SOC_COMMON ioremaps each sockets
-> >>  * IO space area, and so inb() et.al. must be defined to operate as per
-> >>  * readb() et.al. on such platforms.
-> >>  */
-> >>
-> >> Now, i know nothing about how PCI works... So i have a question:
-> >>
-> >> Which is better, put back parts of io.h so allowing the 1MB
-> >> request_resource, or reduce ORION5X_PCIE_IO_SIZE to 64KB, since from
-> >> the comment it is unlikely an PCI card needs more than 64KB?
-> > 
-> > Well, the comment about SOC_COMMON doesn't apply as you're not using that.
-> > 
-> > Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
-> > requirement to support a larger IO space.
-> 
-> Agreed. The next step is moving all i/o space to a fixed virtual address
-> and for this we want to make i/o windows 64K.
+If it is for power then it has to go via regulator. It does not make sense to directly control the gpio inside the wifi driver.
 
-Hi Rob
 
-Reducing the window size to 64K stops the panic at boot, as expected.
+-----Original Message-----
+From: linux-tegra-owner@vger.kernel.org [mailto:linux-tegra-owner at vger.kernel.org] On Behalf Of Rakesh Kumar
+Sent: Monday, June 18, 2012 1:11 PM
+To: Wei Ni; 'Stephen Warren'
+Cc: Mark Brown; 'frankyl at broadcom.com'; Thierry Reding; Mursalin Akon; 'linux-mmc at vger.kernel.org'; devicetree-discuss at lists.ozlabs.org; 'linux-wireless at vger.kernel.org'; linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: Where to power on the wifi device before loading the driver.
 
-> 
-> However, I think you may also have a problem with
-> ORION5X_PCIE_IO_BUS_BASE and the resource start. The i/o resource start
-> should really be 0 and then the __io() macro should add the virtual i/o
-> base address. However, Russell has mentioned previously that some chips
-> may not work correctly with i/o space at 0 (PCI bus addresses, not host).
-> 
-> Do you have cards with i/o that you can test or know what devices are
-> used with this platform?
+>Now if this means adding a child node under the SDIO controller to represent the attached device, and storing any settings required by that device in that child node, that's probably a reasonable basic approach.
+>
+>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That seems reasonable to represent as a GPIO rather than a regulator since it connects directly into the WiFi device as a GPIO, and its use within the WiFi device can indeed be governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
+>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then it'd be better represented as a regulator, since the control point is outside the WiFi device.
 
-I don't have any cards. I've also no idea what cards are used with
-these devices. I guess they are mostly WiFi cards, since Orion5x is
-normally used in NAS boxes, and there is one box supported which is an
-WiFi AP.
+Tegra uses two GPIO (WF_EN and WF_RST) to power on and reset bcm4329 card. In case of bcm4329, these two lines are shorted. Tegra does not control VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card based on these GPIO. Uses of these GPIO are internal to WiFi HW.  It is reasonable to represent as a GPU rather than regulator.
 
-Since the panic kills all orion5x systems, i want to at least fix
-that. So i will post the patch to reduce the window size to 64K.  I
-guess for the moment we have to leave PCI potentially broken, and see
-if anybody complains.
+Rakesh
+---
+nvpublic
 
-Is this O.K?
+-----Original Message-----
+From: Wei Ni 
+Sent: 18 June 2012 11:50
+To: 'Stephen Warren'; Rakesh Kumar
+Cc: Mark Brown; 'frankyl at broadcom.com'; Thierry Reding; Mursalin Akon; 'linux-mmc at vger.kernel.org'; devicetree-discuss at lists.ozlabs.org; 'linux-wireless at vger.kernel.org'; linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: Where to power on the wifi device before loading the driver.
 
-   Thanks
-	Andrew
+On Fri, Jun 15, 2012 at 23:49:10, Stephen Warren wrote:
+>> I talked with Franky, this power sequence is generally for 4329, so 
+>> it mean this sequence can be put into the wifi driver.
+>> We can use the virtual platform device both for OOB and non OOB.
+>> I will send out patches later.
+>
+>Can you please expand on what a "virtual platform device" is; device tree typically represents real hardware rather than anything "virtual".
+
+The "virtual platform device" is created before the real wifi device, so that it can pass the gpios to the driver, and power up the device before calling sdio_register_driver.
+But as Franky said, this power sequence is only generally for 4329, not for the USB dongle chips. So it's not a good idea to add this "power up" in brcmfmac.
+
+>
+>Now if this means adding a child node under the SDIO controller to represent the attached device, and storing any settings required by that device in that child node, that's probably a reasonable basic approach.
+>
+>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That seems reasonable to represent as a GPIO rather than a regulator since it connects directly into the WiFi device as a GPIO, and its use within the WiFi device can indeed be governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
+>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then it'd be better represented as a regulator, since the control point is outside the WiFi device.
+
+I think Rakesh may can answer this.
+
+Wei.
+---
+nvpublic
+
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
