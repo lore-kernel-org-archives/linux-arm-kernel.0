@@ -1,41 +1,30 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 Jun 2012 13:53:41 +0200
-Subject: [RFC PATCH 4/8] ARM: smp: Move cpu initialization directly to
- ipi_cpu_stop
-In-Reply-To: <20120618113422.GD12029@n2100.arm.linux.org.uk>
+Date: Mon, 18 Jun 2012 13:54:35 +0200
+Subject: [RFC PATCH 6/8] ARM: smp: Use generic API for ipi
+In-Reply-To: <20120618113617.GF12029@n2100.arm.linux.org.uk>
 References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
- <1340019011-18642-5-git-send-email-monstr@monstr.eu>
- <20120618113422.GD12029@n2100.arm.linux.org.uk>
-Message-ID: <4FDF16C5.4040304@monstr.eu>
+ <1340019011-18642-7-git-send-email-monstr@monstr.eu>
+ <20120618113617.GF12029@n2100.arm.linux.org.uk>
+Message-ID: <4FDF16FB.6020300@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 01:34 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 18, 2012 at 01:30:07PM +0200, Michal Simek wrote:
->> This is just preparation patch for dynamic IPI allocation.
+On 06/18/2012 01:36 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 18, 2012 at 01:30:09PM +0200, Michal Simek wrote:
+>> Support dynamic IPI allocation. It supports cases
+>> where user wants to use IPI for communication among cpus
+>> and setup own handler for it.
+>>
+>> New functions set_ipi_handler/clear_ipi_handler are used
+>> for dynamic allocation.
 >
-> Why?
+> For what purpose?
 
-Let's start with this one first.
-
-The reason for dynamic IPI allocation is that IPI interrupts can be used (and I am using them)
-for sending IRQ to the second cpu and the second cpu doesn't run Linux.
-But still I need functionality for sending interrupts to the second core for Linux. A also need
-to have any hook to be able to receive irq from the second core.
-Based on that I have looked at this code where only static allocation is used and it is not possible
-to use it in this model because no driver can allocate IPI handler.
-Based on that I have changed it to model where dynamic IPIs can be allocated dynamically.
-As you see from the code. Origin static IPI allocation is still there.
-
-Maybe what it is not visible is that NR_IPI value. As you commented in 5/8 NR_IPI stores number of
-IPI used by Linux and I am using is as maximum IPIs in the system.
-I am completely fine with not changing NR_IPI value and introduce new one like MAX_NR_IPI value which
-will be for Xilinx Zynq GIC setup to 16.
-
-Hope I have clarify it a little bit.
+Please look at my reaction in 4/8. It is the part of dynamic IPI allocation.
 
 Thanks,
 Michal
+
 
 -- 
 Michal Simek, Ing. (M.Eng)
