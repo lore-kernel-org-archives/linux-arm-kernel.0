@@ -1,34 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 18 Jun 2012 11:41:49 -0600 (MDT)
-Subject: [PATCH 09/11] ARM: OMAP4: clock data: add clockdomains for clocks
- used as main clocks
-In-Reply-To: <4FD04C8D.50609@ti.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061313.25532.84569.stgit@dusk> <4FD04C8D.50609@ti.com>
-Message-ID: <alpine.DEB.2.00.1206070108540.6684@utopia.booyaka.com>
+From: ananaza@iki.fi (Antti P Miettinen)
+Date: Mon, 18 Jun 2012 20:41:46 +0300
+Subject: [PATCH 6/6] ARM: l2x0: Optimise the range based operations
+References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+ <1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
+ <1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
+ <1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
+ <1283846243-11600-5-git-send-email-santosh.shilimkar@ti.com>
+ <1283846243-11600-6-git-send-email-santosh.shilimkar@ti.com>
+ <1283846243-11600-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <874nq8y0th.fsf@amiettinen-lnx.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jun 2012, Rajendra Nayak wrote:
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> For the big buffers which are in excess of cache size, the maintaince
+> operations by PA are very slow. For such buffers the maintainace
+> operations can be speeded up by using the WAY based method.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/mm/cache-l2x0.c |   22 ++++++++++++++++++++++
+>  1 files changed, 22 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+[..]
+> @@ -208,6 +225,11 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+>  	void __iomem *base = l2x0_base;
+>  	unsigned long flags;
+>  
+> +	if ((end - start) >= l2x0_size) {
+> +		l2x0_flush_all();
+> +		return;
+> +	}
+> +
+>  	spin_lock_irqsave(&l2x0_lock, flags);
+>  	start &= ~(CACHE_LINE_SIZE - 1);
+>  	while (start < end) {
 
-> On Thursday 07 June 2012 11:43 AM, Paul Walmsley wrote:
-> > Until the OMAP4 code is converted to disable the use of the clock
-> > framework-based clockdomain enable/disable sequence, any clock used as
-> > a hwmod main_clk must have a clockdomain associated with it.  This
-> > patch populates some clock structure clockdomain names to resolve the
-> > following warnings during kernel init:
-> 
-> But these associations are useless if the clock is not a 'gate' clock, 
-> except for getting rid of these warnings. Maybe we should make hwmod 
-> understand that not all clocks need to have a clockdomain associated 
-> with it and stop complaining.
+I wonder if this is safe. Are the L2 controller clean&invalidate
+operations atomic in relation to CPU stores? The PL310 TRM says that
+clean and invalidate by way is a background operation. About background
+operations the TRM says that the targeted ways are locked for
+allocations but read or write hits are permitted to access the way. So
+is the following sequence possible?
 
-In retrospect, I think I should have made clockdomains mandatory for all 
-clocks for OMAP4 back then, rather than only allowing them for some 
-clocks.  As I understand it, that would have saved a lot of time and 
-debugging frustration on the bug fixed by commit 
-6c4a057bffe9823221eab547e11fac181dc18a2b ("ARM: OMAP4: clock data: Force a 
-DPLL clkdm/pwrdm ON before a relock").  Oh well.
+1. L2 controller cleans a way
+2. A CPU writes to the same way
+3. L2 controller invalidates the way
 
+This would result in loss of data. This would mean that the optimization
+is not safe if several cores are active.
 
-- Paul
+--
+Antti P Miettinen
+http://www.iki.fi/~ananaza/
