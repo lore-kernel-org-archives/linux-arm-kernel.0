@@ -1,39 +1,45 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 Jun 2012 13:11:13 +0200
-Subject: [PATCH] arm: zynq: Support GIC OF initialization
-Message-ID: <1340017873-18170-1-git-send-email-monstr@monstr.eu>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 18 Jun 2012 13:13:18 +0200
+Subject: [PATCH] spi: spi-pl022: Adjust probe() to of_get_named_gpio()
+ returning -EPROBE_DEFER
+In-Reply-To: <1340011219-31657-1-git-send-email-stigge@antcom.de>
+References: <1340011219-31657-1-git-send-email-stigge@antcom.de>
+Message-ID: <4FDF0D4E.7090303@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq is OF driven platfrom which requires OF initialization.
+On 06/18/2012 11:20 AM, Roland Stigge wrote:
+> The patch to gpiolib-of.c providing -EPROBE_DEFER as a hint to defer
+> of_get_named_gpio*() to a later probe() breaks spi-pl022.c.
+> 
+> This patch adjusts to this change, using -EPROBE_DEFER as indication to defer.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+> Applies to 3.5-rc3
+> 
+> Should this patch be joined with gpiolib-of's patch to of_get_named_gpio()? Or
+> should they just be issued as a series?
+> 
+>  drivers/spi/spi-pl022.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- linux-2.6.orig/drivers/spi/spi-pl022.c
+> +++ linux-2.6/drivers/spi/spi-pl022.c
+> @@ -2075,7 +2075,7 @@ pl022_probe(struct amba_device *adev, co
+>  	for (i = 0; i < num_cs; i++) {
+>  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+>  
+> -		if (cs_gpio == -ENODEV) {
+> +		if (cs_gpio == -EPROBE_DEFER) {
+>  			status = -EPROBE_DEFER;
+>  			goto err_no_gpio;
+>  		}
 
-Signed-off-by: Michal Simek <monstr@monstr.eu>
----
- arch/arm/mach-zynq/common.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+You can ignore this patch, Alexandre will merge this into his
+yet-unapplied patch to support dt in spi-pl022.
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 17d68d6..7941544 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
- }
- 
-+static const struct of_device_id zynq_dt_irq_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
-+	{ }
-+};
-+
- /**
-  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
-  */
- static void __init xilinx_irq_init(void)
- {
--	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-+	of_irq_init(zynq_dt_irq_match);
- }
- 
- /* The minimum devices needed to be mapped before the VM system is up and
--- 
-1.7.0.4
+Sorry for the noise,
+
+Roland
