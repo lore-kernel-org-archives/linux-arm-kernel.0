@@ -1,47 +1,33 @@
-From: mkl@blackshift.org (Marc Kleine-Budde)
-Date: Mon, 18 Jun 2012 13:50:51 +0200
-Subject: Dove clock support
-In-Reply-To: <4FDEFC6A.7030300@googlemail.com>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
- <20120618084300.GL4799@lunn.ch> <4FDEF7E9.4030504@googlemail.com>
- <4FDEFAE2.7000303@blackshift.org> <4FDEFC6A.7030300@googlemail.com>
-Message-ID: <4FDF161B.1010801@blackshift.org>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Mon, 18 Jun 2012 08:51:08 -0300
+Subject: [PATCH] spi: spi-pl022: Adjust probe() to of_get_named_gpio()
+ returning -EPROBE_DEFER
+In-Reply-To: <CACRpkdYTE0imxEAdq0=wJO49iBAj=8xGjn_PevFm1Bsr3MvUQg@mail.gmail.com>
+References: <1340011219-31657-1-git-send-email-stigge@antcom.de>
+ <CACRpkdYTE0imxEAdq0=wJO49iBAj=8xGjn_PevFm1Bsr3MvUQg@mail.gmail.com>
+Message-ID: <CAAAP30GAwQZtjAjtX=Q8K0Szo83QwqCZNtr09GxrgcvcR-CKeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 12:01 PM, Sebastian Hesselbarh wrote:
-> On 06/18/2012 11:54 AM, Marc Kleine-Budde wrote:
->>> Also ge-phy has to be connected with ge-clk, too. But for dove this is
->>> a clk gate while kirkwood can shut it down somewhere else. I guess it
->>> can be handled like sata/pcie on kirkwood.
+On Mon, Jun 18, 2012 at 8:47 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Jun 18, 2012 at 11:20 AM, Roland Stigge <stigge@antcom.de> wrote:
+>
+>> The patch to gpiolib-of.c providing -EPROBE_DEFER as a hint to defer
+>> of_get_named_gpio*() to a later probe() breaks spi-pl022.c.
 >>
->> The PHY is a clock gate so I'm handling it via:
->>> ge = dove_register_gate("ge0", CLOCK_GATING_GBE_BIT |
->>> CLOCK_GATING_GIGA_PHY_BIT);
->> So no gate_fn needed.
+>> This patch adjusts to this change, using -EPROBE_DEFER as indication to defer.
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-BTW: This code doesn't work, btw. It's bits, not masks.
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-> There is no fn needed for dove, but kirkwood will need one IIRC.
-> Moreover, you could hook-up PHY-gate as a parent of corresponding
-> clk-gate and they will be enabled/disabled simultaneously.
+>> Should this patch be joined with gpiolib-of's patch to of_get_named_gpio()? Or
+>> should they just be issued as a series?
+>
+> If it's not bisectable unless you change this in the same patch then join
+> them. Else I'd put them in a series and try to figure out a good tree for
+> merging them.
 
-My solution doesn't wrk. We need either a custom fn or your proposed
-parent-clock trick.
-
-> But I'd prefer the driver to take care of clks _and_ PHYs.
-
-You mean clk and PHY individually? I'm not that familiar with the new
-clock framework. Is it possible without registering a dummy clock on the
-systems with doesn't have individual clocks?
-
-> One more: I suggest to clean the clk names of orion platforms,
-> they are a mess ;) And IMHO clks should always have both strings
-> set, e.g. kirkwood-i2s has an extclk input besides it on-chip clk.
-
-I'm not (yet) deep into the different orion archs, can you elaborate more?
-
-regards, Marc
-Marc
+Ok, so lets keep the original patch as is for now.
