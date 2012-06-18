@@ -1,74 +1,36 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 18 Jun 2012 00:16:14 -0600
-Subject: [PATCHv3 6/7] ARM: OMAP2+: CM: increase the module disable timeout
+Date: Mon, 18 Jun 2012 00:16:17 -0600
+Subject: [PATCHv3 7/7] ARM: OMAP2+: mux: fix sparse warning
 In-Reply-To: <20120618061037.30632.28539.stgit@dusk>
 References: <20120618061037.30632.28539.stgit@dusk>
-Message-ID: <20120618061611.30632.51094.stgit@dusk>
+Message-ID: <20120618061614.30632.26422.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the timeout for disabling an IP block to five milliseconds.
-This is to handle the usb_host_fs idle latency, which takes almost
-four milliseconds after a host controller reset.
+Commit bbd707acee279a61177a604822db92e8164d00db ("ARM: omap2: use
+machine specific hook for late init") resulted in the addition of this
+sparse warning:
 
-This is the second of two patches needed to resolve the following
-boot warning:
+arch/arm/mach-omap2/mux.c:791:12: warning: symbol 'omap_mux_late_init' was not declared. Should it be static?
 
-omap_hwmod: usb_host_fs: _wait_target_disable failed
+Fix by including the header file containing the prototype.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/cm.h                   |   11 +++++++++++
- arch/arm/mach-omap2/cminst44xx.c           |    4 ++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
- 3 files changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/mux.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
-index a7bc096..f24e3f7 100644
---- a/arch/arm/mach-omap2/cm.h
-+++ b/arch/arm/mach-omap2/cm.h
-@@ -22,4 +22,15 @@
-  */
- #define MAX_MODULE_READY_TIME		2000
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 80e55c5..d3ef99c 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -41,6 +41,7 @@
+ #include "control.h"
+ #include "mux.h"
+ #include "prm.h"
++#include "common.h"
  
-+/*
-+ * MAX_MODULE_DISABLE_TIME: max duration in microseconds to wait for
-+ * the PRCM to request that a module enter the inactive state in the
-+ * case of OMAP2 & 3.  In the case of OMAP4 this is the max duration
-+ * in microseconds for the module to reach the inactive state from
-+ * a functional state.
-+ * XXX FSUSB on OMAP4430 takes ~4ms to idle after reset during
-+ * kernel init.
-+ */
-+#define MAX_MODULE_DISABLE_TIME		5000
-+
- #endif
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 8c86d29..1a39945 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -313,9 +313,9 @@ int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_off
- 
- 	omap_test_timeout((_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) ==
- 			   CLKCTRL_IDLEST_DISABLED),
--			  MAX_MODULE_READY_TIME, i);
-+			  MAX_MODULE_DISABLE_TIME, i);
- 
--	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
-+	return (i < MAX_MODULE_DISABLE_TIME) ? 0 : -EBUSY;
- }
- 
- /**
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 6b0aedc..a428305 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -30,6 +30,7 @@
- #include <plat/mmc.h>
- #include <plat/dmtimer.h>
- #include <plat/common.h>
-+#include <plat/usb.h>
- 
- #include "omap_hwmod_common_data.h"
- 
+ #define OMAP_MUX_BASE_OFFSET		0x30	/* Offset from CTRL_BASE */
+ #define OMAP_MUX_BASE_SZ		0x5ca
