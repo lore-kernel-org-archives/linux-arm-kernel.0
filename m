@@ -1,38 +1,49 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 18 Jun 2012 00:16:08 -0600
-Subject: [PATCHv3 4/7] ARM: OMAP4: hwmod data: fix 32k sync timer idle modes
+Date: Mon, 18 Jun 2012 00:15:58 -0600
+Subject: [PATCHv3 1/7] ARM: OMAP: PM: Lock clocks list while generating summary
 In-Reply-To: <20120618061037.30632.28539.stgit@dusk>
 References: <20120618061037.30632.28539.stgit@dusk>
-Message-ID: <20120618061605.30632.31634.stgit@dusk>
+Message-ID: <20120618061554.30632.84828.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32k sync timer IP block target idle modes in the hwmod data are
-incorrect.  The IP block does not support any smart-idle modes.
-Update the data to reflect the correct modes.
+From: Todd Poynor <toddpoynor@google.com>
 
-This problem was initially identified and a diff fragment posted to
-the lists by Beno?t Cousson <b-cousson@ti.com>.  A patch description
-bug in the first version was also identified by Beno?t.
+Commit a53025724052b2b1edbc982a4a248784638f563d (OMAP: Add debugfs
+node to show the summary of all clocks) introduced clock summary,
+however, we are interested in seeing snapshot of the clock state, not
+in dynamically changing clock configurations as the data provided by
+clock summary will then be useless for debugging configuration
+issues. So, hold the common lock when dumping the clock summary.
 
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Todd Poynor <toddpoynor@google.com>
+[nm at ti.com: added commit message]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+[paul at pwsan.com: minor edits to commit message]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/plat-omap/clock.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 4aaaa84..6b0aedc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -393,8 +393,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_counter_sysc = {
- 	.rev_offs	= 0x0000,
- 	.sysc_offs	= 0x0004,
- 	.sysc_flags	= SYSC_HAS_SIDLEMODE,
--	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			   SIDLE_SMART_WKUP),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 62ec5c4..706b7e2 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -461,6 +461,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
+ 	struct clk *c;
+ 	struct clk *pa;
  
++	mutex_lock(&clocks_mutex);
+ 	seq_printf(s, "%-30s %-30s %-10s %s\n",
+ 		"clock-name", "parent-name", "rate", "use-count");
+ 
+@@ -469,6 +470,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
+ 		seq_printf(s, "%-30s %-30s %-10lu %d\n",
+ 			c->name, pa ? pa->name : "none", c->rate, c->usecount);
+ 	}
++	mutex_unlock(&clocks_mutex);
+ 
+ 	return 0;
+ }
