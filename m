@@ -1,26 +1,46 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 18 Jun 2012 08:15:21 +0000
-Subject: Current state of AM33xx patches
-In-Reply-To: <CBFB6F19.95320%jkridner@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Mon, 18 Jun 2012 16:19:44 +0800
+Subject: [PATCH 07/16] dma: ipu: remove the use of ipu_platform_data
+In-Reply-To: <20120616030106.GD29663@S2101-09.ap.freescale.net>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
+ <20120615093713.GE8383@shlinux2.ap.freescale.net>
+ <20120616030106.GD29663@S2101-09.ap.freescale.net>
+Message-ID: <20120618081943.GA25447@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 19:21:21, Jason Kridner wrote:
-> From: Daniel Mack <zonque@gmail.com>
-> >Hey,
-> >
-> >can anybody give me a quick wrap-up about the current state of AM33xx
-> >based SoCs in mainline? What are the next steps to get things merged?
+On Sat, Jun 16, 2012 at 11:01:08AM +0800, Shawn Guo wrote:
+> On Fri, Jun 15, 2012 at 05:37:14PM +0800, Dong Aisheng wrote:
+> > On Thu, Jun 14, 2012 at 01:59:38PM +0800, Shawn Guo wrote:
+> > .......
+> > > @@ -354,10 +355,12 @@ static struct irq_chip ipu_irq_chip = {
+> > >  /* Install the IRQ handler */
+> > >  int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+> > >  {
+> > > -	struct ipu_platform_data *pdata = dev->dev.platform_data;
+> > > -	unsigned int irq, irq_base, i;
+> > > +	unsigned int irq, i;
+> > > +	int irq_base = irq_alloc_descs(-1, 0, CONFIG_MX3_IPU_IRQS,
+> > > +				       numa_node_id());
+> > >  
+> > > -	irq_base = pdata->irq_base;
+> > > +	if (irq_base < 0)
+> > > +		return irq_base;
+> > >  
+> > Need not add irqdomain for this irq range?
+> > Can we still service this irq properly without irqdomain mapping?
+> > 
+> Yes, I think it should still work, because the driver has the mapping
+> management on its own,  though someday we need to replace its own
+> mapping with irqdomain anyway when we move the driver to device tree.
 > 
-> There is a wiki page [1] that is intended to provide a summary, but I'm
-> confident it is not up-to-date.  
+Hmm, i'm wondering it may not make too much sense to alloc_descs without
+using irqdomain since the allocated irqs are all virtual irqs.
+Using private mapping is not recommended.
+Maybe we can do it together with this patch since irqdomain support
+does not depend on device tree.
+What do you think?
 
-Page updated now...
-
-http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status#AM335x_Linux_Status
-
-
-Thanks,
-Vaibhav
+Regards
+Dong Aisheng
