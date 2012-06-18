@@ -1,30 +1,111 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 18 Jun 2012 14:29:13 -0400 (EDT)
-Subject: mach/io.h cleanup and removal question
-In-Reply-To: <20120618075945.GJ4799@lunn.ch>
-References: <20120608102040.GA26034@lunn.ch>
- <20120608114316.GC15555@n2100.arm.linux.org.uk> <4FD207C9.5010006@gmail.com>
- <20120618075945.GJ4799@lunn.ch>
-Message-ID: <alpine.LFD.2.02.1206181414340.23555@xanadu.home>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Mon, 18 Jun 2012 21:57:12 +0200 (CEST)
+Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
+Message-ID: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jun 2012, Andrew Lunn wrote:
-> On Fri, Jun 08, 2012 at 09:10:17AM -0500, Rob Herring wrote:
-> > Do you have cards with i/o that you can test or know what devices are
-> > used with this platform?
-> 
-> I don't have any cards. I've also no idea what cards are used with
-> these devices. I guess they are mostly WiFi cards, since Orion5x is
-> normally used in NAS boxes, and there is one box supported which is an
-> WiFi AP.
+Some mxc processors have an edge_sel feature, which allows the IRQ to be
+triggered by any edge.
 
-Those are also mini PCI-E cards, and I would be very surprised if one 
-could ever find such a card making use of the PCI I/O space.  So this 
-might prove very difficult to actually test this support, and I can't 
-remember if the current code was ever confirmed to work in the first 
-place because of no available cards.  So the best thing that can be done 
-is to make sure it looks right from a theoretical point of view.
+This patch makes use of this feature if available, which skips mxc_flip_edge().
 
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+---
+ .../drivers/gpio/gpio-mxc.c                        |   44 ++++++++++++++------
+ 1 file changed, 32 insertions(+), 12 deletions(-)
 
-Nicolas
+diff --git linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
+index c337143..4c74482 100644
+--- linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c
++++ linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
+@@ -30,6 +30,7 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/module.h>
++#include <mach/hardware.h>
+ #include <asm-generic/bug.h>
+ #include <asm/mach/irq.h>
+ 
+@@ -104,12 +105,13 @@ static struct mxc_gpio_hwdata *mxc_gpio_hwdata;
+ #define GPIO_ICR2		(mxc_gpio_hwdata->icr2_reg)
+ #define GPIO_IMR		(mxc_gpio_hwdata->imr_reg)
+ #define GPIO_ISR		(mxc_gpio_hwdata->isr_reg)
++#define GPIO_EDGE_SEL		0x1c
+ 
+ #define GPIO_INT_LOW_LEV	(mxc_gpio_hwdata->low_level)
+ #define GPIO_INT_HIGH_LEV	(mxc_gpio_hwdata->high_level)
+ #define GPIO_INT_RISE_EDGE	(mxc_gpio_hwdata->rise_edge)
+ #define GPIO_INT_FALL_EDGE	(mxc_gpio_hwdata->fall_edge)
+-#define GPIO_INT_NONE		0x4
++#define GPIO_INT_BOTH_EDGES	0x4
+ 
+ static struct platform_device_id mxc_gpio_devtype[] = {
+ 	{
+@@ -150,6 +152,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+ 	u32 bit, val;
+ 	int edge;
+ 	void __iomem *reg = port->base;
++	bool edge_sel = cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51() || cpu_is_mx53();
+ 
+ 	port->both_edges &= ~(1 << (gpio & 31));
+ 	switch (type) {
+@@ -160,15 +163,19 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+ 		edge = GPIO_INT_FALL_EDGE;
+ 		break;
+ 	case IRQ_TYPE_EDGE_BOTH:
+-		val = gpio_get_value(gpio);
+-		if (val) {
+-			edge = GPIO_INT_LOW_LEV;
+-			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
++		if (edge_sel) {
++			edge = GPIO_INT_BOTH_EDGES;
+ 		} else {
+-			edge = GPIO_INT_HIGH_LEV;
+-			pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
++			val = gpio_get_value(gpio);
++			if (val) {
++				edge = GPIO_INT_LOW_LEV;
++				pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
++			} else {
++				edge = GPIO_INT_HIGH_LEV;
++				pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
++			}
++			port->both_edges |= 1 << (gpio & 31);
+ 		}
+-		port->both_edges |= 1 << (gpio & 31);
+ 		break;
+ 	case IRQ_TYPE_LEVEL_LOW:
+ 		edge = GPIO_INT_LOW_LEV;
+@@ -180,10 +187,23 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+ 		return -EINVAL;
+ 	}
+ 
+-	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
+-	bit = gpio & 0xf;
+-	val = readl(reg) & ~(0x3 << (bit << 1));
+-	writel(val | (edge << (bit << 1)), reg);
++	if (edge_sel) {
++		val = readl(port->base + GPIO_EDGE_SEL);
++		if (edge == GPIO_INT_BOTH_EDGES)
++			writel(val | (1 << (gpio & 0x1f)),
++				port->base + GPIO_EDGE_SEL);
++		else
++			writel(val & ~(1 << (gpio & 0x1f)),
++				port->base + GPIO_EDGE_SEL);
++	}
++
++	if (edge != GPIO_INT_BOTH_EDGES) {
++		reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
++		bit = gpio & 0xf;
++		val = readl(reg) & ~(0x3 << (bit << 1));
++		writel(val | (edge << (bit << 1)), reg);
++	}
++
+ 	writel(1 << (gpio & 0x1f), port->base + GPIO_ISR);
+ 
+ 	return 0;
