@@ -1,56 +1,58 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 Jun 2012 14:10:52 +0200
-Subject: [PATCH] arm: zynq: Support GIC OF initialization
-In-Reply-To: <4FDF19CF.8010303@gmail.com>
-References: <1340017873-18170-1-git-send-email-monstr@monstr.eu>
- <4FDF19CF.8010303@gmail.com>
-Message-ID: <4FDF1ACC.2040208@monstr.eu>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 18 Jun 2012 16:13:46 +0400
+Subject: [RFC PATCH v2 09/11] ARM: DT: Add support to system control module
+ for OMAP4
+In-Reply-To: <4FDF11D6.6050205@dev.rtsoft.ru>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <4FDF11D6.6050205@dev.rtsoft.ru>
+Message-ID: <4FDF1B7A.6010608@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 02:06 PM, Rob Herring wrote:
-> On 06/18/2012 06:11 AM, Michal Simek wrote:
->> Zynq is OF driven platfrom which requires OF initialization.
->>
->> Signed-off-by: Michal Simek<monstr@monstr.eu>
->> ---
->>   arch/arm/mach-zynq/common.c |    7 ++++++-
->>   1 files changed, 6 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
->> index 17d68d6..7941544 100644
->> --- a/arch/arm/mach-zynq/common.c
->> +++ b/arch/arm/mach-zynq/common.c
->> @@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
->>   	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
->>   }
->>
->> +static const struct of_device_id zynq_dt_irq_match[] __initconst = {
->> +	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
->> +	{ }
->> +};
->> +
->>   /**
->>    * xilinx_irq_init() - Interrupt controller initialization for the GIC.
->>    */
->>   static void __init xilinx_irq_init(void)
->>   {
->> -	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
+Hello.
+
+On 18-06-2012 15:32, Konstantin Baydarov wrote:
+
+> This patch adds device tree entries on OMAP4 based boards
+> for System Control Module (SCM).
+
+> TODO:
+> The IOMEM windows of ctrl_module_core, bandgap, usbphy overlap, so
+> probably only specific registers should be specified in dts for
+> bandgap and usb phy entries.
+
+> Signed-off-by: Konstantin Baydarov<kbaidarov@dev.rtsoft.ru>
+> Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
+> ---
+>   arch/arm/boot/dts/omap4.dtsi |   17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
 >
-> And delete the corresponding defines?
+> Index: linux-2.6/arch/arm/boot/dts/omap4.dtsi
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/boot/dts/omap4.dtsi
+> +++ linux-2.6/arch/arm/boot/dts/omap4.dtsi
+> @@ -272,5 +272,22 @@
+>   			ti,hwmods = "mmc5";
+>   			ti,needs-special-reset;
+>   		};
+> +
+> +		ctrl_module_core: ctrl_module_core at 4a002000 {
+> +			compatible = "ti,omap4-control";
+> +			#address-cells =<1>;
+> +			#size-cells =<1>;
+> +			ranges;
+> +			ti,hwmods = "ctrl_module_core";
+> +			reg =<0x4a002000 0x1000>;
+> +			bandgap at 4a002000 {
+> +				compatible = "ti,omap4-bandgap";
+> +				reg =<0x4a002000 0x1000>;
+> +			};
+> +			usb at 4a002000 {
+> +				compatible = "ti,omap4-usb-phy";
+> +				reg =<0x4a002000 0x1000>;
 
-Agree, Will create v2.
+    Two devices at the same address? Also, shouldn't values in the "reg" 
+property be relative to the value in the parent's "reg" property? Are they 
+needed at all here?
 
-BTW: Who is responsible for zynq? I think John Linn and who is maintainer I should ask for pulling.
-
-Thanks,
-Michal
-
-
-
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+WBR, Sergei
