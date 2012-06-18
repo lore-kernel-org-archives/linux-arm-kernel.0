@@ -1,41 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 18 Jun 2012 12:11:00 +0200
-Subject: Dove clock support
-In-Reply-To: <4FDEFC6A.7030300@googlemail.com>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
- <20120618084300.GL4799@lunn.ch> <4FDEF7E9.4030504@googlemail.com>
- <4FDEFAE2.7000303@blackshift.org> <4FDEFC6A.7030300@googlemail.com>
-Message-ID: <20120618101100.GN4799@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Jun 2012 11:18:22 +0100
+Subject: mach/io.h cleanup and removal question
+In-Reply-To: <4FD207C9.5010006@gmail.com>
+References: <20120608102040.GA26034@lunn.ch>
+ <20120608114316.GC15555@n2100.arm.linux.org.uk> <4FD207C9.5010006@gmail.com>
+Message-ID: <20120618101822.GA12029@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 12:01:14PM +0200, Sebastian Hesselbarh wrote:
-> On 06/18/2012 11:54 AM, Marc Kleine-Budde wrote:
-> >>Also ge-phy has to be connected with ge-clk, too. But for dove this is
-> >>a clk gate while kirkwood can shut it down somewhere else. I guess it
-> >>can be handled like sata/pcie on kirkwood.
-> >
-> >The PHY is a clock gate so I'm handling it via:
-> >>ge = dove_register_gate("ge0", CLOCK_GATING_GBE_BIT | CLOCK_GATING_GIGA_PHY_BIT);
-> >So no gate_fn needed.
+On Fri, Jun 08, 2012 at 09:10:17AM -0500, Rob Herring wrote:
+> Agreed. The next step is moving all i/o space to a fixed virtual address
+> and for this we want to make i/o windows 64K.
 > 
-> There is no fn needed for dove, but kirkwood will need one IIRC.
-> Moreover, you could hook-up PHY-gate as a parent of corresponding
-> clk-gate and they will be enabled/disabled simultaneously.
+> However, I think you may also have a problem with
+> ORION5X_PCIE_IO_BUS_BASE and the resource start. The i/o resource start
+> should really be 0 and then the __io() macro should add the virtual i/o
+> base address. However, Russell has mentioned previously that some chips
+> may not work correctly with i/o space at 0 (PCI bus addresses, not host).
 > 
-> But I'd prefer the driver to take care of clks _and_ PHYs.
+> Do you have cards with i/o that you can test or know what devices are
+> used with this platform?
 
-That would be nice, but we have to remember that the driver is used
-for a number of different Marvell SoC and discreet devices. Only a few
-have the ability to turn on/off there clocks and PHYs. So you need to
-abstract this in such a way it does not break older chipsets.
+I/O cards themselves should not be a problem - remember, they're designed
+and tested in x86 PCs where IO space is only at 0-0xffff inclusive.  Many
+of these cards will only decode up to 16 bits of IO address anyway, and
+they'll ignore the higher order PCI address bits (because... x86 PC,
+what's the point of any more.)
 
-> One more: I suggest to clean the clk names of orion platforms,
-> they are a mess
+The problem seems to be any PCI bridges, whether they're P2P or the host
+to PCI bridge, and whether it can do address translation.  In other words,
+do they just forward the host bus physical address for IO accesses -
+which means any PCI card doing a full 32-bit decode on their IO BARs is
+not going to work when programmed in the 0-0xffff range.
 
-Do you have a proposal?
-
-   Thanks
-	Andrew
+It's all rather horrible, and it can _only_ be changed and checked by
+people who have access to the physical boards _and_ at least one PCI
+card known to do the full 32-bit IO decode, or who are adept enough
+with analysers or scopes be able to analyse the PCI bus.
