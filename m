@@ -1,105 +1,114 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 Jun 2012 21:23:54 +0200
-Subject: [RFC PATCH 7/8] ARM: vmlinux.lds: Setup physical load address
- not virtual
-In-Reply-To: <alpine.LFD.2.02.1206181433130.23555@xanadu.home>
-References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
- <1340019011-18642-8-git-send-email-monstr@monstr.eu>
- <alpine.LFD.2.02.1206181000540.23555@xanadu.home>
- <CAHTX3dJS9zNejv-oLGpbZdXdkJndwR1pcBd9yn3OAobGy3ZLjA@mail.gmail.com>
- <alpine.LFD.2.02.1206181433130.23555@xanadu.home>
-Message-ID: <4FDF804A.5080404@monstr.eu>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 18 Jun 2012 13:27:27 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP AM33xx: add PRCM support (for 3.6) (fwd)
+Message-ID: <alpine.DEB.2.00.1206181326560.11642@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 09:02 PM, Nicolas Pitre wrote:
-> On Mon, 18 Jun 2012, Michal Simek wrote:
->
->> 2012/6/18 Nicolas Pitre<nicolas.pitre@linaro.org>
->>
->>> On Mon, 18 Jun 2012, Michal Simek wrote:
->>>
->>>> Setup correct virtual and physical address in ELF LOAD section.
->>>
->>> We are moving to a single kernel binary for multiple targets, including
->>> targets with different physical load addresses.  The kernel code figures
->>> out at run time what the actual physical address is when
->>> CONFIG_ARM_PATCH_PHYS_VIRT is set which is the default these days.  In
->>> other words, we don't know the physical offset at build time in that
->>> case and CONFIG_PHYS_OFFSET is simply not defined.
->>>
->>
->> ok. good to know and nice features. In that case I expect that you are
->> using any binary format and you copy it to memory and run it. Code
->> find out where it runs and based on that setup things.
->
-> Exact.
 
-ok. One more question about this feature. What is the alignment for it?
-I mean I have done the similar feature for Xilinx ppc440 and alignment depends on
-MMU TLB size.
+Resending this because I got the lakml list address wrong :-(
 
->
->> (BTW: This is very interesting for me to implement it on Microblaze. Can
->> you point me to that kernel code part? or any doc?)
->
-> You could have a look at https://wiki.ubuntu.com/Specs/ARMSingleKernel,
-> especially the section "Optimized virt_to_phys() with a runtime
-> determined PHYS_OFFSET".
->
-> Then the following commits should be of interest:
->
-> 72a20e22f4 "ARM: P2V: eliminate head.S use of PHYS_OFFSET for !XIP_KERNEL"
->
-> dc21af99fa "ARM: P2V: introduce phys_to_virt/virt_to_phys runtime patching"
+- Paul
 
-ok. Thanks will look at it.
+---------- Forwarded message ----------
+Date: Mon, 18 Jun 2012 13:20:41 -0600 (MDT)
+From: Paul Walmsley <paul@pwsan.com>
+To: tony at atomide.com
+Cc: linux-omap at vger.kernel.org, linux-arm-kernel at vger.kernel.org
+Subject: [GIT PULL] ARM: OMAP AM33xx: add PRCM support (for 3.6)
 
->
->> But can you do it with elf?
->
-> No.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-ok
+Hi Tony,
 
->
->> Please correct me if I am wrong IRC ARM Qemu uses zImage but it is no
->> problem to use elf file. For this case
->> Qemu elf loader also uses physical addresses from ELF and also entry point.
->
-> If you want to use the ELF image, then you need to hardcode the physical
-> memory location in its header, and that's something we want to get away
-> from because it prevents a single kernel binary image from being used on
-> different targets with different memory layouts.  Same issue with
-> u-Boot's legacy uImage format.
+The following changes since commit 08f3098928c991560408e8c71d4af8b1a3ff2d67:
 
-And are you able to get these information away from ELF? Or you just need to set it up
-to any default value. I would expect to 0x0.
+  ARM: OMAP2+: am33xx: Add AM335XEVM machine support (2012-06-05 00:52:37 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-a-for-3.6
+
+for you to fetch changes up to 9c80f3aa8b7828c89c5bae5c769955d1ac58630b:
+
+  ARM: OMAP AM33xx: clockdomains: Add clockdomain data and respective operations (2012-06-18 12:08:06 -0600)
+
+- ----------------------------------------------------------------
+Adds AM33xx PRCM support
+
+- ----------------------------------------------------------------
+
+This branch is based on your devel-am33xx branch.
+
+object size (delta in bytes from tmlind_devel_am33xx (08f3098928c991560408e8c71d4af8b1a3ff2d67)):
+  text 	  data 	   bss 	 total 	kernel
+     0 	     0 	     0 	     0 	5912osk_testconfig/vmlinux
+ +2364 	 +6976 	     0 	 +9340 	am33xx_testconfig/vmlinux
+    +4 	  +568 	     0 	  +572 	n800_multi_omap2xxx/vmlinux
+    +4 	  +576 	     0 	  +580 	n800_testconfig/vmlinux
+     0 	     0 	     0 	     0 	omap1510_defconfig/vmlinux
+     0 	     0 	     0 	     0 	omap1_defconfig/vmlinux
+    +4 	 +2104 	     0 	 +2108 	omap2_4_testconfig/vmlinux
+ +6216 	 +6944 	     0 	+13160 	omap2plus_defconfig/vmlinux
+ +6276 	 +6720 	     0 	+12996 	omap2plus_no_pm/vmlinux
+ +2120 	 +6560 	     0 	 +8680 	omap3_4_testconfig/vmlinux
+ +2136 	 +5048 	     0 	 +7184 	omap3_testconfig/vmlinux
+    +4 	 +1536 	     0 	 +1540 	omap4_testconfig/vmlinux
 
 
->
->> I haven't played with CONFIG_ARM_PATCH_PHYS_VIRT option but what is elf
->> entry point for this case?
->
-> For the kernel image itself it is the kernel virtual address.
+Vaibhav Hiremath (6):
+      ARM: OMAP2+: control: Add AM33XX control reg & sec clkctrl offset
+      ARM: OMAP AM33xx: voltagedomain: Add voltage domain data
+      ARM: OMAP AM33xx: PRM: add PRM support
+      ARM: OMAP AM33xx: CM: Introduce AM33xx CM APIs and register level details
+      ARM: OMAP AM33xx: powerdomains: add AM335x support
+      ARM: OMAP AM33xx: clockdomains: Add clockdomain data and respective operations
 
-Is it used somewhere? Or is it just setup to virtual address and no code use it?
-I mean that kernel virtual entry point.
+ arch/arm/mach-omap2/Makefile                  |    6 +
+ arch/arm/mach-omap2/clockdomain.h             |    2 +
+ arch/arm/mach-omap2/clockdomain33xx.c         |   74 +++
+ arch/arm/mach-omap2/clockdomains33xx_data.c   |  196 +++++++
+ arch/arm/mach-omap2/cm-regbits-33xx.h         |  687 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/cm33xx.c                  |  313 +++++++++++
+ arch/arm/mach-omap2/cm33xx.h                  |  420 +++++++++++++++
+ arch/arm/mach-omap2/common.h                  |    1 +
+ arch/arm/mach-omap2/control.h                 |   39 +-
+ arch/arm/mach-omap2/io.c                      |    3 +
+ arch/arm/mach-omap2/powerdomain.h             |   23 +-
+ arch/arm/mach-omap2/powerdomain33xx.c         |  229 +++++++++
+ arch/arm/mach-omap2/powerdomains33xx_data.c   |  185 +++++++
+ arch/arm/mach-omap2/prm-regbits-33xx.h        |  357 +++++++++++++
+ arch/arm/mach-omap2/prm33xx.c                 |  135 +++++
+ arch/arm/mach-omap2/prm33xx.h                 |  129 +++++
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 ++
+ 18 files changed, 2825 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomain33xx.c
+ create mode 100644 arch/arm/mach-omap2/clockdomains33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cm-regbits-33xx.h
+ create mode 100644 arch/arm/mach-omap2/cm33xx.c
+ create mode 100644 arch/arm/mach-omap2/cm33xx.h
+ create mode 100644 arch/arm/mach-omap2/powerdomain33xx.c
+ create mode 100644 arch/arm/mach-omap2/powerdomains33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/prm-regbits-33xx.h
+ create mode 100644 arch/arm/mach-omap2/prm33xx.c
+ create mode 100644 arch/arm/mach-omap2/prm33xx.h
+ create mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
 
-I expect that if CONFIG_ARM_PATCH_PHYS_VIRT=y then CONFIG_PHYS_OFFSET is not setup
-Then LOAD_OFFSET should be equal to CONFIG_PAGE_OFFSET.
-
->
-> For the relocatable zImage decompressor wrapper it is 0.
-
-ok.
-
-Thanks,
-Michal
-
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+iQIcBAEBAgAGBQJP338XAAoJEMePsQ0LvSpL09gQAIjd3cLj1IdNbu5JpstkFwfL
+zgyhH3/1VnMJ8zYtM0M+j4JGBYVtSQ8v7Mp6cbMTyGTpxzy0h+kAb3wL+Tf2f++f
+FpGGqO015n6aBAdWADcuf8ssYbgu5MmZTecfqMUuxMnNioXQkDbKREo9Srn9r/Et
+987AXTaJFPMPu5JNbFDgaVi4axX+eMfHRk8vyMP5laBOOUWBVF7asq4SM2UyxAD8
+s1dD8i/UX4tN7/sLDy6XHDVKLdOpR2aTitw+WQUBXwLaYObawNwVjnoZW7j+bby7
+tUMaxbZTKZNE9utqYTdijYgnc3GsvjIp83jYVYfvjYcdYcc+LGoUSKpXa9ffvTj+
+0dh78Zua/7lRcfhJhlaK3SLGD9UDEfGSq7tMC6tCE2YuHZp71c2Vuf9lzzzywfuT
+LAzTrwkicMqPk3vDJxpgdmzxAyXCe5Qewh93Rgl9Y/Jei5sLmpMJYTGTBTV642cm
+F8ykWaL9KQslqSFLoZwZ9wUlPbz4wiNhSXk2/PvCV5S4A721sQ7J67EZy7SjDW6F
+gW0Mt6d0PdT7MwzqmHr+bYaeVMdgCLRbw9eC9Z6mIQ3Wyu+OTCn6b96tjrbymmy9
+2PDvBXQhoCezRK6mZcrHfek7VoRd+otxvGfwakqPKj8FkAZpj6WfsnK4HSG2DF6e
+ID0oP4CQFmqy4/gvUWqV
+=zSRx
+-----END PGP SIGNATURE-----
