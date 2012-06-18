@@ -1,33 +1,38 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 18 Jun 2012 20:10:51 +0200
-Subject: [PATCH] pinctrl: select the proper symbol
-Message-ID: <1340043051-28746-1-git-send-email-linus.walleij@stericsson.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 18 Jun 2012 18:18:39 +0000
+Subject: [PATCH-V2 0/4] ARM: OMAP2+: am33xx: Add clocktree and hwmod data
+In-Reply-To: <alpine.DEB.2.00.1206181206000.11642@utopia.booyaka.com>
+References: <1338285402-11306-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA50AF1@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206181206000.11642@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA54713@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Jun 18, 2012 at 23:36:58, Paul Walmsley wrote:
+> Hi Vaibhav,
+> 
+> On Thu, 14 Jun 2012, Hiremath, Vaibhav wrote:
+> 
+> > Leaving HWMOD data patch aside, both the above patches should be 
+> > considered for acceptance, can you please review the same and if there 
+> > are no review comments, can it be merged?
+> 
+> I don't quite understand the part about leaving the hwmod data patch 
+> aside.  Is that one not ready?  Or does it need to be modified pending 
+> some other series?
+> 
 
-The Kconfig entry for the COH901 pin controller depended on
-PINMUX_U300 which is stale, use PINCTRL_U300 as it is called
-these days.
+It is ready, since I did not get your acked-by or reviewed-by on the patche-
+series, so I wanted to get trivial patches merged.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Paul,
+I would really recommend you to look at the proposal of getting the clock-
+tree and hwmod patches to the linux-next until merge window, so that it will 
+get tested for some time.
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index c6e6ae0..4c05fe8 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -130,7 +130,7 @@ config PINCTRL_U300
- 
- config PINCTRL_COH901
- 	bool "ST-Ericsson U300 COH 901 335/571 GPIO"
--	depends on GPIOLIB && ARCH_U300 && PINMUX_U300
-+	depends on GPIOLIB && ARCH_U300 && PINCTRL_U300
- 	help
- 	  Say yes here to support GPIO interface on ST-Ericsson U300.
- 	  The names of the two IP block variants supported are
--- 
-1.7.9.2
+Also, I am in the process of converting to common-clock framework on top of 
+Rajendra's patch-series.
+
+Thanks,
+Vaibhav
