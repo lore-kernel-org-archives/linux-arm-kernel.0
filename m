@@ -1,25 +1,34 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Mon, 18 Jun 2012 14:29:07 -0300
-Subject: [PATCH] sound/gpio: of_get_named_gpio() return -EPROBE_DEFER if
- GPIO deferred
-In-Reply-To: <1340040176-16553-1-git-send-email-stigge@antcom.de>
-References: <1340040176-16553-1-git-send-email-stigge@antcom.de>
-Message-ID: <CAAAP30E6GAc4p_G7vZBUDFqdWy+ay0ZP9dGCJ586VysOLe66Mw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 18 Jun 2012 11:41:49 -0600 (MDT)
+Subject: [PATCH 09/11] ARM: OMAP4: clock data: add clockdomains for clocks
+ used as main clocks
+In-Reply-To: <4FD04C8D.50609@ti.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061313.25532.84569.stgit@dusk> <4FD04C8D.50609@ti.com>
+Message-ID: <alpine.DEB.2.00.1206070108540.6684@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 2:22 PM, Roland Stigge <stigge@antcom.de> wrote:
-> of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
-> respective GPIO is not (yet) available. This is useful if driver's probe()
-> functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
-> can be probed again later on.
->
-> The function still returns -EINVAL on other errors (parse error or node doesn't
-> exist). This way, the case of an optional/intentionally missing GPIO is handled
-> appropriately.
->
-> For this change, two sound drivers (tegra_{alc5632,wm8903}) need to be
-> adjusted.
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+On Thu, 7 Jun 2012, Rajendra Nayak wrote:
+
+> On Thursday 07 June 2012 11:43 AM, Paul Walmsley wrote:
+> > Until the OMAP4 code is converted to disable the use of the clock
+> > framework-based clockdomain enable/disable sequence, any clock used as
+> > a hwmod main_clk must have a clockdomain associated with it.  This
+> > patch populates some clock structure clockdomain names to resolve the
+> > following warnings during kernel init:
+> 
+> But these associations are useless if the clock is not a 'gate' clock, 
+> except for getting rid of these warnings. Maybe we should make hwmod 
+> understand that not all clocks need to have a clockdomain associated 
+> with it and stop complaining.
+
+In retrospect, I think I should have made clockdomains mandatory for all 
+clocks for OMAP4 back then, rather than only allowing them for some 
+clocks.  As I understand it, that would have saved a lot of time and 
+debugging frustration on the bug fixed by commit 
+6c4a057bffe9823221eab547e11fac181dc18a2b ("ARM: OMAP4: clock data: Force a 
+DPLL clkdm/pwrdm ON before a relock").  Oh well.
+
+
+- Paul
