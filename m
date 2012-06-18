@@ -1,32 +1,90 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Jun 2012 09:32:48 +0100
-Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
- core_initcall time
-In-Reply-To: <201206121449.22978.arnd@arndb.de>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <201206121259.38807.arnd@arndb.de> <4FD742C9.7090603@linaro.org>
- <201206121449.22978.arnd@arndb.de>
-Message-ID: <4FDEE7B0.9070208@linaro.org>
+Date: Mon, 18 Jun 2012 09:41:00 +0100
+Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120618075834.GA14293@bnru02>
+References: <4FD8BAD2.50703@linaro.org>
+ <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
+ <4FDAFA17.6050502@linaro.org>
+ <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
+ <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
+ <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
+ <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
+ <4FDED62D.6030008@linaro.org> <20120618075834.GA14293@bnru02>
+Message-ID: <4FDEE99C.9090203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/12 15:49, Arnd Bergmann wrote:
-> On Tuesday 12 June 2012, Lee Jones wrote:
->> But your suggestion above involves some heavy refactoring of how Device
->> Tree works. Meanwhile the ab8500 will not work as an IRQ controller
->> until we either complete the work or use the same solution as we did for
->> the Nomadik GPIO controller. I think for now at least we should continue
->> to work on enablement and leave the 'nice to have's until last. We are
->> doing nothing new here, just bringing the ab8500 IRQ controller into
->> line with the Nomadik one.
+On 18/06/12 08:58, Srinidhi Kasagar wrote:
+> On Mon, Jun 18, 2012 at 09:18:05 +0200, Lee Jones wrote:
+>> On 17/06/12 18:43, Linus Walleij wrote:
+>>> Gah, what a thread...
+>>>
+>>> On Fri, Jun 15, 2012 at 3:18 PM, Lee Jones<lee.jones@linaro.org>   wrote:
+>>>> On 15/06/12 14:05, Srinidhi Kasagar wrote:
+>>>>> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
+>>>>>> On 15/06/12 12:50, Srinidhi Kasagar wrote:
+>>>
+>>>>>>>> +static struct nmk_i2c_controller u8500_i2c = {
+>>>>>>>> +       /*
+>>>>>>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
+>>>>>>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+>>>>>>>> +        */
+>>>>>>>> +       .slsu           = 0xe,
+>>>>>>>> +       .tft            = 1,      /* Tx FIFO threshold */
+>>>>>>>> +       .rft            = 8,      /* Rx FIFO threshold */
+>>>>>>>> +       .clk_freq       = 100000, /* std. mode operation */
+>>>>>>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
+>>>>>>>> +       .sm             = I2C_FREQ_MODE_FAST,
+>>>>>>>
+>>>>>>> How is this possible? you are setting clk_freq as 100kb/s and mode
+>>>>>>> as fast mode which is supposed to be 400kb/s.
+>>>>>>
+>>>>>> That's not how I read it:
+>>>>>
+>>>>> But it is not readable. It confuses people.
+>>>>
+>>>> I understood it. :)
+>>>>
+>>>> If you think it's unclear speak to the author, Linus. He's CC'ed.
+>>>
+>>> Author of what? The i2c driver was written by Srinidhi. (The
+>>> MODULE_AUTHOR() clause should be a good hint...)
+>>
+>> Actually, we appear to have our wires crossed. You wrote the board data
+>> stuff below, which changes the mode from STANDARD to FAST, no doubt
+>> using Srinidhi's struct explanation comments found in
+>> arch/arm/plat-nomadik/include/plat/i2c.h.
+>>
+>>   >  I'll cook a separate patch for this or something.
+>>
+>> Cool, thanks Linus.
+>>
+>> But you're correct in what you say Linus. Srinidhi, the comments which
+>> are you say are confusing are the bits you are the author of:
+>> e208c447bd728920e4f3d438a706344ea31249b9?
 >
-> Right, I didn't say we should not take your patch, but we should be
-> aware that it's not the solution we want to use in the long run.
+> yes, it is of course evident that it's my commit from git.
+> I think you are not catching my point. What I mean is:
+> fast mode devices are downward compatible and can communicate
+> with the devices with standard only mode. Those comments in that
+> enum says exactly that (with "up to" keyword). However the code
+> which configures the bus in fast mode and restrict the frequency
+> to operate in 100 kb/s without any reason, and this creates
+> confusion..
+>
+> Perhaps, I think we need to remove one of these
+> parameters as configurable options and derive out the
+> frequency based on the mode of operation..
 
-So is it only for this and the other one to go in now?
+I think Linus is fixing the frequency issues in platform code and I have 
+done so from Device Tree, so I think we're hot-to-trot.
 
-If so, can I have acks for them please, so I may place them in my 
-up-coming pull-request?
+Linus, Srinidhi,
+
+If you're happy with the patch now (not withstanding the removal of 
+slsu, which I'll do in a separate patch), can you ack it please? By the 
+way, which tree will this go through?
 
 -- 
 Lee Jones
