@@ -1,77 +1,38 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 23:01:49 +0200
-Subject: [GIT PULL] ARM: LPC32xx specific updates for next
-Message-ID: <4FDF973D.8010600@antcom.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Jun 2012 15:01:50 -0600
+Subject: [PATCH] ARM: tegra: make tegra_cpu_reset_handler_enable() __init
+Message-ID: <1340053310-20855-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+From: Stephen Warren <swarren@nvidia.com>
 
-this is the pull request for the 22 patches we discussed last week, still same
-commits in the same branch (the 23rd patch was removed from the series, as
-discussed on the list).
+This solves a section mismatch warning. I hadn't noticed this before,
+because my compiler was inlining tegra_cpu_reset_handler_enable() inside
+tegra_cpu_reset_handler_init(), which is already __init, but I switched
+compilers and it stopped doing that.
 
-This time, purely mach-lpc32xx specific patches.
+Cc: <stable@kernel.org> # v3.4
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Arnd, Olof, do you want me to put this in a pull request, or can you apply
+it directly for 3.5?
 
-Please tell if sth. is missing, so I can know if I can build upon that. (I'm
-already collecting new patches on top of this branch.)
+ arch/arm/mach-tegra/reset.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks in advance,
-
-Roland
-
-
-
-The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
-
-  Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx-next
-
-for you to fetch changes up to df072717eb0050326f0f63eed98200412c395831:
-
-  ARM: LPC32xx: Move i2s1 dma enabling to clock.c (2012-06-14 16:16:19 +0200)
-
-----------------------------------------------------------------
-Alexandre Pereira da Silva (7):
-      ARM: LPC32xx: Build arch dtbs
-      ARM: LPC32xx: Add dt settings to the at25 node
-      ARM: LPC32xx: Remove spi chipselect request from board init
-      ARM: LPC32xx: Remove spi chip definitions
-      ARM: LPC32xx: Cleanup board init, remove duplicate clock init
-      ARM: LPC32xx: Move uart6 irda disable to serial.c
-      ARM: LPC32xx: Move i2s1 dma enabling to clock.c
-
-Roland Stigge (15):
-      ARM: LPC32xx: Add NAND flash timing to PHY3250 board dts
-      ARM: LPC32xx: Clock initialization for NAND controllers
-      ARM: LPC32xx: Remove SLC controller initialization from platform init
-      ARM: LPC32xx: Add DMA configuration to platform data
-      ARM: LPC32xx: Adjust dtsi file for MLC controller configuration
-      ARM: LPC32xx: Add dts for EA3250 reference board
-      ARM: LPC32xx: DTS adjustment for key matrix controller
-      ARM: LPC32xx: Clock adjustment for key matrix controller
-      ARM: LPC32xx: Defconfig update
-      ARM: LPC32xx: Add MMC controller support
-      ARM: LPC32xx: DTS adjustment for using pl18x primecell
-      ARM: LPC32xx: DT conversion of Standard UARTs
-      ARM: LPC32xx: High Speed UART configuration via DT
-      ARM: LPC32xx: Remove mach specific ARCH_NR_GPIOS, use default
-      ARM: LPC32xx: Fix lpc32xx.dtsi status property: "disable" -> "disabled"
-
- arch/arm/Kconfig                          |    2 -
- arch/arm/boot/dts/ea3250.dts              |  157 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/lpc32xx.dtsi            |   74 +++++++++-----
- arch/arm/boot/dts/phy3250.dts             |   61 +++++++++++
- arch/arm/configs/lpc32xx_defconfig        |   24 +++--
- arch/arm/mach-lpc32xx/Kconfig             |   32 ------
- arch/arm/mach-lpc32xx/Makefile.boot       |    1 +
- arch/arm/mach-lpc32xx/clock.c             |   21 +++-
- arch/arm/mach-lpc32xx/include/mach/gpio.h |    2 -
- arch/arm/mach-lpc32xx/phy3250.c           |  158 ++++++++++++-----------------
- arch/arm/mach-lpc32xx/serial.c            |   90 ++--------------
- 11 files changed, 376 insertions(+), 246 deletions(-)
- create mode 100644 arch/arm/boot/dts/ea3250.dts
- delete mode 100644 arch/arm/mach-lpc32xx/Kconfig
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 4d6a2ee..5beb7eb 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -33,7 +33,7 @@
+ 
+ static bool is_enabled;
+ 
+-static void tegra_cpu_reset_handler_enable(void)
++static void __init tegra_cpu_reset_handler_enable(void)
+ {
+ 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+ 	void __iomem *evp_cpu_reset =
+-- 
+1.7.0.4
