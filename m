@@ -1,33 +1,136 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 17:23:04 +0200
-Subject: [PATCH] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER
- if GPIO not yet available
-In-Reply-To: <4FDF4543.6090009@wwwdotorg.org>
-References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
- <4FDE8D27.6030508@wwwdotorg.org> <4FDEF293.9080305@antcom.de>
- <4FDF403E.9090302@wwwdotorg.org> <4FDF4461.60707@antcom.de>
- <4FDF4543.6090009@wwwdotorg.org>
-Message-ID: <4FDF47D8.9000309@antcom.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 18 Jun 2012 17:25:30 +0200
+Subject: [PATCHv8 11/13] I2C: OMAP: decrease indentation level on data
+ handling
+In-Reply-To: <1340029828-20751-12-git-send-email-shubhrajyoti@ti.com>
+References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+ <1340029828-20751-12-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120618152530.GB10768@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 05:12 PM, Stephen Warren wrote:
->> Thanks for the hint! I previously also suspected sth. like this but
->> didn't find it in v3.5-rc3. In broonie's sound.git for-next, I now
->> finally found it.
->>
->> Should be easy to fix (replacing the if (... == -ENODEV) to -EPROBE_DEFER.
->>
->> Will you provide patches as signalled, of should I? Which branch would
->> be the correct one to build on top?
+On Mon, Jun 18, 2012 at 08:00:26PM +0530, Shubhrajyoti D wrote:
+> From: Felipe Balbi <balbi@ti.com>
 > 
-> I'm happy either way. It'd probably be best to roll the change into your
-> patch/series so you can manage all the dependencies in one series, but
-> if you can't for some reason, I'm happy to provide a patch for this.
+> trivial patch, no functional changes.
 
-I should be able ;-) - is broonie's sound.git, branch for-next the
-correct one to patch against? Or sth. better suited?
+This patch seems to be correct, but it is not trivial. In fact, it is
+pretty easy to miss a "!" here which can cause subtle bugs.
 
-Thanks in advance,
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |   63 ++++++++++++++++++++---------------------
+>  1 files changed, 31 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 080193a..0e0ab8f 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -845,22 +845,7 @@ complete:
+>  							>> 8) & 0x3F;
+>  			}
+>  			while (num_bytes--) {
+> -				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
+> -				if (dev->buf_len) {
+> -					*dev->buf++ = w;
+> -					dev->buf_len--;
+> -					/*
+> -					 * Data reg in 2430, omap3 and
+> -					 * omap4 is 8 bit wide
+> -					 */
+> -					if (dev->flags &
+> -						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+> -						if (dev->buf_len) {
+> -							*dev->buf++ = w >> 8;
+> -							dev->buf_len--;
+> -						}
+> -					}
+> -				} else {
+> +				if (!dev->buf_len) {
+>  					if (stat & OMAP_I2C_STAT_RRDY)
+>  						dev_err(dev->dev,
+>  							"RRDY IRQ while no data"
+> @@ -871,6 +856,21 @@ complete:
+>  								" requested\n");
+>  					break;
+>  				}
+> +
+> +				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
+> +				*dev->buf++ = w;
+> +				dev->buf_len--;
+> +				/*
+> +				 * Data reg in 2430, omap3 and
+> +				 * omap4 is 8 bit wide
+> +				 */
+> +				if (dev->flags &
+> +						OMAP_I2C_FLAG_16BIT_DATA_REG) {
+> +					if (dev->buf_len) {
+> +						*dev->buf++ = w >> 8;
+> +						dev->buf_len--;
+> +					}
+> +				}
+>  			}
+>  			omap_i2c_ack_stat(dev,
+>  				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
+> @@ -887,22 +887,7 @@ complete:
+>  							& 0x3F;
+>  			}
+>  			while (num_bytes--) {
+> -				w = 0;
+> -				if (dev->buf_len) {
+> -					w = *dev->buf++;
+> -					dev->buf_len--;
+> -					/*
+> -					 * Data reg in 2430, omap3 and
+> -					 * omap4 is 8 bit wide
+> -					 */
+> -					if (dev->flags &
+> -						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+> -						if (dev->buf_len) {
+> -							w |= *dev->buf++ << 8;
+> -							dev->buf_len--;
+> -						}
+> -					}
+> -				} else {
+> +				if (!dev->buf_len) {
+>  					if (stat & OMAP_I2C_STAT_XRDY)
+>  						dev_err(dev->dev,
+>  							"XRDY IRQ while no "
+> @@ -914,6 +899,20 @@ complete:
+>  					break;
+>  				}
+>  
+> +				w = *dev->buf++;
+> +				dev->buf_len--;
+> +				/*
+> +				 * Data reg in 2430, omap3 and
+> +				 * omap4 is 8 bit wide
+> +				 */
+> +				if (dev->flags &
+> +						OMAP_I2C_FLAG_16BIT_DATA_REG) {
+> +					if (dev->buf_len) {
+> +						w |= *dev->buf++ << 8;
+> +						dev->buf_len--;
+> +					}
+> +				}
+> +
+>  				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
+>  				    errata_omap3_i462(dev, &stat, &err))
+>  					goto complete;
+> -- 
+> 1.7.5.4
+> 
 
-Roland
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120618/41392bea/attachment.sig>
