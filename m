@@ -1,77 +1,34 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 18 Jun 2012 00:15:54 -0600
-Subject: [PATCHv3 0/7] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
-Message-ID: <20120618061037.30632.28539.stgit@dusk>
+Date: Mon, 18 Jun 2012 00:16:05 -0600
+Subject: [PATCHv3 3/7] ARM: OMAP4+: hwmod: fix issue causing IPs not going
+ back to Smart-Standby
+In-Reply-To: <20120618061037.30632.28539.stgit@dusk>
+References: <20120618061037.30632.28539.stgit@dusk>
+Message-ID: <20120618061601.30632.66296.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Djamil Elaidi <d-elaidi@ti.com>
 
-Here is an initial set of fixes for power management and OMAP core
-infrastructure for 3.5-rc.  Most of these patches address boot
-warnings and power management problems on OMAP4, although a few of
-them address more general issues.
+If an IP is configured in Smart-Standby-Wakeup, when disabling wakeup feature the
+IP will not go back to Smart-Standby, but will remain in Smart-Standby-Wakeup.
 
-Thanks to (in alphabetical order) Beno?t Cousson, Tero Kristo, Kevin
-Hilman, Vaibhav Hiremath, and Tony Lindgren for help with this series.
-
-Compile- and boot-test information is below.  Note that on OMAP3,
-return from suspend when off-mode is enabled is via GPIO buttons due to:
-
-http://www.spinics.net/lists/arm-kernel/msg173688.html
-
-Boot logs are available from:
-
-http://www.pwsan.com/omap/bootlogs/20120617/omap_fixes_a_3.5rc__52a5ae406dadef781bfcf3a641dae2064e9697ff/
-
-These patches are available via git from git://git.pwsan.com/linux-2.6
-in the branch 'omap_fixes_a_3.5rc'.
-
-This third version adds a fix for a new sparse warning, and drops
-everything that is still being commented on or reviewed or which needs
-acks.  Hopefully those will make it into a future 3.5-rc series.
-
-
-- Paul
-
+Signed-off-by: Djamil Elaidi <d-elaidi@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-object size (delta in bytes from v3.5-rc3 (485802a6c524e62b5924849dd727ddbb1497cc71)):
- text 	 data 	  bss 	total 	kernel
-    0 	    0 	    0 	    0 	5912osk_testconfig/vmlinux
-  +32 	    0 	    0 	  +32 	n800_multi_omap2xxx/vmlinux
-  +64 	    0 	    0 	  +64 	n800_testconfig/vmlinux
-    0 	    0 	    0 	    0 	omap1510_defconfig/vmlinux
-    0 	    0 	    0 	    0 	omap1_defconfig/vmlinux
-  +64 	    0 	    0 	  +64 	omap2_4_testconfig/vmlinux
-+4160 	    0 	    0 	+4160 	omap2plus_defconfig/vmlinux
-    0 	    0 	    0 	    0 	omap2plus_no_pm/vmlinux
-    0 	    0 	    0 	    0 	omap3_4_testconfig/vmlinux
-    0 	    0 	    0 	    0 	omap3_testconfig/vmlinux
-  +64 	    0 	    0 	  +64 	omap4_testconfig/vmlinux
-
-
-Djamil Elaidi (1):
-      ARM: OMAP4+: hwmod: fix issue causing IPs not going back to Smart-Standby
-
-Paul Walmsley (5):
-      ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-      ARM: OMAP4: hwmod data: fix 32k sync timer idle modes
-      ARM: OMAP4: clock data: add clockdomains for clocks used as main clocks
-      ARM: OMAP2+: CM: increase the module disable timeout
-      ARM: OMAP2+: mux: fix sparse warning
-
-Todd Poynor (1):
-      ARM: OMAP: PM: Lock clocks list while generating summary
-
-
- arch/arm/mach-omap2/clock44xx_data.c         |    5 +++++
- arch/arm/mach-omap2/cm.h                     |   11 ++++++++++
- arch/arm/mach-omap2/cminst44xx.c             |    4 ++--
- arch/arm/mach-omap2/mux.c                    |    1 +
- arch/arm/mach-omap2/omap_hwmod.c             |   28 ++++++++++++++++++--------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    6 +++---
- arch/arm/plat-omap/clock.c                   |    2 ++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    9 ++++++++
- 9 files changed, 53 insertions(+), 15 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e174c2a..a6da0b3 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -530,7 +530,7 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
+ 	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+ 		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART, v);
+ 	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
+-		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART_WKUP, v);
++		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART, v);
+ 
+ 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
+ 
