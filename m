@@ -1,112 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 17 Jun 2012 22:50:36 -0700
-Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree
- based pinctrl driver
-In-Reply-To: <4FDB6000.5080703@wwwdotorg.org>
-References: <20120611135826.GB12766@atomide.com>
- <4FDA6FCD.1020605@wwwdotorg.org>
- <20120615094938.GQ12766@atomide.com>
- <4FDB6000.5080703@wwwdotorg.org>
-Message-ID: <20120618055036.GU12766@atomide.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Mon, 18 Jun 2012 14:00:33 +0800
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <4FDB61C9.9020505@broadcom.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+ <4FDB61C9.9020505@broadcom.com>
+Message-ID: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61E@HKMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [120615 09:21]:
-> On 06/15/2012 03:49 AM, Tony Lindgren wrote:
-> 
-> (Arnd, Grant, Rob, CC'ing you mainly re: the very last set of comments
-> in this email; can you take a look at Tony's patch and comment on the
-> binding)
+On Sat, Jun 16, 2012 at 00:24:41, Franky Lin wrote:
+>On 06/14/2012 11:09 PM, Wei Ni wrote:
+>> I talked with Franky, this power sequence is generally for 4329, so it mean this sequence can be put into the wifi driver.
+>
+>Hold on. It's generally for 4329. But fullmac supports 4329/4330 along 
+>with USB dongle chips. Also more chips are incoming. I dont think it's a good idea to add *this* power sequence into brcmfmac.
 
-Yes please take a look.
- 
-> > Care to clarify a bit what you had in mind there?
-> 
-> Basically I meant:
-> 
-> 1) Remove anything TI-/OMAP-specific from the generic binding document
-> 
-> 2) For any TI-/OMAP-specific additions, create a binding document that
-> describes those separately to the generic binding documentation.
-> 
-> However, given that there are no TI-/OMAP-specific additions; OMAP2 just
-> uses the base generic bindings exactly as defined, I don't think you
-> actually need to create an TI-/OMAP-specific document, since there's
-> nothing for it to document.
+Ok we need find other ways for it. Thanks for your comments.
 
-OK so basically you just want the pinctrl-single binding document to be
-generic. Yes I'll do that.
- 
-> > It's best to describe the hardware in case we need to set up some hardware
-> > specific things in the driver.
-> 
-> There's a difference between the (set of) compatible value(s) that
-> appears in the .dts file, and the compatible value(s) that the driver
-> binds to.
-> 
-> Since this driver is purely implementing the pinctrl-single binding, I
-> believe only that should be listed in the driver's of_match table.
-> 
-> However, since the .dts file is describing HW that is both a specific
-> OMAP instance, and compatible with pinctrl-single, the .dts file can
-> certainly list both. If in the future, the driver ever needs to
-> specifically know the difference between the specific OMAP versions, or
-> OMAP-vs-something-else, the compatible value will be there already in
-> the .dts file, so this will all work. However, I'd argue that if the
-> driver has to ever know that, it's probably not appropriate to say it's
-> compatible with pinctrl-single any more...
-
-Yes OK I see what you mean now. Sounds good to me, and if/when we need
-some hardware specific things, we'll add specific parsing for the other
-compatible values.
- 
-> >> One final comment: A little while before Linaro Connect in San
-> >> Francisco, we were all having difficulty coming up with any kind of DT
-> >> binding for pinctrl. I had suggested the possibility of creating a
-> >> binding which just said "write value X to register Y, write value P to
-> >> register Q, ...". This was rejected at connect, because a raw list of
-> >> register writes didn't document anything or describe semantics - it was
-> >> too much of a binary blob. This driver seems to be doing almost the
-> >> exact same thing. In order to avoid that assertion, it'd need to truly
-> >> have individual representations of which pins exist, which pingroups
-> >> exist, which functions exist, and which functions can be selected onto
-> >> which pins/pingroups. That would be a radically different binding. I
-> >> wonder what's changed such that this kind of driver wasn't acceptable
-> >> then, but is now?
-> > 
-> > Well that's why I had two bindings earlier: The current binding for the
-> > bulk pins that's faster to parse, and a more verbose binding for drivers that
-> > allows naming the functions.
-> > 
-> > In your previous comments at [1] you seemed to prefer this current binding
-> > based on the "Why not only allow (1)?" comment. Maybe you had something else
-> > in mind, care to clarify that a bit too?
-> 
-> Well, first I thought about semantics vs. just banging a register list a
-> tiny bit more, and remembered the previous discussion.
-> 
-> But my comment at [1] wasn't so much about "why not just have a raw
-> register list", but more regarding why support two different
-> representations within the same binding; it wasn't really clear to me
-> from reading the original email what the difference between the two
-> representations; why have two representations, why/when-to use one vs.
-> the other, that the difference was about providing a "semantic" list of
-> pins/pingroups/functions vs. providing a "raw" register list.
-
-I too would prefer more verbose .dts files. Unfortunately the parsing of
-several hundred board specific pins adds quite a bit of overhead.
- 
-> IIRC, the pushback on a raw "bang these registers" representation came
-> from Grant and/or Arnd. It'd be a good idea if they (and indeed Rob)
-> could comment on this binding proposal. If they're OK with this kind of
-> pretty raw representation, I'm not going to object, but I have a feeling
-> they might not like it?
-
-Yes let's see if anybody has better ideas.
-
-Regards,
-
-Tony
-
- 
-> > [1] http://article.gmane.org/gmane.linux.kernel/1291838
+Wei
+---
+nvpublic
