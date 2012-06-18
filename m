@@ -1,66 +1,179 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarh)
-Date: Mon, 18 Jun 2012 22:38:41 +0200
-Subject: Dove clock support
-In-Reply-To: <20120618101100.GN4799@lunn.ch>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
- <20120618084300.GL4799@lunn.ch> <4FDEF7E9.4030504@googlemail.com>
- <4FDEFAE2.7000303@blackshift.org> <4FDEFC6A.7030300@googlemail.com>
- <20120618101100.GN4799@lunn.ch>
-Message-ID: <4FDF91D1.1040301@googlemail.com>
+From: snijsure@grid-net.com (Subodh Nijsure)
+Date: Mon, 18 Jun 2012 13:42:03 -0700
+Subject: [PATCH v4 2/2] serial: mxs-auart: Allow device tree probing
+In-Reply-To: <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
+References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
+ <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <4FDF929B.7000809@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 12:11 PM, Andrew Lunn wrote:
- >> But I'd prefer the driver to take care of clks _and_ PHYs.
- >
- > That would be nice, but we have to remember that the driver is used
- > for a number of different Marvell SoC and discreet devices. Only a few
- > have the ability to turn on/off there clocks and PHYs. So you need to
- > abstract this in such a way it does not break older chipsets.
 
-Well, I'd suggest to find a good name for clk and PHY, e.g.
-"pcie.0","clk" and "pcie.0","phy", and let the driver decide if it
-enables/disables clk/PHY when it gets a valid struct clk back.
+If one were to try run console on one of the /dev/ttyAPP* ports, as is 
+the case for hardware I am working with, console output wouldn't show up 
+without the following diff:
 
-Although struct clk is meant for clocks there is no difference
-between clocks and PHYs. Moreover, dove handles PHY control in
-it's clock control register sometimes. (Well, it is maybe external
-clock to PHY so it's ok)
+Let me know if should send formal patch or we can include it as part of v5?
 
-But first I suggest to have a drivers/clk/clk-orion (which I have
-somehow) and I already sent you a proposal some weeks ago.
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index ca3d25e..2ced332 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -761,7 +761,7 @@ static int __devinit mxs_auart_probe(struct 
+platform_device *pdev)
 
-I wasn't sure how to hook up drivers/clk/clk-orion with the platform
-itself but now that there are some other clock drivers available I'll
-have another look.
+         platform_set_drvdata(pdev, s);
 
-I have the datasheets for dove and kirkwood but with other orion-based
-platforms I cannot tell the differences. Maybe someone can comment on
-the different other platforms.
+-       auart_port[pdev->id] = s;
++       auart_port[s->port.line] = s;
 
- >> One more: I suggest to clean the clk names of orion platforms,
- >> they are a mess
- >
- > Do you have a proposal?
+         mxs_auart_reset(&s->port)
 
-Hmm, well if you look at mach-kirkwood/common.c there is:
-- orion_spi.0/NULL (underscore)
-- orion-ehci.0/NULL (dash)
-- pcie/0
-- kirkwood-i2s/NULL
+-Subodh
 
-First, I suggest to choose either underscore or dash. Second, pcie/0
-should be kirkwood-pcie.0/NULL (or orion-pcie.0) and if we consider
-having PHY "clocks" it should be kirkwood-pcie.0/clk.
-
-With kirkwood-i2s/NULL there is mach-dove that has two i2s controllers
-so it should be kirkwood-i2s.0. Moreover, the i2s controller can have
-an external clk instead of internal clock divider, so the clock names
-should be kirkwood-i2s.0/clk and kirkwood-i2s.0/extclk.
-
-With external i2s clock it _could_ be possible to have high bitrate
-audio on spdif by overclocking the i2s controller.
-
-Sebastian
+On 06/18/2012 06:06 AM, Fabio Estevam wrote:
+> Allow device tree probing.
+>
+> Cc: Grant Likely<grant.likely@secretlab.ca>
+> Cc: Rob Herring<rob.herring@calxeda.com>
+> Cc: Alan Cox<alan@linux.intel.com>
+> Cc:<linux-serial@vger.kernel.org>
+> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
+> ---
+> Changes since v3:
+> - Remove unneeded mxs_auart_devtype
+> Changes since v2:
+> - Change compatible string
+> - Add aliases information in bindings doc
+> - Remove unneeded mxs_auart_probe_pdev function
+> - Remove "ifdef CONFIG_OF"
+> - Remove of_match_ptr wrapper
+> Changes since v1:
+> - Merged patches 3 and 5 from v1 into this one
+>   .../bindings/tty/serial/fsl-mxs-auart.txt          |   27 +++++++++++++
+>   drivers/tty/serial/mxs-auart.c                     |   40 +++++++++++++++++++-
+>   2 files changed, 66 insertions(+), 1 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+>
+> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+> new file mode 100644
+> index 0000000..2ee903f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+> @@ -0,0 +1,27 @@
+> +* Freescale MXS Application UART (AUART)
+> +
+> +Required properties:
+> +- compatible : Should be "fsl,<soc>-auart". The supported SoCs include
+> +  imx23 and imx28.
+> +- reg : Address and length of the register set for the device
+> +- interrupts : Should contain the auart interrupt numbers
+> +
+> +Example:
+> +auart0: serial at 8006a000 {
+> +	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+> +	reg =<0x8006a000 0x2000>;
+> +	interrupts =<112 70 71>;
+> +};
+> +
+> +Note: Each auart port should have an alias correctly numbered in "aliases"
+> +node.
+> +
+> +Example:
+> +
+> +aliases {
+> +	serial0 =&auart0;
+> +	serial1 =&auart1;
+> +	serial2 =&auart2;
+> +	serial3 =&auart3;
+> +	serial4 =&auart4;
+> +};
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index ec56d83..103087d 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -33,6 +33,7 @@
+>   #include<linux/delay.h>
+>   #include<linux/io.h>
+>   #include<linux/pinctrl/consumer.h>
+> +#include<linux/of_device.h>
+>
+>   #include<asm/cacheflush.h>
+>
+> @@ -675,6 +676,30 @@ static struct uart_driver auart_driver = {
+>   #endif
+>   };
+>
+> +/*
+> + * This function returns 1 if pdev isn't a device instatiated by dt, 0 if it
+> + * could successfully get all information from dt or a negative errno.
+> + */
+> +static int serial_mxs_probe_dt(struct mxs_auart_port *s,
+> +		struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int ret;
+> +
+> +	if (!np)
+> +		/* no device tree device */
+> +		return 1;
+> +
+> +	ret = of_alias_get_id(np, "serial");
+> +	if (ret<  0) {
+> +		dev_err(&pdev->dev, "failed to get alias id: %d\n", ret);
+> +		return ret;
+> +	}
+> +	s->port.line = ret;
+> +
+> +	return 0;
+> +}
+> +
+>   static int __devinit mxs_auart_probe(struct platform_device *pdev)
+>   {
+>   	struct mxs_auart_port *s;
+> @@ -689,6 +714,12 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
+>   		goto out;
+>   	}
+>
+> +	ret = serial_mxs_probe_dt(s, pdev);
+> +	if (ret>  0)
+> +		s->port.line = pdev->id<  0 ? 0 : pdev->id;
+> +	else if (ret<  0)
+> +		goto out_free;
+> +
+>   	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>   	if (IS_ERR(pinctrl)) {
+>   		ret = PTR_ERR(pinctrl);
+> @@ -711,7 +742,6 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
+>   	s->port.membase = ioremap(r->start, resource_size(r));
+>   	s->port.ops =&mxs_auart_ops;
+>   	s->port.iotype = UPIO_MEM;
+> -	s->port.line = pdev->id<  0 ? 0 : pdev->id;
+>   	s->port.fifosize = 16;
+>   	s->port.uartclk = clk_get_rate(s->clk);
+>   	s->port.type = PORT_IMX;
+> @@ -769,12 +799,19 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> +static struct of_device_id mxs_auart_dt_ids[] = {
+> +	{ .compatible = "fsl,imx23-auart", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
+> +
+>   static struct platform_driver mxs_auart_driver = {
+>   	.probe = mxs_auart_probe,
+>   	.remove = __devexit_p(mxs_auart_remove),
+>   	.driver = {
+>   		.name = "mxs-auart",
+>   		.owner = THIS_MODULE,
+> +		.of_match_table = mxs_auart_dt_ids,
+>   	},
+>   };
+>
+> @@ -807,3 +844,4 @@ module_init(mxs_auart_init);
+>   module_exit(mxs_auart_exit);
+>   MODULE_LICENSE("GPL");
+>   MODULE_DESCRIPTION("Freescale MXS application uart driver");
+> +MODULE_ALIAS("platform:mxs-auart");
