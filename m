@@ -1,97 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Jun 2012 08:18:05 +0100
-Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD8BAD2.50703@linaro.org>
- <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
- <4FDAFA17.6050502@linaro.org>
- <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
- <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
- <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
- <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
-Message-ID: <4FDED62D.6030008@linaro.org>
+From: krakesh@nvidia.com (Rakesh Kumar)
+Date: Mon, 18 Jun 2012 13:10:44 +0530
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+ <4FDB5976.20809@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+Message-ID: <96C9D994977DD0439FB6D3FE3B13DD907DE14CB4DF@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/12 18:43, Linus Walleij wrote:
-> Gah, what a thread...
+>Now if this means adding a child node under the SDIO controller to represent the attached device, and storing any settings required by that device in that child node, that's probably a reasonable basic approach.
 >
-> On Fri, Jun 15, 2012 at 3:18 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->> On 15/06/12 14:05, Srinidhi Kasagar wrote:
->>> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
->>>> On 15/06/12 12:50, Srinidhi Kasagar wrote:
+>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That seems reasonable to represent as a GPIO rather than a regulator since it connects directly into the WiFi device as a GPIO, and its use within the WiFi device can indeed be governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
+>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then it'd be better represented as a regulator, since the control point is outside the WiFi device.
+
+Tegra uses two GPIO (WF_EN and WF_RST) to power on and reset bcm4329 card. In case of bcm4329, these two lines are shorted. Tegra does not control VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card based on these GPIO. Uses of these GPIO are internal to WiFi HW.  It is reasonable to represent as a GPU rather than regulator.
+
+Rakesh
+---
+nvpublic
+
+-----Original Message-----
+From: Wei Ni 
+Sent: 18 June 2012 11:50
+To: 'Stephen Warren'; Rakesh Kumar
+Cc: Mark Brown; 'frankyl at broadcom.com'; Thierry Reding; Mursalin Akon; 'linux-mmc at vger.kernel.org'; devicetree-discuss at lists.ozlabs.org; 'linux-wireless at vger.kernel.org'; linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: Where to power on the wifi device before loading the driver.
+
+On Fri, Jun 15, 2012 at 23:49:10, Stephen Warren wrote:
+>> I talked with Franky, this power sequence is generally for 4329, so 
+>> it mean this sequence can be put into the wifi driver.
+>> We can use the virtual platform device both for OOB and non OOB.
+>> I will send out patches later.
 >
->>>>>> +static struct nmk_i2c_controller u8500_i2c = {
->>>>>> +       /*
->>>>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
->>>>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
->>>>>> +        */
->>>>>> +       .slsu           = 0xe,
->>>>>> +       .tft            = 1,      /* Tx FIFO threshold */
->>>>>> +       .rft            = 8,      /* Rx FIFO threshold */
->>>>>> +       .clk_freq       = 100000, /* std. mode operation */
->>>>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
->>>>>> +       .sm             = I2C_FREQ_MODE_FAST,
->>>>>
->>>>> How is this possible? you are setting clk_freq as 100kb/s and mode
->>>>> as fast mode which is supposed to be 400kb/s.
->>>>
->>>> That's not how I read it:
->>>
->>> But it is not readable. It confuses people.
->>
->> I understood it. :)
->>
->> If you think it's unclear speak to the author, Linus. He's CC'ed.
+>Can you please expand on what a "virtual platform device" is; device tree typically represents real hardware rather than anything "virtual".
+
+The "virtual platform device" is created before the real wifi device, so that it can pass the gpios to the driver, and power up the device before calling sdio_register_driver.
+But as Franky said, this power sequence is only generally for 4329, not for the USB dongle chips. So it's not a good idea to add this "power up" in brcmfmac.
+
 >
-> Author of what? The i2c driver was written by Srinidhi. (The
-> MODULE_AUTHOR() clause should be a good hint...)
-
-Actually, we appear to have our wires crossed. You wrote the board data 
-stuff below, which changes the mode from STANDARD to FAST, no doubt 
-using Srinidhi's struct explanation comments found in 
-arch/arm/plat-nomadik/include/plat/i2c.h.
-
- > I'll cook a separate patch for this or something.
-
-Cool, thanks Linus.
-
-But you're correct in what you say Linus. Srinidhi, the comments which 
-are you say are confusing are the bits you are the author of: 
-e208c447bd728920e4f3d438a706344ea31249b9?
-
-> But it's true that board data for the ux500 kernel use
-> 100000 Hz and I2C_FREQ_MODE_FAST, in the board-mop500.c
-> file, like this:
+>Now if this means adding a child node under the SDIO controller to represent the attached device, and storing any settings required by that device in that child node, that's probably a reasonable basic approach.
 >
-> U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-> U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-> U8500_I2C_CONTROLLER(2, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-> U8500_I2C_CONTROLLER(3, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
- >
-> This is indeed a bit odd. But obviously it works... But reading some
-> fixes in another tree it seems it should look like this:
->
-> /*
->   * The board uses 4 i2c controllers, initialize all of
->   * them with slave data setup time of 250 ns,
->   * Tx&  Rx FIFO threshold values as 1 and standard
->   * mode of operation
->   */
-> U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-> U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-> U8500_I2C_CONTROLLER(2, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-> U8500_I2C_CONTROLLER(3, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
->
-> Which makes *much* more sense.
+>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That seems reasonable to represent as a GPIO rather than a regulator since it connects directly into the WiFi device as a GPIO, and its use within the WiFi device can indeed be governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
+>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then it'd be better represented as a regulator, since the control point is outside the WiFi device.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I think Rakesh may can answer this.
+
+Wei.
+---
+nvpublic
