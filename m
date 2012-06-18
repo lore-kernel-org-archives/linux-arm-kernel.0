@@ -1,40 +1,41 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 18 Jun 2012 13:24:07 +0200
-Subject: [PATCH] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER
- if GPIO not yet available
-In-Reply-To: <4FDEF293.9080305@antcom.de>
-References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
- <4FDE8D27.6030508@wwwdotorg.org> <4FDEF293.9080305@antcom.de>
-Message-ID: <4FDF0FD7.3060004@antcom.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 18 Jun 2012 13:28:34 +0200
+Subject: [PATCH] ARM: ux500: bump i2c bus speed to 400kHz
+In-Reply-To: <CACRpkdZENi8PCdjmr-Ypey95HjDmEZmpJtqEC49SbwPBCfqr7Q@mail.gmail.com>
+References: <1339955837-26691-1-git-send-email-linus.walleij@stericsson.com>
+ <201206180106.21108.marek.vasut@gmail.com>
+ <CACRpkdZENi8PCdjmr-Ypey95HjDmEZmpJtqEC49SbwPBCfqr7Q@mail.gmail.com>
+Message-ID: <201206181328.34644.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 11:19 AM, Roland Stigge wrote:
->> While I agree this is a correct change, it is going to break some
->> existing code - at least sound/soc/tegra/tegra_{wm8903.c,alc5632.c}.
-> 
-> Can you please tell in which way the patch breaks those drivers?
-> However, I can see that those drivers solved the same problem in a
-> different way (deferring of_get_named_gpio(), via the sound init()). So
-> they could be adjusted to take advantage of new -EPROBE_DEFER
-> 
->> However, have you audited all existing callers (including
->> indirect, e.g. through plain of_get_named_gpio()) for issues this will
->> cause?
-> 
-> Thanks for the hint, I searched the code and found
-> 
-> drivers/spi/spi-pl022.c
-> 
-> to be using -ENODEV as indication to return -EPROBE_DEFER from probe().
-> Will send a patch that adjusts to our of_get_named_gpio_flags() patch
-> and if it's good, we should join the two.
+Dear Linus Walleij,
 
-Turned out that this is a fix for a yet-unapplied patch (to support dt
-for pl022). Alexandre will merge my fix into his patch.
+> On Mon, Jun 18, 2012 at 1:06 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >> 
+> >> Some recent discussion revealed inconsistency in the board file
+> >> for the MOP500 family. The board can very well do 400kHz on
+> >> the I2C busses, so make it do that.
+> > 
+> > Shouldn't this be controlled by DT?
+> 
+> They can be controlled by Device Tree after Lee's patch I think.
+> 
+> > Some of the i2c devices can't do 400kHz.
+> 
+> Which ones? This works find on the MOP500/HREF board, are you referring
+> to Snowball devices?
 
-So I can't find immediate breakage from the gpiolib-of patch.
+I had issues with some omnivision cameras, but they were indeed quite old. My 
+rant was rather about not closing the door for 100kHz if it was ever needed. But 
+like you said above, if it can be changed after applying the aforementioned 
+patch, that's ok.
 
-Thanks,
+Thanks for clearing this up, sorry for pestering you.
 
-Roland
+> Yours,
+> Linus Walleij
+
+Best regards,
+Marek Vasut
