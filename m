@@ -1,50 +1,56 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Mon, 18 Jun 2012 14:10:24 +0200
-Subject: How to use linear mapping without DT?
-In-Reply-To: <20120616023507.GC29663@S2101-09.ap.freescale.net>
-References: <4FD9B4DC.80706@atmel.com>
- <20120615160155.GN31565@S2101-09.ap.freescale.net>
- <4FDB639D.4060103@atmel.com>
- <20120616023507.GC29663@S2101-09.ap.freescale.net>
-Message-ID: <4FDF1AB0.5@atmel.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 18 Jun 2012 14:10:52 +0200
+Subject: [PATCH] arm: zynq: Support GIC OF initialization
+In-Reply-To: <4FDF19CF.8010303@gmail.com>
+References: <1340017873-18170-1-git-send-email-monstr@monstr.eu>
+ <4FDF19CF.8010303@gmail.com>
+Message-ID: <4FDF1ACC.2040208@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/16/2012 04:35 AM, Shawn Guo a ?crit :
-> On Fri, Jun 15, 2012 at 06:32:29PM +0200, ludovic.desroches wrote:
->> I've seen your patch series and I am wondering what is the
->> difference between these two solutions:
->> - not using nr_irqs: you will have NR_IRQS_LEGACY irqdescs allocated
->> and you will allocate the irqdescs for your controller just after by
->> calling irq_alloc_descs so you will have to manage the
->> NR_IRQS_LEGACY offset.
->> - using nr_irqs: you will have all your irqdescs allocated and won't
->> have to manage the NR_IRQS_LEGACY offset.
+On 06/18/2012 02:06 PM, Rob Herring wrote:
+> On 06/18/2012 06:11 AM, Michal Simek wrote:
+>> Zynq is OF driven platfrom which requires OF initialization.
 >>
-> First of all, NR_IRQS_LEGACY shifting is a good thing we are actually
-> looking for because we want to reserve virq number 0 for no-interrupt
-> case. [1]
-
-I don't think it's an issue for legacy domain since virq number 0 is 
-ignored.
-
+>> Signed-off-by: Michal Simek<monstr@monstr.eu>
+>> ---
+>>   arch/arm/mach-zynq/common.c |    7 ++++++-
+>>   1 files changed, 6 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+>> index 17d68d6..7941544 100644
+>> --- a/arch/arm/mach-zynq/common.c
+>> +++ b/arch/arm/mach-zynq/common.c
+>> @@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
+>>   	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>>   }
+>>
+>> +static const struct of_device_id zynq_dt_irq_match[] __initconst = {
+>> +	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
+>> +	{ }
+>> +};
+>> +
+>>   /**
+>>    * xilinx_irq_init() - Interrupt controller initialization for the GIC.
+>>    */
+>>   static void __init xilinx_irq_init(void)
+>>   {
+>> -	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
 >
-> Secondly, with .nr_irqs approach, you will have to somehow maintain
-> irq_base for each irqchip, which is needed when adding legacy domain.
-> Calling irq_alloc_descs will just return you the irq_base.
->
-> Lastly, irq_alloc_descs approach can save irqdesc than .nr_irq in some
-> cases, where not all the irqchips get instantiated for every single
-> boot.  That's said, .nr_irqs has to be set the possible maximum numbers
-> for the machine, while some irqchips, e.g. peripheral/device inside
-> ones, are not always instantiated.  irq_alloc_descs approach will save
-> irqdescs for such cases.
+> And delete the corresponding defines?
 
-Of course it makes sense.
+Agree, Will create v2.
 
-Thanks for these explanations. I'll correct my patches to use the 
-NR_IRQS_LEGACY shifting instead of using nr_irqs.
+BTW: Who is responsible for zynq? I think John Linn and who is maintainer I should ask for pulling.
 
-Regards
+Thanks,
+Michal
 
-Ludovic
+
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
