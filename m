@@ -1,27 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 18 Jun 2012 13:29:43 +0200
-Subject: [PATCH 2/3] ARM: ux500: Add i2c configurations to the Device Tree
- for DB8500 based devices
-In-Reply-To: <4FD8BAE4.4050606@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD8BAE4.4050606@linaro.org>
-Message-ID: <CACRpkda2pH1by2hajpP20CJgdg+mWFF=QaGbeNdY=c8iOVtLUQ@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 18 Jun 2012 13:30:03 +0200
+Subject: ARM SMP/GIC/LDS patches for Xilinx Zynq remoteproc
+Message-ID: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 6:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi,
 
-> + ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <100000>;
-> + ? ? ? ? ? ? ? ? ? ? ? stericsson,slsu = <0xe>;
-> + ? ? ? ? ? ? ? ? ? ? ? stericsson,tft = <1>;
-> + ? ? ? ? ? ? ? ? ? ? ? stericsson,rft = <8>;
-> + ? ? ? ? ? ? ? ? ? ? ? stericsson,timeout = <200>;
-> + ? ? ? ? ? ? ? ? ? ? ? stericsson,i2c_freq_mode_fast;
+I am sending bunch of patches which I have made for a Xilinx Zynq remoteproc AMP solution +
+some patches around.
 
-In the context of my patch to the board file, we conclude that the
-clock-frequency should be set to 400000 instead.
+Xilinx Zynq is dual core ARM Cortex A9. Remoteproc in new interface for controlling other cpus
+is the system. I have created solution where on one ARM runs Linux and the second ARM
+runs RTOS or any other standalone firmware. It is AMP between two ARM cores.
 
-Yours,
-Linus Walleij
+Communication is done via shared memory with kicking via IPI interrupts. 
+Based on that I had to do some changes in the kernel which I am sending. 
+
+Thanks for your review,
+Michal
