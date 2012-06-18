@@ -1,39 +1,69 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarh)
-Date: Mon, 18 Jun 2012 11:42:01 +0200
-Subject: Dove clock support
-In-Reply-To: <20120618084300.GL4799@lunn.ch>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
- <20120618084300.GL4799@lunn.ch>
-Message-ID: <4FDEF7E9.4030504@googlemail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 18 Jun 2012 11:42:22 +0200
+Subject: [PATCH] ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4
+Message-ID: <4FDEF7FE.9040202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 10:43 AM, Andrew Lunn wrote:
->> Sure, the address layout is different, but that can be made generic in a
->> second step. Maybe we need a private pointer in the gate_fn struct.
->
-> Yes, something like that.
+The commit 503d0ea24d1d3dd3db95e5e0edd693da7a2a23eb
+  ARM: OMAP4: hwmod data: Add aliases for McBSP fclk clocks
 
-You need to pass at least the controllers base address. Everything else
-is common - IIRC kirkwood has two SATA, dove only one. Moreover the base
-addresses for the second are not defined, yet.
+added a wrong "prcm_clk" alias for PRCM clock whereas the McBSP
+driver and previous OMAPs are using "prcm_fck".
 
-Also ge-phy has to be connected with ge-clk, too. But for dove this is
-a clk gate while kirkwood can shut it down somewhere else. I guess it
-can be handled like sata/pcie on kirkwood.
+It thus lead to the following warning.
 
->> BTW: who will enable the clocks that have been disabled via the
->> sata/pcie shutdown functions?
->
-> This is potentially a problem when the SATA driver is built as a
-> kernel module. There is no code that i know of to turn the SATA PHYs
-> back on again. I think this has been broken like this for a long
-> time...
+[   47.409729] omap-mcbsp: clks: could not clk_get() prcm_fck
 
-IMHO the driver should take care of enabling clk and PHYs. In my
-understanding of the common clock framework both will be disabled
-if no driver requests it.
+Fix that by changing the opt_clk role to prcm_fck.
 
-Sebastian
+Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Tested-by: Sebastien Guiriec <s-guiriec@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 950454a..1527541 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -1924,7 +1924,7 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp1_sdma_reqs[] = {
+ 
+ static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
+ 	{ .role = "pad_fck", .clk = "pad_clks_ck" },
+-	{ .role = "prcm_clk", .clk = "mcbsp1_sync_mux_ck" },
++	{ .role = "prcm_fck", .clk = "mcbsp1_sync_mux_ck" },
+ };
+ 
+ static struct omap_hwmod omap44xx_mcbsp1_hwmod = {
+@@ -1959,7 +1959,7 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp2_sdma_reqs[] = {
+ 
+ static struct omap_hwmod_opt_clk mcbsp2_opt_clks[] = {
+ 	{ .role = "pad_fck", .clk = "pad_clks_ck" },
+-	{ .role = "prcm_clk", .clk = "mcbsp2_sync_mux_ck" },
++	{ .role = "prcm_fck", .clk = "mcbsp2_sync_mux_ck" },
+ };
+ 
+ static struct omap_hwmod omap44xx_mcbsp2_hwmod = {
+@@ -1994,7 +1994,7 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp3_sdma_reqs[] = {
+ 
+ static struct omap_hwmod_opt_clk mcbsp3_opt_clks[] = {
+ 	{ .role = "pad_fck", .clk = "pad_clks_ck" },
+-	{ .role = "prcm_clk", .clk = "mcbsp3_sync_mux_ck" },
++	{ .role = "prcm_fck", .clk = "mcbsp3_sync_mux_ck" },
+ };
+ 
+ static struct omap_hwmod omap44xx_mcbsp3_hwmod = {
+@@ -2029,7 +2029,7 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp4_sdma_reqs[] = {
+ 
+ static struct omap_hwmod_opt_clk mcbsp4_opt_clks[] = {
+ 	{ .role = "pad_fck", .clk = "pad_clks_ck" },
+-	{ .role = "prcm_clk", .clk = "mcbsp4_sync_mux_ck" },
++	{ .role = "prcm_fck", .clk = "mcbsp4_sync_mux_ck" },
+ };
+ 
+ static struct omap_hwmod omap44xx_mcbsp4_hwmod = {
+-- 
+1.7.0.4
