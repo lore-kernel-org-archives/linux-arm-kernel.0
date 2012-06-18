@@ -1,64 +1,38 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 18 Jun 2012 20:00:15 +0530
-Subject: [PATCHv8 00/13] I2C cleanups
-Message-ID: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 18 Jun 2012 20:00:17 +0530
+Subject: [PATCHv8 02/13] I2C: OMAP: Remove the definition of
+ SYSS_RESETDONE_MASK
+In-Reply-To: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340029828-20751-3-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove the definition of SYSS_RESETDONE_MASK and use the
+one in omap_hwmod.h.
 
-The patch series does the following
+Also fixes the warning
+ CC      drivers/i2c/busses/i2c-omap.o
+drivers/i2c/busses/i2c-omap.c:163: warning: "SYSS_RESETDONE_MASK" redefined
 
-- I2C register restore only if context if the context is lost
-- Bus busy recovery mechanism.
-- the reset is not done in init.
-- Adds a patch to use devm_* functions
-- Adds a pdata function pointer to do context save restore
-- Split the omap_i2c_isr to increase readability
-- Make the i2c use SET_RUNTIME_PM_OPS
-- Use INIT_COMPLETION instead of init_completion
-- Dropping a cleanup and taking few patchs Felipe's series as it may
- not be needed.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-This applies on Wolfram's i2c-embedded/for-next branch.
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 9a54e88..838a0ae 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -159,9 +159,6 @@ enum {
+ #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
+ #endif
  
-Functional testing on omap4sdp and omap3sdp. 
-
-Previous discurssions 
-http://www.spinics.net/lists/linux-i2c/msg07748.html
-
-This series mainly is the cleanups rebased on
-i2c-embedded/for-next branch.
-
-
-The following changes since commit 0f009a914b40be8786fa67b1f4345cacc263b48c:
-
-  i2c: tegra: make all resource allocation through devm_* (2012-06-13 16:01:38 +0200)
-
-are available in the git repository at:
-  git://gitorious.org/linus-tree/linus-tree.git for_next/i2c_omap
-
-Felipe Balbi (4):
-      I2C: OMAP: simplify num_bytes handling
-      I2C: OMAP: decrease indentation level on data handling
-      I2C: OMAP: add blank lines
-      I2C: OMAP: simplify omap_i2c_ack_stat()
-
-Jon Hunter (1):
-      I2C: OMAP: Correct I2C revision for OMAP3
-
-Shubhrajyoti D (7):
-      I2C: OMAP: I2C register restore only if context is lost
-      I2C: OMAP: Remove the definition of SYSS_RESETDONE_MASK
-      I2C: OMAP: Remove reset at init
-      I2C: OMAP: Optimise the remove code
-      I2C: OMAP: use devm_* functions
-      I2C: OMAP: Use SET_RUNTIME_PM_OPS
-      I2C: OMAP: Do not initialise the completion everytime
-
-Vikram Pandita (1):
-      I2C: OMAP: Recover from Bus Busy condition
-
- arch/arm/plat-omap/i2c.c      |    3 +
- drivers/i2c/busses/i2c-omap.c |  261 +++++++++++++++++++++++-----------------
- include/linux/i2c-omap.h      |    1 +
- 3 files changed, 154 insertions(+), 111 deletions(-)
+-/* OCP_SYSSTATUS bit definitions */
+-#define SYSS_RESETDONE_MASK		(1 << 0)
+-
+ /* OCP_SYSCONFIG bit definitions */
+ #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
+ #define SYSC_SIDLEMODE_MASK		(0x3 << 3)
+-- 
+1.7.5.4
