@@ -1,66 +1,79 @@
-From: mkl@blackshift.org (Marc Kleine-Budde)
-Date: Mon, 18 Jun 2012 09:54:22 +0200
-Subject: RFC: [PATCH] ARM: Kirkwood: clk_register_gate_fn: add fn
- assignment
-In-Reply-To: <20120618074258.GI4799@lunn.ch>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch>
-Message-ID: <4FDEDEAE.30502@blackshift.org>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Mon, 18 Jun 2012 13:28:38 +0530
+Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <4FDED62D.6030008@linaro.org>
+References: <4FD8BAD2.50703@linaro.org>
+ <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
+ <4FDAFA17.6050502@linaro.org>
+ <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
+ <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
+ <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
+ <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
+ <4FDED62D.6030008@linaro.org>
+Message-ID: <20120618075834.GA14293@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 09:42 AM, Andrew Lunn wrote:
-> On Mon, Jun 18, 2012 at 02:07:34AM +0200, Marc Kleine-Budde wrote:
->> In commit:
->>     98d9986 ARM: Kirkwood: Replace clock gating
->> the kirkwood clock gating has been reworked. A custom variant of
->> clock gating, that calls a custom function before gating the clock
->> off, has been introduced. However in clk_register_gate_fn() this
->> custom function "fn" is never assigned.
->>
->> This patch adds the missing fn assignment.
->>
->> Signed-off-by: Marc Kleine-Budde <mkl@blackshift.org>
->> ---
->> Hi Andrew,
->>
->> just stumbled over this one. I'm not sure if I missed something in the code
->> (it's time to go to bed here). Neither the original version or the patch
->> has been tested on hardware.
->>
->> regards, Marc
->>
->>  arch/arm/mach-kirkwood/common.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
->> index 25fb3fd..855e37b 100644
->> --- a/arch/arm/mach-kirkwood/common.c
->> +++ b/arch/arm/mach-kirkwood/common.c
->> @@ -159,6 +159,7 @@ static struct clk __init *clk_register_gate_fn(struct device *dev,
->>  	gate_fn->gate.flags = clk_gate_flags;
->>  	gate_fn->gate.lock = lock;
->>  	gate_fn->gate.hw.init = &init;
->> +	gate_fn->fn = fn;
->>  
->>  	/* ops is the gate ops, but with our disable function */
->>  	if (clk_gate_fn_ops.disable != clk_gate_fn_disable) {
->> -- 
->> 1.7.4.1
+On Mon, Jun 18, 2012 at 09:18:05 +0200, Lee Jones wrote:
+> On 17/06/12 18:43, Linus Walleij wrote:
+> > Gah, what a thread...
+> >
+> > On Fri, Jun 15, 2012 at 3:18 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+> >> On 15/06/12 14:05, Srinidhi Kasagar wrote:
+> >>> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
+> >>>> On 15/06/12 12:50, Srinidhi Kasagar wrote:
+> >
+> >>>>>> +static struct nmk_i2c_controller u8500_i2c = {
+> >>>>>> +       /*
+> >>>>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
+> >>>>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+> >>>>>> +        */
+> >>>>>> +       .slsu           = 0xe,
+> >>>>>> +       .tft            = 1,      /* Tx FIFO threshold */
+> >>>>>> +       .rft            = 8,      /* Rx FIFO threshold */
+> >>>>>> +       .clk_freq       = 100000, /* std. mode operation */
+> >>>>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
+> >>>>>> +       .sm             = I2C_FREQ_MODE_FAST,
+> >>>>>
+> >>>>> How is this possible? you are setting clk_freq as 100kb/s and mode
+> >>>>> as fast mode which is supposed to be 400kb/s.
+> >>>>
+> >>>> That's not how I read it:
+> >>>
+> >>> But it is not readable. It confuses people.
+> >>
+> >> I understood it. :)
+> >>
+> >> If you think it's unclear speak to the author, Linus. He's CC'ed.
+> >
+> > Author of what? The i2c driver was written by Srinidhi. (The
+> > MODULE_AUTHOR() clause should be a good hint...)
 > 
-> Hi Marc
+> Actually, we appear to have our wires crossed. You wrote the board data 
+> stuff below, which changes the mode from STANDARD to FAST, no doubt 
+> using Srinidhi's struct explanation comments found in 
+> arch/arm/plat-nomadik/include/plat/i2c.h.
 > 
-> Thanks for the patch.
+>  > I'll cook a separate patch for this or something.
 > 
-> Tested-by: Andrew Lunn
-> Acked-by: Andrew Lunn
+> Cool, thanks Linus.
 > 
-> I will pass it on for inclusion.
+> But you're correct in what you say Linus. Srinidhi, the comments which 
+> are you say are confusing are the bits you are the author of: 
+> e208c447bd728920e4f3d438a706344ea31249b9?
 
-Thanks, this should go into 3.5.
+yes, it is of course evident that it's my commit from git.
+I think you are not catching my point. What I mean is:
+fast mode devices are downward compatible and can communicate
+with the devices with standard only mode. Those comments in that
+enum says exactly that (with "up to" keyword). However the code
+which configures the bus in fast mode and restrict the frequency
+to operate in 100 kb/s without any reason, and this creates
+confusion..
 
-BTW: I'm hacking on the dove clock support, I noticed that dove can make
-use of the same ethernet and pci phy shutdown functions than kirkwood.
-What about moving kirkwood_register_gate_fn and subfunctions to plat-orion?
+Perhaps, I think we need to remove one of these
+parameters as configurable options and derive out the
+frequency based on the mode of operation..
 
-regards, Marc
+/srinidhi
