@@ -1,37 +1,37 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Jun 2012 14:20:11 +0800
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <4FDB5976.20809@wwwdotorg.org>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
- <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
-Message-ID: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Jun 2012 08:37:20 +0200
+Subject: [PATCH 1/2] serial/amba-pl011: use devm_* allocators
+In-Reply-To: <CAOMZO5DGxPQyHpPLLJk1P5kmyfB+9jct1rwEZj918wM84ePRKA@mail.gmail.com>
+References: <1339940648-6847-1-git-send-email-linus.walleij@stericsson.com>
+ <CAOMZO5DGxPQyHpPLLJk1P5kmyfB+9jct1rwEZj918wM84ePRKA@mail.gmail.com>
+Message-ID: <CACRpkdahAYSd+H1hgUwwZh3UY7oS1QTym8uyggpmOgBAuSOaxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2012 at 23:49:10, Stephen Warren wrote:
->> I talked with Franky, this power sequence is generally for 4329, so 
->> it mean this sequence can be put into the wifi driver.
->> We can use the virtual platform device both for OOB and non OOB.
->> I will send out patches later.
+On Sun, Jun 17, 2012 at 4:13 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sun, Jun 17, 2012 at 10:44 AM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
 >
->Can you please expand on what a "virtual platform device" is; device tree typically represents real hardware rather than anything "virtual".
-
-The "virtual platform device" is created before the real wifi device, so that it can pass the gpios to the driver, and power up the device before calling sdio_register_driver.
-But as Franky said, this power sequence is only generally for 4329, not for the USB dongle chips. So it's not a good idea to add this "power up" in brcmfmac.
-
+>> ? ? ? ?uap->pinctrl = devm_pinctrl_get(&dev->dev);
+>> ? ? ? ?if (IS_ERR(uap->pinctrl)) {
+>> ? ? ? ? ? ? ? ?ret = PTR_ERR(uap->pinctrl);
+>> - ? ? ? ? ? ? ? goto unmap;
+>> + ? ? ? ? ? ? ? goto out;
+>> ? ? ? ?}
+>> ? ? ? ?uap->pins_default = pinctrl_lookup_state(uap->pinctrl,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PINCTRL_STATE_DEFAULT);
+>> @@ -1915,7 +1917,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>> ? ? ? ?uap->clk = clk_get(&dev->dev, NULL);
 >
->Now if this means adding a child node under the SDIO controller to represent the attached device, and storing any settings required by that device in that child node, that's probably a reasonable basic approach.
->
->BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That seems reasonable to represent as a GPIO rather than a regulator since it connects directly into the WiFi device as a GPIO, and its use within the WiFi device can indeed be governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
->VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then it'd be better represented as a regulator, since the control point is outside the WiFi device.
+> Maybe you can use devm_clk_get here too.
 
-I think Rakesh may can answer this.
+That requires all users of the driver to be using CONFIG_CLKDEV, which
+I *think* is safe to do, but better check: Russell, do you know if
+it's safe to use
+this feature from clkdev in the PL011 driver?
 
-Wei.
----
-nvpublic
+It seems so to me and most likely works on the systems I have (Ux500, U300,
+Nomadik, Integrator, RealView) but the world of PL011 is so big...
+
+Yours,
+Linus Walleij
