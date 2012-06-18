@@ -1,62 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Jun 2012 19:13:06 +0200
-Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
-Message-ID: <201206181913.06886.marex@denx.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 18 Jun 2012 19:15:46 +0200
+Subject: [PATCH 1/2] sound: tegra_wm8903: Adjust to of_get_named_gpio()
+ change
+In-Reply-To: <20120618170408.GW3974@opensource.wolfsonmicro.com>
+References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
+ <20120618164659.GV3974@opensource.wolfsonmicro.com>
+ <4FDF5E9E.6060803@antcom.de>
+ <20120618170408.GW3974@opensource.wolfsonmicro.com>
+Message-ID: <4FDF6242.3040400@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+On 06/18/2012 07:04 PM, Mark Brown wrote:
+> On Mon, Jun 18, 2012 at 07:00:14PM +0200, Roland Stigge wrote:
+> 
+>> Basically, yes. But this would mean that doing via gpio, we would
+>> need to pull other stuff from the sound tree over to gpio to
+>> build upon because "my" tegra_* sound patches won't apply to the
+>> gpio branch currently.
+> 
+> Oh, yes.  Stephen's gone and reorganised all that code which means
+> it's not a trivial merge.  Ho hum.  I'm happy to apply them if
+> folks are comfortable with it, I guess ideally I'd be able to pull
+> a branch with the gpio changes in and then apply on top of that.
 
-> Hi Richard,
-> 
-> On Wed, Jun 13, 2012 at 9:34 AM, Richard Zhao
-> 
-> <richard.zhao@freescale.com> wrote:
-> > The work is based on  ci13xxx rework done by Alexander Shishkin.
-> > 
-> > Status:
-> >  - this version only support host
-> >  - usbotg controler works at host role
-> > 
-> > Changes since last version:
-> >  - collect ack received.
-> > 
-> > Richard Zhao (13):
-> >  usb: otg: add notify_connect/notify_disconnect callback
-> >  USB: move transceiver from ehci_hcd and ohci_hcd to hcd and rename it
-> >    as phy
-> >  USB: notify phy when root hub port connect change
-> >  usb: chipidea: permit driver bindings pass phy pointer
-> >  usb: otg: add basic mxs phy driver support
-> >  usb: chipidea: add imx platform driver
-> >  ARM: imx6q: correct device name of usbphy and usb controller clock
-> >    export
-> >  ARM: imx6q: add config-on-boot gpios
-> >  ARM: imx6q: add usbphy clocks
-> >  ARM: imx6q: disable usb charger detector
-> >  ARM: dts: imx6q-sabrelite: add usb devices
-> >  ARM: mxs: clk_register_clkdev mx28 usb clocks
-> >  ARM: dts: imx28-evk: add usb devices
-> 
-> I am trying your patch series on a mx28evk and I am not able to have
-> my USB pen drive detected.
-> 
-> I tried enabling all the required config options in .config.
-> 
-> Could you please share your .config?
+Depending on what else changes will come via gpio for 3.6, maybe you
+don't even need to merge gpio to sound?
 
-Do you have root TT enabled? If the pendrive isn't detected at all, it's 
-probably the PHY not enabling (disabling?) the discon detector upon init. But 
-the PHY driver is from my code, so that should work. Do you see any response at 
-all upon connecting the stick?
+Can you please coordinate between sound and gpio?
 
-> 
-> Thanks,
-> 
-> Fabio Estevam
+Thanks in advance!
 
-Best regards,
-Marek Vasut
+Roland
+
+PS: I'm posting a combined patch suitable for the sound subsystem.
+Please tell me if you also need the gpiolib-of patch singled out.
