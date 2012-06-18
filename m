@@ -1,42 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Jun 2012 08:50:38 -0600
-Subject: [PATCH] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER
- if GPIO not yet available
-In-Reply-To: <4FDEF293.9080305@antcom.de>
-References: <1339927893-8842-1-git-send-email-stigge@antcom.de>
- <4FDE8D27.6030508@wwwdotorg.org> <4FDEF293.9080305@antcom.de>
-Message-ID: <4FDF403E.9090302@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Jun 2012 16:00:15 +0100
+Subject: kernel fault in get_dump_page on at91
+In-Reply-To: <4FDC8141.2030209@xenomai.org>
+References: <4FDC8141.2030209@xenomai.org>
+Message-ID: <20120618150015.GG8358@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2012 03:19 AM, Roland Stigge wrote:
-> On 06/18/2012 04:06 AM, Stephen Warren wrote:
->> On 06/17/2012 04:11 AM, Roland Stigge wrote:
->>> of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
->>> respective GPIO is not (yet) available. This is useful if driver's probe()
->>> functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
->>> can be probed again later on.
->>>
->>> The function still returns -EINVAL on other errors (parse error or node doesn't
->>> exist). This way, the case of an optional/intentionally missing GPIO is handled
->>> appropriately.
->>
->> While I agree this is a correct change, it is going to break some
->> existing code - at least sound/soc/tegra/tegra_{wm8903.c,alc5632.c}.
+On Sat, Jun 16, 2012 at 01:51:13PM +0100, Gilles Chanteperdrix wrote:
 > 
-> Can you please tell in which way the patch breaks those drivers?
-> However, I can see that those drivers solved the same problem in a
-> different way (deferring of_get_named_gpio(), via the sound init()). So
-> they could be adjusted to take advantage of new -EPROBE_DEFER.
+> Hi,
 
-The drivers I mentioned test the return code of of_get_named_gpio() to
-see if it's -ENODEV, which means that DT property for that GPIO exists
-but the driver for it isn't available yet, so the property can't be
-parsed. In this case, the sound drivers defer their own probe. If
-of_get_named_gpio() is modified to return -EPROBE_DEFER directly, then
-it won't be returning -ENODEV, and hence the sound drivers' check for
--ENODEV won't fire, and hence the sound drivers will just continue their
-probe assuming that the particular GPIOs are not present on the board
-(since they are all optional, so anything other than an explicit
-deferral error from of_get_named_gpio() is not treated as an error).
-This will break sound on those platforms.
+Hello Gilles,
+
+> The function get_dump_page calls vivt_flush_cache_page which tests if
+> the current cpu belongs to mm_cpumask(vma->vm_mm), but vma->vm_mm is
+> NULL for the vector page.
+> 
+> Setting gate_vma.vm_mm to &init_mm seems to avoid the issue, but I am
+> not sure this is the right thing to do.
+
+I don't think that is the right thing to do -- instead we should check that
+vm_mm isn't NULL before dereferencing it:
+
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 004c1bc..b35c376 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -215,7 +215,8 @@ static inline void vivt_flush_cache_mm(struct mm_struct *mm)
+ static inline void
+ vivt_flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
+ {
+-       if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
++       if (!vma->vm_mm ||
++           cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
+                __cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
+                                        vma->vm_flags);
+ }
+@@ -223,7 +224,8 @@ vivt_flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+ static inline void
+ vivt_flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
+ {
+-       if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
++       if (!vma->vm_mm ||
++           cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
+                unsigned long addr = user_addr & PAGE_MASK;
+                __cpuc_flush_user_range(addr, addr + PAGE_SIZE, vma->vm_flags);
+        }
+
+
+The bit that worries me is that code like this isn't confined to vivt cache
+flushing. We also have similar sequences for ptrace flushing and TLB
+maintenance. The former is probably ok since the gate_vma isn't
+writable/COWable but can we guarantee that TLB page flushing routines won't
+be called on the gate_vma?
+
+Will
