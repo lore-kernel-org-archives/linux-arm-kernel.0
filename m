@@ -1,35 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Jun 2012 12:37:53 +0100
-Subject: [PATCH 2/3] ARM: ux500: Add i2c configurations to the Device
- Tree for DB8500 based devices
-In-Reply-To: <CACRpkda2pH1by2hajpP20CJgdg+mWFF=QaGbeNdY=c8iOVtLUQ@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD8BAE4.4050606@linaro.org>
- <CACRpkda2pH1by2hajpP20CJgdg+mWFF=QaGbeNdY=c8iOVtLUQ@mail.gmail.com>
-Message-ID: <4FDF1311.1050207@linaro.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 18 Jun 2012 13:41:52 +0200
+Subject: [RFC PATCH 1/8] ARM: gic: Support forcing cpumask for possible
+ cpus in the system
+In-Reply-To: <20120618113339.GC12029@n2100.arm.linux.org.uk>
+References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
+ <1340019011-18642-2-git-send-email-monstr@monstr.eu>
+ <20120618113339.GC12029@n2100.arm.linux.org.uk>
+Message-ID: <4FDF1400.6090402@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/12 12:29, Linus Walleij wrote:
-> On Wed, Jun 13, 2012 at 6:08 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+On 06/18/2012 01:33 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 18, 2012 at 01:30:04PM +0200, Michal Simek wrote:
+>> gic_set_affinity doesn't support force option. Force option
+>> should work with all possible cpus in the system not only with
+>> online cpus.
 >
->> +                       clock-frequency =<100000>;
->> +                       stericsson,slsu =<0xe>;
->> +                       stericsson,tft =<1>;
->> +                       stericsson,rft =<8>;
->> +                       stericsson,timeout =<200>;
->> +                       stericsson,i2c_freq_mode_fast;
->
-> In the context of my patch to the board file, we conclude that the
-> clock-frequency should be set to 400000 instead.
+> Neither does x86.  Why do you want this?  Offline CPUs are unable to
+> receive the interrupt in any case (and must not receive interrupts in
+> the bringup path until they are online.)
 
-Right, I have already changed that in my patch-set.
+The whole reason for all these changes in AMP on dual core Cortex A9 where
+on one cpu runs Linux and on the second RTOS/standlone.
+
+It means that the second cpu is from Linux point of view offline all the time.
+But GIC has to be (and can be) setup to forward IRQ directly to the second cpu.
+GIC should be controlled by Linux.
+
+Thanks,
+Michal
+
+
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
