@@ -1,42 +1,64 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 18 Jun 2012 20:00:20 +0530
-Subject: [PATCHv8 05/13] I2C: OMAP: Optimise the remove code
-In-Reply-To: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
-References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340029828-20751-6-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 18 Jun 2012 20:00:15 +0530
+Subject: [PATCHv8 00/13] I2C cleanups
+Message-ID: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap_i2c_remove function may not be needed after
-device exit so the memory could be freed.
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+The patch series does the following
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 7ab9fe1..691550a 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1138,8 +1138,7 @@ err_release_region:
- 	return r;
- }
+- I2C register restore only if context if the context is lost
+- Bus busy recovery mechanism.
+- the reset is not done in init.
+- Adds a patch to use devm_* functions
+- Adds a pdata function pointer to do context save restore
+- Split the omap_i2c_isr to increase readability
+- Make the i2c use SET_RUNTIME_PM_OPS
+- Use INIT_COMPLETION instead of init_completion
+- Dropping a cleanup and taking few patchs Felipe's series as it may
+ not be needed.
+
+This applies on Wolfram's i2c-embedded/for-next branch.
  
--static int
--omap_i2c_remove(struct platform_device *pdev)
-+static int __devexit omap_i2c_remove(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
- 	struct resource		*mem;
-@@ -1236,7 +1235,7 @@ static struct dev_pm_ops omap_i2c_pm_ops = {
- 
- static struct platform_driver omap_i2c_driver = {
- 	.probe		= omap_i2c_probe,
--	.remove		= omap_i2c_remove,
-+	.remove		= __devexit_p(omap_i2c_remove),
- 	.driver		= {
- 		.name	= "omap_i2c",
- 		.owner	= THIS_MODULE,
--- 
-1.7.5.4
+Functional testing on omap4sdp and omap3sdp. 
+
+Previous discurssions 
+http://www.spinics.net/lists/linux-i2c/msg07748.html
+
+This series mainly is the cleanups rebased on
+i2c-embedded/for-next branch.
+
+
+The following changes since commit 0f009a914b40be8786fa67b1f4345cacc263b48c:
+
+  i2c: tegra: make all resource allocation through devm_* (2012-06-13 16:01:38 +0200)
+
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git for_next/i2c_omap
+
+Felipe Balbi (4):
+      I2C: OMAP: simplify num_bytes handling
+      I2C: OMAP: decrease indentation level on data handling
+      I2C: OMAP: add blank lines
+      I2C: OMAP: simplify omap_i2c_ack_stat()
+
+Jon Hunter (1):
+      I2C: OMAP: Correct I2C revision for OMAP3
+
+Shubhrajyoti D (7):
+      I2C: OMAP: I2C register restore only if context is lost
+      I2C: OMAP: Remove the definition of SYSS_RESETDONE_MASK
+      I2C: OMAP: Remove reset at init
+      I2C: OMAP: Optimise the remove code
+      I2C: OMAP: use devm_* functions
+      I2C: OMAP: Use SET_RUNTIME_PM_OPS
+      I2C: OMAP: Do not initialise the completion everytime
+
+Vikram Pandita (1):
+      I2C: OMAP: Recover from Bus Busy condition
+
+ arch/arm/plat-omap/i2c.c      |    3 +
+ drivers/i2c/busses/i2c-omap.c |  261 +++++++++++++++++++++++-----------------
+ include/linux/i2c-omap.h      |    1 +
+ 3 files changed, 154 insertions(+), 111 deletions(-)
