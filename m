@@ -1,156 +1,252 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 18 Jun 2012 10:06:09 -0300
-Subject: [PATCH v4 2/2] serial: mxs-auart: Allow device tree probing
-In-Reply-To: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
-References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
+From: smatange@ti.com (Sunil Matange)
+Date: Mon, 18 Jun 2012 18:30:05 +0530
+Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
+ issues.
+In-Reply-To: <CAP05o4Lna51bZHKSNLy9zK49dAf1k1UY_sSXRwPGYcgKtPmzkQ@mail.gmail.com>
+References: <1339691061-12778-1-git-send-email-Russ.Dill@ti.com><393884FF03A1CE4A86A02FC97D0954E73E91B6EC@DBDE01.ent.ti.com>
+ <CAP05o4Lna51bZHKSNLy9zK49dAf1k1UY_sSXRwPGYcgKtPmzkQ@mail.gmail.com>
+Message-ID: <358d9bc4c1dc38c326256727e21daa1c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow device tree probing.
+Thanks Keshava.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: <linux-serial@vger.kernel.org>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v3:
-- Remove unneeded mxs_auart_devtype
-Changes since v2:
-- Change compatible string
-- Add aliases information in bindings doc
-- Remove unneeded mxs_auart_probe_pdev function
-- Remove "ifdef CONFIG_OF"
-- Remove of_match_ptr wrapper
-Changes since v1:
-- Merged patches 3 and 5 from v1 into this one
- .../bindings/tty/serial/fsl-mxs-auart.txt          |   27 +++++++++++++
- drivers/tty/serial/mxs-auart.c                     |   40 +++++++++++++++++++-
- 2 files changed, 66 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+Regards
+Sunil Matange
 
-diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-new file mode 100644
-index 0000000..2ee903f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-@@ -0,0 +1,27 @@
-+* Freescale MXS Application UART (AUART)
-+
-+Required properties:
-+- compatible : Should be "fsl,<soc>-auart". The supported SoCs include
-+  imx23 and imx28.
-+- reg : Address and length of the register set for the device
-+- interrupts : Should contain the auart interrupt numbers
-+
-+Example:
-+auart0: serial at 8006a000 {
-+	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
-+	reg = <0x8006a000 0x2000>;
-+	interrupts = <112 70 71>;
-+};
-+
-+Note: Each auart port should have an alias correctly numbered in "aliases"
-+node.
-+
-+Example:
-+
-+aliases {
-+	serial0 = &auart0;
-+	serial1 = &auart1;
-+	serial2 = &auart2;
-+	serial3 = &auart3;
-+	serial4 = &auart4;
-+};
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index ec56d83..103087d 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -33,6 +33,7 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/of_device.h>
- 
- #include <asm/cacheflush.h>
- 
-@@ -675,6 +676,30 @@ static struct uart_driver auart_driver = {
- #endif
- };
- 
-+/*
-+ * This function returns 1 if pdev isn't a device instatiated by dt, 0 if it
-+ * could successfully get all information from dt or a negative errno.
-+ */
-+static int serial_mxs_probe_dt(struct mxs_auart_port *s,
-+		struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+
-+	if (!np)
-+		/* no device tree device */
-+		return 1;
-+
-+	ret = of_alias_get_id(np, "serial");
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to get alias id: %d\n", ret);
-+		return ret;
-+	}
-+	s->port.line = ret;
-+
-+	return 0;
-+}
-+
- static int __devinit mxs_auart_probe(struct platform_device *pdev)
- {
- 	struct mxs_auart_port *s;
-@@ -689,6 +714,12 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
- 		goto out;
- 	}
- 
-+	ret = serial_mxs_probe_dt(s, pdev);
-+	if (ret > 0)
-+		s->port.line = pdev->id < 0 ? 0 : pdev->id;
-+	else if (ret < 0)
-+		goto out_free;
-+
- 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
- 	if (IS_ERR(pinctrl)) {
- 		ret = PTR_ERR(pinctrl);
-@@ -711,7 +742,6 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
- 	s->port.membase = ioremap(r->start, resource_size(r));
- 	s->port.ops = &mxs_auart_ops;
- 	s->port.iotype = UPIO_MEM;
--	s->port.line = pdev->id < 0 ? 0 : pdev->id;
- 	s->port.fifosize = 16;
- 	s->port.uartclk = clk_get_rate(s->clk);
- 	s->port.type = PORT_IMX;
-@@ -769,12 +799,19 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static struct of_device_id mxs_auart_dt_ids[] = {
-+	{ .compatible = "fsl,imx23-auart", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
-+
- static struct platform_driver mxs_auart_driver = {
- 	.probe = mxs_auart_probe,
- 	.remove = __devexit_p(mxs_auart_remove),
- 	.driver = {
- 		.name = "mxs-auart",
- 		.owner = THIS_MODULE,
-+		.of_match_table = mxs_auart_dt_ids,
- 	},
- };
- 
-@@ -807,3 +844,4 @@ module_init(mxs_auart_init);
- module_exit(mxs_auart_exit);
- MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("Freescale MXS application uart driver");
-+MODULE_ALIAS("platform:mxs-auart");
--- 
-1.7.1
+
+-----Original Message-----
+From: Munegowda, Keshava [mailto:keshava_mgowda at ti.com]
+Sent: Monday, June 18, 2012 1:59 PM
+To: Samuel Ortiz
+Cc: Dill, Russ; linux-omap at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org; Balbi, Felipe; Partha Basak; Igor
+Grinberg; Setty, Sapna; Russ Dill; Mantesh Sarashetti; Sunil Matange;
+Nishant Kamat; Linux USB Devel
+Subject: Re: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
+issues.
+
+On Fri, Jun 15, 2012 at 12:36 AM, Sarashetti, Mantesh <mantesh@ti.com>
+wrote:
+> 'Acked-by: mantesh at ti.com'
+> 'Tested-by: mantesh at ti.com'
+>
+> Regards,
+> Mantesh
+> -----Original Message-----
+> From: Russ Dill [mailto:russ.dill at gmail.com] On Behalf Of Dill, Russ
+> Sent: Thursday, June 14, 2012 11:24 AM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Balbi, Felipe; Munegowda, Keshava; Partha Basak; Igor Grinberg;
+Samuel Ortiz; Sarashetti, Mantesh; Setty, Sapna; Russ Dill
+> Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
+issues.
+>
+> From: Russ Dill <Russ.Dill@gmail.com>
+>
+> 'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
+> an issue where the ULPI PHYs were not held in reset while initializing
+> the EHCI controller. However, it also changes behavior in
+> omap-usb-host.c omap_usbhs_init by releasing reset while the
+> configuration in that function was done.
+>
+> This change caused a regression on BB-xM where USB would not function
+> if 'usb start' had been run from u-boot before booting. A change was
+> made to release reset a little bit earlier which fixed the issue on
+> BB-xM and did not cause any regressions on 3430 sdp, the board for
+> which the fix was originally made.
+>
+> This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
+> before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+>
+> The original fix to hold the EHCI controller in reset during
+> initialization was correct, however it appears that changing
+> omap_usbhs_init to not hold the PHYs in reset during it's
+> configuration was incorrect. This patch first reverts both fixes, and
+> then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
+> reset as the original patch had done. It also is sure to incorporate
+> the _cansleep change that has been made in the meantime.
+>
+> I've tested this on Beagleboard xM, I'd really like to get an ack from
+> the 3430 sdp and OMAP5 guys before getting this merged.
+>
+> v3 - Brown paper bag its too early in the morning actually run
+> ? ? git commit amend fix
+> v2 - Put cansleep gpiolib call outside of spinlock
+>
+> Signed-off-by: Russ Dill <Russ.Dill@gmail.com>
+> ---
+> ?drivers/mfd/omap-usb-host.c ?| ? 48
++++++++++++++++++++++++++++++++++++++++++-
+> ?drivers/usb/host/ehci-omap.c | ? 18 +++++++---------
+> ?2 files changed, 55 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 7e96bb2..41088ec 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -25,6 +25,7 @@
+> ?#include <linux/clk.h>
+> ?#include <linux/dma-mapping.h>
+> ?#include <linux/spinlock.h>
+> +#include <linux/gpio.h>
+> ?#include <plat/cpu.h>
+> ?#include <plat/usb.h>
+> ?#include <linux/pm_runtime.h>
+> @@ -500,8 +501,21 @@ static void omap_usbhs_init(struct device *dev)
+> ? ? ? ?dev_dbg(dev, "starting TI HSUSB Controller\n");
+>
+> ? ? ? ?pm_runtime_get_sync(dev);
+> - ? ? ? spin_lock_irqsave(&omap->lock, flags);
+>
+> + ? ? ? if (pdata->ehci_data->phy_reset) {
+> + ? ? ? ? ? ? ? if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> +
+gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_OUT_INIT_LOW, "USB1 PHY
+reset");
+> +
+> + ? ? ? ? ? ? ? if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> +
+gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_OUT_INIT_LOW, "USB2 PHY
+reset");
+> +
+> + ? ? ? ? ? ? ? /* Hold the PHY in RESET for enough time till DIR is
+high */
+> + ? ? ? ? ? ? ? udelay(10);
+> + ? ? ? }
+> +
+> + ? ? ? spin_lock_irqsave(&omap->lock, flags);
+> ? ? ? ?omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
+> ? ? ? ?dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
+>
+> @@ -581,9 +595,39 @@ static void omap_usbhs_init(struct device *dev)
+> ? ? ? ?}
+>
+> ? ? ? ?spin_unlock_irqrestore(&omap->lock, flags);
+> +
+> + ? ? ? if (pdata->ehci_data->phy_reset) {
+> + ? ? ? ? ? ? ? /* Hold the PHY in RESET for enough time till
+> + ? ? ? ? ? ? ? ?* PHY is settled and ready
+> + ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? udelay(10);
+> +
+> + ? ? ? ? ? ? ? if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> + ? ? ? ? ? ? ? ? ? ? ? gpio_set_value_cansleep
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (pdata->ehci_data->reset_gpio_port[0],
+1);
+> +
+> + ? ? ? ? ? ? ? if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> + ? ? ? ? ? ? ? ? ? ? ? gpio_set_value_cansleep
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (pdata->ehci_data->reset_gpio_port[1],
+1);
+> + ? ? ? }
+> +
+> ? ? ? ?pm_runtime_put_sync(dev);
+> ?}
+>
+> +static void omap_usbhs_deinit(struct device *dev)
+> +{
+> + ? ? ? struct usbhs_hcd_omap ? ? ? ? ? *omap = dev_get_drvdata(dev);
+> + ? ? ? struct usbhs_omap_platform_data *pdata = &omap->platdata;
+> +
+> + ? ? ? if (pdata->ehci_data->phy_reset) {
+> + ? ? ? ? ? ? ? if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> + ? ? ? ? ? ? ? ? ? ? ? gpio_free(pdata->ehci_data->reset_gpio_port[0]);
+> +
+> + ? ? ? ? ? ? ? if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> + ? ? ? ? ? ? ? ? ? ? ? gpio_free(pdata->ehci_data->reset_gpio_port[1]);
+> + ? ? ? }
+> +}
+> +
+>
+> ?/**
+> ?* usbhs_omap_probe - initialize TI-based HCDs
+> @@ -767,6 +811,7 @@ static int __devinit usbhs_omap_probe(struct
+platform_device *pdev)
+> ? ? ? ?goto end_probe;
+>
+> ?err_alloc:
+> + ? ? ? omap_usbhs_deinit(&pdev->dev);
+> ? ? ? ?iounmap(omap->tll_base);
+>
+> ?err_tll:
+> @@ -818,6 +863,7 @@ static int __devexit usbhs_omap_remove(struct
+platform_device *pdev)
+> ?{
+> ? ? ? ?struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
+>
+> + ? ? ? omap_usbhs_deinit(&pdev->dev);
+> ? ? ? ?iounmap(omap->tll_base);
+> ? ? ? ?iounmap(omap->uhh_base);
+> ? ? ? ?clk_put(omap->init_60m_fclk);
+> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+> index a44294d..d0815b6 100644
+> --- a/drivers/usb/host/ehci-omap.c
+> +++ b/drivers/usb/host/ehci-omap.c
+> @@ -192,14 +192,13 @@ static int ehci_hcd_omap_probe(struct
+platform_device *pdev)
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+> + ? ? ? /* Hold PHYs in reset while initializing EHCI controller */
+> ? ? ? ?if (pdata->phy_reset) {
+> ? ? ? ? ? ? ? ?if (gpio_is_valid(pdata->reset_gpio_port[0]))
+> - ? ? ? ? ? ? ? ? ? ? ? gpio_request_one(pdata->reset_gpio_port[0],
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_OUT_INIT_LOW, "USB1 PHY
+reset");
+> +
+gpio_set_value_cansleep(pdata->reset_gpio_port[0], 0);
+>
+> ? ? ? ? ? ? ? ?if (gpio_is_valid(pdata->reset_gpio_port[1]))
+> - ? ? ? ? ? ? ? ? ? ? ? gpio_request_one(pdata->reset_gpio_port[1],
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_OUT_INIT_LOW, "USB2 PHY
+reset");
+> +
+gpio_set_value_cansleep(pdata->reset_gpio_port[1], 0);
+>
+> ? ? ? ? ? ? ? ?/* Hold the PHY in RESET for enough time till DIR is high
+*/
+> ? ? ? ? ? ? ? ?udelay(10);
+> @@ -241,6 +240,11 @@ static int ehci_hcd_omap_probe(struct
+platform_device *pdev)
+> ? ? ? ?omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
+>
+> ? ? ? ?ehci_reset(omap_ehci);
+> + ? ? ? ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> + ? ? ? if (ret) {
+> + ? ? ? ? ? ? ? dev_err(dev, "failed to add hcd with err %d\n", ret);
+> + ? ? ? ? ? ? ? goto err_add_hcd;
+> + ? ? ? }
+>
+> ? ? ? ?if (pdata->phy_reset) {
+> ? ? ? ? ? ? ? ?/* Hold the PHY in RESET for enough time till
+> @@ -255,12 +259,6 @@ static int ehci_hcd_omap_probe(struct
+platform_device *pdev)
+>
+?gpio_set_value_cansleep(pdata->reset_gpio_port[1], 1);
+> ? ? ? ?}
+>
+> - ? ? ? ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> - ? ? ? if (ret) {
+> - ? ? ? ? ? ? ? dev_err(dev, "failed to add hcd with err %d\n", ret);
+> - ? ? ? ? ? ? ? goto err_add_hcd;
+> - ? ? ? }
+> -
+> ? ? ? ?/* root ports should always stay powered */
+> ? ? ? ?ehci_port_power(omap_ehci, 1);
+>
+> --
+> 1.7.10.4
+>
+
+Hi Samuel
+
+I have validated this patch v3 in omap3 beagle XM .
+
+Acked-by: Keshava Munegowda <keshava_mgowda@ti.com>
+Tested-by: Keshava Munegowda <keshava_mgowda@ti.com>
+
+regards
+keshava
