@@ -1,75 +1,40 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 18 Jun 2012 20:00:28 +0530
-Subject: [PATCHv8 13/13] I2C: OMAP: simplify omap_i2c_ack_stat()
-In-Reply-To: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
-References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340029828-20751-14-git-send-email-shubhrajyoti@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 18 Jun 2012 09:39:33 -0500
+Subject: [PATCH] ARM:Orion5x: Fix panic at boot for PCI IO reservation
+In-Reply-To: <20120618141901.GQ4799@lunn.ch>
+References: <1340006794-18097-1-git-send-email-andrew@lunn.ch>
+ <20120618141901.GQ4799@lunn.ch>
+Message-ID: <4FDF3DA5.4030602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+On 06/18/2012 09:19 AM, Andrew Lunn wrote:
+> On Mon, Jun 18, 2012 at 10:06:34AM +0200, Andrew Lunn wrote:
+>> Orion5x, and all other orion based systems have a PCI(E) IO window
+>> size of 1Mbyte. Recent changes to mach/io.h mean that by default the
+>> kernel does not allow such large windows, it refuses to reserve that
+>> much resource space, triggering a panic.
+>>
+>> Reduce the PCI(E) IO window size to the normal 64K.
+> 
+> It turns out this patch does not work...
+> 
+> There are two PCI devices on Orion5x. So the first one takes all the
+> available 64K IO space and the second one fails it allocation.
+> 
+> We need to put back parts of mach/io.h to increase the available size to
+> 128Kbytes.
+> 
+> It has been said in another email, the plan is to put the IO window at
+> one fixed address. How will this work for devices with multiple PCI
+> busses? Most Orion chips for have two separate PCI busses.
 
-stat & BIT(1) is the same as BIT(1), so let's
-simplify things a bit by removing "stat &" from
-all omap_i2c_ack_stat() calls.
+It supports up to 16 64K windows mapped into a 1MB area. So
+IO_RESOURCE_LIMIT will be 1MB in that case.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   19 ++++++++++---------
- 1 files changed, 10 insertions(+), 9 deletions(-)
+If the h/w can support i/o at 0, then it would be good make __io(x) be
+the form of ((x) + <host phys base>). Unfortunately, it seems the only
+way to figure this out is change it and see if it breaks people which
+isn't very nice.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6a79089..bac6305 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -763,7 +763,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 
- 	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
--			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
- 			return -ETIMEDOUT;
- 		}
-@@ -824,10 +824,11 @@ complete:
- 		 */
- 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
- 					OMAP_I2C_STAT_AL)) {
--			omap_i2c_ack_stat(dev, stat &
--				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
--				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
--				OMAP_I2C_STAT_ARDY));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
-+						OMAP_I2C_STAT_RDR |
-+						OMAP_I2C_STAT_XRDY |
-+						OMAP_I2C_STAT_XDR |
-+						OMAP_I2C_STAT_ARDY));
- 			omap_i2c_complete_cmd(dev, err);
- 			return IRQ_HANDLED;
- 		}
-@@ -874,8 +875,8 @@ complete:
- 					}
- 				}
- 			}
--			omap_i2c_ack_stat(dev,
--				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
-+						OMAP_I2C_STAT_RDR));
- 			continue;
- 		}
- 
-@@ -922,8 +923,8 @@ complete:
- 
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
- 			}
--			omap_i2c_ack_stat(dev,
--				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
-+						OMAP_I2C_STAT_XDR));
- 			continue;
- 		}
- 
--- 
-1.7.5.4
+Rob
