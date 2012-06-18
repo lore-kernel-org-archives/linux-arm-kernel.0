@@ -1,94 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Jun 2012 09:41:00 +0100
-Subject: Fwd: [PATCH 1/3] i2c: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120618075834.GA14293@bnru02>
-References: <4FD8BAD2.50703@linaro.org>
- <CACRpkdZFi34nChnMEo6yik67zk9owZLk-6zcdP7mmOXyLz8uqQ@mail.gmail.com>
- <4FDAFA17.6050502@linaro.org>
- <CAE2-_9rRYxjU9QQgtBv9ReMY5x+oRiJG1cDQahYHanjDrwVUYA@mail.gmail.com>
- <20120615115042.GA27480@bnru02> <4FDB2E57.4030904@linaro.org>
- <20120615130544.GA28537@bnru02> <4FDB3642.5030804@linaro.org>
- <CACRpkdZ7ESKhokk8Z+6sC9Kq+jPztFNwzger0Db7nCD1fPnG1A@mail.gmail.com>
- <4FDED62D.6030008@linaro.org> <20120618075834.GA14293@bnru02>
-Message-ID: <4FDEE99C.9090203@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 18 Jun 2012 10:43:00 +0200
+Subject: Dove clock support (was: Re: RFC: [PATCH] ARM: Kirkwood:
+ clk_register_gate_fn: add fn assignment)
+In-Reply-To: <4FDEE6C6.2060101@blackshift.org>
+References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
+ <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
+ <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
+Message-ID: <20120618084300.GL4799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/12 08:58, Srinidhi Kasagar wrote:
-> On Mon, Jun 18, 2012 at 09:18:05 +0200, Lee Jones wrote:
->> On 17/06/12 18:43, Linus Walleij wrote:
->>> Gah, what a thread...
->>>
->>> On Fri, Jun 15, 2012 at 3:18 PM, Lee Jones<lee.jones@linaro.org>   wrote:
->>>> On 15/06/12 14:05, Srinidhi Kasagar wrote:
->>>>> On Fri, Jun 15, 2012 at 14:45:11 +0200, Lee Jones wrote:
->>>>>> On 15/06/12 12:50, Srinidhi Kasagar wrote:
->>>
->>>>>>>> +static struct nmk_i2c_controller u8500_i2c = {
->>>>>>>> +       /*
->>>>>>>> +        * Slave data setup time; 250ns, 100ns, and 10ns, which
->>>>>>>> +        * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
->>>>>>>> +        */
->>>>>>>> +       .slsu           = 0xe,
->>>>>>>> +       .tft            = 1,      /* Tx FIFO threshold */
->>>>>>>> +       .rft            = 8,      /* Rx FIFO threshold */
->>>>>>>> +       .clk_freq       = 100000, /* std. mode operation */
->>>>>>>> +       .timeout        = 200,    /* Slave response timeout(ms) */
->>>>>>>> +       .sm             = I2C_FREQ_MODE_FAST,
->>>>>>>
->>>>>>> How is this possible? you are setting clk_freq as 100kb/s and mode
->>>>>>> as fast mode which is supposed to be 400kb/s.
->>>>>>
->>>>>> That's not how I read it:
->>>>>
->>>>> But it is not readable. It confuses people.
->>>>
->>>> I understood it. :)
->>>>
->>>> If you think it's unclear speak to the author, Linus. He's CC'ed.
->>>
->>> Author of what? The i2c driver was written by Srinidhi. (The
->>> MODULE_AUTHOR() clause should be a good hint...)
->>
->> Actually, we appear to have our wires crossed. You wrote the board data
->> stuff below, which changes the mode from STANDARD to FAST, no doubt
->> using Srinidhi's struct explanation comments found in
->> arch/arm/plat-nomadik/include/plat/i2c.h.
->>
->>   >  I'll cook a separate patch for this or something.
->>
->> Cool, thanks Linus.
->>
->> But you're correct in what you say Linus. Srinidhi, the comments which
->> are you say are confusing are the bits you are the author of:
->> e208c447bd728920e4f3d438a706344ea31249b9?
->
-> yes, it is of course evident that it's my commit from git.
-> I think you are not catching my point. What I mean is:
-> fast mode devices are downward compatible and can communicate
-> with the devices with standard only mode. Those comments in that
-> enum says exactly that (with "up to" keyword). However the code
-> which configures the bus in fast mode and restrict the frequency
-> to operate in 100 kb/s without any reason, and this creates
-> confusion..
->
-> Perhaps, I think we need to remove one of these
-> parameters as configurable options and derive out the
-> frequency based on the mode of operation..
+> Sure, the address layout is different, but that can be made generic in a
+> second step. Maybe we need a private pointer in the gate_fn struct.
 
-I think Linus is fixing the frequency issues in platform code and I have 
-done so from Device Tree, so I think we're hot-to-trot.
+Yes, something like that.
+ 
+> BTW: who will enable the clocks that have been disabled via the
+> sata/pcie shutdown functions?
 
-Linus, Srinidhi,
+This is potentially a problem when the SATA driver is built as a
+kernel module. There is no code that i know of to turn the SATA PHYs
+back on again. I think this has been broken like this for a long
+time...
 
-If you're happy with the patch now (not withstanding the removal of 
-slsu, which I'll do in a separate patch), can you ack it please? By the 
-way, which tree will this go through?
+For PCIE it is not a problem, that code cannot be build as a module.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+    Andrew
