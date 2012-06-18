@@ -1,35 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jun 2012 12:37:16 +0100
-Subject: [RFC PATCH 8/8] ARM: vmlinux.lds: Setup correct entry point to
- physical address
-In-Reply-To: <1340019011-18642-9-git-send-email-monstr@monstr.eu>
-References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
- <1340019011-18642-9-git-send-email-monstr@monstr.eu>
-Message-ID: <20120618113716.GG12029@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Jun 2012 12:37:53 +0100
+Subject: [PATCH 2/3] ARM: ux500: Add i2c configurations to the Device
+ Tree for DB8500 based devices
+In-Reply-To: <CACRpkda2pH1by2hajpP20CJgdg+mWFF=QaGbeNdY=c8iOVtLUQ@mail.gmail.com>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD8BAE4.4050606@linaro.org>
+ <CACRpkda2pH1by2hajpP20CJgdg+mWFF=QaGbeNdY=c8iOVtLUQ@mail.gmail.com>
+Message-ID: <4FDF1311.1050207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 01:30:11PM +0200, Michal Simek wrote:
-> linker script setups entry point to virtual address.
-> 
-> Signed-off-by: Michal Simek <monstr@monstr.eu>
-> 
-> ---
-> Not sure what is the reason to setup entry point to virtual address.
-> ---
->  arch/arm/kernel/vmlinux.lds.S |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index b996bc0..de43b01 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -39,7 +39,7 @@
->  #endif
->  
->  OUTPUT_ARCH(arm)
-> -ENTRY(stext)
-> +ENTRY(arm_start)
+On 18/06/12 12:29, Linus Walleij wrote:
+> On Wed, Jun 13, 2012 at 6:08 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> +                       clock-frequency =<100000>;
+>> +                       stericsson,slsu =<0xe>;
+>> +                       stericsson,tft =<1>;
+>> +                       stericsson,rft =<8>;
+>> +                       stericsson,timeout =<200>;
+>> +                       stericsson,i2c_freq_mode_fast;
+>
+> In the context of my patch to the board file, we conclude that the
+> clock-frequency should be set to 400000 instead.
 
-stext etc better stay as the virtual address through this change.  The
-kernel makes use of all stext/etext etc symbols as virtual addresses.
+Right, I have already changed that in my patch-set.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
