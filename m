@@ -1,35 +1,36 @@
-From: mkl@blackshift.org (Marc Kleine-Budde)
-Date: Mon, 18 Jun 2012 10:28:54 +0200
-Subject: Dove clock support (was: Re: RFC: [PATCH] ARM: Kirkwood:
- clk_register_gate_fn: add fn assignment)
-In-Reply-To: <20120618080449.GK4799@lunn.ch>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch>
-Message-ID: <4FDEE6C6.2060101@blackshift.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Jun 2012 09:32:48 +0100
+Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
+ core_initcall time
+In-Reply-To: <201206121449.22978.arnd@arndb.de>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <201206121259.38807.arnd@arndb.de> <4FD742C9.7090603@linaro.org>
+ <201206121449.22978.arnd@arndb.de>
+Message-ID: <4FDEE7B0.9070208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sebastian,
+On 12/06/12 15:49, Arnd Bergmann wrote:
+> On Tuesday 12 June 2012, Lee Jones wrote:
+>> But your suggestion above involves some heavy refactoring of how Device
+>> Tree works. Meanwhile the ab8500 will not work as an IRQ controller
+>> until we either complete the work or use the same solution as we did for
+>> the Nomadik GPIO controller. I think for now at least we should continue
+>> to work on enablement and leave the 'nice to have's until last. We are
+>> doing nothing new here, just bringing the ab8500 IRQ controller into
+>> line with the Nomadik one.
+>
+> Right, I didn't say we should not take your patch, but we should be
+> aware that it's not the solution we want to use in the long run.
 
-On 06/18/2012 10:04 AM, Andrew Lunn wrote:
->> BTW: I'm hacking on the dove clock support, I noticed that dove can make
->> use of the same ethernet and pci phy shutdown functions than kirkwood.
->> What about moving kirkwood_register_gate_fn and subfunctions to plat-orion?
-> 
-> Please coordinate with Sebastian.hesselbarth
-> <Sebastian.hesselbarth@googlemail.com> He has done some work in the
-> same area.
-> 
-> I would probably move the kirkwood_register_gate_fn() stuff to
-> drivers/clk. Also, the pcie and sata shutdown functions need
-> generalizing if they are the be re-used. The address map on Dove is
-> different to Kirkwood, so the registers are in different places.
+So is it only for this and the other one to go in now?
 
-Sure, the address layout is different, but that can be made generic in a
-second step. Maybe we need a private pointer in the gate_fn struct.
+If so, can I have acks for them please, so I may place them in my 
+up-coming pull-request?
 
-BTW: who will enable the clocks that have been disabled via the
-sata/pcie shutdown functions?
-
-cheers, Marc
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
