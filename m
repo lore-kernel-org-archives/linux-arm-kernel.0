@@ -1,58 +1,40 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 Jun 2012 11:03:24 +0200
-Subject: [PATCH/RFC 0/2] ARM: DMA-mapping: new extensions for buffer
- sharing (part 2)
-In-Reply-To: <20120618105059.12c709d68240ad18c5f8c7a5@nvidia.com>
-References: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
- <20120618105059.12c709d68240ad18c5f8c7a5@nvidia.com>
-Message-ID: <017b01cd4d31$3c855640$b59002c0$%szyprowski@samsung.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 18 Jun 2012 11:08:50 +0200
+Subject: [PATCH] ARM: SPEAr600: Fix timer interrupt definition in
+ spear600.dtsi
+In-Reply-To: <201206060845.09562.sr@denx.de>
+References: <1336725661-29271-1-git-send-email-sr@denx.de>
+ <201206060845.09562.sr@denx.de>
+Message-ID: <201206181108.51023.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday, June 18, 2012 9:51 AM Hiroshi Doyu wrote:
-
-> On Wed, 6 Jun 2012 15:17:35 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Wednesday 06 June 2012 08:45:09 Stefan Roese wrote:
+> On Friday 11 May 2012 10:41:01 Stefan Roese wrote:
+> > Signed-off-by: Stefan Roese <sr@denx.de>
+> > Cc: Viresh Kumar <viresh.kumar@st.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/spear600.dtsi |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/spear600.dtsi
+> > b/arch/arm/boot/dts/spear600.dtsi index 089f0a4..a3c36e4 100644
+> > --- a/arch/arm/boot/dts/spear600.dtsi
+> > +++ b/arch/arm/boot/dts/spear600.dtsi
+> > @@ -181,6 +181,7 @@
+> > 
+> >  			timer at f0000000 {
+> >  				compatible = "st,spear-timer";
+> >  				reg = <0xf0000000 0x400>;
+> > +				interrupt-parent = <&vic0>;
+> >  				interrupts = <16>;
+> >  			};
+> >  		};
 > 
-> > This is a continuation of the dma-mapping extensions posted in the
-> > following thread:
-> > http://thread.gmane.org/gmane.linux.kernel.mm/78644
-> >
-> > We noticed that some advanced buffer sharing use cases usually require
-> > creating a dma mapping for the same memory buffer for more than one
-> > device. Usually also such buffer is never touched with CPU, so the data
-> > are processed by the devices.
-> >
-> > From the DMA-mapping perspective this requires to call one of the
-> > dma_map_{page,single,sg} function for the given memory buffer a few
-> > times, for each of the devices. Each dma_map_* call performs CPU cache
-> > synchronization, what might be a time consuming operation, especially
-> > when the buffers are large. We would like to avoid any useless and time
-> > consuming operations, so that was the main reason for introducing
-> > another attribute for DMA-mapping subsystem: DMA_ATTR_SKIP_CPU_SYNC,
-> > which lets dma-mapping core to skip CPU cache synchronization in certain
-> > cases.
-> 
-> I had implemented the similer patch(*1) to optimize/skip the cache
-> maintanace, but we did this with "dir", not with "attr", making use of
-> the existing DMA_NONE to skip cache operations. I'm just interested in
-> why you choose attr for this purpose. Could you enlight me why attr is
-> used here?
+> Ping.
 
-I also thought initially about adding new dma direction for this feature,
-but then I realized that there might be cases where the real direction of
-the data transfer might be needed (for example to set io read/write
-attributes for the mappings) and this will lead us to 3 new dma directions.
-The second reason was the compatibility with existing code. There are
-already drivers which use DMA_NONE type for their internal stuff. Adding
-support for new dma attributes requires changes in all implementations of
-dma-mapping for all architectures. DMA attributes are imho better fits
-this case. They are by default optional, so other architectures are free
-to leave them unimplemented and the drivers should still work correctly.
- 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Ping again (this is a real show-stopper for SPEAr600 in v3.5!).
+
+Thanks,
+Stefan
