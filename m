@@ -1,49 +1,72 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 18 Jun 2012 00:15:58 -0600
-Subject: [PATCHv3 1/7] ARM: OMAP: PM: Lock clocks list while generating summary
+Date: Mon, 18 Jun 2012 00:16:11 -0600
+Subject: [PATCHv3 5/7] ARM: OMAP4: clock data: add clockdomains for clocks
+ used as main clocks
 In-Reply-To: <20120618061037.30632.28539.stgit@dusk>
 References: <20120618061037.30632.28539.stgit@dusk>
-Message-ID: <20120618061554.30632.84828.stgit@dusk>
+Message-ID: <20120618061608.30632.62660.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Todd Poynor <toddpoynor@google.com>
+Until the OMAP4 code is converted to disable the use of the clock
+framework-based clockdomain enable/disable sequence, any clock used as
+a hwmod main_clk must have a clockdomain associated with it.  This
+patch populates some clock structure clockdomain names to resolve the
+following warnings during kernel init:
 
-Commit a53025724052b2b1edbc982a4a248784638f563d (OMAP: Add debugfs
-node to show the summary of all clocks) introduced clock summary,
-however, we are interested in seeing snapshot of the clock state, not
-in dynamically changing clock configurations as the data provided by
-clock summary will then be useless for debugging configuration
-issues. So, hold the common lock when dumping the clock summary.
+omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
+omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
+omap_hwmod: l3_div_ck: missing clockdomain for l3_div_ck.
+omap_hwmod: ddrphy_ck: missing clockdomain for ddrphy_ck.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
-[nm at ti.com: added commit message]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[paul at pwsan.com: minor edits to commit message]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/plat-omap/clock.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-omap2/clock44xx_data.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 62ec5c4..706b7e2 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -461,6 +461,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
- 	struct clk *c;
- 	struct clk *pa;
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index 2172f66..e2b701e 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -84,6 +84,7 @@ static struct clk slimbus_clk = {
  
-+	mutex_lock(&clocks_mutex);
- 	seq_printf(s, "%-30s %-30s %-10s %s\n",
- 		"clock-name", "parent-name", "rate", "use-count");
- 
-@@ -469,6 +470,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
- 		seq_printf(s, "%-30s %-30s %-10lu %d\n",
- 			c->name, pa ? pa->name : "none", c->rate, c->usecount);
- 	}
-+	mutex_unlock(&clocks_mutex);
- 
- 	return 0;
- }
+ static struct clk sys_32k_ck = {
+ 	.name		= "sys_32k_ck",
++	.clkdm_name	= "prm_clkdm",
+ 	.rate		= 32768,
+ 	.ops		= &clkops_null,
+ };
+@@ -512,6 +513,7 @@ static struct clk ddrphy_ck = {
+ 	.name		= "ddrphy_ck",
+ 	.parent		= &dpll_core_m2_ck,
+ 	.ops		= &clkops_null,
++	.clkdm_name	= "l3_emif_clkdm",
+ 	.fixed_div	= 2,
+ 	.recalc		= &omap_fixed_divisor_recalc,
+ };
+@@ -769,6 +771,7 @@ static const struct clksel dpll_mpu_m2_div[] = {
+ static struct clk dpll_mpu_m2_ck = {
+ 	.name		= "dpll_mpu_m2_ck",
+ 	.parent		= &dpll_mpu_ck,
++	.clkdm_name	= "cm_clkdm",
+ 	.clksel		= dpll_mpu_m2_div,
+ 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_MPU,
+ 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
+@@ -1149,6 +1152,7 @@ static const struct clksel l3_div_div[] = {
+ static struct clk l3_div_ck = {
+ 	.name		= "l3_div_ck",
+ 	.parent		= &div_core_ck,
++	.clkdm_name	= "cm_clkdm",
+ 	.clksel		= l3_div_div,
+ 	.clksel_reg	= OMAP4430_CM_CLKSEL_CORE,
+ 	.clksel_mask	= OMAP4430_CLKSEL_L3_MASK,
+@@ -2824,6 +2828,7 @@ static const struct clksel trace_clk_div_div[] = {
+ static struct clk trace_clk_div_ck = {
+ 	.name		= "trace_clk_div_ck",
+ 	.parent		= &pmd_trace_clk_mux_ck,
++	.clkdm_name	= "emu_sys_clkdm",
+ 	.clksel		= trace_clk_div_div,
+ 	.clksel_reg	= OMAP4430_CM_EMU_DEBUGSS_CLKCTRL,
+ 	.clksel_mask	= OMAP4430_CLKSEL_PMD_TRACE_CLK_MASK,
