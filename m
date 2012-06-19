@@ -1,57 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 09:42:20 +0800
-Subject: [PATCH] ARM: imx28.dtsi: Add pinmux for additional AUART ports
-In-Reply-To: <1340054922-16092-1-git-send-email-festevam@gmail.com>
-References: <1340054922-16092-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120619014218.GB21951@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 19 Jun 2012 04:07:31 +0200
+Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
+In-Reply-To: <CAOMZO5C7KaxO_X23Ur9YwHEoAvCPf4emxMzH4mmrFX6=de5GZA@mail.gmail.com>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <F281D0F91ED19E4D8E63A7504E8A649803BE2DE2@039-SN2MPN1-023.039d.mgd.msft.net>
+ <CAOMZO5C7KaxO_X23Ur9YwHEoAvCPf4emxMzH4mmrFX6=de5GZA@mail.gmail.com>
+Message-ID: <201206190407.31524.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 06:28:42PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Add pinmux for additional AUART ports.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index ee3778a..c98d17a 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -197,6 +197,21 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				auart1_pins_a: auart1 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x3040 0x3050 0x3060 0x3070>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				auart2_pins_a: auart2 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x3080 0x3090 0x30a0 0x30b0>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
+Dear Fabio Estevam,
 
-I would rather have these pin settings added along with the users to
-ensure the pad configuration works for the boards or proper pad fix-up
-for the boards are added together.
-
->  				auart3_pins_a: auart3 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <0x30c0 0x30d0 0x30e0 0x30f0>;
-> -- 
-> 1.7.1
+> Peter,
 > 
+> On Mon, Jun 18, 2012 at 10:14 PM, Chen Peter-B29397
+> 
+> <B29397@freescale.com> wrote:
+> >> Nothing shows up in the console after connecting the stick.
+> >> 
+> >> Attached my .config file.
+> > 
+> > Make sure the vbus is on for your usb port.
+> 
+> So what is the magic needed here? Isn't Richard's series supposed to work
+> as is?
+> 
+> What should be done in addition to Richard's patch in order to get USB
+> host to work on mx28evk?
 
--- 
-Regards,
-Shawn
+Ah right, you need to toggle the power supply (vbus) GPIO.
+
+Best regards,
+Marek Vasut
