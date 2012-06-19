@@ -1,34 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 Jun 2012 23:17:24 -0300
-Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <201206190407.31524.marex@denx.de>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <F281D0F91ED19E4D8E63A7504E8A649803BE2DE2@039-SN2MPN1-023.039d.mgd.msft.net>
- <CAOMZO5C7KaxO_X23Ur9YwHEoAvCPf4emxMzH4mmrFX6=de5GZA@mail.gmail.com>
- <201206190407.31524.marex@denx.de>
-Message-ID: <CAOMZO5Ap_KYM7uYebqOaCzpTzH2kcCFR6BTWX9GMKxsXoxCOew@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 19 Jun 2012 11:25:43 +0800
+Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
+In-Reply-To: <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
+References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
+ <20110808081552.GI32513@linux-sh.org>
+ <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
+ <CAH9JG2V-66Wn7nwJz6tOkESoQAUJzAg-47YeMY0vzwu6T9O=Rg@mail.gmail.com>
+ <4E40912C.5040801@codeaurora.org>
+ <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
+Message-ID: <CAGsJ_4y38KBDfjZS_k-QfDUUFAtEwE-ciUgNOA0U2juOBeoXEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 11:07 PM, Marek Vasut <marex@denx.de> wrote:
+Hi Linus,
+it seems people still use self-defined structure and APIs to set GPIO
+pull, for example:
 
->> What should be done in addition to Richard's patch in order to get USB
->> host to work on mx28evk?
+drivers/pinctrl/pinctrl-nomadik.c:
+
+ 48 /* Pull up/down values */
+ 49 enum nmk_gpio_pull {
+ 50         NMK_GPIO_PULL_NONE,
+ 51         NMK_GPIO_PULL_UP,
+ 52         NMK_GPIO_PULL_DOWN,
+ 53 };
+
+int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull)
+
+or actually you mean use "pin_config_get" and "pin_config_set" with
+self-defined configuration to set pull?
+
+but i think at least the macros of GPIO_PULL_NONE, GPIO_PULL_UP and
+GPIO_PULL_DOWN should be standardized.
+
+2011/8/9 Linus Walleij <linus.walleij@linaro.org>
 >
-> Ah right, you need to toggle the power supply (vbus) GPIO.
+> On Tue, Aug 9, 2011 at 3:45 AM, Rohit Vaswani <rvaswani@codeaurora.org>
+> wrote:
+>
+> > If we add this API - the remaining gpio controls like drive strength and
+> > function select could also be added,
+>
+> I agree.
+>
+> > which eats into the pinmux domain.
+>
+> That's not so bad, since the pinctrl/pinmux subsystem is just a prototype
+> people may want to wrap up their drivers into gpio_chip/gpiolib as
+> they stand today to atleast get some isolation. Later on they can
+> refactor and migrate to a pinctrl/pinmux subsystem.
+>
+> The latter will take some time to provide anyway, since I have been
+> asked to restructure it so as not to use a global pin number space.
+>
+> > Linus W. had a patch earlier which added an API for a gpio config to be
+> > specified through gpiolib. " gpio: add a custom configuration mechanism
+> > to
+> > gpiolib" which is sort of an extensible model of this API.
+>
+> Yes I think I have already suggested a bunch of ways to skin this
+> cat but somehow none of them seem to win general approval.
+>
+> Yours,
+> Linus Walleij
 
-Toggle it where?
-
-I see the following:
-
-reg_usb0_vbus: usb0_vbus {
-compatible = "regulator-fixed";
-regulator-name = "usb0_vbus";
-regulator-min-microvolt = <5000000>;
-regulator-max-microvolt = <5000000>;
-gpio = <&gpio3 9 0>;
-enable-active-high;
-
-So the gpio3_9 will turn on the vbus.
-
-What is missing?
+-barry
