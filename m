@@ -1,41 +1,21 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Jun 2012 21:32:51 +0200
+Date: Tue, 19 Jun 2012 21:35:31 +0200
 Subject: Dove clock support
-In-Reply-To: <4FDFA748.10905@googlemail.com>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
- <20120618084300.GL4799@lunn.ch>
- <20120618214143.GA20040@schnuecks.de>
- <4FDFA748.10905@googlemail.com>
-Message-ID: <20120619193251.GR26034@lunn.ch>
+In-Reply-To: <4FE0D37F.1020300@googlemail.com>
+References: <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
+ <20120618084300.GL4799@lunn.ch> <4FDEF7E9.4030504@googlemail.com>
+ <4FDEFAE2.7000303@blackshift.org> <4FDEFC6A.7030300@googlemail.com>
+ <20120618101100.GN4799@lunn.ch> <4FDF91D1.1040301@googlemail.com>
+ <20120619192518.GQ26034@lunn.ch> <4FE0D37F.1020300@googlemail.com>
+Message-ID: <20120619193531.GS26034@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 12:10:16AM +0200, Sebastian Hesselbarh wrote:
-> On 06/18/2012 11:41 PM, Simon Baatz wrote:
-> >This is not potentially a problem, this is definitively a problem (on kirkwood):
-> >
-> >[   12.280783] sata_mv sata_mv.0: cannot get optional clkdev
-> >[   12.286314] sata_mv sata_mv.0: slots 32 ports 2
-> >...
-> >[   12.665882] ata1: SATA link down (SStatus 0 SControl F300)
-> >[   13.015881] ata2: SATA link down (SStatus 0 SControl F300)
-> 
-> Is this because of some bug in kirkwood soc or missing code in
-> sata_mv.c?
-> 
-> According to the functional specification of kirkwood there is a
-> PhyShutdown bit in it's registers. Dove also has this register bit.
-> 
-> Up to now it looks like the SATA PHY can only be disabled in code,
-> but there should be an phy_enable, too.
+> Of course, this renaming can be postponed after the gory details of DT
+> have been finished. But yes, it would be nice and a lot of work.
 
-Correct.
+Actually, i would suggest doing it before DT is complete,
+i.e. ASAP. At the moment there are very few auxdata entries, meaning
+there is less to change.
 
-When moving from kirkwoods old clock management to the generic clock
-framework, i kept the functionality the same. The old code would turn
-the PHYs off, but have no way to turn them back on again. The new code
-is the same.
-
-	Andrew
+      Andrew
