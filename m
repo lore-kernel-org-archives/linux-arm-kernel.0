@@ -1,34 +1,72 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Tue, 19 Jun 2012 21:03:05 +0200
-Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <CAOMZO5CSy2rOVdv2N7K6ShDS1FKc1JMsDPoyY3TTFNURpFFjvw@mail.gmail.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
- <201206181913.06886.marex@denx.de>
- <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
- <20120619061414.GD21951@S2101-09.ap.freescale.net>
- <CAOMZO5A+eWXsz5_HGzUMJBDKnADrMeWPec7XvX+EMPJMtqWcng@mail.gmail.com>
- <20120619123813.GG21951@S2101-09.ap.freescale.net>
- <CAOMZO5CcC7G8RfG9N60OfU-Ca0EcL+qoQi00KSgxFyJ7Ry1oOg@mail.gmail.com>
- <CAOMZO5CSy2rOVdv2N7K6ShDS1FKc1JMsDPoyY3TTFNURpFFjvw@mail.gmail.com>
-Message-ID: <4FE0CCE9.3020402@googlemail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 19 Jun 2012 21:11:26 +0200
+Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex Net
+In-Reply-To: <201206191400.35410.arnd@arndb.de>
+References: <CAMW5UfaUBROU4o+1jz9O0AxTAgN6e0bjOX=T7YwQvomCTec3aQ@mail.gmail.com>
+ <201206191400.35410.arnd@arndb.de>
+Message-ID: <20120619191126.GA27892@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.06.2012 20:34, Fabio Estevam wrote:
-> On Tue, Jun 19, 2012 at 10:54 AM, Fabio Estevam<festevam@gmail.com>  wrote:
->
->> Excellent! It works fine now ;-)
->
-> In case someone wants to try this USB patch series:
-> https://github.com/Freescale/linux-mainline/commits/patches-3.5-rc3
+On Tue, Jun 19, 2012 at 02:00:34PM +0000, Arnd Bergmann wrote:
+> On Tuesday 19 June 2012, Josh Coombs wrote:
+> 
+> > +static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
+> > +	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+> > +};
+> > +
+> > +static struct mv_sata_platform_data goflexnet_sata_data = {
+> > +	.n_ports	= 2,
+> > +};
+> >
+> 
+> It should not be too hard to let these ones be probed through DT,
+> so if nobody has done this yet, maybe you can provide the patches
+> to let mv_sata be probed based on a compatible property and
+> read the number of ports from a new DT property, as well as 
+> use of_phy_connect() to find the right PHY from the "phy-handle"
+> property.
 
-And something similar with focus on i.MX6 based on 3.4:
+I have this, based on Jason's earlier work. I got side tracked
+re-writing the GPIO controller/GPIO interrupt code, so have not posted
+it yet.
 
-https://github.com/dirkbehme/linux-imx6/commits/linux-imx6-staging
+> 
+> > +static struct gpio_led goflexnet_led_pins[] = {
+> > +	{
+> > +		.name			= "status:green:health",
+> > +		.default_trigger	= "default-on",
+> > +		.gpio			= 46, // 0x4000
+> > +		.active_low		= 1,
+> > +	},
+> > +	{
+> > +		.name			= "status:orange:fault",
+> > +		.default_trigger	= "none",
+> > +		.gpio			= 47, // 0x8000
+> > +		.active_low		= 1,
+> > +	},
+> ...
+> > +};
+> > +
+> > +static struct gpio_led_platform_data goflexnet_led_data = {
+> > +	.leds		= goflexnet_led_pins,
+> > +	.num_leds	= ARRAY_SIZE(goflexnet_led_pins),
+> > +};
+> > +
+> > +static struct platform_device goflexnet_leds = {
+> > +	.name	= "leds-gpio",
+> > +	.id	= -1,
+> > +	.dev	= {
+> > +		.platform_data	= &goflexnet_led_data,
+> > +	}
+> > +};
+> 
+> I believe we have gpio DT support in kirkwood now, so these
+> can both go away and get replaced with DT descriptions.
 
-;)
+What i posted should work, but i've effectively thrown the
+implementation away and started again in order to get interrupts
+working correctly using an irqdomain. The DT description should
+however stay the same.
 
-Best regards
-
-Dirk
+	Andrew
