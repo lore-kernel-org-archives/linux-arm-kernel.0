@@ -1,40 +1,42 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 18 Jun 2012 18:38:12 -0700
-Subject: [PATCH 09/29] ARM: omap: clk: Nuke plat/clock.c & reuse struct
- clk as clk_hw_omap
-In-Reply-To: <1339678038-23082-10-git-send-email-rnayak@ti.com>
-References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
- <1339678038-23082-10-git-send-email-rnayak@ti.com>
-Message-ID: <20120619013812.GC4402@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jun 2012 09:38:49 +0800
+Subject: [PATCH] Fixes console on AUART issue for MX28 platform
+In-Reply-To: <1340055572-555-1-git-send-email-snijsure@grid-net.com>
+References: <1340055572-555-1-git-send-email-snijsure@grid-net.com>
+Message-ID: <20120619013847.GA21951@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120614-18:16, Rajendra Nayak wrote:
-> plat/clock.c which has most of usecounting/locking infrastructure will
-> be used only for OMAP1 until that is moved to use COMMON clk.
+On Mon, Jun 18, 2012 at 02:39:32PM -0700, Subodh Nijsure wrote:
 > 
-> reuse most of what plat/clock.h has while we move to common clk, and
-> move most of what 'struct clk' was as 'struct clk_hw_omap' which
-> will then be used to define platform specific parameters.
-> All usecounting/locking related variables from 'struct clk' are
-> dropped as they will not be used with 'struct clk_hw_omap'.
-> 
-> Based on the original changes from Mike Turquette.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Subodh Nijsure <snijsure@grid-net.com>
 
-Looks good to me Rajendra.
+Thanks for the patch, Subodh.
 
-Reviewed-by: Mike Turquette <mturquette@linaro.org>
-
-> +unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
-> +		unsigned long parent_rate);
-
-Would be nice to get rid of this.  I think only iva1_mpu_int_ifck from
-OMAP2 uses it.  If so it would be nice to convert that clock over to the
-fixed factor type (if possible) and drop this bit of glue code.
-Probably something for the future though, no reason to block this patch
-on it.
+Considering my mxs/for-next is not a stable branch anyway, and we do
+not want to bother Greg again to get his ack on this small fix-up,
+I just amended the change into Fabio's patch with your sign-off added.
 
 Regards,
-Mike
+Shawn
+
+> ---
+>  drivers/tty/serial/mxs-auart.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index ca3d25e..2ced332 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -761,7 +761,7 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, s);
+>  
+> -	auart_port[pdev->id] = s;
+> +	auart_port[s->port.line] = s;
+>  
+>  	mxs_auart_reset(&s->port);
+>  
+> -- 
+> 1.7.5.4
+> 
