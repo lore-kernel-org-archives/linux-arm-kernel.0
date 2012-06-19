@@ -1,154 +1,101 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Tue, 19 Jun 2012 17:38:07 +0900
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <1338880312-17561-1-git-send-email-minchan@kernel.org>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
-Message-ID: <CAEwNFnBAC1OKCA3MnT0VHX+y9gfLDPhCO-=SVD_-sVipoAX4ag@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 19 Jun 2012 17:47:56 +0900
+Subject: [PATCH 2/3] spi: Add the use of DMA config operation
+In-Reply-To: <011601cd42eb$8314ab10$893e0130$%kim@samsung.com>
+References: <011601cd42eb$8314ab10$893e0130$%kim@samsung.com>
+Message-ID: <019301cd4df8$3a5883c0$af098b40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resend.
+Boojin Kim wrote:
+> 
+> Config operation is separated from request operation in DMA common
+> operation.
+> Because spi driver can change the DMA config for every transfer.
+> So this patch is using the separated DMA config operation.
+> 
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+> ---
+>  drivers/spi/spi-s3c64xx.c |   33 +++++++++++++++++++--------------
+>  1 files changed, 19 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index 15f864d..f4e2341 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+> @@ -262,14 +262,24 @@ static void prepare_dma(struct s3c64xx_spi_dma_data
+> *dma,
+>  					unsigned len, dma_addr_t buf)
+>  {
+>  	struct s3c64xx_spi_driver_data *sdd;
+> -	struct samsung_dma_prep_info info;
+> +	struct samsung_dma_prep info;
+> +	struct samsung_dma_config config;
+> 
+> -	if (dma->direction == DMA_DEV_TO_MEM)
+> +	if (dma->direction == DMA_DEV_TO_MEM) {
+>  		sdd = container_of((void *)dma,
+>  			struct s3c64xx_spi_driver_data, rx_dma);
+> -	else
+> +		config.direction = sdd->rx_dma.direction;
+> +		config.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
+> +		config.width = sdd->cur_bpw / 8;
+> +		sdd->ops->config(sdd->rx_dma.ch, &config);
+> +	} else {
+>  		sdd = container_of((void *)dma,
+>  			struct s3c64xx_spi_driver_data, tx_dma);
+> +		config.direction =  sdd->tx_dma.direction;
+> +		config.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
+> +		config.width = sdd->cur_bpw / 8;
+> +		sdd->ops->config(sdd->tx_dma.ch, &config);
+> +	}
+> 
+>  	info.cap = DMA_SLAVE;
+>  	info.len = len;
+> @@ -284,20 +294,15 @@ static void prepare_dma(struct s3c64xx_spi_dma_data
+> *dma,
+> 
+>  static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
+>  {
+> -	struct samsung_dma_info info;
+> +	struct samsung_dma_req req;
+> 
+>  	sdd->ops = samsung_dma_get_ops();
+> 
+> -	info.cap = DMA_SLAVE;
+> -	info.client = &s3c64xx_spi_dma_client;
+> -	info.width = sdd->cur_bpw / 8;
+> -
+> -	info.direction = sdd->rx_dma.direction;
+> -	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
+> -	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &info);
+> -	info.direction =  sdd->tx_dma.direction;
+> -	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
+> -	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &info);
+> +	req.cap = DMA_SLAVE;
+> +	req.client = &s3c64xx_spi_dma_client;
+> +
+> +	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &req);
+> +	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &req);
+> 
+>  	return 1;
+>  }
+> --
+> 1.7.1
 
-Could you please see this problem?
+Hi Grant,
+
+I think, this is needed to support Samsung SPI with DMA and this has
+dependency with other patches in this series.
+
+If you're ok on this, please reply with your ack :) so that I can take this
+series together.
 
 Thanks.
 
-On Tue, Jun 5, 2012 at 4:11 PM, Minchan Kim <minchan@kernel.org> wrote:
-> If we do arm_memblock_steal with a page which is not aligned with section size,
-> panic can happen during boot by page fault in map_lowmem.
->
-> Detail:
->
-> 1) mdesc->reserve can steal a page which is allocated at 0x1ffff000 by memblock
-> ? which prefers tail pages of regions.
-> 2) map_lowmem maps 0x00000000 - 0x1fe00000
-> 3) map_lowmem try to map 0x1fe00000 but it's not aligned by section due to 1.
-> 4) calling alloc_init_pte allocates a new page for new pte by memblock_alloc
-> 5) allocated memory for pte is 0x1fffe000 -> it's not mapped yet.
-> 6) memset(ptr, 0, sz) in early_alloc_aligned got PANICed!
->
-> This patch fix it by limiting memblock to mapped memory range.
->
-> Reported-by: Jongsung Kim <neidhard.kim@lge.com>
-> Suggested-by: Chanho Min <chanho.min@lge.com>
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
-> ---
-> ?arch/arm/mm/mmu.c | ? 37 ++++++++++++++++++++++---------------
-> ?1 file changed, 22 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e5dad60..a15aafe 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -594,7 +594,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->
-> ?static void __init alloc_init_section(pud_t *pud, unsigned long addr,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long end, phys_addr_t phys,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct mem_type *type)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct mem_type *type, bool lowmem)
-> ?{
-> ? ? ? ?pmd_t *pmd = pmd_offset(pud, addr);
->
-> @@ -619,6 +619,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->
-> ? ? ? ? ? ? ? ?flush_pmd_entry(p);
-> ? ? ? ?} else {
-> + ? ? ? ? ? ? ? if (lowmem)
-> + ? ? ? ? ? ? ? ? ? ? ? memblock_set_current_limit(__pa(addr));
-> ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? * No need to loop; pte's aren't interested in the
-> ? ? ? ? ? ? ? ? * individual L1 entries.
-> @@ -628,14 +630,15 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
-> ?}
->
-> ?static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> - ? ? ? unsigned long end, unsigned long phys, const struct mem_type *type)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long end, unsigned long phys,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct mem_type *type, bool lowmem)
-> ?{
-> ? ? ? ?pud_t *pud = pud_offset(pgd, addr);
-> ? ? ? ?unsigned long next;
->
-> ? ? ? ?do {
-> ? ? ? ? ? ? ? ?next = pud_addr_end(addr, end);
-> - ? ? ? ? ? ? ? alloc_init_section(pud, addr, next, phys, type);
-> + ? ? ? ? ? ? ? alloc_init_section(pud, addr, next, phys, type, lowmem);
-> ? ? ? ? ? ? ? ?phys += next - addr;
-> ? ? ? ?} while (pud++, addr = next, addr != end);
-> ?}
-> @@ -702,14 +705,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
-> ?}
-> ?#endif /* !CONFIG_ARM_LPAE */
->
-> -/*
-> - * Create the page directory entries and any necessary
-> - * page tables for the mapping specified by `md'. ?We
-> - * are able to cope here with varying sizes and address
-> - * offsets, and we take full advantage of sections and
-> - * supersections.
-> - */
-> -static void __init create_mapping(struct map_desc *md)
-> +static inline void __create_mapping(struct map_desc *md, bool lowmem)
-> ?{
-> ? ? ? ?unsigned long addr, length, end;
-> ? ? ? ?phys_addr_t phys;
-> @@ -759,7 +755,7 @@ static void __init create_mapping(struct map_desc *md)
-> ? ? ? ?do {
-> ? ? ? ? ? ? ? ?unsigned long next = pgd_addr_end(addr, end);
->
-> - ? ? ? ? ? ? ? alloc_init_pud(pgd, addr, next, phys, type);
-> + ? ? ? ? ? ? ? alloc_init_pud(pgd, addr, next, phys, type, lowmem);
->
-> ? ? ? ? ? ? ? ?phys += next - addr;
-> ? ? ? ? ? ? ? ?addr = next;
-> @@ -767,6 +763,18 @@ static void __init create_mapping(struct map_desc *md)
-> ?}
->
-> ?/*
-> + * Create the page directory entries and any necessary
-> + * page tables for the mapping specified by `md'. ?We
-> + * are able to cope here with varying sizes and address
-> + * offsets, and we take full advantage of sections and
-> + * supersections.
-> + */
-> +static void __init create_mapping(struct map_desc *md)
-> +{
-> + ? ? ? __create_mapping(md, false);
-> +}
-> +
-> +/*
-> ?* Create the architecture specific mappings
-> ?*/
-> ?void __init iotable_init(struct map_desc *io_desc, int nr)
-> @@ -1111,7 +1119,7 @@ static void __init map_lowmem(void)
-> ? ? ? ? ? ? ? ?map.length = end - start;
-> ? ? ? ? ? ? ? ?map.type = MT_MEMORY;
->
-> - ? ? ? ? ? ? ? create_mapping(&map);
-> + ? ? ? ? ? ? ? __create_mapping(&map, true);
-> ? ? ? ?}
-> ?}
->
-> @@ -1123,11 +1131,10 @@ void __init paging_init(struct machine_desc *mdesc)
-> ?{
-> ? ? ? ?void *zero_page;
->
-> - ? ? ? memblock_set_current_limit(arm_lowmem_limit);
-> -
-> ? ? ? ?build_mem_type_table();
-> ? ? ? ?prepare_page_table();
-> ? ? ? ?map_lowmem();
-> + ? ? ? memblock_set_current_limit(arm_lowmem_limit);
-> ? ? ? ?dma_contiguous_remap();
-> ? ? ? ?devicemaps_init(mdesc);
-> ? ? ? ?kmap_init();
-> --
-> 1.7.9.5
->
-
-
-
--- 
-Kind regards,
-Minchan Kim
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
