@@ -1,32 +1,37 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 19 Jun 2012 14:03:14 +0200
-Subject: [PATCH] pinctrl/u300: delete pointless debug print
-Message-ID: <1340107394-2364-1-git-send-email-linus.walleij@stericsson.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 19 Jun 2012 20:21:27 +0800
+Subject: [alsa-devel] [PATCH v2 1/5] dmaengine: mmp_tdma: add mmp tdma
+ support
+In-Reply-To: <1339670638.1927.1641.camel@vkoul-udesk3>
+References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
+ <1339409081-10097-2-git-send-email-zhangfei.gao@marvell.com>
+ <1339670638.1927.1641.camel@vkoul-udesk3>
+Message-ID: <CAMj5Bkh+DeQCVc5OVMUwxxsMUGMaGz5=BxA_9gd-FcyYtGH6=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Jun 14, 2012 at 6:43 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Mon, 2012-06-11 at 18:04 +0800, Zhangfei Gao wrote:
+>> +static int mmp_tdma_clear_chan_irq(struct mmp_tdma_chan *tdmac)
+>> +{
+>> + ? ? ? u32 reg = readl(tdmac->reg_base + TDISR);
+>> +
+>> + ? ? ? if (reg & TDISR_COMP) {
+>> + ? ? ? ? ? ? ? /* clear irq */
+>> + ? ? ? ? ? ? ? reg &= ~TDISR_COMP;
+>> + ? ? ? ? ? ? ? writel(reg, tdmac->reg_base + TDISR);
+>> +
+>> + ? ? ? ? ? ? ? return 0;
+>> + ? ? ? }
+>> + ? ? ? return -1;
+>> +}
+> -1?
+> Please return a proper linux error code.
+>
+>
+> --
+> ~Vinod
 
-This is some leftover from earlier development, let's get rid
-of it.
+Hi, Vinod
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-u300.c |    2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-u300.c b/drivers/pinctrl/pinctrl-u300.c
-index 49b91c2..5f43f9a 100644
---- a/drivers/pinctrl/pinctrl-u300.c
-+++ b/drivers/pinctrl/pinctrl-u300.c
-@@ -1113,8 +1113,6 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
- 	int ret;
- 	int i;
- 
--	pr_err("U300 PMX PROBE\n");
--
- 	/* Create state holders etc for this driver */
- 	upmx = devm_kzalloc(&pdev->dev, sizeof(*upmx), GFP_KERNEL);
- 	if (!upmx)
--- 
-1.7.9.2
+The patch is updated, would you mind take a look, thanks.
