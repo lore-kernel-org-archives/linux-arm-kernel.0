@@ -1,76 +1,345 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 19 Jun 2012 14:16:38 +0800
-Subject: [PATCH 16/16] ARM: imx: enable SPARSE_IRQ for imx platform
-In-Reply-To: <20120618150422.GG19249@S2101-09.ap.freescale.net>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-17-git-send-email-shawn.guo@linaro.org>
- <20120618084850.GG25447@shlinux2.ap.freescale.net>
- <20120618150422.GG19249@S2101-09.ap.freescale.net>
-Message-ID: <20120619061637.GB10387@shlinux2.ap.freescale.net>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Tue, 19 Jun 2012 08:45:05 +0200
+Subject: [PATCH v2 2/7] ARM: at91: add of default irq priorities support
+In-Reply-To: <4FDE9161.60005@gmail.com>
+References: <1339751352-24296-1-git-send-email-ludovic.desroches@atmel.com>
+ <1339751352-24296-3-git-send-email-ludovic.desroches@atmel.com>
+ <4FDE9161.60005@gmail.com>
+Message-ID: <4FE01FF1.60604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 11:04:24PM +0800, Shawn Guo wrote:
-> On Mon, Jun 18, 2012 at 04:48:53PM +0800, Dong Aisheng wrote:
-> > On Thu, Jun 14, 2012 at 01:59:47PM +0800, Shawn Guo wrote:
-> > > As all irqchips on imx have been changed to allocate their irq_descs,
-> > > and all unneeded mach/irqs.h inclusions on imx have been cleaned up,
-> > > now it's time to select SPARSE_IRQ for imx/mxc.
-> > > 
-> > > The SPARSE_IRQ support forces irqs allocation starting from 16.  All
-> > > those static irq number definition for SoCs need to shift 16 to keep
-> > > non-DT boot works.
-> > > 
-> > It seems shift 16 is to get the correct linux virt irq, right?
-> Yes.
-> 
-> > If yes, i do not like this approach very much since it's an implicit way
-> > based on users know how legacy irqdomain works internally.
-> > 
-> I do not quite follow on this.  Users do not need to know how legacy
-> irqdomain works internally.  They are still using those static MX*_INT_*
-> macros.  All they need to know is there is a 16 shift between hardware
-> irq and Linux irq number when they look at /proc/interrupts.
-> 
-Hmm, i mean 'users' driver onwers here.
-You shift 16 because you know after irqdomain map the virt irq will be shifting 16
-according current status.
-It may not always correct if something changes.
-For example, if more irq ranges were pre-allocated except NR_IRQS_LEGACY by
-someone else or if the irq domain type is changed by the driver.
-In above case, i wonder the manual shifting may not work anymore.
+Hi Rob,
 
-With irqdomain support, i think we should always using the standard way
-to get the virt irq number rather than assuming how virt irq ranges is used and what's the
-irqdomain reverse map type is and using the virt irq directly.
+Le 06/18/2012 04:24 AM, Rob Herring a ?crit :
+> On 06/15/2012 04:09 AM, Ludovic Desroches wrote:
+>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>
+>> You will have to set the default priority for all the irq.
+>>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> ---
+>>   .../devicetree/bindings/arm/atmel-aic.txt          |    2 +
+>>   arch/arm/boot/dts/at91sam9260.dtsi                 |   34 ++++++++++++++++
+>>   arch/arm/boot/dts/at91sam9263.dtsi                 |   34 ++++++++++++++++
+>>   arch/arm/boot/dts/at91sam9g45.dtsi                 |   34 ++++++++++++++++
+>>   arch/arm/boot/dts/at91sam9x5.dtsi                  |   34 ++++++++++++++++
+>>   arch/arm/mach-at91/at91sam9x5.c                    |   42 --------------------
+>>   arch/arm/mach-at91/irq.c                           |   21 ++++++++++
+>>   7 files changed, 159 insertions(+), 42 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+>> index 1953b0c..66aa53d 100644
+>> --- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
+>> +++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+>> @@ -16,6 +16,8 @@ Required properties:
+>>         Default flag for internal sources should be set to 4 (active high).
+>>   - reg: Should contain AIC registers location and length
+>>   - atmel,external-irqs: u32 array of external irqs.
+>> +- atmel,default-irq-priorities: u32 array of default irq priorities. This need
+>> +  to contain all the irq.
+>>
+>>   Examples:
+>>   	/*
+>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+>> index f2c9643..791ef87 100644
+>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>> @@ -57,6 +57,40 @@
+>>   				interrupt-controller;
+>>   				reg = <0xfffff000 0x200>;
+>>   				atmel,external-irqs = <29 30 31>;
+>> +				atmel,default-irq-priorities = <
+>> +					7	/* Advanced Interrupt Controller */
+>> +					7	/* System Peripherals */
+>> +					1	/* Parallel IO Controller A */
+>> +					1	/* Parallel IO Controller B */
+>> +					1	/* Parallel IO Controller C */
+>> +					0	/* Analog-to-Digital Converter */
+>> +					5	/* USART 0 */
+>> +					5	/* USART 1 */
+>> +					5	/* USART 2 */
+>> +					0	/* Multimedia Card Interface */
+>> +					2	/* USB Device Port */
+>> +					6	/* Two-Wire Interface */
+>> +					5	/* Serial Peripheral Interface 0 */
+>> +					5	/* Serial Peripheral Interface 1 */
+>> +					5	/* Serial Synchronous Controller */
+>> +					0
+>> +					0
+>> +					0	/* Timer Counter 0 */
+>> +					0	/* Timer Counter 1 */
+>> +					0	/* Timer Counter 2 */
+>> +					2	/* USB Host port */
+>> +					3	/* Ethernet */
+>> +					0	/* Image Sensor Interface */
+>> +					5	/* USART 3 */
+>> +					5	/* USART 4 */
+>> +					5	/* USART 5 */
+>> +					0	/* Timer Counter 3 */
+>> +					0	/* Timer Counter 4 */
+>> +					0	/* Timer Counter 5 */
+>> +					0	/* Advanced Interrupt Controller */
+>> +					0	/* Advanced Interrupt Controller */
+>> +					0	/* Advanced Interrupt Controller */
+>
+> I think this would be better as part of the interrupts property (i.e.
+> another cell). Priorities are a fairly common interrupt controller
+> feature, so we should support it in a common way.
+>
+> Rob
+>
 
-> > Ideally i would see we keep the code as before that still using hw irqs
-> > for device resource definition, but convert to linux virt irq in a standard
-> > irqdomain map way when adding devices by calling imx_add_platform_device.
-> > 
-> What's the point of hiding this irq number conversion in
-> imx_add_platform_device?  
-It's standard and safe way.
+If people want to modify the priority of an irq it has to be done as you 
+said in the interrupt property.
 
-> The irq number used in resource definition
-> should simply just be Linux irq.  Doing what you suggest here will
-No, it's should be hw irq.
-Like you did for gpio driver:
-generic_handle_irq(irq_find_mapping(port->domain, irqoffset));
-
-Using irq_find_mapping to get the correct linux virt irq number.
-
-> only confuse users when they look at /proc/interrupts and those static
-> IRQ definitions.
-I think we may need more information about irqdomain in /proc/inerrupts
-or some where else to make people understand easily when have irq domain
-support.
-
-> 
-> BTW, not all the platform_devices are added by calling
-> imx_add_platform_device on imx.
-> 
-Then, we may need find way to do same thing for them too.
+But we want to set default priority values:
+- you can see quickly priorities of all interrupts at this place instead 
+of having to look through all interrupts property.
+- we don't want a single default priority value for all the interrupts
+- we don't want people to take care about interrupt priorities. Most of 
+them don't have to change default values. If they really need it, they 
+could use the interrupt property to modify the default value but it is 
+at their own risk.
+- not all devices have drivers that will configure the priority.
 
 Regards
-Dong Aisheng
+
+Ludovic
+
+>> +				>;
+>>   			};
+>>
+>>   			ramc0: ramc at ffffea00 {
+>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+>> index c803636..8a5923a 100644
+>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+>> @@ -53,6 +53,40 @@
+>>   				interrupt-controller;
+>>   				reg = <0xfffff000 0x200>;
+>>   				atmel,external-irqs = <30 31>;
+>> +				atmel,default-irq-priorities = <
+>> +					7	/* Advanced Interrupt Controller (FIQ) */
+>> +					7	/* System Peripherals */
+>> +					1	/* Parallel IO Controller A */
+>> +					1	/* Parallel IO Controller B */
+>> +					1	/* Parallel IO Controller C, D and E */
+>> +					0
+>> +					0
+>> +					5	/* USART 0 */
+>> +					5	/* USART 1 */
+>> +					5	/* USART 2 */
+>> +					0	/* Multimedia Card Interface 0 */
+>> +					0	/* Multimedia Card Interface 1 */
+>> +					3	/* CAN */
+>> +					6	/* Two-Wire Interface */
+>> +					5	/* Serial Peripheral Interface 0 */
+>> +					5	/* Serial Peripheral Interface 1 */
+>> +					4	/* Serial Synchronous Controller 0 */
+>> +					4	/* Serial Synchronous Controller 1 */
+>> +					5	/* AC97 Controller */
+>> +					0	/* Timer Counter 0, 1 and 2 */
+>> +					0	/* Pulse Width Modulation Controller */
+>> +					3	/* Ethernet */
+>> +					0
+>> +					0	/* 2D Graphic Engine */
+>> +					2	/* USB Device Port */
+>> +					0	/* Image Sensor Interface */
+>> +					3	/* LDC Controller */
+>> +					0	/* DMA Controller */
+>> +					0
+>> +					2	/* USB Host port */
+>> +					0	/* Advanced Interrupt Controller (IRQ0) */
+>> +					0	/* Advanced Interrupt Controller (IRQ1) */
+>> +				>;
+>>   			};
+>>
+>>   			pmc: pmc at fffffc00 {
+>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+>> index 2d01ce2..d70e4f0 100644
+>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+>> @@ -58,6 +58,40 @@
+>>   				interrupt-controller;
+>>   				reg = <0xfffff000 0x200>;
+>>   				atmel,external-irqs = <31>;
+>> +				atmel,default-irq-priorities = <
+>> +					7	/* Advanced Interrupt Controller (FIQ) */
+>> +					7	/* System Peripherals */
+>> +					1	/* Parallel IO Controller A */
+>> +					1	/* Parallel IO Controller B */
+>> +					1	/* Parallel IO Controller C */
+>> +					1	/* Parallel IO Controller D and E */
+>> +					0
+>> +					5	/* USART 0 */
+>> +					5	/* USART 1 */
+>> +					5	/* USART 2 */
+>> +					5	/* USART 3 */
+>> +					0	/* Multimedia Card Interface 0 */
+>> +					6	/* Two-Wire Interface 0 */
+>> +					6	/* Two-Wire Interface 1 */
+>> +					5	/* Serial Peripheral Interface 0 */
+>> +					5	/* Serial Peripheral Interface 1 */
+>> +					4	/* Serial Synchronous Controller 0 */
+>> +					4	/* Serial Synchronous Controller 1 */
+>> +					0	/* Timer Counter 0, 1, 2, 3, 4 and 5 */
+>> +					0	/* Pulse Width Modulation Controller */
+>> +					0	/* Touch Screen Controller */
+>> +					0	/* DMA Controller */
+>> +					2	/* USB Host High Speed port */
+>> +					3	/* LDC Controller */
+>> +					5	/* AC97 Controller */
+>> +					3	/* Ethernet */
+>> +					0	/* Image Sensor Interface */
+>> +					2	/* USB Device High speed port */
+>> +					0
+>> +					0	/* Multimedia Card Interface 1 */
+>> +					0
+>> +					0	/* Advanced Interrupt Controller (IRQ0) */
+>> +				>;
+>>   			};
+>>
+>>   			ramc0: ramc at ffffe400 {
+>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> index 6a0a0fb..fcd9d43 100644
+>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> @@ -56,6 +56,40 @@
+>>   				interrupt-controller;
+>>   				reg = <0xfffff000 0x200>;
+>>   				atmel,external-irqs = <31>;
+>> +				atmel,default-irq-priorities = <
+>> +					7	/* Advanced Interrupt Controller (FIQ) */
+>> +					7	/* System Peripherals */
+>> +					1	/* Parallel IO Controller A and B */
+>> +					1	/* Parallel IO Controller C and D */
+>> +					4	/* Soft Modem */
+>> +					5	/* USART 0 */
+>> +					5	/* USART 1 */
+>> +					5	/* USART 2 */
+>> +					5	/* USART 3 */
+>> +					6	/* Two-Wire Interface 0 */
+>> +					6	/* Two-Wire Interface 1 */
+>> +					6	/* Two-Wire Interface 2 */
+>> +					0	/* Multimedia Card Interface 0 */
+>> +					5	/* Serial Peripheral Interface 0 */
+>> +					5	/* Serial Peripheral Interface 1 */
+>> +					5	/* UART 0 */
+>> +					5	/* UART 1 */
+>> +					0	/* Timer Counter 0, 1, 2, 3, 4 and 5 */
+>> +					0	/* Pulse Width Modulation Controller */
+>> +					0	/* ADC Controller */
+>> +					0	/* DMA Controller 0 */
+>> +					0	/* DMA Controller 1 */
+>> +					2	/* USB Host High Speed port */
+>> +					2	/* USB Device High speed port */
+>> +					3	/* Ethernet MAC 0 */
+>> +					3	/* LDC Controller or Image Sensor Interface */
+>> +					0	/* Multimedia Card Interface 1 */
+>> +					3	/* Ethernet MAC 1 */
+>> +					4	/* Synchronous Serial Interface */
+>> +					4	/* CAN Controller 0 */
+>> +					4	/* CAN Controller 1 */
+>> +					0	/* Advanced Interrupt Controller (IRQ0) */
+>> +				>;
+>>   			};
+>>
+>>   			ramc0: ramc at ffffe800 {
+>> diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+>> index 537710b..1e7ef56 100644
+>> --- a/arch/arm/mach-at91/at91sam9x5.c
+>> +++ b/arch/arm/mach-at91/at91sam9x5.c
+>> @@ -316,50 +316,8 @@ void __init at91sam9x5_initialize(void)
+>>   	at91_gpio_init(NULL, 0);
+>>   }
+>>
+>> -/* --------------------------------------------------------------------
+>> - *  Interrupt initialization
+>> - * -------------------------------------------------------------------- */
+>> -/*
+>> - * The default interrupt priority levels (0 = lowest, 7 = highest).
+>> - */
+>> -static unsigned int at91sam9x5_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>> -	7,	/* Advanced Interrupt Controller (FIQ) */
+>> -	7,	/* System Peripherals */
+>> -	1,	/* Parallel IO Controller A and B */
+>> -	1,	/* Parallel IO Controller C and D */
+>> -	4,	/* Soft Modem */
+>> -	5,	/* USART 0 */
+>> -	5,	/* USART 1 */
+>> -	5,	/* USART 2 */
+>> -	5,	/* USART 3 */
+>> -	6,	/* Two-Wire Interface 0 */
+>> -	6,	/* Two-Wire Interface 1 */
+>> -	6,	/* Two-Wire Interface 2 */
+>> -	0,	/* Multimedia Card Interface 0 */
+>> -	5,	/* Serial Peripheral Interface 0 */
+>> -	5,	/* Serial Peripheral Interface 1 */
+>> -	5,	/* UART 0 */
+>> -	5,	/* UART 1 */
+>> -	0,	/* Timer Counter 0, 1, 2, 3, 4 and 5 */
+>> -	0,	/* Pulse Width Modulation Controller */
+>> -	0,	/* ADC Controller */
+>> -	0,	/* DMA Controller 0 */
+>> -	0,	/* DMA Controller 1 */
+>> -	2,	/* USB Host High Speed port */
+>> -	2,	/* USB Device High speed port */
+>> -	3,	/* Ethernet MAC 0 */
+>> -	3,	/* LDC Controller or Image Sensor Interface */
+>> -	0,	/* Multimedia Card Interface 1 */
+>> -	3,	/* Ethernet MAC 1 */
+>> -	4,	/* Synchronous Serial Interface */
+>> -	4,	/* CAN Controller 0 */
+>> -	4,	/* CAN Controller 1 */
+>> -	0,	/* Advanced Interrupt Controller (IRQ0) */
+>> -};
+>> -
+>>   struct at91_init_soc __initdata at91sam9x5_soc = {
+>>   	.map_io = at91sam9x5_map_io,
+>> -	.default_irq_priority = at91sam9x5_default_irq_priority,
+>>   	.register_clocks = at91sam9x5_register_clocks,
+>>   	.init = at91sam9x5_initialize,
+>>   };
+>> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+>> index df8605f..8e6ac53 100644
+>> --- a/arch/arm/mach-at91/irq.c
+>> +++ b/arch/arm/mach-at91/irq.c
+>> @@ -191,6 +191,25 @@ static struct irq_domain_ops at91_aic_irq_ops = {
+>>   	.xlate	= irq_domain_xlate_twocell,
+>>   };
+>>
+>> +static void __init at91_aic_of_priority(struct device_node *node)
+>> +{
+>> +	struct property *prop;
+>> +	const __be32 *p;
+>> +	u32 val;
+>> +	int i = 0;
+>> +
+>> +	of_property_for_each_u32(node, "atmel,default-irq-priorities", prop, p, val) {
+>> +		/* Put hardware irq number in Source Vector Register: */
+>> +		at91_aic_write(AT91_AIC_SVR(i), i);
+>> +		/* Active Low interrupt, with the specified priority */
+>> +		at91_aic_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | val);
+>> +		i++;
+>> +	}
+>> +
+>> +	if (i < 1)
+>> +		pr_warn("AIC: no valid default irqs priorities\n");
+>> +}
+>> +
+>>   int __init at91_aic_of_init(struct device_node *node,
+>>   				     struct device_node *parent)
+>>   {
+>> @@ -214,6 +233,8 @@ int __init at91_aic_of_init(struct device_node *node,
+>>   			at91_extern_irq |= (1 << val);
+>>   	}
+>>
+>> +	at91_aic_of_priority(node);
+>> +
+>>   	irq_set_default_host(at91_aic_domain);
+>>
+>>   	at91_aic_hw_init(NR_AIC_IRQS);
+>
+>
+>
