@@ -1,61 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 15:43:00 +0800
-Subject: [PATCH 16/16] ARM: imx: enable SPARSE_IRQ for imx platform
-In-Reply-To: <20120619072110.GC10387@shlinux2.ap.freescale.net>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-17-git-send-email-shawn.guo@linaro.org>
- <20120618084850.GG25447@shlinux2.ap.freescale.net>
- <20120618150422.GG19249@S2101-09.ap.freescale.net>
- <20120619061637.GB10387@shlinux2.ap.freescale.net>
- <20120619064742.GE21951@S2101-09.ap.freescale.net>
- <20120619072110.GC10387@shlinux2.ap.freescale.net>
-Message-ID: <20120619074258.GF21951@S2101-09.ap.freescale.net>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 19 Jun 2012 10:28:51 +0200
+Subject: [PATCH v2 0/5] ARM: topology: set the capacity of each cores for
+ big.LITTLE
+Message-ID: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 03:21:11PM +0800, Dong Aisheng wrote:
-> On Tue, Jun 19, 2012 at 02:47:44PM +0800, Shawn Guo wrote:
-> > On Tue, Jun 19, 2012 at 02:16:38PM +0800, Dong Aisheng wrote:
-> > > > > Ideally i would see we keep the code as before that still using hw irqs
-> > > > > for device resource definition, but convert to linux virt irq in a standard
-> > > > > irqdomain map way when adding devices by calling imx_add_platform_device.
-> > > > > 
-> > > > What's the point of hiding this irq number conversion in
-> > > > imx_add_platform_device?  
-> > > It's standard and safe way.
-> > > 
-> > Why do you think it's standard?
-> Why do you think using irq_find_mapping to get the linux virt irq is not
-> standard way?
-> 
-I never said using irq_find_mapping to get the linux irq is not
-standard way.  What I said is using it during adding platform_device
-is nothing standard.
+This patchset creates an arch_scale_freq_power function for ARM, which is used 
+to set the relative capacity of each core of a big.LITTLE system. It also removes
+the broken power estimation of x86.
 
-> > Care to show me a couple of examples
-> > that make this conversion when adding platform device?
-> > 
-> I did not search any example, currently it's just my idea based on my understanding
-> on irq domain design. Maybe i should give a patch to describe my idea,
-> then we can discuss on the patch.
-> 
-I understand your idea, and I just do not think it's a good/right one.
+Modification since v1:
+ - Add and update explanation about the use of the table and the range of the value 
+ - Remove the use of NR_CPUS and use nr_cpu_ids instead
+ - Remove broken power estimation of x86
 
-> Or did you see any example on using shift way to define device irq resource?
-> Then i can look at it.
-> 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/171075
+Peter Zijlstra (1):
+  sched, x86: Remove broken power estimation
 
-> > > > The irq number used in resource definition
-> > > > should simply just be Linux irq.  Doing what you suggest here will
-> > > No, it's should be hw irq.
-> > 
-> > You are simply wrong here.  Nothing more to respond on this.
-> >
-> If using linux virt irq, how do we avoid the issues i said in my last reply?
-> 
-Do not make up any issue.  I'm only interesting in the practical issues.
+Vincent Guittot (4):
+  ARM: topology: Add arch_scale_freq_power function
+  ARM: topology: factorize the update of sibling masks
+  ARM: topology: Update cpu_power according to DT information
+  sched: cpu_power: enable ARCH_POWER
+
+ arch/arm/include/asm/topology.h |    2 +
+ arch/arm/kernel/topology.c      |  210 +++++++++++++++++++++++++++++++++++----
+ arch/x86/kernel/cpu/Makefile    |    2 +-
+ arch/x86/kernel/cpu/sched.c     |   55 ----------
+ kernel/sched/features.h         |    2 +-
+ 5 files changed, 193 insertions(+), 78 deletions(-)
+ delete mode 100644 arch/x86/kernel/cpu/sched.c
 
 -- 
-Regards,
-Shawn
+1.7.9.5
