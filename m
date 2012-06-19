@@ -1,58 +1,54 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Jun 2012 17:50:31 +0900
-Subject: [PATCH 2/2] ARM: S3C64XX: Dynamically assign interrupts for CPU
- PMIC on Cragganmore
-In-Reply-To: <1338727361-25243-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1338727361-25243-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1338727361-25243-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <019a01cd4df8$954ad530$bfe07f90$%kim@samsung.com>
+Date: Tue, 19 Jun 2012 17:50:45 +0900
+Subject: arch/arm/mach-s3c2410/Kconfig is unsourced
+In-Reply-To: <1339322235.30984.35.camel@x61.thuisdomein>
+References: <1335090082.1814.27.camel@x61.thuisdomein>
+ <4F973FB2.1050004@samsung.com> <1339322235.30984.35.camel@x61.thuisdomein>
+Message-ID: <019b01cd4df8$9dbc8ba0$d935a2e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Paul Bolle wrote:
 > 
-> Now that the WM831x driver uses irq_domain we can happily allow it to
-> assign its own IRQs.
+> On Tue, 2012-04-24 at 17:05 -0700, Kukjin Kim wrote:
+> > Paul Bolle wrote:
+> > > 0) commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410:
+> move
+> > > mach-s3c2410/* into mach-s3c24xx/") orphaned
+> > > arch/arm/mach-s3c2410/Kconfig: currently nothing sources that file in
+> > > Linus' tree.
+> > >
+> > Oops, you're right.
+> >
+> > > 1) I haven't looked in depth at this, but this made S3C2410_PLLTABLE
+> > > disappear from the build system (ie, arch/arm/mach-s3c2410/pll.c is
+> dead
+> > > code now). Moreover, this basically turned both "select
+> S3C2410_CPUFREQ
+> > > if CPU_FREQ_S3C24XX", under "config CPU_S3C2410", and "select
+> > > S3C2410_IOTIMING if S3C2410_CPUFREQ", under "config ARCH_BAST", into
+> > > nops (both in arch/arm/mach-s3c24xx/Kconfig).
+> > >
+> > > 2) So to me it seems the move has only been done half: either more
+> > > things needs to be moved or those things can be removed entirely. But
+> > > perhaps arch/arm/mach-s3c2410/Kconfig should just be sourced again.
+> > >
+> > Yes, I think, would be better right now, if we could add just sourcing
+> > mach-s3c2410/Kconfig but as you said, I need to remove entire mach-s3c24
+> > stuff.
+> >
+> > Thanks for your pointing out and let me fix it.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/include/mach/crag6410.h |    3 +--
->  arch/arm/mach-s3c64xx/mach-crag6410.c         |    1 -
->  2 files changed, 1 insertion(+), 3 deletions(-)
+> I reported this issue just after v3.4-rc4 was released. We're now at
+> v3.5-rc2 and arch/arm/mach-s3c2410/Kconfig is still unsourced. I'm
+> tempted to submit a clean up patch (though I haven't checked what
+> currently can be removed because that Kconfig file is still unsourced).
+> But perhaps there's a fix pending in some development branch.
 > 
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-> b/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-> index ec97c15..4c3c999 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-> @@ -13,8 +13,7 @@
-> 
->  #include <linux/gpio.h>
-> 
-> -#define BANFF_PMIC_IRQ_BASE		IRQ_BOARD_START
-> -#define GLENFARCLAS_PMIC_IRQ_BASE	(IRQ_BOARD_START + 64)
-> +#define GLENFARCLAS_PMIC_IRQ_BASE	IRQ_BOARD_START
-> 
->  #define PCA935X_GPIO_BASE		GPIO_BOARD_START
->  #define CODEC_GPIO_BASE			(GPIO_BOARD_START + 8)
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index d0c352d..161c3b6 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -525,7 +525,6 @@ static struct wm831x_touch_pdata touch_pdata
-> __initdata = {
-> 
->  static struct wm831x_pdata crag_pmic_pdata __initdata = {
->  	.wm831x_num = 1,
-> -	.irq_base = BANFF_PMIC_IRQ_BASE,
->  	.gpio_base = BANFF_PMIC_GPIO_BASE,
->  	.soft_shutdown = true,
-> 
-> --
-> 1.7.10
+Yeah, I'm working on moving s3c24xx cpufreq into drivers/cpufreq/ and then the arch/arm/mach-s3c2410/ will be removed. But I lost the chance in the last time :( and this will be cleared from v3.6 with my patch.
 
-OK, will apply.
+So I think, your cleanup patch would be nice now.
+
 Thanks.
 
 Best regards,
