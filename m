@@ -1,31 +1,57 @@
-From: xiechao.linux@gmail.com (chao xie)
-Date: Tue, 19 Jun 2012 09:39:05 +0800
-Subject: pm runtime and system suspend resume
-Message-ID: <CAK9wHMQ7ZLtMTfBKWOb4A8wmjP9EQV8gA_moh5dXxvU0-b-vMQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jun 2012 09:42:20 +0800
+Subject: [PATCH] ARM: imx28.dtsi: Add pinmux for additional AUART ports
+In-Reply-To: <1340054922-16092-1-git-send-email-festevam@gmail.com>
+References: <1340054922-16092-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120619014218.GB21951@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi
-PM_RUNTIME provide a way for device driver do runtime PM. so for some
-devices, they have some surrounded logic. For example, the device may
-get clock from outside, or it need PHY support(USB is a example).
-To get these dependency out of device driver, i define a struct
-dev_pm_domain, and make dev.pm_domain point to it. So in the device
-driver, when the hardware should be enabled, we can call
-pm_runtime_get_sync while when the hardware is idle or does not work,
-we can call pm_runtime_put_sync.
-It seems work well, but i have question about the suspend/resume of
-device. When the whole system will go to deep idle, and it will
-suspend the devices. for the function do device suspend
-__device_suspend, it will call pm_runtime_get_noresume(dev). As i
-think it will make the device not do runtime suspend any more. Is that
-correct?
-There is the question, how device driver handle the logic surrounds
-it? I want to add pm_runtime_put_sync in dev->driver->pm->suspend
-function, and pm_runtime_get_sync in dev->driver->pm->resume. Because
-__device_suspend increase the usage_count, pm_runtime_put_sync will
-not do real work.
-So is that right that i directly call pm_runtime_suspend in
-dev->driver->pm->suspend and pm_runtime_resume in
-dev->driver->pm->resume?
-Thanks.
+On Mon, Jun 18, 2012 at 06:28:42PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Add pinmux for additional AUART ports.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index ee3778a..c98d17a 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -197,6 +197,21 @@
+>  					fsl,pull-up = <0>;
+>  				};
+>  
+> +				auart1_pins_a: auart1 at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <0x3040 0x3050 0x3060 0x3070>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
+> +
+> +				auart2_pins_a: auart2 at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <0x3080 0x3090 0x30a0 0x30b0>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
+
+I would rather have these pin settings added along with the users to
+ensure the pad configuration works for the boards or proper pad fix-up
+for the boards are added together.
+
+>  				auart3_pins_a: auart3 at 0 {
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <0x30c0 0x30d0 0x30e0 0x30f0>;
+> -- 
+> 1.7.1
+> 
+
+-- 
+Regards,
+Shawn
