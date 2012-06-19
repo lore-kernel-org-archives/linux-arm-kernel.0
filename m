@@ -1,128 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 09:24:22 +0800
-Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
-In-Reply-To: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
-References: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
-Message-ID: <20120619012420.GJ19249@S2101-09.ap.freescale.net>
+From: prakity@marvell.com (Philip Rakity)
+Date: Mon, 18 Jun 2012 18:23:35 -0700
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+ <4FDB5976.20809@wwwdotorg.org>,
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+Message-ID: <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 09:57:12PM +0200, Beno?t Th?baudeau wrote:
-> Some mxc processors have an edge_sel feature, which allows the IRQ to be
-> triggered by any edge.
-> 
-> This patch makes use of this feature if available, which skips mxc_flip_edge().
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+Why can't you use the regulator notify to get called back on power or voltage change options to plumb in the manipulation of the gpio. I can imagine you might need to add a notify call in core.c if you need to assert the gpio before power is applied
 
-NAK.
 
-We have just gone through the pain to clean up those cpu_is_xxx() from
-the driver.  Please do not bring them back.
+________________________________________
+From: linux-mmc-owner@vger.kernel.org [linux-mmc-owner at vger.kernel.org] On Behalf Of Wei Ni [wni at nvidia.com]
+Sent: Sunday, June 17, 2012 11:20 PM
+To: 'Stephen Warren'; Rakesh Kumar
+Cc: Mark Brown; 'frankyl at broadcom.com'; Thierry Reding; Mursalin Akon; 'linux-mmc at vger.kernel.org'; devicetree-discuss at lists.ozlabs.org; 'linux-wireless at vger.kernel.org'; linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: Where to power on the wifi device before loading the driver.
 
-Regards,
-Shawn
+On Fri, Jun 15, 2012 at 23:49:10, Stephen Warren wrote:
+>> I talked with Franky, this power sequence is generally for 4329, so
+>> it mean this sequence can be put into the wifi driver.
+>> We can use the virtual platform device both for OOB and non OOB.
+>> I will send out patches later.
+>
+>Can you please expand on what a "virtual platform device" is; device tree typically represents real hardware rather than anything "virtual".
 
-> ---
->  .../drivers/gpio/gpio-mxc.c                        |   44 ++++++++++++++------
->  1 file changed, 32 insertions(+), 12 deletions(-)
-> 
-> diff --git linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
-> index c337143..4c74482 100644
-> --- linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c
-> +++ linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
-> @@ -30,6 +30,7 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/module.h>
-> +#include <mach/hardware.h>
->  #include <asm-generic/bug.h>
->  #include <asm/mach/irq.h>
->  
-> @@ -104,12 +105,13 @@ static struct mxc_gpio_hwdata *mxc_gpio_hwdata;
->  #define GPIO_ICR2		(mxc_gpio_hwdata->icr2_reg)
->  #define GPIO_IMR		(mxc_gpio_hwdata->imr_reg)
->  #define GPIO_ISR		(mxc_gpio_hwdata->isr_reg)
-> +#define GPIO_EDGE_SEL		0x1c
->  
->  #define GPIO_INT_LOW_LEV	(mxc_gpio_hwdata->low_level)
->  #define GPIO_INT_HIGH_LEV	(mxc_gpio_hwdata->high_level)
->  #define GPIO_INT_RISE_EDGE	(mxc_gpio_hwdata->rise_edge)
->  #define GPIO_INT_FALL_EDGE	(mxc_gpio_hwdata->fall_edge)
-> -#define GPIO_INT_NONE		0x4
-> +#define GPIO_INT_BOTH_EDGES	0x4
->  
->  static struct platform_device_id mxc_gpio_devtype[] = {
->  	{
-> @@ -150,6 +152,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
->  	u32 bit, val;
->  	int edge;
->  	void __iomem *reg = port->base;
-> +	bool edge_sel = cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51() || cpu_is_mx53();
->  
->  	port->both_edges &= ~(1 << (gpio & 31));
->  	switch (type) {
-> @@ -160,15 +163,19 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
->  		edge = GPIO_INT_FALL_EDGE;
->  		break;
->  	case IRQ_TYPE_EDGE_BOTH:
-> -		val = gpio_get_value(gpio);
-> -		if (val) {
-> -			edge = GPIO_INT_LOW_LEV;
-> -			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
-> +		if (edge_sel) {
-> +			edge = GPIO_INT_BOTH_EDGES;
->  		} else {
-> -			edge = GPIO_INT_HIGH_LEV;
-> -			pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
-> +			val = gpio_get_value(gpio);
-> +			if (val) {
-> +				edge = GPIO_INT_LOW_LEV;
-> +				pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
-> +			} else {
-> +				edge = GPIO_INT_HIGH_LEV;
-> +				pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
-> +			}
-> +			port->both_edges |= 1 << (gpio & 31);
->  		}
-> -		port->both_edges |= 1 << (gpio & 31);
->  		break;
->  	case IRQ_TYPE_LEVEL_LOW:
->  		edge = GPIO_INT_LOW_LEV;
-> @@ -180,10 +187,23 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
->  		return -EINVAL;
->  	}
->  
-> -	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
-> -	bit = gpio & 0xf;
-> -	val = readl(reg) & ~(0x3 << (bit << 1));
-> -	writel(val | (edge << (bit << 1)), reg);
-> +	if (edge_sel) {
-> +		val = readl(port->base + GPIO_EDGE_SEL);
-> +		if (edge == GPIO_INT_BOTH_EDGES)
-> +			writel(val | (1 << (gpio & 0x1f)),
-> +				port->base + GPIO_EDGE_SEL);
-> +		else
-> +			writel(val & ~(1 << (gpio & 0x1f)),
-> +				port->base + GPIO_EDGE_SEL);
-> +	}
-> +
-> +	if (edge != GPIO_INT_BOTH_EDGES) {
-> +		reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
-> +		bit = gpio & 0xf;
-> +		val = readl(reg) & ~(0x3 << (bit << 1));
-> +		writel(val | (edge << (bit << 1)), reg);
-> +	}
-> +
->  	writel(1 << (gpio & 0x1f), port->base + GPIO_ISR);
->  
->  	return 0;
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The "virtual platform device" is created before the real wifi device, so that it can pass the gpios to the driver, and power up the device before calling sdio_register_driver.
+But as Franky said, this power sequence is only generally for 4329, not for the USB dongle chips. So it's not a good idea to add this "power up" in brcmfmac.
+
+>
+>Now if this means adding a child node under the SDIO controller to represent the attached device, and storing any settings required by that device in that child node, that's probably a reasonable basic approach.
+>
+>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That seems reasonable to represent as a GPIO rather than a regulator since it connects directly into the WiFi device as a GPIO, and its use within the WiFi device can indeed be governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
+>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then it'd be better represented as a regulator, since the control point is outside the WiFi device.
+
+I think Rakesh may can answer this.
+
+Wei.
+---
+nvpublic
+
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
