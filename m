@@ -1,7 +1,7 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Jun 2012 15:34:37 -0300
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Tue, 19 Jun 2012 21:03:05 +0200
 Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <CAOMZO5CcC7G8RfG9N60OfU-Ca0EcL+qoQi00KSgxFyJ7Ry1oOg@mail.gmail.com>
+In-Reply-To: <CAOMZO5CSy2rOVdv2N7K6ShDS1FKc1JMsDPoyY3TTFNURpFFjvw@mail.gmail.com>
 References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
  <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
  <201206181913.06886.marex@denx.de>
@@ -10,15 +10,25 @@ References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
  <CAOMZO5A+eWXsz5_HGzUMJBDKnADrMeWPec7XvX+EMPJMtqWcng@mail.gmail.com>
  <20120619123813.GG21951@S2101-09.ap.freescale.net>
  <CAOMZO5CcC7G8RfG9N60OfU-Ca0EcL+qoQi00KSgxFyJ7Ry1oOg@mail.gmail.com>
-Message-ID: <CAOMZO5CSy2rOVdv2N7K6ShDS1FKc1JMsDPoyY3TTFNURpFFjvw@mail.gmail.com>
+ <CAOMZO5CSy2rOVdv2N7K6ShDS1FKc1JMsDPoyY3TTFNURpFFjvw@mail.gmail.com>
+Message-ID: <4FE0CCE9.3020402@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 10:54 AM, Fabio Estevam <festevam@gmail.com> wrote:
+On 19.06.2012 20:34, Fabio Estevam wrote:
+> On Tue, Jun 19, 2012 at 10:54 AM, Fabio Estevam<festevam@gmail.com>  wrote:
+>
+>> Excellent! It works fine now ;-)
+>
+> In case someone wants to try this USB patch series:
+> https://github.com/Freescale/linux-mainline/commits/patches-3.5-rc3
 
-> Excellent! It works fine now ;-)
+And something similar with focus on i.MX6 based on 3.4:
 
-In case someone wants to try this USB patch series:
-https://github.com/Freescale/linux-mainline/commits/patches-3.5-rc3
+https://github.com/dirkbehme/linux-imx6/commits/linux-imx6-staging
 
-I also added all the required USB select options into mxs_defconfig.
+;)
+
+Best regards
+
+Dirk
