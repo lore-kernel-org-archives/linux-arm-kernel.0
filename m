@@ -1,61 +1,25 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 19 Jun 2012 05:57:57 +0000
-Subject: [PATCH v2 2/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <4FDF50EA.4080506@ti.com>
-References: <cover.1339828867.git.afzal@ti.com>
- <1414767dd444d4ab3998adf957e77ff4f3394f92.1339828867.git.afzal@ti.com>
- <4FDF50EA.4080506@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jun 2012 14:14:16 +0800
+Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
+In-Reply-To: <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
+ <201206181913.06886.marex@denx.de>
+ <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
+Message-ID: <20120619061414.GD21951@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Mon, Jun 18, 2012 at 21:31:46, Hunter, Jon wrote:
-
-> > @@ -95,10 +89,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
-> >  	if (err)
-> >  		return err;
-> >  
-> > -	/* Ensure sync read and sync write are disabled */
-> > -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
-> > -	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
-> > -	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+On Mon, Jun 18, 2012 at 02:25:20PM -0300, Fabio Estevam wrote:
+> Nothing shows up in the console after connecting the stick.
 > 
-> Sorry if I was not clear, but I was still thinking that we keep the
-> above instance of setting async mode.
-:
-> >  static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
-> >  {
-> >  	struct device *dev = &gpmc_onenand_device.dev;
-> > +	u32 reg;
-> > +
-> > +	/* Ensure sync read and sync write are disabled */
-> > +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
-> > +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
-> > +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+> Attached my .config file.
 > 
-> ... and here we should just call omap2_onenand_set_async_mode(), ...
+You haven't enabled the following two in your .config.
 
-If omap2_onenand_set_async_mode is called from gpmc_onenand_setup & removed
-from gpmc_onenand_init, when using new gpmc driver interface, i.e. using
-gpmc_onenand_update [1], we lost opportunity to provide gpmc driver with
-configuration details for async mode causing a big warning about each
-timings & configurations that was left by bootloader (which is meant only
-for cases where Kernel can't configure GPMC). Of course, we can put
-omap2_onenand_set_async_mode in gpmc_onenand_update too, but then
-unnecessarily, omap2_onenand_sey_async_mode would be called twice.
+CONFIG_USB_CHIPIDEA
+CONFIG_USB_CHIPIDEA_HOST
 
-Please note that gpmc_onenand_setup is a callback by onenand driver.
-
-Regards
-Afzal
-
-> >  
-> > +	omap2_onenand_set_async_mode(gpmc_onenand_data->cs);
-> > +
-> 
-> ...  then remove the above call.
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69919.html
+-- 
+Regards,
+Shawn
