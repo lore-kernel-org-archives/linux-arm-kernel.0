@@ -1,24 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 09:34:14 +0800
-Subject: [PATCH] ARM: imx23-evk.dts: Fix total RAM size
-In-Reply-To: <CAOMZO5BkZ7wGK9xjJmdn4mQ+F0nXcm_7ethXzzK3pbeB1F8zFw@mail.gmail.com>
-References: <1340046070-1955-1-git-send-email-fabio.estevam@freescale.com>
- <20120619011737.GI19249@S2101-09.ap.freescale.net>
- <CAOMZO5BkZ7wGK9xjJmdn4mQ+F0nXcm_7ethXzzK3pbeB1F8zFw@mail.gmail.com>
-Message-ID: <CAAQ0ZWQ-YFJfKQ+3SfzxcLmYxzUKG1Q+o3KtdRtwpEJv3Z+EAA@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 18 Jun 2012 18:38:12 -0700
+Subject: [PATCH 09/29] ARM: omap: clk: Nuke plat/clock.c & reuse struct
+ clk as clk_hw_omap
+In-Reply-To: <1339678038-23082-10-git-send-email-rnayak@ti.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-10-git-send-email-rnayak@ti.com>
+Message-ID: <20120619013812.GC4402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2012 09:32, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Jun 18, 2012 at 10:17 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> On Mon, Jun 18, 2012 at 04:01:10PM -0300, Fabio Estevam wrote:
->>> mx23evk has 64MB of RAM, so fix the RAM size accordingly.
->>>
->> Are you sure about that? ?Please check hardware document again.
->
-> I see a MT46V32M16 DDR, which is 64MB.
+On 20120614-18:16, Rajendra Nayak wrote:
+> plat/clock.c which has most of usecounting/locking infrastructure will
+> be used only for OMAP1 until that is moved to use COMMON clk.
+> 
+> reuse most of what plat/clock.h has while we move to common clk, and
+> move most of what 'struct clk' was as 'struct clk_hw_omap' which
+> will then be used to define platform specific parameters.
+> All usecounting/locking related variables from 'struct clk' are
+> dropped as they will not be used with 'struct clk_hw_omap'.
+> 
+> Based on the original changes from Mike Turquette.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-There are two.  One is on the top, and the other is on the bottom.
+Looks good to me Rajendra.
+
+Reviewed-by: Mike Turquette <mturquette@linaro.org>
+
+> +unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
+> +		unsigned long parent_rate);
+
+Would be nice to get rid of this.  I think only iva1_mpu_int_ifck from
+OMAP2 uses it.  If so it would be nice to convert that clock over to the
+fixed factor type (if possible) and drop this bit of glue code.
+Probably something for the future though, no reason to block this patch
+on it.
 
 Regards,
-Shawn
+Mike
