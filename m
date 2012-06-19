@@ -1,37 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Jun 2012 09:24:51 -0300
-Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <20120619061414.GD21951@S2101-09.ap.freescale.net>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
- <201206181913.06886.marex@denx.de>
- <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
- <20120619061414.GD21951@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5A+eWXsz5_HGzUMJBDKnADrMeWPec7XvX+EMPJMtqWcng@mail.gmail.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Tue, 19 Jun 2012 08:26:53 -0400
+Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex Net
+In-Reply-To: <20120619071854.GA28421@schnuecks.de>
+References: <CAMW5UfaUBROU4o+1jz9O0AxTAgN6e0bjOX=T7YwQvomCTec3aQ@mail.gmail.com>
+ <20120619071854.GA28421@schnuecks.de>
+Message-ID: <CAMW5UfZf2eqOXeovdjLd+1TB6iGqndbj_U8BWFMPnXLY0YB4BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Tue, Jun 19, 2012 at 3:14 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-
->> Attached my .config file.
->>
-> You haven't enabled the following two in your .config.
+On Tue, Jun 19, 2012 at 3:18 AM, Simon Baatz <gmbnomis@gmail.com> wrote:
+> Hi Josh,
 >
-> CONFIG_USB_CHIPIDEA
-> CONFIG_USB_CHIPIDEA_HOST
+> On Mon, Jun 18, 2012 at 08:35:27PM -0400, Josh Coombs wrote:
+>> This is an attempt to get the Seagate GoFlex Net booting using
+>> Kirkwood DTS support based on Arch Linux ARM's non-DTS GFN patches.
+>> Currently 3.5rc3 will load and begin initializing, but stops without
+>> error before mounting a rootfs and starting init. ?This patch is based
+>> on 3.5rc3 with the printk fix already applied. ?The only oddity I can
+>> pick out from dmesg is the console attaching to ttyS0 twice.
+>
+> It looks like you don't enable NAND (the GoFlex Net has NAND, isn't
+> it?). The problem is that the associated clock (runit) seems also to
+> be used for other purposes and the machine locks up when it is
+> disabled if neither NAND nor SPI are used.
+>
+> Thus, you either need to find Andrew's patch (can't lookup the URL
+> currently, the title is "Fix crash when neither NAND nor SPI") to
+> always enable the clock or you should add a nand part to your dts
+> file.
 
-Please check my config file again:
+Initially I had the NAND layout defined in the DTS similar to
+RaidSonic ICY BOX IB-NAS62x0, I removed it when I restarted my attempt
+based strictly on the Dreamplug's implementation (which appears to
+hang it's flash off SPI instead).  I'll re-add to the DTS and remove
+the unused portion from the board file and see if that makes a
+difference.  Thank you for the review, I should have results this
+evening.
 
-It does have:
-
-CONFIG_USB_CHIPIDEA=y
-CONFIG_USB_CHIPIDEA_HOST=y
-
-Can someone confirm that this patch series works on a mx28evk? If it
-does, please send me the .config that works.
-
-Thanks,
-
-Fabio Estevam
+Josh C
