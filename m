@@ -1,32 +1,31 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 19 Jun 2012 23:38:32 +0200
-Subject: [PATCH] pinctrl/coh901: use clk_prepare_enable()
-Message-ID: <1340141912-13111-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 19 Jun 2012 23:40:54 +0200
+Subject: [PATCH] pinctrl/u300: drop unused variable
+Message-ID: <1340142054-14077-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The COH901 GPIO driver did not prepare its clock, so let us
-fix it to do so.
+The "i" variable was left after the GPIO range cleanup
+moved to core.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/pinctrl-coh901.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/pinctrl-u300.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-index 55697a5..1b5d232a 100644
---- a/drivers/pinctrl/pinctrl-coh901.c
-+++ b/drivers/pinctrl/pinctrl-coh901.c
-@@ -770,7 +770,7 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 		dev_err(gpio->dev, "could not get GPIO clock\n");
- 		goto err_no_clk;
- 	}
--	err = clk_enable(gpio->clk);
-+	err = clk_prepare_enable(gpio->clk);
- 	if (err) {
- 		dev_err(gpio->dev, "could not enable GPIO clock\n");
- 		goto err_no_clk_enable;
+diff --git a/drivers/pinctrl/pinctrl-u300.c b/drivers/pinctrl/pinctrl-u300.c
+index 5f43f9a..a7ad8c1 100644
+--- a/drivers/pinctrl/pinctrl-u300.c
++++ b/drivers/pinctrl/pinctrl-u300.c
+@@ -1173,7 +1173,6 @@ out_no_resource:
+ static int __devexit u300_pmx_remove(struct platform_device *pdev)
+ {
+ 	struct u300_pmx *upmx = platform_get_drvdata(pdev);
+-	int i;
+ 
+ 	pinctrl_unregister(upmx->pctl);
+ 	iounmap(upmx->virtbase);
 -- 
 1.7.9.2
