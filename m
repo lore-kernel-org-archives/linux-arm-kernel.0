@@ -1,37 +1,61 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 19 Jun 2012 13:51:15 +0800
-Subject: [PATCH 07/16] dma: ipu: remove the use of ipu_platform_data
-In-Reply-To: <20120618140219.GE19249@S2101-09.ap.freescale.net>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
- <20120615093713.GE8383@shlinux2.ap.freescale.net>
- <20120616030106.GD29663@S2101-09.ap.freescale.net>
- <20120618081943.GA25447@shlinux2.ap.freescale.net>
- <20120618140219.GE19249@S2101-09.ap.freescale.net>
-Message-ID: <20120619055114.GA10387@shlinux2.ap.freescale.net>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 19 Jun 2012 05:57:57 +0000
+Subject: [PATCH v2 2/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <4FDF50EA.4080506@ti.com>
+References: <cover.1339828867.git.afzal@ti.com>
+ <1414767dd444d4ab3998adf957e77ff4f3394f92.1339828867.git.afzal@ti.com>
+ <4FDF50EA.4080506@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 10:02:23PM +0800, Shawn Guo wrote:
-> On Mon, Jun 18, 2012 at 04:19:44PM +0800, Dong Aisheng wrote:
-...
-> > Using private mapping is not recommended.
-> > Maybe we can do it together with this patch since irqdomain support
-> > does not depend on device tree.
-> > What do you think?
-> > 
-> At this point, I would be conservative on that, since I do not have
-> the setup to test all the IPU irq handling.
-> 
-I looked into the code a bit more, it seems ipu uses its own special irq mapping
-between virt irq and hw/dma_chan irq itself and the mapping is dynamically
-and limited to how many CONFIG_MX3_IPU_IRQS defined.
-No sure it's so suitable to convert to irqdomain.
-With adding irqdomain, i wonder we may need change this mechanism a bit.
+Hi Jon,
 
-For now, i'm ok to put that work in another patch later and using the original
-way first since the later patch may need to do more things, so
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+On Mon, Jun 18, 2012 at 21:31:46, Hunter, Jon wrote:
+
+> > @@ -95,10 +89,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
+> >  	if (err)
+> >  		return err;
+> >  
+> > -	/* Ensure sync read and sync write are disabled */
+> > -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> > -	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+> > -	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+> 
+> Sorry if I was not clear, but I was still thinking that we keep the
+> above instance of setting async mode.
+:
+> >  static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
+> >  {
+> >  	struct device *dev = &gpmc_onenand_device.dev;
+> > +	u32 reg;
+> > +
+> > +	/* Ensure sync read and sync write are disabled */
+> > +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> > +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+> > +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+> 
+> ... and here we should just call omap2_onenand_set_async_mode(), ...
+
+If omap2_onenand_set_async_mode is called from gpmc_onenand_setup & removed
+from gpmc_onenand_init, when using new gpmc driver interface, i.e. using
+gpmc_onenand_update [1], we lost opportunity to provide gpmc driver with
+configuration details for async mode causing a big warning about each
+timings & configurations that was left by bootloader (which is meant only
+for cases where Kernel can't configure GPMC). Of course, we can put
+omap2_onenand_set_async_mode in gpmc_onenand_update too, but then
+unnecessarily, omap2_onenand_sey_async_mode would be called twice.
+
+Please note that gpmc_onenand_setup is a callback by onenand driver.
 
 Regards
-Dong Aisheng
+Afzal
+
+> >  
+> > +	omap2_onenand_set_async_mode(gpmc_onenand_data->cs);
+> > +
+> 
+> ...  then remove the above call.
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69919.html
