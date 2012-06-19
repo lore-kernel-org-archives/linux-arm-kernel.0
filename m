@@ -1,34 +1,24 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Jun 2012 15:20:39 -0300
-Subject: [PATCH, RFC] i.MX DRM support
-In-Reply-To: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
-References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAOMZO5DsM1KuxjVPdOwJjHfjV7akFs1KQkBLzarSmYykNhpBaQ@mail.gmail.com>
+Date: Tue, 19 Jun 2012 15:34:37 -0300
+Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
+In-Reply-To: <CAOMZO5CcC7G8RfG9N60OfU-Ca0EcL+qoQi00KSgxFyJ7Ry1oOg@mail.gmail.com>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
+ <201206181913.06886.marex@denx.de>
+ <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
+ <20120619061414.GD21951@S2101-09.ap.freescale.net>
+ <CAOMZO5A+eWXsz5_HGzUMJBDKnADrMeWPec7XvX+EMPJMtqWcng@mail.gmail.com>
+ <20120619123813.GG21951@S2101-09.ap.freescale.net>
+ <CAOMZO5CcC7G8RfG9N60OfU-Ca0EcL+qoQi00KSgxFyJ7Ry1oOg@mail.gmail.com>
+Message-ID: <CAOMZO5CSy2rOVdv2N7K6ShDS1FKc1JMsDPoyY3TTFNURpFFjvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 10:43 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi All,
->
-> The following is the state-of-the-art i.MX IPU (Image Processing Unit)
-> DRM support.
->
-> This code is around for quite some time now and has been posted several
-> times with different APIs, first with plain old framebuffer support, now
-> DRM, first platform device binding, now devicetree. Unfortunately there's
-> quite much code needed to get something useful out of the IPU, so these
-> patches haven't received a lot of attention from people not involved in
-> i.MX. I think we have now come to a point where this code needs more public
-> exposure and where it's easier to talk in incremental changes instead of
-> blobs. Therefore I request this to go to staging for some cycles. This
-> would allow us to have something in mainline as a base for further discussion
-> while still being able to change bigger amounts of the driver without breaking
-> officially supported features. What do you think about this?
+On Tue, Jun 19, 2012 at 10:54 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-+1 on this.
+> Excellent! It works fine now ;-)
 
-Thanks for your hard work on this, Sascha.
+In case someone wants to try this USB patch series:
+https://github.com/Freescale/linux-mainline/commits/patches-3.5-rc3
 
-Regards,
-
-Fabio Estevam
+I also added all the required USB select options into mxs_defconfig.
