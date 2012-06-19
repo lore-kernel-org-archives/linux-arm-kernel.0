@@ -1,62 +1,55 @@
 From: grgupta@ti.com (Gupta, Ramesh)
-Date: Tue, 19 Jun 2012 16:51:16 +0530
-Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
-Message-ID: <CADysL2acF3ttJ-TR2as+GT66MfJiK4YyWYaAiP5j8yQ+YLBGYQ@mail.gmail.com>
+Date: Tue, 19 Jun 2012 16:51:28 +0530
+Subject: [PATCH v2 3/4] ARM: add flush_mem api for ARMv7
+Message-ID: <CADysL2ZDtJf1P+2jAsRJbczaowTwTbhXqNt3dpd5dFL4df0RSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 630a3a8f341eb7f58f9a63bf786d732b5bdfd01e Mon Sep 17 00:00:00 2001
+>From 635d33cf6c6758fb2063aa2adc03b69ce0d2799a Mon Sep 17 00:00:00 2001
 From: Ramesh Gupta G <grgupta@ti.com>
-Date: Fri, 15 Jun 2012 16:39:21 +0530
-Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
+Date: Fri, 15 Jun 2012 16:45:41 +0530
+Subject: [PATCH v2 3/4] ARM: add flush_mem api for ARMv7
 
-Added flush_mem cache maintenance api for ARMv6.
+Added flush_mem cache maintenance api for ARMv7.
 The implementation is based on dma_flush_range.
 
 Signed-off-by: Ramesh Gupta G <grgupta@ti.com>
 ---
- arch/arm/mm/cache-v6.S |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
+ arch/arm/mm/cache-v7.S |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 74c2e5a..f91d847 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -328,6 +328,34 @@ ENTRY(v6_dma_unmap_area)
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index a655d3d..2e041c8 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -322,6 +322,27 @@ ENTRY(v7_dma_flush_range)
+ 	dsb
  	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
-
+ ENDPROC(v7_dma_flush_range)
 +/*
-+ *	v6_flush_mem(start,end)
++ *	v7_flush_mem(start,end)
 + *	- start   - virtual start address of region
 + *	- end     - virtual end address of region
 + */
-+ENTRY(v6_flush_mem)
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrb	r2, [r0]		@ read for ownership
-+	strb	r2, [r0]		@ write for ownership
++ENTRY(v7_flush_mem)
++	dcache_line_size r2, r3
++	sub	r3, r2, #1
++	bic	r0, r0, r3
++#ifdef CONFIG_ARM_ERRATA_764369
++	ALT_SMP(W(dsb))
++	ALT_UP(W(nop))
 +#endif
-+	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
 +1:
-+#ifdef HARVARD_CACHE
-+	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
-+#else
-+	mcr	p15, 0, r0, c7, c15, 1		@ clean & invalidate line
-+#endif
-+	add	r0, r0, #D_CACHE_LINE_SIZE
++	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
++	add	r0, r0, r2
 +	cmp	r0, r1
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrlob	r2, [r0]			@ read for ownership
-+	strlob	r2, [r0]			@ write for ownership
-+#endif
 +	blo	1b
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
++	dsb
 +	mov	pc, lr
-+ENDPROC(v6_flush_mem)
- 	__INITDATA
++ENDPROC(v7_flush_mem)
 
- 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
+ /*
+  *	dma_map_area(start, size, dir)
 -- 
 1.7.0.4
 
