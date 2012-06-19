@@ -1,34 +1,39 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 19 Jun 2012 01:14:58 +0000
-Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
-In-Reply-To: <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
- <201206181913.06886.marex@denx.de>
- <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803BE2DE2@039-SN2MPN1-023.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jun 2012 09:17:39 +0800
+Subject: [PATCH] ARM: imx23-evk.dts: Fix total RAM size
+In-Reply-To: <1340046070-1955-1-git-send-email-fabio.estevam@freescale.com>
+References: <1340046070-1955-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120619011737.GI19249@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Mon, Jun 18, 2012 at 04:01:10PM -0300, Fabio Estevam wrote:
+> mx23evk has 64MB of RAM, so fix the RAM size accordingly.
 > 
-> > Do you have root TT enabled? If the pendrive isn't detected at all,
-> it's
-> 
-> USB_EHCI_ROOT_HUB_TT is enabled.
-> 
-> > probably the PHY not enabling (disabling?) the discon detector upon
-> init. But
-> > the PHY driver is from my code, so that should work. Do you see any
-> response at
-> > all upon connecting the stick?
-> 
-> Nothing shows up in the console after connecting the stick.
-> 
-> Attached my .config file.
-> 
-Make sure the vbus is on for your usb port.
+Are you sure about that?  Please check hardware document again.
 
-> Thanks,
+Regards,
+Shawn
+
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx23-evk.dts |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Fabio Estevam
+> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+> index 70bffa9..00390fb 100644
+> --- a/arch/arm/boot/dts/imx23-evk.dts
+> +++ b/arch/arm/boot/dts/imx23-evk.dts
+> @@ -17,7 +17,7 @@
+>  	compatible = "fsl,imx23-evk", "fsl,imx23";
+>  
+>  	memory {
+> -		reg = <0x40000000 0x08000000>;
+> +		reg = <0x40000000 0x04000000>;
+>  	};
+>  
+>  	apb at 80000000 {
+> -- 
+> 1.7.1
+> 
+> 
