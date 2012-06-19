@@ -1,40 +1,166 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Tue, 19 Jun 2012 08:26:53 -0400
-Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex Net
-In-Reply-To: <20120619071854.GA28421@schnuecks.de>
-References: <CAMW5UfaUBROU4o+1jz9O0AxTAgN6e0bjOX=T7YwQvomCTec3aQ@mail.gmail.com>
- <20120619071854.GA28421@schnuecks.de>
-Message-ID: <CAMW5UfZf2eqOXeovdjLd+1TB6iGqndbj_U8BWFMPnXLY0YB4BQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 19 Jun 2012 14:36:56 +0200
+Subject: [PATCH 3/6] ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+In-Reply-To: <1339811764-5337-4-git-send-email-omar.luna@linaro.org>
+References: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
+ <1339811764-5337-4-git-send-email-omar.luna@linaro.org>
+Message-ID: <4FE07268.7040606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 3:18 AM, Simon Baatz <gmbnomis@gmail.com> wrote:
-> Hi Josh,
->
-> On Mon, Jun 18, 2012 at 08:35:27PM -0400, Josh Coombs wrote:
->> This is an attempt to get the Seagate GoFlex Net booting using
->> Kirkwood DTS support based on Arch Linux ARM's non-DTS GFN patches.
->> Currently 3.5rc3 will load and begin initializing, but stops without
->> error before mounting a rootfs and starting init. ?This patch is based
->> on 3.5rc3 with the printk fix already applied. ?The only oddity I can
->> pick out from dmesg is the console attaching to ttyS0 twice.
->
-> It looks like you don't enable NAND (the GoFlex Net has NAND, isn't
-> it?). The problem is that the associated clock (runit) seems also to
-> be used for other purposes and the machine locks up when it is
-> disabled if neither NAND nor SPI are used.
->
-> Thus, you either need to find Andrew's patch (can't lookup the URL
-> currently, the title is "Fix crash when neither NAND nor SPI") to
-> always enable the clock or you should add a nand part to your dts
-> file.
+Hi Omar,
 
-Initially I had the NAND layout defined in the DTS similar to
-RaidSonic ICY BOX IB-NAS62x0, I removed it when I restarted my attempt
-based strictly on the Dreamplug's implementation (which appears to
-hang it's flash off SPI instead).  I'll re-add to the DTS and remove
-the unused portion from the board file and see if that makes a
-difference.  Thank you for the review, I should have results this
-evening.
+On 6/16/2012 3:56 AM, Omar Ramirez Luna wrote:
+> Add mmu hwmod data for ipu and dsp.
+> 
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  136 +++++++++++++++++++++++++++-
+>   1 files changed, 134 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index ebf9657..3879e9c 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -30,6 +30,7 @@
+>   #include <plat/mmc.h>
+>   #include <plat/dmtimer.h>
+>   #include <plat/common.h>
+> +#include <plat/iommu.h>
+>   
+>   #include "omap_hwmod_common_data.h"
+>   
+> @@ -614,7 +615,6 @@ static struct omap_hwmod_irq_info omap44xx_dsp_irqs[] = {
+>   
+>   static struct omap_hwmod_rst_info omap44xx_dsp_resets[] = {
+>   	{ .name = "dsp", .rst_shift = 0 },
+> -	{ .name = "mmu_cache", .rst_shift = 1 },
+>   };
+>   
+>   static struct omap_hwmod omap44xx_dsp_hwmod = {
+> @@ -1629,7 +1629,6 @@ static struct omap_hwmod_irq_info omap44xx_ipu_irqs[] = {
+>   static struct omap_hwmod_rst_info omap44xx_ipu_resets[] = {
+>   	{ .name = "cpu0", .rst_shift = 0 },
+>   	{ .name = "cpu1", .rst_shift = 1 },
+> -	{ .name = "mmu_cache", .rst_shift = 2 },
+>   };
+>   
+>   static struct omap_hwmod omap44xx_ipu_hwmod = {
+> @@ -2436,6 +2435,137 @@ static struct omap_hwmod omap44xx_mmc5_hwmod = {
+>   };
+>   
+>   /*
+> + * 'mmu' class
+> + * The memory management unit performs virtual to physical address translation
+> + * for its requestors.
+> + */
+> +
+> +static struct omap_hwmod_class_sysconfig mmu_sysc = {
+> +	.rev_offs	= 0x000,
+> +	.sysc_offs	= 0x010,
+> +	.syss_offs	= 0x014,
+> +	.sysc_flags	= (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
+> +			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	= &omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
+> +	.name = "mmu",
+> +	.sysc = &mmu_sysc,
+> +};
+> +
+> +/* ipu mmu */
+> +
+> +static struct omap_mmu_dev_attr ipu_mmu_dev_attr = {
+> +	.da_start = 0x0,
+> +	.da_end = 0xfffff000,
+> +	.nr_tlb_entries = 32,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_ipu_mmu_hwmod;
+> +static struct omap_hwmod_irq_info omap44xx_ipu_mmu_irqs[] = {
+> +	{ .irq = 100 + OMAP44XX_IRQ_GIC_START, },
+> +	{ .irq = -1 }
+> +};
+> +
+> +static struct omap_hwmod_rst_info omap44xx_ipu_mmu_resets[] = {
+> +	{ .name = "mmu_cache", .rst_shift = 2 },
+> +};
+> +
+> +static struct omap_hwmod_addr_space omap44xx_ipu_mmu_addrs[] = {
+> +	{
+> +		.pa_start	= 0x55082000,
+> +		.pa_end		= 0x550820ff,
+> +		.flags		= ADDR_TYPE_RT,
+> +	},
+> +	{ }
+> +};
+> +
+> +/* l3_main_2 -> ipu_mmu */
+> +static struct omap_hwmod_ocp_if omap44xx_l3_main_2__ipu_mmu = {
+> +	.master		= &omap44xx_l3_main_2_hwmod,
+> +	.slave		= &omap44xx_ipu_mmu_hwmod,
+> +	.clk		= "l3_div_ck",
+> +	.addr		= omap44xx_ipu_mmu_addrs,
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_ipu_mmu_hwmod = {
+> +	.name		= "ipu_mmu",
+> +	.class		= &omap44xx_mmu_hwmod_class,
+> +	.clkdm_name	= "ducati_clkdm",
+> +	.mpu_irqs	= omap44xx_ipu_mmu_irqs,
+> +	.rst_lines	= omap44xx_ipu_mmu_resets,
+> +	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_ipu_mmu_resets),
+> +	.main_clk	= "ipu_fck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = OMAP4_CM_DUCATI_DUCATI_CLKCTRL_OFFSET,
+> +			.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
+> +			.context_offs = OMAP4_RM_DUCATI_DUCATI_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_HWCTRL,
+> +		},
+> +	},
+> +	.dev_attr	= &ipu_mmu_dev_attr,
+> +};
 
-Josh C
+In fact, the MMU_IPU hwmod is now almost the same one than the previous IPU one...
+If we do that we should maybe just rename the IPU -> MMU_IPU and DSP -> MMU_DSP.
+
+But by doing that we will assume that the MMU does represent the subsystem, which is not necessarily super nice.
+
+I guess that a much better representation will be to keep the subsystem (IPU) to handle the PRCM part:
+
++	.main_clk	= "ipu_fck",
++	.prcm = {
++		.clkctrl_offs = OMAP4_CM_DUCATI_DUCATI_CLKCTRL_OFFSET,
++		.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
++		.context_offs = OMAP4_RM_DUCATI_DUCATI_CONTEXT_OFFSET,
++		.modulemode   = MODULEMODE_HWCTRL,
+
+
+And then the MMU_IPU will handle the configuration registers part and the reset + irq.
+
+But then, you will have to create a parent child dependency between your devices to ensure that the IPU subsystem device will be enabled before trying to access the MMU_IPU.
+
+This is what the DSS is about to do to handle the same kind of power dependency. The DSS device is the parent of all the DSS IPs (DISPC, HDMI...) and thus pm_runtime will ensure that the parent is enabled before trying to enable the children.
+
+In term of DT, just to illustrate the situation, it will be something like that:
+
+ipu {
+	compatible = "simple-bus";
+	ti,hwmods = "ipu";
+
+	ipu_mmu: mmu at 4a066000 {
+		compatible = "omap-mmu";
+		ti,hwmods = "mmu_ipu";
+		reg...;
+		irqs...;
+	}	
+}
+
+Is it something you can handle with your current framework?
+
+Regards,
+Benoit
