@@ -1,67 +1,73 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 19 Jun 2012 11:25:43 +0800
-Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
-In-Reply-To: <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
-References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
- <20110808081552.GI32513@linux-sh.org>
- <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
- <CAH9JG2V-66Wn7nwJz6tOkESoQAUJzAg-47YeMY0vzwu6T9O=Rg@mail.gmail.com>
- <4E40912C.5040801@codeaurora.org>
- <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
-Message-ID: <CAGsJ_4y38KBDfjZS_k-QfDUUFAtEwE-ciUgNOA0U2juOBeoXEA@mail.gmail.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Tue, 19 Jun 2012 12:25:58 +0800
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
+References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+ <4FD90352.9090606@wwwdotorg.org>
+ <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
+ <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+ <4FDB5976.20809@wwwdotorg.org>,
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+ <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
+Message-ID: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-it seems people still use self-defined structure and APIs to set GPIO
-pull, for example:
+On Tue, Jun 19, 2012 at 09:23:35, Philip Rakity wrote:
+>Why can't you use the regulator notify to get called back on power or 
+>voltage change options to plumb in the manipulation of the gpio. I can 
+>imagine you might need to add a notify call in core.c if you need to 
+>assert the gpio before power is applied
 
-drivers/pinctrl/pinctrl-nomadik.c:
+Yes, we can use the regulator notify, but the Tegra30 support is via device tree, I think there have no special board file to run the call back.
 
- 48 /* Pull up/down values */
- 49 enum nmk_gpio_pull {
- 50         NMK_GPIO_PULL_NONE,
- 51         NMK_GPIO_PULL_UP,
- 52         NMK_GPIO_PULL_DOWN,
- 53 };
-
-int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull)
-
-or actually you mean use "pin_config_get" and "pin_config_set" with
-self-defined configuration to set pull?
-
-but i think at least the macros of GPIO_PULL_NONE, GPIO_PULL_UP and
-GPIO_PULL_DOWN should be standardized.
-
-2011/8/9 Linus Walleij <linus.walleij@linaro.org>
 >
-> On Tue, Aug 9, 2011 at 3:45 AM, Rohit Vaswani <rvaswani@codeaurora.org>
-> wrote:
 >
-> > If we add this API - the remaining gpio controls like drive strength and
-> > function select could also be added,
+>________________________________________
+From: linux-mmc-owner@vger.kernel.org [linux-mmc-owner at vger.kernel.org] 
+>On Behalf Of Wei Ni [wni at nvidia.com]
+>Sent: Sunday, June 17, 2012 11:20 PM
+>To: 'Stephen Warren'; Rakesh Kumar
+>Cc: Mark Brown; 'frankyl at broadcom.com'; Thierry Reding; Mursalin Akon; 
+>'linux-mmc at vger.kernel.org'; devicetree-discuss at lists.ozlabs.org; 
+>'linux-wireless at vger.kernel.org'; linux-tegra at vger.kernel.org; 
+>linux-arm-kernel at lists.infradead.org
+>Subject: RE: Where to power on the wifi device before loading the driver.
 >
-> I agree.
+>On Fri, Jun 15, 2012 at 23:49:10, Stephen Warren wrote:
+>>> I talked with Franky, this power sequence is generally for 4329, so 
+>>> it mean this sequence can be put into the wifi driver.
+>>> We can use the virtual platform device both for OOB and non OOB.
+>>> I will send out patches later.
+>>
+>>Can you please expand on what a "virtual platform device" is; device 
+>>tree typically represents real
+>hardware rather than anything "virtual".
 >
-> > which eats into the pinmux domain.
+>The "virtual platform device" is created before the real wifi device, 
+>so that it can pass the gpios to the driver, and power up the device before calling sdio_register_driver.
+>But as Franky said, this power sequence is only generally for 4329, not 
+>for the USB dongle chips. So it's not a good idea to add this "power up" in brcmfmac.
 >
-> That's not so bad, since the pinctrl/pinmux subsystem is just a prototype
-> people may want to wrap up their drivers into gpio_chip/gpiolib as
-> they stand today to atleast get some isolation. Later on they can
-> refactor and migrate to a pinctrl/pinmux subsystem.
+>>
+>>Now if this means adding a child node under the SDIO controller to 
+>>represent the attached device, and
+>storing any settings required by that device in that child node, that's 
+>probably a reasonable basic approach.
+>>
+>>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That 
+>>seems reasonable to represent
+>as a GPIO rather than a regulator since it connects directly into the 
+>WiFi device as a GPIO, and its use within the WiFi device can indeed be 
+>governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
+>>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then 
+>>it'd be better represented as a
+>regulator, since the control point is outside the WiFi device.
 >
-> The latter will take some time to provide anyway, since I have been
-> asked to restructure it so as not to use a global pin number space.
+>I think Rakesh may can answer this.
 >
-> > Linus W. had a patch earlier which added an API for a gpio config to be
-> > specified through gpiolib. " gpio: add a custom configuration mechanism
-> > to
-> > gpiolib" which is sort of an extensible model of this API.
->
-> Yes I think I have already suggested a bunch of ways to skin this
-> cat but somehow none of them seem to win general approval.
->
-> Yours,
-> Linus Walleij
-
--barry
+>Wei.
+>---
+>nvpublic
