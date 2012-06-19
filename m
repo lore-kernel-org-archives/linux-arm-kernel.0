@@ -1,43 +1,95 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 19 Jun 2012 10:17:19 +0100
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
- <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
-Message-ID: <20120619091719.GZ3974@opensource.wolfsonmicro.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Tue, 19 Jun 2012 14:50:23 +0530
+Subject: [PATCHv8 13/13] I2C: OMAP: simplify omap_i2c_ack_stat()
+In-Reply-To: <20120618153000.GC10768@pengutronix.de>
+References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+ <1340029828-20751-14-git-send-email-shubhrajyoti@ti.com>
+ <20120618153000.GC10768@pengutronix.de>
+Message-ID: <CAM=Q2ctOS19ToH7JRLxmEkoz8eUj8umcWFhaTQ-MWBbeh_DHtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 12:25:58PM +0800, Wei Ni wrote:
+On Mon, Jun 18, 2012 at 9:00 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Mon, Jun 18, 2012 at 08:00:28PM +0530, Shubhrajyoti D wrote:
+>> From: Felipe Balbi <balbi@ti.com>
+>>
+>> stat & BIT(1) is the same as BIT(1),
+>
+> Not true. I'd guess you are missing some context in the patch
+> description.
 
-As Stephen previously said please fix your mail formatting - word
-wrapping within paragraphs is important!
 
-> On Tue, Jun 19, 2012 at 09:23:35, Philip Rakity wrote:
-> >Why can't you use the regulator notify to get called back on power or 
-> >voltage change options to plumb in the manipulation of the gpio. I can 
-> >imagine you might need to add a notify call in core.c if you need to 
-> >assert the gpio before power is applied
-> 
-> Yes, we can use the regulator notify, but the Tegra30 support is via
-> device tree, I think there have no special board file to run the call
-> back.
+See the explanation , hope I understood your concern correctly.
 
-You can mix board files with device tree for cases where device tree is
-not yet up to the job, though the goal should be to come up with a way
-of expressing things in device tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120619/738ceb54/attachment.sig>
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70277.html
+
+>
+>> so let's
+>> simplify things a bit by removing "stat &" from
+>> all omap_i2c_ack_stat() calls.
+>>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>> ?drivers/i2c/busses/i2c-omap.c | ? 19 ++++++++++---------
+>> ?1 files changed, 10 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index 6a79089..bac6305 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -763,7 +763,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
+>>
+>> ? ? ? while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
+>> ? ? ? ? ? ? ? if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+>> - ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
+>> + ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_XDR));
+>> ? ? ? ? ? ? ? ? ? ? ? return -ETIMEDOUT;
+>> ? ? ? ? ? ? ? }
+>> @@ -824,10 +824,11 @@ complete:
+>> ? ? ? ? ? ? ? ?*/
+>> ? ? ? ? ? ? ? if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_AL)) {
+>> - ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, stat &
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_ARDY));
+>> + ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_RDR |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_XRDY |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_XDR |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_ARDY));
+>> ? ? ? ? ? ? ? ? ? ? ? omap_i2c_complete_cmd(dev, err);
+>> ? ? ? ? ? ? ? ? ? ? ? return IRQ_HANDLED;
+>> ? ? ? ? ? ? ? }
+>> @@ -874,8 +875,8 @@ complete:
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? }
+>> - ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
+>> + ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_RDR));
+>> ? ? ? ? ? ? ? ? ? ? ? continue;
+>> ? ? ? ? ? ? ? }
+>>
+>> @@ -922,8 +923,8 @@ complete:
+>>
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
+>> ? ? ? ? ? ? ? ? ? ? ? }
+>> - ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
+>> + ? ? ? ? ? ? ? ? ? ? omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_I2C_STAT_XDR));
+>> ? ? ? ? ? ? ? ? ? ? ? continue;
+>> ? ? ? ? ? ? ? }
+>>
+>> --
+>> 1.7.5.4
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
