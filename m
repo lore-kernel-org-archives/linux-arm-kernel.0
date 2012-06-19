@@ -1,50 +1,28 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Tue, 19 Jun 2012 17:44:00 +0800
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <20120619091719.GZ3974@opensource.wolfsonmicro.com>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
- <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
- <20120619091719.GZ3974@opensource.wolfsonmicro.com>
-Message-ID: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD626@HKMAIL01.nvidia.com>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Tue, 19 Jun 2012 07:03:41 -0300
+Subject: [PATCH 2/2] sound: tegra_alc5632: Adjust to of_get_named_gpio()
+ change
+In-Reply-To: <CALq1K=LXVqfiyrLjn+_p+NTU3X5RjyQzvKdVRf09zXk-RqbkrQ@mail.gmail.com>
+References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
+ <1340037743-12924-2-git-send-email-stigge@antcom.de>
+ <CAAAP30G1qzDn+NKT1is+GJ9K2DS3Sm3QY+=n7s-P-Rop2b7FPQ@mail.gmail.com>
+ <CALq1K=LXVqfiyrLjn+_p+NTU3X5RjyQzvKdVRf09zXk-RqbkrQ@mail.gmail.com>
+Message-ID: <CAAAP30FoHAbA1HcUCGQxorFymVDed19N1PPe-ZH0x0s3M+W8bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 17:17:19, Mark Brown wrote:
->* PGP Signed by an unknown key
->
->On Tue, Jun 19, 2012 at 12:25:58PM +0800, Wei Ni wrote:
->
->As Stephen previously said please fix your mail formatting - word 
->wrapping within paragraphs is important!
->
->> On Tue, Jun 19, 2012 at 09:23:35, Philip Rakity wrote:
->> >Why can't you use the regulator notify to get called back on power 
->> >or voltage change options to plumb in the manipulation of the gpio. 
->> >I can imagine you might need to add a notify call in core.c if you 
->> >need to assert the gpio before power is applied
->>
->> Yes, we can use the regulator notify, but the Tegra30 support is via 
->> device tree, I think there have no special board file to run the call 
->> back.
->
->You can mix board files with device tree for cases where device tree is 
->not yet up to the job, though the goal should be to come up with a way of expressing things in device tree.
+On Tue, Jun 19, 2012 at 3:29 AM, Leon Romanovsky <leon@leon.nu> wrote:
+> On Mon, Jun 18, 2012 at 8:28 PM, Alexandre Pereira da Silva
+> <aletes.xgr@gmail.com> wrote:
+>> On Mon, Jun 18, 2012 at 1:42 PM, Roland Stigge <stigge@antcom.de> wrote:
+>>> of_get_named_gpio() was changed to return -EPROBE_DEFER in case of
+>>> gpios not probed yet. This patch adjusts tegra_alc5632 to this.
+>>>
+>>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>> Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> Hi Alexandre,
+> Sorry to be rude, but can you explain me why did you "Acked-by" on this patch ?
+> I don't see your name in git log for tegra_alc5632.c file:
+> http://git.kernel.org/?p=linux/kernel/git/broonie/sound.git;a=history;f=sound/soc/tegra/tegra_alc5632.c;h=d684df294c0c5c80458b6de591c16965027db14b;hb=refs/heads/for-next
 
-I think we wish to use the device tree to handle these gpios, pass them to the related driver to assert them.
-If we mix the board files, we even can set these gpio directly, not use the notify. But I think this is not a goog way.
-
-Wei.
----
-nvpublic
-
->
->* Unknown Key
->* 0x6E30FDDD
+I'm tracking Roland's work on Probe defer.
