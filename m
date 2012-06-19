@@ -1,47 +1,27 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 19 Jun 2012 15:33:52 +0200
-Subject: [PATCHv8 13/13] I2C: OMAP: simplify omap_i2c_ack_stat()
-In-Reply-To: <CAM=Q2ctOS19ToH7JRLxmEkoz8eUj8umcWFhaTQ-MWBbeh_DHtA@mail.gmail.com>
-References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
- <1340029828-20751-14-git-send-email-shubhrajyoti@ti.com>
- <20120618153000.GC10768@pengutronix.de>
- <CAM=Q2ctOS19ToH7JRLxmEkoz8eUj8umcWFhaTQ-MWBbeh_DHtA@mail.gmail.com>
-Message-ID: <20120619133352.GB18711@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Jun 2012 10:54:39 -0300
+Subject: [Patch v5 00/13] add imx usb driver for mx28/6x
+In-Reply-To: <20120619123813.GG21951@S2101-09.ap.freescale.net>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <CAOMZO5BXsPtwC2CTt6Z-DjZUYhrWMKDkr2QnFoAKb-aLc1XsNA@mail.gmail.com>
+ <201206181913.06886.marex@denx.de>
+ <CAOMZO5DF+CH+qe+VKc4vefkj05aXOtn0nVZK9vx+0kakP_em1A@mail.gmail.com>
+ <20120619061414.GD21951@S2101-09.ap.freescale.net>
+ <CAOMZO5A+eWXsz5_HGzUMJBDKnADrMeWPec7XvX+EMPJMtqWcng@mail.gmail.com>
+ <20120619123813.GG21951@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5CcC7G8RfG9N60OfU-Ca0EcL+qoQi00KSgxFyJ7Ry1oOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 02:50:23PM +0530, Shubhrajyoti Datta wrote:
-> On Mon, Jun 18, 2012 at 9:00 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> > On Mon, Jun 18, 2012 at 08:00:28PM +0530, Shubhrajyoti D wrote:
-> >> From: Felipe Balbi <balbi@ti.com>
-> >>
-> >> stat & BIT(1) is the same as BIT(1),
-> >
-> > Not true. I'd guess you are missing some context in the patch
-> > description.
-> 
-> 
-> See the explanation , hope I understood your concern correctly.
-> 
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70277.html
+On Tue, Jun 19, 2012 at 9:38 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Jun 19, 2012 at 09:24:51AM -0300, Fabio Estevam wrote:
+>> Can someone confirm that this patch series works on a mx28evk? If it
+>> does, please send me the .config that works.
+>>
+> The series works fine on my imx28-evk board with the .config attached.
 
-The code may be right, but as Russell pointed out, the patch description
-is very weak. I could read the mail now to understand, but I prefer to
-wait for a better patch description. Because I need to ensure other
-people reading the git history later will understand easily without
-having to search the web.
+Excellent! It works fine now ;-)
 
-Regards,
+Thanks,
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120619/f49d51fb/attachment.sig>
+Fabio Estevam
