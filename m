@@ -1,97 +1,36 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Jun 2012 17:47:56 +0900
-Subject: [PATCH 2/3] spi: Add the use of DMA config operation
-In-Reply-To: <011601cd42eb$8314ab10$893e0130$%kim@samsung.com>
-References: <011601cd42eb$8314ab10$893e0130$%kim@samsung.com>
-Message-ID: <019301cd4df8$3a5883c0$af098b40$%kim@samsung.com>
+Date: Tue, 19 Jun 2012 17:50:01 +0900
+Subject: [PATCH] ARM: S3C64XX: Add IRQ mapping for wm0010 on Cragganmore
+In-Reply-To: <1339775065-13211-1-git-send-email-dp@opensource.wolfsonmicro.com>
+References: <1339775065-13211-1-git-send-email-dp@opensource.wolfsonmicro.com>
+Message-ID: <019601cd4df8$83b33380$8b199a80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boojin Kim wrote:
+Dimitris Papastamos wrote:
 > 
-> Config operation is separated from request operation in DMA common
-> operation.
-> Because spi driver can change the DMA config for every transfer.
-> So this patch is using the separated DMA config operation.
-> 
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+> Signed-off-by: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
 > ---
->  drivers/spi/spi-s3c64xx.c |   33 +++++++++++++++++++--------------
->  1 files changed, 19 insertions(+), 14 deletions(-)
+>  arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 15f864d..f4e2341 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -262,14 +262,24 @@ static void prepare_dma(struct s3c64xx_spi_dma_data
-> *dma,
->  					unsigned len, dma_addr_t buf)
->  {
->  	struct s3c64xx_spi_driver_data *sdd;
-> -	struct samsung_dma_prep_info info;
-> +	struct samsung_dma_prep info;
-> +	struct samsung_dma_config config;
-> 
-> -	if (dma->direction == DMA_DEV_TO_MEM)
-> +	if (dma->direction == DMA_DEV_TO_MEM) {
->  		sdd = container_of((void *)dma,
->  			struct s3c64xx_spi_driver_data, rx_dma);
-> -	else
-> +		config.direction = sdd->rx_dma.direction;
-> +		config.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-> +		config.width = sdd->cur_bpw / 8;
-> +		sdd->ops->config(sdd->rx_dma.ch, &config);
-> +	} else {
->  		sdd = container_of((void *)dma,
->  			struct s3c64xx_spi_driver_data, tx_dma);
-> +		config.direction =  sdd->tx_dma.direction;
-> +		config.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> +		config.width = sdd->cur_bpw / 8;
-> +		sdd->ops->config(sdd->tx_dma.ch, &config);
-> +	}
-> 
->  	info.cap = DMA_SLAVE;
->  	info.len = len;
-> @@ -284,20 +294,15 @@ static void prepare_dma(struct s3c64xx_spi_dma_data
-> *dma,
-> 
->  static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
->  {
-> -	struct samsung_dma_info info;
-> +	struct samsung_dma_req req;
-> 
->  	sdd->ops = samsung_dma_get_ops();
-> 
-> -	info.cap = DMA_SLAVE;
-> -	info.client = &s3c64xx_spi_dma_client;
-> -	info.width = sdd->cur_bpw / 8;
-> -
-> -	info.direction = sdd->rx_dma.direction;
-> -	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-> -	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &info);
-> -	info.direction =  sdd->tx_dma.direction;
-> -	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> -	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &info);
-> +	req.cap = DMA_SLAVE;
-> +	req.client = &s3c64xx_spi_dma_client;
-> +
-> +	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &req);
-> +	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &req);
-> 
->  	return 1;
->  }
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-
+> s3c64xx/mach-crag6410-module.c
+> index f347336..7c8ea3c 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> @@ -47,6 +47,7 @@ static struct spi_board_info wm1253_devs[] = {
+>  		.bus_num	= 0,
+>  		.chip_select	= 0,
+>  		.mode		= SPI_MODE_0,
+> +		.irq            = S3C_EINT(5),
+>  		.controller_data = &wm0010_spi_csinfo,
+>  		.platform_data = &wm0010_crag_pdata,
+>  	},
 > --
-> 1.7.1
+> 1.7.10.4
 
-Hi Grant,
-
-I think, this is needed to support Samsung SPI with DMA and this has
-dependency with other patches in this series.
-
-If you're ok on this, please reply with your ack :) so that I can take this
-series together.
-
+OK, will apply.
 Thanks.
 
 Best regards,
