@@ -1,54 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Jun 2012 17:50:45 +0900
-Subject: arch/arm/mach-s3c2410/Kconfig is unsourced
-In-Reply-To: <1339322235.30984.35.camel@x61.thuisdomein>
-References: <1335090082.1814.27.camel@x61.thuisdomein>
- <4F973FB2.1050004@samsung.com> <1339322235.30984.35.camel@x61.thuisdomein>
-Message-ID: <019b01cd4df8$9dbc8ba0$d935a2e0$%kim@samsung.com>
+Date: Tue, 19 Jun 2012 17:51:02 +0900
+Subject: [PATCH] ARM: s3c24xx: remove unused header
+In-Reply-To: <1339078540.25798.13.camel@x61.thuisdomein>
+References: <1339078540.25798.13.camel@x61.thuisdomein>
+Message-ID: <019c01cd4df8$a80f5e20$f82e1a60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Paul Bolle wrote:
 > 
-> On Tue, 2012-04-24 at 17:05 -0700, Kukjin Kim wrote:
-> > Paul Bolle wrote:
-> > > 0) commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410:
-> move
-> > > mach-s3c2410/* into mach-s3c24xx/") orphaned
-> > > arch/arm/mach-s3c2410/Kconfig: currently nothing sources that file in
-> > > Linus' tree.
-> > >
-> > Oops, you're right.
-> >
-> > > 1) I haven't looked in depth at this, but this made S3C2410_PLLTABLE
-> > > disappear from the build system (ie, arch/arm/mach-s3c2410/pll.c is
-> dead
-> > > code now). Moreover, this basically turned both "select
-> S3C2410_CPUFREQ
-> > > if CPU_FREQ_S3C24XX", under "config CPU_S3C2410", and "select
-> > > S3C2410_IOTIMING if S3C2410_CPUFREQ", under "config ARCH_BAST", into
-> > > nops (both in arch/arm/mach-s3c24xx/Kconfig).
-> > >
-> > > 2) So to me it seems the move has only been done half: either more
-> > > things needs to be moved or those things can be removed entirely. But
-> > > perhaps arch/arm/mach-s3c2410/Kconfig should just be sourced again.
-> > >
-> > Yes, I think, would be better right now, if we could add just sourcing
-> > mach-s3c2410/Kconfig but as you said, I need to remove entire mach-s3c24
-> > stuff.
-> >
-> > Thanks for your pointing out and let me fix it.
+> Since (at least) v2.6.12-rc2 there has been a bast-pmu.h header in the
+> tree. Currently it can be found at
+> arch/arm/mach-s3c24xx/include/mach/bast-pmu.h.
 > 
-> I reported this issue just after v3.4-rc4 was released. We're now at
-> v3.5-rc2 and arch/arm/mach-s3c2410/Kconfig is still unsourced. I'm
-> tempted to submit a clean up patch (though I haven't checked what
-> currently can be removed because that Kconfig file is still unsourced).
-> But perhaps there's a fix pending in some development branch.
+> It seems that during that entire period nothing included that header and
+> that none of the named constants it provided were ever used. That header
+> can safely be removed.
 > 
-Yeah, I'm working on moving s3c24xx cpufreq into drivers/cpufreq/ and then the arch/arm/mach-s3c2410/ will be removed. But I lost the chance in the last time :( and this will be cleared from v3.6 with my patch.
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Tested with "git grep". But it's again hard to imagine how this could
+> break anything.
+> 
+>  arch/arm/mach-s3c24xx/include/mach/bast-pmu.h |   40 ---------------------
+> ----
+>  1 files changed, 0 insertions(+), 40 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/bast-pmu.h
+> 
+> diff --git a/arch/arm/mach-s3c24xx/include/mach/bast-pmu.h
+> b/arch/arm/mach-s3c24xx/include/mach/bast-pmu.h
+> deleted file mode 100644
+> index 4c38b39..0000000
+> --- a/arch/arm/mach-s3c24xx/include/mach/bast-pmu.h
+> +++ /dev/null
+> @@ -1,40 +0,0 @@
+> -/* arch/arm/mach-s3c2410/include/mach/bast-pmu.h
+> - *
+> - * Copyright (c) 2003-2004 Simtec Electronics
+> - *	Ben Dooks <ben@simtec.co.uk>
+> - *	Vincent Sanders <vince@simtec.co.uk>
+> - *
+> - * Machine BAST - Power Management chip
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> -*/
+> -
+> -#ifndef __ASM_ARCH_BASTPMU_H
+> -#define __ASM_ARCH_BASTPMU_H "08_OCT_2004"
+> -
+> -#define BASTPMU_REG_IDENT	(0x00)
+> -#define BASTPMU_REG_VERSION	(0x01)
+> -#define BASTPMU_REG_DDCCTRL	(0x02)
+> -#define BASTPMU_REG_POWER	(0x03)
+> -#define BASTPMU_REG_RESET	(0x04)
+> -#define BASTPMU_REG_GWO		(0x05)
+> -#define BASTPMU_REG_WOL		(0x06)
+> -#define BASTPMU_REG_WOR		(0x07)
+> -#define BASTPMU_REG_UID		(0x09)
+> -
+> -#define BASTPMU_EEPROM		(0xC0)
+> -
+> -#define BASTPMU_EEP_UID		(BASTPMU_EEPROM + 0)
+> -#define BASTPMU_EEP_WOL		(BASTPMU_EEPROM + 8)
+> -#define BASTPMU_EEP_WOR		(BASTPMU_EEPROM + 9)
+> -
+> -#define BASTPMU_IDENT_0		0x53
+> -#define BASTPMU_IDENT_1		0x42
+> -#define BASTPMU_IDENT_2		0x50
+> -#define BASTPMU_IDENT_3		0x4d
+> -
+> -#define BASTPMU_RESET_GUARD	(0x55)
+> -
+> -#endif /* __ASM_ARCH_BASTPMU_H */
+> --
+> 1.7.7.6
 
-So I think, your cleanup patch would be nice now.
-
+Yes, I think, no longer need above header. Will apply this into cleanup branch.
 Thanks.
 
 Best regards,
