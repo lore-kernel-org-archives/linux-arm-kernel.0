@@ -1,22 +1,32 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Tue, 19 Jun 2012 14:00:38 +0200 (CEST)
-Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
-In-Reply-To: <20120619012420.GJ19249@S2101-09.ap.freescale.net>
-Message-ID: <1569254394.2932189.1340107238237.JavaMail.root@advansee.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 19 Jun 2012 14:03:14 +0200
+Subject: [PATCH] pinctrl/u300: delete pointless debug print
+Message-ID: <1340107394-2364-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 03:24:22AM +0200, Shawn Guo wrote:
-> NAK.
-> 
-> We have just gone through the pain to clean up those cpu_is_xxx()
-> from
-> the driver.  Please do not bring them back.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-OK. I don't find the changeset you are referring to. Can you give me an example
-that tells me by what you replaced those cpu_is_xxx()? By some feature test
-macros? E.g., there are still many of those cpu_is_xxx() in
-drivers/mtd/nand/mxc_nand.c in linux-next.
+This is some leftover from earlier development, let's get rid
+of it.
 
-Regards,
-Beno?t
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-u300.c |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-u300.c b/drivers/pinctrl/pinctrl-u300.c
+index 49b91c2..5f43f9a 100644
+--- a/drivers/pinctrl/pinctrl-u300.c
++++ b/drivers/pinctrl/pinctrl-u300.c
+@@ -1113,8 +1113,6 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
+ 	int ret;
+ 	int i;
+ 
+-	pr_err("U300 PMX PROBE\n");
+-
+ 	/* Create state holders etc for this driver */
+ 	upmx = devm_kzalloc(&pdev->dev, sizeof(*upmx), GFP_KERNEL);
+ 	if (!upmx)
+-- 
+1.7.9.2
