@@ -1,42 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 09:38:49 +0800
-Subject: [PATCH] Fixes console on AUART issue for MX28 platform
-In-Reply-To: <1340055572-555-1-git-send-email-snijsure@grid-net.com>
-References: <1340055572-555-1-git-send-email-snijsure@grid-net.com>
-Message-ID: <20120619013847.GA21951@S2101-09.ap.freescale.net>
+From: xiechao.linux@gmail.com (chao xie)
+Date: Tue, 19 Jun 2012 09:39:05 +0800
+Subject: pm runtime and system suspend resume
+Message-ID: <CAK9wHMQ7ZLtMTfBKWOb4A8wmjP9EQV8gA_moh5dXxvU0-b-vMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 02:39:32PM -0700, Subodh Nijsure wrote:
-> 
-> Signed-off-by: Subodh Nijsure <snijsure@grid-net.com>
-
-Thanks for the patch, Subodh.
-
-Considering my mxs/for-next is not a stable branch anyway, and we do
-not want to bother Greg again to get his ack on this small fix-up,
-I just amended the change into Fabio's patch with your sign-off added.
-
-Regards,
-Shawn
-
-> ---
->  drivers/tty/serial/mxs-auart.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index ca3d25e..2ced332 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -761,7 +761,7 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, s);
->  
-> -	auart_port[pdev->id] = s;
-> +	auart_port[s->port.line] = s;
->  
->  	mxs_auart_reset(&s->port);
->  
-> -- 
-> 1.7.5.4
-> 
+hi
+PM_RUNTIME provide a way for device driver do runtime PM. so for some
+devices, they have some surrounded logic. For example, the device may
+get clock from outside, or it need PHY support(USB is a example).
+To get these dependency out of device driver, i define a struct
+dev_pm_domain, and make dev.pm_domain point to it. So in the device
+driver, when the hardware should be enabled, we can call
+pm_runtime_get_sync while when the hardware is idle or does not work,
+we can call pm_runtime_put_sync.
+It seems work well, but i have question about the suspend/resume of
+device. When the whole system will go to deep idle, and it will
+suspend the devices. for the function do device suspend
+__device_suspend, it will call pm_runtime_get_noresume(dev). As i
+think it will make the device not do runtime suspend any more. Is that
+correct?
+There is the question, how device driver handle the logic surrounds
+it? I want to add pm_runtime_put_sync in dev->driver->pm->suspend
+function, and pm_runtime_get_sync in dev->driver->pm->resume. Because
+__device_suspend increase the usage_count, pm_runtime_put_sync will
+not do real work.
+So is that right that i directly call pm_runtime_suspend in
+dev->driver->pm->suspend and pm_runtime_resume in
+dev->driver->pm->resume?
+Thanks.
