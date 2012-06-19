@@ -1,26 +1,110 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Jun 2012 11:18:42 +0000
-Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
- probing
-In-Reply-To: <20120618172042.GA29647@gmail.com>
-References: <1336725678-29327-1-git-send-email-sr@denx.de>
- <201206181109.15250.sr@denx.de> <20120618172042.GA29647@gmail.com>
-Message-ID: <201206191118.42416.arnd@arndb.de>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Tue, 19 Jun 2012 16:51:07 +0530
+Subject: [PATCH v2 1/4] ARM: new cache maintenance api for iommu mem flush
+Message-ID: <CADysL2aFufYzmxWOHp2xUt_TkqOQpX883za+7it5h2qd=PMwwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 June 2012, Mike Turquette wrote:
-> > Ping again (this is a real show-stopper for SPEAr600 in v3.5!).
-> > 
-> I've taken this into my clk-next branch already.  Sorry if I did not
-> communicate that well enough.  I will request for clk-next to be
-> included into linux-next later this week.  Hopefully this patch will
-> start showing up in linux-next in a matter of days.
-> 
-> Let me know if there is anything else I can do.
+>From 785a1f2854002ce7c1c8880bc5d8d92a7868bf1c Mon Sep 17 00:00:00 2001
+From: Ramesh Gupta G <grgupta@ti.com>
+Date: Fri, 15 Jun 2012 16:37:20 +0530
+Subject: [PATCH v2 1/4] ARM: new cache maintenance api for iommu mem flush
 
-It sounds to me that Stefan needs this in 3.5, while the clk-next
-patches are destined for 3.6. Is that correct? If so, do you also
-have a clk-fixes branch that is targetted at 3.5 regressions?
+non-coherent IOMMUs need to make sure that the
+data held in the caches need to be visible for the
+MMU hardware. A new L1 cache maintenance api has been
+created to handle this. Thanks to RMK's suggestions on
+creating a dedicated API for this purpose.
 
-	Arnd
+ref:
+http://marc.info/?l=linux-kernel&m=131316512713815&w=2
+
+Signed-off-by: Ramesh Gupta G <grgupta@ti.com>
+---
+ arch/arm/include/asm/cacheflush.h |   17 +++++++++++++++++
+ arch/arm/include/asm/glue-cache.h |    1 +
+ arch/arm/mm/proc-macros.S         |    1 +
+ 3 files changed, 19 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/cacheflush.h
+b/arch/arm/include/asm/cacheflush.h
+index d5d8d5c..2b4f5aa 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -84,6 +84,11 @@
+  *		- kaddr  - page address
+  *		- size   - region size
+  *
++ *     flush_mem(start, end)
++ *
++ *             Clean and invalidate the specified virtual address range.
++ *             - start  - virtual start address
++ *             - end    - virtual end address
+  *	DMA Cache Coherency
+  *	===================
+  *
+@@ -108,6 +113,7 @@ struct cpu_cache_fns {
+ 	void (*dma_unmap_area)(const void *, size_t, int);
+
+ 	void (*dma_flush_range)(const void *, const void *);
++	void (*flush_mem)(const void *, const void *);
+ };
+
+ /*
+@@ -135,6 +141,12 @@ extern struct cpu_cache_fns cpu_cache;
+ #define dmac_unmap_area			cpu_cache.dma_unmap_area
+ #define dmac_flush_range		cpu_cache.dma_flush_range
+
++/* This API is to support non-coherent IOMMUs. The purpose of
++ * this API is to ensure that data held in the cache is visible
++ * to MMU.
++ */
++#define flush_mem			cpu_cache.flush_mem
++
+ #else
+
+ extern void __cpuc_flush_icache_all(void);
+@@ -155,6 +167,11 @@ extern void dmac_map_area(const void *, size_t, int);
+ extern void dmac_unmap_area(const void *, size_t, int);
+ extern void dmac_flush_range(const void *, const void *);
+
++/* This API is to support non-coherent IOMMUs. The purpose of
++ * this API is to ensure that data held in the cache is visible
++ * to MMU.
++ */
++extern void flush_mem(const void *, const void *);
+ #endif
+
+ /*
+diff --git a/arch/arm/include/asm/glue-cache.h
+b/arch/arm/include/asm/glue-cache.h
+index 7e30874..59818a4 100644
+--- a/arch/arm/include/asm/glue-cache.h
++++ b/arch/arm/include/asm/glue-cache.h
+@@ -141,6 +141,7 @@
+ #define dmac_map_area			__glue(_CACHE,_dma_map_area)
+ #define dmac_unmap_area			__glue(_CACHE,_dma_unmap_area)
+ #define dmac_flush_range		__glue(_CACHE,_dma_flush_range)
++#define flush_mem			__glue(_CACHE,_flush_mem)
+ #endif
+
+ #endif
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 2d8ff3a..f48a5ab 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -307,6 +307,7 @@ ENTRY(\name\()_cache_fns)
+ 	.long	\name\()_dma_map_area
+ 	.long	\name\()_dma_unmap_area
+ 	.long	\name\()_dma_flush_range
++	.long	\name\()_flush_mem
+ 	.size	\name\()_cache_fns, . - \name\()_cache_fns
+ .endm
+
+-- 
+1.7.0.4
+
+
+-- 
+regards
+Ramesh Gupta G
