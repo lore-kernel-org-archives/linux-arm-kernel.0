@@ -1,63 +1,26 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 19 Jun 2012 12:46:27 +0200
-Subject: [PATCH] ARM: sa1100: remove lart.h
-Message-ID: <1340102787.1936.19.camel@x61.thuisdomein>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 19 Jun 2012 13:03:21 +0200
+Subject: [PATCH 2/2] sound: tegra_alc5632: Adjust to of_get_named_gpio()
+ change
+In-Reply-To: <CAAAP30FoHAbA1HcUCGQxorFymVDed19N1PPe-ZH0x0s3M+W8bg@mail.gmail.com>
+References: <1340037743-12924-1-git-send-email-stigge@antcom.de>
+ <1340037743-12924-2-git-send-email-stigge@antcom.de>
+ <CAAAP30G1qzDn+NKT1is+GJ9K2DS3Sm3QY+=n7s-P-Rop2b7FPQ@mail.gmail.com>
+ <CALq1K=LXVqfiyrLjn+_p+NTU3X5RjyQzvKdVRf09zXk-RqbkrQ@mail.gmail.com>
+ <CAAAP30FoHAbA1HcUCGQxorFymVDed19N1PPe-ZH0x0s3M+W8bg@mail.gmail.com>
+Message-ID: <4FE05C79.1040602@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No file includes this header. It has never been included since at least
-v2.6.12-rc2. It can safely be removed.
+On 06/19/2012 12:03 PM, Alexandre Pereira da Silva wrote:
+> On Tue, Jun 19, 2012 at 3:29 AM, Leon Romanovsky <leon@leon.nu> wrote:
+>> Hi Alexandre,
+>> Sorry to be rude, but can you explain me why did you "Acked-by" on this patch ?
+>> I don't see your name in git log for tegra_alc5632.c file:
+>> http://git.kernel.org/?p=linux/kernel/git/broonie/sound.git;a=history;f=sound/soc/tegra/tegra_alc5632.c;h=d684df294c0c5c80458b6de591c16965027db14b;hb=refs/heads/for-next
+> 
+> I'm tracking Roland's work on Probe defer.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Tested only by using various git commands on the (history of the)
-tree.
+Yes, that's valuable. Thanks!
 
-1) One other (potential) cleanup that I discovered while looking at the
-effects of removing this header can be found in
-arch/arm/mach-sa1100/lart.c:
-- outdated warning, referring to a header that (in short) got removed in
-commit c36167de652f8acdf0b374c78805e662646cd327 ("ide: remove dead
-<asm-arm/arch-sa1100/ide.h>");
-- quite a bit of code depends on macros that seem to be never defined
-anywhere (eg, LART_GREY_LCD).
-
-So that code is in need of some cleaning up. But does anyone still care
-about the LART related code? Especially that outdated warning suggests
-this code has seriously bit rotted.
-
-2) While I'm at it, I might as well add some more details on the history
-of lart.h, which are not really relevant for the commit explanation (or
-anything else, for that matter):
-- it got added in v2.4.9-pre1 and was only included by
-include/asm-arm/arch-sa1100/hardware.h;
-- its sole #include got removed in a patch called "[ARM] Clean up sa1100
-hardware specific headers.". That patch got merged in release v2.5.47.
-So it is actually unused since v2.5.47, ie it's unused for almost ten
-years!
-
- arch/arm/mach-sa1100/include/mach/lart.h |   13 -------------
- 1 files changed, 0 insertions(+), 13 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/lart.h
-
-diff --git a/arch/arm/mach-sa1100/include/mach/lart.h b/arch/arm/mach-sa1100/include/mach/lart.h
-deleted file mode 100644
-index 8a5482d..0000000
---- a/arch/arm/mach-sa1100/include/mach/lart.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--#ifndef _INCLUDE_LART_H
--#define _INCLUDE_LART_H
--
--#define LART_GPIO_ETH0			GPIO_GPIO0
--#define LART_IRQ_ETH0			IRQ_GPIO0
--
--#define LART_GPIO_IDE			GPIO_GPIO1
--#define LART_IRQ_IDE			IRQ_GPIO1
--
--#define LART_GPIO_UCB1200		GPIO_GPIO18
--#define LART_IRQ_UCB1200		IRQ_GPIO18
--
--#endif
--- 
-1.7.7.6
+Roland
