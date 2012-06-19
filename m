@@ -1,29 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 18 Jun 2012 16:44:12 -0700
-Subject: [PATCH] ARM: tegra: make tegra_cpu_reset_handler_enable() __init
-In-Reply-To: <1340053310-20855-1-git-send-email-swarren@wwwdotorg.org>
-References: <1340053310-20855-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120618234412.GA2034@quad.lixom.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 18 Jun 2012 17:34:27 -0700
+Subject: [PATCH 1/2] serial/amba-pl011: use devm_* allocators
+In-Reply-To: <1339940648-6847-1-git-send-email-linus.walleij@stericsson.com>
+References: <1339940648-6847-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120619003427.GA3114@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 03:01:50PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Sun, Jun 17, 2012 at 03:44:08PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> This solves a section mismatch warning. I hadn't noticed this before,
-> because my compiler was inlining tegra_cpu_reset_handler_enable() inside
-> tegra_cpu_reset_handler_init(), which is already __init, but I switched
-> compilers and it stopped doing that.
+> This switches a bunch of allocation and remapping to use the
+> devm_* garbage collected methods and cleans up the error
+> path and remove() paths consequently.
 > 
-> Cc: <stable@kernel.org> # v3.4
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> devm_ioremap() is only in <linux/io.h> so fix up the
+> erroneous <asm/*> include as well.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> Arnd, Olof, do you want me to put this in a pull request, or can you apply
-> it directly for 3.5?
+>  drivers/tty/serial/amba-pl011.c |   20 ++++++++------------
+>  1 file changed, 8 insertions(+), 12 deletions(-)
+> 
 
-Single patches are just fine as is, no need for a pull request.
+This patch doesn't apply, what tree did you make it against?
 
-Applied to fixes. Thanks!
-
-
--Olof
+greg k-h
