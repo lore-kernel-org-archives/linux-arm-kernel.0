@@ -1,73 +1,55 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Tue, 19 Jun 2012 12:25:58 +0800
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
- <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>,
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
-Message-ID: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 19 Jun 2012 10:45:56 +0530
+Subject: [PATCH 09/11] ARM: OMAP4: clock data: add clockdomains for clocks
+ used as main clocks
+In-Reply-To: <alpine.DEB.2.00.1206070108540.6684@utopia.booyaka.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061313.25532.84569.stgit@dusk> <4FD04C8D.50609@ti.com>
+ <alpine.DEB.2.00.1206070108540.6684@utopia.booyaka.com>
+Message-ID: <4FE00B0C.4070407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 09:23:35, Philip Rakity wrote:
->Why can't you use the regulator notify to get called back on power or 
->voltage change options to plumb in the manipulation of the gpio. I can 
->imagine you might need to add a notify call in core.c if you need to 
->assert the gpio before power is applied
+On Monday 18 June 2012 11:11 PM, Paul Walmsley wrote:
+> On Thu, 7 Jun 2012, Rajendra Nayak wrote:
+>
+>> On Thursday 07 June 2012 11:43 AM, Paul Walmsley wrote:
+>>> Until the OMAP4 code is converted to disable the use of the clock
+>>> framework-based clockdomain enable/disable sequence, any clock used as
+>>> a hwmod main_clk must have a clockdomain associated with it.  This
+>>> patch populates some clock structure clockdomain names to resolve the
+>>> following warnings during kernel init:
+>>
+>> But these associations are useless if the clock is not a 'gate' clock,
+>> except for getting rid of these warnings. Maybe we should make hwmod
+>> understand that not all clocks need to have a clockdomain associated
+>> with it and stop complaining.
+>
+> In retrospect, I think I should have made clockdomains mandatory for all
+> clocks for OMAP4 back then, rather than only allowing them for some
+> clocks.  As I understand it, that would have saved a lot of time and
+> debugging frustration on the bug fixed by commit
+> 6c4a057bffe9823221eab547e11fac181dc18a2b ("ARM: OMAP4: clock data: Force a
+> DPLL clkdm/pwrdm ON before a relock").  Oh well.
 
-Yes, we can use the regulator notify, but the Tegra30 support is via device tree, I think there have no special board file to run the call back.
+We should certainly have a better way for PM code to WARN() users if
+some clocks which need clockdomains to be programmed together with
+the clocks, have the clockdomain information missing. One way to do
+that is make it mandatory for *all* clocks to have an associated
+clockdomain, but that would mean we populate dummy and unnecessary
+data atleast in some cases wherein it never gets used, just to get
+rid of the WARN(). That certainly does not seem right.
+The other way is really to make our frameworks understand and WARN()
+*intelligently*.
+
+Today we WARN() users only for main_clks used in hwmod. I feel this
+WARN() should instead come from the clock framework, because there
+are clearly clocks outside of what is handled by hwmod (like the one
+in the commit above) which need this information.
+We should also look at making the clock framework intelligent to
+identify which clocks really need a clockdomain associated instead
+of adding a WARN for every other clock. just my 2 cents..
 
 >
 >
->________________________________________
-From: linux-mmc-owner@vger.kernel.org [linux-mmc-owner at vger.kernel.org] 
->On Behalf Of Wei Ni [wni at nvidia.com]
->Sent: Sunday, June 17, 2012 11:20 PM
->To: 'Stephen Warren'; Rakesh Kumar
->Cc: Mark Brown; 'frankyl at broadcom.com'; Thierry Reding; Mursalin Akon; 
->'linux-mmc at vger.kernel.org'; devicetree-discuss at lists.ozlabs.org; 
->'linux-wireless at vger.kernel.org'; linux-tegra at vger.kernel.org; 
->linux-arm-kernel at lists.infradead.org
->Subject: RE: Where to power on the wifi device before loading the driver.
->
->On Fri, Jun 15, 2012 at 23:49:10, Stephen Warren wrote:
->>> I talked with Franky, this power sequence is generally for 4329, so 
->>> it mean this sequence can be put into the wifi driver.
->>> We can use the virtual platform device both for OOB and non OOB.
->>> I will send out patches later.
->>
->>Can you please expand on what a "virtual platform device" is; device 
->>tree typically represents real
->hardware rather than anything "virtual".
->
->The "virtual platform device" is created before the real wifi device, 
->so that it can pass the gpios to the driver, and power up the device before calling sdio_register_driver.
->But as Franky said, this power sequence is only generally for 4329, not 
->for the USB dongle chips. So it's not a good idea to add this "power up" in brcmfmac.
->
->>
->>Now if this means adding a child node under the SDIO controller to 
->>represent the attached device, and
->storing any settings required by that device in that child node, that's 
->probably a reasonable basic approach.
->>
->>BTW, which GPIO is the power GPIO; is it WF_EN on the schematic? That 
->>seems reasonable to represent
->as a GPIO rather than a regulator since it connects directly into the 
->WiFi device as a GPIO, and its use within the WiFi device can indeed be 
->governed purely internally to the WiFi driver/HW. However, if this is some GPIO that controls the power to e.g.
->>VBAT3V3_IN_WF, VDDIO_WF, or other power supply to the WiFi card, then 
->>it'd be better represented as a
->regulator, since the control point is outside the WiFi device.
->
->I think Rakesh may can answer this.
->
->Wei.
->---
->nvpublic
+> - Paul
