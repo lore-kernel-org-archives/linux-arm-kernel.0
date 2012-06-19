@@ -1,65 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 13:26:56 +0800
-Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
- number
-In-Reply-To: <20120618164402.GA18630@n2100.arm.linux.org.uk>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 19 Jun 2012 13:51:15 +0800
+Subject: [PATCH 07/16] dma: ipu: remove the use of ipu_platform_data
+In-Reply-To: <20120618140219.GE19249@S2101-09.ap.freescale.net>
 References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
- <20120618143128.GF19249@S2101-09.ap.freescale.net>
- <20120618164402.GA18630@n2100.arm.linux.org.uk>
-Message-ID: <20120619052654.GC21951@S2101-09.ap.freescale.net>
+ <1339653587-4832-8-git-send-email-shawn.guo@linaro.org>
+ <20120615093713.GE8383@shlinux2.ap.freescale.net>
+ <20120616030106.GD29663@S2101-09.ap.freescale.net>
+ <20120618081943.GA25447@shlinux2.ap.freescale.net>
+ <20120618140219.GE19249@S2101-09.ap.freescale.net>
+Message-ID: <20120619055114.GA10387@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 05:44:02PM +0100, Russell King - ARM Linux wrote:
-> FIQs should be an entirely separate number space from IRQs, as we
-> may want to totally decouple them from the IRQ stuff (we probably
-> should have already done this when genirq came along.)
+On Mon, Jun 18, 2012 at 10:02:23PM +0800, Shawn Guo wrote:
+> On Mon, Jun 18, 2012 at 04:19:44PM +0800, Dong Aisheng wrote:
+...
+> > Using private mapping is not recommended.
+> > Maybe we can do it together with this patch since irqdomain support
+> > does not depend on device tree.
+> > What do you think?
+> > 
+> At this point, I would be conservative on that, since I do not have
+> the setup to test all the IPU irq handling.
 > 
-> About the only stuff FIQs use is the enable/disable_irq as a short
-> cut to dealing with the mask registers.
+I looked into the code a bit more, it seems ipu uses its own special irq mapping
+between virt irq and hw/dma_chan irq itself and the mapping is dynamically
+and limited to how many CONFIG_MX3_IPU_IRQS defined.
+No sure it's so suitable to convert to irqdomain.
+With adding irqdomain, i wonder we may need change this mechanism a bit.
 
-I do not quite understand what you are asking for, but I'm guessing it
-with the patch below.  Please elaborate it a little bit more if that's
-not what you are asking for.
+For now, i'm ok to put that work in another patch later and using the original
+way first since the later patch may need to do more things, so
+Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Regards,
-Shawn
-
---8<---
-
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index c32f845..dce12fb 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -39,6 +39,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/seq_file.h>
-
- #include <asm/cacheflush.h>
-@@ -124,12 +125,20 @@ void release_fiq(struct fiq_handler *f)
-
- void enable_fiq(int fiq)
- {
--       enable_irq(fiq + FIQ_START);
-+       struct irq_data *d = irq_get_irq_data(fiq);
-+       struct irq_chip *chip = irq_data_get_irq_chip(d);
-+
-+       if (chip->irq_unmask)
-+               chip->irq_unmask(d);
- }
-
- void disable_fiq(int fiq)
- {
--       disable_irq(fiq + FIQ_START);
-+       struct irq_data *d = irq_get_irq_data(fiq);
-+       struct irq_chip *chip = irq_data_get_irq_chip(d);
-+
-+       if (chip->irq_mask)
-+               chip->irq_mask(d);
- }
-
- EXPORT_SYMBOL(set_fiq_handler);
+Regards
+Dong Aisheng
