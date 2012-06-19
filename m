@@ -1,34 +1,37 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Jun 2012 17:50:01 +0900
-Subject: [PATCH] ARM: S3C64XX: Add IRQ mapping for wm0010 on Cragganmore
-In-Reply-To: <1339775065-13211-1-git-send-email-dp@opensource.wolfsonmicro.com>
-References: <1339775065-13211-1-git-send-email-dp@opensource.wolfsonmicro.com>
-Message-ID: <019601cd4df8$83b33380$8b199a80$%kim@samsung.com>
+Date: Tue, 19 Jun 2012 17:50:11 +0900
+Subject: [PATCH 1/2] ARM: S3C64XX: Add module identification for Balblair
+ Cragganmore module
+In-Reply-To: <1338398378-18268-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1338398378-18268-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <019701cd4df8$89387860$9ba96920$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dimitris Papastamos wrote:
+Mark Brown wrote:
 > 
-> Signed-off-by: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
 >  arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 +
 >  1 file changed, 1 insertion(+)
 > 
 > diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-
 > s3c64xx/mach-crag6410-module.c
-> index f347336..7c8ea3c 100644
+> index dbd5771..985e255 100644
 > --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
 > +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> @@ -47,6 +47,7 @@ static struct spi_board_info wm1253_devs[] = {
->  		.bus_num	= 0,
->  		.chip_select	= 0,
->  		.mode		= SPI_MODE_0,
-> +		.irq            = S3C_EINT(5),
->  		.controller_data = &wm0010_spi_csinfo,
->  		.platform_data = &wm0010_crag_pdata,
->  	},
+> @@ -219,6 +219,7 @@ static __devinitdata const struct {
+>  	  .spi_devs = wm1253_devs, .num_spi_devs =
+> ARRAY_SIZE(wm1253_devs) },
+>  	{ .id = 0x32, .name = "XXXX-EV1 Caol Illa" },
+>  	{ .id = 0x33, .name = "XXXX-EV1 Oban" },
+> +	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair" },
+>  	{ .id = 0x39, .name = "1254-EV1 Dallas Dhu",
+>  	  .i2c_devs = wm1254_devs, .num_i2c_devs =
+> ARRAY_SIZE(wm1254_devs) },
+>  	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
 > --
-> 1.7.10.4
+> 1.7.10
 
 OK, will apply.
 Thanks.
