@@ -1,101 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jun 2012 23:20:46 +0800
-Subject: [PATCH] ARM: mxs: store mac address read from OTP in device tree
-Message-ID: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 19 Jun 2012 23:28:10 +0800
+Subject: [PATCH] ARM: dts: imx6q-sabrelite: add ecspi1 pinctrl support
+In-Reply-To: <1340096887-24156-1-git-send-email-jason77.wang@gmail.com>
+References: <1340096887-24156-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20120619152808.GI21951@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The non-DT boot reads the mac from OTP and pass it to fec driver via
-platform data.  The patch provides an equivalent support for device
-tree boot, with reading mac from OTP and store it in device tree,
-and fec driver can get the mac from device tree at its probe time.
+On Tue, Jun 19, 2012 at 05:08:07PM +0800, Hui Wang wrote:
+> Imx6q sabrelite board uses ecspi1 to connect a spi flash sst25vf016b,
+> we need to add pinctrl information for it in the dts, otherwise the
+> ecspi1 driver can't work and the connected flash is wrongly
+> detected as a mr25h256 flash like this:
+> 
+> m25p80 spi32766.0: found mr25h256, expected sst25vf016b
+> m25p80 spi32766.0: mr25h256 (32 Kbytes)
+> 
+> Cc: Richard Zhao <richard.zhao@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx6q-sabrelite.dts | 2 ++
+>  arch/arm/boot/dts/imx6q.dtsi          | 9 +++++++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index e0ec929..83a8f62 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -27,6 +27,8 @@
+>  				ecspi at 02008000 { /* eCSPI1 */
+>  					fsl,spi-num-chipselects = <1>;
+>  					cs-gpios = <&gpio3 19 0>;
+> +					pinctrl-names = "default";
+> +					pinctrl-0 = <&pinctrl_ecspi1_1>;
+>  					status = "okay";
+>  
+>  					flash: m25p80 at 0 {
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 8c90cba..ae8e7f2 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -538,6 +538,15 @@
+>  							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
+>  					};
+>  				};
+> +
+> +				ecspi1 {
+> +					pinctrl_ecspi1_1: ecspi1grp-1 {
+> +						fsl,pins = <101 0x100b1		/* MX6Q_PAD_EIM_D17__ECSPI1_MISO */
+> +							    109 0x100b1		/* MX6Q_PAD_EIM_D18__ECSPI1_MOSI */
+> +							    94  0x100b1		/* MX6Q_PAD_EIM_D16__ECSPI1_SCLK */
+> +							    121 0x100b1>;	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/mach-mxs.c |   64 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 64 insertions(+), 0 deletions(-)
+Which gpio is used is really a board specific setting and should not
+be defined in <soc>.dtsi.  Before gpio_request can automatically
+configure the requested pin into gpio mode by talking to pinctrl system,
+we may want to use "hog" feature to configure pins into gpio mode,
+which means defining a pinctrl state for pin controller node itself,
+then at pinctrl subsystem init time, pinctrl core will configure these
+"hog" pins properly.  The following is an example using that feature.
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 8cac94b..167f649 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -71,6 +71,68 @@ static struct sys_timer imx28_timer = {
- 	.init = imx28_timer_init,
- };
- 
-+enum mac_oui {
-+	OUI_FSL,
-+	OUI_DENX,
-+};
-+
-+static void __init update_fec_mac_prop(enum mac_oui oui)
-+{
-+	struct device_node *np, *from = NULL;
-+	struct property *oldmac, *newmac;
-+	const u32 *ocotp = mxs_get_ocotp();
-+	u8 *macaddr;
-+	u32 val;
-+	int i;
-+
-+	for (i = 0; i < 2; i++) {
-+		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
-+		if (!np)
-+			return;
-+		from = np;
-+
-+		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
-+		if (!newmac)
-+			return;
-+		newmac->value = newmac + 1;
-+		newmac->length = 6;
-+
-+		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
-+		if (!newmac->name) {
-+			kfree(newmac);
-+			return;
-+		}
-+
-+		/*
-+		 * OCOTP only stores the last 4 octets for each mac address,
-+		 * so hard-code OUI here.
-+		 */
-+		macaddr = newmac->value;
-+		switch (oui) {
-+		case OUI_FSL:
-+			macaddr[0] = 0x00;
-+			macaddr[1] = 0x04;
-+			macaddr[2] = 0x9f;
-+			break;
-+		case OUI_DENX:
-+			macaddr[0] = 0xc0;
-+			macaddr[1] = 0xe5;
-+			macaddr[2] = 0x4e;
-+			break;
-+		}
-+		val = ocotp[i];
-+		macaddr[3] = (val >> 16) & 0xff;
-+		macaddr[4] = (val >> 8) & 0xff;
-+		macaddr[5] = (val >> 0) & 0xff;
-+
-+		oldmac = of_find_property(np, newmac->name, NULL);
-+		if (oldmac)
-+			prom_update_property(np, newmac, oldmac);
-+		else
-+			prom_add_property(np, newmac);
-+	}
-+}
-+
- static void __init imx28_evk_init(void)
- {
- 	struct clk *clk;
-@@ -79,6 +141,8 @@ static void __init imx28_evk_init(void)
- 	clk = clk_get_sys("enet_out", NULL);
- 	if (!IS_ERR(clk))
- 		clk_prepare_enable(clk);
-+
-+	update_fec_mac_prop(OUI_FSL);
- }
- 
- static void __init mxs_machine_init(void)
--- 
-1.7.5.4
+http://permalink.gmane.org/gmane.linux.usb.general/65761
+
+Regards,
+Shawn
+
+> +					};
+> +				};
+>  			};
+>  
+>  			dcic at 020e4000 { /* DCIC1 */
+> -- 
+> 1.7.11
+> 
