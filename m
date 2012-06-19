@@ -1,64 +1,48 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 19 Jun 2012 09:18:54 +0200
-Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex Net
-In-Reply-To: <CAMW5UfaUBROU4o+1jz9O0AxTAgN6e0bjOX=T7YwQvomCTec3aQ@mail.gmail.com>
-References: <CAMW5UfaUBROU4o+1jz9O0AxTAgN6e0bjOX=T7YwQvomCTec3aQ@mail.gmail.com>
-Message-ID: <20120619071854.GA28421@schnuecks.de>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 19 Jun 2012 15:21:11 +0800
+Subject: [PATCH 16/16] ARM: imx: enable SPARSE_IRQ for imx platform
+In-Reply-To: <20120619064742.GE21951@S2101-09.ap.freescale.net>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-17-git-send-email-shawn.guo@linaro.org>
+ <20120618084850.GG25447@shlinux2.ap.freescale.net>
+ <20120618150422.GG19249@S2101-09.ap.freescale.net>
+ <20120619061637.GB10387@shlinux2.ap.freescale.net>
+ <20120619064742.GE21951@S2101-09.ap.freescale.net>
+Message-ID: <20120619072110.GC10387@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Tue, Jun 19, 2012 at 02:47:44PM +0800, Shawn Guo wrote:
+> On Tue, Jun 19, 2012 at 02:16:38PM +0800, Dong Aisheng wrote:
+> > > > Ideally i would see we keep the code as before that still using hw irqs
+> > > > for device resource definition, but convert to linux virt irq in a standard
+> > > > irqdomain map way when adding devices by calling imx_add_platform_device.
+> > > > 
+> > > What's the point of hiding this irq number conversion in
+> > > imx_add_platform_device?  
+> > It's standard and safe way.
+> > 
+> Why do you think it's standard?
+Why do you think using irq_find_mapping to get the linux virt irq is not
+standard way?
 
-On Mon, Jun 18, 2012 at 08:35:27PM -0400, Josh Coombs wrote:
-> This is an attempt to get the Seagate GoFlex Net booting using
-> Kirkwood DTS support based on Arch Linux ARM's non-DTS GFN patches.
-> Currently 3.5rc3 will load and begin initializing, but stops without
-> error before mounting a rootfs and starting init.  This patch is based
-> on 3.5rc3 with the printk fix already applied.  The only oddity I can
-> pick out from dmesg is the console attaching to ttyS0 twice.
+> Care to show me a couple of examples
+> that make this conversion when adding platform device?
+> 
+I did not search any example, currently it's just my idea based on my understanding
+on irq domain design. Maybe i should give a patch to describe my idea,
+then we can discuss on the patch.
 
-It looks like you don't enable NAND (the GoFlex Net has NAND, isn't
-it?). The problem is that the associated clock (runit) seems also to
-be used for other purposes and the machine locks up when it is
-disabled if neither NAND nor SPI are used. 
+Or did you see any example on using shift way to define device irq resource?
+Then i can look at it.
 
-Thus, you either need to find Andrew's patch (can't lookup the URL
-currently, the title is "Fix crash when neither NAND nor SPI") to
-always enable the clock or you should add a nand part to your dts
-file.
+> > > The irq number used in resource definition
+> > > should simply just be Linux irq.  Doing what you suggest here will
+> > No, it's should be hw irq.
+> 
+> You are simply wrong here.  Nothing more to respond on this.
+>
+If using linux virt irq, how do we avoid the issues i said in my last reply?
 
-
-...
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/mtd/physmap.h>
-...
-> +
-> +struct mtd_partition goflexnet_partitions[] = {
-> +	{
-> +		.name	= "u-boot",
-> +		.size	= SZ_1M,
-> +		.offset = 0,
-> +	},
-> +	{
-> +		.name	= "uImage",
-> +		.size	= SZ_4M,
-> +		.offset = MTDPART_OFS_NXTBLK,
-> +	},
-> +	{
-> +		.name	= "pogoplug",
-> +		.size	= SZ_32M,
-> +		.offset = MTDPART_OFS_NXTBLK,
-> +	},
-> +	{
-> +		.name	= "root",
-> +		.size	= MTDPART_SIZ_FULL,
-> +		.offset = MTDPART_OFS_NXTBLK,
-> +	},
-> +};
-> +
-
-You can remove this. I think it is not used and it should be defined
-in the dts anyway.
-
-
-- Simon
+Regards
+Dong Aisheng
