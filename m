@@ -1,50 +1,101 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 19 Jun 2012 10:48:22 -0400 (EDT)
-Subject: pm runtime and system suspend resume
-In-Reply-To: <CAK9wHMQ7ZLtMTfBKWOb4A8wmjP9EQV8gA_moh5dXxvU0-b-vMQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1206191046000.1814-100000@iolanthe.rowland.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jun 2012 23:20:46 +0800
+Subject: [PATCH] ARM: mxs: store mac address read from OTP in device tree
+Message-ID: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jun 2012, chao xie wrote:
+The non-DT boot reads the mac from OTP and pass it to fec driver via
+platform data.  The patch provides an equivalent support for device
+tree boot, with reading mac from OTP and store it in device tree,
+and fec driver can get the mac from device tree at its probe time.
 
-> hi
-> PM_RUNTIME provide a way for device driver do runtime PM. so for some
-> devices, they have some surrounded logic. For example, the device may
-> get clock from outside, or it need PHY support(USB is a example).
-> To get these dependency out of device driver, i define a struct
-> dev_pm_domain, and make dev.pm_domain point to it. So in the device
-> driver, when the hardware should be enabled, we can call
-> pm_runtime_get_sync while when the hardware is idle or does not work,
-> we can call pm_runtime_put_sync.
-> It seems work well, but i have question about the suspend/resume of
-> device. When the whole system will go to deep idle, and it will
-> suspend the devices. for the function do device suspend
-> __device_suspend,
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |   64 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 64 insertions(+), 0 deletions(-)
 
-What source file is that function in?
-
->  it will call pm_runtime_get_noresume(dev). As i
-> think it will make the device not do runtime suspend any more. Is that
-> correct?
-
-It sounds wrong.  Why would a suspend routine do that?
-
-> There is the question, how device driver handle the logic surrounds
-> it? I want to add pm_runtime_put_sync in dev->driver->pm->suspend
-> function, and pm_runtime_get_sync in dev->driver->pm->resume.
-
-You must not do that.  If you do, your driver will hang.
-
-> Because
-> __device_suspend increase the usage_count, pm_runtime_put_sync will
-> not do real work.
-> So is that right that i directly call pm_runtime_suspend in
-> dev->driver->pm->suspend and pm_runtime_resume in
-> dev->driver->pm->resume?
-
-No, it works the other way around.  pm_runtime_suspend calls 
-dev->driver->pm->suspend, and pm_runtime_resume calls 
-dev->driver->pm->resume.
-
-Alan Stern
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 8cac94b..167f649 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -71,6 +71,68 @@ static struct sys_timer imx28_timer = {
+ 	.init = imx28_timer_init,
+ };
+ 
++enum mac_oui {
++	OUI_FSL,
++	OUI_DENX,
++};
++
++static void __init update_fec_mac_prop(enum mac_oui oui)
++{
++	struct device_node *np, *from = NULL;
++	struct property *oldmac, *newmac;
++	const u32 *ocotp = mxs_get_ocotp();
++	u8 *macaddr;
++	u32 val;
++	int i;
++
++	for (i = 0; i < 2; i++) {
++		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
++		if (!np)
++			return;
++		from = np;
++
++		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
++		if (!newmac)
++			return;
++		newmac->value = newmac + 1;
++		newmac->length = 6;
++
++		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
++		if (!newmac->name) {
++			kfree(newmac);
++			return;
++		}
++
++		/*
++		 * OCOTP only stores the last 4 octets for each mac address,
++		 * so hard-code OUI here.
++		 */
++		macaddr = newmac->value;
++		switch (oui) {
++		case OUI_FSL:
++			macaddr[0] = 0x00;
++			macaddr[1] = 0x04;
++			macaddr[2] = 0x9f;
++			break;
++		case OUI_DENX:
++			macaddr[0] = 0xc0;
++			macaddr[1] = 0xe5;
++			macaddr[2] = 0x4e;
++			break;
++		}
++		val = ocotp[i];
++		macaddr[3] = (val >> 16) & 0xff;
++		macaddr[4] = (val >> 8) & 0xff;
++		macaddr[5] = (val >> 0) & 0xff;
++
++		oldmac = of_find_property(np, newmac->name, NULL);
++		if (oldmac)
++			prom_update_property(np, newmac, oldmac);
++		else
++			prom_add_property(np, newmac);
++	}
++}
++
+ static void __init imx28_evk_init(void)
+ {
+ 	struct clk *clk;
+@@ -79,6 +141,8 @@ static void __init imx28_evk_init(void)
+ 	clk = clk_get_sys("enet_out", NULL);
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
++
++	update_fec_mac_prop(OUI_FSL);
+ }
+ 
+ static void __init mxs_machine_init(void)
+-- 
+1.7.5.4
