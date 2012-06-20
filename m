@@ -1,50 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jun 2012 15:14:37 +0000
-Subject: [PATCH] ARM: Orion5x - Restore parts of io.h
-In-Reply-To: <1340172410-11229-1-git-send-email-andrew@lunn.ch>
-References: <1340172410-11229-1-git-send-email-andrew@lunn.ch>
-Message-ID: <201206201514.37618.arnd@arndb.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 20 Jun 2012 17:19:17 +0200
+Subject: [PATCH v3 0/5] ARM: topology: set the capacity of each cores for
+ big.LITTLE
+Message-ID: <1340205562-7653-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 June 2012, Andrew Lunn wrote:
-> Commit 4d5fc58dbe34b78157c05b319669bb3e064ba8bd remove the orion5x
-> io.h. Unfortunetely, this is still needed for the definition of
-> IO_SPACE_LIMIT which overrides the default 64K. All Orion based
-> systems have 1Mbyte of IO space per PCI[e] bus, and try to
-> request_resource() this size.
+This patchset creates an arch_scale_freq_power function for ARM, which is used 
+to set the relative capacity of each core of a big.LITTLE system. It also removes
+the broken power estimation of x86.
 
-> diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
-> new file mode 100644
-> index 0000000..f017fe2
-> --- /dev/null
-> +++ b/arch/arm/mach-orion5x/include/mach/io.h
-> @@ -0,0 +1,14 @@
-> +/*
-> + * arch/arm/mach-orion5x/include/mach/io.h
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __ASM_ARCH_IO_H
-> +#define __ASM_ARCH_IO_H
-> +
-> +#define IO_SPACE_LIMIT		0xffffffff
-> +#define __io(a)			__typesafe_io(a)
-> +#endif
+Modification since v2:
+ - set_power_scale function becomes static
+ - Rework loop in update_siblings_masks
+ - Remove useless code in parse_dt_topology
 
-So if you need 1 MB per bus, why do you make the limit 4GB? Also,
-the __io function does not actually point to the IO window at all,
-which also appears to be horribly wrong.
+Modification since v1:
+ - Add and update explanation about the use of the table and the range of the value 
+ - Remove the use of NR_CPUS and use nr_cpu_ids instead
+ - Remove broken power estimation of x86
 
-My guess is that you actually want this to be
+Peter Zijlstra (1):
+  sched, x86: Remove broken power estimation
 
-#define IO_SPACE_LIMIT SZ_2MB
-#define __io(a)	((void __iomem *)ORION5X_PCI_IO_VIRT_BASE + a)
+Vincent Guittot (4):
+  ARM: topology: Add arch_scale_freq_power function
+  ARM: topology: factorize the update of sibling masks
+  ARM: topology: Update cpu_power according to DT information
+  sched: cpu_power: enable ARCH_POWER
 
-Your patch otherwise would make the kernel build again, but has
-no chance of doing the right thing.
+ arch/arm/kernel/topology.c   |  209 +++++++++++++++++++++++++++++++++++++-----
+ arch/x86/kernel/cpu/Makefile |    2 +-
+ arch/x86/kernel/cpu/sched.c  |   55 -----------
+ kernel/sched/features.h      |    2 +-
+ 4 files changed, 189 insertions(+), 79 deletions(-)
+ delete mode 100644 arch/x86/kernel/cpu/sched.c
 
-	Arnd
+-- 
+1.7.9.5
