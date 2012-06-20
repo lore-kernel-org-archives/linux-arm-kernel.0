@@ -1,34 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 20 Jun 2012 16:50:36 -0700
-Subject: [PATCH 2/2] serial: samsung: Fixed wrong comparison for
- baudclk_rate
-In-Reply-To: <028f01cd4e9d$2b344410$819ccc30$%kim@samsung.com>
-References: <000101cd3665$7943b690$6bcb23b0$%kim@samsung.com>
- <028f01cd4e9d$2b344410$819ccc30$%kim@samsung.com>
-Message-ID: <20120620235036.GB8293@kroah.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Jun 2012 07:53:20 +0800
+Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
+ number
+In-Reply-To: <20120620225520.GA30087@n2100.arm.linux.org.uk>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
+ <20120618143128.GF19249@S2101-09.ap.freescale.net>
+ <20120618164402.GA18630@n2100.arm.linux.org.uk>
+ <20120619052654.GC21951@S2101-09.ap.freescale.net>
+ <20120620225520.GA30087@n2100.arm.linux.org.uk>
+Message-ID: <20120620233614.GH2253@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:28:40PM +0900, Kukjin Kim wrote:
-> Kyoungil Kim wrote:
+On Wed, Jun 20, 2012 at 11:55:20PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 19, 2012 at 01:26:56PM +0800, Shawn Guo wrote:
+> > On Mon, Jun 18, 2012 at 05:44:02PM +0100, Russell King - ARM Linux wrote:
+> > > FIQs should be an entirely separate number space from IRQs, as we
+> > > may want to totally decouple them from the IRQ stuff (we probably
+> > > should have already done this when genirq came along.)
+> > > 
+> > > About the only stuff FIQs use is the enable/disable_irq as a short
+> > > cut to dealing with the mask registers.
 > > 
-> > port->baudclk_rate should be compared to the rate of port->baudclk,
-> > because port->baudclk_rate was assigned as the rate of port->baudclk
-> > previously.
-> > So to check that the current baudclk rate is same as previous rate,
-> > the target of comparison sholud be the rate of port->baudclk.
-> > 
-> > Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
-> > Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+> > I do not quite understand what you are asking for, but I'm guessing it
+> > with the patch below.  Please elaborate it a little bit more if that's
+> > not what you are asking for.
 > 
-> (Cc'ed Greg)
+> I was thinking about moving entirely away from any bits of genirq for
+> this.  We shouldn't really be mixing these two things together by
+> nabbing some of the IRQ numberspace for this.
 > 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Greg, this is needed to fix the wrong comparison for baudclk_rate for
-> Samsung Serial.
-> Could you please pick this up in your fix tree?
+> Looking at this code, I'm thinking about taking this further, and
+> santising the whole thing... though that's not going to be a quick
+> change.
 
-Already there, thanks.
+What I'm looking for is a quick and safe fixing for a compile error
+when SPARSE_IRQ enabled for imx.  Can we take the original patch as
+it is and defer the whole cleanup to another series?
 
-greg k-h
+-- 
+Regards,
+Shawn
