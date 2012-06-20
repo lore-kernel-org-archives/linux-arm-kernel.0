@@ -1,143 +1,47 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 20 Jun 2012 15:59:27 +0200
-Subject: [PATCH] ARM: LPC32XX: Cleanup USB clock init
-In-Reply-To: <1340193675-30717-1-git-send-email-aletes.xgr@gmail.com>
-References: <1340193675-30717-1-git-send-email-aletes.xgr@gmail.com>
-Message-ID: <4FE1D73F.4060007@antcom.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 Jun 2012 15:01:16 +0100
+Subject: [PATCH 15/15] ARM: perf: handle muxed CPU IRQ lines
+In-Reply-To: <4FE1D3D2.3050209@linaro.org>
+References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
+ <1340197011-5435-16-git-send-email-lee.jones@linaro.org>
+ <20120620132823.GG32666@mudshark.cambridge.arm.com>
+ <4FE1D3D2.3050209@linaro.org>
+Message-ID: <20120620140115.GJ32666@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 02:01 PM, Alexandre Pereira da Silva wrote:
-> Move most of usb clock initialization from lpc32xx_udc and ohci-nxp to
-> clock.c. Also adds ohci clocks and otg clocks.
+On Wed, Jun 20, 2012 at 02:44:50PM +0100, Lee Jones wrote:
+> >
+> > Shouldn't this be in the platform IRQ handler, rather than the core v7 perf
+> > code?
 > 
-> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> Well that's where it currently resides, but in the process of DT:ing the 
+> platform, we have no real way to set the call-back. Normally, if it's 
+> absolutely necessary, we do this with AUXDATA. However in the PMU case 
+> we fall-down as a device address is required for DT look-up, which the 
+> PMU does not have.
 
-Acked-by: Roland Stigge <stigge@antcom.de>
+Right, so I suspect this is going to be a huge problem for the OMAP guys,
+where they have to do a fair amount of jiggery-pokery to kick their PMU into
+action. We are also looking to put suspend/resume hooks into the
+arm_pmu_platdata which will undoubtedly be highly platform-specific.
 
-> ---
->  arch/arm/mach-lpc32xx/clock.c                 |   73 ++++++++++++++++++++++++-
->  arch/arm/mach-lpc32xx/include/mach/platform.h |   14 +++++
->  2 files changed, 86 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-> index f6a3ffe..c80f064 100644
-> --- a/arch/arm/mach-lpc32xx/clock.c
-> +++ b/arch/arm/mach-lpc32xx/clock.c
-> @@ -727,14 +727,82 @@ static struct clk clk_rtc = {
->  	.get_rate	= local_return_parent_rate,
->  };
->  
-> +static int local_usb_enable(struct clk *clk, int enable)
-> +{
-> +	u32 tmp;
-> +
-> +	if (enable) {
-> +		/* Set up I2C pull levels
-> +		 *
-> +		 * This should never be disabled as the host/gadget driver may
-> +		 * need to talk to the usb transceiver while the main clocks are
-> +		 * disabled to save power.
-> +		 */
-> +		tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
-> +		tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE;
-> +		__raw_writel(tmp, LPC32XX_CLKPWR_I2C_CLK_CTRL);
-> +	}
-> +
-> +	return local_onoff_enable(clk, enable);
-> +}
-> +
->  static struct clk clk_usbd = {
->  	.parent		= &clk_usbpll,
-> -	.enable		= local_onoff_enable,
-> +	.enable		= local_usb_enable,
->  	.enable_reg	= LPC32XX_CLKPWR_USB_CTRL,
->  	.enable_mask	= LPC32XX_CLKPWR_USBCTRL_HCLK_EN,
->  	.get_rate	= local_return_parent_rate,
->  };
->  
-> +#define OTG_ALWAYS_MASK		(LPC32XX_USB_OTG_OTG_CLOCK_ON | \
-> +				 LPC32XX_USB_OTG_I2C_CLOCK_ON)
-> +
-> +static int local_usb_otg_enable(struct clk *clk, int enable)
-> +{
-> +	int to = 1000;
-> +
-> +	if (enable) {
-> +		__raw_writel(clk->enable_mask, clk->enable_reg);
-> +
-> +		while (((__raw_readl(LPC32XX_USB_OTG_CLK_STAT) &
-> +			clk->enable_mask) != clk->enable_mask) && (to > 0))
-> +			to--;
-> +	} else {
-> +		__raw_writel(OTG_ALWAYS_MASK, clk->enable_reg);
-> +
-> +		while (((__raw_readl(LPC32XX_USB_OTG_CLK_STAT) &
-> +			OTG_ALWAYS_MASK) != OTG_ALWAYS_MASK) && (to > 0))
-> +			to--;
-> +	}
-> +
-> +	if (to)
-> +		return 0;
-> +	else
-> +		return -1;
-> +}
-> +
-> +static struct clk clk_usb_otg_dev = {
-> +	.parent		= &clk_usbpll,
-> +	.enable		= local_usb_otg_enable,
-> +	.enable_reg	= LPC32XX_USB_OTG_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_USB_OTG_AHB_M_CLOCK_ON |
-> +			  LPC32XX_USB_OTG_OTG_CLOCK_ON |
-> +			  LPC32XX_USB_OTG_DEV_CLOCK_ON |
-> +			  LPC32XX_USB_OTG_I2C_CLOCK_ON,
-> +	.get_rate	= local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_usb_otg_host = {
-> +	.parent		= &clk_usbpll,
-> +	.enable		= local_usb_otg_enable,
-> +	.enable_reg	= LPC32XX_USB_OTG_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_USB_OTG_AHB_M_CLOCK_ON |
-> +			  LPC32XX_USB_OTG_OTG_CLOCK_ON |
-> +			  LPC32XX_USB_OTG_HOST_CLOCK_ON |
-> +			  LPC32XX_USB_OTG_I2C_CLOCK_ON,
-> +	.get_rate	= local_return_parent_rate,
-> +};
-> +
->  static int tsc_onoff_enable(struct clk *clk, int enable)
->  {
->  	u32 tmp;
-> @@ -1130,6 +1198,9 @@ static struct clk_lookup lookups[] = {
->  	CLKDEV_INIT("31060000.ethernet", NULL, &clk_net),
->  	CLKDEV_INIT("dev:clcd", NULL, &clk_lcd),
->  	CLKDEV_INIT("31020000.usbd", "ck_usbd", &clk_usbd),
-> +	CLKDEV_INIT("31020000.ohci", "ck_usbd", &clk_usbd),
-> +	CLKDEV_INIT("31020000.usbd", "ck_usb_otg", &clk_usb_otg_dev),
-> +	CLKDEV_INIT("31020000.ohci", "ck_usb_otg", &clk_usb_otg_host),
->  	CLKDEV_INIT("lpc32xx_rtc", NULL, &clk_rtc),
->  };
->  
-> diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
-> index c584f5b..acc4aab 100644
-> --- a/arch/arm/mach-lpc32xx/include/mach/platform.h
-> +++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
-> @@ -694,4 +694,18 @@
->  #define LPC32XX_GPIO_P2_MUX_CLR			_GPREG(0x02C)
->  #define LPC32XX_GPIO_P2_MUX_STATE		_GPREG(0x030)
->  
-> +/*
-> + * USB Otg Registers
-> + */
-> +#define _OTGREG(x)			io_p2v(LPC32XX_USB_OTG_BASE + (x))
-> +#define LPC32XX_USB_OTG_CLK_CTRL	_OTGREG(0xFF4)
-> +#define LPC32XX_USB_OTG_CLK_STAT	_OTGREG(0xFF8)
-> +
-> +/* USB OTG CLK CTRL bit defines */
-> +#define LPC32XX_USB_OTG_AHB_M_CLOCK_ON	_BIT(4)
-> +#define LPC32XX_USB_OTG_OTG_CLOCK_ON	_BIT(3)
-> +#define LPC32XX_USB_OTG_I2C_CLOCK_ON	_BIT(2)
-> +#define LPC32XX_USB_OTG_DEV_CLOCK_ON	_BIT(1)
-> +#define LPC32XX_USB_OTG_HOST_CLOCK_ON	_BIT(0)
-> +
->  #endif
+> I spoke with Arnd about sensible solutions and he suggested placing the 
+> logic inside the generic instead, thus supporting muxed IRQ lines 
+> without the requirement of providing a platform specific handler in 
+> every instance this occurs (although, I think the ux500 are the only 
+> platform to do this currently).
+
+Whilst this code isn't too problematic (but yes, you are the only platform
+that needs it) I think if we solve the bigger problem then you can use the
+same solution to do your IRQ ping-ponging.
+
+> I'd be happy to take any other suggestions, but this seemed fairly neat 
+> and unobtrusive (not withstanding the predicate cock-up).
+
+Can we not fix the AUXDATA stuff to assume address 0 if it's not present for
+the matching node? This will work for perf as I don't expect to have
+multiple nodes with the same compatible string for PMUs that are not
+memory-mapped (for big.LITTLE, the strings will be different).
+
+Will
