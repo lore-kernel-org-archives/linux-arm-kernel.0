@@ -1,37 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jun 2012 11:21:57 +0200
-Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
-In-Reply-To: <CACRpkdbLMCirzyk-UbS0zx_TpY-mx51-aEn0bk-48eGMhmm=fg@mail.gmail.com>
-References: <20120619012420.GJ19249@S2101-09.ap.freescale.net>
- <1569254394.2932189.1340107238237.JavaMail.root@advansee.com>
- <CACRpkdbLMCirzyk-UbS0zx_TpY-mx51-aEn0bk-48eGMhmm=fg@mail.gmail.com>
-Message-ID: <20120620092157.GR28394@pengutronix.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 20 Jun 2012 17:22:16 +0800
+Subject: [PATCH v2] PINCTRL: SiRF: add GPIO and GPIO irq support in CSR
+ SiRFprimaII
+In-Reply-To: <CACRpkdbZXqiv2maVqaDHX-7AmYZLqRot-F0UX8UWOe3WPA2B7g@mail.gmail.com>
+References: <1340090216-1689-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdbZXqiv2maVqaDHX-7AmYZLqRot-F0UX8UWOe3WPA2B7g@mail.gmail.com>
+Message-ID: <CAGsJ_4xQxdQc0GB-6iUw00Eny4kE6f7CBf=QA8euEhkpDPGhqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 10:35:21AM +0200, Linus Walleij wrote:
-> On Tue, Jun 19, 2012 at 2:00 PM, Beno?t Th?baudeau
-> <benoit.thebaudeau@advansee.com> wrote:
-> 
-> > Can you give me an example
-> > that tells me by what you replaced those cpu_is_xxx()? By some feature test
-> > macros?
-> 
-> Since this is a DT-enabled driver, add a boolean attribute for
-> the DT node like "has-edge-select" and add that attribute to
-> the SoC .dtsi files for the SoCs that has this feature.
-> 
-> Another (better) option is if there are magic numbers in the
-> silicon register range that you can check for revision of that
-> hardware in itself. Such auto-detect plug-n-play is always best.
+Hi Linus,
 
-If there would be such a register it would almost certainly be on different
-register offsets on different SoCs...
+2012/6/20 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Jun 19, 2012 at 9:16 AM, Barry Song <Barry.Song@csr.com> wrote:
+>
+>> In SiRFprimaII, Each GPIO pin can be configured as input or output
+>> independently. If a GPIO is configured as input, it can also be
+>> enabled as an interrupt source (either edge or level triggered).
+>>
+>> These pins must be either MUXed as GPIO or other function pads.
+>>
+>> Signed-off-by: Yuping Luo <Yuping.Luo@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> This is looking great!
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I assume you will merge this through the ARM SoC tree and the
+> PrimaII branch? Tell me if you need it to be merged through the
+> pinctrl tree.
 
-Sascha
+Thanks. i'll handle it in primaII tree.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>> +/* Pull up/down values */
+>> +enum sirfsoc_gpio_pull {
+>> + ? ? ? SIRFSOC_GPIO_PULL_NONE,
+>> + ? ? ? SIRFSOC_GPIO_PULL_UP,
+>> + ? ? ? SIRFSOC_GPIO_PULL_DOWN,
+>> +};
+>
+> As noted you can use pinconf-generic and friends, but it's definately
+> not a requirement. You can also do that as a refactoring on top of this
+> patch if you want to.
+>
+> Yours,
+> Linus Walleij
+>
+
+-barry
