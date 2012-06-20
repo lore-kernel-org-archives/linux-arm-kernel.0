@@ -1,38 +1,92 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 20 Jun 2012 15:27:33 +0100
-Subject: [RFC] Support for 'Coda' video codec IP.
-In-Reply-To: <20120620135633.GA2513@S2101-09.ap.freescale.net>
-References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
- <20120619181717.GE28394@pengutronix.de>
- <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
- <20120620090126.GO28394@pengutronix.de>
- <20120620100015.GA30243@sirena.org.uk>
- <20120620130941.GB2253@S2101-09.ap.freescale.net>
- <20120620133148.GP3978@opensource.wolfsonmicro.com>
- <20120620135633.GA2513@S2101-09.ap.freescale.net>
-Message-ID: <20120620142733.GQ3978@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 20 Jun 2012 09:29:39 -0500
+Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <20120614013343.GD29684@b20223-02.ap.freescale.net>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
+ <4FD8AD42.6010702@gmail.com> <20120613152841.GA23590@richard-laptop>
+ <4FD8C4DB.4020908@gmail.com>
+ <20120614013343.GD29684@b20223-02.ap.freescale.net>
+Message-ID: <4FE1DE53.4070202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 09:56:37PM +0800, Shawn Guo wrote:
-> On Wed, Jun 20, 2012 at 02:31:48PM +0100, Mark Brown wrote:
+On 06/13/2012 08:33 PM, Richard Zhao wrote:
+> On Wed, Jun 13, 2012 at 11:50:35AM -0500, Rob Herring wrote:
+>> On 06/13/2012 10:28 AM, Richard Zhao wrote:
+>>> On Wed, Jun 13, 2012 at 10:09:54AM -0500, Rob Herring wrote:
+>>>> On 06/13/2012 07:34 AM, Richard Zhao wrote:
+>>>>> Sometimes, boards have gpios that don't own by any driver or owner
+>>>>> by a generic driver that don't like hacks. Such gpios is normally
+>>>>> output and need setup once on boot. So I introduce the config-on-boot
+>>>>> gpios.
+>>>>>
+>>>>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>>>>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>>>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>>>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>>>> ---
+>>>>>  .../devicetree/bindings/arm/config-on-boot.txt     |   12 +++++++
+>>>>>  arch/arm/boot/dts/imx6q-sabrelite.dts              |    7 ++++
+>>>>>  arch/arm/mach-imx/mach-imx6q.c                     |   35 ++++++++++++++++++++
+>>>>>  3 files changed, 54 insertions(+)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/arm/config-on-boot.txt
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/arm/config-on-boot.txt b/Documentation/devicetree/bindings/arm/config-on-boot.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..f98ed74
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/arm/config-on-boot.txt
+>>>>> @@ -0,0 +1,12 @@
+>>>>> +* Configure on Boot
+>>>>> +
+>>>>> +Node name: config-on-boot
+>>>>> +  It must be in root node. config-on-boot means to describe settings that needs
+>>>>> +  to be set one time on boot but aren't owned by any driver, or the owned driver
+>>>>> +  is too generic to handle such settings. For example, usb hub uses generic
+>>>>> +  driver in usb core code, a on-board usb may need deassert reset pin.
+>>>>
+>>>> NAK. This is not a h/w description
+>>> It's misc things, but is hw description.
+>>
+>> You are defining something based on whether linux has a driver or not.
+>> That should not matter to DT. That's backwards.
+> I just define the board needs some misc settings. If you think
+> config-on-boot is not good, we can name it like config-misc.
 
-> > Moving to irqdomain without DT is really very easy, you just need to
-> > select a legacy mapping if a base is provided and otherwise all the code
-> > is identical - it just comes down to a field in platform data and an if
-> > statement.
+Even worse.
 
-> Yeah, but I guess what I'm saying is *linear* irqdomain.
+>>
+>>>> and should be solved within the
+>>>> kernel or bootloader. Either fix this in u-boot,
+>>> Kernel might be better not to depend on uboot.
+>>>> the platform code, or
+>>> How do I get gpio in platfrom code without dts description?
+>>>> make the generic driver support this in a generic way.
+>>> It's called just after populate devices. It's hard for generic driver to
+>>> decide when it's called.
+>>
+>> You need to describe that you have a hub on the usb bus and add the gpio
+>> line to that node. Just like PCI is probe-able, you still need DT nodes
+>> sometimes for cases like this.
+> PCI has dev id and may add quirks. But for embedded, I don't know how
+> to connect a of node to a hub device enumerated by usb core code. And
+> it may also pollute the usb core code.
 
-Sure, but like I say the only code change required for keeping platform
-data working is the three lines or so required to change to a legacy
-mapping if you've got an irq_base.  All my development systems currently
-use linear domains for several of the IRQ domains on a totally non-DT
-system.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/8d4f57e9/attachment.sig>
+USB also uses device and manufacturer ids. One of the main reasons for
+putting pci devices into dts is to describe out of band signals just
+like this.
+
+Creating a binding and support code for full usb bus topology would be a
+lot of work which is why I propose a simpler approach below.
+
+>> A simpler approach would be to just add
+>> the gpio to the ehci controller node, but that's not exactly correct.
+> That's exactly why this patch comes out.
+
+I mean just something like "fsl,hub-reset-gpios" in the ehci device
+node. It's at least under a usb node. Whether the ehci driver handles
+this or you just have a separate piece of code to find this property and
+setup the gpio is up to you.
+
+Rob
