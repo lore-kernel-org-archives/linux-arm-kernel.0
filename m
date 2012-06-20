@@ -1,78 +1,64 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 20 Jun 2012 14:40:00 +0800
-Subject: [RFC PATCH 1/1] ARM: imx: enable SPARSE_IRQ for imx
-In-Reply-To: <20120620054015.GB1568@S2100-06.ap.freescale.net>
-References: <20120619130145.GD10387@shlinux2.ap.freescale.net>
- <1340111993-6676-1-git-send-email-b29396@freescale.com>
- <20120619140613.GH21951@S2101-09.ap.freescale.net>
- <20120620022313.GE10387@shlinux2.ap.freescale.net>
- <20120620054015.GB1568@S2100-06.ap.freescale.net>
-Message-ID: <20120620063959.GH10387@shlinux2.ap.freescale.net>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Wed, 20 Jun 2012 02:06:03 -0500
+Subject: [PATCH v5] ARM: imx: Add basic imx6q cpu thermal management
+Message-ID: <1340175964-4043-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:40:17PM +0800, Shawn Guo wrote:
-> On Wed, Jun 20, 2012 at 10:23:15AM +0800, Dong Aisheng wrote:
-> > I did see what you said, but you did not go with reasons and that was not so
-> > convinced to me
-> > Can you explain more why you choose linux virt irq and how about the real exist
-> > potential issues i raised before?
-> > 
-> It's not my choice.  Instead, this is how struct resource defined in
-> Linux.  What more reasons do you need to understand that?
-> 
-It's not about how struct resource defined.
-It's about why you directly define linux irq for device rather than
-using standard api irq_find_mapping to get the correct linux virt irq
-for device after using irqdomain.
+Based on v3.5-rc3 plus recently submmited cpu_cooling functionality here:
 
-> I do not take the thing you raised as issues, because in the end all
-> these static definitions will be removed after we move over to device
-> tree.
-So you agree they're issues for non-dt?
-IMHO moving to dt is not an excuse to do wrong things for non-dt.
+http://www.spinics.net/lists/kernel/msg1340221.html
 
-> 
-> > Hmm, it's not driver code.
-> > And i did see a lot of such code in mach-specific file.
-> 
-> That does not mean you are encouraged to add more.  We are trying to
-> remove them.
-> 
-> > If wrong, any other better way to distinguish the different SoCs?
-> > 
-> There are certainly better way, since we have soc specific
-> initialization to do all the soc specific setup.  That said, we do
-> not have to necessarily use all those ugly cpu_is_xxx and #ifdef.
-> 
-I did not see your point, for soc specific setup, it definitely does not have
-such issue. The issue happens in a common function shared by many SoCs.
-And without dev_id as used by drivers, how do we do it in machine code
-in a better way than cpu_is_xx for non-dt?
+I am told this cpu cooling patch has been accepted and exists in len brown's
+next branch.
 
-> > That is a way, but i would prefer to do it in mach-specific code first
-> 
-> No.  Do not make imx special on this.  We would like to use resource
-> definition in the way how it's defined and how everyone else use it.
-> 
-> > since i'm not sure if other people will also like that.
-> 
-> No one (except yourself) likes it.  As I said, we are not supposed to
-> manipulate resource definition this way.
-> 
-Hmm, how can you say NO one?
+link to previous submissions:
+v4: http://comments.gmane.org/gmane.linux.acpi.devel/51779
+v3: http://www.spinics.net/lists/arm-kernel/msg155955.html
+v2: http://www.spinics.net/lists/arm-kernel/msg155790.html
+v1: http://www.spinics.net/lists/arm-kernel/msg155111.html
 
-Looking at my patch, you will see the main difference is i use
-irq_find_mapping to get the correct linux irq number not matter
-what the type of irqdomain of this irqchip is and how virtual irq
-range used,
-while you're doing based on the assumption that "i know the irqdomain
-type of this chip is legacy and i know how virtual irq range is allocated,
-then i konw after irqdomain map the linux virtual irq number
-should be x, so i directly define x as the irq number for device without
-using irq_find_mapping api",
-the later one is obviously non-standard and dangerous.
-Why you still think the later one is better?
+Changes in v5:
+1. Modified to use anatop mfd driver for accessing anatop registers
+2. Made necessary changes to work with latest generic CPU cooling code.
+3. Added Config changes and functionality to allow testing on parts without
+ without programmed temperature sensor calibration values.
+4. General cleanup and addition of comments.
 
-Regards
-Dong Aisheng
+Changes in v4:
+1.  Removed bad suspend/resume assignment into thermal class.  After further
+examination and discussion with SoC designers, a sequence is now used
+for making measurements that is is unaffected by system suspendresumes.
+Temp Sensor automatically powers off in hardware during the low power mode
+caused by a system suspend.
+2.  Moved some structures from static to dynamic allocation.
+3.  Added some noise handling to temperatuer sensor readings.
+
+Changes in v3:
+1. Fixed the various issues pointed out in v2
+2. Made other code cleanup and a bit of re-organizing
+3. Removed unecessary platform driver and device.
+
+Changes in v2:
+1. Cleaned up some style issues pointed out in v1
+2. Made various other code cleanup and re-organizing
+3. Added temperature sensor calibration
+4. Created platform driver and device to hook into pm suspend.
+
+
+Performed some basic testing to ensure proper cooling operating.  If
+you want to test this, full testing requires imx6q cpufreq
+implementation (not yet in v3.5).
+
+Robert Lee (1):
+  ARM: imx: Add basic imx6q cpu thermal management
+
+ arch/arm/boot/dts/imx6q.dtsi    |    5 +
+ drivers/thermal/Kconfig         |   28 ++
+ drivers/thermal/Makefile        |    1 +
+ drivers/thermal/imx6q_thermal.c |  593 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 627 insertions(+)
+ create mode 100644 drivers/thermal/imx6q_thermal.c
+
+-- 
+1.7.10
