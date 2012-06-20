@@ -1,45 +1,30 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 20 Jun 2012 11:11:04 +0200
-Subject: [PATCH v2 5/5] sched: cpu_power: enable ARCH_POWER
-In-Reply-To: <20120619090110.GA1692@zhy>
-References: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
- <1340094536-20873-6-git-send-email-vincent.guittot@linaro.org>
- <20120619090110.GA1692@zhy>
-Message-ID: <CAKfTPtAdSMJ1RnDPDYZZ378QW9DUCKLA+oC3TWJD7v5KAkFitA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Jun 2012 11:12:05 +0200
+Subject: [PATCH 08/14] mfd: Add IRQ domain support for the AB8500
+In-Reply-To: <20120618102003.GB12029@n2100.arm.linux.org.uk>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
+ <20120614183231.GA30185@sirena.org.uk>
+ <4FDEEEBD.5070108@linaro.org>
+ <20120618102003.GB12029@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZDVDZYKsT9Lxg3_ef6YKgmcWFa7-o+2PAmYpy47JDysw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2012 11:01, Yong Zhang <yong.zhang0@gmail.com> wrote:
-> On Tue, Jun 19, 2012 at 10:28:56AM +0200, Vincent Guittot wrote:
->> Heteregeneous ARM platform uses arch_scale_freq_power function
->> to reflect the relative capacity of each core
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->> ?kernel/sched/features.h | ? ?2 +-
->> ?1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/kernel/sched/features.h b/kernel/sched/features.h
->> index de00a48..d98ae90 100644
->> --- a/kernel/sched/features.h
->> +++ b/kernel/sched/features.h
->> @@ -42,7 +42,7 @@ SCHED_FEAT(CACHE_HOT_BUDDY, true)
->> ?/*
->> ? * Use arch dependent cpu power functions
->> ? */
->> -SCHED_FEAT(ARCH_POWER, false)
->> +SCHED_FEAT(ARCH_POWER, true)
+On Mon, Jun 18, 2012 at 12:20 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 18, 2012 at 10:02:53AM +0100, Lee Jones wrote:
+>> @@ -361,7 +362,7 @@ static void ab8500_irq_sync_unlock(struct irq_data *data)
+>> ?static void ab8500_irq_mask(struct irq_data *data)
+>> ?{
+>> ? ? ? struct ab8500 *ab8500 = irq_data_get_irq_chip_data(data);
+>> - ? ? int offset = data->irq - ab8500->irq_base;
+>> + ? ? int offset = data->irq;
 >
-> Hmmm...seems we can remove this knob completely.
->
+> Are you sure this is right? ?I thought irq_data->irq was the Linux IRQ
+> number, irq_data->hwirq was the interrupt number inside the domain.
 
-Peter,
+Agree, this need to be fixed and respin...
 
-Do you prefer to keep it or remove it completely ?
-
-Thanks
-
-> __weak arch_scale_smt_power() is doing all the trick.
->
-> Thanks,
-> Yong
+Yours,
+Linus Walleij
