@@ -1,38 +1,54 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 20 Jun 2012 07:51:39 +0200
-Subject: Dove clock support
-In-Reply-To: <20120619204210.GA18128@schnuecks.de>
-References: <1339978054-8464-1-git-send-email-mkl@blackshift.org>
- <20120618074258.GI4799@lunn.ch> <4FDEDEAE.30502@blackshift.org>
- <20120618080449.GK4799@lunn.ch> <4FDEE6C6.2060101@blackshift.org>
- <20120618084300.GL4799@lunn.ch>
- <20120618214143.GA20040@schnuecks.de>
- <4FDFA748.10905@googlemail.com> <20120619193251.GR26034@lunn.ch>
- <20120619204210.GA18128@schnuecks.de>
-Message-ID: <20120620055139.GD28139@lunn.ch>
+Date: Wed, 20 Jun 2012 08:06:50 +0200
+Subject: [PATCH] ARM: Orion5x - Restore parts of io.h
+Message-ID: <1340172410-11229-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > When moving from kirkwoods old clock management to the generic clock
-> > framework, i kept the functionality the same. The old code would turn
-> > the PHYs off, but have no way to turn them back on again. The new code
-> > is the same.
-> 
-> No, not exactly the same. In the old code, it was sufficient to call
-> the respective kirkwood_..._init function to keep the clock and the
-> PHY alive. Now, the respective driver needs to enable the clock in
-> order to prevent that the clock and the PHY are shut down. 
+Commit 4d5fc58dbe34b78157c05b319669bb3e064ba8bd remove the orion5x
+io.h. Unfortunetely, this is still needed for the definition of
+IO_SPACE_LIMIT which overrides the default 64K. All Orion based
+systems have 1Mbyte of IO space per PCI[e] bus, and try to
+request_resource() this size.
 
-Ah yes, you are right.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-orion5x/include/mach/io.h |   14 ++++++++++++++
+ 2 files changed, 15 insertions(+)
+ create mode 100644 arch/arm/mach-orion5x/include/mach/io.h
 
-I must admit, i never thought much about systems using kernel modules.
-My experience so far, is that systems using kirkwood tend to have
-nearly all drivers built in. The exception seems to be wifi, IPv6, and
-all plug+play drivers for USB.
-
-However, now i start thinking about it, with the move to one kernel
-per ARM architectures, we are probably going to have more and more
-systems using modules, since for example it makes little sense to have
-the sata_mv driver built in, when run on an AT91 system...
-
-    Andrew
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 84449dd..8fb7e4a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -588,6 +588,7 @@ config ARCH_ORION5X
+ 	select PCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
++	select NEED_MACH_IO_H
+ 	select PLAT_ORION
+ 	help
+ 	  Support for the following Marvell Orion 5x series SoCs:
+diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
+new file mode 100644
+index 0000000..f017fe2
+--- /dev/null
++++ b/arch/arm/mach-orion5x/include/mach/io.h
+@@ -0,0 +1,14 @@
++/*
++ * arch/arm/mach-orion5x/include/mach/io.h
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ASM_ARCH_IO_H
++#define __ASM_ARCH_IO_H
++
++#define IO_SPACE_LIMIT		0xffffffff
++#define __io(a)			__typesafe_io(a)
++#endif
+-- 
+1.7.10
