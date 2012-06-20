@@ -1,77 +1,78 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 20 Jun 2012 14:20:46 -0700
-Subject: [GIT PULL] Integrator common clock
-In-Reply-To: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
-References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
-Message-ID: <20120620212046.GI4402@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 20 Jun 2012 17:11:39 -0500
+Subject: [PATCH v2 2/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
+References: <cover.1339828867.git.afzal@ti.com>
+ <1414767dd444d4ab3998adf957e77ff4f3394f92.1339828867.git.afzal@ti.com>
+ <4FDF50EA.4080506@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
+Message-ID: <4FE24A9B.6070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120619-08:53, Linus Walleij wrote:
-> Hi ARM SoC people,
-> 
-> would you consider pulling in the support form common clk in the Integrator,
-> unless Mike shouts at me? I think I have adressed all review comments.
-> 
+Hi Afzal,
 
-Hi Linus,
+On 06/19/2012 12:57 AM, Mohammed, Afzal wrote:
+> Hi Jon,
+> 
+> On Mon, Jun 18, 2012 at 21:31:46, Hunter, Jon wrote:
+> 
+>>> @@ -95,10 +89,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
+>>>  	if (err)
+>>>  		return err;
+>>>  
+>>> -	/* Ensure sync read and sync write are disabled */
+>>> -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+>>> -	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+>>> -	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+>>
+>> Sorry if I was not clear, but I was still thinking that we keep the
+>> above instance of setting async mode.
+> :
+>>>  static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
+>>>  {
+>>>  	struct device *dev = &gpmc_onenand_device.dev;
+>>> +	u32 reg;
+>>> +
+>>> +	/* Ensure sync read and sync write are disabled */
+>>> +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+>>> +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+>>> +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+>>
+>> ... and here we should just call omap2_onenand_set_async_mode(), ...
+> 
+> If omap2_onenand_set_async_mode is called from gpmc_onenand_setup & removed
+> from gpmc_onenand_init, when using new gpmc driver interface, i.e. using
+> gpmc_onenand_update [1], we lost opportunity to provide gpmc driver with
+> configuration details for async mode causing a big warning about each
+> timings & configurations that was left by bootloader (which is meant only
+> for cases where Kernel can't configure GPMC). Of course, we can put
+> omap2_onenand_set_async_mode in gpmc_onenand_update too, but then
+> unnecessarily, omap2_onenand_sey_async_mode would be called twice.
+> 
+> Please note that gpmc_onenand_setup is a callback by onenand driver.
 
-Any reason for this code to go through the arm-soc tree instead of
-common clk tree?
+Ok, I see your point. So today the _set_async_mode() is really doing two
+things ...
 
-Thanks,
-Mike
+1. It is calculating the timings
+2. Programming the timings and setting async mode.
 
-> There will at some point be some trivial merge conflicts in drivers/clk/Makefile
-> I think, but you're used to that I think...
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
-> 
->   Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> integrator-clk
-> 
-> for you to fetch changes up to aa3f7190e46514002ddf5b6054d7dc9f6f9f9cb7:
-> 
->   ARM: integrator: convert to common clock (2012-06-15 09:00:43 +0200)
-> 
-> ----------------------------------------------------------------
-> Linus Walleij (3):
->       ARM: integrator: put symbolic bus names on devices
->       clk: add versatile ICST307 driver
->       ARM: integrator: convert to common clock
-> 
->  arch/arm/Kconfig                               |    8 +-
->  arch/arm/mach-integrator/core.c                |   55 ++----------
->  arch/arm/mach-integrator/include/mach/clkdev.h |   26 ------
->  arch/arm/mach-integrator/integrator_ap.c       |    8 +-
->  arch/arm/mach-integrator/integrator_cp.c       |   69 ++-------------
->  arch/arm/plat-versatile/Kconfig                |    3 +
->  arch/arm/plat-versatile/Makefile               |    2 +-
->  drivers/clk/Kconfig                            |    2 +
->  drivers/clk/Makefile                           |    1 +
->  drivers/clk/versatile/Kconfig                  |    8 ++
->  drivers/clk/versatile/Makefile                 |    3 +
->  drivers/clk/versatile/clk-icst.c               |  100 +++++++++++++++++++++
->  drivers/clk/versatile/clk-icst.h               |   10 +++
->  drivers/clk/versatile/clk-integrator.c         |  111 ++++++++++++++++++++++++
->  include/linux/platform_data/clk-integrator.h   |    1 +
->  15 files changed, 263 insertions(+), 144 deletions(-)
->  delete mode 100644 arch/arm/mach-integrator/include/mach/clkdev.h
->  create mode 100644 drivers/clk/versatile/Kconfig
->  create mode 100644 drivers/clk/versatile/Makefile
->  create mode 100644 drivers/clk/versatile/clk-icst.c
->  create mode 100644 drivers/clk/versatile/clk-icst.h
->  create mode 100644 drivers/clk/versatile/clk-integrator.c
->  create mode 100644 include/linux/platform_data/clk-integrator.h
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I think that it would be best if we were to make _set_async_mode() into
+two functions, for example ...
+
+1. omap2_onenand_get_async_timings()
+2. omap2_onenand_set_async_timings()
+
+Where the omap2_onenand_get_async_timings() calculates the timings and
+can be used in both legacy mode and with the driver. Then
+omap2_onenand_set_sync_timings() is just used in the legacy mode where
+we don't have the driver to configure the chip-select.
+
+Do you think that could work?
+
+We could also do the same for omap2_onenand_set_sync_mode().
+
+Cheers
+Jon
