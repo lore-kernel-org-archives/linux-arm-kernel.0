@@ -1,23 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 20 Jun 2012 14:08:41 +0100
-Subject: [PATCH 08/15] regulator: Stop initialising AB8500's registers
- during bring-up
-In-Reply-To: <1340197011-5435-9-git-send-email-lee.jones@linaro.org>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120620130840.GM3978@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Jun 2012 21:09:43 +0800
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <20120620100015.GA30243@sirena.org.uk>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+ <20120620090126.GO28394@pengutronix.de>
+ <20120620100015.GA30243@sirena.org.uk>
+Message-ID: <20120620130941.GB2253@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:56:44PM +0100, Lee Jones wrote:
-> There is no need to initialise the AB8500's regulator registers, as
-> most of this work is already carried out by framework features.
+On Wed, Jun 20, 2012 at 11:00:15AM +0100, Mark Brown wrote:
+> The approach a lot of platforms have been taking is that it's OK to keep
+> on maintaining existing boards using board files (especially for trivial
+> things like adding new devices).
 
-Does this have any dependency on the rest of the series?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/8fe6cae5/attachment.sig>
+I think that's the approach being taken during the transition to device
+tree.  But it's definitely a desirable thing to remove those board
+files with device tree support at some point, because not having non-DT
+users will ease platform maintenance and new feature adoption a lot
+easier, for example linear irqdomain.
+
+-- 
+Regards,
+Shawn
