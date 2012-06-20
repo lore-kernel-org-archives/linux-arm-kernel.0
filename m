@@ -1,97 +1,126 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 20 Jun 2012 13:28:46 +0800
-Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
- level
-In-Reply-To: <4FD98BD0.7090901@windriver.com>
-References: <zumeng.chen@gmail.com>
- <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
- <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
- <4FD96CBF.5040106@windriver.com>
- <79CD15C6BA57404B839C016229A409A83EA4FC98@DBDE01.ent.ti.com>
- <4FD98BD0.7090901@windriver.com>
-Message-ID: <4FE15F8E.4000008@windriver.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 20 Jun 2012 13:36:50 +0800
+Subject: [PATCH] ARM: mxs: store mac address read from OTP in device tree
+In-Reply-To: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
+References: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120620053649.GG10387@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?06?14? 14:59, Zumeng Chen ??:
-> ? 2012?06?14? 14:31, Hiremath, Vaibhav ??:
->> On Thu, Jun 14, 2012 at 10:16:55, Zumeng Chen wrote:
->>> ? 2012?06?13? 20:18, Hiremath, Vaibhav ??:
->>>> On Wed, Jun 13, 2012 at 07:14:10, Zumeng Chen wrote:
->>>>> From: Zumeng Chen<zumeng.chen@windriver.com>
->>>>>
->>>>> If we don't set proper debouce time for ads7846, then there are
->>>>> flooded interrupt counters of ads7846 responding to one time
->>>>> touch on screen, so the driver couldn't work well.
->>>>>
->>>>> And since most OMAP3 series boards pass NULL pointer of board_pdata
->>>>> to omap_ads7846_init, so it's more proper to set it in driver level
->>>>> after having gpio_request done.
->>>>>
->>>>> This patch has been validated on 3530evm.
->>>>>
->>>>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
->>>>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
->>>>> ---
->>>>>   drivers/input/touchscreen/ads7846.c |    4 ++++
->>>>>   1 files changed, 4 insertions(+), 0 deletions(-)
->>>>>
->>>>> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
->>>>> index f02028e..459ff29 100644
->>>>> --- a/drivers/input/touchscreen/ads7846.c
->>>>> +++ b/drivers/input/touchscreen/ads7846.c
->>>>> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
->>>>>   		}
->>>>>
->>>>>   		ts->gpio_pendown = pdata->gpio_pendown;
->>>>> +#ifdef CONFIG_ARCH_OMAP3
->>>>> +		/* 310 means about 10 microsecond for omap3 */
->>>>> +		gpio_set_debounce(pdata->gpio_pendown, 310);
->>>>> +#endif
->>>>>
->>>> Zumeng,
->>>>
->>>> With my sign-off you are changing the original code, that too
->>>> without my sign-off and ack.
->>>> I wouldn't mind you to submit patches from my tree, but the expectation is
->>>> if you are changing the original code, it should be under your sign-off.
->>> Thanks, good to learn. I'll remove in next time.
->>>> Coming to the patch, #ifdef in driver is not recommended, and this 10msec
->>>> delay is specific to OMAP GPIO and driver should not be aware of this,
->>>> that's where you will find the original patch handling it in board file.
->>> According to the git blame of the board-omap3evm.c I think
->>> 96974a24 did a good thing to all the related codes for omap3
->>> boards. So I think we can call board and driver as BSP level :-)
->>>
->>> If #ifdef in driver can save many codes, I guess it's deserved.
->>>
->> No, not really.
->>
->> In the same commit, the debounce time is already handled as an argument to 
->> the function omap_ads7846_init(), and that?s the way it should be.
-> That means you'd like to implement the same get_pendown_state for every
-> omap3 board? Currently, board_pdata is NULL.
->
-> And actually, the reason why I agree 96974a24 is that get_pendown_state
-> for all omap3 boards is the common chip level gpio operations. so I think
-> we should set debounce for them in one common point.
->
-> But since Igor and you don't like them, I have created and tested the
-> attachment
-> patch, and I'd like Mike to check if convenience too
-> But obviously there are more codes than mine before :-)
-Hi Mike,
+On Tue, Jun 19, 2012 at 11:20:46PM +0800, Shawn Guo wrote:
+> The non-DT boot reads the mac from OTP and pass it to fec driver via
+> platform data.  The patch provides an equivalent support for device
+> tree boot, with reading mac from OTP and store it in device tree,
+> and fec driver can get the mac from device tree at its probe time.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-mxs/mach-mxs.c |   64 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 64 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 8cac94b..167f649 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -71,6 +71,68 @@ static struct sys_timer imx28_timer = {
+>  	.init = imx28_timer_init,
+>  };
+>  
+> +enum mac_oui {
+> +	OUI_FSL,
+> +	OUI_DENX,
+> +};
+> +
+> +static void __init update_fec_mac_prop(enum mac_oui oui)
+So this is a general function, right?
+Then i would like it to be really general.
 
-I'll send V3 with the change on the attachment to you for 5/5,
-if you happen to get it, it's high appreciated to review it.
+> +{
+> +	struct device_node *np, *from = NULL;
+> +	struct property *oldmac, *newmac;
+> +	const u32 *ocotp = mxs_get_ocotp();
+> +	u8 *macaddr;
+> +	u32 val;
+> +	int i;
+> +
+> +	for (i = 0; i < 2; i++) {
+First, this is board specific.
+Not all the boards have two mac, right?
 
-Regards,
-Zumeng
->
-> Regards,
-> Zumeng
->> So no need for #ifdefs in driver...
->>
->> Thanks,
->> Vaibhav
+> +		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
+> +		if (!np)
+> +			return;
+> +		from = np;
+> +
+> +		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
+> +		if (!newmac)
+> +			return;
+> +		newmac->value = newmac + 1;
+> +		newmac->length = 6;
+> +
+> +		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
+> +		if (!newmac->name) {
+> +			kfree(newmac);
+> +			return;
+> +		}
+> +
+> +		/*
+> +		 * OCOTP only stores the last 4 octets for each mac address,
+> +		 * so hard-code OUI here.
+Is it possible that customer boards store a different size of octets in OCOTP
+because spec does not define it?
+If yes, this possible should not be hard coded in general function.
+
+> +		 */
+> +		macaddr = newmac->value;
+> +		switch (oui) {
+> +		case OUI_FSL:
+> +			macaddr[0] = 0x00;
+> +			macaddr[1] = 0x04;
+> +			macaddr[2] = 0x9f;
+> +			break;
+> +		case OUI_DENX:
+> +			macaddr[0] = 0xc0;
+> +			macaddr[1] = 0xe5;
+> +			macaddr[2] = 0x4e;
+Personally i would like these board specific data out of this function.
+
+> +			break;
+> +		}
+> +		val = ocotp[i];
+> +		macaddr[3] = (val >> 16) & 0xff;
+> +		macaddr[4] = (val >> 8) & 0xff;
+> +		macaddr[5] = (val >> 0) & 0xff;
+....
+> +
+> +		oldmac = of_find_property(np, newmac->name, NULL);
+> +		if (oldmac)
+> +			prom_update_property(np, newmac, oldmac);
+> +		else
+> +			prom_add_property(np, newmac);
+Grant gave a suggestion before that we'd better change prom_update_property
+behavior to add_or_update from update only.
+I did a patch like that, with the patch the code here will become more simple.
+I will send it out in this thread for you to see if it helps.
+
+> +	}
+> +}
+> +
+>  static void __init imx28_evk_init(void)
+>  {
+>  	struct clk *clk;
+> @@ -79,6 +141,8 @@ static void __init imx28_evk_init(void)
+>  	clk = clk_get_sys("enet_out", NULL);
+>  	if (!IS_ERR(clk))
+>  		clk_prepare_enable(clk);
+> +
+> +	update_fec_mac_prop(OUI_FSL);
+>  }
+>  
+>  static void __init mxs_machine_init(void)
+> -- 
+> 1.7.5.4
+> 
+
+Regards
+Dong Aisheng
