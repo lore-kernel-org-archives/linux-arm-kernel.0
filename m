@@ -1,53 +1,98 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 20 Jun 2012 08:48:07 +0200
-Subject: [RFC PATCH 1/8] ARM: gic: Support forcing cpumask for possible
- cpus in the system
-In-Reply-To: <4FDF1400.6090402@monstr.eu>
-References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
- <1340019011-18642-2-git-send-email-monstr@monstr.eu>
- <20120618113339.GC12029@n2100.arm.linux.org.uk>
- <4FDF1400.6090402@monstr.eu>
-Message-ID: <CAHTX3d+oprSkMLABVGCyv45jU7t57DYV3RvrvPN8DPKdVS6mzQ@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 20 Jun 2012 10:43:34 +0200
+Subject: [PATCH v2 3/5] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <877gv2hjhb.fsf@sejong.aot.lge.com>
+References: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
+ <1340094536-20873-4-git-send-email-vincent.guittot@linaro.org>
+ <877gv2hjhb.fsf@sejong.aot.lge.com>
+Message-ID: <CAKfTPtDhS3Hj+ErN5E_U_Ji=zE75m2Ya68UW4jLDEjoiO9bAsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/18 Michal Simek <monstr@monstr.eu>
 
-> On 06/18/2012 01:33 PM, Russell King - ARM Linux wrote:
->
->> On Mon, Jun 18, 2012 at 01:30:04PM +0200, Michal Simek wrote:
->>
->>> gic_set_affinity doesn't support force option. Force option
->>> should work with all possible cpus in the system not only with
->>> online cpus.
->>>
->>
->> Neither does x86.  Why do you want this?  Offline CPUs are unable to
->> receive the interrupt in any case (and must not receive interrupts in
->> the bringup path until they are online.)
->>
->
-> The whole reason for all these changes in AMP on dual core Cortex A9 where
-> on one cpu runs Linux and on the second RTOS/standlone.
->
-> It means that the second cpu is from Linux point of view offline all the
-> time.
-> But GIC has to be (and can be) setup to forward IRQ directly to the second
-> cpu.
-> GIC should be controlled by Linux.
->
->
-Russel: Any other reaction?
-Can you see a way how to get this feature to the mainline Linux kernel?
-Some patches needs to be refactored a little bit but the point is if you
-are willing to
-support this type of configuration.
 
-Not sure if Ohad has any information that someone else would like to use it
-remoteproc(AMP) among ARM cores.
+On 20 June 2012 03:15, Namhyung Kim <namhyung@kernel.org> wrote:
+>
+>
+>
+> On Tue, 19 Jun 2012 10:28:54 +0200, Vincent Guittot wrote:
+>> Use cpu compatibility field and clock-frequency field of DT to
+>> estimate the capacity of each core of the system and to update
+>> the cpu_power field accordingly.
+>> This patch enables to put more running tasks on big cores than
+>> on LITTLE ones. But this patch doesn't ensure that long running
+>> tasks will run on big cores and short ones on LITTLE cores.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>
+>> ---
+> [snip]
+>> +static void __init parse_dt_topology(void)
+>> +{
+>> + ? ? struct cpu_efficiency *cpu_eff;
+>> + ? ? struct device_node *cn = NULL;
+>> + ? ? unsigned long min_capacity = (unsigned long)(-1);
+>> + ? ? unsigned long max_capacity = 0;
+>> + ? ? unsigned long capacity = 0;
+>> + ? ? int alloc_size, cpu = 0;
+>> +
+>> + ? ? alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
+>> + ? ? cpu_capacity = (struct cpu_capacity *)kzalloc(alloc_size, GFP_NOWAIT);
+>> +
+>> + ? ? while ((cn = of_find_node_by_type(cn, "cpu"))) {
+>> + ? ? ? ? ? ? const u32 *rate, *reg;
+>> + ? ? ? ? ? ? char *compatible;
+>> + ? ? ? ? ? ? int len;
+>> +
+>> + ? ? ? ? ? ? if (cpu >= num_possible_cpus())
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? compatible = of_get_property(cn, "compatible", &len);
+>
+> Why is this line needed?
 
-Thanks,
-Michal
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/5d1c190a/attachment-0001.html>
+not needed is the final version, should have been removed.
+
+>
+>
+>> +
+>> + ? ? ? ? ? ? for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
+>> + ? ? ? ? ? ? ? ? ? ? if (of_device_is_compatible(cn, cpu_eff->compatible))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? if (cpu_eff->compatible == NULL)
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> +
+>> + ? ? ? ? ? ? rate = of_get_property(cn, "clock-frequency", &len);
+>> + ? ? ? ? ? ? if (!rate || len != 4) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s missing clock-frequency property\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? cn->full_name);
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> + ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? reg = of_get_property(cn, "reg", &len);
+>> + ? ? ? ? ? ? if (!reg || len != 4) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s missing reg property\n", cn->full_name);
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> + ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? capacity = ((be32_to_cpup(rate)) >> 20)
+>> + ? ? ? ? ? ? ? ? ? ? * cpu_eff->efficiency;
+>
+> Why did you break this line?
+
+It was more than 80 chars large previously but no more the case.
+I'm going to correct
+
+Thanks
+>
+> Thanks,
+> Namhyung
+>
+>
+>
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
