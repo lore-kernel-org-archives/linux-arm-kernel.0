@@ -1,300 +1,96 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Jun 2012 13:56:37 +0100
-Subject: [PATCH 01/15] mfd: Add IRQ domain support for the AB8500
+Date: Wed, 20 Jun 2012 13:56:38 +0100
+Subject: [PATCH 02/15] mfd: Generically describe interactions with the DB8500
+ PRCMU
 In-Reply-To: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
 References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1340197011-5435-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1340197011-5435-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the AB8500 is an IRQ controller in its own right, here we provide
-the AB8500 driver with IRQ domain support. This is required if we wish
-to reference any of its IRQs from a platform's Device Tree.
+There is only one method used to communicate with the DB8500 PRCMU, via I2C.
+Now this can be assumed, there is no requirement to specify the protocol in
+the function name. This patch removes protocol specifics and uses a more
+generic naming convention.
 
 Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Naga Radheshy <naga.radheshy@stericsson.com>
-Cc: Mattias Wallin <mattias.wallin@stericsson.com>
-Cc: Daniel Willerud <daniel.willerud@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/Kconfig               |    1 +
- drivers/mfd/ab8500-core.c         |  130 ++++++++++++++++++++-----------------
- include/linux/mfd/abx500/ab8500.h |    5 ++
- 3 files changed, 76 insertions(+), 60 deletions(-)
+ drivers/mfd/ab8500-core.c    |   12 ++++++------
+ drivers/mfd/ab8500-debugfs.c |    6 +++---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 170072e..e3637c2 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -696,6 +696,7 @@ config AB8500_CORE
- 	bool "ST-Ericsson AB8500 Mixed Signal Power Management chip"
- 	depends on GENERIC_HARDIRQS && ABX500_CORE && MFD_DB8500_PRCMU
- 	select MFD_CORE
-+	select IRQ_DOMAIN
- 	help
- 	  Select this option to enable access to AB8500 power management
- 	  chip. This connects to U8500 either on the SSP/SPI bus (deprecated
 diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 4dc5024..bf2ba0a 100644
+index bf2ba0a..8de3b65 100644
 --- a/drivers/mfd/ab8500-core.c
 +++ b/drivers/mfd/ab8500-core.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/module.h>
-@@ -361,7 +362,7 @@ static void ab8500_irq_sync_unlock(struct irq_data *data)
- static void ab8500_irq_mask(struct irq_data *data)
- {
- 	struct ab8500 *ab8500 = irq_data_get_irq_chip_data(data);
--	int offset = data->irq - ab8500->irq_base;
-+	int offset = data->hwirq;
- 	int index = offset / 8;
- 	int mask = 1 << (offset % 8);
+@@ -141,7 +141,7 @@ static const char ab8500_version_str[][7] = {
+ 	[AB8500_VERSION_AB8540] = "AB8540",
+ };
  
-@@ -371,7 +372,7 @@ static void ab8500_irq_mask(struct irq_data *data)
- static void ab8500_irq_unmask(struct irq_data *data)
+-static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
++static int ab8500_prcmu_write(struct ab8500 *ab8500, u16 addr, u8 data)
  {
- 	struct ab8500 *ab8500 = irq_data_get_irq_chip_data(data);
--	int offset = data->irq - ab8500->irq_base;
-+	int offset = data->hwirq;
- 	int index = offset / 8;
- 	int mask = 1 << (offset % 8);
+ 	int ret;
  
-@@ -510,38 +511,51 @@ static irqreturn_t ab8500_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
+@@ -151,7 +151,7 @@ static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
+ 	return ret;
  }
  
--static int ab8500_irq_init(struct ab8500 *ab8500)
-+/**
-+ * ab8500_irq_get_virq(): Map an interrupt on a chip to a virtual IRQ
-+ *
-+ * @ab8500: ab8500_irq controller to operate on.
-+ * @irq: index of the interrupt requested in the chip IRQs
-+ *
-+ * Useful for drivers to request their own IRQs.
-+ */
-+int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq)
+-static int ab8500_i2c_write_masked(struct ab8500 *ab8500, u16 addr, u8 mask,
++static int ab8500_prcmu_write_masked(struct ab8500 *ab8500, u16 addr, u8 mask,
+ 	u8 data)
  {
--	int base = ab8500->irq_base;
--	int irq;
--	int num_irqs;
-+	if (!ab8500)
-+		return -EINVAL;
- 
--	if (is_ab9540(ab8500))
--		num_irqs = AB9540_NR_IRQS;
--	else if (is_ab8505(ab8500))
--		num_irqs = AB8505_NR_IRQS;
--	else
--		num_irqs = AB8500_NR_IRQS;
-+	return irq_create_mapping(ab8500->domain, irq);
-+}
-+EXPORT_SYMBOL_GPL(ab8500_irq_get_virq);
- 
--	for (irq = base; irq < base + num_irqs; irq++) {
--		irq_set_chip_data(irq, ab8500);
--		irq_set_chip_and_handler(irq, &ab8500_irq_chip,
--					 handle_simple_irq);
--		irq_set_nested_thread(irq, 1);
-+static int ab8500_irq_map(struct irq_domain *d, unsigned int virq,
-+				irq_hw_number_t hwirq)
-+{
-+	struct ab8500 *ab8500 = d->host_data;
-+
-+	if (!ab8500)
-+		return -EINVAL;
-+
-+	irq_set_chip_data(virq, ab8500);
-+	irq_set_chip_and_handler(virq, &ab8500_irq_chip,
-+				handle_simple_irq);
-+	irq_set_nested_thread(virq, 1);
- #ifdef CONFIG_ARM
--		set_irq_flags(irq, IRQF_VALID);
-+	set_irq_flags(virq, IRQF_VALID);
- #else
--		irq_set_noprobe(irq);
-+	irq_set_noprobe(virq);
- #endif
--	}
- 
- 	return 0;
+ 	int ret;
+@@ -163,7 +163,7 @@ static int ab8500_i2c_write_masked(struct ab8500 *ab8500, u16 addr, u8 mask,
+ 	return ret;
  }
  
--static void ab8500_irq_remove(struct ab8500 *ab8500)
-+static struct irq_domain_ops ab8500_irq_ops = {
-+        .map    = ab8500_irq_map,
-+        .xlate  = irq_domain_xlate_twocell,
-+};
-+
-+static int ab8500_irq_init(struct ab8500 *ab8500, struct device_node *np)
+-static int ab8500_i2c_read(struct ab8500 *ab8500, u16 addr)
++static int ab8500_prcmu_read(struct ab8500 *ab8500, u16 addr)
  {
--	int base = ab8500->irq_base;
--	int irq;
- 	int num_irqs;
+ 	int ret;
+ 	u8 data;
+@@ -1267,9 +1267,9 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
  
- 	if (is_ab9540(ab8500))
-@@ -551,13 +565,22 @@ static void ab8500_irq_remove(struct ab8500 *ab8500)
- 	else
- 		num_irqs = AB8500_NR_IRQS;
+ 	ab8500->irq = resource->start;
  
--	for (irq = base; irq < base + num_irqs; irq++) {
--#ifdef CONFIG_ARM
--		set_irq_flags(irq, 0);
--#endif
--		irq_set_chip_and_handler(irq, NULL, NULL);
--		irq_set_chip_data(irq, NULL);
-+	if (ab8500->irq_base) {
-+		ab8500->domain = irq_domain_add_legacy(
-+			NULL, num_irqs, ab8500->irq_base,
-+			0, &ab8500_irq_ops, ab8500);
-+	}
-+	else {
-+		ab8500->domain = irq_domain_add_linear(
-+			np, num_irqs, &ab8500_irq_ops, ab8500);
- 	}
-+
-+	if (!ab8500->domain) {
-+		dev_err(ab8500->dev, "Failed to create irqdomain\n");
-+		return -ENOSYS;
-+	}
-+
-+	return 0;
- }
+-	ab8500->read = ab8500_i2c_read;
+-	ab8500->write = ab8500_i2c_write;
+-	ab8500->write_masked = ab8500_i2c_write_masked;
++	ab8500->read = ab8500_prcmu_read;
++	ab8500->write = ab8500_prcmu_write;
++	ab8500->write_masked = ab8500_prcmu_write_masked;
  
- int ab8500_suspend(struct ab8500 *ab8500)
-@@ -1233,14 +1256,6 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
+ 	mutex_init(&ab8500->lock);
+ 	mutex_init(&ab8500->irq_lock);
+diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+index 50c4c89..361de52 100644
+--- a/drivers/mfd/ab8500-debugfs.c
++++ b/drivers/mfd/ab8500-debugfs.c
+@@ -31,12 +31,12 @@ struct ab8500_reg_range {
+ };
  
- 	if (plat)
- 		ab8500->irq_base = plat->irq_base;
--	else if (np)
--		ret = of_property_read_u32(np, "stericsson,irq-base", &ab8500->irq_base);
--
--	if (!ab8500->irq_base) {
--		dev_info(&pdev->dev, "couldn't find irq-base\n");
--		ret = -EINVAL;
--		goto out_free_ab8500;
--	}
+ /**
+- * struct ab8500_i2c_ranges
++ * struct ab8500_prcmu_ranges
+  * @num_ranges: the number of ranges in the list
+  * @bankid: bank identifier
+  * @range: the list of register ranges
+  */
+-struct ab8500_i2c_ranges {
++struct ab8500_prcmu_ranges {
+ 	u8 num_ranges;
+ 	u8 bankid;
+ 	const struct ab8500_reg_range *range;
+@@ -47,7 +47,7 @@ struct ab8500_i2c_ranges {
  
- 	ab8500->dev = &pdev->dev;
+ #define AB8500_REV_REG 0x80
  
-@@ -1323,7 +1338,7 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 		AB8500_SWITCH_OFF_STATUS, &value);
- 	if (ret < 0)
- 		return ret;
--	dev_info(ab8500->dev, "switch off status: %#x", value);
-+	dev_info(ab8500->dev, "switch off status: %#x\n", value);
- 
- 	if (plat && plat->init)
- 		plat->init(ab8500);
-@@ -1352,25 +1367,25 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 	for (i = 0; i < ab8500->mask_size; i++)
- 		ab8500->mask[i] = ab8500->oldmask[i] = 0xff;
- 
--	if (ab8500->irq_base) {
--		ret = ab8500_irq_init(ab8500);
--		if (ret)
--			goto out_freeoldmask;
-+	ret = ab8500_irq_init(ab8500, np);
-+	if (ret)
-+		goto out_freeoldmask;
- 
--		/*  Activate this feature only in ab9540 */
--		/*  till tests are done on ab8500 1p2 or later*/
--		if (is_ab9540(ab8500))
--			ret = request_threaded_irq(ab8500->irq, NULL,
-+	/*  Activate this feature only in ab9540 */
-+	/*  till tests are done on ab8500 1p2 or later*/
-+	if (is_ab9540(ab8500)) {
-+		ret = request_threaded_irq(ab8500->irq, NULL,
- 					ab8500_hierarchical_irq,
- 					IRQF_ONESHOT | IRQF_NO_SUSPEND,
- 					"ab8500", ab8500);
--		else
--			ret = request_threaded_irq(ab8500->irq, NULL,
-+	}
-+	else {
-+		ret = request_threaded_irq(ab8500->irq, NULL,
- 					ab8500_irq,
- 					IRQF_ONESHOT | IRQF_NO_SUSPEND,
- 					"ab8500", ab8500);
- 		if (ret)
--			goto out_removeirq;
-+			goto out_freeoldmask;
- 	}
- 
- 	if (!np) {
-@@ -1417,15 +1432,11 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 					&ab8500_attr_group);
- 	if (ret)
- 		dev_err(ab8500->dev, "error creating sysfs entries\n");
--	else
--		return ret;
-+
-+	return ret;
- 
- out_freeirq:
--	if (ab8500->irq_base)
--		free_irq(ab8500->irq, ab8500);
--out_removeirq:
--	if (ab8500->irq_base)
--		ab8500_irq_remove(ab8500);
-+	free_irq(ab8500->irq, ab8500);
- out_freeoldmask:
- 	kfree(ab8500->oldmask);
- out_freemask:
-@@ -1444,11 +1455,10 @@ static int __devexit ab8500_remove(struct platform_device *pdev)
- 		sysfs_remove_group(&ab8500->dev->kobj, &ab9540_attr_group);
- 	else
- 		sysfs_remove_group(&ab8500->dev->kobj, &ab8500_attr_group);
-+
- 	mfd_remove_devices(ab8500->dev);
--	if (ab8500->irq_base) {
--		free_irq(ab8500->irq, ab8500);
--		ab8500_irq_remove(ab8500);
--	}
-+	free_irq(ab8500->irq, ab8500);
-+
- 	kfree(ab8500->oldmask);
- 	kfree(ab8500->mask);
- 	kfree(ab8500);
-diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
-index 91dd3ef..4ae2cd9 100644
---- a/include/linux/mfd/abx500/ab8500.h
-+++ b/include/linux/mfd/abx500/ab8500.h
-@@ -9,6 +9,7 @@
- 
- #include <linux/atomic.h>
- #include <linux/mutex.h>
-+#include <linux/irqdomain.h>
- 
- struct device;
- 
-@@ -227,6 +228,7 @@ enum ab8500_version {
-  * @irq_lock: genirq bus lock
-  * @transfer_ongoing: 0 if no transfer ongoing
-  * @irq: irq line
-+ * @irq_domain: irq domain
-  * @version: chip version id (e.g. ab8500 or ab9540)
-  * @chip_id: chip revision id
-  * @write: register write
-@@ -247,6 +249,7 @@ struct ab8500 {
- 	atomic_t	transfer_ongoing;
- 	int		irq_base;
- 	int		irq;
-+	struct irq_domain  *domain;
- 	enum ab8500_version version;
- 	u8		chip_id;
- 
-@@ -336,4 +339,6 @@ static inline int is_ab8500_2p0(struct ab8500 *ab)
- 	return (is_ab8500(ab) && (ab->chip_id == AB8500_CUT2P0));
- }
- 
-+int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq);
-+
- #endif /* MFD_AB8500_H */
+-static struct ab8500_i2c_ranges debug_ranges[AB8500_NUM_BANKS] = {
++static struct ab8500_prcmu_ranges debug_ranges[AB8500_NUM_BANKS] = {
+ 	[0x0] = {
+ 		.num_ranges = 0,
+ 		.range = 0,
 -- 
 1.7.9.5
