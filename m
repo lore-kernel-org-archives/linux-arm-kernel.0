@@ -1,34 +1,17 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 20 Jun 2012 16:31:31 +0530
-Subject: [PATCH 07/10] ARM: OMAP3: update cpuidle latency and threshold
- figures
-In-Reply-To: <1339686361-11526-8-git-send-email-j-pihet@ti.com>
-References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
- <1339686361-11526-8-git-send-email-j-pihet@ti.com>
-Message-ID: <4FE1AD8B.305@ti.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Wed, 20 Jun 2012 16:33:51 +0530
+Subject: [PATCH 1/5] dmaengine: mmp_tdma: add mmp tdma support
+In-Reply-To: <1339729448-25895-1-git-send-email-zhangfei.gao@marvell.com>
+References: <1339670638.1927.1641.camel@vkoul-udesk3>
+ <1339729448-25895-1-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1340190231.1927.1652.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 June 2012 08:35 PM, Jean Pihet wrote:
->   		{
->   			.enter		  = omap3_enter_idle_bm,
-> -			.exit_latency	  = 3000 + 8500,
-> -			.target_residency = 15000,
-> +			.exit_latency	  = 4080 + 801,
-> +			.target_residency = 215000,
->   			.flags		  = CPUIDLE_FLAG_TIME_VALID,
->   			.name		  = "C6",
->   			.desc		  = "MPU OFF + CORE RET",
->   		},
->   		{
->   			.enter		  = omap3_enter_idle_bm,
-> -			.exit_latency	  = 10000 + 30000,
-> -			.target_residency = 30000,
-> +			.exit_latency	  = 4300 + 13000,
-> +			.target_residency = 215000,
+On Fri, 2012-06-15 at 11:04 +0800, Zhangfei Gao wrote:
+> Add support for two-channel dma under dmaengine
+> support: mmp-adma and pxa910-squ 
+Applied, thanks
 
-Is the target_residency same for both these states?
-
->   			.flags		  = CPUIDLE_FLAG_TIME_VALID,
->   			.name		  = "C7",
->   			.desc		  = "MPU OFF + CORE OFF",
+-- 
+~Vinod
