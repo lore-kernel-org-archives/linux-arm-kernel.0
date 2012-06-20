@@ -1,125 +1,42 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 20 Jun 2012 16:33:52 +0200
-Subject: [PATCH] gpio: gpio-lpc32xx: Add gpio_to_irq mapping
-Message-ID: <1340202832-16850-1-git-send-email-stigge@antcom.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Jun 2012 22:38:32 +0800
+Subject: [PATCH] clk: mxs: Register USB clocks for mx23
+In-Reply-To: <1340148392-9847-1-git-send-email-festevam@gmail.com>
+References: <1340148392-9847-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120620143830.GF2253@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch helps mapping with gpio_to_irq for the GPIOs that are irq enabled.
+On Tue, Jun 19, 2012 at 08:26:32PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Register USB clocks for mx23.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  drivers/clk/mxs/clk-imx23.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+> index f7be225..4735136 100644
+> --- a/drivers/clk/mxs/clk-imx23.c
+> +++ b/drivers/clk/mxs/clk-imx23.c
+> @@ -195,6 +195,8 @@ int __init mx23_clocks_init(void)
+>  	clk_register_clkdevs(clks[ssp], ssp_lookups, ARRAY_SIZE(ssp_lookups));
+>  	clk_register_clkdevs(clks[gpmi], gpmi_lookups, ARRAY_SIZE(gpmi_lookups));
+>  	clk_register_clkdevs(clks[lcdif], lcdif_lookups, ARRAY_SIZE(lcdif_lookups));
+> +	clk_register_clkdev(clks[usb_pwr], NULL, "8007c000.usbphy");
+> +	clk_register_clkdev(clks[usb], NULL, "80080000.usb");
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
----
-Applies to 3.5-rc3
+It depends on the node name in device tree.  I would defer this
+a little bit to have the node name in dts settled down first.
 
- drivers/gpio/gpio-lpc32xx.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+Regards,
+Shawn
 
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -28,6 +28,7 @@
- #include <mach/hardware.h>
- #include <mach/platform.h>
- #include <mach/gpio-lpc32xx.h>
-+#include <mach/irqs.h>
- 
- #define LPC32XX_GPIO_P3_INP_STATE		_GPREG(0x000)
- #define LPC32XX_GPIO_P3_OUTP_SET		_GPREG(0x004)
-@@ -367,6 +368,66 @@ static int lpc32xx_gpio_request(struct g
- 	return -EINVAL;
- }
- 
-+static int lpc32xx_gpio_to_irq_p01(struct gpio_chip *chip, unsigned offset)
-+{
-+	return IRQ_LPC32XX_P0_P1_IRQ;
-+}
-+
-+static const char lpc32xx_gpio_to_irq_gpio_p3_table[] = {
-+	IRQ_LPC32XX_GPIO_00,
-+	IRQ_LPC32XX_GPIO_01,
-+	IRQ_LPC32XX_GPIO_02,
-+	IRQ_LPC32XX_GPIO_03,
-+	IRQ_LPC32XX_GPIO_04,
-+	IRQ_LPC32XX_GPIO_05,
-+};
-+
-+static int lpc32xx_gpio_to_irq_gpio_p3(struct gpio_chip *chip, unsigned offset)
-+{
-+	if (offset < ARRAY_SIZE(lpc32xx_gpio_to_irq_gpio_p3_table))
-+		return lpc32xx_gpio_to_irq_gpio_p3_table[offset];
-+	return -ENXIO;
-+}
-+
-+static const char lpc32xx_gpio_to_irq_gpi_p3_table[] = {
-+	IRQ_LPC32XX_GPI_00,
-+	IRQ_LPC32XX_GPI_01,
-+	IRQ_LPC32XX_GPI_02,
-+	IRQ_LPC32XX_GPI_03,
-+	IRQ_LPC32XX_GPI_04,
-+	IRQ_LPC32XX_GPI_05,
-+	IRQ_LPC32XX_GPI_06,
-+	IRQ_LPC32XX_GPI_07,
-+	IRQ_LPC32XX_GPI_08,
-+	IRQ_LPC32XX_GPI_09,
-+	-ENXIO, /* 10 */
-+	-ENXIO, /* 11 */
-+	-ENXIO, /* 12 */
-+	-ENXIO, /* 13 */
-+	-ENXIO, /* 14 */
-+	-ENXIO, /* 15 */
-+	-ENXIO, /* 16 */
-+	-ENXIO, /* 17 */
-+	-ENXIO, /* 18 */
-+	IRQ_LPC32XX_GPI_19,
-+	-ENXIO, /* 20 */
-+	-ENXIO, /* 21 */
-+	-ENXIO, /* 22 */
-+	-ENXIO, /* 23 */
-+	-ENXIO, /* 24 */
-+	-ENXIO, /* 25 */
-+	-ENXIO, /* 26 */
-+	-ENXIO, /* 27 */
-+	IRQ_LPC32XX_GPI_28,
-+};
-+
-+static int lpc32xx_gpio_to_irq_gpi_p3(struct gpio_chip *chip, unsigned offset)
-+{
-+	if (offset < ARRAY_SIZE(lpc32xx_gpio_to_irq_gpi_p3_table))
-+		return lpc32xx_gpio_to_irq_gpi_p3_table[offset];
-+	return -ENXIO;
-+}
-+
- static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 	{
- 		.chip = {
-@@ -376,6 +437,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_p01,
- 			.base			= LPC32XX_GPIO_P0_GRP,
- 			.ngpio			= LPC32XX_GPIO_P0_MAX,
- 			.names			= gpio_p0_names,
-@@ -391,6 +453,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_p01,
- 			.base			= LPC32XX_GPIO_P1_GRP,
- 			.ngpio			= LPC32XX_GPIO_P1_MAX,
- 			.names			= gpio_p1_names,
-@@ -421,6 +484,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_output	= lpc32xx_gpio_dir_output_p3,
- 			.set			= lpc32xx_gpio_set_value_p3,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_gpio_p3,
- 			.base			= LPC32XX_GPIO_P3_GRP,
- 			.ngpio			= LPC32XX_GPIO_P3_MAX,
- 			.names			= gpio_p3_names,
-@@ -434,6 +498,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_input	= lpc32xx_gpio_dir_in_always,
- 			.get			= lpc32xx_gpi_get_value,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_gpi_p3,
- 			.base			= LPC32XX_GPI_P3_GRP,
- 			.ngpio			= LPC32XX_GPI_P3_MAX,
- 			.names			= gpi_p3_names,
+>  
+>  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+>  		clk_prepare_enable(clks[clks_init_on[i]]);
+> -- 
+> 1.7.1
+> 
