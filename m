@@ -1,129 +1,44 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 20 Jun 2012 18:35:56 -0500
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <20120620151221.GT12766@atomide.com>
-References: <4FD8A906.8080202@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
- <4FD9E5AF.6010201@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
- <4FDA3464.4040704@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99A511@DBDE01.ent.ti.com>
- <20120615124520.GS12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99A9E7@DBDE01.ent.ti.com>
- <20120620132848.GK12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99D1C5@DBDE01.ent.ti.com>
- <20120620151221.GT12766@atomide.com>
-Message-ID: <4FE25E5C.9020908@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Jun 2012 07:40:02 +0800
+Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
+ number
+In-Reply-To: <20120620225520.GA30087@n2100.arm.linux.org.uk>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
+ <20120618143128.GF19249@S2101-09.ap.freescale.net>
+ <20120618164402.GA18630@n2100.arm.linux.org.uk>
+ <20120619052654.GC21951@S2101-09.ap.freescale.net>
+ <20120620225520.GA30087@n2100.arm.linux.org.uk>
+Message-ID: <20120620233958.GA3377@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/20/2012 10:12 AM, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120620 07:57]:
->> Hi Tony,
->>
->> On Wed, Jun 20, 2012 at 18:58:49, Tony Lindgren wrote:
->>> * Mohammed, Afzal <afzal@ti.com> [120616 02:19]:
->>>> On Fri, Jun 15, 2012 at 18:15:20, Tony Lindgren wrote:
->>
->>>> By gpmc registration, if you meant registering platform device for
->>>> gpmc peripherals, for a board that uses the new gpmc driver interface*,
->>>> it will be done in probe only.
->>>
->>> I was thinking when the gpmc needs to be initialized, and there should
->>> not be any need to do it earlier than at the gpmc using driver probe
->>> time. With device tree that is, as there's no need to stuff the gpmc
->>> timings into a board-*.c file.
->>
->> I believe by "gpmc needs to be initialized", you meant calculating gpmc
->> timings, determining configuration, the things that are done in functions
->> like gpmc_smsc911x_update etc. as in [1] and not initializing gpmc at
->> hardware level. With the above assumption, I feel we need to have a way
->> first to generalize gpmc timing calculation for different peripherals as
->> suggested by Jon as well as have logic to handle timings that depends on
->> cycles too.
+On Wed, Jun 20, 2012 at 11:55:20PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 19, 2012 at 01:26:56PM +0800, Shawn Guo wrote:
+> > On Mon, Jun 18, 2012 at 05:44:02PM +0100, Russell King - ARM Linux wrote:
+> > > FIQs should be an entirely separate number space from IRQs, as we
+> > > may want to totally decouple them from the IRQ stuff (we probably
+> > > should have already done this when genirq came along.)
+> > > 
+> > > About the only stuff FIQs use is the enable/disable_irq as a short
+> > > cut to dealing with the mask registers.
+> > 
+> > I do not quite understand what you are asking for, but I'm guessing it
+> > with the patch below.  Please elaborate it a little bit more if that's
+> > not what you are asking for.
 > 
-> Yup. We'll be only getting the timings from device tree. Ideally the gpmc
-> code would just do all the calculations, but it sounds like device timings
-> may require some calculation on the gpmc consumer driver side too.
+> I was thinking about moving entirely away from any bits of genirq for
+> this.  We shouldn't really be mixing these two things together by
+> nabbing some of the IRQ numberspace for this.
 > 
->>>>> It may require some bus level hooks, or wrapper drivers for the generic
->>>>> device drivers like smsc911x.
->>>>
->>>> This too, not sure whether I follow you
->>>
->>> Well smsc911x has device tree binding, and is a generic driver. How do
->>> we trigger the gpmc initialization from a generic driver probe?
->>
->> Not sure whether device tree have capability to represent something like
->> child devices, if non bus devices can have child devices, then we
->> can have peripherals connected to gpmc as childs, but may be this will
->> remain only as a dream; I need to get into DT to find things out
-> 
-> Yes the that's there set up automatically. But for the timings we
-> could have something like this to associate the following invented
-> gpmc timings with smsc911x:
-> 
-> /* in omap[234].dtsi */
-> gpmc: gpmc at 480121234 {
-> 	compatible = "ti,gpmc";
-> 	reg = <0x480121234 0x1234>;
-> 	#address-cells = <0>;
-> 	#size-cells = <0>;
-> };
-> ...
-> 
-> /* in some board *.dts file */
-> &gpmc {
-> 	gpmc_cs1: gpmc_cs1_timings {
-> 		...
-> 	};
-> };
-> 
-> net at 48001234 {
-> 	compatible = "smsc,lan91c111";
-> 	reg = <0x48001234 0x10000>;
-> 	interrupts = <12>;
-> 	gpmc_timings = <&gpmc_cs1>;
-> };
+> Looking at this code, I'm thinking about taking this further, and
+> santising the whole thing... though that's not going to be a quick
+> change.
 
-The above make sense to me, but I am struggling to see how we can make
-the above work with the proposed driver Afzal has created. The problem
-is how devices are getting registered with Afzal's driver in comparison
-to how device tree will register them.
+What I'm looking for is a quick and reasonable fixing for a compile
+error when SPARSE_IRQ is enabled for imx.  Can we take the original
+patch as it is and defer the whole cleanup to another series?
 
-In Afzal's driver the gpmc_probe() is going to request and configure the
-chip-selects and if successful, then call platform_device_register() to
-register the child devices. So all child devices get registered during
-the gpmc_probe() itself.
-
-With device tree, my understanding is that, it will first register the
-gpmc device and then the children afterwards. In other words, the
-gpmc_probe will be called first and the children registered/probed after.
-
-Therefore, I am wondering if Afzal's driver needs to register the gpmc
-devices outside of the gpmc_probe() and add the devices as children. Or
-maybe we tackle that when we migrate it to DT.
-
->>>>> We should not need to pass clock handles around. It's better to
->>>>> export some helper functions in the gpmc code for the calculation.
->>>>
->>>> Currently we have helper function in gpmc.c for the same, were you
->>>> referring those ?
->>>
->>> Yes something that let's the driver call gpmc code to do the calculation.
->>> The other option would be to just add gpmc clock as a clock fwk node,
->>> and then the driver could clk_get() it as ick.
->>
->> For gpmc driver to calculate timings rather than platform code doing it,
->> we first need to have a generalized way to calculate gpmc timings for
->> all peripherals as well as have a logic to calculate timings based on
->> time & cycles, correct ? (to make sure we are talking the same thing)
-> 
-> Yes that might be tricky..
-
-I am wondering more and more if we need to do a clean-up of the timing
-calculations prior to driver migration ...
-
-Cheers
-Jon
+-- 
+Regards,
+Shawn
