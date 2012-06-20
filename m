@@ -1,24 +1,55 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?UHJjaGFsIEppxZnDrQ==?=)
-Date: Wed, 20 Jun 2012 10:36:47 +0200
-Subject: [PATCH]  clock: at91: fix PLLA overclocked warning
-Message-ID: <4FE18B9F.1060409@aksignal.cz>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 20 Jun 2012 10:42:12 +0200
+Subject: [PATCH v2] pinctrl/coh901: use clk_prepare_[en|dis]able()
+Message-ID: <1340181732-21953-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix false warning "PLLA overclocked". Maximum frequency for sam9260 is 210MHz as stated in atmel's datasheet. 
-Originally there was plus 4.5%, so add this 4.5% to new value too.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+The COH901 GPIO driver did not prepare or unprepare its
+clock, so let us fix it to do so.
+
+Cc: Pankaj Jangra <jangra.pankaj9@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ChangeLog v1->v2:
+- Fix up to use clk_disable_unprepare() on error and exit paths,
+  noticed by Pankaj Jangra.
+---
+ drivers/pinctrl/pinctrl-coh901.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
---- linux/linux-3.5-rc3/arch/arm/mach-at91/clock.c.orig	2012-06-17 02:25:17.000000000 +0200
-+++ linux/linux-3.5-rc3/arch/arm/mach-at91/clock.c	2012-06-20 10:26:34.076174379 +0200
-@@ -707,7 +707,7 @@ static int __init at91_pmc_init(unsigned
-  		if (plla.rate_hz > 800000000)
-  			pll_overclock = true;
-  	} else {
--		if (plla.rate_hz > 209000000)
-+		if (plla.rate_hz > 219000000)
-  			pll_overclock = true;
-  	}
-  	if (pll_overclock)
+diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+index 55697a5..cc0f00d 100644
+--- a/drivers/pinctrl/pinctrl-coh901.c
++++ b/drivers/pinctrl/pinctrl-coh901.c
+@@ -770,7 +770,7 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+ 		dev_err(gpio->dev, "could not get GPIO clock\n");
+ 		goto err_no_clk;
+ 	}
+-	err = clk_enable(gpio->clk);
++	err = clk_prepare_enable(gpio->clk);
+ 	if (err) {
+ 		dev_err(gpio->dev, "could not enable GPIO clock\n");
+ 		goto err_no_clk_enable;
+@@ -912,7 +912,7 @@ err_no_ioremap:
+ 	release_mem_region(gpio->memres->start, resource_size(gpio->memres));
+ err_no_ioregion:
+ err_no_resource:
+-	clk_disable(gpio->clk);
++	clk_disable_unprepare(gpio->clk);
+ err_no_clk_enable:
+ 	clk_put(gpio->clk);
+ err_no_clk:
+@@ -943,7 +943,7 @@ static int __exit u300_gpio_remove(struct platform_device *pdev)
+ 	iounmap(gpio->base);
+ 	release_mem_region(gpio->memres->start,
+ 			   resource_size(gpio->memres));
+-	clk_disable(gpio->clk);
++	clk_disable_unprepare(gpio->clk);
+ 	clk_put(gpio->clk);
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(gpio);
+-- 
+1.7.9.2
