@@ -1,73 +1,78 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Wed, 20 Jun 2012 14:41:50 +0800
-Subject: [PATCH v2] ARM: dts: imx6q-sabrelite: add ecspi1 pinctrl support
-Message-ID: <1340174510-20280-1-git-send-email-jason77.wang@gmail.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 20 Jun 2012 14:40:00 +0800
+Subject: [RFC PATCH 1/1] ARM: imx: enable SPARSE_IRQ for imx
+In-Reply-To: <20120620054015.GB1568@S2100-06.ap.freescale.net>
+References: <20120619130145.GD10387@shlinux2.ap.freescale.net>
+ <1340111993-6676-1-git-send-email-b29396@freescale.com>
+ <20120619140613.GH21951@S2101-09.ap.freescale.net>
+ <20120620022313.GE10387@shlinux2.ap.freescale.net>
+ <20120620054015.GB1568@S2100-06.ap.freescale.net>
+Message-ID: <20120620063959.GH10387@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Imx6q sabrelite board uses ecspi1 to connect a spi flash sst25vf016b,
-we need to add pinctrl information for it in the dts, otherwise the
-ecspi1 driver can't work and the connected flash is wrongly
-detected as a mr25h256 flash like this:
+On Wed, Jun 20, 2012 at 01:40:17PM +0800, Shawn Guo wrote:
+> On Wed, Jun 20, 2012 at 10:23:15AM +0800, Dong Aisheng wrote:
+> > I did see what you said, but you did not go with reasons and that was not so
+> > convinced to me
+> > Can you explain more why you choose linux virt irq and how about the real exist
+> > potential issues i raised before?
+> > 
+> It's not my choice.  Instead, this is how struct resource defined in
+> Linux.  What more reasons do you need to understand that?
+> 
+It's not about how struct resource defined.
+It's about why you directly define linux irq for device rather than
+using standard api irq_find_mapping to get the correct linux virt irq
+for device after using irqdomain.
 
-m25p80 spi32766.0: found mr25h256, expected sst25vf016b
-m25p80 spi32766.0: mr25h256 (32 Kbytes)
+> I do not take the thing you raised as issues, because in the end all
+> these static definitions will be removed after we move over to device
+> tree.
+So you agree they're issues for non-dt?
+IMHO moving to dt is not an excuse to do wrong things for non-dt.
 
-Cc: Richard Zhao <richard.zhao@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Hui Wang <jason77.wang@gmail.com>
----
-In the v2, i moved gpio pinctrl declaration from the ${soc}.dtsi to the
-${board).dts, since the gpio assignment is board specific.
+> 
+> > Hmm, it's not driver code.
+> > And i did see a lot of such code in mach-specific file.
+> 
+> That does not mean you are encouraged to add more.  We are trying to
+> remove them.
+> 
+> > If wrong, any other better way to distinguish the different SoCs?
+> > 
+> There are certainly better way, since we have soc specific
+> initialization to do all the soc specific setup.  That said, we do
+> not have to necessarily use all those ugly cpu_is_xxx and #ifdef.
+> 
+I did not see your point, for soc specific setup, it definitely does not have
+such issue. The issue happens in a common function shared by many SoCs.
+And without dev_id as used by drivers, how do we do it in machine code
+in a better way than cpu_is_xx for non-dt?
 
-This patch is based on the richard.zhao's patch:
-http://permalink.gmane.org/gmane.linux.usb.general/65761
+> > That is a way, but i would prefer to do it in mach-specific code first
+> 
+> No.  Do not make imx special on this.  We would like to use resource
+> definition in the way how it's defined and how everyone else use it.
+> 
+> > since i'm not sure if other people will also like that.
+> 
+> No one (except yourself) likes it.  As I said, we are not supposed to
+> manipulate resource definition this way.
+> 
+Hmm, how can you say NO one?
 
- arch/arm/boot/dts/imx6q-sabrelite.dts | 5 ++++-
- arch/arm/boot/dts/imx6q.dtsi          | 8 ++++++++
- 2 files changed, 12 insertions(+), 1 deletion(-)
+Looking at my patch, you will see the main difference is i use
+irq_find_mapping to get the correct linux irq number not matter
+what the type of irqdomain of this irqchip is and how virtual irq
+range used,
+while you're doing based on the assumption that "i know the irqdomain
+type of this chip is legacy and i know how virtual irq range is allocated,
+then i konw after irqdomain map the linux virtual irq number
+should be x, so i directly define x as the irq number for device without
+using irq_find_mapping api",
+the later one is obviously non-standard and dangerous.
+Why you still think the later one is better?
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 5bba0d1..f7d91ad 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -27,6 +27,8 @@
- 				ecspi at 02008000 { /* eCSPI1 */
- 					fsl,spi-num-chipselects = <1>;
- 					cs-gpios = <&gpio3 19 0>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_ecspi1_1>;
- 					status = "okay";
- 
- 					flash: m25p80 at 0 {
-@@ -48,7 +50,8 @@
- 				gpios {
- 					pinctrl_gpio_hog: gpiohog {
- 						fsl,pins = <1044 0x80000000	/* MX6Q_PAD_GPIO_17__GPIO_7_12 */
--							   144  0x80000000>;	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
-+							    144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
-+							    121  0x80000000>;	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
- 					};
- 				};
- 			};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index ccc8a5f..9fb1683 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -540,6 +540,14 @@
- 							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
- 					};
- 				};
-+
-+				ecspi1 {
-+					pinctrl_ecspi1_1: ecspi1grp-1 {
-+						fsl,pins = <101 0x100b1		/* MX6Q_PAD_EIM_D17__ECSPI1_MISO */
-+							    109 0x100b1		/* MX6Q_PAD_EIM_D18__ECSPI1_MOSI */
-+							    94  0x100b1>;	/* MX6Q_PAD_EIM_D16__ECSPI1_SCLK */
-+					};
-+				};
- 			};
- 
- 			dcic at 020e4000 { /* DCIC1 */
--- 
-1.7.11
+Regards
+Dong Aisheng
