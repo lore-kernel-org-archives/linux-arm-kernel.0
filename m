@@ -1,41 +1,23 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 20 Jun 2012 09:33:05 -0500
-Subject: [PATCH v5] ARM: imx: Add basic imx6q cpu thermal management
-In-Reply-To: <20120620142044.GU28394@pengutronix.de>
-References: <1340175964-4043-1-git-send-email-rob.lee@linaro.org>
- <1340175964-4043-2-git-send-email-rob.lee@linaro.org>
- <20120620101127.GS28394@pengutronix.de>
- <CAMXH7KE0Ei5cZLCOuO-hxBXW8WX48VhxNs2FxPV8biDNqzRY5A@mail.gmail.com>
- <20120620142044.GU28394@pengutronix.de>
-Message-ID: <CAMXH7KHJ5LHCZM2iY_mRm=1L2B5cdxPD_B0htRwX_1HBfn1oxQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Jun 2012 22:33:38 +0800
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+ <20120620090126.GO28394@pengutronix.de>
+ <20120620100015.GA30243@sirena.org.uk>
+ <20120620130941.GB2253@S2101-09.ap.freescale.net>
+ <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
+Message-ID: <20120620143336.GE2253@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 9:20 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Jun 20, 2012 at 09:12:51AM -0500, Rob Lee wrote:
->> Sascha, thanks for the review.
->>
->> >> +
->> >> +static struct imx6q_thermal_zone ? ? *th_zone;
->> >> +static void __iomem ? ? ? ? ? ? ? ? ?*ocotp_base;
->> >
->> > This is a driver and drivers should generally be multi instance safe.
->> >
->>
->> I don't understand what this comment is referring to. ?Could you elaborate?
->
-> Drivers can only be multi instance safe when all variables are inside a
-> instance specific struct and you pass a pointer to this struct around.
-> What if the i.MX7 has two different ocotp_base and you want to use this
-> driver on both ocotp?
->
+On Wed, Jun 20, 2012 at 04:25:54PM +0200, javier Martin wrote:
+> Do you plan to add pinctrl support for i.MX27 and i.MX21?
+> 
+We will have to when we are there to convert these platforms over to DT.
 
-Understood, thanks.  I'll fix this in v6.
-
-> Sascha
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+-- 
+Regards,
+Shawn
