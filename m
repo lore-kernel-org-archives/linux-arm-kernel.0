@@ -1,75 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Jun 2012 14:44:50 +0100
-Subject: [PATCH 15/15] ARM: perf: handle muxed CPU IRQ lines
-In-Reply-To: <20120620132823.GG32666@mudshark.cambridge.arm.com>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-16-git-send-email-lee.jones@linaro.org>
- <20120620132823.GG32666@mudshark.cambridge.arm.com>
-Message-ID: <4FE1D3D2.3050209@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Jun 2012 21:56:37 +0800
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <20120620133148.GP3978@opensource.wolfsonmicro.com>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+ <20120620090126.GO28394@pengutronix.de>
+ <20120620100015.GA30243@sirena.org.uk>
+ <20120620130941.GB2253@S2101-09.ap.freescale.net>
+ <20120620133148.GP3978@opensource.wolfsonmicro.com>
+Message-ID: <20120620135633.GA2513@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Jun 20, 2012 at 02:31:48PM +0100, Mark Brown wrote:
+> > I think that's the approach being taken during the transition to device
+> > tree.  But it's definitely a desirable thing to remove those board
+> > files with device tree support at some point, because not having non-DT
+> > users will ease platform maintenance and new feature adoption a lot
+> > easier, for example linear irqdomain.
+> 
+> Moving to irqdomain without DT is really very easy, you just need to
+> select a legacy mapping if a base is provided and otherwise all the code
+> is identical - it just comes down to a field in platform data and an if
+> statement.
 
-> On Wed, Jun 20, 2012 at 01:56:51PM +0100, Lee Jones wrote:
->> When registering a PMU device, a platform can either use the generic
->> IRQ handler, or supplement it with one of its own. One of the reasons
->> a platform might choose to do this is to handle the case of muxed IRQ
->> lines. If this is the case and the IRQ is handled on the wrong CPU,
->> this patch sets affinity with the next successive online CPU.
->>
->> Cc: Will Deacon<will.deacon@arm.com>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->> ---
->>   arch/arm/kernel/perf_event_v7.c |   12 +++++++++++-
->>   1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
->> index d3c5360..04a8867 100644
->> --- a/arch/arm/kernel/perf_event_v7.c
->> +++ b/arch/arm/kernel/perf_event_v7.c
->> @@ -1069,8 +1069,18 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
->>   	/*
->>   	 * Did an overflow occur?
->>   	 */
->> -	if (!armv7_pmnc_has_overflowed(pmnc))
->> +	if (armv7_pmnc_has_overflowed(pmnc)) {
->
-> Did you mean to change this predicate?
-
-No sorry, that's a mistake.
-
->> +		unsigned int next_cpu;
->> +
->> +		next_cpu = cpumask_next(smp_processor_id(), cpu_online_mask);
->> +
->> +		if (next_cpu>= nr_cpumask_bits)
->> +			next_cpu = cpumask_first(cpu_online_mask);
->> +
->> +		irq_set_affinity(irq_num, cpumask_of(next_cpu));
->> +
->
-> Shouldn't this be in the platform IRQ handler, rather than the core v7 perf
-> code?
-
-Well that's where it currently resides, but in the process of DT:ing the 
-platform, we have no real way to set the call-back. Normally, if it's 
-absolutely necessary, we do this with AUXDATA. However in the PMU case 
-we fall-down as a device address is required for DT look-up, which the 
-PMU does not have.
-
-I spoke with Arnd about sensible solutions and he suggested placing the 
-logic inside the generic instead, thus supporting muxed IRQ lines 
-without the requirement of providing a platform specific handler in 
-every instance this occurs (although, I think the ux500 are the only 
-platform to do this currently).
-
-I'd be happy to take any other suggestions, but this seemed fairly neat 
-and unobtrusive (not withstanding the predicate cock-up).
+Yeah, but I guess what I'm saying is *linear* irqdomain.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Shawn
