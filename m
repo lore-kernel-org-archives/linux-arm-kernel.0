@@ -1,178 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Jun 2012 14:15:32 +0900
-Subject: [PATCH] ARM: remove unused SPI clock headers
-In-Reply-To: <1339616647.30984.174.camel@x61.thuisdomein>
-References: <1339616647.30984.174.camel@x61.thuisdomein>
-Message-ID: <029101cd4ea3$b744fd40$25cef7c0$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Jun 2012 13:40:17 +0800
+Subject: [RFC PATCH 1/1] ARM: imx: enable SPARSE_IRQ for imx
+In-Reply-To: <20120620022313.GE10387@shlinux2.ap.freescale.net>
+References: <20120619130145.GD10387@shlinux2.ap.freescale.net>
+ <1340111993-6676-1-git-send-email-b29396@freescale.com>
+ <20120619140613.GH21951@S2101-09.ap.freescale.net>
+ <20120620022313.GE10387@shlinux2.ap.freescale.net>
+Message-ID: <20120620054015.GB1568@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
+On Wed, Jun 20, 2012 at 10:23:15AM +0800, Dong Aisheng wrote:
+> I did see what you said, but you did not go with reasons and that was not so
+> convinced to me
+> Can you explain more why you choose linux virt irq and how about the real exist
+> potential issues i raised before?
 > 
-> Commit 875a59374cd10200ac24f03877ccd8f73af590cc ("ARM: SAMSUNG:
-> Consolidation of SPI platform devices to plat-samsung") deleted all
-> (four) files that included one of the "spi-clocks.h" headers. It seems
-> it was just an oversight to not remove those headers too. They can
-> safely be removed now.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> 0) Only tested by using various git commands on the (history of the)
-> tree.
-> 
-> 1) The history of arch/arm/mach-exynos/include/mach/spi-clocks.h
-> actually differs from the history of the other four headers. It got
-> added by commit 74ac23a3e4962bf4f935a5579ae08754d21f9d5a ("ARM: EXYNOS:
-> Modified files for SPI consolidation work"). That commit actually got
-> added (very shortly) after commit
-> 875a59374cd10200ac24f03877ccd8f73af590cc removed all files that included
-> spi-clocks.h.
-> 
->  arch/arm/mach-exynos/include/mach/spi-clocks.h  |   16 ----------------
->  arch/arm/mach-s3c64xx/include/mach/spi-clocks.h |   18 ------------------
->  arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 -------------------
-> -
->  arch/arm/mach-s5pc100/include/mach/spi-clocks.h |   18 ------------------
->  arch/arm/mach-s5pv210/include/mach/spi-clocks.h |   17 -----------------
->  5 files changed, 0 insertions(+), 89 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/include/mach/spi-clocks.h
->  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
->  delete mode 100644 arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
->  delete mode 100644 arch/arm/mach-s5pc100/include/mach/spi-clocks.h
->  delete mode 100644 arch/arm/mach-s5pv210/include/mach/spi-clocks.h
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/spi-clocks.h
-> b/arch/arm/mach-exynos/include/mach/spi-clocks.h
-> deleted file mode 100644
-> index c71a5fb..0000000
-> --- a/arch/arm/mach-exynos/include/mach/spi-clocks.h
-> +++ /dev/null
-> @@ -1,16 +0,0 @@
-> -/* linux/arch/arm/mach-exynos4/include/mach/spi-clocks.h
-> - *
-> - * Copyright (C) 2011 Samsung Electronics Co. Ltd.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __ASM_ARCH_SPI_CLKS_H
-> -#define __ASM_ARCH_SPI_CLKS_H __FILE__
-> -
-> -/* Must source from SCLK_SPI */
-> -#define EXYNOS_SPI_SRCCLK_SCLK		0
-> -
-> -#endif /* __ASM_ARCH_SPI_CLKS_H */
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
-> b/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
-> deleted file mode 100644
-> index 9d0c43b..0000000
-> --- a/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
-> +++ /dev/null
-> @@ -1,18 +0,0 @@
-> -/* linux/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
-> - *
-> - * Copyright (C) 2009 Samsung Electronics Ltd.
-> - *	Jaswinder Singh <jassi.brar@samsung.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __S3C64XX_PLAT_SPI_CLKS_H
-> -#define __S3C64XX_PLAT_SPI_CLKS_H __FILE__
-> -
-> -#define S3C64XX_SPI_SRCCLK_PCLK		0
-> -#define S3C64XX_SPI_SRCCLK_SPIBUS	1
-> -#define S3C64XX_SPI_SRCCLK_48M		2
-> -
-> -#endif /* __S3C64XX_PLAT_SPI_CLKS_H */
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
-> b/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
-> deleted file mode 100644
-> index 170a20a..0000000
-> --- a/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
-> +++ /dev/null
-> @@ -1,20 +0,0 @@
-> -/* linux/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
-> - *
-> - * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com
-> - *
-> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-> - *	Jaswinder Singh <jassi.brar@samsung.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> -*/
-> -
-> -#ifndef __ASM_ARCH_SPI_CLKS_H
-> -#define __ASM_ARCH_SPI_CLKS_H __FILE__
-> -
-> -#define S5P64X0_SPI_SRCCLK_PCLK		0
-> -#define S5P64X0_SPI_SRCCLK_SCLK		1
-> -
-> -#endif /* __ASM_ARCH_SPI_CLKS_H */
-> diff --git a/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
-> b/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
-> deleted file mode 100644
-> index 65e4263..0000000
-> --- a/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
-> +++ /dev/null
-> @@ -1,18 +0,0 @@
-> -/* linux/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
-> - *
-> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-> - *	Jaswinder Singh <jassi.brar@samsung.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __S5PC100_PLAT_SPI_CLKS_H
-> -#define __S5PC100_PLAT_SPI_CLKS_H __FILE__
-> -
-> -#define S5PC100_SPI_SRCCLK_PCLK		0
-> -#define S5PC100_SPI_SRCCLK_48M		1
-> -#define S5PC100_SPI_SRCCLK_SPIBUS	2
-> -
-> -#endif /* __S5PC100_PLAT_SPI_CLKS_H */
-> diff --git a/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
-> b/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
-> deleted file mode 100644
-> index 02acded..0000000
-> --- a/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
-> +++ /dev/null
-> @@ -1,17 +0,0 @@
-> -/* linux/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
-> - *
-> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-> - *	Jaswinder Singh <jassi.brar@samsung.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __S5PV210_PLAT_SPI_CLKS_H
-> -#define __S5PV210_PLAT_SPI_CLKS_H __FILE__
-> -
-> -#define S5PV210_SPI_SRCCLK_PCLK		0
-> -#define S5PV210_SPI_SRCCLK_SCLK		1
-> -
-> -#endif /* __S5PV210_PLAT_SPI_CLKS_H */
-> --
-> 1.7.7.6
+It's not my choice.  Instead, this is how struct resource defined in
+Linux.  What more reasons do you need to understand that?
 
-Yes, looks ok to me and will apply this into cleanup branch.
-Thanks.
+I do not take the thing you raised as issues, because in the end all
+these static definitions will be removed after we move over to device
+tree.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Hmm, it's not driver code.
+> And i did see a lot of such code in mach-specific file.
+
+That does not mean you are encouraged to add more.  We are trying to
+remove them.
+
+> If wrong, any other better way to distinguish the different SoCs?
+> 
+There are certainly better way, since we have soc specific
+initialization to do all the soc specific setup.  That said, we do
+not have to necessarily use all those ugly cpu_is_xxx and #ifdef.
+
+> That is a way, but i would prefer to do it in mach-specific code first
+
+No.  Do not make imx special on this.  We would like to use resource
+definition in the way how it's defined and how everyone else use it.
+
+> since i'm not sure if other people will also like that.
+
+No one (except yourself) likes it.  As I said, we are not supposed to
+manipulate resource definition this way.
+
+-- 
+Regards,
+Shawn
