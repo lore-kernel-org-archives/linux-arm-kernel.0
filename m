@@ -1,60 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Jun 2012 15:13:51 +0100
-Subject: [PATCH 15/15] ARM: perf: handle muxed CPU IRQ lines
-In-Reply-To: <20120620140115.GJ32666@mudshark.cambridge.arm.com>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-16-git-send-email-lee.jones@linaro.org>
- <20120620132823.GG32666@mudshark.cambridge.arm.com>
- <4FE1D3D2.3050209@linaro.org>
- <20120620140115.GJ32666@mudshark.cambridge.arm.com>
-Message-ID: <4FE1DA9F.30902@linaro.org>
+From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
+Date: Wed, 20 Jun 2012 18:13:54 +0400
+Subject: [RFC PATCH v2 03/11] mfd: omap: control: core system control
+ driver
+In-Reply-To: <20120620102224.GZ12766@atomide.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <4FDF11C3.4010701@dev.rtsoft.ru> <20120620102224.GZ12766@atomide.com>
+Message-ID: <4FE1DAA2.1000502@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/12 15:01, Will Deacon wrote:
-> On Wed, Jun 20, 2012 at 02:44:50PM +0100, Lee Jones wrote:
->>>
->>> Shouldn't this be in the platform IRQ handler, rather than the core v7 perf
->>> code?
+  Hi, Tony.
+
+On 06/20/2012 02:22 PM, Tony Lindgren wrote:
+> * Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120618 04:36]:
+>> This patch introduces a MFD core device driver for
+>> OMAP system control module.
 >>
->> Well that's where it currently resides, but in the process of DT:ing the
->> platform, we have no real way to set the call-back. Normally, if it's
->> absolutely necessary, we do this with AUXDATA. However in the PMU case
->> we fall-down as a device address is required for DT look-up, which the
->> PMU does not have.
+>> The control module allows software control of
+>> various static modes supported by the device. It is
+>> composed of two control submodules: general control
+>> module and device (padconfiguration) control
+>> module.
+>> +++ linux-2.6/drivers/mfd/omap-control-core.c
+> ...
 >
-> Right, so I suspect this is going to be a huge problem for the OMAP guys,
-> where they have to do a fair amount of jiggery-pokery to kick their PMU into
-> action. We are also looking to put suspend/resume hooks into the
-> arm_pmu_platdata which will undoubtedly be highly platform-specific.
 >
->> I spoke with Arnd about sensible solutions and he suggested placing the
->> logic inside the generic instead, thus supporting muxed IRQ lines
->> without the requirement of providing a platform specific handler in
->> every instance this occurs (although, I think the ux500 are the only
->> platform to do this currently).
->
-> Whilst this code isn't too problematic (but yes, you are the only platform
-> that needs it) I think if we solve the bigger problem then you can use the
-> same solution to do your IRQ ping-ponging.
->
->> I'd be happy to take any other suggestions, but this seemed fairly neat
->> and unobtrusive (not withstanding the predicate cock-up).
->
-> Can we not fix the AUXDATA stuff to assume address 0 if it's not present for
-> the matching node? This will work for perf as I don't expect to have
-> multiple nodes with the same compatible string for PMUs that are not
-> memory-mapped (for big.LITTLE, the strings will be different).
+>> +u32 omap_control_readl(u16 offset)
+>> +{
+>> +	return __raw_readl(omap_control_base + (offset));
+>> +}
+>> +
+>> +void omap_control_writel(u32 val, u16 offset)
+>> +{
+>> +	__raw_writel(val, omap_control_base + (offset));
+>> +}
+> There should not be any need to have the individual drivers use
+> these. Please instead just set up something where individual drivers
+> register with the control module core, and get their own iobase
+> returned so they can use readl/writel and behave like normal device
+> drivers.
+IIUC one of the reasons drivers/mfd/omap-control-core.c introduction is replacement of arch/arm/mach-omap2/control.c. control.c provides omap_ctrl_readl/omap_ctrl_writel API which are heavily used in arch/arm/mach-omap2/:
+arch/arm/mach-omap2/hsmmc.c
+arch/arm/mach-omap2/usb-fs.c
+arch/arm/mach-omap2/sr_device.c
+arch/arm/mach-omap2/id.c
+...
 
-Okay, leave it with me.
+So,the same API set (omap_control_readl/omap_control_writel) was added to omap-control-core.c.
 
-I'm off now until Monday, I'll pick it up then.
+If omap-control-core.c should only service users from driver/ directory, than I agree - we can remove
+omap_control_readl/omap_control_writel from omap-control-core.c.
+  But IIUC you are agree to "switch" arch/arm/mach-omap2/id.c from control.c to omap-control-core.c. If arch/arm/mach-omap2/id.c is switched to control.c, then I guess all arch/arm/mach-omap2/*.c should be "switched" to omap-control-core.c as well. But this means that omap-control-core.c should provide omap_control_readl/omap_control_writel API.
 
-Thanks Will.
+  BR,
+    Konstantin Baydarov.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+> Regards,
+>
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
