@@ -1,77 +1,35 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 20 Jun 2012 11:13:07 +0200
-Subject: Fwd: Re: [PATCH]  mmc: at91: fix bus speed
-In-Reply-To: <4FE18E84.9000603@atmel.com>
-References: <4FE18E84.9000603@atmel.com>
-Message-ID: <4FE19423.4010103@atmel.com>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Wed, 20 Jun 2012 17:14:48 +0800
+Subject: [PATCH v3 0/5] ARM OMAP3530evm misc fixes
+Message-ID: <1340183693-3195-1-git-send-email-zumeng.chen@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mmc mailing list.
+The series is based upon the latest linux-omap master branch from
+Tony (3.5-rc2).
 
+V3 Changes :
 
--------- Message original --------
-Sujet: Re: [PATCH]  mmc: at91: fix bus speed
-Date : Wed, 20 Jun 2012 10:49:08 +0200
-De : ludovic.desroches <ludovic.desroches@atmel.com>
-Pour : Prchal Ji?? <jiri.prchal@aksignal.cz>
-Copie ? : <ludovic.desroches@atmel.com>, 
-<linux-arm-kernel@lists.infradead.org>
+ 1. [patch 5/5] Leave driver/input/touchscreen as-is. some changes
+    on arch/arm/mach-omap2/common-board-devices.c, please see the
+    shortlog for more information.
+ 2. For the first patch, I noticed GPMC driver conversion v5, so
+    this is decided by Tony, we can drop it, and I'll create a new
+    one if needed, but obviously I'm not very proper candidate for
+    it.
 
-Hello Jiri,
+ Thanks all comments :-)
 
-Thanks for your patch but at91-mci is now deprecated and should be
-removed in 3.7.
-On one hand I don't know if we have to continue to take patches for this
-driver, on the other hand it's a fix for some SD cards.
+Zumeng Chen (5):
+      ARM: OMAP3EVM: Add NAND flash definition
+      ARM: OMAP3EVM: Adding USB internal LDOs board file
+      ARM: omap3evm: enable VBUS switch for EHCI tranceiver
+      ARM: OMAP3EVM: cosmetic fixes for parent clk set
+      ARM: OMAP3530evm: set pendown_state and debounce time for ads7846
 
-Le 06/20/2012 10:15 AM, Prchal Ji?? a ?crit :
-> This patch change minimum and maximum clock speed because some noname
-> cards doesn't work during init even at 375kHz and new cards (SD v. 3.0)
-> can run at 50 or 100 MHz.
-> Also aded clkdiv register overrun fix when setting low speeds.
->
-> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-> ---
->
-> --- linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c.orig    2012-06-17
-> 02:25:17.000000000 +0200
-> +++ linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c    2012-06-18
-> 11:01:49.751415984 +0200
-> @@ -724,6 +724,10 @@ static void at91_mci_set_ios(struct mmc_
->           else
->               clkdiv = (at91_master_clock / ios->clock) / 2;
->
-> +        /* set maximum divider */
-> +        if (clkdiv > 255)
-> +            clkdiv = 255;
-> +
->           pr_debug("clkdiv = %d. mcck = %ld\n", clkdiv,
->               at91_master_clock / (2 * (clkdiv + 1)));
->       }
-> @@ -948,8 +952,8 @@ static int __init at91_mci_probe(struct
->       }
->
->       mmc->ops = &at91_mci_ops;
-> -    mmc->f_min = 375000;
-> -    mmc->f_max = 25000000;
-> +    mmc->f_min = 200000; /* not all cards can run at 375kHz */
-
-I will check on atmel-mci if we have to decrease f_min.
-
-> +    mmc->f_max = 100000000; /* new cards can run at 100MHz */
-
-MCI operates at a rate of up to master clock divided by two so you can't
-reach 100MHz as max frequency since it means that our master clock is at
-200MHz that is not the case. I would say 50MHz is the maximum frequency
-for product compatible with at91-mci.
-
->       mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
->       mmc->caps = 0;
->
->
->
-
-Regards
-
-Ludovic
+ arch/arm/mach-omap2/board-omap3evm.c       |   74 +++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/common-board-devices.c |   18 ++++++-
+ arch/arm/mach-omap2/common-board-devices.h |    1 +
+ arch/arm/plat-omap/clock.c                 |    4 ++
+ drivers/mfd/omap-usb-host.c                |    2 +-
+ 5 files changed, 95 insertions(+), 4 deletions(-)
