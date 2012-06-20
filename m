@@ -1,29 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Jun 2012 14:19:00 +0100
-Subject: [PATCH 08/15] regulator: Stop initialising AB8500's registers
- during bring-up
-In-Reply-To: <20120620130840.GM3978@opensource.wolfsonmicro.com>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-9-git-send-email-lee.jones@linaro.org>
- <20120620130840.GM3978@opensource.wolfsonmicro.com>
-Message-ID: <4FE1CDC4.9000305@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Jun 2012 06:19:19 -0700
+Subject: [PATCH] arm: OMAP depends on MMU
+In-Reply-To: <1339116651-18051-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1339116651-18051-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20120620131918.GJ12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/12 14:08, Mark Brown wrote:
-> On Wed, Jun 20, 2012 at 01:56:44PM +0100, Lee Jones wrote:
->> There is no need to initialise the AB8500's regulator registers, as
->> most of this work is already carried out by framework features.
->
-> Does this have any dependency on the rest of the series?
+* mathieu.poirier at linaro.org <mathieu.poirier@linaro.org> [120607 17:55]:
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> There is no way to build OMAP kernels without an MMU
+> at this point because of dependencies on MMU-only functions.
+> 
+> As long as nobody is interested in fixing this, let's just disable
+> this platforms for nommu kernels.
 
-Unfortunately yes.
+Thanks, applying into fixes non-critical.
 
-It needs the "ARM: ux500:" stuff to go in first.
+Tony
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 84449dd..4b1fc0d 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -934,6 +934,7 @@ config ARCH_DAVINCI
+>  
+>  config ARCH_OMAP
+>  	bool "TI OMAP"
+> +	depends on MMU
+>  	select HAVE_CLK
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select ARCH_HAS_CPUFREQ
+> -- 
+> 1.7.5.4
+> 
