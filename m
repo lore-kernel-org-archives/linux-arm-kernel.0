@@ -1,59 +1,76 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Wed, 20 Jun 2012 15:41:41 +0800
-Subject: [PATCH] pinctrl: pinctrl-imx: fix map setting problem if NO_PAD_CTL
-Message-ID: <1340178101-21605-1-git-send-email-jason77.wang@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 20 Jun 2012 09:45:34 +0200
+Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
+In-Reply-To: <CAOesGMi+2-xEv5+s0xEX7UzoC500q87zrXV4bHynQyzXE8Virw@mail.gmail.com>
+References: <4FBE4FE7.3010005@atmel.com> <4FC722B7.10409@atmel.com>
+ <CAOesGMhq8uzei+Dn8=1iYrTiAOtuByjm58j9zgFyORVG5VZuNQ@mail.gmail.com>
+ <4FCCD8D9.2070005@atmel.com> <4FD8C476.3080904@atmel.com>
+ <CAOesGMi+2-xEv5+s0xEX7UzoC500q87zrXV4bHynQyzXE8Virw@mail.gmail.com>
+Message-ID: <4FE17F9E.3090009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-new_map is allocated according to map_num instead of grp->npins,
-if a pin or some pins of a group has NO_PAD_CTL property, the map_num
-and the grp->npin are different definitely.
+On 06/18/2012 03:49 PM, Olof Johansson :
+> Hi,
+> 
+> On Wed, Jun 13, 2012 at 9:48 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> On 06/04/2012 05:48 PM, Nicolas Ferre :
+>>> On 05/31/2012 11:04 PM, Olof Johansson :
+>>>> Hi Nicolas,
+>>>>
+>>>> On Thu, May 31, 2012 at 12:50 AM, Nicolas Ferre <nicolas.ferre@atmel.com
+>>>> <mailto:nicolas.ferre@atmel.com>> wrote:
+>>>>
+>>>>     On 05/24/2012 05:12 PM, Nicolas Ferre :
+>>>>     > Hi Arnd, hi Olof,
+>>>>
+>>>>     Ping?
+>>>>
+>>>>     (or maybe you will have a look at this after the merge window...)
+>>>>
+>>>>
+>>>> So, I looked at this branch yesterday but I wasn't entirely happy with
+>>>> the number of ifdefs it adds.
+>>>
+>>> Unfortunately, this is the usual shape of any devices/boards files on
+>>> AT91. This amount will be reduced when we remove the old driver and when
+>>> we move newer/popular devices to Device Tree...
+>>>
+>>>> If the idea is to deprecate the old driver, wouldn't it make more sense
+>>>> to just cut everyone over instead of having both sets of setup in the
+>>>> kernel?
+>>>
+>>> Well, the old driver has existed since a very long time and I think that
+>>> people are used to it on oldest platforms. This is why we put in place a
+>>> overlapping period. This way we hope that the transition will be smoother.
+>>> On the other hand, the old code will be removed in 3.7 so the
+>>> overlapping period will not be so long.
+>>> I hope that it will allow people to track bugs if some are remaining and
+>>> switch to newer driver easily.
+>>
+>> Olof, Arnd,
+>>
+>> So, do you have made up your mind about this pull request?
+> 
+> Sorry for the delays in handling this, I should have been quicker at replying.
+> 
+> That said, the driver is staged for removal in 3.7, and this patch is
+> 3.6 material at this time. But I think it makes sense to cut every
+> in-tree board over completely one release before the driver is
+> removed, and thus not keep the old platform data around for them.
+> 
+> That way the out-of-tree users still have a one-release grace period,
+> but everyone with an in-tree board (and the reference platforms) will
+> move over sooner. I think I would prefer that over having all these
+> ifdefs in the tree, even if it's just for one release.
+> 
+> I could be convinced otherwise if there's a good reason though. Either
+> way, 3.6 is the way to go.
 
-When we set mapping information to the new_map[], we should skip those
-pins with NO_PAD_CTL from index, otherwise it is possible the driver
-will aceesss to a unallocated region.
+Fair enough, we will prepare a patch to remove the old platform data
+combined with this patch. We will integrate in an "at91-3.6-soc"
+series/branch that we will submit to you soon.
 
-Cc: Dong Aisheng <dong.aisheng@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Hui Wang <jason77.wang@gmail.com>
----
-This problem is easily reproduced if we set pinctrl in the
-${board}.dts like following:
-fsl,pins = <pin_func_id1   config_with_NO_PAD_CTL
-            pin_func_id2   config_with_NO_PAD_CTL
-            pin_func_id3   config_normal>;
-
- drivers/pinctrl/pinctrl-imx.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index dd6d93a..0e21abb 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -146,6 +146,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	struct pinctrl_map *new_map;
- 	struct device_node *parent;
- 	int map_num = 1;
-+	int map_pos = 0;
- 	int i;
- 
- 	/*
-@@ -186,11 +187,11 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	new_map++;
- 	for (i = 0; i < grp->npins; i++) {
- 		if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
--			new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
--			new_map[i].data.configs.group_or_pin =
-+			new_map[map_pos].type = PIN_MAP_TYPE_CONFIGS_PIN;
-+			new_map[map_pos].data.configs.group_or_pin =
- 					pin_get_name(pctldev, grp->pins[i]);
--			new_map[i].data.configs.configs = &grp->configs[i];
--			new_map[i].data.configs.num_configs = 1;
-+			new_map[map_pos].data.configs.configs = &grp->configs[i];
-+			new_map[map_pos++].data.configs.num_configs = 1;
- 		}
- 	}
- 
+Thanks, best regards,
 -- 
-1.7.11
+Nicolas Ferre
