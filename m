@@ -1,56 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Jun 2012 13:28:47 +0900
-Subject: [PATCH] serial: samsung: protect NULL dereference of clock name
-In-Reply-To: <001401cd3e3e$644fd3a0$2cef7ae0$%kim@samsung.com>
-References: <001401cd3e3e$644fd3a0$2cef7ae0$%kim@samsung.com>
-Message-ID: <029001cd4e9d$2f2af9b0$8d80ed10$%kim@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 20 Jun 2012 12:48:37 +0800
+Subject: [PATCH 1/1] pinctrl: pinctrl-mxs: fix a compiling error
+Message-ID: <1340167717-13082-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyoungil Kim wrote:
-> 
-> From: KeyYoung Park <keyyoung.park@samsung.com>
-> 
-> When priting the serial clock source, if clock source name is null,
-> kernel reference NULL point.
-> 
-> Signed-off-by: KeyYoung Park <keyyoung.park@samsung.com>
-> Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
-> Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-(Cc'ed Greg)
+The compiling error is:
+drivers/pinctrl/pinctrl-mxs.c: In function 'mxs_dt_node_to_map':
+drivers/pinctrl/pinctrl-mxs.c:140: error: implicit declaration of function 'free'
+drivers/pinctrl/pinctrl-mxs.c:140: warning: incompatible implicit declaration of built-in function 'free'
+It should be kfree.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ drivers/pinctrl/pinctrl-mxs.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Greg, could you please pick this up?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> ---
->  drivers/tty/serial/samsung.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index ea76b40..77484e0 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -1160,7 +1160,8 @@ static ssize_t s3c24xx_serial_show_clksrc(struct
-> device *dev,
->  	struct uart_port *port = s3c24xx_dev_to_port(dev);
->  	struct s3c24xx_uart_port *ourport = to_ourport(port);
-> 
-> -	return snprintf(buf, PAGE_SIZE, "* %s\n", ourport->baudclk->name);
-> +	return snprintf(buf, PAGE_SIZE, "* %s\n",
-> +			ourport->baudclk->name ?: "(null)");
->  }
-> 
->  static DEVICE_ATTR(clock_source, S_IRUGO, s3c24xx_serial_show_clksrc,
-> NULL);
-> --
-> 1.7.1
+diff --git a/drivers/pinctrl/pinctrl-mxs.c b/drivers/pinctrl/pinctrl-mxs.c
+index afb50ee..4ba4636 100644
+--- a/drivers/pinctrl/pinctrl-mxs.c
++++ b/drivers/pinctrl/pinctrl-mxs.c
+@@ -137,7 +137,7 @@ static int mxs_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 
+ free_group:
+ 	if (!purecfg)
+-		free(group);
++		kfree(group);
+ free:
+ 	kfree(new_map);
+ 	return ret;
+-- 
+1.7.0.4
