@@ -1,139 +1,51 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Wed, 20 Jun 2012 09:01:12 -0300
-Subject: [PATCH] ARM: LPC32XX: Cleanup USB clock init
-Message-ID: <1340193675-30717-1-git-send-email-aletes.xgr@gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 20 Jun 2012 16:05:44 +0400
+Subject: [PATCH 3/5] ARM: omap3evm: enable VBUS switch for EHCI tranceiver
+In-Reply-To: <1340183693-3195-4-git-send-email-zumeng.chen@windriver.com>
+References: <1340183693-3195-1-git-send-email-zumeng.chen@windriver.com>
+ <1340183693-3195-4-git-send-email-zumeng.chen@windriver.com>
+Message-ID: <4FE1BC98.7050607@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move most of usb clock initialization from lpc32xx_udc and ohci-nxp to
-clock.c. Also adds ohci clocks and otg clocks.
+Hello.
 
-Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
----
- arch/arm/mach-lpc32xx/clock.c                 |   73 ++++++++++++++++++++++++-
- arch/arm/mach-lpc32xx/include/mach/platform.h |   14 +++++
- 2 files changed, 86 insertions(+), 1 deletion(-)
+On 20-06-2012 13:14, Zumeng Chen wrote:
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index f6a3ffe..c80f064 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -727,14 +727,82 @@ static struct clk clk_rtc = {
- 	.get_rate	= local_return_parent_rate,
- };
- 
-+static int local_usb_enable(struct clk *clk, int enable)
-+{
-+	u32 tmp;
-+
-+	if (enable) {
-+		/* Set up I2C pull levels
-+		 *
-+		 * This should never be disabled as the host/gadget driver may
-+		 * need to talk to the usb transceiver while the main clocks are
-+		 * disabled to save power.
-+		 */
-+		tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
-+		tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE;
-+		__raw_writel(tmp, LPC32XX_CLKPWR_I2C_CLK_CTRL);
-+	}
-+
-+	return local_onoff_enable(clk, enable);
-+}
-+
- static struct clk clk_usbd = {
- 	.parent		= &clk_usbpll,
--	.enable		= local_onoff_enable,
-+	.enable		= local_usb_enable,
- 	.enable_reg	= LPC32XX_CLKPWR_USB_CTRL,
- 	.enable_mask	= LPC32XX_CLKPWR_USBCTRL_HCLK_EN,
- 	.get_rate	= local_return_parent_rate,
- };
- 
-+#define OTG_ALWAYS_MASK		(LPC32XX_USB_OTG_OTG_CLOCK_ON | \
-+				 LPC32XX_USB_OTG_I2C_CLOCK_ON)
-+
-+static int local_usb_otg_enable(struct clk *clk, int enable)
-+{
-+	int to = 1000;
-+
-+	if (enable) {
-+		__raw_writel(clk->enable_mask, clk->enable_reg);
-+
-+		while (((__raw_readl(LPC32XX_USB_OTG_CLK_STAT) &
-+			clk->enable_mask) != clk->enable_mask) && (to > 0))
-+			to--;
-+	} else {
-+		__raw_writel(OTG_ALWAYS_MASK, clk->enable_reg);
-+
-+		while (((__raw_readl(LPC32XX_USB_OTG_CLK_STAT) &
-+			OTG_ALWAYS_MASK) != OTG_ALWAYS_MASK) && (to > 0))
-+			to--;
-+	}
-+
-+	if (to)
-+		return 0;
-+	else
-+		return -1;
-+}
-+
-+static struct clk clk_usb_otg_dev = {
-+	.parent		= &clk_usbpll,
-+	.enable		= local_usb_otg_enable,
-+	.enable_reg	= LPC32XX_USB_OTG_CLK_CTRL,
-+	.enable_mask	= LPC32XX_USB_OTG_AHB_M_CLOCK_ON |
-+			  LPC32XX_USB_OTG_OTG_CLOCK_ON |
-+			  LPC32XX_USB_OTG_DEV_CLOCK_ON |
-+			  LPC32XX_USB_OTG_I2C_CLOCK_ON,
-+	.get_rate	= local_return_parent_rate,
-+};
-+
-+static struct clk clk_usb_otg_host = {
-+	.parent		= &clk_usbpll,
-+	.enable		= local_usb_otg_enable,
-+	.enable_reg	= LPC32XX_USB_OTG_CLK_CTRL,
-+	.enable_mask	= LPC32XX_USB_OTG_AHB_M_CLOCK_ON |
-+			  LPC32XX_USB_OTG_OTG_CLOCK_ON |
-+			  LPC32XX_USB_OTG_HOST_CLOCK_ON |
-+			  LPC32XX_USB_OTG_I2C_CLOCK_ON,
-+	.get_rate	= local_return_parent_rate,
-+};
-+
- static int tsc_onoff_enable(struct clk *clk, int enable)
- {
- 	u32 tmp;
-@@ -1130,6 +1198,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_INIT("31060000.ethernet", NULL, &clk_net),
- 	CLKDEV_INIT("dev:clcd", NULL, &clk_lcd),
- 	CLKDEV_INIT("31020000.usbd", "ck_usbd", &clk_usbd),
-+	CLKDEV_INIT("31020000.ohci", "ck_usbd", &clk_usbd),
-+	CLKDEV_INIT("31020000.usbd", "ck_usb_otg", &clk_usb_otg_dev),
-+	CLKDEV_INIT("31020000.ohci", "ck_usb_otg", &clk_usb_otg_host),
- 	CLKDEV_INIT("lpc32xx_rtc", NULL, &clk_rtc),
- };
- 
-diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
-index c584f5b..acc4aab 100644
---- a/arch/arm/mach-lpc32xx/include/mach/platform.h
-+++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
-@@ -694,4 +694,18 @@
- #define LPC32XX_GPIO_P2_MUX_CLR			_GPREG(0x02C)
- #define LPC32XX_GPIO_P2_MUX_STATE		_GPREG(0x030)
- 
-+/*
-+ * USB Otg Registers
-+ */
-+#define _OTGREG(x)			io_p2v(LPC32XX_USB_OTG_BASE + (x))
-+#define LPC32XX_USB_OTG_CLK_CTRL	_OTGREG(0xFF4)
-+#define LPC32XX_USB_OTG_CLK_STAT	_OTGREG(0xFF8)
-+
-+/* USB OTG CLK CTRL bit defines */
-+#define LPC32XX_USB_OTG_AHB_M_CLOCK_ON	_BIT(4)
-+#define LPC32XX_USB_OTG_OTG_CLOCK_ON	_BIT(3)
-+#define LPC32XX_USB_OTG_I2C_CLOCK_ON	_BIT(2)
-+#define LPC32XX_USB_OTG_DEV_CLOCK_ON	_BIT(1)
-+#define LPC32XX_USB_OTG_HOST_CLOCK_ON	_BIT(0)
-+
- #endif
--- 
-1.7.10
+> This was chosen by following the trace on the schematic from component U131
+> and U134 to the CPEN pin on the USB3320 device.
+
+> TWL4030.GPIO2-...->(T2_GPIO2_3V3)U131-..>nUSB2_EN-..>U134-..>EXP_nUSB2_1V8
+> which starts EHCI tranceiver USB3320.
+
+> This will set TWL4030.GPIO2 as output pin to drive EHCI tranceiver.
+
+> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
+> ---
+>   arch/arm/mach-omap2/board-omap3evm.c |    9 +++++++++
+>   1 files changed, 9 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+> index 1bfbe42..02d8047 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -360,6 +360,15 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
+>
+>   	platform_device_register(&leds_gpio);
+>
+> +	/* Enable VBUS switch by setting TWL4030.GPIO2DIR as output
+> +	 * for starting USB tranceiver
+> +	 */
+> +	if (get_omap3_evm_rev()>= OMAP3EVM_BOARD_GEN_2) {
+> +		u8 val;
+
+    Empty line after declaration block wouldn't hurt...
+
+> +		twl_i2c_read_u8(TWL4030_MODULE_GPIO,&val, REG_GPIODATADIR1);
+> +		val |= 0x04; /* TWL4030.GPIO2DIR BIT at GPIODATADIR1(0x9B) */
+> +		twl_i2c_write_u8(TWL4030_MODULE_GPIO, val, REG_GPIODATADIR1);
+> +	}
+>   	return 0;
+>   }
+
+WBR, Sergei
