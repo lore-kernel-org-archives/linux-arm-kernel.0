@@ -1,60 +1,77 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Wed, 20 Jun 2012 10:19:30 -1000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <201206201957.39343.arnd@arndb.de>
-References: <4FD84133.4060401@firmworks.com>
- <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
- <4FE0EFBB.6090206@firmworks.com> <201206201957.39343.arnd@arndb.de>
-Message-ID: <4FE23052.3020702@firmworks.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 20 Jun 2012 14:20:46 -0700
+Subject: [GIT PULL] Integrator common clock
+In-Reply-To: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
+References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
+Message-ID: <20120620212046.GI4402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/20/2012 9:57 AM, Arnd Bergmann wrote:
-> On Tuesday 19 June 2012, Mitch Bradley wrote:
->
->> Version A - 3 address cells:  In this version, the intermediate address
->> space has 3 cells:  port#, address type, offset.  Address type is
->>     0 : root port
->>     1 : config space
->>     2 : extended config space
->>     3 : I/O
->>     4 : non-prefetchable memory
->>     5 : prefetchable memory.
->>
->> The third cell "offset" is necessary so that the size field has a number
->> space that can include it.
->
-> I agree with Stephen that this is a clever way to encode all the address spaces,
-> very nice!
->
->> Version B - 2 address cells:  In this first version, the intermediate
->> address space has 2 cells:  port#, offset.  The address type (I/O, mem,
->> etc) is the high digit of in the offset:
->>      Offset 0....... : Root port
->>      Offset 1....... : config
->>      Offset 2....... : extended config
->>      Offset 3....... : I/O
->>      Offset 4....... : non-prefetchable memory
->>      Offset 5....... : prefetchable memory.
->
-> This is similar to how the PCI binding works internally, but I find that
-> a bit confusing as well, so given those two choices, I'd prefer the first
-> one.
+On 20120619-08:53, Linus Walleij wrote:
+> Hi ARM SoC people,
+> 
+> would you consider pulling in the support form common clk in the Integrator,
+> unless Mike shouts at me? I think I have adressed all review comments.
+> 
 
-Yeah, version A is my preference too.  It's straightforward and clear.  
-I did the other two
-versions mostly to explore the possibility space.
+Hi Linus,
 
->
->     
->> Version C - 2 address cells, 0 size cells (!) : In this version we hide the size component in
->> the intermediate space.  I don't know if that will actually work, but my guess is that it
->> probably would.  The intermediate address space is like version A with the omission of the
->> offset field.  The intermediate address just specifies the port number and the address type.
->
-> My guess is that it doesn't work with the current Linux code that transforms
-> the addresses. I've just recently seen the code complain about any platform
-> device whose parent has #size-cells=0.
->
-> 	Arnd
->
+Any reason for this code to go through the arm-soc tree instead of
+common clk tree?
+
+Thanks,
+Mike
+
+> There will at some point be some trivial merge conflicts in drivers/clk/Makefile
+> I think, but you're used to that I think...
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+> 
+>   Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> integrator-clk
+> 
+> for you to fetch changes up to aa3f7190e46514002ddf5b6054d7dc9f6f9f9cb7:
+> 
+>   ARM: integrator: convert to common clock (2012-06-15 09:00:43 +0200)
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (3):
+>       ARM: integrator: put symbolic bus names on devices
+>       clk: add versatile ICST307 driver
+>       ARM: integrator: convert to common clock
+> 
+>  arch/arm/Kconfig                               |    8 +-
+>  arch/arm/mach-integrator/core.c                |   55 ++----------
+>  arch/arm/mach-integrator/include/mach/clkdev.h |   26 ------
+>  arch/arm/mach-integrator/integrator_ap.c       |    8 +-
+>  arch/arm/mach-integrator/integrator_cp.c       |   69 ++-------------
+>  arch/arm/plat-versatile/Kconfig                |    3 +
+>  arch/arm/plat-versatile/Makefile               |    2 +-
+>  drivers/clk/Kconfig                            |    2 +
+>  drivers/clk/Makefile                           |    1 +
+>  drivers/clk/versatile/Kconfig                  |    8 ++
+>  drivers/clk/versatile/Makefile                 |    3 +
+>  drivers/clk/versatile/clk-icst.c               |  100 +++++++++++++++++++++
+>  drivers/clk/versatile/clk-icst.h               |   10 +++
+>  drivers/clk/versatile/clk-integrator.c         |  111 ++++++++++++++++++++++++
+>  include/linux/platform_data/clk-integrator.h   |    1 +
+>  15 files changed, 263 insertions(+), 144 deletions(-)
+>  delete mode 100644 arch/arm/mach-integrator/include/mach/clkdev.h
+>  create mode 100644 drivers/clk/versatile/Kconfig
+>  create mode 100644 drivers/clk/versatile/Makefile
+>  create mode 100644 drivers/clk/versatile/clk-icst.c
+>  create mode 100644 drivers/clk/versatile/clk-icst.h
+>  create mode 100644 drivers/clk/versatile/clk-integrator.c
+>  create mode 100644 include/linux/platform_data/clk-integrator.h
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
