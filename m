@@ -1,126 +1,53 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 20 Jun 2012 13:36:50 +0800
-Subject: [PATCH] ARM: mxs: store mac address read from OTP in device tree
-In-Reply-To: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
-References: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120620053649.GG10387@shlinux2.ap.freescale.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 20 Jun 2012 07:43:14 +0200
+Subject: Dove clock support
+In-Reply-To: <20120619230610.GA3210@schnuecks.de>
+References: <4FDEDEAE.30502@blackshift.org> <20120618080449.GK4799@lunn.ch>
+ <4FDEE6C6.2060101@blackshift.org> <20120618084300.GL4799@lunn.ch>
+ <20120618214143.GA20040@schnuecks.de>
+ <4FDFA748.10905@googlemail.com> <20120619193251.GR26034@lunn.ch>
+ <20120619204210.GA18128@schnuecks.de>
+ <4FE0E753.3010105@googlemail.com>
+ <20120619230610.GA3210@schnuecks.de>
+Message-ID: <20120620054314.GC28139@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 11:20:46PM +0800, Shawn Guo wrote:
-> The non-DT boot reads the mac from OTP and pass it to fec driver via
-> platform data.  The patch provides an equivalent support for device
-> tree boot, with reading mac from OTP and store it in device tree,
-> and fec driver can get the mac from device tree at its probe time.
+On Wed, Jun 20, 2012 at 01:06:10AM +0200, Simon Baatz wrote:
+> On Tue, Jun 19, 2012 at 10:55:47PM +0200, Sebastian Hesselbarh wrote:
+> > On 06/19/2012 10:42 PM, Simon Baatz wrote:
+> > >Should we make this symmetric and add an enable function to gate_fn?
+> > 
+> > I also thought about that issue and I think that as long as PHY is
+> > controlled by controller specific registers it should be handled
+> > by the driver and not by common clock framework.
+> > 
+> > This is true for SATA and PCIe and will also remove the need for
+> > gate_fn - as long as it doen't break other orion-based SoCs. ...
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-mxs/mach-mxs.c |   64 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 64 insertions(+), 0 deletions(-)
+> If PHY control is part of the driver, where do we turn off PHYs that
+> are on by default and that we don't use?
 > 
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 8cac94b..167f649 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -71,6 +71,68 @@ static struct sys_timer imx28_timer = {
->  	.init = imx28_timer_init,
->  };
->  
-> +enum mac_oui {
-> +	OUI_FSL,
-> +	OUI_DENX,
-> +};
-> +
-> +static void __init update_fec_mac_prop(enum mac_oui oui)
-So this is a general function, right?
-Then i would like it to be really general.
+> Don't we still need something like gate_fn or the clk gate/phy gate
+> parent/child mechanism you propose?
 
-> +{
-> +	struct device_node *np, *from = NULL;
-> +	struct property *oldmac, *newmac;
-> +	const u32 *ocotp = mxs_get_ocotp();
-> +	u8 *macaddr;
-> +	u32 val;
-> +	int i;
-> +
-> +	for (i = 0; i < 2; i++) {
-First, this is board specific.
-Not all the boards have two mac, right?
+Hi Simon
 
-> +		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
-> +		if (!np)
-> +			return;
-> +		from = np;
-> +
-> +		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
-> +		if (!newmac)
-> +			return;
-> +		newmac->value = newmac + 1;
-> +		newmac->length = 6;
-> +
-> +		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
-> +		if (!newmac->name) {
-> +			kfree(newmac);
-> +			return;
-> +		}
-> +
-> +		/*
-> +		 * OCOTP only stores the last 4 octets for each mac address,
-> +		 * so hard-code OUI here.
-Is it possible that customer boards store a different size of octets in OCOTP
-because spec does not define it?
-If yes, this possible should not be hard coded in general function.
+This is the interesting part to the puzzle.
 
-> +		 */
-> +		macaddr = newmac->value;
-> +		switch (oui) {
-> +		case OUI_FSL:
-> +			macaddr[0] = 0x00;
-> +			macaddr[1] = 0x04;
-> +			macaddr[2] = 0x9f;
-> +			break;
-> +		case OUI_DENX:
-> +			macaddr[0] = 0xc0;
-> +			macaddr[1] = 0xe5;
-> +			macaddr[2] = 0x4e;
-Personally i would like these board specific data out of this function.
+Probably the correct way for the driver to turn the PHY clk on/off is
+via PM runtime functions. This interface should allow a good level of
+abstraction such that Dove can do what it needs, while one older
+devices, which do not require anything will just have a NOP.
 
-> +			break;
-> +		}
-> +		val = ocotp[i];
-> +		macaddr[3] = (val >> 16) & 0xff;
-> +		macaddr[4] = (val >> 8) & 0xff;
-> +		macaddr[5] = (val >> 0) & 0xff;
-....
-> +
-> +		oldmac = of_find_property(np, newmac->name, NULL);
-> +		if (oldmac)
-> +			prom_update_property(np, newmac, oldmac);
-> +		else
-> +			prom_add_property(np, newmac);
-Grant gave a suggestion before that we'd better change prom_update_property
-behavior to add_or_update from update only.
-I did a patch like that, with the patch the code here will become more simple.
-I will send it out in this thread for you to see if it helps.
+The problem with runtime PM functions is that you need a device
+structure. However, when turning off unused clks at boot, it is unused
+because we don't have a device driver using the hardware and hence
+there is no device structure we can pass to the runtime PM functions.
+The same applies for device where there is a kernel module for the
+hardware, but it has not been loaded yet.
 
-> +	}
-> +}
-> +
->  static void __init imx28_evk_init(void)
->  {
->  	struct clk *clk;
-> @@ -79,6 +141,8 @@ static void __init imx28_evk_init(void)
->  	clk = clk_get_sys("enet_out", NULL);
->  	if (!IS_ERR(clk))
->  		clk_prepare_enable(clk);
-> +
-> +	update_fec_mac_prop(OUI_FSL);
->  }
->  
->  static void __init mxs_machine_init(void)
-> -- 
-> 1.7.5.4
-> 
+We probably need both, the extended gate_fn to turn off unused
+hardware, and runtime pm to control used hardware.
 
-Regards
-Dong Aisheng
+      Andrew
