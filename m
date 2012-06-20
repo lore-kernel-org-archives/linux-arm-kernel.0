@@ -1,36 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Jun 2012 11:03:01 +0100
-Subject: [PATCH 1/2] serial/amba-pl011: use devm_* allocators
-In-Reply-To: <CACRpkdahAYSd+H1hgUwwZh3UY7oS1QTym8uyggpmOgBAuSOaxg@mail.gmail.com>
-References: <1339940648-6847-1-git-send-email-linus.walleij@stericsson.com>
- <CAOMZO5DGxPQyHpPLLJk1P5kmyfB+9jct1rwEZj918wM84ePRKA@mail.gmail.com>
- <CACRpkdahAYSd+H1hgUwwZh3UY7oS1QTym8uyggpmOgBAuSOaxg@mail.gmail.com>
-Message-ID: <20120620100301.GB12537@n2100.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 20 Jun 2012 18:07:40 +0800
+Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
+In-Reply-To: <CACRpkdazTKs_sNHVkVAYdz6CK9fwghf2n-Rrs7fi7R1Z=Gt+3w@mail.gmail.com>
+References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
+ <20110808081552.GI32513@linux-sh.org>
+ <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
+ <CAH9JG2V-66Wn7nwJz6tOkESoQAUJzAg-47YeMY0vzwu6T9O=Rg@mail.gmail.com>
+ <4E40912C.5040801@codeaurora.org>
+ <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
+ <CAGsJ_4y38KBDfjZS_k-QfDUUFAtEwE-ciUgNOA0U2juOBeoXEA@mail.gmail.com>
+ <CACRpkdazTKs_sNHVkVAYdz6CK9fwghf2n-Rrs7fi7R1Z=Gt+3w@mail.gmail.com>
+Message-ID: <CAGsJ_4xuoxgKbSdhkMYadiJTK141-BB13F8cRvo6qny_wzOHDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 08:37:20AM +0200, Linus Walleij wrote:
-> On Sun, Jun 17, 2012 at 4:13 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Sun, Jun 17, 2012 at 10:44 AM, Linus Walleij
-> > <linus.walleij@stericsson.com> wrote:
-> >
-> >> ? ? ? ?uap->pinctrl = devm_pinctrl_get(&dev->dev);
-> >> ? ? ? ?if (IS_ERR(uap->pinctrl)) {
-> >> ? ? ? ? ? ? ? ?ret = PTR_ERR(uap->pinctrl);
-> >> - ? ? ? ? ? ? ? goto unmap;
-> >> + ? ? ? ? ? ? ? goto out;
-> >> ? ? ? ?}
-> >> ? ? ? ?uap->pins_default = pinctrl_lookup_state(uap->pinctrl,
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PINCTRL_STATE_DEFAULT);
-> >> @@ -1915,7 +1917,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
-> >> ? ? ? ?uap->clk = clk_get(&dev->dev, NULL);
-> >
-> > Maybe you can use devm_clk_get here too.
-> 
-> That requires all users of the driver to be using CONFIG_CLKDEV, which
-> I *think* is safe to do, but better check: Russell, do you know if
-> it's safe to use
-> this feature from clkdev in the PL011 driver?
+Hi Linus,
 
-No idea.  What I have said is that the devm_* clk_get interfaces should
-not be dependent on clkdev being built.
+2012/6/20 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Jun 19, 2012 at 5:25 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>> it seems people still use self-defined structure and APIs to set GPIO
+>> pull,
+>
+> Yes. They came into existance before the pinctrl subsystem was invented.
+>
+>> int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull)
+>
+> Yes, that is one example...
+>
+>> or actually you mean use "pin_config_get" and "pin_config_set" with
+>> self-defined configuration to set pull?
+>
+> I don't quite undertand this part of question, can you elaborate?
+>
+
+i just want to make sure whether these two functions are provided to
+support for users to set pin config dynamically.
+for example, one driver might get GPIO number from DT and set
+PIN_CONFIG_BIAS_xxx by pin_config_set() after that.
+until now, no real driver has called pin_config_set(), so i am not sure....
+
+> The idea is to move this driver over to using the pinctrl API and
+> delete these functions (or atleast make them static so they are only
+> used inside the driver itself).
+>
+> It's taking time since legacy code needs to be handled carefully
+> and tested on various hardware, sorry for that, but I'm onto it.
+>
+>> but i think at least the macros of GPIO_PULL_NONE, GPIO_PULL_UP and
+>> GPIO_PULL_DOWN should be standardized.
+>
+> You find an attempt at standardization in drivers/pinctrl/pinconf-generic.c
+> which is also used by the composite U300+COH901 drivers. Drivers
+> can select this support library and use the flags from
+> <linux/pinctrl/pinconf-generic.h>
+>
+> The reason that it's not mandated and some modern SoCs use their
+> own custom definitions was that it was impossible at the time to
+> reach consensus (review the mailing list for the discussion, but
+> mainly it was Mark Brow's arguments that made me give up the
+> general approach).
+
+Thanks for update. i am sorry recently i have missed many discussions ~^?^~
+i guess the generic pin_config_param should be able to cover most cases.
+
+>
+> So currently this support lib is available if your pin configs are
+> simple, if they are complex you can cook your own (like many
+> drivers do).
+>
+> Yours,
+> Linus Walleij
+
+-barry
