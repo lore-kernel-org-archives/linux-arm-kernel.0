@@ -1,55 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Jun 2012 10:51:42 -0600
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C6EE2DD629@HKMAIL01.nvidia.com>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
- <4FD90352.9090606@wwwdotorg.org>
- <20120614063120.GA20167@avionic-0098.mockup.avionic-design.de>
- <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
- <20120619091719.GZ3974@opensource.wolfsonmicro.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD626@HKMAIL01.nvidia.com>
- <4FE112F2.7000506@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD629@HKMAIL01.nvidia.com>
-Message-ID: <4FE1FF9E.4070604@wwwdotorg.org>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 20 Jun 2012 07:41:08 -1000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FE1FB28.3080901@wwwdotorg.org>
+References: <4FD84133.4060401@firmworks.com>
+ <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
+ <4FD849CF.4030009@firmworks.com>
+ <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
+ <4FD85127.8050301@firmworks.com>
+ <20120614091905.GA9081@avionic-0098.mockup.avionic-design.de>
+ <4FDA2DDA.1030704@wwwdotorg.org>
+ <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
+ <4FDA40A0.4030206@wwwdotorg.org>
+ <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
+ <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
+ <4FE0EFBB.6090206@firmworks.com> <4FE1FB28.3080901@wwwdotorg.org>
+Message-ID: <4FE20B34.2090305@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 05:28 AM, Wei Ni wrote:
-...
-> Stephen, as Rakesh said that in case of bcm4329, the two GPIO (WF_EN
-> and WF_RST) are shorted. So I think we can simply to use the
-> power-gpios properity in the SD driver, just use one gpio I test it
-> in this way, it runs ok, the bcm4329 can be powered up. We can use
-> this option.
+On 6/20/2012 6:32 AM, Stephen Warren wrote:
+> On 06/19/2012 03:31 PM, Mitch Bradley wrote:
+> ...
+>
+>
+> The third cell "offset" is necessary so that the size field has a number
+> space that can include it.
+>
+> Can you expand on that sentence a bit more; I don't quite understand
+> that aspect. Thanks.
 
-Wei, again, your emails and not correctly word-wrapped to well under 80
-columns. I know it's a pain to do that with Exchange/Outlook, but it's
-really difficult for anyone to read emails that aren't correctly formatted.
+The meaning of "size"(in the context of "reg" which is phys,size) is 
+"the device occupies a
+contiguous sequence of addresses beginning at phys and continuing to 
+phys+size-1". The
+implicit addition occurs on the last #size-cells cells of the phys.
 
-So yes, once we'd resolved this general issue, that was going to be my
-next topic of discussion.
+Suppose you have 2-cell phys where the values for different devices are 
+<0 0>, <0 1>, <0 2>, <1 0>, <1 1>,
+<1 2>.  The first number is the port number and the second is address 
+space type.  It doesn't make
+sense to say that size is 0x8000, because that would imply that the 
+device extends from, say,
+<1 2> to <1 0x8001>.
 
-I looked at the schematic of the 4329 module, and the GPIOs aren't
-shorted, but rather there's a stuffing option - either WF_EN or WF_RST
-is actually connected to the 4329's WL_SHUTDOWN_N_RST pin. I believe
-WF_EN is the one connected. If the two signals were shorted, you'd need
-to control both of them to avoid sinking power from one of Tegra's GPIO
-outputs into the other if they were set to differing values.
-
-So, yes, using the power-gpios property will probably work in this case.
-
-This rather begs the question: WTF is our downstream kernel doing
-actively controlling both GPIOs with time delays between each? Do you
-have the schematic for the 4330 module, or indeed any other module
-that's used on Cardhu? If so, please do send them to me internally.
-While this workaround might work for the 4329, additional research would
-be useful so we can determine whether we still have a problem to solve
-for other modules.
-
-Thanks.
+I'm not sure this is written down anywhere as explicitly as above, but 
+it is certainly implicit
+in the way that ranges properties work, and it is certainly part of the 
+mental model that
+was in my head when I developed the device tree addressing scheme.
