@@ -1,22 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Jun 2012 09:45:47 +0100
-Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
-In-Reply-To: <CADysL2acF3ttJ-TR2as+GT66MfJiK4YyWYaAiP5j8yQ+YLBGYQ@mail.gmail.com>
-References: <CADysL2acF3ttJ-TR2as+GT66MfJiK4YyWYaAiP5j8yQ+YLBGYQ@mail.gmail.com>
-Message-ID: <20120620084547.GB13009@n2100.arm.linux.org.uk>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Wed, 20 Jun 2012 10:49:08 +0200
+Subject: [PATCH]  mmc: at91: fix bus speed
+In-Reply-To: <4FE18688.4000700@aksignal.cz>
+References: <4FE18688.4000700@aksignal.cz>
+Message-ID: <4FE18E84.9000603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 04:51:16PM +0530, Gupta, Ramesh wrote:
-> >From 630a3a8f341eb7f58f9a63bf786d732b5bdfd01e Mon Sep 17 00:00:00 2001
-> From: Ramesh Gupta G <grgupta@ti.com>
-> Date: Fri, 15 Jun 2012 16:39:21 +0530
-> Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
-> 
-> Added flush_mem cache maintenance api for ARMv6.
-> The implementation is based on dma_flush_range.
+Hello Jiri,
 
-And what about all the other users of the define_cache_functions macro?
+Thanks for your patch but at91-mci is now deprecated and should be 
+removed in 3.7.
+On one hand I don't know if we have to continue to take patches for this 
+driver, on the other hand it's a fix for some SD cards.
 
-This series is incomplete, and therefore entirely unsuitable for
-upstreaming.
+Le 06/20/2012 10:15 AM, Prchal Ji?? a ?crit :
+> This patch change minimum and maximum clock speed because some noname
+> cards doesn't work during init even at 375kHz and new cards (SD v. 3.0)
+> can run at 50 or 100 MHz.
+> Also aded clkdiv register overrun fix when setting low speeds.
+>
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> ---
+>
+> --- linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c.orig    2012-06-17
+> 02:25:17.000000000 +0200
+> +++ linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c    2012-06-18
+> 11:01:49.751415984 +0200
+> @@ -724,6 +724,10 @@ static void at91_mci_set_ios(struct mmc_
+>           else
+>               clkdiv = (at91_master_clock / ios->clock) / 2;
+>
+> +        /* set maximum divider */
+> +        if (clkdiv > 255)
+> +            clkdiv = 255;
+> +
+>           pr_debug("clkdiv = %d. mcck = %ld\n", clkdiv,
+>               at91_master_clock / (2 * (clkdiv + 1)));
+>       }
+> @@ -948,8 +952,8 @@ static int __init at91_mci_probe(struct
+>       }
+>
+>       mmc->ops = &at91_mci_ops;
+> -    mmc->f_min = 375000;
+> -    mmc->f_max = 25000000;
+> +    mmc->f_min = 200000; /* not all cards can run at 375kHz */
+
+I will check on atmel-mci if we have to decrease f_min.
+
+> +    mmc->f_max = 100000000; /* new cards can run at 100MHz */
+
+MCI operates at a rate of up to master clock divided by two so you can't 
+reach 100MHz as max frequency since it means that our master clock is at 
+200MHz that is not the case. I would say 50MHz is the maximum frequency 
+for product compatible with at91-mci.
+
+>       mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+>       mmc->caps = 0;
+>
+>
+>
+
+Regards
+
+Ludovic
