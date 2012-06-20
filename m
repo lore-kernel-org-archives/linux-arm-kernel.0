@@ -1,57 +1,89 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 20 Jun 2012 08:24:11 +0200
-Subject: [PATCH v2] arm: zynq: Support GIC OF initialization
-Message-ID: <1340173451-14613-1-git-send-email-monstr@monstr.eu>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Wed, 20 Jun 2012 14:28:00 +0800
+Subject: [PATCH] ARM: dts: imx6q-sabrelite: add ecspi1 pinctrl support
+In-Reply-To: <20120619152808.GI21951@S2101-09.ap.freescale.net>
+References: <1340096887-24156-1-git-send-email-jason77.wang@gmail.com>
+ <20120619152808.GI21951@S2101-09.ap.freescale.net>
+Message-ID: <4FE16D70.4020800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq is OF driven platfrom which requires OF initialization.
+Shawn Guo wrote:
+> On Tue, Jun 19, 2012 at 05:08:07PM +0800, Hui Wang wrote:
+>   
+>> Imx6q sabrelite board uses ecspi1 to connect a spi flash sst25vf016b,
+>> we need to add pinctrl information for it in the dts, otherwise the
+>> ecspi1 driver can't work and the connected flash is wrongly
+>> detected as a mr25h256 flash like this:
+>>
+>> m25p80 spi32766.0: found mr25h256, expected sst25vf016b
+>> m25p80 spi32766.0: mr25h256 (32 Kbytes)
+>>
+>> Cc: Richard Zhao <richard.zhao@freescale.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/imx6q-sabrelite.dts | 2 ++
+>>  arch/arm/boot/dts/imx6q.dtsi          | 9 +++++++++
+>>  2 files changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+>> index e0ec929..83a8f62 100644
+>> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+>> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+>> @@ -27,6 +27,8 @@
+>>  				ecspi at 02008000 { /* eCSPI1 */
+>>  					fsl,spi-num-chipselects = <1>;
+>>  					cs-gpios = <&gpio3 19 0>;
+>> +					pinctrl-names = "default";
+>> +					pinctrl-0 = <&pinctrl_ecspi1_1>;
+>>  					status = "okay";
+>>  
+>>  					flash: m25p80 at 0 {
+>> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+>> index 8c90cba..ae8e7f2 100644
+>> --- a/arch/arm/boot/dts/imx6q.dtsi
+>> +++ b/arch/arm/boot/dts/imx6q.dtsi
+>> @@ -538,6 +538,15 @@
+>>  							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
+>>  					};
+>>  				};
+>> +
+>> +				ecspi1 {
+>> +					pinctrl_ecspi1_1: ecspi1grp-1 {
+>> +						fsl,pins = <101 0x100b1		/* MX6Q_PAD_EIM_D17__ECSPI1_MISO */
+>> +							    109 0x100b1		/* MX6Q_PAD_EIM_D18__ECSPI1_MOSI */
+>> +							    94  0x100b1		/* MX6Q_PAD_EIM_D16__ECSPI1_SCLK */
+>> +							    121 0x100b1>;	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
+>>     
+>
+> Which gpio is used is really a board specific setting and should not
+> be defined in <soc>.dtsi.  Before gpio_request can automatically
+> configure the requested pin into gpio mode by talking to pinctrl system,
+> we may want to use "hog" feature to configure pins into gpio mode,
+> which means defining a pinctrl state for pin controller node itself,
+> then at pinctrl subsystem init time, pinctrl core will configure these
+> "hog" pins properly.  The following is an example using that feature.
+>
+> http://permalink.gmane.org/gmane.linux.usb.general/65761
+>
+> Regards,
+> Shawn
+>
+>   
+Yes, you are right, i will fix it in the v2.
 
-Signed-off-by: Michal Simek <monstr@monstr.eu>
-
----
-v2: Remove also corresponding defines
----
- arch/arm/mach-zynq/common.c                |    7 ++++++-
- arch/arm/mach-zynq/include/mach/zynq_soc.h |    2 --
- 2 files changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 17d68d6..7941544 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
- }
- 
-+static const struct of_device_id zynq_dt_irq_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
-+	{ }
-+};
-+
- /**
-  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
-  */
- static void __init xilinx_irq_init(void)
- {
--	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-+	of_irq_init(zynq_dt_irq_match);
- }
- 
- /* The minimum devices needed to be mapped before the VM system is up and
-diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index 6ff7015..eab11a0 100644
---- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-+++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -41,9 +41,7 @@
- 
- #define TTC0_BASE			IOMEM(TTC0_VIRT)
- #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
--#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
- #define SCU_CPU_TIMER_BASE		(SCU_PERIPH_BASE + 0x600)
--#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
- #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
- 
- /*
--- 
-1.7.0.4
+Thanks,
+Hui.
+>> +					};
+>> +				};
+>>  			};
+>>  
+>>  			dcic at 020e4000 { /* DCIC1 */
+>> -- 
+>> 1.7.11
+>>
+>>     
+>
+>
+>   
