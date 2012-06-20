@@ -1,32 +1,45 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 20 Jun 2012 17:00:30 +0800
-Subject: [RFC PATCH 1/2] irq_domain: correct a minor wrong comment for linear
- revmap
-Message-ID: <1340182831-10477-1-git-send-email-b29396@freescale.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 20 Jun 2012 11:11:04 +0200
+Subject: [PATCH v2 5/5] sched: cpu_power: enable ARCH_POWER
+In-Reply-To: <20120619090110.GA1692@zhy>
+References: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
+ <1340094536-20873-6-git-send-email-vincent.guittot@linaro.org>
+ <20120619090110.GA1692@zhy>
+Message-ID: <CAKfTPtAdSMJ1RnDPDYZZ378QW9DUCKLA+oC3TWJD7v5KAkFitA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On 19 June 2012 11:01, Yong Zhang <yong.zhang0@gmail.com> wrote:
+> On Tue, Jun 19, 2012 at 10:28:56AM +0200, Vincent Guittot wrote:
+>> Heteregeneous ARM platform uses arch_scale_freq_power function
+>> to reflect the relative capacity of each core
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>> ?kernel/sched/features.h | ? ?2 +-
+>> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/sched/features.h b/kernel/sched/features.h
+>> index de00a48..d98ae90 100644
+>> --- a/kernel/sched/features.h
+>> +++ b/kernel/sched/features.h
+>> @@ -42,7 +42,7 @@ SCHED_FEAT(CACHE_HOT_BUDDY, true)
+>> ?/*
+>> ? * Use arch dependent cpu power functions
+>> ? */
+>> -SCHED_FEAT(ARCH_POWER, false)
+>> +SCHED_FEAT(ARCH_POWER, true)
+>
+> Hmmm...seems we can remove this knob completely.
+>
 
-The revmap type should be linear for irq_domain_add_linear function.
+Peter,
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- kernel/irq/irqdomain.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Do you prefer to keep it or remove it completely ?
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 3e4ea85..cb83554 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -219,7 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- EXPORT_SYMBOL_GPL(irq_domain_add_legacy);
- 
- /**
-- * irq_domain_add_linear() - Allocate and register a legacy revmap irq_domain.
-+ * irq_domain_add_linear() - Allocate and register a linear revmap irq_domain.
-  * @of_node: pointer to interrupt controller's device tree node.
-  * @size: Number of interrupts in the domain.
-  * @ops: map/unmap domain callbacks
--- 
-1.7.0.4
+Thanks
+
+> __weak arch_scale_smt_power() is doing all the trick.
+>
+> Thanks,
+> Yong
