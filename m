@@ -1,46 +1,26 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 20 Jun 2012 13:39:37 +0200
-Subject: [PATCH 07/10] ARM: OMAP3: update cpuidle latency and threshold
- figures
-In-Reply-To: <4FE1AD8B.305@ti.com>
-References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
- <1339686361-11526-8-git-send-email-j-pihet@ti.com>
- <4FE1AD8B.305@ti.com>
-Message-ID: <CAORVsuU7N3N=iSGQKo0oBYysWrg3M15Uak0u2kQg6N7Jwk0Jjg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Jun 2012 04:41:49 -0700
+Subject: [PATCH 04/29] ARM: omap: clk: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <4FDAC07A.7020702@ti.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-5-git-send-email-rnayak@ti.com>
+ <20120614191147.GP19410@gmail.com> <4FDAC07A.7020702@ti.com>
+Message-ID: <20120620114149.GG12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 1:01 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> On Thursday 14 June 2012 08:35 PM, Jean Pihet wrote:
->>
->> ? ? ? ? ? ? ? ?{
->> ? ? ? ? ? ? ? ? ? ? ? ?.enter ? ? ? ? ? ?= omap3_enter_idle_bm,
->> - ? ? ? ? ? ? ? ? ? ? ? .exit_latency ? ? = 3000 + 8500,
->> - ? ? ? ? ? ? ? ? ? ? ? .target_residency = 15000,
->> + ? ? ? ? ? ? ? ? ? ? ? .exit_latency ? ? = 4080 + 801,
->> + ? ? ? ? ? ? ? ? ? ? ? .target_residency = 215000,
->> ? ? ? ? ? ? ? ? ? ? ? ?.flags ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? ? = "C6",
->> ? ? ? ? ? ? ? ? ? ? ? ?.desc ? ? ? ? ? ? = "MPU OFF + CORE RET",
->> ? ? ? ? ? ? ? ?},
->> ? ? ? ? ? ? ? ?{
->> ? ? ? ? ? ? ? ? ? ? ? ?.enter ? ? ? ? ? ?= omap3_enter_idle_bm,
->> - ? ? ? ? ? ? ? ? ? ? ? .exit_latency ? ? = 10000 + 30000,
->> - ? ? ? ? ? ? ? ? ? ? ? .target_residency = 30000,
->> + ? ? ? ? ? ? ? ? ? ? ? .exit_latency ? ? = 4300 + 13000,
->> + ? ? ? ? ? ? ? ? ? ? ? .target_residency = 215000,
->
->
-> Is the target_residency same for both these states?
-Yes it is. The details are found in the omappedia wiki page.
+* Rajendra Nayak <rnayak@ti.com> [120614 22:01]:
+> On Friday 15 June 2012 12:41 AM, Mike Turquette wrote:
+> >On 20120614-18:16, Rajendra Nayak wrote:
+> >>As we move to Common clk framework use clk_prepare_enable()
+> >>instead of clk_enable() and similarly clk_disable_unprepare()
+> >>instead of clk_disable()
+> >>
+> >>Based on initial changes from Mike turquette.
 
-Thanks,
-Jean
+Sounds like these kind of patches should be a separate series
+to prepare for the common clk fwk conversion? It seems these
+could already get merged separately?
 
->
->
->> ? ? ? ? ? ? ? ? ? ? ? ?.flags ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? ? = "C7",
->> ? ? ? ? ? ? ? ? ? ? ? ?.desc ? ? ? ? ? ? = "MPU OFF + CORE OFF",
->
->
+Tony
