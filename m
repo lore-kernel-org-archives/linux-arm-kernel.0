@@ -1,109 +1,156 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Jun 2012 13:56:42 +0100
-Subject: [PATCH 06/15] mfd: Register the ab8500 from db8500-prcmu using the
- MFD API
+Date: Wed, 20 Jun 2012 13:56:43 +0100
+Subject: [PATCH 07/15] i2c: Add Device Tree support to the Nomadik I2C driver
 In-Reply-To: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
 References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1340197011-5435-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1340197011-5435-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hierarchically, the AB8500 is a child of the DB8500 PRCMU. So now that
-Device Tree is being used and MFD core code is Device Tree aware, we
-can simply register DB8500 PRCMU from Device Tree in the normal way
-then allow the DB8500 PRCMU driver to register the AB8500 as a simple
-MFD device at probe time.
+Here we apply the bindings required for successful Device Tree
+probing of the i2c-nomadik driver. We also apply a fall-back
+configuration in case either one is not provided, or a required
+element is missing from the one supplied.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: linux-i2c at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    2 --
- drivers/mfd/ab8500-core.c          |   12 ------------
- drivers/mfd/db8500-prcmu.c         |   15 +++++++++++++++
- 3 files changed, 15 insertions(+), 14 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c |   90 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 84 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 7e5b161..0bae853 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -820,8 +820,6 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
- 	/* only create devices below soc node */
- 	{ .compatible = "stericsson,db8500", },
- 	{ .compatible = "stericsson,db8500-prcmu", },
--	{ .compatible = "stericsson,db8500-prcmu-regulator", },
--	{ .compatible = "stericsson,ab8500", },
- 	{ .compatible = "simple-bus"},
- 	{ },
- };
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 79d7672..738b9c5 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1247,14 +1247,6 @@ static struct attribute_group ab9540_attr_group = {
- 	.attrs	= ab9540_sysfs_entries,
- };
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index a92440d..5611c62 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
  
--static const struct of_device_id ab8500_match[] = {
--	{
--		.compatible = "stericsson,ab8500",
--		.data = (void *)AB8500_VERSION_AB8500,
--	},
--	{},
--};
+ #include <plat/i2c.h>
+ 
+@@ -333,10 +334,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
+ 
+ 	i2c_clk = clk_get_rate(dev->clk);
+ 
+-	/* fallback to std. mode if machine has not provided it */
+-	if (dev->cfg.clk_freq == 0)
+-		dev->cfg.clk_freq = 100000;
 -
- static int __devinit ab8500_probe(struct platform_device *pdev)
- {
- 	struct ab8500_platform_data *plat = dev_get_platdata(&pdev->dev);
-@@ -1296,9 +1288,6 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 
- 	if (platid)
- 		version = platid->driver_data;
--	else if (np)
--		version = (unsigned int)
--			of_match_device(ab8500_match, &pdev->dev)->data;
- 
- 	if (version != AB8500_VERSION_UNDEFINED)
- 		ab8500->version = version;
-@@ -1492,7 +1481,6 @@ static struct platform_driver ab8500_core_driver = {
- 	.driver = {
- 		.name = "ab8500-core",
- 		.owner = THIS_MODULE,
--		.of_match_table = ab8500_match,
- 	},
- 	.probe	= ab8500_probe,
- 	.remove	= __devexit_p(ab8500_remove),
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index e9e576c..80def6c 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2945,6 +2945,14 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
- 	},
+ 	/*
+ 	 * The spec says, in case of std. mode the divider is
+ 	 * 2 whereas it is 3 for fast and fastplus mode of
+@@ -899,15 +896,90 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+ 	.functionality	= nmk_i2c_functionality
  };
  
-+static struct resource ab8500_resources[] = {
-+	[0] = {
-+		.start	= IRQ_DB8500_AB8500,
-+		.end	= IRQ_DB8500_AB8500,
-+		.flags	= IORESOURCE_IRQ
-+	}
++static struct nmk_i2c_controller u8500_i2c = {
++	/*
++	 * Slave data setup time; 250ns, 100ns, and 10ns, which
++	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
++	 */
++	.slsu           = 0xe,
++	.tft            = 1,      /* Tx FIFO threshold */
++	.rft            = 8,      /* Rx FIFO threshold */
++	.clk_freq       = 100000, /* std. mode operation */
++	.timeout        = 200,    /* Slave response timeout(ms) */
++	.sm             = I2C_FREQ_MODE_FAST,
 +};
 +
- static struct mfd_cell db8500_prcmu_devs[] = {
- 	{
- 		.name = "db8500-prcmu-regulators",
-@@ -2956,6 +2964,13 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 		.name = "cpufreq-u8500",
- 		.of_compatible = "stericsson,cpufreq-u8500",
- 	},
-+	{
-+		.name = "ab8500-core",
-+		.of_compatible = "stericsson,ab8500",
-+		.num_resources = ARRAY_SIZE(ab8500_resources),
-+		.resources = ab8500_resources,
-+		.id = AB8500_VERSION_AB8500,
-+	},
- };
++static int __devinit
++nmk_i2c_of_probe(struct device_node *np, struct nmk_i2c_controller *pdata)
++{
++	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
++	if (!pdata->clk_freq) {
++		pr_warn("%s: Clock frequency not found\n", np->full_name);
++		return -EINVAL;
++	}
++
++	of_property_read_u32(np, "stericsson,slsu", (u32*)&pdata->slsu);
++	if (!pdata->slsu) {
++		pr_warn("%s: Data line delay not found\n", np->full_name);
++		return -EINVAL;
++	}
++
++	of_property_read_u32(np, "stericsson,tft", (u32*)&pdata->tft);
++	if (!pdata->tft) {
++		pr_warn("%s: Tx FIFO threshold not found\n", np->full_name);
++		return -EINVAL;
++	}
++
++	of_property_read_u32(np, "stericsson,rft", (u32*)&pdata->rft);
++	if (!pdata->rft) {
++		pr_warn("%s: Rx FIFO threshold not found\n", np->full_name);
++		return -EINVAL;
++	}
++
++	of_property_read_u32(np, "stericsson,timeout", (u32*)&pdata->timeout);
++	if (!pdata->timeout) {
++		pr_warn("%s: Timeout not found\n", np->full_name);
++		return -EINVAL;
++	}
++
++	/*
++	 * This driver only supports fast and standard frequency
++	 * modes. If anything else is requested fall-back to standard.
++	 */
++	if (of_get_property(np, "stericsson,i2c_freq_mode_fast", NULL))
++		pdata->sm = I2C_FREQ_MODE_FAST;
++	else
++		pdata->sm = I2C_FREQ_MODE_STANDARD;
++
++	return 0;
++}
++
+ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 	struct resource *res;
+-	struct nmk_i2c_controller *pdata =
+-			pdev->dev.platform_data;
++	struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct nmk_i2c_dev	*dev;
+ 	struct i2c_adapter *adap;
  
- /**
++	if (np) {
++		if (!pdata) {
++			pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++			if (!pdata) {
++				ret = -ENOMEM;
++				goto err_no_mem;
++			}
++		}
++		ret = nmk_i2c_of_probe(np, pdata);
++		if (ret)
++			kfree(pdata);
++	}
++
++	if (!pdata)
++		/* No i2c configuration found, using the default. */
++		pdata = &u8500_i2c;
++
+ 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_err(&pdev->dev, "cannot allocate memory\n");
+@@ -1038,11 +1110,17 @@ static int __devexit nmk_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id nmk_gpio_match[] = {
++	{ .compatible = "st,nomadik-i2c", },
++	{},
++};
++
+ static struct platform_driver nmk_i2c_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = DRIVER_NAME,
+ 		.pm = &nmk_i2c_pm,
++		.of_match_table = nmk_gpio_match,
+ 	},
+ 	.probe = nmk_i2c_probe,
+ 	.remove = __devexit_p(nmk_i2c_remove),
 -- 
 1.7.9.5
