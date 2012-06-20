@@ -1,67 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jun 2012 11:01:26 +0200
-Subject: [RFC] Support for 'Coda' video codec IP.
-In-Reply-To: <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
-References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
- <20120619181717.GE28394@pengutronix.de>
- <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
-Message-ID: <20120620090126.GO28394@pengutronix.de>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Wed, 20 Jun 2012 14:32:08 +0530
+Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
+In-Reply-To: <20120620084547.GB13009@n2100.arm.linux.org.uk>
+References: <CADysL2acF3ttJ-TR2as+GT66MfJiK4YyWYaAiP5j8yQ+YLBGYQ@mail.gmail.com>
+ <20120620084547.GB13009@n2100.arm.linux.org.uk>
+Message-ID: <CADysL2aTMwDW1xXjRcOrEm5Fq2S6+V31yE0AeDCHBw2Ak+sU7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 09:51:32AM +0200, javier Martin wrote:
-> Hi Sascha,
-> thank you for your review.
-> 
+Hi Russell,
+
+
+On Wed, Jun 20, 2012 at 2:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> On Tue, Jun 19, 2012 at 04:51:16PM +0530, Gupta, Ramesh wrote:
+> > >From 630a3a8f341eb7f58f9a63bf786d732b5bdfd01e Mon Sep 17 00:00:00 2001
+> > From: Ramesh Gupta G <grgupta@ti.com>
+> > Date: Fri, 15 Jun 2012 16:39:21 +0530
+> > Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
 > >
-> > Since we all move to devicetree shouldn't we stop adding new
-> > platform devices?
-> 
-> Our platfrom, 'visstrim_m10' doesn't currently support devicetree yet,
-> so it would be highly difficult for us to test it at the moment.
-> Couldn't you add devicetree support in a later patch?
+> > Added flush_mem cache maintenance api for ARMv6.
+> > The implementation is based on dma_flush_range.
+>
+> And what about all the other users of the define_cache_functions macro?
 
-I try to motivate people moving to devicetree. At some point I'd like to
-get rid of the platform based boards in the tree. Adding new platform
-seems like delaying this instead of working towards a platform board
-free Kernel.
-Any other opinions on this?
+I initially added only for ARMv6/7 and I will add this for the other users.
 
-> >
-> > The Coda device supports four instances. In this patch you only use
-> > instance 0, but you do not protect this function from being opened
-> > multiple times. Does this work with multiple opens?
-> 
-> No, it doesn't work with multiple opens. It would need either
-> multi-instance handling support or a restriction so that only can be
-> opened once, as you said.
-> 
-> > Can we do this driver multiple instance from the start? This could be
-> > done more easily if we do not create seperate device nodes for
-> > encoding/decoding, but when we create a single device node which can be
-> > opened exactly 4 times. The decision whether we do encoder or decoder
-> > can then be done in set_fmt.
-> 
-> I don't think adding multi-instance support is that difficult, let me
-> take a look at your code and if this is the case I'll do it.
+> This series is incomplete, and therefore entirely unsuitable for
+> upstreaming.
 
-The only difficult thing in multi instance support is that the core has
-memory for four different contexts, but only a single processing engine.
-So you have to queue up the next frames for all instances in a single
-list and let the driver pick the next frame from the list.
-In our code we use 'write' to get the datastream from userspace. This
-means that it may happen that there is not enough data available for the
-next decoding frame. For encoding we use 'read' to pass the datastream
-to userspace.  This means that there may be not enough space in the
-fifo. Handling this is a bit complicated. Since you are using mem2mem
-and work on buffers instead of streams this should be much simpler than
-in our driver. I'm just telling you so that you don't get confused when
-you look at our code.
+I will send an updated patch set.
 
-Sascha
+Thank you for the comments.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Ramesh Gupta G
