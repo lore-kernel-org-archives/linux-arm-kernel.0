@@ -1,75 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jun 2012 03:25:58 -0700
-Subject: [RFC PATCH v2 06/11] ARM: OMAP4+: Adding the temperature
- sensor register set bit fields
-In-Reply-To: <4FDF11CD.2090101@dev.rtsoft.ru>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <4FDF11CD.2090101@dev.rtsoft.ru>
-Message-ID: <20120620102557.GB12766@atomide.com>
+Date: Wed, 20 Jun 2012 03:29:05 -0700
+Subject: [PATCHv8 03/13] I2C: OMAP: Remove reset at init
+In-Reply-To: <1340029828-20751-4-git-send-email-shubhrajyoti@ti.com>
+References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+ <1340029828-20751-4-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120620102905.GC12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120618 04:36]:
-> OMAP4460 specific temperature sensor register bit fields are added.
-> Existing OMAP4 entries are renamed to OMAP4430.
+* Shubhrajyoti D <shubhrajyoti@ti.com> [120618 07:35]:
+> The reset in the driver at init is not needed anymore as the
+> following patch has removed the HWMOD_INIT_NO_RESET flag.
+> 6d3c55f [OMAP: hwmod: fix the i2c-reset timeout during bootup]
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> ---
->  arch/arm/mach-omap2/include/mach/control.h |  116 ++++++++++++++++++++++++++++
->  1 files changed, 116 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/include/mach/control.h b/arch/arm/mach-omap2/include/mach/control.h
-> index cf42764..171b504 100644
-> --- a/arch/arm/mach-omap2/include/mach/control.h
-> +++ b/arch/arm/mach-omap2/include/mach/control.h
-> @@ -230,6 +230,122 @@
->  /* OMAP44xx control McBSP padconf */
->  #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP	0x061c
->  
-> +/* TEMP_SENSOR OMAP4430 */
-> +#define OMAP4430_BGAP_TEMPSOFF_SHIFT			12
-> +#define OMAP4430_BGAP_TEMPSOFF_MASK			(1 << 12)
-> +#define OMAP4430_BGAP_TSHUT_SHIFT				11
-> +#define OMAP4430_BGAP_TSHUT_MASK				(1 << 11)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_CONTCONV_SHIFT		10
-> +#define OMAP4430_BGAP_TEMP_SENSOR_CONTCONV_MASK		(1 << 10)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_SOC_SHIFT		9
-> +#define OMAP4430_BGAP_TEMP_SENSOR_SOC_MASK			(1 << 9)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_EOCZ_SHIFT		8
-> +#define OMAP4430_BGAP_TEMP_SENSOR_EOCZ_MASK		(1 << 8)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
-> +#define OMAP4430_BGAP_TEMP_SENSOR_DTEMP_MASK		(0xff << 0)
-> +
-> +/* TEMP_SENSOR OMAP4460 */
-> +#define OMAP4460_BGAP_TEMPSOFF_SHIFT			13
-> +#define OMAP4460_BGAP_TEMPSOFF_MASK			(1 << 13)
-> +#define OMAP4460_BGAP_TEMP_SENSOR_SOC_SHIFT		11
-> +#define OMAP4460_BGAP_TEMP_SENSOR_SOC_MASK		(1 << 11)
-> +#define OMAP4460_BGAP_TEMP_SENSOR_EOCZ_SHIFT		10
-> +#define OMAP4460_BGAP_TEMP_SENSOR_EOCZ_MASK		(1 << 10)
-> +#define OMAP4460_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
-> +#define OMAP4460_BGAP_TEMP_SENSOR_DTEMP_MASK		(0x3ff << 0)
-> +
-> +/* BANDGAP_CTRL */
-> +#define OMAP4460_SINGLE_MODE_SHIFT			31
-> +#define OMAP4460_SINGLE_MODE_MASK			(1 << 31)
-> +#define OMAP4460_MASK_HOT_SHIFT				1
-> +#define OMAP4460_MASK_HOT_MASK				(1 << 1)
-> +#define OMAP4460_MASK_COLD_SHIFT			0
-> +#define OMAP4460_MASK_COLD_MASK				(1 << 0)
-> +
-> +/* BANDGAP_COUNTER */
-> +#define OMAP4460_COUNTER_SHIFT				0
-> +#define OMAP4460_COUNTER_MASK				(0xffffff << 0)
-> +
-> +/* BANDGAP_THRESHOLD */
-> +#define OMAP4460_T_HOT_SHIFT				16
-> +#define OMAP4460_T_HOT_MASK				(0x3ff << 16)
-> +#define OMAP4460_T_COLD_SHIFT				0
-> +#define OMAP4460_T_COLD_MASK				(0x3ff << 0)
+> This patch does the following
+> -removes the reset from the probe and implements a omap_i2c_reset
+>  function to reset.
+> - Reset is removed from omap_i2c_init, which was called
+>  not only during probe, but also after time out and error handling.
+>  omap_i2c_reset is added in those places to effect the reset.
 
-These should be all private to the bandgap driver. The same applies
-for other driver specific registers for other drivers.
+See the comments regarding driver specific resets in hwmod code.
+
+The way to set this up is to have a shared inline function in
+i2c-omap.h that both the driver and hwmod code can use.
+
+Eventually hwmod code will do the reset only in late initcall
+if no driver is loaded for the device in question.
 
 Tony
