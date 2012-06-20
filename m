@@ -1,64 +1,156 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jun 2012 03:32:35 -0700
-Subject: [PATCHv8 06/13] I2C: OMAP: Correct I2C revision for OMAP3
-In-Reply-To: <1340029828-20751-7-git-send-email-shubhrajyoti@ti.com>
-References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
- <1340029828-20751-7-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120620103235.GD12766@atomide.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 20 Jun 2012 16:11:24 +0530
+Subject: [PATCH 04/10] ARM: OMAP: omap_device: register to the per-device
+ PM QoS framework
+In-Reply-To: <1339686361-11526-5-git-send-email-j-pihet@ti.com>
+References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
+ <1339686361-11526-5-git-send-email-j-pihet@ti.com>
+Message-ID: <4FE1A8D4.1060003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shubhrajyoti D <shubhrajyoti@ti.com> [120618 07:35]:
-> From: Jon Hunter <jon-hunter@ti.com>
-> 
-> The OMAP3530 is based upon the same silicon as the OMAP3430 and so the I2C
-> revision is the same for 3430 and 3530. However, the OMAP3630 device has the
-> same I2C revision as OMAP4. Correct the revision definition to reflect this.
-> 
-> This patch is based on work done by Jon Hunter <jon-hunter@ti.com>
-> Changes from his patch
-> - Update OMAP_I2C_REV_ON_3430 also to reflect that it is same as 3530
-...
->  /* timeout waiting for the controller to respond */
->  #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
-> @@ -298,7 +298,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
->  			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
->  					   SYSC_AUTOIDLE_MASK);
->  
-> -		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
-> +		} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
->  			dev->syscstate = SYSC_AUTOIDLE_MASK;
->  			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
->  			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
+On Thursday 14 June 2012 08:35 PM, Jean Pihet wrote:
+> Implement the devices wake-up latency constraints using the global
+> device PM QoS notification handler which applies the constraints to the
+> underlying layer by calling the corresponding function at hwmod level.
+>
+> Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
+> latency constraints on MPU, CORE and PER.
+>
+> Signed-off-by: Jean Pihet<j-pihet@ti.com>
+> Reviewed-by: Kevin Hilman<khilman@ti.com>
+> [paul at pwsan.com: modified to work with omap_devices with large numbers of
+>   hwmods; moved code to mach-omap2/omap_device.c; added documentation; use
+>   notifier return codes]
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> ---
+>   arch/arm/plat-omap/omap_device.c |   81 +++++++++++++++++++++++++++++++++++++-
+>   1 files changed, 80 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index c490240..241705b 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -3,6 +3,7 @@
+>    * omap_device implementation
+>    *
+>    * Copyright (C) 2009-2010 Nokia Corporation
+> + * Copyright (C) 2011 Texas Instruments, Inc.
 
-Having to patch all over the place for these revision defines leads
-into unmaintainable code as new SoCs get added.
+2012?
 
-Please instead just check the revision once during init, then set
-up some feature bits like I2C_OMAP_NEEDS_XYZ_RESET that the runtime
-code can check.
+>    * Paul Walmsley, Kevin Hilman
+>    *
+>    * Developed in collaboration with (alphabetical order): Benoit
+> @@ -89,6 +90,7 @@
+>   #include<linux/pm_runtime.h>
+>   #include<linux/of.h>
+>   #include<linux/notifier.h>
+> +#include<linux/pm_qos.h>
+>
+>   #include<plat/omap_device.h>
+>   #include<plat/omap_hwmod.h>
+> @@ -401,6 +403,72 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+>   	return NOTIFY_DONE;
+>   }
+>
+> +/**
+> + * _omap_device_pm_qos_handler - interface to the per-device PM QoS framework
+> + * @nb: pointer to omap_device_pm_qos_nb (not used)
+> + * @new_value: new maximum wakeup latency constraint for @req->dev (in us)
+> + * @req: struct dev_pm_qos_request * passed by the Linux PM QoS code
+> + *
+> + * Called by the Linux core device PM QoS code to alter the maximum
+> + * wakeup latency constraint on a device.  If the underlying device is
+> + * an omap_device, then this code will pass the constraint on to the
+> + * underlying hwmods.  Returns -EINVAL if this code can't handle the
+> + * constraint for some reason, or passes along the return code from the
+> + * hwmod wakeup latency constraint functions.
+> + */
+> +static int _omap_device_pm_qos_handler(struct notifier_block *nb,
+> +				       unsigned long new_value,
+> +				       void *req)
+> +{
+> +	struct omap_device *od;
+> +	struct omap_hwmod *oh;
+> +	struct platform_device *pdev;
+> +	struct dev_pm_qos_request *dev_pm_qos_req = req;
+> +	int ret = NOTIFY_OK;
+> +	int r, i;
+> +
+> +	pr_debug("OMAP PM constraints: req at 0x%p, new_value=%lu\n",
+> +		 req, new_value);
+> +
+> +	/* Look for the platform device for the constraint target device */
+> +	pdev = to_platform_device(dev_pm_qos_req->dev);
+> +
+> +	/* Try to catch non platform devices */
+> +	if (pdev->name == NULL) {
 
+Is this a safe way to catch non platform devices?
 
-> @@ -1055,7 +1055,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
->  		dev->errata |= I2C_OMAP_ERRATA_I207;
->  
-> -	if (dev->rev <= OMAP_I2C_REV_ON_3430)
-> +	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
->  		dev->errata |= I2C_OMAP_ERRATA_I462;
->  
->  	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
-> @@ -1073,7 +1073,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  
->  		dev->fifo_size = (dev->fifo_size / 2);
->  
-> -		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430)
-> +		if (dev->rev >= OMAP_I2C_REV_ON_3630_4430)
->  			dev->b_hw = 0; /* Disable hardware fixes */
->  		else
->  			dev->b_hw = 1; /* Enable hardware fixes */
-
-That way the code does not need to change when new SoC revisions
-get added.
-
-Tony
+regards,
+Rajendra
+> +		pr_err("%s: Error: platform device for device %s not valid\n",
+> +		       __func__, dev_name(dev_pm_qos_req->dev));
+> +		return NOTIFY_DONE;
+> +	}
+> +
+> +	/* Find the associated omap_device for dev */
+> +	od = to_omap_device(pdev);
+> +	if (od == NULL) {
+> +		pr_err("%s: Error: no omap_device for device %s\n",
+> +		       __func__, dev_name(dev_pm_qos_req->dev));
+> +		return NOTIFY_DONE;
+> +	}
+> +
+> +	pr_debug("OMAP PM constraints: req at 0x%p, dev=0x%p, new_value=%lu\n",
+> +		 req, dev_pm_qos_req->dev, new_value);
+> +
+> +	for (i = 0; i<  od->hwmods_cnt; i++) {
+> +		oh = od->hwmods[i];
+> +		if (new_value == PM_QOS_DEV_LAT_DEFAULT_VALUE)
+> +			r = omap_hwmod_remove_wakeuplat_constraint(
+> +							oh,
+> +							dev_pm_qos_req);
+> +		else
+> +			r = omap_hwmod_set_wakeuplat_constraint(
+> +							oh,
+> +							dev_pm_qos_req,
+> +							new_value);
+> +
+> +		if (!r)
+> +			ret = NOTIFY_BAD;
+> +	}
+> +
+> +	return ret;
+> +}
+>
+>   /* Public functions for use by core code */
+>
+> @@ -1115,13 +1183,24 @@ int omap_device_enable_clocks(struct omap_device *od)
+>   	return 0;
+>   }
+>
+> +static struct notifier_block omap_device_pm_qos_nb = {
+> +	.notifier_call = _omap_device_pm_qos_handler,
+> +};
+> +
+>   static struct notifier_block platform_nb = {
+>   	.notifier_call = _omap_device_notifier_call,
+>   };
+>
+>   static int __init omap_device_init(void)
+>   {
+> +	int ret;
+> +
+>   	bus_register_notifier(&platform_bus_type,&platform_nb);
+> -	return 0;
+> +
+> +	ret = dev_pm_qos_add_global_notifier(&omap_device_pm_qos_nb);
+> +	if (ret)
+> +		pr_err("omap_device: cannot add global notifier for dev PM QoS\n");
+> +
+> +	return ret;
+>   }
+>   core_initcall(omap_device_init);
