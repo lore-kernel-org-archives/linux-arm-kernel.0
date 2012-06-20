@@ -1,78 +1,80 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jun 2012 11:19:59 +0200
-Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
-In-Reply-To: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
-References: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
-Message-ID: <20120620091959.GQ28394@pengutronix.de>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 20 Jun 2012 17:17:35 +0800
+Subject: [PATCH] pinctrl: pinctrl-imx: fix map setting problem if
+ NO_PAD_CTL
+In-Reply-To: <1340178101-21605-1-git-send-email-jason77.wang@gmail.com>
+References: <1340178101-21605-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20120620091735.GI10387@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 09:57:12PM +0200, Beno?t Th?baudeau wrote:
-> Some mxc processors have an edge_sel feature, which allows the IRQ to be
-> triggered by any edge.
+On Wed, Jun 20, 2012 at 03:41:41PM +0800, Hui Wang wrote:
+> new_map is allocated according to map_num instead of grp->npins,
+> if a pin or some pins of a group has NO_PAD_CTL property, the map_num
+> and the grp->npin are different definitely.
 > 
-> This patch makes use of this feature if available, which skips mxc_flip_edge().
+> When we set mapping information to the new_map[], we should skip those
+> pins with NO_PAD_CTL from index, otherwise it is possible the driver
+> will aceesss to a unallocated region.
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+Good catching.
+Thanks.
+
+> Cc: Dong Aisheng <dong.aisheng@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
 > ---
->  .../drivers/gpio/gpio-mxc.c                        |   44 ++++++++++++++------
->  1 file changed, 32 insertions(+), 12 deletions(-)
+> This problem is easily reproduced if we set pinctrl in the
+> ${board}.dts like following:
+> fsl,pins = <pin_func_id1   config_with_NO_PAD_CTL
+>             pin_func_id2   config_with_NO_PAD_CTL
+>             pin_func_id3   config_normal>;
 > 
-> diff --git linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
-> index c337143..4c74482 100644
-> --- linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c
-> +++ linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
-> @@ -30,6 +30,7 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/module.h>
-> +#include <mach/hardware.h>
->  #include <asm-generic/bug.h>
->  #include <asm/mach/irq.h>
+>  drivers/pinctrl/pinctrl-imx.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+> index dd6d93a..0e21abb 100644
+> --- a/drivers/pinctrl/pinctrl-imx.c
+> +++ b/drivers/pinctrl/pinctrl-imx.c
+> @@ -146,6 +146,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
+>  	struct pinctrl_map *new_map;
+>  	struct device_node *parent;
+>  	int map_num = 1;
+> +	int map_pos = 0;
+>  	int i;
 >  
-> @@ -104,12 +105,13 @@ static struct mxc_gpio_hwdata *mxc_gpio_hwdata;
->  #define GPIO_ICR2		(mxc_gpio_hwdata->icr2_reg)
->  #define GPIO_IMR		(mxc_gpio_hwdata->imr_reg)
->  #define GPIO_ISR		(mxc_gpio_hwdata->isr_reg)
-> +#define GPIO_EDGE_SEL		0x1c
->  
->  #define GPIO_INT_LOW_LEV	(mxc_gpio_hwdata->low_level)
->  #define GPIO_INT_HIGH_LEV	(mxc_gpio_hwdata->high_level)
->  #define GPIO_INT_RISE_EDGE	(mxc_gpio_hwdata->rise_edge)
->  #define GPIO_INT_FALL_EDGE	(mxc_gpio_hwdata->fall_edge)
-> -#define GPIO_INT_NONE		0x4
-> +#define GPIO_INT_BOTH_EDGES	0x4
->  
->  static struct platform_device_id mxc_gpio_devtype[] = {
->  	{
-> @@ -150,6 +152,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
->  	u32 bit, val;
->  	int edge;
->  	void __iomem *reg = port->base;
-> +	bool edge_sel = cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51() || cpu_is_mx53();
+>  	/*
+> @@ -186,11 +187,11 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
+>  	new_map++;
+>  	for (i = 0; i < grp->npins; i++) {
+>  		if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
+> -			new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
+> -			new_map[i].data.configs.group_or_pin =
+> +			new_map[map_pos].type = PIN_MAP_TYPE_CONFIGS_PIN;
+> +			new_map[map_pos].data.configs.group_or_pin =
+>  					pin_get_name(pctldev, grp->pins[i]);
+> -			new_map[i].data.configs.configs = &grp->configs[i];
+> -			new_map[i].data.configs.num_configs = 1;
+> +			new_map[map_pos].data.configs.configs = &grp->configs[i];
+> +			new_map[map_pos++].data.configs.num_configs = 1;
+I'm ok with the change, only a minor comment:
+Does the change as follows look better?
 
-To make Shawns suggestion a bit more clear:
+-       for (i = 0; i < grp->npins; i++) {
++       for (i = j = 0; i < grp->npins; i++) {
+                if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
+-                       new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
+-                       new_map[i].data.configs.group_or_pin =
++                       new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
++                       new_map[j].data.configs.group_or_pin =
+                                        pin_get_name(pctldev, grp->pins[i]);
+-                       new_map[i].data.configs.configs = &grp->configs[i];
+-                       new_map[i].data.configs.num_configs = 1;
++                       new_map[j].data.configs.configs = &grp->configs[i];
++                       new_map[j].data.configs.num_configs = 1;
++                       j++;
 
-What you should do here is to add flags describing differences between
-SoCs in mxc_gpio_hwdata.
-
-This means that you have to:
-
-- add IMX35_GPIO to enum mxc_gpio_hwtype
-- add imx35-gpio to mxc_gpio_devtype[]
-- add "fsl,imx35-gpio" to the compatible list.
-- fix all devicetree bindings and platform device bindings for
-  i.MX25,35,51,53 and probably i.MX6
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Dong Aisheng
