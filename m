@@ -1,40 +1,188 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 20 Jun 2012 11:47:44 +0100
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <4FE112F2.7000506@wwwdotorg.org>
-References: <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
- <20120619091719.GZ3974@opensource.wolfsonmicro.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD626@HKMAIL01.nvidia.com>
- <4FE112F2.7000506@wwwdotorg.org>
-Message-ID: <20120620104744.GK3978@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 20 Jun 2012 11:51:17 +0100
+Subject: Bindings for SMC/HVC firmware interfaces on ARM (Re: [RFC PATCH]
+ ARM: Make a compile trustzone conditionally)
+In-Reply-To: <20120620094334.GA32666@mudshark.cambridge.arm.com>
+References: <20120611051502.GA24030@july>
+ <CAOesGMgGQMwQTUy2g-XSYFrQ-p+x9g2q8kAd-ZYq=TBgVFu0Zw@mail.gmail.com>
+ <CAH9JG2X=15G6wDX5SGJkDEVohkQQkzfBoL3Qv7HVuBUMqYnwRg@mail.gmail.com>
+ <201206181410.39267.arnd@arndb.de>
+ <4FE125C6.3030401@codeaurora.org>
+ <20120620094334.GA32666@mudshark.cambridge.arm.com>
+Message-ID: <20120620105116.GA2179@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 06:01:54PM -0600, Stephen Warren wrote:
+On Wed, Jun 20, 2012 at 10:43:34AM +0100, Will Deacon wrote:
+> Hi Stephen,
+> 
+> On Wed, Jun 20, 2012 at 02:22:14AM +0100, Stephen Boyd wrote:
+> > On 06/18/12 07:10, Arnd Bergmann wrote:
+> > > Instead of checking for trustzone_enabled() in each place where
+> > > we call into smc, we can have a generic implementation that
+> > > we call for the disabled case, and provide a vendor specific
+> > > version of that struct with functions that call into smp 
+> > > where necessary.
+> > >
+> > 
+> > What if we tried to read the SCR.NS bit to determine if we're running in
+> > secure state or not? It looks like reading SCR is UNDEFINED (i.e. causes
+> > an undefined instruction exception) if we're running in the non-secure
+> > state so I propose we set up an undef hook that traps the SCR access and
+> > lies about the value of the NS bit to indicate we're non-secure.
+> > Basically this:
+> 
+> Well, I can't resist reviewing the code, but I don't think we should be
+> trying to detect this (see below).
+> 
+> > static int scr_trap(struct pt_regs *regs, unsigned int instr)
+> > {
+> >         int reg = (instr >> 12) & 15;
+> >         if (reg == 15)
+> >                 return 1;
+> 
+> Eek -- surely GCC won't allocate PC for the destination register?!
+> 
+> >         regs->uregs[reg] = BIT(0); /* Trapped = non-secure */
+> >         regs->ARM_pc += 4;
+> >         return 0;
+> > }
+> > 
+> > static struct undef_hook scr_hook = {
+> >         .instr_mask     = 0x0fff0fff,
+> >         .instr_val      = 0x0e110f11,
+> >         .fn             = scr_trap,
+> > };
 
-> Unfortunately, it should be noted that the WiFi device socket on Cardhu
-> apparently isn't some standardized thing (like PCIe) but something
-> rather more custom, although there are apparently devices available to
-> plug into it from multiple module vendors which contain WiFi chips from
-> multiple chip vendors.
+(you'd also need to handle the Thumb case; I digress...)
 
-Right, and indeed someone may decide to plug in something that isn't a
-WiFi device at all but some other SDIO attached device with totally
-different uses for those GPIOs.  Really these boards are an example of
-the sort of thing I was talking about with modular reference systems,
-though a simpler case as given what's brought out you probably can just
-do something like list all the options that are there and allow hotplug
-to sort things out.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/7401edeb/attachment.sig>
+> > 
+> > int in_secure_state(void)
+> > {
+> >         unsigned int scr;
+> > 
+> > 	register_undef_hook(&scr_hook);
+> > 
+> >         asm volatile(
+> >         "       mrc p15, 0, %0, c1, c1, 0\n"
+> >         : "=r" (scr)
+> >         :
+> >         : "cc");
+> 
+> I don't think you need this clobber either.
+> > It seems to mostly work, although I haven't figured out what you do
+> > about the hypervisor case when the hypervisor has disabled the smc
+> > instruction entirely (SCR.SCD=1). At that point I throw up my hands.
+> > Maybe Will has some idea.
+> 
+> I think this is part of a bigger problem, which is about how we know where
+> we live in the privilege hierarchy and what we have sitting above us. We
+> have exactly the same issue with hypervisors and the hvc instruction.
+> 
+> Rather than try to probe the instruction (which by itself isn't enough,
+> since we can't guarantee that the exception will be handled by the upper
+> layers) I would personally prefer to see this described in the device tree.
+> We could have a simple property in the CPU node that says what the interface
+> looks like:
+> 
+> 	smc-interface = "samsung, exynos";
+> 
+> or whatever you need to identify the interface uniquely. You could have a
+> corresponding entry for hvc-interface (and something like KVM could pass
+> its version to the guest for paravirualisation). If the property is missing,
+> then we take that to mean that the instruction shouldn't be executed on that
+> core -- it may be undefined or there may not be anything to pick up the
+> exception.
+
+I concur.
+
+The firmware is the only thing that really knows what's there,
+and in reality there's no safe way to probe.  Even if we know we're in the
+Normal World, we have no idea what's on the other side of SMC.  One
+firmware's "probe" call may be another firmware's "halt and catch fire"
+call.
+
+So DT bindings permitting the firmware to tell us what's there make a lot
+of sense.
+
+
+Fleshing this out a bit...
+
+Since the SMC and HVC instructions are features of the architecture, it may
+make sense for the names to be:
+
+	arm,smc = "vendor,interface-name";
+	arm,hvc = "vendor,interface-name";
+
+Some platforms may not fully service SMC on all CPUs, so there might be a
+need to set this per CPU node.  This can be topologically determined, so
+you might have:
+
+	cluster at 0 {
+		arm,smc = "vendor,platform-basic-firmware";
+		
+		cpu at 0 {
+			arm,smc = "vendor,platform-fancy-firmware";
+		};
+
+		cpu at 1 {
+			// no arm,smc property
+		};
+
+		cpu at 2 {
+			// no arm,smc property
+		};
+
+		// ...
+	}
+
+The set of supported SMC calls on a CPU would then be determined by the
+list of all strings on arm,smc properties on that CPU node and its
+ancestors.
+
+If the arm,smc or arm,hvc property is absent at all levels of the
+topology, this does not mean that there is nothing there, but it does
+mean that nothing is known about what's there.  Platform code would fall
+back to the legacy case in that situation.
+
+
+If additional properties are needed, like version or capability info,
+we could have nodes instead:
+
+	cluster at 0 {
+		arm,smc {
+			basic-firmware {
+				compatible = "vendor,platform-basic-firmware";
+			};
+		}
+
+		cpu at 0 {
+			arm,smc {
+				fancy-firmware {
+					compatible = "vendor,platform-fancy-firmware";
+					version = <1 12>;
+					capabilities = "whizz", "bang", "kapow";
+				};
+
+				common-firmware {
+					compatible = "standards-body,common-firmware";
+					version = <1 0>;
+				}
+			};
+		};
+
+		// ...
+	};
+
+...or something equally esoteric.
+
+(If node names like "arm,smc" are acceptable ... we could have something
+else if not.)
+
+It would be up to the platform's code handling "vendor,platform-fancy-
+firmware" etc. to know about and deal with the precise calling
+conventions for that firmware, though if there are generic firmware
+interfaces someday, then those nodes' support code could be shared.
+
+Cheers
+---Dave
