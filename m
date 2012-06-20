@@ -1,94 +1,45 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 20 Jun 2012 14:47:33 +0530
-Subject: [PATCH 1/8] ARM: OMAP2+: PM: protect the power domain state change
- by a mutex
-In-Reply-To: <1339685591-11177-2-git-send-email-j-pihet@ti.com>
-References: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
- <1339685591-11177-2-git-send-email-j-pihet@ti.com>
-Message-ID: <4FE1952D.1020102@ti.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Wed, 20 Jun 2012 11:19:39 +0200
+Subject: [PATCH v2 5/5] sched: cpu_power: enable ARCH_POWER
+In-Reply-To: <CAKfTPtAdSMJ1RnDPDYZZ378QW9DUCKLA+oC3TWJD7v5KAkFitA@mail.gmail.com>
+References: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
+ <1340094536-20873-6-git-send-email-vincent.guittot@linaro.org>
+ <20120619090110.GA1692@zhy>
+ <CAKfTPtAdSMJ1RnDPDYZZ378QW9DUCKLA+oC3TWJD7v5KAkFitA@mail.gmail.com>
+Message-ID: <1340183979.21745.78.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 June 2012 08:23 PM, Jean Pihet wrote:
-> omap_set_pwrdm_state is intented to be the only API for changing
-> a power domain state.
+On Wed, 2012-06-20 at 11:11 +0200, Vincent Guittot wrote:
+> On 19 June 2012 11:01, Yong Zhang <yong.zhang0@gmail.com> wrote:
+> > On Tue, Jun 19, 2012 at 10:28:56AM +0200, Vincent Guittot wrote:
+> >> Heteregeneous ARM platform uses arch_scale_freq_power function
+> >> to reflect the relative capacity of each core
+> >>
+> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> >> ---
+> >>  kernel/sched/features.h |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/kernel/sched/features.h b/kernel/sched/features.h
+> >> index de00a48..d98ae90 100644
+> >> --- a/kernel/sched/features.h
+> >> +++ b/kernel/sched/features.h
+> >> @@ -42,7 +42,7 @@ SCHED_FEAT(CACHE_HOT_BUDDY, true)
+> >>  /*
+> >>   * Use arch dependent cpu power functions
+> >>   */
+> >> -SCHED_FEAT(ARCH_POWER, false)
+> >> +SCHED_FEAT(ARCH_POWER, true)
+> >
+> > Hmmm...seems we can remove this knob completely.
+> >
+> 
+> Peter,
+> 
+> Do you prefer to keep it or remove it completely ?
 
-Yes, but there are others which are used to _read_ the power domain
-state. Shouldn't those be protected too?
-
-> This patch protects the power domains settings and structs from
-> concurrent accesses to the function by using a mutex.
->
-> Signed-off-by: Jean Pihet<j-pihet@ti.com>
-> ---
->   arch/arm/mach-omap2/pm.c          |    8 ++++++--
->   arch/arm/mach-omap2/powerdomain.c |    1 +
->   arch/arm/mach-omap2/powerdomain.h |    3 ++-
->   3 files changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 9cb5ced..a05f00c 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -100,15 +100,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
->   	if (!pwrdm || IS_ERR(pwrdm))
->   		return -EINVAL;
->
-> +	mutex_lock(&pwrdm->lock);
-> +
->   	while (!(pwrdm->pwrsts&  (1<<  pwrst))) {
->   		if (pwrst == PWRDM_POWER_OFF)
-> -			return ret;
-> +			goto out;
->   		pwrst--;
->   	}
->
->   	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
->   	if (next_pwrst == pwrst)
-> -		return ret;
-> +		goto out;
->
->   	curr_pwrst = pwrdm_read_pwrst(pwrdm);
->   	if (curr_pwrst<  PWRDM_POWER_ON) {
-> @@ -141,6 +143,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
->   		break;
->   	}
->
-> +out:
-> +	mutex_unlock(&pwrdm->lock);
->   	return ret;
->   }
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 9611490..1641e72 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -102,6 +102,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
->   	INIT_LIST_HEAD(&pwrdm->voltdm_node);
->   	voltdm_add_pwrdm(voltdm, pwrdm);
->
-> +	mutex_init(&pwrdm->lock);
->   	list_add(&pwrdm->node,&pwrdm_list);
->
->   	/* Initialize the powerdomain's state counter */
-> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-> index 8f88d65..bab84fc 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -19,7 +19,7 @@
->
->   #include<linux/types.h>
->   #include<linux/list.h>
-> -
-> +#include<linux/mutex.h>
->   #include<linux/atomic.h>
->
->   #include<plat/cpu.h>
-> @@ -116,6 +116,7 @@ struct powerdomain {
->   	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
->   	struct list_head node;
->   	struct list_head voltdm_node;
-> +	struct mutex lock;
->   	int state;
->   	unsigned state_counter[PWRDM_MAX_PWRSTS];
->   	unsigned ret_logic_off_counter;
+I prefer to keep it, the 'we can remove it' is true for all feature
+bits, they should never be twiddled in normal circumstances, its a debug
+feature. As such it makes sense to allow disabling the arch cpu-power
+fiddling.
