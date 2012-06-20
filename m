@@ -1,45 +1,78 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Wed, 20 Jun 2012 11:19:39 +0200
-Subject: [PATCH v2 5/5] sched: cpu_power: enable ARCH_POWER
-In-Reply-To: <CAKfTPtAdSMJ1RnDPDYZZ378QW9DUCKLA+oC3TWJD7v5KAkFitA@mail.gmail.com>
-References: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
- <1340094536-20873-6-git-send-email-vincent.guittot@linaro.org>
- <20120619090110.GA1692@zhy>
- <CAKfTPtAdSMJ1RnDPDYZZ378QW9DUCKLA+oC3TWJD7v5KAkFitA@mail.gmail.com>
-Message-ID: <1340183979.21745.78.camel@twins>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Jun 2012 11:19:59 +0200
+Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
+In-Reply-To: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
+References: <375509863.2886324.1340049432848.JavaMail.root@advansee.com>
+Message-ID: <20120620091959.GQ28394@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-20 at 11:11 +0200, Vincent Guittot wrote:
-> On 19 June 2012 11:01, Yong Zhang <yong.zhang0@gmail.com> wrote:
-> > On Tue, Jun 19, 2012 at 10:28:56AM +0200, Vincent Guittot wrote:
-> >> Heteregeneous ARM platform uses arch_scale_freq_power function
-> >> to reflect the relative capacity of each core
-> >>
-> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> >> ---
-> >>  kernel/sched/features.h |    2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/kernel/sched/features.h b/kernel/sched/features.h
-> >> index de00a48..d98ae90 100644
-> >> --- a/kernel/sched/features.h
-> >> +++ b/kernel/sched/features.h
-> >> @@ -42,7 +42,7 @@ SCHED_FEAT(CACHE_HOT_BUDDY, true)
-> >>  /*
-> >>   * Use arch dependent cpu power functions
-> >>   */
-> >> -SCHED_FEAT(ARCH_POWER, false)
-> >> +SCHED_FEAT(ARCH_POWER, true)
-> >
-> > Hmmm...seems we can remove this knob completely.
-> >
+On Mon, Jun 18, 2012 at 09:57:12PM +0200, Beno?t Th?baudeau wrote:
+> Some mxc processors have an edge_sel feature, which allows the IRQ to be
+> triggered by any edge.
 > 
-> Peter,
+> This patch makes use of this feature if available, which skips mxc_flip_edge().
 > 
-> Do you prefer to keep it or remove it completely ?
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+> ---
+>  .../drivers/gpio/gpio-mxc.c                        |   44 ++++++++++++++------
+>  1 file changed, 32 insertions(+), 12 deletions(-)
+> 
+> diff --git linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
+> index c337143..4c74482 100644
+> --- linux-next-HEAD-6c86b58.orig/drivers/gpio/gpio-mxc.c
+> +++ linux-next-HEAD-6c86b58/drivers/gpio/gpio-mxc.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+>  #include <linux/module.h>
+> +#include <mach/hardware.h>
+>  #include <asm-generic/bug.h>
+>  #include <asm/mach/irq.h>
+>  
+> @@ -104,12 +105,13 @@ static struct mxc_gpio_hwdata *mxc_gpio_hwdata;
+>  #define GPIO_ICR2		(mxc_gpio_hwdata->icr2_reg)
+>  #define GPIO_IMR		(mxc_gpio_hwdata->imr_reg)
+>  #define GPIO_ISR		(mxc_gpio_hwdata->isr_reg)
+> +#define GPIO_EDGE_SEL		0x1c
+>  
+>  #define GPIO_INT_LOW_LEV	(mxc_gpio_hwdata->low_level)
+>  #define GPIO_INT_HIGH_LEV	(mxc_gpio_hwdata->high_level)
+>  #define GPIO_INT_RISE_EDGE	(mxc_gpio_hwdata->rise_edge)
+>  #define GPIO_INT_FALL_EDGE	(mxc_gpio_hwdata->fall_edge)
+> -#define GPIO_INT_NONE		0x4
+> +#define GPIO_INT_BOTH_EDGES	0x4
+>  
+>  static struct platform_device_id mxc_gpio_devtype[] = {
+>  	{
+> @@ -150,6 +152,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+>  	u32 bit, val;
+>  	int edge;
+>  	void __iomem *reg = port->base;
+> +	bool edge_sel = cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51() || cpu_is_mx53();
 
-I prefer to keep it, the 'we can remove it' is true for all feature
-bits, they should never be twiddled in normal circumstances, its a debug
-feature. As such it makes sense to allow disabling the arch cpu-power
-fiddling.
+To make Shawns suggestion a bit more clear:
+
+What you should do here is to add flags describing differences between
+SoCs in mxc_gpio_hwdata.
+
+This means that you have to:
+
+- add IMX35_GPIO to enum mxc_gpio_hwtype
+- add imx35-gpio to mxc_gpio_devtype[]
+- add "fsl,imx35-gpio" to the compatible list.
+- fix all devicetree bindings and platform device bindings for
+  i.MX25,35,51,53 and probably i.MX6
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
