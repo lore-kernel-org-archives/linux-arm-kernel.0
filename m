@@ -1,44 +1,49 @@
 From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 20 Jun 2012 17:14:51 +0800
-Subject: [PATCH 3/5] ARM: omap3evm: enable VBUS switch for EHCI tranceiver
+Date: Wed, 20 Jun 2012 17:14:52 +0800
+Subject: [PATCH 4/5] ARM: OMAP3EVM: cosmetic fixes for parent clk set
 In-Reply-To: <1340183693-3195-1-git-send-email-zumeng.chen@windriver.com>
 References: <1340183693-3195-1-git-send-email-zumeng.chen@windriver.com>
-Message-ID: <1340183693-3195-4-git-send-email-zumeng.chen@windriver.com>
+Message-ID: <1340183693-3195-5-git-send-email-zumeng.chen@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was chosen by following the trace on the schematic from component U131
-and U134 to the CPEN pin on the USB3320 device.
+Since it's no more sense to set parent for dummy clock,
+so we can just ignore it to mute failed message.
 
-TWL4030.GPIO2-...->(T2_GPIO2_3V3)U131-..>nUSB2_EN-..>U134-..>EXP_nUSB2_1V8
-which starts EHCI tranceiver USB3320.
-
-This will set TWL4030.GPIO2 as output pin to drive EHCI tranceiver.
-
-Signed-off-by: Zumeng Chen <zumeng.chen@windriver.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
 ---
- arch/arm/mach-omap2/board-omap3evm.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/plat-omap/clock.c  |    4 ++++
+ drivers/mfd/omap-usb-host.c |    2 +-
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 1bfbe42..02d8047 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -360,6 +360,15 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 62ec5c4..c7e26e4 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -149,6 +149,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	if (!arch_clock || !arch_clock->clk_set_parent)
+ 		return ret;
  
- 	platform_device_register(&leds_gpio);
++	/* If the clock is a dummy clock just return */
++	if (clk == &dummy_ck)
++		return 0;
++
+ 	spin_lock_irqsave(&clockfw_lock, flags);
+ 	if (clk->usecount == 0) {
+ 		ret = arch_clock->clk_set_parent(clk, parent);
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 7e96bb2..c9d27c4 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -699,7 +699,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+ 	}
  
-+	/* Enable VBUS switch by setting TWL4030.GPIO2DIR as output
-+	 * for starting USB tranceiver
-+	 */
-+	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2) {
-+		u8 val;
-+		twl_i2c_read_u8(TWL4030_MODULE_GPIO, &val, REG_GPIODATADIR1);
-+		val |= 0x04; /* TWL4030.GPIO2DIR BIT at GPIODATADIR1(0x9B) */
-+		twl_i2c_write_u8(TWL4030_MODULE_GPIO, val, REG_GPIODATADIR1);
-+	}
- 	return 0;
- }
- 
+ 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
+-		/* for OMAP3 , the clk set paretn fails */
++		/* for OMAP3 , the clk set parent fails */
+ 		ret = clk_set_parent(omap->utmi_p1_fck,
+ 					omap->xclk60mhsp1_ck);
+ 		if (ret != 0)
 -- 
 1.7.5.4
