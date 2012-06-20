@@ -1,78 +1,34 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 20 Jun 2012 17:11:39 -0500
-Subject: [PATCH v2 2/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
-References: <cover.1339828867.git.afzal@ti.com>
- <1414767dd444d4ab3998adf957e77ff4f3394f92.1339828867.git.afzal@ti.com>
- <4FDF50EA.4080506@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
-Message-ID: <4FE24A9B.6070203@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Jun 2012 23:55:20 +0100
+Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
+ number
+In-Reply-To: <20120619052654.GC21951@S2101-09.ap.freescale.net>
+References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
+ <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
+ <20120618143128.GF19249@S2101-09.ap.freescale.net>
+ <20120618164402.GA18630@n2100.arm.linux.org.uk>
+ <20120619052654.GC21951@S2101-09.ap.freescale.net>
+Message-ID: <20120620225520.GA30087@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
-
-On 06/19/2012 12:57 AM, Mohammed, Afzal wrote:
-> Hi Jon,
+On Tue, Jun 19, 2012 at 01:26:56PM +0800, Shawn Guo wrote:
+> On Mon, Jun 18, 2012 at 05:44:02PM +0100, Russell King - ARM Linux wrote:
+> > FIQs should be an entirely separate number space from IRQs, as we
+> > may want to totally decouple them from the IRQ stuff (we probably
+> > should have already done this when genirq came along.)
+> > 
+> > About the only stuff FIQs use is the enable/disable_irq as a short
+> > cut to dealing with the mask registers.
 > 
-> On Mon, Jun 18, 2012 at 21:31:46, Hunter, Jon wrote:
-> 
->>> @@ -95,10 +89,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
->>>  	if (err)
->>>  		return err;
->>>  
->>> -	/* Ensure sync read and sync write are disabled */
->>> -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
->>> -	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
->>> -	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
->>
->> Sorry if I was not clear, but I was still thinking that we keep the
->> above instance of setting async mode.
-> :
->>>  static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
->>>  {
->>>  	struct device *dev = &gpmc_onenand_device.dev;
->>> +	u32 reg;
->>> +
->>> +	/* Ensure sync read and sync write are disabled */
->>> +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
->>> +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
->>> +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
->>
->> ... and here we should just call omap2_onenand_set_async_mode(), ...
-> 
-> If omap2_onenand_set_async_mode is called from gpmc_onenand_setup & removed
-> from gpmc_onenand_init, when using new gpmc driver interface, i.e. using
-> gpmc_onenand_update [1], we lost opportunity to provide gpmc driver with
-> configuration details for async mode causing a big warning about each
-> timings & configurations that was left by bootloader (which is meant only
-> for cases where Kernel can't configure GPMC). Of course, we can put
-> omap2_onenand_set_async_mode in gpmc_onenand_update too, but then
-> unnecessarily, omap2_onenand_sey_async_mode would be called twice.
-> 
-> Please note that gpmc_onenand_setup is a callback by onenand driver.
+> I do not quite understand what you are asking for, but I'm guessing it
+> with the patch below.  Please elaborate it a little bit more if that's
+> not what you are asking for.
 
-Ok, I see your point. So today the _set_async_mode() is really doing two
-things ...
+I was thinking about moving entirely away from any bits of genirq for
+this.  We shouldn't really be mixing these two things together by
+nabbing some of the IRQ numberspace for this.
 
-1. It is calculating the timings
-2. Programming the timings and setting async mode.
-
-I think that it would be best if we were to make _set_async_mode() into
-two functions, for example ...
-
-1. omap2_onenand_get_async_timings()
-2. omap2_onenand_set_async_timings()
-
-Where the omap2_onenand_get_async_timings() calculates the timings and
-can be used in both legacy mode and with the driver. Then
-omap2_onenand_set_sync_timings() is just used in the legacy mode where
-we don't have the driver to configure the chip-select.
-
-Do you think that could work?
-
-We could also do the same for omap2_onenand_set_sync_mode().
-
-Cheers
-Jon
+Looking at this code, I'm thinking about taking this further, and
+santising the whole thing... though that's not going to be a quick
+change.
