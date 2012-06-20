@@ -1,55 +1,53 @@
-From: jett.zhou@gmail.com (jett zhou)
-Date: Wed, 20 Jun 2012 10:05:52 +0800
-Subject: [PATCH 1/3] regulator: add pre-regulator support for 88pm860x
-In-Reply-To: <20120620013814.GA7246@lizard>
-References: <1332825916-2183-1-git-send-email-jtzhou@marvell.com>
- <20120506022954.GB29576@lizard>
- <20120507091001.GB4415@opensource.wolfsonmicro.com>
- <CACDDiy-mMShDv9GiRiy_OhceGdStgSLdQNNwo1V_ADpnANeUeA@mail.gmail.com>
- <20120620013814.GA7246@lizard>
-Message-ID: <CACDDiy_YfJkdNZapL6eYH+O=+hELaQ8Cpqw+06XM+C0-P3pfkg@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 20 Jun 2012 08:48:07 +0200
+Subject: [RFC PATCH 1/8] ARM: gic: Support forcing cpumask for possible
+ cpus in the system
+In-Reply-To: <4FDF1400.6090402@monstr.eu>
+References: <1340019011-18642-1-git-send-email-monstr@monstr.eu>
+ <1340019011-18642-2-git-send-email-monstr@monstr.eu>
+ <20120618113339.GC12029@n2100.arm.linux.org.uk>
+ <4FDF1400.6090402@monstr.eu>
+Message-ID: <CAHTX3d+oprSkMLABVGCyv45jU7t57DYV3RvrvPN8DPKdVS6mzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anton
-    Sorry to response late. I will send out the amended patches based on
-latest reguator tree in these two days.
-Thanks
-2012/6/20 Anton Vorontsov <cbouatmailru@gmail.com>
+2012/6/18 Michal Simek <monstr@monstr.eu>
 
-> Hello Jett,
+> On 06/18/2012 01:33 PM, Russell King - ARM Linux wrote:
 >
-> On Mon, May 07, 2012 at 06:08:34PM +0800, jett zhou wrote:
-> > Got it. I will rebase to the latest regulator tree code base to amend
-> these
-> > patches.
+>> On Mon, Jun 18, 2012 at 01:30:04PM +0200, Michal Simek wrote:
+>>
+>>> gic_set_affinity doesn't support force option. Force option
+>>> should work with all possible cpus in the system not only with
+>>> online cpus.
+>>>
+>>
+>> Neither does x86.  Why do you want this?  Offline CPUs are unable to
+>> receive the interrupt in any case (and must not receive interrupts in
+>> the bringup path until they are online.)
+>>
 >
-> Any news on these patches?
+> The whole reason for all these changes in AMP on dual core Cortex A9 where
+> on one cpu runs Linux and on the second RTOS/standlone.
 >
-> Thanks,
+> It means that the second cpu is from Linux point of view offline all the
+> time.
+> But GIC has to be (and can be) setup to forward IRQ directly to the second
+> cpu.
+> GIC should be controlled by Linux.
 >
-> > 2012/5/7 Mark Brown <broonie@opensource.wolfsonmicro.com>
-> >
-> > > On Sat, May 05, 2012 at 07:29:54PM -0700, Anton Vorontsov wrote:
-> > >
-> > > > OK to let me take this via battery tree?
-> > >
-> > > No, there's now substantial conflicts with the regulator driver's
-> > > ongoing development.  For example, the driver has been converted to use
-> > > the core regmap support for enable and disable.
 >
-> --
-> Anton Vorontsov
-> Email: cbouatmailru at gmail.com
->
+Russel: Any other reaction?
+Can you see a way how to get this feature to the mainline Linux kernel?
+Some patches needs to be refactored a little bit but the point is if you
+are willing to
+support this type of configuration.
 
+Not sure if Ohad has any information that someone else would like to use it
+remoteproc(AMP) among ARM cores.
 
-
--- 
-
-----------------------------------
-Best Regards
-Jett Zhou
+Thanks,
+Michal
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/ddddb53a/attachment.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/5d1c190a/attachment-0001.html>
