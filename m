@@ -1,52 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Jun 2012 14:28:23 +0100
-Subject: [PATCH 15/15] ARM: perf: handle muxed CPU IRQ lines
-In-Reply-To: <1340197011-5435-16-git-send-email-lee.jones@linaro.org>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-16-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120620132823.GG32666@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Jun 2012 06:28:49 -0700
+Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99A9E7@DBDE01.ent.ti.com>
+References: <4FD77EF1.8000600@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
+ <4FD8A906.8080202@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
+ <4FD9E5AF.6010201@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
+ <4FDA3464.4040704@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99A511@DBDE01.ent.ti.com>
+ <20120615124520.GS12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99A9E7@DBDE01.ent.ti.com>
+Message-ID: <20120620132848.GK12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, Jun 20, 2012 at 01:56:51PM +0100, Lee Jones wrote:
-> When registering a PMU device, a platform can either use the generic
-> IRQ handler, or supplement it with one of its own. One of the reasons
-> a platform might choose to do this is to handle the case of muxed IRQ
-> lines. If this is the case and the IRQ is handled on the wrong CPU,
-> this patch sets affinity with the next successive online CPU.
+* Mohammed, Afzal <afzal@ti.com> [120616 02:19]:
+> Hi Tony,
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/kernel/perf_event_v7.c |   12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+> On Fri, Jun 15, 2012 at 18:15:20, Tony Lindgren wrote:
+> > * Mohammed, Afzal <afzal@ti.com> [120615 03:26]:
 > 
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index d3c5360..04a8867 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -1069,8 +1069,18 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
->  	/*
->  	 * Did an overflow occur?
->  	 */
-> -	if (!armv7_pmnc_has_overflowed(pmnc))
-> +	if (armv7_pmnc_has_overflowed(pmnc)) {
+> > > Here clock is required even before driver is probed, i.e for platform to
+> > > calculate timings, that has to be passed through platform data.
+> > 
+> > Eventually we should be able to move the gpmc registration to the driver
+> > probe, especially with device tree. There's no need to set up gpmc
+> > before the driver probe runs for the device using gpmc. Just how the
+> > gpmc init gets called from the driver probe is still a bit open though..
+> 
+> Sorry, I did not get you, can you please clarify
 
-Did you mean to change this predicate?
+OK, I'll try :)
+ 
+> By gpmc registration, if you meant registering platform device for
+> gpmc peripherals, for a board that uses the new gpmc driver interface*,
+> it will be done in probe only.
 
-> +		unsigned int next_cpu;
-> +
-> +		next_cpu = cpumask_next(smp_processor_id(), cpu_online_mask);
-> +
-> +		if (next_cpu >= nr_cpumask_bits)
-> +			next_cpu = cpumask_first(cpu_online_mask);
-> +
-> +		irq_set_affinity(irq_num, cpumask_of(next_cpu));
-> +
+I was thinking when the gpmc needs to be initialized, and there should
+not be any need to do it earlier than at the gpmc using driver probe
+time. With device tree that is, as there's no need to stuff the gpmc
+timings into a board-*.c file.
 
-Shouldn't this be in the platform IRQ handler, rather than the core v7 perf
-code?
+> All the responsibilities of old gpmc init is now taken care by probe;
+> probe in addition does setting up gpmc for each peripheral, registering
+> platform device (if the board makes use of new driver interface). If
+> a board uses new gpmc driver interface, gpmc for that device is not
+> setup before gpmc probe.
 
-Will
+OK
+ 
+> > It may require some bus level hooks, or wrapper drivers for the generic
+> > device drivers like smsc911x.
+> 
+> This too, not sure whether I follow you
+
+Well smsc911x has device tree binding, and is a generic driver. How do
+we trigger the gpmc initialization from a generic driver probe?
+
+> > > I understand the necessity for clk rate information in driver, but seems
+> > > unless we have a generic way to scale timings for all the kinds of
+> > > peripheral, having it may not be of much help.
+> > 
+> > We should not need to pass clock handles around. It's better to
+> > export some helper functions in the gpmc code for the calculation.
+> 
+> Currently we have helper function in gpmc.c for the same, were you
+> referring those ?
+
+Yes something that let's the driver call gpmc code to do the calculation.
+The other option would be to just add gpmc clock as a clock fwk node,
+and then the driver could clk_get() it as ick.
+
+Regards,
+
+Tony
+ 
+> *: [1] converts omap3evm & beagle board to use new interface, in addition
+>  to [1], similar to it, one more series would be posted to convert remaining
+>  boards also to use the new gpmc driver interface. As these cannot be tested
+>  by me and as it depends on final shape of this basic driver conversion
+>  series (or the present series), they have not yet been converted
+> 
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69917.html
+> 
