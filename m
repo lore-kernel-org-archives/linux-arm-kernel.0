@@ -1,35 +1,92 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 19 Jun 2012 18:38:15 -0700
-Subject: [PATCH 1/3] regulator: add pre-regulator support for 88pm860x
-In-Reply-To: <CACDDiy-mMShDv9GiRiy_OhceGdStgSLdQNNwo1V_ADpnANeUeA@mail.gmail.com>
-References: <1332825916-2183-1-git-send-email-jtzhou@marvell.com>
- <20120506022954.GB29576@lizard>
- <20120507091001.GB4415@opensource.wolfsonmicro.com>
- <CACDDiy-mMShDv9GiRiy_OhceGdStgSLdQNNwo1V_ADpnANeUeA@mail.gmail.com>
-Message-ID: <20120620013814.GA7246@lizard>
+From: xiechao.linux@gmail.com (chao xie)
+Date: Wed, 20 Jun 2012 09:54:42 +0800
+Subject: pm runtime and system suspend resume
+In-Reply-To: <Pine.LNX.4.44L0.1206191046000.1814-100000@iolanthe.rowland.org>
+References: <CAK9wHMQ7ZLtMTfBKWOb4A8wmjP9EQV8gA_moh5dXxvU0-b-vMQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1206191046000.1814-100000@iolanthe.rowland.org>
+Message-ID: <CAK9wHMQ6kJX06ZRjk6w_bt2HDnu=7dQEKde-Cxu8t4QbgLyTCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jett,
+>> hi
+>> PM_RUNTIME provide a way for device driver do runtime PM. so for some
+>> devices, they have some surrounded logic. For example, the device may
+>> get clock from outside, or it need PHY support(USB is a example).
+>> To get these dependency out of device driver, i define a struct
+>> dev_pm_domain, and make dev.pm_domain point to it. So in the device
+>> driver, when the hardware should be enabled, we can call
+>> pm_runtime_get_sync while when the hardware is idle or does not work,
+>> we can call pm_runtime_put_sync.
+>> It seems work well, but i have question about the suspend/resume of
+>> device. When the whole system will go to deep idle, and it will
+>> suspend the devices. for the function do device suspend
+>> __device_suspend,
+>
+> What source file is that function in?
+>
 
-On Mon, May 07, 2012 at 06:08:34PM +0800, jett zhou wrote:
-> Got it. I will rebase to the latest regulator tree code base to amend these
-> patches.
+The function is located at drivers/base/power/main.c
 
-Any news on these patches?
+>>  it will call pm_runtime_get_noresume(dev). As i
+>> think it will make the device not do runtime suspend any more. Is that
+>> correct?
+>
+> It sounds wrong.  Why would a suspend routine do that?
+>
 
-Thanks,
+I do knot know, but the code is there.
 
-> 2012/5/7 Mark Brown <broonie@opensource.wolfsonmicro.com>
-> 
-> > On Sat, May 05, 2012 at 07:29:54PM -0700, Anton Vorontsov wrote:
-> >
-> > > OK to let me take this via battery tree?
-> >
-> > No, there's now substantial conflicts with the regulator driver's
-> > ongoing development.  For example, the driver has been converted to use
-> > the core regmap support for enable and disable.
+>> There is the question, how device driver handle the logic surrounds
+>> it? I want to add pm_runtime_put_sync in dev->driver->pm->suspend
+>> function, and pm_runtime_get_sync in dev->driver->pm->resume.
+>
+> You must not do that.  If you do, your driver will hang.
+>
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+why it will hang?
+
+>> Because
+>> __device_suspend increase the usage_count, pm_runtime_put_sync will
+>> not do real work.
+>> So is that right that i directly call pm_runtime_suspend in
+>> dev->driver->pm->suspend and pm_runtime_resume in
+>> dev->driver->pm->resume?
+>
+> No, it works the other way around.  pm_runtime_suspend calls
+> dev->driver->pm->suspend, and pm_runtime_resume calls
+> dev->driver->pm->resume.
+>
+
+I have checked the pm_runtime_suspend implementation. It will call
+__pm_runtime_suspend without RPM_GET_PUT. It means that it will
+directly call rpm_suspend. in this function, the pm_ops call sequence
+is
+if (dev->pm_domain)
+               callback = dev->pm_domain->ops.runtime_suspend;
+       else if (dev->type && dev->type->pm)
+               callback = dev->type->pm->runtime_suspend;
+       else if (dev->class && dev->class->pm)
+               callback = dev->class->pm->runtime_suspend;
+       else if (dev->bus && dev->bus->pm)
+               callback = dev->bus->pm->runtime_suspend;
+       else
+               callback = NULL;
+
+       if (!callback && dev->driver && dev->driver->pm)
+               callback = dev->driver->pm->runtime_suspend;
+
+It means that if dev->pm_domain is not NULL, it will not call
+dev->driver->pm operations.
+
+Finally the real question is who will deal with the dev->pm_domain?
+when system go to sleep.
+The driver will use pm_runtime_get/put to deal with dev->pm_domain
+when it want to work or is in idle. Then when system go to sleep, the
+driver need care about dev->pm_domain too.
+Usally, dev->pm_domain is a easy way to handle the difference SOCs
+with same device IP. For example, USB. Many vendor may have same usb
+IP but difference phy and clock configuration. putting these stuff
+into dev->pm_domain can make driver be shared by different SOCs.
+
+> Alan Stern
+>
