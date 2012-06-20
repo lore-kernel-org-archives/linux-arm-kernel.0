@@ -1,41 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 Jun 2012 22:26:45 +0800
-Subject: [PATCH] clk: mxs: Fix the GPMI clock name
-In-Reply-To: <1340137652-2227-1-git-send-email-festevam@gmail.com>
-References: <1340137652-2227-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120620142643.GD2253@S2101-09.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 20 Jun 2012 15:27:33 +0100
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <20120620135633.GA2513@S2101-09.ap.freescale.net>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+ <20120620090126.GO28394@pengutronix.de>
+ <20120620100015.GA30243@sirena.org.uk>
+ <20120620130941.GB2253@S2101-09.ap.freescale.net>
+ <20120620133148.GP3978@opensource.wolfsonmicro.com>
+ <20120620135633.GA2513@S2101-09.ap.freescale.net>
+Message-ID: <20120620142733.GQ3978@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 05:27:32PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> The correct name for the GPMI clock is 'gpmi-nand'.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Jun 20, 2012 at 09:56:37PM +0800, Shawn Guo wrote:
+> On Wed, Jun 20, 2012 at 02:31:48PM +0100, Mark Brown wrote:
 
-Applied, thanks.
+> > Moving to irqdomain without DT is really very easy, you just need to
+> > select a legacy mapping if a base is provided and otherwise all the code
+> > is identical - it just comes down to a field in platform data and an if
+> > statement.
 
-Regards,
-Shawn
+> Yeah, but I guess what I'm saying is *linear* irqdomain.
 
-> ---
->  drivers/clk/mxs/clk-imx23.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-> index f7be225..40ad638 100644
-> --- a/drivers/clk/mxs/clk-imx23.c
-> +++ b/drivers/clk/mxs/clk-imx23.c
-> @@ -106,7 +106,7 @@ static struct clk_lookup lcdif_lookups[] __initdata = {
->  
->  static struct clk_lookup gpmi_lookups[] __initdata = {
->  	{ .dev_id = "imx23-gpmi-nand", },
-> -	{ .dev_id = "8000c000.gpmi", },
-> +	{ .dev_id = "8000c000.gpmi-nand", },
->  };
->  
->  static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
-> -- 
-> 1.7.1
-> 
+Sure, but like I say the only code change required for keeping platform
+data working is the three lines or so required to change to a legacy
+mapping if you've got an irq_base.  All my development systems currently
+use linear domains for several of the IRQ domains on a totally non-DT
+system.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/8d4f57e9/attachment.sig>
