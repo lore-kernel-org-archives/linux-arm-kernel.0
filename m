@@ -1,80 +1,37 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 20 Jun 2012 17:17:35 +0800
-Subject: [PATCH] pinctrl: pinctrl-imx: fix map setting problem if
- NO_PAD_CTL
-In-Reply-To: <1340178101-21605-1-git-send-email-jason77.wang@gmail.com>
-References: <1340178101-21605-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20120620091735.GI10387@shlinux2.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Jun 2012 11:21:57 +0200
+Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
+In-Reply-To: <CACRpkdbLMCirzyk-UbS0zx_TpY-mx51-aEn0bk-48eGMhmm=fg@mail.gmail.com>
+References: <20120619012420.GJ19249@S2101-09.ap.freescale.net>
+ <1569254394.2932189.1340107238237.JavaMail.root@advansee.com>
+ <CACRpkdbLMCirzyk-UbS0zx_TpY-mx51-aEn0bk-48eGMhmm=fg@mail.gmail.com>
+Message-ID: <20120620092157.GR28394@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 03:41:41PM +0800, Hui Wang wrote:
-> new_map is allocated according to map_num instead of grp->npins,
-> if a pin or some pins of a group has NO_PAD_CTL property, the map_num
-> and the grp->npin are different definitely.
+On Wed, Jun 20, 2012 at 10:35:21AM +0200, Linus Walleij wrote:
+> On Tue, Jun 19, 2012 at 2:00 PM, Beno?t Th?baudeau
+> <benoit.thebaudeau@advansee.com> wrote:
 > 
-> When we set mapping information to the new_map[], we should skip those
-> pins with NO_PAD_CTL from index, otherwise it is possible the driver
-> will aceesss to a unallocated region.
+> > Can you give me an example
+> > that tells me by what you replaced those cpu_is_xxx()? By some feature test
+> > macros?
 > 
-Good catching.
-Thanks.
+> Since this is a DT-enabled driver, add a boolean attribute for
+> the DT node like "has-edge-select" and add that attribute to
+> the SoC .dtsi files for the SoCs that has this feature.
+> 
+> Another (better) option is if there are magic numbers in the
+> silicon register range that you can check for revision of that
+> hardware in itself. Such auto-detect plug-n-play is always best.
 
-> Cc: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
-> ---
-> This problem is easily reproduced if we set pinctrl in the
-> ${board}.dts like following:
-> fsl,pins = <pin_func_id1   config_with_NO_PAD_CTL
->             pin_func_id2   config_with_NO_PAD_CTL
->             pin_func_id3   config_normal>;
-> 
->  drivers/pinctrl/pinctrl-imx.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-> index dd6d93a..0e21abb 100644
-> --- a/drivers/pinctrl/pinctrl-imx.c
-> +++ b/drivers/pinctrl/pinctrl-imx.c
-> @@ -146,6 +146,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
->  	struct pinctrl_map *new_map;
->  	struct device_node *parent;
->  	int map_num = 1;
-> +	int map_pos = 0;
->  	int i;
->  
->  	/*
-> @@ -186,11 +187,11 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
->  	new_map++;
->  	for (i = 0; i < grp->npins; i++) {
->  		if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
-> -			new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
-> -			new_map[i].data.configs.group_or_pin =
-> +			new_map[map_pos].type = PIN_MAP_TYPE_CONFIGS_PIN;
-> +			new_map[map_pos].data.configs.group_or_pin =
->  					pin_get_name(pctldev, grp->pins[i]);
-> -			new_map[i].data.configs.configs = &grp->configs[i];
-> -			new_map[i].data.configs.num_configs = 1;
-> +			new_map[map_pos].data.configs.configs = &grp->configs[i];
-> +			new_map[map_pos++].data.configs.num_configs = 1;
-I'm ok with the change, only a minor comment:
-Does the change as follows look better?
+If there would be such a register it would almost certainly be on different
+register offsets on different SoCs...
 
--       for (i = 0; i < grp->npins; i++) {
-+       for (i = j = 0; i < grp->npins; i++) {
-                if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
--                       new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
--                       new_map[i].data.configs.group_or_pin =
-+                       new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
-+                       new_map[j].data.configs.group_or_pin =
-                                        pin_get_name(pctldev, grp->pins[i]);
--                       new_map[i].data.configs.configs = &grp->configs[i];
--                       new_map[i].data.configs.num_configs = 1;
-+                       new_map[j].data.configs.configs = &grp->configs[i];
-+                       new_map[j].data.configs.num_configs = 1;
-+                       j++;
+Sascha
 
-Regards
-Dong Aisheng
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
