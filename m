@@ -1,61 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 20 Jun 2012 07:29:44 -0500
-Subject: [PATCH v2] arm: zynq: Support GIC OF initialization
-In-Reply-To: <1340173451-14613-1-git-send-email-monstr@monstr.eu>
-References: <1340173451-14613-1-git-send-email-monstr@monstr.eu>
-Message-ID: <4FE1C238.7070106@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Jun 2012 13:56:36 +0100
+Subject: [PATCH 00/15] Device Tree related re-works and clean-ups
+Message-ID: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 01:24 AM, Michal Simek wrote:
-> Zynq is OF driven platfrom which requires OF initialization.
-> 
-> Signed-off-by: Michal Simek <monstr@monstr.eu>
+The next in a long line of Device Tree enablement of ST-Ericsson
+related devices. In this patch-set we see the AB8500 obtain a its
+own IRQ domain, some major code deletions surrounding regulator
+register initialisation and a fairly major change in the way we
+register MFD devices when Device Tree is enabled.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+After this patch-set is applied on top of the previous one (some
+patches are still to be Acked and dragged into the correct trees)
+the boot log on Snowball is clean and /proc/interrupts appears to
+have the right idea.
 
-> 
-> ---
-> v2: Remove also corresponding defines
-> ---
->  arch/arm/mach-zynq/common.c                |    7 ++++++-
->  arch/arm/mach-zynq/include/mach/zynq_soc.h |    2 --
->  2 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 17d68d6..7941544 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
->  	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
->  }
->  
-> +static const struct of_device_id zynq_dt_irq_match[] __initconst = {
-> +	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
-> +	{ }
-> +};
-> +
->  /**
->   * xilinx_irq_init() - Interrupt controller initialization for the GIC.
->   */
->  static void __init xilinx_irq_init(void)
->  {
-> -	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-> +	of_irq_init(zynq_dt_irq_match);
->  }
->  
->  /* The minimum devices needed to be mapped before the VM system is up and
-> diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-> index 6ff7015..eab11a0 100644
-> --- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-> +++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-> @@ -41,9 +41,7 @@
->  
->  #define TTC0_BASE			IOMEM(TTC0_VIRT)
->  #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
-> -#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
->  #define SCU_CPU_TIMER_BASE		(SCU_PERIPH_BASE + 0x600)
-> -#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
->  #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
->  
->  /*
+ .../devicetree/bindings/gpio/gpio-nmk.txt          |    2 +-
+ arch/arm/boot/dts/db8500.dtsi                      |   18 +-
+ arch/arm/kernel/perf_event_v7.c                    |   12 +-
+ arch/arm/mach-ux500/board-mop500-regulators.c      |  176 --------------
+ arch/arm/mach-ux500/board-mop500-regulators.h      |    2 -
+ arch/arm/mach-ux500/board-mop500.c                 |   22 --
+ arch/arm/mach-ux500/cpu-db8500.c                   |    3 +-
+ drivers/i2c/busses/i2c-nomadik.c                   |   90 +++++++-
+ drivers/input/misc/ab8500-ponkey.c                 |    6 -
+ drivers/mfd/Kconfig                                |    1 +
+ drivers/mfd/ab8500-core.c                          |  218 +++++++++---------
+ drivers/mfd/ab8500-debugfs.c                       |   12 +-
+ drivers/mfd/ab8500-gpadc.c                         |    6 -
+ drivers/mfd/ab8500-sysctrl.c                       |    6 -
+ drivers/mfd/db8500-prcmu.c                         |   29 ++-
+ drivers/mfd/mfd-core.c                             |   31 ++-
+ drivers/misc/ab8500-pwm.c                          |    6 -
+ drivers/pinctrl/pinctrl-nomadik.c                  |    4 +-
+ drivers/regulator/ab8500.c                         |  240 --------------------
+ drivers/regulator/db8500-prcmu.c                   |    6 -
+ drivers/rtc/rtc-ab8500.c                           |    7 -
+ drivers/usb/otg/ab8500-usb.c                       |    6 -
+ include/linux/mfd/abx500/ab8500.h                  |    8 +-
+ include/linux/mfd/core.h                           |    1 +
+ include/linux/regulator/ab8500.h                   |   12 -
+ 25 files changed, 282 insertions(+), 642 deletions(-)
