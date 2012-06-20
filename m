@@ -1,48 +1,79 @@
-From: dp@opensource.wolfsonmicro.com (Dimitris Papastamos)
-Date: Wed, 20 Jun 2012 17:02:10 +0100
-Subject: [PATCH] ARM: S3C64XX: Add IRQ mapping for wm0010 on Cragganmore
-In-Reply-To: <028c01cd4e9d$16c0f9b0$4442ed10$%kim@samsung.com>
-References: <1339775065-13211-1-git-send-email-dp@opensource.wolfsonmicro.com>
- <028c01cd4e9d$16c0f9b0$4442ed10$%kim@samsung.com>
-Message-ID: <20120620160210.GA27145@opensource.wolfsonmicro.com>
+From: johnhlinn@gmail.com (John Linn)
+Date: Wed, 20 Jun 2012 09:30:17 -0700
+Subject: Fwd: FW: [PATCH v2] arm: zynq: Support GIC OF initialization
+In-Reply-To: <7758b679-088d-4a81-a7c6-2d6f1bef1262@AM1EHSMHS004.ehs.local>
+References: <7758b679-088d-4a81-a7c6-2d6f1bef1262@AM1EHSMHS004.ehs.local>
+Message-ID: <CAB9O=CMH9oaNHAxc714ZzsS1bzpWUvvLPUAntbw6aVFO_+oNwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:28:06PM +0900, Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> > 
-> > Dimitris Papastamos wrote:
-> > >
-> > > Signed-off-by: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
-> > > ---
-> > >  arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 +
-> > >  1 file changed, 1 insertion(+)
-> > >
-> > > diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> > b/arch/arm/mach-
-> > > s3c64xx/mach-crag6410-module.c
-> > > index f347336..7c8ea3c 100644
-> > > --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> > > +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> > > @@ -47,6 +47,7 @@ static struct spi_board_info wm1253_devs[] = {
-> > >  		.bus_num	= 0,
-> > >  		.chip_select	= 0,
-> > >  		.mode		= SPI_MODE_0,
-> > > +		.irq            = S3C_EINT(5),
->                     ^^^^^^^^^^^^
-> If there is no reason, using tab is better at the mark ^
+> -----Original Message-----
+> From: Rob Herring [mailto:robherring2 at gmail.com]
+> Sent: Wednesday, June 20, 2012 5:30 AM
+> To: Michal Simek
+> Cc: linux-kernel at vger.kernel.org; arnd at arndb.de; John Linn;
+> linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2] arm: zynq: Support GIC OF initialization
+>
+> On 06/20/2012 01:24 AM, Michal Simek wrote:
+> > Zynq is OF driven platfrom which requires OF initialization.
+> >
+> > Signed-off-by: Michal Simek <monstr@monstr.eu>
+>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Oops, yes tabs there, will re-send.
+Acked-by: John Linn <johnhlinn@gmail.com>
 
-> > >  		.controller_data = &wm0010_spi_csinfo,
-> > >  		.platform_data = &wm0010_crag_pdata,
-> 
-> I can't find platform_data in my tree (just v3.5-rc3), there is another
-> patch?
-> 
-> Now, just applying this patch is ok?
-
-Applying this patch should be fine.
-
-Thanks,
-Dimitris
+>
+> >
+> > ---
+> > v2: Remove also corresponding defines
+> > ---
+> > ?arch/arm/mach-zynq/common.c ? ? ? ? ? ? ? ?| ? ?7 ++++++-
+> > ?arch/arm/mach-zynq/include/mach/zynq_soc.h | ? ?2 --
+> > ?2 files changed, 6 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-zynq/common.c
+b/arch/arm/mach-zynq/common.c
+> > index 17d68d6..7941544 100644
+> > --- a/arch/arm/mach-zynq/common.c
+> > +++ b/arch/arm/mach-zynq/common.c
+> > @@ -56,12 +56,17 @@ static void __init xilinx_init_machine(void)
+> > ? ? of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+> > ?}
+> >
+> > +static const struct of_device_id zynq_dt_irq_match[] __initconst =
+{
+> > + ? { .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
+> > + ? { }
+> > +};
+> > +
+> > ?/**
+> > ? * xilinx_irq_init() - Interrupt controller initialization for the
+> GIC.
+> > ? */
+> > ?static void __init xilinx_irq_init(void)
+> > ?{
+> > - ? gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
+> > + ? of_irq_init(zynq_dt_irq_match);
+> > ?}
+> >
+> > ?/* The minimum devices needed to be mapped before the VM system is
+up
+> and
+> > diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h
+> b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+> > index 6ff7015..eab11a0 100644
+> > --- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
+> > +++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+> > @@ -41,9 +41,7 @@
+> >
+> > ?#define TTC0_BASE ? ? ? ? ? ? ? ? ?IOMEM(TTC0_VIRT)
+> > ?#define SCU_PERIPH_BASE ? ? ? ? ? ? ? ? ? ?IOMEM(SCU_PERIPH_VIRT)
+> > -#define SCU_GIC_CPU_BASE ? ? ? ? ? (SCU_PERIPH_BASE + 0x100)
+> > ?#define SCU_CPU_TIMER_BASE ? ? ? ? (SCU_PERIPH_BASE + 0x600)
+> > -#define SCU_GIC_DIST_BASE ? ? ? ? ?(SCU_PERIPH_BASE + 0x1000)
+> > ?#define PL310_L2CC_BASE ? ? ? ? ? ? ? ? ? ?IOMEM(PL310_L2CC_VIRT)
+> >
+> > ?/*
+>
