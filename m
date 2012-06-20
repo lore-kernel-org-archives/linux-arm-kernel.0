@@ -1,89 +1,67 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Wed, 20 Jun 2012 14:30:32 +0530
-Subject: [PATCH v2 1/4] ARM: new cache maintenance api for iommu mem flush
-In-Reply-To: <20120620084330.GA13009@n2100.arm.linux.org.uk>
-References: <CADysL2aFufYzmxWOHp2xUt_TkqOQpX883za+7it5h2qd=PMwwA@mail.gmail.com>
- <20120620084330.GA13009@n2100.arm.linux.org.uk>
-Message-ID: <CADysL2bzL_TCmeEcSJdv-_WeXFyU3zNnU8mxtc81JDG7bLYHoQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Jun 2012 11:01:26 +0200
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+Message-ID: <20120620090126.GO28394@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Jun 20, 2012 at 09:51:32AM +0200, javier Martin wrote:
+> Hi Sascha,
+> thank you for your review.
+> 
+> >
+> > Since we all move to devicetree shouldn't we stop adding new
+> > platform devices?
+> 
+> Our platfrom, 'visstrim_m10' doesn't currently support devicetree yet,
+> so it would be highly difficult for us to test it at the moment.
+> Couldn't you add devicetree support in a later patch?
 
+I try to motivate people moving to devicetree. At some point I'd like to
+get rid of the platform based boards in the tree. Adding new platform
+seems like delaying this instead of working towards a platform board
+free Kernel.
+Any other opinions on this?
 
-On Wed, Jun 20, 2012 at 2:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 19, 2012 at 04:51:07PM +0530, Gupta, Ramesh wrote:
->> >From 785a1f2854002ce7c1c8880bc5d8d92a7868bf1c Mon Sep 17 00:00:00 2001
->> From: Ramesh Gupta G <grgupta@ti.com>
->> Date: Fri, 15 Jun 2012 16:37:20 +0530
->> Subject: [PATCH v2 1/4] ARM: new cache maintenance api for iommu mem flush
->>
->> non-coherent IOMMUs need to make sure that the
->> data held in the caches need to be visible for the
->> MMU hardware. A new L1 cache maintenance api has been
->> created to handle this. Thanks to RMK's suggestions on
->> creating a dedicated API for this purpose.
->>
->> ref:
->> http://marc.info/?l=linux-kernel&m=131316512713815&w=2
->>
->> Signed-off-by: Ramesh Gupta G <grgupta@ti.com>
->> ---
->> ?arch/arm/include/asm/cacheflush.h | ? 17 +++++++++++++++++
->> ?arch/arm/include/asm/glue-cache.h | ? ?1 +
->> ?arch/arm/mm/proc-macros.S ? ? ? ? | ? ?1 +
->> ?3 files changed, 19 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/cacheflush.h
->> b/arch/arm/include/asm/cacheflush.h
->> index d5d8d5c..2b4f5aa 100644
->> --- a/arch/arm/include/asm/cacheflush.h
->> +++ b/arch/arm/include/asm/cacheflush.h
->> @@ -84,6 +84,11 @@
->> ? * ? ? ? ? ? - kaddr ?- page address
->> ? * ? ? ? ? ? - size ? - region size
->> ? *
->> + * ? ? flush_mem(start, end)
->> + *
->> + * ? ? ? ? ? ? Clean and invalidate the specified virtual address range.
->> + * ? ? ? ? ? ? - start ?- virtual start address
->> + * ? ? ? ? ? ? - end ? ?- virtual end address
->
-> You're missing a blank line here.
+> >
+> > The Coda device supports four instances. In this patch you only use
+> > instance 0, but you do not protect this function from being opened
+> > multiple times. Does this work with multiple opens?
+> 
+> No, it doesn't work with multiple opens. It would need either
+> multi-instance handling support or a restriction so that only can be
+> opened once, as you said.
+> 
+> > Can we do this driver multiple instance from the start? This could be
+> > done more easily if we do not create seperate device nodes for
+> > encoding/decoding, but when we create a single device node which can be
+> > opened exactly 4 times. The decision whether we do encoder or decoder
+> > can then be done in set_fmt.
+> 
+> I don't think adding multi-instance support is that difficult, let me
+> take a look at your code and if this is the case I'll do it.
 
-I will fix it.
+The only difficult thing in multi instance support is that the core has
+memory for four different contexts, but only a single processing engine.
+So you have to queue up the next frames for all instances in a single
+list and let the driver pick the next frame from the list.
+In our code we use 'write' to get the datastream from userspace. This
+means that it may happen that there is not enough data available for the
+next decoding frame. For encoding we use 'read' to pass the datastream
+to userspace.  This means that there may be not enough space in the
+fifo. Handling this is a bit complicated. Since you are using mem2mem
+and work on buffers instead of streams this should be much simpler than
+in our driver. I'm just telling you so that you don't get confused when
+you look at our code.
 
-> Also, "flush_mem" is a very lame name - it tells us nothing about what the
-> purpose of this new API is. ?Should it be used for when the CPU MMU TLB
-> entries are changed? ?What about if we're suspending, should it be used
-> then? ?What about if we're performing DMA - should it be used for that
-> memory too?
->
-> Please, give it a better name which describes what it is for.
-
-I agree, will choose a better name to describe the api.
-
->> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
->> index 2d8ff3a..f48a5ab 100644
->> --- a/arch/arm/mm/proc-macros.S
->> +++ b/arch/arm/mm/proc-macros.S
->> @@ -307,6 +307,7 @@ ENTRY(\name\()_cache_fns)
->> ? ? ? .long ? \name\()_dma_map_area
->> ? ? ? .long ? \name\()_dma_unmap_area
->> ? ? ? .long ? \name\()_dma_flush_range
->> + ? ? .long ? \name\()_flush_mem
->> ? ? ? .size ? \name\()_cache_fns, . - \name\()_cache_fns
->> ?.endm
->
-> This will immediately break the kernel compilation. ?Therefore, your
-> patch is incomplete and unsuitable for applying.
-
-I was checking only with panda configuration, I will update the patch
-set to take care of this.
-
-Thank you for review comments.
+Sascha
 
 -- 
-regards
-Ramesh Gupta G
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
