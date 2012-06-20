@@ -1,38 +1,103 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Wed, 20 Jun 2012 14:32:08 +0530
-Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
-In-Reply-To: <20120620084547.GB13009@n2100.arm.linux.org.uk>
-References: <CADysL2acF3ttJ-TR2as+GT66MfJiK4YyWYaAiP5j8yQ+YLBGYQ@mail.gmail.com>
- <20120620084547.GB13009@n2100.arm.linux.org.uk>
-Message-ID: <CADysL2aTMwDW1xXjRcOrEm5Fq2S6+V31yE0AeDCHBw2Ak+sU7Q@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 20 Jun 2012 17:00:31 +0800
+Subject: [RFC PATCH 2/2] irq: add irq_desc_initialize to remove some
+ duplicated lines
+In-Reply-To: <1340182831-10477-1-git-send-email-b29396@freescale.com>
+References: <1340182831-10477-1-git-send-email-b29396@freescale.com>
+Message-ID: <1340182831-10477-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
+There're two copies of irq_desc initialization code, reform them into
+an irq_desc_initialize function to call.
 
-On Wed, Jun 20, 2012 at 2:15 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> On Tue, Jun 19, 2012 at 04:51:16PM +0530, Gupta, Ramesh wrote:
-> > >From 630a3a8f341eb7f58f9a63bf786d732b5bdfd01e Mon Sep 17 00:00:00 2001
-> > From: Ramesh Gupta G <grgupta@ti.com>
-> > Date: Fri, 15 Jun 2012 16:39:21 +0530
-> > Subject: [PATCH v2 2/4] ARM: add flush_mem api for ARMv6
-> >
-> > Added flush_mem cache maintenance api for ARMv6.
-> > The implementation is based on dma_flush_range.
->
-> And what about all the other users of the define_cache_functions macro?
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ kernel/irq/irqdesc.c |   51 +++++++++++++++++++++++++++----------------------
+ 1 files changed, 28 insertions(+), 23 deletions(-)
 
-I initially added only for ARMv6/7 and I will add this for the other users.
-
-> This series is incomplete, and therefore entirely unsuitable for
-> upstreaming.
-
-I will send an updated patch set.
-
-Thank you for the comments.
-
-Regards
-Ramesh Gupta G
+diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+index 192a302..e29db67 100644
+--- a/kernel/irq/irqdesc.c
++++ b/kernel/irq/irqdesc.c
+@@ -131,34 +131,43 @@ static void free_masks(struct irq_desc *desc)
+ static inline void free_masks(struct irq_desc *desc) { }
+ #endif
+ 
+-static struct irq_desc *alloc_desc(int irq, int node, struct module *owner)
++static inline int irq_desc_initialize(struct irq_desc *desc,
++					int irq, int node, struct module *owner)
+ {
+-	struct irq_desc *desc;
+-	gfp_t gfp = GFP_KERNEL;
+-
+-	desc = kzalloc_node(sizeof(*desc), gfp, node);
+-	if (!desc)
+-		return NULL;
+ 	/* allocate based on nr_cpu_ids */
+ 	desc->kstat_irqs = alloc_percpu(unsigned int);
+ 	if (!desc->kstat_irqs)
+-		goto err_desc;
++		return -ENOMEM;
+ 
+-	if (alloc_masks(desc, gfp, node))
+-		goto err_kstat;
++	if (alloc_masks(desc, GFP_KERNEL, node)) {
++		kfree(desc->kstat_irqs);
++		return -ENOMEM;
++	}
+ 
+ 	raw_spin_lock_init(&desc->lock);
+ 	lockdep_set_class(&desc->lock, &irq_desc_lock_class);
+ 
+ 	desc_set_defaults(irq, desc, node, owner);
+ 
+-	return desc;
++	return 0;
++}
+ 
+-err_kstat:
+-	free_percpu(desc->kstat_irqs);
+-err_desc:
+-	kfree(desc);
+-	return NULL;
++static struct irq_desc *alloc_desc(int irq, int node, struct module *owner)
++{
++	struct irq_desc *desc;
++	int ret;
++
++	desc = kzalloc_node(sizeof(*desc), GFP_KERNEL, node);
++	if (!desc)
++		return NULL;
++
++	ret = irq_desc_initialize(desc, irq, node, owner);
++	if (ret) {
++		kfree(desc);
++		return NULL;
++	}
++
++	return desc;
+ }
+ 
+ static void free_desc(unsigned int irq)
+@@ -260,13 +269,9 @@ int __init early_irq_init(void)
+ 	desc = irq_desc;
+ 	count = ARRAY_SIZE(irq_desc);
+ 
+-	for (i = 0; i < count; i++) {
+-		desc[i].kstat_irqs = alloc_percpu(unsigned int);
+-		alloc_masks(&desc[i], GFP_KERNEL, node);
+-		raw_spin_lock_init(&desc[i].lock);
+-		lockdep_set_class(&desc[i].lock, &irq_desc_lock_class);
+-		desc_set_defaults(i, &desc[i], node, NULL);
+-	}
++	for (i = 0; i < count; i++)
++		irq_desc_initialize(desc, irq, node, NULL);
++
+ 	return arch_early_irq_init();
+ }
+ 
+-- 
+1.7.0.4
