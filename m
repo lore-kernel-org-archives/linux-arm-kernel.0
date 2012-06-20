@@ -1,44 +1,55 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jun 2012 03:22:25 -0700
-Subject: [RFC PATCH v2 03/11] mfd: omap: control: core system control
- driver
-In-Reply-To: <4FDF11C3.4010701@dev.rtsoft.ru>
+Date: Wed, 20 Jun 2012 03:24:11 -0700
+Subject: [RFC PATCH v2 04/11] OMAP2+: use control module mfd driver in
+ omap_type
+In-Reply-To: <4FDF11C6.6000400@dev.rtsoft.ru>
 References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <4FDF11C3.4010701@dev.rtsoft.ru>
-Message-ID: <20120620102224.GZ12766@atomide.com>
+ <4FDF11C6.6000400@dev.rtsoft.ru>
+Message-ID: <20120620102410.GA12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120618 04:36]:
-> This patch introduces a MFD core device driver for
-> OMAP system control module.
+> OMAP system control module can be probed early, then
+> omap_type is safe to use its APIs.
 > 
-> The control module allows software control of
-> various static modes supported by the device. It is
-> composed of two control submodules: general control
-> module and device (padconfiguration) control
-> module.
-
-> +++ linux-2.6/drivers/mfd/omap-control-core.c
-...
-
-
-> +u32 omap_control_readl(u16 offset)
-> +{
-> +	return __raw_readl(omap_control_base + (offset));
-> +}
+> TODO: add support for other omap versions
+> 
+> Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
+> 
+> ---
+>  arch/arm/mach-omap2/id.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> Index: linux-2.6/arch/arm/mach-omap2/id.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-omap2/id.c
+> +++ linux-2.6/arch/arm/mach-omap2/id.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> +#include <linux/mfd/omap_control.h>
+>  
+>  #include <asm/cputype.h>
+>  
+> @@ -38,6 +39,8 @@ unsigned int omap_rev(void)
+>  }
+>  EXPORT_SYMBOL(omap_rev);
+>  
+> +u32 omap_control_readl(u16 offset);
 > +
-> +void omap_control_writel(u32 val, u16 offset)
-> +{
-> +	__raw_writel(val, omap_control_base + (offset));
-> +}
+>  int omap_type(void)
+>  {
+>  	u32 val = 0;
+> @@ -49,7 +52,7 @@ int omap_type(void)
+>  	} else if (cpu_is_omap34xx()) {
+>  		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+>  	} else if (cpu_is_omap44xx()) {
+> -		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
+> +		val = omap_control_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
 
-There should not be any need to have the individual drivers use
-these. Please instead just set up something where individual drivers
-register with the control module core, and get their own iobase
-returned so they can use readl/writel and behave like normal device
-drivers.
-
-Regards,
+Please just set up a function in the ctrl module core to return the
+status so you can get rid of omap_control_readl here.
 
 Tony
