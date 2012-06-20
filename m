@@ -1,23 +1,125 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 Jun 2012 22:33:38 +0800
-Subject: [RFC] Support for 'Coda' video codec IP.
-In-Reply-To: <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
-References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
- <20120619181717.GE28394@pengutronix.de>
- <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
- <20120620090126.GO28394@pengutronix.de>
- <20120620100015.GA30243@sirena.org.uk>
- <20120620130941.GB2253@S2101-09.ap.freescale.net>
- <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
-Message-ID: <20120620143336.GE2253@S2101-09.ap.freescale.net>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 20 Jun 2012 16:33:52 +0200
+Subject: [PATCH] gpio: gpio-lpc32xx: Add gpio_to_irq mapping
+Message-ID: <1340202832-16850-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 04:25:54PM +0200, javier Martin wrote:
-> Do you plan to add pinctrl support for i.MX27 and i.MX21?
-> 
-We will have to when we are there to convert these platforms over to DT.
+This patch helps mapping with gpio_to_irq for the GPIOs that are irq enabled.
 
--- 
-Regards,
-Shawn
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+---
+Applies to 3.5-rc3
+
+ drivers/gpio/gpio-lpc32xx.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+ #include <mach/gpio-lpc32xx.h>
++#include <mach/irqs.h>
+ 
+ #define LPC32XX_GPIO_P3_INP_STATE		_GPREG(0x000)
+ #define LPC32XX_GPIO_P3_OUTP_SET		_GPREG(0x004)
+@@ -367,6 +368,66 @@ static int lpc32xx_gpio_request(struct g
+ 	return -EINVAL;
+ }
+ 
++static int lpc32xx_gpio_to_irq_p01(struct gpio_chip *chip, unsigned offset)
++{
++	return IRQ_LPC32XX_P0_P1_IRQ;
++}
++
++static const char lpc32xx_gpio_to_irq_gpio_p3_table[] = {
++	IRQ_LPC32XX_GPIO_00,
++	IRQ_LPC32XX_GPIO_01,
++	IRQ_LPC32XX_GPIO_02,
++	IRQ_LPC32XX_GPIO_03,
++	IRQ_LPC32XX_GPIO_04,
++	IRQ_LPC32XX_GPIO_05,
++};
++
++static int lpc32xx_gpio_to_irq_gpio_p3(struct gpio_chip *chip, unsigned offset)
++{
++	if (offset < ARRAY_SIZE(lpc32xx_gpio_to_irq_gpio_p3_table))
++		return lpc32xx_gpio_to_irq_gpio_p3_table[offset];
++	return -ENXIO;
++}
++
++static const char lpc32xx_gpio_to_irq_gpi_p3_table[] = {
++	IRQ_LPC32XX_GPI_00,
++	IRQ_LPC32XX_GPI_01,
++	IRQ_LPC32XX_GPI_02,
++	IRQ_LPC32XX_GPI_03,
++	IRQ_LPC32XX_GPI_04,
++	IRQ_LPC32XX_GPI_05,
++	IRQ_LPC32XX_GPI_06,
++	IRQ_LPC32XX_GPI_07,
++	IRQ_LPC32XX_GPI_08,
++	IRQ_LPC32XX_GPI_09,
++	-ENXIO, /* 10 */
++	-ENXIO, /* 11 */
++	-ENXIO, /* 12 */
++	-ENXIO, /* 13 */
++	-ENXIO, /* 14 */
++	-ENXIO, /* 15 */
++	-ENXIO, /* 16 */
++	-ENXIO, /* 17 */
++	-ENXIO, /* 18 */
++	IRQ_LPC32XX_GPI_19,
++	-ENXIO, /* 20 */
++	-ENXIO, /* 21 */
++	-ENXIO, /* 22 */
++	-ENXIO, /* 23 */
++	-ENXIO, /* 24 */
++	-ENXIO, /* 25 */
++	-ENXIO, /* 26 */
++	-ENXIO, /* 27 */
++	IRQ_LPC32XX_GPI_28,
++};
++
++static int lpc32xx_gpio_to_irq_gpi_p3(struct gpio_chip *chip, unsigned offset)
++{
++	if (offset < ARRAY_SIZE(lpc32xx_gpio_to_irq_gpi_p3_table))
++		return lpc32xx_gpio_to_irq_gpi_p3_table[offset];
++	return -ENXIO;
++}
++
+ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
+ 	{
+ 		.chip = {
+@@ -376,6 +437,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 			.direction_output	= lpc32xx_gpio_dir_output_p012,
+ 			.set			= lpc32xx_gpio_set_value_p012,
+ 			.request		= lpc32xx_gpio_request,
++			.to_irq			= lpc32xx_gpio_to_irq_p01,
+ 			.base			= LPC32XX_GPIO_P0_GRP,
+ 			.ngpio			= LPC32XX_GPIO_P0_MAX,
+ 			.names			= gpio_p0_names,
+@@ -391,6 +453,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 			.direction_output	= lpc32xx_gpio_dir_output_p012,
+ 			.set			= lpc32xx_gpio_set_value_p012,
+ 			.request		= lpc32xx_gpio_request,
++			.to_irq			= lpc32xx_gpio_to_irq_p01,
+ 			.base			= LPC32XX_GPIO_P1_GRP,
+ 			.ngpio			= LPC32XX_GPIO_P1_MAX,
+ 			.names			= gpio_p1_names,
+@@ -421,6 +484,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 			.direction_output	= lpc32xx_gpio_dir_output_p3,
+ 			.set			= lpc32xx_gpio_set_value_p3,
+ 			.request		= lpc32xx_gpio_request,
++			.to_irq			= lpc32xx_gpio_to_irq_gpio_p3,
+ 			.base			= LPC32XX_GPIO_P3_GRP,
+ 			.ngpio			= LPC32XX_GPIO_P3_MAX,
+ 			.names			= gpio_p3_names,
+@@ -434,6 +498,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 			.direction_input	= lpc32xx_gpio_dir_in_always,
+ 			.get			= lpc32xx_gpi_get_value,
+ 			.request		= lpc32xx_gpio_request,
++			.to_irq			= lpc32xx_gpio_to_irq_gpi_p3,
+ 			.base			= LPC32XX_GPI_P3_GRP,
+ 			.ngpio			= LPC32XX_GPI_P3_MAX,
+ 			.names			= gpi_p3_names,
