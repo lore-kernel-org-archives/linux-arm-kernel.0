@@ -1,31 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Jun 2012 00:26:48 -0300
-Subject: [RFC] Support for 'Coda' video codec IP.
-In-Reply-To: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CAOMZO5AOEdVpSvV2bnbw6bwGb8+83Zji3jkTjH01yaC7pZUGvA@mail.gmail.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Wed, 20 Jun 2012 09:14:00 +0530
+Subject: [PATCH] pinctrl/coh901: use clk_prepare_enable()
+In-Reply-To: <1340141912-13111-1-git-send-email-linus.walleij@stericsson.com>
+References: <1340141912-13111-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CADTbHxrmDQZ8UpSVwDPXiD21SrqUmid-fQ_9+eVBVaAk08MaDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On Tue, Jun 19, 2012 at 11:11 AM, Javier Martin
-<javier.martin@vista-silicon.com> wrote:
-> This patch adds support for the video encoder present
-> in the i.MX27. It currently support encoding in H.264 and
-> in MPEG4 SP. It's working properly in a Visstrim SM10 platform.
-> It uses V4L2-mem2mem framework.
+On Wed, Jun 20, 2012 at 3:08 AM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 >
-> A public git repository is available too:
-> git://github.com/jmartinc/video_visstrim.git
+> The COH901 GPIO driver did not prepare its clock, so let us
+> fix it to do so.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ?drivers/pinctrl/pinctrl-coh901.c | ? ?2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+> index 55697a5..1b5d232a 100644
+> --- a/drivers/pinctrl/pinctrl-coh901.c
+> +++ b/drivers/pinctrl/pinctrl-coh901.c
+> @@ -770,7 +770,7 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?dev_err(gpio->dev, "could not get GPIO clock\n");
+> ? ? ? ? ? ? ? ?goto err_no_clk;
+> ? ? ? ?}
+> - ? ? ? err = clk_enable(gpio->clk);
+> + ? ? ? err = clk_prepare_enable(gpio->clk);
+> ? ? ? ?if (err) {
+> ? ? ? ? ? ? ? ?dev_err(gpio->dev, "could not enable GPIO clock\n");
+> ? ? ? ? ? ? ? ?goto err_no_clk_enable;
 
-I will give it a try and I have some questions:
+What about clk_disable_unprepare() in error path?
 
-- How did you generate the VPU firmware?
-
-- Which userspace application did you use for testing the encoding? Is
-Gstreamer OK to test it?
-
-Thanks,
-
-Fabio Estevam
+Regards,
+Pankaj Jangra
