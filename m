@@ -1,42 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 Jun 2012 22:38:32 +0800
-Subject: [PATCH] clk: mxs: Register USB clocks for mx23
-In-Reply-To: <1340148392-9847-1-git-send-email-festevam@gmail.com>
-References: <1340148392-9847-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120620143830.GF2253@S2101-09.ap.freescale.net>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 20 Jun 2012 10:40:14 -0400 (EDT)
+Subject: pm runtime and system suspend resume
+In-Reply-To: <CAK9wHMQ6kJX06ZRjk6w_bt2HDnu=7dQEKde-Cxu8t4QbgLyTCA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1206201031590.1804-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 08:26:32PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Register USB clocks for mx23.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/clk/mxs/clk-imx23.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-> index f7be225..4735136 100644
-> --- a/drivers/clk/mxs/clk-imx23.c
-> +++ b/drivers/clk/mxs/clk-imx23.c
-> @@ -195,6 +195,8 @@ int __init mx23_clocks_init(void)
->  	clk_register_clkdevs(clks[ssp], ssp_lookups, ARRAY_SIZE(ssp_lookups));
->  	clk_register_clkdevs(clks[gpmi], gpmi_lookups, ARRAY_SIZE(gpmi_lookups));
->  	clk_register_clkdevs(clks[lcdif], lcdif_lookups, ARRAY_SIZE(lcdif_lookups));
-> +	clk_register_clkdev(clks[usb_pwr], NULL, "8007c000.usbphy");
-> +	clk_register_clkdev(clks[usb], NULL, "80080000.usb");
+On Wed, 20 Jun 2012, chao xie wrote:
 
-It depends on the node name in device tree.  I would defer this
-a little bit to have the node name in dts settled down first.
-
-Regards,
-Shawn
-
->  
->  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
->  		clk_prepare_enable(clks[clks_init_on[i]]);
-> -- 
-> 1.7.1
+> >> It seems work well, but i have question about the suspend/resume of
+> >> device. When the whole system will go to deep idle, and it will
+> >> suspend the devices. for the function do device suspend
+> >> __device_suspend,
+> >
+> > What source file is that function in?
+> >
 > 
+> The function is located at drivers/base/power/main.c
+> 
+> >>  it will call pm_runtime_get_noresume(dev). As i
+> >> think it will make the device not do runtime suspend any more. Is that
+> >> correct?
+> >
+> > It sounds wrong.  Why would a suspend routine do that?
+> >
+> 
+> I do knot know, but the code is there.
+
+Okay, now I understand your question.  The problem is that system 
+suspend uses a separate mechanism from runtime suspend, and we don't 
+want the two things to happen at the same time.  Therefore 
+__device_suspend does a get_noresume in order to prevent runtime 
+suspend from occurring in the middle of a system suspend.
+
+> >> There is the question, how device driver handle the logic surrounds
+> >> it? I want to add pm_runtime_put_sync in dev->driver->pm->suspend
+> >> function, and pm_runtime_get_sync in dev->driver->pm->resume.
+> >
+> > You must not do that.  If you do, your driver will hang.
+> >
+> 
+> why it will hang?
+
+Sorry, I misunderstood your question.  It will not hang.  But why do 
+you want to add those calls?
+
+> >> Because
+> >> __device_suspend increase the usage_count, pm_runtime_put_sync will
+> >> not do real work.
+> >> So is that right that i directly call pm_runtime_suspend in
+> >> dev->driver->pm->suspend and pm_runtime_resume in
+> >> dev->driver->pm->resume?
+
+No, don't call pm_runtime_suspend.  Just call your driver's
+runtime_suspend routine directly.  Same for resume.
+
+> Finally the real question is who will deal with the dev->pm_domain?
+> when system go to sleep.
+
+The __device_suspend routine in drivers/base/main.c uses 
+dev->pm_domain.
+
+> The driver will use pm_runtime_get/put to deal with dev->pm_domain
+> when it want to work or is in idle. Then when system go to sleep, the
+> driver need care about dev->pm_domain too.
+> Usally, dev->pm_domain is a easy way to handle the difference SOCs
+> with same device IP. For example, USB. Many vendor may have same usb
+> IP but difference phy and clock configuration. putting these stuff
+> into dev->pm_domain can make driver be shared by different SOCs.
+
+Alan Stern
