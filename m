@@ -1,47 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Jun 2012 15:01:16 +0100
-Subject: [PATCH 15/15] ARM: perf: handle muxed CPU IRQ lines
-In-Reply-To: <4FE1D3D2.3050209@linaro.org>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-16-git-send-email-lee.jones@linaro.org>
- <20120620132823.GG32666@mudshark.cambridge.arm.com>
- <4FE1D3D2.3050209@linaro.org>
-Message-ID: <20120620140115.GJ32666@mudshark.cambridge.arm.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 20 Jun 2012 19:18:07 +0530
+Subject: [PATCH 1/1] davinci:mcasp: Fix audio pll (pll-p) configure bug
+Message-ID: <1340200087-13744-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 02:44:50PM +0100, Lee Jones wrote:
-> >
-> > Shouldn't this be in the platform IRQ handler, rather than the core v7 perf
-> > code?
-> 
-> Well that's where it currently resides, but in the process of DT:ing the 
-> platform, we have no real way to set the call-back. Normally, if it's 
-> absolutely necessary, we do this with AUXDATA. However in the PMU case 
-> we fall-down as a device address is required for DT look-up, which the 
-> PMU does not have.
+In sound/soc/codecs/tlv320aic3x.c
 
-Right, so I suspect this is going to be a huge problem for the OMAP guys,
-where they have to do a fair amount of jiggery-pokery to kick their PMU into
-action. We are also looking to put suspend/resume hooks into the
-arm_pmu_platdata which will undoubtedly be highly platform-specific.
+	data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG);
+	snd_soc_write(codec, AIC3X_PLL_PROGA_REG,
+		      data | (pll_p << PLLP_SHIFT));
 
-> I spoke with Arnd about sensible solutions and he suggested placing the 
-> logic inside the generic instead, thus supporting muxed IRQ lines 
-> without the requirement of providing a platform specific handler in 
-> every instance this occurs (although, I think the ux500 are the only 
-> platform to do this currently).
+In the above code pll-p value is OR'ed with previous value without
+clearing the mask.
 
-Whilst this code isn't too problematic (but yes, you are the only platform
-that needs it) I think if we solve the bigger problem then you can use the
-same solution to do your IRQ ping-ponging.
+Currently it seems pll-p value doesn't change across Sampling frequency
+(it stays at 1).
 
-> I'd be happy to take any other suggestions, but this seemed fairly neat 
-> and unobtrusive (not withstanding the predicate cock-up).
+However on some platforms (like AM335x EVM-SK), pll-p may have different
+values across different sampling frequencies. In such case, above code
+configures the pll with a wrong value.
+Because of this bug, when a audio stream is played with pll value
+different from previous stream, audio is heard as stretched.
 
-Can we not fix the AUXDATA stuff to assume address 0 if it's not present for
-the matching node? This will work for perf as I don't expect to have
-multiple nodes with the same compatible string for PMUs that are not
-memory-mapped (for big.LITTLE, the strings will be different).
+Fix the same by clearing the mask and then writing the value.
 
-Will
+Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+---
+ sound/soc/codecs/tlv320aic3x.c |    2 +-
+ sound/soc/codecs/tlv320aic3x.h |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
+index d0dbac1..8c1977b 100644
+--- a/sound/soc/codecs/tlv320aic3x.c
++++ b/sound/soc/codecs/tlv320aic3x.c
+@@ -963,7 +963,7 @@ static int aic3x_hw_params(struct snd_pcm_substream *substream,
+ 	}
+ 
+ found:
+-	data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG);
++	data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG) & ~PLLP_MASK;
+ 	snd_soc_write(codec, AIC3X_PLL_PROGA_REG,
+ 		      data | (pll_p << PLLP_SHIFT));
+ 	snd_soc_write(codec, AIC3X_OVRF_STATUS_AND_PLLR_REG,
+diff --git a/sound/soc/codecs/tlv320aic3x.h b/sound/soc/codecs/tlv320aic3x.h
+index 06a1978..16d9999 100644
+--- a/sound/soc/codecs/tlv320aic3x.h
++++ b/sound/soc/codecs/tlv320aic3x.h
+@@ -166,6 +166,7 @@
+ 
+ /* PLL registers bitfields */
+ #define PLLP_SHIFT		0
++#define PLLP_MASK		7
+ #define PLLQ_SHIFT		3
+ #define PLLR_SHIFT		0
+ #define PLLJ_SHIFT		2
+-- 
+1.7.1
