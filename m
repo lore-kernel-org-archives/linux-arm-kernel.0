@@ -1,41 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Jun 2012 10:19:50 +0200
-Subject: [PATCH v2] PINCTRL: SiRF: add GPIO and GPIO irq support in CSR
- SiRFprimaII
-In-Reply-To: <1340090216-1689-1-git-send-email-Barry.Song@csr.com>
-References: <1340090216-1689-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CACRpkdbZXqiv2maVqaDHX-7AmYZLqRot-F0UX8UWOe3WPA2B7g@mail.gmail.com>
+Date: Wed, 20 Jun 2012 10:25:30 +0200
+Subject: [GIT PULL] SPEAr pinctrl updates for v-3.5
+In-Reply-To: <CAOh2x=kOU=X2V5zBg4G_SWzNSfQyoeygwgW-vO-xxRkDXzZDJQ@mail.gmail.com>
+References: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
+ <CAOh2x=mGdV_wbJC64wvb9+UV_FBgnsat9=ojD8BJYVxT+HoWhQ@mail.gmail.com>
+ <201205122142.02318.arnd@arndb.de>
+ <CACRpkdZgSJGcM9cT3yMv1jhUrD9hKXv=VVb1mFSWrMzRPYu-=g@mail.gmail.com>
+ <4FB47DE2.4070704@st.com>
+ <CACRpkdYGuqg3xy+x+adREEzkPL9RFzDDBaEBttR-HarZ7jWuFA@mail.gmail.com>
+ <CAOh2x=kOU=X2V5zBg4G_SWzNSfQyoeygwgW-vO-xxRkDXzZDJQ@mail.gmail.com>
+Message-ID: <CACRpkday9+zhMHWWjNNBfhhQ2NXPc+RoGkHvxodud5HY7hLm4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 9:16 AM, Barry Song <Barry.Song@csr.com> wrote:
+On Tue, Jun 19, 2012 at 4:11 PM, viresh kumar <viresh.linux@gmail.com> wrote:
 
-> In SiRFprimaII, Each GPIO pin can be configured as input or output
-> independently. If a GPIO is configured as input, it can also be
-> enabled as an interrupt source (either edge or level triggered).
->
-> These pins must be either MUXed as GPIO or other function pads.
->
-> Signed-off-by: Yuping Luo <Yuping.Luo@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> @Grant: Can we have your comments here please. Or any other better
+> solution to the problem
+> we are facing. I do hope, my last suggestion is not that bad.
 
-This is looking great!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I did hunt Grant down in Hong Kong (this make me sound like some
+secret agent...) and we discussed this with Dong Aisheng.
 
-I assume you will merge this through the ARM SoC tree and the
-PrimaII branch? Tell me if you need it to be merged through the
-pinctrl tree.
+The outcome was basically this work item from Linaro:
+https://blueprints.launchpad.net/linux-linaro/+spec/pinctrl-gpiorange-makeover
 
-> +/* Pull up/down values */
-> +enum sirfsoc_gpio_pull {
-> + ? ? ? SIRFSOC_GPIO_PULL_NONE,
-> + ? ? ? SIRFSOC_GPIO_PULL_UP,
-> + ? ? ? SIRFSOC_GPIO_PULL_DOWN,
-> +};
+So the idea is that GPIO drivers should register their pin ranges
+instead of the other way around (pinctrl drivers register them, as it
+is done today), and that we need to move the mapping to be
+GPIO-driver local, which in turn mandates stashing the
+struct gpio_chip into the GPIO range mapping.
 
-As noted you can use pinconf-generic and friends, but it's definately
-not a requirement. You can also do that as a refactoring on top of this
-patch if you want to.
+Not a simple refactoring but probably necessary (all current users need
+to be switched over).
+
+Interested? ;-)
 
 Yours,
 Linus Walleij
