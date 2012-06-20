@@ -1,50 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jun 2012 07:25:16 -0700
-Subject: [PATCH] ARM: OMAP2: twl-common: Fix compiler warning
-In-Reply-To: <1339767234-25323-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1339767234-25323-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120620142515.GQ12766@atomide.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 20 Jun 2012 16:25:54 +0200
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <20120620130941.GB2253@S2101-09.ap.freescale.net>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+ <20120620090126.GO28394@pengutronix.de>
+ <20120620100015.GA30243@sirena.org.uk>
+ <20120620130941.GB2253@S2101-09.ap.freescale.net>
+Message-ID: <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120615 06:38]:
-> If the kernel is built only for OMAP2 the following warning will show up:
-> 
-> arch/arm/mach-omap2/twl-common.c:52: warning: ?twl_set_voltage? defined but not used
-> arch/arm/mach-omap2/twl-common.c:58: warning: ?twl_get_voltage? defined but not used
-> 
-> The twl_set/get_voltage callbacks only used when OMAP3/4 is selected.
+On 20 June 2012 15:09, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Jun 20, 2012 at 11:00:15AM +0100, Mark Brown wrote:
+>> The approach a lot of platforms have been taking is that it's OK to keep
+>> on maintaining existing boards using board files (especially for trivial
+>> things like adding new devices).
+>
+> I think that's the approach being taken during the transition to device
+> tree. ?But it's definitely a desirable thing to remove those board
+> files with device tree support at some point, because not having non-DT
+> users will ease platform maintenance and new feature adoption a lot
+> easier, for example linear irqdomain.
 
-Thanks applying into fixes.
+Do you plan to add pinctrl support for i.MX27 and i.MX21?
 
-Tony
 
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/mach-omap2/twl-common.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index 119d5a9..5447c13 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -48,6 +48,7 @@ static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
->  	},
->  };
->  
-> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
->  static int twl_set_voltage(void *data, int target_uV)
->  {
->  	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> @@ -59,6 +60,7 @@ static int twl_get_voltage(void *data)
->  	struct voltagedomain *voltdm = (struct voltagedomain *)data;
->  	return voltdm_get_voltage(voltdm);
->  }
-> +#endif
->  
->  void __init omap_pmic_init(int bus, u32 clkrate,
->  			   const char *pmic_type, int pmic_irq,
-> -- 
-> 1.7.8.6
-> 
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
