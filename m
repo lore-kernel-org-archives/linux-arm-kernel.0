@@ -1,46 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jun 2012 06:19:19 -0700
-Subject: [PATCH] arm: OMAP depends on MMU
-In-Reply-To: <1339116651-18051-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1339116651-18051-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20120620131918.GJ12766@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 20 Jun 2012 14:26:49 +0100
+Subject: [PATCH 08/15] regulator: Stop initialising AB8500's registers
+ during bring-up
+In-Reply-To: <1340197011-5435-9-git-send-email-lee.jones@linaro.org>
+References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
+ <1340197011-5435-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120620132649.GO3978@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* mathieu.poirier at linaro.org <mathieu.poirier@linaro.org> [120607 17:55]:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> There is no way to build OMAP kernels without an MMU
-> at this point because of dependencies on MMU-only functions.
-> 
-> As long as nobody is interested in fixing this, let's just disable
-> this platforms for nommu kernels.
+On Wed, Jun 20, 2012 at 01:56:44PM +0100, Lee Jones wrote:
+> There is no need to initialise the AB8500's regulator registers, as
+> most of this work is already carried out by framework features.
 
-Thanks, applying into fixes non-critical.
-
-Tony
-
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 84449dd..4b1fc0d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -934,6 +934,7 @@ config ARCH_DAVINCI
->  
->  config ARCH_OMAP
->  	bool "TI OMAP"
-> +	depends on MMU
->  	select HAVE_CLK
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARCH_HAS_CPUFREQ
-> -- 
-> 1.7.5.4
-> 
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120620/8ab4b0f3/attachment.sig>
