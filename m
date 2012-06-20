@@ -1,68 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 20 Jun 2012 21:09:51 +0200
-Subject: [Patchv2] ARM: Orion5x - Restore parts of io.h, with rework
-Message-ID: <1340219391-21561-1-git-send-email-andrew@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Jun 2012 21:25:35 +0200
+Subject: [PATCH v2] pinctrl: pinctrl-imx: fix map setting problem if
+ NO_PAD_CTL is set
+In-Reply-To: <1340187227-25343-1-git-send-email-jason77.wang@gmail.com>
+References: <1340187227-25343-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <CACRpkdYXuRC0d1NcUEfRZbfgis+9xVyzsEFpGmS21xYBmyrAPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4d5fc58dbe34b78157c05b319669bb3e064ba8bd (ARM: remove bunch of
-now unused mach/io.h files) removed the orion5x io.h. Unfortunetely,
-this is still needed for the definition of IO_SPACE_LIMIT which
-overrides the default 64K. All Orion based systems have 1Mbyte of IO
-space per PCI[e] bus, and try to request_resource() this size. Orion5x
-has two such PCI busses.
+On Wed, Jun 20, 2012 at 12:13 PM, Hui Wang <jason77.wang@gmail.com> wrote:
 
-It is likely that the origional, removed version, was broken. This
-version might be less broken. However, it has not been tested on
-hardware with a PCI card, let alone hardware with a PCI card with IO
-capabilities.
+> new_map is allocated according to map_num instead of grp->npins,
+> if a pin or some pins of a group has NO_PAD_CTL property, the map_num
+> and the grp->npin are different definitely.
+>
+> When we set mapping information to the new_map[], we should skip those
+> pins with NO_PAD_CTL from index, otherwise it is possible the driver
+> will aceesss to a unallocated region.
+>
+> Cc: Dong Aisheng <dong.aisheng@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+> ---
+> In the v2, according to dong.aisheng's suggestion, change to use j as index.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/Kconfig                        |    1 +
- arch/arm/mach-orion5x/include/mach/io.h |   22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
- create mode 100644 arch/arm/mach-orion5x/include/mach/io.h
+OK applied this v2 version. Is this a serious bug fix that is causing
+regressions right now and needs to go into the -rc:s for v3.5 or can it wait
+for v3.6?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 84449dd..8fb7e4a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -588,6 +588,7 @@ config ARCH_ORION5X
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
-+	select NEED_MACH_IO_H
- 	select PLAT_ORION
- 	help
- 	  Support for the following Marvell Orion 5x series SoCs:
-diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
-new file mode 100644
-index 0000000..9f22ae6
---- /dev/null
-+++ b/arch/arm/mach-orion5x/include/mach/io.h
-@@ -0,0 +1,22 @@
-+/*
-+ * arch/arm/mach-orion5x/include/mach/io.h
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __ASM_ARCH_IO_H
-+#define __ASM_ARCH_IO_H
-+
-+#include <mach/orion5x.h>
-+#include <asm/sizes.h>
-+
-+#define IO_SPACE_LIMIT		SZ_2M
-+static inline void __iomem *__io(unsigned long addr)
-+{
-+	return (void __iomem *)(addr + ORION5X_PCI_IO_VIRT_BASE);
-+}
-+
-+#define __io(a)			 __io(a)
-+#endif
--- 
-1.7.10
+Thanks,
+Linus Walleij
