@@ -1,33 +1,44 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Jun 2012 21:25:35 +0200
-Subject: [PATCH v2] pinctrl: pinctrl-imx: fix map setting problem if
- NO_PAD_CTL is set
-In-Reply-To: <1340187227-25343-1-git-send-email-jason77.wang@gmail.com>
-References: <1340187227-25343-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <CACRpkdYXuRC0d1NcUEfRZbfgis+9xVyzsEFpGmS21xYBmyrAPg@mail.gmail.com>
+Date: Wed, 20 Jun 2012 21:30:17 +0200
+Subject: [PATCH 07/15] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <1340197011-5435-8-git-send-email-lee.jones@linaro.org>
+References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
+ <1340197011-5435-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbi7vmJE9LPmiu2NGM4b_SZ-Hi=a_xgrCOQX9ofKsLFew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 12:13 PM, Hui Wang <jason77.wang@gmail.com> wrote:
+On Wed, Jun 20, 2012 at 2:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> new_map is allocated according to map_num instead of grp->npins,
-> if a pin or some pins of a group has NO_PAD_CTL property, the map_num
-> and the grp->npin are different definitely.
+> Here we apply the bindings required for successful Device Tree
+> probing of the i2c-nomadik driver. We also apply a fall-back
+> configuration in case either one is not provided, or a required
+> element is missing from the one supplied.
 >
-> When we set mapping information to the new_map[], we should skip those
-> pins with NO_PAD_CTL from index, otherwise it is possible the driver
-> will aceesss to a unallocated region.
->
-> Cc: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
-> ---
-> In the v2, according to dong.aisheng's suggestion, change to use j as index.
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-OK applied this v2 version. Is this a serious bug fix that is causing
-regressions right now and needs to go into the -rc:s for v3.5 or can it wait
-for v3.6?
+Pls Cc Srinidhi on these patches, and I would prefer to get his ACK on this.
+
+Srinidhi, could you propose a patch to MAINTAINERS adding yourself as
+explicit maintainer for this driver?
+
+> +static struct nmk_i2c_controller u8500_i2c = {
+> + ? ? ? /*
+> + ? ? ? ?* Slave data setup time; 250ns, 100ns, and 10ns, which
+> + ? ? ? ?* is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+> + ? ? ? ?*/
+> + ? ? ? .slsu ? ? ? ? ? = 0xe,
+> + ? ? ? .tft ? ? ? ? ? ?= 1, ? ? ?/* Tx FIFO threshold */
+> + ? ? ? .rft ? ? ? ? ? ?= 8, ? ? ?/* Rx FIFO threshold */
+> + ? ? ? .clk_freq ? ? ? = 100000, /* std. mode operation */
+
+As per earlier discussion, change this default value to 400000.
+
+> + ? ? ? .timeout ? ? ? ?= 200, ? ?/* Slave response timeout(ms) */
+> + ? ? ? .sm ? ? ? ? ? ? = I2C_FREQ_MODE_FAST,
+> +};
 
 Thanks,
-Linus Walleij
+Lmims Walleij
