@@ -1,43 +1,59 @@
-From: balajitk@ti.com (T Krishnamoorthy, Balaji)
-Date: Wed, 20 Jun 2012 12:53:41 +0530
-Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
-In-Reply-To: <4FE0AE7B.4040502@gmail.com>
-References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
- <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
- <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
- <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
- <4FE0AE7B.4040502@gmail.com>
-Message-ID: <CANrkHUawrQfb+o+W7FrYACv6NocZn_MAym5A209peP8tW1nZRQ@mail.gmail.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Wed, 20 Jun 2012 15:41:41 +0800
+Subject: [PATCH] pinctrl: pinctrl-imx: fix map setting problem if NO_PAD_CTL
+Message-ID: <1340178101-21605-1-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2012 at 10:23 PM, Paolo Pisati <p.pisati@gmail.com> wrote:
-> On 06/13/2012 05:28 PM, T Krishnamoorthy, Balaji wrote:
->> On Mon, Jun 11, 2012 at 12:50 PM, Ming Lei <ming.lei@canonical.com> wrote:
->>>
->>> On Mon, Jun 11, 2012 at 2:21 PM, T Krishnamoorthy, Balaji
->>> <balajitk@ti.com> wrote:
->>>> Hi Ming Lei,
->>>> Can you let me know if you noticed any write/timeout errors ?
->>>
->>> Nothing error logs found during writing.
->> Hi,
->>
->> Couldn't reproduce the issue with BeagleXM rev C, Might be a combination
->> of rev and SD card. How often do you see mis-match in file content?
->
-> i just want to say that i'm affected by this too, and i can reproduce it
-> 100%.
->
+new_map is allocated according to map_num instead of grp->npins,
+if a pin or some pins of a group has NO_PAD_CTL property, the map_num
+and the grp->npin are different definitely.
 
-Is it with SD or MMC card
-Can you provide Beagle board rev info?
+When we set mapping information to the new_map[], we should skip those
+pins with NO_PAD_CTL from index, otherwise it is possible the driver
+will aceesss to a unallocated region.
 
-> do you want me to run that patch or you already have enough data?
+Cc: Dong Aisheng <dong.aisheng@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+---
+This problem is easily reproduced if we set pinctrl in the
+${board}.dts like following:
+fsl,pins = <pin_func_id1   config_with_NO_PAD_CTL
+            pin_func_id2   config_with_NO_PAD_CTL
+            pin_func_id3   config_normal>;
 
-Can you enable MMC debug and apply the debug patch I provided.
-The debug patch did not print any AUTOCMD errors with Ming Lei setup.
+ drivers/pinctrl/pinctrl-imx.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-> --
-> bye,
-> p.
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index dd6d93a..0e21abb 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -146,6 +146,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	struct pinctrl_map *new_map;
+ 	struct device_node *parent;
+ 	int map_num = 1;
++	int map_pos = 0;
+ 	int i;
+ 
+ 	/*
+@@ -186,11 +187,11 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	new_map++;
+ 	for (i = 0; i < grp->npins; i++) {
+ 		if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
+-			new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
+-			new_map[i].data.configs.group_or_pin =
++			new_map[map_pos].type = PIN_MAP_TYPE_CONFIGS_PIN;
++			new_map[map_pos].data.configs.group_or_pin =
+ 					pin_get_name(pctldev, grp->pins[i]);
+-			new_map[i].data.configs.configs = &grp->configs[i];
+-			new_map[i].data.configs.num_configs = 1;
++			new_map[map_pos].data.configs.configs = &grp->configs[i];
++			new_map[map_pos++].data.configs.num_configs = 1;
+ 		}
+ 	}
+ 
+-- 
+1.7.11
