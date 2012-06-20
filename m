@@ -1,29 +1,178 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 20 Jun 2012 13:07:04 +0800
-Subject: [PATCH 1/1] pinctrl: pinctrl-mxs: fix a compiling error
-In-Reply-To: <20120620052312.GA1568@S2100-06.ap.freescale.net>
-References: <1340167717-13082-1-git-send-email-b29396@freescale.com>
- <20120620052312.GA1568@S2100-06.ap.freescale.net>
-Message-ID: <20120620050703.GF10387@shlinux2.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 20 Jun 2012 14:15:32 +0900
+Subject: [PATCH] ARM: remove unused SPI clock headers
+In-Reply-To: <1339616647.30984.174.camel@x61.thuisdomein>
+References: <1339616647.30984.174.camel@x61.thuisdomein>
+Message-ID: <029101cd4ea3$b744fd40$25cef7c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:23:15PM +0800, Shawn Guo wrote:
-> On Wed, Jun 20, 2012 at 12:48:37PM +0800, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > The compiling error is:
-> > drivers/pinctrl/pinctrl-mxs.c: In function 'mxs_dt_node_to_map':
-> > drivers/pinctrl/pinctrl-mxs.c:140: error: implicit declaration of function 'free'
-> > drivers/pinctrl/pinctrl-mxs.c:140: warning: incompatible implicit declaration of built-in function 'free'
-> > It should be kfree.
-> > 
+Paul Bolle wrote:
 > 
-> Already fixed by Fabio.
+> Commit 875a59374cd10200ac24f03877ccd8f73af590cc ("ARM: SAMSUNG:
+> Consolidation of SPI platform devices to plat-samsung") deleted all
+> (four) files that included one of the "spi-clocks.h" headers. It seems
+> it was just an oversight to not remove those headers too. They can
+> safely be removed now.
 > 
-> http://git.kernel.org/?p=linux/kernel/git/linusw/linux-pinctrl.git;a=commit;h=14e1e9f5cadb7cff3a2846c27cc1b9c8f207ee18
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> 0) Only tested by using various git commands on the (history of the)
+> tree.
 > 
-Sorry, missed it.
+> 1) The history of arch/arm/mach-exynos/include/mach/spi-clocks.h
+> actually differs from the history of the other four headers. It got
+> added by commit 74ac23a3e4962bf4f935a5579ae08754d21f9d5a ("ARM: EXYNOS:
+> Modified files for SPI consolidation work"). That commit actually got
+> added (very shortly) after commit
+> 875a59374cd10200ac24f03877ccd8f73af590cc removed all files that included
+> spi-clocks.h.
+> 
+>  arch/arm/mach-exynos/include/mach/spi-clocks.h  |   16 ----------------
+>  arch/arm/mach-s3c64xx/include/mach/spi-clocks.h |   18 ------------------
+>  arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 -------------------
+> -
+>  arch/arm/mach-s5pc100/include/mach/spi-clocks.h |   18 ------------------
+>  arch/arm/mach-s5pv210/include/mach/spi-clocks.h |   17 -----------------
+>  5 files changed, 0 insertions(+), 89 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/spi-clocks.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
+>  delete mode 100644 arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+>  delete mode 100644 arch/arm/mach-s5pc100/include/mach/spi-clocks.h
+>  delete mode 100644 arch/arm/mach-s5pv210/include/mach/spi-clocks.h
+> 
+> diff --git a/arch/arm/mach-exynos/include/mach/spi-clocks.h
+> b/arch/arm/mach-exynos/include/mach/spi-clocks.h
+> deleted file mode 100644
+> index c71a5fb..0000000
+> --- a/arch/arm/mach-exynos/include/mach/spi-clocks.h
+> +++ /dev/null
+> @@ -1,16 +0,0 @@
+> -/* linux/arch/arm/mach-exynos4/include/mach/spi-clocks.h
+> - *
+> - * Copyright (C) 2011 Samsung Electronics Co. Ltd.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef __ASM_ARCH_SPI_CLKS_H
+> -#define __ASM_ARCH_SPI_CLKS_H __FILE__
+> -
+> -/* Must source from SCLK_SPI */
+> -#define EXYNOS_SPI_SRCCLK_SCLK		0
+> -
+> -#endif /* __ASM_ARCH_SPI_CLKS_H */
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
+> b/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
+> deleted file mode 100644
+> index 9d0c43b..0000000
+> --- a/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
+> +++ /dev/null
+> @@ -1,18 +0,0 @@
+> -/* linux/arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
+> - *
+> - * Copyright (C) 2009 Samsung Electronics Ltd.
+> - *	Jaswinder Singh <jassi.brar@samsung.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef __S3C64XX_PLAT_SPI_CLKS_H
+> -#define __S3C64XX_PLAT_SPI_CLKS_H __FILE__
+> -
+> -#define S3C64XX_SPI_SRCCLK_PCLK		0
+> -#define S3C64XX_SPI_SRCCLK_SPIBUS	1
+> -#define S3C64XX_SPI_SRCCLK_48M		2
+> -
+> -#endif /* __S3C64XX_PLAT_SPI_CLKS_H */
+> diff --git a/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+> b/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+> deleted file mode 100644
+> index 170a20a..0000000
+> --- a/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+> +++ /dev/null
+> @@ -1,20 +0,0 @@
+> -/* linux/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+> - *
+> - * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> - *		http://www.samsung.com
+> - *
+> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+> - *	Jaswinder Singh <jassi.brar@samsung.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> -*/
+> -
+> -#ifndef __ASM_ARCH_SPI_CLKS_H
+> -#define __ASM_ARCH_SPI_CLKS_H __FILE__
+> -
+> -#define S5P64X0_SPI_SRCCLK_PCLK		0
+> -#define S5P64X0_SPI_SRCCLK_SCLK		1
+> -
+> -#endif /* __ASM_ARCH_SPI_CLKS_H */
+> diff --git a/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
+> b/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
+> deleted file mode 100644
+> index 65e4263..0000000
+> --- a/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
+> +++ /dev/null
+> @@ -1,18 +0,0 @@
+> -/* linux/arch/arm/mach-s5pc100/include/mach/spi-clocks.h
+> - *
+> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+> - *	Jaswinder Singh <jassi.brar@samsung.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef __S5PC100_PLAT_SPI_CLKS_H
+> -#define __S5PC100_PLAT_SPI_CLKS_H __FILE__
+> -
+> -#define S5PC100_SPI_SRCCLK_PCLK		0
+> -#define S5PC100_SPI_SRCCLK_48M		1
+> -#define S5PC100_SPI_SRCCLK_SPIBUS	2
+> -
+> -#endif /* __S5PC100_PLAT_SPI_CLKS_H */
+> diff --git a/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
+> b/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
+> deleted file mode 100644
+> index 02acded..0000000
+> --- a/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
+> +++ /dev/null
+> @@ -1,17 +0,0 @@
+> -/* linux/arch/arm/mach-s5pv210/include/mach/spi-clocks.h
+> - *
+> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+> - *	Jaswinder Singh <jassi.brar@samsung.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef __S5PV210_PLAT_SPI_CLKS_H
+> -#define __S5PV210_PLAT_SPI_CLKS_H __FILE__
+> -
+> -#define S5PV210_SPI_SRCCLK_PCLK		0
+> -#define S5PV210_SPI_SRCCLK_SCLK		1
+> -
+> -#endif /* __S5PV210_PLAT_SPI_CLKS_H */
+> --
+> 1.7.7.6
 
-Regards
-Dong Aisheng
+Yes, looks ok to me and will apply this into cleanup branch.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
