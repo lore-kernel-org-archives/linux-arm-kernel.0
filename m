@@ -1,50 +1,97 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 Jun 2012 13:40:17 +0800
-Subject: [RFC PATCH 1/1] ARM: imx: enable SPARSE_IRQ for imx
-In-Reply-To: <20120620022313.GE10387@shlinux2.ap.freescale.net>
-References: <20120619130145.GD10387@shlinux2.ap.freescale.net>
- <1340111993-6676-1-git-send-email-b29396@freescale.com>
- <20120619140613.GH21951@S2101-09.ap.freescale.net>
- <20120620022313.GE10387@shlinux2.ap.freescale.net>
-Message-ID: <20120620054015.GB1568@S2100-06.ap.freescale.net>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Wed, 20 Jun 2012 13:28:46 +0800
+Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <4FD98BD0.7090901@windriver.com>
+References: <zumeng.chen@gmail.com>
+ <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
+ <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
+ <4FD96CBF.5040106@windriver.com>
+ <79CD15C6BA57404B839C016229A409A83EA4FC98@DBDE01.ent.ti.com>
+ <4FD98BD0.7090901@windriver.com>
+Message-ID: <4FE15F8E.4000008@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 10:23:15AM +0800, Dong Aisheng wrote:
-> I did see what you said, but you did not go with reasons and that was not so
-> convinced to me
-> Can you explain more why you choose linux virt irq and how about the real exist
-> potential issues i raised before?
-> 
-It's not my choice.  Instead, this is how struct resource defined in
-Linux.  What more reasons do you need to understand that?
+? 2012?06?14? 14:59, Zumeng Chen ??:
+> ? 2012?06?14? 14:31, Hiremath, Vaibhav ??:
+>> On Thu, Jun 14, 2012 at 10:16:55, Zumeng Chen wrote:
+>>> ? 2012?06?13? 20:18, Hiremath, Vaibhav ??:
+>>>> On Wed, Jun 13, 2012 at 07:14:10, Zumeng Chen wrote:
+>>>>> From: Zumeng Chen<zumeng.chen@windriver.com>
+>>>>>
+>>>>> If we don't set proper debouce time for ads7846, then there are
+>>>>> flooded interrupt counters of ads7846 responding to one time
+>>>>> touch on screen, so the driver couldn't work well.
+>>>>>
+>>>>> And since most OMAP3 series boards pass NULL pointer of board_pdata
+>>>>> to omap_ads7846_init, so it's more proper to set it in driver level
+>>>>> after having gpio_request done.
+>>>>>
+>>>>> This patch has been validated on 3530evm.
+>>>>>
+>>>>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
+>>>>> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
+>>>>> ---
+>>>>>   drivers/input/touchscreen/ads7846.c |    4 ++++
+>>>>>   1 files changed, 4 insertions(+), 0 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+>>>>> index f02028e..459ff29 100644
+>>>>> --- a/drivers/input/touchscreen/ads7846.c
+>>>>> +++ b/drivers/input/touchscreen/ads7846.c
+>>>>> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+>>>>>   		}
+>>>>>
+>>>>>   		ts->gpio_pendown = pdata->gpio_pendown;
+>>>>> +#ifdef CONFIG_ARCH_OMAP3
+>>>>> +		/* 310 means about 10 microsecond for omap3 */
+>>>>> +		gpio_set_debounce(pdata->gpio_pendown, 310);
+>>>>> +#endif
+>>>>>
+>>>> Zumeng,
+>>>>
+>>>> With my sign-off you are changing the original code, that too
+>>>> without my sign-off and ack.
+>>>> I wouldn't mind you to submit patches from my tree, but the expectation is
+>>>> if you are changing the original code, it should be under your sign-off.
+>>> Thanks, good to learn. I'll remove in next time.
+>>>> Coming to the patch, #ifdef in driver is not recommended, and this 10msec
+>>>> delay is specific to OMAP GPIO and driver should not be aware of this,
+>>>> that's where you will find the original patch handling it in board file.
+>>> According to the git blame of the board-omap3evm.c I think
+>>> 96974a24 did a good thing to all the related codes for omap3
+>>> boards. So I think we can call board and driver as BSP level :-)
+>>>
+>>> If #ifdef in driver can save many codes, I guess it's deserved.
+>>>
+>> No, not really.
+>>
+>> In the same commit, the debounce time is already handled as an argument to 
+>> the function omap_ads7846_init(), and that?s the way it should be.
+> That means you'd like to implement the same get_pendown_state for every
+> omap3 board? Currently, board_pdata is NULL.
+>
+> And actually, the reason why I agree 96974a24 is that get_pendown_state
+> for all omap3 boards is the common chip level gpio operations. so I think
+> we should set debounce for them in one common point.
+>
+> But since Igor and you don't like them, I have created and tested the
+> attachment
+> patch, and I'd like Mike to check if convenience too
+> But obviously there are more codes than mine before :-)
+Hi Mike,
 
-I do not take the thing you raised as issues, because in the end all
-these static definitions will be removed after we move over to device
-tree.
+I'll send V3 with the change on the attachment to you for 5/5,
+if you happen to get it, it's high appreciated to review it.
 
-> Hmm, it's not driver code.
-> And i did see a lot of such code in mach-specific file.
-
-That does not mean you are encouraged to add more.  We are trying to
-remove them.
-
-> If wrong, any other better way to distinguish the different SoCs?
-> 
-There are certainly better way, since we have soc specific
-initialization to do all the soc specific setup.  That said, we do
-not have to necessarily use all those ugly cpu_is_xxx and #ifdef.
-
-> That is a way, but i would prefer to do it in mach-specific code first
-
-No.  Do not make imx special on this.  We would like to use resource
-definition in the way how it's defined and how everyone else use it.
-
-> since i'm not sure if other people will also like that.
-
-No one (except yourself) likes it.  As I said, we are not supposed to
-manipulate resource definition this way.
-
--- 
 Regards,
-Shawn
+Zumeng
+>
+> Regards,
+> Zumeng
+>> So no need for #ifdefs in driver...
+>>
+>> Thanks,
+>> Vaibhav
