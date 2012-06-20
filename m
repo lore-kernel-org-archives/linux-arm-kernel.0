@@ -1,106 +1,369 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Jun 2012 13:56:39 +0100
-Subject: [PATCH 03/15] mfd: Make MFD core code Device Tree and IRQ domain aware
+Date: Wed, 20 Jun 2012 13:56:40 +0100
+Subject: [PATCH 04/15] mfd: ab8500: Register devices using the newly DT:ed MFD
+ API
 In-Reply-To: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
 References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1340197011-5435-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1340197011-5435-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During Device Tree enablement of the ab8500 and db8500-prcmu drivers,
-a decision was made to omit registration through the MFD API and use
-Device Tree directly. However, because MFD devices have a different
-address space and the ab8500 and db8500 both use I2C to communicate,
-this causes issues with address translation during execution of
-of_platform_populate(). So the solution is to make the MFD core aware
-of Device Tree and have it assign the correct node pointers instead.
-
-To make this work the MFD core also needs to be awere of IRQ domains,
-as Device Tree insists on IRQ domain compatibility. So, instead of
-providing an irq-base via platform code, in the DT case we simply
-look up the IRQ domain and map to the correct virtual IRQ.
+Now the MFD API is Device Tree aware we can use it for platform
+registration again, even when booting with DT enabled. To aid in
+Device Node pointer allocation we provide each cell with the
+associative compatible string.
 
 Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/mfd-core.c   |   31 +++++++++++++++++++++++++++----
- include/linux/mfd/core.h |    1 +
- 2 files changed, 28 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c |    1 -
+ drivers/input/misc/ab8500-ponkey.c |    6 ----
+ drivers/mfd/ab8500-core.c          |   64 ++++++++++++++++++++++--------------
+ drivers/mfd/ab8500-debugfs.c       |    6 ----
+ drivers/mfd/ab8500-gpadc.c         |    6 ----
+ drivers/mfd/ab8500-sysctrl.c       |    6 ----
+ drivers/misc/ab8500-pwm.c          |    6 ----
+ drivers/regulator/ab8500.c         |    6 ----
+ drivers/rtc/rtc-ab8500.c           |    7 ----
+ drivers/usb/otg/ab8500-usb.c       |    6 ----
+ 10 files changed, 39 insertions(+), 75 deletions(-)
 
-diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-index ffc3d48..effc4f5 100644
---- a/drivers/mfd/mfd-core.c
-+++ b/drivers/mfd/mfd-core.c
-@@ -18,6 +18,8 @@
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of.h>
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 1087176..7e5b161 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -822,7 +822,6 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
+ 	{ .compatible = "stericsson,db8500-prcmu", },
+ 	{ .compatible = "stericsson,db8500-prcmu-regulator", },
+ 	{ .compatible = "stericsson,ab8500", },
+-	{ .compatible = "stericsson,ab8500-regulator", },
+ 	{ .compatible = "simple-bus"},
+ 	{ },
+ };
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index 33e5b1e..5ceb23e 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -132,16 +132,10 @@ static int __devexit ab8500_ponkey_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- int mfd_cell_enable(struct platform_device *pdev)
- {
-@@ -76,6 +78,8 @@ static int mfd_add_device(struct device *parent, int id,
- {
- 	struct resource *res;
- 	struct platform_device *pdev;
-+	struct device_node *np = NULL;
-+	struct irq_domain *domain = NULL;
- 	int ret = -ENOMEM;
- 	int r;
+-static const struct of_device_id ab8500_ponkey_match[] = {
+-	{ .compatible = "stericsson,ab8500-ponkey", },
+-	{}
+-};
+-
+ static struct platform_driver ab8500_ponkey_driver = {
+ 	.driver		= {
+ 		.name	= "ab8500-poweron-key",
+ 		.owner	= THIS_MODULE,
+-		.of_match_table = ab8500_ponkey_match,
+ 	},
+ 	.probe		= ab8500_ponkey_probe,
+ 	.remove		= __devexit_p(ab8500_ponkey_remove),
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 8de3b65..79d7672 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -970,54 +970,69 @@ static struct mfd_cell __devinitdata abx500_common_devs[] = {
+ #ifdef CONFIG_DEBUG_FS
+ 	{
+ 		.name = "ab8500-debug",
++		.of_compatible = "stericsson,ab8500-debug",
+ 		.num_resources = ARRAY_SIZE(ab8500_debug_resources),
+ 		.resources = ab8500_debug_resources,
+ 	},
+ #endif
+ 	{
+ 		.name = "ab8500-sysctrl",
++		.of_compatible = "stericsson,ab8500-sysctrl",
+ 	},
+ 	{
+ 		.name = "ab8500-regulator",
++		.of_compatible = "stericsson,ab8500-regulator",
+ 	},
+ 	{
+ 		.name = "ab8500-gpadc",
++		.of_compatible = "stericsson,ab8500-gpadc",
+ 		.num_resources = ARRAY_SIZE(ab8500_gpadc_resources),
+ 		.resources = ab8500_gpadc_resources,
+ 	},
+ 	{
+ 		.name = "ab8500-rtc",
++		.of_compatible = "stericsson,ab8500-rtc",
+ 		.num_resources = ARRAY_SIZE(ab8500_rtc_resources),
+ 		.resources = ab8500_rtc_resources,
+ 	},
+ 	{
+ 		.name = "ab8500-acc-det",
++		.of_compatible = "stericsson,ab8500-acc-det",
+ 		.num_resources = ARRAY_SIZE(ab8500_av_acc_detect_resources),
+ 		.resources = ab8500_av_acc_detect_resources,
+ 	},
+ 	{
+ 		.name = "ab8500-poweron-key",
++		.of_compatible = "stericsson,ab8500-poweron-key",
+ 		.num_resources = ARRAY_SIZE(ab8500_poweronkey_db_resources),
+ 		.resources = ab8500_poweronkey_db_resources,
+ 	},
+ 	{
+ 		.name = "ab8500-pwm",
++		.of_compatible = "stericsson,ab8500-pwm",
+ 		.id = 1,
+ 	},
+ 	{
+ 		.name = "ab8500-pwm",
++		.of_compatible = "stericsson,ab8500-pwm",
+ 		.id = 2,
+ 	},
+ 	{
+ 		.name = "ab8500-pwm",
++		.of_compatible = "stericsson,ab8500-pwm",
+ 		.id = 3,
+ 	},
+-	{ .name = "ab8500-leds", },
++	{
++		.name = "ab8500-leds",
++		.of_compatible = "stericsson,ab8500-leds",
++	},
+ 	{
+ 		.name = "ab8500-denc",
++		.of_compatible = "stericsson,ab8500-denc",
+ 	},
+ 	{
+ 		.name = "ab8500-temp",
++		.of_compatible = "stericsson,ab8500-temp",
+ 		.num_resources = ARRAY_SIZE(ab8500_temp_resources),
+ 		.resources = ab8500_temp_resources,
+ 	},
+@@ -1049,11 +1064,13 @@ static struct mfd_cell __devinitdata ab8500_bm_devs[] = {
+ static struct mfd_cell __devinitdata ab8500_devs[] = {
+ 	{
+ 		.name = "ab8500-gpio",
++		.of_compatible = "stericsson,ab8500-gpio",
+ 		.num_resources = ARRAY_SIZE(ab8500_gpio_resources),
+ 		.resources = ab8500_gpio_resources,
+ 	},
+ 	{
+ 		.name = "ab8500-usb",
++		.of_compatible = "stericsson,ab8500-usb",
+ 		.num_resources = ARRAY_SIZE(ab8500_usb_resources),
+ 		.resources = ab8500_usb_resources,
+ 	},
+@@ -1388,32 +1405,29 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
+ 			goto out_freeoldmask;
+ 	}
  
-@@ -89,6 +93,18 @@ static int mfd_add_device(struct device *parent, int id,
+-	if (!np) {
+-		ret = mfd_add_devices(ab8500->dev, 0, abx500_common_devs,
+-				ARRAY_SIZE(abx500_common_devs), NULL,
+-				ab8500->irq_base);
++	ret = mfd_add_devices(ab8500->dev, 0, abx500_common_devs,
++			ARRAY_SIZE(abx500_common_devs), NULL,
++			ab8500->irq_base);
++	if (ret)
++		goto out_freeirq;
  
- 	pdev->dev.parent = parent;
+-		if (ret)
+-			goto out_freeirq;
+-
+-		if (is_ab9540(ab8500))
+-			ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
+-					ARRAY_SIZE(ab9540_devs), NULL,
+-					ab8500->irq_base);
+-		else
+-			ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
+-					ARRAY_SIZE(ab8500_devs), NULL,
+-					ab8500->irq_base);
+-		if (ret)
+-			goto out_freeirq;
++	if (is_ab9540(ab8500))
++		ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
++				ARRAY_SIZE(ab9540_devs), NULL,
++				ab8500->irq_base);
++	else
++		ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
++				ARRAY_SIZE(ab8500_devs), NULL,
++				ab8500->irq_base);
++	if (ret)
++		goto out_freeirq;
  
-+	if (parent->of_node) {
-+		if (cell->of_compatible) {
-+			for_each_child_of_node(parent->of_node, np) {
-+				if (of_device_is_compatible(np, cell->of_compatible)) {
-+					pdev->dev.of_node = np;
-+					domain = irq_find_host(parent->of_node);
-+					break;
-+				}
-+			}
-+		}
-+	}
-+
- 	if (cell->pdata_size) {
- 		ret = platform_device_add_data(pdev,
- 					cell->platform_data, cell->pdata_size);
-@@ -112,10 +128,17 @@ static int mfd_add_device(struct device *parent, int id,
- 			res[r].end = mem_base->start +
- 				cell->resources[r].end;
- 		} else if (cell->resources[r].flags & IORESOURCE_IRQ) {
--			res[r].start = irq_base +
--				cell->resources[r].start;
--			res[r].end   = irq_base +
--				cell->resources[r].end;
-+			if (domain) {
-+				/* Unable to create mappings for IRQ ranges. */
-+				WARN_ON(cell->resources[r].start != cell->resources[r].end);
-+				res[r].start = res[r].end = irq_create_mapping(
-+					domain, cell->resources[r].start);
-+			} else {
-+				res[r].start = irq_base +
-+					cell->resources[r].start;
-+				res[r].end   = irq_base +
-+					cell->resources[r].end;
-+			}
- 		} else {
- 			res[r].parent = cell->resources[r].parent;
- 			res[r].start = cell->resources[r].start;
-diff --git a/include/linux/mfd/core.h b/include/linux/mfd/core.h
-index 4e76163..99b7eb1 100644
---- a/include/linux/mfd/core.h
-+++ b/include/linux/mfd/core.h
-@@ -36,6 +36,7 @@ struct mfd_cell {
- 	/* platform data passed to the sub devices drivers */
- 	void			*platform_data;
- 	size_t			pdata_size;
-+	const char		*of_compatible;
+-		if (is_ab9540(ab8500) || is_ab8505(ab8500))
+-			ret = mfd_add_devices(ab8500->dev, 0, ab9540_ab8505_devs,
+-					ARRAY_SIZE(ab9540_ab8505_devs), NULL,
+-					ab8500->irq_base);
+-		if (ret)
+-			goto out_freeirq;
+-	}
++	if (is_ab9540(ab8500) || is_ab8505(ab8500))
++		ret = mfd_add_devices(ab8500->dev, 0, ab9540_ab8505_devs,
++				ARRAY_SIZE(ab9540_ab8505_devs), NULL,
++				ab8500->irq_base);
++	if (ret)
++		goto out_freeirq;
  
- 	/*
- 	 * These resources can be specified relative to the parent device.
+ 	if (!no_bm) {
+ 		/* Add battery management devices */
+diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+index 361de52..c4cb806 100644
+--- a/drivers/mfd/ab8500-debugfs.c
++++ b/drivers/mfd/ab8500-debugfs.c
+@@ -608,16 +608,10 @@ static int __devexit ab8500_debug_remove(struct platform_device *plf)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_debug_match[] = {
+-        { .compatible = "stericsson,ab8500-debug", },
+-        {}
+-};
+-
+ static struct platform_driver ab8500_debug_driver = {
+ 	.driver = {
+ 		.name = "ab8500-debug",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ab8500_debug_match,
+ 	},
+ 	.probe  = ab8500_debug_probe,
+ 	.remove = __devexit_p(ab8500_debug_remove)
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index b6cbc3ba..866f959 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -649,18 +649,12 @@ static int __devexit ab8500_gpadc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_gpadc_match[] = {
+-	{ .compatible = "stericsson,ab8500-gpadc", },
+-	{}
+-};
+-
+ static struct platform_driver ab8500_gpadc_driver = {
+ 	.probe = ab8500_gpadc_probe,
+ 	.remove = __devexit_p(ab8500_gpadc_remove),
+ 	.driver = {
+ 		.name = "ab8500-gpadc",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ab8500_gpadc_match,
+ 	},
+ };
+ 
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index 5a3e51c..c28d4eb 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -61,16 +61,10 @@ static int __devexit ab8500_sysctrl_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_sysctrl_match[] = {
+-	{ .compatible = "stericsson,ab8500-sysctrl", },
+-	{}
+-};
+-
+ static struct platform_driver ab8500_sysctrl_driver = {
+ 	.driver = {
+ 		.name = "ab8500-sysctrl",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ab8500_sysctrl_match,
+ 	},
+ 	.probe = ab8500_sysctrl_probe,
+ 	.remove = __devexit_p(ab8500_sysctrl_remove),
+diff --git a/drivers/misc/ab8500-pwm.c b/drivers/misc/ab8500-pwm.c
+index 042a8fe..d7a9aa1 100644
+--- a/drivers/misc/ab8500-pwm.c
++++ b/drivers/misc/ab8500-pwm.c
+@@ -142,16 +142,10 @@ static int __devexit ab8500_pwm_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_pwm_match[] = {
+-	{ .compatible = "stericsson,ab8500-pwm", },
+-	{}
+-};
+-
+ static struct platform_driver ab8500_pwm_driver = {
+ 	.driver = {
+ 		.name = "ab8500-pwm",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ab8500_pwm_match,
+ 	},
+ 	.probe = ab8500_pwm_probe,
+ 	.remove = __devexit_p(ab8500_pwm_remove),
+diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
+index a739f5c..6745bd2 100644
+--- a/drivers/regulator/ab8500.c
++++ b/drivers/regulator/ab8500.c
+@@ -906,18 +906,12 @@ static __devexit int ab8500_regulator_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_regulator_match[] = {
+-        { .compatible = "stericsson,ab8500-regulator", },
+-        {}
+-};
+-
+ static struct platform_driver ab8500_regulator_driver = {
+ 	.probe = ab8500_regulator_probe,
+ 	.remove = __devexit_p(ab8500_regulator_remove),
+ 	.driver         = {
+ 		.name   = "ab8500-regulator",
+ 		.owner  = THIS_MODULE,
+-		.of_match_table = ab8500_regulator_match,
+ 	},
+ };
+ 
+diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
+index 116c23d..3046af5 100644
+--- a/drivers/rtc/rtc-ab8500.c
++++ b/drivers/rtc/rtc-ab8500.c
+@@ -17,7 +17,6 @@
+ #include <linux/mfd/abx500.h>
+ #include <linux/mfd/abx500/ab8500.h>
+ #include <linux/delay.h>
+-#include <linux/of.h>
+ 
+ #define AB8500_RTC_SOFF_STAT_REG	0x00
+ #define AB8500_RTC_CC_CONF_REG		0x01
+@@ -454,16 +453,10 @@ static int __devexit ab8500_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_rtc_match[] = {
+-        { .compatible = "stericsson,ab8500-rtc", },
+-        {}
+-};
+-
+ static struct platform_driver ab8500_rtc_driver = {
+ 	.driver = {
+ 		.name = "ab8500-rtc",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ab8500_rtc_match,
+ 	},
+ 	.probe	= ab8500_rtc_probe,
+ 	.remove = __devexit_p(ab8500_rtc_remove),
+diff --git a/drivers/usb/otg/ab8500-usb.c b/drivers/usb/otg/ab8500-usb.c
+index 9799ac6..a84af67 100644
+--- a/drivers/usb/otg/ab8500-usb.c
++++ b/drivers/usb/otg/ab8500-usb.c
+@@ -569,18 +569,12 @@ static int __devexit ab8500_usb_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_usb_match[] = {
+-	{ .compatible = "stericsson,ab8500-usb", },
+-	{},
+-};
+-
+ static struct platform_driver ab8500_usb_driver = {
+ 	.probe		= ab8500_usb_probe,
+ 	.remove		= __devexit_p(ab8500_usb_remove),
+ 	.driver		= {
+ 		.name	= "ab8500-usb",
+ 		.owner	= THIS_MODULE,
+-		.of_match_table = ab8500_usb_match,
+ 	},
+ };
+ 
 -- 
 1.7.9.5
