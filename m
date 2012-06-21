@@ -1,27 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 21 Jun 2012 10:27:46 -0400 (EDT)
-Subject: pm runtime and system suspend resume
-In-Reply-To: <CAK9wHMS_P+y+NmvVVrH+nNOb=KPi3rEgJOWEcRcKf3mTkxjDPA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1206211025060.1164-100000@iolanthe.rowland.org>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Thu, 21 Jun 2012 10:32:18 -0400
+Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex
+In-Reply-To: <20120621141156.GA12038@lunn.ch>
+References: <20120621141156.GA12038@lunn.ch>
+Message-ID: <CAMW5UfbhxbsY0GsB7TQ_b7hjnSRga27-7Xbop8h2Xn7wjJtgUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jun 2012, chao xie wrote:
+On Thu, Jun 21, 2012 at 10:11 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> Without the clock patch:
+>> - No NAND definitions anywhere - doesn't complete a boot
+>> - NAND defined and initialized in board-goflexnet.c - complete boot
+>> with NAND accessible
+>> - NAND defined via DT - doesn't complete a boot, stops at same point
+>> as with no NAND definitions
+>
+> I'm surprised about the last. Is MTD finding the NAND device and
+> creating the partitions and devices?
 
-> I check the code, __device_suspend will invoke dev->pm_domain->ops
-> first if dev->pm_domain is not NULL.
-> Taking "suspend" as esample, i can do the following things in the
-> dev->pm_domain->ops->suspend
-> 1. invoke dev->driver->pm->suspend for suspending the device
-> 2. do what we do in dev->pm_domain->ops->runtime_suspend for
-> suspending the surrounded logic, for example, shutdown the phy or
-> clocks.
-> So is above implementation fine?
+According to the kernel dmesg output during init it sees it and lists
+the partitions and their associated devices correctly.
 
-Yes, that sounds like it will work.  Watch out for the case where your 
-device is already runtime-suspended when a system suspend occurs.
+>> To move forward, do I assume the clock patch is going to be pulled
+>> into mainline and submit my patch as depending on it, with NAND
+>> defined in the DT, or for now submit with it defined and initialized
+>> via the board file until the DT issue can be resolved?
+>
+> The patch has been accepted and should appear in the next -rc.
+>
+> ? ?Andrew
 
-Have you read section 6 in Documentation/power/runtime_pm.txt?  It is 
-related to your question.
+I'll make sure my patch is clean then and submit with NAND defined via DT.
 
-Alan Stern
+Josh C
