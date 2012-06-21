@@ -1,69 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jun 2012 10:28:14 +0900
-Subject: [PATCH] ARM: EXYNOS: Clear SYS_WDTRESET bit to use watchdog reset
-Message-ID: <038801cd4f4d$20942bf0$61bc83d0$%kim@samsung.com>
+From: xiechao.linux@gmail.com (chao xie)
+Date: Thu, 21 Jun 2012 09:31:47 +0800
+Subject: pm runtime and system suspend resume
+In-Reply-To: <Pine.LNX.4.44L0.1206201031590.1804-100000@iolanthe.rowland.org>
+References: <CAK9wHMQ6kJX06ZRjk6w_bt2HDnu=7dQEKde-Cxu8t4QbgLyTCA@mail.gmail.com>
+ <Pine.LNX.4.44L0.1206201031590.1804-100000@iolanthe.rowland.org>
+Message-ID: <CAK9wHMS_P+y+NmvVVrH+nNOb=KPi3rEgJOWEcRcKf3mTkxjDPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghwan Choi <jhbird.choi@samsung.com>
+2012/6/20 Alan Stern <stern@rowland.harvard.edu>:
+> On Wed, 20 Jun 2012, chao xie wrote:
+>
+>> >> It seems work well, but i have question about the suspend/resume of
+>> >> device. When the whole system will go to deep idle, and it will
+>> >> suspend the devices. for the function do device suspend
+>> >> __device_suspend,
+>> >
+>> > What source file is that function in?
+>> >
+>>
+>> The function is located at drivers/base/power/main.c
+>>
+>> >> ?it will call pm_runtime_get_noresume(dev). As i
+>> >> think it will make the device not do runtime suspend any more. Is that
+>> >> correct?
+>> >
+>> > It sounds wrong. ?Why would a suspend routine do that?
+>> >
+>>
+>> I do knot know, but the code is there.
+>
+> Okay, now I understand your question. ?The problem is that system
+> suspend uses a separate mechanism from runtime suspend, and we don't
+> want the two things to happen at the same time. ?Therefore
+> __device_suspend does a get_noresume in order to prevent runtime
+> suspend from occurring in the middle of a system suspend.
+>
+>> >> There is the question, how device driver handle the logic surrounds
+>> >> it? I want to add pm_runtime_put_sync in dev->driver->pm->suspend
+>> >> function, and pm_runtime_get_sync in dev->driver->pm->resume.
+>> >
+>> > You must not do that. ?If you do, your driver will hang.
+>> >
+>>
+>> why it will hang?
+>
+> Sorry, I misunderstood your question. ?It will not hang. ?But why do
+> you want to add those calls?
+>
+>> >> Because
+>> >> __device_suspend increase the usage_count, pm_runtime_put_sync will
+>> >> not do real work.
+>> >> So is that right that i directly call pm_runtime_suspend in
+>> >> dev->driver->pm->suspend and pm_runtime_resume in
+>> >> dev->driver->pm->resume?
+>
+> No, don't call pm_runtime_suspend. ?Just call your driver's
+> runtime_suspend routine directly. ?Same for resume.
+>
+>> Finally the real question is who will deal with the dev->pm_domain?
+>> when system go to sleep.
+>
+> The __device_suspend routine in drivers/base/main.c uses
+> dev->pm_domain.
+>
 
-When SYS_WDTRESET is set, watchdog timer reset request
-is ignored by power management unit.
+I check the code, __device_suspend will invoke dev->pm_domain->ops
+first if dev->pm_domain is not NULL.
+Taking "suspend" as esample, i can do the following things in the
+dev->pm_domain->ops->suspend
+1. invoke dev->driver->pm->suspend for suspending the device
+2. do what we do in dev->pm_domain->ops->runtime_suspend for
+suspending the surrounded logic, for example, shutdown the phy or
+clocks.
+So is above implementation fine?
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos/include/mach/regs-pmu.h |    5 +++++
- arch/arm/mach-exynos/pmu.c                   |   14 ++++++++++++++
- 2 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index 43a99e6..d4e392b 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -232,6 +232,11 @@
- 
- #define EXYNOS5_USB_CFG						S5P_PMUREG(0x0230)
- 
-+#define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
-+#define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
-+
-+#define EXYNOS5_SYS_WDTRESET					(1 << 20)
-+
- #define EXYNOS5_ARM_CORE0_SYS_PWR_REG				S5P_PMUREG(0x1000)
- #define EXYNOS5_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG		S5P_PMUREG(0x1004)
- #define EXYNOS5_DIS_IRQ_ARM_CORE0_CENTRAL_SYS_PWR_REG		S5P_PMUREG(0x1008)
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 4aacb66..bb4c522 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -390,6 +390,8 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 
- static int __init exynos_pmu_init(void)
- {
-+	unsigned int value;
-+
- 	exynos_pmu_config = exynos4210_pmu_config;
- 
- 	if (soc_is_exynos4210()) {
-@@ -399,6 +401,18 @@ static int __init exynos_pmu_init(void)
- 		exynos_pmu_config = exynos4x12_pmu_config;
- 		pr_info("EXYNOS4x12 PMU Initialize\n");
- 	} else if (soc_is_exynos5250()) {
-+		/*
-+		 * When SYS_WDTRESET is set, watchdog timer reset request
-+		 * is ignored by power management unit.
-+		 */
-+		value = __raw_readl(EXYNOS5_AUTO_WDTRESET_DISABLE);
-+		value &= ~EXYNOS5_SYS_WDTRESET;
-+		__raw_writel(value, EXYNOS5_AUTO_WDTRESET_DISABLE);
-+
-+		value = __raw_readl(EXYNOS5_MASK_WDTRESET_REQUEST);
-+		value &= ~EXYNOS5_SYS_WDTRESET;
-+		__raw_writel(value, EXYNOS5_MASK_WDTRESET_REQUEST);
-+
- 		exynos_pmu_config = exynos5250_pmu_config;
- 		pr_info("EXYNOS5250 PMU Initialize\n");
- 	} else {
--- 
-1.7.1
+>> The driver will use pm_runtime_get/put to deal with dev->pm_domain
+>> when it want to work or is in idle. Then when system go to sleep, the
+>> driver need care about dev->pm_domain too.
+>> Usally, dev->pm_domain is a easy way to handle the difference SOCs
+>> with same device IP. For example, USB. Many vendor may have same usb
+>> IP but difference phy and clock configuration. putting these stuff
+>> into dev->pm_domain can make driver be shared by different SOCs.
+>
+> Alan Stern
+>
