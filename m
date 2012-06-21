@@ -1,145 +1,47 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 21 Jun 2012 10:56:57 +0200
-Subject: [PATCH] ARM: zImage: Allow DTB command line concatenation with
- ATAG_CMDLINE
-Message-ID: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 21 Jun 2012 11:10:23 +0200
+Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
+In-Reply-To: <20120621085246.GC1582@b20223-02.ap.freescale.net>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+ <4FE2CC37.8010202@pengutronix.de>
+ <20120621085246.GC1582@b20223-02.ap.freescale.net>
+Message-ID: <4FE2E4FF.8030700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the ATAG_CMDLINE provided by the bootloader to be
-concatenated to the bootargs property of the device tree.
+On 06/21/2012 10:52 AM, Richard Zhao wrote:
+> On Thu, Jun 21, 2012 at 09:24:39AM +0200, Marc Kleine-Budde wrote:
+>> On 06/21/2012 08:41 AM, Richard Zhao wrote:
+>>> The work is based on  ci13xxx rework done by Alexander Shishkin.
+>>>
+>>> To let Greg pick up, I also added patches Alex queued that I depends on.
+>>> Patch #1 - #9 : It can also be found at
+>>> http://github.com/virtuoso/linux-ci.git ci
+>>>
+>>> This patch series can also be found at:
+>>> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+>>>
+>>> Status:
+>>>   - this version only support host
+>>>   - usbotg controler works at host role
+>>
+>> I'm interested in usb device support on mx28, what has to be implemented
+>> to get it working?
+> I don't have patch yet, but on the plan.
 
-This is useful to merge static values defined in the device tree with the
-boot loader's (possibly) more dynamic values, such as startup reasons and more.
+What needs to be done? I want to help/implement it.
 
-The bootloader should use the device tree to pass those values to the kernel,
-but that's not always simple (old bootloader or very small one).
-
-The behaviour is the same as the one introduced by Victor Boivie in
-4394c1244249198c6b85093d46935b761b36ae05 by extending the CONFIG_CMDLINE.
-
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- arch/arm/Kconfig                        |   19 +++++++++
- arch/arm/boot/compressed/atags_to_fdt.c |   62 ++++++++++++++++++++++++++++++-
- 2 files changed, 79 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 84449dd..ff4b6e6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1959,6 +1959,25 @@ config ARM_ATAG_DTB_COMPAT
- 	  bootloaders, this option allows zImage to extract the information
- 	  from the ATAG list and store it at run time into the appended DTB.
- 
-+choice
-+	prompt "Kernel command line type" if ARM_ATAG_DTB_COMPAT
-+	default ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
-+
-+config ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
-+	bool "Use bootloader kernel arguments if available"
-+	help
-+	  Uses the command-line options passed by the boot loader instead of
-+	  the device tree bootargs property. If the boot loader doesn't provide
-+	  any, the device tree bootargs property will be used.
-+
-+config ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
-+	bool "Extend with bootloader kernel arguments"
-+	help
-+	  The command-line arguments provided by the boot loader will be
-+	  appended to the the device tree bootargs property.
-+
-+endchoice
-+
- config CMDLINE
- 	string "Default kernel command string"
- 	default ""
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index 797f04b..aabc02a 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -1,6 +1,12 @@
- #include <asm/setup.h>
- #include <libfdt.h>
- 
-+#if defined(CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND)
-+#define do_extend_cmdline 1
-+#else
-+#define do_extend_cmdline 0
-+#endif
-+
- static int node_offset(void *fdt, const char *node_path)
- {
- 	int offset = fdt_path_offset(fdt, node_path);
-@@ -36,6 +42,48 @@ static int setprop_cell(void *fdt, const char *node_path,
- 	return fdt_setprop_cell(fdt, offset, property, val);
- }
- 
-+static const void *getprop(const void *fdt, const char *node_path,
-+			   const char *property, int *len)
-+{
-+	int offset = fdt_path_offset(fdt, node_path);
-+
-+	if (offset == -FDT_ERR_NOTFOUND)
-+		return NULL;
-+
-+	return fdt_getprop(fdt, offset, property, len);
-+}
-+
-+static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
-+{
-+	char cmdline[COMMAND_LINE_SIZE];
-+	const char *fdt_bootargs;
-+	char *ptr = cmdline;
-+	int len = 0;
-+
-+	/* copy the fdt command line into the buffer */
-+	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
-+	if (fdt_bootargs)
-+		if (len < COMMAND_LINE_SIZE) {
-+			memcpy(ptr, fdt_bootargs, len);
-+			/* len is the length of the string
-+			 * including the NULL terminator */
-+			ptr += len - 1;
-+		}
-+
-+	/* and append the ATAG_CMDLINE */
-+	if (fdt_cmdline) {
-+		len = strlen(fdt_cmdline);
-+		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
-+			*ptr++ = ' ';
-+			memcpy(ptr, fdt_cmdline, len);
-+			ptr += len;
-+		}
-+	}
-+	*ptr = '\0';
-+
-+	setprop_string(fdt, "/chosen", "bootargs", cmdline);
-+}
-+
- /*
-  * Convert and fold provided ATAGs into the provided FDT.
-  *
-@@ -72,8 +120,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 
- 	for_each_tag(atag, atag_list) {
- 		if (atag->hdr.tag == ATAG_CMDLINE) {
--			setprop_string(fdt, "/chosen", "bootargs",
--					atag->u.cmdline.cmdline);
-+			/* Append the ATAGS command line to the device tree
-+			 * command line.
-+			 * NB: This means that if the same parameter is set in
-+			 * the device tree and in the tags, the one from the
-+			 * tags will be chosen.
-+			 */
-+			if (do_extend_cmdline)
-+				merge_fdt_bootargs(fdt,
-+						   atag->u.cmdline.cmdline);
-+			else
-+				setprop_string(fdt, "/chosen", "bootargs",
-+					       atag->u.cmdline.cmdline);
- 		} else if (atag->hdr.tag == ATAG_MEM) {
- 			if (memcount >= sizeof(mem_reg_property)/4)
- 				continue;
+Marc
 -- 
-1.7.2.5
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/b4d3e8b3/attachment.sig>
