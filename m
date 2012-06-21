@@ -1,39 +1,30 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 21 Jun 2012 18:10:35 +0800
-Subject: [PATCH] pinctrl: pinctrl-imx: only print debug message when DEBUG is
- defined
-Message-ID: <1340273435-7530-1-git-send-email-b29396@freescale.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 21 Jun 2012 11:15:36 +0100
+Subject: [V2 1/3] regulator: add pre-regulator support for 88pm860x
+In-Reply-To: <1340259538-24239-1-git-send-email-jtzhou@marvell.com>
+References: <1340259538-24239-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20120621101536.GR4037@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Thu, Jun 21, 2012 at 02:18:58PM +0800, Jett.Zhou wrote:
 
-Fix regression for commit 3a86a5f8 (pinctrl: pinctrl-imx: free allocated
-pinctrl_map structure only once and use kernel facilities for IMX_PMX_DUMP)
-introduced in 3.5-rc3.
-With above commit, the debug code will alway be excuted.
-Change to excute it only when DEBUG is defined.
+> +static struct regulator_consumer_supply preg_supply[] = {
+> +	REGULATOR_SUPPLY("preg", NULL),
+> +};
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
-Hopefully it can catch 3.5.
----
- drivers/pinctrl/pinctrl-imx.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+This looks wrong, why is there no dev_name being specified?
 
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index dd6d93a..90c837f 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -474,7 +474,9 @@ static int __devinit imx_pinctrl_parse_groups(struct device_node *np,
- 		grp->configs[j] = config & ~IMX_PAD_SION;
- 	}
- 
-+#ifdef DEBUG
- 	IMX_PMX_DUMP(info, grp->pins, grp->mux_mode, grp->configs, grp->npins);
-+#endif
- 
- 	return 0;
- }
--- 
-1.7.0.4
+> +static struct regulator_init_data preg_init_data = {
+> +	.num_consumer_supplies	= 1,
+> +	.consumer_supplies	= &preg_supply[0],
+> +};
+
+Use ARRAY_SIZE() since it's an array.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/bea6d848/attachment.sig>
