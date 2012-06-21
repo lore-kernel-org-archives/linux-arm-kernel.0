@@ -1,43 +1,39 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 21 Jun 2012 14:41:03 +0800
-Subject: [PATCH v6 02/14] usb: chipidea: drop useless arch-check
+Date: Thu, 21 Jun 2012 14:41:02 +0800
+Subject: [PATCH v6 01/14] usb: chipidea: remove unneeded NULL check
 In-Reply-To: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
 References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340260875-21934-3-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340260875-21934-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-msm glue layer compiles on all arches just
-fine. Let's drop the unnecessary ARCH check
-so we have easier compile tests.
+As reported by Dan Carpenter, there is a NULL check in udc_start() that
+follows a dereference of the pointer that's being checked. However, at
+that point udc pointer shouldn't ever be NULL and if it is, the dereference
+should cause an oops.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/chipidea/Makefile |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/usb/chipidea/udc.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index cc34937..b69900a 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -5,10 +5,12 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 51f9694..cdb9212 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1647,9 +1647,6 @@ static int udc_start(struct ci13xxx *udc)
+ 	struct device *dev = udc->dev;
+ 	int retval = 0;
  
-+# Glue/Bridge layers go here
-+
-+obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
-+
-+# PCI doesn't provide stubs, need to check
- ifneq ($(CONFIG_PCI),)
- 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
- endif
+-	if (!udc)
+-		return -EINVAL;
+-
+ 	spin_lock_init(&udc->lock);
  
--ifneq ($(CONFIG_ARCH_MSM),)
--	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
--endif
+ 	udc->gadget.ops          = &usb_gadget_ops;
 -- 
 1.7.9.5
