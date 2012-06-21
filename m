@@ -1,82 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Jun 2012 16:22:26 -0600
-Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803BE3E73@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
- <4FD8AD42.6010702@gmail.com> <20120613152841.GA23590@richard-laptop>
- <4FD8C4DB.4020908@gmail.com>
- <20120614013343.GD29684@b20223-02.ap.freescale.net>
- <4FE1DE53.4070202@gmail.com> <4FE1EF26.9080401@wwwdotorg.org>
- <F281D0F91ED19E4D8E63A7504E8A649803BE3E73@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <4FE39EA2.8050809@wwwdotorg.org>
+From: snijsure@grid-net.com (Subodh Nijsure)
+Date: Thu, 21 Jun 2012 15:24:25 -0700
+Subject: GPMI NAND on MX28 with DT.with
+Message-ID: <4FE39F19.9090105@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 07:32 PM, Chen Peter-B29397 wrote:
->  
->> I haven't been following the thread, but just noticed it. Very similar
->> things (DT nodes for probed devices) are coming up quite a bit recently,
->> for example:
->>
->> Re: Where to power on the wifi device before loading the driver.
->> http://www.spinics.net/lists/arm-kernel/msg180368.html
->>
->> dt: rfkill-gpio: add bindings documentation
->> http://www.spinics.net/lists/linux-tegra/msg03977.html
->>
->> I wonder if there's any kind of infra-structure or standardized bindings
->> that would be useful here?
-> 
-> Hi Stephen,
-> For your suggestion: 
-> 
-> sdhci at 78000000 {
-> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> 	reg = <0x78000000 0x200>;
-> 	interrupts = <0 14 0x04>;
-> 
-> 	sdio-device {
-> 		reset-gpios = <...>;
-> 		enable-gpios = <...>;
-> 	};
-> };
-> 
-> I have a question, if reset-gpio or enable-gpio is not set, how bus (sd or usb) know
-> it is a sdio device as the wifi is not powered on at the time, it will not response host's
-> command,  the hub at usb bus is the same.
+Has anyone gotten the latest GPMI NAND patches for MX28 with device-tree 
+to work?
 
-That's a good point. We need those properties to be part of the device
-that controls the port/slot/connector, not the thing that plugs into it.
-Having each such binding and driver implement this themselves might not
-be a good idea though. Perhaps we can standardize on a mechanism for
-this; something vaguely like rfkill, but for arbitrary types of devices
-connected to ports.
+I came across this thread where Huang Shijie reported that it has some 
+issues with ECC.
 
-For USB at least, where the power/reset/... GPIOs might affect just one
-port on a hub rather than the root USB host controller, the issue of
-representing these properties on a dynamically probed device still
-applies. Something like:
+Our attempt to attach fail as shown below, anybody else encountered 
+these errors?
 
-ehci {
-    /* The following node is dynamically detected, although the hub
-     * IC is physically soldered onto the board
-     */
-    hub {
-        hub { /* also dynamic */
-            port at 2 {
-                child-supply = <&regulator>;
-                reset-gpios = <&gpio 0 0>;
-            };
-        };
-    };
-};
+cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 00a00000 00020000 "boot"
+mtd1: 0f200000 00020000 "data"
+mtd2: 00400000 00020000 "boot-config"
 
-But without knowing what might be connected to port at 2, how do we know
-how to sequence the power supply and reset GPIOs according to its
-requirements? I guess this is part of the specification of the port
-itself though, not the attached device, since anything that is allowed
-to plug in must conform to whatever sequencing the port is designed to
-give. If the connected device is known, the port at 2 node in DT can encode
-whatever sequencing requirements are associated with the known connected
-device.
+ubiformat /dev/mtd1
+ubiformat: mtd1 (nand), size 253755392 bytes (242.0 MiB), 1936 
+eraseblocks of 131072 bytes (128.0 KiB), min. I/O size 2048 bytes
+libscan: scanning eraseblock 1935 -- 100 % complete
+ubiformat: 1933 eraseblocks have valid erase counter, mean value is 3
+ubiformat: 3 bad eraseblocks found, numbers: 264, 468, 1593
+ubiformat: formatting eraseblock 1935 -- 100 % complete
+/ # ubiattach /dev/ubi_ctrl -m 1
+[  185.560000] UBI error: vtbl_check: bad CRC at record 0: 0x2b4f6dd5, 
+not 0x000000
+[  185.560000] UBI error: vtbl_check: bad CRC at record 0: 0x2b4f6dd5, 
+not 0x000000
+[  185.560000] UBI error: process_lvol: both volume tables are corrupted
+[  185.560000] UBI error: ubi_attach_mtd_dev: failed to attach mtd1, 
+error -22
+ubiattach: error!: cannot attach mtd1
+            error 22 (Invalid argument)
+
+
+-Subodh Nijsure
