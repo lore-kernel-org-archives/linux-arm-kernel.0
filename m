@@ -1,27 +1,32 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Thu, 21 Jun 2012 08:08:36 -0400
-Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex Net
-In-Reply-To: <CAMW5UfZ4YVj4DBiGDL6t2vRJEtUikOVS9kpGOCQqHuruxLzQmw@mail.gmail.com>
-References: <20120619191820.GA28139@lunn.ch>
- <CAMW5UfZ4YVj4DBiGDL6t2vRJEtUikOVS9kpGOCQqHuruxLzQmw@mail.gmail.com>
-Message-ID: <CAMW5UfYYuzjzh_PJapngtF-mBX8WX=orZw6Vzc5=tbA+FpWOTQ@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 21 Jun 2012 21:18:44 +0900
+Subject: [PATCH 02/02] clk: clk-of: Use alloc_bootmem() instead of
+ kzalloc()
+In-Reply-To: <87395p15or.fsf_-_@octavius.laptop.org>
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+ <87bokd15x7.fsf@octavius.laptop.org>
+ <87395p15or.fsf_-_@octavius.laptop.org>
+Message-ID: <20120621121843.GA20236@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some more test results:
+On Thu, Jun 21, 2012 at 03:32:04AM -0400, Chris Ball wrote:
+> When of_clk_add_provider() is used at boot time (during .init_early on
+> ARM, in the motivating case for this patch), kzalloc() cannot be used
+> because slab isn't up yet.
+> 
+> Signed-off-by: Chris Ball <cjb@laptop.org>
 
-Without the clock patch:
-- No NAND definitions anywhere - doesn't complete a boot
-- NAND defined and initialized in board-goflexnet.c - complete boot
-with NAND accessible
-- NAND defined via DT - doesn't complete a boot, stops at same point
-as with no NAND definitions
+I wouldn't use alloc_bootmem() unconditionally for this, as you have no
+idea where other platforms may wire the call site up. slab is also
+available a lot earlier now than it used to be, so many places that
+required bootmem pages previously can get away with slab allocations now.
 
-With the clock patch, all combos work as you'd expect.
+You could rework this as:
 
-To move forward, do I assume the clock patch is going to be pulled
-into mainline and submit my patch as depending on it, with NAND
-defined in the DT, or for now submit with it defined and initialized
-via the board file until the DT issue can be resolved?
+	if (slab_is_available())
+		cp = kzalloc(...)
+	else
+		cp = alloc_bootmem(...)
 
-Josh Coombs
+and then it doesn't matter when and where it gets called.
