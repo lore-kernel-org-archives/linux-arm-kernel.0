@@ -1,41 +1,58 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 21 Jun 2012 12:50:44 +0200
-Subject: [PATCH] ARM: dma-mapping: fix buffer chunk allocation order
-Message-ID: <1340275844-18705-1-git-send-email-m.szyprowski@samsung.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 21 Jun 2012 16:08:28 +0530
+Subject: [PATCH] davinci:mcasp: Fix codec pll configure bug
+Message-ID: <1340275108-15555-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU-aware dma_alloc_attrs() implementation allocates buffers in
-power-of-two chunks to improve performance and take advantage of large
-page mappings provided by some IOMMU hardware. However current code, due
-to a subtle bug, allocated those chunks in the smallest-to-largest
-order, what completely killed all the advantages of using larger than
-page chunks. If a 4KiB chunk has been mapped as a first chunk, the
-consecutive chunks are not aligned correctly to the power-of-two which
-match their size and IOMMU drivers were not able to use internal
-mappings of size other than the 4KiB (largest common denominator of
-alignment and chunk size).
+In sound/soc/codecs/tlv320aic3x.c
 
-This patch fixes this issue by changing to the correct largest-to-smallest
-chunk size allocation sequence.
+	data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG);
+	snd_soc_write(codec, AIC3X_PLL_PROGA_REG,
+		      data | (pll_p << PLLP_SHIFT));
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+In the above code, pll-p value is OR'ed with previous value without
+clearing it. Bug is not seen if pll-p value doesn't change across
+Sampling frequency.
+
+However on some platforms (like AM335x EVM-SK), pll-p may have different
+values across different sampling frequencies. In such case, above code
+configures the pll with a wrong value.
+Because of this bug, when a audio stream is played with pll value
+different from previous stream, audio is heard as stretched.
+
+Fix the same by clearing the mask and then writing the value.
+
+Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
 ---
- arch/arm/mm/dma-mapping.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ sound/soc/codecs/tlv320aic3x.c |    2 +-
+ sound/soc/codecs/tlv320aic3x.h |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index d766e42..4044abc 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1067,7 +1067,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size, gfp_t
- 		return NULL;
+diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
+index d0dbac1..8c1977b 100644
+--- a/sound/soc/codecs/tlv320aic3x.c
++++ b/sound/soc/codecs/tlv320aic3x.c
+@@ -963,7 +963,7 @@ static int aic3x_hw_params(struct snd_pcm_substream *substream,
+ 	}
  
- 	while (count) {
--		int j, order = __ffs(count);
-+		int j, order = __fls(count);
+ found:
+-	data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG);
++	data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG) & ~PLLP_MASK;
+ 	snd_soc_write(codec, AIC3X_PLL_PROGA_REG,
+ 		      data | (pll_p << PLLP_SHIFT));
+ 	snd_soc_write(codec, AIC3X_OVRF_STATUS_AND_PLLR_REG,
+diff --git a/sound/soc/codecs/tlv320aic3x.h b/sound/soc/codecs/tlv320aic3x.h
+index 06a1978..16d9999 100644
+--- a/sound/soc/codecs/tlv320aic3x.h
++++ b/sound/soc/codecs/tlv320aic3x.h
+@@ -166,6 +166,7 @@
  
- 		pages[i] = alloc_pages(gfp | __GFP_NOWARN, order);
- 		while (!pages[i] && order)
+ /* PLL registers bitfields */
+ #define PLLP_SHIFT		0
++#define PLLP_MASK		7
+ #define PLLQ_SHIFT		3
+ #define PLLR_SHIFT		0
+ #define PLLJ_SHIFT		2
 -- 
-1.7.1.569.g6f426
+1.7.1
