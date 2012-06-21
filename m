@@ -1,88 +1,36 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Thu, 21 Jun 2012 10:42:17 -0700
-Subject: [PATCH] Consolidate stack size information into THREAD_SIZE_ORDER
-In-Reply-To: <4FBD8205.3010904@am.sony.com>
-References: <4FBD8205.3010904@am.sony.com>
-Message-ID: <4FE35CF9.60707@am.sony.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Thu, 21 Jun 2012 10:54:43 -0700
+Subject: [PATCH v3 0/4] DT clock bindings
+In-Reply-To: <4FE33723.3040403@gmail.com>
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+ <87bokd15x7.fsf@octavius.laptop.org> <4FE33723.3040403@gmail.com>
+Message-ID: <20120621175443.GL4402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any response to the following, which I submitted about
-a month ago?  May I submit it to the ARM patch-queue?
-Note that Ben Dooks took a quick look at it, but I
-haven't gotten an official ACK-ed by from anyone.
+On 20120621-10:00, Rob Herring wrote:
+> On 06/21/2012 02:27 AM, Chris Ball wrote:
+> > 
+> > 2) Use alloc_bootmem() instead of kzalloc() in of_clk_add_provider(),
+> >    because we need to set up clocks during .init_early on ARM (which
+> >    happens pre-slab) so that they are available for platform init.
+> 
+> This depends on 1 as the common clock code would have the same issue.
+> Generally, the first place clocks are needed is the timer init. At that
+> point, you can call kzalloc. This is where all the clock init used to be
+> done until init_early was added and some platforms have moved their
+> clock init. I don't think there was really ever much reason to move it
+> other than to make the timer init function only deal with timer setup.
+> 
 
-It's rather trival, has no performance impact, and
-makes the code more flexible IMHO.   I realize it's
-not the most important issue in the world, but it
-will make my life easier.
+Hi Rob,
 
-[original patch follows]
+Just FYI I've been looking at using alloc_bootmem in the common clk code
+as a way to get rid of the static initialization stuff (which only
+existed due to very early initialization of timers).
 
-This reduces the number of magic values in the code, as well as
-makes it easier to experiment with larger or smaller stack sizes.
+The suggested change above to of_clk_add_provider would jive well with
+my change to the common clk code.
 
-Signed-off-by: Tim Bird <tim.bird@am.sony.com>
-PATCH FOLLOWS
----
- arch/arm/include/asm/thread_info.h |    2 +-
- arch/arm/kernel/entry-header.S     |    8 ++++----
- arch/arm/mm/proc-macros.S          |    4 ++--
- 3 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 0f04d84..5172c36 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -16,7 +16,7 @@
- #include <asm/fpstate.h>
-
- #define THREAD_SIZE_ORDER	1
--#define THREAD_SIZE		8192
-+#define THREAD_SIZE		(4096 << THREAD_SIZE_ORDER)
- #define THREAD_START_SP		(THREAD_SIZE - 8)
-
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 9a8531e..f94216b 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -109,8 +109,8 @@
- 	.endm
-
- 	.macro	get_thread_info, rd
--	mov	\rd, sp, lsr #13
--	mov	\rd, \rd, lsl #13
-+	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
-+	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
- 	.endm
-
- 	@
-@@ -150,8 +150,8 @@
-
- 	.macro	get_thread_info, rd
- 	mov	\rd, sp
--	lsr	\rd, \rd, #13
--	mov	\rd, \rd, lsl #13
-+	lsr	\rd, \rd, #12 + THREAD_SIZE_ORDER
-+	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
- 	.endm
-
- 	@
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 2d8ff3a..7006c88 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -30,8 +30,8 @@
-  * act_mm - get current->active_mm
-  */
- 	.macro	act_mm, rd
--	bic	\rd, sp, #8128
--	bic	\rd, \rd, #63
-+	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
-+	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
- 	ldr	\rd, [\rd, #TI_TASK]
- 	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
- 	.endm
--- 
-1.7.9.5
+Regards,
+Mike
