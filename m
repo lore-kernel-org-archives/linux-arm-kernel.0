@@ -1,50 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Jun 2012 09:48:59 +0200
-Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
-In-Reply-To: <20120620143140.GA7817@linux-sh.org>
-References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
- <20110808081552.GI32513@linux-sh.org>
- <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
- <CAH9JG2V-66Wn7nwJz6tOkESoQAUJzAg-47YeMY0vzwu6T9O=Rg@mail.gmail.com>
- <4E40912C.5040801@codeaurora.org>
- <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
- <CAGsJ_4y38KBDfjZS_k-QfDUUFAtEwE-ciUgNOA0U2juOBeoXEA@mail.gmail.com>
- <CACRpkdazTKs_sNHVkVAYdz6CK9fwghf2n-Rrs7fi7R1Z=Gt+3w@mail.gmail.com>
- <20120620143140.GA7817@linux-sh.org>
-Message-ID: <CACRpkdZE45cSUTKBfJ=sqmw35MG1f_2s=Jyh350QXpATT_wFxQ@mail.gmail.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?UHJjaGFsIEppxZnDrQ==?=)
+Date: Thu, 21 Jun 2012 09:56:25 +0200
+Subject: Fwd: Re: [PATCH]  mmc: at91: fix bus speed
+In-Reply-To: <4FE19423.4010103@atmel.com>
+References: <4FE18E84.9000603@atmel.com> <4FE19423.4010103@atmel.com>
+Message-ID: <4FE2D3A9.6000803@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 4:31 PM, Paul Mundt <lethal@linux-sh.org> wrote:
-> On Wed, Jun 20, 2012 at 10:15:01AM +0200, Linus Walleij wrote:
->> On Tue, Jun 19, 2012 at 5:25 AM, Barry Song <21cnbao@gmail.com> wrote:
->> > but i think at least the macros of GPIO_PULL_NONE, GPIO_PULL_UP and
->> > GPIO_PULL_DOWN should be standardized.
+Hello Ludovic,
+I have tried it with atmel-mci driver. It took me little time to change setting of my board.
+It seems to try clock down to 200kHz:
+[    5.860000] mmc0: mmc_rescan_try_freq: trying to init card at 400000 Hz
+[    5.920000] mmc0: mmc_rescan_try_freq: trying to init card at 300000 Hz
+[    5.980000] mmc0: mmc_rescan_try_freq: trying to init card at 205079 Hz
+As I see in driver source, there is better clkdiv overrun work around.
+But I don't find min and max freq definitions in this driver, it is probably somewhere else.
+So this would be OK.
+
+Dne 20.6.2012 11:13, ludovic.desroches napsal(a):
+> Add mmc mailing list.
+>
+>
+> -------- Message original --------
+> Sujet: Re: [PATCH] mmc: at91: fix bus speed
+> Date : Wed, 20 Jun 2012 10:49:08 +0200
+> De : ludovic.desroches <ludovic.desroches@atmel.com>
+> Pour : Prchal Ji?? <jiri.prchal@aksignal.cz>
+> Copie ? : <ludovic.desroches@atmel.com>, <linux-arm-kernel@lists.infradead.org>
+>
+> Hello Jiri,
+>
+> Thanks for your patch but at91-mci is now deprecated and should be
+> removed in 3.7.
+> On one hand I don't know if we have to continue to take patches for this
+> driver, on the other hand it's a fix for some SD cards.
+>
+> Le 06/20/2012 10:15 AM, Prchal Ji?? a ?crit :
+>> This patch change minimum and maximum clock speed because some noname
+>> cards doesn't work during init even at 375kHz and new cards (SD v. 3.0)
+>> can run at 50 or 100 MHz.
+>> Also aded clkdiv register overrun fix when setting low speeds.
 >>
->> You find an attempt at standardization in drivers/pinctrl/pinconf-generic.c
->> which is also used by the composite U300+COH901 drivers. Drivers
->> can select this support library and use the flags from
->> <linux/pinctrl/pinconf-generic.h>
+>> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+>> ---
 >>
-> What's with PIN_CONFIG_END using such an insane value?
-
-This: PIN_CONFIG_END = 0x7FFF
-
-It's just that I reserved 16 bits for the different stuff, and then
-the bitstuffing
-functions below use 16 bits for this. If it's too much we can shrink
-it.
-
-> I'm happy to consolidate on the provided definitions and add my own on top
-> of that, but I'm not going to waste an insane amount of bits that I could
-> be using for driver-specific data and so on instead to comply with the
-> PIN_CONFIG_END comment. Is there any valid reason why this would ever
-> need to exceed 4 bits?
-
-I think we need more than 4 bits for sure, but not more than 8.
-
-If you want to patch it down to have 8 bits for the param and 24 bits
-for the argument, go ahead, it won't hurt.
-
-Yours,
-Linus Walleij
+>> --- linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c.orig 2012-06-17
+>> 02:25:17.000000000 +0200
+>> +++ linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c 2012-06-18
+>> 11:01:49.751415984 +0200
+>> @@ -724,6 +724,10 @@ static void at91_mci_set_ios(struct mmc_
+>> else
+>> clkdiv = (at91_master_clock / ios->clock) / 2;
+>>
+>> + /* set maximum divider */
+>> + if (clkdiv > 255)
+>> + clkdiv = 255;
+>> +
+>> pr_debug("clkdiv = %d. mcck = %ld\n", clkdiv,
+>> at91_master_clock / (2 * (clkdiv + 1)));
+>> }
+>> @@ -948,8 +952,8 @@ static int __init at91_mci_probe(struct
+>> }
+>>
+>> mmc->ops = &at91_mci_ops;
+>> - mmc->f_min = 375000;
+>> - mmc->f_max = 25000000;
+>> + mmc->f_min = 200000; /* not all cards can run at 375kHz */
+>
+> I will check on atmel-mci if we have to decrease f_min.
+>
+>> + mmc->f_max = 100000000; /* new cards can run at 100MHz */
+>
+> MCI operates at a rate of up to master clock divided by two so you can't
+> reach 100MHz as max frequency since it means that our master clock is at
+> 200MHz that is not the case. I would say 50MHz is the maximum frequency
+> for product compatible with at91-mci.
+>
+>> mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+>> mmc->caps = 0;
+>>
+>>
+>>
+>
+> Regards
+>
+> Ludovic
+>
+>
+>
+>
+>
