@@ -1,30 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jun 2012 00:20:00 -0700
-Subject: [PATCHv8 03/13] I2C: OMAP: Remove reset at init
-In-Reply-To: <4FE2C750.3020803@ti.com>
-References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
- <1340029828-20751-4-git-send-email-shubhrajyoti@ti.com>
- <20120620102905.GC12766@atomide.com> <4FE2C750.3020803@ti.com>
-Message-ID: <20120621071959.GV12766@atomide.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 21 Jun 2012 09:24:39 +0200
+Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
+In-Reply-To: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <4FE2CC37.8010202@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shubhrajyoti <shubhrajyoti@ti.com> [120621 00:08]:
-> On Wednesday 20 June 2012 03:59 PM, Tony Lindgren wrote:
-> > See the comments regarding driver specific resets in hwmod code.
-> you mean omap_hwmod.c
-> >
-> > The way to set this up is to have a shared inline function in
-> > i2c-omap.h that both the driver and hwmod code can use.
-> hwmod reset function uses oh (omap_hwmod).
+On 06/21/2012 08:41 AM, Richard Zhao wrote:
+> The work is based on  ci13xxx rework done by Alexander Shishkin.
 > 
-> How could the driver also pass oh ?
-> Could we keep a local copy in driver data?
-> > Eventually hwmod code will do the reset only in late initcall
-> > if no driver is loaded for the device in question.
+> To let Greg pick up, I also added patches Alex queued that I depends on.
+> Patch #1 - #9 : It can also be found at
+> http://github.com/virtuoso/linux-ci.git ci
 > 
+> This patch series can also be found at:
+> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+> 
+> Status:
+>   - this version only support host
+>   - usbotg controler works at host role
 
-There's no need for the driver to know anything about oh.
-The driver just needs to know the iobase.
+I'm interested in usb device support on mx28, what has to be implemented
+to get it working?
 
-Tony
+Regards, Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/c88f15db/attachment.sig>
