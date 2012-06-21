@@ -1,63 +1,41 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Thu, 21 Jun 2012 03:44:32 -0700
-Subject: [PATCH 2/2] ARM: OMAP: USB: Fix omap3xxx EHCI regression caused by
- i693 errata fix.
-In-Reply-To: <1340275473-16374-1-git-send-email-Russ.Dill@ti.com>
-References: <CA+Bv8XZ-g26_3Hv9xgDvwRooUeZwaKtZJwvnxxEZHcFx06es7Q@mail.gmail.com>
- <1340275473-16374-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <1340275473-16374-2-git-send-email-Russ.Dill@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 21 Jun 2012 12:50:44 +0200
+Subject: [PATCH] ARM: dma-mapping: fix buffer chunk allocation order
+Message-ID: <1340275844-18705-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[PATCH] Fix OMAP EHCI suspend/resume failure (i693) '354ab856' causes
-an oops on boot for all omap3xxx platforms that use usbhs_omap for
-EHCI. The actual oops comes from faulty ehci-omap cleanup, but the
-failure caused by the change is evidenced here:
+IOMMU-aware dma_alloc_attrs() implementation allocates buffers in
+power-of-two chunks to improve performance and take advantage of large
+page mappings provided by some IOMMU hardware. However current code, due
+to a subtle bug, allocated those chunks in the smallest-to-largest
+order, what completely killed all the advantages of using larger than
+page chunks. If a 4KiB chunk has been mapped as a first chunk, the
+consecutive chunks are not aligned correctly to the power-of-two which
+match their size and IOMMU drivers were not able to use internal
+mappings of size other than the 4KiB (largest common denominator of
+alignment and chunk size).
 
-[    3.655059] ehci-omap ehci-omap.0: utmi_p1_gfclk failed error:-2
-[    3.661376] ehci-omap: probe of ehci-omap.0 failed with error -2
+This patch fixes this issue by changing to the correct largest-to-smallest
+chunk size allocation sequence.
 
-utmi_p1_gfclk is a clock that exists on OMAP4, but not OMAP3. In the
-OMAP3 case, it is configured as a dummy clock. However, OMAP4 lists
-the dev_id as NULL, but OMAP3 lists it as "usbhs_omap".
-
-Attempting to get that clock from ehci-omap then fails. The solution
-is to just change the clock3xxx_data.c for dummy clocks used in the
-errata fix to match the dev_id, NULL, used in clock44xx_data.c.
-
-Tested on BB-xM.
-
-Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-omap2/clock3xxx_data.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mm/dma-mapping.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 4e1a3b0..59d5315 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3391,15 +3391,15 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK(NULL,	"usbhost_48m_fck", &usbhost_48m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
- 	CLK(NULL,	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
- 	CLK("usbhs_omap",	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("usbhs_omap",	"utmi_p1_gfclk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"utmi_p2_gfclk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"xclk60mhsp1_ck",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"xclk60mhsp2_ck",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"usb_host_hs_utmi_p1_clk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"usb_host_hs_utmi_p2_clk",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"utmi_p1_gfclk",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"utmi_p2_gfclk",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"xclk60mhsp1_ck",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"xclk60mhsp2_ck",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"usb_host_hs_utmi_p1_clk",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&dummy_ck,	CK_3XXX),
- 	CLK("usbhs_omap",	"usb_tll_hs_usb_ch0_clk",	&dummy_ck,	CK_3XXX),
- 	CLK("usbhs_omap",	"usb_tll_hs_usb_ch1_clk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"init_60m_fclk",	&dummy_ck,	CK_3XXX),
-+	CLK(NULL,	"init_60m_fclk",	&dummy_ck,	CK_3XXX),
- 	CLK(NULL,	"usim_fck",	&usim_fck,	CK_3430ES2PLUS | CK_36XX),
- 	CLK(NULL,	"gpt1_fck",	&gpt1_fck,	CK_3XXX),
- 	CLK(NULL,	"wkup_32k_fck",	&wkup_32k_fck,	CK_3XXX),
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index d766e42..4044abc 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1067,7 +1067,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size, gfp_t
+ 		return NULL;
+ 
+ 	while (count) {
+-		int j, order = __ffs(count);
++		int j, order = __fls(count);
+ 
+ 		pages[i] = alloc_pages(gfp | __GFP_NOWARN, order);
+ 		while (!pages[i] && order)
 -- 
-1.7.10.4
+1.7.1.569.g6f426
