@@ -1,152 +1,204 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 20 Jun 2012 11:04:47 +0200
-Subject: [PATCH v2 1/5] ARM: topology: Add arch_scale_freq_power function
-In-Reply-To: <87fw9qhkl9.fsf@sejong.aot.lge.com>
-References: <1340094536-20873-1-git-send-email-vincent.guittot@linaro.org>
- <1340094536-20873-2-git-send-email-vincent.guittot@linaro.org>
- <87fw9qhkl9.fsf@sejong.aot.lge.com>
-Message-ID: <CAKfTPtBEGQP4-NUem0WBoyW8PNWi2=9qaO1oOLaKv6ox+5i76A@mail.gmail.com>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Thu, 21 Jun 2012 19:31:23 +0800
+Subject: [V3 1/3] regulator: add pre-regulator support for 88pm860x
+In-Reply-To: <20120621101536.GR4037@opensource.wolfsonmicro.com>
+References: <20120621101536.GR4037@opensource.wolfsonmicro.com>
+Message-ID: <1340278283-16423-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Pre-regulator of 88pm8606 is mainly for support charging based on vbus,
+it needs to be enabled for charging battery, and will be disabled in
+some exception condition like over-temp.
 
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+---
+ drivers/mfd/88pm860x-core.c  |   23 ++++++++++++++
+ drivers/regulator/88pm8607.c |   66 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/88pm860x.h |    1 +
+ 3 files changed, 90 insertions(+), 0 deletions(-)
 
-On 20 June 2012 02:51, Namhyung Kim <namhyung@kernel.org> wrote:
->
->
->
-> Hi, Vincent
->
-> Just a couple of nitpicks..
->
->
-> On Tue, 19 Jun 2012 10:28:52 +0200, Vincent Guittot wrote:
->> Add infrastructure to be able to modify the cpu_power of each core
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>
->> ---
->> ?arch/arm/include/asm/topology.h | ? ?2 ++
->> ?arch/arm/kernel/topology.c ? ? ?| ? 38 +++++++++++++++++++++++++++++++++++++-
->> ?2 files changed, 39 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
->> index 58b8b84..78e4c85 100644
->> --- a/arch/arm/include/asm/topology.h
->> +++ b/arch/arm/include/asm/topology.h
->> @@ -27,11 +27,13 @@ void init_cpu_topology(void);
->> ?void store_cpu_topology(unsigned int cpuid);
->> ?const struct cpumask *cpu_coregroup_mask(int cpu);
->>
->> +void set_power_scale(unsigned int cpu, unsigned long power);
->> ?#else
->>
->> ?static inline void init_cpu_topology(void) { }
->> ?static inline void store_cpu_topology(unsigned int cpuid) { }
->>
->> +static inline void set_power_scale(unsigned int cpu, unsigned long power) { }
->> ?#endif
->>
->> ?#include <asm-generic/topology.h>
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> index 8200dea..37e2e57 100644
->> --- a/arch/arm/kernel/topology.c
->> +++ b/arch/arm/kernel/topology.c
->> @@ -22,6 +22,37 @@
->> ?#include <asm/cputype.h>
->> ?#include <asm/topology.h>
->>
->> +/*
->> + * cpu power scale management
->> + */
->> +
->> +/*
->> + * cpu power table
->> + * This per cpu data structure describes the relative capacity of each core.
->> + * On a heteregenous system, cores don't have the same computation capacity
->> + * and we reflect that difference in the cpu_power field so the scheduler can
->> + * take this difference into account during load balance. A per cpu structure
->> + * is preferred because each CPU updates its own cpu_power field during the
->> + * load balance except for idle cores. One idle core is selected to run the
->> + * rebalance_domains for all idle cores and the cpu_power can be updated
->> + * during this sequence.
->> + */
->> +static DEFINE_PER_CPU(unsigned long, cpu_scale);
->> +
->> +unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
->> +{
->> + ? ? return per_cpu(cpu_scale, cpu);
->> +}
->> +
->> +void set_power_scale(unsigned int cpu, unsigned long power)
->> +{
->> + ? ? per_cpu(cpu_scale, cpu) = power;
->> +}
->
-> Isn't it a static function?
-
-It's not static because the function could also be used outside. This
-patchset updates the capacity according to DT information but the
-capacity could also be updated depending of other inputs like a
-modification of the maximum frequency of a core.
-
-I can make it static for now and could remove the static attribute when needed
-
->
->
->> +
->> +/*
->> + * cpu topology management
->> + */
->> +
->> ?#define MPIDR_SMP_BITMASK (0x3 << 30)
->> ?#define MPIDR_SMP_VALUE (0x2 << 30)
->>
->> @@ -41,6 +72,9 @@
->> ?#define MPIDR_LEVEL2_MASK 0xFF
->> ?#define MPIDR_LEVEL2_SHIFT 16
->>
->> +/*
->> + * cpu topology table
->> + */
->> ?struct cputopo_arm cpu_topology[NR_CPUS];
->>
->> ?const struct cpumask *cpu_coregroup_mask(int cpu)
->> @@ -134,7 +168,7 @@ void init_cpu_topology(void)
->> ?{
->> ? ? ? unsigned int cpu;
->>
->> - ? ? /* init core mask */
->> + ? ? /* init core mask and power*/
->> ? ? ? for_each_possible_cpu(cpu) {
->> ? ? ? ? ? ? ? struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
->>
->> @@ -143,6 +177,8 @@ void init_cpu_topology(void)
->> ? ? ? ? ? ? ? cpu_topo->socket_id = -1;
->> ? ? ? ? ? ? ? cpumask_clear(&cpu_topo->core_sibling);
->> ? ? ? ? ? ? ? cpumask_clear(&cpu_topo->thread_sibling);
->> +
->> + ? ? ? ? ? ? per_cpu(cpu_scale, cpu) = SCHED_POWER_SCALE;
->
-> Wouldn't it be better using:
->
-> ? ? ? ? ? ? ? ?set_power_scale(cpu, SCHED_POWER_SCALE);
-> ?
-
-Yes
-
-Thanks
->
-> Thanks,
-> Namhyung
->
->
->> ? ? ? }
->> ? ? ? smp_wmb();
->> ?}
->
->
->
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+index 87bd5ba..d09918c 100644
+--- a/drivers/mfd/88pm860x-core.c
++++ b/drivers/mfd/88pm860x-core.c
+@@ -90,6 +90,10 @@ static struct resource charger_resources[] __devinitdata = {
+ 	{PM8607_IRQ_VCHG, PM8607_IRQ_VCHG, "vchg voltage",    IORESOURCE_IRQ,},
+ };
+ 
++static struct resource preg_resources[] __devinitdata = {
++	{PM8606_ID_PREG,  PM8606_ID_PREG,  "preg",   IORESOURCE_IO,},
++};
++
+ static struct resource rtc_resources[] __devinitdata = {
+ 	{PM8607_IRQ_RTC, PM8607_IRQ_RTC, "rtc", IORESOURCE_IRQ,},
+ };
+@@ -142,9 +146,19 @@ static struct mfd_cell codec_devs[] = {
+ 	{"88pm860x-codec", -1,},
+ };
+ 
++static struct regulator_consumer_supply preg_supply[] = {
++	REGULATOR_SUPPLY("preg", "charger-manager"),
++};
++
++static struct regulator_init_data preg_init_data = {
++	.num_consumer_supplies	= ARRAY_SIZE(preg_supply),
++	.consumer_supplies	= &preg_supply[0],
++};
++
+ static struct mfd_cell power_devs[] = {
+ 	{"88pm860x-battery", -1,},
+ 	{"88pm860x-charger", -1,},
++	{"88pm860x-preg",    -1,},
+ };
+ 
+ static struct mfd_cell rtc_devs[] = {
+@@ -768,6 +782,15 @@ static void __devinit device_power_init(struct pm860x_chip *chip,
+ 			      &charger_resources[0], chip->irq_base);
+ 	if (ret < 0)
+ 		dev_err(chip->dev, "Failed to add charger subdev\n");
++
++	power_devs[2].platform_data = &preg_init_data;
++	power_devs[2].pdata_size = sizeof(struct regulator_init_data);
++	power_devs[2].num_resources = ARRAY_SIZE(preg_resources);
++	power_devs[2].resources = &preg_resources[0],
++	ret = mfd_add_devices(chip->dev, 0, &power_devs[2], 1,
++			      &preg_resources[0], chip->irq_base);
++	if (ret < 0)
++		dev_err(chip->dev, "Failed to add preg subdev\n");
+ }
+ 
+ static void __devinit device_onkey_init(struct pm860x_chip *chip,
+diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
+index c3482b9..3c81fd0 100644
+--- a/drivers/regulator/88pm8607.c
++++ b/drivers/regulator/88pm8607.c
+@@ -23,6 +23,7 @@ struct pm8607_regulator_info {
+ 	struct pm860x_chip	*chip;
+ 	struct regulator_dev	*regulator;
+ 	struct i2c_client	*i2c;
++	struct i2c_client	*i2c_8606;
+ 
+ 	unsigned int	*vol_table;
+ 	unsigned int	*vol_suspend;
+@@ -242,6 +243,35 @@ static int pm8607_set_voltage_sel(struct regulator_dev *rdev, unsigned selector)
+ 	return ret;
+ }
+ 
++static int pm8606_preg_enable(struct regulator_dev *rdev)
++{
++	struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
++
++	return pm860x_set_bits(info->i2c, rdev->desc->enable_reg,
++			       1 << rdev->desc->enable_mask, 0);
++}
++
++static int pm8606_preg_disable(struct regulator_dev *rdev)
++{
++	struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
++
++	return pm860x_set_bits(info->i2c, rdev->desc->enable_reg,
++			       1 << rdev->desc->enable_mask,
++			       1 << rdev->desc->enable_mask);
++}
++
++static int pm8606_preg_is_enabled(struct regulator_dev *rdev)
++{
++	struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
++	int ret;
++
++	ret = pm860x_reg_read(info->i2c, rdev->desc->enable_reg);
++	if (ret < 0)
++		return ret;
++
++	return !((unsigned char)ret & (1 << rdev->desc->enable_mask));
++}
++
+ static struct regulator_ops pm8607_regulator_ops = {
+ 	.list_voltage	= pm8607_list_voltage,
+ 	.set_voltage_sel = pm8607_set_voltage_sel,
+@@ -251,6 +281,25 @@ static struct regulator_ops pm8607_regulator_ops = {
+ 	.is_enabled = regulator_is_enabled_regmap,
+ };
+ 
++static struct regulator_ops pm8606_preg_ops = {
++	.enable		= pm8606_preg_enable,
++	.disable	= pm8606_preg_disable,
++	.is_enabled	= pm8606_preg_is_enabled,
++};
++
++#define PM8606_PREG(ereg, ebit)						\
++{									\
++	.desc	= {							\
++		.name	= "PREG",					\
++		.ops	= &pm8606_preg_ops,				\
++		.type	= REGULATOR_CURRENT,				\
++		.id	= PM8606_ID_PREG,				\
++		.owner	= THIS_MODULE,					\
++		.enable_reg = PM8606_##ereg,				\
++		.enable_mask = (ebit),					\
++	},								\
++}
++
+ #define PM8607_DVC(vreg, ureg, ubit, ereg, ebit)			\
+ {									\
+ 	.desc	= {							\
+@@ -309,6 +358,8 @@ static struct pm8607_regulator_info pm8607_regulator_info[] = {
+ 	PM8607_LDO(12,        LDO12, 0, SUPPLIES_EN12, 5),
+ 	PM8607_LDO(13, VIBRATOR_SET, 1, VIBRATOR_SET, 0),
+ 	PM8607_LDO(14,        LDO14, 0, SUPPLIES_EN12, 6),
++
++	PM8606_PREG(PREREGULATORB, 5),
+ };
+ 
+ static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
+@@ -336,6 +387,8 @@ static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 	info->i2c = (chip->id == CHIP_PM8607) ? chip->client : chip->companion;
++	info->i2c_8606 = (chip->id == CHIP_PM8607) ? chip->companion :
++			chip->client;
+ 	info->chip = chip;
+ 
+ 	/* check DVC ramp slope double */
+@@ -372,6 +425,18 @@ static int __devexit pm8607_regulator_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static struct platform_device_id pm8607_regulator_driver_ids[] = {
++	{
++		.name	= "88pm860x-regulator",
++		.driver_data	= 0,
++	}, {
++		.name	= "88pm860x-preg",
++		.driver_data	= 0,
++	},
++	{ },
++};
++MODULE_DEVICE_TABLE(platform, pm8607_regulator_driver_ids);
++
+ static struct platform_driver pm8607_regulator_driver = {
+ 	.driver		= {
+ 		.name	= "88pm860x-regulator",
+@@ -379,6 +444,7 @@ static struct platform_driver pm8607_regulator_driver = {
+ 	},
+ 	.probe		= pm8607_regulator_probe,
+ 	.remove		= __devexit_p(pm8607_regulator_remove),
++	.id_table	= pm8607_regulator_driver_ids,
+ };
+ 
+ static int __init pm8607_regulator_init(void)
+diff --git a/include/linux/mfd/88pm860x.h b/include/linux/mfd/88pm860x.h
+index 84d071a..7b24943 100644
+--- a/include/linux/mfd/88pm860x.h
++++ b/include/linux/mfd/88pm860x.h
+@@ -136,6 +136,7 @@ enum {
+ 	PM8607_ID_LDO13,
+ 	PM8607_ID_LDO14,
+ 	PM8607_ID_LDO15,
++	PM8606_ID_PREG,
+ 
+ 	PM8607_ID_RG_MAX,
+ };
+-- 
+1.7.0.4
