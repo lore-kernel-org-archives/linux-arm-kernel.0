@@ -1,61 +1,45 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 21 Jun 2012 14:41:11 +0800
-Subject: [PATCH v6 10/14] usb: otg: add notify_connect/notify_disconnect
- callback
+Date: Thu, 21 Jun 2012 14:41:12 +0800
+Subject: [PATCH v6 11/14] USB: notify phy when root hub port connect change
 In-Reply-To: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
 References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340260875-21934-11-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340260875-21934-12-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This let usb phy driver has a chance to change hw settings when connect
-status change.
+Phy may need to change settings when port connect change.
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 Tested-by: Subodh Nijsure <snijsure@grid-net.com>
 ---
- include/linux/usb/otg.h |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ drivers/usb/core/hub.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-index 38ab3f4..6dfdc8d 100644
---- a/include/linux/usb/otg.h
-+++ b/include/linux/usb/otg.h
-@@ -117,6 +117,9 @@ struct usb_phy {
- 	int	(*set_suspend)(struct usb_phy *x,
- 				int suspend);
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 25a7422..6ecfb5e 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -20,6 +20,7 @@
+ #include <linux/usb.h>
+ #include <linux/usbdevice_fs.h>
+ #include <linux/usb/hcd.h>
++#include <linux/usb/otg.h>
+ #include <linux/usb/quirks.h>
+ #include <linux/kthread.h>
+ #include <linux/mutex.h>
+@@ -4034,6 +4035,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
+ 		}
+ 	}
  
-+	/* notify phy connect status change */
-+	int	(*notify_connect)(struct usb_phy *x, int port);
-+	int	(*notify_disconnect)(struct usb_phy *x, int port);
- };
- 
- 
-@@ -252,6 +255,24 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
- }
- 
- static inline int
-+usb_phy_notify_connect(struct usb_phy *x, int port)
-+{
-+	if (x->notify_connect)
-+		return x->notify_connect(x, port);
-+	else
-+		return 0;
-+}
++	if (unlikely(hcd->phy && !hdev->parent)) {
++		if (portstatus & USB_PORT_STAT_CONNECTION)
++			usb_phy_notify_connect(hcd->phy, port1);
++		else
++			usb_phy_notify_disconnect(hcd->phy, port1);
++	}
 +
-+static inline int
-+usb_phy_notify_disconnect(struct usb_phy *x, int port)
-+{
-+	if (x->notify_disconnect)
-+		return x->notify_disconnect(x, port);
-+	else
-+		return 0;
-+}
-+
-+static inline int
- otg_start_srp(struct usb_otg *otg)
- {
- 	if (otg && otg->start_srp)
+ 	/* Return now if debouncing failed or nothing is connected or
+ 	 * the device was "removed".
+ 	 */
 -- 
 1.7.9.5
