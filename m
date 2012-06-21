@@ -1,35 +1,63 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 21 Jun 2012 14:41:04 +0800
-Subject: [PATCH v6 03/14] usb: chipidea: msm: add missing section annotation
+Date: Thu, 21 Jun 2012 14:41:05 +0800
+Subject: [PATCH v6 04/14] usb: chipidea: msm: add remove method
 In-Reply-To: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
 References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340260875-21934-4-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340260875-21934-5-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-no functional changes, it will just free up some
-code if we don't have hotplug.
+allow this driver to be removed too.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- drivers/usb/chipidea/ci13xxx_msm.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/chipidea/ci13xxx_msm.c |   20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
-index 958069e..8d438b8 100644
+index 8d438b8..68512d4 100644
 --- a/drivers/usb/chipidea/ci13xxx_msm.c
 +++ b/drivers/usb/chipidea/ci13xxx_msm.c
-@@ -55,7 +55,7 @@ static struct ci13xxx_udc_driver ci13xxx_msm_udc_driver = {
- 	.notify_event		= ci13xxx_msm_notify_event,
- };
+@@ -84,6 +84,8 @@ static int __devinit ci13xxx_msm_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto put_platform;
  
--static int ci13xxx_msm_probe(struct platform_device *pdev)
-+static int __devinit ci13xxx_msm_probe(struct platform_device *pdev)
- {
- 	struct platform_device *plat_ci;
- 	int ret;
++	platform_set_drvdata(pdev, plat_ci);
++
+ 	pm_runtime_no_callbacks(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
+ 
+@@ -95,16 +97,22 @@ put_platform:
+ 	return ret;
+ }
+ 
++static int __devexit ci13xxx_msm_remove(struct platform_device *pdev)
++{
++	struct platform_device *plat_ci = platform_get_drvdata(pdev);
++
++	platform_device_unregister(plat_ci);
++
++	return 0;
++}
++
+ static struct platform_driver ci13xxx_msm_driver = {
+ 	.probe = ci13xxx_msm_probe,
++	.remove = __devexit_p(ci13xxx_msm_remove),
+ 	.driver = { .name = "msm_hsusb", },
+ };
+-MODULE_ALIAS("platform:msm_hsusb");
+ 
+-static int __init ci13xxx_msm_init(void)
+-{
+-	return platform_driver_register(&ci13xxx_msm_driver);
+-}
+-module_init(ci13xxx_msm_init);
++module_platform_driver(ci13xxx_msm_driver);
+ 
++MODULE_ALIAS("platform:msm_hsusb");
+ MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.5
