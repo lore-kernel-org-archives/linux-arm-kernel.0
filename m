@@ -1,56 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Jun 2012 16:22:41 +0200
-Subject: [PATCH] ARM:MXS: Initial support for the Crystalfontz CFA-10036
-In-Reply-To: <20120621131138.GA21418@S2101-09.ap.freescale.net>
-References: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
- <20120621131138.GA21418@S2101-09.ap.freescale.net>
-Message-ID: <4FE32E31.2070909@free-electrons.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 21 Jun 2012 10:27:46 -0400 (EDT)
+Subject: pm runtime and system suspend resume
+In-Reply-To: <CAK9wHMS_P+y+NmvVVrH+nNOb=KPi3rEgJOWEcRcKf3mTkxjDPA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1206211025060.1164-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, 21 Jun 2012, chao xie wrote:
 
-Le 21/06/2012 15:11, Shawn Guo a ?crit :
-> On Thu, Jun 21, 2012 at 10:46:52AM +0200, Maxime Ripard wrote:
->> On the MMC part though, Something odd is going on.  On the first
->> patches I made against 3.4, everything was working fine. With 3.5-rc2
->> though, the MMC never replies to the first CMD52 command sent to
->> it. The pin muxing hasn't changed and has been checked, the card is
->> well detected through the card detect pin, the power enable pin is
->> correctly set to a low level, and so the SD card is correctly
->> powered. The MMC works fine with the exact same kernel on the
->> imx28-evk though.
->>
->> What seems odd to me, is that when booting the board with the 3.4
->> kernel, at boot, the mxs-mmc driver reports a SSP clock of 288MHz,
->> while on 3.5, it reports a 480MHz SSP clock. By looking at the clk
->> driver for the iMX28, there is a comment saying that the 480MHz clock
->> seems to high for SD controlers, and that it should be 288MHz
->> instead. Given that the clock part has changed quite a lot from 3.4 to
->> 3.5, I think it might be a good lead, but hardcoding the SSP clock to
->> 288MHz in the mxs-mmc driver instead of using the clk_get_rate
->> function does not resolve the problem.
->>
->> Also, this problem is seen with both DT-probing and traditionnal
->> probing.
->>
->> Do someone have an idea on what could possibly happen here ?
->>
-> Can you try the change below to see if it fixes the problem?
+> I check the code, __device_suspend will invoke dev->pm_domain->ops
+> first if dev->pm_domain is not NULL.
+> Taking "suspend" as esample, i can do the following things in the
+> dev->pm_domain->ops->suspend
+> 1. invoke dev->driver->pm->suspend for suspending the device
+> 2. do what we do in dev->pm_domain->ops->runtime_suspend for
+> suspending the surrounded logic, for example, shutdown the phy or
+> clocks.
+> So is above implementation fine?
 
-It is indeed working now, thanks a lot :)
-I've also tested it on the imx28evk, and it works as well.
+Yes, that sounds like it will work.  Watch out for the case where your 
+device is already runtime-suspended when a system suspend occurs.
 
-You can add by Tested-by I guess :)
+Have you read section 6 in Documentation/power/runtime_pm.txt?  It is 
+related to your question.
 
-We have found that indeed the two registers were inverted compared to
-the datasheet, but why was it still working on the iMX28-evk ?
-
-Thanks again,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Alan Stern
