@@ -1,35 +1,27 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 21 Jun 2012 15:55:21 +0400
-Subject: [PATCH 1/2] ARM: OMAP: USB: Fixup ehci_hcd_omap_probe error path
-In-Reply-To: <1340275473-16374-1-git-send-email-Russ.Dill@ti.com>
-References: <CA+Bv8XZ-g26_3Hv9xgDvwRooUeZwaKtZJwvnxxEZHcFx06es7Q@mail.gmail.com>
- <1340275473-16374-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <4FE30BA9.1070108@mvista.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Thu, 21 Jun 2012 08:08:36 -0400
+Subject: [RFC PATCH] ARM: Initial DTS support for Kirkwood GoFlex Net
+In-Reply-To: <CAMW5UfZ4YVj4DBiGDL6t2vRJEtUikOVS9kpGOCQqHuruxLzQmw@mail.gmail.com>
+References: <20120619191820.GA28139@lunn.ch>
+ <CAMW5UfZ4YVj4DBiGDL6t2vRJEtUikOVS9kpGOCQqHuruxLzQmw@mail.gmail.com>
+Message-ID: <CAMW5UfYYuzjzh_PJapngtF-mBX8WX=orZw6Vzc5=tbA+FpWOTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Some more test results:
 
-On 21-06-2012 14:44, Russ Dill wrote:
+Without the clock patch:
+- No NAND definitions anywhere - doesn't complete a boot
+- NAND defined and initialized in board-goflexnet.c - complete boot
+with NAND accessible
+- NAND defined via DT - doesn't complete a boot, stops at same point
+as with no NAND definitions
 
-> A recent commit, [PATCH] Fix OMAP EHCI suspend/resume failure
-> (i693) '354ab856'
+With the clock patch, all combos work as you'd expect.
 
-    Usually commit ID follows the word "commit", and then the commit summary.
+To move forward, do I assume the clock patch is going to be pulled
+into mainline and submit my patch as depending on it, with NAND
+defined in the DT, or for now submit with it defined and initialized
+via the board file until the DT issue can be resolved?
 
-> causes ehci probe to fail on omap3xxx. This
-> exposed bugs in the ehci_hcd_omap_probe error path causing
-> an oops.
-
-> On the error path, call usb_remove_hcd if usb_add_hcd has been
-> called, and call usb_put_hcd if usb_alloc_hcd has been called.
-
-> Tested on BB-xM.
-
-> Signed-off-by: Russ.Dill at ti.com
-
-    It should be:
-
-Signed-off-by: Russ Dill <Russ.Dill@ti.com>
-
-WBR, Sergei
+Josh Coombs
