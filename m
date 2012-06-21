@@ -1,117 +1,280 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 21 Jun 2012 12:02:00 +0800
-Subject: [RFC PATCH v2] MTD: nand: add return value for
- write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
-In-Reply-To: <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
-References: <1339567570-4816-1-git-send-email-josh.wu@atmel.com>
- <4FE13CB2.3000605@atmel.com>
- <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
-Message-ID: <4FE29CB8.3000404@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Jun 2012 13:30:16 +0800
+Subject: [PATCH 1/5] DRM: Add i.MX drm core support
+In-Reply-To: <1339681407-28721-2-git-send-email-s.hauer@pengutronix.de>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+ <1339681407-28721-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120621053014.GB3971@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Brian
+On Thu, Jun 14, 2012 at 03:43:23PM +0200, Sascha Hauer wrote:
+...
+> +struct drm_device *imx_drm_device_get(void)
+> +{
+> +	struct imx_drm_device *imxdrm = __imx_drm_device();
+> +	struct imx_drm_encoder *enc;
+> +	struct imx_drm_connector *con;
+> +	struct imx_drm_crtc *crtc;
+> +
+> +	mutex_lock(&imxdrm->mutex);
+> +
+> +	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
+> +		if (!try_module_get(enc->owner)) {
+> +			dev_err(imxdrm->dev, "could not get module %s\n",
+> +					module_name(enc->owner));
+> +			goto unwind_enc;
+> +		}
+> +	}
+> +
+> +	list_for_each_entry(con, &imxdrm->connector_list, list) {
+> +		if (!try_module_get(con->owner)) {
+> +			dev_err(imxdrm->dev, "could not get module %s\n",
+> +					module_name(con->owner));
+> +			goto unwind_con;
+> +		}
+> +	}
+> +
+> +	list_for_each_entry(crtc, &imxdrm->crtc_list, list) {
+> +		if (!try_module_get(crtc->owner)) {
+> +			dev_err(imxdrm->dev, "could not get module %s\n",
+> +					module_name(crtc->owner));
+> +			goto unwind_crtc;
+> +		}
+> +	}
+> +
+> +	imxdrm->references++;
+> +
+> +	mutex_unlock(&imxdrm->mutex);
+> +
+> +	return imx_drm_device->drm;
 
-On 6/21/2012 2:43 AM, Brian Norris wrote:
-> Hi Josh,
->
-> On Tue, Jun 19, 2012 at 8:00 PM, Josh Wu<josh.wu@atmel.com>  wrote:
->> Hi, Artem
->>
->> Ping? Do you have any comments for this patch?
-> I'm not Artem, but I have some comments :)
+Though I'm not quite sure about the point of retrieving the static
+variable imx_drm_device from calling __imx_drm_device(), shouldn't
+imxdrm be used here since you already retrieve it?
 
-sure,  thanks for the comments. :)
+> +
+> +unwind_crtc:
+> +	list_for_each_entry_continue_reverse(crtc, &imxdrm->crtc_list, list)
+> +		module_put(crtc->owner);
+> +unwind_con:
+> +	list_for_each_entry_continue_reverse(con, &imxdrm->connector_list, list)
+> +		module_put(con->owner);
+> +unwind_enc:
+> +	list_for_each_entry_continue_reverse(enc, &imxdrm->encoder_list, list)
+> +		module_put(enc->owner);
+> +
+> +	mutex_unlock(&imxdrm->mutex);
+> +
+> +	return NULL;
+> +
+> +}
+> +EXPORT_SYMBOL_GPL(imx_drm_device_get);
 
->
->> On 6/13/2012 2:06 PM, Josh Wu wrote:
->>> There is an implemention of hardware ECC write page function which may
->>> return an error indication. But now the definition of 'write_page' function
->>> in struct nand_ecc_ctrl is 'void'.
-> I think it would help reviewers (and changelog readers) to note which
-> implementations are the real issue, if there are a small number of
-> implementations targeted.
+...
 
-Currently, I am introducing the atmel pragrammable multibit ECC(PMECC) 
-hardware code to nand flash. I meet following situation that I need 
-change the write_page()'s return value to 'int':
+> +/*
+> + * register a connector to the drm core
+> + */
+> +static int imx_drm_connector_register(
+> +		struct imx_drm_connector *imx_drm_connector)
+> +{
+> +	struct imx_drm_device *imxdrm = __imx_drm_device();
+> +	int ret;
+> +
+> +	drm_connector_init(imxdrm->drm, imx_drm_connector->connector,
+> +			imx_drm_connector->connector->funcs,
+> +			imx_drm_connector->connector->connector_type);
+> +	drm_mode_group_reinit(imxdrm->drm);
+> +	ret = drm_sysfs_connector_add(imx_drm_connector->connector);
+> +	if (ret)
+> +		goto err;
 
-when writing one page into a nand flash with PMECC enabled, the hardware 
-engine will compute the BCH ecc code for this page. so we need read a 
-the status register to theck whether the ecc code is generated.
-But we cannot assume the status register always can be ready, (for 
-instance, incorrect hardware configuration or hardware issue), in such 
-case I need write_page() to return a error code.
+Simply return ret to save the err path?
 
-So this is the reason that I push this patch to change the return value 
-to int.
+> +
+> +	return 0;
+> +err:
+> +
+> +	return ret;
+> +}
 
-> I noticed, for instance, that docg4.c has some strange code involving
-> a return in a void function (comment below). If that is the *only*
-> existing return statement within an 'ecc_ctrl.write_page'
-> implmentation, then this whole patch is unneeded; you can just remove
-> the 'return' in docg4.c.
->
->>> diff --git a/drivers/mtd/nand/docg4.c b/drivers/mtd/nand/docg4.c
->>> index a225e49..0f2ffd7 100644
->>> --- a/drivers/mtd/nand/docg4.c
->>> +++ b/drivers/mtd/nand/docg4.c
-> ...
->>> -static void docg4_write_page_raw(struct mtd_info *mtd, struct nand_chip
->>> *nand,
->>> +static int docg4_write_page_raw(struct mtd_info *mtd, struct nand_chip
->>> *nand,
->>>                                  const uint8_t *buf, int oob_required)
->>>   {
->>>         return write_page(mtd, nand, buf, false);
->>>   }
-> Hmm, this used to be a void function, returning the result of another
-> void function? I would think the compiler would have warned about
-> these issues before. Anyway, this is a useless 'return' statement and
-> can be killed with no real effect.
+...
 
-In original version seems the 'return' is useless. I change this only 
-because the write_page() function's return type is changed.
+> +/*
+> + * imx_drm_add_encoder - add a new encoder
+> + */
+> +int imx_drm_add_encoder(struct drm_encoder *encoder,
+> +		struct imx_drm_encoder **newenc, struct module *owner)
+> +{
+> +	struct imx_drm_device *imxdrm = __imx_drm_device();
+> +	struct imx_drm_encoder *imx_drm_encoder;
+> +	int ret;
+> +
+> +	mutex_lock(&imxdrm->mutex);
+> +
+> +	if (imxdrm->references) {
+> +		ret = -EBUSY;
+> +		goto err_busy;
+> +	}
+> +
+> +	imx_drm_encoder = kzalloc(sizeof(struct imx_drm_encoder), GFP_KERNEL);
 
->
->>> -static void docg4_write_page(struct mtd_info *mtd, struct nand_chip
->>> *nand,
->>> +static int docg4_write_page(struct mtd_info *mtd, struct nand_chip *nand,
->>>                              const uint8_t *buf, int oob_required)
->>>   {
->>>         return write_page(mtd, nand, buf, true);
-> Ditto. Are these the only "issues" being addressed in this patch?
+sizeof(*imx_drm_encoder)
 
-No. This is not the reason for this patch as I said above.
+> +	if (!imx_drm_encoder) {
+> +		ret = -ENOMEM;
+> +		goto err_alloc;
+> +	}
+> +
+> +	imx_drm_encoder->encoder = encoder;
+> +	imx_drm_encoder->owner = owner;
+> +
+> +	ret = imx_drm_encoder_register(imx_drm_encoder);
+> +	if (ret) {
+> +		kfree(imx_drm_encoder);
+> +		ret = -ENOMEM;
+> +		goto err_register;
+> +	}
+> +
+> +	list_add_tail(&imx_drm_encoder->list, &imxdrm->encoder_list);
+> +
+> +	*newenc = imx_drm_encoder;
+> +
+> +	mutex_unlock(&imxdrm->mutex);
+> +
+> +	return 0;
+> +
+> +err_register:
+> +	kfree(imx_drm_encoder);
+> +err_alloc:
+> +err_busy:
+> +	mutex_unlock(&imxdrm->mutex);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(imx_drm_add_encoder);
 
->
->>> --- a/drivers/mtd/nand/nand_base.c
->>> +++ b/drivers/mtd/nand/nand_base.c
-> ...
->>> @@ -2096,9 +2104,14 @@ static int nand_write_page(struct mtd_info *mtd,
->>> struct nand_chip *chip,
->>>         chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
->>>
->>>         if (unlikely(raw))
->>> -               chip->ecc.write_page_raw(mtd, chip, buf, oob_required);
->>> +               status = chip->ecc.write_page_raw(mtd, chip, buf,
->>> oob_required);
->>>         else
->>> -               chip->ecc.write_page(mtd, chip, buf, oob_required);
->>> +               status = chip->ecc.write_page(mtd, chip, buf, oob_required);
->>> +
->>> +       if (status<    0) {
->>> +               pr_warn("Error happened when calling nand_write_page()\n");
->>> +               return status;
->>> +       }
-> I'm not sure this is the most informative error message. (Similar
-> comment applies in cafe_nand.c, which imitates a lot of nand_base.c
-> code)
+...
 
-Maybe in this case I need print the error code as well.
+> +/*
+> + * imx_drm_add_connector - add a connector
+> + */
+> +int imx_drm_add_connector(struct drm_connector *connector,
+> +		struct imx_drm_connector **new_con,
+> +		struct module *owner)
+> +{
+> +	struct imx_drm_device *imxdrm = __imx_drm_device();
+> +	struct imx_drm_connector *imx_drm_connector;
+> +	int ret;
+> +
+> +	mutex_lock(&imxdrm->mutex);
+> +
+> +	if (imxdrm->references) {
+> +		ret = -EBUSY;
+> +		goto err_busy;
+> +	}
+> +
+> +	imx_drm_connector = kzalloc(sizeof(struct imx_drm_connector),
 
->
-> Brian
+sizeof(*imx_drm_connector)
 
-Best Regards,
-Josh Wu
+> +			GFP_KERNEL);
+> +	if (!imx_drm_connector) {
+> +		ret = -ENOMEM;
+> +		goto err_alloc;
+> +	}
+> +
+> +	imx_drm_connector->connector = connector;
+> +	imx_drm_connector->owner = owner;
+> +
+> +	ret = imx_drm_connector_register(imx_drm_connector);
+> +	if (ret)
+> +		goto err_register;
+> +
+> +	list_add_tail(&imx_drm_connector->list, &imxdrm->connector_list);
+> +
+> +	*new_con = imx_drm_connector;
+> +
+> +	mutex_unlock(&imxdrm->mutex);
+> +
+> +	return 0;
+> +
+> +err_register:
+> +	kfree(imx_drm_connector);
+> +err_alloc:
+> +err_busy:
+> +	mutex_unlock(&imxdrm->mutex);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(imx_drm_add_connector);
+
+...
+
+> +static int __init imx_drm_init(void)
+> +{
+> +	int ret;
+> +
+> +	imx_drm_device = kzalloc(sizeof(*imx_drm_device), GFP_KERNEL);
+> +	if (!imx_drm_device)
+> +		return -ENOMEM;
+> +
+> +	mutex_init(&imx_drm_device->mutex);
+> +	INIT_LIST_HEAD(&imx_drm_device->crtc_list);
+> +	INIT_LIST_HEAD(&imx_drm_device->connector_list);
+> +	INIT_LIST_HEAD(&imx_drm_device->encoder_list);
+> +
+> +	imx_drm_pdev = platform_device_register_simple("imx-drm", -1, NULL, 0);
+> +	if (!imx_drm_pdev) {
+> +		ret = -EINVAL;
+> +		goto err_pdev;
+> +	}
+> +
+> +	imx_drm_pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32),
+> +
+> +	ret = platform_driver_register(&imx_drm_pdrv);
+> +	if (ret)
+> +		goto err_pdrv;
+> +
+> +	return 0;
+> +
+> +err_pdev:
+> +	kfree(imx_drm_device);
+> +err_pdrv:
+> +	platform_device_unregister(imx_drm_pdev);
+
+The order between these two blocks looks wrong.
+
+> +
+> +	return ret;
+> +}
+
+...
+
+> +static int __init imx_fb_helper_init(void)
+> +{
+> +	struct drm_device *drm = imx_drm_device_get();
+> +
+> +	if (!drm)
+> +		return -EINVAL;
+> +
+> +	fbdev_cma = drm_fbdev_cma_init(drm, PREFERRED_BPP,
+> +			drm->mode_config.num_crtc, MAX_CONNECTOR);
+> +
+> +	imx_drm_fb_helper_set(fbdev_cma);
+> +
+> +	if (IS_ERR(fbdev_cma)) {
+> +		imx_drm_device_put();
+> +		return PTR_ERR(fbdev_cma);
+> +	}
+
+Shouldn't this error check be put right after drm_fbdev_cma_init call?
+
+> +
+> +	return 0;
+> +}
+
+-- 
+Regards,
+Shawn
