@@ -1,106 +1,82 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Jun 2012 16:13:26 -0600
-Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based
- pinctrl driver
-In-Reply-To: <20120619135600.GX12766@atomide.com>
-References: <20120611135826.GB12766@atomide.com>
- <4FDA6FCD.1020605@wwwdotorg.org> <20120615094938.GQ12766@atomide.com>
- <4FDB6000.5080703@wwwdotorg.org> <20120618055036.GU12766@atomide.com>
- <20120619135600.GX12766@atomide.com>
-Message-ID: <4FE39C86.5070901@wwwdotorg.org>
+Date: Thu, 21 Jun 2012 16:22:26 -0600
+Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803BE3E73@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
+ <4FD8AD42.6010702@gmail.com> <20120613152841.GA23590@richard-laptop>
+ <4FD8C4DB.4020908@gmail.com>
+ <20120614013343.GD29684@b20223-02.ap.freescale.net>
+ <4FE1DE53.4070202@gmail.com> <4FE1EF26.9080401@wwwdotorg.org>
+ <F281D0F91ED19E4D8E63A7504E8A649803BE3E73@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <4FE39EA2.8050809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2012 07:56 AM, Tony Lindgren wrote:
-> Hi,
+On 06/20/2012 07:32 PM, Chen Peter-B29397 wrote:
+>  
+>> I haven't been following the thread, but just noticed it. Very similar
+>> things (DT nodes for probed devices) are coming up quite a bit recently,
+>> for example:
+>>
+>> Re: Where to power on the wifi device before loading the driver.
+>> http://www.spinics.net/lists/arm-kernel/msg180368.html
+>>
+>> dt: rfkill-gpio: add bindings documentation
+>> http://www.spinics.net/lists/linux-tegra/msg03977.html
+>>
+>> I wonder if there's any kind of infra-structure or standardized bindings
+>> that would be useful here?
 > 
-> Below is the pinctrl-single patch updated with hopefully all the Stephen's
-> comments addressed. The binding still needs to be looked at, see relevant
-> parts of the discussion below.
-...
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 6 Jun 2012 04:18:18 -0700
-> Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based pinctrl driver
+> Hi Stephen,
+> For your suggestion: 
 > 
-> Add one-register-per-pin type device tree based pinctrl driver.
+> sdhci at 78000000 {
+> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+> 	reg = <0x78000000 0x200>;
+> 	interrupts = <0 14 0x04>;
 > 
-> Currently this driver only works on omap2+ series of processors,
-> where there is either an 8 or 16-bit padconf register for each pin.
-> Support for other similar pinmux controllers can be added.
+> 	sdio-device {
+> 		reset-gpios = <...>;
+> 		enable-gpios = <...>;
+> 	};
+> };
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-> new file mode 100644
-> index 0000000..929254c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-> @@ -0,0 +1,106 @@
-> +One-register-per-pin type device tree based pinctrl driver
-> +
-> +Required properties:
-> +- compatible : "pinctrl-single"
-> +
-> +- reg : offset and length of the register set for the mux registers
-> +
-> +- pinctrl-single,register-width : pinmux register access width in bits
-> +
-> +- pinctrl-single,function-mask : mask of allowed pinmux function bits
-> +  in the pinmux register
-> +
-> +- pinctrl-single,pinconf-mask : mask of allowed pinconf bits in the
-> +  pinmux register; this gets combined with pinconf mask but is a separate
-> +  mask to allow the option of setting pinconf separatately from the
-> +  function
+> I have a question, if reset-gpio or enable-gpio is not set, how bus (sd or usb) know
+> it is a sdio device as the wifi is not powered on at the time, it will not response host's
+> command,  the hub at usb bus is the same.
 
-Given that this binding doesn't allow describing pin configuration at
-present, I would simply remove all mention of that property in the
-binding documentation. It can be added back if/when that feature is
-added. Any future driver using this binding can refuse to allow pin
-configuration if that property is missing.
+That's a good point. We need those properties to be part of the device
+that controls the port/slot/connector, not the thing that plugs into it.
+Having each such binding and driver implement this themselves might not
+be a good idea though. Perhaps we can standardize on a mechanism for
+this; something vaguely like rfkill, but for arbitrary types of devices
+connected to ports.
 
-> +- pinctrl-single,function-off : function off mode for disabled state if
-> +  available and same for all registers; if not, use a value larger than
-> +  function-mask to ignore disabling of registers
+For USB at least, where the power/reset/... GPIOs might affect just one
+port on a hub rather than the root USB host controller, the issue of
+representing these properties on a dynamically probed device still
+applies. Something like:
 
-Rather than requiring an invalid value in this property, shouldn't the
-lack of a valid function-off value be represented by the property not
-being present in the DT?
+ehci {
+    /* The following node is dynamically detected, although the hub
+     * IC is physically soldered onto the board
+     */
+    hub {
+        hub { /* also dynamic */
+            port at 2 {
+                child-supply = <&regulator>;
+                reset-gpios = <&gpio 0 0>;
+            };
+        };
+    };
+};
 
-> +This driver assumes that there is only one register for each pin,
-> +and uses the common pinctrl bindings as specified in the pinctrl-bindings.txt
-> +document in this directory.
-
-At this point in the file, I think you need to mention that you're
-switching from describing the top-level device node to describing pin
-configuration nodes.
-
-> +The pinctrl register offsets and default values are specified as pairs
-
-I thought we were going to remove "default" here?
-
-> +using pinctrl-single,pins. For example, setting a pin for a device
-> +could be done with:
-> +
-> +	pinctrl-single,pins = <0xdc 0x118>;
-> +
-> +Where 0xdc is the offset from the pinctrl register base address for the
-> +device pinctrl register, and 0x118 contains the desired value of the
-> +pinctrl register. See the device example and static board pins example
-> +below for more information.
-
-There should be some explanation only the portion of this value covered
-by the pinctrl-single,function-mask value is updated in the register.
-
-> +This driver tries to avoid understanding pin and function names because of
-> +the extra bloat they would cause especially in the case of a large number
-> +of pins. This driver just sets what is specified for the board in the .dts file.
-> +Further user space debugging tools can be developed to decipher the pin and
-> +function names using debugfs.
-
-There shouldn't be any discussion of a driver here; the binding is a HW
-description.
-
-> +Example:
-
-I only reviewed the binding document, not the code.
+But without knowing what might be connected to port at 2, how do we know
+how to sequence the power supply and reset GPIOs according to its
+requirements? I guess this is part of the specification of the port
+itself though, not the attached device, since anything that is allowed
+to plug in must conform to whatever sequencing the port is designed to
+give. If the connected device is known, the port at 2 node in DT can encode
+whatever sequencing requirements are associated with the known connected
+device.
