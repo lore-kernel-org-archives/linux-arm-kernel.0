@@ -1,30 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 21 Jun 2012 11:15:36 +0100
-Subject: [V2 1/3] regulator: add pre-regulator support for 88pm860x
-In-Reply-To: <1340259538-24239-1-git-send-email-jtzhou@marvell.com>
-References: <1340259538-24239-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20120621101536.GR4037@opensource.wolfsonmicro.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Thu, 21 Jun 2012 03:44:31 -0700
+Subject: [PATCH 1/2] ARM: OMAP: USB: Fixup ehci_hcd_omap_probe error path
+In-Reply-To: <CA+Bv8XZ-g26_3Hv9xgDvwRooUeZwaKtZJwvnxxEZHcFx06es7Q@mail.gmail.com>
+References: <CA+Bv8XZ-g26_3Hv9xgDvwRooUeZwaKtZJwvnxxEZHcFx06es7Q@mail.gmail.com>
+Message-ID: <1340275473-16374-1-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 02:18:58PM +0800, Jett.Zhou wrote:
+A recent commit, [PATCH] Fix OMAP EHCI suspend/resume failure
+(i693) '354ab856' causes ehci probe to fail on omap3xxx. This
+exposed bugs in the ehci_hcd_omap_probe error path causing
+an oops.
 
-> +static struct regulator_consumer_supply preg_supply[] = {
-> +	REGULATOR_SUPPLY("preg", NULL),
-> +};
+On the error path, call usb_remove_hcd if usb_add_hcd has been
+called, and call usb_put_hcd if usb_alloc_hcd has been called.
 
-This looks wrong, why is there no dev_name being specified?
+Tested on BB-xM.
 
-> +static struct regulator_init_data preg_init_data = {
-> +	.num_consumer_supplies	= 1,
-> +	.consumer_supplies	= &preg_supply[0],
-> +};
+Signed-off-by: Russ.Dill at ti.com
+---
+ drivers/usb/host/ehci-omap.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Use ARRAY_SIZE() since it's an array.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/bea6d848/attachment.sig>
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 17cfb8a..6e15fc8 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -347,7 +347,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (ret) {
+ 		dev_err(dev, "failed to add hcd with err %d\n", ret);
+-		goto err_add_hcd;
++		goto err_pm_runtime;
+ 	}
+ 
+ 	/* root ports should always stay powered */
+@@ -424,8 +424,12 @@ err_utmi_p1_fck:
+ 	clk_put(utmi_p1_fck);
+ 
+ err_add_hcd:
++	usb_remove_hcd(hcd);
++
++err_pm_runtime:
+ 	disable_put_regulator(pdata);
+ 	pm_runtime_put_sync(dev);
++	usb_put_hcd(hcd);
+ 
+ err_io:
+ 	iounmap(regs);
+-- 
+1.7.10.4
