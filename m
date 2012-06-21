@@ -1,76 +1,43 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 21 Jun 2012 14:41:01 +0800
-Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
-Message-ID: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+Date: Thu, 21 Jun 2012 14:41:03 +0800
+Subject: [PATCH v6 02/14] usb: chipidea: drop useless arch-check
+In-Reply-To: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340260875-21934-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The work is based on  ci13xxx rework done by Alexander Shishkin.
+From: Felipe Balbi <balbi@ti.com>
 
-To let Greg pick up, I also added patches Alex queued that I depends on.
-Patch #1 - #9 : It can also be found at
-http://github.com/virtuoso/linux-ci.git ci
+msm glue layer compiles on all arches just
+fine. Let's drop the unnecessary ARCH check
+so we have easier compile tests.
 
-This patch series can also be found at:
-https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+---
+ drivers/usb/chipidea/Makefile |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Status:
-  - this version only support host
-  - usbotg controler works at host role
-
-Changes since last version:
- - Add patches from Alex's git tree that it depends
- - Rebase to Greg's git tree
- - Move arch/arm patches to other series
- - dev_err fixes as Sascha comment
- - Add MODULE_DEVICE_TABLE
-
-Alexander Shishkin (1):
-  usb: chipidea: remove unneeded NULL check
-
-Felipe Balbi (3):
-  usb: chipidea: drop useless arch-check
-  usb: chipidea: msm: add missing section annotation
-  usb: chipidea: msm: add remove method
-
-Richard Zhao (10):
-  USB: Chipidea: rename struct ci13xxx_udc_driver to struct
-    ci13xxx_platform_data
-  USB: Chipidea: rename struct ci13xxx variables from udc to ci
-  USB: Chipidea: add unified ci13xxx_{add,remove}_device for platform
-    drivers
-  USB: Chipidea: add ci13xxx device id management
-  usb: chipidea: select USB_EHCI_ROOT_HUB_TT in USB_CHIPIDEA_HOST of
-    Kconfig
-  usb: otg: add notify_connect/notify_disconnect callback
-  USB: notify phy when root hub port connect change
-  usb: chipidea: permit driver bindings pass phy pointer
-  usb: otg: add basic mxs phy driver support
-  usb: chipidea: add imx platform driver
-
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |   20 +
- Documentation/devicetree/bindings/usb/mxs-phy.txt  |   13 +
- drivers/usb/chipidea/Kconfig                       |    1 +
- drivers/usb/chipidea/Makefile                      |    9 +-
- drivers/usb/chipidea/ci.h                          |   32 +-
- drivers/usb/chipidea/ci13xxx_imx.c                 |  197 ++++++
- drivers/usb/chipidea/ci13xxx_msm.c                 |   62 +-
- drivers/usb/chipidea/ci13xxx_pci.c                 |   52 +-
- drivers/usb/chipidea/core.c                        |   70 ++-
- drivers/usb/chipidea/debug.c                       |  146 ++---
- drivers/usb/chipidea/host.c                        |    3 +-
- drivers/usb/chipidea/udc.c                         |  636 ++++++++++----------
- drivers/usb/core/hub.c                             |    8 +
- drivers/usb/otg/Kconfig                            |    9 +
- drivers/usb/otg/Makefile                           |    1 +
- drivers/usb/otg/mxs-phy.c                          |  197 ++++++
- include/linux/usb/chipidea.h                       |   14 +-
- include/linux/usb/otg.h                            |   21 +
- 18 files changed, 1000 insertions(+), 491 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
- create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
- create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
- create mode 100644 drivers/usb/otg/mxs-phy.c
-
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index cc34937..b69900a 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -5,10 +5,12 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+ 
++# Glue/Bridge layers go here
++
++obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
++
++# PCI doesn't provide stubs, need to check
+ ifneq ($(CONFIG_PCI),)
+ 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
+ endif
+ 
+-ifneq ($(CONFIG_ARCH_MSM),)
+-	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
+-endif
 -- 
 1.7.9.5
