@@ -1,31 +1,101 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 20 Jun 2012 16:55:26 -0700
-Subject: [PATCH] serial: samsung: protect NULL dereference of clock name
-In-Reply-To: <029001cd4e9d$2f2af9b0$8d80ed10$%kim@samsung.com>
-References: <001401cd3e3e$644fd3a0$2cef7ae0$%kim@samsung.com>
- <029001cd4e9d$2f2af9b0$8d80ed10$%kim@samsung.com>
-Message-ID: <20120620235526.GB31520@kroah.com>
+From: namhyung@kernel.org (Namhyung Kim)
+Date: Thu, 21 Jun 2012 09:01:09 +0900
+Subject: [PATCH v3 2/5] ARM: topology: factorize the update of sibling
+ masks
+In-Reply-To: <1340205562-7653-3-git-send-email-vincent.guittot@linaro.org>
+ (Vincent Guittot's message of "Wed, 20 Jun 2012 17:19:19 +0200")
+References: <1340205562-7653-1-git-send-email-vincent.guittot@linaro.org>
+ <1340205562-7653-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <87txy5fs8q.fsf@sejong.aot.lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:28:47PM +0900, Kukjin Kim wrote:
-> Kyoungil Kim wrote:
-> > 
-> > From: KeyYoung Park <keyyoung.park@samsung.com>
-> > 
-> > When priting the serial clock source, if clock source name is null,
-> > kernel reference NULL point.
-> > 
-> > Signed-off-by: KeyYoung Park <keyyoung.park@samsung.com>
-> > Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
-> > Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
-> 
-> (Cc'ed Greg)
-> 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Greg, could you please pick this up?
+On Wed, 20 Jun 2012 17:19:19 +0200, Vincent Guittot wrote:
+> This factorization has also been proposed in another patchset that has not been
+> merged yet:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html
+> So, this patch could be dropped depending of the state of the other one.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-Already have, thanks.
+Reviewed-by: Namhyung Kim <namhyung@kernel.org>
 
-greg k-h
+
+> ---
+>  arch/arm/kernel/topology.c |   48 +++++++++++++++++++++++++-------------------
+>  1 file changed, 27 insertions(+), 21 deletions(-)
+>
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index 51f23b3..eb5fc81 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -82,6 +82,32 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
+>  	return &cpu_topology[cpu].core_sibling;
+>  }
+>  
+> +void update_siblings_masks(unsigned int cpuid)
+> +{
+> +	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
+> +	int cpu;
+> +
+> +	/* update core and thread sibling masks */
+> +	for_each_possible_cpu(cpu) {
+> +		cpu_topo = &cpu_topology[cpu];
+> +
+> +		if (cpuid_topo->socket_id != cpu_topo->socket_id)
+> +			continue;
+> +
+> +		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+> +		if (cpu != cpuid)
+> +			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
+> +
+> +		if (cpuid_topo->core_id != cpu_topo->core_id)
+> +			continue;
+> +
+> +		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
+> +		if (cpu != cpuid)
+> +			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
+> +	}
+> +	smp_wmb();
+> +}
+> +
+>  /*
+>   * store_cpu_topology is called at boot when only one cpu is running
+>   * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
+> @@ -91,7 +117,6 @@ void store_cpu_topology(unsigned int cpuid)
+>  {
+>  	struct cputopo_arm *cpuid_topo = &cpu_topology[cpuid];
+>  	unsigned int mpidr;
+> -	unsigned int cpu;
+>  
+>  	/* If the cpu topology has been already set, just return */
+>  	if (cpuid_topo->core_id != -1)
+> @@ -133,26 +158,7 @@ void store_cpu_topology(unsigned int cpuid)
+>  		cpuid_topo->socket_id = -1;
+>  	}
+>  
+> -	/* update core and thread sibling masks */
+> -	for_each_possible_cpu(cpu) {
+> -		struct cputopo_arm *cpu_topo = &cpu_topology[cpu];
+> -
+> -		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
+> -			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+> -			if (cpu != cpuid)
+> -				cpumask_set_cpu(cpu,
+> -					&cpuid_topo->core_sibling);
+> -
+> -			if (cpuid_topo->core_id == cpu_topo->core_id) {
+> -				cpumask_set_cpu(cpuid,
+> -					&cpu_topo->thread_sibling);
+> -				if (cpu != cpuid)
+> -					cpumask_set_cpu(cpu,
+> -						&cpuid_topo->thread_sibling);
+> -			}
+> -		}
+> -	}
+> -	smp_wmb();
+> +	update_siblings_masks(cpuid);
+>  
+>  	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
+>  		cpuid, cpu_topology[cpuid].thread_id,
