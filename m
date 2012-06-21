@@ -1,47 +1,175 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Thu, 21 Jun 2012 10:58:01 -0700
-Subject: [RFC PATCH v2] MTD: nand: add return value for
- write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
-In-Reply-To: <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
-References: <1339567570-4816-1-git-send-email-josh.wu@atmel.com>
- <4FE13CB2.3000605@atmel.com>
- <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
-Message-ID: <4FE360A9.4040102@newsguy.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 21 Jun 2012 20:04:25 +0200
+Subject: [PATCH] clk: mxs: mx23,
+ mx28: fix clock lookup after freeing init memory
+Message-ID: <1340301865-15815-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 11:43 AM, Brian Norris wrote:
-> 
-> I noticed, for instance, that docg4.c has some strange code involving
-> a return in a void function (comment below). If that is the *only*
-> existing return statement within an 'ecc_ctrl.write_page'
-> implmentation, then this whole patch is unneeded; you can just remove
-> the 'return' in docg4.c.
-> 
->>> diff --git a/drivers/mtd/nand/docg4.c b/drivers/mtd/nand/docg4.c
->>> index a225e49..0f2ffd7 100644
->>> --- a/drivers/mtd/nand/docg4.c
->>> +++ b/drivers/mtd/nand/docg4.c
-> ...
->>> -static void docg4_write_page_raw(struct mtd_info *mtd, struct nand_chip
->>> *nand,
->>> +static int docg4_write_page_raw(struct mtd_info *mtd, struct nand_chip
->>> *nand,
->>>                                 const uint8_t *buf, int oob_required)
->>>  {
->>>        return write_page(mtd, nand, buf, false);
->>>  }
-> 
-> Hmm, this used to be a void function, returning the result of another
-> void function? I would think the compiler would have warned about
-> these issues before. Anyway, this is a useless 'return' statement and
-> can be killed with no real effect.
+The struct clk_lookup are marked as __initdata, resulting in beeing
+removed from memory after the kernel finished booting. However this
+leads to a NULL pointer de-ref if loading a module which uses clk_get.
+
+This patch removes the __initdata from the struct clk_lookup.
+
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+This patch applies to v3.5-rc3. Maybe I've missed some upstream patch.
+
+Marc
 
 
-Oops, yes, this must have been a careless mistake when I combined the read_page
-and read_page_raw functions into one, with wrappers for each case.  Oddly, no
-compiler warning.  I'm trying to get around to putting together a patch with a
-couple minor fixes for the docg4, and I'll add this to the list.
+ drivers/clk/mxs/clk-imx23.c |   12 ++++++------
+ drivers/clk/mxs/clk-imx28.c |   28 ++++++++++++++--------------
+ 2 files changed, 20 insertions(+), 20 deletions(-)
 
-Thanks Brian,
-Mike
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index f7be225..db2391c 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -71,7 +71,7 @@ static void __init clk_misc_init(void)
+ 	__mxs_setl(30 << BP_FRAC_IOFRAC, FRAC);
+ }
+ 
+-static struct clk_lookup uart_lookups[] __initdata = {
++static struct clk_lookup uart_lookups[] = {
+ 	{ .dev_id = "duart", },
+ 	{ .dev_id = "mxs-auart.0", },
+ 	{ .dev_id = "mxs-auart.1", },
+@@ -80,31 +80,31 @@ static struct clk_lookup uart_lookups[] __initdata = {
+ 	{ .dev_id = "80070000.serial", },
+ };
+ 
+-static struct clk_lookup hbus_lookups[] __initdata = {
++static struct clk_lookup hbus_lookups[] = {
+ 	{ .dev_id = "imx23-dma-apbh", },
+ 	{ .dev_id = "80004000.dma-apbh", },
+ };
+ 
+-static struct clk_lookup xbus_lookups[] __initdata = {
++static struct clk_lookup xbus_lookups[] = {
+ 	{ .dev_id = "duart", .con_id = "apb_pclk"},
+ 	{ .dev_id = "80070000.serial", .con_id = "apb_pclk"},
+ 	{ .dev_id = "imx23-dma-apbx", },
+ 	{ .dev_id = "80024000.dma-apbx", },
+ };
+ 
+-static struct clk_lookup ssp_lookups[] __initdata = {
++static struct clk_lookup ssp_lookups[] = {
+ 	{ .dev_id = "imx23-mmc.0", },
+ 	{ .dev_id = "imx23-mmc.1", },
+ 	{ .dev_id = "80010000.ssp", },
+ 	{ .dev_id = "80034000.ssp", },
+ };
+ 
+-static struct clk_lookup lcdif_lookups[] __initdata = {
++static struct clk_lookup lcdif_lookups[] = {
+ 	{ .dev_id = "imx23-fb", },
+ 	{ .dev_id = "80030000.lcdif", },
+ };
+ 
+-static struct clk_lookup gpmi_lookups[] __initdata = {
++static struct clk_lookup gpmi_lookups[] = {
+ 	{ .dev_id = "imx23-gpmi-nand", },
+ 	{ .dev_id = "8000c000.gpmi", },
+ };
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 2826a26..db69962 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -120,7 +120,7 @@ static void __init clk_misc_init(void)
+ 	writel_relaxed(val, FRAC0);
+ }
+ 
+-static struct clk_lookup uart_lookups[] __initdata = {
++static struct clk_lookup uart_lookups[] = {
+ 	{ .dev_id = "duart", },
+ 	{ .dev_id = "mxs-auart.0", },
+ 	{ .dev_id = "mxs-auart.1", },
+@@ -135,71 +135,71 @@ static struct clk_lookup uart_lookups[] __initdata = {
+ 	{ .dev_id = "80074000.serial", },
+ };
+ 
+-static struct clk_lookup hbus_lookups[] __initdata = {
++static struct clk_lookup hbus_lookups[] = {
+ 	{ .dev_id = "imx28-dma-apbh", },
+ 	{ .dev_id = "80004000.dma-apbh", },
+ };
+ 
+-static struct clk_lookup xbus_lookups[] __initdata = {
++static struct clk_lookup xbus_lookups[] = {
+ 	{ .dev_id = "duart", .con_id = "apb_pclk"},
+ 	{ .dev_id = "80074000.serial", .con_id = "apb_pclk"},
+ 	{ .dev_id = "imx28-dma-apbx", },
+ 	{ .dev_id = "80024000.dma-apbx", },
+ };
+ 
+-static struct clk_lookup ssp0_lookups[] __initdata = {
++static struct clk_lookup ssp0_lookups[] = {
+ 	{ .dev_id = "imx28-mmc.0", },
+ 	{ .dev_id = "80010000.ssp", },
+ };
+ 
+-static struct clk_lookup ssp1_lookups[] __initdata = {
++static struct clk_lookup ssp1_lookups[] = {
+ 	{ .dev_id = "imx28-mmc.1", },
+ 	{ .dev_id = "80012000.ssp", },
+ };
+ 
+-static struct clk_lookup ssp2_lookups[] __initdata = {
++static struct clk_lookup ssp2_lookups[] = {
+ 	{ .dev_id = "imx28-mmc.2", },
+ 	{ .dev_id = "80014000.ssp", },
+ };
+ 
+-static struct clk_lookup ssp3_lookups[] __initdata = {
++static struct clk_lookup ssp3_lookups[] = {
+ 	{ .dev_id = "imx28-mmc.3", },
+ 	{ .dev_id = "80016000.ssp", },
+ };
+ 
+-static struct clk_lookup lcdif_lookups[] __initdata = {
++static struct clk_lookup lcdif_lookups[] = {
+ 	{ .dev_id = "imx28-fb", },
+ 	{ .dev_id = "80030000.lcdif", },
+ };
+ 
+-static struct clk_lookup gpmi_lookups[] __initdata = {
++static struct clk_lookup gpmi_lookups[] = {
+ 	{ .dev_id = "imx28-gpmi-nand", },
+ 	{ .dev_id = "8000c000.gpmi", },
+ };
+ 
+-static struct clk_lookup fec_lookups[] __initdata = {
++static struct clk_lookup fec_lookups[] = {
+ 	{ .dev_id = "imx28-fec.0", },
+ 	{ .dev_id = "imx28-fec.1", },
+ 	{ .dev_id = "800f0000.ethernet", },
+ 	{ .dev_id = "800f4000.ethernet", },
+ };
+ 
+-static struct clk_lookup can0_lookups[] __initdata = {
++static struct clk_lookup can0_lookups[] = {
+ 	{ .dev_id = "flexcan.0", },
+ 	{ .dev_id = "80032000.can", },
+ };
+ 
+-static struct clk_lookup can1_lookups[] __initdata = {
++static struct clk_lookup can1_lookups[] = {
+ 	{ .dev_id = "flexcan.1", },
+ 	{ .dev_id = "80034000.can", },
+ };
+ 
+-static struct clk_lookup saif0_lookups[] __initdata = {
++static struct clk_lookup saif0_lookups[] = {
+ 	{ .dev_id = "mxs-saif.0", },
+ 	{ .dev_id = "80042000.saif", },
+ };
+ 
+-static struct clk_lookup saif1_lookups[] __initdata = {
++static struct clk_lookup saif1_lookups[] = {
+ 	{ .dev_id = "mxs-saif.1", },
+ 	{ .dev_id = "80046000.saif", },
+ };
+-- 
+1.7.10
