@@ -1,23 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Jun 2012 13:35:56 +0800
-Subject: [PATCH 2/5] DRM i.MX: Add parallel display support
-In-Reply-To: <1339681407-28721-3-git-send-email-s.hauer@pengutronix.de>
-References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
- <1339681407-28721-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120621053554.GC3971@S2101-09.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 21 Jun 2012 11:06:06 +0530
+Subject: [PATCH 04/29] ARM: omap: clk: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <20120620114149.GG12766@atomide.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-5-git-send-email-rnayak@ti.com>
+ <20120614191147.GP19410@gmail.com> <4FDAC07A.7020702@ti.com>
+ <20120620114149.GG12766@atomide.com>
+Message-ID: <4FE2B2C6.4010904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 03:43:24PM +0200, Sascha Hauer wrote:
-> +static const struct of_device_id imx_pd_dt_ids[] = {
-> +	{ .compatible = "fsl,imx-parallel-display", .data = NULL, },
+On Wednesday 20 June 2012 05:11 PM, Tony Lindgren wrote:
+> * Rajendra Nayak<rnayak@ti.com>  [120614 22:01]:
+>> On Friday 15 June 2012 12:41 AM, Mike Turquette wrote:
+>>> On 20120614-18:16, Rajendra Nayak wrote:
+>>>> As we move to Common clk framework use clk_prepare_enable()
+>>>> instead of clk_enable() and similarly clk_disable_unprepare()
+>>>> instead of clk_disable()
+>>>>
+>>>> Based on initial changes from Mike turquette.
+>
+> Sounds like these kind of patches should be a separate series
+> to prepare for the common clk fwk conversion? It seems these
+> could already get merged separately?
 
-Can we use particular soc name to define the compatible string?  Also,
-the .data initialization seems not needed.
+yes, I will post them out separately as a preparatory series for
+CCF conversion.
 
-> +	{ /* sentinel */ }
-> +};
+I also have some to get rid of the omap_clk_get_by_name() usage and
+direct dereferencing of 'struct clk'.
 
--- 
-Regards,
-Shawn
+Paul, are you ok to look at them as preparatory patches for CCF
+conversion too?
+
+>
+> Tony
