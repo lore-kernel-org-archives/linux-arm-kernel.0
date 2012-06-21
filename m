@@ -1,45 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jun 2012 08:37:58 +0100
-Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq
- number
-In-Reply-To: <20120620233614.GH2253@S2101-09.ap.freescale.net>
-References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
- <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
- <20120618143128.GF19249@S2101-09.ap.freescale.net>
- <20120618164402.GA18630@n2100.arm.linux.org.uk>
- <20120619052654.GC21951@S2101-09.ap.freescale.net>
- <20120620225520.GA30087@n2100.arm.linux.org.uk>
- <20120620233614.GH2253@S2101-09.ap.freescale.net>
-Message-ID: <20120621073758.GA16617@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Jun 2012 09:48:59 +0200
+Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
+In-Reply-To: <20120620143140.GA7817@linux-sh.org>
+References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
+ <20110808081552.GI32513@linux-sh.org>
+ <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
+ <CAH9JG2V-66Wn7nwJz6tOkESoQAUJzAg-47YeMY0vzwu6T9O=Rg@mail.gmail.com>
+ <4E40912C.5040801@codeaurora.org>
+ <CACRpkdZUxYP0Mbe+heEwrZE5VC+J42g_-QAusrOsUuBPT324Hw@mail.gmail.com>
+ <CAGsJ_4y38KBDfjZS_k-QfDUUFAtEwE-ciUgNOA0U2juOBeoXEA@mail.gmail.com>
+ <CACRpkdazTKs_sNHVkVAYdz6CK9fwghf2n-Rrs7fi7R1Z=Gt+3w@mail.gmail.com>
+ <20120620143140.GA7817@linux-sh.org>
+Message-ID: <CACRpkdZE45cSUTKBfJ=sqmw35MG1f_2s=Jyh350QXpATT_wFxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 07:53:20AM +0800, Shawn Guo wrote:
-> On Wed, Jun 20, 2012 at 11:55:20PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jun 19, 2012 at 01:26:56PM +0800, Shawn Guo wrote:
-> > > On Mon, Jun 18, 2012 at 05:44:02PM +0100, Russell King - ARM Linux wrote:
-> > > > FIQs should be an entirely separate number space from IRQs, as we
-> > > > may want to totally decouple them from the IRQ stuff (we probably
-> > > > should have already done this when genirq came along.)
-> > > > 
-> > > > About the only stuff FIQs use is the enable/disable_irq as a short
-> > > > cut to dealing with the mask registers.
-> > > 
-> > > I do not quite understand what you are asking for, but I'm guessing it
-> > > with the patch below.  Please elaborate it a little bit more if that's
-> > > not what you are asking for.
-> > 
-> > I was thinking about moving entirely away from any bits of genirq for
-> > this.  We shouldn't really be mixing these two things together by
-> > nabbing some of the IRQ numberspace for this.
-> > 
-> > Looking at this code, I'm thinking about taking this further, and
-> > santising the whole thing... though that's not going to be a quick
-> > change.
-> 
-> What I'm looking for is a quick and safe fixing for a compile error
-> when SPARSE_IRQ enabled for imx.  Can we take the original patch as
-> it is and defer the whole cleanup to another series?
+On Wed, Jun 20, 2012 at 4:31 PM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Wed, Jun 20, 2012 at 10:15:01AM +0200, Linus Walleij wrote:
+>> On Tue, Jun 19, 2012 at 5:25 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> > but i think at least the macros of GPIO_PULL_NONE, GPIO_PULL_UP and
+>> > GPIO_PULL_DOWN should be standardized.
+>>
+>> You find an attempt at standardization in drivers/pinctrl/pinconf-generic.c
+>> which is also used by the composite U300+COH901 drivers. Drivers
+>> can select this support library and use the flags from
+>> <linux/pinctrl/pinconf-generic.h>
+>>
+> What's with PIN_CONFIG_END using such an insane value?
 
-No, I don't want to make FIQ numbers somehow the same as IRQ numbers,
-not even "temporarily".
+This: PIN_CONFIG_END = 0x7FFF
+
+It's just that I reserved 16 bits for the different stuff, and then
+the bitstuffing
+functions below use 16 bits for this. If it's too much we can shrink
+it.
+
+> I'm happy to consolidate on the provided definitions and add my own on top
+> of that, but I'm not going to waste an insane amount of bits that I could
+> be using for driver-specific data and so on instead to comply with the
+> PIN_CONFIG_END comment. Is there any valid reason why this would ever
+> need to exceed 4 bits?
+
+I think we need more than 4 bits for sure, but not more than 8.
+
+If you want to patch it down to have 8 bits for the param and 24 bits
+for the argument, go ahead, it won't hurt.
+
+Yours,
+Linus Walleij
