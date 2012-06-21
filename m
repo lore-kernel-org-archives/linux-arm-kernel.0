@@ -1,114 +1,41 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 21 Jun 2012 10:23:41 +0200
-Subject: Fwd: Re: [PATCH]  mmc: at91: fix bus speed
-In-Reply-To: <4FE2D3A9.6000803@aksignal.cz>
-References: <4FE18E84.9000603@atmel.com> <4FE19423.4010103@atmel.com>
- <4FE2D3A9.6000803@aksignal.cz>
-Message-ID: <4FE2DA0D.2080509@atmel.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 21 Jun 2012 16:38:26 +0800
+Subject: [PATCH v6 12/14] usb: chipidea: permit driver bindings pass phy
+ pointer
+In-Reply-To: <4FE2CABE.7050708@pengutronix.de>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+ <1340260875-21934-13-git-send-email-richard.zhao@freescale.com>
+ <4FE2CABE.7050708@pengutronix.de>
+Message-ID: <20120621083825.GB1582@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Prchal,
+On Thu, Jun 21, 2012 at 09:18:22AM +0200, Marc Kleine-Budde wrote:
+> On 06/21/2012 08:41 AM, Richard Zhao wrote:
+> > Sometimes, the driver bindings may know what phy they use.
+> > For example, when using device tree, the usb controller may have a
+> > phandler pointing to usb phy.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > Reviewed-by: Marek Vasut <marex@denx.de>
+> > Acked-by: Felipe Balbi <balbi@ti.com>
+> > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
+> 
+> [...]
+> 
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1684,7 +1684,8 @@ static int udc_start(struct ci13xxx *ci)
+> >  
+> >  	ci->gadget.ep0 = &ci->ep0in->ep;
+> >  
+> > -	ci->transceiver = usb_get_transceiver();
+> > +	if (ci->global_phy) {
+>                            ^^^
+> 
+> This doesn't compile, closing curly brackets are missing.
+> 
+Nice catch. 
 
-Le 06/21/2012 09:56 AM, Prchal Ji?? a ?crit :
-> Hello Ludovic,
-> I have tried it with atmel-mci driver. It took me little time to change
-> setting of my board.
-> It seems to try clock down to 200kHz:
-> [    5.860000] mmc0: mmc_rescan_try_freq: trying to init card at 400000 Hz
-> [    5.920000] mmc0: mmc_rescan_try_freq: trying to init card at 300000 Hz
-> [    5.980000] mmc0: mmc_rescan_try_freq: trying to init card at 205079 Hz
-> As I see in driver source, there is better clkdiv overrun work around.
-
-Yes it was well managed in this driver.
-
-> But I don't find min and max freq definitions in this driver, it is
-> probably somewhere else.
-
-Into atmel_init_slot:
-mmc->f_min = DIV_ROUND_UP(host->bus_hz, 512);
-mmc->f_max = host->bus_hz / 2;
-
-Regards
-
-Ludovic
-
-> So this would be OK.
->
-> Dne 20.6.2012 11:13, ludovic.desroches napsal(a):
->> Add mmc mailing list.
->>
->>
->> -------- Message original --------
->> Sujet: Re: [PATCH] mmc: at91: fix bus speed
->> Date : Wed, 20 Jun 2012 10:49:08 +0200
->> De : ludovic.desroches <ludovic.desroches@atmel.com>
->> Pour : Prchal Ji?? <jiri.prchal@aksignal.cz>
->> Copie ? : <ludovic.desroches@atmel.com>,
->> <linux-arm-kernel@lists.infradead.org>
->>
->> Hello Jiri,
->>
->> Thanks for your patch but at91-mci is now deprecated and should be
->> removed in 3.7.
->> On one hand I don't know if we have to continue to take patches for this
->> driver, on the other hand it's a fix for some SD cards.
->>
->> Le 06/20/2012 10:15 AM, Prchal Ji?? a ?crit :
->>> This patch change minimum and maximum clock speed because some noname
->>> cards doesn't work during init even at 375kHz and new cards (SD v. 3.0)
->>> can run at 50 or 100 MHz.
->>> Also aded clkdiv register overrun fix when setting low speeds.
->>>
->>> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
->>> ---
->>>
->>> --- linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c.orig 2012-06-17
->>> 02:25:17.000000000 +0200
->>> +++ linux/linux-3.5-rc3/drivers/mmc/host/at91_mci.c 2012-06-18
->>> 11:01:49.751415984 +0200
->>> @@ -724,6 +724,10 @@ static void at91_mci_set_ios(struct mmc_
->>> else
->>> clkdiv = (at91_master_clock / ios->clock) / 2;
->>>
->>> + /* set maximum divider */
->>> + if (clkdiv > 255)
->>> + clkdiv = 255;
->>> +
->>> pr_debug("clkdiv = %d. mcck = %ld\n", clkdiv,
->>> at91_master_clock / (2 * (clkdiv + 1)));
->>> }
->>> @@ -948,8 +952,8 @@ static int __init at91_mci_probe(struct
->>> }
->>>
->>> mmc->ops = &at91_mci_ops;
->>> - mmc->f_min = 375000;
->>> - mmc->f_max = 25000000;
->>> + mmc->f_min = 200000; /* not all cards can run at 375kHz */
->>
->> I will check on atmel-mci if we have to decrease f_min.
->>
->>> + mmc->f_max = 100000000; /* new cards can run at 100MHz */
->>
->> MCI operates at a rate of up to master clock divided by two so you can't
->> reach 100MHz as max frequency since it means that our master clock is at
->> 200MHz that is not the case. I would say 50MHz is the maximum frequency
->> for product compatible with at91-mci.
->>
->>> mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
->>> mmc->caps = 0;
->>>
->>>
->>>
->>
->> Regards
->>
->> Ludovic
->>
->>
->>
->>
->>
->
->
->
+Thanks
+Richard
