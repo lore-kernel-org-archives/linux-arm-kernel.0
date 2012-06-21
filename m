@@ -1,34 +1,106 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Jun 2012 16:32:26 -0500
-Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <20120620150502.GG2253@S2101-09.ap.freescale.net>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
- <4FD8AD42.6010702@gmail.com> <20120613152841.GA23590@richard-laptop>
- <4FD8C4DB.4020908@gmail.com>
- <20120614013343.GD29684@b20223-02.ap.freescale.net>
- <4FE1DE53.4070202@gmail.com>
- <20120620150502.GG2253@S2101-09.ap.freescale.net>
-Message-ID: <4FE392EA.7060103@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Jun 2012 16:13:26 -0600
+Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based
+ pinctrl driver
+In-Reply-To: <20120619135600.GX12766@atomide.com>
+References: <20120611135826.GB12766@atomide.com>
+ <4FDA6FCD.1020605@wwwdotorg.org> <20120615094938.GQ12766@atomide.com>
+ <4FDB6000.5080703@wwwdotorg.org> <20120618055036.GU12766@atomide.com>
+ <20120619135600.GX12766@atomide.com>
+Message-ID: <4FE39C86.5070901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 10:05 AM, Shawn Guo wrote:
-> On Wed, Jun 20, 2012 at 09:29:39AM -0500, Rob Herring wrote:
->> I mean just something like "fsl,hub-reset-gpios" in the ehci device
->> node. It's at least under a usb node. Whether the ehci driver handles
->> this or you just have a separate piece of code to find this property and
->> setup the gpio is up to you.
->>
-> I ever had an argument on this.  If we have "fsl,hub-reset-gpios"
-> defined in ehci device node, it should simply be ehci driver who needs
-> to find this property and set up the gpio.  Defining the property in
-> ehci device node while having platform code to find the property just
-> seems wired to me.  That said, if it's not ehci driver who will use
-> the property, we should not define the property in in ehci device node.
+On 06/19/2012 07:56 AM, Tony Lindgren wrote:
+> Hi,
+> 
+> Below is the pinctrl-single patch updated with hopefully all the Stephen's
+> comments addressed. The binding still needs to be looked at, see relevant
+> parts of the discussion below.
+...
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 6 Jun 2012 04:18:18 -0700
+> Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based pinctrl driver
+> 
+> Add one-register-per-pin type device tree based pinctrl driver.
+> 
+> Currently this driver only works on omap2+ series of processors,
+> where there is either an 8 or 16-bit padconf register for each pin.
+> Support for other similar pinmux controllers can be added.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+> new file mode 100644
+> index 0000000..929254c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+> @@ -0,0 +1,106 @@
+> +One-register-per-pin type device tree based pinctrl driver
+> +
+> +Required properties:
+> +- compatible : "pinctrl-single"
+> +
+> +- reg : offset and length of the register set for the mux registers
+> +
+> +- pinctrl-single,register-width : pinmux register access width in bits
+> +
+> +- pinctrl-single,function-mask : mask of allowed pinmux function bits
+> +  in the pinmux register
+> +
+> +- pinctrl-single,pinconf-mask : mask of allowed pinconf bits in the
+> +  pinmux register; this gets combined with pinconf mask but is a separate
+> +  mask to allow the option of setting pinconf separatately from the
+> +  function
 
-There's no requirement that 1 DT node be 1 driver. That's purely an OS
-decision and it's usually simpler that way. But if it it's just a one
-time thing at boot, then its fine for the platform code to handle it.
+Given that this binding doesn't allow describing pin configuration at
+present, I would simply remove all mention of that property in the
+binding documentation. It can be added back if/when that feature is
+added. Any future driver using this binding can refuse to allow pin
+configuration if that property is missing.
 
-Rob
+> +- pinctrl-single,function-off : function off mode for disabled state if
+> +  available and same for all registers; if not, use a value larger than
+> +  function-mask to ignore disabling of registers
+
+Rather than requiring an invalid value in this property, shouldn't the
+lack of a valid function-off value be represented by the property not
+being present in the DT?
+
+> +This driver assumes that there is only one register for each pin,
+> +and uses the common pinctrl bindings as specified in the pinctrl-bindings.txt
+> +document in this directory.
+
+At this point in the file, I think you need to mention that you're
+switching from describing the top-level device node to describing pin
+configuration nodes.
+
+> +The pinctrl register offsets and default values are specified as pairs
+
+I thought we were going to remove "default" here?
+
+> +using pinctrl-single,pins. For example, setting a pin for a device
+> +could be done with:
+> +
+> +	pinctrl-single,pins = <0xdc 0x118>;
+> +
+> +Where 0xdc is the offset from the pinctrl register base address for the
+> +device pinctrl register, and 0x118 contains the desired value of the
+> +pinctrl register. See the device example and static board pins example
+> +below for more information.
+
+There should be some explanation only the portion of this value covered
+by the pinctrl-single,function-mask value is updated in the register.
+
+> +This driver tries to avoid understanding pin and function names because of
+> +the extra bloat they would cause especially in the case of a large number
+> +of pins. This driver just sets what is specified for the board in the .dts file.
+> +Further user space debugging tools can be developed to decipher the pin and
+> +function names using debugfs.
+
+There shouldn't be any discussion of a driver here; the binding is a HW
+description.
+
+> +Example:
+
+I only reviewed the binding document, not the code.
