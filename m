@@ -1,58 +1,76 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 21 Jun 2012 06:38:53 +0000
-Subject: [PATCH v2 2/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <4FE24A9B.6070203@ti.com>
-References: <cover.1339828867.git.afzal@ti.com>
- <1414767dd444d4ab3998adf957e77ff4f3394f92.1339828867.git.afzal@ti.com>
- <4FDF50EA.4080506@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99C502@DBDE01.ent.ti.com>
- <4FE24A9B.6070203@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99D5F8@DBDE01.ent.ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 21 Jun 2012 14:41:01 +0800
+Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
+Message-ID: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+The work is based on  ci13xxx rework done by Alexander Shishkin.
 
-On Thu, Jun 21, 2012 at 03:41:39, Hunter, Jon wrote:
+To let Greg pick up, I also added patches Alex queued that I depends on.
+Patch #1 - #9 : It can also be found at
+http://github.com/virtuoso/linux-ci.git ci
 
-> Ok, I see your point. So today the _set_async_mode() is really doing two
-> things ...
-> 
-> 1. It is calculating the timings
-> 2. Programming the timings and setting async mode.
-> 
-> I think that it would be best if we were to make _set_async_mode() into
-> two functions, for example ...
-> 
-> 1. omap2_onenand_get_async_timings()
-> 2. omap2_onenand_set_async_timings()
-> 
-> Where the omap2_onenand_get_async_timings() calculates the timings and
-> can be used in both legacy mode and with the driver. Then
-> omap2_onenand_set_sync_timings() is just used in the legacy mode where
-> we don't have the driver to configure the chip-select.
-> 
-> Do you think that could work?
-> 
-> We could also do the same for omap2_onenand_set_sync_mode().
+This patch series can also be found at:
+https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
 
-Seems it should work
+Status:
+  - this version only support host
+  - usbotg controler works at host role
 
-Not sure whether the best time to do such kind of refactoring is
-at the time of cleaning up / generalizing timing calculation, one
-reason to think that way being removal of legacy mode once driver
-migration is completed. Goal for this series was to do the minimal
-of changes, without creating any disruptive changes to prepare for
-gpmc driver series so that both interfaces would work.
+Changes since last version:
+ - Add patches from Alex's git tree that it depends
+ - Rebase to Greg's git tree
+ - Move arch/arm patches to other series
+ - dev_err fixes as Sascha comment
+ - Add MODULE_DEVICE_TABLE
 
-Either way I will go ahead and make change as per your suggestions,
-seems at least there is one advantage; w.r.t bringing setting bool
-type time settings to gpmc_cs_set_timings (even though may not be
-necessary for this change, it will certainly simplify it) and make
-it part of driver preparation series and this will help us discover
-if any board depends on these kinds of settings unknowingly with the
-preparation series itself rather than hunting for it in driver series
+Alexander Shishkin (1):
+  usb: chipidea: remove unneeded NULL check
 
-Regards
-Afzal
+Felipe Balbi (3):
+  usb: chipidea: drop useless arch-check
+  usb: chipidea: msm: add missing section annotation
+  usb: chipidea: msm: add remove method
+
+Richard Zhao (10):
+  USB: Chipidea: rename struct ci13xxx_udc_driver to struct
+    ci13xxx_platform_data
+  USB: Chipidea: rename struct ci13xxx variables from udc to ci
+  USB: Chipidea: add unified ci13xxx_{add,remove}_device for platform
+    drivers
+  USB: Chipidea: add ci13xxx device id management
+  usb: chipidea: select USB_EHCI_ROOT_HUB_TT in USB_CHIPIDEA_HOST of
+    Kconfig
+  usb: otg: add notify_connect/notify_disconnect callback
+  USB: notify phy when root hub port connect change
+  usb: chipidea: permit driver bindings pass phy pointer
+  usb: otg: add basic mxs phy driver support
+  usb: chipidea: add imx platform driver
+
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |   20 +
+ Documentation/devicetree/bindings/usb/mxs-phy.txt  |   13 +
+ drivers/usb/chipidea/Kconfig                       |    1 +
+ drivers/usb/chipidea/Makefile                      |    9 +-
+ drivers/usb/chipidea/ci.h                          |   32 +-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |  197 ++++++
+ drivers/usb/chipidea/ci13xxx_msm.c                 |   62 +-
+ drivers/usb/chipidea/ci13xxx_pci.c                 |   52 +-
+ drivers/usb/chipidea/core.c                        |   70 ++-
+ drivers/usb/chipidea/debug.c                       |  146 ++---
+ drivers/usb/chipidea/host.c                        |    3 +-
+ drivers/usb/chipidea/udc.c                         |  636 ++++++++++----------
+ drivers/usb/core/hub.c                             |    8 +
+ drivers/usb/otg/Kconfig                            |    9 +
+ drivers/usb/otg/Makefile                           |    1 +
+ drivers/usb/otg/mxs-phy.c                          |  197 ++++++
+ include/linux/usb/chipidea.h                       |   14 +-
+ include/linux/usb/otg.h                            |   21 +
+ 18 files changed, 1000 insertions(+), 491 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
+ create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+ create mode 100644 drivers/usb/otg/mxs-phy.c
+
+-- 
+1.7.9.5
