@@ -1,162 +1,221 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 21 Jun 2012 11:40:07 +0200
-Subject: [PATCH] ARM: zImage: Allow DTB command line concatenation with
- ATAG_CMDLINE
-In-Reply-To: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
-References: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <4FE2EBF7.90601@free-electrons.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 21 Jun 2012 11:47:42 +0200
+Subject: [PATCH 1/2] Early support for the Crystalfontz CFA10036 module
+In-Reply-To: <1340268415-5022-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1340268415-5022-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201206211147.43074.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2012 10:56 AM, Richard Genoud wrote:
-> This patch allows the ATAG_CMDLINE provided by the bootloader to be
-> concatenated to the bootargs property of the device tree.
-> 
-> This is useful to merge static values defined in the device tree with the
-> boot loader's (possibly) more dynamic values, such as startup reasons and more.
-> 
-> The bootloader should use the device tree to pass those values to the kernel,
-> but that's not always simple (old bootloader or very small one).
-> 
-> The behaviour is the same as the one introduced by Victor Boivie in
-> 4394c1244249198c6b85093d46935b761b36ae05 by extending the CONFIG_CMDLINE.
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Dear Maxime Ripard,
 
-Hi Richard,
-
-I have tested both option on a Armada XP dev board. It worked as expected.
-
-You can add:
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Cc: Brian Lily <brian@crystalfontz.com>
 > ---
->  arch/arm/Kconfig                        |   19 +++++++++
->  arch/arm/boot/compressed/atags_to_fdt.c |   62 ++++++++++++++++++++++++++++++-
->  2 files changed, 79 insertions(+), 2 deletions(-)
+>  arch/arm/mach-mxs/Kconfig         |   15 +++++
+>  arch/arm/mach-mxs/Makefile        |    1 +
+>  arch/arm/mach-mxs/mach-cfa10036.c |  129
+> +++++++++++++++++++++++++++++++++++++ 3 files changed, 145 insertions(+)
+>  create mode 100644 arch/arm/mach-mxs/mach-cfa10036.c
+
+Well before someone will tear your ass all the way to the spatulae for this one, 
+I'll try explaining :)
+
+Basically, everyone is trying as hard as possibly (sometimes excessively in my 
+opinion, so don't run away if you're asked for V2, V3 ... of the patch) to 
+convert mxs to device tree. Therefore we want no additions of the kind of mach-
+cfa10036.c .
+
+Your module actually does look very simple, therefore writing the DT file will 
+be quite easy:
+
+1) Check arch/arm/boot/dts/imx28.dtsi and copy arch/arm/boot/dts/imx28-evk.dts 
+to arch/arm/boot/dts/imx28-cfa10036.dts .
+2) Edit arch/arm/boot/dts/imx28-cfa10036.dts to fit your needs (basically, 
+configure GPIOs as you see fit, enable your peripherals etc.). Note you should 
+avoid as much possible duplication from the imx28.dtsi file as possible .
+3) Compile it:
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- imx28-cfa10036.dtb uImage
+4) Pick it up:
+arch/arm/boot/uImage
+arch/arm/boot/imx28-cfa10036.dtb
+5) Boot it
+bootm <uImage addr> <initrd addr or "-" if none> <dtb addr>
+
+Don't hesitate to ask in any case!
+
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 84449dd..ff4b6e6 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1959,6 +1959,25 @@ config ARM_ATAG_DTB_COMPAT
->  	  bootloaders, this option allows zImage to extract the information
->  	  from the ATAG list and store it at run time into the appended DTB.
->  
-> +choice
-> +	prompt "Kernel command line type" if ARM_ATAG_DTB_COMPAT
-> +	default ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
-> +
-> +config ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
-> +	bool "Use bootloader kernel arguments if available"
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 91cf062..54ace90 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -70,6 +70,21 @@ config MACH_MX28EVK
+>  	  Include support for MX28EVK platform. This includes specific
+>  	  configurations for the board and its peripherals.
+> 
+> +config MACH_CFA10036
+> +	bool "Support Crystalfontz CFA-10036 Module"
+> +	select SOC_IMX28
+> +	select NEW_LEDS
+> +	select LEDS_CLASS
+> +	select LEDS_GPIO
+> +	select LEDS_GPIO_REGISTER
+> +	select MXS_HAVE_AMBA_DUART
+> +	select MXS_HAVE_PLATFORM_MXS_MMC
+> +	select MXS_HAVE_PLATFORM_MXS_I2C
+> +	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
 > +	help
-> +	  Uses the command-line options passed by the boot loader instead of
-> +	  the device tree bootargs property. If the boot loader doesn't provide
-> +	  any, the device tree bootargs property will be used.
+> +	  Include support for CFA10036 module. This includes specific
+> +	  configurations for the board and its peripherals.
 > +
-> +config ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
-> +	bool "Extend with bootloader kernel arguments"
-> +	help
-> +	  The command-line arguments provided by the boot loader will be
-> +	  appended to the the device tree bootargs property.
+>  config MODULE_TX28
+>  	bool
+>  	select SOC_IMX28
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> index e41590c..36633b9 100644
+> --- a/arch/arm/mach-mxs/Makefile
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -12,5 +12,6 @@ obj-$(CONFIG_MACH_M28EVK)    += mach-m28evk.o
+>  obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
+>  obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+>  obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+> +obj-$(CONFIG_MACH_CFA10036) += mach-cfa10036.o
+> 
+>  obj-y += devices/
+> diff --git a/arch/arm/mach-mxs/mach-cfa10036.c
+> b/arch/arm/mach-mxs/mach-cfa10036.c new file mode 100644
+> index 0000000..2cea113
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/mach-cfa10036.c
+> @@ -0,0 +1,129 @@
+> +/*
+> + * Copyright 2012, Free Electrons. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 > +
-> +endchoice
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/leds.h>
+> +#include <linux/clk.h>
+> +#include <linux/i2c.h>
+> +#include <linux/regulator/machine.h>
+> +#include <linux/regulator/fixed.h>
 > +
->  config CMDLINE
->  	string "Default kernel command string"
->  	default ""
-> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-> index 797f04b..aabc02a 100644
-> --- a/arch/arm/boot/compressed/atags_to_fdt.c
-> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
-> @@ -1,6 +1,12 @@
->  #include <asm/setup.h>
->  #include <libfdt.h>
->  
-> +#if defined(CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND)
-> +#define do_extend_cmdline 1
-> +#else
-> +#define do_extend_cmdline 0
-> +#endif
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
 > +
->  static int node_offset(void *fdt, const char *node_path)
->  {
->  	int offset = fdt_path_offset(fdt, node_path);
-> @@ -36,6 +42,48 @@ static int setprop_cell(void *fdt, const char *node_path,
->  	return fdt_setprop_cell(fdt, offset, property, val);
->  }
->  
-> +static const void *getprop(const void *fdt, const char *node_path,
-> +			   const char *property, int *len)
+> +#include <mach/common.h>
+> +#include <mach/iomux-mx28.h>
+> +#include <mach/digctl.h>
+> +
+> +#include "devices-mx28.h"
+> +
+> +#define CFA10036_GPIO_PWR_LED		MXS_GPIO_NR(3, 4)
+> +#define CFA10036_MMC0_SLOT_POWER	MXS_GPIO_NR(3, 28)
+> +
+> +static const iomux_cfg_t cfa10036_pads[] __initconst = {
+> +	/* duart */
+> +	MXS_IOMUX_PAD_NAKED(3, 2, PAD_MUXSEL_2) | MXS_PAD_CTRL,
+> +	MXS_IOMUX_PAD_NAKED(3, 3, PAD_MUXSEL_2) | MXS_PAD_CTRL,
+> +
+> +	/* mmc0 */
+> +	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_CMD__SSP0_CMD |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX28_PAD_SSP0_SCK__SSP0_SCK |
+> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	/* slot power enable */
+> +	MX28_PAD_PWM3__GPIO_3_28 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +
+> +	/* Power Led */
+> +	MXS_IOMUX_PAD_NAKED(3, 4, PAD_MUXSEL_GPIO) | MXS_PAD_CTRL,
+> +};
+> +
+> +/* led */
+> +static const struct gpio_led cfa10036_leds[] __initconst = {
+> +	{
+> +		.name = "power-led",
+> +		.default_state = LEDS_GPIO_DEFSTATE_ON,
+> +		.gpio = CFA10036_GPIO_PWR_LED,
+> +		.active_low = true,
+> +	},
+> +};
+> +
+> +static const struct gpio_led_platform_data cfa10036_led_data __initconst =
+> { +	.leds = cfa10036_leds,
+> +	.num_leds = ARRAY_SIZE(cfa10036_leds),
+> +};
+> +
+> +/* mmc */
+> +static struct mxs_mmc_platform_data cfa10036_mmc_pdata[] __initdata = {
+> +	{
+> +		/* mmc0 */
+> +		.wp_gpio = -EINVAL,
+> +		.flags = SLOTF_4_BIT_CAPABLE,
+> +	},
+> +};
+> +
+> +static const struct gpio cfa10036_gpios[] __initconst = {
+> +	{ CFA10036_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
+> +};
+> +
+> +static void __init cfa10036_init(void)
 > +{
-> +	int offset = fdt_path_offset(fdt, node_path);
+> +	int ret;
 > +
-> +	if (offset == -FDT_ERR_NOTFOUND)
-> +		return NULL;
+> +	mx28_soc_init();
 > +
-> +	return fdt_getprop(fdt, offset, property, len);
+> +	mxs_iomux_setup_multiple_pads(cfa10036_pads, ARRAY_SIZE(cfa10036_pads));
+> +
+> +	mx28_add_duart();
+> +
+> +	ret = gpio_request_array(cfa10036_gpios, ARRAY_SIZE(cfa10036_gpios));
+> +	if (ret)
+> +		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
+> +
+> +	mx28_add_mxs_mmc(0, &cfa10036_mmc_pdata[0]);
+> +
+> +	mx28_add_rtc_stmp3xxx();
+> +
+> +	gpio_led_register_device(0, &cfa10036_led_data);
 > +}
 > +
-> +static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+> +static void __init cfa10036_timer_init(void)
 > +{
-> +	char cmdline[COMMAND_LINE_SIZE];
-> +	const char *fdt_bootargs;
-> +	char *ptr = cmdline;
-> +	int len = 0;
-> +
-> +	/* copy the fdt command line into the buffer */
-> +	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
-> +	if (fdt_bootargs)
-> +		if (len < COMMAND_LINE_SIZE) {
-> +			memcpy(ptr, fdt_bootargs, len);
-> +			/* len is the length of the string
-> +			 * including the NULL terminator */
-> +			ptr += len - 1;
-> +		}
-> +
-> +	/* and append the ATAG_CMDLINE */
-> +	if (fdt_cmdline) {
-> +		len = strlen(fdt_cmdline);
-> +		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
-> +			*ptr++ = ' ';
-> +			memcpy(ptr, fdt_cmdline, len);
-> +			ptr += len;
-> +		}
-> +	}
-> +	*ptr = '\0';
-> +
-> +	setprop_string(fdt, "/chosen", "bootargs", cmdline);
+> +	mx28_clocks_init();
 > +}
 > +
->  /*
->   * Convert and fold provided ATAGs into the provided FDT.
->   *
-> @@ -72,8 +120,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
->  
->  	for_each_tag(atag, atag_list) {
->  		if (atag->hdr.tag == ATAG_CMDLINE) {
-> -			setprop_string(fdt, "/chosen", "bootargs",
-> -					atag->u.cmdline.cmdline);
-> +			/* Append the ATAGS command line to the device tree
-> +			 * command line.
-> +			 * NB: This means that if the same parameter is set in
-> +			 * the device tree and in the tags, the one from the
-> +			 * tags will be chosen.
-> +			 */
-> +			if (do_extend_cmdline)
-> +				merge_fdt_bootargs(fdt,
-> +						   atag->u.cmdline.cmdline);
-> +			else
-> +				setprop_string(fdt, "/chosen", "bootargs",
-> +					       atag->u.cmdline.cmdline);
->  		} else if (atag->hdr.tag == ATAG_MEM) {
->  			if (memcount >= sizeof(mem_reg_property)/4)
->  				continue;
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
-+33 602 196 044
+> +static struct sys_timer cfa10036_timer = {
+> +	.init	= cfa10036_timer_init,
+> +};
+> +
+> +MACHINE_START(CFA10036, "Crystalfontz CFA-10036")
+> +	.map_io		= mx28_map_io,
+> +	.init_irq	= mx28_init_irq,
+> +	.timer		= &cfa10036_timer,
+> +	.init_machine	= cfa10036_init,
+> +	.restart	= mxs_restart,
+> +MACHINE_END
