@@ -1,32 +1,56 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 21 Jun 2012 15:50:32 +0200
-Subject: Current state of AM33xx patches
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
-Message-ID: <4FE326A8.8090807@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Jun 2012 16:22:41 +0200
+Subject: [PATCH] ARM:MXS: Initial support for the Crystalfontz CFA-10036
+In-Reply-To: <20120621131138.GA21418@S2101-09.ap.freescale.net>
+References: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20120621131138.GA21418@S2101-09.ap.freescale.net>
+Message-ID: <4FE32E31.2070909@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.06.2012 10:15, Hiremath, Vaibhav wrote:
-> On Mon, Jun 11, 2012 at 19:21:21, Jason Kridner wrote:
->> From: Daniel Mack <zonque@gmail.com>
->>> Hey,
->>>
->>> can anybody give me a quick wrap-up about the current state of AM33xx
->>> based SoCs in mainline? What are the next steps to get things merged?
+Hi Shawn,
+
+Le 21/06/2012 15:11, Shawn Guo a ?crit :
+> On Thu, Jun 21, 2012 at 10:46:52AM +0200, Maxime Ripard wrote:
+>> On the MMC part though, Something odd is going on.  On the first
+>> patches I made against 3.4, everything was working fine. With 3.5-rc2
+>> though, the MMC never replies to the first CMD52 command sent to
+>> it. The pin muxing hasn't changed and has been checked, the card is
+>> well detected through the card detect pin, the power enable pin is
+>> correctly set to a low level, and so the SD card is correctly
+>> powered. The MMC works fine with the exact same kernel on the
+>> imx28-evk though.
 >>
->> There is a wiki page [1] that is intended to provide a summary, but I'm
->> confident it is not up-to-date.  
-> 
-> Page updated now...
-> 
-> http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status#AM335x_Linux_Status
+>> What seems odd to me, is that when booting the board with the 3.4
+>> kernel, at boot, the mxs-mmc driver reports a SSP clock of 288MHz,
+>> while on 3.5, it reports a 480MHz SSP clock. By looking at the clk
+>> driver for the iMX28, there is a comment saying that the 480MHz clock
+>> seems to high for SD controlers, and that it should be 288MHz
+>> instead. Given that the clock part has changed quite a lot from 3.4 to
+>> 3.5, I think it might be a good lead, but hardcoding the SSP clock to
+>> 288MHz in the mxs-mmc driver instead of using the clk_get_rate
+>> function does not resolve the problem.
+>>
+>> Also, this problem is seen with both DT-probing and traditionnal
+>> probing.
+>>
+>> Do someone have an idea on what could possibly happen here ?
+>>
+> Can you try the change below to see if it fixes the problem?
 
-Great, thanks. So if things get upstreamed, which is the repo/branch
-they appear in? In other words: where is the code people should write
-patches against? I couldn't find an answer to that yet.
+It is indeed working now, thanks a lot :)
+I've also tested it on the imx28evk, and it works as well.
 
+You can add by Tested-by I guess :)
 
-Thanks,
-Daniel
+We have found that indeed the two registers were inverted compared to
+the datasheet, but why was it still working on the iMX28-evk ?
+
+Thanks again,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
