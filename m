@@ -1,313 +1,120 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Thu, 21 Jun 2012 14:22:06 -0400
-Subject: [PATCH v2] Initial DTS support for Kirkwood GoFlex Net
-Message-ID: <CAMW5UfaW1kdM-igqQcEctotXZxKiKWrnW+VT3k8e-8JZw2hBZA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 21 Jun 2012 12:26:54 -0600 (MDT)
+Subject: No subject
+Message-ID: <alpine.DEB.2.00.1206211225360.10198@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supplies the necessary DTS and supporting files to boot up
-a Seagate GoFlex Net with 3.5.0-rc3.  I can confirm it works on my
-personal GFN.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-The patch is against 3.5.0-rc3 with Andrew Lunn's RUNIT clock and
-printk patches in place.
+Hi Tony
 
-RUNIT patch: http://www.spinics.net/lists/arm-kernel/msg178389.html
-printk patch: http://comments.gmane.org/gmane.linux.ports.arm.kernel/170442
+The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
 
-Signed-off by: Joshua Coombs <josh.coombs@gmail.com>
+  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
 
-PATCH FOLLOWS
----
+are available in the git repository at:
 
-diff -ruN a/arch/arm/boot/dts/kirkwood-goflexnet.dts
-b/arch/arm/boot/dts/kirkwood-goflexnet.dts
---- a/arch/arm/boot/dts/kirkwood-goflexnet.dts	1969-12-31
-19:00:00.000000000 -0500
-+++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts	2012-06-20
-05:28:31.000000000 -0400
-@@ -0,0 +1,49 @@
-+/dts-v1/;
-+
-+/include/ "kirkwood.dtsi"
-+
-+/ {
-+	model = "Seagate GoFlex Net";
-+	compatible = "seagate,goflexnet", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/sda1 rootdelay=10";
-+	};
-+
-+	ocp at f1000000 {
-+		serial at 12000 {
-+			clock-frequency = <200000000>;
-+			status = "ok";
-+		};
-+
-+		nand at 3000000 {
-+			status = "okay";
-+
-+			partition at 0 {
-+				label = "u-boot";
-+				reg = <0x0000000 0x100000>;
-+				read-only;
-+			};
-+
-+			partition at 100000 {
-+				label = "uImage";
-+				reg = <0x0100000 0x400000>;
-+			};
-+
-+			partition at 500000 {
-+				label = "pogoplug";
-+				reg = <0x0500000 0x2000000>;
-+			};
-+
-+			partition at 2500000 {
-+				label = "root";
-+				reg = <0x02500000 0xd800000>;
-+			};
-+		};
-+	};
-+};
-diff -ruN a/arch/arm/mach-kirkwood/board-dt.c
-b/arch/arm/mach-kirkwood/board-dt.c
---- a/arch/arm/mach-kirkwood/board-dt.c	2012-06-16 20:25:17.000000000 -0400
-+++ b/arch/arm/mach-kirkwood/board-dt.c	2012-06-18 13:20:55.000000000 -0400
-@@ -68,6 +68,9 @@
- 	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
- 		ib62x0_init();
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.6
 
-+	if (of_machine_is_compatible("seagate,goflexnet"))
-+		goflexnet_init();
-+
- 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
- }
+for you to fetch changes up to 07b3a13957aa250ff5b5409b8ed756b113544112:
 
-@@ -77,6 +80,7 @@
- 	"dlink,dns-325",
- 	"iom,iconnect",
- 	"raidsonic,ib-nas62x0",
-+	"seagate,goflexnet",
- 	NULL
- };
+  Merge branches 'clock_cleanup_misc_3.6', 'control_clean_dspbridge_writes_cleanup_3.6', 'hwmod_soc_conditional_cleanup_3.6', 'mcbsp_clock_aliases_cleanup_3.6' and 'remove_clkdm_requirement_from_hwmod_3.6' into omap_cleanup_a_3.6 (2012-06-20 20:11:36 -0600)
 
-diff -ruN a/arch/arm/mach-kirkwood/board-goflexnet.c
-b/arch/arm/mach-kirkwood/board-goflexnet.c
---- a/arch/arm/mach-kirkwood/board-goflexnet.c	1969-12-31
-19:00:00.000000000 -0500
-+++ b/arch/arm/mach-kirkwood/board-goflexnet.c	2012-06-20
-05:29:18.000000000 -0400
-@@ -0,0 +1,155 @@
-+/*
-+ * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-+ *
-+ * arch/arm/mach-kirkwood/board-dreamplug.c
-+ *
-+ * Marvell DreamPlug Reference Board Init for drivers not converted to
-+ * flattened device tree yet.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Copied and modified for Seagate GoFlex Net support by
-+ * Joshua Coombs <josh.coombs@gmail.com> based on ArchLinux ARM's
-+ * GoFlex kernel patches.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/ata_platform.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/gpio.h>
-+#include <linux/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <mach/kirkwood.h>
-+#include <mach/bridge-regs.h>
-+#include <plat/mvsdio.h>
-+#include "common.h"
-+#include "mpp.h"
-+
-+static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-+};
-+
-+static struct mv_sata_platform_data goflexnet_sata_data = {
-+	.n_ports	= 2,
-+};
-+
-+static struct gpio_led goflexnet_led_pins[] = {
-+	{
-+		.name			= "status:green:health",
-+		.default_trigger	= "default-on",
-+		.gpio			= 46, // 0x4000
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "status:orange:fault",
-+		.default_trigger	= "none",
-+		.gpio			= 47, // 0x8000
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "status:white:left0",
-+		.default_trigger	= "none",
-+		.gpio			= 42, // 0x0400
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:left1",
-+		.default_trigger	= "none",
-+		.gpio			= 43, // 0x0800
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:left2",
-+		.default_trigger	= "none",
-+		.gpio			= 44, // 0x1000
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:left3",
-+		.default_trigger	= "none",
-+		.gpio			= 45, // 0x2000
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:right0",
-+		.default_trigger	= "none",
-+		.gpio			= 38, // 0x0040
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:right1",
-+		.default_trigger	= "none",
-+		.gpio			= 39, // 0x0080
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:right2",
-+		.default_trigger	= "none",
-+		.gpio			= 40, // 0x0100
-+		.active_low		= 0,
-+	},
-+	{
-+		.name			= "status:white:right3",
-+		.default_trigger	= "none",
-+		.gpio			= 41, // 0x0200
-+		.active_low		= 0,
-+	},
-+};
-+
-+static struct gpio_led_platform_data goflexnet_led_data = {
-+	.leds		= goflexnet_led_pins,
-+	.num_leds	= ARRAY_SIZE(goflexnet_led_pins),
-+};
-+
-+static struct platform_device goflexnet_leds = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &goflexnet_led_data,
-+	}
-+};
-+
-+static unsigned int goflexnet_mpp_config[] __initdata = {
-+	MPP29_GPIO,	/* USB Power Enable */
-+	MPP47_GPIO,	/* LED Orange */
-+	MPP46_GPIO,	/* LED Green */
-+	MPP45_GPIO,	/* LED Left Capacity 3 */
-+	MPP44_GPIO,	/* LED Left Capacity 2 */
-+	MPP43_GPIO,	/* LED Left Capacity 1 */
-+	MPP42_GPIO,	/* LED Left Capacity 0 */
-+	MPP41_GPIO,	/* LED Right Capacity 3 */
-+	MPP40_GPIO,	/* LED Right Capacity 2 */
-+	MPP39_GPIO,	/* LED Right Capacity 1 */
-+	MPP38_GPIO,	/* LED Right Capacity 0 */
-+	0
-+};
-+
-+void __init goflexnet_init(void)
-+{
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_mpp_conf(goflexnet_mpp_config);
-+
-+	if (gpio_request(29, "USB Power Enable") != 0 ||
-+	    gpio_direction_output(29, 1) != 0)
-+	        printk(KERN_ERR "can't setup GPIO 29 (USB Power Enable)\n");
-+	kirkwood_ehci_init();
-+
-+	kirkwood_ge00_init(&goflexnet_ge00_data);
-+	kirkwood_sata_init(&goflexnet_sata_data);
-+
-+	platform_device_register(&goflexnet_leds);
-+}
-diff -ruN a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
---- a/arch/arm/mach-kirkwood/common.h	2012-06-16 20:25:17.000000000 -0400
-+++ b/arch/arm/mach-kirkwood/common.h	2012-06-18 13:35:54.000000000 -0400
-@@ -77,6 +77,12 @@
- static inline void ib62x0_init(void) {};
- #endif
+- ----------------------------------------------------------------
 
-+#ifdef CONFIG_MACH_GOFLEXNET_DT
-+void goflexnet_init(void);
-+#else
-+static inline void goflexnet_init(void) {};
-+#endif
-+
- /* early init functions not converted to fdt yet */
- char *kirkwood_id(void);
- void kirkwood_l2_init(void);
-diff -ruN a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
---- a/arch/arm/mach-kirkwood/Kconfig	2012-06-16 20:25:17.000000000 -0400
-+++ b/arch/arm/mach-kirkwood/Kconfig	2012-06-18 13:37:22.000000000 -0400
-@@ -80,6 +80,13 @@
- 	  RaidSonic IB-NAS6210 & IB-NAS6220 devices, using
- 	  Flattened Device Tree.
+Some OMAP hwmod, clock, and System Control Module cleanup patches for 3.6.
 
-+config MACH_GOFLEXNET_DT
-+	bool "Seagate GoFlex Net (Flattened Device Tree)"
-+	select ARCH_KIRKWOOD_DT
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Seagate GoFlex Net (Flattened Device Tree).
-+
- config MACH_TS219
- 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
-TS-219P+ Turbo NAS"
- 	help
-diff -ruN a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
---- a/arch/arm/mach-kirkwood/Makefile	2012-06-16 20:25:17.000000000 -0400
-+++ b/arch/arm/mach-kirkwood/Makefile	2012-06-18 13:38:04.000000000 -0400
-@@ -25,3 +25,4 @@
- obj-$(CONFIG_MACH_ICONNECT_DT)		+= board-iconnect.o
- obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
- obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
-+obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
-diff -ruN a/arch/arm/mach-kirkwood/Makefile.boot
-b/arch/arm/mach-kirkwood/Makefile.boot
---- a/arch/arm/mach-kirkwood/Makefile.boot	2012-06-16 20:25:17.000000000 -0400
-+++ b/arch/arm/mach-kirkwood/Makefile.boot	2012-06-18 13:38:38.000000000 -0400
-@@ -7,3 +7,4 @@
- dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
- dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
- dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
-+dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
+- ----------------------------------------------------------------
+
+Testing logs are available at
+
+http://www.pwsan.com/omap/bootlogs/20120620/omap_cleanup_a_3.6__07b3a13957aa250ff5b5409b8ed756b113544112/
+
+The summary is that 5912OSK NFS root and N800 MMC don't boot to
+userspace; this broke between v3.4-rc2 and v3.5-rc3.  3517 boards are
+still broken with NFS root and also several stack tracebacks during
+boot.  In terms of PM, core isn't entering idle on OMAP3 or OMAP4.
+These problems all exist in v3.5-rc3 - they aren't caused by this
+series.
+
+object size (delta in bytes from v3.5-rc3 (485802a6c524e62b5924849dd727ddbb1497cc71)):
+  text 	  data 	   bss 	 total 	kernel
+     0 	     0 	     0 	     0 	5912osk_testconfig/vmlinux
+ +4636 	  -400 	     0 	 +4236 	am33xx_testconfig/vmlinux
+  +440 	  -408 	   +32 	   +64 	n800_multi_omap2xxx/vmlinux
+  +416 	  -192 	   +32 	  +256 	n800_testconfig/vmlinux
+     0 	     0 	     0 	     0 	omap1510_defconfig/vmlinux
+     0 	     0 	     0 	     0 	omap1_defconfig/vmlinux
+  +732 	  -456 	     0 	  +276 	omap2_4_testconfig/vmlinux
+ +4776 	  -624 	     0 	 +4152 	omap2plus_defconfig/vmlinux
+  +684 	  -664 	     0 	   +20 	omap2plus_no_pm/vmlinux
+  +616 	  -336 	   +64 	  +344 	omap3_4_testconfig/vmlinux
+  +360 	  -384 	     0 	   -24 	omap3_testconfig/vmlinux
+  +580 	  -120 	   +64 	  +524 	omap4_testconfig/vmlinux
+
+
+Kevin Hilman (7):
+      ARM: OMAP4: hwmod: rename _enable_module to _omap4_enable_module()
+      ARM: OMAP2+: hwmod: use init-time function ptrs for enable/disable module
+      ARM: OMAP4: hwmod: drop extra cpu_is check from _wait_target_disable()
+      ARM: OMAP2+: hwmod: use init-time function pointer for wait_target_ready
+      ARM: OMAP2+: hwmod: use init-time function pointer for hardreset
+      ARM: OMAP2+: hwmod: use init-time function pointer for _init_clkdm
+      ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct dpll_data
+
+Omar Ramirez Luna (2):
+      ARM: OMAP2+: control: new APIs to configure boot address and mode
+      ARM: OMAP: dsp: interface to control module functions
+
+Paul Walmsley (2):
+      ARM: OMAP2+: hwmod: remove prm_clkdm, cm_clkdm; allow hwmods to have no clockdomain
+      Merge branches 'clock_cleanup_misc_3.6', 'control_clean_dspbridge_writes_cleanup_3.6', 'hwmod_soc_conditional_cleanup_3.6', 'mcbsp_clock_aliases_cleanup_3.6' and 'remove_clkdm_requirement_from_hwmod_3.6' into omap_cleanup_a_3.6
+
+Peter Ujfalusi (3):
+      ARM: OMAP2: Move McBSP fck clock alias to hwmod data for OMAP2420
+      ARM: OMAP2: Move McBSP fck clock alias to hwmod data for OMAP2430
+      ARM: OMAP3: Move McBSP fck clock alias to hwmod data
+
+ arch/arm/mach-omap2/Makefile                       |    1 -
+ arch/arm/mach-omap2/clock2420_data.c               |    4 -
+ arch/arm/mach-omap2/clock2430_data.c               |   10 -
+ arch/arm/mach-omap2/clock3xxx_data.c               |   10 -
+ arch/arm/mach-omap2/clockdomain.h                  |    2 -
+ arch/arm/mach-omap2/clockdomains2420_data.c        |    2 -
+ arch/arm/mach-omap2/clockdomains2430_data.c        |    2 -
+ arch/arm/mach-omap2/clockdomains3xxx_data.c        |    2 -
+ arch/arm/mach-omap2/clockdomains44xx_data.c        |    2 -
+ arch/arm/mach-omap2/clockdomains_common_data.c     |   24 --
+ arch/arm/mach-omap2/control.c                      |   43 ++
+ arch/arm/mach-omap2/control.h                      |    2 +
+ arch/arm/mach-omap2/dsp.c                          |    4 +
+ .../include/mach/ctrl_module_core_44xx.h           |    1 +
+ arch/arm/mach-omap2/omap_hwmod.c                   |  427 ++++++++++++++------
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   10 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   16 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   23 ++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +-
+ arch/arm/plat-omap/include/plat/clock.h            |    2 -
+ arch/arm/plat-omap/include/plat/dsp.h              |    3 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h       |    2 +
+ 22 files changed, 409 insertions(+), 187 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJP42cFAAoJEMePsQ0LvSpLmMAP/06LRRSFBPklr2hDmFPKBfBD
+guF3rAN5zimEyknXp1RhoHJjcH0YCkUdQgD24w51yVwVB9zVW0M6G9hVi91cJj9X
+1StRIwTbtb08yPdOlpywEXzHpjXz3AauCMRRxYJHi0FjajwHNKWWv+A/iolM0p8P
+5o5ZY+D3AzJqfX/+A0FK2YKn2Z7X9kxg8uTTukhXhe38ldZJ2pHqA4ND2n2F+GnD
+DUGqpnYu+QLTmw0x0NbpTNDarnmUEa/tH1NRny5Fh+ujYxH5NPTVvxHTW8tbm5bl
+qkleWJaDc+D2pCnD3ch3cUlLgIfTZbo4KUg+Y4uv4QLrLx/QTu6TpyJaP+ZJw3sY
+amakgmv3vzYzHMOf/0gxIe6xDZl6YFVXiOdJex4kQ5qodXRgmh82gYUrEKLLHuWn
++EKwIBM8xV5zYzA60vZ05ul7QqeNfwD5D6dd5As96QweVJFMGiIDWINGfxOtI/mH
+ygXD6sSZvYhqGk2EVb+hje971urmI4aIrolt/xB4anOATiehaJuwhLjtp+5ZO7tL
+5w3bybiUqKh+CN0DlpL/Srw0jaVp/pjZE8+4tzw/Mvm5T8wSVZL2ysJfmX4WffKl
+k7RI46jiiQfFLJbSF5pgXUEm00/Ut3g7otp2F+iZLuAplJwoojl7cgezTSAgRc9E
+Rhv07SsL5AAZ5OyCOdeQ
+=rQK5
+-----END PGP SIGNATURE-----
