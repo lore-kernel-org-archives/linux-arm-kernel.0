@@ -1,23 +1,154 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 21 Jun 2012 11:36:26 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: OMAP: USB: Fixup ehci_hcd_omap_probe error path
-In-Reply-To: <1340275473-16374-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1206211136010.1164-100000@iolanthe.rowland.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 21 Jun 2012 12:05:09 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: Allow DTB command line concatenation with
+ ATAG_CMDLINE
+In-Reply-To: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
+References: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <alpine.LFD.2.02.1206211204430.10229@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jun 2012, Russ Dill wrote:
+On Thu, 21 Jun 2012, Richard Genoud wrote:
 
-> A recent commit, [PATCH] Fix OMAP EHCI suspend/resume failure
-> (i693) '354ab856' causes ehci probe to fail on omap3xxx. This
-> exposed bugs in the ehci_hcd_omap_probe error path causing
-> an oops.
+> This patch allows the ATAG_CMDLINE provided by the bootloader to be
+> concatenated to the bootargs property of the device tree.
 > 
-> On the error path, call usb_remove_hcd if usb_add_hcd has been
-> called, and call usb_put_hcd if usb_alloc_hcd has been called.
+> This is useful to merge static values defined in the device tree with the
+> boot loader's (possibly) more dynamic values, such as startup reasons and more.
 > 
-> Tested on BB-xM.
+> The bootloader should use the device tree to pass those values to the kernel,
+> but that's not always simple (old bootloader or very small one).
 > 
-> Signed-off-by: Russ.Dill at ti.com
+> The behaviour is the same as the one introduced by Victor Boivie in
+> 4394c1244249198c6b85093d46935b761b36ae05 by extending the CONFIG_CMDLINE.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+>  arch/arm/Kconfig                        |   19 +++++++++
+>  arch/arm/boot/compressed/atags_to_fdt.c |   62 ++++++++++++++++++++++++++++++-
+>  2 files changed, 79 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 84449dd..ff4b6e6 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1959,6 +1959,25 @@ config ARM_ATAG_DTB_COMPAT
+>  	  bootloaders, this option allows zImage to extract the information
+>  	  from the ATAG list and store it at run time into the appended DTB.
+>  
+> +choice
+> +	prompt "Kernel command line type" if ARM_ATAG_DTB_COMPAT
+> +	default ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
+> +
+> +config ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
+> +	bool "Use bootloader kernel arguments if available"
+> +	help
+> +	  Uses the command-line options passed by the boot loader instead of
+> +	  the device tree bootargs property. If the boot loader doesn't provide
+> +	  any, the device tree bootargs property will be used.
+> +
+> +config ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
+> +	bool "Extend with bootloader kernel arguments"
+> +	help
+> +	  The command-line arguments provided by the boot loader will be
+> +	  appended to the the device tree bootargs property.
+> +
+> +endchoice
+> +
+>  config CMDLINE
+>  	string "Default kernel command string"
+>  	default ""
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index 797f04b..aabc02a 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -1,6 +1,12 @@
+>  #include <asm/setup.h>
+>  #include <libfdt.h>
+>  
+> +#if defined(CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND)
+> +#define do_extend_cmdline 1
+> +#else
+> +#define do_extend_cmdline 0
+> +#endif
+> +
+>  static int node_offset(void *fdt, const char *node_path)
+>  {
+>  	int offset = fdt_path_offset(fdt, node_path);
+> @@ -36,6 +42,48 @@ static int setprop_cell(void *fdt, const char *node_path,
+>  	return fdt_setprop_cell(fdt, offset, property, val);
+>  }
+>  
+> +static const void *getprop(const void *fdt, const char *node_path,
+> +			   const char *property, int *len)
+> +{
+> +	int offset = fdt_path_offset(fdt, node_path);
+> +
+> +	if (offset == -FDT_ERR_NOTFOUND)
+> +		return NULL;
+> +
+> +	return fdt_getprop(fdt, offset, property, len);
+> +}
+> +
+> +static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+> +{
+> +	char cmdline[COMMAND_LINE_SIZE];
+> +	const char *fdt_bootargs;
+> +	char *ptr = cmdline;
+> +	int len = 0;
+> +
+> +	/* copy the fdt command line into the buffer */
+> +	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+> +	if (fdt_bootargs)
+> +		if (len < COMMAND_LINE_SIZE) {
+> +			memcpy(ptr, fdt_bootargs, len);
+> +			/* len is the length of the string
+> +			 * including the NULL terminator */
+> +			ptr += len - 1;
+> +		}
+> +
+> +	/* and append the ATAG_CMDLINE */
+> +	if (fdt_cmdline) {
+> +		len = strlen(fdt_cmdline);
+> +		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
+> +			*ptr++ = ' ';
+> +			memcpy(ptr, fdt_cmdline, len);
+> +			ptr += len;
+> +		}
+> +	}
+> +	*ptr = '\0';
+> +
+> +	setprop_string(fdt, "/chosen", "bootargs", cmdline);
+> +}
+> +
+>  /*
+>   * Convert and fold provided ATAGs into the provided FDT.
+>   *
+> @@ -72,8 +120,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  
+>  	for_each_tag(atag, atag_list) {
+>  		if (atag->hdr.tag == ATAG_CMDLINE) {
+> -			setprop_string(fdt, "/chosen", "bootargs",
+> -					atag->u.cmdline.cmdline);
+> +			/* Append the ATAGS command line to the device tree
+> +			 * command line.
+> +			 * NB: This means that if the same parameter is set in
+> +			 * the device tree and in the tags, the one from the
+> +			 * tags will be chosen.
+> +			 */
+> +			if (do_extend_cmdline)
+> +				merge_fdt_bootargs(fdt,
+> +						   atag->u.cmdline.cmdline);
+> +			else
+> +				setprop_string(fdt, "/chosen", "bootargs",
+> +					       atag->u.cmdline.cmdline);
+>  		} else if (atag->hdr.tag == ATAG_MEM) {
+>  			if (memcount >= sizeof(mem_reg_property)/4)
+>  				continue;
+> -- 
+> 1.7.2.5
+> 
