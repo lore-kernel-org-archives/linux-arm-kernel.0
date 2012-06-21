@@ -1,73 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 21 Jun 2012 08:52:42 +0200
-Subject: [PATCH 1/5] DRM: Add i.MX drm core support
-In-Reply-To: <20120621053014.GB3971@S2101-09.ap.freescale.net>
-References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
- <1339681407-28721-2-git-send-email-s.hauer@pengutronix.de>
- <20120621053014.GB3971@S2101-09.ap.freescale.net>
-Message-ID: <20120621065242.GX28394@pengutronix.de>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 21 Jun 2012 12:26:07 +0530
+Subject: [PATCHv8 06/13] I2C: OMAP: Correct I2C revision for OMAP3
+In-Reply-To: <20120620141437.GN12766@atomide.com>
+References: <1340029828-20751-1-git-send-email-shubhrajyoti@ti.com>
+ <1340029828-20751-7-git-send-email-shubhrajyoti@ti.com>
+ <20120620103235.GD12766@atomide.com> <4FE1C9AC.3020104@ti.com>
+ <20120620141437.GN12766@atomide.com>
+Message-ID: <CAM=Q2cvW3MaU4ZT8Lv6hKBtwuXiSVP75y4A5RWAB+oQr3B6kdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 01:30:16PM +0800, Shawn Guo wrote:
-> On Thu, Jun 14, 2012 at 03:43:23PM +0200, Sascha Hauer wrote:
-> ...
-> > +struct drm_device *imx_drm_device_get(void)
-> > +{
-> > +	struct imx_drm_device *imxdrm = __imx_drm_device();
-> > +	struct imx_drm_encoder *enc;
-> > +	struct imx_drm_connector *con;
-> > +	struct imx_drm_crtc *crtc;
-> > +
-> > +	mutex_lock(&imxdrm->mutex);
-> > +
-> > +	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
-> > +		if (!try_module_get(enc->owner)) {
-> > +			dev_err(imxdrm->dev, "could not get module %s\n",
-> > +					module_name(enc->owner));
-> > +			goto unwind_enc;
-> > +		}
-> > +	}
-> > +
-> > +	list_for_each_entry(con, &imxdrm->connector_list, list) {
-> > +		if (!try_module_get(con->owner)) {
-> > +			dev_err(imxdrm->dev, "could not get module %s\n",
-> > +					module_name(con->owner));
-> > +			goto unwind_con;
-> > +		}
-> > +	}
-> > +
-> > +	list_for_each_entry(crtc, &imxdrm->crtc_list, list) {
-> > +		if (!try_module_get(crtc->owner)) {
-> > +			dev_err(imxdrm->dev, "could not get module %s\n",
-> > +					module_name(crtc->owner));
-> > +			goto unwind_crtc;
-> > +		}
-> > +	}
-> > +
-> > +	imxdrm->references++;
-> > +
-> > +	mutex_unlock(&imxdrm->mutex);
-> > +
-> > +	return imx_drm_device->drm;
-> 
-> Though I'm not quite sure about the point of retrieving the static
-> variable imx_drm_device from calling __imx_drm_device(), shouldn't
-> imxdrm be used here since you already retrieve it?
+On Wed, Jun 20, 2012 at 7:44 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Shubhrajyoti <shubhrajyoti@ti.com> [120620 06:06]:
+>> On Wednesday 20 June 2012 04:02 PM, Tony Lindgren wrote:
+>> > * Shubhrajyoti D <shubhrajyoti@ti.com> [120618 07:35]:
+>> >> From: Jon Hunter <jon-hunter@ti.com>
+>> >>
+>> >> The OMAP3530 is based upon the same silicon as the OMAP3430 and so the I2C
+>> >> revision is the same for 3430 and 3530. However, the OMAP3630 device has the
+>> >> same I2C revision as OMAP4. Correct the revision definition to reflect this.
+>> >>
+>> >> This patch is based on work done by Jon Hunter <jon-hunter@ti.com>
+>> >> Changes from his patch
+>> >> - Update OMAP_I2C_REV_ON_3430 also to reflect that it is same as 3530
+>> > ...
+>> >> ?/* timeout waiting for the controller to respond */
+>> >> ?#define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+>> >> @@ -298,7 +298,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
+>> >> ? ? ? ? ? ? ? ? ? ?omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+>> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SYSC_AUTOIDLE_MASK);
+>> >>
+>> >> - ? ? ? ? ?} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
+>> >> + ? ? ? ? ?} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+>> >> ? ? ? ? ? ? ? ? ? ?dev->syscstate = SYSC_AUTOIDLE_MASK;
+>> >> ? ? ? ? ? ? ? ? ? ?dev->syscstate |= SYSC_ENAWAKEUP_MASK;
+>> >> ? ? ? ? ? ? ? ? ? ?dev->syscstate |= (SYSC_IDLEMODE_SMART <<
+>> > Having to patch all over the place for these revision defines leads
+>> > into unmaintainable code as new SoCs get added.
+>> >
+>> > Please instead just check the revision once during init, then set
+>> > up some feature bits like I2C_OMAP_NEEDS_XYZ_RESET that the runtime
+>> > code can check.
+>> Even now at probe
+>>
+>> dev->rev is set by reading the rev register.
+>>
+>> The (macro)name used to identify is only changed.
+>>
+>> Also all the ips need reset the difference is that 2430 has less bits eg only autoidle and reset.
+>> So a flag needs reset may not be meaningful.
+>
+> Hmm OK so this is a cosmetic/readability fix..
 
-The point of calling __imx_drm_device() instead of using imx_drm_device
-directly is that I thought it might be easier to convert to a non global
-variable later should we have (or want) to. I'm also unsure about the
-value of having such a function, but you are right, it should be used
-consistently if we have it.
+Yes
 
-I'll fix the remaining things you mentioned in the next round. Thanks
-for looking at it.
+>
+> ..but your earlier patch now spreads the checking of revision
+> to the new non-init function omap_i2c_reset.
+>
+> Why don't you just do this cosmetic/readability rename fix
+> before your 03/13 patch?
 
-Sascha
+OK thats doable.I can reorder the patch.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Then set the already existing
+> OMAP_I2C_FLAG_RESET_REGS_POSTIDLE during init for some
+> revisions and use that instead of the rev check in
+> omap_i2c_reset?
+
+OMAP_I2C_FLAG_RESET_REGS_POSTIDLE is a hwmod flag whose intention is to find
+know if it can lose context after idle.
+
+The rev check that we have is because post reset( triggered by driver)
+to know if we have to restore only autoidle or other bits like clockactivity
+sidle , enable wakeup .
+
+>
+> Tony
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
