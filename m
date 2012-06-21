@@ -1,101 +1,57 @@
-From: namhyung@kernel.org (Namhyung Kim)
-Date: Thu, 21 Jun 2012 09:01:09 +0900
-Subject: [PATCH v3 2/5] ARM: topology: factorize the update of sibling
- masks
-In-Reply-To: <1340205562-7653-3-git-send-email-vincent.guittot@linaro.org>
- (Vincent Guittot's message of "Wed, 20 Jun 2012 17:19:19 +0200")
-References: <1340205562-7653-1-git-send-email-vincent.guittot@linaro.org>
- <1340205562-7653-3-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <87txy5fs8q.fsf@sejong.aot.lge.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Jun 2012 09:48:00 +0900
+Subject: [PATCH] ARM: EXYNOS: Remove the L2 cache latency setting for EXYNOS5
+Message-ID: <038301cd4f47$8202b420$86081c60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jun 2012 17:19:19 +0200, Vincent Guittot wrote:
-> This factorization has also been proposed in another patchset that has not been
-> merged yet:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html
-> So, this patch could be dropped depending of the state of the other one.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+From: Boojin Kim <boojin.kim@samsung.com>
 
-Reviewed-by: Namhyung Kim <namhyung@kernel.org>
+Since SYSRAM set the L2 cache latency on EXYNOS5 SoCs,
+no longer need that in the kernel. It helps to reduce
+booting time (no need cache disable and cache enable).
 
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/common.c |   25 -------------------------
+ 1 files changed, 0 insertions(+), 25 deletions(-)
 
-> ---
->  arch/arm/kernel/topology.c |   48 +++++++++++++++++++++++++-------------------
->  1 file changed, 27 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 51f23b3..eb5fc81 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -82,6 +82,32 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
->  	return &cpu_topology[cpu].core_sibling;
->  }
->  
-> +void update_siblings_masks(unsigned int cpuid)
-> +{
-> +	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
-> +	int cpu;
-> +
-> +	/* update core and thread sibling masks */
-> +	for_each_possible_cpu(cpu) {
-> +		cpu_topo = &cpu_topology[cpu];
-> +
-> +		if (cpuid_topo->socket_id != cpu_topo->socket_id)
-> +			continue;
-> +
-> +		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-> +		if (cpu != cpuid)
-> +			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
-> +
-> +		if (cpuid_topo->core_id != cpu_topo->core_id)
-> +			continue;
-> +
-> +		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-> +		if (cpu != cpuid)
-> +			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
-> +	}
-> +	smp_wmb();
-> +}
-> +
->  /*
->   * store_cpu_topology is called at boot when only one cpu is running
->   * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
-> @@ -91,7 +117,6 @@ void store_cpu_topology(unsigned int cpuid)
->  {
->  	struct cputopo_arm *cpuid_topo = &cpu_topology[cpuid];
->  	unsigned int mpidr;
-> -	unsigned int cpu;
->  
->  	/* If the cpu topology has been already set, just return */
->  	if (cpuid_topo->core_id != -1)
-> @@ -133,26 +158,7 @@ void store_cpu_topology(unsigned int cpuid)
->  		cpuid_topo->socket_id = -1;
->  	}
->  
-> -	/* update core and thread sibling masks */
-> -	for_each_possible_cpu(cpu) {
-> -		struct cputopo_arm *cpu_topo = &cpu_topology[cpu];
-> -
-> -		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
-> -			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-> -			if (cpu != cpuid)
-> -				cpumask_set_cpu(cpu,
-> -					&cpuid_topo->core_sibling);
-> -
-> -			if (cpuid_topo->core_id == cpu_topo->core_id) {
-> -				cpumask_set_cpu(cpuid,
-> -					&cpu_topo->thread_sibling);
-> -				if (cpu != cpuid)
-> -					cpumask_set_cpu(cpu,
-> -						&cpuid_topo->thread_sibling);
-> -			}
-> -		}
-> -	}
-> -	smp_wmb();
-> +	update_siblings_masks(cpuid);
->  
->  	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
->  		cpuid, cpu_topology[cpuid].thread_id,
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 742edd3..0ec1a91 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -712,31 +712,6 @@ static int __init exynos4_l2x0_cache_init(void)
+ early_initcall(exynos4_l2x0_cache_init);
+ #endif
+ 
+-static int __init exynos5_l2_cache_init(void)
+-{
+-	unsigned int val;
+-
+-	if (!soc_is_exynos5250())
+-		return 0;
+-
+-	asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
+-		     "bic %0, %0, #(1 << 2)\n"	/* cache disable */
+-		     "mcr p15, 0, %0, c1, c0, 0\n"
+-		     "mrc p15, 1, %0, c9, c0, 2\n"
+-		     : "=r"(val));
+-
+-	val |= (1 << 9) | (1 << 5) | (2 << 6) | (2 << 0);
+-
+-	asm volatile("mcr p15, 1, %0, c9, c0, 2\n" : : "r"(val));
+-	asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
+-		     "orr %0, %0, #(1 << 2)\n"	/* cache enable */
+-		     "mcr p15, 0, %0, c1, c0, 0\n"
+-		     : : "r"(val));
+-
+-	return 0;
+-}
+-early_initcall(exynos5_l2_cache_init);
+-
+ static int __init exynos_init(void)
+ {
+ 	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
+-- 
+1.7.1
