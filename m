@@ -1,105 +1,139 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 21 Jun 2012 15:38:44 +0530
-Subject: [PATCHv9 3/8] I2C: OMAP: use devm_* functions
-In-Reply-To: <1340273329-8319-1-git-send-email-shubhrajyoti@ti.com>
-References: <1340273329-8319-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340273329-8319-4-git-send-email-shubhrajyoti@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Jun 2012 12:12:30 +0200
+Subject: [PATCH 2/2] ARM: MXS: Add Crystalfontz CFA-10036 DTS
+In-Reply-To: <201206211149.01556.marex@denx.de>
+References: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1340268415-5022-3-git-send-email-maxime.ripard@free-electrons.com>
+ <201206211149.01556.marex@denx.de>
+Message-ID: <4FE2F38E.9010902@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various devm_* functions allocate memory that is released when a driver
-detaches. This patch uses devm_kzalloc, devm_request_and_ioremap for data
-that is allocated in the probe function of a platform device and is only
-freed in the remove function.
+Hi Marek,
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   33 +++++++++------------------------
- 1 files changed, 9 insertions(+), 24 deletions(-)
+Le 21/06/2012 11:49, Marek Vasut a ?crit :
+> Dear Maxime Ripard,
+> 
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Cc: Brian Lily <brian@crystalfontz.com>
+> 
+> But then, wait ... why did you add the mach-cfa10036.c entry?
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d704f64..328a022 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -943,7 +943,7 @@ omap_i2c_probe(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev;
- 	struct i2c_adapter	*adap;
--	struct resource		*mem, *irq, *ioarea;
-+	struct resource		*mem, *irq;
- 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
- 	struct device_node	*node = pdev->dev.of_node;
- 	const struct of_device_id *match;
-@@ -962,17 +962,16 @@ omap_i2c_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	ioarea = request_mem_region(mem->start, resource_size(mem),
--			pdev->name);
--	if (!ioarea) {
--		dev_err(&pdev->dev, "I2C region already claimed\n");
--		return -EBUSY;
-+	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
-+	if (!dev) {
-+		dev_err(&pdev->dev, "Menory allocation failed\n");
-+		return -ENOMEM;
- 	}
- 
--	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
--	if (!dev) {
--		r = -ENOMEM;
--		goto err_release_region;
-+	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
-+	if (!dev->base) {
-+		dev_err(&pdev->dev, "I2C region already claimed\n");
-+		return -ENOMEM;
- 	}
- 
- 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
-@@ -996,11 +995,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	dev->dev = &pdev->dev;
- 	dev->irq = irq->start;
--	dev->base = ioremap(mem->start, resource_size(mem));
--	if (!dev->base) {
--		r = -ENOMEM;
--		goto err_free_mem;
--	}
- 
- 	platform_set_drvdata(pdev, dev);
- 
-@@ -1095,13 +1089,9 @@ err_free_irq:
- err_unuse_clocks:
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(dev->dev);
--	iounmap(dev->base);
- 	pm_runtime_disable(&pdev->dev);
- err_free_mem:
- 	platform_set_drvdata(pdev, NULL);
--	kfree(dev);
--err_release_region:
--	release_mem_region(mem->start, resource_size(mem));
- 
- 	return r;
- }
-@@ -1109,7 +1099,6 @@ err_release_region:
- static int __devexit omap_i2c_remove(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
--	struct resource		*mem;
- 	int ret;
- 
- 	platform_set_drvdata(pdev, NULL);
-@@ -1123,10 +1112,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
--	iounmap(dev->base);
--	kfree(dev);
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(mem->start, resource_size(mem));
- 	return 0;
- }
- 
+As I stated in my introduction mail, I first did the job on 3.4 before
+forward porting it to 3.5. And since the MMC part worked on 3.4 and no
+longer on 3.5, I wanted to keep an easily trackable file between these
+two versions, which is not the case with DT.
+
+So partly historical, partly debugging reasons :)
+
+Anyway, I totally understand your point, I'll remove the board file for
+the next postings.
+
+>> ---
+>>  arch/arm/boot/dts/cfa10036.dts |   66
+>> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 66 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/cfa10036.dts
+>>
+>> diff --git a/arch/arm/boot/dts/cfa10036.dts
+>> b/arch/arm/boot/dts/cfa10036.dts new file mode 100644
+>> index 0000000..ceae960
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/cfa10036.dts
+>> @@ -0,0 +1,66 @@
+>> +/*
+>> + * Copyright 2012 Free Electrons
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +/dts-v1/;
+>> +/include/ "imx28.dtsi"
+>> +
+>> +/ {
+>> +	model = "Crystalfontz CFA-10036 Board";
+>> +	compatible = "crystalfontz,cfa10036", "fsl,imx28-evk", "fsl,imx28";
+>> +
+>> +	memory {
+>> +		reg = <0x40000000 0x08000000>;
+>> +	};
+>> +
+>> +	apb at 80000000 {
+>> +		apbh at 80000000 {
+>> +			ssp0: ssp at 80010000 {
+>> +				compatible = "fsl,imx28-mmc";
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&mmc0_4bit_pins_a
+>> +					&mmc0_cd_cfg &mmc0_sck_cfg>;
+>> +				bus-width = <4>;
+>> +				status = "okay";
+>> +			};
+>> +			pinctrl at 80018000 {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				compatible = "fsl,imx28-pinctrl", "simple-bus";
+>> +				reg = <0x80018000 2000>;
+>> +
+>> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
+>> +					reg = <0>;
+>> +					fsl,pinmux-ids = <0x2000 0x2010 0x2020
+>> +						0x2030 0x2080 0x2090 0x20a0>;
+>> +					fsl,drive-strength = <1>;
+>> +					fsl,voltage = <1>;
+>> +					fsl,pull-up = <1>;
+> 
+> Do you need this copy here?
+
+This is not a direct copy, as there is only 4 pins for the MMC bus on
+this board, and one of the pins used for the additional bus pins on the
+imx28evk is used to power the OLED screen on this one, so I don't want
+all of the imx28 pins allocated for the mmc0 to be muxed as such.
+
+Anyway, I'm not very familiar with pinctrl yet, so I might be missing
+something.
+
+>> +				};
+>> +
+>> +				duart_pins_a: duart at 0 {
+>> +					reg = <0>;
+>> +					fsl,pinmux-ids = <0x3022 0x3032>;
+>> +					fsl,drive-strength = <0>;
+>> +					fsl,voltage = <1>;
+>> +					fsl,pull-up = <0>;
+> 
+> And this?
+
+The pins to be muxed for the DUART differs from the imx28 here as well.
+On the iMX28EVK, the pins used for the DUART are 3-16 and 3-17, while we
+use the 3-2 and 3-3 on this board.
+
+> 
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +		apbx at 80040000 {
+>> +			duart: serial at 80074000 {
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&duart_pins_a>;
+>> +				status = "okay";
+>> +			};
+>> +		};
+>> +	};
+>> +};
+
+Thanks!
+
+Maxime
+
+
 -- 
-1.7.5.4
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
