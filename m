@@ -1,36 +1,73 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Thu, 21 Jun 2012 12:17:06 +0530
-Subject: [PATCH 07/15] i2c: Add Device Tree support to the Nomadik I2C
- driver
-In-Reply-To: <CACRpkdbi7vmJE9LPmiu2NGM4b_SZ-Hi=a_xgrCOQX9ofKsLFew@mail.gmail.com>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdbi7vmJE9LPmiu2NGM4b_SZ-Hi=a_xgrCOQX9ofKsLFew@mail.gmail.com>
-Message-ID: <20120621064705.GA24921@bnru02>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 21 Jun 2012 08:52:42 +0200
+Subject: [PATCH 1/5] DRM: Add i.MX drm core support
+In-Reply-To: <20120621053014.GB3971@S2101-09.ap.freescale.net>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+ <1339681407-28721-2-git-send-email-s.hauer@pengutronix.de>
+ <20120621053014.GB3971@S2101-09.ap.freescale.net>
+Message-ID: <20120621065242.GX28394@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 21:30:17 +0200, Linus Walleij wrote:
-> On Wed, Jun 20, 2012 at 2:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Jun 21, 2012 at 01:30:16PM +0800, Shawn Guo wrote:
+> On Thu, Jun 14, 2012 at 03:43:23PM +0200, Sascha Hauer wrote:
+> ...
+> > +struct drm_device *imx_drm_device_get(void)
+> > +{
+> > +	struct imx_drm_device *imxdrm = __imx_drm_device();
+> > +	struct imx_drm_encoder *enc;
+> > +	struct imx_drm_connector *con;
+> > +	struct imx_drm_crtc *crtc;
+> > +
+> > +	mutex_lock(&imxdrm->mutex);
+> > +
+> > +	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
+> > +		if (!try_module_get(enc->owner)) {
+> > +			dev_err(imxdrm->dev, "could not get module %s\n",
+> > +					module_name(enc->owner));
+> > +			goto unwind_enc;
+> > +		}
+> > +	}
+> > +
+> > +	list_for_each_entry(con, &imxdrm->connector_list, list) {
+> > +		if (!try_module_get(con->owner)) {
+> > +			dev_err(imxdrm->dev, "could not get module %s\n",
+> > +					module_name(con->owner));
+> > +			goto unwind_con;
+> > +		}
+> > +	}
+> > +
+> > +	list_for_each_entry(crtc, &imxdrm->crtc_list, list) {
+> > +		if (!try_module_get(crtc->owner)) {
+> > +			dev_err(imxdrm->dev, "could not get module %s\n",
+> > +					module_name(crtc->owner));
+> > +			goto unwind_crtc;
+> > +		}
+> > +	}
+> > +
+> > +	imxdrm->references++;
+> > +
+> > +	mutex_unlock(&imxdrm->mutex);
+> > +
+> > +	return imx_drm_device->drm;
 > 
-> > Here we apply the bindings required for successful Device Tree
-> > probing of the i2c-nomadik driver. We also apply a fall-back
-> > configuration in case either one is not provided, or a required
-> > element is missing from the one supplied.
-> >
-> > Cc: linux-i2c at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Pls Cc Srinidhi on these patches, and I would prefer to get his ACK on this.
+> Though I'm not quite sure about the point of retrieving the static
+> variable imx_drm_device from calling __imx_drm_device(), shouldn't
+> imxdrm be used here since you already retrieve it?
 
-if trivial comments fixed, then
+The point of calling __imx_drm_device() instead of using imx_drm_device
+directly is that I thought it might be easier to convert to a non global
+variable later should we have (or want) to. I'm also unsure about the
+value of having such a function, but you are right, it should be used
+consistently if we have it.
 
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+I'll fix the remaining things you mentioned in the next round. Thanks
+for looking at it.
 
-> 
-> Srinidhi, could you propose a patch to MAINTAINERS adding yourself as
-> explicit maintainer for this driver?
+Sascha
 
-ok.
-
-/srinidhi
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
