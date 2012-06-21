@@ -1,281 +1,56 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 21 Jun 2012 18:09:12 +0530
-Subject: [PATCH v3 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver migration
-In-Reply-To: <cover.1340281127.git.afzal@ti.com>
-References: <cover.1340281127.git.afzal@ti.com>
-Message-ID: <c9fbc9345f72216d3d92e65ed39ca3101a459f46.1340281127.git.afzal@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Jun 2012 21:11:41 +0800
+Subject: [PATCH] ARM:MXS: Initial support for the Crystalfontz CFA-10036
+In-Reply-To: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120621131138.GA21418@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorganize gpmc-onenand initialization so that changes
-required for gpmc driver migration can be made smooth.
+On Thu, Jun 21, 2012 at 10:46:52AM +0200, Maxime Ripard wrote:
+> On the MMC part though, Something odd is going on.  On the first
+> patches I made against 3.4, everything was working fine. With 3.5-rc2
+> though, the MMC never replies to the first CMD52 command sent to
+> it. The pin muxing hasn't changed and has been checked, the card is
+> well detected through the card detect pin, the power enable pin is
+> correctly set to a low level, and so the SD card is correctly
+> powered. The MMC works fine with the exact same kernel on the
+> imx28-evk though.
+> 
+> What seems odd to me, is that when booting the board with the 3.4
+> kernel, at boot, the mxs-mmc driver reports a SSP clock of 288MHz,
+> while on 3.5, it reports a 480MHz SSP clock. By looking at the clk
+> driver for the iMX28, there is a comment saying that the 480MHz clock
+> seems to high for SD controlers, and that it should be 288MHz
+> instead. Given that the clock part has changed quite a lot from 3.4 to
+> 3.5, I think it might be a good lead, but hardcoding the SSP clock to
+> 288MHz in the mxs-mmc driver instead of using the clk_get_rate
+> function does not resolve the problem.
+> 
+> Also, this problem is seen with both DT-probing and traditionnal
+> probing.
+> 
+> Do someone have an idea on what could possibly happen here ?
+> 
+Can you try the change below to see if it fixes the problem?
 
-Ensuring sync read/write are disabled in onenand cannot
-be expected to work properly unless GPMC is setup, this
-has been removed.
+Regards,
+Shawn
 
-Refactor set_async_mode & set_sync_mode functions to
-separate out timing calculation & actual configuration
-(GPMC & OneNAND side).
+--8<---
 
-Thanks to Jon for his suggestions.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
-
-v3:
-Refactor set_sync/async functions to separate out timing and
- configurations
-v2:
-Move ensuring that async mode in OneNAND has been setup from
- set_sync to setup function, improve commit message
-
- arch/arm/mach-omap2/gpmc-onenand.c |  134 +++++++++++++++++++-----------------
- 1 file changed, 69 insertions(+), 65 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index 8863e0a..789ca8c9 100644
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -15,6 +15,7 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/onenand_regs.h>
- #include <linux/io.h>
-+#include <linux/err.h>
- 
- #include <asm/mach/flash.h>
- 
-@@ -25,6 +26,7 @@
- 
- #define	ONENAND_IO_SIZE	SZ_128K
- 
-+static int hf, vhf, sync_read, sync_write, latency;
- static struct omap_onenand_platform_data *gpmc_onenand_data;
- 
- static struct resource gpmc_onenand_resource = {
-@@ -38,11 +40,9 @@ static struct platform_device gpmc_onenand_device = {
- 	.resource	= &gpmc_onenand_resource,
- };
- 
--static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
-+static struct gpmc_timings omap2_onenand_calc_async_timings(void)
- {
- 	struct gpmc_timings t;
--	u32 reg;
--	int err;
- 
- 	const int t_cer = 15;
- 	const int t_avdp = 12;
-@@ -55,11 +55,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
- 	const int t_wpl = 40;
- 	const int t_wph = 30;
- 
--	/* Ensure sync read and sync write are disabled */
--	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
--	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
--	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
--
- 	memset(&t, 0, sizeof(t));
- 	t.sync_clk = 0;
- 	t.cs_on = 0;
-@@ -86,12 +81,21 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
- 	t.cs_wr_off = t.we_off + gpmc_round_ns_to_ticks(t_wph);
- 	t.wr_cycle  = t.cs_wr_off + gpmc_round_ns_to_ticks(t_cez);
- 
-+	return t;
-+}
-+
-+static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base,
-+							struct gpmc_timings *t)
-+{
-+	u32 reg;
-+	int err;
-+
- 	/* Configure GPMC for asynchronous read */
- 	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1,
- 			  GPMC_CONFIG1_DEVICESIZE_16 |
- 			  GPMC_CONFIG1_MUXADDDATA);
- 
--	err = gpmc_cs_set_timings(cs, &t);
-+	err = gpmc_cs_set_timings(cs, t);
- 	if (err)
- 		return err;
- 
-@@ -103,8 +107,7 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
- 	return 0;
- }
- 
--static void set_onenand_cfg(void __iomem *onenand_base, int latency,
--				int sync_read, int sync_write, int hf, int vhf)
-+static void set_onenand_cfg(void __iomem *onenand_base)
- {
- 	u32 reg;
- 
-@@ -172,9 +175,9 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
- 	return freq;
- }
- 
--static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
--					void __iomem *onenand_base,
--					int *freq_ptr)
-+static struct gpmc_timings
-+omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
-+						int freq, bool clk_dep)
- {
- 	struct gpmc_timings t;
- 	const int t_cer  = 15;
-@@ -184,28 +187,15 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
- 	const int t_wpl  = 40;
- 	const int t_wph  = 30;
- 	int min_gpmc_clk_period, t_ces, t_avds, t_avdh, t_ach, t_aavdh, t_rdyo;
--	int div, fclk_offset_ns, fclk_offset, gpmc_clk_ns, latency;
--	int first_time = 0, hf = 0, vhf = 0, sync_read = 0, sync_write = 0;
--	int err, ticks_cez;
--	int cs = cfg->cs, freq = *freq_ptr;
--	u32 reg;
--	bool clk_dep = false;
-+	int div, fclk_offset_ns, fclk_offset, gpmc_clk_ns;
-+	int ticks_cez;
-+	int cs = cfg->cs;
- 
- 	if (cfg->flags & ONENAND_SYNC_READ) {
- 		sync_read = 1;
- 	} else if (cfg->flags & ONENAND_SYNC_READWRITE) {
- 		sync_read = 1;
- 		sync_write = 1;
--	} else
--		return omap2_onenand_set_async_mode(cs, onenand_base);
--
--	if (!freq) {
--		/* Very first call freq is not known */
--		err = omap2_onenand_set_async_mode(cs, onenand_base);
--		if (err)
--			return err;
--		freq = omap2_onenand_get_freq(cfg, onenand_base, &clk_dep);
--		first_time = 1;
- 	}
- 
- 	switch (freq) {
-@@ -279,36 +269,16 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
- 		}
- 	}
- 
--	if (first_time)
--		set_onenand_cfg(onenand_base, latency,
--					sync_read, sync_write, hf, vhf);
-+	/* Set synchronous read timings */
-+	memset(&t, 0, sizeof(t));
- 
- 	if (div == 1) {
--		reg = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG2);
--		reg |= (1 << 7);
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG2, reg);
--		reg = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG3);
--		reg |= (1 << 7);
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG3, reg);
--		reg = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG4);
--		reg |= (1 << 7);
--		reg |= (1 << 23);
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG4, reg);
--	} else {
--		reg = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG2);
--		reg &= ~(1 << 7);
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG2, reg);
--		reg = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG3);
--		reg &= ~(1 << 7);
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG3, reg);
--		reg = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG4);
--		reg &= ~(1 << 7);
--		reg &= ~(1 << 23);
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG4, reg);
-+		t.bool_timings.cs_extra_delay = true;
-+		t.bool_timings.adv_extra_delay = true;
-+		t.bool_timings.oe_extra_delay = true;
-+		t.bool_timings.we_extra_delay = true;
- 	}
- 
--	/* Set synchronous read timings */
--	memset(&t, 0, sizeof(t));
- 	t.sync_clk = min_gpmc_clk_period;
- 	t.cs_on = 0;
- 	t.adv_on = 0;
-@@ -357,6 +327,17 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
- 		}
- 	}
- 
-+	return t;
-+}
-+
-+static int omap2_onenand_set_sync_mode(int cs, struct gpmc_timings *t,
-+					void __iomem *onenand_base, int initial)
-+{
-+	int err;
-+
-+	if (initial)
-+		set_onenand_cfg(onenand_base);
-+
- 	/* Configure GPMC for synchronous read */
- 	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1,
- 			  GPMC_CONFIG1_WRAPBURST_SUPP |
-@@ -372,13 +353,11 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
- 			  GPMC_CONFIG1_DEVICETYPE_NOR |
- 			  GPMC_CONFIG1_MUXADDDATA);
- 
--	err = gpmc_cs_set_timings(cs, &t);
-+	err = gpmc_cs_set_timings(cs, t);
- 	if (err)
- 		return err;
- 
--	set_onenand_cfg(onenand_base, latency, sync_read, sync_write, hf, vhf);
--
--	*freq_ptr = freq;
-+	set_onenand_cfg(onenand_base);
- 
- 	return 0;
- }
-@@ -386,13 +365,38 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
- static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
- {
- 	struct device *dev = &gpmc_onenand_device.dev;
-+	struct gpmc_timings t;
-+	int ret, first_time = 0, freq = *freq_ptr;
-+	unsigned l = ONENAND_SYNC_READ | ONENAND_SYNC_READWRITE;
-+	bool clk_dep = false;
-+
-+	t = omap2_onenand_calc_async_timings();
-+	ret = omap2_onenand_set_async_mode(gpmc_onenand_data->cs,
-+							onenand_base, &t);
-+	if (IS_ERR_VALUE(ret)) {
-+		dev_err(dev, "unable to set to async mode\n");
-+		return ret;
-+	}
-+
-+	if (!(gpmc_onenand_data->flags & l))
-+		return 0;
-+
-+	/* setup sync mode */
-+	if (!freq) {
-+		/* Very first call freq is not known */
-+		freq = omap2_onenand_get_freq(gpmc_onenand_data,
-+						onenand_base, &clk_dep);
-+		first_time = 1;
-+	}
- 
--	/* Set sync timings in GPMC */
--	if (omap2_onenand_set_sync_mode(gpmc_onenand_data, onenand_base,
--			freq_ptr) < 0) {
--		dev_err(dev, "Unable to set synchronous mode\n");
--		return -EINVAL;
-+	t = omap2_onenand_calc_sync_timings(gpmc_onenand_data, freq, clk_dep);
-+	ret = omap2_onenand_set_sync_mode(gpmc_onenand_data->cs, &t,
-+						onenand_base, first_time);
-+	if (IS_ERR_VALUE(ret)) {
-+		dev_err(dev, "unable to set to sync mode\n");
-+		return ret;
- 	}
-+	*freq_ptr = freq;
- 
- 	return 0;
- }
--- 
-1.7.10.2
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 003b0f3..1a41d4e 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -245,8 +245,8 @@ int __init mx28_clocks_init(void)
+        clks[pll2] = mxs_clk_pll("pll2", "ref_xtal", PLL2CTRL0, 23, 50000000);
+        clks[ref_cpu] = mxs_clk_ref("ref_cpu", "pll0", FRAC0, 0);
+        clks[ref_emi] = mxs_clk_ref("ref_emi", "pll0", FRAC0, 1);
+-       clks[ref_io0] = mxs_clk_ref("ref_io0", "pll0", FRAC0, 2);
+-       clks[ref_io1] = mxs_clk_ref("ref_io1", "pll0", FRAC0, 3);
++       clks[ref_io1] = mxs_clk_ref("ref_io1", "pll0", FRAC0, 2);
++       clks[ref_io0] = mxs_clk_ref("ref_io0", "pll0", FRAC0, 3);
+        clks[ref_pix] = mxs_clk_ref("ref_pix", "pll0", FRAC1, 0);
+        clks[ref_hsadc] = mxs_clk_ref("ref_hsadc", "pll0", FRAC1, 1);
+        clks[ref_gpmi] = mxs_clk_ref("ref_gpmi", "pll0", FRAC1, 2);
