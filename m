@@ -1,126 +1,117 @@
-From: neilb@suse.de (NeilBrown)
-Date: Thu, 21 Jun 2012 13:16:16 +1000
-Subject: [GIT PULL] gpio/omap: cleanups for v3.5
-In-Reply-To: <CAC83ZvKT+EDRzBWrMbiyqOYqLW7WudOQeAq5Y5ZgXEs2txEPrA@mail.gmail.com>
-References: <874nrmtf47.fsf@ti.com> <20120614101541.39f50aee@notabene.brown>
- <CAC83ZvKT+EDRzBWrMbiyqOYqLW7WudOQeAq5Y5ZgXEs2txEPrA@mail.gmail.com>
-Message-ID: <20120621131616.7ac6426f@notabene.brown>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 21 Jun 2012 12:02:00 +0800
+Subject: [RFC PATCH v2] MTD: nand: add return value for
+ write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
+In-Reply-To: <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
+References: <1339567570-4816-1-git-send-email-josh.wu@atmel.com>
+ <4FE13CB2.3000605@atmel.com>
+ <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
+Message-ID: <4FE29CB8.3000404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jun 2012 23:24:10 +0530 "DebBarma, Tarun Kanti"
-<tarun.kanti@ti.com> wrote:
+Hi, Brian
 
-> On Thu, Jun 14, 2012 at 5:45 AM, NeilBrown <neilb@suse.de> wrote:
-> > On Fri, 11 May 2012 17:30:48 -0700 Kevin Hilman <khilman@ti.com> wrote:
-> >
-> >> Hi Grant,
-> >>
-> >> Here's the final round of GPIO cleanups for v3.5. ?This branch is based
-> >> on my for_3.5/fixes/gpio branch you just pulled.
-> >>
-> >> Kevin
-> >
-> > Hi.
-> >
-> > ?I'm not sure if it was this series or the following cleanups which broke
-> > ?things for me, but I've been trying 3.5-rc2 on my GTA04 and the serial
-> > ?console (ttyO2) dies as soon as the omap-gpio driver initialises.
-> >
-> > ?After some digging I came up with this patch to gpio-omap.c
-> >
-> > @@ -1124,6 +1124,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> >
-> > ? ? ? ?platform_set_drvdata(pdev, bank);
-> >
-> > + ? ? ? if (bank->get_context_loss_count)
-> > + ? ? ? ? ? ? ? bank->context_loss_count =
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->get_context_loss_count(bank->dev);
-> > ? ? ? ?pm_runtime_enable(bank->dev);
-> > ? ? ? ?pm_runtime_irq_safe(bank->dev);
-> > ? ? ? ?pm_runtime_get_sync(bank->dev);
-> >
-> > which fixes it.
-> >
-> > What was happening ?was that when omap_gpio_probe calls pm_runtime_get_sync,
-> > it calls
-> > ?_od_runtime_resume -> pm_generic_runtime_resume -> omap_gpio_runtime_resume
-> > ?-> omap_gpio_restore_context
-> >
-> > and then the serial port stops.
-> > I reasoned that the context probably hadn't been set up yet, so restoring
-> > from it broke things.
-> > Initialising bank->context_loss_count seems sensible and would ensure that
-> > we didn't try to restore the context until it has actually been lost.
-> 
-> I thought the following code exactly does that. That is context_lost_cnt_after
-> would be zero until there is context loss. The bank->context_loss_count is zero
-> at the beginning. So, (context_lost_cnt_after != bank->context_loss_count) would
-> be false and hence context restore should NOT happen? Not sure if I am
-> over looking
-> anything here....
-> 
-> omap_gpio_runtime_resume(...)
-> {
+On 6/21/2012 2:43 AM, Brian Norris wrote:
+> Hi Josh,
+>
+> On Tue, Jun 19, 2012 at 8:00 PM, Josh Wu<josh.wu@atmel.com>  wrote:
+>> Hi, Artem
+>>
+>> Ping? Do you have any comments for this patch?
+> I'm not Artem, but I have some comments :)
+
+sure,  thanks for the comments. :)
+
+>
+>> On 6/13/2012 2:06 PM, Josh Wu wrote:
+>>> There is an implemention of hardware ECC write page function which may
+>>> return an error indication. But now the definition of 'write_page' function
+>>> in struct nand_ecc_ctrl is 'void'.
+> I think it would help reviewers (and changelog readers) to note which
+> implementations are the real issue, if there are a small number of
+> implementations targeted.
+
+Currently, I am introducing the atmel pragrammable multibit ECC(PMECC) 
+hardware code to nand flash. I meet following situation that I need 
+change the write_page()'s return value to 'int':
+
+when writing one page into a nand flash with PMECC enabled, the hardware 
+engine will compute the BCH ecc code for this page. so we need read a 
+the status register to theck whether the ecc code is generated.
+But we cannot assume the status register always can be ready, (for 
+instance, incorrect hardware configuration or hardware issue), in such 
+case I need write_page() to return a error code.
+
+So this is the reason that I push this patch to change the return value 
+to int.
+
+> I noticed, for instance, that docg4.c has some strange code involving
+> a return in a void function (comment below). If that is the *only*
+> existing return statement within an 'ecc_ctrl.write_page'
+> implmentation, then this whole patch is unneeded; you can just remove
+> the 'return' in docg4.c.
+>
+>>> diff --git a/drivers/mtd/nand/docg4.c b/drivers/mtd/nand/docg4.c
+>>> index a225e49..0f2ffd7 100644
+>>> --- a/drivers/mtd/nand/docg4.c
+>>> +++ b/drivers/mtd/nand/docg4.c
 > ...
->         if (bank->get_context_loss_count) {
->                 context_lost_cnt_after =
->                         bank->get_context_loss_count(bank->dev);
->                 if (context_lost_cnt_after != bank->context_loss_count) {
->                         omap_gpio_restore_context(bank);
->                 } else {
->                         spin_unlock_irqrestore(&bank->lock, flags);
->                         return 0;
->                 }
->         }
+>>> -static void docg4_write_page_raw(struct mtd_info *mtd, struct nand_chip
+>>> *nand,
+>>> +static int docg4_write_page_raw(struct mtd_info *mtd, struct nand_chip
+>>> *nand,
+>>>                                  const uint8_t *buf, int oob_required)
+>>>   {
+>>>         return write_page(mtd, nand, buf, false);
+>>>   }
+> Hmm, this used to be a void function, returning the result of another
+> void function? I would think the compiler would have warned about
+> these issues before. Anyway, this is a useless 'return' statement and
+> can be killed with no real effect.
+
+In original version seems the 'return' is useless. I change this only 
+because the write_page() function's return type is changed.
+
+>
+>>> -static void docg4_write_page(struct mtd_info *mtd, struct nand_chip
+>>> *nand,
+>>> +static int docg4_write_page(struct mtd_info *mtd, struct nand_chip *nand,
+>>>                              const uint8_t *buf, int oob_required)
+>>>   {
+>>>         return write_page(mtd, nand, buf, true);
+> Ditto. Are these the only "issues" being addressed in this patch?
+
+No. This is not the reason for this patch as I said above.
+
+>
+>>> --- a/drivers/mtd/nand/nand_base.c
+>>> +++ b/drivers/mtd/nand/nand_base.c
 > ...
-> }
+>>> @@ -2096,9 +2104,14 @@ static int nand_write_page(struct mtd_info *mtd,
+>>> struct nand_chip *chip,
+>>>         chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
+>>>
+>>>         if (unlikely(raw))
+>>> -               chip->ecc.write_page_raw(mtd, chip, buf, oob_required);
+>>> +               status = chip->ecc.write_page_raw(mtd, chip, buf,
+>>> oob_required);
+>>>         else
+>>> -               chip->ecc.write_page(mtd, chip, buf, oob_required);
+>>> +               status = chip->ecc.write_page(mtd, chip, buf, oob_required);
+>>> +
+>>> +       if (status<    0) {
+>>> +               pr_warn("Error happened when calling nand_write_page()\n");
+>>> +               return status;
+>>> +       }
+> I'm not sure this is the most informative error message. (Similar
+> comment applies in cafe_nand.c, which imitates a lot of nand_base.c
+> code)
 
-Hi,
- I've looked more closely at this now.
+Maybe in this case I need print the error code as well.
 
-The problem is that the initial context loss count is *not* zero.  Not always.
-The context loss count is the sum of 
+>
+> Brian
 
-	count = pwrdm->state_counter[PWRDM_POWER_OFF];
-	count += pwrdm->ret_logic_off_counter;
-
-	for (i = 0; i < pwrdm->banks; i++)
-		count += pwrdm->ret_mem_off_counter[i];
-
-(from  pwrdm_get_context_loss_count()).
-
-These are initlialised in _pwrdm_register
-
-	/* Initialize the powerdomain's state counter */
-	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
-		pwrdm->state_counter[i] = 0;
-
-	pwrdm->ret_logic_off_counter = 0;
-	for (i = 0; i < pwrdm->banks; i++)
-		pwrdm->ret_mem_off_counter[i] = 0;
-
-	pwrdm_wait_transition(pwrdm);
-	pwrdm->state = pwrdm_read_pwrst(pwrdm);
-	pwrdm->state_counter[pwrdm->state] = 1;
-
-
-What I'm seeing is that for wkup_pwrdm and dpll{3,4,5}_pwrdm,
-the state that pwrdm_read_pwrst returns is PWRDM_POWER_OFF.
-So that state_counter gets initialised to '1', and so the initial
-context_loss_count, which includes that counter, is also '1'.
-I think it is the wkup_pwrdm that covers the GPIOs that are causing problems
-for me.
-
-So either there is something seriously wrong with pwrdm_read_pwrst and it
-shouldn't be reporting that the wkup_pwrdm is off, or we need to initialise
-bank->context_loss_count like my patch does.
-
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/1b8947b3/attachment-0001.sig>
+Best Regards,
+Josh Wu
