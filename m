@@ -1,39 +1,51 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 21 Jun 2012 15:38:46 +0530
-Subject: [PATCHv9 5/8] I2C: OMAP: Do not initialise the completion everytime
+Date: Thu, 21 Jun 2012 15:38:45 +0530
+Subject: [PATCHv9 4/8] I2C: OMAP: Use SET_RUNTIME_PM_OPS
 In-Reply-To: <1340273329-8319-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340273329-8319-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340273329-8319-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340273329-8319-5-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use INIT_COMPLETION instead of init_completion in transfer.
+Use SET_RUNTIME_PM_OPS macro to set runtime functions.
 
+Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index ccb2fc4..2a50094 100644
+index 328a022..ccb2fc4 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -493,7 +493,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
- 	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
+@@ -1115,6 +1115,7 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--	init_completion(&dev->cmd_complete);
-+	INIT_COMPLETION(dev->cmd_complete);
- 	dev->cmd_err = 0;
++#ifdef CONFIG_PM
+ #ifdef CONFIG_PM_RUNTIME
+ static void omap_i2c_restore(struct omap_i2c_dev *dev)
+ {
+@@ -1176,15 +1177,16 @@ static int omap_i2c_runtime_resume(struct device *dev)
  
- 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
-@@ -997,6 +997,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	dev->irq = irq->start;
+ 	return 0;
+ }
++#endif /* CONFIG_PM_RUNTIME */
  
- 	platform_set_drvdata(pdev, dev);
-+	init_completion(&dev->cmd_complete);
+ static struct dev_pm_ops omap_i2c_pm_ops = {
+-	.runtime_suspend = omap_i2c_runtime_suspend,
+-	.runtime_resume = omap_i2c_runtime_resume,
++	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
++			   omap_i2c_runtime_resume, NULL)
+ };
+ #define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+ #else
+ #define OMAP_I2C_PM_OPS NULL
+-#endif
++#endif /* CONFIG_PM */
  
- 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
- 
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
 -- 
 1.7.5.4
