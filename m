@@ -1,70 +1,121 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 22 Jun 2012 14:30:06 +0530
-Subject: [PATCH v4 0/3] Prepare for GPMC driver conversion
-Message-ID: <cover.1340354985.git.afzal@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 21 Jun 2012 10:36:51 +0200
+Subject: [GIT PULL] PWM subsystem
+Message-ID: <20120621083650.GA2529@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
 
-Objective of this series is to make things easy for GPMC driver
-conversion series by separating out more things from driver
-conversion series.
+The PWM subsystem patches have gone through a number of versions now and
+all outstanding issues have been resolved. I believe that the subsystem
+is ready for broader testing in linux-next. If all goes well I plan to
+submit it to Linus during the 3.6 merge window.
 
-This series,
-1. Unifies NAND platform initialization functions
-2. Prepares OneNAND platform code for gpmc driver migration
-3. Handles additional timings in Kernel
+I am not aware of any dependencies in linux-next. The two patches that
+don't touch the PWM subsystem itself are OF related and have been acked
+by Rob Herring who prefers that I take them through the PWM tree.
 
-This series is based on 3.5-rc1 & made on top of
-[PATCH v2 00/10] Prepare for GPMC driver conversion (w.r.t MTD)
-{http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70096.html}
+Please contact me if there are any issues with the tree.
 
-These changes has been tested with omap3evm & beagle board. Relevant
-GPMC peripherals that got tested by this were NAND (beagle) and
-OneNAND (using local patches for omap3evm)
+The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
 
-Regards
-Afzal
+  Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
 
-v4:
-1. Reorganize OneNAND set_sync/async functions in a better way
-v3:
-1. Refactor OneNAND set_sync/async functions to separate out timing
- and configurations
-2. Handle bool type timings too
-3. Swap patches 2 & 3 due to dependency of OneNAND change on  newly
- added bool type timings
-v2:
-1. Make use of timing api for setting clock activation time, and
- remove direct writing to register for clock activation. Peripherals
- making use of it were tusb6010 & onenand
-2. Move ensuring that async mode in OneNAND has been setup from
- set_sync to setup function, improve commit message
+are available in the git repository at:
 
+  git://gitorious.org/linux-pwm/linux-pwm.git for-next
 
+for you to fetch changes up to b5156ca503f9471449b941364bb2bc34fa355d5d:
 
-Afzal Mohammed (3):
-  ARM: OMAP2+: nand: unify init functions
-  ARM: OMAP2+: gpmc: handle additional timings
-  ARM: OMAP2+: onenand: prepare for gpmc driver migration
+  pwm: Take over maintainership of the PWM subsystem (2012-06-15 12:57:07 +0200)
 
- arch/arm/mach-omap2/board-devkit8000.c     |    8 +-
- arch/arm/mach-omap2/board-flash.c          |   45 ++++----
- arch/arm/mach-omap2/board-flash.h          |    6 +-
- arch/arm/mach-omap2/board-igep0020.c       |    2 +-
- arch/arm/mach-omap2/board-ldp.c            |    4 +-
- arch/arm/mach-omap2/board-omap3beagle.c    |    8 +-
- arch/arm/mach-omap2/board-omap3touchbook.c |    8 +-
- arch/arm/mach-omap2/board-overo.c          |    7 +-
- arch/arm/mach-omap2/board-zoom.c           |    5 +-
- arch/arm/mach-omap2/common-board-devices.c |   46 --------
- arch/arm/mach-omap2/common-board-devices.h |    1 -
- arch/arm/mach-omap2/gpmc-onenand.c         |  156 +++++++++++++++-------------
- arch/arm/mach-omap2/gpmc.c                 |   45 ++++++++
- arch/arm/mach-omap2/usb-tusb6010.c         |    3 +-
- arch/arm/plat-omap/include/plat/gpmc.h     |   19 ++++
- 15 files changed, 207 insertions(+), 156 deletions(-)
+----------------------------------------------------------------
+Sascha Hauer (4):
+      pwm: Add PWM framework support
+      ARM i.MX: Move i.MX pwm driver to pwm framework
+      ARM Samsung: Move s3c pwm driver to pwm framework
+      ARM vt8500: Move vt8500 pwm driver to pwm framework
 
--- 
-1.7.10.2
+Shawn Guo (1):
+      pwm: add pwm-mxs support
+
+Simon Que (1):
+      ARM: tegra: Fix PWM clock programming
+
+Thierry Reding (13):
+      pwm: Allow chips to support multiple PWMs
+      pwm: Add debugfs interface
+      pwm: Add table-based lookup for static mappings
+      dt: Add empty of_property_match_string() function
+      dt: Add empty of_parse_phandle_with_args() function
+      pwm: Add device tree support
+      ARM: tegra: Provide clock for only one PWM controller
+      pwm: Add NVIDIA Tegra SoC support
+      pwm: tegra: Add device tree support
+      pwm: Move Blackfin PWM driver to PWM framework
+      pwm: Move PXA PWM driver to PWM framework
+      pwm-backlight: Add rudimentary device tree support
+      pwm: Take over maintainership of the PWM subsystem
+
+ Documentation/devicetree/bindings/pwm/mxs-pwm.txt  |   17 +
+ .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |   18 +
+ Documentation/devicetree/bindings/pwm/pwm.txt      |   57 ++
+ .../bindings/video/backlight/pwm-backlight         |   28 +
+ Documentation/pwm.txt                              |   76 +++
+ MAINTAINERS                                        |   12 +
+ arch/arm/boot/dts/tegra20.dtsi                     |    6 +
+ arch/arm/boot/dts/tegra30.dtsi                     |    6 +
+ arch/arm/mach-tegra/board-dt-tegra20.c             |    1 +
+ arch/arm/mach-tegra/board-dt-tegra30.c             |    3 +
+ arch/arm/mach-tegra/tegra2_clocks.c                |   36 +-
+ arch/arm/mach-tegra/tegra30_clocks.c               |    6 +-
+ arch/arm/mach-vt8500/Makefile                      |    2 -
+ arch/arm/plat-mxc/Kconfig                          |    6 -
+ arch/arm/plat-mxc/Makefile                         |    1 -
+ arch/arm/plat-pxa/Makefile                         |    1 -
+ arch/arm/plat-samsung/Makefile                     |    4 -
+ arch/blackfin/Kconfig                              |   10 -
+ arch/blackfin/kernel/Makefile                      |    1 -
+ arch/blackfin/kernel/pwm.c                         |  100 ---
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/pwm/Kconfig                                |   76 +++
+ drivers/pwm/Makefile                               |    8 +
+ drivers/pwm/core.c                                 |  713 ++++++++++++++++++++
+ drivers/pwm/pwm-bfin.c                             |  164 +++++
+ arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c   |  183 ++---
+ drivers/pwm/pwm-mxs.c                              |  207 ++++++
+ arch/arm/plat-pxa/pwm.c => drivers/pwm/pwm-pxa.c   |  172 ++---
+ .../pwm.c => drivers/pwm/pwm-samsung.c             |  230 +++----
+ drivers/pwm/pwm-tegra.c                            |  265 ++++++++
+ .../mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c  |  169 ++---
+ drivers/video/backlight/Kconfig                    |    2 +-
+ drivers/video/backlight/pwm_bl.c                   |  149 +++-
+ include/linux/of.h                                 |   16 +
+ include/linux/pwm.h                                |  117 ++++
+ include/linux/pwm_backlight.h                      |    1 +
+ 37 files changed, 2227 insertions(+), 639 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
+ create mode 100644 Documentation/pwm.txt
+ delete mode 100644 arch/blackfin/kernel/pwm.c
+ create mode 100644 drivers/pwm/Kconfig
+ create mode 100644 drivers/pwm/Makefile
+ create mode 100644 drivers/pwm/core.c
+ create mode 100644 drivers/pwm/pwm-bfin.c
+ rename arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c (58%)
+ create mode 100644 drivers/pwm/pwm-mxs.c
+ rename arch/arm/plat-pxa/pwm.c => drivers/pwm/pwm-pxa.c (57%)
+ rename arch/arm/plat-samsung/pwm.c => drivers/pwm/pwm-samsung.c (58%)
+ create mode 100644 drivers/pwm/pwm-tegra.c
+ rename arch/arm/mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c (52%)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/033e8eb2/attachment-0001.sig>
