@@ -1,35 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Jun 2012 10:05:34 +0800
-Subject: [PATCH] ARM: mxs: store mac address read from OTP in device tree
-In-Reply-To: <20120620053649.GG10387@shlinux2.ap.freescale.net>
-References: <1340119246-17471-1-git-send-email-shawn.guo@linaro.org>
- <20120620053649.GG10387@shlinux2.ap.freescale.net>
-Message-ID: <20120621020531.GA3971@S2101-09.ap.freescale.net>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 21 Jun 2012 10:13:59 +0800
+Subject: [PATCH v2] pinctrl: pinctrl-imx: fix map setting problem if
+ NO_PAD_CTL is set
+In-Reply-To: <CACRpkdYXuRC0d1NcUEfRZbfgis+9xVyzsEFpGmS21xYBmyrAPg@mail.gmail.com>
+References: <1340187227-25343-1-git-send-email-jason77.wang@gmail.com>
+ <CACRpkdYXuRC0d1NcUEfRZbfgis+9xVyzsEFpGmS21xYBmyrAPg@mail.gmail.com>
+Message-ID: <20120621021358.GO10387@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2012 at 01:36:50PM +0800, Dong Aisheng wrote:
-> > +static void __init update_fec_mac_prop(enum mac_oui oui)
-> So this is a general function, right?
-
-No.  The function is only meant to provide an equivalent of
-mx28evk_fec_get_mac and m28evk_fec_get_mac for mx28evk and m28evk
-to boot from device tree.
-
-> > +
-> > +		oldmac = of_find_property(np, newmac->name, NULL);
-> > +		if (oldmac)
-> > +			prom_update_property(np, newmac, oldmac);
-> > +		else
-> > +			prom_add_property(np, newmac);
-> Grant gave a suggestion before that we'd better change prom_update_property
-> behavior to add_or_update from update only.
-> I did a patch like that, with the patch the code here will become more simple.
-> I will send it out in this thread for you to see if it helps.
+On Wed, Jun 20, 2012 at 09:25:35PM +0200, Linus Walleij wrote:
+> On Wed, Jun 20, 2012 at 12:13 PM, Hui Wang <jason77.wang@gmail.com> wrote:
 > 
-Yes, it helps.  Will have my patch rebased on yours once your patch
-gets accepted.
+> > new_map is allocated according to map_num instead of grp->npins,
+> > if a pin or some pins of a group has NO_PAD_CTL property, the map_num
+> > and the grp->npin are different definitely.
+> >
+> > When we set mapping information to the new_map[], we should skip those
+> > pins with NO_PAD_CTL from index, otherwise it is possible the driver
+> > will aceesss to a unallocated region.
+> >
+> > Cc: Dong Aisheng <dong.aisheng@linaro.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+> > ---
+> > In the v2, according to dong.aisheng's suggestion, change to use j as index.
+> 
+> OK applied this v2 version. Is this a serious bug fix that is causing
+> regressions right now and needs to go into the -rc:s for v3.5 or can it wait
+> for v3.6?
+> 
+Yes, it's a serious bug fix.
+Although still not triggered by current dts file but it did may block some legal using
+defined in binding doc.
+So can it go into rc?
 
--- 
-Regards,
-Shawn
+Regards
+Dong Aisheng
