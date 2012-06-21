@@ -1,44 +1,45 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 21 Jun 2012 09:08:24 +0800
-Subject: [PATCH v2] pinctrl: pinctrl-imx: fix map setting problem if
- NO_PAD_CTL is set
-In-Reply-To: <CACRpkdYXuRC0d1NcUEfRZbfgis+9xVyzsEFpGmS21xYBmyrAPg@mail.gmail.com>
-References: <1340187227-25343-1-git-send-email-jason77.wang@gmail.com>
- <CACRpkdYXuRC0d1NcUEfRZbfgis+9xVyzsEFpGmS21xYBmyrAPg@mail.gmail.com>
-Message-ID: <4FE27408.8030703@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 21 Jun 2012 09:16:35 +0800
+Subject: [PATCH] i2c: let the core register devices from devicetree
+In-Reply-To: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <CAGsJ_4xZM0DYV6YLLUyQ1fd-s9DOvKAZ94UcNwGaUN3xTR97Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> On Wed, Jun 20, 2012 at 12:13 PM, Hui Wang <jason77.wang@gmail.com> wrote:
+2012/6/14 Wolfram Sang <w.sang@pengutronix.de>:
+> Currently, every driver has to do it on its own, but it should be done
+> in the core, like we already do with board_info structs.
 >
->   
->> new_map is allocated according to map_num instead of grp->npins,
->> if a pin or some pins of a group has NO_PAD_CTL property, the map_num
->> and the grp->npin are different definitely.
->>
->> When we set mapping information to the new_map[], we should skip those
->> pins with NO_PAD_CTL from index, otherwise it is possible the driver
->> will aceesss to a unallocated region.
->>
->> Cc: Dong Aisheng <dong.aisheng@linaro.org>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
->> ---
->> In the v2, according to dong.aisheng's suggestion, change to use j as index.
->>     
->
-> OK applied this v2 version. Is this a serious bug fix that is causing
-> regressions right now and needs to go into the -rc:s for v3.5 or can it wait
-> for v3.6?
->   
-It is a bug fix, but currently no {board}.dts can trigger this bug, so 
-it  can wait for v3.6.
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Regards,
-Hui.
-> Thanks,
-> Linus Walleij
+Acked-by: Barry Song <barry.song@lianlab.org>
+
+> ---
 >
->   
+> Based on v3.5-rc2. Only build tested, I don't have a OF based device
+> around at the moment.
+>
+> @Peter: Why does ocores do the device registration manually via
+> platform_data instead of using board_info?
+>
+> ?drivers/i2c/busses/i2c-cpm.c ? ? ? ? ? ? ? ?| ? ?5 -----
+> ?drivers/i2c/busses/i2c-designware-platdrv.c | ? ?1 -
+> ?drivers/i2c/busses/i2c-gpio.c ? ? ? ? ? ? ? | ? ?2 --
+> ?drivers/i2c/busses/i2c-ibm_iic.c ? ? ? ? ? ?| ? ?3 ---
+> ?drivers/i2c/busses/i2c-imx.c ? ? ? ? ? ? ? ?| ? ?2 --
+> ?drivers/i2c/busses/i2c-mpc.c ? ? ? ? ? ? ? ?| ? ?1 -
+> ?drivers/i2c/busses/i2c-mxs.c ? ? ? ? ? ? ? ?| ? ?2 --
+> ?drivers/i2c/busses/i2c-ocores.c ? ? ? ? ? ? | ? ?2 --
+> ?drivers/i2c/busses/i2c-omap.c ? ? ? ? ? ? ? | ? ?2 --
+> ?drivers/i2c/busses/i2c-pnx.c ? ? ? ? ? ? ? ?| ? ?2 --
+> ?drivers/i2c/busses/i2c-pxa.c ? ? ? ? ? ? ? ?| ? ?1 -
+> ?drivers/i2c/busses/i2c-s3c2410.c ? ? ? ? ? ?| ? ?1 -
+> ?drivers/i2c/busses/i2c-sh_mobile.c ? ? ? ? ?| ? ?1 -
+> ?drivers/i2c/busses/i2c-tegra.c ? ? ? ? ? ? ?| ? ?2 --
+> ?drivers/i2c/busses/i2c-versatile.c ? ? ? ? ?| ? ?1 -
+> ?drivers/i2c/busses/i2c-xiic.c ? ? ? ? ? ? ? | ? ?2 --
+> ?drivers/i2c/i2c-core.c ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +++
+> ?17 files changed, 3 insertions(+), 30 deletions(-)
+
+-barry
