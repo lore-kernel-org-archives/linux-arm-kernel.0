@@ -1,40 +1,45 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 21 Jun 2012 09:24:39 +0200
-Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
-In-Reply-To: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
-References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <4FE2CC37.8010202@pengutronix.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 21 Jun 2012 03:27:00 -0400
+Subject: [PATCH v3 0/4] DT clock bindings
+In-Reply-To: <1339512111-11172-1-git-send-email-robherring2@gmail.com> (Rob
+ Herring's message of "Tue, 12 Jun 2012 09:41:47 -0500")
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+Message-ID: <87bokd15x7.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2012 08:41 AM, Richard Zhao wrote:
-> The work is based on  ci13xxx rework done by Alexander Shishkin.
-> 
-> To let Greg pick up, I also added patches Alex queued that I depends on.
-> Patch #1 - #9 : It can also be found at
-> http://github.com/virtuoso/linux-ci.git ci
-> 
-> This patch series can also be found at:
-> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
-> 
-> Status:
->   - this version only support host
->   - usbotg controler works at host role
+Hi Rob,
 
-I'm interested in usb device support on mx28, what has to be implemented
-to get it working?
+On Tue, Jun 12 2012, Rob Herring wrote:
+> This series defines clock bindings for Device-Tree and adds kernel
+> support using the common clock infrastructure. The last patch enables
+> DT clock support for the Calxeda Highbank platform.
+>
+> I'm posting this again to solicit further review. There has been some
+> discussion[1], but no definite path forward. This series is not changed
+> from the last post other than rebasing to v3.5-rc2.
 
-Regards, Marc
+This is a very useful patchset, thanks!  Mitch Bradley and I have been
+hooking up the mach-mmp ARM subarchitecture to it and we needed to
+make a few changes, mainly because mach-mmp doesn't use COMMON_CLK.
+The changes are:
+
+1) Remove the COMMON_CLK dependency that the of_clk_* functions have by
+   moving them into a new file, drivers/clk/clk-of.c.  The OF functions
+   in drivers/clk/clk.c aren't dependent on anything else in clk.c
+   (since you pass them a struct clk) so they can be moved out easily.
+   The of_clk_* entries in clk-provider.h move to clk.h.
+
+2) Use alloc_bootmem() instead of kzalloc() in of_clk_add_provider(),
+   because we need to set up clocks during .init_early on ARM (which
+   happens pre-slab) so that they are available for platform init.
+
+I'll send our patches in a reply to this mail.  Are you okay with these
+changes, and would you like to include them in your patchset?
+
+Thanks very much,
+
+- Chris.
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120621/c88f15db/attachment.sig>
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
