@@ -1,45 +1,69 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 21 Jun 2012 09:16:35 +0800
-Subject: [PATCH] i2c: let the core register devices from devicetree
-In-Reply-To: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
-References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <CAGsJ_4xZM0DYV6YLLUyQ1fd-s9DOvKAZ94UcNwGaUN3xTR97Yw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Jun 2012 10:28:14 +0900
+Subject: [PATCH] ARM: EXYNOS: Clear SYS_WDTRESET bit to use watchdog reset
+Message-ID: <038801cd4f4d$20942bf0$61bc83d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/14 Wolfram Sang <w.sang@pengutronix.de>:
-> Currently, every driver has to do it on its own, but it should be done
-> in the core, like we already do with board_info structs.
->
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-Acked-by: Barry Song <barry.song@lianlab.org>
+When SYS_WDTRESET is set, watchdog timer reset request
+is ignored by power management unit.
 
-> ---
->
-> Based on v3.5-rc2. Only build tested, I don't have a OF based device
-> around at the moment.
->
-> @Peter: Why does ocores do the device registration manually via
-> platform_data instead of using board_info?
->
-> ?drivers/i2c/busses/i2c-cpm.c ? ? ? ? ? ? ? ?| ? ?5 -----
-> ?drivers/i2c/busses/i2c-designware-platdrv.c | ? ?1 -
-> ?drivers/i2c/busses/i2c-gpio.c ? ? ? ? ? ? ? | ? ?2 --
-> ?drivers/i2c/busses/i2c-ibm_iic.c ? ? ? ? ? ?| ? ?3 ---
-> ?drivers/i2c/busses/i2c-imx.c ? ? ? ? ? ? ? ?| ? ?2 --
-> ?drivers/i2c/busses/i2c-mpc.c ? ? ? ? ? ? ? ?| ? ?1 -
-> ?drivers/i2c/busses/i2c-mxs.c ? ? ? ? ? ? ? ?| ? ?2 --
-> ?drivers/i2c/busses/i2c-ocores.c ? ? ? ? ? ? | ? ?2 --
-> ?drivers/i2c/busses/i2c-omap.c ? ? ? ? ? ? ? | ? ?2 --
-> ?drivers/i2c/busses/i2c-pnx.c ? ? ? ? ? ? ? ?| ? ?2 --
-> ?drivers/i2c/busses/i2c-pxa.c ? ? ? ? ? ? ? ?| ? ?1 -
-> ?drivers/i2c/busses/i2c-s3c2410.c ? ? ? ? ? ?| ? ?1 -
-> ?drivers/i2c/busses/i2c-sh_mobile.c ? ? ? ? ?| ? ?1 -
-> ?drivers/i2c/busses/i2c-tegra.c ? ? ? ? ? ? ?| ? ?2 --
-> ?drivers/i2c/busses/i2c-versatile.c ? ? ? ? ?| ? ?1 -
-> ?drivers/i2c/busses/i2c-xiic.c ? ? ? ? ? ? ? | ? ?2 --
-> ?drivers/i2c/i2c-core.c ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +++
-> ?17 files changed, 3 insertions(+), 30 deletions(-)
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    5 +++++
+ arch/arm/mach-exynos/pmu.c                   |   14 ++++++++++++++
+ 2 files changed, 19 insertions(+), 0 deletions(-)
 
--barry
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 43a99e6..d4e392b 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -232,6 +232,11 @@
+ 
+ #define EXYNOS5_USB_CFG						S5P_PMUREG(0x0230)
+ 
++#define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
++#define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
++
++#define EXYNOS5_SYS_WDTRESET					(1 << 20)
++
+ #define EXYNOS5_ARM_CORE0_SYS_PWR_REG				S5P_PMUREG(0x1000)
+ #define EXYNOS5_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG		S5P_PMUREG(0x1004)
+ #define EXYNOS5_DIS_IRQ_ARM_CORE0_CENTRAL_SYS_PWR_REG		S5P_PMUREG(0x1008)
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 4aacb66..bb4c522 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -390,6 +390,8 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+ 
+ static int __init exynos_pmu_init(void)
+ {
++	unsigned int value;
++
+ 	exynos_pmu_config = exynos4210_pmu_config;
+ 
+ 	if (soc_is_exynos4210()) {
+@@ -399,6 +401,18 @@ static int __init exynos_pmu_init(void)
+ 		exynos_pmu_config = exynos4x12_pmu_config;
+ 		pr_info("EXYNOS4x12 PMU Initialize\n");
+ 	} else if (soc_is_exynos5250()) {
++		/*
++		 * When SYS_WDTRESET is set, watchdog timer reset request
++		 * is ignored by power management unit.
++		 */
++		value = __raw_readl(EXYNOS5_AUTO_WDTRESET_DISABLE);
++		value &= ~EXYNOS5_SYS_WDTRESET;
++		__raw_writel(value, EXYNOS5_AUTO_WDTRESET_DISABLE);
++
++		value = __raw_readl(EXYNOS5_MASK_WDTRESET_REQUEST);
++		value &= ~EXYNOS5_SYS_WDTRESET;
++		__raw_writel(value, EXYNOS5_MASK_WDTRESET_REQUEST);
++
+ 		exynos_pmu_config = exynos5250_pmu_config;
+ 		pr_info("EXYNOS5250 PMU Initialize\n");
+ 	} else {
+-- 
+1.7.1
