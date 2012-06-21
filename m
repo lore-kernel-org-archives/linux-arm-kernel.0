@@ -1,45 +1,38 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 21 Jun 2012 11:34:10 +0200
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 21 Jun 2012 11:40:07 +0200
 Subject: [PATCH] ARM: zImage: Allow DTB command line concatenation with
  ATAG_CMDLINE
 In-Reply-To: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
 References: <1340269017-11701-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <7510940.OaXg6CbgK9@flexo>
+Message-ID: <4FE2EBF7.90601@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thursday 21 June 2012 10:56:57 Richard Genoud wrote:
+On 06/21/2012 10:56 AM, Richard Genoud wrote:
 > This patch allows the ATAG_CMDLINE provided by the bootloader to be
 > concatenated to the bootargs property of the device tree.
 > 
 > This is useful to merge static values defined in the device tree with the
-> boot loader's (possibly) more dynamic values, such as startup reasons and 
-more.
+> boot loader's (possibly) more dynamic values, such as startup reasons and more.
 > 
-> The bootloader should use the device tree to pass those values to the 
-kernel,
+> The bootloader should use the device tree to pass those values to the kernel,
 > but that's not always simple (old bootloader or very small one).
 > 
 > The behaviour is the same as the one introduced by Victor Boivie in
 > 4394c1244249198c6b85093d46935b761b36ae05 by extending the CONFIG_CMDLINE.
-
-I had a similar need recently, and I was pointed at this more generic 
-solution: http://www.mail-archive.com/devicetree-
-discuss at lists.ozlabs.org/msg10448.html
-
-The only thing which is ARM-specific and not yet resolved is the following: if 
-you have ARM_ATAG_DTB_COMPAT enabled, the kernel command-line contains only 
-the bootloader supplied command-line and not bootloader + bootargs from DT. I 
-have not yet had a chance to get this sorted.
-
 > 
 > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+
+Hi Richard,
+
+I have tested both option on a Armada XP dev board. It worked as expected.
+
+You can add:
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
 > ---
 >  arch/arm/Kconfig                        |   19 +++++++++
->  arch/arm/boot/compressed/atags_to_fdt.c |   62 
-++++++++++++++++++++++++++++++-
+>  arch/arm/boot/compressed/atags_to_fdt.c |   62 ++++++++++++++++++++++++++++++-
 >  2 files changed, 79 insertions(+), 2 deletions(-)
 > 
 > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
@@ -72,8 +65,7 @@ have not yet had a chance to get this sorted.
 >  config CMDLINE
 >  	string "Default kernel command string"
 >  	default ""
-> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c 
-b/arch/arm/boot/compressed/atags_to_fdt.c
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
 > index 797f04b..aabc02a 100644
 > --- a/arch/arm/boot/compressed/atags_to_fdt.c
 > +++ b/arch/arm/boot/compressed/atags_to_fdt.c
@@ -139,8 +131,7 @@ b/arch/arm/boot/compressed/atags_to_fdt.c
 >  /*
 >   * Convert and fold provided ATAGs into the provided FDT.
 >   *
-> @@ -72,8 +120,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int 
-total_space)
+> @@ -72,8 +120,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 >  
 >  	for_each_tag(atag, atag_list) {
 >  		if (atag->hdr.tag == ATAG_CMDLINE) {
@@ -161,11 +152,11 @@ total_space)
 >  		} else if (atag->hdr.tag == ATAG_MEM) {
 >  			if (memcount >= sizeof(mem_reg_property)/4)
 >  				continue;
-> -- 
-> 1.7.2.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
++33 602 196 044
