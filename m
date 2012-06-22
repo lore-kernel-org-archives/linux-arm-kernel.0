@@ -1,34 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Jun 2012 17:14:01 -0600
-Subject: [PATCH 2/3] ARM: dt: tegra: ventana: add regulators
-In-Reply-To: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1340406842-27135-2-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 22 Jun 2012 17:14:00 -0600
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+Message-ID: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Ventana uses a TPS6586x regulator. Instantiate this, and hook up a
+Seaboard uses a TPS6586x regulator. Instantiate this, and hook up a
 couple of fixed GPIO-controlled regulators too.
 
-The regulator configurations were all taken from NVIDIA's downstream
-android-tegra-nv-3.1 kernel.
+The regulator configurations were mostly taken from the ChromeOS 3.2
+kernel. Exceptions are:
+
+* The schematic lists a fixed voltage for each rail, whereas the ChromeOS
+  kernel lists a range for many rails. I used the values from the ChromeOS
+  kernel in all cases, since I know the board file there is the most
+  complete available for this hardware.
+
+* The vdd_1v2 fixed regulator is present only in the schematic. So, I added
+  this based on the schematic.
+
+* A 3.3v fixed regulator using GPIO3 of the TPS6586x is present in the
+  ChromeOS kernel, but not in the schematic. So, I dropped this based on
+  the schematic.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-ventana.dts |  173 +++++++++++++++++++++++++++++++++
- 1 files changed, 173 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra20-seaboard.dts |  164 ++++++++++++++++++++++++++++++++
+ 1 files changed, 164 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index be90544..330c212 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -289,6 +289,144 @@
- 	i2c at 7000d000 {
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index 85e621a..fe2bdd0 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -374,6 +374,141 @@
  		status = "okay";
  		clock-frequency = <400000>;
-+
+ 
 +		pmic: tps6586x at 34 {
 +			compatible = "ti,tps6586x";
 +			reg = <0x34>;
@@ -45,8 +54,8 @@ index be90544..330c212 100644
 +					reg = <0>;
 +					regulator-compatible = "sm0";
 +					regulator-name = "vdd_sm0";
-+					regulator-min-microvolt = < 725000>;
-+					regulator-max-microvolt = <1500000>;
++					regulator-min-microvolt = < 950000>;
++					regulator-max-microvolt = <1300000>;
 +					regulator-always-on;
 +				};
 +
@@ -54,8 +63,8 @@ index be90544..330c212 100644
 +					reg = <1>;
 +					regulator-compatible = "sm1";
 +					regulator-name = "vdd_sm1";
-+					regulator-min-microvolt = < 725000>;
-+					regulator-max-microvolt = <1500000>;
++					regulator-min-microvolt = < 750000>;
++					regulator-max-microvolt = <1275000>;
 +					regulator-always-on;
 +				};
 +
@@ -81,8 +90,8 @@ index be90544..330c212 100644
 +					reg = <4>;
 +					regulator-compatible = "ldo1";
 +					regulator-name = "vdd_ldo1";
-+					regulator-min-microvolt = < 725000>;
-+					regulator-max-microvolt = <1500000>;
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
 +					regulator-always-on;
 +					vin-supply = <&sm2_reg>;
 +				};
@@ -91,8 +100,8 @@ index be90544..330c212 100644
 +					reg = <5>;
 +					regulator-compatible = "ldo2";
 +					regulator-name = "vdd_ldo2";
-+					regulator-min-microvolt = < 725000>;
-+					regulator-max-microvolt = <1500000>;
++					regulator-min-microvolt = < 900000>;
++					regulator-max-microvolt = <1300000>;
 +					vin-supply = <&sm2_reg>;
 +				};
 +
@@ -100,8 +109,9 @@ index be90544..330c212 100644
 +					reg = <6>;
 +					regulator-compatible = "ldo3";
 +					regulator-name = "vdd_ldo3";
-+					regulator-min-microvolt = <1250000>;
++					regulator-min-microvolt = <3300000>;
 +					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
 +					vin-supply = <&sm2_reg>;
 +				};
 +
@@ -109,8 +119,8 @@ index be90544..330c212 100644
 +					reg = <7>;
 +					regulator-compatible = "ldo4";
 +					regulator-name = "vdd_ldo4";
-+					regulator-min-microvolt = <1700000>;
-+					regulator-max-microvolt = <2475000>;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
 +					regulator-always-on;
 +					vin-supply = <&sm2_reg>;
 +				};
@@ -119,7 +129,7 @@ index be90544..330c212 100644
 +					reg = <8>;
 +					regulator-compatible = "ldo5";
 +					regulator-name = "vdd_ldo5";
-+					regulator-min-microvolt = <1250000>;
++					regulator-min-microvolt = <2850000>;
 +					regulator-max-microvolt = <3300000>;
 +					regulator-always-on;
 +				};
@@ -137,7 +147,7 @@ index be90544..330c212 100644
 +					reg = <10>;
 +					regulator-compatible = "ldo7";
 +					regulator-name = "vdd_ldo7";
-+					regulator-min-microvolt = <1250000>;
++					regulator-min-microvolt = <3300000>;
 +					regulator-max-microvolt = <3300000>;
 +					vin-supply = <&sm2_reg>;
 +				};
@@ -146,8 +156,8 @@ index be90544..330c212 100644
 +					reg = <11>;
 +					regulator-compatible = "ldo8";
 +					regulator-name = "vdd_ldo8";
-+					regulator-min-microvolt = <1250000>;
-+					regulator-max-microvolt = <3300000>;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
 +					vin-supply = <&sm2_reg>;
 +				};
 +
@@ -155,22 +165,30 @@ index be90544..330c212 100644
 +					reg = <12>;
 +					regulator-compatible = "ldo9";
 +					regulator-name = "vdd_ldo9";
-+					regulator-min-microvolt = <1250000>;
-+					regulator-max-microvolt = <3300000>;
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
 +					regulator-always-on;
 +					vin-supply = <&sm2_reg>;
 +				};
 +			};
 +		};
-+	};
 +
-+	pmc {
-+		nvidia,invert-interrupt;
+ 		temperature-sensor at 4c {
+ 			compatible = "nct1008";
+ 			reg = <0x4c>;
+@@ -387,6 +522,10 @@
+ 		};
  	};
  
- 	usb at c5000000 {
-@@ -317,6 +455,41 @@
- 		bus-width = <8>;
++	pmc {
++		nvidia,invert-interrupt;
++	};
++
+ 	memory-controller at 0x7000f400 {
+ 		emc-table at 190000 {
+ 			reg = <190000>;
+@@ -473,6 +612,31 @@
+ 		};
  	};
  
 +	regulators {
@@ -196,20 +214,10 @@ index be90544..330c212 100644
 +			gpio = <&pmic 1 0>;
 +			enable-active-high;
 +		};
-+
-+		regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "pnl_pwr";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio 22 0>; /* gpio PC6 */
-+			enable-active-high;
-+		};
 +	};
 +
  	sound {
- 		compatible = "nvidia,tegra-audio-wm8903-ventana",
+ 		compatible = "nvidia,tegra-audio-wm8903-seaboard",
  			     "nvidia,tegra-audio-wm8903";
 -- 
 1.7.0.4
