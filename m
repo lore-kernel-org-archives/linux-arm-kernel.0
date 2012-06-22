@@ -1,53 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Jun 2012 13:03:21 +0000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120622124311.GA21606@avionic-0098.mockup.avionic-design.de>
-References: <4FDA2DDA.1030704@wwwdotorg.org>
- <CAErSpo6vHn3p96o7DSdL28cjapk2UnQ4ZVJ1oH6ksxbqD=Hh-g@mail.gmail.com>
- <20120622124311.GA21606@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201206221303.21985.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 22 Jun 2012 08:08:57 -0500
+Subject: [Patchv2] ARM: Orion5x - Restore parts of io.h, with rework
+In-Reply-To: <1340219391-21561-1-git-send-email-andrew@lunn.ch>
+References: <1340219391-21561-1-git-send-email-andrew@lunn.ch>
+Message-ID: <4FE46E69.5010707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 June 2012, Thierry Reding wrote:
-> On Fri, Jun 22, 2012 at 05:46:52AM -0600, Bjorn Helgaas wrote:
-> > On Fri, Jun 22, 2012 at 5:00 AM, Thierry Reding
-> > <thierry.reding@avionic-design.de> wrote:
-> > >> Is the bus number aperture included somewhere?  How do we know what
-> > >> bus numbers are available for allocation under each bridge?
-> > >
-> > > Not yet. I don't think DT imposes a bus number allocation on PCI
-> > > bridges. However the matching of DT nodes to PCI bridges is done based
-> > > on the bus number. For that you provide a bus-ranges property which
-> > > defines the bus aperture of the given PCI bridge. The DT matching code
-> > > compares the first cell of this property with the primary bus number of
-> > > the bridge.
-> > 
-> > I don't fully understand this, but I can tell you that things don't
-> > work very well if we don't know the aperture.  We can make
-> > assumptions, like the root bus is 00, and then enumerate everything
-> > reachable from there.  But then all we know is the largest bus number
-> > actually reachable from bus 00, which is usually smaller then the end
-> > of the aperture.  We don't know how many unused bus numbers there are
-> > in the aperture, so we can't safely allocate any for hot-added
-> > devices.
+On 06/20/2012 02:09 PM, Andrew Lunn wrote:
+> Commit 4d5fc58dbe34b78157c05b319669bb3e064ba8bd (ARM: remove bunch of
+> now unused mach/io.h files) removed the orion5x io.h. Unfortunetely,
 
-I believe the assumption today is that all bus numbers are ok on each
-root port, which is usually the case. There was something about a Power
-Mac that faked a single PCI bus number space across both an AGP and
-a PCIe domain in pmac_pci_fixup_u4_of_node(), but I think that is the
-exception.
+typo: Unfortunately
 
-Is there any requirement to use a bus aperture on non-PC hardware?
- 
-> I think DT support for PCI is lacking in a lot of areas. PowerPC seems
-> to be the only architecture actively setting up busses according to the
-> bus-range property specified in the DT. All other architectures seem to
-> not pre-allocate bus apertures and go with the default instead. From
-> what you say that means hot-plugging is out. Although I don't think the
-> Tegra PCIe controller even supports hot-plugging.
+> this is still needed for the definition of IO_SPACE_LIMIT which
+> overrides the default 64K. All Orion based systems have 1Mbyte of IO
+> space per PCI[e] bus, and try to request_resource() this size. Orion5x
+> has two such PCI busses.
 
-If the default is allowing any bus numbers, and that matches the
-hardware capabilities, I think hot-plugging would work.
+typo: buses
 
-	Arnd
+> 
+> It is likely that the origional, removed version, was broken. This
+
+typo: original
+
+> version might be less broken. However, it has not been tested on
+> hardware with a PCI card, let alone hardware with a PCI card with IO
+> capabilities.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/Kconfig                        |    1 +
+>  arch/arm/mach-orion5x/include/mach/io.h |   22 ++++++++++++++++++++++
+>  2 files changed, 23 insertions(+)
+>  create mode 100644 arch/arm/mach-orion5x/include/mach/io.h
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 84449dd..8fb7e4a 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -588,6 +588,7 @@ config ARCH_ORION5X
+>  	select PCI
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select GENERIC_CLOCKEVENTS
+> +	select NEED_MACH_IO_H
+>  	select PLAT_ORION
+>  	help
+>  	  Support for the following Marvell Orion 5x series SoCs:
+> diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
+> new file mode 100644
+> index 0000000..9f22ae6
+> --- /dev/null
+> +++ b/arch/arm/mach-orion5x/include/mach/io.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * arch/arm/mach-orion5x/include/mach/io.h
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef __ASM_ARCH_IO_H
+> +#define __ASM_ARCH_IO_H
+> +
+> +#include <mach/orion5x.h>
+> +#include <asm/sizes.h>
+> +
+> +#define IO_SPACE_LIMIT		SZ_2M
+> +static inline void __iomem *__io(unsigned long addr)
+> +{
+> +	return (void __iomem *)(addr + ORION5X_PCI_IO_VIRT_BASE);
+
+You need to use the first i/o range here which is PCIe.
+
+Rob
+
+> +}
+> +
+> +#define __io(a)			 __io(a)
+> +#endif
