@@ -1,39 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:15:44 +0100
-Subject: [PATCH 0/2] Implement ticket spinlocks for ARM
-Message-ID: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Fri, 22 Jun 2012 21:03:28 +0530
+Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
+In-Reply-To: <4FE45C4E.8060808@gmail.com>
+References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+ <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
+ <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+ <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
+ <4FE0AE7B.4040502@gmail.com>
+ <CANrkHUawrQfb+o+W7FrYACv6NocZn_MAym5A209peP8tW1nZRQ@mail.gmail.com>
+ <4FE45C4E.8060808@gmail.com>
+Message-ID: <CANrkHUYFZ3y1hyDD54nD-wqmhPcvkrjBQAzf23OknABJsUS0AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jun 22, 2012 at 5:21 PM, Paolo Pisati <p.pisati@gmail.com> wrote:
+> On 06/20/2012 09:23 AM, T Krishnamoorthy, Balaji wrote:
+>>>
+>>> i just want to say that i'm affected by this too, and i can reproduce it
+>>> 100%.
+>>>
+>>
+>> Is it with SD or MMC card
+>> Can you provide Beagle board rev info?
+>
+> kingston 4g class 4 sdhc c04g taiwan
+>
+> tested on a beagle xm rev a and rev c, both boards exhibit the same
+> problem with this card, while with a brand new sandisk 16gb sdhc class 4
+> card, everything is ok.
+>
+> i tried reverting dba3c29 "Enable Auto CMD12", and both cards are
+> behaving fine.
+>
+>>> do you want me to run that patch or you already have enough data?
+>>
+>> Can you enable MMC debug and apply the debug patch I provided.
+>> The debug patch did not print any AUTOCMD errors with Ming Lei setup.
+>
+> http://people.canonical.com/~ppisati/mmc-testing/
+>
+> test-mmc.sh: script used for testing
+>
+> test-mmc.log: md5sum of file copied around (as you can see after the
+> umount the md5 changes)
+>
+> test-mmc.syslog: mmc-debug output (plus your patch)
 
-With multi-cluster ARM platforms on the horizon, our current spinlock
-implementation can result in lock-bias when the memory latency is not
-uniform between clusters. This may be due to microarchitectural
-constraints or (mis-)configuration of the cache-coherent interconnect.
+Thanks for testing and sharing the log.
+md5sum is giving 2 different values for 8 tries which indicates writes are not
+entirely random.
 
-This series ensures lock fairness by implementing the ticket algorithm
-described in detail here:
+>
+> after the test, my sd card was so badly wounded that it wouldn't even boot.
 
-        http://lwn.net/Articles/267968/
+I guess boot partition was not updated, so I think it should boot until kernel
+and fail at mounting filesystem as filesystem would have got corrupted by
+previous test.
 
-Whilst fairness is not necessarily congruent with throughput, I've not
-observed any drop in performance on single-cluster systems with this
-change to the kernel (I ran hackbench, which stresses &(&u->lock)->rlock
-on the msg{snd,rcv} paths).
-
-All comments welcome,
-
-Will
-
-
-Will Deacon (2):
-  ARM: spinlock: use ticket algorithm for ARMv6+ locking implementation
-  ARM: rwlocks: remove unused branch labels from trylock routines
-
- arch/arm/include/asm/spinlock.h       |   77 ++++++++++++++++++++++-----------
- arch/arm/include/asm/spinlock_types.h |   17 ++++++-
- 2 files changed, 66 insertions(+), 28 deletions(-)
-
--- 
-1.7.4.1
+> --
+> bye,
+> p.
