@@ -1,66 +1,86 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 22 Jun 2012 18:26:30 +0530
-Subject: [PATCH v6 01/13] ARM: OMAP2+: gpmc: platform definitions
+Date: Fri, 22 Jun 2012 18:26:41 +0530
+Subject: [PATCH v6 02/13] ARM: OMAP2+: gpmc: Adapt to HWMOD
 In-Reply-To: <cover.1340367480.git.afzal@ti.com>
 References: <cover.1340367480.git.afzal@ti.com>
-Message-ID: <bf4c348fbcbc001ab362097687151f0ac42f7ed5.1340367480.git.afzal@ti.com>
+Message-ID: <e0aee8fdaa363f86b256a2f62451e1c754f8e9e0.1340367480.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpmc driver platform definitions
+Create API for platforms to adapt gpmc to HWMOD
+
+gpmc clk is stored as timing calculation for
+platform code require its rate so that GPMC
+timing values (platform data for gpmc driver)
+can be calculated.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/plat-omap/include/plat/gpmc.h |   37 ++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/mach-omap2/gpmc.c             |   31 +++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/gpmc.h |    2 ++
+ 2 files changed, 33 insertions(+)
 
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 8b0978f..f8131f8 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -27,6 +27,7 @@
+ 
+ #include <asm/mach-types.h>
+ #include <plat/gpmc.h>
++#include <plat/omap_device.h>
+ 
+ #include <plat/sdrc.h>
+ 
+@@ -937,6 +938,36 @@ static int __init gpmc_init(void)
+ }
+ postcore_initcall(gpmc_init);
+ 
++__init int omap_gpmc_init(struct gpmc_pdata *pdata)
++{
++	struct omap_hwmod *oh;
++	struct platform_device *pdev;
++	char *name = "omap-gpmc";
++	char *oh_name = "gpmc";
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh) {
++		pr_err("Could not look up %s\n", oh_name);
++		return -ENODEV;
++	}
++
++	gpmc_l3_clk = oh->_clk;
++	if (!gpmc_l3_clk) {
++		pr_err("Could not get GPMC clock\n");
++		return -EINVAL;
++	}
++
++	pdev = omap_device_build(name, -1, oh, pdata,
++					sizeof(*pdata), NULL, 0, 0);
++	if (IS_ERR(pdev)) {
++		WARN(1, "Can't build omap_device for %s:%s.\n",
++						name, oh->name);
++		return PTR_ERR(pdev);
++	}
++
++	return 0;
++}
++
+ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
+ {
+ 	int i;
 diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index b7c9ea6..4e799b1 100644
+index 4e799b1..157753ab 100644
 --- a/arch/arm/plat-omap/include/plat/gpmc.h
 +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -152,6 +152,43 @@ struct gpmc_timings {
- 	struct gpmc_bool_timings bool_timings;
- };
+@@ -208,6 +208,8 @@ struct gpmc_nand_regs {
+ extern void gpmc_update_nand_reg(struct gpmc_nand_regs *reg, int cs);
+ extern int gpmc_get_client_irq(unsigned irq_config);
  
-+enum {
-+	has_none,
-+	has_period,
-+	has_clock
-+};
++extern int omap_gpmc_init(struct gpmc_pdata *pdata);
 +
-+struct gpmc_time_ctrl {
-+	int type;
-+	struct gpmc_timings timings;
-+};
-+
-+struct gpmc_cs_data {
-+	unsigned		cs;
-+	unsigned long		mem_size;
-+	unsigned long		mem_offset;
-+	bool			have_config;
-+	unsigned		config;
-+	struct gpmc_time_ctrl	time_ctrl;
-+	unsigned		irq_config;
-+};
-+
-+struct gpmc_device_pdata {
-+	char			*name;
-+	int			id;
-+	void			*pdata;
-+	unsigned		pdata_size;
-+	struct resource		*per_res;
-+	unsigned		per_res_cnt;
-+	struct gpmc_cs_data	*cs_data;
-+	unsigned		num_cs;
-+};
-+
-+struct gpmc_pdata {
-+	unsigned			waitpin_nr;
-+	struct gpmc_device_pdata	**device_pdata;
-+};
-+
- struct gpmc_nand_regs {
- 	void __iomem	*gpmc_status;
- 	void __iomem	*gpmc_nand_command;
+ extern unsigned int gpmc_ns_to_ticks(unsigned int time_ns);
+ extern unsigned int gpmc_ps_to_ticks(unsigned int time_ps);
+ extern unsigned int gpmc_ticks_to_ns(unsigned int ticks);
 -- 
 1.7.10.2
