@@ -1,44 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jun 2012 23:26:47 +0100
-Subject: [PATCH 0/2] Use architected timers for delay loop
-In-Reply-To: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
-References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20120622222647.GE30087@n2100.arm.linux.org.uk>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 22 Jun 2012 17:52:08 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201206141148.20371.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201206090004.10086.arnd@arndb.de> <4FD914F6.6000402@ti.com>
+ <201206141148.20371.arnd@arndb.de>
+Message-ID: <4FE4F718.3080204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2012 at 04:09:32PM +0100, Will Deacon wrote:
-> Hello,
+Hi Arnd,
+
+On 06/14/2012 06:48 AM, Arnd Bergmann wrote:
+
+[snip]
+
+> This would let us handle the following cases very easily:
 > 
-> This patch series reworks our delay loop implementation to allow the
-> busy-loop to be replaced with the physical counter included as part of
-> the architected timer on recent CPUs. The polling implementation is
-> still maintained to support cores without the timers and we use the same
-> maths and upper delay bound of 2ms.
+> 1. one read-write channel
 > 
-> Russell - I think my maths is correct, but why can't we increase the
->           precision by using a magic constant of 4398046U and a right
-> 	  shift of 31?
+> 	dmas = <&dmac 0x3 match>;
+> 
+> 2. a choice of two read-write channels:
+> 
+> 	dmas = <&dmacA 0x3 matchA>, <&dmacB 0x3 matchB>;
+> 
+> 3. one read-channel, one write channel:
+> 
+> 	dmas = <&dmac 0x1 match-read>, <&dmac 0x2 match-write>;
+> 
+> 4. a choice of two read channels and one write channel:
+> 
+> 	dmas = <&dmacA 0x1 match-readA>, <&dmacA 0x2 match-write> 
+> 			<&dmacB match-readB>;
+> 
+> And only the cases where we have more multiple channels that differ
+> in more aspects would require named properties:
+> 
+> 5. two different channels
+> 
+> 	dmas = <&dmac 0x3 match-rwdata>, <&dmac 0x1 match-status>;
+> 	dma-names = "rwdata", "status";
+> 
+> 6. same as 5, but with a choice of channels:
+> 
+> 	dmas = <&dmacA 0x3 match-rwdataA>, <&dmacA 0x1 match-status>;
+> 		<dmacB 0x3 match-rwdataB>;
+> 	dma-names = "rwdata", "status", "rwdata";
+> 
+> 
+> With a definition like that, we can implement a very simple device
+> driver interface for the common cases, and a slightly more complex
+> one for the more complex cases:
+> 
+> 1. chan = of_dma_request_channel(dev->of_node, 0);
+> 2. chan = of_dma_request_channel(dev->of_node, 0);
+> 3. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
+>    txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
+> 4. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
+>    txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
+> 5. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
+>    auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
+> 6. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
+>    auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
 
-It's been soo long since I looked at that code that I've forgotten the
-maths behind it.
+In the above examples, did you imply that the of_dma_request_channel()
+function would return a type of "struct dma_chan" and so be calling
+dma_request_channel() underneath?
 
-What I can say is that the maths in the assembly code version is
-carefully chosen to avoid overflows during the various stages of
-computation without loosing too much precision along the way.
+I am been prototyping something, but wanted to make sure I am completely
+aligned on this :-)
 
-The assembly is also designed to round up any lost precision, so we
-try to produce a longer delay by way of the lost precision in the
-maths.
-
-I forget what kind of precision we do get, but precision is not really
-a major concern here.  We are only after a "rough" estimate of the
-delay (hell, we don't even guarantee according to Linus that you will
-get a minimum of the delay you asked for - you might get a shorter
-delay!)  You _will_ get shorter delays because of the way the loop is
-calibrated (think: the jiffy code tries to find how many loops fit in
-a single jiffy, but a jiffy _also_ includes the overhead of running
-the timer interrupt, which artificially reduces loops_per_jiffy.)
-
-Provided we get a delay "in the ballpark" of what was requested, that's
-good enough.
+Cheers
+Jon
