@@ -1,24 +1,24 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 22 Jun 2012 10:07:29 +0800
-Subject: [PATCH] clk: mxs: mx23, mx28: fix clock lookup after freeing
- init memory
-In-Reply-To: <1340301865-15815-1-git-send-email-mkl@pengutronix.de>
-References: <1340301865-15815-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20120622020726.GC21418@S2101-09.ap.freescale.net>
+Date: Fri, 22 Jun 2012 10:12:21 +0800
+Subject: [PATCH] ARM:MXS: Initial support for the Crystalfontz CFA-10036
+In-Reply-To: <4FE32E31.2070909@free-electrons.com>
+References: <1340268415-5022-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20120621131138.GA21418@S2101-09.ap.freescale.net>
+ <4FE32E31.2070909@free-electrons.com>
+Message-ID: <20120622021219.GD21418@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 08:04:25PM +0200, Marc Kleine-Budde wrote:
-> The struct clk_lookup are marked as __initdata, resulting in beeing
-> removed from memory after the kernel finished booting. However this
-> leads to a NULL pointer de-ref if loading a module which uses clk_get.
+On Thu, Jun 21, 2012 at 04:22:41PM +0200, Maxime Ripard wrote:
+> You can add by Tested-by I guess :)
 > 
-> This patch removes the __initdata from the struct clk_lookup.
+Thanks for reporting and testing.
+
+> We have found that indeed the two registers were inverted compared to
+> the datasheet, but why was it still working on the iMX28-evk ?
 > 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+I guess imx28-evk will also have issue with some stressful testing.
 
-Thanks for the fixing.  Will try to send it for -rc together with
-another fixing on imx28 clock code.
-
+-- 
 Regards,
 Shawn
