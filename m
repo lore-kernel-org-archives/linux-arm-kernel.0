@@ -1,115 +1,64 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 22 Jun 2012 04:18:05 -0600
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
-References: <4FD849CF.4030009@firmworks.com>
- <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
- <4FD85127.8050301@firmworks.com>
- <20120614091905.GA9081@avionic-0098.mockup.avionic-design.de>
- <4FDA2DDA.1030704@wwwdotorg.org>
- <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
- <4FDA40A0.4030206@wwwdotorg.org>
- <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
- <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
- <4FE0EFBB.6090206@firmworks.com>
- <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
-Message-ID: <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 22 Jun 2012 11:20:58 +0100
+Subject: [PATCH] Consolidate stack size information into THREAD_SIZE_ORDER
+In-Reply-To: <4FE35CF9.60707@am.sony.com>
+References: <4FBD8205.3010904@am.sony.com>
+ <4FE35CF9.60707@am.sony.com>
+Message-ID: <20120622102058.GB28748@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 12:47 AM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> On Tue, Jun 19, 2012 at 11:31:39AM -1000, Mitch Bradley wrote:
+Hi Tim,
 
->> Version A - 3 address cells: ?In this version, the intermediate
->> address space has 3 cells: ?port#, address type, offset. ?Address
->> type is
->> ? 0 : root port
->> ? 1 : config space
->> ? 2 : extended config space
->> ? 3 : I/O
->> ? 4 : non-prefetchable memory
->> ? 5 : prefetchable memory.
->>
->> The third cell "offset" is necessary so that the size field has a
->> number space that can include it.
->>
->> ? ? ? pcie-controller {
->> ? ? ? ? ? ? ? compatible = "nvidia,tegra20-pcie";
->> ? ? ? ? ? ? ? reg = <0x80003000 0x00000800 ? /* PADS registers */
->> ? ? ? ? ? ? ? ? ? ? ?0x80003800 0x00000200>; /* extended configuration space */
->> ? ? ? ? ? ? ? interrupts = <0 98 0x04 ? /* controller interrupt */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0 99 0x04>; /* MSI interrupt */
->> ? ? ? ? ? ? ? status = "disabled";
->>
->> ? ? ? ? ? ? ? ranges = <0 0 0 ?0x80000000 0x00001000 ? /* Root port 0 */
->> ? ? ? ? ? ? ? ? ? ? ? ? 0 1 0 ?0x80004000 0x00080000 ? /* Port 0 config space */
->> ? ? ? ? ? ? ? ? ? ? ? ? 0 2 0 ?0x80104000 0x00080000 ? /* Port 0 ext config space *
->> ? ? ? ? ? ? ? ? ? ? ? ? 0 3 0 ?0x80400000 0x00008000 ? /* Port 0 downstream I/O */
->> ? ? ? ? ? ? ? ? ? ? ? ? 0 4 0 ?0x90000000 0x08000000 ? /* Port 0 non-prefetchable memory */
->> ? ? ? ? ? ? ? ? ? ? ? ? 0 5 0 ?0xa0000000 0x08000000 ? /* Port 0 prefetchable memory */
->>
->> ? ? ? ? ? ? ? ? ? ? ? ? 1 0 0 ?0x80001000 0x00001000 ? /* Root port 1 */
->> ? ? ? ? ? ? ? ? ? ? ? ? 1 1 0 ?0x80004000 0x00080000 ? /* Port 1 config space */
->> ? ? ? ? ? ? ? ? ? ? ? ? 1 2 0 ?0x80184000 0x00080000 ? /* Port 1 ext config space */
->> ? ? ? ? ? ? ? ? ? ? ? ? 1 3 0 ?0x80408000 0x00010000 ? /* Port 1 downstream I/O */
->> ? ? ? ? ? ? ? ? ? ? ? ? 1 4 0 ?0x98000000 0x08000000 ? /* Port 1 non-prefetchable memory */
->> ? ? ? ? ? ? ? ? ? ? ? ? 1 5 0 ?0xa0000000 0x08000000>; /* Port 1 prefetchable memory */
->>
->> ? ? ? ? ? ? ? #address-cells = <3>;
->> ? ? ? ? ? ? ? #size-cells = <1>;
->>
->> ? ? ? ? ? ? ? pci at 0 {
->> ? ? ? ? ? ? ? ? ? ? ? reg = <0 0 0 0x1000>;
->> ? ? ? ? ? ? ? ? ? ? ? status = "disabled";
->>
->> ? ? ? ? ? ? ? ? ? ? ? #address-cells = <3>;
->> ? ? ? ? ? ? ? ? ? ? ? #size-cells = <2>;
->>
->> ? ? ? ? ? ? ? ? ? ? ? ranges = <0x80000000 0 0 ?0 1 0 ?0 0x00080000 ? /* config */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x90000000 0 0 ?0 2 0 ?0 0x00080000 ? /* extended config */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x81000000 0 0 ?0 3 0 ?0 0x00008000 ? /* I/O */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x82000000 0 0 ?0 4 0 ?0 0x08000000 ? /* non-prefetchable memory */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0xc2000000 0 0 ?0 5 0 ?0 0x08000000>; /* prefetchable memory */
->>
->> ? ? ? ? ? ? ? ? ? ? ? nvidia,ctrl-offset = <0x110>;
->> ? ? ? ? ? ? ? ? ? ? ? nvidia,num-lanes = <2>;
->> ? ? ? ? ? ? ? };
->>
->>
->> ? ? ? ? ? ? ? pci at 1 {
->> ? ? ? ? ? ? ? ? ? ? ? reg = <1 0 0 0x1000>;
->> ? ? ? ? ? ? ? ? ? ? ? status = "disabled";
->>
->> ? ? ? ? ? ? ? ? ? ? ? #address-cells = <3>;
->> ? ? ? ? ? ? ? ? ? ? ? #size-cells = <2>;
->>
->> ? ? ? ? ? ? ? ? ? ? ? ranges = <0x80000000 0 0 ?1 1 0 ?0 0x00080000 ? /* config */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x90000000 0 0 ?1 2 0 ?0 0x00080000 ? /* extended config */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x81000000 0 0 ?1 3 0 ?0 0x00008000 ? /* I/O */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x82000000 0 0 ?1 4 0 ?0 0x08000000 ? /* non-prefetchable memory */
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0xc2000000 0 0 ?1 5 0 ?0 0x08000000>; /* prefetchable memory */
->>
->> ? ? ? ? ? ? ? ? ? ? ? nvidia,ctrl-offset = <0x118>;
->> ? ? ? ? ? ? ? ? ? ? ? nvidia,num-lanes = <2>;
->> ? ? ? ? ? ? ? };
+On Thu, Jun 21, 2012 at 06:42:17PM +0100, Tim Bird wrote:
+> Any response to the following, which I submitted about
+> a month ago?  May I submit it to the ARM patch-queue?
+> Note that Ben Dooks took a quick look at it, but I
+> haven't gotten an official ACK-ed by from anyone.
 
-I'm not familiar with device tree, so pardon me if these are stupid
-questions.  These seem to be describing PCI host bridges.  I assume
-some of these ranges describe MMIO, prefetchable MMIO, and I/O port
-apertures that the bridge forwards to the PCI bus.
+[...]
 
-Is there provision for any address offset applied by the bridge when
-it forwards downstream?  (Maybe these bridges don't apply any offset?)
- "0xa0000000 0x08000000" appears for both ports 0 and 1 prefetchable
-memory; I don't know if that's an error, an indication that each
-bridge applies a different offset, or that both bridges forward the
-same aperture (I hope not the latter, because Linux can't really deal
-with that).
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index 0f04d84..5172c36 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -16,7 +16,7 @@
+>  #include <asm/fpstate.h>
+> 
+>  #define THREAD_SIZE_ORDER	1
+> -#define THREAD_SIZE		8192
+> +#define THREAD_SIZE		(4096 << THREAD_SIZE_ORDER)
+>  #define THREAD_START_SP		(THREAD_SIZE - 8)
+> 
+>  #ifndef __ASSEMBLY__
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index 9a8531e..f94216b 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -109,8 +109,8 @@
+>  	.endm
+> 
+>  	.macro	get_thread_info, rd
+> -	mov	\rd, sp, lsr #13
+> -	mov	\rd, \rd, lsl #13
+> +	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
+> +	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
+>  	.endm
 
-Is the bus number aperture included somewhere?  How do we know what
-bus numbers are available for allocation under each bridge?
+Maybe use PAGE_SHIFT instead of hardcoding the 12?
 
-I see mention of config space.  Is some of that referring to the ECAM
-as in 7.2.2 of the PCIe spec v3.0 (what we refer to as MMCONFIG on
-x86)?
+>  	@
+> @@ -150,8 +150,8 @@
+> 
+>  	.macro	get_thread_info, rd
+>  	mov	\rd, sp
+> -	lsr	\rd, \rd, #13
+> -	mov	\rd, \rd, lsl #13
+> +	lsr	\rd, \rd, #12 + THREAD_SIZE_ORDER
+> +	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
+>  	.endm
+
+I appreciate you've followed the same style as before but while we're here
+maybe you could rewrite the lsr as a mov for consistency?
+
+Will
