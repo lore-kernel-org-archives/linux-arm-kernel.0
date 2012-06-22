@@ -1,37 +1,33 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 22 Jun 2012 08:06:57 +0200
-Subject: [PATCH v2 08/10] ARM: tegra: harmony: Initialize regulators from
- DT
-In-Reply-To: <4FE3815C.8030505@wwwdotorg.org>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-9-git-send-email-thierry.reding@avionic-design.de>
- <4FE3815C.8030505@wwwdotorg.org>
-Message-ID: <20120622060657.GA15213@avionic-0098.adnet.avionic-design.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Jun 2012 01:56:06 -0700
+Subject: your mail
+In-Reply-To: <alpine.DEB.2.00.1206211225360.10198@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1206211225360.10198@utopia.booyaka.com>
+Message-ID: <20120622085605.GB12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 02:17:32PM -0600, Stephen Warren wrote:
-> On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> > Device tree support for the TPS6586x PMU used on Harmony has recently
-> > been added. This commit adds the required device tree nodes to probe the
-> > PMU from the device tree.
+* Paul Walmsley <paul@pwsan.com> [120621 11:31]:
+> Hi Tony
 > 
-> > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+> The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
 > 
-> > +		tps6586x at 34 {
-> > +			compatible = "ti,tps6586x";
-> > +			reg = <0x34>;
-> > +			interrupts = <0 88 0x4>;
+>   Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
 > 
-> I believe that should be interrupt 86 not 88.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.6
+> 
+> for you to fetch changes up to 07b3a13957aa250ff5b5409b8ed756b113544112:
+> 
+>   Merge branches 'clock_cleanup_misc_3.6', 'control_clean_dspbridge_writes_cleanup_3.6', 'hwmod_soc_conditional_cleanup_3.6', 'mcbsp_clock_aliases_cleanup_3.6' and 'remove_clkdm_requirement_from_hwmod_3.6' into omap_cleanup_a_3.6 (2012-06-20 20:11:36 -0600)
+> 
+> ----------------------------------------------------------------
+> 
+> Some OMAP hwmod, clock, and System Control Module cleanup patches for 3.6.
+> 
+> ----------------------------------------------------------------
 
-Yes, you're absolutely correct.
+Merging into cleanup-hwmod and merging into l-o master for testing.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120622/4b5c3dc3/attachment.sig>
+Tony
