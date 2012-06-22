@@ -1,174 +1,40 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 22 Jun 2012 18:45:41 +0530
-Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for ocp2scp
-In-Reply-To: <1340370942-23201-1-git-send-email-kishon@ti.com>
-References: <1340370942-23201-1-git-send-email-kishon@ti.com>
-Message-ID: <1340370942-23201-2-git-send-email-kishon@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Jun 2012 14:17:51 +0100
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+In-Reply-To: <20120622123013.GA7586@sirena.org.uk>
+References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+ <20120622123013.GA7586@sirena.org.uk>
+Message-ID: <20120622131750.GB19226@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a new driver _ocp2scp_. This driver takes the responsibility of creating
-all the devices that is connected to OCP2SCP. In the case of OMAP4, USB2PHY
-is connected to ocp2scp.
+On Fri, Jun 22, 2012 at 01:30:13PM +0100, Mark Brown wrote:
+> On Fri, Jun 22, 2012 at 09:59:11AM +0100, Russell King - ARM Linux wrote:
+> 
+> > As v3.5-rc is horribly broken on my OMAP platforms, I've had to back out
+> > all the sound/soc/omap changes from the last merge window to test this,
+> > inspite of Peter Ujfalusi maintaining that there is nothing wrong.  I
+> > can't get working audio support on the OMAP4430SDP any other way.
+> 
+> Do you have any details on what's wrong here?  I've not seen any
+> upstream reports but there's been precious little upstream work there so
+> it should be simple to identify which changes caused the breakage and
+> just drop them.  There's been no public reports...
 
-This also includes device tree support for ocp2scp driver and
-the documentation with device tree binding information is updated.
+Peter took the thread off the mailing lists.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- .../devicetree/bindings/misc/omap-ocp2scp.txt      |    9 ++
- drivers/misc/Kconfig                               |    8 ++
- drivers/misc/Makefile                              |    1 +
- drivers/misc/omap-ocp2scp.c                        |   96 ++++++++++++++++++++
- 4 files changed, 114 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/misc/omap-ocp2scp.txt
- create mode 100644 drivers/misc/omap-ocp2scp.c
+3.5-rc3 + Peter's blaze.aconf + aplay produces no audio but aplay
+appears to complete in about the right time.
 
-diff --git a/Documentation/devicetree/bindings/misc/omap-ocp2scp.txt b/Documentation/devicetree/bindings/misc/omap-ocp2scp.txt
-new file mode 100644
-index 0000000..e9391d8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/omap-ocp2scp.txt
-@@ -0,0 +1,9 @@
-+* OMAP OCP2SCP - ocp interface to scp interface
-+
-+properties:
-+- compatible : Should be "ti,omap-ocp2scp"
-+- #address-cells, #size-cells : Must be present if the device has sub-nodes
-+- ti,hwmods : must be "ocp2scp_usb_phy"
-+
-+Sub-nodes:
-+All the devices connected to ocp2scp are described using sub-node to ocp2scp
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 2661f6e..c70aa15 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -508,6 +508,14 @@ config USB_SWITCH_FSA9480
- 	  stereo and mono audio, video, microphone and UART data to use
- 	  a common connector port.
- 
-+config OMAP_OCP2SCP
-+	tristate "OMAP OCP2SCP DRIVER"
-+	help
-+	  Driver to enable ocp2scp module which transforms ocp interface
-+	  protocol to scp protocol. In OMAP4, USB PHY is connected via
-+	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
-+	  OCP2SCP.
-+
- source "drivers/misc/c2port/Kconfig"
- source "drivers/misc/eeprom/Kconfig"
- source "drivers/misc/cb710/Kconfig"
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 456972f..4d7c8ce 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -50,4 +50,5 @@ obj-y				+= lis3lv02d/
- obj-y				+= carma/
- obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
- obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
-+obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_INTEL_MEI)		+= mei/
-diff --git a/drivers/misc/omap-ocp2scp.c b/drivers/misc/omap-ocp2scp.c
-new file mode 100644
-index 0000000..f3a11e4
---- /dev/null
-+++ b/drivers/misc/omap-ocp2scp.c
-@@ -0,0 +1,96 @@
-+/*
-+ * omap-ocp2scp.c - transform ocp interface protocol to scp protocol
-+ *
-+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * Author: Kishon Vijay Abraham I <kishon@ti.com>
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+
-+static int ocp2scp_remove_devices(struct device *dev, void *c)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+
-+	platform_device_unregister(pdev);
-+
-+	return 0;
-+}
-+
-+static int __devinit omap_ocp2scp_probe(struct platform_device *pdev)
-+{
-+	int			ret;
-+	struct device_node	*np = pdev->dev.of_node;
-+
-+	if (np) {
-+		ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to add resources for ocp2scp child\n");
-+			goto err0;
-+		}
-+	}
-+	pm_runtime_enable(&pdev->dev);
-+
-+	return 0;
-+
-+err0:
-+	device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
-+
-+	return ret;
-+}
-+
-+static int __devexit omap_ocp2scp_remove(struct platform_device *pdev)
-+{
-+	pm_runtime_disable(&pdev->dev);
-+	device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id omap_ocp2scp_id_table[] = {
-+	{ .compatible = "ti,omap-ocp2scp" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, omap_usb2_id_table);
-+
-+static struct platform_driver omap_ocp2scp_driver = {
-+	.probe		= omap_ocp2scp_probe,
-+	.remove		= __devexit_p(omap_ocp2scp_remove),
-+	.driver		= {
-+		.name	= "omap-ocp2scp",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(omap_ocp2scp_id_table),
-+	},
-+};
-+
-+static int __init omap_ocp2scp_init(void)
-+{
-+	return platform_driver_register(&omap_ocp2scp_driver);
-+}
-+arch_initcall(omap_ocp2scp_init);
-+
-+static void __exit omap_ocp2scp_exit(void)
-+{
-+	platform_driver_unregister(&omap_ocp2scp_driver);
-+}
-+module_exit(omap_ocp2scp_exit);
-+
-+MODULE_ALIAS("platform: omap-ocp2scp");
-+MODULE_AUTHOR("Texas Instruments Inc.");
-+MODULE_DESCRIPTION("OMAP OCP2SCP DRIVER");
-+MODULE_LICENSE("GPLv2");
--- 
-1.7.5.4
+3.5-rc3 + Peter's blaze.aconf + aplay + sound/soc/omap reverted back to
+v3.4 produces audio.
+
+I have nothing further, other than "it produces no audio".  As I have
+zero information on the SDP4430 hardware, if something doesn't work I
+just stop and post a bug report.  I've no idea of the structure of the
+audio implementations on OMAP platforms.  That information is kept from
+me.
+
+I suspect the key difference is I run the uImage kernels on the SDP4430
+without a DT blob.  I suspect it's the DT conversion of sound/soc/omap
+that's buggered it up.
