@@ -1,31 +1,32 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 22 Jun 2012 19:19:57 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <201206221349.18326.jbe@pengutronix.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <CAOMZO5BkaawScSsFqPiP--Bxh5vcm9G1E8MbN2aoL+_Fg_HhDg@mail.gmail.com>
- <201206221349.18326.jbe@pengutronix.de>
-Message-ID: <201206221919.57485.marek.vasut@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 22 Jun 2012 11:28:15 -0600
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FE4A4B3.9010200@wwwdotorg.org>
+References: <4FD85127.8050301@firmworks.com>
+ <20120614091905.GA9081@avionic-0098.mockup.avionic-design.de>
+ <4FDA2DDA.1030704@wwwdotorg.org>
+ <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
+ <4FDA40A0.4030206@wwwdotorg.org>
+ <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
+ <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
+ <4FE0EFBB.6090206@firmworks.com>
+ <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
+ <20120622110038.GA15212@avionic-0098.mockup.avionic-design.de>
+ <4FE4A4B3.9010200@wwwdotorg.org>
+Message-ID: <4FE4AB2F.8090402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
-
-> Fabio Estevam wrote:
-> > On Wed, Apr 4, 2012 at 9:07 PM, Randle, Bill <Bill.Randle@aei.com> wrote:
-> > > That would be even better. That's ultimately what I need - an easy way
-> > > to get access to that information from user space. I'll look for the
-> > > linux-iio mailing list archives and see if I can find that code.
-> > 
-> > Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
+On 06/22/2012 11:00 AM, Stephen Warren wrote:
+> On 06/22/2012 05:00 AM, Thierry Reding wrote:
+> ...
+>> Stephen: can you try to find out whether the Tegra PCIe controller 
+>> indeed implements ECAM, or if this scheme is actually just a
+>> proprietary variant?
 > 
-> Any progress here with inclusion in some git tree?
+> Sure. I have added this request to the bug I filed requesting more
+> complete PCIe host documentation.
 
-Well ... I recently raised from the dead. It's on the schedule, obviously help 
-is welcome.
-
-> Regards,
-> Juergen
-
-Best regards,
-Marek Vasut
+I've received unofficial confirmation that we do indeed implement a
+non-standard/non-ECAM mapping, and what's in our driver matches our HW.
