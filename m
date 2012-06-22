@@ -1,26 +1,36 @@
-From: jangra.pankaj9@gmail.com (Pankaj Jangra)
-Date: Fri, 22 Jun 2012 21:27:44 +0530
-Subject: [PATCH 06/11] gpio/omap: add clk_prepare and clk_unprepare
-In-Reply-To: <1340372890-10091-7-git-send-email-rnayak@ti.com>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
- <1340372890-10091-7-git-send-email-rnayak@ti.com>
-Message-ID: <CADTbHxrWwYQK+ei7yy7RYuD1dvHg2mL-yajLnzwjg=h=UzBt3w@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 22 Jun 2012 17:11:56 +0100
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+In-Reply-To: <20120622131750.GB19226@n2100.arm.linux.org.uk>
+References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+ <20120622123013.GA7586@sirena.org.uk>
+ <20120622131750.GB19226@n2100.arm.linux.org.uk>
+Message-ID: <20120622161155.GM4037@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+On Fri, Jun 22, 2012 at 02:17:51PM +0100, Russell King - ARM Linux wrote:
 
-On Fri, Jun 22, 2012 at 7:18 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> In preparation of OMAP moving to Common Clk Framework(CCF) add clk_prepare()
-> for omap gpio debounce clock.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> ?drivers/gpio/gpio-omap.c | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
+> I suspect the key difference is I run the uImage kernels on the SDP4430
+> without a DT blob.  I suspect it's the DT conversion of sound/soc/omap
+> that's buggered it up.
 
-Reviewed-by: Pankaj Jangra <jangra.pankaj9@gmail.com>
+This sounds like the most likely explanation.  There's not that many
+commits, would it be possible for you to try bisecting them (or just
+reverting them one at a time)?  The most salient ones should be:
 
-Regards,
-Pankaj Jangra
+356bccbea17988bd32a016ada867dd6a53ba2796 ASoC: omap-abe-twl6040: Introduce driver data for runtime parameters
+7d09f9e98956b29755f20d830252dec9300e7044 ASoC: omap-abe-twl6040: Move Digital Mic widget into dapm table
+c2f98956e3635a897737cc08a60539752aa00dd7 ASoC: omap-abe-twl6040: Keep only one snd_soc_dai_link structure
+
+though it looks like a bisect of sound/soc/omap should be about as fast.
+Like I say if we're talking late July or August there's a very good
+chance that 3.5 will be broken so we should at least revert but it'd be
+a shame to loose the HDMI stuff, I'd really expect that to be unrelated.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120622/6e1ce553/attachment.sig>
