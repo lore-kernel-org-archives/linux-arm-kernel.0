@@ -1,71 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 22 Jun 2012 17:07:59 +0200
-Subject: [PATCH v3] ARM: Orion5x - Restore parts of io.h, with rework
-Message-ID: <1340377679-11992-1-git-send-email-andrew@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 22 Jun 2012 16:09:32 +0100
+Subject: [PATCH 0/2] Use architected timers for delay loop
+Message-ID: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4d5fc58dbe34b78157c05b319669bb3e064ba8bd (ARM: remove bunch of
-now unused mach/io.h files) removed the orion5x io.h. Unfortunately,
-this is still needed for the definition of IO_SPACE_LIMIT which
-overrides the default 64K. All Orion based systems have 1Mbyte of IO
-space per PCI[e] bus, and try to request_resource() this size. Orion5x
-has two such PCI buses.
+Hello,
 
-It is likely that the original, removed version, was broken. This
-version might be less broken. However, it has not been tested on
-hardware with a PCI card, let alone hardware with a PCI card with IO
-capabilities.
+This patch series reworks our delay loop implementation to allow the
+busy-loop to be replaced with the physical counter included as part of
+the architected timer on recent CPUs. The polling implementation is
+still maintained to support cores without the timers and we use the same
+maths and upper delay bound of 2ms.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
-v3: Typo's in commit log fixed
-    ORION5X_PCIE_IO_VIRT_BASE, since it is first in the IO space.
----
- arch/arm/Kconfig                        |    1 +
- arch/arm/mach-orion5x/include/mach/io.h |   22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
- create mode 100644 arch/arm/mach-orion5x/include/mach/io.h
+Russell - I think my maths is correct, but why can't we increase the
+          precision by using a magic constant of 4398046U and a right
+	  shift of 31?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 84449dd..8fb7e4a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -588,6 +588,7 @@ config ARCH_ORION5X
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
-+	select NEED_MACH_IO_H
- 	select PLAT_ORION
- 	help
- 	  Support for the following Marvell Orion 5x series SoCs:
-diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
-new file mode 100644
-index 0000000..1aa5d0a
---- /dev/null
-+++ b/arch/arm/mach-orion5x/include/mach/io.h
-@@ -0,0 +1,22 @@
-+/*
-+ * arch/arm/mach-orion5x/include/mach/io.h
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __ASM_ARCH_IO_H
-+#define __ASM_ARCH_IO_H
-+
-+#include <mach/orion5x.h>
-+#include <asm/sizes.h>
-+
-+#define IO_SPACE_LIMIT		SZ_2M
-+static inline void __iomem *__io(unsigned long addr)
-+{
-+	return (void __iomem *)(addr + ORION5X_PCIE_IO_VIRT_BASE);
-+}
-+
-+#define __io(a)			 __io(a)
-+#endif
+As usual, all feedback is welcome,
+
+Will
+
+
+Will Deacon (2):
+  ARM: arch timer: implement read_current_timer and get_cycles
+  ARM: delay: allow timer-based delay implementation to be selected
+
+ arch/arm/include/asm/arch_timer.h      |    1 +
+ arch/arm/include/asm/delay.h           |   19 +++++++--
+ arch/arm/include/asm/timex.h           |   10 +++--
+ arch/arm/kernel/arch_timer.c           |   11 +++++
+ arch/arm/kernel/armksyms.c             |    3 +-
+ arch/arm/lib/Makefile                  |    2 +-
+ arch/arm/lib/{delay.S => delay-loop.S} |   16 +++----
+ arch/arm/lib/delay.c                   |   66 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-sa1100/sleep.S           |    8 ++--
+ 9 files changed, 112 insertions(+), 24 deletions(-)
+ rename arch/arm/lib/{delay.S => delay-loop.S} (85%)
+ create mode 100644 arch/arm/lib/delay.c
+
 -- 
-1.7.10
+1.7.4.1
