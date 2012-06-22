@@ -1,109 +1,83 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 22 Jun 2012 15:46:25 +0200 (CEST)
-Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
-In-Reply-To: <1469075585.3041816.1340216842779.JavaMail.root@advansee.com>
-References: <1469075585.3041816.1340216842779.JavaMail.root@advansee.com>
-Message-ID: <Pine.LNX.4.64.1206221540390.17552@axis700.grange>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 22 Jun 2012 19:17:59 +0530
+Subject: [PATCH 00/11] Prepare for OMAP2+ movement to Common Clk
+Message-ID: <1340372890-10091-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno??t
+Hi,
 
-Sorry for a delay, just a minor nit-pick below:
+This is a preparatory series for the OMAP Common Clk
+conversion. They mostly add clk_prepare/clk_unprepare
+in OMAP drivers and platform code. Also gets
+rid of omap_clk_get_by_name() and uses clk_get(), and
+removes all direct 'struct clk' dereferrencing and
+uses helpers similar to what is provided by Common
+Clk.
 
-On Wed, 20 Jun 2012, Beno??t Th??baudeau wrote:
+Patches are boot tested on OMAP2430sdp, 3630 Beagle-Xm
+and 4460 Panda.
 
-> On Wed, Jun 20, 2012 at 11:19:59AM +0200, Sascha Hauer wrote:
-> > To make Shawns suggestion a bit more clear:
-> > 
-> > What you should do here is to add flags describing differences
-> > between
-> > SoCs in mxc_gpio_hwdata.
-> > 
-> > This means that you have to:
-> > 
-> > - add IMX35_GPIO to enum mxc_gpio_hwtype
-> > - add imx35-gpio to mxc_gpio_devtype[]
-> > - add "fsl,imx35-gpio" to the compatible list.
-> > - fix all devicetree bindings and platform device bindings for
-> >   i.MX25,35,51,53 and probably i.MX6
-> 
-> Thanks for your suggestion. I have implemented it in the reworked patch below.
-> 
-> I have checked the reference manuals for i.MX25/35/5x and tested it on
-> i.MX25/35. The reference manual of the i.MX6Q is not public (yet?), so I need
-> someone who has it to check that this change is valid for the i.MX6Q too. I
-> assumed in this patch that the i.MX6Q has this EDGE_SEL register at offset 0x1c.
-> 
-> I have a question regarding the fallback mechanism in the i.MX31 case: it has
-> been created in commit 910862e using levels instead of edges, and this has not
-> been changed since. Why? Is it a bug or on purpose?
-> 
-> Regards,
-> Beno??t
-> 
-> 
-> [PATCH] gpio/mxc: use the edge_sel feature if available
-> 
-> Some mxc processors have an edge_sel feature, which allows the IRQ to be
-> triggered by any edge.
-> 
-> This patch makes use of this feature if available, which skips mxc_flip_edge().
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Beno??t Th??baudeau <benoit.thebaudeau@advansee.com>
-> ---
->  .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |    2 +-
->  .../arch/arm/boot/dts/imx51.dtsi                   |    8 +--
->  .../arch/arm/boot/dts/imx53.dtsi                   |   14 ++---
->  .../arch/arm/boot/dts/imx6q.dtsi                   |   14 ++---
->  .../arch/arm/mach-imx/mm-imx25.c                   |   10 +--
->  .../arch/arm/mach-imx/mm-imx3.c                    |    7 +--
->  .../arch/arm/mach-imx/mm-imx5.c                    |   40 ++++++------
->  .../drivers/gpio/gpio-mxc.c                        |   66 +++++++++++++++-----
->  8 files changed, 96 insertions(+), 65 deletions(-)
+Some of these patches were earlier posted as part of
+OMAP2+ Common Clk conversion series [1] which is now
+split into a preparatory series and actual CCF conversion
+series.
 
-[snip]
+Patches from this series can be found here
+git://github.com/rrnayak/linux.git prepare-common-clk-3.5-rc3
 
-> @@ -74,13 +77,14 @@ static struct mxc_gpio_hwdata imx1_imx21_gpio_hwdata = {
->  	.icr2_reg	= 0x2c,
->  	.imr_reg	= 0x30,
->  	.isr_reg	= 0x34,
-> +	.edge_sel_reg	= -1,
+regards,
+Rajendra
 
-Maybe better use a meaningful error code like -EINVAL?
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70299.html
 
-[snip]
+Rajendra Nayak (11):
+  ARM: omap: clk: add clk_prepare and clk_unprepare
+  mmc: omap: add clk_prepare and clk_unprepare
+  hwrng: omap: add clk_prepare and clk_unprepare
+  mfd: omap-usb: add clk_prepare and clk_unprepare
+  OMAPDSS: add clk_prepare and clk_unprepare
+  gpio/omap: add clk_prepare and clk_unprepare
+  w1: omap_hdq: add clk_prepare and clk_unprepare
+  crypto: omap: add clk_prepare and clk_unprepare
+  iommu: omap: add clk_prepare and clk_unprepare
+  ARM: omap: hwmod: get rid of all omap_clk_get_by_name usage
+  ARM: omap: clk: Remove all direct dereferencing of struct clk
 
-> @@ -338,10 +365,15 @@ static void __devinit mxc_gpio_get_hw(struct platform_device *pdev)
->  		return;
->  	}
->  
-> -	if (hwtype == IMX31_GPIO)
-> -		mxc_gpio_hwdata = &imx31_gpio_hwdata;
-> -	else
-> +	switch (hwtype) {
-> +	case IMX31_GPIO:
-> +		imx31_imx35_gpio_hwdata.edge_sel_reg = -1;
-
-ditto
-
-> +	case IMX35_GPIO:
-> +		mxc_gpio_hwdata = &imx31_imx35_gpio_hwdata;
-> +		break;
-> +	default:
->  		mxc_gpio_hwdata = &imx1_imx21_gpio_hwdata;
-> +	}
->  
->  	mxc_gpio_hwtype = hwtype;
->  }
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/mach-omap2/board-apollon.c          |    4 +-
+ arch/arm/mach-omap2/board-h4.c               |    6 +-
+ arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |    2 +-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    4 +-
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |   18 +++---
+ arch/arm/mach-omap2/clkt_clksel.c            |   84 ++++++++++++++++++--------
+ arch/arm/mach-omap2/clkt_dpll.c              |   24 ++++---
+ arch/arm/mach-omap2/clock.c                  |    9 ++-
+ arch/arm/mach-omap2/clock2420_data.c         |   17 +++++
+ arch/arm/mach-omap2/clock2430_data.c         |   21 +++++++
+ arch/arm/mach-omap2/clock3xxx.c              |    8 +-
+ arch/arm/mach-omap2/clock3xxx_data.c         |   24 +++++++
+ arch/arm/mach-omap2/clock44xx_data.c         |   17 +++++
+ arch/arm/mach-omap2/display.c                |    4 +-
+ arch/arm/mach-omap2/dpll3xxx.c               |   45 ++++++++------
+ arch/arm/mach-omap2/gpmc.c                   |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |   21 ++++---
+ arch/arm/mach-omap2/omap_phy_internal.c      |    3 +
+ arch/arm/mach-omap2/pm.c                     |    2 +-
+ arch/arm/mach-omap2/pm24xx.c                 |    2 +
+ arch/arm/mach-omap2/usb-fs.c                 |    4 +-
+ arch/arm/plat-omap/include/plat/clock.h      |    4 +
+ arch/arm/plat-omap/omap_device.c             |    6 +-
+ drivers/char/hw_random/omap-rng.c            |    6 +-
+ drivers/crypto/omap-aes.c                    |    2 +
+ drivers/crypto/omap-sham.c                   |    2 +
+ drivers/gpio/gpio-omap.c                     |    2 +
+ drivers/iommu/omap-iommu.c                   |    2 +
+ drivers/mfd/omap-usb-host.c                  |   20 ++++++
+ drivers/mmc/host/omap.c                      |    9 ++-
+ drivers/mmc/host/omap_hsmmc.c                |    6 +-
+ drivers/video/omap2/dss/dsi.c                |    5 +-
+ drivers/video/omap2/dss/hdmi.c               |    5 +-
+ drivers/video/omap2/dss/venc.c               |    5 +-
+ drivers/w1/masters/omap_hdq.c                |    8 +-
+ 36 files changed, 292 insertions(+), 113 deletions(-)
