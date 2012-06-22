@@ -1,45 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:15:46 +0100
-Subject: [PATCH 2/2] ARM: rwlocks: remove unused branch labels from trylock
- routines
-In-Reply-To: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
-References: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340378146-17560-3-git-send-email-will.deacon@arm.com>
+Date: Fri, 22 Jun 2012 16:15:44 +0100
+Subject: [PATCH 0/2] Implement ticket spinlocks for ARM
+Message-ID: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM arch_{read,write}_trylock implementations include unused
-backwards branch labels, since we don't retry the locking operation
-if the exclusive store fails.
+Hello,
 
-This patch removes the labels.
+With multi-cluster ARM platforms on the horizon, our current spinlock
+implementation can result in lock-bias when the memory latency is not
+uniform between clusters. This may be due to microarchitectural
+constraints or (mis-)configuration of the cache-coherent interconnect.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/spinlock.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+This series ensures lock fairness by implementing the ticket algorithm
+described in detail here:
 
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index dcca638..aa7945b 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -183,7 +183,7 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
- 	unsigned long tmp;
- 
- 	__asm__ __volatile__(
--"1:	ldrex	%0, [%1]\n"
-+"	ldrex	%0, [%1]\n"
- "	teq	%0, #0\n"
- "	strexeq	%0, %2, [%1]"
- 	: "=&r" (tmp)
-@@ -269,7 +269,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
- 	unsigned long tmp, tmp2 = 1;
- 
- 	__asm__ __volatile__(
--"1:	ldrex	%0, [%2]\n"
-+"	ldrex	%0, [%2]\n"
- "	adds	%0, %0, #1\n"
- "	strexpl	%1, %0, [%2]\n"
- 	: "=&r" (tmp), "+r" (tmp2)
+        http://lwn.net/Articles/267968/
+
+Whilst fairness is not necessarily congruent with throughput, I've not
+observed any drop in performance on single-cluster systems with this
+change to the kernel (I ran hackbench, which stresses &(&u->lock)->rlock
+on the msg{snd,rcv} paths).
+
+All comments welcome,
+
+Will
+
+
+Will Deacon (2):
+  ARM: spinlock: use ticket algorithm for ARMv6+ locking implementation
+  ARM: rwlocks: remove unused branch labels from trylock routines
+
+ arch/arm/include/asm/spinlock.h       |   77 ++++++++++++++++++++++-----------
+ arch/arm/include/asm/spinlock_types.h |   17 ++++++-
+ 2 files changed, 66 insertions(+), 28 deletions(-)
+
 -- 
 1.7.4.1
