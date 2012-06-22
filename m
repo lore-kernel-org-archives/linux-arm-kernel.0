@@ -1,68 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 22 Jun 2012 11:14:54 +0200
-Subject: [PATCH 2/2] ARM: MXS: Add Crystalfontz CFA-10036 DTS
-In-Reply-To: <1340356494-24664-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1340356494-24664-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1340356494-24664-3-git-send-email-maxime.ripard@free-electrons.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Fri, 22 Jun 2012 14:30:06 +0530
+Subject: [PATCH v4 0/3] Prepare for GPMC driver conversion
+Message-ID: <cover.1340354985.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Cc: Brian Lily <brian@crystalfontz.com>
----
- arch/arm/boot/dts/cfa10036.dts |   43 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 arch/arm/boot/dts/cfa10036.dts
+Objective of this series is to make things easy for GPMC driver
+conversion series by separating out more things from driver
+conversion series.
 
-diff --git a/arch/arm/boot/dts/cfa10036.dts b/arch/arm/boot/dts/cfa10036.dts
-new file mode 100644
-index 0000000..28b9326
---- /dev/null
-+++ b/arch/arm/boot/dts/cfa10036.dts
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright 2012 Free Electrons
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx28.dtsi"
-+
-+/ {
-+	model = "Crystalfontz CFA-10036 Board";
-+	compatible = "crystalfontz,cfa10036", "fsl,imx28";
-+
-+	memory {
-+		reg = <0x40000000 0x08000000>;
-+	};
-+
-+	apb at 80000000 {
-+		apbh at 80000000 {
-+			ssp0: ssp at 80010000 {
-+				compatible = "fsl,imx28-mmc";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc0_4bit_pins_a
-+					&mmc0_cd_cfg &mmc0_sck_cfg>;
-+				bus-width = <4>;
-+				status = "okay";
-+			};
-+		};
-+
-+		apbx at 80040000 {
-+			duart: serial at 80074000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&duart_pins_b>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
+This series,
+1. Unifies NAND platform initialization functions
+2. Prepares OneNAND platform code for gpmc driver migration
+3. Handles additional timings in Kernel
+
+This series is based on 3.5-rc1 & made on top of
+[PATCH v2 00/10] Prepare for GPMC driver conversion (w.r.t MTD)
+{http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70096.html}
+
+These changes has been tested with omap3evm & beagle board. Relevant
+GPMC peripherals that got tested by this were NAND (beagle) and
+OneNAND (using local patches for omap3evm)
+
+Regards
+Afzal
+
+v4:
+1. Reorganize OneNAND set_sync/async functions in a better way
+v3:
+1. Refactor OneNAND set_sync/async functions to separate out timing
+ and configurations
+2. Handle bool type timings too
+3. Swap patches 2 & 3 due to dependency of OneNAND change on  newly
+ added bool type timings
+v2:
+1. Make use of timing api for setting clock activation time, and
+ remove direct writing to register for clock activation. Peripherals
+ making use of it were tusb6010 & onenand
+2. Move ensuring that async mode in OneNAND has been setup from
+ set_sync to setup function, improve commit message
+
+
+
+Afzal Mohammed (3):
+  ARM: OMAP2+: nand: unify init functions
+  ARM: OMAP2+: gpmc: handle additional timings
+  ARM: OMAP2+: onenand: prepare for gpmc driver migration
+
+ arch/arm/mach-omap2/board-devkit8000.c     |    8 +-
+ arch/arm/mach-omap2/board-flash.c          |   45 ++++----
+ arch/arm/mach-omap2/board-flash.h          |    6 +-
+ arch/arm/mach-omap2/board-igep0020.c       |    2 +-
+ arch/arm/mach-omap2/board-ldp.c            |    4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    8 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    8 +-
+ arch/arm/mach-omap2/board-overo.c          |    7 +-
+ arch/arm/mach-omap2/board-zoom.c           |    5 +-
+ arch/arm/mach-omap2/common-board-devices.c |   46 --------
+ arch/arm/mach-omap2/common-board-devices.h |    1 -
+ arch/arm/mach-omap2/gpmc-onenand.c         |  156 +++++++++++++++-------------
+ arch/arm/mach-omap2/gpmc.c                 |   45 ++++++++
+ arch/arm/mach-omap2/usb-tusb6010.c         |    3 +-
+ arch/arm/plat-omap/include/plat/gpmc.h     |   19 ++++
+ 15 files changed, 207 insertions(+), 156 deletions(-)
+
 -- 
-1.7.9.5
+1.7.10.2
