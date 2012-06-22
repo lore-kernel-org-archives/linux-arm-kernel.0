@@ -1,93 +1,53 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 22 Jun 2012 19:18:04 +0530
-Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
+Date: Fri, 22 Jun 2012 19:18:02 +0530
+Subject: [PATCH 03/11] hwrng: omap: add clk_prepare and clk_unprepare
 In-Reply-To: <1340372890-10091-1-git-send-email-rnayak@ti.com>
 References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
-Message-ID: <1340372890-10091-6-git-send-email-rnayak@ti.com>
+Message-ID: <1340372890-10091-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In preparation of OMAP moving to Common Clk Framework(CCF) add clk_prepare()
-and clk_unprepare() for the omapdss clocks.
+and clk_unprepare() for the rng interface clock as part of the drivers
+probe() and remove() routines.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: <linux-fbdev@vger.kernel.org>
+Cc: Deepak Saxena <dsaxena@plexity.net>
+Cc: Matt Mackall <mpm@selenic.com>
 ---
- drivers/video/omap2/dss/dsi.c  |    5 ++++-
- drivers/video/omap2/dss/hdmi.c |    5 ++++-
- drivers/video/omap2/dss/venc.c |    5 ++++-
- 3 files changed, 12 insertions(+), 3 deletions(-)
+ drivers/char/hw_random/omap-rng.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/dsi.c b/drivers/video/omap2/dss/dsi.c
-index ca8382d..81b474d 100644
---- a/drivers/video/omap2/dss/dsi.c
-+++ b/drivers/video/omap2/dss/dsi.c
-@@ -4776,6 +4776,7 @@ static int dsi_get_clocks(struct platform_device *dsidev)
+diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+index 1412565..500604a 100644
+--- a/drivers/char/hw_random/omap-rng.c
++++ b/drivers/char/hw_random/omap-rng.c
+@@ -110,7 +110,7 @@ static int __devinit omap_rng_probe(struct platform_device *pdev)
+ 			ret = PTR_ERR(rng_ick);
+ 			return ret;
+ 		} else
+-			clk_enable(rng_ick);
++			clk_prepare_enable(rng_ick);
  	}
  
- 	dsi->sys_clk = clk;
-+	clk_prepare(dsi->sys_clk);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -138,7 +138,7 @@ err_register:
+ 	rng_base = NULL;
+ err_ioremap:
+ 	if (cpu_is_omap24xx()) {
+-		clk_disable(rng_ick);
++		clk_disable_unprepare(rng_ick);
+ 		clk_put(rng_ick);
+ 	}
+ 	return ret;
+@@ -151,7 +151,7 @@ static int __exit omap_rng_remove(struct platform_device *pdev)
+ 	omap_rng_write_reg(RNG_MASK_REG, 0x0);
  
- 	return 0;
- }
-@@ -4786,8 +4787,10 @@ static void dsi_put_clocks(struct platform_device *dsidev)
- 
- 	if (dsi->dss_clk)
- 		clk_put(dsi->dss_clk);
--	if (dsi->sys_clk)
-+	if (dsi->sys_clk) {
-+		clk_unprepare(dsi->sys_clk);
- 		clk_put(dsi->sys_clk);
-+	}
- }
- 
- static void __init dsi_probe_pdata(struct platform_device *dsidev)
-diff --git a/drivers/video/omap2/dss/hdmi.c b/drivers/video/omap2/dss/hdmi.c
-index 8195c71..0b7ded3 100644
---- a/drivers/video/omap2/dss/hdmi.c
-+++ b/drivers/video/omap2/dss/hdmi.c
-@@ -544,14 +544,17 @@ static int hdmi_get_clocks(struct platform_device *pdev)
+ 	if (cpu_is_omap24xx()) {
+-		clk_disable(rng_ick);
++		clk_disable_unprepare(rng_ick);
+ 		clk_put(rng_ick);
  	}
  
- 	hdmi.sys_clk = clk;
-+	clk_prepare(hdmi.sys_clk);
- 
- 	return 0;
- }
- 
- static void hdmi_put_clocks(void)
- {
--	if (hdmi.sys_clk)
-+	if (hdmi.sys_clk) {
-+		clk_unprepare(hdmi.sys_clk);
- 		clk_put(hdmi.sys_clk);
-+	}
- }
- 
- #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
-diff --git a/drivers/video/omap2/dss/venc.c b/drivers/video/omap2/dss/venc.c
-index 2b89739..62f395d 100644
---- a/drivers/video/omap2/dss/venc.c
-+++ b/drivers/video/omap2/dss/venc.c
-@@ -818,14 +818,17 @@ static int venc_get_clocks(struct platform_device *pdev)
- 	}
- 
- 	venc.tv_dac_clk = clk;
-+	clk_prepare(venc.tv_dac_clk);
- 
- 	return 0;
- }
- 
- static void venc_put_clocks(void)
- {
--	if (venc.tv_dac_clk)
-+	if (venc.tv_dac_clk) {
-+		clk_unprepare(venc.tv_dac_clk);
- 		clk_put(venc.tv_dac_clk);
-+	}
- }
- 
- static void __init venc_probe_pdata(struct platform_device *pdev)
 -- 
 1.7.1
