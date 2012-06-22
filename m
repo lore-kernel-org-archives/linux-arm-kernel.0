@@ -1,52 +1,113 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Fri, 22 Jun 2012 20:36:26 +0100
-Subject: [RFC PATCH 0/8] Fix restart_block syscall restarting for 3.5
-In-Reply-To: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20120622193626.GG14083@ZenIV.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 22 Jun 2012 16:08:47 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: spinlock: use ticket algorithm for ARMv6+ locking
+ implementation
+In-Reply-To: <1340378146-17560-2-git-send-email-will.deacon@arm.com>
+References: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
+ <1340378146-17560-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1206221443100.10229@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2012 at 04:06:58PM +0100, Will Deacon wrote:
-> Hello,
+On Fri, 22 Jun 2012, Will Deacon wrote:
+
+> Ticket spinlocks ensure locking fairness by reducing the thundering herd
+> effect when acquiring a lock.
+
+The conventional thundering herd effect is still there as all waiting 
+CPUs are still woken up from WFE upon a spin_unlock with a SEV.  Maybe 
+the fact that the actual spinning is no longer banging on the exclusion 
+monitor does count as reduction of the thundering herd effect at that 
+level though, and if that is what you meant then this could be precised 
+here.
+
+> This is especially important on systems
+> where memory-access times are not necessarily uniform when accessing
+> the lock structure (for example, on a multi-cluster platform where the
+> lock is allocated into L1 when a CPU releases it).
+
+In which case it is more about fairness.  This algorithm brings fairness 
+due to its FIFO nature, despite possible memory access speed 
+differences.  And that is even more important than the thundering herd 
+effect.  Solving both at once is of course all good.
+
+> This patch implements the ticket spinlock algorithm for ARM, replacing
+> the simpler implementation for ARMv6+ processors.
 > 
-> This RFC series attempts to address the syscall restarting problems
-> introduced during the merge window and described here:
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+A minor remarks below.  Otherwise...
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  arch/arm/include/asm/spinlock.h       |   73 ++++++++++++++++++++++-----------
+>  arch/arm/include/asm/spinlock_types.h |   17 +++++++-
+>  2 files changed, 64 insertions(+), 26 deletions(-)
 > 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104733.html
-> 
-> I reckon the first two reverts should go in for 3.5 unless anybody has
-> a better solution. The rest of the code is an RFC since, as Russell has
-> said before, the code is `rather yucky'.
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index 65fa3c8..dcca638 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -79,31 +74,40 @@ static inline void dsb_sev(void)
+>  static inline void arch_spin_lock(arch_spinlock_t *lock)
+>  {
+>  	unsigned long tmp;
+> +	u32 newval;
+> +	arch_spinlock_t lockval;
+>  
+>  	__asm__ __volatile__(
+> -"1:	ldrex	%0, [%1]\n"
+> -"	teq	%0, #0\n"
+> -	WFE("ne")
+> -"	strexeq	%0, %2, [%1]\n"
+> -"	teqeq	%0, #0\n"
+> +"1:	ldrex	%0, [%3]\n"
+> +"	add	%1, %0, %4\n"
+> +"	strex	%2, %1, [%3]\n"
+> +"	teq	%2, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (tmp)
+> -	: "r" (&lock->lock), "r" (1)
+> +	: "=&r" (lockval), "=&r" (newval), "=&r" (tmp)
+> +	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+>  	: "cc");
+>  
+> +	while (lockval.tickets.next != lockval.tickets.owner) {
+> +		wfe();
+> +		lockval.tickets.owner = ACCESS_ONCE(lock->tickets.owner);
+> +	}
+> +
+>  	smp_mb();
+>  }
+>  
+>  static inline int arch_spin_trylock(arch_spinlock_t *lock)
+>  {
+>  	unsigned long tmp;
+> +	u32 slock;
+>  
+>  	__asm__ __volatile__(
+> -"	ldrex	%0, [%1]\n"
+> -"	teq	%0, #0\n"
+> -"	strexeq	%0, %2, [%1]"
+> -	: "=&r" (tmp)
+> -	: "r" (&lock->lock), "r" (1)
+> +"	ldrex	%0, [%2]\n"
+> +"	cmp	%0, %0, ror #16\n"
+> +"	movne	%1, #1\n"
 
-See commit 76c3f4da3ee47b68304dbe0f64e86562e7945bf3 and a couiple before it in
-signal.git:
-commit 76c3f4da3ee47b68304dbe0f64e86562e7945bf3
-Author: Al Viro <viro@zeniv.linux.org.uk>
-Date:   Sat Jun 2 02:11:01 2012 -0400
+You could replace the above 2 insns with:
 
-    arm: get rid of TIF_SYSCALL_RESTARTSYS
-    
-    just let do_work_pending() return 1 on normal local restarts and
-    -1 on those that had been caused by ERESTART_RESTARTBLOCK (and 0
-    is still "all done, sod off to userland now").  And let the asm
-    glue flip scno to restart_syscall(2) one if it got negative from
-    us...
-    
-    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+	subs	%1, %0, %0, ror #16
 
-commit 9c802c169f964830496be6480ab71d2123cf38a7
-Author: Al Viro <viro@zeniv.linux.org.uk>
-Date:   Sat Jun 2 01:52:18 2012 -0400
+> +"	addeq	%0, %0, %3\n"
+> +"	strexeq	%1, %0, [%2]"
+> +	: "=&r" (slock), "=&r" (tmp)
+> +	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+>  	: "cc");
+>  
+>  	if (tmp == 0) {
 
-    arm: deal with handlerless restarts without leaving the kernel
-    
-    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
 
-commit c1eafa6fc84aaf725e02c7b50ee8a8a748f45b63
-Author: Al Viro <viro@zeniv.linux.org.uk>
-Date:   Fri Jun 1 23:58:57 2012 -0400
-
-    arm: pull all work_pending logics into C function
-    
-    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+Nicolas
