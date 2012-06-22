@@ -1,8 +1,10 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 22 Jun 2012 13:00:38 +0200
+Date: Fri, 22 Jun 2012 13:04:03 +0200
 Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
-References: <4FD85127.8050301@firmworks.com>
+In-Reply-To: <4FE0EFBB.6090206@firmworks.com>
+References: <4FD849CF.4030009@firmworks.com>
+ <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
+ <4FD85127.8050301@firmworks.com>
  <20120614091905.GA9081@avionic-0098.mockup.avionic-design.de>
  <4FDA2DDA.1030704@wwwdotorg.org>
  <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
@@ -10,170 +12,199 @@ References: <4FD85127.8050301@firmworks.com>
  <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
  <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
  <4FE0EFBB.6090206@firmworks.com>
- <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
-Message-ID: <20120622110038.GA15212@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120622110403.GA15710@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2012 at 04:18:05AM -0600, Bjorn Helgaas wrote:
-> On Thu, Jun 21, 2012 at 12:47 AM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > On Tue, Jun 19, 2012 at 11:31:39AM -1000, Mitch Bradley wrote:
+On Tue, Jun 19, 2012 at 11:31:39AM -1000, Mitch Bradley wrote:
+> On 6/19/2012 3:30 AM, Thierry Reding wrote:
+> >On Fri, Jun 15, 2012 at 08:12:36AM +0200, Thierry Reding wrote:
+> >>On Thu, Jun 14, 2012 at 01:50:56PM -0600, Stephen Warren wrote:
+> >>>On 06/14/2012 01:29 PM, Thierry Reding wrote:
+> >>>>On Thu, Jun 14, 2012 at 12:30:50PM -0600, Stephen Warren wrote:
+> >>>>>On 06/14/2012 03:19 AM, Thierry Reding wrote:
+> >>>...
+> >>>>>>#address-cells = <1>; #size-cells = <1>;
+> >>>>>>
+> >>>>>>pci at 80000000 {
+> >>>>>
+> >>>>>I'm still not convinced that using the address of the port's
+> >>>>>registers is the correct way to represent each port. The port
+> >>>>>index seems much more useful.
+> >>>>>
+> >>>>>The main reason here is that there are a lot of registers that
+> >>>>>contain fields for each port - far more than the combination of
+> >>>>>this node's reg and ctrl-offset (which I assume is an address
+> >>>>>offset for just one example of this issue) properties can
+> >>>>>describe. The bit position and bit stride of these fields isn't
+> >>>>>necessarily the same in each register. Do we want a property like
+> >>>>>ctrl-offset for every single type of field in every single shared
+> >>>>>register that describes the location of the relevant data, or
+> >>>>>just a single "port ID" bit that can be applied to anything?
+> >>>>>
+> >>>>>(Perhaps this isn't so obvious looking at the TRM since it
+> >>>>>doesn't document all registers, and I'm also looking at the
+> >>>>>Tegra30 documentation too, which might be more exposed to this -
+> >>>>>I haven't correlated all the documentation sources to be sure
+> >>>>>though)
+> >>>>
+> >>>>I agree that maybe adding properties for each bit position or
+> >>>>register offset may not work out too well. But I think it still
+> >>>>makes sense to use the base address of the port's registers (see
+> >>>>below). We could of course add some code to determine the index
+> >>>>from the base address at initialization time and reuse the index
+> >>>>where appropriate.
+> >>>
+> >>>To me, working back from address to ID then using the ID to calculate
+> >>>some other addresses seems far more icky than just calculating all the
+> >>>addresses based off of one ID. But, I suppose this doesn't make a huge
+> >>>practical difference.
+> >>
+> >>This really depends on the device vs. no device decision below. If we can
+> >>make it work without needing an extra device for it, then using the index
+> >>is certainly better. However, if we instantiate devices from the DT, then
+> >>we have the address anyway and adding the index as a property would be
+> >>redundant and error prone (what happens if somebody sets the index of the
+> >>port at address 0x80000000 to 2?).
+> >
+> >An additional problem with this is that we'd have to add the following
+> >to the pcie-controller node:
+> >
+> >	#address-cells = <1>;
+> >	#size-cells = <0>;
+> >
+> >This will conflict with the "ranges" property, because suddenly we can
+> >no longer map the regions properly. Maybe Mitch can comment on whether
+> >this is possible or not?
+> >
+> >To make it clearer what I'm talking about, here's the DT snippet again
+> >(with the compatible property removed from the pci@ nodes because they
+> >are no longer probed by a driver, the "simple-bus" removed from the
+> >pcie-controller node's compatible property removed and its #address-
+> >and #size-cells properties adjusted as described above).
+> >
+> >	pcie-controller {
+> >		compatible = "nvidia,tegra20-pcie";
+> >		reg = <0x80003000 0x00000800   /* PADS registers */
+> >		       0x80003800 0x00000200   /* AFI registers */
+> >		       0x80004000 0x00100000   /* configuration space */
+> >		       0x80104000 0x00100000>; /* extended configuration space */
+> >		interrupts = <0 98 0x04   /* controller interrupt */
+> >			      0 99 0x04>; /* MSI interrupt */
+> >		status = "disabled";
+> >
+> >		ranges = <0x80000000 0x80000000 0x00002000   /* 2 root ports */
+> >			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
+> >			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
+> >			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+> >
+> >		#address-cells = <1>;
+> >		#size-cells = <0>;
+> >
+> >		pci at 0 {
+> >			reg = <2>;
+> >			status = "disabled";
+> >
+> >			#address-cells = <3>;
+> >			#size-cells = <2>;
+> >
+> >			ranges = <0x81000000 0 0 0x80400000 0 0x00008000   /* I/O */
+> >				  0x82000000 0 0 0x90000000 0 0x08000000   /* non-prefetchable memory */
+> >				  0xc2000000 0 0 0xa0000000 0 0x08000000>; /* prefetchable memory */
+> >
+> >			nvidia,ctrl-offset = <0x110>;
+> >			nvidia,num-lanes = <2>;
+> >		};
+> >
+> >		pci at 1 {
+> >			reg = <1>;
+> >			status = "disabled";
+> >
+> >			#address-cells = <3>;
+> >			#size-cells = <2>;
+> >
+> >			ranges = <0x81000000 0 0 0x80408000 0 0x00008000   /* I/O */
+> >				  0x82000000 0 0 0x98000000 0 0x08000000   /* non-prefetchable memory */
+> >				  0xc2000000 0 0 0xa8000000 0 0x08000000>; /* prefetchable memory */
+> >
+> >			nvidia,ctrl-offset = <0x118>;
+> >			nvidia,num-lanes = <2>;
+> >		};
+> >	};
+> >
+> >AIUI none of the ranges properties are valid anymore, because the bus
+> >represented by pcie-controller no longer reflects the truth, namely that
+> >it translates the CPU address space to the PCI address space.
+> >
 > 
-> >> Version A - 3 address cells: ?In this version, the intermediate
-> >> address space has 3 cells: ?port#, address type, offset. ?Address
-> >> type is
-> >> ? 0 : root port
-> >> ? 1 : config space
-> >> ? 2 : extended config space
-> >> ? 3 : I/O
-> >> ? 4 : non-prefetchable memory
-> >> ? 5 : prefetchable memory.
-> >>
-> >> The third cell "offset" is necessary so that the size field has a
-> >> number space that can include it.
-> >>
-> >> ? ? ? pcie-controller {
-> >> ? ? ? ? ? ? ? compatible = "nvidia,tegra20-pcie";
-> >> ? ? ? ? ? ? ? reg = <0x80003000 0x00000800 ? /* PADS registers */
-> >> ? ? ? ? ? ? ? ? ? ? ?0x80003800 0x00000200>; /* extended configuration space */
-> >> ? ? ? ? ? ? ? interrupts = <0 98 0x04 ? /* controller interrupt */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0 99 0x04>; /* MSI interrupt */
-> >> ? ? ? ? ? ? ? status = "disabled";
-> >>
-> >> ? ? ? ? ? ? ? ranges = <0 0 0 ?0x80000000 0x00001000 ? /* Root port 0 */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 0 1 0 ?0x80004000 0x00080000 ? /* Port 0 config space */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 0 2 0 ?0x80104000 0x00080000 ? /* Port 0 ext config space *
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 0 3 0 ?0x80400000 0x00008000 ? /* Port 0 downstream I/O */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 0 4 0 ?0x90000000 0x08000000 ? /* Port 0 non-prefetchable memory */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 0 5 0 ?0xa0000000 0x08000000 ? /* Port 0 prefetchable memory */
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 1 0 0 ?0x80001000 0x00001000 ? /* Root port 1 */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 1 1 0 ?0x80004000 0x00080000 ? /* Port 1 config space */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 1 2 0 ?0x80184000 0x00080000 ? /* Port 1 ext config space */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 1 3 0 ?0x80408000 0x00010000 ? /* Port 1 downstream I/O */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 1 4 0 ?0x98000000 0x08000000 ? /* Port 1 non-prefetchable memory */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? 1 5 0 ?0xa0000000 0x08000000>; /* Port 1 prefetchable memory */
-> >>
-> >> ? ? ? ? ? ? ? #address-cells = <3>;
-> >> ? ? ? ? ? ? ? #size-cells = <1>;
-> >>
-> >> ? ? ? ? ? ? ? pci at 0 {
-> >> ? ? ? ? ? ? ? ? ? ? ? reg = <0 0 0 0x1000>;
-> >> ? ? ? ? ? ? ? ? ? ? ? status = "disabled";
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? #address-cells = <3>;
-> >> ? ? ? ? ? ? ? ? ? ? ? #size-cells = <2>;
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? ranges = <0x80000000 0 0 ?0 1 0 ?0 0x00080000 ? /* config */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x90000000 0 0 ?0 2 0 ?0 0x00080000 ? /* extended config */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x81000000 0 0 ?0 3 0 ?0 0x00008000 ? /* I/O */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x82000000 0 0 ?0 4 0 ?0 0x08000000 ? /* non-prefetchable memory */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0xc2000000 0 0 ?0 5 0 ?0 0x08000000>; /* prefetchable memory */
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? nvidia,ctrl-offset = <0x110>;
-> >> ? ? ? ? ? ? ? ? ? ? ? nvidia,num-lanes = <2>;
-> >> ? ? ? ? ? ? ? };
-> >>
-> >>
-> >> ? ? ? ? ? ? ? pci at 1 {
-> >> ? ? ? ? ? ? ? ? ? ? ? reg = <1 0 0 0x1000>;
-> >> ? ? ? ? ? ? ? ? ? ? ? status = "disabled";
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? #address-cells = <3>;
-> >> ? ? ? ? ? ? ? ? ? ? ? #size-cells = <2>;
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? ranges = <0x80000000 0 0 ?1 1 0 ?0 0x00080000 ? /* config */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x90000000 0 0 ?1 2 0 ?0 0x00080000 ? /* extended config */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x81000000 0 0 ?1 3 0 ?0 0x00008000 ? /* I/O */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x82000000 0 0 ?1 4 0 ?0 0x08000000 ? /* non-prefetchable memory */
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0xc2000000 0 0 ?1 5 0 ?0 0x08000000>; /* prefetchable memory */
-> >>
-> >> ? ? ? ? ? ? ? ? ? ? ? nvidia,ctrl-offset = <0x118>;
-> >> ? ? ? ? ? ? ? ? ? ? ? nvidia,num-lanes = <2>;
-> >> ? ? ? ? ? ? ? };
+> I think you can use a small-integer port number as an address by
+> defining the intermediate address space properly, and using
+> appropriate ranges above and below.  Here's a swag at how that would
+> look.
 > 
-> I'm not familiar with device tree, so pardon me if these are stupid
-> questions.  These seem to be describing PCI host bridges.
+> I present three versions, using different choices for the
+> intermediate address space encoding.  The intermediate address space
+> may seem somewhat artificial, in that it decouples the "linear pass
+> through of ranges" between the lower PCI address space and the upper
+> CPU address space.  But in another sense, it accurately reflects
+> that fact that the bus bridge "slices and dices" that linear address
+> space into non-contiguous pieces.
+> 
+> Note that I'm also fixing a problem that I neglected to mention
+> earlier - namely the fact that config space is part of the child PCI
+> address space so it must be passed through.
+> 
+> Version A - 3 address cells:  In this version, the intermediate
+> address space has 3 cells:  port#, address type, offset.  Address
+> type is
+>   0 : root port
+>   1 : config space
+>   2 : extended config space
+>   3 : I/O
+>   4 : non-prefetchable memory
+>   5 : prefetchable memory.
+> 
+> The third cell "offset" is necessary so that the size field has a
+> number space that can include it.
+> 
+> 	pcie-controller {
+> 		compatible = "nvidia,tegra20-pcie";
+> 		reg = <0x80003000 0x00000800   /* PADS registers */
+> 		       0x80003800 0x00000200>; /* extended configuration space */
+> 		interrupts = <0 98 0x04   /* controller interrupt */
+> 			      0 99 0x04>; /* MSI interrupt */
+> 		status = "disabled";
+> 
+> 		ranges = <0 0 0  0x80000000 0x00001000   /* Root port 0 */
+> 			  0 1 0  0x80004000 0x00080000   /* Port 0 config space */
+> 			  0 2 0  0x80104000 0x00080000   /* Port 0 ext config space *
+> 			  0 3 0  0x80400000 0x00008000   /* Port 0 downstream I/O */
+> 			  0 4 0  0x90000000 0x08000000   /* Port 0 non-prefetchable memory */
+> 			  0 5 0  0xa0000000 0x08000000   /* Port 0 prefetchable memory */
+> 
+> 			  1 0 0  0x80001000 0x00001000   /* Root port 1 */
+> 			  1 1 0  0x80004000 0x00080000   /* Port 1 config space */
+> 			  1 2 0  0x80184000 0x00080000   /* Port 1 ext config space */
+> 			  1 3 0  0x80408000 0x00010000   /* Port 1 downstream I/O */
+> 			  1 4 0  0x98000000 0x08000000   /* Port 1 non-prefetchable memory */
+> 			  1 5 0  0xa0000000 0x08000000>; /* Port 1 prefetchable memory */
+> 
+> 		#address-cells = <3>;
+> 		#size-cells = <1>;
+> 
+> 		pci at 0 {
+> 			reg = <0 0 0 0x1000>;
+[...]
+> 		};
+> 
+> 		pci at 1 {
+> 			reg = <1 0 0 0x1000>;
+[...]
+> 		};
 
-Yes, correct.
-
-> I assume some of these ranges describe MMIO, prefetchable MMIO, and
-> I/O port apertures that the bridge forwards to the PCI bus.
-
-Yes.
-
-> Is there provision for any address offset applied by the bridge when
-> it forwards downstream?  (Maybe these bridges don't apply any offset?)
->  "0xa0000000 0x08000000" appears for both ports 0 and 1 prefetchable
-> memory; I don't know if that's an error, an indication that each
-> bridge applies a different offset, or that both bridges forward the
-> same aperture (I hope not the latter, because Linux can't really deal
-> with that).
-
-That seems to be a typo. It should have been 0xa8000000 in the second
-case. The PCIe controller has registers that are programmed with the
-aperture for the configuration and extended configuration spaces, as
-well as the downstream I/O, prefetchable and non-prefetchable memory
-regions.
-
-The configuration spaces aren't actually forwarded by the bridges, but
-are handled only by the controller. The other apertures are programmed
-into the bridges using standard PCI registers.
-
-> Is the bus number aperture included somewhere?  How do we know what
-> bus numbers are available for allocation under each bridge?
-
-Not yet. I don't think DT imposes a bus number allocation on PCI
-bridges. However the matching of DT nodes to PCI bridges is done based
-on the bus number. For that you provide a bus-ranges property which
-defines the bus aperture of the given PCI bridge. The DT matching code
-compares the first cell of this property with the primary bus number of
-the bridge.
-
-This is in fact somewhat counter-productive because it requires you to
-hard-code the PCI hierarchy within the DT and you loose a lot of the
-probing functionality. This is not much of an issue for typical PCI
-endpoints (like network cards) but becomes a problem if you have a PCI
-endpoint that implements an I2C bus and you want to match I2C slaves on
-that bus to device nodes so that the kernel can parse and instantiate
-them properly. I guess in the latter cases hard-coding the PCI tree in
-DT is not actually a drawback, though.
-
-> I see mention of config space.  Is some of that referring to the ECAM
-> as in 7.2.2 of the PCIe spec v3.0 (what we refer to as MMCONFIG on
-> x86)?
-
-I only have access to the PCIe 2.0 specification, but it seems to
-contain the same 7.2.2 section. In fact it looks as though this
-particular controller indeed implements something similar to ECAM. The
-address mapping is a little different, though:
-
-	A[(16 + n - 1):16]: bus number
-	A[15:11]: device number
-	A[10:8]: function number
-	A[7:2]: register number
-	A[1:0]: unused
-
-That information comes directly from the driver and I have no access to
-the corresponding documentation. It seems like the extended
-configuration space is accessed using the same mapping but starting at a
-different base address.
-
-But now that you mention it, maybe the driver code is buggy here, and
-the controller indeed implements ECAM. Furthermore it also seems like
-the current code doesn't work for the extended configuration space
-because while the correct offset into the extended configuration space
-is chosen, the access to registers is done using the same mapping as
-above, so instead of the 12 (10) bits required for the register number
-only 8 (6) are in fact used.
-
-I wonder whether anyone's actually tested this.
-
-Stephen: can you try to find out whether the Tegra PCIe controller
-indeed implements ECAM, or if this scheme is actually just a proprietary
-variant?
+It seems like this isn't working properly. For some reason both the reg
+property of pci at 0 and pci at 1 are translated to the same parent address
+0x80000000. I'll have to investigate where exactly this goes wrong.
 
 Thierry
 -------------- next part --------------
@@ -182,4 +213,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120622/e48a90b3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120622/a9e3ca1d/attachment-0001.sig>
