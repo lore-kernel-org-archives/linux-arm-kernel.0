@@ -1,50 +1,123 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 22 Jun 2012 13:29:38 +0000
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FE25E5C.9020908@ti.com>
-References: <4FD8A906.8080202@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999582@DBDE01.ent.ti.com>
- <4FD9E5AF.6010201@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999CA6@DBDE01.ent.ti.com>
- <4FDA3464.4040704@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99A511@DBDE01.ent.ti.com>
- <20120615124520.GS12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99A9E7@DBDE01.ent.ti.com>
- <20120620132848.GK12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99D1C5@DBDE01.ent.ti.com>
- <20120620151221.GT12766@atomide.com> <4FE25E5C.9020908@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99E02E@DBDE01.ent.ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 22 Jun 2012 15:29:28 +0200
+Subject: [PATCH] Atmel NAND ECC: Remove unaffected config option
+Message-ID: <1340371768-24703-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Jon,
+The commit bf4289cba02b8cf770ecd7959ca70839f0dd9d3c removed the use of
+CONFIG_MTD_NAND_ATMEL_ECC_NONE and CONFIG_MTD_NAND_ATMEL_ECC_HW but the
+Kconfig file was forgotten.
 
-On Thu, Jun 21, 2012 at 05:05:56, Hunter, Jon wrote:
-> On 06/20/2012 10:12 AM, Tony Lindgren wrote:
-> > * Mohammed, Afzal <afzal@ti.com> [120620 07:57]:
+This patch remove those inoperative options.
 
-> Therefore, I am wondering if Afzal's driver needs to register the gpmc
-> devices outside of the gpmc_probe() and add the devices as children. Or
-> maybe we tackle that when we migrate it to DT.
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ arch/arm/configs/afeb9260_defconfig    |    1 -
+ arch/arm/configs/at91sam9263_defconfig |    1 -
+ arch/arm/configs/qil-a9260_defconfig   |    1 -
+ arch/arm/configs/usb-a9260_defconfig   |    1 -
+ drivers/mtd/nand/Kconfig               |   40 --------------------------------
+ 5 files changed, 0 insertions(+), 44 deletions(-)
 
-V6 of this series has been posted assuming that we tackle above issue
-during DT migration
-
-> >> For gpmc driver to calculate timings rather than platform code doing it,
-> >> we first need to have a generalized way to calculate gpmc timings for
-> >> all peripherals as well as have a logic to calculate timings based on
-> >> time & cycles, correct ? (to make sure we are talking the same thing)
-> > 
-> > Yes that might be tricky..
-> 
-> I am wondering more and more if we need to do a clean-up of the timing
-> calculations prior to driver migration ...
-
-I propose to have clean-up of timing calculations after driver migration,
-v6 of this series has been posted, except the controversial issue of clock,
-I believe other issues has been addressed.
-
-Please let me know your comments.
-
-Regards
-Afzal
+diff --git a/arch/arm/configs/afeb9260_defconfig b/arch/arm/configs/afeb9260_defconfig
+index 2afdf67..c285a9d 100644
+--- a/arch/arm/configs/afeb9260_defconfig
++++ b/arch/arm/configs/afeb9260_defconfig
+@@ -39,7 +39,6 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ATMEL=y
+-CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+ CONFIG_ATMEL_SSC=y
+diff --git a/arch/arm/configs/at91sam9263_defconfig b/arch/arm/configs/at91sam9263_defconfig
+index 1cf9626..585e7e0 100644
+--- a/arch/arm/configs/at91sam9263_defconfig
++++ b/arch/arm/configs/at91sam9263_defconfig
+@@ -61,7 +61,6 @@ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_BLOCK2MTD=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ATMEL=y
+-CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
+ CONFIG_MTD_UBI=y
+ CONFIG_MTD_UBI_GLUEBI=y
+ CONFIG_BLK_DEV_LOOP=y
+diff --git a/arch/arm/configs/qil-a9260_defconfig b/arch/arm/configs/qil-a9260_defconfig
+index 9160f3b..2bb100b 100644
+--- a/arch/arm/configs/qil-a9260_defconfig
++++ b/arch/arm/configs/qil-a9260_defconfig
+@@ -50,7 +50,6 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ATMEL=y
+-CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
+ CONFIG_BLK_DEV_LOOP=y
+ # CONFIG_MISC_DEVICES is not set
+ CONFIG_SCSI=y
+diff --git a/arch/arm/configs/usb-a9260_defconfig b/arch/arm/configs/usb-a9260_defconfig
+index 2e39f38..a1501e1 100644
+--- a/arch/arm/configs/usb-a9260_defconfig
++++ b/arch/arm/configs/usb-a9260_defconfig
+@@ -49,7 +49,6 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ATMEL=y
+-CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
+ CONFIG_BLK_DEV_LOOP=y
+ # CONFIG_MISC_DEVICES is not set
+ CONFIG_SCSI=y
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 31bb7e5..0d93407 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -406,46 +406,6 @@ config MTD_NAND_ATMEL
+ 	help
+ 	  Enables support for NAND Flash / Smart Media Card interface
+ 	  on Atmel AT91 and AVR32 processors.
+-choice
+-	prompt "ECC management for NAND Flash / SmartMedia on AT91 / AVR32"
+-	depends on MTD_NAND_ATMEL
+-
+-config MTD_NAND_ATMEL_ECC_HW
+-	bool "Hardware ECC"
+-	depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9260 || AVR32
+-	help
+-	  Use hardware ECC instead of software ECC when the chip
+-	  supports it.
+-
+-	  The hardware ECC controller is capable of single bit error
+-	  correction and 2-bit random detection per page.
+-
+-	  NB : hardware and software ECC schemes are incompatible.
+-	  If you switch from one to another, you'll have to erase your
+-	  mtd partition.
+-
+-	  If unsure, say Y
+-
+-config MTD_NAND_ATMEL_ECC_SOFT
+-	bool "Software ECC"
+-	help
+-	  Use software ECC.
+-
+-	  NB : hardware and software ECC schemes are incompatible.
+-	  If you switch from one to another, you'll have to erase your
+-	  mtd partition.
+-
+-config MTD_NAND_ATMEL_ECC_NONE
+-	bool "No ECC (testing only, DANGEROUS)"
+-	depends on DEBUG_KERNEL
+-	help
+-	  No ECC will be used.
+-	  It's not a good idea and it should be reserved for testing
+-	  purpose only.
+-
+-	  If unsure, say N
+-
+-endchoice
+ 
+ config MTD_NAND_PXA3xx
+ 	tristate "Support for NAND flash devices on PXA3xx"
+-- 
+1.7.2.5
