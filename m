@@ -1,54 +1,53 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 22 Jun 2012 13:57:23 +0100
-Subject: arm erratas (config options)
-In-Reply-To: <20120622103512.GB19026@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 22 Jun 2012 11:35:12 +0100")
-References: <4FE44378.9050803@ahsoftware.de>
- <20120622103512.GB19026@n2100.arm.linux.org.uk>
-Message-ID: <yw1xzk7va4i4.fsf@unicorn.mansr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Jun 2012 13:03:21 +0000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120622124311.GA21606@avionic-0098.mockup.avionic-design.de>
+References: <4FDA2DDA.1030704@wwwdotorg.org>
+ <CAErSpo6vHn3p96o7DSdL28cjapk2UnQ4ZVJ1oH6ksxbqD=Hh-g@mail.gmail.com>
+ <20120622124311.GA21606@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201206221303.21985.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Friday 22 June 2012, Thierry Reding wrote:
+> On Fri, Jun 22, 2012 at 05:46:52AM -0600, Bjorn Helgaas wrote:
+> > On Fri, Jun 22, 2012 at 5:00 AM, Thierry Reding
+> > <thierry.reding@avionic-design.de> wrote:
+> > >> Is the bus number aperture included somewhere?  How do we know what
+> > >> bus numbers are available for allocation under each bridge?
+> > >
+> > > Not yet. I don't think DT imposes a bus number allocation on PCI
+> > > bridges. However the matching of DT nodes to PCI bridges is done based
+> > > on the bus number. For that you provide a bus-ranges property which
+> > > defines the bus aperture of the given PCI bridge. The DT matching code
+> > > compares the first cell of this property with the primary bus number of
+> > > the bridge.
+> > 
+> > I don't fully understand this, but I can tell you that things don't
+> > work very well if we don't know the aperture.  We can make
+> > assumptions, like the root bus is 00, and then enumerate everything
+> > reachable from there.  But then all we know is the largest bus number
+> > actually reachable from bus 00, which is usually smaller then the end
+> > of the aperture.  We don't know how many unused bus numbers there are
+> > in the aperture, so we can't safely allocate any for hot-added
+> > devices.
 
-> On Fri, Jun 22, 2012 at 12:05:44PM +0200, Alexander Holler wrote:
->> E.g. /proc/cpuinfo talks about variant and revision while all the help  
->> texts for the erratas are talking about rNpM (which I would translate to  
->> "revision" and "patch level", without knowing the real meanings).
->
-> rNpM is a hardware thing.  On the test chips which ARM Ltd supply on
-> their platforms, it's marked on the case.  With SoC vendors, the only
-> way to know this definitively is to ask them.
+I believe the assumption today is that all bus numbers are ok on each
+root port, which is usually the case. There was something about a Power
+Mac that faked a single PCI bus number space across both an AGP and
+a PCIe domain in pmac_pci_fixup_u4_of_node(), but I think that is the
+exception.
 
-The N and M values are contained in the main ID register on any core
-with a standard CP15 system control interface.  Occasionally, an
-implementation will have incorrect values here, e.g. (some?) Samsung
-Exynos4 chips, and don't ask me how that happens, but most of the time
-these values are reliable.
+Is there any requirement to use a bus aperture on non-PC hardware?
+ 
+> I think DT support for PCI is lacking in a lot of areas. PowerPC seems
+> to be the only architecture actively setting up busses according to the
+> bus-range property specified in the DT. All other architectures seem to
+> not pre-allocate bus apertures and go with the default instead. From
+> what you say that means hot-plugging is out. Although I don't think the
+> Tegra PCIe controller even supports hot-plugging.
 
-The fields in /proc/cpuinfo are indeed populated from the ID register.
-The raw value of the ID register is also printed to the kernel log early
-on.
+If the default is allowing any bus numbers, and that matches the
+hardware capabilities, I think hot-plugging would work.
 
->> This makes it necessary to translate "variant" to 'r' and "revision" to  
->> 'p', which isn't really obvious (because most people would translate  
->> "revision" to 'r' and would wonder how to find the value for 'p' in  
->> /proc/cpuinfo or somewhere else).
->
-> The variant and revision are terms used in the ARM ARM (or was used at
-> some point) which don't always reflect the rNpM marking on the package.
-> Sometimes, a hardware change is made which updates the rNpM but doesn't
-> update the ID registers.  So they can't be relied upon.
-
-The ARM ARM refers to the version fields in the main ID register as
-"variant" and "revision" without assigning any specific meaning to
-them beyond noting that "typically, [the variant] field distinguishes
-between different product variants, or major revisions of a product."
-
-The rNpM versioning scheme is commonly used by ARM, not only for CPU
-cores.  The mapping of these versions to ID register fields is
-unfortunately a little confusing, as you have noted.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+	Arnd
