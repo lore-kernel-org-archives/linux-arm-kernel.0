@@ -1,126 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:07:04 +0100
-Subject: [RFC PATCH 6/8] ARM: ptrace: provide separate functions for tracing
- syscall {entry, exit}
-In-Reply-To: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340377626-17075-7-git-send-email-will.deacon@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 22 Jun 2012 17:07:59 +0200
+Subject: [PATCH v3] ARM: Orion5x - Restore parts of io.h, with rework
+Message-ID: <1340377679-11992-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The syscall_trace on ARM takes a `why' parameter to indicate whether or
-not we are entering or exiting a system call. This can be confusing for
-people looking at the code since (a) it conflicts with the why register
-alias in the entry assembly code and (b) it is not immediately clear
-what it represents.
+Commit 4d5fc58dbe34b78157c05b319669bb3e064ba8bd (ARM: remove bunch of
+now unused mach/io.h files) removed the orion5x io.h. Unfortunately,
+this is still needed for the definition of IO_SPACE_LIMIT which
+overrides the default 64K. All Orion based systems have 1Mbyte of IO
+space per PCI[e] bus, and try to request_resource() this size. Orion5x
+has two such PCI buses.
 
-This patch splits up the syscall_trace function into separate wrappers
-for syscall entry and exit, allowing the low-level syscall handling
-code to branch to the appropriate function.
+It is likely that the original, removed version, was broken. This
+version might be less broken. However, it has not been tested on
+hardware with a PCI card, let alone hardware with a PCI card with IO
+capabilities.
 
-Reported-by: Al Viro <viro@zeniv.linux.org.uk>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/kernel/entry-common.S |   14 ++++++--------
- arch/arm/kernel/ptrace.c       |   37 +++++++++++++++++++++++++------------
- 2 files changed, 31 insertions(+), 20 deletions(-)
+v3: Typo's in commit log fixed
+    ORION5X_PCIE_IO_VIRT_BASE, since it is first in the IO space.
+---
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-orion5x/include/mach/io.h |   22 ++++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+ create mode 100644 arch/arm/mach-orion5x/include/mach/io.h
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 10911c9..49d9f93 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -442,10 +442,9 @@ ENDPROC(vector_swi)
- 	 * context switches, and waiting for our parent to respond.
- 	 */
- __sys_trace:
--	mov	r2, scno
--	add	r1, sp, #S_OFF
--	mov	r0, #0				@ trace entry [IP = 0]
--	bl	syscall_trace
-+	mov	r1, scno
-+	add	r0, sp, #S_OFF
-+	bl	syscall_trace_enter
- 
- 	adr	lr, BSYM(__sys_trace_return)	@ return address
- 	mov	scno, r0			@ syscall number (possibly new)
-@@ -457,10 +456,9 @@ __sys_trace:
- 
- __sys_trace_return:
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
--	mov	r2, scno
--	mov	r1, sp
--	mov	r0, #1				@ trace exit [IP = 1]
--	bl	syscall_trace
-+	mov	r1, scno
-+	mov	r0, sp
-+	bl	syscall_trace_exit
- 	b	ret_slow_syscall
- 
- 	.align	5
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 592a39d..dab711e 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -907,12 +907,18 @@ long arch_ptrace(struct task_struct *child, long request,
- 	return ret;
- }
- 
--asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
-+enum ptrace_syscall_dir {
-+	PTRACE_SYSCALL_ENTER = 0,
-+	PTRACE_SYSCALL_EXIT,
-+};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 84449dd..8fb7e4a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -588,6 +588,7 @@ config ARCH_ORION5X
+ 	select PCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
++	select NEED_MACH_IO_H
+ 	select PLAT_ORION
+ 	help
+ 	  Support for the following Marvell Orion 5x series SoCs:
+diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
+new file mode 100644
+index 0000000..1aa5d0a
+--- /dev/null
++++ b/arch/arm/mach-orion5x/include/mach/io.h
+@@ -0,0 +1,22 @@
++/*
++ * arch/arm/mach-orion5x/include/mach/io.h
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
-+				enum ptrace_syscall_dir dir)
- {
- 	unsigned long ip;
- 
- 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
--		goto out_no_trace;
-+		return scno;
- 
- 	current_thread_info()->syscall = scno;
- 
-@@ -921,21 +927,28 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 	 * IP = 0 -> entry, =1 -> exit
- 	 */
- 	ip = regs->ARM_ip;
--	regs->ARM_ip = why;
-+	regs->ARM_ip = dir;
- 
--	if (why)
-+	if (dir == PTRACE_SYSCALL_EXIT)
- 		tracehook_report_syscall_exit(regs, 0);
- 	else if (tracehook_report_syscall_entry(regs))
- 		current_thread_info()->syscall = -1;
- 
- 	regs->ARM_ip = ip;
--	scno = current_thread_info()->syscall;
-+	return current_thread_info()->syscall;
-+}
- 
--out_no_trace:
--	if (why)
--		audit_syscall_exit(regs);
--	else
--		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
--				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
--	return scno;
-+asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
++#ifndef __ASM_ARCH_IO_H
++#define __ASM_ARCH_IO_H
++
++#include <mach/orion5x.h>
++#include <asm/sizes.h>
++
++#define IO_SPACE_LIMIT		SZ_2M
++static inline void __iomem *__io(unsigned long addr)
 +{
-+	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_ENTER);
-+	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
-+			    regs->ARM_r2, regs->ARM_r3);
-+	return ret;
++	return (void __iomem *)(addr + ORION5X_PCIE_IO_VIRT_BASE);
 +}
 +
-+asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
-+{
-+	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_EXIT);
-+	audit_syscall_exit(regs);
-+	return ret;
- }
++#define __io(a)			 __io(a)
++#endif
 -- 
-1.7.4.1
+1.7.10
