@@ -1,33 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Jun 2012 01:56:06 -0700
-Subject: your mail
-In-Reply-To: <alpine.DEB.2.00.1206211225360.10198@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1206211225360.10198@utopia.booyaka.com>
-Message-ID: <20120622085605.GB12766@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Jun 2012 09:59:11 +0100
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+Message-ID: <20120622085911.GA19026@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120621 11:31]:
-> Hi Tony
-> 
-> The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
-> 
->   Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.6
-> 
-> for you to fetch changes up to 07b3a13957aa250ff5b5409b8ed756b113544112:
-> 
->   Merge branches 'clock_cleanup_misc_3.6', 'control_clean_dspbridge_writes_cleanup_3.6', 'hwmod_soc_conditional_cleanup_3.6', 'mcbsp_clock_aliases_cleanup_3.6' and 'remove_clkdm_requirement_from_hwmod_3.6' into omap_cleanup_a_3.6 (2012-06-20 20:11:36 -0600)
-> 
-> ----------------------------------------------------------------
-> 
-> Some OMAP hwmod, clock, and System Control Module cleanup patches for 3.6.
-> 
-> ----------------------------------------------------------------
+These three patches add support for returning the residue and cyclic DMA
+support to the OMAP DMA engine driver.
 
-Merging into cleanup-hwmod and merging into l-o master for testing.
+As v3.5-rc is horribly broken on my OMAP platforms, I've had to back out
+all the sound/soc/omap changes from the last merge window to test this,
+inspite of Peter Ujfalusi maintaining that there is nothing wrong.  I
+can't get working audio support on the OMAP4430SDP any other way.
 
-Tony
+I am planning no further work on this until OMAP ASoC support gets fixed;
+due to Peter and my plans this summer, this is likely to be late July/
+August time.
+
+This does not implement all of the weird and wonderfully different DMA
+setups which the OMAP ASoC driver appears to support (do we need soo much
+flexibility?) but it does support whatever is required for my OMAP4430SDP
+board.
+
+These patches apply on top of the previously posted series of DMA patches.
+
+I will be merging at least some of these down into the "dmaengine: add
+OMAP DMA engine driver" commit at some point.
+
+ drivers/dma/omap-dma.c |  167 ++++++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 156 insertions(+), 11 deletions(-)
