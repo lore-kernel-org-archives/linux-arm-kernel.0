@@ -1,19 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Jun 2012 17:14:52 +0000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <201206221653.31817.arnd@arndb.de>
-References: <4FDA2DDA.1030704@wwwdotorg.org>
- <CAErSpo56=S2oQ0usYfH28T0178SQUBD=5jqmcKWCT6M5WUQF6g@mail.gmail.com>
- <201206221653.31817.arnd@arndb.de>
-Message-ID: <201206221714.53172.arnd@arndb.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 22 Jun 2012 19:19:57 +0200
+Subject: i.MX28 die temperature
+In-Reply-To: <201206221349.18326.jbe@pengutronix.de>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <CAOMZO5BkaawScSsFqPiP--Bxh5vcm9G1E8MbN2aoL+_Fg_HhDg@mail.gmail.com>
+ <201206221349.18326.jbe@pengutronix.de>
+Message-ID: <201206221919.57485.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 June 2012, Arnd Bergmann wrote:
-> The part that is specific to PCs is that they don't have PCI domains
-> normally.
+Dear Juergen Beisert,
 
-Scratch that, PCs have moved on beyond that long ago, I just wasn't
-aware that they also do that now. That was only true before mmconfig.
+> Fabio Estevam wrote:
+> > On Wed, Apr 4, 2012 at 9:07 PM, Randle, Bill <Bill.Randle@aei.com> wrote:
+> > > That would be even better. That's ultimately what I need - an easy way
+> > > to get access to that information from user space. I'll look for the
+> > > linux-iio mailing list archives and see if I can find that code.
+> > 
+> > Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
+> 
+> Any progress here with inclusion in some git tree?
 
-	Arnd
+Well ... I recently raised from the dead. It's on the schedule, obviously help 
+is welcome.
+
+> Regards,
+> Juergen
+
+Best regards,
+Marek Vasut
