@@ -1,81 +1,126 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:06:59 +0100
-Subject: [RFC PATCH 1/8] Revert "arm: remove unused restart trampoline"
+Date: Fri, 22 Jun 2012 16:07:04 +0100
+Subject: [RFC PATCH 6/8] ARM: ptrace: provide separate functions for tracing
+ syscall {entry, exit}
 In-Reply-To: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
 References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340377626-17075-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1340377626-17075-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit fa18484d0947b976a769d15c83c50617493c81c1.
+The syscall_trace on ARM takes a `why' parameter to indicate whether or
+not we are entering or exiting a system call. This can be confusing for
+people looking at the code since (a) it conflicts with the why register
+alias in the entry assembly code and (b) it is not immediately clear
+what it represents.
 
-We need the restart trampoline back so that we can revert a related
-problematic patch 6b5c8045ecc7e726cdaa2a9d9c8e5008050e1252 ("arm: new
-way of handling ERESTART_RESTARTBLOCK").
+This patch splits up the syscall_trace function into separate wrappers
+for syscall entry and exit, allowing the low-level syscall handling
+code to branch to the appropriate function.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Al Viro <viro@zeniv.linux.org.uk>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/signal.c |   13 +++++++++++++
- arch/arm/kernel/signal.h |    2 ++
- arch/arm/kernel/traps.c  |    2 ++
- 3 files changed, 17 insertions(+), 0 deletions(-)
+ arch/arm/kernel/entry-common.S |   14 ++++++--------
+ arch/arm/kernel/ptrace.c       |   37 +++++++++++++++++++++++++------------
+ 2 files changed, 31 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index fd2392a..6d3bce5 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -27,6 +27,7 @@
-  */
- #define SWI_SYS_SIGRETURN	(0xef000000|(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
- #define SWI_SYS_RT_SIGRETURN	(0xef000000|(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
-+#define SWI_SYS_RESTART		(0xef000000|__NR_restart_syscall|__NR_OABI_SYSCALL_BASE)
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 10911c9..49d9f93 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -442,10 +442,9 @@ ENDPROC(vector_swi)
+ 	 * context switches, and waiting for our parent to respond.
+ 	 */
+ __sys_trace:
+-	mov	r2, scno
+-	add	r1, sp, #S_OFF
+-	mov	r0, #0				@ trace entry [IP = 0]
+-	bl	syscall_trace
++	mov	r1, scno
++	add	r0, sp, #S_OFF
++	bl	syscall_trace_enter
  
- /*
-  * With EABI, the syscall number has to be loaded into r7.
-@@ -47,6 +48,18 @@ const unsigned long sigreturn_codes[7] = {
- };
+ 	adr	lr, BSYM(__sys_trace_return)	@ return address
+ 	mov	scno, r0			@ syscall number (possibly new)
+@@ -457,10 +456,9 @@ __sys_trace:
  
- /*
-+ * Either we support OABI only, or we have EABI with the OABI
-+ * compat layer enabled.  In the later case we don't know if
-+ * user space is EABI or not, and if not we must not clobber r7.
-+ * Always using the OABI syscall solves that issue and works for
-+ * all those cases.
-+ */
-+const unsigned long syscall_restart_code[2] = {
-+	SWI_SYS_RESTART,	/* swi	__NR_restart_syscall */
-+	0xe49df004,		/* ldr	pc, [sp], #4 */
+ __sys_trace_return:
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+-	mov	r2, scno
+-	mov	r1, sp
+-	mov	r0, #1				@ trace exit [IP = 1]
+-	bl	syscall_trace
++	mov	r1, scno
++	mov	r0, sp
++	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
+ 
+ 	.align	5
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 592a39d..dab711e 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -907,12 +907,18 @@ long arch_ptrace(struct task_struct *child, long request,
+ 	return ret;
+ }
+ 
+-asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
++enum ptrace_syscall_dir {
++	PTRACE_SYSCALL_ENTER = 0,
++	PTRACE_SYSCALL_EXIT,
 +};
 +
-+/*
-  * atomically swap in the new signal mask, and wait for a signal.
-  */
- asmlinkage int sys_sigsuspend(int restart, unsigned long oldmask, old_sigset_t mask)
-diff --git a/arch/arm/kernel/signal.h b/arch/arm/kernel/signal.h
-index 5ff067b7..6fcfe83 100644
---- a/arch/arm/kernel/signal.h
-+++ b/arch/arm/kernel/signal.h
-@@ -8,5 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- #define KERN_SIGRETURN_CODE	(CONFIG_VECTORS_BASE + 0x00000500)
-+#define KERN_RESTART_CODE	(KERN_SIGRETURN_CODE + sizeof(sigreturn_codes))
++static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
++				enum ptrace_syscall_dir dir)
+ {
+ 	unsigned long ip;
  
- extern const unsigned long sigreturn_codes[7];
-+extern const unsigned long syscall_restart_code[2];
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4928d89..3647170 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -820,6 +820,8 @@ void __init early_trap_init(void *vectors_base)
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+-		goto out_no_trace;
++		return scno;
+ 
+ 	current_thread_info()->syscall = scno;
+ 
+@@ -921,21 +927,28 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 	 * IP = 0 -> entry, =1 -> exit
  	 */
- 	memcpy((void *)(vectors + KERN_SIGRETURN_CODE - CONFIG_VECTORS_BASE),
- 	       sigreturn_codes, sizeof(sigreturn_codes));
-+	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
-+	       syscall_restart_code, sizeof(syscall_restart_code));
+ 	ip = regs->ARM_ip;
+-	regs->ARM_ip = why;
++	regs->ARM_ip = dir;
  
- 	flush_icache_range(vectors, vectors + PAGE_SIZE);
- 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+-	if (why)
++	if (dir == PTRACE_SYSCALL_EXIT)
+ 		tracehook_report_syscall_exit(regs, 0);
+ 	else if (tracehook_report_syscall_entry(regs))
+ 		current_thread_info()->syscall = -1;
+ 
+ 	regs->ARM_ip = ip;
+-	scno = current_thread_info()->syscall;
++	return current_thread_info()->syscall;
++}
+ 
+-out_no_trace:
+-	if (why)
+-		audit_syscall_exit(regs);
+-	else
+-		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
+-				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
+-	return scno;
++asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
++{
++	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_ENTER);
++	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
++			    regs->ARM_r2, regs->ARM_r3);
++	return ret;
++}
++
++asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
++{
++	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_EXIT);
++	audit_syscall_exit(regs);
++	return ret;
+ }
 -- 
 1.7.4.1
