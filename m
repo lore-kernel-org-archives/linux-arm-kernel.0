@@ -1,60 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Jun 2012 16:40:17 +0000
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 22 Jun 2012 10:49:42 -0600
 Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120622140210.GA32097@avionic-0098.mockup.avionic-design.de>
-References: <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
- <201206221348.39346.arnd@arndb.de>
- <20120622140210.GA32097@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201206221640.18014.arnd@arndb.de>
+In-Reply-To: <201206221303.21985.arnd@arndb.de>
+References: <4FDA2DDA.1030704@wwwdotorg.org>
+ <CAErSpo6vHn3p96o7DSdL28cjapk2UnQ4ZVJ1oH6ksxbqD=Hh-g@mail.gmail.com>
+ <20120622124311.GA21606@avionic-0098.mockup.avionic-design.de>
+ <201206221303.21985.arnd@arndb.de>
+Message-ID: <CAErSpo56=S2oQ0usYfH28T0178SQUBD=5jqmcKWCT6M5WUQF6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 June 2012, Thierry Reding wrote:
-> Actually this is from of_translate_address(). The calling sequence looks
-> like this:
-> 
->         of_address_to_resource()
->           __of_address_to_resource()
->             of_translate_address()
->               __of_translate_address()
->                 of_translate_one()
->                   of_bus_default_map()
->                     of_read_number()
+On Fri, Jun 22, 2012 at 7:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 22 June 2012, Thierry Reding wrote:
+>> On Fri, Jun 22, 2012 at 05:46:52AM -0600, Bjorn Helgaas wrote:
+>> > On Fri, Jun 22, 2012 at 5:00 AM, Thierry Reding
+>> > <thierry.reding@avionic-design.de> wrote:
+>> > >> Is the bus number aperture included somewhere? ?How do we know what
+>> > >> bus numbers are available for allocation under each bridge?
+>> > >
+>> > > Not yet. I don't think DT imposes a bus number allocation on PCI
+>> > > bridges. However the matching of DT nodes to PCI bridges is done based
+>> > > on the bus number. For that you provide a bus-ranges property which
+>> > > defines the bus aperture of the given PCI bridge. The DT matching code
+>> > > compares the first cell of this property with the primary bus number of
+>> > > the bridge.
+>> >
+>> > I don't fully understand this, but I can tell you that things don't
+>> > work very well if we don't know the aperture. ?We can make
+>> > assumptions, like the root bus is 00, and then enumerate everything
+>> > reachable from there. ?But then all we know is the largest bus number
+>> > actually reachable from bus 00, which is usually smaller then the end
+>> > of the aperture. ?We don't know how many unused bus numbers there are
+>> > in the aperture, so we can't safely allocate any for hot-added
+>> > devices.
+>
+> I believe the assumption today is that all bus numbers are ok on each
+> root port, which is usually the case. There was something about a Power
+> Mac that faked a single PCI bus number space across both an AGP and
+> a PCIe domain in pmac_pci_fixup_u4_of_node(), but I think that is the
+> exception.
+>
+> Is there any requirement to use a bus aperture on non-PC hardware?
 
-Ok, I see.
+The requirement (if there is one) isn't anything related to PC-ness.
+I just don't understand how things can actually work if two host
+bridges both claim the same bus number.  If we do a config read to
+that bus, both bridges should claim it and turn it into config cycles
+on their respective root buses, and we should get two responses.  I
+would expect the second response to cause an "unexpected response"
+machine check or similar.
 
-This looks like a problem in of_bus_default_map, which expects to
-see only 64 bit addresses at most. of_bus_pci_map by comparison
-handles the pci addresses with three cells.
+Beyond that, Yinghai's recent "busn-alloc" work (now in my -next
+branch) tracks bus number assignments using a struct resource tree,
+and that obviously won't work with overlaps.  Here's one of the
+relevant commits:
+http://git.kernel.org/?p=linux/kernel/git/helgaas/pci.git;a=commitdiff;h=5cc62c202211096ec26309722ec27455d52c8726
 
-If I read this correctly, this fix is to make sure we compare the
-upper cells of the address in of_bus_default_map:
-
-static u64 of_bus_default_map(u32 *addr, const __be32 *range,
-                int na, int ns, int pna)
-{
-        u64 cp, s, da;
-
-        cp = of_read_number(range, na);
-        s  = of_read_number(range + na + pna, ns);
-        da = of_read_number(addr, na);
-
-        pr_debug("OF: default map, cp=%llx, s=%llx, da=%llx\n",
-                 (unsigned long long)cp, (unsigned long long)s,
-                 (unsigned long long)da);
-
-        if (da < cp || da >= (cp + s))
-                return OF_BAD_ADDR;
-        return da - cp;
-}
-
-How about adding code like:
-
-	if ((na > 2) && memcmp(range, addr, na * 4) != 0)
-		return OF_BAD_ADDR;
-
-This won't handle entries with #size-cells>2 or those that
-span a 64-bit boundary, but I think it will work for all
-relevant cases.
-
-	Arnd
+>> I think DT support for PCI is lacking in a lot of areas. PowerPC seems
+>> to be the only architecture actively setting up busses according to the
+>> bus-range property specified in the DT. All other architectures seem to
+>> not pre-allocate bus apertures and go with the default instead. From
+>> what you say that means hot-plugging is out. Although I don't think the
+>> Tegra PCIe controller even supports hot-plugging.
+>
+> If the default is allowing any bus numbers, and that matches the
+> hardware capabilities, I think hot-plugging would work.
+>
+> ? ? ? ?Arnd
