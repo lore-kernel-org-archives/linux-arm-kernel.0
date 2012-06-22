@@ -1,50 +1,26 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Fri, 22 Jun 2012 13:51:42 +0200
-Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
-In-Reply-To: <CANrkHUawrQfb+o+W7FrYACv6NocZn_MAym5A209peP8tW1nZRQ@mail.gmail.com>
-References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
- <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
- <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
- <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
- <4FE0AE7B.4040502@gmail.com>
- <CANrkHUawrQfb+o+W7FrYACv6NocZn_MAym5A209peP8tW1nZRQ@mail.gmail.com>
-Message-ID: <4FE45C4E.8060808@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 22 Jun 2012 13:30:13 +0100
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+In-Reply-To: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+Message-ID: <20120622123013.GA7586@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2012 09:23 AM, T Krishnamoorthy, Balaji wrote:
->>
->> i just want to say that i'm affected by this too, and i can reproduce it
->> 100%.
->>
-> 
-> Is it with SD or MMC card
-> Can you provide Beagle board rev info?
+On Fri, Jun 22, 2012 at 09:59:11AM +0100, Russell King - ARM Linux wrote:
 
-kingston 4g class 4 sdhc c04g taiwan
+> As v3.5-rc is horribly broken on my OMAP platforms, I've had to back out
+> all the sound/soc/omap changes from the last merge window to test this,
+> inspite of Peter Ujfalusi maintaining that there is nothing wrong.  I
+> can't get working audio support on the OMAP4430SDP any other way.
 
-tested on a beagle xm rev a and rev c, both boards exhibit the same
-problem with this card, while with a brand new sandisk 16gb sdhc class 4
-card, everything is ok.
+Do you have any details on what's wrong here?  I've not seen any
+upstream reports but there's been precious little upstream work there so
+it should be simple to identify which changes caused the breakage and
+just drop them.  There's been no public reports...
 
-i tried reverting dba3c29 "Enable Auto CMD12", and both cards are
-behaving fine.
+> I am planning no further work on this until OMAP ASoC support gets fixed;
+> due to Peter and my plans this summer, this is likely to be late July/
+> August time.
 
->> do you want me to run that patch or you already have enough data?
-> 
-> Can you enable MMC debug and apply the debug patch I provided.
-> The debug patch did not print any AUTOCMD errors with Ming Lei setup.
-
-http://people.canonical.com/~ppisati/mmc-testing/
-
-test-mmc.sh: script used for testing
-
-test-mmc.log: md5sum of file copied around (as you can see after the
-umount the md5 changes)
-
-test-mmc.syslog: mmc-debug output (plus your patch)
-
-after the test, my sd card was so badly wounded that it wouldn't even boot.
--- 
-bye,
-p.
+That's sounding like 3.5 is likely to go out work broken audio.
