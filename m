@@ -1,87 +1,52 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 22 Jun 2012 12:32:53 -0700
-Subject: [RFC PATCH v2] MTD: nand: add return value for
- write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
-In-Reply-To: <4FE29CB8.3000404@atmel.com>
-References: <1339567570-4816-1-git-send-email-josh.wu@atmel.com>
- <4FE13CB2.3000605@atmel.com>
- <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
- <4FE29CB8.3000404@atmel.com>
-Message-ID: <CAN8TOE9ebFAfJHaG2-po0LeLi=wTq9YZ9pNFXhQE0PLt5TQxeg@mail.gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Fri, 22 Jun 2012 20:36:26 +0100
+Subject: [RFC PATCH 0/8] Fix restart_block syscall restarting for 3.5
+In-Reply-To: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
+References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20120622193626.GG14083@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Fri, Jun 22, 2012 at 04:06:58PM +0100, Will Deacon wrote:
+> Hello,
+> 
+> This RFC series attempts to address the syscall restarting problems
+> introduced during the merge window and described here:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104733.html
+> 
+> I reckon the first two reverts should go in for 3.5 unless anybody has
+> a better solution. The rest of the code is an RFC since, as Russell has
+> said before, the code is `rather yucky'.
 
-On Wed, Jun 20, 2012 at 9:02 PM, Josh Wu <josh.wu@atmel.com> wrote:
-> On 6/21/2012 2:43 AM, Brian Norris wrote:
->> On Tue, Jun 19, 2012 at 8:00 PM, Josh Wu<josh.wu@atmel.com> ?wrote:
->>> On 6/13/2012 2:06 PM, Josh Wu wrote:
->>>>
->>>> There is an implemention of hardware ECC write page function which may
->>>> return an error indication. But now the definition of 'write_page'
->>>> function
->>>> in struct nand_ecc_ctrl is 'void'.
->>
->> I think it would help reviewers (and changelog readers) to note which
->> implementations are the real issue, if there are a small number of
->> implementations targeted.
->
-> Currently, I am introducing the atmel pragrammable multibit ECC(PMECC)
-> hardware code to nand flash. I meet following situation that I need change
-> the write_page()'s return value to 'int':
->
-> when writing one page into a nand flash with PMECC enabled, the hardware
-> engine will compute the BCH ecc code for this page. so we need read a the
-> status register to theck whether the ecc code is generated.
-> But we cannot assume the status register always can be ready, (for instance,
-> incorrect hardware configuration or hardware issue), in such case I need
-> write_page() to return a error code.
->
-> So this is the reason that I push this patch to change the return value to
-> int.
+See commit 76c3f4da3ee47b68304dbe0f64e86562e7945bf3 and a couiple before it in
+signal.git:
+commit 76c3f4da3ee47b68304dbe0f64e86562e7945bf3
+Author: Al Viro <viro@zeniv.linux.org.uk>
+Date:   Sat Jun 2 02:11:01 2012 -0400
 
-OK, thanks for the clarification here. I think that this is valuable
-information that should be included in the change log when you send
-v3. Also, this is the kind of fix that should probably be sent in a
-series with the patch for your Atmel PMECC driver. That way, they can
-be reviewed/accepted together. As you mention, it is pointless to
-merge this patch without your driver patch.
+    arm: get rid of TIF_SYSCALL_RESTARTSYS
+    
+    just let do_work_pending() return 1 on normal local restarts and
+    -1 on those that had been caused by ERESTART_RESTARTBLOCK (and 0
+    is still "all done, sod off to userland now").  And let the asm
+    glue flip scno to restart_syscall(2) one if it got negative from
+    us...
+    
+    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
 
->>>> --- a/drivers/mtd/nand/nand_base.c
->>>> +++ b/drivers/mtd/nand/nand_base.c
->>
->> ...
->>>>
->>>> @@ -2096,9 +2104,14 @@ static int nand_write_page(struct mtd_info *mtd,
->>>> struct nand_chip *chip,
->>>> ? ? ? ?chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
->>>>
->>>> ? ? ? ?if (unlikely(raw))
->>>> - ? ? ? ? ? ? ? chip->ecc.write_page_raw(mtd, chip, buf, oob_required);
->>>> + ? ? ? ? ? ? ? status = chip->ecc.write_page_raw(mtd, chip, buf, oob_required);
->>>> ? ? ? ?else
->>>> - ? ? ? ? ? ? ? chip->ecc.write_page(mtd, chip, buf, oob_required);
->>>> + ? ? ? ? ? ? ? status = chip->ecc.write_page(mtd, chip, buf, oob_required);
->>>> +
->>>> + ? ? ? if (status< ? ?0) {
->>>> + ? ? ? ? ? ? ? pr_warn("Error happened when calling nand_write_page()\n");
->>>> + ? ? ? ? ? ? ? return status;
->>>> + ? ? ? }
->>
->> I'm not sure this is the most informative error message. (Similar
->> comment applies in cafe_nand.c, which imitates a lot of nand_base.c
->> code)
->
-> Maybe in this case I need print the error code as well.
+commit 9c802c169f964830496be6480ab71d2123cf38a7
+Author: Al Viro <viro@zeniv.linux.org.uk>
+Date:   Sat Jun 2 01:52:18 2012 -0400
 
-After a little closer look, I don't think you need to print anything
-(here, or in cafe_nand.c). This is a kind of intermediate-layer
-function that doesn't print anything on other errors (e.g., when it
-checks the status, it just fails with 'return -EIO;'). The error will
-be caught by upper layers and an appropriate error code may or may not
-be displayed. So just make sure that your new driver asserts an
-appropriate error code, and no print should be necessary.
+    arm: deal with handlerless restarts without leaving the kernel
+    
+    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
 
-Regards,
-Brian
+commit c1eafa6fc84aaf725e02c7b50ee8a8a748f45b63
+Author: Al Viro <viro@zeniv.linux.org.uk>
+Date:   Fri Jun 1 23:58:57 2012 -0400
+
+    arm: pull all work_pending logics into C function
+    
+    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
