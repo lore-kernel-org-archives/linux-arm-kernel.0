@@ -1,36 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:07:01 +0100
-Subject: [RFC PATCH 3/8] audit: arm: only allow syscall auditing for pure EABI
- userspace
-In-Reply-To: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340377626-17075-4-git-send-email-will.deacon@arm.com>
+Date: Fri, 22 Jun 2012 16:06:58 +0100
+Subject: [RFC PATCH 0/8] Fix restart_block syscall restarting for 3.5
+Message-ID: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audit tools support only EABI userspace and, since there are no
-AUDIT_ARCH_* defines for the ARM OABI, it makes sense to allow syscall
-auditing on ARM only for EABI at the moment.
+Hello,
 
-Cc: Eric Paris <eparis@redhat.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- init/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This RFC series attempts to address the syscall restarting problems
+introduced during the merge window and described here:
 
-diff --git a/init/Kconfig b/init/Kconfig
-index d07dcf9..b3f55f1 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -357,7 +357,7 @@ config AUDIT
- 
- config AUDITSYSCALL
- 	bool "Enable system-call auditing support"
--	depends on AUDIT && (X86 || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || ARM)
-+	depends on AUDIT && (X86 || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
- 	default y if SECURITY_SELINUX
- 	help
- 	  Enable low-overhead system-call auditing infrastructure that
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104733.html
+
+I reckon the first two reverts should go in for 3.5 unless anybody has
+a better solution. The rest of the code is an RFC since, as Russell has
+said before, the code is `rather yucky'.
+
+In my effort to avoid breaking strace, I ended up merging in my audit
+fixes with this series since keeping the patch sets separate was
+becoming a bit of a nightmare given the amount of common code they are
+modifying.
+
+Given the mysterious ability of this code to wrap my brain around my
+face and beat it with a hammer, I would really appreciate some feedback!
+
+Cheers,
+
+Will
+
+
+Will Deacon (8):
+  Revert "arm: remove unused restart trampoline"
+  Revert "arm: new way of handling ERESTART_RESTARTBLOCK"
+  audit: arm: only allow syscall auditing for pure EABI userspace
+  ARM: entry: don't bother with syscall tracing on ret_from_fork path
+  ARM: audit: move syscall auditing until after ptrace SIGTRAP handling
+  ARM: ptrace: provide separate functions for tracing syscall
+    {entry,exit}
+  ARM: signal: perform restart_block system call restarting in the
+    kernel
+  Revert "Revert "arm: remove unused restart trampoline""
+
+ arch/arm/include/asm/ptrace.h      |    3 ++
+ arch/arm/include/asm/thread_info.h |   11 +++---
+ arch/arm/kernel/calls.S            |    2 +-
+ arch/arm/kernel/entry-common.S     |   25 ++++++--------
+ arch/arm/kernel/ptrace.c           |   37 +++++++++++++-------
+ arch/arm/kernel/signal.c           |   63 ++++++++++++++++++++++++------------
+ init/Kconfig                       |    2 +-
+ 7 files changed, 88 insertions(+), 55 deletions(-)
+
 -- 
 1.7.4.1
