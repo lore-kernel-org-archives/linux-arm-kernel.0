@@ -1,123 +1,77 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 22 Jun 2012 15:29:28 +0200
-Subject: [PATCH] Atmel NAND ECC: Remove unaffected config option
-Message-ID: <1340371768-24703-1-git-send-email-richard.genoud@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 22 Jun 2012 19:02:09 +0530
+Subject: [RFC PATCH 00/10] omap: musb: Add device tree support
+Message-ID: <1340371939-23572-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit bf4289cba02b8cf770ecd7959ca70839f0dd9d3c removed the use of
-CONFIG_MTD_NAND_ATMEL_ECC_NONE and CONFIG_MTD_NAND_ATMEL_ECC_HW but the
-Kconfig file was forgotten.
+This patch series adds device tree support for MUSB and device
+tree support for all the related modules to get MUSB working in
+OMAP platform.
 
-This patch remove those inoperative options.
+A new omap-usb2 phy driver has been added (with only dt suppport)
+to perform phy configurations. Previously this configuration was
+performed by twl6030, using pdata function pointers.
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- arch/arm/configs/afeb9260_defconfig    |    1 -
- arch/arm/configs/at91sam9263_defconfig |    1 -
- arch/arm/configs/qil-a9260_defconfig   |    1 -
- arch/arm/configs/usb-a9260_defconfig   |    1 -
- drivers/mtd/nand/Kconfig               |   40 --------------------------------
- 5 files changed, 0 insertions(+), 44 deletions(-)
+With the addition of omap-usb2 to perform phy configurations,
+twl6030 is made as a comparator driver to detect VBUS and ID events
+and notify it to the glue layer.
 
-diff --git a/arch/arm/configs/afeb9260_defconfig b/arch/arm/configs/afeb9260_defconfig
-index 2afdf67..c285a9d 100644
---- a/arch/arm/configs/afeb9260_defconfig
-+++ b/arch/arm/configs/afeb9260_defconfig
-@@ -39,7 +39,6 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
- CONFIG_ATMEL_SSC=y
-diff --git a/arch/arm/configs/at91sam9263_defconfig b/arch/arm/configs/at91sam9263_defconfig
-index 1cf9626..585e7e0 100644
---- a/arch/arm/configs/at91sam9263_defconfig
-+++ b/arch/arm/configs/at91sam9263_defconfig
-@@ -61,7 +61,6 @@ CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_BLOCK2MTD=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
- CONFIG_MTD_UBI=y
- CONFIG_MTD_UBI_GLUEBI=y
- CONFIG_BLK_DEV_LOOP=y
-diff --git a/arch/arm/configs/qil-a9260_defconfig b/arch/arm/configs/qil-a9260_defconfig
-index 9160f3b..2bb100b 100644
---- a/arch/arm/configs/qil-a9260_defconfig
-+++ b/arch/arm/configs/qil-a9260_defconfig
-@@ -50,7 +50,6 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
- CONFIG_BLK_DEV_LOOP=y
- # CONFIG_MISC_DEVICES is not set
- CONFIG_SCSI=y
-diff --git a/arch/arm/configs/usb-a9260_defconfig b/arch/arm/configs/usb-a9260_defconfig
-index 2e39f38..a1501e1 100644
---- a/arch/arm/configs/usb-a9260_defconfig
-+++ b/arch/arm/configs/usb-a9260_defconfig
-@@ -49,7 +49,6 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
- CONFIG_BLK_DEV_LOOP=y
- # CONFIG_MISC_DEVICES is not set
- CONFIG_SCSI=y
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 31bb7e5..0d93407 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -406,46 +406,6 @@ config MTD_NAND_ATMEL
- 	help
- 	  Enables support for NAND Flash / Smart Media Card interface
- 	  on Atmel AT91 and AVR32 processors.
--choice
--	prompt "ECC management for NAND Flash / SmartMedia on AT91 / AVR32"
--	depends on MTD_NAND_ATMEL
--
--config MTD_NAND_ATMEL_ECC_HW
--	bool "Hardware ECC"
--	depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9260 || AVR32
--	help
--	  Use hardware ECC instead of software ECC when the chip
--	  supports it.
--
--	  The hardware ECC controller is capable of single bit error
--	  correction and 2-bit random detection per page.
--
--	  NB : hardware and software ECC schemes are incompatible.
--	  If you switch from one to another, you'll have to erase your
--	  mtd partition.
--
--	  If unsure, say Y
--
--config MTD_NAND_ATMEL_ECC_SOFT
--	bool "Software ECC"
--	help
--	  Use software ECC.
--
--	  NB : hardware and software ECC schemes are incompatible.
--	  If you switch from one to another, you'll have to erase your
--	  mtd partition.
--
--config MTD_NAND_ATMEL_ECC_NONE
--	bool "No ECC (testing only, DANGEROUS)"
--	depends on DEBUG_KERNEL
--	help
--	  No ECC will be used.
--	  It's not a good idea and it should be reserved for testing
--	  purpose only.
--
--	  If unsure, say N
--
--endchoice
- 
- config MTD_NAND_PXA3xx
- 	tristate "Support for NAND flash devices on PXA3xx"
+musb core is _NOT_ yet converted to support device tree support as it
+would need lot of driver re-design because of its enormous use of
+function pointers. That will be in _TO DO_ list.
+
+This series was developed on
+http://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-next
+
+However to test this patch series, the following patch series is needed
+[PATCH v7 0/3] usb: multi-phy support
+[PATCH v3 0/5] usb: musb: cleanup
+[RFC PATCH 00/11] OMAP System Control Module
+[RFC PATCH v2 0/2] omap: add ocp2scp as a misc driver
+
+Performed device mode testing on OMAP4 panda and OMAP3 beagle.
+
+Kishon Vijay Abraham I (10):
+  drivers: usb: otg: add a new driver for omap usb2 phy
+  arm/dts: omap: Add omap-usb2 dt data
+  drivers: usb: otg: make twl6030_usb as a comparator driver to
+    omap_usb2
+  drivers: usb: twl6030: Add dt support for twl6030 usb
+  arm/dts: Add twl6030-usb data
+  drivers: usb: twl4030: Add device tree support for twl4030 usb
+  arm/dts: Add twl4030-usb data
+  drivers: usb: musb: Add device tree support for omap musb glue
+  arm/dts: omap: Add usb_otg and glue data
+  arm: omap: phy: remove unused functions from omap-phy-internal.c
+
+ .../devicetree/bindings/misc/omap-ocp2scp.txt      |    3 +
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   46 ++++
+ .../devicetree/bindings/usb/twlxxxx-usb.txt        |   37 +++
+ arch/arm/boot/dts/omap3-beagle.dts                 |    6 +
+ arch/arm/boot/dts/omap3-evm.dts                    |    6 +
+ arch/arm/boot/dts/omap3.dtsi                       |    8 +
+ arch/arm/boot/dts/omap4-panda.dts                  |    6 +
+ arch/arm/boot/dts/omap4-sdp.dts                    |    6 +
+ arch/arm/boot/dts/omap4.dtsi                       |   12 +
+ arch/arm/boot/dts/twl4030.dtsi                     |   21 ++
+ arch/arm/boot/dts/twl6030.dtsi                     |    7 +
+ arch/arm/mach-omap2/omap_phy_internal.c            |  138 -----------
+ arch/arm/mach-omap2/twl-common.c                   |    5 -
+ drivers/usb/musb/omap2430.c                        |   86 +++++++-
+ drivers/usb/otg/Kconfig                            |   17 +-
+ drivers/usb/otg/Makefile                           |    1 +
+ drivers/usb/otg/omap-usb2.c                        |  239 ++++++++++++++++++++
+ drivers/usb/otg/twl4030-usb.c                      |   26 ++-
+ drivers/usb/otg/twl6030-usb.c                      |  153 ++++---------
+ include/linux/usb/omap_usb.h                       |   43 ++++
+ include/linux/usb/phy_companion.h                  |   34 +++
+ 21 files changed, 627 insertions(+), 273 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/omap-usb.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+ create mode 100644 drivers/usb/otg/omap-usb2.c
+ create mode 100644 include/linux/usb/omap_usb.h
+ create mode 100644 include/linux/usb/phy_companion.h
+
 -- 
-1.7.2.5
+1.7.5.4
