@@ -1,58 +1,33 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 22 Jun 2012 16:22:20 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: rwlocks: remove unused branch labels from trylock
- routines
-In-Reply-To: <1340378146-17560-3-git-send-email-will.deacon@arm.com>
-References: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
- <1340378146-17560-3-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1206221621350.10229@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Jun 2012 21:08:34 +0000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <CAErSpo5dj99iHW0WNEABPR1OO2yS=BwNezOivu6_7Go8sKyjsQ@mail.gmail.com>
+References: <4FDA2DDA.1030704@wwwdotorg.org> <201206221653.31817.arnd@arndb.de>
+ <CAErSpo5dj99iHW0WNEABPR1OO2yS=BwNezOivu6_7Go8sKyjsQ@mail.gmail.com>
+Message-ID: <201206222108.35094.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Jun 2012, Will Deacon wrote:
+On Friday 22 June 2012, Bjorn Helgaas wrote:
+> 
+> On Fri, Jun 22, 2012 at 10:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 22 June 2012, Bjorn Helgaas wrote:
+> >> The requirement (if there is one) isn't anything related to PC-ness.
+> >> I just don't understand how things can actually work if two host
+> >> bridges both claim the same bus number.  If we do a config read to
+> >> that bus, both bridges should claim it and turn it into config cycles
+> >> on their respective root buses, and we should get two responses.  I
+> >> would expect the second response to cause an "unexpected response"
+> >> machine check or similar.
+> >
+> > But each PCI domain has its own config space, so if you do a config
+> > read for one bus, it's always relative to the domain.
+> 
+> Oh, I see!  I totally missed the fact that each host bridge was in its
+> own domain.  If each has its own domain, then the bus number aperture
+> can certainly be [bus 00-ff] and there's no problem.
 
-> The ARM arch_{read,write}_trylock implementations include unused
-> backwards branch labels, since we don't retry the locking operation
-> if the exclusive store fails.
-> 
-> This patch removes the labels.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Right. On my side, it took me a while to figure out that you can
+actually have multiple root ports in one domain ;-)
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> ---
->  arch/arm/include/asm/spinlock.h |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-> index dcca638..aa7945b 100644
-> --- a/arch/arm/include/asm/spinlock.h
-> +++ b/arch/arm/include/asm/spinlock.h
-> @@ -183,7 +183,7 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
->  	unsigned long tmp;
->  
->  	__asm__ __volatile__(
-> -"1:	ldrex	%0, [%1]\n"
-> +"	ldrex	%0, [%1]\n"
->  "	teq	%0, #0\n"
->  "	strexeq	%0, %2, [%1]"
->  	: "=&r" (tmp)
-> @@ -269,7 +269,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
->  	unsigned long tmp, tmp2 = 1;
->  
->  	__asm__ __volatile__(
-> -"1:	ldrex	%0, [%2]\n"
-> +"	ldrex	%0, [%2]\n"
->  "	adds	%0, %0, #1\n"
->  "	strexpl	%1, %0, [%2]\n"
->  	: "=&r" (tmp), "+r" (tmp2)
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+	Arnd
