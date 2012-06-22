@@ -1,138 +1,50 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 22 Jun 2012 18:27:47 +0530
-Subject: [PATCH v6 13/13] ARM: OMAP2+: gpmc: configure writeprotect
-In-Reply-To: <cover.1340367480.git.afzal@ti.com>
-References: <cover.1340367480.git.afzal@ti.com>
-Message-ID: <0e5d76d0159cb558801515eb2b6957ee581fa305.1340367480.git.afzal@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 22 Jun 2012 18:45:40 +0530
+Subject: [RFC PATCH v2 0/2] omap: add ocp2scp as a misc driver
+Message-ID: <1340370942-23201-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPMC has a writeprotect pin that can be connected to
-peripherals. Default is to disable writeprotect. In
-case of conflicting requirement of writeprotect, it
-will be left in enabled state to be on safer side,
-along with a warning to attract user attention.
+This patch series is done as a preparatory step for adding phy drivers
+for dwc3 and musb.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/gpmc.c             |   42 ++++++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/gpmc.h |    2 ++
- 2 files changed, 44 insertions(+)
+This series adds a new driver for ocp2scp (only dt) to which phy
+drivers are connected.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index c8e967f..1b0b526 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -110,6 +110,12 @@ enum {
- 	GPMC_MAX_NR_WAITPIN
- };
- 
-+enum {
-+	NONE,
-+	OFF,
-+	ON
-+};
-+
- struct gpmc_client_irq	{
- 	unsigned		irq;
- 	u32			bitmask;
-@@ -161,6 +167,7 @@ static struct gpmc_peripheral gpmc_peripheral[GPMC_CS_NUM];
- static unsigned gpmc_num_peripheral;
- static unsigned gpmc_waitpin_map;
- static unsigned gpmc_waitpin_nr = GPMC_MAX_NR_WAITPIN;
-+static unsigned gpmc_writeprotect;
- 
- static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
- static struct irq_chip gpmc_irq_chip;
-@@ -192,6 +199,18 @@ static u32 gpmc_read_reg(int idx)
- 	return __raw_readl(gpmc_base + idx);
- }
- 
-+static inline void gpmc_modify_reg(int idx, u32 mask, bool value)
-+{
-+	u32 l;
-+
-+	l = gpmc_read_reg(idx);
-+	if (value)
-+		l |= mask;
-+	else
-+		l &= ~mask;
-+	gpmc_write_reg(idx, l);
-+}
-+
- static void gpmc_cs_write_byte(int cs, int idx, u8 val)
- {
- 	void __iomem *reg_addr;
-@@ -991,6 +1010,7 @@ static __devinit int gpmc_setup_cs_mem(struct gpmc_cs_data *cs,
- static void gpmc_setup_cs_config(unsigned cs, unsigned conf)
- {
- 	u32 l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
-+	unsigned wp;
- 
- 	l &= ~(GPMC_CONFIG1_MUXADDDATA |
- 		GPMC_CONFIG1_WRITETYPE_SYNC |
-@@ -1025,6 +1045,19 @@ static void gpmc_setup_cs_config(unsigned cs, unsigned conf)
- 	l |= conf;
- 
- 	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, l);
-+
-+	if (conf & GPMC_CONFIG_ENABLE_WRITEPROTECT)
-+		wp = ON;
-+	else
-+		wp = OFF;
-+
-+	if (gpmc_writeprotect) {
-+		if (gpmc_writeprotect != wp) {
-+			dev_warn(gpmc_dev, "conflicting writeprotect requests, writeprotect is left enabled\n");
-+			gpmc_writeprotect = ON;
-+		}
-+	} else
-+		gpmc_writeprotect = wp;
- }
- 
- static inline void gpmc_set_one_timing(int cs, int reg, int start,
-@@ -1453,6 +1486,12 @@ int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *c)
- }
- EXPORT_SYMBOL_GPL(gpmc_cs_reconfigure);
- 
-+static inline void gpmc_setup_writeprotect(void)
-+{
-+	gpmc_modify_reg(GPMC_CONFIG, GPMC_CONFIG_WRITEPROTECT,
-+					gpmc_writeprotect == ON ? false : true);
-+}
-+
- static __devinit int gpmc_probe(struct platform_device *pdev)
- {
- 	u32 l;
-@@ -1512,6 +1551,8 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
- 	}
- 	gpmc_num_peripheral = g_per - gpmc_peripheral;
- 
-+	gpmc_setup_writeprotect();
-+
- 	for (l = 0, g_per = gpmc_peripheral;
- 			l < gpmc_num_peripheral; l++, g_per++)
- 		if (IS_ERR(gpmc_create_device(g_per)))
-@@ -1528,6 +1569,7 @@ static __exit int gpmc_remove(struct platform_device *pdev)
- 	for (; gpmc_num_peripheral; g_per++, gpmc_num_peripheral--)
- 		platform_device_unregister(g_per->pdev);
- 
-+	gpmc_writeprotect = NONE;
- 	gpmc_waitpin_map = 0;
- 	gpmc_waitpin_nr = GPMC_MAX_NR_WAITPIN;
- 	gpmc_free_irq();
-diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index 0085a01..3de05dc 100644
---- a/arch/arm/plat-omap/include/plat/gpmc.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -79,6 +79,8 @@
- #define GPMC_CONFIG1_FCLK_DIV4          (GPMC_CONFIG1_FCLK_DIV(3))
- #define GPMC_CONFIG7_CSVALID		(1 << 6)
- 
-+#define	GPMC_CONFIG_ENABLE_WRITEPROTECT	(1 << 5)
-+
- #define	GPMC_WAITPIN_ACTIVE_HIGH	(1 << 4)
- #define	GPMC_WAITPIN_ACTIVE_LOW		(0 << 4)
- #define	GPMC_WAITPIN_0			(1 << 0)
+Since currently there is no generic way to create a child device along
+with doing a pm_runtime_enable (the exact requirement for ocp2scp), i'm
+sending this second rfc patch with only dt support. If we can figure out
+a way to do that generically this patch series can be dropped and I'll
+send a patch only for adding dt data.
+
+*arm: omap: hwmod: make *phy_48m* as the main_clk of ocp2scp* and
+*arm: omap: remove ocp2scp_usb_phy_ick clock node* patches are removed
+from the series as Benoit is planning to take it up in his series.
+
+This series was developed on
+http://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-next
+
+and [RFC PATCH 00/11] OMAP System Control Module (There is no direct
+dependencies with this patch series).
+
+However to test this patch series, the following patch series is needed
+[PATCH v7 0/3] usb: multi-phy support
+[PATCH v3 0/5] usb: musb: cleanup
+[RFC PATCH 00/11] OMAP System Control Module
+[RFC PATCH 00/10] omap: musb: Add device tree support (To be sent)
+
+Kishon Vijay Abraham I (2):
+  drivers: misc: omap: add a new driver for ocp2scp
+  arm/dts: omap4: Add ocp2scp data
+
+ .../devicetree/bindings/misc/omap-ocp2scp.txt      |    9 ++
+ arch/arm/boot/dts/omap4.dtsi                       |    7 ++
+ drivers/misc/Kconfig                               |    8 ++
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/omap-ocp2scp.c                        |   96 ++++++++++++++++++++
+ 5 files changed, 121 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/misc/omap-ocp2scp.txt
+ create mode 100644 drivers/misc/omap-ocp2scp.c
+
 -- 
-1.7.10.2
+1.7.5.4
