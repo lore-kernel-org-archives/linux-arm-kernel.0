@@ -1,82 +1,286 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:09:33 +0100
-Subject: [PATCH 1/2] ARM: arch timer: implement read_current_timer and
- get_cycles
+Date: Fri, 22 Jun 2012 16:09:34 +0100
+Subject: [PATCH 2/2] ARM: delay: allow timer-based delay implementation to be
+ selected
 In-Reply-To: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
 References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340377774-17173-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1340377774-17173-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements read_current_timer using the architected timers
-when they are selected via CONFIG_ARM_ARCH_TIMER. If they are detected
-not to be usable at runtime, we return -ENXIO to the caller.
+This patch allows a timer-based delay implementation to be selected by
+switching the delay routines over to use get_cycles, which is
+implemented in terms of read_current_timer. This further allows us to
+skip the loop calibration and have a consistent delay function in the
+face of core frequency scaling.
 
-Furthermore, if read_current_timer is exported then we can implement
-get_cycles in terms of it for use as both an entropy source and for
-implementing __udelay and friends.
+To avoid the pain of dealing with memory-mapped counters, this
+implementation uses the co-processor interface to the architected timers
+when they are available. The previous loop-based implementation is
+kept around for CPUs without the architected timers and we retain both
+the maximum delay (2ms) and the corresponding conversion factors for
+determining the number of loops required for a given interval. Since the
+indirection of the timer routines will only work when called from C,
+the sa1100 sleep routines are modified to branch to the loop-based delay
+functions directly.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h |    1 +
- arch/arm/include/asm/timex.h      |   10 ++++++----
- arch/arm/kernel/arch_timer.c      |    8 ++++++++
- 3 files changed, 15 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/delay.h           |   19 +++++++--
+ arch/arm/kernel/arch_timer.c           |    3 +
+ arch/arm/kernel/armksyms.c             |    3 +-
+ arch/arm/lib/Makefile                  |    2 +-
+ arch/arm/lib/{delay.S => delay-loop.S} |   16 +++----
+ arch/arm/lib/delay.c                   |   66 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-sa1100/sleep.S           |    8 ++--
+ 7 files changed, 97 insertions(+), 20 deletions(-)
+ rename arch/arm/lib/{delay.S => delay-loop.S} (85%)
+ create mode 100644 arch/arm/lib/delay.c
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index ed2e95d..7b0fe68 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -2,6 +2,7 @@
- #define __ASMARM_ARCH_TIMER_H
+diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+index b2deda1..c6ab91a 100644
+--- a/arch/arm/include/asm/delay.h
++++ b/arch/arm/include/asm/delay.h
+@@ -8,7 +8,13 @@
  
- #ifdef CONFIG_ARM_ARCH_TIMER
-+#define ARCH_HAS_READ_CURRENT_TIMER
- int arch_timer_of_register(void);
- int arch_timer_sched_clock_init(void);
- #else
-diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
-index 3be8de3..ce11944 100644
---- a/arch/arm/include/asm/timex.h
-+++ b/arch/arm/include/asm/timex.h
-@@ -12,13 +12,15 @@
- #ifndef _ASMARM_TIMEX_H
- #define _ASMARM_TIMEX_H
+ #include <asm/param.h>	/* HZ */
  
-+#include <asm/arch_timer.h>
- #include <mach/timex.h>
+-extern void __delay(int loops);
++extern struct arm_delay_ops {
++	void (*delay)(unsigned long);
++	void (*const_udelay)(unsigned long);
++	void (*udelay)(unsigned long);
++} arm_delay_ops;
++
++#define __delay(n)		arm_delay_ops.delay(n)
  
- typedef unsigned long cycles_t;
+ /*
+  * This function intentionally does not exist; if you see references to
+@@ -23,14 +29,14 @@ extern void __bad_udelay(void);
+  * division by multiplication: you don't have to worry about
+  * loss of precision.
+  *
+- * Use only for very small delays ( < 1 msec).  Should probably use a
++ * Use only for very small delays ( < 2 msec).  Should probably use a
+  * lookup table, really, as the multiplications take much too long with
+  * short delays.  This is a "reasonable" implementation, though (and the
+  * first constant multiplications gets optimized away if the delay is
+  * a constant)
+  */
+-extern void __udelay(unsigned long usecs);
+-extern void __const_udelay(unsigned long);
++#define __udelay(n)		arm_delay_ops.udelay(n)
++#define __const_udelay(n)	arm_delay_ops.const_udelay(n)
  
--static inline cycles_t get_cycles (void)
--{
--	return 0;
--}
-+#ifdef ARCH_HAS_READ_CURRENT_TIMER
-+#define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
-+#else
-+#define get_cycles()	(0)
-+#endif
+ #define MAX_UDELAY_MS 2
  
- #endif
+@@ -40,5 +46,10 @@ extern void __const_udelay(unsigned long);
+ 			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
+ 	  __udelay(n))
+ 
++/* Loop-based definitions for assembly code. */
++extern void __loop_delay(unsigned long loops);
++extern void __loop_udelay(unsigned long usecs);
++extern void __loop_const_udelay(unsigned long);
++
+ #endif /* defined(_ARM_DELAY_H) */
+ 
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index dd58035..dbbeec4 100644
+index dbbeec4..675cee0 100644
 --- a/arch/arm/kernel/arch_timer.c
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -223,6 +223,14 @@ static cycle_t arch_counter_read(struct clocksource *cs)
- 	return arch_counter_get_cntpct();
- }
+@@ -32,6 +32,8 @@ static int arch_timer_ppi2;
  
-+int read_current_timer(unsigned long *timer_val)
+ static struct clock_event_device __percpu **arch_timer_evt;
+ 
++extern void init_current_timer_delay(unsigned long freq);
++
+ /*
+  * Architected system timer support.
+  */
+@@ -304,6 +306,7 @@ static int __init arch_timer_register(void)
+ 	if (err)
+ 		goto out_free_irq;
+ 
++	init_current_timer_delay(arch_timer_rate);
+ 	return 0;
+ 
+ out_free_irq:
+diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+index b57c75e..7196228 100644
+--- a/arch/arm/kernel/armksyms.c
++++ b/arch/arm/kernel/armksyms.c
+@@ -49,8 +49,7 @@ extern void __aeabi_ulcmp(void);
+ extern void fpundefinstr(void);
+ 
+ 	/* platform dependent support */
+-EXPORT_SYMBOL(__udelay);
+-EXPORT_SYMBOL(__const_udelay);
++EXPORT_SYMBOL(arm_delay_ops);
+ 
+ 	/* networking */
+ EXPORT_SYMBOL(csum_partial);
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index 992769a..b621114 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -6,7 +6,7 @@
+ 
+ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+ 		   csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
+-		   delay.o findbit.o memchr.o memcpy.o		      \
++		   delay.o delay-loop.o findbit.o memchr.o memcpy.o   \
+ 		   memmove.o memset.o memzero.o setbit.o              \
+ 		   strncpy_from_user.o strnlen_user.o                 \
+ 		   strchr.o strrchr.o                                 \
+diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay-loop.S
+similarity index 85%
+rename from arch/arm/lib/delay.S
+rename to arch/arm/lib/delay-loop.S
+index 3c9a05c..1428a8f 100644
+--- a/arch/arm/lib/delay.S
++++ b/arch/arm/lib/delay-loop.S
+@@ -21,10 +21,10 @@
+  * HZ  <= 1000
+  */
+ 
+-ENTRY(__udelay)
++ENTRY(__loop_udelay)
+ 		ldr	r2, .LC1
+ 		mul	r0, r2, r0
+-ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
++ENTRY(__loop_const_udelay)			@ 0 <= r0 <= 0x7fffff06
+ 		mov	r1, #-1
+ 		ldr	r2, .LC0
+ 		ldr	r2, [r2]		@ max = 0x01ffffff
+@@ -39,12 +39,10 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
+ 
+ /*
+  * loops = r0 * HZ * loops_per_jiffy / 1000000
+- *
+- * Oh, if only we had a cycle counter...
+  */
+ 
+ @ Delay routine
+-ENTRY(__delay)
++ENTRY(__loop_delay)
+ 		subs	r0, r0, #1
+ #if 0
+ 		movls	pc, lr
+@@ -62,8 +60,8 @@ ENTRY(__delay)
+ 		movls	pc, lr
+ 		subs	r0, r0, #1
+ #endif
+-		bhi	__delay
++		bhi	__loop_delay
+ 		mov	pc, lr
+-ENDPROC(__udelay)
+-ENDPROC(__const_udelay)
+-ENDPROC(__delay)
++ENDPROC(__loop_udelay)
++ENDPROC(__loop_const_udelay)
++ENDPROC(__loop_delay)
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+new file mode 100644
+index 0000000..2b590c3
+--- /dev/null
++++ b/arch/arm/lib/delay.c
+@@ -0,0 +1,66 @@
++/*
++ * Delay loops based on the OpenRISC implementation.
++ *
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ */
++
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/timex.h>
++
++/*
++ * Default to the loop-based delay implementation.
++ */
++struct arm_delay_ops arm_delay_ops = {
++	.delay		= __loop_delay,
++	.const_udelay	= __loop_const_udelay,
++	.udelay		= __loop_udelay,
++};
++
++#ifdef ARCH_HAS_READ_CURRENT_TIMER
++static void __timer_delay(unsigned long cycles)
 +{
-+	if (!arch_timer_rate)
-+		return -ENXIO;
-+	*timer_val = arch_counter_get_cntpct();
-+	return 0;
++	cycles_t start = get_cycles();
++
++	while ((get_cycles() - start) < cycles)
++		cpu_relax();
 +}
 +
- static struct clocksource clocksource_counter = {
- 	.name	= "arch_sys_counter",
- 	.rating	= 400,
++static void __timer_const_udelay(unsigned long xloops)
++{
++	unsigned long long loops = xloops;
++	loops *= loops_per_jiffy;
++	__timer_delay(loops >> 30);
++}
++
++static void __timer_udelay(unsigned long usecs)
++{
++	__timer_const_udelay(usecs * ((2199023U * HZ) >> 11));
++}
++
++void __init init_current_timer_delay(unsigned long freq)
++{
++	pr_info("Switching to timer-based delay loop\n");
++	lpj_fine			= freq / HZ;
++	arm_delay_ops.delay		= __timer_delay;
++	arm_delay_ops.const_udelay	= __timer_const_udelay;
++	arm_delay_ops.udelay		= __timer_udelay;
++}
++#endif
+diff --git a/arch/arm/mach-sa1100/sleep.S b/arch/arm/mach-sa1100/sleep.S
+index 30cc672..8586374 100644
+--- a/arch/arm/mach-sa1100/sleep.S
++++ b/arch/arm/mach-sa1100/sleep.S
+@@ -38,9 +38,9 @@ ENTRY(sa1100_finish_suspend)
+ 	orr     r4, r4, #MDREFR_K1DB2
+ 	ldr	r5, =PPCR
+ 
+-	@ Pre-load __udelay into the I-cache
++	@ Pre-load __loop_udelay into the I-cache
+ 	mov	r0, #1
+-	bl	__udelay
++	bl	__loop_udelay
+ 	mov	r0, r0
+ 
+ 	@ The following must all exist in a single cache line to
+@@ -53,11 +53,11 @@ ENTRY(sa1100_finish_suspend)
+ 	@ delay 90us and set CPU PLL to lowest speed
+ 	@ fixes resume problem on high speed SA1110
+ 	mov	r0, #90
+-	bl	__udelay
++	bl	__loop_udelay
+ 	mov	r1, #0
+ 	str	r1, [r5]
+ 	mov	r0, #90
+-	bl	__udelay
++	bl	__loop_udelay
+ 
+ 	/*
+ 	 * SA1110 SDRAM controller workaround.  register values:
 -- 
 1.7.4.1
