@@ -1,80 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2012 16:07:06 +0100
-Subject: [RFC PATCH 8/8] Revert "Revert "arm: remove unused restart
- trampoline""
+Date: Fri, 22 Jun 2012 16:07:03 +0100
+Subject: [RFC PATCH 5/8] ARM: audit: move syscall auditing until after ptrace
+ SIGTRAP handling
 In-Reply-To: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
 References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340377626-17075-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1340377626-17075-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit b7913c74b230d2f4fbdb6928a099933bb15f8e49.
+When auditing system calls on ARM, the audit code is called before
+notifying the parent process in the case that the current task is being
+ptraced. At this point, the parent (debugger) may choose to change the
+system call being issued via the SET_SYSCALL ptrace request, causing
+the wrong system call to be reported to the audit tools.
 
-Now that we perform system call restarting in the kernel, we can safely
-remove the OABI restart trampoline.
+This patch moves the audit calls after the ptrace SIGTRAP handling code
+in the syscall tracing implementation.
 
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/signal.c |   13 -------------
- arch/arm/kernel/signal.h |    2 --
- arch/arm/kernel/traps.c  |    2 --
- 3 files changed, 0 insertions(+), 17 deletions(-)
+ arch/arm/kernel/ptrace.c |   17 +++++++++--------
+ 1 files changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 8250475..19b899f 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -28,7 +28,6 @@
-  */
- #define SWI_SYS_SIGRETURN	(0xef000000|(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
- #define SWI_SYS_RT_SIGRETURN	(0xef000000|(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
--#define SWI_SYS_RESTART		(0xef000000|__NR_restart_syscall|__NR_OABI_SYSCALL_BASE)
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 14e3826..592a39d 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -911,14 +911,8 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ {
+ 	unsigned long ip;
  
- /*
-  * With EABI, the syscall number has to be loaded into r7.
-@@ -49,18 +48,6 @@ const unsigned long sigreturn_codes[7] = {
- };
- 
- /*
-- * Either we support OABI only, or we have EABI with the OABI
-- * compat layer enabled.  In the later case we don't know if
-- * user space is EABI or not, and if not we must not clobber r7.
-- * Always using the OABI syscall solves that issue and works for
-- * all those cases.
-- */
--const unsigned long syscall_restart_code[2] = {
--	SWI_SYS_RESTART,	/* swi	__NR_restart_syscall */
--	0xe49df004,		/* ldr	pc, [sp], #4 */
--};
+-	if (why)
+-		audit_syscall_exit(regs);
+-	else
+-		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
+-				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
 -
--/*
-  * atomically swap in the new signal mask, and wait for a signal.
-  */
- asmlinkage int sys_sigsuspend(int restart, unsigned long oldmask, old_sigset_t mask)
-diff --git a/arch/arm/kernel/signal.h b/arch/arm/kernel/signal.h
-index 6fcfe83..5ff067b7 100644
---- a/arch/arm/kernel/signal.h
-+++ b/arch/arm/kernel/signal.h
-@@ -8,7 +8,5 @@
-  * published by the Free Software Foundation.
-  */
- #define KERN_SIGRETURN_CODE	(CONFIG_VECTORS_BASE + 0x00000500)
--#define KERN_RESTART_CODE	(KERN_SIGRETURN_CODE + sizeof(sigreturn_codes))
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+-		return scno;
++		goto out_no_trace;
  
- extern const unsigned long sigreturn_codes[7];
--extern const unsigned long syscall_restart_code[2];
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 3647170..4928d89 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -820,8 +820,6 @@ void __init early_trap_init(void *vectors_base)
- 	 */
- 	memcpy((void *)(vectors + KERN_SIGRETURN_CODE - CONFIG_VECTORS_BASE),
- 	       sigreturn_codes, sizeof(sigreturn_codes));
--	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
--	       syscall_restart_code, sizeof(syscall_restart_code));
+ 	current_thread_info()->syscall = scno;
  
- 	flush_icache_range(vectors, vectors + PAGE_SIZE);
- 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+@@ -935,6 +929,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 		current_thread_info()->syscall = -1;
+ 
+ 	regs->ARM_ip = ip;
++	scno = current_thread_info()->syscall;
+ 
+-	return current_thread_info()->syscall;
++out_no_trace:
++	if (why)
++		audit_syscall_exit(regs);
++	else
++		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
++				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
++	return scno;
+ }
 -- 
 1.7.4.1
