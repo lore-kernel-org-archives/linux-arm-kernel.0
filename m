@@ -1,27 +1,50 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Fri, 22 Jun 2012 13:49:18 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <CAOMZO5BkaawScSsFqPiP--Bxh5vcm9G1E8MbN2aoL+_Fg_HhDg@mail.gmail.com>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <330B740BA662BF4E8386F534DF556ED8196D9923@AEDCEXC09.aei.com>
- <CAOMZO5BkaawScSsFqPiP--Bxh5vcm9G1E8MbN2aoL+_Fg_HhDg@mail.gmail.com>
-Message-ID: <201206221349.18326.jbe@pengutronix.de>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Fri, 22 Jun 2012 13:51:42 +0200
+Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
+In-Reply-To: <CANrkHUawrQfb+o+W7FrYACv6NocZn_MAym5A209peP8tW1nZRQ@mail.gmail.com>
+References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+ <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
+ <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+ <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
+ <4FE0AE7B.4040502@gmail.com>
+ <CANrkHUawrQfb+o+W7FrYACv6NocZn_MAym5A209peP8tW1nZRQ@mail.gmail.com>
+Message-ID: <4FE45C4E.8060808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam wrote:
-> On Wed, Apr 4, 2012 at 9:07 PM, Randle, Bill <Bill.Randle@aei.com> wrote:
-> > That would be even better. That's ultimately what I need - an easy way to
-> > get access to that information from user space. I'll look for the
-> > linux-iio mailing list archives and see if I can find that code.
->
-> Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
+On 06/20/2012 09:23 AM, T Krishnamoorthy, Balaji wrote:
+>>
+>> i just want to say that i'm affected by this too, and i can reproduce it
+>> 100%.
+>>
+> 
+> Is it with SD or MMC card
+> Can you provide Beagle board rev info?
 
-Any progress here with inclusion in some git tree?
+kingston 4g class 4 sdhc c04g taiwan
 
-Regards,
-Juergen
+tested on a beagle xm rev a and rev c, both boards exhibit the same
+problem with this card, while with a brand new sandisk 16gb sdhc class 4
+card, everything is ok.
 
+i tried reverting dba3c29 "Enable Auto CMD12", and both cards are
+behaving fine.
+
+>> do you want me to run that patch or you already have enough data?
+> 
+> Can you enable MMC debug and apply the debug patch I provided.
+> The debug patch did not print any AUTOCMD errors with Ming Lei setup.
+
+http://people.canonical.com/~ppisati/mmc-testing/
+
+test-mmc.sh: script used for testing
+
+test-mmc.log: md5sum of file copied around (as you can see after the
+umount the md5 changes)
+
+test-mmc.syslog: mmc-debug output (plus your patch)
+
+after the test, my sd card was so badly wounded that it wouldn't even boot.
 -- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
+bye,
+p.
