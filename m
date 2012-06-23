@@ -1,22 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 23 Jun 2012 16:12:29 -0700
-Subject: [GIT PULL] omap fixes for v3.5-rc3
-In-Reply-To: <20120621162026.GW12766@atomide.com>
-References: <20120621162026.GW12766@atomide.com>
-Message-ID: <CAOesGMhiSvMzdY6CJqBfxMo0_gFBxB+niPgCiK1tsj5+qRKPOw@mail.gmail.com>
+Date: Sat, 23 Jun 2012 16:15:54 -0700
+Subject: [GIT PULL] ARM: OMAP2+: clock/hwmod/warning fixes for 3.5-rc
+In-Reply-To: <20120622083023.GY12766@atomide.com>
+References: <alpine.DEB.2.00.1206211913120.10198@utopia.booyaka.com>
+ <20120622083023.GY12766@atomide.com>
+Message-ID: <CAOesGMhKAQ+BQktYs4H88DxVAP+qwHp9eMAP4_kR7ivJJ17zCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+On Fri, Jun 22, 2012 at 1:30 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Olof,
 >
-> ?Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+> Can you please take the branch below directly from Paul for this
+> -rc cycle?
 >
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.5-rc3
+> It would be good to get these in. If you don't want to take
+> all of them this late because they're not all strictly oopses or
+> regressions, let us know and Paul can regroup them.
 
-Pulled, thanks.
+Looks reasonable enough. I've pulled the branch and will include it in
+the next batch.
 
+Thanks,
 
 -Olof
