@@ -1,52 +1,34 @@
-From: amwang@redhat.com (Cong Wang)
-Date: Sat, 23 Jun 2012 18:04:13 +0800
-Subject: [PATCH 02/12] arm: remove km_type definitions
-In-Reply-To: <1340445863-16111-1-git-send-email-amwang@redhat.com>
-References: <1340445863-16111-1-git-send-email-amwang@redhat.com>
-Message-ID: <1340445863-16111-3-git-send-email-amwang@redhat.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 23 Jun 2012 20:52:04 +0800
+Subject: [PATCH] usb: gadget: pxa25x_udc: compile fix
+In-Reply-To: <1340338452-885-1-git-send-email-steveb@workware.net.au>
+References: <1340338452-885-1-git-send-email-steveb@workware.net.au>
+Message-ID: <CAMPhdO8TVi720Lm267pDe=aT1Ru8iQAC0Y=d+v7A3Lku9nQ3fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Cong Wang <amwang@redhat.com>
----
- arch/arm/include/asm/kmap_types.h |   26 +-------------------------
- 1 files changed, 1 insertions(+), 25 deletions(-)
+On Fri, Jun 22, 2012 at 12:14 PM, Steve Bennett <steveb@workware.net.au> wrote:
+> Signed-off-by: Steve Bennett <steveb@workware.net.au>
 
-diff --git a/arch/arm/include/asm/kmap_types.h b/arch/arm/include/asm/kmap_types.h
-index e51b1e8..83eb2f7 100644
---- a/arch/arm/include/asm/kmap_types.h
-+++ b/arch/arm/include/asm/kmap_types.h
-@@ -4,30 +4,6 @@
- /*
-  * This is the "bare minimum".  AIO seems to require this.
-  */
--enum km_type {
--	KM_BOUNCE_READ,
--	KM_SKB_SUNRPC_DATA,
--	KM_SKB_DATA_SOFTIRQ,
--	KM_USER0,
--	KM_USER1,
--	KM_BIO_SRC_IRQ,
--	KM_BIO_DST_IRQ,
--	KM_PTE0,
--	KM_PTE1,
--	KM_IRQ0,
--	KM_IRQ1,
--	KM_SOFTIRQ0,
--	KM_SOFTIRQ1,
--	KM_L1_CACHE,
--	KM_L2_CACHE,
--	KM_KDB,
--	KM_TYPE_NR
--};
--
--#ifdef CONFIG_DEBUG_HIGHMEM
--#define KM_NMI		(-1)
--#define KM_NMI_PTE	(-1)
--#define KM_IRQ_PTE	(-1)
--#endif
-+#define KM_TYPE_NR 16
- 
- #endif
--- 
-1.7.7.6
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+
+> ---
+> ?drivers/usb/gadget/pxa25x_udc.h | ? ?2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/usb/gadget/pxa25x_udc.h b/drivers/usb/gadget/pxa25x_udc.h
+> index 861f4df..2eca1e7 100644
+> --- a/drivers/usb/gadget/pxa25x_udc.h
+> +++ b/drivers/usb/gadget/pxa25x_udc.h
+> @@ -225,7 +225,7 @@ dump_state(struct pxa25x_udc *dev)
+> ? ? ? ? ? ? ? ?dev->stats.read.bytes, dev->stats.read.ops);
+>
+> ? ? ? ?for (i = 1; i < PXA_UDC_NUM_ENDPOINTS; i++) {
+> - ? ? ? ? ? ? ? if (dev->ep [i].desc == NULL)
+> + ? ? ? ? ? ? ? if (dev->ep[i].ep.desc == NULL)
+> ? ? ? ? ? ? ? ? ? ? ? ?continue;
+> ? ? ? ? ? ? ? ?DMSG ("udccs%d = %02x\n", i, *dev->ep->reg_udccs);
+> ? ? ? ?}
+> --
+> 1.7.10
+>
