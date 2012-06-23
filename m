@@ -1,30 +1,22 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sun, 24 Jun 2012 00:18:59 +0200
-Subject: [PATCH 1/1] ARM: OMAP: omap2plus_defconfig: Enable EXT4 support
-Message-ID: <1340489939-5390-1-git-send-email-javier@dowhile0.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 23 Jun 2012 16:12:29 -0700
+Subject: [GIT PULL] omap fixes for v3.5-rc3
+In-Reply-To: <20120621162026.GW12766@atomide.com>
+References: <20120621162026.GW12766@atomide.com>
+Message-ID: <CAOesGMhiSvMzdY6CJqBfxMo0_gFBxB+niPgCiK1tsj5+qRKPOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP boards that includes an SD card slot, an EXT4 partition could
-be used to store the root file system. So, the kernel should have
-built-in support for EXT4 to be able to mount the VFS root on boot.
+On Thu, Jun 21, 2012 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
+> The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+>
+> ?Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.5-rc3
 
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
----
- arch/arm/configs/omap2plus_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Pulled, thanks.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 9854ff4..f3087cb 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -197,6 +197,7 @@ CONFIG_RTC_DRV_TWL4030=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_EXT4_FS=y
- CONFIG_QUOTA=y
- CONFIG_QFMT_V2=y
- CONFIG_MSDOS_FS=y
--- 
-1.7.7.6
+
+-Olof
