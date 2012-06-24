@@ -1,60 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 24 Jun 2012 17:57:10 +0100
-Subject: imx27_visstrim_m10: spot the mistake
-Message-ID: <20120624165710.GA20378@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 24 Jun 2012 22:06:16 +0200
+Subject: [GIT PULL] Fixes (for v3.5 if possible) for Renesas ARM-based
+ platforms
+Message-ID: <201206242206.16398.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 435ca24116bc5365a10fa0be1bf1c1e4c5680157
-Author: Javier Martin <javier.martin@vista-silicon.com>
-Date:   Tue Apr 10 11:26:59 2012 +0200
+Hi,
 
-    ARM i.MX: Visstrim_M10: Add board version detection.
-    
-    Visstrim_M10 boards have 3 gpios to detect the
-    expansion board version attached and other 3 to
-    detect the motherboard revision.
-    
-    Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Please pull changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71
 
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index f7b074f..748ba2e 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -38,6 +38,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/system.h>
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
+    Linux 3.5-rc3
 
-...
+with top-most commit 86f887c105b909a2cea7b06f2136d66b3438b038
 
-commit 9f97da78bf018206fb623cd351d454af2f105fe0
-Author: David Howells <dhowells@redhat.com>
-Date:   Wed Mar 28 18:30:01 2012 +0100
+    ARM: shmobile: r8a7779: Route all interrupts to ARM
 
-    Disintegrate asm/system.h for ARM
-    
-    Disintegrate asm/system.h for ARM.
-    
-    Signed-off-by: David Howells <dhowells@redhat.com>
-    cc: Russell King <linux@arm.linux.org.uk>
-    cc: linux-arm-kernel at lists.infradead.org
+from the git repository at:
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 774c41e..74542c5 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-+/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
-+#include <asm/barrier.h>
-+#include <asm/compiler.h>
-+#include <asm/cmpxchg.h>
-+#include <asm/exec.h>
-+#include <asm/switch_to.h>
-+#include <asm/system_info.h>
-+#include <asm/system_misc.h>
+  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
 
-What's wrong with the above commit to mach-imx27_visstrim_m10.c ?
+to receive fixes for Renesas ARM-based platforms for 3.5.  Included are:
+
+* sh7372 and sh73a0 register definition fixes from Kuninori Morimoto.
+* SMP build regression fix for EMEV2 not set from Nobuhiro Iwamatsu.
+* GPIO IRQ configuration fix for the Mackerel board from Guennadi Liakhovetski.
+* Initialization regression fixes for kzm9d, kzm9g and armadillo800eva from
+  Laurent Pinchart and Kuninori Morimoto.
+* r8a7779 interrupt routing fix from Phil Edworthy.
+
+Thanks!
+
+
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 1 +
+ arch/arm/mach-shmobile/board-kzm9d.c           | 1 +
+ arch/arm/mach-shmobile/board-kzm9g.c           | 1 +
+ arch/arm/mach-shmobile/board-mackerel.c        | 3 +++
+ arch/arm/mach-shmobile/clock-sh73a0.c          | 8 ++++----
+ arch/arm/mach-shmobile/intc-r8a7779.c          | 7 +++++++
+ arch/arm/mach-shmobile/platsmp.c               | 5 +++++
+ arch/arm/mach-shmobile/setup-sh7372.c          | 2 +-
+ 8 files changed, 23 insertions(+), 5 deletions(-)
+
+---------------
+
+Guennadi Liakhovetski (1):
+      ARM: mach-shmobile: add missing GPIO IRQ configuration on mackerel
+
+Kuninori Morimoto (4):
+      ARM: shmobile: sh73a0: bugfix: SY-DMAC number
+      ARM: shmobile: sh7372: bugfix: chclr_offset base
+      ARM: shmobile: kzm9g: use late init machine hook
+      ARM: shmobile: kzm9d: use late init machine hook
+
+Laurent Pinchart (1):
+      ARM: mach-shmobile: armadillo800eva: Use late init machine hook
+
+Nobuhiro Iwamatsu (1):
+      ARM: mach-shmobile: Fix build when SMP is enabled and EMEV2 is not enabled
+
+Phil Edworthy (1):
+      ARM: shmobile: r8a7779: Route all interrupts to ARM
