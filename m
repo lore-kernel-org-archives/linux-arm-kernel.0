@@ -1,40 +1,36 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Sun, 24 Jun 2012 11:05:41 -0300
-Subject: [PATCH 5/7] ARM: LPC32xx: Defconfig update
-In-Reply-To: <1340545637-5449-6-git-send-email-stigge@antcom.de>
-References: <1340545637-5449-1-git-send-email-stigge@antcom.de>
- <1340545637-5449-6-git-send-email-stigge@antcom.de>
-Message-ID: <CAAAP30Epd3S9EdKqam2rtL0HH3CXDk30A54sFVN+swOe6ZF2Bw@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 24 Jun 2012 16:42:28 +0200
+Subject: [PATCH RESEND v4] input: keyboard: Add keys driver for the LPC32xx
+ SoC
+In-Reply-To: <20120621085623.GF2193@core.coreip.homeip.net>
+References: <1339443891-15197-1-git-send-email-stigge@antcom.de>
+ <20120621085623.GF2193@core.coreip.homeip.net>
+Message-ID: <4FE72754.2000706@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 24, 2012 at 10:47 AM, Roland Stigge <stigge@antcom.de> wrote:
-> This defconfig update for LPC32xx adds interrupt and polled gpio keyboard
-> drivers.
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On 21/06/12 10:56, Dmitry Torokhov wrote:
+> On Mon, Jun 11, 2012 at 09:44:51PM +0200, Roland Stigge wrote:
+>> This patch adds a driver for the key scan interface of the LPC32xx SoC
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>> For the DT binding: Acked-by: Rob Herring <rob.herring@calxeda.con>
+> 
+> Not a real review, just a quick question - if th driver is DT-only now
+> do we need to have the platform data or it would make more sense to read
+> DT-bindings and fill the main device structure directly?
 
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+And:
 
-> ---
-> ?arch/arm/configs/lpc32xx_defconfig | ? ?2 ++
-> ?1 file changed, 2 insertions(+)
->
-> --- linux-2.6.orig/arch/arm/configs/lpc32xx_defconfig
-> +++ linux-2.6/arch/arm/configs/lpc32xx_defconfig
-> @@ -18,6 +18,7 @@ CONFIG_MODULE_UNLOAD=y
-> ?# CONFIG_BLK_DEV_BSG is not set
-> ?CONFIG_PARTITION_ADVANCED=y
-> ?CONFIG_ARCH_LPC32XX=y
-> +CONFIG_KEYBOARD_GPIO_POLLED=y
-> ?CONFIG_PREEMPT=y
-> ?CONFIG_AEABI=y
-> ?CONFIG_ZBOOT_ROM_TEXT=0x0
-> @@ -89,6 +90,7 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
-> ?CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
-> ?CONFIG_INPUT_EVDEV=y
-> ?# CONFIG_KEYBOARD_ATKBD is not set
-> +CONFIG_KEYBOARD_GPIO=y
-> ?CONFIG_KEYBOARD_LPC32XX=y
-> ?# CONFIG_INPUT_MOUSE is not set
-> ?CONFIG_INPUT_TOUCHSCREEN=y
+>> +
+>> +	matrix_keypad_build_keymap(NULL, NULL, kscandat->kscancfg->matrix_sz,
+>> +				   kscandat->kscancfg->matrix_sz,
+>> +				   kscandat->kscancfg->keymap, kscandat->input);
+> 
+> This function may fail now.
+
+I'm addressing both issues in a updated patch.
+
+Thanks for the feedback,
+
+Roland
