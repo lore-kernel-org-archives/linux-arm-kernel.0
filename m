@@ -1,123 +1,43 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sun, 24 Jun 2012 06:21:07 +0200
-Subject: [PATCH 1/1] ARM: only call smp_send_stop() on SMP
-Message-ID: <1340511667-4976-1-git-send-email-javier@dowhile0.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 24 Jun 2012 03:28:09 -0300
+Subject: [PATCH] ARM: mx28: Add LCD pinmux
+In-Reply-To: <1340477119-2835-1-git-send-email-marex@denx.de>
+References: <1340477119-2835-1-git-send-email-marex@denx.de>
+Message-ID: <CAOMZO5Dr4JK1gF6pPD80XbRDJ79V-2mkUHaLv-ZdrxKrqmTn8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On reboot or poweroff (machine_shutdown()) a call to smp_send_stop() is
-made (to stop the others CPU's) when CONFIG_SMP=y.
+Hi Marek,
 
-arch/arm/kernel/process.c:
+On Sat, Jun 23, 2012 at 3:45 PM, Marek Vasut <marex@denx.de> wrote:
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Detlev Zundel <dzu@denx.de>
+> CC: Dong Aisheng <b29396@freescale.com>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> Cc: Wolfgang Denk <wd@denx.de>
+> ---
+> ?arch/arm/boot/dts/imx28.dtsi | ? 45 ++++++++++++++++++++++++++++++++++++++++++
+> ?1 file changed, 45 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 464303c..ab29cbe 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -221,6 +221,51 @@
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?fsl,pull-up = <0>;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?};
+>
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lcd_data_pins_8bpp_a: lcd at 0 {
 
-void machine_shutdown(void)
-{
- #ifdef CONFIG_SMP
-       smp_send_stop();
- #endif
-}
+Please remove the "bpp" from all the names.
 
-smp_send_stop() calls the function pointer smp_cross_call(), which is set
-on the smp_init_cpus() function for OMAP processors.
+bpp is usually used for the pixel depth in a framebuffer, and what you
+are describing here is how many bits are physically connected into the
+LCD interface.
 
-arch/arm/mach-omap2/omap-smp.c:
+Regards,
 
-void __init smp_init_cpus(void)
-{
-...
-	set_smp_cross_call(gic_raise_softirq);
-...
-}
-
-But the ARM setup_arch() function only calls smp_init_cpus()
-if CONFIG_SMP=y && is_smp().
-
-arm/kernel/setup.c:
-
-void __init setup_arch(char **cmdline_p)
-{
-...
- #ifdef CONFIG_SMP
-	if (is_smp())
-		smp_init_cpus();
- #endif
-...
-}
-
-Newer OMAP CPU's are SMP machines so omap2plus_defconfig sets
-CONFIG_SMP=y. Unfortunately on an OMAP UP machine is_smp()
-returns false and smp_init_cpus() is never called and the
-smp_cross_call() function remains NULL.
-
-If the machine is rebooted or powered off, smp_send_stop() will
-be called (since CONFIG_SMP=y) leading to the following error:
-
-[   42.815551] Restarting system.
-[   42.819030] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-[   42.827667] pgd = d7a74000
-[   42.830566] [00000000] *pgd=96ce7831, *pte=00000000, *ppte=00000000
-[   42.837249] Internal error: Oops: 80000007 [#1] SMP ARM
-[   42.842773] Modules linked in:
-[   42.846008] CPU: 0    Not tainted  (3.5.0-rc3-next-20120622-00002-g62e87ba-dirty #44)
-[   42.854278] PC is at 0x0
-[   42.856994] LR is at smp_send_stop+0x4c/0xe4
-[   42.861511] pc : [<00000000>]    lr : [<c00183a4>]    psr: 60000013
-[   42.861511] sp : d6c85e70  ip : 00000000  fp : 00000000
-[   42.873626] r10: 00000000  r9 : d6c84000  r8 : 00000002
-[   42.879150] r7 : c07235a0  r6 : c06dd2d0  r5 : 000f4241  r4 : d6c85e74
-[   42.886047] r3 : 00000000  r2 : 00000000  r1 : 00000006  r0 : d6c85e74
-[   42.892944] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   42.900482] Control: 10c5387d  Table: 97a74019  DAC: 00000015
-[   42.906555] Process reboot (pid: 1166, stack limit = 0xd6c842f8)
-[   42.912902] Stack: (0xd6c85e70 to 0xd6c86000)
-[   42.917510] 5e60:                                     c07235a0 00000000 00000000 d6c84000
-[   42.926177] 5e80: 01234567 c00143d0 4321fedc c00511bc d6c85ebc 00000168 00000460 00000000
-[   42.934814] 5ea0: c1017950 a0000013 c1017900 d8014390 d7ec3858 c0498e48 c1017950 00000000
-[   42.943481] 5ec0: d6ddde10 d6c85f78 00000003 00000000 d6ddde10 d6c84000 00000000 00000000
-[   42.952117] 5ee0: 00000002 00000000 00000000 c0088c88 00000002 00000000 00000000 c00f4b90
-[   42.960784] 5f00: 00000000 d6c85ebc d8014390 d7e311c8 60000013 00000103 00000002 d6c84000
-[   42.969421] 5f20: c00f3274 d6e00a00 00000001 60000013 d6c84000 00000000 00000000 c00895d4
-[   42.978057] 5f40: 00000002 d8007c80 d781f000 c00f6150 d8010cc0 c00f3274 d781f000 d6c84000
-[   42.986694] 5f60: c0013020 d6e00a00 00000001 20000010 0001257c ef000000 00000000 c00895d4
-[   42.995361] 5f80: 00000002 00000001 00000003 00000000 00000001 00000003 00000000 00000058
-[   43.003997] 5fa0: c00130c8 c0012f00 00000001 00000003 fee1dead 28121969 01234567 00000002
-[   43.012634] 5fc0: 00000001 00000003 00000000 00000058 00012584 0001257c 00000001 00000000
-[   43.021270] 5fe0: 000124bc bec5cc6c 00008f9c 4a2f7c40 20000010 fee1dead 00000000 00000000
-[   43.029968] [<c00183a4>] (smp_send_stop+0x4c/0xe4) from [<c00143d0>] (machine_restart+0xc/0x4c)
-[   43.039154] [<c00143d0>] (machine_restart+0xc/0x4c) from [<c00511bc>] (sys_reboot+0x144/0x1f0)
-[   43.048278] [<c00511bc>] (sys_reboot+0x144/0x1f0) from [<c0012f00>] (ret_fast_syscall+0x0/0x3c)
-[   43.057464] Code: bad PC value
-[   43.060760] ---[ end trace c3988d1dd0b8f0fb ]---
-
-An is_smp() check is also necessary besides shilding the smp_send_stop()
-call around CONFIG_SMP.
-
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
----
- arch/arm/kernel/process.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 864580a..a9043b8 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -38,6 +38,7 @@
- #include <asm/thread_notify.h>
- #include <asm/stacktrace.h>
- #include <asm/mach/time.h>
-+#include <asm/smp_plat.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
- #include <linux/stackprotector.h>
-@@ -240,7 +241,8 @@ __setup("reboot=", reboot_setup);
- void machine_shutdown(void)
- {
- #ifdef CONFIG_SMP
--	smp_send_stop();
-+	if (is_smp())
-+		smp_send_stop();
- #endif
- }
- 
--- 
-1.7.7.6
+Fabio Estevam
