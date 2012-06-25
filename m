@@ -1,48 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Jun 2012 15:33:45 +0300
-Subject: [PATCHv10 4/7] I2C: OMAP: Do not initialise the completion
- everytime
-In-Reply-To: <1340622702-21622-5-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 25 Jun 2012 15:34:20 +0300
+Subject: [PATCHv10 5/7] I2C: OMAP: Remove the definition of
+ SYSS_RESETDONE_MASK
+In-Reply-To: <1340622702-21622-6-git-send-email-shubhrajyoti@ti.com>
 References: <1340622702-21622-1-git-send-email-shubhrajyoti@ti.com>
- <1340622702-21622-5-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120625123345.GC30463@arwen.pp.htv.fi>
+ <1340622702-21622-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120625123419.GD30463@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jun 25, 2012 at 04:41:39PM +0530, Shubhrajyoti D wrote:
-> Use INIT_COMPLETION instead of init_completion in transfer.
+On Mon, Jun 25, 2012 at 04:41:40PM +0530, Shubhrajyoti D wrote:
+> Remove the definition of SYSS_RESETDONE_MASK and use the
+> one in omap_hwmod.h.
+> 
+> Also fixes the warning
+>  CC      drivers/i2c/busses/i2c-omap.o
+> drivers/i2c/busses/i2c-omap.c:163: warning: "SYSS_RESETDONE_MASK" redefined
 > 
 > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 
 > ---
->  drivers/i2c/busses/i2c-omap.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+>  drivers/i2c/busses/i2c-omap.c |    3 ---
+>  1 files changed, 0 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index c771c28..f1109f4 100644
+> index f1109f4..8344ad030 100644
 > --- a/drivers/i2c/busses/i2c-omap.c
 > +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -493,7 +493,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
->  	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
+> @@ -159,9 +159,6 @@ enum {
+>  #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
+>  #endif
 >  
-> -	init_completion(&dev->cmd_complete);
-> +	INIT_COMPLETION(dev->cmd_complete);
->  	dev->cmd_err = 0;
->  
->  	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
-> @@ -1003,6 +1003,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  	}
->  
->  	platform_set_drvdata(pdev, dev);
-> +	init_completion(&dev->cmd_complete);
->  
->  	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
->  
+> -/* OCP_SYSSTATUS bit definitions */
+> -#define SYSS_RESETDONE_MASK		(1 << 0)
+> -
+>  /* OCP_SYSCONFIG bit definitions */
+>  #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
+>  #define SYSC_SIDLEMODE_MASK		(0x3 << 3)
 > -- 
 > 1.7.5.4
 > 
@@ -59,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/819e5806/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/84938d01/attachment-0001.sig>
