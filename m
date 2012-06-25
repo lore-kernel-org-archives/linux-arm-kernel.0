@@ -1,910 +1,136 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 24 Jun 2012 16:30:38 -0500
-Subject: [PATCH v3 2/7] ARM: at91: add of irq priorities support
-In-Reply-To: <1340467539-12294-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1340467539-12294-1-git-send-email-ludovic.desroches@atmel.com>
- <1340467539-12294-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <4FE786FE.4040105@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 Jun 2012 08:51:37 +0800
+Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
+In-Reply-To: <1340533690-4049-1-git-send-email-javier@dowhile0.org>
+References: <1340533690-4049-1-git-send-email-javier@dowhile0.org>
+Message-ID: <20120625005134.GA2342@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2012 11:05 AM, ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Add a third cell to define irq priority.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+It seems the same patch has been there for a while.
 
-Looks good.
+http://thread.gmane.org/gmane.linux.kernel/1303115
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+Regards,
+Shawn
 
-> ---
->  .../devicetree/bindings/arm/atmel-aic.txt          |    8 +++--
->  arch/arm/boot/dts/at91sam9260.dtsi                 |   36 +++++++++---------
->  arch/arm/boot/dts/at91sam9263.dtsi                 |   30 ++++++++--------
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |   38 ++++++++++----------
->  arch/arm/boot/dts/at91sam9n12.dtsi                 |   30 ++++++++--------
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |   38 ++++++++++----------
->  arch/arm/mach-at91/include/mach/at91_aic.h         |    3 ++
->  arch/arm/mach-at91/irq.c                           |   34 ++++++++++++++++--
->  8 files changed, 125 insertions(+), 92 deletions(-)
+On Sun, Jun 24, 2012 at 12:28:10PM +0200, Javier Martinez Canillas wrote:
+> On reboot or poweroff (machine_shutdown()) a call to smp_send_stop() is
+> made (to stop the others CPU's) when CONFIG_SMP=y.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-> index 1953b0c..19078bf 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-> @@ -4,7 +4,7 @@ Required properties:
->  - compatible: Should be "atmel,<chip>-aic"
->  - interrupt-controller: Identifies the node as an interrupt controller.
->  - interrupt-parent: For single AIC system, it is an empty property.
-> -- #interrupt-cells: The number of cells to define the interrupts. It sould be 2.
-> +- #interrupt-cells: The number of cells to define the interrupts. It sould be 3.
->    The first cell is the IRQ number (aka "Peripheral IDentifier" on datasheet).
->    The second cell is used to specify flags:
->      bits[3:0] trigger type and level flags:
-> @@ -14,6 +14,8 @@ Required properties:
->        8 = active low level-sensitive.
->        Valid combinations are 1, 2, 3, 4, 8.
->        Default flag for internal sources should be set to 4 (active high).
-> +  The third cell is used to specify the irq priority from 0 (lowest) to 7
-> +  (highest).
->  - reg: Should contain AIC registers location and length
->  - atmel,external-irqs: u32 array of external irqs.
->  
-> @@ -25,7 +27,7 @@ Examples:
->  		compatible = "atmel,at91rm9200-aic";
->  		interrupt-controller;
->  		interrupt-parent;
-> -		#interrupt-cells = <2>;
-> +		#interrupt-cells = <3>;
->  		reg = <0xfffff000 0x200>;
->  	};
->  
-> @@ -35,5 +37,5 @@ Examples:
->  	dma: dma-controller at ffffec00 {
->  		compatible = "atmel,at91sam9g45-dma";
->  		reg = <0xffffec00 0x200>;
-> -		interrupts = <21 4>;
-> +		interrupts = <21 4 5>;
->  	};
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index f2c9643..66389c1 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -52,7 +52,7 @@
->  			ranges;
->  
->  			aic: interrupt-controller at fffff000 {
-> -				#interrupt-cells = <2>;
-> +				#interrupt-cells = <3>;
->  				compatible = "atmel,at91rm9200-aic";
->  				interrupt-controller;
->  				reg = <0xfffff000 0x200>;
-> @@ -82,25 +82,25 @@
->  			pit: timer at fffffd30 {
->  				compatible = "atmel,at91sam9260-pit";
->  				reg = <0xfffffd30 0xf>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  			};
->  
->  			tcb0: timer at fffa0000 {
->  				compatible = "atmel,at91rm9200-tcb";
->  				reg = <0xfffa0000 0x100>;
-> -				interrupts = <17 4 18 4 19 4>;
-> +				interrupts = <17 4 0 18 4 0 19 4 0>;
->  			};
->  
->  			tcb1: timer at fffdc000 {
->  				compatible = "atmel,at91rm9200-tcb";
->  				reg = <0xfffdc000 0x100>;
-> -				interrupts = <26 4 27 4 28 4>;
-> +				interrupts = <26 4 0 27 4 0 28 4 0>;
->  			};
->  
->  			pioA: gpio at fffff400 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff400 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -109,7 +109,7 @@
->  			pioB: gpio at fffff600 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff600 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -118,7 +118,7 @@
->  			pioC: gpio at fffff800 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff800 0x100>;
-> -				interrupts = <4 4>;
-> +				interrupts = <4 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -127,14 +127,14 @@
->  			dbgu: serial at fffff200 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffff200 0x200>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  				status = "disabled";
->  			};
->  
->  			usart0: serial at fffb0000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffb0000 0x200>;
-> -				interrupts = <6 4>;
-> +				interrupts = <6 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -143,7 +143,7 @@
->  			usart1: serial at fffb4000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffb4000 0x200>;
-> -				interrupts = <7 4>;
-> +				interrupts = <7 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -152,7 +152,7 @@
->  			usart2: serial at fffb8000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffb8000 0x200>;
-> -				interrupts = <8 4>;
-> +				interrupts = <8 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -161,7 +161,7 @@
->  			usart3: serial at fffd0000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffd0000 0x200>;
-> -				interrupts = <23 4>;
-> +				interrupts = <23 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -170,7 +170,7 @@
->  			usart4: serial at fffd4000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffd4000 0x200>;
-> -				interrupts = <24 4>;
-> +				interrupts = <24 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -179,7 +179,7 @@
->  			usart5: serial at fffd8000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffd8000 0x200>;
-> -				interrupts = <25 4>;
-> +				interrupts = <25 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -188,21 +188,21 @@
->  			macb0: ethernet at fffc4000 {
->  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
->  				reg = <0xfffc4000 0x100>;
-> -				interrupts = <21 4>;
-> +				interrupts = <21 4 3>;
->  				status = "disabled";
->  			};
->  
->  			usb1: gadget at fffa4000 {
->  				compatible = "atmel,at91rm9200-udc";
->  				reg = <0xfffa4000 0x4000>;
-> -				interrupts = <10 4>;
-> +				interrupts = <10 4 2>;
->  				status = "disabled";
->  			};
->  
->  			adc0: adc at fffe0000 {
->  				compatible = "atmel,at91sam9260-adc";
->  				reg = <0xfffe0000 0x100>;
-> -				interrupts = <5 4>;
-> +				interrupts = <5 4 0>;
->  				atmel,adc-use-external-triggers;
->  				atmel,adc-channels-used = <0xf>;
->  				atmel,adc-vref = <3300>;
-> @@ -254,7 +254,7 @@
->  		usb0: ohci at 00500000 {
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00500000 0x100000>;
-> -			interrupts = <20 4>;
-> +			interrupts = <20 4 2>;
->  			status = "disabled";
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index c803636..b460d6c 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -48,7 +48,7 @@
->  			ranges;
->  
->  			aic: interrupt-controller at fffff000 {
-> -				#interrupt-cells = <2>;
-> +				#interrupt-cells = <3>;
->  				compatible = "atmel,at91rm9200-aic";
->  				interrupt-controller;
->  				reg = <0xfffff000 0x200>;
-> @@ -69,13 +69,13 @@
->  			pit: timer at fffffd30 {
->  				compatible = "atmel,at91sam9260-pit";
->  				reg = <0xfffffd30 0xf>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  			};
->  
->  			tcb0: timer at fff7c000 {
->  				compatible = "atmel,at91rm9200-tcb";
->  				reg = <0xfff7c000 0x100>;
-> -				interrupts = <19 4>;
-> +				interrupts = <19 4 0>;
->  			};
->  
->  			rstc at fffffd00 {
-> @@ -91,7 +91,7 @@
->  			pioA: gpio at fffff200 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff200 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -100,7 +100,7 @@
->  			pioB: gpio at fffff400 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff400 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -109,7 +109,7 @@
->  			pioC: gpio at fffff600 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff600 0x100>;
-> -				interrupts = <4 4>;
-> +				interrupts = <4 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -118,7 +118,7 @@
->  			pioD: gpio at fffff800 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff800 0x100>;
-> -				interrupts = <4 4>;
-> +				interrupts = <4 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -127,7 +127,7 @@
->  			pioE: gpio at fffffa00 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffffa00 0x100>;
-> -				interrupts = <4 4>;
-> +				interrupts = <4 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -136,14 +136,14 @@
->  			dbgu: serial at ffffee00 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xffffee00 0x200>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  				status = "disabled";
->  			};
->  
->  			usart0: serial at fff8c000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff8c000 0x200>;
-> -				interrupts = <7 4>;
-> +				interrupts = <7 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -152,7 +152,7 @@
->  			usart1: serial at fff90000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff90000 0x200>;
-> -				interrupts = <8 4>;
-> +				interrupts = <8 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -161,7 +161,7 @@
->  			usart2: serial at fff94000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff94000 0x200>;
-> -				interrupts = <9 4>;
-> +				interrupts = <9 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -170,14 +170,14 @@
->  			macb0: ethernet at fffbc000 {
->  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
->  				reg = <0xfffbc000 0x100>;
-> -				interrupts = <21 4>;
-> +				interrupts = <21 4 3>;
->  				status = "disabled";
->  			};
->  
->  			usb1: gadget at fff78000 {
->  				compatible = "atmel,at91rm9200-udc";
->  				reg = <0xfff78000 0x4000>;
-> -				interrupts = <24 4>;
-> +				interrupts = <24 4 2>;
->  				status = "disabled";
->  			};
->  		};
-> @@ -201,7 +201,7 @@
->  		usb0: ohci at 00a00000 {
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00a00000 0x100000>;
-> -			interrupts = <29 4>;
-> +			interrupts = <29 4 2>;
->  			status = "disabled";
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 2d01ce2..bafa880 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -53,7 +53,7 @@
->  			ranges;
->  
->  			aic: interrupt-controller at fffff000 {
-> -				#interrupt-cells = <2>;
-> +				#interrupt-cells = <3>;
->  				compatible = "atmel,at91rm9200-aic";
->  				interrupt-controller;
->  				reg = <0xfffff000 0x200>;
-> @@ -79,7 +79,7 @@
->  			pit: timer at fffffd30 {
->  				compatible = "atmel,at91sam9260-pit";
->  				reg = <0xfffffd30 0xf>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  			};
->  
->  
-> @@ -91,25 +91,25 @@
->  			tcb0: timer at fff7c000 {
->  				compatible = "atmel,at91rm9200-tcb";
->  				reg = <0xfff7c000 0x100>;
-> -				interrupts = <18 4>;
-> +				interrupts = <18 4 0>;
->  			};
->  
->  			tcb1: timer at fffd4000 {
->  				compatible = "atmel,at91rm9200-tcb";
->  				reg = <0xfffd4000 0x100>;
-> -				interrupts = <18 4>;
-> +				interrupts = <18 4 0>;
->  			};
->  
->  			dma: dma-controller at ffffec00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
-> -				interrupts = <21 4>;
-> +				interrupts = <21 4 0>;
->  			};
->  
->  			pioA: gpio at fffff200 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff200 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -118,7 +118,7 @@
->  			pioB: gpio at fffff400 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff400 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -127,7 +127,7 @@
->  			pioC: gpio at fffff600 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff600 0x100>;
-> -				interrupts = <4 4>;
-> +				interrupts = <4 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -136,7 +136,7 @@
->  			pioD: gpio at fffff800 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffff800 0x100>;
-> -				interrupts = <5 4>;
-> +				interrupts = <5 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -145,7 +145,7 @@
->  			pioE: gpio at fffffa00 {
->  				compatible = "atmel,at91rm9200-gpio";
->  				reg = <0xfffffa00 0x100>;
-> -				interrupts = <5 4>;
-> +				interrupts = <5 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -154,14 +154,14 @@
->  			dbgu: serial at ffffee00 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xffffee00 0x200>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  				status = "disabled";
->  			};
->  
->  			usart0: serial at fff8c000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff8c000 0x200>;
-> -				interrupts = <7 4>;
-> +				interrupts = <7 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -170,7 +170,7 @@
->  			usart1: serial at fff90000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff90000 0x200>;
-> -				interrupts = <8 4>;
-> +				interrupts = <8 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -179,7 +179,7 @@
->  			usart2: serial at fff94000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff94000 0x200>;
-> -				interrupts = <9 4>;
-> +				interrupts = <9 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -188,7 +188,7 @@
->  			usart3: serial at fff98000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfff98000 0x200>;
-> -				interrupts = <10 4>;
-> +				interrupts = <10 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -197,14 +197,14 @@
->  			macb0: ethernet at fffbc000 {
->  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
->  				reg = <0xfffbc000 0x100>;
-> -				interrupts = <25 4>;
-> +				interrupts = <25 4 3>;
->  				status = "disabled";
->  			};
->  
->  			adc0: adc at fffb0000 {
->  				compatible = "atmel,at91sam9260-adc";
->  				reg = <0xfffb0000 0x100>;
-> -				interrupts = <20 4>;
-> +				interrupts = <20 4 0>;
->  				atmel,adc-use-external-triggers;
->  				atmel,adc-channels-used = <0xff>;
->  				atmel,adc-vref = <3300>;
-> @@ -258,14 +258,14 @@
->  		usb0: ohci at 00700000 {
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00700000 0x100000>;
-> -			interrupts = <22 4>;
-> +			interrupts = <22 4 2>;
->  			status = "disabled";
->  		};
->  
->  		usb1: ehci at 00800000 {
->  			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
->  			reg = <0x00800000 0x100000>;
-> -			interrupts = <22 4>;
-> +			interrupts = <22 4 2>;
->  			status = "disabled";
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index cb84de7..bfac0df 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -50,7 +50,7 @@
->  			ranges;
->  
->  			aic: interrupt-controller at fffff000 {
-> -				#interrupt-cells = <2>;
-> +				#interrupt-cells = <3>;
->  				compatible = "atmel,at91rm9200-aic";
->  				interrupt-controller;
->  				reg = <0xfffff000 0x200>;
-> @@ -74,7 +74,7 @@
->  			pit: timer at fffffe30 {
->  				compatible = "atmel,at91sam9260-pit";
->  				reg = <0xfffffe30 0xf>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  			};
->  
->  			shdwc at fffffe10 {
-> @@ -85,25 +85,25 @@
->  			tcb0: timer at f8008000 {
->  				compatible = "atmel,at91sam9x5-tcb";
->  				reg = <0xf8008000 0x100>;
-> -				interrupts = <17 4>;
-> +				interrupts = <17 4 0>;
->  			};
->  
->  			tcb1: timer at f800c000 {
->  				compatible = "atmel,at91sam9x5-tcb";
->  				reg = <0xf800c000 0x100>;
-> -				interrupts = <17 4>;
-> +				interrupts = <17 4 0>;
->  			};
->  
->  			dma: dma-controller at ffffec00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
-> -				interrupts = <20 4>;
-> +				interrupts = <20 4 0>;
->  			};
->  
->  			pioA: gpio at fffff400 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffff400 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -112,7 +112,7 @@
->  			pioB: gpio at fffff600 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffff600 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -121,7 +121,7 @@
->  			pioC: gpio at fffff800 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffff800 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -130,7 +130,7 @@
->  			pioD: gpio at fffffa00 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffffa00 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -139,14 +139,14 @@
->  			dbgu: serial at fffff200 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffff200 0x200>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  				status = "disabled";
->  			};
->  
->  			usart0: serial at f801c000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf801c000 0x4000>;
-> -				interrupts = <5 4>;
-> +				interrupts = <5 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -155,7 +155,7 @@
->  			usart1: serial at f8020000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf8020000 0x4000>;
-> -				interrupts = <6 4>;
-> +				interrupts = <6 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -164,7 +164,7 @@
->  			usart2: serial at f8024000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf8024000 0x4000>;
-> -				interrupts = <7 4>;
-> +				interrupts = <7 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -173,7 +173,7 @@
->  			usart3: serial at f8028000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf8028000 0x4000>;
-> -				interrupts = <8 4>;
-> +				interrupts = <8 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -201,7 +201,7 @@
->  		usb0: ohci at 00500000 {
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00500000 0x00100000>;
-> -			interrupts = <22 4>;
-> +			interrupts = <22 4 2>;
->  			status = "disabled";
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 6a0a0fb..4a18c39 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -51,7 +51,7 @@
->  			ranges;
->  
->  			aic: interrupt-controller at fffff000 {
-> -				#interrupt-cells = <2>;
-> +				#interrupt-cells = <3>;
->  				compatible = "atmel,at91rm9200-aic";
->  				interrupt-controller;
->  				reg = <0xfffff000 0x200>;
-> @@ -81,37 +81,37 @@
->  			pit: timer at fffffe30 {
->  				compatible = "atmel,at91sam9260-pit";
->  				reg = <0xfffffe30 0xf>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  			};
->  
->  			tcb0: timer at f8008000 {
->  				compatible = "atmel,at91sam9x5-tcb";
->  				reg = <0xf8008000 0x100>;
-> -				interrupts = <17 4>;
-> +				interrupts = <17 4 0>;
->  			};
->  
->  			tcb1: timer at f800c000 {
->  				compatible = "atmel,at91sam9x5-tcb";
->  				reg = <0xf800c000 0x100>;
-> -				interrupts = <17 4>;
-> +				interrupts = <17 4 0>;
->  			};
->  
->  			dma0: dma-controller at ffffec00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
-> -				interrupts = <20 4>;
-> +				interrupts = <20 4 0>;
->  			};
->  
->  			dma1: dma-controller at ffffee00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffee00 0x200>;
-> -				interrupts = <21 4>;
-> +				interrupts = <21 4 0>;
->  			};
->  
->  			pioA: gpio at fffff400 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffff400 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -120,7 +120,7 @@
->  			pioB: gpio at fffff600 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffff600 0x100>;
-> -				interrupts = <2 4>;
-> +				interrupts = <2 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -129,7 +129,7 @@
->  			pioC: gpio at fffff800 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffff800 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -138,7 +138,7 @@
->  			pioD: gpio at fffffa00 {
->  				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  				reg = <0xfffffa00 0x100>;
-> -				interrupts = <3 4>;
-> +				interrupts = <3 4 1>;
->  				#gpio-cells = <2>;
->  				gpio-controller;
->  				interrupt-controller;
-> @@ -147,14 +147,14 @@
->  			dbgu: serial at fffff200 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xfffff200 0x200>;
-> -				interrupts = <1 4>;
-> +				interrupts = <1 4 7>;
->  				status = "disabled";
->  			};
->  
->  			usart0: serial at f801c000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf801c000 0x200>;
-> -				interrupts = <5 4>;
-> +				interrupts = <5 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -163,7 +163,7 @@
->  			usart1: serial at f8020000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf8020000 0x200>;
-> -				interrupts = <6 4>;
-> +				interrupts = <6 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -172,7 +172,7 @@
->  			usart2: serial at f8024000 {
->  				compatible = "atmel,at91sam9260-usart";
->  				reg = <0xf8024000 0x200>;
-> -				interrupts = <7 4>;
-> +				interrupts = <7 4 5>;
->  				atmel,use-dma-rx;
->  				atmel,use-dma-tx;
->  				status = "disabled";
-> @@ -181,21 +181,21 @@
->  			macb0: ethernet at f802c000 {
->  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
->  				reg = <0xf802c000 0x100>;
-> -				interrupts = <24 4>;
-> +				interrupts = <24 4 3>;
->  				status = "disabled";
->  			};
->  
->  			macb1: ethernet at f8030000 {
->  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
->  				reg = <0xf8030000 0x100>;
-> -				interrupts = <27 4>;
-> +				interrupts = <27 4 3>;
->  				status = "disabled";
->  			};
->  
->  			adc0: adc at f804c000 {
->  				compatible = "atmel,at91sam9260-adc";
->  				reg = <0xf804c000 0x100>;
-> -				interrupts = <19 4>;
-> +				interrupts = <19 4 0>;
->  				atmel,adc-use-external;
->  				atmel,adc-channels-used = <0xffff>;
->  				atmel,adc-vref = <3300>;
-> @@ -249,14 +249,14 @@
->  		usb0: ohci at 00600000 {
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00600000 0x100000>;
-> -			interrupts = <22 4>;
-> +			interrupts = <22 4 2>;
->  			status = "disabled";
->  		};
->  
->  		usb1: ehci at 00700000 {
->  			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
->  			reg = <0x00700000 0x100000>;
-> -			interrupts = <22 4>;
-> +			interrupts = <22 4 2>;
->  			status = "disabled";
->  		};
->  	};
-> diff --git a/arch/arm/mach-at91/include/mach/at91_aic.h b/arch/arm/mach-at91/include/mach/at91_aic.h
-> index c1413ed..3af7272 100644
-> --- a/arch/arm/mach-at91/include/mach/at91_aic.h
-> +++ b/arch/arm/mach-at91/include/mach/at91_aic.h
-> @@ -28,6 +28,9 @@ extern void __iomem *at91_aic_base;
->  .extern at91_aic_base
+> arch/arm/kernel/process.c:
+> 
+> void machine_shutdown(void)
+> {
+>  #ifdef CONFIG_SMP
+>        smp_send_stop();
 >  #endif
+> }
+> 
+> smp_send_stop() calls the function pointer smp_cross_call(), which is set
+> on the smp_init_cpus() function for OMAP processors.
+> 
+> arch/arm/mach-omap2/omap-smp.c:
+> 
+> void __init smp_init_cpus(void)
+> {
+> ...
+> 	set_smp_cross_call(gic_raise_softirq);
+> ...
+> }
+> 
+> But the ARM setup_arch() function only calls smp_init_cpus()
+> if CONFIG_SMP=y && is_smp().
+> 
+> arm/kernel/setup.c:
+> 
+> void __init setup_arch(char **cmdline_p)
+> {
+> ...
+>  #ifdef CONFIG_SMP
+> 	if (is_smp())
+> 		smp_init_cpus();
+>  #endif
+> ...
+> }
+> 
+> Newer OMAP CPU's are SMP machines so omap2plus_defconfig sets
+> CONFIG_SMP=y. Unfortunately on an OMAP UP machine is_smp()
+> returns false and smp_init_cpus() is never called and the
+> smp_cross_call() function remains NULL.
+> 
+> If the machine is rebooted or powered off, smp_send_stop() will
+> be called (since CONFIG_SMP=y) leading to the following error:
+> 
+> [   42.815551] Restarting system.
+> [   42.819030] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [   42.827667] pgd = d7a74000
+> [   42.830566] [00000000] *pgd=96ce7831, *pte=00000000, *ppte=00000000
+> [   42.837249] Internal error: Oops: 80000007 [#1] SMP ARM
+> [   42.842773] Modules linked in:
+> [   42.846008] CPU: 0    Not tainted  (3.5.0-rc3-next-20120622-00002-g62e87ba-dirty #44)
+> [   42.854278] PC is at 0x0
+> [   42.856994] LR is at smp_send_stop+0x4c/0xe4
+> [   42.861511] pc : [<00000000>]    lr : [<c00183a4>]    psr: 60000013
+> [   42.861511] sp : d6c85e70  ip : 00000000  fp : 00000000
+> [   42.873626] r10: 00000000  r9 : d6c84000  r8 : 00000002
+> [   42.879150] r7 : c07235a0  r6 : c06dd2d0  r5 : 000f4241  r4 : d6c85e74
+> [   42.886047] r3 : 00000000  r2 : 00000000  r1 : 00000006  r0 : d6c85e74
+> [   42.892944] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> [   42.900482] Control: 10c5387d  Table: 97a74019  DAC: 00000015
+> [   42.906555] Process reboot (pid: 1166, stack limit = 0xd6c842f8)
+> [   42.912902] Stack: (0xd6c85e70 to 0xd6c86000)
+> [   42.917510] 5e60:                                     c07235a0 00000000 00000000 d6c84000
+> [   42.926177] 5e80: 01234567 c00143d0 4321fedc c00511bc d6c85ebc 00000168 00000460 00000000
+> [   42.934814] 5ea0: c1017950 a0000013 c1017900 d8014390 d7ec3858 c0498e48 c1017950 00000000
+> [   42.943481] 5ec0: d6ddde10 d6c85f78 00000003 00000000 d6ddde10 d6c84000 00000000 00000000
+> [   42.952117] 5ee0: 00000002 00000000 00000000 c0088c88 00000002 00000000 00000000 c00f4b90
+> [   42.960784] 5f00: 00000000 d6c85ebc d8014390 d7e311c8 60000013 00000103 00000002 d6c84000
+> [   42.969421] 5f20: c00f3274 d6e00a00 00000001 60000013 d6c84000 00000000 00000000 c00895d4
+> [   42.978057] 5f40: 00000002 d8007c80 d781f000 c00f6150 d8010cc0 c00f3274 d781f000 d6c84000
+> [   42.986694] 5f60: c0013020 d6e00a00 00000001 20000010 0001257c ef000000 00000000 c00895d4
+> [   42.995361] 5f80: 00000002 00000001 00000003 00000000 00000001 00000003 00000000 00000058
+> [   43.003997] 5fa0: c00130c8 c0012f00 00000001 00000003 fee1dead 28121969 01234567 00000002
+> [   43.012634] 5fc0: 00000001 00000003 00000000 00000058 00012584 0001257c 00000001 00000000
+> [   43.021270] 5fe0: 000124bc bec5cc6c 00008f9c 4a2f7c40 20000010 fee1dead 00000000 00000000
+> [   43.029968] [<c00183a4>] (smp_send_stop+0x4c/0xe4) from [<c00143d0>] (machine_restart+0xc/0x4c)
+> [   43.039154] [<c00143d0>] (machine_restart+0xc/0x4c) from [<c00511bc>] (sys_reboot+0x144/0x1f0)
+> [   43.048278] [<c00511bc>] (sys_reboot+0x144/0x1f0) from [<c0012f00>] (ret_fast_syscall+0x0/0x3c)
+> [   43.057464] Code: bad PC value
+> [   43.060760] ---[ end trace c3988d1dd0b8f0fb ]---
+> 
+> Add a check so smp_cross_call() is only called when there is more than one CPU on-line.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> ---
+> 
+> Changes since v1:
+> 
+> - check for cpumask_empty() on arch/arm/kernel/smp.c instead for
+>   is_smp() on arch/arm/kernel/process.c
+> 
+>  arch/arm/kernel/smp.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 2c7217d..ea73045 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -563,7 +563,8 @@ void smp_send_stop(void)
 >  
-> +#define AT91_AIC_IRQ_MIN_PRIORITY	0
-> +#define AT91_AIC_IRQ_MAX_PRIORITY	7
-> +
->  #define AT91_AIC_SMR(n)		((n) * 4)		/* Source Mode Registers 0-31 */
->  #define		AT91_AIC_PRIOR		(7 << 0)		/* Priority Level */
->  #define		AT91_AIC_SRCTYPE	(3 << 5)		/* Interrupt Source Type */
-> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-> index df8605f..cc009be 100644
-> --- a/arch/arm/mach-at91/irq.c
-> +++ b/arch/arm/mach-at91/irq.c
-> @@ -30,6 +30,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/irqdomain.h>
->  #include <linux/err.h>
-> +#include <linux/slab.h>
+>  	cpumask_copy(&mask, cpu_online_mask);
+>  	cpumask_clear_cpu(smp_processor_id(), &mask);
+> -	smp_cross_call(&mask, IPI_CPU_STOP);
+> +	if (!cpumask_empty(&mask))
+> +		smp_cross_call(&mask, IPI_CPU_STOP);
 >  
->  #include <mach/hardware.h>
->  #include <asm/irq.h>
-> @@ -42,6 +43,7 @@
->  void __iomem *at91_aic_base;
->  static struct irq_domain *at91_aic_domain;
->  static struct device_node *at91_aic_np;
-> +static unsigned int *at91_aic_irq_priorities;
->  
->  static void at91_aic_mask_irq(struct irq_data *d)
->  {
-> @@ -177,8 +179,9 @@ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
->  	/* Put virq number in Source Vector Register */
->  	at91_aic_write(AT91_AIC_SVR(hw), virq);
->  
-> -	/* Active Low interrupt, without priority */
-> -	at91_aic_write(AT91_AIC_SMR(hw), AT91_AIC_SRCTYPE_LOW);
-> +	/* Active Low interrupt, with priority */
-> +	at91_aic_write(AT91_AIC_SMR(hw),
-> +	               AT91_AIC_SRCTYPE_LOW | at91_aic_irq_priorities[hw]);
->  
->  	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_fasteoi_irq);
->  	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-> @@ -186,9 +189,28 @@ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
->  	return 0;
->  }
->  
-> +static int at91_aic_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
-> +                               const u32 *intspec, unsigned int intsize,
-> +                               irq_hw_number_t *out_hwirq, unsigned int *out_type)
-> +{
-> +	if (WARN_ON(intsize < 3))
-> +		return -EINVAL;
-> +	if (WARN_ON(intspec[0] >= NR_AIC_IRQS))
-> +		return -EINVAL;
-> +	if (WARN_ON((intspec[2] < AT91_AIC_IRQ_MIN_PRIORITY)
-> +	            || (intspec[2] > AT91_AIC_IRQ_MAX_PRIORITY)))
-> +		return -EINVAL;
-> +
-> +	*out_hwirq = intspec[0];
-> +	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
-> +	at91_aic_irq_priorities[*out_hwirq] = intspec[2];
-> +
-> +	return 0;
-> +}
-> +
->  static struct irq_domain_ops at91_aic_irq_ops = {
->  	.map	= at91_aic_irq_map,
-> -	.xlate	= irq_domain_xlate_twocell,
-> +	.xlate	= at91_aic_irq_domain_xlate,
->  };
->  
->  int __init at91_aic_of_init(struct device_node *node,
-> @@ -198,6 +220,12 @@ int __init at91_aic_of_init(struct device_node *node,
->  	const __be32 *p;
->  	u32 val;
->  
-> +	at91_aic_irq_priorities = kzalloc(NR_AIC_IRQS
-> +	                                  * sizeof(*at91_aic_irq_priorities),
-> +	                                  GFP_KERNEL);
-> +	if (!at91_aic_irq_priorities)
-> +		return -ENOMEM;
-> +
->  	at91_aic_base = of_iomap(node, 0);
->  	at91_aic_np = node;
->  
+>  	/* Wait up to one second for other CPUs to stop */
+>  	timeout = USEC_PER_SEC;
+> -- 
+> 1.7.7.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
