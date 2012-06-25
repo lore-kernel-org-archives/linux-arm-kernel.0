@@ -1,39 +1,34 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 25 Jun 2012 14:56:18 +0800
-Subject: [PATCH v7 01/14] usb: chipidea: remove unneeded NULL check
+Date: Mon, 25 Jun 2012 14:56:26 +0800
+Subject: [PATCH v7 09/14] usb: chipidea: select USB_EHCI_ROOT_HUB_TT in
+ USB_CHIPIDEA_HOST of Kconfig
 In-Reply-To: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
 References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340607391-16380-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340607391-16380-10-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+ci13xxx host needs Root Hub Transaction Translators.
 
-As reported by Dan Carpenter, there is a NULL check in udc_start() that
-follows a dereference of the pointer that's being checked. However, at
-that point udc pointer shouldn't ever be NULL and if it is, the dereference
-should cause an oops.
-
-Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Reported-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- drivers/usb/chipidea/udc.c |    3 ---
- 1 file changed, 3 deletions(-)
+ drivers/usb/chipidea/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 51f9694..cdb9212 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1647,9 +1647,6 @@ static int udc_start(struct ci13xxx *udc)
- 	struct device *dev = udc->dev;
- 	int retval = 0;
+diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
+index fd36dc8..8337fb5 100644
+--- a/drivers/usb/chipidea/Kconfig
++++ b/drivers/usb/chipidea/Kconfig
+@@ -20,6 +20,7 @@ config USB_CHIPIDEA_UDC
  
--	if (!udc)
--		return -EINVAL;
--
- 	spin_lock_init(&udc->lock);
- 
- 	udc->gadget.ops          = &usb_gadget_ops;
+ config USB_CHIPIDEA_HOST
+ 	bool "ChipIdea host controller"
++	select USB_EHCI_ROOT_HUB_TT
+ 	help
+ 	  Say Y here to enable host controller functionality of the
+ 	  ChipIdea driver.
 -- 
 1.7.9.5
