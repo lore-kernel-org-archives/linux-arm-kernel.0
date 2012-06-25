@@ -1,96 +1,61 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 25 Jun 2012 13:25:08 +0530
-Subject: [PATCH] ARM: tegra: Remove second instance of uart clk
-Message-ID: <1340610908-2729-1-git-send-email-pgaikwad@nvidia.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 25 Jun 2012 10:58:53 +0300
+Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
+In-Reply-To: <4FE80C43.6090802@ti.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1340372890-10091-6-git-send-email-rnayak@ti.com>
+ <1340604478.12683.25.camel@lappyti> <4FE80C43.6090802@ti.com>
+Message-ID: <1340611133.3395.3.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Tegra30 clock file two clk objects were created for same UART clock.
-Remove the duplicates and add clock aliases instead.
+On Mon, 2012-06-25 at 12:29 +0530, Rajendra Nayak wrote:
+> On Monday 25 June 2012 11:37 AM, Tomi Valkeinen wrote:
+> > Hi,
+> >
+> > On Fri, 2012-06-22 at 19:18 +0530, Rajendra Nayak wrote:
+> >> In preparation of OMAP moving to Common Clk Framework(CCF) add clk_prepare()
+> >> and clk_unprepare() for the omapdss clocks.
+> >
+> > You used clk_prepare and clk_unprepare instead of clk_prepare_enable and
+> > clk_disable_unprepare. I didn't check the dss driver yet, but my hunch
+> > is that the clocks are normally not enabled/disabled from atomic
+> > context.
+> >
+> > What does the prepare/unprepare actually do? Is there any benefit in
+> > delaying preparing, i.e. is there a difference between prepare right
+> > after clk_get, or prepare right before clk_enable? (And similarly for
+> > unprepare)
+> 
+> clk_prepare/unprepare are useful for clocks which need the 'enable'
+> logic to be implemented as a slow part (which can sleep) and a fast part
+> (which does not sleep). For all the dss clocks in question we don't need
+> a slow part and hence they do not have a .clk_prepare/unprepare
+> platform hook.
+> 
+> The framework however still does prepare usecounting (it has a prepare
+> count and an enable count, and prepare count is expected to be non-zero
+> while the clock is being enabled) and uses a mutex around to guard it.
+> So while the dss driver would do multiple clk_enable/disable while its
+> active, it seems fair to just prepare/unprepare the clocks once just
+> after clk_get() and before clk_put() in this particular case.
 
-Update the Tegra20 clock file to make the names consistent.
+But the driver should not presume anything special about the clocks. In
+this case the dss driver would presume that the clocks it uses do not
+have prepare and unprepare hooks.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- arch/arm/mach-tegra/tegra2_clocks.c  |   20 ++++++++++----------
- arch/arm/mach-tegra/tegra30_clocks.c |   20 ++++++++++----------
- 2 files changed, 20 insertions(+), 20 deletions(-)
+If the generally proper way to use prepare/unprepare is in combination
+of enable/disable, then I think we should try to do that.
 
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index b59315c..034d952 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -2189,11 +2189,11 @@ static struct clk tegra_list_clks[] = {
- 	PERIPH_CLK("i2c2_i2c",	"tegra-i2c.1",		"i2c",	0,	0,	72000000,  mux_pllp_out3,			0),
- 	PERIPH_CLK("i2c3_i2c",	"tegra-i2c.2",		"i2c",	0,	0,	72000000,  mux_pllp_out3,			0),
- 	PERIPH_CLK("dvc_i2c",	"tegra-i2c.3",		"i2c",	0,	0,	72000000,  mux_pllp_out3,			0),
--	PERIPH_CLK("uarta",	"uart.0",		NULL,	6,	0x178,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
--	PERIPH_CLK("uartb",	"uart.1",		NULL,	7,	0x17c,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
--	PERIPH_CLK("uartc",	"uart.2",		NULL,	55,	0x1a0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
--	PERIPH_CLK("uartd",	"uart.3",		NULL,	65,	0x1c0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
--	PERIPH_CLK("uarte",	"uart.4",		NULL,	66,	0x1c4,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-+	PERIPH_CLK("uarta",	"tegra-uart.0",		NULL,	6,	0x178,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-+	PERIPH_CLK("uartb",	"tegra-uart.1",		NULL,	7,	0x17c,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-+	PERIPH_CLK("uartc",	"tegra-uart.2",		NULL,	55,	0x1a0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-+	PERIPH_CLK("uartd",	"tegra-uart.3",		NULL,	65,	0x1c0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-+	PERIPH_CLK("uarte",	"tegra-uart.4",		NULL,	66,	0x1c4,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
- 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
- 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
- 	PERIPH_CLK("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
-@@ -2245,11 +2245,11 @@ static struct clk tegra_list_clks[] = {
-  * table under two names.
-  */
- static struct clk_duplicate tegra_clk_duplicates[] = {
--	CLK_DUPLICATE("uarta",	"tegra_uart.0",	NULL),
--	CLK_DUPLICATE("uartb",	"tegra_uart.1",	NULL),
--	CLK_DUPLICATE("uartc",	"tegra_uart.2",	NULL),
--	CLK_DUPLICATE("uartd",	"tegra_uart.3",	NULL),
--	CLK_DUPLICATE("uarte",	"tegra_uart.4",	NULL),
-+	CLK_DUPLICATE("uarta",  "serial8250.0", NULL),
-+	CLK_DUPLICATE("uartb",  "serial8250.1", NULL),
-+	CLK_DUPLICATE("uartc",  "serial8250.2", NULL),
-+	CLK_DUPLICATE("uartd",  "serial8250.3", NULL),
-+	CLK_DUPLICATE("uarte",  "serial8250.4", NULL),
- 	CLK_DUPLICATE("usbd", "utmip-pad", NULL),
- 	CLK_DUPLICATE("usbd", "tegra-ehci.0", NULL),
- 	CLK_DUPLICATE("usbd", "tegra-otg", NULL),
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
-index e33fe4b..e1a7489 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks.c
-@@ -2924,16 +2924,11 @@ struct clk tegra_list_clks[] = {
- 	PERIPH_CLK("i2c3",	"tegra-i2c.2",		NULL,	67,	0x1b8,	26000000,  mux_pllp_clkm,		MUX | DIV_U16 | PERIPH_ON_APB),
- 	PERIPH_CLK("i2c4",	"tegra-i2c.3",		NULL,	103,	0x3c4,	26000000,  mux_pllp_clkm,		MUX | DIV_U16 | PERIPH_ON_APB),
- 	PERIPH_CLK("i2c5",	"tegra-i2c.4",		NULL,	47,	0x128,	26000000,  mux_pllp_clkm,		MUX | DIV_U16 | PERIPH_ON_APB),
--	PERIPH_CLK("uarta",	"tegra_uart.0",		NULL,	6,	0x178,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uartb",	"tegra_uart.1",		NULL,	7,	0x17c,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uartc",	"tegra_uart.2",		NULL,	55,	0x1a0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uartd",	"tegra_uart.3",		NULL,	65,	0x1c0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uarte",	"tegra_uart.4",		NULL,	66,	0x1c4,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uarta_dbg",	"serial8250.0",		"uarta", 6,	0x178,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uartb_dbg",	"serial8250.0",		"uartb", 7,	0x17c,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uartc_dbg",	"serial8250.0",		"uartc", 55,	0x1a0,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uartd_dbg",	"serial8250.0",		"uartd", 65,	0x1c0,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
--	PERIPH_CLK("uarte_dbg",	"serial8250.0",		"uarte", 66,	0x1c4,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
-+	PERIPH_CLK("uarta",	"tegra-uart.0",		NULL,	6,	0x178,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
-+	PERIPH_CLK("uartb",	"tegra-uart.1",		NULL,	7,	0x17c,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
-+	PERIPH_CLK("uartc",	"tegra-uart.2",		NULL,	55,	0x1a0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
-+	PERIPH_CLK("uartd",	"tegra-uart.3",		NULL,	65,	0x1c0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
-+	PERIPH_CLK("uarte",	"tegra-uart.4",		NULL,	66,	0x1c4,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
- 	PERIPH_CLK_EX("vi",	"tegra_camera",		"vi",	20,	0x148,	425000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT,	&tegra_vi_clk_ops),
- 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE | PERIPH_MANUAL_RESET),
- 	PERIPH_CLK("3d2",       "3d2",			NULL,	98,	0x3b0,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE | PERIPH_MANUAL_RESET),
-@@ -2983,6 +2978,11 @@ struct clk tegra_list_clks[] = {
-  * table under two names.
-  */
- struct clk_duplicate tegra_clk_duplicates[] = {
-+	CLK_DUPLICATE("uarta",  "serial8250.0", NULL),
-+	CLK_DUPLICATE("uartb",  "serial8250.1", NULL),
-+	CLK_DUPLICATE("uartc",  "serial8250.2", NULL),
-+	CLK_DUPLICATE("uartd",  "serial8250.3", NULL),
-+	CLK_DUPLICATE("uarte",  "serial8250.4", NULL),
- 	CLK_DUPLICATE("usbd", "utmip-pad", NULL),
- 	CLK_DUPLICATE("usbd", "tegra-ehci.0", NULL),
- 	CLK_DUPLICATE("usbd", "tegra-otg", NULL),
--- 
-1.7.4.1
+I'll check if any of the dss clocks are enabled or disabled in atomic
+context.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/85453955/attachment.sig>
