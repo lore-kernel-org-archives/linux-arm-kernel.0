@@ -1,86 +1,43 @@
-From: dhowells@redhat.com (David Howells)
-Date: Mon, 25 Jun 2012 20:11:31 +0100
-Subject: [PATCH] ARM: Delete asm/system.h
-Message-ID: <20120625191130.27109.42551.stgit@warthog.procyon.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jun 2012 16:26:08 +0000
+Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
+ ocp2scp
+In-Reply-To: <20120625122449.GA30463@arwen.pp.htv.fi>
+References: <1340370942-23201-1-git-send-email-kishon@ti.com>
+ <CAAe_U6+dkiQw-i93pFapt6qKrArzaQoE8X3GjDzUDraziG8B2Q@mail.gmail.com>
+ <20120625122449.GA30463@arwen.pp.htv.fi>
+Message-ID: <201206251626.09666.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delete asm/system.h from the ARM arch.  This was missed when the others were
-deleted.
+On Monday 25 June 2012, Felipe Balbi wrote:
+> > > Can't this live where the scp drivers live?  Actually, where is that at?
+> > > Do we have scp drivers?
+> > AFAIK, there isn't any driver for scp. But we have a driver for ocp
+> > and it is present at arch/arm/mach-omap2/omap_l3_noc.c
+> 
+> I don't think this deserves a directory of its own. Maybe
+> drivers/platform/arm/omap/ ?? the l3_noc is an OMAP-specific
+> interconnect and the SCP bus is also an OMAP-specific bus. I don't know
+> of any other arch/soc who uses the same interconnect IP as OMAP and the
+> same ocp2scp bridge. That bridge was created by TI for all I know.
+> 
+> Greg, would drivers/platform/arm/omap/ work for you ? We could also move
+> the interconnect drivers there.
 
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: David Howells <dhowells@redhat.com>
----
+I really don't like the idea of introducing drivers/platform/arm/ because
+very little of the stuff that one would put in there are actually ARM
+specific.
 
- arch/arm/include/asm/jump_label.h |    1 -
- arch/arm/include/asm/system.h     |    8 --------
- arch/arm/mach-msm/idle.c          |    2 +-
- arch/arm/plat-omap/mux.c          |    2 --
- drivers/usb/gadget/lpc32xx_udc.c  |    1 -
- 5 files changed, 1 insertions(+), 13 deletions(-)
- delete mode 100644 arch/arm/include/asm/system.h
+I have suggested a drivers/bus/ before and people did not see the need
+back then, and we agreed to continue having a directory for each bus,
+as we have for the big ones (pci, usb, i2c, spi, ...) and a lot of
+simple (amba, rapidio, bcma, ...) or obscure (tc,  vlynq, nubus, ...)
+ones.
 
-diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
-index bfc198c..f0409ec 100644
---- a/arch/arm/include/asm/jump_label.h
-+++ b/arch/arm/include/asm/jump_label.h
-@@ -4,7 +4,6 @@
- #ifdef __KERNEL__
- 
- #include <linux/types.h>
--#include <asm/system.h>
- 
- #define JUMP_LABEL_NOP_SIZE 4
- 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-deleted file mode 100644
-index 74542c5..0000000
---- a/arch/arm/include/asm/system.h
-+++ /dev/null
-@@ -1,8 +0,0 @@
--/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
--#include <asm/barrier.h>
--#include <asm/compiler.h>
--#include <asm/cmpxchg.h>
--#include <asm/exec.h>
--#include <asm/switch_to.h>
--#include <asm/system_info.h>
--#include <asm/system_misc.h>
-diff --git a/arch/arm/mach-msm/idle.c b/arch/arm/mach-msm/idle.c
-index 0c9e13c..e4d0c66 100644
---- a/arch/arm/mach-msm/idle.c
-+++ b/arch/arm/mach-msm/idle.c
-@@ -17,7 +17,7 @@
-  */
- 
- #include <linux/init.h>
--#include <asm/system.h>
-+#include <asm/system_misc.h>
- 
- static void msm_idle(void)
- {
-diff --git a/arch/arm/plat-omap/mux.c b/arch/arm/plat-omap/mux.c
-index cff8712..da503eb 100644
---- a/arch/arm/plat-omap/mux.c
-+++ b/arch/arm/plat-omap/mux.c
-@@ -28,8 +28,6 @@
- #include <linux/io.h>
- #include <linux/spinlock.h>
- 
--#include <asm/system.h>
--
- #include <plat/cpu.h>
- #include <plat/mux.h>
- 
-diff --git a/drivers/usb/gadget/lpc32xx_udc.c b/drivers/usb/gadget/lpc32xx_udc.c
-index 262acfd..626963e 100644
---- a/drivers/usb/gadget/lpc32xx_udc.c
-+++ b/drivers/usb/gadget/lpc32xx_udc.c
-@@ -55,7 +55,6 @@
- #include <mach/hardware.h>
- #include <linux/io.h>
- #include <asm/irq.h>
--#include <asm/system.h>
- 
- #include <mach/platform.h>
- #include <mach/irqs.h>
+I think we should reconsider the idea of drivers/bus/ with a file per
+bus in there at least for new buses, but doing a new drivers/scp/
+would be ok for me if there is enough opposition against the idea
+of drivers/bus aggregating different buses.
+
+	Arnd
