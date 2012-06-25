@@ -1,81 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jun 2012 10:36:48 +0100
-Subject: [PATCH 1/2] ARM: spinlock: use ticket algorithm for ARMv6+
- locking implementation
-In-Reply-To: <alpine.LFD.2.02.1206221443100.10229@xanadu.home>
-References: <1340378146-17560-1-git-send-email-will.deacon@arm.com>
- <1340378146-17560-2-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1206221443100.10229@xanadu.home>
-Message-ID: <20120625093648.GC22128@mudshark.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 25 Jun 2012 12:38:59 +0300
+Subject: [PATCH 2/2] ARM: OMAP2: Fix tusb6010 GPIO interrupt for n8x0
+In-Reply-To: <20120613101512.18645.12865.stgit@muffinssi.local>
+References: <20120613101303.18645.83320.stgit@muffinssi.local>
+ <20120613101512.18645.12865.stgit@muffinssi.local>
+Message-ID: <20120625093858.GA6468@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-Thanks for looking at this.
-
-On Fri, Jun 22, 2012 at 09:08:47PM +0100, Nicolas Pitre wrote:
-> On Fri, 22 Jun 2012, Will Deacon wrote:
+On Wed, Jun 13, 2012 at 03:15:12AM -0700, Tony Lindgren wrote:
+> Here's one more gpio_to_irq conversion that we missed
+> earlier. Tested with n800 in gadget mode using USB_ETH.
 > 
-> > Ticket spinlocks ensure locking fairness by reducing the thundering herd
-> > effect when acquiring a lock.
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+> ---
+>  arch/arm/mach-omap2/usb-tusb6010.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> The conventional thundering herd effect is still there as all waiting 
-> CPUs are still woken up from WFE upon a spin_unlock with a SEV.  Maybe 
-> the fact that the actual spinning is no longer banging on the exclusion 
-> monitor does count as reduction of the thundering herd effect at that 
-> level though, and if that is what you meant then this could be precised 
-> here.
-
-Sure, I can clarify that. The thundering herd effect is reduced because (a)
-the cacheline can remain shared and (b) the memory access time doesn't
-determine the winner.
-
-> > This is especially important on systems
-> > where memory-access times are not necessarily uniform when accessing
-> > the lock structure (for example, on a multi-cluster platform where the
-> > lock is allocated into L1 when a CPU releases it).
+> diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
+> index db84a46..805bea6 100644
+> --- a/arch/arm/mach-omap2/usb-tusb6010.c
+> +++ b/arch/arm/mach-omap2/usb-tusb6010.c
+> @@ -300,7 +300,7 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
+>  		printk(error, 3, status);
+>  		return status;
+>  	}
+> -	tusb_resources[2].start = irq + IH_GPIO_BASE;
+> +	tusb_resources[2].start = gpio_to_irq(irq);
+>  
+>  	/* set up memory timings ... can speed them up later */
+>  	if (!ps_refclk) {
 > 
-> In which case it is more about fairness.  This algorithm brings fairness 
-> due to its FIFO nature, despite possible memory access speed 
-> differences.  And that is even more important than the thundering herd 
-> effect.  Solving both at once is of course all good.
 
-Precisely.
-
-> > This patch implements the ticket spinlock algorithm for ARM, replacing
-> > the simpler implementation for ARMv6+ processors.
-> > 
-> > Cc: Nicolas Pitre <nico@fluxnic.net>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> A minor remarks below.  Otherwise...
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-
-Thanks Nicolas.
-
-> >  static inline int arch_spin_trylock(arch_spinlock_t *lock)
-> >  {
-> >  	unsigned long tmp;
-> > +	u32 slock;
-> >  
-> >  	__asm__ __volatile__(
-> > -"	ldrex	%0, [%1]\n"
-> > -"	teq	%0, #0\n"
-> > -"	strexeq	%0, %2, [%1]"
-> > -	: "=&r" (tmp)
-> > -	: "r" (&lock->lock), "r" (1)
-> > +"	ldrex	%0, [%2]\n"
-> > +"	cmp	%0, %0, ror #16\n"
-> > +"	movne	%1, #1\n"
-> 
-> You could replace the above 2 insns with:
-> 
-> 	subs	%1, %0, %0, ror #16
-
-Wahey, that is extremely concise!
-
-Cheers,
-
-Will
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/bd7020b7/attachment.sig>
