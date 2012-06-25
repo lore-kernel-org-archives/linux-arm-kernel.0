@@ -1,913 +1,1606 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 25 Jun 2012 10:34:54 +0200
-Subject: [PATCH v3 4/7] ARM: at91: at91 based machines specify their own
- irq handler at run time
-In-Reply-To: <1340467539-12294-5-git-send-email-ludovic.desroches@atmel.com>
+Date: Mon, 25 Jun 2012 10:35:19 +0200
+Subject: [PATCH v3 5/7] ARM: at91: sparse irq support
+In-Reply-To: <1340467866-12342-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1340467539-12294-1-git-send-email-ludovic.desroches@atmel.com>
- <1340467539-12294-5-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <4FE822AE.20704@atmel.com>
+ <1340467866-12342-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <4FE822C7.3040704@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2012 06:05 PM, ludovic.desroches at atmel.com :
+On 06/23/2012 06:11 PM, ludovic.desroches at atmel.com :
 > From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> SOC_AT91SAM9 selects MULTI_IRQ_HANDLER in order to let machines specify their
-> own IRQ handler at run time.
+> Enable sparse irq support for multisoc image. It involves to add the
+> NR_IRQS_LEGACY offset to static SoC irq number definitions since NR_IRQS_LEGACY
+> irq descs are allocated before AIC requests irq descs allocation.
+> Move NR_AIC_IRQS macro to a more appropiate place with the purpose to
+> remove mach/irqs.h later.
 > 
 > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  arch/arm/mach-at91/Kconfig                    |    1 +
->  arch/arm/mach-at91/board-1arm.c               |    2 +
->  arch/arm/mach-at91/board-afeb-9260v1.c        |    2 +
->  arch/arm/mach-at91/board-cam60.c              |    2 +
->  arch/arm/mach-at91/board-carmeva.c            |    2 +
->  arch/arm/mach-at91/board-cpu9krea.c           |    2 +
->  arch/arm/mach-at91/board-cpuat91.c            |    2 +
->  arch/arm/mach-at91/board-csb337.c             |    2 +
->  arch/arm/mach-at91/board-csb637.c             |    2 +
->  arch/arm/mach-at91/board-dt.c                 |    2 +
->  arch/arm/mach-at91/board-eb01.c               |    2 +
->  arch/arm/mach-at91/board-eb9200.c             |    2 +
->  arch/arm/mach-at91/board-ecbat91.c            |    2 +
->  arch/arm/mach-at91/board-eco920.c             |    2 +
->  arch/arm/mach-at91/board-flexibity.c          |    2 +
->  arch/arm/mach-at91/board-foxg20.c             |    2 +
->  arch/arm/mach-at91/board-gsia18s.c            |    2 +
->  arch/arm/mach-at91/board-kafa.c               |    2 +
->  arch/arm/mach-at91/board-kb9202.c             |    2 +
->  arch/arm/mach-at91/board-neocore926.c         |    2 +
->  arch/arm/mach-at91/board-pcontrol-g20.c       |    2 +
->  arch/arm/mach-at91/board-picotux200.c         |    2 +
->  arch/arm/mach-at91/board-qil-a9260.c          |    2 +
->  arch/arm/mach-at91/board-rm9200dk.c           |    2 +
->  arch/arm/mach-at91/board-rm9200ek.c           |    2 +
->  arch/arm/mach-at91/board-rsi-ews.c            |    2 +
->  arch/arm/mach-at91/board-sam9-l9260.c         |    2 +
->  arch/arm/mach-at91/board-sam9260ek.c          |    2 +
->  arch/arm/mach-at91/board-sam9261ek.c          |    2 +
->  arch/arm/mach-at91/board-sam9263ek.c          |    2 +
->  arch/arm/mach-at91/board-sam9g20ek.c          |    3 ++
->  arch/arm/mach-at91/board-sam9m10g45ek.c       |    2 +
->  arch/arm/mach-at91/board-sam9rlek.c           |    2 +
->  arch/arm/mach-at91/board-snapper9260.c        |    2 +
->  arch/arm/mach-at91/board-stamp9g20.c          |    3 ++
->  arch/arm/mach-at91/board-usb-a926x.c          |    4 +++
->  arch/arm/mach-at91/board-yl-9200.c            |    2 +
->  arch/arm/mach-at91/include/mach/at91_aic.h    |    2 +
->  arch/arm/mach-at91/include/mach/entry-macro.S |   27 -------------------------
->  arch/arm/mach-at91/irq.c                      |   19 +++++++++++++++++
->  40 files changed, 98 insertions(+), 27 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/include/mach/entry-macro.S
+>  arch/arm/mach-at91/Kconfig                 |    1 +
+>  arch/arm/mach-at91/at91rm9200.c            |    1 +
+>  arch/arm/mach-at91/at91rm9200_devices.c    |   84 +++++++++++-----------
+>  arch/arm/mach-at91/at91sam9260.c           |    1 +
+>  arch/arm/mach-at91/at91sam9260_devices.c   |   92 ++++++++++++------------
+>  arch/arm/mach-at91/at91sam9261.c           |    1 +
+>  arch/arm/mach-at91/at91sam9261_devices.c   |   68 +++++++++---------
+>  arch/arm/mach-at91/at91sam9263.c           |    1 +
+>  arch/arm/mach-at91/at91sam9263_devices.c   |   80 ++++++++++----------
+>  arch/arm/mach-at91/at91sam926x_time.c      |    2 +-
+>  arch/arm/mach-at91/at91sam9g45.c           |    1 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c   |  108 ++++++++++++++--------------
+>  arch/arm/mach-at91/at91sam9rl.c            |    1 +
+>  arch/arm/mach-at91/at91sam9rl_devices.c    |   76 ++++++++++----------
+>  arch/arm/mach-at91/at91x40.c               |    1 +
+>  arch/arm/mach-at91/include/mach/at91_aic.h |    3 +
+>  arch/arm/mach-at91/include/mach/irqs.h     |   12 ---
+>  arch/arm/mach-at91/irq.c                   |    6 +-
+>  arch/arm/mach-at91/pm.c                    |    1 +
+>  19 files changed, 271 insertions(+), 269 deletions(-)
 > 
 > diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 19505c0..e401dea 100644
+> index e401dea..7d0c40a 100644
 > --- a/arch/arm/mach-at91/Kconfig
 > +++ b/arch/arm/mach-at91/Kconfig
-> @@ -29,6 +29,7 @@ comment "Atmel AT91 Processor"
->  config SOC_AT91SAM9
+> @@ -30,6 +30,7 @@ config SOC_AT91SAM9
 >  	bool
 >  	select CPU_ARM926T
-> +	select MULTI_IRQ_HANDLER
+>  	select MULTI_IRQ_HANDLER
+> +	select SPARSE_IRQ
 >  	select AT91_SAM9_TIME
 >  	select AT91_SAM9_SMC
 >  
-> diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-> index 271f994..22d8856 100644
-> --- a/arch/arm/mach-at91/board-1arm.c
-> +++ b/arch/arm/mach-at91/board-1arm.c
-> @@ -36,6 +36,7 @@
->  
->  #include <mach/board.h>
->  #include <mach/cpu.h>
-> +#include <mach/at91_aic.h>
->  
->  #include "generic.h"
->  
-> @@ -91,6 +92,7 @@ MACHINE_START(ONEARM, "Ajeco 1ARM single board computer")
->  	/* Maintainer: Lennert Buytenhek <buytenh@wantstofly.org> */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= onearm_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= onearm_board_init,
-> diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-> index b7d8aa7..de7be19 100644
-> --- a/arch/arm/mach-at91/board-afeb-9260v1.c
-> +++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-> @@ -44,6 +44,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include "generic.h"
->  
-> @@ -212,6 +213,7 @@ MACHINE_START(AFEB9260, "Custom afeb9260 board")
->  	/* Maintainer: Sergey Lapin <slapin@ossfans.org> */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= afeb9260_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= afeb9260_board_init,
-> diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-> index 29d3ef0..477e708 100644
-> --- a/arch/arm/mach-at91/board-cam60.c
-> +++ b/arch/arm/mach-at91/board-cam60.c
-> @@ -39,6 +39,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  
->  #include "sam9_smc.h"
-> @@ -188,6 +189,7 @@ MACHINE_START(CAM60, "KwikByte CAM60")
->  	/* Maintainer: KwikByte */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= cam60_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= cam60_board_init,
-> diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-> index 44328a6..a5b002f 100644
-> --- a/arch/arm/mach-at91/board-carmeva.c
-> +++ b/arch/arm/mach-at91/board-carmeva.c
-> @@ -36,6 +36,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include "generic.h"
->  
-> @@ -158,6 +159,7 @@ MACHINE_START(CARMEVA, "Carmeva")
->  	/* Maintainer: Conitec Datasystems */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= carmeva_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= carmeva_board_init,
-> diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-> index 69951ec..ecbc13b 100644
-> --- a/arch/arm/mach-at91/board-cpu9krea.c
-> +++ b/arch/arm/mach-at91/board-cpu9krea.c
-> @@ -41,6 +41,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91sam9260_matrix.h>
->  #include <mach/at91_matrix.h>
-> @@ -376,6 +377,7 @@ MACHINE_START(CPUAT9G20, "Eukrea CPU9G20")
->  	/* Maintainer: Eric Benard - EUKREA Electromatique */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= cpu9krea_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= cpu9krea_board_init,
-> diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-> index 895cf2d..2e6d043 100644
-> --- a/arch/arm/mach-at91/board-cpuat91.c
-> +++ b/arch/arm/mach-at91/board-cpuat91.c
-> @@ -37,6 +37,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
->  #include <mach/cpu.h>
-> @@ -178,6 +179,7 @@ MACHINE_START(CPUAT91, "Eukrea")
->  	/* Maintainer: Eric Benard - EUKREA Electromatique */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= cpuat91_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= cpuat91_board_init,
-> diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-> index cd81336..462bc31 100644
-> --- a/arch/arm/mach-at91/board-csb337.c
-> +++ b/arch/arm/mach-at91/board-csb337.c
-> @@ -39,6 +39,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include "generic.h"
->  
-> @@ -252,6 +253,7 @@ MACHINE_START(CSB337, "Cogent CSB337")
->  	/* Maintainer: Bill Gatliff */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= csb337_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= csb337_board_init,
-> diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
-> index 7c8b05a..872871a 100644
-> --- a/arch/arm/mach-at91/board-csb637.c
-> +++ b/arch/arm/mach-at91/board-csb637.c
-> @@ -36,6 +36,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include "generic.h"
->  
-> @@ -133,6 +134,7 @@ MACHINE_START(CSB637, "Cogent CSB637")
->  	/* Maintainer: Bill Gatliff */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= csb637_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= csb637_board_init,
-> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-> index a1fce05..e8f45c4 100644
-> --- a/arch/arm/mach-at91/board-dt.c
-> +++ b/arch/arm/mach-at91/board-dt.c
-> @@ -16,6 +16,7 @@
->  #include <linux/of_platform.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include <asm/setup.h>
->  #include <asm/irq.h>
-> @@ -53,6 +54,7 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= at91_dt_initialize,
->  	.init_irq	= at91_dt_init_irq,
->  	.init_machine	= at91_dt_device_init,
-> diff --git a/arch/arm/mach-at91/board-eb01.c b/arch/arm/mach-at91/board-eb01.c
-> index d2023f2..01f66e9 100644
-> --- a/arch/arm/mach-at91/board-eb01.c
-> +++ b/arch/arm/mach-at91/board-eb01.c
-> @@ -28,6 +28,7 @@
->  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index 2691768..6f50c67 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -17,6 +17,7 @@
 >  #include <asm/mach/map.h>
->  #include <mach/board.h>
+>  #include <asm/system_misc.h>
+>  #include <mach/at91rm9200.h>
 > +#include <mach/at91_aic.h>
->  #include "generic.h"
->  
->  static void __init at91eb01_init_irq(void)
-> @@ -43,6 +44,7 @@ static void __init at91eb01_init_early(void)
->  MACHINE_START(AT91EB01, "Atmel AT91 EB01")
->  	/* Maintainer: Greg Ungerer <gerg@snapgear.com> */
->  	.timer		= &at91x40_timer,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= at91eb01_init_early,
->  	.init_irq	= at91eb01_init_irq,
->  MACHINE_END
-> diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-> index bd10172..d1e1f3f 100644
-> --- a/arch/arm/mach-at91/board-eb9200.c
-> +++ b/arch/arm/mach-at91/board-eb9200.c
-> @@ -36,6 +36,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include "generic.h"
->  
-> @@ -118,6 +119,7 @@ static void __init eb9200_board_init(void)
->  MACHINE_START(ATEB9200, "Embest ATEB9200")
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= eb9200_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= eb9200_board_init,
-> diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-> index 89cc372..9c24cb2 100644
-> --- a/arch/arm/mach-at91/board-ecbat91.c
-> +++ b/arch/arm/mach-at91/board-ecbat91.c
-> @@ -39,6 +39,7 @@
->  
->  #include <mach/board.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_st.h>
 >  #include <mach/cpu.h>
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index e6b7d05..01fb732 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -41,8 +41,8 @@ static struct resource usbh_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_UHP,
+> -		.end	= AT91RM9200_ID_UHP,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_UHP,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_UHP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -94,8 +94,8 @@ static struct resource udc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_UDP,
+> -		.end	= AT91RM9200_ID_UDP,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_UDP,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_UDP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -145,8 +145,8 @@ static struct resource eth_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_EMAC,
+> -		.end	= AT91RM9200_ID_EMAC,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_EMAC,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_EMAC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -305,8 +305,8 @@ static struct resource mmc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_MCI,
+> -		.end	= AT91RM9200_ID_MCI,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_MCI,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_MCI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -488,8 +488,8 @@ static struct resource twi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_TWI,
+> -		.end	= AT91RM9200_ID_TWI,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TWI,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TWI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -532,8 +532,8 @@ static struct resource spi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_SPI,
+> -		.end	= AT91RM9200_ID_SPI,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_SPI,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_SPI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -598,18 +598,18 @@ static struct resource tcb0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_TC0,
+> -		.end	= AT91RM9200_ID_TC0,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TC0,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[2] = {
+> -		.start	= AT91RM9200_ID_TC1,
+> -		.end	= AT91RM9200_ID_TC1,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TC1,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[3] = {
+> -		.start	= AT91RM9200_ID_TC2,
+> -		.end	= AT91RM9200_ID_TC2,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TC2,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TC2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -628,18 +628,18 @@ static struct resource tcb1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_TC3,
+> -		.end	= AT91RM9200_ID_TC3,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TC3,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TC3,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[2] = {
+> -		.start	= AT91RM9200_ID_TC4,
+> -		.end	= AT91RM9200_ID_TC4,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TC4,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TC4,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[3] = {
+> -		.start	= AT91RM9200_ID_TC5,
+> -		.end	= AT91RM9200_ID_TC5,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_TC5,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_TC5,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -673,8 +673,8 @@ static struct resource rtc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -729,8 +729,8 @@ static struct resource ssc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_SSC0,
+> -		.end	= AT91RM9200_ID_SSC0,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_SSC0,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_SSC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -771,8 +771,8 @@ static struct resource ssc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_SSC1,
+> -		.end	= AT91RM9200_ID_SSC1,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_SSC1,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_SSC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -813,8 +813,8 @@ static struct resource ssc2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_SSC2,
+> -		.end	= AT91RM9200_ID_SSC2,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_SSC2,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_SSC2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -897,8 +897,8 @@ static struct resource dbgu_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -935,8 +935,8 @@ static struct resource uart0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_US0,
+> -		.end	= AT91RM9200_ID_US0,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_US0,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_US0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -984,8 +984,8 @@ static struct resource uart1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_US1,
+> -		.end	= AT91RM9200_ID_US1,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_US1,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_US1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1035,8 +1035,8 @@ static struct resource uart2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_US2,
+> -		.end	= AT91RM9200_ID_US2,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_US2,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_US2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1078,8 +1078,8 @@ static struct resource uart3_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91RM9200_ID_US3,
+> -		.end	= AT91RM9200_ID_US3,
+> +		.start	= NR_IRQS_LEGACY + AT91RM9200_ID_US3,
+> +		.end	= NR_IRQS_LEGACY + AT91RM9200_ID_US3,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 2b1e438..30c7f26 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -20,6 +20,7 @@
+>  #include <mach/cpu.h>
+>  #include <mach/at91_dbgu.h>
+>  #include <mach/at91sam9260.h>
 > +#include <mach/at91_aic.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
 >  
->  #include "generic.h"
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 0ded951..7b9c2ba 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -45,8 +45,8 @@ static struct resource usbh_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_UHP,
+> -		.end	= AT91SAM9260_ID_UHP,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_UHP,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_UHP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -98,8 +98,8 @@ static struct resource udc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_UDP,
+> -		.end	= AT91SAM9260_ID_UDP,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_UDP,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_UDP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -149,8 +149,8 @@ static struct resource eth_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_EMAC,
+> -		.end	= AT91SAM9260_ID_EMAC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_EMAC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_EMAC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -223,8 +223,8 @@ static struct resource mmc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_MCI,
+> -		.end	= AT91SAM9260_ID_MCI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_MCI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_MCI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -305,8 +305,8 @@ static struct resource mmc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_MCI,
+> -		.end	= AT91SAM9260_ID_MCI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_MCI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_MCI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -496,8 +496,8 @@ static struct resource twi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_TWI,
+> -		.end	= AT91SAM9260_ID_TWI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TWI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TWI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -540,8 +540,8 @@ static struct resource spi0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_SPI0,
+> -		.end	= AT91SAM9260_ID_SPI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_SPI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_SPI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -566,8 +566,8 @@ static struct resource spi1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_SPI1,
+> -		.end	= AT91SAM9260_ID_SPI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_SPI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_SPI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -652,18 +652,18 @@ static struct resource tcb0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_TC0,
+> -		.end	= AT91SAM9260_ID_TC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9260_ID_TC1,
+> -		.end	= AT91SAM9260_ID_TC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[3] = {
+> -		.start	= AT91SAM9260_ID_TC2,
+> -		.end	= AT91SAM9260_ID_TC2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -682,18 +682,18 @@ static struct resource tcb1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_TC3,
+> -		.end	= AT91SAM9260_ID_TC3,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC3,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC3,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9260_ID_TC4,
+> -		.end	= AT91SAM9260_ID_TC4,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC4,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC4,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[3] = {
+> -		.start	= AT91SAM9260_ID_TC5,
+> -		.end	= AT91SAM9260_ID_TC5,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC5,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_TC5,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -807,8 +807,8 @@ static struct resource ssc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_SSC,
+> -		.end	= AT91SAM9260_ID_SSC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_SSC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_SSC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -882,8 +882,8 @@ static struct resource dbgu_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -920,8 +920,8 @@ static struct resource uart0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_US0,
+> -		.end	= AT91SAM9260_ID_US0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_US0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_US0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -971,8 +971,8 @@ static struct resource uart1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_US1,
+> -		.end	= AT91SAM9260_ID_US1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_US1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_US1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1014,8 +1014,8 @@ static struct resource uart2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_US2,
+> -		.end	= AT91SAM9260_ID_US2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_US2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_US2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1057,8 +1057,8 @@ static struct resource uart3_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_US3,
+> -		.end	= AT91SAM9260_ID_US3,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_US3,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_US3,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1100,8 +1100,8 @@ static struct resource uart4_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_US4,
+> -		.end	= AT91SAM9260_ID_US4,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_US4,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_US4,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1138,8 +1138,8 @@ static struct resource uart5_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_US5,
+> -		.end	= AT91SAM9260_ID_US5,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_US5,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_US5,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1357,8 +1357,8 @@ static struct resource adc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9260_ID_ADC,
+> -		.end	= AT91SAM9260_ID_ADC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9260_ID_ADC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9260_ID_ADC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index c77d503..f40762c 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -19,6 +19,7 @@
+>  #include <asm/system_misc.h>
+>  #include <mach/cpu.h>
+>  #include <mach/at91sam9261.h>
+> +#include <mach/at91_aic.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
 >  
-> @@ -170,6 +171,7 @@ MACHINE_START(ECBAT91, "emQbit's ECB_AT91")
->  	/* Maintainer: emQbit.com */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ecb_at91init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ecb_at91board_init,
-> diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-> index 558546c..82bdfde 100644
-> --- a/arch/arm/mach-at91/board-eco920.c
-> +++ b/arch/arm/mach-at91/board-eco920.c
-> @@ -25,6 +25,7 @@
+> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+> index 9295e90..8df5c1b 100644
+> --- a/arch/arm/mach-at91/at91sam9261_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
+> @@ -45,8 +45,8 @@ static struct resource usbh_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_UHP,
+> -		.end	= AT91SAM9261_ID_UHP,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_UHP,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_UHP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -98,8 +98,8 @@ static struct resource udc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_UDP,
+> -		.end	= AT91SAM9261_ID_UDP,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_UDP,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_UDP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -148,8 +148,8 @@ static struct resource mmc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_MCI,
+> -		.end	= AT91SAM9261_ID_MCI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_MCI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_MCI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -310,8 +310,8 @@ static struct resource twi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_TWI,
+> -		.end	= AT91SAM9261_ID_TWI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_TWI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_TWI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -354,8 +354,8 @@ static struct resource spi0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_SPI0,
+> -		.end	= AT91SAM9261_ID_SPI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_SPI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_SPI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -380,8 +380,8 @@ static struct resource spi1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_SPI1,
+> -		.end	= AT91SAM9261_ID_SPI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_SPI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_SPI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -468,8 +468,8 @@ static struct resource lcdc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_LCDC,
+> -		.end	= AT91SAM9261_ID_LCDC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_LCDC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_LCDC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  #if defined(CONFIG_FB_INTSRAM)
+> @@ -566,18 +566,18 @@ static struct resource tcb_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_TC0,
+> -		.end	= AT91SAM9261_ID_TC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_TC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_TC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9261_ID_TC1,
+> -		.end	= AT91SAM9261_ID_TC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_TC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_TC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[3] = {
+> -		.start	= AT91SAM9261_ID_TC2,
+> -		.end	= AT91SAM9261_ID_TC2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_TC2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_TC2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -689,8 +689,8 @@ static struct resource ssc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_SSC0,
+> -		.end	= AT91SAM9261_ID_SSC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_SSC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_SSC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -731,8 +731,8 @@ static struct resource ssc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_SSC1,
+> -		.end	= AT91SAM9261_ID_SSC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_SSC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_SSC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -773,8 +773,8 @@ static struct resource ssc2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_SSC2,
+> -		.end	= AT91SAM9261_ID_SSC2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_SSC2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_SSC2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -857,8 +857,8 @@ static struct resource dbgu_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -895,8 +895,8 @@ static struct resource uart0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_US0,
+> -		.end	= AT91SAM9261_ID_US0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_US0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_US0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -938,8 +938,8 @@ static struct resource uart1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_US1,
+> -		.end	= AT91SAM9261_ID_US1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_US1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_US1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -981,8 +981,8 @@ static struct resource uart2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9261_ID_US2,
+> -		.end	= AT91SAM9261_ID_US2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9261_ID_US2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9261_ID_US2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index ed91c7e..84b3810 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -18,6 +18,7 @@
 >  #include <asm/mach/map.h>
->  
->  #include <mach/board.h>
+>  #include <asm/system_misc.h>
+>  #include <mach/at91sam9263.h>
 > +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+>  
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index 175e000..eb6bbf8 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -44,8 +44,8 @@ static struct resource usbh_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_UHP,
+> -		.end	= AT91SAM9263_ID_UHP,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_UHP,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_UHP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -104,8 +104,8 @@ static struct resource udc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_UDP,
+> -		.end	= AT91SAM9263_ID_UDP,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_UDP,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_UDP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -155,8 +155,8 @@ static struct resource eth_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_EMAC,
+> -		.end	= AT91SAM9263_ID_EMAC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_EMAC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_EMAC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -229,8 +229,8 @@ static struct resource mmc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_MCI0,
+> -		.end	= AT91SAM9263_ID_MCI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_MCI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_MCI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -254,8 +254,8 @@ static struct resource mmc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_MCI1,
+> -		.end	= AT91SAM9263_ID_MCI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_MCI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_MCI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -567,8 +567,8 @@ static struct resource twi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_TWI,
+> -		.end	= AT91SAM9263_ID_TWI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_TWI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_TWI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -611,8 +611,8 @@ static struct resource spi0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_SPI0,
+> -		.end	= AT91SAM9263_ID_SPI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_SPI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_SPI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -637,8 +637,8 @@ static struct resource spi1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_SPI1,
+> -		.end	= AT91SAM9263_ID_SPI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_SPI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_SPI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -725,8 +725,8 @@ static struct resource ac97_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_AC97C,
+> -		.end	= AT91SAM9263_ID_AC97C,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_AC97C,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_AC97C,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -776,8 +776,8 @@ static struct resource can_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_CAN,
+> -		.end	= AT91SAM9263_ID_CAN,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_CAN,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_CAN,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -816,8 +816,8 @@ static struct resource lcdc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_LCDC,
+> -		.end	= AT91SAM9263_ID_LCDC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_LCDC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_LCDC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -883,8 +883,8 @@ struct resource isi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_ISI,
+> -		.end	= AT91SAM9263_ID_ISI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -940,8 +940,8 @@ static struct resource tcb_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_TCB,
+> -		.end	= AT91SAM9263_ID_TCB,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_TCB,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_TCB,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1108,8 +1108,8 @@ static struct resource pwm_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_PWMC,
+> -		.end	= AT91SAM9263_ID_PWMC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_PWMC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_PWMC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1161,8 +1161,8 @@ static struct resource ssc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_SSC0,
+> -		.end	= AT91SAM9263_ID_SSC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_SSC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_SSC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1203,8 +1203,8 @@ static struct resource ssc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_SSC1,
+> -		.end	= AT91SAM9263_ID_SSC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_SSC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_SSC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1284,8 +1284,8 @@ static struct resource dbgu_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1322,8 +1322,8 @@ static struct resource uart0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_US0,
+> -		.end	= AT91SAM9263_ID_US0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_US0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_US0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1365,8 +1365,8 @@ static struct resource uart1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_US1,
+> -		.end	= AT91SAM9263_ID_US1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_US1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_US1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1408,8 +1408,8 @@ static struct resource uart2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9263_ID_US2,
+> -		.end	= AT91SAM9263_ID_US2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_US2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_US2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index a94758b..ffc0957 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -137,7 +137,7 @@ static struct irqaction at91sam926x_pit_irq = {
+>  	.name		= "at91_tick",
+>  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+>  	.handler	= at91sam926x_pit_interrupt,
+> -	.irq		= AT91_ID_SYS,
+> +	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  };
+>  
+>  static void at91sam926x_pit_reset(void)
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 4792682..9771273 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -18,6 +18,7 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/system_misc.h>
+>  #include <mach/at91sam9g45.h>
+> +#include <mach/at91_aic.h>
+>  #include <mach/at91_pmc.h>
 >  #include <mach/cpu.h>
-> @@ -132,6 +133,7 @@ MACHINE_START(ECO920, "eco920")
->  	/* Maintainer: Sascha Hauer */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= eco920_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= eco920_board_init,
-> diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-> index 47658f7..6cc83a8 100644
-> --- a/arch/arm/mach-at91/board-flexibity.c
-> +++ b/arch/arm/mach-at91/board-flexibity.c
-> @@ -34,6 +34,7 @@
 >  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 933fc9a..40fb79d 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -53,8 +53,8 @@ static struct resource hdmac_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_DMA,
+> -		.end	= AT91SAM9G45_ID_DMA,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_DMA,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_DMA,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -94,8 +94,8 @@ static struct resource usbh_ohci_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_UHPHS,
+> -		.end	= AT91SAM9G45_ID_UHPHS,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_UHPHS,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_UHPHS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -156,8 +156,8 @@ static struct resource usbh_ehci_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_UHPHS,
+> -		.end	= AT91SAM9G45_ID_UHPHS,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_UHPHS,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_UHPHS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -213,8 +213,8 @@ static struct resource usba_udc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9G45_ID_UDPHS,
+> -		.end	= AT91SAM9G45_ID_UDPHS,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_UDPHS,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_UDPHS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -296,8 +296,8 @@ static struct resource eth_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_EMAC,
+> -		.end	= AT91SAM9G45_ID_EMAC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_EMAC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_EMAC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -370,8 +370,8 @@ static struct resource mmc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_MCI0,
+> -		.end	= AT91SAM9G45_ID_MCI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_MCI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_MCI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -395,8 +395,8 @@ static struct resource mmc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_MCI1,
+> -		.end	= AT91SAM9G45_ID_MCI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_MCI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_MCI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -645,8 +645,8 @@ static struct resource twi0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_TWI0,
+> -		.end	= AT91SAM9G45_ID_TWI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TWI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TWI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -665,8 +665,8 @@ static struct resource twi1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_TWI1,
+> -		.end	= AT91SAM9G45_ID_TWI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TWI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TWI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -720,8 +720,8 @@ static struct resource spi0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_SPI0,
+> -		.end	= AT91SAM9G45_ID_SPI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SPI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SPI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -746,8 +746,8 @@ static struct resource spi1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_SPI1,
+> -		.end	= AT91SAM9G45_ID_SPI1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SPI1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SPI1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -834,8 +834,8 @@ static struct resource ac97_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_AC97C,
+> -		.end	= AT91SAM9G45_ID_AC97C,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_AC97C,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_AC97C,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -887,8 +887,8 @@ struct resource isi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_ISI,
+> -		.end	= AT91SAM9G45_ID_ISI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_ISI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_ISI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -979,8 +979,8 @@ static struct resource lcdc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_LCDC,
+> -		.end	= AT91SAM9G45_ID_LCDC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_LCDC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_LCDC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1054,8 +1054,8 @@ static struct resource tcb0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_TCB,
+> -		.end	= AT91SAM9G45_ID_TCB,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TCB,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TCB,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1075,8 +1075,8 @@ static struct resource tcb1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_TCB,
+> -		.end	= AT91SAM9G45_ID_TCB,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TCB,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TCB,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1110,8 +1110,8 @@ static struct resource rtc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1147,8 +1147,8 @@ static struct resource tsadcc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_TSC,
+> -		.end	= AT91SAM9G45_ID_TSC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TSC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TSC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	}
+>  };
+> @@ -1197,8 +1197,8 @@ static struct resource adc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_TSC,
+> -		.end	= AT91SAM9G45_ID_TSC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TSC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_TSC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	}
+>  };
+> @@ -1400,8 +1400,8 @@ static struct resource pwm_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_PWMC,
+> -		.end	= AT91SAM9G45_ID_PWMC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_PWMC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_PWMC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1453,8 +1453,8 @@ static struct resource ssc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_SSC0,
+> -		.end	= AT91SAM9G45_ID_SSC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SSC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SSC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1495,8 +1495,8 @@ static struct resource ssc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_SSC1,
+> -		.end	= AT91SAM9G45_ID_SSC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SSC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_SSC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1575,8 +1575,8 @@ static struct resource dbgu_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1613,8 +1613,8 @@ static struct resource uart0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_US0,
+> -		.end	= AT91SAM9G45_ID_US0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1656,8 +1656,8 @@ static struct resource uart1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_US1,
+> -		.end	= AT91SAM9G45_ID_US1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1699,8 +1699,8 @@ static struct resource uart2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_US2,
+> -		.end	= AT91SAM9G45_ID_US2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1742,8 +1742,8 @@ static struct resource uart3_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9G45_ID_US3,
+> -		.end	= AT91SAM9G45_ID_US3,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US3,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_US3,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index e420085..72ce50a 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -19,6 +19,7 @@
+>  #include <mach/cpu.h>
+>  #include <mach/at91_dbgu.h>
+>  #include <mach/at91sam9rl.h>
 > +#include <mach/at91_aic.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
 >  
+> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+> index 9c0b148..f09fff9 100644
+> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+> @@ -41,8 +41,8 @@ static struct resource hdmac_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9RL_ID_DMA,
+> -		.end	= AT91SAM9RL_ID_DMA,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_DMA,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_DMA,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -84,8 +84,8 @@ static struct resource usba_udc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9RL_ID_UDPHS,
+> -		.end	= AT91SAM9RL_ID_UDPHS,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_UDPHS,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_UDPHS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -172,8 +172,8 @@ static struct resource mmc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_MCI,
+> -		.end	= AT91SAM9RL_ID_MCI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_MCI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_MCI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -339,8 +339,8 @@ static struct resource twi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_TWI0,
+> -		.end	= AT91SAM9RL_ID_TWI0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TWI0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TWI0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -383,8 +383,8 @@ static struct resource spi_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_SPI,
+> -		.end	= AT91SAM9RL_ID_SPI,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_SPI,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_SPI,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -452,8 +452,8 @@ static struct resource ac97_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_AC97C,
+> -		.end	= AT91SAM9RL_ID_AC97C,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_AC97C,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_AC97C,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -507,8 +507,8 @@ static struct resource lcdc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_LCDC,
+> -		.end	= AT91SAM9RL_ID_LCDC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_LCDC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_LCDC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -574,18 +574,18 @@ static struct resource tcb_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_TC0,
+> -		.end	= AT91SAM9RL_ID_TC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[2] = {
+> -		.start	= AT91SAM9RL_ID_TC1,
+> -		.end	= AT91SAM9RL_ID_TC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  	[3] = {
+> -		.start	= AT91SAM9RL_ID_TC2,
+> -		.end	= AT91SAM9RL_ID_TC2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TC2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TC2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -621,8 +621,8 @@ static struct resource tsadcc_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_TSC,
+> -		.end	= AT91SAM9RL_ID_TSC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TSC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TSC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	}
+>  };
+> @@ -768,8 +768,8 @@ static struct resource pwm_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_PWMC,
+> -		.end	= AT91SAM9RL_ID_PWMC,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_PWMC,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_PWMC,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -821,8 +821,8 @@ static struct resource ssc0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_SSC0,
+> -		.end	= AT91SAM9RL_ID_SSC0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_SSC0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_SSC0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -863,8 +863,8 @@ static struct resource ssc1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_SSC1,
+> -		.end	= AT91SAM9RL_ID_SSC1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_SSC1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_SSC1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -943,8 +943,8 @@ static struct resource dbgu_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91_ID_SYS,
+> -		.end	= AT91_ID_SYS,
+> +		.start	= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +		.end	= NR_IRQS_LEGACY + AT91_ID_SYS,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -981,8 +981,8 @@ static struct resource uart0_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_US0,
+> -		.end	= AT91SAM9RL_ID_US0,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US0,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US0,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1032,8 +1032,8 @@ static struct resource uart1_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_US1,
+> -		.end	= AT91SAM9RL_ID_US1,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US1,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US1,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1075,8 +1075,8 @@ static struct resource uart2_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_US2,
+> -		.end	= AT91SAM9RL_ID_US2,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US2,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US2,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> @@ -1118,8 +1118,8 @@ static struct resource uart3_resources[] = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start	= AT91SAM9RL_ID_US3,
+> -		.end	= AT91SAM9RL_ID_US3,
+> +		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US3,
+> +		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_US3,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+> index d62fe09..4c0f5fd 100644
+> --- a/arch/arm/mach-at91/at91x40.c
+> +++ b/arch/arm/mach-at91/at91x40.c
+> @@ -17,6 +17,7 @@
+>  #include <asm/system_misc.h>
+>  #include <asm/mach/arch.h>
+>  #include <mach/at91x40.h>
+> +#include <mach/at91_aic.h>
+>  #include <mach/at91_st.h>
+>  #include <mach/timex.h>
 >  #include "generic.h"
->  
-> @@ -160,6 +161,7 @@ MACHINE_START(FLEXIBITY, "Flexibity Connect")
->  	/* Maintainer: Maxim Osipov */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= flexibity_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= flexibity_board_init,
-> diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-> index 33411e6..69ab124 100644
-> --- a/arch/arm/mach-at91/board-foxg20.c
-> +++ b/arch/arm/mach-at91/board-foxg20.c
-> @@ -42,6 +42,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  
->  #include "sam9_smc.h"
-> @@ -262,6 +263,7 @@ MACHINE_START(ACMENETUSFOXG20, "Acme Systems srl FOX Board G20")
->  	/* Maintainer: Sergio Tanzilli */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= foxg20_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= foxg20_board_init,
-> diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
-> index 3e0dfa6..a9d5e78 100644
-> --- a/arch/arm/mach-at91/board-gsia18s.c
-> +++ b/arch/arm/mach-at91/board-gsia18s.c
-> @@ -31,6 +31,7 @@
->  #include <asm/mach/arch.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/gsia18s.h>
->  #include <mach/stamp9g20.h>
-> @@ -575,6 +576,7 @@ static void __init gsia18s_board_init(void)
->  MACHINE_START(GSIA18S, "GS_IA18_S")
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= gsia18s_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= gsia18s_board_init,
-> diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-> index f260657..64c1dbf 100644
-> --- a/arch/arm/mach-at91/board-kafa.c
-> +++ b/arch/arm/mach-at91/board-kafa.c
-> @@ -35,6 +35,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/cpu.h>
->  
->  #include "generic.h"
-> @@ -93,6 +94,7 @@ MACHINE_START(KAFA, "Sperry-Sun KAFA")
->  	/* Maintainer: Sergei Sharonov */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= kafa_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= kafa_board_init,
-> diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-> index ba39db5..5d96cb8 100644
-> --- a/arch/arm/mach-at91/board-kb9202.c
-> +++ b/arch/arm/mach-at91/board-kb9202.c
-> @@ -37,6 +37,7 @@
->  
->  #include <mach/board.h>
->  #include <mach/cpu.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
->  
-> @@ -133,6 +134,7 @@ MACHINE_START(KB9200, "KB920x")
->  	/* Maintainer: KwikByte, Inc. */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= kb9202_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= kb9202_board_init,
-> diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-> index d2f4cc1..18103c5d 100644
-> --- a/arch/arm/mach-at91/board-neocore926.c
-> +++ b/arch/arm/mach-at91/board-neocore926.c
-> @@ -45,6 +45,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  
->  #include "sam9_smc.h"
-> @@ -378,6 +379,7 @@ MACHINE_START(NEOCORE926, "ADENEO NEOCORE 926")
->  	/* Maintainer: ADENEO */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= neocore926_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= neocore926_board_init,
-> diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
-> index 7fe6383..9ca3e32 100644
-> --- a/arch/arm/mach-at91/board-pcontrol-g20.c
-> +++ b/arch/arm/mach-at91/board-pcontrol-g20.c
-> @@ -30,6 +30,7 @@
->  #include <asm/mach/arch.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/stamp9g20.h>
->  
-> @@ -218,6 +219,7 @@ MACHINE_START(PCONTROL_G20, "PControl G20")
->  	/* Maintainer: pgsellmann at portner-elektronik.at */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= pcontrol_g20_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= pcontrol_g20_board_init,
-> diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-> index b45c0a5..1270655 100644
-> --- a/arch/arm/mach-at91/board-picotux200.c
-> +++ b/arch/arm/mach-at91/board-picotux200.c
-> @@ -38,6 +38,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
->  
-> @@ -120,6 +121,7 @@ MACHINE_START(PICOTUX2XX, "picotux 200")
->  	/* Maintainer: Kleinhenz Elektronik GmbH */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= picotux200_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= picotux200_board_init,
-> diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-> index 0c61bf0..bf351e2 100644
-> --- a/arch/arm/mach-at91/board-qil-a9260.c
-> +++ b/arch/arm/mach-at91/board-qil-a9260.c
-> @@ -41,6 +41,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  
-> @@ -258,6 +259,7 @@ MACHINE_START(QIL_A9260, "CALAO QIL_A9260")
->  	/* Maintainer: calao-systems */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-> index afd7a47..cc2bf97 100644
-> --- a/arch/arm/mach-at91/board-rm9200dk.c
-> +++ b/arch/arm/mach-at91/board-rm9200dk.c
-> @@ -40,6 +40,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
->  
-> @@ -223,6 +224,7 @@ MACHINE_START(AT91RM9200DK, "Atmel AT91RM9200-DK")
->  	/* Maintainer: SAN People/Atmel */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= dk_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= dk_board_init,
-> diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-> index 2b15b8a..62e19e6 100644
-> --- a/arch/arm/mach-at91/board-rm9200ek.c
-> +++ b/arch/arm/mach-at91/board-rm9200ek.c
-> @@ -40,6 +40,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
->  
-> @@ -190,6 +191,7 @@ MACHINE_START(AT91RM9200EK, "Atmel AT91RM9200-EK")
->  	/* Maintainer: SAN People/Atmel */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
-> index 24ab9be..c3b43ae 100644
-> --- a/arch/arm/mach-at91/board-rsi-ews.c
-> +++ b/arch/arm/mach-at91/board-rsi-ews.c
-> @@ -26,6 +26,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  
->  #include <linux/gpio.h>
->  
-> @@ -225,6 +226,7 @@ MACHINE_START(RSI_EWS, "RSI EWS")
->  	/* Maintainer: Josef Holzmayr <holzmayr@rsi-elektrotechnik.de> */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= rsi_ews_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= rsi_ews_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-> index cdd21f2..7bf6da7 100644
-> --- a/arch/arm/mach-at91/board-sam9-l9260.c
-> +++ b/arch/arm/mach-at91/board-sam9-l9260.c
-> @@ -38,6 +38,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  
->  #include "sam9_smc.h"
-> @@ -202,6 +203,7 @@ MACHINE_START(SAM9_L9260, "Olimex SAM9-L9260")
->  	/* Maintainer: Olimex */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-> index 7b3c391..889c1bf 100644
-> --- a/arch/arm/mach-at91/board-sam9260ek.c
-> +++ b/arch/arm/mach-at91/board-sam9260ek.c
-> @@ -42,6 +42,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  #include <mach/system_rev.h>
-> @@ -344,6 +345,7 @@ MACHINE_START(AT91SAM9260EK, "Atmel AT91SAM9260-EK")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-> index 2736453..2269be5 100644
-> --- a/arch/arm/mach-at91/board-sam9261ek.c
-> +++ b/arch/arm/mach-at91/board-sam9261ek.c
-> @@ -46,6 +46,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  #include <mach/system_rev.h>
-> @@ -615,6 +616,7 @@ MACHINE_START(AT91SAM9G10EK, "Atmel AT91SAM9G10-EK")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-> index 983cb98..82adf58 100644
-> --- a/arch/arm/mach-at91/board-sam9263ek.c
-> +++ b/arch/arm/mach-at91/board-sam9263ek.c
-> @@ -45,6 +45,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  #include <mach/system_rev.h>
-> @@ -443,6 +444,7 @@ MACHINE_START(AT91SAM9263EK, "Atmel AT91SAM9263-EK")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-> index 6860d34..4ea4ee0 100644
-> --- a/arch/arm/mach-at91/board-sam9g20ek.c
-> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
-> @@ -44,6 +44,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/system_rev.h>
->  
-> @@ -413,6 +414,7 @@ MACHINE_START(AT91SAM9G20EK, "Atmel AT91SAM9G20-EK")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> @@ -422,6 +424,7 @@ MACHINE_START(AT91SAM9G20EK_2MMC, "Atmel AT91SAM9G20-EK 2 MMC Slot Mod")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index 63163dc..3d48ec1 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -43,6 +43,7 @@
->  #include <asm/mach/irq.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  #include <mach/system_rev.h>
-> @@ -503,6 +504,7 @@ MACHINE_START(AT91SAM9M10G45EK, "Atmel AT91SAM9M10G45-EK")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-> index be3239f..e7dc3ea 100644
-> --- a/arch/arm/mach-at91/board-sam9rlek.c
-> +++ b/arch/arm/mach-at91/board-sam9rlek.c
-> @@ -31,6 +31,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  
-> @@ -319,6 +320,7 @@ MACHINE_START(AT91SAM9RLEK, "Atmel AT91SAM9RL-EK")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-> index 9d446f1..a4e031a 100644
-> --- a/arch/arm/mach-at91/board-snapper9260.c
-> +++ b/arch/arm/mach-at91/board-snapper9260.c
-> @@ -33,6 +33,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  
->  #include "sam9_smc.h"
-> @@ -178,6 +179,7 @@ static void __init snapper9260_board_init(void)
->  MACHINE_START(SNAPPER_9260, "Bluewater Systems Snapper 9260/9G20 module")
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= snapper9260_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= snapper9260_board_init,
-> diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-> index ee86f9d..29eae16 100644
-> --- a/arch/arm/mach-at91/board-stamp9g20.c
-> +++ b/arch/arm/mach-at91/board-stamp9g20.c
-> @@ -26,6 +26,7 @@
->  #include <asm/mach/arch.h>
->  
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  
->  #include "sam9_smc.h"
-> @@ -287,6 +288,7 @@ MACHINE_START(PORTUXG20, "taskit PortuxG20")
->  	/* Maintainer: taskit GmbH */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= stamp9g20_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= portuxg20_board_init,
-> @@ -296,6 +298,7 @@ MACHINE_START(STAMP9G20, "taskit Stamp9G20")
->  	/* Maintainer: taskit GmbH */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= stamp9g20_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= stamp9g20evb_board_init,
-> diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
-> index 95393fc..c1476b9 100644
-> --- a/arch/arm/mach-at91/board-usb-a926x.c
-> +++ b/arch/arm/mach-at91/board-usb-a926x.c
-> @@ -42,6 +42,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91sam9_smc.h>
->  #include <mach/at91_shdwc.h>
->  
-> @@ -358,6 +359,7 @@ MACHINE_START(USB_A9263, "CALAO USB_A9263")
->  	/* Maintainer: calao-systems */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> @@ -367,6 +369,7 @@ MACHINE_START(USB_A9260, "CALAO USB_A9260")
->  	/* Maintainer: calao-systems */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> @@ -376,6 +379,7 @@ MACHINE_START(USB_A9G20, "CALAO USB_A92G0")
->  	/* Maintainer: Jean-Christophe PLAGNIOL-VILLARD */
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= ek_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= ek_board_init,
-> diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-> index d56665e..516d340 100644
-> --- a/arch/arm/mach-at91/board-yl-9200.c
-> +++ b/arch/arm/mach-at91/board-yl-9200.c
-> @@ -44,6 +44,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/board.h>
-> +#include <mach/at91_aic.h>
->  #include <mach/at91rm9200_mc.h>
->  #include <mach/at91_ramc.h>
->  #include <mach/cpu.h>
-> @@ -590,6 +591,7 @@ MACHINE_START(YL9200, "uCdragon YL-9200")
->  	/* Maintainer: S.Birtles */
->  	.timer		= &at91rm9200_timer,
->  	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
->  	.init_early	= yl9200_init_early,
->  	.init_irq	= at91_init_irq_default,
->  	.init_machine	= yl9200_board_init,
 > diff --git a/arch/arm/mach-at91/include/mach/at91_aic.h b/arch/arm/mach-at91/include/mach/at91_aic.h
-> index 3af7272..7867378 100644
+> index 7867378..fd42a85 100644
 > --- a/arch/arm/mach-at91/include/mach/at91_aic.h
 > +++ b/arch/arm/mach-at91/include/mach/at91_aic.h
-> @@ -65,4 +65,6 @@ extern void __iomem *at91_aic_base;
->  #define AT91_AIC_FFDR		0x144			/* Fast Forcing Disable Register [SAM9 only] */
->  #define AT91_AIC_FFSR		0x148			/* Fast Forcing Status Register [SAM9 only] */
->  
-> +void at91_aic_handle_irq(struct pt_regs *regs);
-> +
+> @@ -28,6 +28,9 @@ extern void __iomem *at91_aic_base;
+>  .extern at91_aic_base
 >  #endif
-> diff --git a/arch/arm/mach-at91/include/mach/entry-macro.S b/arch/arm/mach-at91/include/mach/entry-macro.S
-> deleted file mode 100644
-> index 903bf20..0000000
-> --- a/arch/arm/mach-at91/include/mach/entry-macro.S
-> +++ /dev/null
-> @@ -1,27 +0,0 @@
-> -/*
-> - * arch/arm/mach-at91/include/mach/entry-macro.S
-> - *
-> - *  Copyright (C) 2003-2005 SAN People
-> - *
-> - * Low-level IRQ helper macros for AT91RM9200 platforms
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2. This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#include <mach/hardware.h>
+>  
+> +/* Number of irq lines managed by AIC */
+> +#define NR_AIC_IRQS	32
+> +
+>  #define AT91_AIC_IRQ_MIN_PRIORITY	0
+>  #define AT91_AIC_IRQ_MAX_PRIORITY	7
+>  
+> diff --git a/arch/arm/mach-at91/include/mach/irqs.h b/arch/arm/mach-at91/include/mach/irqs.h
+> index 2d510ee..cab60d5 100644
+> --- a/arch/arm/mach-at91/include/mach/irqs.h
+> +++ b/arch/arm/mach-at91/include/mach/irqs.h
+> @@ -22,18 +22,6 @@
+>  #define __ASM_ARCH_IRQS_H
+>  
+>  #include <linux/io.h>
 > -#include <mach/at91_aic.h>
 > -
-> -	.macro  get_irqnr_preamble, base, tmp
-> -	ldr	\base, =at91_aic_base		@ base virtual address of AIC peripheral
-> -	ldr	\base, [\base]
-> -	.endm
+> -#define NR_AIC_IRQS 32
 > -
-> -	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-> -	ldr	\irqnr, [\base, #AT91_AIC_IVR]		@ read IRQ vector register: de-asserts nIRQ to processor (and clears interrupt)
-> -	ldr	\irqstat, [\base, #AT91_AIC_ISR]	@ read interrupt source number
-> -	teq	\irqstat, #0				@ ISR is 0 when no current interrupt, or spurious interrupt
-> -	streq	\tmp, [\base, #AT91_AIC_EOICR]		@ not going to be handled further, then ACK it now.
-> -	.endm
 > -
+> -/*
+> - * IRQ interrupt symbols are the AT91xxx_ID_* symbols
+> - * for IRQs handled directly through the AIC, or else the AT91_PIN_*
+> - * symbols in gpio.h for ones handled indirectly as GPIOs.
+> - * We make provision for 5 banks of GPIO.
+> - */
+> -#define	NR_IRQS		(NR_AIC_IRQS + (5 * 32))
+>  
+>  /* FIQ is AIC source 0. */
+>  #define FIQ_START AT91_ID_FIQ
 > diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-> index cc009be..c6bf734 100644
+> index c6bf734..89679a7 100644
 > --- a/arch/arm/mach-at91/irq.c
 > +++ b/arch/arm/mach-at91/irq.c
-> @@ -36,6 +36,7 @@
->  #include <asm/irq.h>
->  #include <asm/setup.h>
->  
-> +#include <asm/exception.h>
->  #include <asm/mach/arch.h>
+> @@ -41,6 +41,8 @@
 >  #include <asm/mach/irq.h>
 >  #include <asm/mach/map.h>
-> @@ -45,6 +46,24 @@ static struct irq_domain *at91_aic_domain;
->  static struct device_node *at91_aic_np;
->  static unsigned int *at91_aic_irq_priorities;
 >  
-> +asmlinkage void __exception_irq_entry at91_aic_handle_irq(struct pt_regs *regs)
-> +{
-> +	u32 irqnr;
-> +	u32 irqstat;
+> +#include <mach/at91_aic.h>
 > +
-> +	irqnr = at91_aic_read(AT91_AIC_IVR);
-> +	irqstat = at91_aic_read(AT91_AIC_ISR);
-> +
-> +	/*
-> +	 * ISR value is 0 when there is no current interrupt or when there is
-> +	 * a spurious interrupt
-> +	 */
-> +	if (!irqstat)
-> +		at91_aic_write(AT91_AIC_EOICR, 0);
-> +	else
-> +		handle_IRQ(irqnr, regs);
-> +}
-> +
->  static void at91_aic_mask_irq(struct irq_data *d)
->  {
->  	/* Disable interrupt on AIC */
+>  void __iomem *at91_aic_base;
+>  static struct irq_domain *at91_aic_domain;
+>  static struct device_node *at91_aic_np;
+> @@ -302,11 +304,11 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+>  	 */
+>  	for (i = 0; i < NR_AIC_IRQS; i++) {
+>  		/* Put hardware irq number in Source Vector Register: */
+> -		at91_aic_write(AT91_AIC_SVR(i), i);
+> +		at91_aic_write(AT91_AIC_SVR(i), NR_IRQS_LEGACY + i);
+>  		/* Active Low interrupt, with the specified priority */
+>  		at91_aic_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
+>  
+> -		irq_set_chip_and_handler(i, &at91_aic_chip, handle_fasteoi_irq);
+> +		irq_set_chip_and_handler(NR_IRQS_LEGACY + i, &at91_aic_chip, handle_fasteoi_irq);
+>  		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+>  	}
+>  
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 1bfaad6..2c2d865 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -25,6 +25,7 @@
+>  #include <asm/mach/time.h>
+>  #include <asm/mach/irq.h>
+>  
+> +#include <mach/at91_aic.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/cpu.h>
+>  
 > 
 
 
