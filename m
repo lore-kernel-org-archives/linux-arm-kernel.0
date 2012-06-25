@@ -1,54 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 25 Jun 2012 14:39:10 -0700
-Subject: [PATCH 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <1340377774-17173-3-git-send-email-will.deacon@arm.com>
-References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
- <1340377774-17173-3-git-send-email-will.deacon@arm.com>
-Message-ID: <4FE8DA7E.5040105@codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 25 Jun 2012 23:26:46 +0100
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <4FE882A5.3080504@nvidia.com>
+References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
+ <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
+ <4FE882A5.3080504@nvidia.com>
+Message-ID: <20120625222646.GB30406@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/12 08:09, Will Deacon wrote:
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index dbbeec4..675cee0 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
-> @@ -32,6 +32,8 @@ static int arch_timer_ppi2;
->  
->  static struct clock_event_device __percpu **arch_timer_evt;
->  
-> +extern void init_current_timer_delay(unsigned long freq);
+On Mon, Jun 25, 2012 at 08:54:21PM +0530, Laxman Dewangan wrote:
 
-Can we find a home for this in some header file?
+> I had detailed discussion with Mark on  this support and as per him
+> (based on my understanding), the input to different regulator is
+> from the pin of the chips and so the name should be the
+> <pin-name>-supply which should be part of chip-dt binding, not to
+> the particular rail.
 
-> +static void __timer_const_udelay(unsigned long xloops)
-> +{
-> +	unsigned long long loops = xloops;
-> +	loops *= loops_per_jiffy;
-> +	__timer_delay(loops >> 30);
-> +}
-
-Is it ok to have a 64 bit multiply here? It seems the assembly version
-tries to keep it all 32 bit math.
-
-> +
-> +static void __timer_udelay(unsigned long usecs)
-> +{
-> +	__timer_const_udelay(usecs * ((2199023U * HZ) >> 11));
-> +}
-
-It's unfortunate that we have to duplicate the same code and constants
-in both C and assembly. With my approach we convert delay.S into C and
-avoid the duplication.
-
-> +
-> +void __init init_current_timer_delay(unsigned long freq)
-> +{
-> +	pr_info("Switching to timer-based delay loop\n");
-
-Might be worth printing the frequency here too.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+More specifically, all the supplies for a device (including those that
+happen to be inputs for regulators) should be specified in exactly the
+same fashion.  This makes the binding more regular and means that users
+can just go through the schematic adding the mappings without worrying
+about what what the supply happens to be.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/342fb195/attachment.sig>
