@@ -1,75 +1,128 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Jun 2012 11:48:27 +0200
-Subject: [PATCH v7 08/14] USB: Chipidea: add ci13xxx device id management
-In-Reply-To: <1340607391-16380-9-git-send-email-richard.zhao@freescale.com>
-References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
- <1340607391-16380-9-git-send-email-richard.zhao@freescale.com>
-Message-ID: <4FE833EB.3050503@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 25 Jun 2012 12:51:54 +0300
+Subject: [PATCHv9 3/8] I2C: OMAP: use devm_* functions
+In-Reply-To: <1340273329-8319-4-git-send-email-shubhrajyoti@ti.com>
+References: <1340273329-8319-1-git-send-email-shubhrajyoti@ti.com>
+ <1340273329-8319-4-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120625095152.GE6468@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2012 08:56 AM, Richard Zhao wrote:
-> We use ida_simple_get and ida_simple_remove to manage the ids.
+On Thu, Jun 21, 2012 at 03:38:44PM +0530, Shubhrajyoti D wrote:
+> The various devm_* functions allocate memory that is released when a driver
+> detaches. This patch uses devm_kzalloc, devm_request_and_ioremap for data
+> that is allocated in the probe function of a platform device and is only
+> freed in the remove function.
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-Removing the "ci13xxx_imx" module doesn't work as expected:
+this looks a lot like:
+http://marc.info/?l=linux-omap&m=133969143407572&w=2
 
-ci_hdrc ci_hdrc.0: remove, state 1
-usb usb1: USB disconnect, device number 1
-ci_hdrc ci_hdrc.0: USB bus 1 deregistered
-Unable to handle kernel NULL pointer dereference at virtual address 0000006c
-pgd = c6bb8000
-[0000006c] *pgd=46a7e831, *pte=00000000, *ppte=00000000
-Internal error: Oops: 17 [#1] PREEMPT ARM
-Modules linked in: ci13xxx_imx(-) ci_hdrc
-CPU: 0    Not tainted  (3.5.0-rc4-00055-g35d73a8-dirty #80)
-PC is at ida_remove+0xa0/0x110
-LR is at ida_simple_remove+0x30/0x60
-pc : [<c0154294>]    lr : [<c01544f4>]    psr: a0000093
-sp : c6be3ed0  ip : 80000000  fp : 0092f008
-r10: d9a22647  r9 : c6be2000  r8 : 08421085
-r7 : 00000001  r6 : 0000034b  r5 : bf00a3a8  r4 : 00000000
-r3 : c087d6b0  r2 : 001bb89f  r1 : 6b6b6b6b  r0 : 00000068
-Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 0005317f  Table: 46bb8000  DAC: 00000015
-Process rmmod (pid: 136, stack limit = 0xc6be2270)
-Stack: (0xc6be3ed0 to 0xc6be4000)
-3ec0:                                     c6be2000 20000013 6b6b6b6b bf00a3a8
-3ee0: c6be2000 c0009408 00000000 c01544f4 c6ad5430 c7865980 bf01562c bf01501c
-3f00: bf015000 c7865988 bf01562c c018dad8 c018dac4 c018c5e0 bf01562c c7865988
-3f20: c78659bc c018cdbc c6b78040 bf015680 bf01562c c0e670d0 0092f0b8 c018c438
-3f40: bf015680 c6be2000 00000000 c004c56c c74ca308 33316963 5f787878 00786d69
-3f60: 0092f008 c00a5088 c7812138 c6b5b388 00000000 c6b79860 c6b5b388 c0088648
-3f80: 00000003 c6b79860 c6be2000 00088730 00002002 00000001 0092f088 be82fe5c
-3fa0: 00000081 c0009260 00000001 0092f088 0092f0b8 00000800 b6eb865c be82fc00
-3fc0: 00000001 0092f088 be82fe5c 00000081 0092f088 00000000 00000800 0092f008
-3fe0: b6e7cbc0 be82fc04 b6ef65f8 b6e7cbcc 60000010 0092f0b8 00000000 00000000
-[<c0154294>] (ida_remove+0xa0/0x110) from [<c01544f4>] (ida_simple_remove+0x30/0x60)
-[<c01544f4>] (ida_simple_remove+0x30/0x60) from [<bf01501c>] (ci13xxx_imx_remove+0x1c/0x84 [ci13xxx_imx])
-[<bf01501c>] (ci13xxx_imx_remove+0x1c/0x84 [ci13xxx_imx]) from [<c018dad8>] (platform_drv_remove+0x14/0x18)
-[<c018dad8>] (platform_drv_remove+0x14/0x18) from [<c018c5e0>] (__device_release_driver+0x58/0xa8)
-[<c018c5e0>] (__device_release_driver+0x58/0xa8) from [<c018cdbc>] (driver_detach+0xcc/0xd8)
-[<c018cdbc>] (driver_detach+0xcc/0xd8) from [<c018c438>] (bus_remove_driver+0x7c/0xc0)
-[<c018c438>] (bus_remove_driver+0x7c/0xc0) from [<c004c56c>] (sys_delete_module+0x180/0x23c)
-[<c004c56c>] (sys_delete_module+0x180/0x23c) from [<c0009260>] (ret_fast_syscall+0x0/0x2c)
-Code: e0416286 e5904004 e1a002c6 e0840100 (e5908004)
----[ end trace 7d882a2086a6a3d8 ]---
-note: rmmod[136] exited with preempt_count 1
+I wonder why wasn't that one used instead ?
 
-Marc
+> ---
+>  drivers/i2c/busses/i2c-omap.c |   33 +++++++++------------------------
+>  1 files changed, 9 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index d704f64..328a022 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -943,7 +943,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  {
+>  	struct omap_i2c_dev	*dev;
+>  	struct i2c_adapter	*adap;
+> -	struct resource		*mem, *irq, *ioarea;
+> +	struct resource		*mem, *irq;
+>  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+>  	struct device_node	*node = pdev->dev.of_node;
+>  	const struct of_device_id *match;
+> @@ -962,17 +962,16 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> -	ioarea = request_mem_region(mem->start, resource_size(mem),
+> -			pdev->name);
+> -	if (!ioarea) {
+> -		dev_err(&pdev->dev, "I2C region already claimed\n");
+> -		return -EBUSY;
+> +	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
+> +	if (!dev) {
+> +		dev_err(&pdev->dev, "Menory allocation failed\n");
+> +		return -ENOMEM;
+>  	}
+>  
+> -	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
+> -	if (!dev) {
+> -		r = -ENOMEM;
+> -		goto err_release_region;
+> +	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
+> +	if (!dev->base) {
+> +		dev_err(&pdev->dev, "I2C region already claimed\n");
+> +		return -ENOMEM;
+>  	}
+>  
+>  	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
+> @@ -996,11 +995,6 @@ omap_i2c_probe(struct platform_device *pdev)
+>  
+>  	dev->dev = &pdev->dev;
+>  	dev->irq = irq->start;
+> -	dev->base = ioremap(mem->start, resource_size(mem));
+> -	if (!dev->base) {
+> -		r = -ENOMEM;
+> -		goto err_free_mem;
+> -	}
+>  
+>  	platform_set_drvdata(pdev, dev);
+>  
+> @@ -1095,13 +1089,9 @@ err_free_irq:
+>  err_unuse_clocks:
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>  	pm_runtime_put(dev->dev);
+> -	iounmap(dev->base);
+>  	pm_runtime_disable(&pdev->dev);
+>  err_free_mem:
+>  	platform_set_drvdata(pdev, NULL);
+> -	kfree(dev);
+> -err_release_region:
+> -	release_mem_region(mem->start, resource_size(mem));
+>  
+>  	return r;
+>  }
+> @@ -1109,7 +1099,6 @@ err_release_region:
+>  static int __devexit omap_i2c_remove(struct platform_device *pdev)
+>  {
+>  	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+> -	struct resource		*mem;
+>  	int ret;
+>  
+>  	platform_set_drvdata(pdev, NULL);
+> @@ -1123,10 +1112,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>  	pm_runtime_put(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+> -	iounmap(dev->base);
+> -	kfree(dev);
+> -	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	release_mem_region(mem->start, resource_size(mem));
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.7.5.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/163b7ba8/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/0ff5c800/attachment.sig>
