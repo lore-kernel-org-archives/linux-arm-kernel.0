@@ -1,36 +1,96 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 25 Jun 2012 12:21:10 +0200
-Subject: ARM: BAST: update MAINTAINERS entry
-Message-ID: <1340619670.1773.162.camel@x61.thuisdomein>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 25 Jun 2012 15:52:58 +0530
+Subject: [PATCH 06/11] gpio/omap: add clk_prepare and clk_unprepare
+In-Reply-To: <4FE80D05.7010305@ti.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1340372890-10091-7-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1206221312400.10198@utopia.booyaka.com>
+ <4FE7F765.40405@ti.com>
+ <CAC83Zv+2B9=fu+YDab62O-WZdJzP8-qddPOZaVKLrqD0vvzCjw@mail.gmail.com>
+ <4FE80D05.7010305@ti.com>
+Message-ID: <CAC83ZvLbLM1b=UpM8DeW4KvoGbtd7AG5a1PQeauD4m0RficKQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410: move
-mach-s3c2410/* into mach-s3c24xx/") moved the three files mentioned in
-the "SIMTEC EB2410ITX (BAST)" MAINTAINERS entry to the arch/arm/s3c24xx
-directory. Update that entry accordingly.
-
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
- MAINTAINERS |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index eb22272..df09359 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6145,9 +6145,9 @@ P:	Vincent Sanders <vince@simtec.co.uk>
- M:	Simtec Linux Team <linux@simtec.co.uk>
- W:	http://www.simtec.co.uk/products/EB2410ITX/
- S:	Supported
--F:	arch/arm/mach-s3c2410/mach-bast.c
--F:	arch/arm/mach-s3c2410/bast-ide.c
--F:	arch/arm/mach-s3c2410/bast-irq.c
-+F:	arch/arm/mach-s3c24xx/mach-bast.c
-+F:	arch/arm/mach-s3c24xx/bast-ide.c
-+F:	arch/arm/mach-s3c24xx/bast-irq.c
- 
- TI DAVINCI MACHINE SUPPORT
- M:	Sekhar Nori <nsekhar@ti.com>
--- 
-1.7.7.6
+On Mon, Jun 25, 2012 at 12:32 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> On Monday 25 June 2012 11:41 AM, DebBarma, Tarun Kanti wrote:
+>>
+>> On Mon, Jun 25, 2012 at 11:00 AM, Rajendra Nayak<rnayak@ti.com> ?wrote:
+>>>
+>>> On Saturday 23 June 2012 12:47 AM, Paul Walmsley wrote:
+>>>>
+>>>>
+>>>> Hi
+>>>>
+>>>> On Fri, 22 Jun 2012, Rajendra Nayak wrote:
+>>>>
+>>>>> In preparation of OMAP moving to Common Clk Framework(CCF) add
+>>>>> clk_prepare()
+>>>>> for omap gpio debounce clock.
+>>>>>
+>>>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>>>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>>>>> ---
+>>>>> ?drivers/gpio/gpio-omap.c | ? ?2 ++
+>>>>> ?1 files changed, 2 insertions(+), 0 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>>>> index c4ed172..6a73b01 100644
+>>>>> --- a/drivers/gpio/gpio-omap.c
+>>>>> +++ b/drivers/gpio/gpio-omap.c
+>>>>> @@ -893,6 +893,8 @@ static int gpio_debounce(struct gpio_chip *chip,
+>>>>> unsigned offset,
+>>>>> ? ? ? ? ? ? ? ?bank->dbck = clk_get(bank->dev, "dbclk");
+>>>>> ? ? ? ? ? ? ? ?if (IS_ERR(bank->dbck))
+>>>>> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(bank->dev, "Could not get gpio dbck\n");
+>>>>> + ? ? ? ? ? ? ? else
+>>>>> + ? ? ? ? ? ? ? ? ? ? ? clk_prepare(bank->dbck);
+>>>>> ? ? ? ?}
+>>>>>
+>>>>> ? ? ? ?spin_lock_irqsave(&bank->lock, flags);
+>>>>
+>>>>
+>>>>
+>>>> What code unprepares this clock?
+>>>>
+>>>> Put differently, doesn't this driver need at least a platform_driver
+>>>> .remove function pointer, that would call clk_unprepare() and clk_put()?
+>>>
+>>>
+>>>
+>>> Maybe because this driver can never be built as a module. It gets
+>>> complied in with CONFIG_ARCH_OMAP=y.
+>>>
+>>> Adding Tarun and Santosh who can comment further.
+>>>
+>>>
+>>>>
+>>>> Also, it looks to me that the bank->dbck init should be in
+>>>> omap_gpio_chip_init(), not gpio_debounce()?
+>>>
+>>>
+>>>
+>>> Tarun, can you comment on why the dbck init is in gpio_debounce
+>>> and not in omap_gpio_chip_init()?
+>>
+>> BTW, bank->dbck is initialized in gpio_debounce() even before the cleanup
+>> and fixes series. I am not quite sure if there was specific intent for
+>> keeping
+>> it here. Personally I do not see issues in doing clk_get of bank->dbck in
+>> omap_gpio_chip_init().
+>
+>
+> Care to send a patch to move it into omap_gpio_chip_init() then? Also
+> can you comment on the above point that Paul made, as to why this driver
+> has a .remove missing? If adding that is a non-issue, would be great if
+> you can drop in a patch for that too.
+Yes, I will have a re-look before generating the patches.
+--
+Tarun
+>>>>
+>>>>
+>>>> - Paul
+>>>
+>>>
+>>>
+>
