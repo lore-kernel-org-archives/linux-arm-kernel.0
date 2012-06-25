@@ -1,33 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 25 Jun 2012 18:02:53 +0200
-Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <20120625154354.GC2342@S2101-09.ap.freescale.net>
-References: <1339242351-8797-1-git-send-email-marex@denx.de>
- <201206232047.33228.marex@denx.de>
- <20120625154354.GC2342@S2101-09.ap.freescale.net>
-Message-ID: <201206251802.53389.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 00:05:18 +0800
+Subject: [PATCH v4] ARM: mx23: Add initial support for olinuxino board
+In-Reply-To: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
+References: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120625160515.GF2342@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On Mon, Jun 18, 2012 at 10:51:52AM -0300, Fabio Estevam wrote:
+> +
+> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <0x2000 0x2020 0x2030
+> +						0x2040 0x2050>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
+> +
+> +				mmc0_sck_cfg: mmc0_sck_cfg {
+> +					fsl,pinmux-ids = <0x2010>;
+> +					fsl,pull-up = <0>;
+> +				};
 
-> On Sat, Jun 23, 2012 at 08:47:32PM +0200, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > This patch configures the I2C bus timing registers according
-> > > to information passed via DT. Currently, 100kHz and 400kHz
-> > > modes are supported.
-> > 
-> > [...]
-> > 
-> > Is there any reason why this can not be merged other than the timing
-> > registers goo (which I believe shall stay as in the datasheet until we
-> > figure out if it's even reasonable to add some computation there).
-> 
-> I assume this is a question for Wolfram.  But I guess part of the reason
-> is there is still one comment from me staying unresolved.
+This looks suspicious.  First of all, 0x2010 (SSP1_DETECT) should be
+in pinmux-ids of mmc0_4bit_pins_a.  Secondly, SSP1_SCK seems missing
+from the pins.  You do not have a SSP1_SCK pin for the mmc slot?
 
-Ah, you mean about the audio? I'll poke into it tonight.
-
-Best regards,
-Marek Vasut
+-- 
+Regards,
+Shawn
