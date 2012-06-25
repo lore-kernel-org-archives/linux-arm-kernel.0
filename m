@@ -1,59 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jun 2012 11:03:03 +0100
-Subject: [PATCH 0/2] Use architected timers for delay loop
-In-Reply-To: <20120622222647.GE30087@n2100.arm.linux.org.uk>
-References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
- <20120622222647.GE30087@n2100.arm.linux.org.uk>
-Message-ID: <20120625100303.GE22128@mudshark.cambridge.arm.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 25 Jun 2012 18:07:42 +0800
+Subject: [PATCH v11 0/4] MTD: at91: Add PMECC support for at91 nand flash
+ driver
+Message-ID: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Those patches is based on v3.5-rc4
 
-Thanks for the clarification.
+Changes since v10,
+	add one more patch in this patch set, which add 'int' return value for write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
+	Instead of calling BUG(), atmel_nand_pmecc_write_page() will return -EIO when time out to read the pmecc status register.
+	increase the time-out duration to 100ms, which has more toleration.
+	add oob_required argument for pmecc read/write functions to align with v3.5-rc4.
 
-On Fri, Jun 22, 2012 at 11:26:47PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 22, 2012 at 04:09:32PM +0100, Will Deacon wrote:
-> > Russell - I think my maths is correct, but why can't we increase the
-> >           precision by using a magic constant of 4398046U and a right
-> > 	  shift of 31?
-> 
-> It's been soo long since I looked at that code that I've forgotten the
-> maths behind it.
+Changes since v9,
+	use jiffies for timeout test to read PMECC status register.
+	modified according to J.C and Artem's comments.
+	add rom lookup table offset as DT variables.
+	refine coding style and error handling.
 
-No problem. I managed to convince myself of the maths but I don't want to
-touch the assembly code in delay.S if I don't have to!
+Changes since v8,
+	use _relaxed read/write in most place. use writel in operations of Control Register since it needs memory barrier.
+	allocate the data for PMECC computation.
+	add pmecc prefix for related variable/functions.
+	modify code according to J.C's suggestion.
 
-> What I can say is that the maths in the assembly code version is
-> carefully chosen to avoid overflows during the various stages of
-> computation without loosing too much precision along the way.
-> 
-> The assembly is also designed to round up any lost precision, so we
-> try to produce a longer delay by way of the lost precision in the
-> maths.
+Josh Wu (4):
+  MTD: at91: extract hw ecc initialization to one function
+  MTD: at91: add dt parameters for Atmel PMECC
+  MTD: nand: add return value for write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
+  MTD: at91: atmel_nand: Update driver to support Programmable Multibit ECC controller
 
-Right, that probably explains why I was having difficulty following it.
+ .../devicetree/bindings/mtd/atmel-nand.txt         |    9 +
+ drivers/mtd/nand/atmel_nand.c                      |  914 ++++++++++++++++++--
+ drivers/mtd/nand/atmel_nand_ecc.h                  |  114 ++-
+ drivers/mtd/nand/bcm_umi_bch.c                     |    6 +-
+ drivers/mtd/nand/bf5xx_nand.c                      |    6 +-
+ drivers/mtd/nand/cafe_nand.c                       |   11 +-
+ drivers/mtd/nand/denali.c                          |   12 +-
+ drivers/mtd/nand/docg4.c                           |    8 +-
+ drivers/mtd/nand/fsl_elbc_nand.c                   |    4 +-
+ drivers/mtd/nand/fsl_ifc_nand.c                    |    4 +-
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c             |    6 +-
+ drivers/mtd/nand/nand_base.c                       |   27 +-
+ drivers/mtd/nand/pxa3xx_nand.c                     |    4 +-
+ drivers/mtd/nand/sh_flctl.c                        |    4 +-
+ include/linux/mtd/nand.h                           |    4 +-
+ 15 files changed, 1039 insertions(+), 94 deletions(-)
 
-> I forget what kind of precision we do get, but precision is not really
-> a major concern here.  We are only after a "rough" estimate of the
-> delay (hell, we don't even guarantee according to Linus that you will
-> get a minimum of the delay you asked for - you might get a shorter
-> delay!)  You _will_ get shorter delays because of the way the loop is
-> calibrated (think: the jiffy code tries to find how many loops fit in
-> a single jiffy, but a jiffy _also_ includes the overhead of running
-> the timer interrupt, which artificially reduces loops_per_jiffy.)
-
-We avoid the calibration step for the timer-based loop and use the counter
-frequency directly so I think we probably always delay for slightly longer
-in that case. But yes, I see that precision isn't the be-all and end-all
-here!
-
-> Provided we get a delay "in the ballpark" of what was requested, that's
-> good enough.
-
-In which case, let's leave the maths like it is. The current values work
-fine with both the polling loop and the timer loop up to 2ms.
-
-Cheers,
-
-Will
+-- 
+1.7.9.5
