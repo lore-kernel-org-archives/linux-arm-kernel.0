@@ -1,275 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 25 Jun 2012 00:06:14 -0700
-Subject: [PATCH v6] input: keyboard: Add keys driver for the LPC32xx SoC
-In-Reply-To: <1340549078-8973-1-git-send-email-stigge@antcom.de>
-References: <1340549078-8973-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120625070614.GA13876@core.coreip.homeip.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 25 Jun 2012 12:43:19 +0530
+Subject: [PATCH 02/11] mmc: omap: add clk_prepare and clk_unprepare
+In-Reply-To: <alpine.DEB.2.00.1206250017090.21883@utopia.booyaka.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1340372890-10091-3-git-send-email-rnayak@ti.com>
+ <CANfBPZ-YpupgvzPcJsqZpG4QOErw6kqBNWjP2GL5teDwU+wbBA@mail.gmail.com>
+ <alpine.DEB.2.00.1206221233490.10198@utopia.booyaka.com>
+ <4FE7F636.7040803@ti.com>
+ <alpine.DEB.2.00.1206250017090.21883@utopia.booyaka.com>
+Message-ID: <4FE80F8F.6050404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Roland,
+On Monday 25 June 2012 11:48 AM, Paul Walmsley wrote:
+> On Mon, 25 Jun 2012, Rajendra Nayak wrote:
+>
+>> On Saturday 23 June 2012 12:04 AM, Paul Walmsley wrote:
+>>> On Fri, 22 Jun 2012, S, Venkatraman wrote:
+>>>
+>>>> On Fri, Jun 22, 2012 at 7:18 PM, Rajendra Nayak<rnayak@ti.com>   wrote:
+>>>>> In preparation of OMAP moving to Common Clk Framework(CCF) add
+>>>>> clk_prepare()
+>>>>> and clk_unprepare() for the mmc and hsmmc clocks as part of the drivers
+>>>>> probe() and remove() routines.
+>>>>>
+>>>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>>>> Cc: Chris Ball<cjb@laptop.org>
+>>>>> Cc: Balaji T K<balajitk@ti.com>
+>>>>> Cc:<linux-mmc@vger.kernel.org>
+>>>>
+>>>> Rajendra,
+>>>>     Can this be applied independently, or does this patch have a
+>>>> dependency on other patches in the series ?
+>>>
+>>> A better way to handle this one would be to convert the driver to runtime
+>>> PM.  That needs to be done anyway.
+>>
+>> Well, mmc driver is already using runtime PM. But it still using clock
+>> apis' to deal with some optional debounce clock needed only on 2430.
+>
+> drivers/mmc/host/omap.c, which is what this patch changes, has not yet
+> been converted to use runtime PM in mainline.
 
-On Sun, Jun 24, 2012 at 04:44:38PM +0200, Roland Stigge wrote:
-> This patch adds a driver for the key scan interface of the LPC32xx SoC
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
+Venkat/Balaji,
 
-This looks _very_ good, I just have a couple more comments:
+Any plans of converting this driver to use runtime pm?
 
-> +
-> +static int lpc32xx_kscan_open(struct input_dev *dev)
-> +{
-> +	struct lpc32xx_kscan_drv *kscandat = input_get_drvdata(dev);
-> +
-> +	return clk_prepare_enable(kscandat->clk);
+>
+> This is a driver for the MSDI IP block which is not available on 2430.
 
-Don't you need to clear IRQ here, the same way you do it in resume?
+Sorry, I meant to say the debounce clock in omap_hsmmc.c was used only
+on 2430. I seemed to have overlooked the fclk/iclk in drivers/mmc
+/host/omap.c completely. That one seems to be for the controller in
+2420 (atlest, and maybe some other older OMAPs).
 
-> +}
-> +
-> +static void lpc32xx_kscan_close(struct input_dev *dev)
-> +{
-> +	struct lpc32xx_kscan_drv *kscandat = input_get_drvdata(dev);
-> +
-> +	clk_disable_unprepare(kscandat->clk);
-
-And same here.
-
-> +}
-> +
-> +int lpc32xx_parse_dt(struct platform_device *pdev)
-
-Static? Also why don't you pass kscandat instead of platform device?
-> +{
-> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-> +	struct device_node *np = pdev->dev.of_node;
-> +	u32 rows, columns;
-> +
-> +	of_property_read_u32(np, "keypad,num-rows", &rows);
-> +	of_property_read_u32(np, "keypad,num-columns", &columns);
-> +	if (!rows || rows != columns) {
-> +		dev_err(&pdev->dev,
-> +			"rows and columns must be specified and be equal!\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	kscandat->matrix_sz = rows;
-> +	kscandat->row_shift = get_count_order(columns);
-> +
-> +	of_property_read_u32(np, "nxp,debounce-delay-ms", &kscandat->deb_clks);
-> +	of_property_read_u32(np, "nxp,scan-delay-ms", &kscandat->scan_delay);
-> +	if (!kscandat->deb_clks || !kscandat->scan_delay) {
-> +		dev_err(&pdev->dev, "debounce or scan delay not specified\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	kscandat->keymap = kzalloc(sizeof(kscandat->keymap[0]) *
-> +				(rows << kscandat->row_shift), GFP_KERNEL);
-> +	if (!kscandat->keymap) {
-> +		dev_err(&pdev->dev, "could not allocate memory for keymap\n");
-> +		return -ENOMEM;
-> +	}
-
-I think this allocation belongs to the probe().
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int __devinit lpc32xx_kscan_probe(struct platform_device *pdev)
-> +{
-> +	struct lpc32xx_kscan_drv *kscandat;
-> +	struct resource *res;
-> +	int error;
-> +	int irq;
-> +
-> +	kscandat = kzalloc(sizeof(struct lpc32xx_kscan_drv), GFP_KERNEL);
-> +	if (!kscandat) {
-> +		dev_err(&pdev->dev, "failed to allocate memory\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "failed to get platform I/O memory\n");
-> +		error = -EBUSY;
-> +		goto out1;
-> +	}
-> +
-> +	res = request_mem_region(res->start, resource_size(res), pdev->name);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "failed to request I/O memory\n");
-> +		error = -EBUSY;
-> +		goto out1;
-> +	}
-> +	kscandat->io_p_start = res->start;
-> +	kscandat->io_p_size = resource_size(res);
-> +
-> +	kscandat->kscan_base = ioremap(res->start, resource_size(res));
-> +	if (!kscandat->kscan_base) {
-> +		dev_err(&pdev->dev, "failed to remap I/O memory\n");
-> +		error = -EBUSY;
-> +		goto out2;
-> +	}
-> +
-> +	/* Get the key scanner clock */
-> +	kscandat->clk = clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(kscandat->clk)) {
-> +		dev_err(&pdev->dev, "failed to get clock\n");
-> +		error = PTR_ERR(kscandat->clk);
-> +		goto out3;
-> +	}
-> +	clk_enable(kscandat->clk);
-
-Why not clk_prepare_enable()? Also I think you need to move it down, to
-where you actually write to the device's registers.
-
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if ((irq < 0) || (irq >= NR_IRQS)) {
-> +		dev_err(&pdev->dev, "failed to get platform irq\n");
-> +		error = -EINVAL;
-> +		goto out4;
-> +	}
-> +	error = request_irq(irq, lpc32xx_kscan_irq, 0, pdev->name, kscandat);
-> +	if (error) {
-> +		dev_err(&pdev->dev, "failed to request irq\n");
-> +		goto out4;
-> +	}
-> +
-> +	kscandat->input = input_allocate_device();
-> +	if (kscandat->input == NULL) {
-> +		dev_err(&pdev->dev, "failed to allocate device\n");
-> +		error = -ENOMEM;
-> +		goto out5;
-> +	}
-
-This might be too late - IRQ is alreday registered and clock is enabled
-- what is to stop interrupts to be delivered? I'd allocate the input
-device together with kscandat structure.
-
-> +
-> +	platform_set_drvdata(pdev, kscandat);
-> +
-> +	error = lpc32xx_parse_dt(pdev);
-> +	if (error) {
-> +		dev_err(&pdev->dev, "failed to parse device tree\n");
-> +		goto out6;
-> +	}
-> +
-> +	/* Setup key input */
-> +	kscandat->input->evbit[0]	= BIT_MASK(EV_KEY);
-> +	kscandat->input->name		= pdev->name;
-> +	kscandat->input->phys		= "matrix-keys/input0";
-> +	kscandat->input->id.vendor	= 0x0001;
-> +	kscandat->input->id.product	= 0x0001;
-> +	kscandat->input->id.version	= 0x0100;
-> +	kscandat->input->open		= lpc32xx_kscan_open;
-> +	kscandat->input->close		= lpc32xx_kscan_close;
-> +	kscandat->input->dev.parent	= &pdev->dev;
-> +
-> +	error = matrix_keypad_build_keymap(NULL, NULL, kscandat->matrix_sz,
-> +					   kscandat->matrix_sz,
-> +					   kscandat->keymap, kscandat->input);
-> +	if (error) {
-> +		dev_err(&pdev->dev, "failed to build keymap\n");
-> +		goto out6;
-> +	}
-> +
-> +	input_set_drvdata(kscandat->input, kscandat);
-> +	input_set_capability(kscandat->input, EV_MSC, MSC_SCAN);
-> +
-> +	error = input_register_device(kscandat->input);
-> +	if (error) {
-> +		dev_err(&pdev->dev, "failed to register input device\n");
-> +		goto out6;
-> +	}
-> +
-
-I think this needs to be done before you register input device as as
-soon as it is registered it may be used.
-
-> +	/* Configure the key scanner */
-> +	writel(kscandat->deb_clks, LPC32XX_KS_DEB(kscandat->kscan_base));
-> +	writel(kscandat->scan_delay, LPC32XX_KS_SCAN_CTL(kscandat->kscan_base));
-> +	writel(LPC32XX_KSCAN_FTST_USE32K_CLK,
-> +	       LPC32XX_KS_FAST_TST(kscandat->kscan_base));
-> +	writel(kscandat->matrix_sz,
-> +	       LPC32XX_KS_MATRIX_DIM(kscandat->kscan_base));
-> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-> +	clk_disable(kscandat->clk);
-
-clk_disable_unprepare()?
-
-> +	return 0;
-> +
-> +out6:
-> +	input_free_device(kscandat->input);
-> +out5:
-> +	free_irq(irq, pdev);
-> +out4:
-> +	clk_disable(kscandat->clk);
-> +	clk_put(kscandat->clk);
-> +out3:
-> +	iounmap(kscandat->kscan_base);
-> +out2:
-> +	release_mem_region(kscandat->io_p_start, kscandat->io_p_size);
-> +out1:
-> +	kfree(kscandat);
-> +
-> +	return error;
-> +}
-> +
-> +static int __devexit lpc32xx_kscan_remove(struct platform_device *pdev)
-> +{
-> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-> +
-> +	input_unregister_device(kscandat->input);
-
-Are we certain it is safe to free input device before freeing IRQ? I see
-we have close(), still I'd feel safer if you swapper unregister and
-free_irq().
-
-> +	free_irq(platform_get_irq(pdev, 0), pdev);
-> +	clk_put(kscandat->clk);
-> +	iounmap(kscandat->kscan_base);
-> +	release_mem_region(kscandat->io_p_start, kscandat->io_p_size);
-> +	kfree(kscandat);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int lpc32xx_kscan_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-> +
-> +	/* Clear IRQ and disable clock */
-> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-> +	clk_disable_unprepare(kscandat->clk);
-> +
-
-This may race with open()/close(). You need to take input_dev->mutex and
-avoid touching the device if it sis not opened (users == 0).
-
-> +	return 0;
-> +}
-> +
-> +static int lpc32xx_kscan_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-> +
-> +	/* Enable clock and clear IRQ */
-> +	clk_prepare_enable(kscandat->clk);
-> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-> +
-
-Same here.
-
-Thanks!
-
--- 
-Dmitry
+>
+> - Paul
