@@ -1,114 +1,69 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 25 Jun 2012 16:41:42 +0530
-Subject: [PATCHv10 7/7] I2C: OMAP: Recover from Bus Busy condition
+Date: Mon, 25 Jun 2012 16:41:41 +0530
+Subject: [PATCHv10 6/7] I2C: OMAP: Correct I2C revision for OMAP3
 In-Reply-To: <1340622702-21622-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340622702-21622-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340622702-21622-8-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340622702-21622-7-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikram Pandita <vikram.pandita@ti.com>
+From: Jon Hunter <jon-hunter@ti.com>
 
-In case a peripheral is driving SDA bus low (ie. a start condition), provide
-a constant clock output using the test mode of the OMAP I2C controller to
-try and clear the bus. Soft reset I2C controller after attempting the bus clear
-to ensure that controller is in a good state.
+The OMAP3530 is based upon the same silicon as the OMAP3430 and so the I2C
+revision is the same for 3430 and 3530. However, the OMAP3630 device has the
+same I2C revision as OMAP4. Correct the revision definition to reflect this.
 
-Based upon Vikram Pandita's patch from TI Android 3.0.
-I acknowledge the contributions and suggestions of Jon and Hemant.
+This patch is based on work done by Jon Hunter <jon-hunter@ti.com>
+Changes from his patch
+- Update OMAP_I2C_REV_ON_3430 also to reflect that it is same as 3530
 
-A couple differences from the original patch ...
-1. Add a new function for bus clear
-2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
-   output a permanent clock. This bit needs to be set and typically it would
-   be set by the unidle function but this is not the case for all OMAP
-   generations.
-3. Program the SYSTEST setting only the bits we care about. However, restore
-   SYSTEST registers to there original state as some OMAP generations do not
-   implement perform a soft-reset.
-4. Clear the CON register after performing the bus clear, so when we call the
-   init function the controller is disabled and the init function will
-   re-enable later.
-
-Original patch can be found here:
-http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
-
-Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   31 ++++++++++++++++++++++++++++---
- 1 files changed, 28 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 0557b0d..421dcd7 100644
+index 8344ad030..0557b0d 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -148,16 +148,15 @@ enum {
- #define OMAP_I2C_SCLH_HSSCLH	8
+@@ -50,8 +50,8 @@
  
- /* I2C System Test Register (OMAP_I2C_SYSTEST): */
--#ifdef DEBUG
- #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
- #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
- #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
--#define OMAP_I2C_SYSTEST_TMODE_SHIFT	(12)		/* Test mode select */
-+#define OMAP_I2C_SYSTEST_TMODE_TEST	(2 << 12)	/* Test mode select */
-+#define OMAP_I2C_SYSTEST_TMODE_LOOP	(3 << 12)	/* Test mode select */
- #define OMAP_I2C_SYSTEST_SCL_I		(1 << 3)	/* SCL line sense in */
- #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
- #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
- #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
--#endif
+ /* I2C controller revisions present on specific hardware */
+ #define OMAP_I2C_REV_ON_2430		0x36
+-#define OMAP_I2C_REV_ON_3430		0x3C
+-#define OMAP_I2C_REV_ON_3530_4430	0x40
++#define OMAP_I2C_REV_ON_3430_3530	0x3C
++#define OMAP_I2C_REV_ON_3630_4430	0x40
  
- /* OCP_SYSCONFIG bit definitions */
- #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
-@@ -460,6 +459,29 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+@@ -305,7 +305,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+ 					   SYSC_AUTOIDLE_MASK);
  
- 	return 0;
- }
-+/*
-+ * Bus Clear
-+ */
-+static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
-+{
-+	u16 w;
-+
-+	/*
-+	 * Per the I2C specification, if we are stuck in a bus busy state
-+	 * we can attempt a bus clear to try and recover the bus by sending
-+	 *@least 9 clock pulses on SCL. Put the I2C in a test mode so it
-+	 * will output a continuous clock on SCL.
-+	 */
-+	w = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, (OMAP_I2C_SYSTEST_ST_EN
-+			   | OMAP_I2C_SYSTEST_TMODE_TEST));
-+	msleep(1);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, w);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	omap_i2c_init(dev);
-+	return omap_i2c_wait_for_bb(dev);
-+}
+-		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
++		} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+ 			dev->syscstate = SYSC_AUTOIDLE_MASK;
+ 			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
+ 			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
+@@ -1021,7 +1021,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+ 		dev->errata |= I2C_OMAP_ERRATA_I207;
  
- /*
-  * Low level master read/write transaction.
-@@ -586,6 +608,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+-	if (dev->rev <= OMAP_I2C_REV_ON_3430)
++	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
+ 		dev->errata |= I2C_OMAP_ERRATA_I462;
  
- 	r = omap_i2c_wait_for_bb(dev);
- 	if (r < 0)
-+		r = omap_i2c_bus_clear(dev);
-+	if (r < 0)
- 		goto out;
+ 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
+@@ -1039,7 +1039,7 @@ omap_i2c_probe(struct platform_device *pdev)
  
- 	if (dev->set_mpu_wkup_lat != NULL)
-@@ -654,6 +678,7 @@ static inline void i2c_omap_errata_i207(struct omap_i2c_dev *dev, u16 stat)
+ 		dev->fifo_size = (dev->fifo_size / 2);
  
- 		}
- 	}
-+	return 0;
- }
- 
- /* rev1 devices are apparently only on some 15xx */
+-		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430)
++		if (dev->rev >= OMAP_I2C_REV_ON_3630_4430)
+ 			dev->b_hw = 0; /* Disable hardware fixes */
+ 		else
+ 			dev->b_hw = 1; /* Enable hardware fixes */
 -- 
 1.7.5.4
