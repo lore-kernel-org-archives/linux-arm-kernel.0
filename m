@@ -1,110 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Jun 2012 12:37:14 +0800
-Subject: [PATCH V2] MXS: Add DT binding support into stmp3xxx-rtc
-In-Reply-To: <1339181804-22822-1-git-send-email-marex@denx.de>
-References: <1339181804-22822-1-git-send-email-marex@denx.de>
-Message-ID: <20120625043711.GA18156@S2101-09.ap.freescale.net>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Sun, 24 Jun 2012 23:49:49 -0500
+Subject: [PATCH v5 0/7] cleanup imx5 idle, add imx5/6 cpuidle
+In-Reply-To: <CAMXH7KGh2RrzTy9+mcYAfbQgcVC0H9=ozXzBb-wCho51pM6CVg@mail.gmail.com>
+References: <1337640630-29176-1-git-send-email-rob.lee@linaro.org>
+ <20120620103004.GA13194@pengutronix.de>
+ <CAMXH7KGh2RrzTy9+mcYAfbQgcVC0H9=ozXzBb-wCho51pM6CVg@mail.gmail.com>
+Message-ID: <CAMXH7KHthCK+vP2H0Y86C9vRk3ZOqJXbgEBSCZx0E2LpmO=i5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 08:56:44PM +0200, Marek Vasut wrote:
-> Add simple binding for the stmp3xxx-rtc.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
+On Wed, Jun 20, 2012 at 9:15 AM, Rob Lee <rob.lee@linaro.org> wrote:
+> Hello Sascha,
+>
+> On Wed, Jun 20, 2012 at 5:30 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> Hi Robert,
+>>
+>> On Mon, May 21, 2012 at 05:50:23PM -0500, Robert Lee wrote:
+>>> Cleanup up imx5 idle code and enable imx5 low powe idle for imx53.
+>>>
+>>> Add common imx cpuidle initialization functionality and add a i.MX5 and i.MX6Q
+>>> platform cpuidle implementation.
+>>
+>> I rebased this to 3.5-rc1 here:
+>>
+>> git.pengutronix.de/git/imx/linux-2.6.git imx/cpuidle
+>>
+>> Could you check if the result is ok with you?
+>>
+>
+> Certainly. ?I will let you know in a day or two.
+>
 
-Hi Alessandro,
+I did some basic testing and everything looks ok as far as idle and
+cpuidle goes.  For imx51 and 53 I tested both device tree and
+non-device tree boot.  On my imx51-babbage board, a generic
+imx_v6_v7_defconfig does not boot without enabling device tree and
+shows no output after the u-boot messages.  But this also occurs on
+the kernel.org v3.5-rc3.  Removing support for all boards except
+imx51-babbage makes it boot up ok.  The idle changes don't seem to
+affect this behavior.
 
-The patch has some changes on arch/arm/boot/dts/imx28.dtsi, and also we
-need the patch to convert some board files over to device tree.  May I
-have your ack to queue the patch on my tree?
-
-Regards,
-Shawn
-
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: rtc-linux at googlegroups.com
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../devicetree/bindings/rtc/stmp3xxx-rtc.txt        |   19 +++++++++++++++++++
->  arch/arm/boot/dts/imx28.dtsi                        |    1 +
->  drivers/rtc/rtc-stmp3xxx.c                          |    7 +++++++
->  3 files changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
-> 
-> V2: Fix typos, remove fsl,imx28-rtc
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
-> new file mode 100644
-> index 0000000..a7a7de5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
-> @@ -0,0 +1,19 @@
-> +* STMP3xxx/i.MX28 Time Clock controller
-> +
-> +Required properties:
-> +- compatible: should be one of the following.
-> +    * "fsl,stmp3xxx-rtc"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: Two interrupt numbers to the cpu should be specified. First
-> +  interrupt number is the rtc tick interrupt and second interrupt number
-> +  is the rtc alarm interrupt. The number of cells representing a interrupt
-> +  depends on the parent interrupt controller.
-> +
-> +Example:
-> +
-> +	rtc at 80056000 {
-> +		compatible = "fsl,stmp3xxx-rtc";
-> +		reg = <0x80056000 2000>;
-> +		interrupts = <28 29>;
-> +	};
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index cabcce8..5053019 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -387,6 +387,7 @@
->  			};
->  
->  			rtc at 80056000 {
-> +				compatible = "fsl,imx28-rtc", "fsl,stmp3xxx-rtc";
->  				reg = <0x80056000 2000>;
->  				interrupts = <28 29>;
->  				status = "disabled";
-> diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
-> index 1028786..3aadb58 100644
-> --- a/drivers/rtc/rtc-stmp3xxx.c
-> +++ b/drivers/rtc/rtc-stmp3xxx.c
-> @@ -25,6 +25,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/rtc.h>
->  #include <linux/slab.h>
-> +#include <linux/of_device.h>
->  
->  #include <mach/common.h>
->  
-> @@ -265,6 +266,11 @@ static int stmp3xxx_rtc_resume(struct platform_device *dev)
->  #define stmp3xxx_rtc_resume	NULL
->  #endif
->  
-> +static const struct of_device_id rtc_dt_ids[] = {
-> +	{ .compatible = "fsl,stmp3xxx-rtc", },
-> +	{ /* sentinel */ }
-> +};
-> +
->  static struct platform_driver stmp3xxx_rtcdrv = {
->  	.probe		= stmp3xxx_rtc_probe,
->  	.remove		= stmp3xxx_rtc_remove,
-> @@ -273,6 +279,7 @@ static struct platform_driver stmp3xxx_rtcdrv = {
->  	.driver		= {
->  		.name	= "stmp3xxx-rtc",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = rtc_dt_ids,
->  	},
->  };
->  
-> -- 
-> 1.7.10
-> 
+> Rob
+>
+>> Sascha
+>>
+>>
+>> --
+>> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+>> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+>> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
