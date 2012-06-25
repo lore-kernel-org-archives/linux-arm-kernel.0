@@ -1,75 +1,32 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 25 Jun 2012 11:12:14 -0500
-Subject: [PATCH v4 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <7a14edf83068261d8c07217873d14fe7f73975bc.1340354986.git.afzal@ti.com>
-References: <cover.1340354985.git.afzal@ti.com>
- <7a14edf83068261d8c07217873d14fe7f73975bc.1340354986.git.afzal@ti.com>
-Message-ID: <4FE88DDE.60601@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 00:15:08 +0800
+Subject: [PATCH] mtd/m25p80: add device tree probe support
+In-Reply-To: <201206251801.22385.marex@denx.de>
+References: <1311601063-16581-1-git-send-email-shawn.guo@linaro.org>
+ <201206230415.18833.marex@denx.de>
+ <20120625154006.GB2342@S2101-09.ap.freescale.net>
+ <201206251801.22385.marex@denx.de>
+Message-ID: <20120625161506.GH2342@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+On Mon, Jun 25, 2012 at 06:01:22PM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
+> 
+> > On Sat, Jun 23, 2012 at 04:15:18AM +0200, Marek Vasut wrote:
+> > > So is there any particular reason why this wasn't applied?
+> > 
+> > Let me remind Artem by resending the patch tomorrow.
+> 
+> Actually ... the SPI does have the heuristics to probe this chip without the 
+> patch. But there was this discussion about them eventually being removed. That 
+> was a point raised by you I think. Is that still valid?
+> 
+That was a point raised by Grant.  IIRC, the reason I made the patch
+is my system does not probe the device without the patch.  I can
+retest, and if it's true that the patch is not necessarily needed,
+I will probably let it be.
 
-Looks much better!
-
-On 06/22/2012 04:01 AM, Afzal Mohammed wrote:
-> Reorganize gpmc-onenand initialization so that changes
-> required for gpmc driver migration can be made smooth.
-> 
-> Ensuring sync read/write are disabled in onenand cannot
-> be expected to work properly unless GPMC is setup, this
-> has been removed.
-> 
-> Refactor set_async_mode & set_sync_mode functions to
-> separate out timing calculation & actual configuration
-> (GPMC & OneNAND side).
-> 
-> Thanks to Jon for his suggestions.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
-> 
-> v4:
-> Reorganize set_sync/async functions in a better way
-> v3:
-> Refactor set_sync/async functions to separate out timing and
->  configurations
-> v2:
-> Move ensuring that async mode in OneNAND has been setup from
->  set_sync to setup function, improve commit message
-> 
->  arch/arm/mach-omap2/gpmc-onenand.c |  153 +++++++++++++++++++-----------------
->  1 file changed, 83 insertions(+), 70 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-> index 8863e0a..878182b 100644
-> --- a/arch/arm/mach-omap2/gpmc-onenand.c
-> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
-> @@ -15,6 +15,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/mtd/onenand_regs.h>
->  #include <linux/io.h>
-> +#include <linux/err.h>
->  
->  #include <asm/mach/flash.h>
->  
-> @@ -25,6 +26,7 @@
->  
->  #define	ONENAND_IO_SIZE	SZ_128K
->  
-> +static int hf, vhf, sync_read, sync_write, latency;
-
-I am wondering if we can remove hf, vhf, sync_read/write variables
-completely. We already have flags from sync_read/write and so we could
-just use the cfg->flags variable and remove sync_read/write variables.
-
-At the same time, we could create flags for ONENAND_FREQ_HF and
-ONENAND_FREQ_VHF or something like that. It could be nice to store the
-latency in onenand_data too. In other words, keep all the configuration
-in one place.
-
-Otherwise looks good.
-
-Cheers
-Jon
+-- 
+Regards,
+Shawn
