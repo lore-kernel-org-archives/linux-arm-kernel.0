@@ -1,80 +1,52 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 25 Jun 2012 12:32:29 +0530
-Subject: [PATCH 06/11] gpio/omap: add clk_prepare and clk_unprepare
-In-Reply-To: <CAC83Zv+2B9=fu+YDab62O-WZdJzP8-qddPOZaVKLrqD0vvzCjw@mail.gmail.com>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>	<1340372890-10091-7-git-send-email-rnayak@ti.com>	<alpine.DEB.2.00.1206221312400.10198@utopia.booyaka.com>	<4FE7F765.40405@ti.com>
- <CAC83Zv+2B9=fu+YDab62O-WZdJzP8-qddPOZaVKLrqD0vvzCjw@mail.gmail.com>
-Message-ID: <4FE80D05.7010305@ti.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 25 Jun 2012 09:04:26 +0200
+Subject: imx27_visstrim_m10: spot the mistake
+In-Reply-To: <20120625064903.GA14321@pengutronix.de>
+References: <20120624165710.GA20378@n2100.arm.linux.org.uk>
+ <20120625064903.GA14321@pengutronix.de>
+Message-ID: <CACKLOr0SZAerw1adE9xZ+PuwtGWVuo8M=yCqKAog2SAmiyK9mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 June 2012 11:41 AM, DebBarma, Tarun Kanti wrote:
-> On Mon, Jun 25, 2012 at 11:00 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
->> On Saturday 23 June 2012 12:47 AM, Paul Walmsley wrote:
->>>
->>> Hi
->>>
->>> On Fri, 22 Jun 2012, Rajendra Nayak wrote:
->>>
->>>> In preparation of OMAP moving to Common Clk Framework(CCF) add
->>>> clk_prepare()
->>>> for omap gpio debounce clock.
->>>>
->>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->>>> Cc: Grant Likely<grant.likely@secretlab.ca>
->>>> ---
->>>>   drivers/gpio/gpio-omap.c |    2 ++
->>>>   1 files changed, 2 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>>> index c4ed172..6a73b01 100644
->>>> --- a/drivers/gpio/gpio-omap.c
->>>> +++ b/drivers/gpio/gpio-omap.c
->>>> @@ -893,6 +893,8 @@ static int gpio_debounce(struct gpio_chip *chip,
->>>> unsigned offset,
->>>>                 bank->dbck = clk_get(bank->dev, "dbclk");
->>>>                 if (IS_ERR(bank->dbck))
->>>>                         dev_err(bank->dev, "Could not get gpio dbck\n");
->>>> +               else
->>>> +                       clk_prepare(bank->dbck);
->>>>         }
->>>>
->>>>         spin_lock_irqsave(&bank->lock, flags);
->>>
->>>
->>> What code unprepares this clock?
->>>
->>> Put differently, doesn't this driver need at least a platform_driver
->>> .remove function pointer, that would call clk_unprepare() and clk_put()?
+On 25 June 2012 08:49, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Sun, Jun 24, 2012 at 05:57:10PM +0100, Russell King - ARM Linux wrote:
+>> commit 9f97da78bf018206fb623cd351d454af2f105fe0
+>> Author: David Howells <dhowells@redhat.com>
+>> Date: ? Wed Mar 28 18:30:01 2012 +0100
 >>
+>> ? ? Disintegrate asm/system.h for ARM
 >>
->> Maybe because this driver can never be built as a module. It gets
->> complied in with CONFIG_ARCH_OMAP=y.
+>> ? ? Disintegrate asm/system.h for ARM.
 >>
->> Adding Tarun and Santosh who can comment further.
+>> ? ? Signed-off-by: David Howells <dhowells@redhat.com>
+>> ? ? cc: Russell King <linux@arm.linux.org.uk>
+>> ? ? cc: linux-arm-kernel at lists.infradead.org
 >>
+>> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+>> index 774c41e..74542c5 100644
+>> --- a/arch/arm/include/asm/system.h
+>> +++ b/arch/arm/include/asm/system.h
+>> +/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
+>> +#include <asm/barrier.h>
+>> +#include <asm/compiler.h>
+>> +#include <asm/cmpxchg.h>
+>> +#include <asm/exec.h>
+>> +#include <asm/switch_to.h>
+>> +#include <asm/system_info.h>
+>> +#include <asm/system_misc.h>
 >>
->>>
->>> Also, it looks to me that the bank->dbck init should be in
->>> omap_gpio_chip_init(), not gpio_debounce()?
->>
->>
->> Tarun, can you comment on why the dbck init is in gpio_debounce
->> and not in omap_gpio_chip_init()?
-> BTW, bank->dbck is initialized in gpio_debounce() even before the cleanup
-> and fixes series. I am not quite sure if there was specific intent for keeping
-> it here. Personally I do not see issues in doing clk_get of bank->dbck in
-> omap_gpio_chip_init().
-
-Care to send a patch to move it into omap_gpio_chip_init() then? Also
-can you comment on the above point that Paul made, as to why this driver
-has a .remove missing? If adding that is a non-issue, would be great if
-you can drop in a patch for that too.
-
+>> What's wrong with the above commit to mach-imx27_visstrim_m10.c ?
 >
->>
->>>
->>>
->>> - Paul
->>
->>
+> Sorry Russell, thank you Fabio for sending a patch.
+>
+
+Sorry, thank you for spotting the mistake.
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
