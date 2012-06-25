@@ -1,35 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Jun 2012 02:46:57 +0800
-Subject: [PATCH] serial/amba-pl011: move custom pin control to driver
-In-Reply-To: <CAOh2x==OPVVLeKxCT0mkYX3NmOjGQRcsSY=GHCaHEJfy6wOg3Q@mail.gmail.com>
-References: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
- <CAOh2x==OPVVLeKxCT0mkYX3NmOjGQRcsSY=GHCaHEJfy6wOg3Q@mail.gmail.com>
-Message-ID: <CACRpkdb9=m7Qiv+hQy3sDYAQNO5+_y5fW=av0-eW589qjL5TxQ@mail.gmail.com>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 25 Jun 2012 20:11:31 +0100
+Subject: [PATCH] ARM: Delete asm/system.h
+Message-ID: <20120625191130.27109.42551.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 7:31 PM, viresh kumar <viresh.kumar@linaro.org> wrote:
+Delete asm/system.h from the ARM arch.  This was missed when the others were
+deleted.
 
-> People testing SPEAr with v3.5-rc1 saw that serial devices don't show
-> up during boot and they
-> actually return with error from this point, after Shawn's last patch.
-> That will still happen with
-> this patch i believe.
->
-> What is expected from Platforms to handle this? AFAICR, we haven't
-> done anything special
-> to bind a pinctrl node to a struct dev for uart.
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: David Howells <dhowells@redhat.com>
+---
 
-Yeah as Fabio pointed out, activate dummies is the quick
-fix.
+ arch/arm/include/asm/jump_label.h |    1 -
+ arch/arm/include/asm/system.h     |    8 --------
+ arch/arm/mach-msm/idle.c          |    2 +-
+ arch/arm/plat-omap/mux.c          |    2 --
+ drivers/usb/gadget/lpc32xx_udc.c  |    1 -
+ 5 files changed, 1 insertions(+), 13 deletions(-)
+ delete mode 100644 arch/arm/include/asm/system.h
 
-The "real" fix is to provide atleast a default pin map table
-entry (sleep is not needed).
-
-However I think you could benefit from using this on
-SPEAr by providing two different pinconf lists for
-the default and sleep modes as the ux500 does:
-usually this saves some power.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
+index bfc198c..f0409ec 100644
+--- a/arch/arm/include/asm/jump_label.h
++++ b/arch/arm/include/asm/jump_label.h
+@@ -4,7 +4,6 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/types.h>
+-#include <asm/system.h>
+ 
+ #define JUMP_LABEL_NOP_SIZE 4
+ 
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+deleted file mode 100644
+index 74542c5..0000000
+--- a/arch/arm/include/asm/system.h
++++ /dev/null
+@@ -1,8 +0,0 @@
+-/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
+-#include <asm/barrier.h>
+-#include <asm/compiler.h>
+-#include <asm/cmpxchg.h>
+-#include <asm/exec.h>
+-#include <asm/switch_to.h>
+-#include <asm/system_info.h>
+-#include <asm/system_misc.h>
+diff --git a/arch/arm/mach-msm/idle.c b/arch/arm/mach-msm/idle.c
+index 0c9e13c..e4d0c66 100644
+--- a/arch/arm/mach-msm/idle.c
++++ b/arch/arm/mach-msm/idle.c
+@@ -17,7 +17,7 @@
+  */
+ 
+ #include <linux/init.h>
+-#include <asm/system.h>
++#include <asm/system_misc.h>
+ 
+ static void msm_idle(void)
+ {
+diff --git a/arch/arm/plat-omap/mux.c b/arch/arm/plat-omap/mux.c
+index cff8712..da503eb 100644
+--- a/arch/arm/plat-omap/mux.c
++++ b/arch/arm/plat-omap/mux.c
+@@ -28,8 +28,6 @@
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
+ 
+-#include <asm/system.h>
+-
+ #include <plat/cpu.h>
+ #include <plat/mux.h>
+ 
+diff --git a/drivers/usb/gadget/lpc32xx_udc.c b/drivers/usb/gadget/lpc32xx_udc.c
+index 262acfd..626963e 100644
+--- a/drivers/usb/gadget/lpc32xx_udc.c
++++ b/drivers/usb/gadget/lpc32xx_udc.c
+@@ -55,7 +55,6 @@
+ #include <mach/hardware.h>
+ #include <linux/io.h>
+ #include <asm/irq.h>
+-#include <asm/system.h>
+ 
+ #include <mach/platform.h>
+ #include <mach/irqs.h>
