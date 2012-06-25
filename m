@@ -1,81 +1,208 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 25 Jun 2012 11:07:02 +0800
-Subject: [PATCH v7] usb: chipidea: permit driver bindings pass phy pointer
-In-Reply-To: <4FE3874C.2040504@pengutronix.de>
-References: <4FE2CABE.7050708@pengutronix.de>
- <1340268682-14654-1-git-send-email-richard.zhao@freescale.com>
- <4FE3874C.2040504@pengutronix.de>
-Message-ID: <20120625030701.GB4384@b20223-02.ap.freescale.net>
+Date: Mon, 25 Jun 2012 11:08:24 +0800
+Subject: [PATCH v6 07/14] USB: Chipidea: add unified
+ ci13xxx_{add,remove}_device for platform drivers
+In-Reply-To: <1340260875-21934-8-git-send-email-richard.zhao@freescale.com>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+ <1340260875-21934-8-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120625030823.GC4384@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 10:42:52PM +0200, Marc Kleine-Budde wrote:
-> On 06/21/2012 10:51 AM, Richard Zhao wrote:
-> > Sometimes, the driver bindings may know what phy they use.
-> > For example, when using device tree, the usb controller may have a
-> > phandler pointing to usb phy.
+On Thu, Jun 21, 2012 at 02:41:08PM +0800, Richard Zhao wrote:
+> Platform drivers do the similar things to add/remove ci13xxx device, so
+> create a unified one.
 > 
-> Remove the module doesn't remove the platform device. A subsequent modprobe fails with:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> ---
+>  drivers/usb/chipidea/ci13xxx_msm.c |   34 ++++++----------------------
+>  drivers/usb/chipidea/ci13xxx_pci.c |   34 +++++-----------------------
+>  drivers/usb/chipidea/core.c        |   43 ++++++++++++++++++++++++++++++++++++
+>  include/linux/usb/chipidea.h       |    7 ++++++
+>  4 files changed, 63 insertions(+), 55 deletions(-)
 > 
-> ------------[ cut here ]------------
-> WARNING: at fs/sysfs/dir.c:529 sysfs_add_one+0x8c/0xbc()
-> sysfs: cannot create duplicate filename '/devices/80080000.ahb/80080000.usb/ci_hdrc.0'
-> Modules linked in: ci13xxx_imx(+) ci_hdrc udc_core [last unloaded: ci13xxx_imx]
-> [<c000e6c8>] (unwind_backtrace+0x0/0xf0) from [<c0015c70>] (warn_slowpath_common+0x4c/0x64)
-> [<c0015c70>] (warn_slowpath_common+0x4c/0x64) from [<c0015d1c>] (warn_slowpath_fmt+0x30/0x40)
-> [<c0015d1c>] (warn_slowpath_fmt+0x30/0x40) from [<c00dbbbc>] (sysfs_add_one+0x8c/0xbc)
-> [<c00dbbbc>] (sysfs_add_one+0x8c/0xbc) from [<c00dbd2c>] (create_dir+0x60/0xc0)
-> [<c00dbd2c>] (create_dir+0x60/0xc0) from [<c00dc08c>] (sysfs_create_dir+0x64/0xa8)
-> [<c00dc08c>] (sysfs_create_dir+0x64/0xa8) from [<c0151f28>] (kobject_add_internal+0xa4/0x1e8)
-> [<c0151f28>] (kobject_add_internal+0xa4/0x1e8) from [<c0152434>] (kobject_add+0x50/0x98)
-> [<c0152434>] (kobject_add+0x50/0x98) from [<c0187fe4>] (device_add+0xb8/0x358)
-> [<c0187fe4>] (device_add+0xb8/0x358) from [<c018b76c>] (platform_device_add+0xf8/0x1a0)
-> [<c018b76c>] (platform_device_add+0xf8/0x1a0) from [<bf006250>] (ci13xxx_add_device+0xd4/0x114 [ci_hdrc])
-> [<bf006250>] (ci13xxx_add_device+0xd4/0x114 [ci_hdrc]) from [<bf022264>] (ci13xxx_imx_probe+0x1e0/0x288 [ci13xxx_imx])
-> [<bf022264>] (ci13xxx_imx_probe+0x1e0/0x288 [ci13xxx_imx]) from [<c018b378>] (platform_drv_probe+0x14/0x18)
-> [<c018b378>] (platform_drv_probe+0x14/0x18) from [<c018a230>] (really_probe+0x68/0x1e0)
-> [<c018a230>] (really_probe+0x68/0x1e0) from [<c018a530>] (__driver_attach+0x8c/0x90)
-> [<c018a530>] (__driver_attach+0x8c/0x90) from [<c0188c0c>] (bus_for_each_dev+0x54/0x7c)
-> [<c0188c0c>] (bus_for_each_dev+0x54/0x7c) from [<c0189b74>] (bus_add_driver+0x17c/0x248)
-> [<c0189b74>] (bus_add_driver+0x17c/0x248) from [<c018a7e4>] (driver_register+0x78/0x12c)
-> [<c018a7e4>] (driver_register+0x78/0x12c) from [<c00086c4>] (do_one_initcall+0x30/0x168)
-> [<c00086c4>] (do_one_initcall+0x30/0x168) from [<c004c824>] (sys_init_module+0x74/0x198)
-> [<c004c824>] (sys_init_module+0x74/0x198) from [<c0009260>] (ret_fast_syscall+0x0/0x2c)
-> ---[ end trace e152599aa12f31d8 ]---
-> ------------[ cut here ]------------
-> WARNING: at lib/kobject.c:196 kobject_add_internal+0x1cc/0x1e8()
-> kobject_add_internal failed for ci_hdrc.0 with -EEXIST, don't try to register things with the same name in the same directory.
-> Modules linked in: ci13xxx_imx(+) ci_hdrc udc_core [last unloaded: ci13xxx_imx]
-> [<c000e6c8>] (unwind_backtrace+0x0/0xf0) from [<c0015c70>] (warn_slowpath_common+0x4c/0x64)
-> [<c0015c70>] (warn_slowpath_common+0x4c/0x64) from [<c0015d1c>] (warn_slowpath_fmt+0x30/0x40)
-> [<c0015d1c>] (warn_slowpath_fmt+0x30/0x40) from [<c0152050>] (kobject_add_internal+0x1cc/0x1e8)
-> [<c0152050>] (kobject_add_internal+0x1cc/0x1e8) from [<c0152434>] (kobject_add+0x50/0x98)
-> [<c0152434>] (kobject_add+0x50/0x98) from [<c0187fe4>] (device_add+0xb8/0x358)
-> [<c0187fe4>] (device_add+0xb8/0x358) from [<c018b76c>] (platform_device_add+0xf8/0x1a0)
-> [<c018b76c>] (platform_device_add+0xf8/0x1a0) from [<bf006250>] (ci13xxx_add_device+0xd4/0x114 [ci_hdrc])
-> [<bf006250>] (ci13xxx_add_device+0xd4/0x114 [ci_hdrc]) from [<bf022264>] (ci13xxx_imx_probe+0x1e0/0x288 [ci13xxx_imx])
-> [<bf022264>] (ci13xxx_imx_probe+0x1e0/0x288 [ci13xxx_imx]) from [<c018b378>] (platform_drv_probe+0x14/0x18)
-> [<c018b378>] (platform_drv_probe+0x14/0x18) from [<c018a230>] (really_probe+0x68/0x1e0)
-> [<c018a230>] (really_probe+0x68/0x1e0) from [<c018a530>] (__driver_attach+0x8c/0x90)
-> [<c018a530>] (__driver_attach+0x8c/0x90) from [<c0188c0c>] (bus_for_each_dev+0x54/0x7c)
-> [<c0188c0c>] (bus_for_each_dev+0x54/0x7c) from [<c0189b74>] (bus_add_driver+0x17c/0x248)
-> [<c0189b74>] (bus_add_driver+0x17c/0x248) from [<c018a7e4>] (driver_register+0x78/0x12c)
-> [<c018a7e4>] (driver_register+0x78/0x12c) from [<c00086c4>] (do_one_initcall+0x30/0x168)
-> [<c00086c4>] (do_one_initcall+0x30/0x168) from [<c004c824>] (sys_init_module+0x74/0x198)
-> [<c004c824>] (sys_init_module+0x74/0x198) from [<c0009260>] (ret_fast_syscall+0x0/0x2c)
-> ---[ end trace e152599aa12f31d9 ]---
-> imx_usb 80080000.usb: Can't register ci_hdrc platform device, err=-17
-> imx_usb: probe of 80080000.usb failed with error -17
-It's caused by Patch #7 .
-Thanks very much.
+> diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
+> index a7dd9f1..92bfe36 100644
+> --- a/drivers/usb/chipidea/ci13xxx_msm.c
+> +++ b/drivers/usb/chipidea/ci13xxx_msm.c
+> @@ -58,50 +58,30 @@ static struct ci13xxx_platform_data ci13xxx_msm_platdata = {
+>  static int __devinit ci13xxx_msm_probe(struct platform_device *pdev)
+>  {
+>  	struct platform_device *plat_ci;
+> -	int ret;
+>  
+>  	dev_dbg(&pdev->dev, "ci13xxx_msm_probe\n");
+>  
+> -	plat_ci = platform_device_alloc("ci_hdrc", -1);
+> -	if (!plat_ci) {
+> -		dev_err(&pdev->dev, "can't allocate ci_hdrc platform device\n");
+> -		return -ENOMEM;
+> +	plat_ci = ci13xxx_add_device(&pdev->dev,
+> +				pdev->resource, pdev->num_resources,
+> +				&ci13xxx_msm_platdata);
+> +	if (IS_ERR(plat_ci)) {
+> +		dev_err(&pdev->dev, "ci13xxx_add_device failed!\n");
+> +		return PTR_ERR(plat_ci);
+>  	}
+>  
+> -	ret = platform_device_add_resources(plat_ci, pdev->resource,
+> -					    pdev->num_resources);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "can't add resources to platform device\n");
+> -		goto put_platform;
+> -	}
+> -
+> -	ret = platform_device_add_data(plat_ci, &ci13xxx_msm_platdata,
+> -				       sizeof(ci13xxx_msm_platdata));
+> -	if (ret)
+> -		goto put_platform;
+> -
+> -	ret = platform_device_add(plat_ci);
+> -	if (ret)
+> -		goto put_platform;
+> -
+>  	platform_set_drvdata(pdev, plat_ci);
+>  
+>  	pm_runtime_no_callbacks(&pdev->dev);
+>  	pm_runtime_enable(&pdev->dev);
+>  
+>  	return 0;
+> -
+> -put_platform:
+> -	platform_device_put(plat_ci);
+> -
+> -	return ret;
+>  }
+>  
+>  static int __devexit ci13xxx_msm_remove(struct platform_device *pdev)
+>  {
+>  	struct platform_device *plat_ci = platform_get_drvdata(pdev);
+>  
+> -	platform_device_unregister(plat_ci);
+> +	ci13xxx_remove_device(plat_ci);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
+> index cdcac3a..918e149 100644
+> --- a/drivers/usb/chipidea/ci13xxx_pci.c
+> +++ b/drivers/usb/chipidea/ci13xxx_pci.c
+> @@ -75,13 +75,6 @@ static int __devinit ci13xxx_pci_probe(struct pci_dev *pdev,
+>  	pci_set_master(pdev);
+>  	pci_try_set_mwi(pdev);
+>  
+> -	plat_ci = platform_device_alloc("ci_hdrc", -1);
+> -	if (!plat_ci) {
+> -		dev_err(&pdev->dev, "can't allocate ci_hdrc platform device\n");
+> -		retval = -ENOMEM;
+> -		goto disable_device;
+> -	}
+> -
+>  	memset(res, 0, sizeof(res));
+>  	res[0].start	= pci_resource_start(pdev, 0);
+>  	res[0].end	= pci_resource_end(pdev, 0);
+> @@ -89,32 +82,17 @@ static int __devinit ci13xxx_pci_probe(struct pci_dev *pdev,
+>  	res[1].start	= pdev->irq;
+>  	res[1].flags	= IORESOURCE_IRQ;
+>  
+> -	retval = platform_device_add_resources(plat_ci, res, nres);
+> -	if (retval) {
+> -		dev_err(&pdev->dev, "can't add resources to platform device\n");
+> -		goto put_platform;
+> +	plat_ci = ci13xxx_add_device(&pdev->dev, res, nres, platdata);
+> +	if (IS_ERR(plat_ci)) {
+> +		dev_err(&pdev->dev, "ci13xxx_add_device failed!\n");
+> +		retval = PTR_ERR(plat_ci);
+> +		goto disable_device;
+>  	}
+>  
+> -	retval = platform_device_add_data(plat_ci, platdata, sizeof(*platdata));
+> -	if (retval)
+> -		goto put_platform;
+> -
+> -	dma_set_coherent_mask(&plat_ci->dev, pdev->dev.coherent_dma_mask);
+> -	plat_ci->dev.dma_mask = pdev->dev.dma_mask;
+> -	plat_ci->dev.dma_parms = pdev->dev.dma_parms;
+> -	plat_ci->dev.parent = &pdev->dev;
+> -
+>  	pci_set_drvdata(pdev, plat_ci);
+>  
+> -	retval = platform_device_add(plat_ci);
+> -	if (retval)
+> -		goto put_platform;
+> -
+>  	return 0;
+>  
+> - put_platform:
+> -	pci_set_drvdata(pdev, NULL);
+> -	platform_device_put(plat_ci);
+>   disable_device:
+>  	pci_disable_device(pdev);
+>   done:
+> @@ -133,7 +111,7 @@ static void __devexit ci13xxx_pci_remove(struct pci_dev *pdev)
+>  {
+>  	struct platform_device *plat_ci = pci_get_drvdata(pdev);
+>  
+> -	platform_device_unregister(plat_ci);
+> +	ci13xxx_remove_device(plat_ci);
+>  	pci_set_drvdata(pdev, NULL);
+>  	pci_disable_device(pdev);
+>  }
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 9a883bd..8eccd1b 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -332,6 +332,49 @@ static irqreturn_t ci_irq(int irq, void *data)
+>  	return ci->role == CI_ROLE_END ? ret : ci_role(ci)->irq(ci);
+>  }
+>  
+> +struct platform_device *ci13xxx_add_device(struct device *dev,
+> +			struct resource *res, int nres,
+> +			struct ci13xxx_platform_data *platdata)
+> +{
+> +	struct platform_device *pdev;
+> +	int ret;
+> +
+> +	/* FIXME: find a way to choose id */
+> +	pdev = platform_device_alloc("ci_hdrc", -1);
+> +	if (!pdev)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	pdev->dev.parent = dev;
+> +	pdev->dev.dma_mask = dev->dma_mask;
+> +	pdev->dev.dma_parms = dev->dma_parms;
+> +	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+> +
+> +	ret = platform_device_add_resources(pdev, res, nres);
+> +	if (ret)
+> +		goto err;
+> +
+> +	ret = platform_device_add_data(pdev, platdata, sizeof(*platdata));
+> +	if (ret)
+> +		goto err;
+> +
+> +	ret = platform_device_add(pdev);
+> +	if (ret)
+> +		goto err;
+> +
+> +	return pdev;
+> +
+> +err:
+> +	platform_device_put(pdev);
+> +	return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(ci13xxx_add_device);
+> +
+> +void ci13xxx_remove_device(struct platform_device *pdev)
+> +{
+> +	platform_device_put(pdev);
+It's supposed to be
+	platform_device_unregister(pdev);
 
+Thanks
 Richard
-> 
-> Marc
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+> +}
+> +EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
+ 
