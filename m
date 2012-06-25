@@ -1,52 +1,36 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 25 Jun 2012 20:54:21 +0530
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <4FE87FE3.1080608@wwwdotorg.org>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
-Message-ID: <4FE882A5.3080504@nvidia.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 25 Jun 2012 10:29:57 -0500
+Subject: [PATCH v4 1/3] ARM: OMAP2+: nand: unify init functions
+In-Reply-To: <cdcf19df902fbfa0632371f94309f21544cdad21.1340354986.git.afzal@ti.com>
+References: <cover.1340354985.git.afzal@ti.com>
+ <cdcf19df902fbfa0632371f94309f21544cdad21.1340354986.git.afzal@ti.com>
+Message-ID: <4FE883F5.6040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 June 2012 08:42 PM, Stephen Warren wrote:
-> On 06/25/2012 12:24 AM, Laxman Dewangan wrote:
->> On Saturday 23 June 2012 04:44 AM, Stephen Warren wrote:
->>> From: Stephen Warren<swarren@nvidia.com>
->>>
->>> Seaboard uses a TPS6586x regulator. Instantiate this, and hook up a
->>> couple of fixed GPIO-controlled regulators too.
->>>
->>>
->>> Signed-off-by: Stephen Warren<swarren@nvidia.com>
->>> ---
->> Acked-by: Laxman Dewangan<ldewangan@nvidia.com>
->>
->> I think this series very much depends on the series
->> [PATCH V3 0/3] regulator: dt: add policy to match regulator with prop
->> "regulator-compatible"
-> That's certainly true. However, it's a runtime dependency to enable a
-> new feature, and shouldn't cause any breakage without that patch, so we
-> don't need to be explicit about the dependency in git.
->
 
-Here, wanted to say that although we enable it but it will not work. The 
-functionality depends on the above patch.
 
->>> +                regulator at 3 {
->>> +                    reg =<3>;
->>> +                    regulator-compatible = "ldo0";
->>> +                    regulator-name = "vdd_ldo0";
->>> +                    regulator-min-microvolt =<1250000>;
->>> +                    regulator-max-microvolt =<3300000>;
->>> +                    vin-supply =<&sm2_reg>;
->> I think support for vin-supply is still not there for this regulator in
->> driver.
-> That's also true. I wonder if we shouldn't support this in the regulator
-> core bindings instead, since the existence of a parent regulator seems
-> likely to be common. Either way, I'd like to include the property to
-> document it for now.
+On 06/22/2012 04:00 AM, Afzal Mohammed wrote:
+> Helper function for updating nand platform data has been
+> added the capability to take timing structure arguement.
+> Usage of omap_nand_flash_init() has been replaced by modifed
+> one, omap_nand_flash_init was doing things similar to
+> board_nand_init except that NAND CS# were being acquired
+> based on bootloader setting. As CS# is hardwired for a given
+> board, acquiring gpmc CS# has been removed, and updated with
+> the value on board.
+> 
+> NAND CS# used in beagle board was found to be CS0.
+> Thomas Weber <thomas.weber.linux@googlemail.com> reported
+> that value of devkit8000 to be CS0. Overo board was found
+> to be using CS0 based on u-boot, while google grep says
+> omap3touchbook too has CS0.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
 
-I had detailed discussion with Mark on  this support and as per him 
-(based on my understanding), the input to different regulator is from 
-the pin of the chips and so the name should be the <pin-name>-supply 
-which should be part of chip-dt binding, not to the particular rail.
+Looks good.
+
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+
+Cheers
+Jon
