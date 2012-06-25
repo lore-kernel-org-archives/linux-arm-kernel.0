@@ -1,47 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 25 Jun 2012 08:49:03 +0200
-Subject: imx27_visstrim_m10: spot the mistake
-In-Reply-To: <20120624165710.GA20378@n2100.arm.linux.org.uk>
-References: <20120624165710.GA20378@n2100.arm.linux.org.uk>
-Message-ID: <20120625064903.GA14321@pengutronix.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 25 Jun 2012 14:56:19 +0800
+Subject: [PATCH v7 02/14] usb: chipidea: drop useless arch-check
+In-Reply-To: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
+References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340607391-16380-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 24, 2012 at 05:57:10PM +0100, Russell King - ARM Linux wrote:
-> commit 9f97da78bf018206fb623cd351d454af2f105fe0
-> Author: David Howells <dhowells@redhat.com>
-> Date:   Wed Mar 28 18:30:01 2012 +0100
-> 
->     Disintegrate asm/system.h for ARM
->     
->     Disintegrate asm/system.h for ARM.
->     
->     Signed-off-by: David Howells <dhowells@redhat.com>
->     cc: Russell King <linux@arm.linux.org.uk>
->     cc: linux-arm-kernel at lists.infradead.org
-> 
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 774c41e..74542c5 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> +/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
-> +#include <asm/barrier.h>
-> +#include <asm/compiler.h>
-> +#include <asm/cmpxchg.h>
-> +#include <asm/exec.h>
-> +#include <asm/switch_to.h>
-> +#include <asm/system_info.h>
-> +#include <asm/system_misc.h>
-> 
-> What's wrong with the above commit to mach-imx27_visstrim_m10.c ?
+From: Felipe Balbi <balbi@ti.com>
 
-Sorry Russell, thank you Fabio for sending a patch.
+msm glue layer compiles on all arches just
+fine. Let's drop the unnecessary ARCH check
+so we have easier compile tests.
 
-Sascha
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+---
+ drivers/usb/chipidea/Makefile |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index cc34937..b69900a 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -5,10 +5,12 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+ 
++# Glue/Bridge layers go here
++
++obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
++
++# PCI doesn't provide stubs, need to check
+ ifneq ($(CONFIG_PCI),)
+ 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
+ endif
+ 
+-ifneq ($(CONFIG_ARCH_MSM),)
+-	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
+-endif
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
