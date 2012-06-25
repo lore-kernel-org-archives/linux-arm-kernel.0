@@ -1,35 +1,28 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Jun 2012 11:12:07 +0200
-Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
-In-Reply-To: <1340615374-21352-1-git-send-email-mkl@pengutronix.de>
-References: <1340615374-21352-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <4FE82B67.8010601@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jun 2012 10:18:18 +0100
+Subject: [RFC PATCH 0/8] Fix restart_block syscall restarting for 3.5
+In-Reply-To: <20120622193626.GG14083@ZenIV.linux.org.uk>
+References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
+ <20120622193626.GG14083@ZenIV.linux.org.uk>
+Message-ID: <20120625091818.GB22128@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2012 11:09 AM, Marc Kleine-Budde wrote:
-> If udc_start() fails the qh_pool dma-pool cannot be closed because
-> it's still in use. This patch factors out the dma_pool_free() loop
-> into destroy_eps() and calls it in the error path of udc_start(),
-> too.
+Hi Al,
+
+On Fri, Jun 22, 2012 at 08:36:26PM +0100, Al Viro wrote:
+> On Fri, Jun 22, 2012 at 04:06:58PM +0100, Will Deacon wrote:
+> > I reckon the first two reverts should go in for 3.5 unless anybody has
+> > a better solution. The rest of the code is an RFC since, as Russell has
+> > said before, the code is `rather yucky'.
 > 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
+> See commit 76c3f4da3ee47b68304dbe0f64e86562e7945bf3 and a couiple before it in
+> signal.git:
 
-This patch applies on top of Richard's just published imx-chipindea
-tree. (https://github.com/riczhao/kernel-imx/commits/topics/usb-driver)
+Thanks, I'll take a look (it may keep me occupied for some time...). Are
+these destined for 3.5 or shall we press ahead with the two reverts for now
+and fix this properly in the merge window?
 
-regards, Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Cheers,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/f9d219da/attachment.sig>
+Will
