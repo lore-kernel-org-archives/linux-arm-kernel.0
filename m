@@ -1,33 +1,48 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Mon, 25 Jun 2012 12:45:51 +0200
-Subject: [PATCH 3/3] ARM: dt: tegra: paz00: add regulators
-In-Reply-To: <20120625084656.GA4037@opensource.wolfsonmicro.com>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <27366523.LjLfRK1TqH@ax5200p>
- <20120625084656.GA4037@opensource.wolfsonmicro.com>
-Message-ID: <5989569.YVq7UL4sPq@fb07-iapwap2>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Jun 2012 03:53:37 -0700
+Subject: [PATCH] ARM: omap4: Fix standalone OMAP4 build break
+In-Reply-To: <1340365461-25385-1-git-send-email-rnayak@ti.com>
+References: <1340365461-25385-1-git-send-email-rnayak@ti.com>
+Message-ID: <20120625105336.GD12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 25. Juni 2012, 09:46:56 schrieb Mark Brown:
-> On Sun, Jun 24, 2012 at 03:27:42PM +0200, Marc Dietrich wrote:
-> > On Sunday 24 June 2012 13:31:51 Mark Brown wrote:
-> > > > there should be some initial value, e.g. regulator-default-microvolt,
-> > > > as
-> > > > the original driver (from 2.6.32 ages) did. This way the maximum value
-> > > > can be set
-> > > 
-> > > That's *never* been in mainline, and nobody even bothered trying to
-> > > submit it.
-> > 
-> > which was the best thing to do ;-)
+* Rajendra Nayak <rnayak@ti.com> [120622 04:48]:
+> Fix the below build error while building OMAP4 standalone
 > 
-> Well, no - had there been some attempt to submit it it might've helped
-> stop people writing constaints like this.
+>   CC      arch/arm/mach-omap2/board-flash.o
+> arch/arm/mach-omap2/board-flash.c:102: error: redefinition of 'board_onenand_init'
+> arch/arm/mach-omap2/board-flash.h:56: note: previous definition of 'board_onenand_init' was here
+> make[1]: *** [arch/arm/mach-omap2/board-flash.o] Error 1
+> make: *** [arch/arm/mach-omap2] Error 2
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-by saying "best thing to do" I meant that the driver isn't mainline compatible 
-as it is based on some cross OS HAL. On the other hand, I think the current
-tps6586x could be enhanced to include such a field. I don't know if the 
-regulator api supports this, though.
+Thanks, applying into fixes with the updated description to describe
+the regression causing commit.
 
-Marc
+Tony
+
+> ---
+>  arch/arm/mach-omap2/board-flash.c |    5 -----
+>  1 files changed, 0 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+> index 70a81f9..53c39d2 100644
+> --- a/arch/arm/mach-omap2/board-flash.c
+> +++ b/arch/arm/mach-omap2/board-flash.c
+> @@ -97,11 +97,6 @@ __init board_onenand_init(struct mtd_partition *onenand_parts,
+>  
+>  	gpmc_onenand_init(&board_onenand_data);
+>  }
+> -#else
+> -void
+> -__init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
+> -{
+> -}
+>  #endif /* CONFIG_MTD_ONENAND_OMAP2 || CONFIG_MTD_ONENAND_OMAP2_MODULE */
+>  
+>  #if defined(CONFIG_MTD_NAND_OMAP2) || \
+> -- 
+> 1.7.1
+> 
