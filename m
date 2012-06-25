@@ -1,51 +1,51 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 25 Jun 2012 22:08:13 +0530
-Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
-In-Reply-To: <20120622085911.GA19026@n2100.arm.linux.org.uk>
-References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
-Message-ID: <1340642293.1562.59.camel@vkoul-udesk3>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 25 Jun 2012 18:50:10 +0200
+Subject: [PATCH] mtd/m25p80: add device tree probe support
+In-Reply-To: <20120625161506.GH2342@S2101-09.ap.freescale.net>
+References: <1311601063-16581-1-git-send-email-shawn.guo@linaro.org>
+ <201206251801.22385.marex@denx.de>
+ <20120625161506.GH2342@S2101-09.ap.freescale.net>
+Message-ID: <201206251850.10839.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Dear Shawn Guo,
 
-What is the status of the virtual dma and the series you have posted
-previously. Is it ready for merge?
+> On Mon, Jun 25, 2012 at 06:01:22PM +0200, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > On Sat, Jun 23, 2012 at 04:15:18AM +0200, Marek Vasut wrote:
+> > > > So is there any particular reason why this wasn't applied?
+> > > 
+> > > Let me remind Artem by resending the patch tomorrow.
+> > 
+> > Actually ... the SPI does have the heuristics to probe this chip without
+> > the patch. But there was this discussion about them eventually being
+> > removed. That was a point raised by you I think. Is that still valid?
+> 
+> That was a point raised by Grant.  IIRC, the reason I made the patch
+> is my system does not probe the device without the patch.  I can
+> retest, and if it's true that the patch is not necessarily needed,
+> I will probably let it be.
 
-I would be away for 10days starting coming Thursday. So please let me
-know
+116                         ssp2: ssp at 80014000 {
+117                                 #address-cells = <1>;
+118                                 #size-cells = <0>;
+119                                 compatible = "fsl,imx28-spi";
+120                                 pinctrl-names = "default";
+121                                 pinctrl-0 = <&spi2_pins_a>;
+122                                 status = "okay";
+123 
+124                                 flash: m25p80 at 0 {
+125                                         #address-cells = <1>;
+126                                         #size-cells = <1>;
+127                                         compatible = "m25p80";
+128                                         spi-max-frequency = <25000000>;
+129                                         reg = <0>;
+130                                 };
+131                         };
 
-On Fri, 2012-06-22 at 09:59 +0100, Russell King - ARM Linux wrote:
-> These three patches add support for returning the residue and cyclic DMA
-> support to the OMAP DMA engine driver.
-> 
-> As v3.5-rc is horribly broken on my OMAP platforms, I've had to back out
-> all the sound/soc/omap changes from the last merge window to test this,
-> inspite of Peter Ujfalusi maintaining that there is nothing wrong.  I
-> can't get working audio support on the OMAP4430SDP any other way.
-> 
-> I am planning no further work on this until OMAP ASoC support gets fixed;
-> due to Peter and my plans this summer, this is likely to be late July/
-> August time.
-> 
-> This does not implement all of the weird and wonderfully different DMA
-> setups which the OMAP ASoC driver appears to support (do we need soo much
-> flexibility?) but it does support whatever is required for my OMAP4430SDP
-> board.
-> 
-> These patches apply on top of the previously posted series of DMA patches.
-> 
-> I will be merging at least some of these down into the "dmaengine: add
-> OMAP DMA engine driver" commit at some point.
-> 
->  drivers/dma/omap-dma.c |  167 ++++++++++++++++++++++++++++++++++++++++++++---
->  1 files changed, 156 insertions(+), 11 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I use this + my SPI patches I submitted recently.
 
-
--- 
-~Vinod
+Best regards,
+Marek Vasut
