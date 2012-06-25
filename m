@@ -1,50 +1,44 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 25 Jun 2012 11:54:19 +0530
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <4FE80413.6070001@nvidia.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 25 Jun 2012 08:34:56 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FE4AB2F.8090402@wwwdotorg.org>
+References: <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
+ <4FDA40A0.4030206@wwwdotorg.org>
+ <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
+ <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
+ <4FE0EFBB.6090206@firmworks.com>
+ <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
+ <20120622110038.GA15212@avionic-0098.mockup.avionic-design.de>
+ <4FE4A4B3.9010200@wwwdotorg.org> <4FE4AB2F.8090402@wwwdotorg.org>
+Message-ID: <20120625063456.GB11469@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 23 June 2012 04:44 AM, Stephen Warren wrote:
-> From: Stephen Warren<swarren@nvidia.com>
->
-> Seaboard uses a TPS6586x regulator. Instantiate this, and hook up a
-> couple of fixed GPIO-controlled regulators too.
->
-> The regulator configurations were mostly taken from the ChromeOS 3.2
-> kernel. Exceptions are:
->
-> * The schematic lists a fixed voltage for each rail, whereas the ChromeOS
->    kernel lists a range for many rails. I used the values from the ChromeOS
->    kernel in all cases, since I know the board file there is the most
->    complete available for this hardware.
->
-> * The vdd_1v2 fixed regulator is present only in the schematic. So, I added
->    this based on the schematic.
->
-> * A 3.3v fixed regulator using GPIO3 of the TPS6586x is present in the
->    ChromeOS kernel, but not in the schematic. So, I dropped this based on
->    the schematic.
->
-> Signed-off-by: Stephen Warren<swarren@nvidia.com>
-> ---
+On Fri, Jun 22, 2012 at 11:28:15AM -0600, Stephen Warren wrote:
+> On 06/22/2012 11:00 AM, Stephen Warren wrote:
+> > On 06/22/2012 05:00 AM, Thierry Reding wrote:
+> > ...
+> >> Stephen: can you try to find out whether the Tegra PCIe controller 
+> >> indeed implements ECAM, or if this scheme is actually just a
+> >> proprietary variant?
+> > 
+> > Sure. I have added this request to the bug I filed requesting more
+> > complete PCIe host documentation.
+> 
+> I've received unofficial confirmation that we do indeed implement a
+> non-standard/non-ECAM mapping, and what's in our driver matches our HW.
 
-Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
+What I don't quite see yet is how the extended configuration space is
+supposed to work with the current driver. The PCIE_CONF_* macros don't
+provide for registers >= 256. Passing a value higher than that will mess
+with the device function field.
 
-I think this series very much depends on the series
-[PATCH V3 0/3] regulator: dt: add policy to match regulator with prop 
-"regulator-compatible"
-
-
-> +				regulator at 3 {
-> +					reg =<3>;
-> +					regulator-compatible = "ldo0";
-> +					regulator-name = "vdd_ldo0";
-> +					regulator-min-microvolt =<1250000>;
-> +					regulator-max-microvolt =<3300000>;
-> +					vin-supply =<&sm2_reg>;
-
-I think support for vin-supply is still not there for this regulator in 
-driver.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/62af3efd/attachment.sig>
