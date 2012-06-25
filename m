@@ -1,42 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 25 Jun 2012 13:23:35 -0300
-Subject: [PATCH v4] ARM: mx23: Add initial support for olinuxino board
-In-Reply-To: <20120625160515.GF2342@S2101-09.ap.freescale.net>
-References: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
- <20120625160515.GF2342@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5D1=bTcYhCa34D9L5c5P+6Q=G3HCimAWq=LsjbWDPd+Eg@mail.gmail.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 25 Jun 2012 22:08:13 +0530
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+In-Reply-To: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+Message-ID: <1340642293.1562.59.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Russell,
 
-On Mon, Jun 25, 2012 at 1:05 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Jun 18, 2012 at 10:51:52AM -0300, Fabio Estevam wrote:
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc0_4bit_pins_a: mmc0-4bit at 0 {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? fsl,pinmux-ids = <0x2000 0x2020 0x2030
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x2040 0x2050>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? fsl,drive-strength = <1>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? fsl,voltage = <1>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? fsl,pull-up = <1>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? };
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc0_sck_cfg: mmc0_sck_cfg {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? fsl,pinmux-ids = <0x2010>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? fsl,pull-up = <0>;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? };
->
-> This looks suspicious. ?First of all, 0x2010 (SSP1_DETECT) should be
-> in pinmux-ids of mmc0_4bit_pins_a. ?Secondly, SSP1_SCK seems missing
-> from the pins. ?You do not have a SSP1_SCK pin for the mmc slot?
+What is the status of the virtual dma and the series you have posted
+previously. Is it ready for merge?
 
-Looks like the ROM code did the IOMUX setup of SSP1_SCK, so that's why
-it worked.
+I would be away for 10days starting coming Thursday. So please let me
+know
 
-I will fix it. How do you want me to handle it? Via an incremental
-patch against your tree or should I post a new version of the patch?
+On Fri, 2012-06-22 at 09:59 +0100, Russell King - ARM Linux wrote:
+> These three patches add support for returning the residue and cyclic DMA
+> support to the OMAP DMA engine driver.
+> 
+> As v3.5-rc is horribly broken on my OMAP platforms, I've had to back out
+> all the sound/soc/omap changes from the last merge window to test this,
+> inspite of Peter Ujfalusi maintaining that there is nothing wrong.  I
+> can't get working audio support on the OMAP4430SDP any other way.
+> 
+> I am planning no further work on this until OMAP ASoC support gets fixed;
+> due to Peter and my plans this summer, this is likely to be late July/
+> August time.
+> 
+> This does not implement all of the weird and wonderfully different DMA
+> setups which the OMAP ASoC driver appears to support (do we need soo much
+> flexibility?) but it does support whatever is required for my OMAP4430SDP
+> board.
+> 
+> These patches apply on top of the previously posted series of DMA patches.
+> 
+> I will be merging at least some of these down into the "dmaengine: add
+> OMAP DMA engine driver" commit at some point.
+> 
+>  drivers/dma/omap-dma.c |  167 ++++++++++++++++++++++++++++++++++++++++++++---
+>  1 files changed, 156 insertions(+), 11 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Regards,
 
-Fabio Estevam
+-- 
+~Vinod
