@@ -1,80 +1,79 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Jun 2012 23:50:49 +0800
-Subject: [PATCH 1/2] ARM:MX28: Add additionnal muxing options to iMX28 DTSI
-In-Reply-To: <1340356494-24664-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 25 Jun 2012 23:58:39 +0800
+Subject: [PATCH 2/2] ARM: MXS: Add Crystalfontz CFA-10036 DTS
+In-Reply-To: <1340356494-24664-3-git-send-email-maxime.ripard@free-electrons.com>
 References: <1340356494-24664-1-git-send-email-maxime.ripard@free-electrons.com>
- <1340356494-24664-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120625155047.GD2342@S2101-09.ap.freescale.net>
+ <1340356494-24664-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120625155837.GE2342@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suggested subject prefix "ARM: dts: imx28: ..."
-
-On Fri, Jun 22, 2012 at 11:14:53AM +0200, Maxime Ripard wrote:
+On Fri, Jun 22, 2012 at 11:14:54AM +0200, Maxime Ripard wrote:
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 4634cb8..babc604 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -159,7 +159,7 @@
->  					#interrupt-cells = <2>;
->  				};
->  
-> -				duart_pins_a: duart at 0 {
-> +				duart_pins_a: duart-a at 0 {
+> Cc: Brian Lily <brian@crystalfontz.com>
+> ---
+>  arch/arm/boot/dts/cfa10036.dts |   43 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/cfa10036.dts
+> 
+> diff --git a/arch/arm/boot/dts/cfa10036.dts b/arch/arm/boot/dts/cfa10036.dts
+> new file mode 100644
+> index 0000000..28b9326
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/cfa10036.dts
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright 2012 Free Electrons
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx28.dtsi"
+> +
+> +/ {
+> +	model = "Crystalfontz CFA-10036 Board";
+> +	compatible = "crystalfontz,cfa10036", "fsl,imx28";
 
-Leave this line unchanged ...
-
->  					reg = <0>;
->  					fsl,pinmux-ids = <0x3102 0x3112>;
->  					fsl,drive-strength = <0>;
-> @@ -167,6 +167,14 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				duart_pins_b: duart-b at 0 {
-> +					reg = <0>;
-
-... and have the new mux option for duart like
-
-				duart_pins_b: duart at 1 {
-					reg = <1>;
-
-then, pinctrl system will be able to report there are 2 pin groups for
-function "duart" in debugfs.
+I would like to maintain a explicit list of in-tree boards that imx28
+DT machine supports, so please have the compatible string added into
+imx28_dt_compat.
 
 Regards,
 Shawn
 
-> +					fsl,pinmux-ids = <0x3022 0x3032>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
 > +
->  				mac0_pins_a: mac0 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <0x4000 0x4010 0x4020
-> @@ -196,6 +204,15 @@
->  					fsl,pull-up = <1>;
->  				};
->  
-> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x2000 0x2010 0x2020
-> +						0x2030 0x2080 0x2090 0x20a0>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;
+> +	};
 > +
->  				mmc0_cd_cfg: mmc0-cd-cfg {
->  					fsl,pinmux-ids = <0x2090>;
->  					fsl,pull-up = <0>;
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			ssp0: ssp at 80010000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&mmc0_4bit_pins_a
+> +					&mmc0_cd_cfg &mmc0_sck_cfg>;
+> +				bus-width = <4>;
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			duart: serial at 80074000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&duart_pins_b>;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +};
 > -- 
 > 1.7.9.5
 > 
