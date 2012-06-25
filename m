@@ -1,17 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Jun 2012 09:49:05 +0100
-Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
-In-Reply-To: <20120625005134.GA2342@S2101-09.ap.freescale.net>
-References: <1340533690-4049-1-git-send-email-javier@dowhile0.org>
- <20120625005134.GA2342@S2101-09.ap.freescale.net>
-Message-ID: <20120625084905.GD19226@n2100.arm.linux.org.uk>
+From: keshava_mgowda@ti.com (Munegowda, Keshava)
+Date: Mon, 25 Jun 2012 14:25:47 +0530
+Subject: [PATCH 04/11] mfd: omap-usb: add clk_prepare and clk_unprepare
+In-Reply-To: <alpine.DEB.2.00.1206221302470.10198@utopia.booyaka.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1340372890-10091-5-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1206221302470.10198@utopia.booyaka.com>
+Message-ID: <CAP05o4L5r46UV3yte-iH1Qh7yA=dggjjHmeHvQTyURg31mo6Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 08:51:37AM +0800, Shawn Guo wrote:
-> It seems the same patch has been there for a while.
-> 
-> http://thread.gmane.org/gmane.linux.kernel/1303115
+On Sat, Jun 23, 2012 at 12:34 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Fri, 22 Jun 2012, Rajendra Nayak wrote:
+>
+>> In preparation of OMAP moving to Common Clk Framework (CCF) add clk_prepare()
+>> and clk_unprepare() for the various usb host clocks.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>
+> Looks like this one will be at least partially obsoleted by this series:
+>
 
-Bah, why doesn't stuff like this get resent if nothing has happened for
-a while?
+Thanks paul
+Hi Rajendra
+         please re-base this patch to below series:
+
+> ARM: OMAP: TLL driver implementation for USB host driver
+> http://marc.info/?l=linux-omap&m=134019432606399&w=2
+>
+> and the runtime PM conversion in that series needs to be done anyway.
+>
+>
+> - Paul
