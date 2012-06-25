@@ -1,52 +1,26 @@
-From: xiechao.linux@gmail.com (chao xie)
-Date: Mon, 25 Jun 2012 17:24:18 +0800
-Subject: pm runtime and system suspend resume
-In-Reply-To: <CAK9wHMTYoxVqj3Ls3Y7NEwgL4Y=XnxGFzyxfy4bseMR_Hhzp7Q@mail.gmail.com>
-References: <CAK9wHMS_P+y+NmvVVrH+nNOb=KPi3rEgJOWEcRcKf3mTkxjDPA@mail.gmail.com>
- <Pine.LNX.4.44L0.1206211025060.1164-100000@iolanthe.rowland.org>
- <CAK9wHMTYoxVqj3Ls3Y7NEwgL4Y=XnxGFzyxfy4bseMR_Hhzp7Q@mail.gmail.com>
-Message-ID: <CAK9wHMSp+h9dMjZivV=Y42D1JjvZCC9vCqa4HDBV7osYek70AQ@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 25 Jun 2012 11:32:13 +0200
+Subject: [PATCH v6] input: keyboard: Add keys driver for the LPC32xx SoC
+In-Reply-To: <20120625070614.GA13876@core.coreip.homeip.net>
+References: <1340549078-8973-1-git-send-email-stigge@antcom.de>
+ <20120625070614.GA13876@core.coreip.homeip.net>
+Message-ID: <4FE8301D.9050108@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/22 chao xie <xiechao.linux@gmail.com>:
-> 2012/6/21 Alan Stern <stern@rowland.harvard.edu>:
->> On Thu, 21 Jun 2012, chao xie wrote:
->>
->>> I check the code, __device_suspend will invoke dev->pm_domain->ops
->>> first if dev->pm_domain is not NULL.
->>> Taking "suspend" as esample, i can do the following things in the
->>> dev->pm_domain->ops->suspend
->>> 1. invoke dev->driver->pm->suspend for suspending the device
->>> 2. do what we do in dev->pm_domain->ops->runtime_suspend for
->>> suspending the surrounded logic, for example, shutdown the phy or
->>> clocks.
->>> So is above implementation fine?
->>
->> Yes, that sounds like it will work. ?Watch out for the case where your
->> device is already runtime-suspended when a system suspend occurs.
->>
->> Have you read section 6 in Documentation/power/runtime_pm.txt? ?It is
->> related to your question.
->>
-> I will read the document. Thanks very much.
->
->> Alan Stern
->>
+Hi Dmitry!
 
-There is no more question about runtime_idle and runtime_suspend
-as i understand that runtime_idle indicates that the device is idle,
-clock may be off, no function there, runtime_suspend means that the
-device my be power off, and making it rework may need some
-initialization work.
-So in the scenario, for USB, there are some clocks relates to it and
-there is a phy attached to it.
-When phy is powered off, it need to be initialized again, and it will
-take some time.
-So in the driver, when there is no action, we will call
-pm_runtime_put, and it will shut off the clocks, for
-pm_runtime_put_sync_suspend, it will shut off the phy to save more
-power.
-Then how do we call pm_runtime_put_sync_suspend if it already calls
-pm_runtime_put? Do we need do call pm_runtime_get before call
-pm_runtime_put_sync_suspend because the usage_count is not 0?
+On 06/25/2012 09:06 AM, Dmitry Torokhov wrote:
+> On Sun, Jun 24, 2012 at 04:44:38PM +0200, Roland Stigge wrote:
+>> This patch adds a driver for the key scan interface of the LPC32xx SoC
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>>
+> 
+> This looks _very_ good, I just have a couple more comments:
+
+Thanks for reviewing!
+
+I think I'm addressing all of those points in my v7 patch.
+
+Roland
