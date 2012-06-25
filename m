@@ -1,56 +1,62 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 25 Jun 2012 10:24:00 -0400 (EDT)
-Subject: pm runtime and system suspend resume
-In-Reply-To: <CAK9wHMSp+h9dMjZivV=Y42D1JjvZCC9vCqa4HDBV7osYek70AQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1206251014260.1770-100000@iolanthe.rowland.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Jun 2012 09:12:35 -0600
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <4FE80413.6070001@nvidia.com>
+References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
+ <4FE80413.6070001@nvidia.com>
+Message-ID: <4FE87FE3.1080608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jun 2012, chao xie wrote:
+On 06/25/2012 12:24 AM, Laxman Dewangan wrote:
+> On Saturday 23 June 2012 04:44 AM, Stephen Warren wrote:
+>> From: Stephen Warren<swarren@nvidia.com>
+>>
+>> Seaboard uses a TPS6586x regulator. Instantiate this, and hook up a
+>> couple of fixed GPIO-controlled regulators too.
+>>
+>> The regulator configurations were mostly taken from the ChromeOS 3.2
+>> kernel. Exceptions are:
+>>
+>> * The schematic lists a fixed voltage for each rail, whereas the ChromeOS
+>>    kernel lists a range for many rails. I used the values from the
+>> ChromeOS
+>>    kernel in all cases, since I know the board file there is the most
+>>    complete available for this hardware.
+>>
+>> * The vdd_1v2 fixed regulator is present only in the schematic. So, I
+>> added
+>>    this based on the schematic.
+>>
+>> * A 3.3v fixed regulator using GPIO3 of the TPS6586x is present in the
+>>    ChromeOS kernel, but not in the schematic. So, I dropped this based on
+>>    the schematic.
+>>
+>> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+>> ---
+> 
+> Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
+> 
+> I think this series very much depends on the series
+> [PATCH V3 0/3] regulator: dt: add policy to match regulator with prop
+> "regulator-compatible"
 
-> There is no more question about runtime_idle and runtime_suspend
-> as i understand that runtime_idle indicates that the device is idle,
-> clock may be off, no function there,
+That's certainly true. However, it's a runtime dependency to enable a
+new feature, and shouldn't cause any breakage without that patch, so we
+don't need to be explicit about the dependency in git.
 
-runtime_idle indicates the the device is idle and the usage counter is
-0, right.  Your runtime_idle routine is allowed to call
-pm_runtime_suspend, pm_runtime_autosuspend, or a similar function.
+>> +                regulator at 3 {
+>> +                    reg =<3>;
+>> +                    regulator-compatible = "ldo0";
+>> +                    regulator-name = "vdd_ldo0";
+>> +                    regulator-min-microvolt =<1250000>;
+>> +                    regulator-max-microvolt =<3300000>;
+>> +                    vin-supply =<&sm2_reg>;
+> 
+> I think support for vin-supply is still not there for this regulator in
+> driver.
 
->  runtime_suspend means that the
-> device my be power off, and making it rework may need some
-> initialization work.
-> So in the scenario, for USB, there are some clocks relates to it and
-> there is a phy attached to it.
-> When phy is powered off, it need to be initialized again, and it will
-> take some time.
-> So in the driver, when there is no action, we will call
-> pm_runtime_put, and it will shut off the clocks, for
-> pm_runtime_put_sync_suspend, it will shut off the phy to save more
-> power.
-
-I'm not sure what you mean.
-
-There are only two differences between pm_runtime_put and 
-pm_runtime_put_sync_suspend:
-
-	pm_runtime_put calls pm_request_idle, which means your
-	driver's runtime_idle routine gets called asynchronously;
-
-	pm_runtime_put_sync_suspend pm_runtime_suspend, which means
-	your driver's runtime_suspend routine gets called
-	synchronously.
-
-Your runtime_idle routine shouldn't turn off anything.  All it should 
-do is call pm_runtime_suspend (or something similar).  Thus, in either 
-case your driver's runtime_suspend routine will be called.  It can turn 
-off both the clocks and the phy.
-
-> Then how do we call pm_runtime_put_sync_suspend if it already calls
-> pm_runtime_put? Do we need do call pm_runtime_get before call
-> pm_runtime_put_sync_suspend because the usage_count is not 0?
-
-You should always call pm_runtime_get (or one of its variants) before 
-calling pm_runtime_put (or any of its variants).  Increments and 
-decrements of the usage counter must balance.
-
-Alan Stern
+That's also true. I wonder if we shouldn't support this in the regulator
+core bindings instead, since the existence of a parent regulator seems
+likely to be common. Either way, I'd like to include the property to
+document it for now.
