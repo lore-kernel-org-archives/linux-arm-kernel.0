@@ -1,71 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Jun 2012 17:09:56 -0600
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <20120625222646.GB30406@opensource.wolfsonmicro.com>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
- <4FE882A5.3080504@nvidia.com>
- <20120625222646.GB30406@opensource.wolfsonmicro.com>
-Message-ID: <4FE8EFC4.3090509@wwwdotorg.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 25 Jun 2012 16:11:59 -0700
+Subject: [PATCH] clk: mxs: mx23,
+ mx28: fix clock lookup after freeing init memory
+In-Reply-To: <20120622051443.GE21418@S2101-09.ap.freescale.net>
+References: <1340301865-15815-1-git-send-email-mkl@pengutronix.de>
+ <20120622020726.GC21418@S2101-09.ap.freescale.net>
+ <CAJOA=zNeSPdNrP0Z8ymaYMjHA4dVoBrPSEWrumNXT04gVQak-w@mail.gmail.com>
+ <20120622051443.GE21418@S2101-09.ap.freescale.net>
+Message-ID: <CAJOA=zPeALNUYEd91Y4eNaRY33UPk6a0D89Ht20eiOfTdMwNuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2012 04:26 PM, Mark Brown wrote:
-> On Mon, Jun 25, 2012 at 08:54:21PM +0530, Laxman Dewangan wrote:
-> 
->> I had detailed discussion with Mark on  this support and as per
->> him (based on my understanding), the input to different regulator
->> is from the pin of the chips and so the name should be the 
->> <pin-name>-supply which should be part of chip-dt binding, not
->> to the particular rail.
-> 
-> More specifically, all the supplies for a device (including those
-> that happen to be inputs for regulators) should be specified in
-> exactly the same fashion.  This makes the binding more regular and
-> means that users can just go through the schematic adding the
-> mappings without worrying about what what the supply happens to
-> be.
+On Thu, Jun 21, 2012 at 10:14 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Jun 21, 2012 at 07:52:30PM -0700, Turquette, Mike wrote:
+>> Looks like a clk-fixes branch is in order. ?There are at least three
+>> fixes that need to into the 3.5 bugfix window. ?I'll push such a
+>> branch to my linaro git tree tomorrow.
+>>
+> To ease your life a little bit, here are the fixes for clk/mxs.
+>
 
-Just making sure I parsed that right. I think what you're saying is
-that the device itself should represent its input pins, e.g.:
+Thanks for the branch.  Pulled into my clk-fixes.  I'll be sending
+this out ASAP.
 
-tps6586x {
-    vin-ldo01-supply = <&some_regulator>;
-    vin-ldo23-supply = <...>;
-    vin-ldo4-supply = <...>;
-    vin-ldo678-supply = <...>;
-    vin-ldo9-supply = <...>;
+Regards,
+Mike
 
-    regulators {
-        regulator at 0 {
-            regulator-compatible = "ldo0";
-            ...
-        };
-        regulator at 1 {
-            regulator-compatible = "ldo1";
-            ...
-        };
-    };
-};
-
-(and then the driver internally uses the *-supply to set up the
-parents of each of its own regulators)
-
-... rather than each regulator specifying its parent, which might
-result in some duplication, since in this case both ldo0/1 are
-supplied from the same input pin:
-
-tps6586x {
-    regulators {
-        regulator at 0 {
-            regulator-compatible = "ldo0";
-            vin-supply = <&some_regulator>;
-            ...
-        };
-        regulator at 1 {
-            regulator-compatible = "ldo1";
-            vin-supply = <&some_regulator>;
-            ...
-        };
-    };
-};
+> Regards,
+> Shawn
+>
+> ---
+>
+> The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
+>
+> ?Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
+>
+> are available in the git repository at:
+> ?git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs/fixes-for-3.5
+>
+> Marc Kleine-Budde (1):
+> ? ? ?clk: mxs: fix clock lookup after freeing init memory
+>
+> Shawn Guo (1):
+> ? ? ?clk: mxs: fix ref_io clock definition
+>
+> ?drivers/clk/mxs/clk-imx23.c | ? 12 ++++++------
+> ?drivers/clk/mxs/clk-imx28.c | ? 32 ++++++++++++++++----------------
+> ?2 files changed, 22 insertions(+), 22 deletions(-)
+>
