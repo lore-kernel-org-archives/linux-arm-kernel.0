@@ -1,128 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Jun 2012 12:51:54 +0300
-Subject: [PATCHv9 3/8] I2C: OMAP: use devm_* functions
-In-Reply-To: <1340273329-8319-4-git-send-email-shubhrajyoti@ti.com>
-References: <1340273329-8319-1-git-send-email-shubhrajyoti@ti.com>
- <1340273329-8319-4-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120625095152.GE6468@arwen.pp.htv.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jun 2012 11:03:03 +0100
+Subject: [PATCH 0/2] Use architected timers for delay loop
+In-Reply-To: <20120622222647.GE30087@n2100.arm.linux.org.uk>
+References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
+ <20120622222647.GE30087@n2100.arm.linux.org.uk>
+Message-ID: <20120625100303.GE22128@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 03:38:44PM +0530, Shubhrajyoti D wrote:
-> The various devm_* functions allocate memory that is released when a driver
-> detaches. This patch uses devm_kzalloc, devm_request_and_ioremap for data
-> that is allocated in the probe function of a platform device and is only
-> freed in the remove function.
+Hi Russell,
+
+Thanks for the clarification.
+
+On Fri, Jun 22, 2012 at 11:26:47PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 22, 2012 at 04:09:32PM +0100, Will Deacon wrote:
+> > Russell - I think my maths is correct, but why can't we increase the
+> >           precision by using a magic constant of 4398046U and a right
+> > 	  shift of 31?
 > 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> It's been soo long since I looked at that code that I've forgotten the
+> maths behind it.
 
-this looks a lot like:
-http://marc.info/?l=linux-omap&m=133969143407572&w=2
+No problem. I managed to convince myself of the maths but I don't want to
+touch the assembly code in delay.S if I don't have to!
 
-I wonder why wasn't that one used instead ?
-
-> ---
->  drivers/i2c/busses/i2c-omap.c |   33 +++++++++------------------------
->  1 files changed, 9 insertions(+), 24 deletions(-)
+> What I can say is that the maths in the assembly code version is
+> carefully chosen to avoid overflows during the various stages of
+> computation without loosing too much precision along the way.
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index d704f64..328a022 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -943,7 +943,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  {
->  	struct omap_i2c_dev	*dev;
->  	struct i2c_adapter	*adap;
-> -	struct resource		*mem, *irq, *ioarea;
-> +	struct resource		*mem, *irq;
->  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
->  	struct device_node	*node = pdev->dev.of_node;
->  	const struct of_device_id *match;
-> @@ -962,17 +962,16 @@ omap_i2c_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	ioarea = request_mem_region(mem->start, resource_size(mem),
-> -			pdev->name);
-> -	if (!ioarea) {
-> -		dev_err(&pdev->dev, "I2C region already claimed\n");
-> -		return -EBUSY;
-> +	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
-> +	if (!dev) {
-> +		dev_err(&pdev->dev, "Menory allocation failed\n");
-> +		return -ENOMEM;
->  	}
->  
-> -	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
-> -	if (!dev) {
-> -		r = -ENOMEM;
-> -		goto err_release_region;
-> +	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
-> +	if (!dev->base) {
-> +		dev_err(&pdev->dev, "I2C region already claimed\n");
-> +		return -ENOMEM;
->  	}
->  
->  	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
-> @@ -996,11 +995,6 @@ omap_i2c_probe(struct platform_device *pdev)
->  
->  	dev->dev = &pdev->dev;
->  	dev->irq = irq->start;
-> -	dev->base = ioremap(mem->start, resource_size(mem));
-> -	if (!dev->base) {
-> -		r = -ENOMEM;
-> -		goto err_free_mem;
-> -	}
->  
->  	platform_set_drvdata(pdev, dev);
->  
-> @@ -1095,13 +1089,9 @@ err_free_irq:
->  err_unuse_clocks:
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	pm_runtime_put(dev->dev);
-> -	iounmap(dev->base);
->  	pm_runtime_disable(&pdev->dev);
->  err_free_mem:
->  	platform_set_drvdata(pdev, NULL);
-> -	kfree(dev);
-> -err_release_region:
-> -	release_mem_region(mem->start, resource_size(mem));
->  
->  	return r;
->  }
-> @@ -1109,7 +1099,6 @@ err_release_region:
->  static int __devexit omap_i2c_remove(struct platform_device *pdev)
->  {
->  	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
-> -	struct resource		*mem;
->  	int ret;
->  
->  	platform_set_drvdata(pdev, NULL);
-> @@ -1123,10 +1112,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> -	iounmap(dev->base);
-> -	kfree(dev);
-> -	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	release_mem_region(mem->start, resource_size(mem));
->  	return 0;
->  }
->  
-> -- 
-> 1.7.5.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> The assembly is also designed to round up any lost precision, so we
+> try to produce a longer delay by way of the lost precision in the
+> maths.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/0ff5c800/attachment.sig>
+Right, that probably explains why I was having difficulty following it.
+
+> I forget what kind of precision we do get, but precision is not really
+> a major concern here.  We are only after a "rough" estimate of the
+> delay (hell, we don't even guarantee according to Linus that you will
+> get a minimum of the delay you asked for - you might get a shorter
+> delay!)  You _will_ get shorter delays because of the way the loop is
+> calibrated (think: the jiffy code tries to find how many loops fit in
+> a single jiffy, but a jiffy _also_ includes the overhead of running
+> the timer interrupt, which artificially reduces loops_per_jiffy.)
+
+We avoid the calibration step for the timer-based loop and use the counter
+frequency directly so I think we probably always delay for slightly longer
+in that case. But yes, I see that precision isn't the be-all and end-all
+here!
+
+> Provided we get a delay "in the ballpark" of what was requested, that's
+> good enough.
+
+In which case, let's leave the maths like it is. The current values work
+fine with both the polling loop and the timer loop up to 2ms.
+
+Cheers,
+
+Will
