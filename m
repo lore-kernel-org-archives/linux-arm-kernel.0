@@ -1,44 +1,47 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 25 Jun 2012 08:34:56 +0200
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <4FE4AB2F.8090402@wwwdotorg.org>
-References: <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
- <4FDA40A0.4030206@wwwdotorg.org>
- <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
- <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
- <4FE0EFBB.6090206@firmworks.com>
- <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
- <20120622110038.GA15212@avionic-0098.mockup.avionic-design.de>
- <4FE4A4B3.9010200@wwwdotorg.org> <4FE4AB2F.8090402@wwwdotorg.org>
-Message-ID: <20120625063456.GB11469@avionic-0098.adnet.avionic-design.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 25 Jun 2012 08:49:03 +0200
+Subject: imx27_visstrim_m10: spot the mistake
+In-Reply-To: <20120624165710.GA20378@n2100.arm.linux.org.uk>
+References: <20120624165710.GA20378@n2100.arm.linux.org.uk>
+Message-ID: <20120625064903.GA14321@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2012 at 11:28:15AM -0600, Stephen Warren wrote:
-> On 06/22/2012 11:00 AM, Stephen Warren wrote:
-> > On 06/22/2012 05:00 AM, Thierry Reding wrote:
-> > ...
-> >> Stephen: can you try to find out whether the Tegra PCIe controller 
-> >> indeed implements ECAM, or if this scheme is actually just a
-> >> proprietary variant?
-> > 
-> > Sure. I have added this request to the bug I filed requesting more
-> > complete PCIe host documentation.
+On Sun, Jun 24, 2012 at 05:57:10PM +0100, Russell King - ARM Linux wrote:
+> commit 9f97da78bf018206fb623cd351d454af2f105fe0
+> Author: David Howells <dhowells@redhat.com>
+> Date:   Wed Mar 28 18:30:01 2012 +0100
 > 
-> I've received unofficial confirmation that we do indeed implement a
-> non-standard/non-ECAM mapping, and what's in our driver matches our HW.
+>     Disintegrate asm/system.h for ARM
+>     
+>     Disintegrate asm/system.h for ARM.
+>     
+>     Signed-off-by: David Howells <dhowells@redhat.com>
+>     cc: Russell King <linux@arm.linux.org.uk>
+>     cc: linux-arm-kernel at lists.infradead.org
+> 
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index 774c41e..74542c5 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> +/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
+> +#include <asm/barrier.h>
+> +#include <asm/compiler.h>
+> +#include <asm/cmpxchg.h>
+> +#include <asm/exec.h>
+> +#include <asm/switch_to.h>
+> +#include <asm/system_info.h>
+> +#include <asm/system_misc.h>
+> 
+> What's wrong with the above commit to mach-imx27_visstrim_m10.c ?
 
-What I don't quite see yet is how the extended configuration space is
-supposed to work with the current driver. The PCIE_CONF_* macros don't
-provide for registers >= 256. Passing a value higher than that will mess
-with the device function field.
+Sorry Russell, thank you Fabio for sending a patch.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/62af3efd/attachment.sig>
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
