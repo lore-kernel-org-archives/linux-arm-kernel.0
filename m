@@ -1,34 +1,35 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Mon, 25 Jun 2012 11:09:54 +0530
-Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
- ocp2scp
-In-Reply-To: <20120623044445.GA2993@kroah.com>
-References: <1340370942-23201-1-git-send-email-kishon@ti.com>
- <1340370942-23201-2-git-send-email-kishon@ti.com>
- <20120623044445.GA2993@kroah.com>
-Message-ID: <CAAe_U6+dkiQw-i93pFapt6qKrArzaQoE8X3GjDzUDraziG8B2Q@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 25 Jun 2012 09:07:58 +0300
+Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
+In-Reply-To: <1340372890-10091-6-git-send-email-rnayak@ti.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1340372890-10091-6-git-send-email-rnayak@ti.com>
+Message-ID: <1340604478.12683.25.camel@lappyti>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi,
 
-On Sat, Jun 23, 2012 at 10:14 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Fri, Jun 22, 2012 at 06:45:41PM +0530, Kishon Vijay Abraham I wrote:
->> Adds a new driver _ocp2scp_.
->
-> That's not what you called this driver in the patch below :(
->
->> This driver takes the responsibility of creating
->> all the devices that is connected to OCP2SCP. In the case of OMAP4, USB2PHY
->> is connected to ocp2scp.
->>
->> This also includes device tree support for ocp2scp driver and
->> the documentation with device tree binding information is updated.
->
-> Can't this live where the scp drivers live? ?Actually, where is that at?
-> Do we have scp drivers?
-AFAIK, there isn't any driver for scp. But we have a driver for ocp
-and it is present at arch/arm/mach-omap2/omap_l3_noc.c
+On Fri, 2012-06-22 at 19:18 +0530, Rajendra Nayak wrote:
+> In preparation of OMAP moving to Common Clk Framework(CCF) add clk_prepare()
+> and clk_unprepare() for the omapdss clocks.
 
-Thanks
-Kishon
+You used clk_prepare and clk_unprepare instead of clk_prepare_enable and
+clk_disable_unprepare. I didn't check the dss driver yet, but my hunch
+is that the clocks are normally not enabled/disabled from atomic
+context.
+
+What does the prepare/unprepare actually do? Is there any benefit in
+delaying preparing, i.e. is there a difference between prepare right
+after clk_get, or prepare right before clk_enable? (And similarly for
+unprepare)
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/fb172c0f/attachment.sig>
