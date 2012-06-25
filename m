@@ -1,109 +1,37 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 25 Jun 2012 11:51:05 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <20120622231222.GB2426@n2100.arm.linux.org.uk>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206090004.10086.arnd@arndb.de> <4FD914F6.6000402@ti.com>
- <201206141148.20371.arnd@arndb.de> <4FE4F718.3080204@ti.com>
- <20120622231222.GB2426@n2100.arm.linux.org.uk>
-Message-ID: <4FE896F9.2020806@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 25 Jun 2012 22:45:55 +0530
+Subject: [PATCH v5 1/7] ARM: davinci, cp_intc: Add irq domain support
+In-Reply-To: <1338373143-7467-2-git-send-email-hs@denx.de>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-2-git-send-email-hs@denx.de>
+Message-ID: <4FE89CCB.4090609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Heiko,
 
-On 06/22/2012 06:12 PM, Russell King - ARM Linux wrote:
-> Before this goes much further... one fairly obvious and important point
-> must be made.
+On 5/30/2012 3:48 PM, Heiko Schocher wrote:
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
 > 
-> You're designing an API here.  You're designing it *WITHOUT* involving
-> the two most important people in its design that there are.  The
-> DMA engine maintainers.  Is this how we go about designing APIs - behind
-> maintainers backs and then presenting it to the maintainers as a fait
-> accompli?
+> ---
 
-Absolutely not, this was not the intent and your point is well
-understood. I have added Dan and Vinod, and will ensure that he is added
-in future.
+Applying this patch with two changes:
 
-> There's 86 messages in this thread, none of which have been copied to
-> them in any way.  Why aren't they involved?
+1) select IRQ_DOMAIN for CP_INTC arch/arm/mach-davinci/Kconfig. Without
+this build breaks.
 
-Initially this binding was not dma-engine centric. However, I should
-have included them in this version from the beginning as I had evolved
-it in that direction.
+2) Add some commit description. For future, please have some commit
+description on all patches.
 
-Dan, Vinod, in this thread we have been discussing the addition of a
-generic device-tree binding for DMA controllers. In the below, we were
-discussing the addition of a device-tree API, which would work as a
-wrapper to the dma-engine dma_request_channel() API. I apologise for
-adding you late into the discussion. If you have any questions/comments
-let me know.
+I boot tested this on AM18x EVM. Also tested that GPIO interrupts are
+not broken.
 
-Jon
-
-> On Fri, Jun 22, 2012 at 05:52:08PM -0500, Jon Hunter wrote:
->> Hi Arnd,
->>
->> On 06/14/2012 06:48 AM, Arnd Bergmann wrote:
->>
->> [snip]
->>
->>> This would let us handle the following cases very easily:
->>>
->>> 1. one read-write channel
->>>
->>> 	dmas = <&dmac 0x3 match>;
->>>
->>> 2. a choice of two read-write channels:
->>>
->>> 	dmas = <&dmacA 0x3 matchA>, <&dmacB 0x3 matchB>;
->>>
->>> 3. one read-channel, one write channel:
->>>
->>> 	dmas = <&dmac 0x1 match-read>, <&dmac 0x2 match-write>;
->>>
->>> 4. a choice of two read channels and one write channel:
->>>
->>> 	dmas = <&dmacA 0x1 match-readA>, <&dmacA 0x2 match-write> 
->>> 			<&dmacB match-readB>;
->>>
->>> And only the cases where we have more multiple channels that differ
->>> in more aspects would require named properties:
->>>
->>> 5. two different channels
->>>
->>> 	dmas = <&dmac 0x3 match-rwdata>, <&dmac 0x1 match-status>;
->>> 	dma-names = "rwdata", "status";
->>>
->>> 6. same as 5, but with a choice of channels:
->>>
->>> 	dmas = <&dmacA 0x3 match-rwdataA>, <&dmacA 0x1 match-status>;
->>> 		<dmacB 0x3 match-rwdataB>;
->>> 	dma-names = "rwdata", "status", "rwdata";
->>>
->>>
->>> With a definition like that, we can implement a very simple device
->>> driver interface for the common cases, and a slightly more complex
->>> one for the more complex cases:
->>>
->>> 1. chan = of_dma_request_channel(dev->of_node, 0);
->>> 2. chan = of_dma_request_channel(dev->of_node, 0);
->>> 3. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
->>>    txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
->>> 4. rxchan = of_dma_request_channel(dev->of_node, DMA_MEM_TO_DEV);
->>>    txchan = of_dma_request_channel(dev->of_node, DMA_DEV_TO_MEM);
->>> 5. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
->>>    auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
->>> 6. chan = of_dma_request_named_channel(dev->of_node, "rwdata", 0);
->>>    auxchan = of_dma_request_named_channel(dev->of_node, "status", DMA_DEV_TO_MEM);
->>
->> In the above examples, did you imply that the of_dma_request_channel()
->> function would return a type of "struct dma_chan" and so be calling
->> dma_request_channel() underneath?
->>
->> I am been prototyping something, but wanted to make sure I am completely
->> aligned on this :-)
->>
->> Cheers
->> Jon
+Thanks,
+Sekhar
