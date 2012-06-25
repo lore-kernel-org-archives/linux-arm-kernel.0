@@ -1,47 +1,75 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Jun 2012 12:38:59 +0300
-Subject: [PATCH 2/2] ARM: OMAP2: Fix tusb6010 GPIO interrupt for n8x0
-In-Reply-To: <20120613101512.18645.12865.stgit@muffinssi.local>
-References: <20120613101303.18645.83320.stgit@muffinssi.local>
- <20120613101512.18645.12865.stgit@muffinssi.local>
-Message-ID: <20120625093858.GA6468@arwen.pp.htv.fi>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Jun 2012 11:48:27 +0200
+Subject: [PATCH v7 08/14] USB: Chipidea: add ci13xxx device id management
+In-Reply-To: <1340607391-16380-9-git-send-email-richard.zhao@freescale.com>
+References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
+ <1340607391-16380-9-git-send-email-richard.zhao@freescale.com>
+Message-ID: <4FE833EB.3050503@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 03:15:12AM -0700, Tony Lindgren wrote:
-> Here's one more gpio_to_irq conversion that we missed
-> earlier. Tested with n800 in gadget mode using USB_ETH.
+On 06/25/2012 08:56 AM, Richard Zhao wrote:
+> We use ida_simple_get and ida_simple_remove to manage the ids.
 > 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Removing the "ci13xxx_imx" module doesn't work as expected:
 
-> ---
->  arch/arm/mach-omap2/usb-tusb6010.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
-> index db84a46..805bea6 100644
-> --- a/arch/arm/mach-omap2/usb-tusb6010.c
-> +++ b/arch/arm/mach-omap2/usb-tusb6010.c
-> @@ -300,7 +300,7 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
->  		printk(error, 3, status);
->  		return status;
->  	}
-> -	tusb_resources[2].start = irq + IH_GPIO_BASE;
-> +	tusb_resources[2].start = gpio_to_irq(irq);
->  
->  	/* set up memory timings ... can speed them up later */
->  	if (!ps_refclk) {
-> 
+ci_hdrc ci_hdrc.0: remove, state 1
+usb usb1: USB disconnect, device number 1
+ci_hdrc ci_hdrc.0: USB bus 1 deregistered
+Unable to handle kernel NULL pointer dereference at virtual address 0000006c
+pgd = c6bb8000
+[0000006c] *pgd=46a7e831, *pte=00000000, *ppte=00000000
+Internal error: Oops: 17 [#1] PREEMPT ARM
+Modules linked in: ci13xxx_imx(-) ci_hdrc
+CPU: 0    Not tainted  (3.5.0-rc4-00055-g35d73a8-dirty #80)
+PC is at ida_remove+0xa0/0x110
+LR is at ida_simple_remove+0x30/0x60
+pc : [<c0154294>]    lr : [<c01544f4>]    psr: a0000093
+sp : c6be3ed0  ip : 80000000  fp : 0092f008
+r10: d9a22647  r9 : c6be2000  r8 : 08421085
+r7 : 00000001  r6 : 0000034b  r5 : bf00a3a8  r4 : 00000000
+r3 : c087d6b0  r2 : 001bb89f  r1 : 6b6b6b6b  r0 : 00000068
+Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 0005317f  Table: 46bb8000  DAC: 00000015
+Process rmmod (pid: 136, stack limit = 0xc6be2270)
+Stack: (0xc6be3ed0 to 0xc6be4000)
+3ec0:                                     c6be2000 20000013 6b6b6b6b bf00a3a8
+3ee0: c6be2000 c0009408 00000000 c01544f4 c6ad5430 c7865980 bf01562c bf01501c
+3f00: bf015000 c7865988 bf01562c c018dad8 c018dac4 c018c5e0 bf01562c c7865988
+3f20: c78659bc c018cdbc c6b78040 bf015680 bf01562c c0e670d0 0092f0b8 c018c438
+3f40: bf015680 c6be2000 00000000 c004c56c c74ca308 33316963 5f787878 00786d69
+3f60: 0092f008 c00a5088 c7812138 c6b5b388 00000000 c6b79860 c6b5b388 c0088648
+3f80: 00000003 c6b79860 c6be2000 00088730 00002002 00000001 0092f088 be82fe5c
+3fa0: 00000081 c0009260 00000001 0092f088 0092f0b8 00000800 b6eb865c be82fc00
+3fc0: 00000001 0092f088 be82fe5c 00000081 0092f088 00000000 00000800 0092f008
+3fe0: b6e7cbc0 be82fc04 b6ef65f8 b6e7cbcc 60000010 0092f0b8 00000000 00000000
+[<c0154294>] (ida_remove+0xa0/0x110) from [<c01544f4>] (ida_simple_remove+0x30/0x60)
+[<c01544f4>] (ida_simple_remove+0x30/0x60) from [<bf01501c>] (ci13xxx_imx_remove+0x1c/0x84 [ci13xxx_imx])
+[<bf01501c>] (ci13xxx_imx_remove+0x1c/0x84 [ci13xxx_imx]) from [<c018dad8>] (platform_drv_remove+0x14/0x18)
+[<c018dad8>] (platform_drv_remove+0x14/0x18) from [<c018c5e0>] (__device_release_driver+0x58/0xa8)
+[<c018c5e0>] (__device_release_driver+0x58/0xa8) from [<c018cdbc>] (driver_detach+0xcc/0xd8)
+[<c018cdbc>] (driver_detach+0xcc/0xd8) from [<c018c438>] (bus_remove_driver+0x7c/0xc0)
+[<c018c438>] (bus_remove_driver+0x7c/0xc0) from [<c004c56c>] (sys_delete_module+0x180/0x23c)
+[<c004c56c>] (sys_delete_module+0x180/0x23c) from [<c0009260>] (ret_fast_syscall+0x0/0x2c)
+Code: e0416286 e5904004 e1a002c6 e0840100 (e5908004)
+---[ end trace 7d882a2086a6a3d8 ]---
+note: rmmod[136] exited with preempt_count 1
 
+Marc
 -- 
-balbi
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/bd7020b7/attachment.sig>
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/163b7ba8/attachment.sig>
