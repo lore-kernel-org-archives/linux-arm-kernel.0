@@ -1,90 +1,75 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 25 Jun 2012 18:16:06 +0800
-Subject: [RFC PATCH v2] MTD: nand: add return value for
- write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
-In-Reply-To: <CAN8TOE9ebFAfJHaG2-po0LeLi=wTq9YZ9pNFXhQE0PLt5TQxeg@mail.gmail.com>
-References: <1339567570-4816-1-git-send-email-josh.wu@atmel.com>
- <4FE13CB2.3000605@atmel.com>
- <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
- <4FE29CB8.3000404@atmel.com>
- <CAN8TOE9ebFAfJHaG2-po0LeLi=wTq9YZ9pNFXhQE0PLt5TQxeg@mail.gmail.com>
-Message-ID: <4FE83A66.9090100@atmel.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 25 Jun 2012 12:17:13 +0200
+Subject: [PATCH v7 08/14] USB: Chipidea: add ci13xxx device id management
+In-Reply-To: <513f64cb-8eac-4e51-81f7-e3824d96d870@email.android.com>
+References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
+ <1340607391-16380-9-git-send-email-richard.zhao@freescale.com>
+ <4FE833EB.3050503@pengutronix.de>
+ <513f64cb-8eac-4e51-81f7-e3824d96d870@email.android.com>
+Message-ID: <4FE83AA9.6030507@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Brian
+On 06/25/2012 12:03 PM, Richard Zhao wrote:
+> Could you use my USB test branch? 
 
-On 6/23/2012 3:32 AM, Brian Norris wrote:
-> Hi Josh,
->
-> On Wed, Jun 20, 2012 at 9:02 PM, Josh Wu <josh.wu@atmel.com> wrote:
->> On 6/21/2012 2:43 AM, Brian Norris wrote:
->>> On Tue, Jun 19, 2012 at 8:00 PM, Josh Wu<josh.wu@atmel.com>  wrote:
->>>> On 6/13/2012 2:06 PM, Josh Wu wrote:
->>>>> There is an implemention of hardware ECC write page function which may
->>>>> return an error indication. But now the definition of 'write_page'
->>>>> function
->>>>> in struct nand_ecc_ctrl is 'void'.
->>> I think it would help reviewers (and changelog readers) to note which
->>> implementations are the real issue, if there are a small number of
->>> implementations targeted.
->> Currently, I am introducing the atmel pragrammable multibit ECC(PMECC)
->> hardware code to nand flash. I meet following situation that I need change
->> the write_page()'s return value to 'int':
->>
->> when writing one page into a nand flash with PMECC enabled, the hardware
->> engine will compute the BCH ecc code for this page. so we need read a the
->> status register to theck whether the ecc code is generated.
->> But we cannot assume the status register always can be ready, (for instance,
->> incorrect hardware configuration or hardware issue), in such case I need
->> write_page() to return a error code.
->>
->> So this is the reason that I push this patch to change the return value to
->> int.
-> OK, thanks for the clarification here. I think that this is valuable
-> information that should be included in the change log when you send
-> v3. Also, this is the kind of fix that should probably be sent in a
-> series with the patch for your Atmel PMECC driver. That way, they can
-> be reviewed/accepted together. As you mention, it is pointless to
-> merge this patch without your driver patch.
->
->>>>> --- a/drivers/mtd/nand/nand_base.c
->>>>> +++ b/drivers/mtd/nand/nand_base.c
->>> ...
->>>>> @@ -2096,9 +2104,14 @@ static int nand_write_page(struct mtd_info *mtd,
->>>>> struct nand_chip *chip,
->>>>>         chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
->>>>>
->>>>>         if (unlikely(raw))
->>>>> -               chip->ecc.write_page_raw(mtd, chip, buf, oob_required);
->>>>> +               status = chip->ecc.write_page_raw(mtd, chip, buf, oob_required);
->>>>>         else
->>>>> -               chip->ecc.write_page(mtd, chip, buf, oob_required);
->>>>> +               status = chip->ecc.write_page(mtd, chip, buf, oob_required);
->>>>> +
->>>>> +       if (status<    0) {
->>>>> +               pr_warn("Error happened when calling nand_write_page()\n");
->>>>> +               return status;
->>>>> +       }
->>> I'm not sure this is the most informative error message. (Similar
->>> comment applies in cafe_nand.c, which imitates a lot of nand_base.c
->>> code)
->> Maybe in this case I need print the error code as well.
-> After a little closer look, I don't think you need to print anything
-> (here, or in cafe_nand.c). This is a kind of intermediate-layer
-> function that doesn't print anything on other errors (e.g., when it
-> checks the status, it just fails with 'return -EIO;'). The error will
-> be caught by upper layers and an appropriate error code may or may not
-> be displayed. So just make sure that your new driver asserts an
-> appropriate error code, and no print should be necessary.
->
-> Regards,
-> Brian
+Same result:
 
-According to your advice, I resent a new patch series, which merge this 
-patch with PMECC.
+ci_hdrc ci_hdrc.0: remove, state 1
+usb usb1: USB disconnect, device number 1
+ci_hdrc ci_hdrc.0: USB bus 1 deregistered
+Unable to handle kernel NULL pointer dereference at virtual address 0000006c
+pgd = c6ba4000
+[0000006c] *pgd=46a68831, *pte=00000000, *ppte=00000000
+Internal error: Oops: 17 [#1] PREEMPT ARM
+Modules linked in: ci13xxx_imx(-) ci_hdrc imx_usbmisc
+CPU: 0    Not tainted  (3.5.0-rc4-00058-g01710ef #85)
+PC is at ida_remove+0xa0/0x110
+LR is at ida_simple_remove+0x30/0x60
+pc : [<c0154294>]    lr : [<c01544f4>]    psr: a0000093
+sp : c6b9fed0  ip : 80000000  fp : 0023f008
+r10: d9a22647  r9 : c6b9e000  r8 : 08421085
+r7 : 00000001  r6 : 0000034b  r5 : bf00de34  r4 : 00000000
+r3 : c6a7f0c0  r2 : 001bb89f  r1 : 6b6b6b6b  r0 : 00000068
+Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 0005317f  Table: 46ba4000  DAC: 00000015
+Process rmmod (pid: 142, stack limit = 0xc6b9e270)
+Stack: (0xc6b9fed0 to 0xc6ba0000)
+fec0:                                     c6b9e000 20000013 6b6b6b6b bf00de34
+fee0: c6b9e000 c0009408 00000000 c01544f4 c082a3b0 c7865980 bf019634 bf01901c
+ff00: bf019000 c7865988 bf019634 c018dad8 c018dac4 c018c5e0 bf019634 c7865988
+ff20: c78659bc c018cdbc c6a86360 bf019688 bf019634 c0e690d0 0023f0b8 c018c438
+ff40: bf019688 c6b9e000 00000000 c004c56c c75352a8 33316963 5f787878 00786d69
+ff60: 0023f008 c00a5088 c7812138 c6a4a388 00000000 c782c908 c6a4a388 c0088648
+ff80: 00000003 c782c908 c6b9e000 00088730 00002002 00000001 0023f088 beea3e5c
+ffa0: 00000081 c0009260 00000001 0023f088 0023f0b8 00000800 b6f4c65c beea3c00
+ffc0: 00000001 0023f088 beea3e5c 00000081 0023f088 00000000 00000800 0023f008
+ffe0: b6f10bc0 beea3c04 b6f8a5f8 b6f10bcc 60000010 0023f0b8 00000000 00000000
+[<c0154294>] (ida_remove+0xa0/0x110) from [<c01544f4>] (ida_simple_remove+0x30/0x60)
+[<c01544f4>] (ida_simple_remove+0x30/0x60) from [<bf01901c>] (ci13xxx_imx_remove+0x1c/0x84 [ci13xxx_imx])
+[<bf01901c>] (ci13xxx_imx_remove+0x1c/0x84 [ci13xxx_imx]) from [<c018dad8>] (platform_drv_remove+0x14/0x18)
+[<c018dad8>] (platform_drv_remove+0x14/0x18) from [<c018c5e0>] (__device_release_driver+0x58/0xa8)
+[<c018c5e0>] (__device_release_driver+0x58/0xa8) from [<c018cdbc>] (driver_detach+0xcc/0xd8)
+[<c018cdbc>] (driver_detach+0xcc/0xd8) from [<c018c438>] (bus_remove_driver+0x7c/0xc0)
+[<c018c438>] (bus_remove_driver+0x7c/0xc0) from [<c004c56c>] (sys_delete_module+0x180/0x23c)
+[<c004c56c>] (sys_delete_module+0x180/0x23c) from [<c0009260>] (ret_fast_syscall+0x0/0x2c)
+Code: e0416286 e5904004 e1a002c6 e0840100 (e5908004)
+---[ end trace 74ff20eb0c5179ff ]---
+note: rmmod[142] exited with preempt_count 1
+Segmentation fault
 
-Thank you.
+Marc
 
-Best Regards,
-Josh Wu
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120625/3d4a6778/attachment.sig>
