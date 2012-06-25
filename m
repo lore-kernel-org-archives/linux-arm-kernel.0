@@ -1,28 +1,80 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Jun 2012 23:43:56 +0800
-Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <201206232047.33228.marex@denx.de>
-References: <1339242351-8797-1-git-send-email-marex@denx.de>
- <201206232047.33228.marex@denx.de>
-Message-ID: <20120625154354.GC2342@S2101-09.ap.freescale.net>
+Date: Mon, 25 Jun 2012 23:50:49 +0800
+Subject: [PATCH 1/2] ARM:MX28: Add additionnal muxing options to iMX28 DTSI
+In-Reply-To: <1340356494-24664-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1340356494-24664-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1340356494-24664-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120625155047.GD2342@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 23, 2012 at 08:47:32PM +0200, Marek Vasut wrote:
-> Dear Shawn Guo,
-> 
-> > This patch configures the I2C bus timing registers according
-> > to information passed via DT. Currently, 100kHz and 400kHz
-> > modes are supported.
-> [...]
-> 
-> Is there any reason why this can not be merged other than the timing registers 
-> goo (which I believe shall stay as in the datasheet until we figure out if it's 
-> even reasonable to add some computation there).
-> 
-I assume this is a question for Wolfram.  But I guess part of the reason
-is there is still one comment from me staying unresolved.
+Suggested subject prefix "ARM: dts: imx28: ..."
 
--- 
+On Fri, Jun 22, 2012 at 11:14:53AM +0200, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |   19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 4634cb8..babc604 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -159,7 +159,7 @@
+>  					#interrupt-cells = <2>;
+>  				};
+>  
+> -				duart_pins_a: duart at 0 {
+> +				duart_pins_a: duart-a at 0 {
+
+Leave this line unchanged ...
+
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <0x3102 0x3112>;
+>  					fsl,drive-strength = <0>;
+> @@ -167,6 +167,14 @@
+>  					fsl,pull-up = <0>;
+>  				};
+>  
+> +				duart_pins_b: duart-b at 0 {
+> +					reg = <0>;
+
+... and have the new mux option for duart like
+
+				duart_pins_b: duart at 1 {
+					reg = <1>;
+
+then, pinctrl system will be able to report there are 2 pin groups for
+function "duart" in debugfs.
+
 Regards,
 Shawn
+
+> +					fsl,pinmux-ids = <0x3022 0x3032>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
+> +
+>  				mac0_pins_a: mac0 at 0 {
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <0x4000 0x4010 0x4020
+> @@ -196,6 +204,15 @@
+>  					fsl,pull-up = <1>;
+>  				};
+>  
+> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <0x2000 0x2010 0x2020
+> +						0x2030 0x2080 0x2090 0x20a0>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
+> +
+>  				mmc0_cd_cfg: mmc0-cd-cfg {
+>  					fsl,pinmux-ids = <0x2090>;
+>  					fsl,pull-up = <0>;
+> -- 
+> 1.7.9.5
+> 
