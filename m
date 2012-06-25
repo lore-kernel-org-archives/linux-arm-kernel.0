@@ -1,36 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Jun 2012 12:22:03 +0100
-Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
-In-Reply-To: <1340604478.12683.25.camel@lappyti>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
- <1340372890-10091-6-git-send-email-rnayak@ti.com>
- <1340604478.12683.25.camel@lappyti>
-Message-ID: <20120625112203.GF19226@n2100.arm.linux.org.uk>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Mon, 25 Jun 2012 12:31:00 +0100
+Subject: [PATCH] serial/amba-pl011: move custom pin control to driver
+In-Reply-To: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
+References: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAOh2x==OPVVLeKxCT0mkYX3NmOjGQRcsSY=GHCaHEJfy6wOg3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 09:07:58AM +0300, Tomi Valkeinen wrote:
-> On Fri, 2012-06-22 at 19:18 +0530, Rajendra Nayak wrote:
-> > In preparation of OMAP moving to Common Clk Framework(CCF) add clk_prepare()
-> > and clk_unprepare() for the omapdss clocks.
-> 
-> You used clk_prepare and clk_unprepare instead of clk_prepare_enable and
-> clk_disable_unprepare. I didn't check the dss driver yet, but my hunch
-> is that the clocks are normally not enabled/disabled from atomic
-> context.
-> 
-> What does the prepare/unprepare actually do? Is there any benefit in
-> delaying preparing, i.e. is there a difference between prepare right
-> after clk_get, or prepare right before clk_enable? (And similarly for
-> unprepare)
+On Wed, May 23, 2012 at 8:18 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> We had a boot regression in Ux500 in the merge window because
+> two orthogonal pin control schemes for the PL011 were merged
+> at the same time:
+>
+> - One using the .init() and .exit() hooks into the platform
+> ?for Ux500 putting the pins into default vs sleep state
+> ?respectively as the port was started/stopped.
+> ?commit a09806607fd20bed2f8c41fe22793386790a14aa
+> ?"ARM: ux500: switch to using pinctrl for uart0"
+>
+> - One hogging the default setting at PL011 probe()
+> ?commit 258e055111d3cde2607e0d04eb91da2f7a59b591
+> ?"serial: amba-pl011: adopt pinctrl support"
+>
+> To get a solution that works for both let's scrap the stuff
+> in the platform callbacks, instead have the driver itself
+> select default and sleep states when the port is
+> started/stopped. Hopefully this works for all clients.
+> Platform callbacks are bad for device tree migration anyway,
+> so this rids us of another problem in Ux500.
+>
+> Cc: linux-serial at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Reported-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ?arch/arm/mach-ux500/board-mop500.c | ? 54 +-----------------------------------
+> ?drivers/tty/serial/amba-pl011.c ? ?| ? 45 +++++++++++++++++++++++++++---
+> ?2 files changed, 42 insertions(+), 57 deletions(-)
 
-I think you're looking at this the wrong way.
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> @@ -1869,11 +1897,20 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ?goto free;
+> ? ? ? ?}
+>
+> - ? ? ? pinctrl = devm_pinctrl_get_select_default(&dev->dev);
+> - ? ? ? if (IS_ERR(pinctrl)) {
+> - ? ? ? ? ? ? ? ret = PTR_ERR(pinctrl);
+> + ? ? ? uap->pinctrl = devm_pinctrl_get(&dev->dev);
+> + ? ? ? if (IS_ERR(uap->pinctrl)) {
+> + ? ? ? ? ? ? ? ret = PTR_ERR(uap->pinctrl);
+> ? ? ? ? ? ? ? ?goto unmap;
+> ? ? ? ?}
 
-Think of clk_prepare() as the _sleepable_ part of clk_enable().  So, think
-of clk_prepare() as ideally being placed just before clk_enable() with the
-exception that if that's not possible (because you're in a non-atomic
-context) it should be placed in a position as close to clk_enable() as
-possible which is atomic.
+Hi Linus,
 
-Don't think of it as an extra step to be done after clk_get() but as an
-extra step needing to be done before clk_enable().
+People testing SPEAr with v3.5-rc1 saw that serial devices don't show
+up during boot and they
+actually return with error from this point, after Shawn's last patch.
+That will still happen with
+this patch i believe.
+
+What is expected from Platforms to handle this? AFAICR, we haven't
+done anything special
+to bind a pinctrl node to a struct dev for uart.
+
+--
+Viresh
