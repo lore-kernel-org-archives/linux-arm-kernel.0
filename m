@@ -1,29 +1,38 @@
-From: frankyl@broadcom.com (Franky Lin)
-Date: Mon, 25 Jun 2012 13:52:07 -0700
-Subject: Panda ES board hang when using GPIO as interrupt
-Message-ID: <4FE8CF77.5080400@broadcom.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 25 Jun 2012 14:38:45 -0700
+Subject: [PATCH 0/2] Use architected timers for delay loop
+In-Reply-To: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
+References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
+Message-ID: <4FE8DA65.8030403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Tarun,
+On 06/22/12 08:09, Will Deacon wrote:
+> Hello,
+>
+> This patch series reworks our delay loop implementation to allow the
+> busy-loop to be replaced with the physical counter included as part of
+> the architected timer on recent CPUs. The polling implementation is
+> still maintained to support cores without the timers and we use the same
+> maths and upper delay bound of 2ms.
+>
+> Russell - I think my maths is correct, but why can't we increase the
+>           precision by using a magic constant of 4398046U and a right
+> 	  shift of 31?
+>
+> As usual, all feedback is welcome,
 
-We are using the expansion connector A on Panda board to mount a SDIO 
-WiFi dongle on MMC2 with a level triggered interrupt signal connected to 
-GPIO 138. It's been working fine until 3.5 rc1. The board hang randomly 
-within 5 mins during a network traffic test. After bisecting we found 
-the culprit is "[PATCH 8/8] gpio/omap: fix missing check in 
-*_runtime_suspend()" [1].
+I have posted a read_current_timer implementation to the list a couple
+times but had no success in getting it merged. The patches are still in
+the patch tracker but I haven't really pushed them to get merged.
 
-I noticed Kevin raised some similar cases on other platforms and also 
-provided two patches in the patch mail thread. But unfortunately those 
-two patches doesn't help in our case. I tested the driver with 3.5-rc3 
-mainline kernel and the issue is still there. I can only "fix" the hang 
-by either reverting the commit or disabling CONFIG_PM_RUNTIME. Also, the 
-hang only happens on Panda ES board. Old Panda with 4430 works good.
+    http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6874/1
+    http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6873/1
+    http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6875/1
 
-Any thoughts and suggestions?
+So far we've just been carrying them internally. I suppose ARM needs
+this now because of big little?
 
-Thanks,
-Franky
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.omap/75708/
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
