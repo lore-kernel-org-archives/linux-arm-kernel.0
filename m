@@ -1,82 +1,56 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 25 Jun 2012 16:20:10 +0200
-Subject: [PATCH v7 04/14] usb: chipidea: msm: add remove method
-In-Reply-To: <20120625141443.GB601@arwen.pp.htv.fi>
-References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
- <201206251555.22820.marex@denx.de> <20120625141443.GB601@arwen.pp.htv.fi>
-Message-ID: <201206251620.10442.marex@denx.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 25 Jun 2012 10:24:00 -0400 (EDT)
+Subject: pm runtime and system suspend resume
+In-Reply-To: <CAK9wHMSp+h9dMjZivV=Y42D1JjvZCC9vCqa4HDBV7osYek70AQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1206251014260.1770-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Felipe Balbi,
+On Mon, 25 Jun 2012, chao xie wrote:
 
-> Hi,
-> 
-> On Mon, Jun 25, 2012 at 03:55:22PM +0200, Marek Vasut wrote:
-> > Dear ABRAHAM, KISHON VIJAY,
-> > 
-> > > Hi,
-> > > 
-> > > On Mon, Jun 25, 2012 at 7:03 PM, Marek Vasut <marex@denx.de> wrote:
-> > > > Dear ABRAHAM, KISHON VIJAY,
-> > > > 
-> > > >> Hi,
-> > > >> 
-> > > >> On Mon, Jun 25, 2012 at 12:26 PM, Richard Zhao
-> > > >> 
-> > > >> <richard.zhao@freescale.com> wrote:
-> > > >> > From: Felipe Balbi <balbi@ti.com>
-> > > >> > 
-> > > >> > allow this driver to be removed too.
-> > > >> > 
-> > > >> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > >> > Signed-off-by: Alexander Shishkin
-> > > >> > <alexander.shishkin@linux.intel.com> ---
-> > > >> > 
-> > > >> >  drivers/usb/chipidea/ci13xxx_msm.c |   20 ++++++++++++++------
-> > > >> >  1 file changed, 14 insertions(+), 6 deletions(-)
-> > > >> > 
-> > > >> > diff --git a/drivers/usb/chipidea/ci13xxx_msm.c
-> > > >> > b/drivers/usb/chipidea/ci13xxx_msm.c index 8d438b8..68512d4 100644
-> > > >> > --- a/drivers/usb/chipidea/ci13xxx_msm.c
-> > > >> > +++ b/drivers/usb/chipidea/ci13xxx_msm.c
-> > > >> > @@ -84,6 +84,8 @@ static int __devinit ci13xxx_msm_probe(struct
-> > > >> > platform_device *pdev) if (ret)
-> > > >> > 
-> > > >> >                goto put_platform;
-> > > >> > 
-> > > >> > +       platform_set_drvdata(pdev, plat_ci);
-> > > >> > +
-> > > >> > 
-> > > >> >        pm_runtime_no_callbacks(&pdev->dev);
-> > > >> >        pm_runtime_enable(&pdev->dev);
-> > > >> > 
-> > > >> > @@ -95,16 +97,22 @@ put_platform:
-> > > >> >        return ret;
-> > > >> >  
-> > > >> >  }
-> > > >> > 
-> > > >> > +static int __devexit ci13xxx_msm_remove(struct platform_device
-> > > >> > *pdev) +{
-> > > >> > +       struct platform_device *plat_ci =
-> > > >> > platform_get_drvdata(pdev);
-> > > >> 
-> > > >> How about a pm_runtime_disable() here?
-> > > > 
-> > > > MX28 doesn't do runtime PM yet. Actually it doesn't do any PM.
-> > > 
-> > > I was probably misled by the call to pm_runtime_enable in your probe
-> > > 
-> > > :-( Then can we have it removed from probe as well?
-> > 
-> > Yes, either that or properly add runtime PM support since mxc maybe does
-> > support it, I dunno right now.
-> 
-> I think adding pm_runtime_disable() to the exit path should be the way
-> to go. proper callbacks can be implemented later, but we cannot leave pm
-> enabled for the device.
+> There is no more question about runtime_idle and runtime_suspend
+> as i understand that runtime_idle indicates that the device is idle,
+> clock may be off, no function there,
 
-Agreed
+runtime_idle indicates the the device is idle and the usage counter is
+0, right.  Your runtime_idle routine is allowed to call
+pm_runtime_suspend, pm_runtime_autosuspend, or a similar function.
 
-Best regards,
-Marek Vasut
+>  runtime_suspend means that the
+> device my be power off, and making it rework may need some
+> initialization work.
+> So in the scenario, for USB, there are some clocks relates to it and
+> there is a phy attached to it.
+> When phy is powered off, it need to be initialized again, and it will
+> take some time.
+> So in the driver, when there is no action, we will call
+> pm_runtime_put, and it will shut off the clocks, for
+> pm_runtime_put_sync_suspend, it will shut off the phy to save more
+> power.
+
+I'm not sure what you mean.
+
+There are only two differences between pm_runtime_put and 
+pm_runtime_put_sync_suspend:
+
+	pm_runtime_put calls pm_request_idle, which means your
+	driver's runtime_idle routine gets called asynchronously;
+
+	pm_runtime_put_sync_suspend pm_runtime_suspend, which means
+	your driver's runtime_suspend routine gets called
+	synchronously.
+
+Your runtime_idle routine shouldn't turn off anything.  All it should 
+do is call pm_runtime_suspend (or something similar).  Thus, in either 
+case your driver's runtime_suspend routine will be called.  It can turn 
+off both the clocks and the phy.
+
+> Then how do we call pm_runtime_put_sync_suspend if it already calls
+> pm_runtime_put? Do we need do call pm_runtime_get before call
+> pm_runtime_put_sync_suspend because the usage_count is not 0?
+
+You should always call pm_runtime_get (or one of its variants) before 
+calling pm_runtime_put (or any of its variants).  Increments and 
+decrements of the usage counter must balance.
+
+Alan Stern
