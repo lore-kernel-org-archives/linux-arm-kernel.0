@@ -1,79 +1,39 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 25 Jun 2012 14:56:25 +0800
-Subject: [PATCH v7 08/14] USB: Chipidea: add ci13xxx device id management
+Date: Mon, 25 Jun 2012 14:56:18 +0800
+Subject: [PATCH v7 01/14] usb: chipidea: remove unneeded NULL check
 In-Reply-To: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
 References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340607391-16380-9-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340607391-16380-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use ida_simple_get and ida_simple_remove to manage the ids.
+From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+As reported by Dan Carpenter, there is a NULL check in udc_start() that
+follows a dereference of the pointer that's being checked. However, at
+that point udc pointer shouldn't ever be NULL and if it is, the dereference
+should cause an oops.
+
 Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/chipidea/core.c |   21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ drivers/usb/chipidea/udc.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 8b9d06f..39603d7 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -56,6 +56,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/module.h>
-+#include <linux/idr.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -332,17 +333,24 @@ static irqreturn_t ci_irq(int irq, void *data)
- 	return ci->role == CI_ROLE_END ? ret : ci_role(ci)->irq(ci);
- }
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 51f9694..cdb9212 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1647,9 +1647,6 @@ static int udc_start(struct ci13xxx *udc)
+ 	struct device *dev = udc->dev;
+ 	int retval = 0;
  
-+static DEFINE_IDA(ci_ida);
-+
- struct platform_device *ci13xxx_add_device(struct device *dev,
- 			struct resource *res, int nres,
- 			struct ci13xxx_platform_data *platdata)
- {
- 	struct platform_device *pdev;
--	int ret;
-+	int id, ret;
+-	if (!udc)
+-		return -EINVAL;
+-
+ 	spin_lock_init(&udc->lock);
  
--	/* FIXME: find a way to choose id */
--	pdev = platform_device_alloc("ci_hdrc", -1);
--	if (!pdev)
--		return ERR_PTR(-ENOMEM);
-+	id = ida_simple_get(&ci_ida, 0, 0, GFP_KERNEL);
-+	if (id < 0)
-+		return ERR_PTR(id);
-+
-+	pdev = platform_device_alloc("ci_hdrc", id);
-+	if (!pdev) {
-+		ret = -ENOMEM;
-+		goto put_id;
-+	}
- 
- 	pdev->dev.parent = dev;
- 	pdev->dev.dma_mask = dev->dma_mask;
-@@ -365,6 +373,8 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
- 
- err:
- 	platform_device_put(pdev);
-+put_id:
-+	ida_simple_remove(&ci_ida, id);
- 	return ERR_PTR(ret);
- }
- EXPORT_SYMBOL_GPL(ci13xxx_add_device);
-@@ -372,6 +382,7 @@ EXPORT_SYMBOL_GPL(ci13xxx_add_device);
- void ci13xxx_remove_device(struct platform_device *pdev)
- {
- 	platform_device_unregister(pdev);
-+	ida_simple_remove(&ci_ida, pdev->id);
- }
- EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
- 
+ 	udc->gadget.ops          = &usb_gadget_ops;
 -- 
 1.7.9.5
