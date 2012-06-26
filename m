@@ -1,17 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Jun 2012 03:50:36 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: fix naming collision of variable nr_irqs
-In-Reply-To: <1340620000-27074-1-git-send-email-svenkatr@ti.com>
-References: <1340620000-27074-1-git-send-email-svenkatr@ti.com>
-Message-ID: <20120626105035.GC31393@atomide.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 26 Jun 2012 16:21:30 +0530
+Subject: [PATCH v2 00/17] Big OMAP I2C Cleanup
+In-Reply-To: <20120614175950.GE14419@pengutronix.de>
+References: <1339691067-919-1-git-send-email-balbi@ti.com>
+ <20120614175950.GE14419@pengutronix.de>
+Message-ID: <4FE99432.8030300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Venkatraman S <svenkatr@ti.com> [120625 03:31]:
-> Using nr_irqs as local variable name triggers the sparse warning..
-> ./arch/arm/mach-omap2/irq.c:265:6: warning: symbol 'nr_irqs' shadows an earlier one
-> ./linux/include/linux/irqnr.h:26:12: originally declared here
+On Thursday 14 June 2012 11:29 PM, Wolfram Sang wrote:
+>> 	- removed dev_err() which was introduced on patch 09/17
+> To prevent the list being flooded, I would appreciate if you could wait
+> a few days to collect reviews before resending. It will take some time
+> until I pick this series anyhow, because I want people to have time to
+> donate Tested-by tags.
+Felipe thats a good cleanup.
+The series look good to me.
 
-Thanks applying both into fixes-non-critical.
+Also draining interrupt I had some queries.
+Looks good to me.
 
-Tony
+I have tested it after rebasing.
+Tested-by : Shubhrajyoti <shubhrajyoti@ti.com>
+
+
+Thanks,
