@@ -1,70 +1,158 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 26 Jun 2012 23:13:29 +0200
-Subject: [PATCH 2/2] ARM: omap: remove unused cpu detection macros
-Message-ID: <1340745209.1911.15.camel@x61.thuisdomein>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 26 Jun 2012 16:26:04 -0500
+Subject: Where to power on the wifi device before loading the driver.
+In-Reply-To: <4FE9E907.6050803@wwwdotorg.org>
+References: <20120614121234.GC3913@opensource.wolfsonmicro.com>
+ <4FDA092E.10301@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
+ <4FDB5976.20809@wwwdotorg.org>
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
+ <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
+ <20120619091719.GZ3974@opensource.wolfsonmicro.com>
+ <6B4D417B830BC44B8026029FD256F7F1C6EE2DD626@HKMAIL01.nvidia.com>
+ <4FE112F2.7000506@wwwdotorg.org>
+ <20120626085605.GA6047@shlinux2.ap.freescale.net>
+ <4FE9E907.6050803@wwwdotorg.org>
+Message-ID: <4FEA28EC.2080906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that OMAP730 and OMAP850 support is mostly unified, there's no
-need for separate cpu detection macros for these architectures. At
-least, currently there isn't, because both macros are unused.
-cpu_is_7xx() seems to cover all possible uses.
+On 06/26/2012 11:53 AM, Stephen Warren wrote:
+> (I'm adding everyone on thread "ARM: imx6q: add config-on-boot gpios" to
+> the CC of this similar thread. Sorry if you think that's spam.)
+> 
+> On 06/26/2012 02:56 AM, Dong Aisheng wrote:
+>> On Tue, Jun 19, 2012 at 06:01:54PM -0600, Stephen Warren wrote:
+> ...
+>>> I think what we need is some way of matching a DT node to a device even
+>>> when that device was instantiated through some probing mechanism such as
+>>> SDIO or USB (and I've heard hints that one can already do this for PCI;
+>>> I should investigate).
+>>>
+>>> So, we start off with the plain SDHCI controller node:
+>>>
+>>> sdhci at 78000000 {
+>>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>>> 	reg = <0x78000000 0x200>;
+>>> 	interrupts = <0 14 0x04>;
+>>> };
+>>>
+>>> Then, we add a child node to represent the device that's attached:
+>>>
+>>> sdhci at 78000000 {
+>>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>>> 	reg = <0x78000000 0x200>;
+>>> 	interrupts = <0 14 0x04>;
+>>>
+>>> 	sdio-device {
+>>> 		reset-gpios = <...>;
+>>> 		enable-gpios = <...>;
+>>> 	};
+>>> };
+>>>
+>>> When the SDHCI controller/core instantiates the child device it finds on
+>>> the HW bus, it initializes that struct device's of_node with a pointer
+>>> to the sdio-device node above. From there, the child device can get DT
+>>> properties such as GPIOs in the usual way.
+>>>
+>>> However, there are still some issues that need thought here; what if (as
+>>> is I believe the case on Cardhu) we can in fact plug in multiple
+>>> different types of device into the socket? Might we end up with
+>>> something like:
+>>>
+>>> sdhci at 78000000 {
+>>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>>> 	reg = <0x78000000 0x200>;
+>>> 	interrupts = <0 14 0x04>;
+>>>
+>>> 	sdio-device-option at 0 {
+>>> 		compatible = "broadcom,bcm4239";
+>>> 		reset-gpios = <...>;
+>>> 		enable-gpios = <...>;
+>>> 	};
+>>>
+>>> 	sdio-device-option at 1 {
+>>> 		compatible = "broadcom,bcm4330";
+>>> 		reset-gpios = <...>;
+>>> 		enable-gpios = <...>;
+>>> 	};
+>>> };
+>>>
+>>> and match on compatible value?
+>>>
+>> I like this idea.
+>> We may extend the sdio_device_id to contain a compatible string,
+>> then sdio core is responsible to pass the corresponding device node to the
+>> sdio function driver once a match device found, this is sdio function independent.
+>> The sdio function driver then are responsible to parse the device node to
+>> fetch the needed information like reset-gpios and enable-gpios to do correct
+>> initialization sequence.
+>>
+>> However, one known question for this model is that some WiFi may need reset the chip
+>> via gpio first before being able to be enumerated.
+> 
+> Yes, that's exactly the issue that makes the above binding incorrect.
+> 
+> In another thread on a very similar topic, I proposed a binding that
+> would address this issue:
+> 
+> http://www.spinics.net/lists/linux-usb/msg66013.html
+> 
+>> sdhci at 78000000 {
+>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>> 	reg = <0x78000000 0x200>;
+>> 	interrupts = <0 14 0x04>;
+>>
+>> 	sdio-device {
+>> 		reset-gpios = <...>;
+>> 		enable-gpios = <...>;
+>> 	};
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Entirely untested!
+These are really no different than CD and WP on gpio lines. So I don't
+think a child node is even necessary. They are really properties of the
+host controller as you have to know how to handle them before enumeration.
 
-1) And now the IS_OMAP_TYPE() macro "calls" for 730 and 850 are unused.
-Not sure whether they should be removed too.
+One question is do the gpios have strict timing or ordering
+requirements. If so then that would be difficult to describe generically.
 
-2) Note that cpu_is_omap343x(), cpu_is_omap447x(), and cpu_is_omap2423()
-are all unused too. Reserved for future use, I guess.
+>> };
+> 
+>> ehci {
+>>     /* The following node is dynamically detected, although the hub
+>>      * IC is physically soldered onto the board
+>>      */
+>>     hub {
+>>         hub { /* also dynamic */
+>>             port at 2 {
+>>                 child-supply = <&regulator>;
+>>                 reset-gpios = <&gpio 0 0>;
+>>             };
+>>         };
+>>     };
+>> }
+> 
 
- arch/arm/plat-omap/include/plat/cpu.h |   16 +---------------
- 1 files changed, 1 insertions(+), 15 deletions(-)
+Considering the same enumeration ordering requirement as above and that
+this is probably limited to a single hub/device on the root hub, I think
+the simple solution of just adding the gpio's to the ehci node and
+handling in the ehci driver is sufficient.
 
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index f2bdf15..e5304f2 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -239,8 +239,6 @@ IS_AM_SUBCLASS(335x, 0x335)
-  * Macros to detect individual cpu types.
-  * These are only rarely needed.
-  * cpu_is_omap310():	True for OMAP310
-- * cpu_is_omap730():	True for OMAP730
-- * cpu_is_omap850():	True for OMAP850
-  * cpu_is_omap1510():	True for OMAP1510
-  * cpu_is_omap1610():	True for OMAP1610
-  * cpu_is_omap1611():	True for OMAP1611
-@@ -281,8 +279,6 @@ IS_OMAP_TYPE(3505, 0x3517)
- IS_OMAP_TYPE(3517, 0x3517)
- 
- #define cpu_is_omap310()		0
--#define cpu_is_omap730()		0
--#define cpu_is_omap850()		0
- #define cpu_is_omap1510()		0
- #define cpu_is_omap1610()		0
- #define cpu_is_omap5912()		0
-@@ -304,19 +300,9 @@ IS_OMAP_TYPE(3517, 0x3517)
- 
- /*
-  * Whether we have MULTI_OMAP1 or not, we still need to distinguish
-- * between 730 vs 850, 310 vs. 1510 and 1611B/5912 vs. 1710.
-+ * between 310 vs. 1510 and 1611B/5912 vs. 1710.
-  */
- 
--#if defined(CONFIG_ARCH_OMAP730)
--# undef  cpu_is_omap730
--# define cpu_is_omap730()		is_omap730()
--#endif
--
--#if defined(CONFIG_ARCH_OMAP850)
--# undef  cpu_is_omap850
--# define cpu_is_omap850()		is_omap850()
--#endif
--
- #if defined(CONFIG_ARCH_OMAP15XX)
- # undef  cpu_is_omap310
- # undef  cpu_is_omap1510
--- 
-1.7.7.6
+> Presumably something similar could be set up with platform data.
+> 
+> Basically, the SD controller or USB host/hub node contains a child that
+> represents the socket/port/... that needs some services provided to it
+> (power, reset de-asserted, even clocks). The services provided by that
+> node are set up before enumeration, so that the device will respond to
+> enumeration. Hopefully, the DT representation of this socket/port/..
+> could be shared across arbitrary types of controller (so both SD and
+> USB) and the driver the "implements" that node would be common code that
+> SD and USB call into, rather than having them both re-implement it from
+> scratch.
+
+While I think this can be handled generically with SD and USB drivers,
+I'm not so sure there would be benefit across them. It is just getting a
+gpio and toggling it. But really that's a detail that doesn't matter
+until we're closer to an implementation...
+
+Rob
