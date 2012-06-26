@@ -1,39 +1,78 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 26 Jun 2012 09:55:58 +0300
-Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
-In-Reply-To: <4FE941EA.7050108@ti.com>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
- <1340372890-10091-6-git-send-email-rnayak@ti.com>
- <1340604478.12683.25.camel@lappyti> <4FE80C43.6090802@ti.com>
- <1340611133.3395.3.camel@deskari> <4FE85005.4090303@ti.com>
- <1340630090.3395.85.camel@deskari> <4FE941EA.7050108@ti.com>
-Message-ID: <1340693758.2093.15.camel@lappyti>
+From: dofmind@gmail.com (Joonyoung Shim)
+Date: Tue, 26 Jun 2012 16:11:36 +0900
+Subject: [PATCH] ARM: EXYNOS: Remove the L2 cache latency setting for
+ EXYNOS5
+In-Reply-To: <038301cd4f47$8202b420$86081c60$%kim@samsung.com>
+References: <038301cd4f47$8202b420$86081c60$%kim@samsung.com>
+Message-ID: <CAPLVkLsgi3ST622ZhRusJz5OHV6MJYP7SNkj2Mh-QPos1AWyhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-06-26 at 10:30 +0530, Rajendra Nayak wrote:
+Hi,
 
-> > So as far as I see, clocks are never handled in atomic context. Is
-> > everything related to the base clk stuff already in mainline? Can I take
-> > the clk_prepare/unprepare patch into my omapdss tree?
-> 
-> Well the Common Clk framework is already in mainline, but we still don;t
-> have CONFIG_COMMON_CLK enabled for our builds yet. So until we do so,
-> clk_prepare/unprepare will just be stubs which do nothing.
+2012/6/21 Kukjin Kim <kgene.kim@samsung.com>:
+> From: Boojin Kim <boojin.kim@samsung.com>
+>
+> Since SYSRAM set the L2 cache latency on EXYNOS5 SoCs,
 
-But if I understood correctly, clk_prepare and clk_unprepare are anyway
-no-ops with dss clocks, even when CONFIG_COMMON_CLK is enabled?
+I don't understand this. Do you mean that BL1 codes do it?
+I also wonder how enable L2 cache at the exynos5.
 
-My point was only to understand if I can safely take the patch into
-omapdss tree, instead of it going through l-o, to avoid any possible
-conflicts.
+> no longer need that in the kernel. It helps to reduce
+> booting time (no need cache disable and cache enable).
+>
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-exynos/common.c | ? 25 -------------------------
+> ?1 files changed, 0 insertions(+), 25 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 742edd3..0ec1a91 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -712,31 +712,6 @@ static int __init exynos4_l2x0_cache_init(void)
+> ?early_initcall(exynos4_l2x0_cache_init);
+> ?#endif
+>
+> -static int __init exynos5_l2_cache_init(void)
+> -{
+> - ? ? ? unsigned int val;
+> -
+> - ? ? ? if (!soc_is_exynos5250())
+> - ? ? ? ? ? ? ? return 0;
+> -
+> - ? ? ? asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
+> - ? ? ? ? ? ? ? ? ? ?"bic %0, %0, #(1 << 2)\n" ?/* cache disable */
+> - ? ? ? ? ? ? ? ? ? ?"mcr p15, 0, %0, c1, c0, 0\n"
+> - ? ? ? ? ? ? ? ? ? ?"mrc p15, 1, %0, c9, c0, 2\n"
+> - ? ? ? ? ? ? ? ? ? ?: "=r"(val));
+> -
+> - ? ? ? val |= (1 << 9) | (1 << 5) | (2 << 6) | (2 << 0);
+> -
+> - ? ? ? asm volatile("mcr p15, 1, %0, c9, c0, 2\n" : : "r"(val));
+> - ? ? ? asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
+> - ? ? ? ? ? ? ? ? ? ?"orr %0, %0, #(1 << 2)\n" ?/* cache enable */
+> - ? ? ? ? ? ? ? ? ? ?"mcr p15, 0, %0, c1, c0, 0\n"
+> - ? ? ? ? ? ? ? ? ? ?: : "r"(val));
+> -
+> - ? ? ? return 0;
+> -}
+> -early_initcall(exynos5_l2_cache_init);
+> -
+> ?static int __init exynos_init(void)
+> ?{
+> ? ? ? ?printk(KERN_INFO "EXYNOS: Initializing architecture\n");
+> --
+> 1.7.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
- Tomi
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/ab95f1a0/attachment.sig>
+
+-- 
+- Joonyoung Shim
