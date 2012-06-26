@@ -1,170 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Jun 2012 16:38:32 -0600
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <4FEA28EC.2080906@gmail.com>
-References: <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
- <20120619091719.GZ3974@opensource.wolfsonmicro.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD626@HKMAIL01.nvidia.com>
- <4FE112F2.7000506@wwwdotorg.org>
- <20120626085605.GA6047@shlinux2.ap.freescale.net>
- <4FE9E907.6050803@wwwdotorg.org> <4FEA28EC.2080906@gmail.com>
-Message-ID: <4FEA39E8.6090502@wwwdotorg.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 26 Jun 2012 18:55:41 -0400
+Subject: [PATCH] ARM: sa1100: fix build failure on missing IOMEM
+Message-ID: <1340751341-5248-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 03:26 PM, Rob Herring wrote:
-> On 06/26/2012 11:53 AM, Stephen Warren wrote:
->> (I'm adding everyone on thread "ARM: imx6q: add config-on-boot gpios" to
->> the CC of this similar thread. Sorry if you think that's spam.)
->>
->> On 06/26/2012 02:56 AM, Dong Aisheng wrote:
->>> On Tue, Jun 19, 2012 at 06:01:54PM -0600, Stephen Warren wrote:
->> ...
->>>> I think what we need is some way of matching a DT node to a device even
->>>> when that device was instantiated through some probing mechanism such as
->>>> SDIO or USB (and I've heard hints that one can already do this for PCI;
->>>> I should investigate).
->>>>
->>>> So, we start off with the plain SDHCI controller node:
->>>>
->>>> sdhci at 78000000 {
->>>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->>>> 	reg = <0x78000000 0x200>;
->>>> 	interrupts = <0 14 0x04>;
->>>> };
->>>>
->>>> Then, we add a child node to represent the device that's attached:
->>>>
->>>> sdhci at 78000000 {
->>>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->>>> 	reg = <0x78000000 0x200>;
->>>> 	interrupts = <0 14 0x04>;
->>>>
->>>> 	sdio-device {
->>>> 		reset-gpios = <...>;
->>>> 		enable-gpios = <...>;
->>>> 	};
->>>> };
->>>>
->>>> When the SDHCI controller/core instantiates the child device it finds on
->>>> the HW bus, it initializes that struct device's of_node with a pointer
->>>> to the sdio-device node above. From there, the child device can get DT
->>>> properties such as GPIOs in the usual way.
->>>>
->>>> However, there are still some issues that need thought here; what if (as
->>>> is I believe the case on Cardhu) we can in fact plug in multiple
->>>> different types of device into the socket? Might we end up with
->>>> something like:
->>>>
->>>> sdhci at 78000000 {
->>>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->>>> 	reg = <0x78000000 0x200>;
->>>> 	interrupts = <0 14 0x04>;
->>>>
->>>> 	sdio-device-option at 0 {
->>>> 		compatible = "broadcom,bcm4239";
->>>> 		reset-gpios = <...>;
->>>> 		enable-gpios = <...>;
->>>> 	};
->>>>
->>>> 	sdio-device-option at 1 {
->>>> 		compatible = "broadcom,bcm4330";
->>>> 		reset-gpios = <...>;
->>>> 		enable-gpios = <...>;
->>>> 	};
->>>> };
->>>>
->>>> and match on compatible value?
->>>>
->>> I like this idea.
->>> We may extend the sdio_device_id to contain a compatible string,
->>> then sdio core is responsible to pass the corresponding device node to the
->>> sdio function driver once a match device found, this is sdio function independent.
->>> The sdio function driver then are responsible to parse the device node to
->>> fetch the needed information like reset-gpios and enable-gpios to do correct
->>> initialization sequence.
->>>
->>> However, one known question for this model is that some WiFi may need reset the chip
->>> via gpio first before being able to be enumerated.
->>
->> Yes, that's exactly the issue that makes the above binding incorrect.
->>
->> In another thread on a very similar topic, I proposed a binding that
->> would address this issue:
->>
->> http://www.spinics.net/lists/linux-usb/msg66013.html
->>
->>> sdhci at 78000000 {
->>> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->>> 	reg = <0x78000000 0x200>;
->>> 	interrupts = <0 14 0x04>;
->>>
->>> 	sdio-device {
->>> 		reset-gpios = <...>;
->>> 		enable-gpios = <...>;
->>> 	};
-> 
-> These are really no different than CD and WP on gpio lines. So I don't
-> think a child node is even necessary. They are really properties of the
-> host controller as you have to know how to handle them before enumeration.
-> 
-> One question is do the gpios have strict timing or ordering
-> requirements. If so then that would be difficult to describe generically.
+Introduced by commit 6686732c8b8974fafbdd7886de0fcf77cf34ec07 [linux-next]
 
-There certainly are some timing requirements specified in our downstream
-kernels, although as I mentioned earlier in the thread, I think the code
-is a bit confused since it controls two GPIOs but only one is hooked up,
-at least on the one plugin WiFi card I looked at. Even with just one
-GPIO, there's still potentially a delay needed between GPIO assertion
-and device enumeration.
+    "ARM: sa11x0/pxa: convert OS timer registers to IOMEM"
 
->>> };
->>
->>> ehci {
->>>     /* The following node is dynamically detected, although the hub
->>>      * IC is physically soldered onto the board
->>>      */
->>>     hub {
->>>         hub { /* also dynamic */
->>>             port at 2 {
->>>                 child-supply = <&regulator>;
->>>                 reset-gpios = <&gpio 0 0>;
->>>             };
->>>         };
->>>     };
->>> }
->>
-> 
-> Considering the same enumeration ordering requirement as above and that
-> this is probably limited to a single hub/device on the root hub, I think
-> the simple solution of just adding the gpio's to the ehci node and
-> handling in the ehci driver is sufficient.
-> 
->> Presumably something similar could be set up with platform data.
->>
->> Basically, the SD controller or USB host/hub node contains a child that
->> represents the socket/port/... that needs some services provided to it
->> (power, reset de-asserted, even clocks). The services provided by that
->> node are set up before enumeration, so that the device will respond to
->> enumeration. Hopefully, the DT representation of this socket/port/..
->> could be shared across arbitrary types of controller (so both SD and
->> USB) and the driver the "implements" that node would be common code that
->> SD and USB call into, rather than having them both re-implement it from
->> scratch.
-> 
-> While I think this can be handled generically with SD and USB drivers,
-> I'm not so sure there would be benefit across them. It is just getting a
-> gpio and toggling it. But really that's a detail that doesn't matter
-> until we're closer to an implementation...
+which causes:
 
-Well, power-gpios should really be a regulator not a GPIO if it really
-represents power (although on the one WiFi board I looked at, it was
-really an enable/reset signal not a power signal), and we also need to
-enable a clock out to the card too, so it gets a bit more complex than
-just a couple GPIOs...
+arch/arm/mach-sa1100/cpu-sa1100.c:153:3: error: implicit declaration of function 'IOMEM'
+
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+
+Feel free to squash into original if rebasing.
+Fixes http://kisskb.ellerman.id.au/kisskb/buildresult/6545966/
+
+ arch/arm/mach-sa1100/cpu-sa1100.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
+index 19b2053..829c6f1 100644
+--- a/arch/arm/mach-sa1100/cpu-sa1100.c
++++ b/arch/arm/mach-sa1100/cpu-sa1100.c
+@@ -86,6 +86,7 @@
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <linux/cpufreq.h>
+ 
+ #include <asm/cputype.h>
+-- 
+1.7.9.1
