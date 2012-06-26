@@ -1,32 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Jun 2012 17:16:07 -0600
-Subject: [PATCH 3/3] ARM: dt: tegra: paz00: add regulators
-In-Reply-To: <20120626230235.GX30406@opensource.wolfsonmicro.com>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <1340406842-27135-3-git-send-email-swarren@wwwdotorg.org>
- <1963397.cqAXgGafFs@ax5200p> <20120624110306.GA16455@sirena.org.uk>
- <4FEA3942.9040906@wwwdotorg.org>
- <20120626230235.GX30406@opensource.wolfsonmicro.com>
-Message-ID: <4FEA42B7.9060802@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jun 2012 00:22:23 +0100
+Subject: [PATCH] ARM: sa1100: fix build failure on missing IOMEM
+In-Reply-To: <1340751341-5248-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1340751341-5248-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20120626232223.GB22977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 05:02 PM, Mark Brown wrote:
-> On Tue, Jun 26, 2012 at 04:35:46PM -0600, Stephen Warren wrote:
+On Tue, Jun 26, 2012 at 06:55:41PM -0400, Paul Gortmaker wrote:
+> Introduced by commit 6686732c8b8974fafbdd7886de0fcf77cf34ec07 [linux-next]
 > 
->> So I think this sm0 (and the sm1) entry might actually be
->> correct; sm0 feeds vdd_core and sm1 feeds vdd_cpu. These rails
->> have DVFS and hence the voltage can vary. I guess I should change
->> the regulator-name in these cases to something more useful than
->> the very first signal name on the schematics too.
+>     "ARM: sa11x0/pxa: convert OS timer registers to IOMEM"
 > 
-> Even if they feed these supplies are they capable of varying on
-> this board if they're shared with other things?  This is one of the
-> common issues with constraints...  But generally if the supply
-> covers more than one thing the idiomatic thing is to list them all
-> separated by / or something.
+> which causes:
+> 
+> arch/arm/mach-sa1100/cpu-sa1100.c:153:3: error: implicit declaration of function 'IOMEM'
 
-These two supplies aren't shared, it's just that the signal on the
-schematic ends up being named different things in different places; on
-the regulator page it's named vdd_sm0, but on some other page it gets
-renamed vdd_core.
+I disagree, that commit doesn't - that commit is in my build tree, and:
+
+http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=1253
+
+It will be due to some other commit.
+
+> 
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+> 
+> Feel free to squash into original if rebasing.
+> Fixes http://kisskb.ellerman.id.au/kisskb/buildresult/6545966/
+> 
+>  arch/arm/mach-sa1100/cpu-sa1100.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
+> index 19b2053..829c6f1 100644
+> --- a/arch/arm/mach-sa1100/cpu-sa1100.c
+> +++ b/arch/arm/mach-sa1100/cpu-sa1100.c
+> @@ -86,6 +86,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/types.h>
+>  #include <linux/init.h>
+> +#include <linux/io.h>
+>  #include <linux/cpufreq.h>
+>  
+>  #include <asm/cputype.h>
+> -- 
+> 1.7.9.1
+> 
