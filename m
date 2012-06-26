@@ -1,24 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Jun 2012 14:31:10 +0200
-Subject: [PATCH 4/7] ARM: mxs: Add SPI clock into clk framwork
-In-Reply-To: <20120626122424.GG8858@S2101-09.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 20:31:43 +0800
+Subject: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
+In-Reply-To: <201206261422.55005.marex@denx.de>
 References: <1340477033-2761-1-git-send-email-marex@denx.de>
- <201206261416.11599.marex@denx.de>
- <20120626122424.GG8858@S2101-09.ap.freescale.net>
-Message-ID: <201206261431.10782.marex@denx.de>
+ <1340477033-2761-7-git-send-email-marex@denx.de>
+ <20120626074342.GA4928@S2101-09.ap.freescale.net>
+ <201206261422.55005.marex@denx.de>
+Message-ID: <20120626123141.GH8858@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Tue, Jun 26, 2012 at 02:16:11PM +0200, Marek Vasut wrote:
-> > So why are those imx28-mmc there ? Shall these not be removed then ?
+On Tue, Jun 26, 2012 at 02:22:54PM +0200, Marek Vasut wrote:
+> > > +static int __devexit mxs_spi_remove(struct platform_device *pdev)
+> > > +{
+> > > +	struct spi_master *host;
+> > > +	struct mxs_ssp *ssp;
+> > > +
+> > > +	host = platform_get_drvdata(pdev);
+> > > +	if (host)
+> > > +		return 0;
+> > 
+> > Hmm, why the check and return here?
 > 
-> They are still needed by those non-DT board files.  Once we have those
-> board files removed, these imx28-mmc lookups will not be needed any
-> longer.
+> If it's not set, things went _very_ wrong somewhere. Maybe BUG_ON() might be 
+> better?
+> 
+So shouldn't it be "if (!host)"?
 
-Ah ok, I'll discard this patch then.
+And I still do not understand how that could happen.  I think
+mxs_spi_remove will only be called in case that mxs_spi_probe
+succeeds, which means platform_set_drvdata must have been called
+already?
 
-Best regards,
-Marek Vasut
+-- 
+Regards,
+Shawn
