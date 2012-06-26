@@ -1,22 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Jun 2012 20:24:26 +0800
-Subject: [PATCH 4/7] ARM: mxs: Add SPI clock into clk framwork
-In-Reply-To: <201206261416.11599.marex@denx.de>
-References: <1340477033-2761-1-git-send-email-marex@denx.de>
- <1340477033-2761-4-git-send-email-marex@denx.de>
- <20120626065428.GM2342@S2101-09.ap.freescale.net>
- <201206261416.11599.marex@denx.de>
-Message-ID: <20120626122424.GG8858@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 26 Jun 2012 14:25:13 +0200
+Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
+In-Reply-To: <20120626023754.GJ2342@S2101-09.ap.freescale.net>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+ <CAOMZO5BEVrPrgZ7E5xUE-_3zXb317mzqoZXaxXw1SNACuRzOPw@mail.gmail.com>
+ <20120626023754.GJ2342@S2101-09.ap.freescale.net>
+Message-ID: <201206261425.14058.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 02:16:11PM +0200, Marek Vasut wrote:
-> So why are those imx28-mmc there ? Shall these not be removed then ?
-> 
-They are still needed by those non-DT board files.  Once we have those
-board files removed, these imx28-mmc lookups will not be needed any
-longer.
+Dear Shawn Guo,
 
--- 
-Regards,
-Shawn
+> On Mon, Jun 25, 2012 at 01:18:22PM -0300, Fabio Estevam wrote:
+> > Any suggestions as to how to make the driver work on mx23?
+> 
+> I won't be able to test it on my imx23-evk board, because the board
+> design is somehow odd on vbus supply, which probably requires a board
+> rework.
+
+We should be able to hack around the olinuxino. I just got the card image from 
+Tsvetan.
+
+Best regards,
+Marek Vasut
