@@ -1,34 +1,53 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 26 Jun 2012 11:57:03 +0200
-Subject: [PATCH 2/4] pwm: pwm-mxs: use global reset function
- stmp_reset_block
-In-Reply-To: <20120626095456.GA8687@avionic-0098.mockup.avionic-design.de>
-References: <1340701091-8488-1-git-send-email-shawn.guo@linaro.org>
- <1340701091-8488-3-git-send-email-shawn.guo@linaro.org>
- <20120626095456.GA8687@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120626095703.GA20185@avionic-0098.mockup.avionic-design.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 Jun 2012 12:05:53 +0200
+Subject: [PATCH v4 3/9] arm: mach-mvebu: add source files
+In-Reply-To: <20120626084715.GC25625@lunn.ch>
+References: <1340699313-29331-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340699313-29331-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120626084715.GC25625@lunn.ch>
+Message-ID: <4FE98981.40903@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 11:54:56AM +0200, Thierry Reding wrote:
-> On Tue, Jun 26, 2012 at 04:58:09PM +0800, Shawn Guo wrote:
-> > Use global reset function stmp_reset_block instead of mxs_reset_block
-> > to remove <mach/common.h> inclusion.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  drivers/pwm/pwm-mxs.c |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> Doesn't this need a depends on/select STMP_DEVICE?
+On 06/26/2012 10:47 AM, Andrew Lunn wrote:>> +#define ARMADA_370_XP_RESET_OFFSET		  0x60
+>> +#define OTHER_MVEBU_RESET_OFFSET		 0x108
+>> +#define MVEBU_RSTOUTN_MASK_OFFSET		   0x0
+>> +#define   OTHER_MVEBU_RSTOUTN_MASK_RESET_OUT_EN	   0x4
+>> +#define   ARMADA_370_XP_RSTOUTN_MASK_RESET_OUT_EN  0x1
+>> +#define MVEBU_SYSTEM_SOFT_RESET_OFFSET		   0x4
+>> +#define   MVEBU_SYSTEM_SOFT_RESET		   0x1
+>> +
+>> +#define OTHER_MVEBU_VARIANT	1
+>> +#define ARMADA_370_XP_VARIANT	2
+>
+> Hi Gregory
+>
 
-Upon closer investigation, select STMP_DEVICE seems to be correct.
+Hi Andrew,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/9e34ec72/attachment.sig>
+> Rather than OTHER, could you call this ORION?
+>
+
+I thought that one purpose of the next mach-mvebu directory, was to
+remove the references to orion.
+
+However, I agree that OTHER is not a really good name. We could
+consider indeed 'orion' as a legacy name for this subset of' mvebu'.
+
+I don't have a strong opinion about it.
+
+> I think it will then work on Orion5x, dove, kirkwood and mv78xx0.
+>
+> I will try to test this on Orion5x and Kirkwood.
+>
+
+Thank you!
+
+>   Thanks
+> 	Andrew
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
