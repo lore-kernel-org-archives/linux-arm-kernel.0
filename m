@@ -1,68 +1,52 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Tue, 26 Jun 2012 18:55:29 +0200
-Subject: [PATCH 0/2] flexcan driver updates
-In-Reply-To: <1340700563-8386-1-git-send-email-shawn.guo@linaro.org>
-References: <1340700563-8386-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4FE9E981.2080402@hartkopp.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Jun 2012 11:05:48 -0600
+Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based
+ pinctrl driver
+In-Reply-To: <20120626134319.GA3483@atomide.com>
+References: <20120611135826.GB12766@atomide.com>
+ <4FDA6FCD.1020605@wwwdotorg.org> <20120615094938.GQ12766@atomide.com>
+ <4FDB6000.5080703@wwwdotorg.org> <20120618055036.GU12766@atomide.com>
+ <20120619135600.GX12766@atomide.com> <4FE39C86.5070901@wwwdotorg.org>
+ <20120622083955.GZ12766@atomide.com> <4FE4AC40.8080400@wwwdotorg.org>
+ <20120626134319.GA3483@atomide.com>
+Message-ID: <4FE9EBEC.9040208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.06.2012 10:49, Shawn Guo wrote:
-
-> Here are a couple of flexcan driver/bindings updates, which are meant
-> to get the driver more device tree friendly.
+On 06/26/2012 07:43 AM, Tony Lindgren wrote:
+...
+> Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based pinctrl driver
 > 
-> Shawn Guo (2):
->   net: flexcan: clock-frequency is optional for device tree probe
->   net: flexcan: add transceiver switch gpio support
+> Add one-register-per-pin type device tree based pinctrl driver.
 > 
->  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    6 ++++
->  drivers/net/can/flexcan.c                          |   30 ++++++++++++++++++++
->  2 files changed, 36 insertions(+), 0 deletions(-)
-> 
+> This driver has been tested on omap2+ series of processors,
+> where there is either an 8 or 16-bit padconf register for each pin.
+> Support for other similar pinmux controllers can be added.
 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
 
-Sorry Shawn, but your posting is pretty misplaced ...
+> +/* board specific .dts file */
+> +
+> +&pmx_core {
 
-Please check for the maintainers and mailing lists in the MAINTAINERS file
-that match your suggested changes:
+> +	board_pins: pinmux_board_pins {
+> +		pinctrl-single,pins = <
+> +			0x6c 0xf	/* csi21_dx3 OUTPUT | MODE7 */
+> +			0x6e 0xf	/* csi21_dy3 OUTPUT | MODE7 */
+> +			0x70 0xf	/* csi21_dx4 OUTPUT | MODE7 */
+> +			0x72 0xf	/* csi21_dy4 OUTPUT | MODE7 */
 
-Documentation/devicetree/bindings/net/can/fsl-flexcan.txt =>
+If you're removing the pinconf mask, I think the comments in the example
+should reflect just setting a particular mux function, and remove any
+references to pinconf settings in that field. While the binding can be
+abused to do that, I think the docs shouldn't encourage it:-)
 
-OPEN FIRMWARE AND FLATTENED DEVICE TREE
-M:	Grant Likely <grant.likely@secretlab.ca>
-M:	Rob Herring <rob.herring@calxeda.com>
-L:	devicetree-discuss at lists.ozlabs.org (moderated for non-subscribers)
-W:	http://fdt.secretlab.ca
-T:	git git://git.secretlab.ca/git/linux-2.6.git
-S:	Maintained
-F:	Documentation/devicetree		<<<<<------------- !!!
-F:	drivers/of
-F:	include/linux/of*.h
-K:	of_get_property
-K:	of_match_table
+Other than that, the binding looks reasonable to me, given what it's
+intended to do.
 
-
-drivers/net/can/flexcan.c =>
-
-CAN NETWORK DRIVERS
-M:	Wolfgang Grandegger <wg@grandegger.com>
-M:	Marc Kleine-Budde <mkl@pengutronix.de>
-L:	linux-can at vger.kernel.org
-W:	http://gitorious.org/linux-can
-T:	git git://gitorious.org/linux-can/linux-can-next.git
-S:	Maintained
-F:	drivers/net/can/			<<<<<------------- !!!
-F:	include/linux/can/dev.h
-F:	include/linux/can/error.h
-F:	include/linux/can/netlink.h
-F:	include/linux/can/platform/
-
-So please post your suggested changes for the flexcan driver on the mailing
-lists linux-can at vger.kernel.org and devicetree-discuss@lists.ozlabs.org
-
-Once the changes are discussed and accepted they can be pulled by Dave Miller
-from the CAN development git repository into the networking tree.
-
-Thanks,
-Oliver
+However, I'd still like Grant and Rob (and any other DT experts) to
+explicitly sign off on this binding, because it's doing exactly
+something that was rejected at Linaro Connect in February (albeit the
+binding is slightly more oriented at specifically being for pinmux
+rather than a fully general "blast in these register values", but that
+distinction seems minor to me).
