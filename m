@@ -1,38 +1,71 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 26 Jun 2012 18:55:41 -0400
-Subject: [PATCH] ARM: sa1100: fix build failure on missing IOMEM
-Message-ID: <1340751341-5248-1-git-send-email-paul.gortmaker@windriver.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 27 Jun 2012 00:02:36 +0100
+Subject: [PATCH 3/3] ARM: dt: tegra: paz00: add regulators
+In-Reply-To: <4FEA3942.9040906@wwwdotorg.org>
+References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
+ <1340406842-27135-3-git-send-email-swarren@wwwdotorg.org>
+ <1963397.cqAXgGafFs@ax5200p> <20120624110306.GA16455@sirena.org.uk>
+ <4FEA3942.9040906@wwwdotorg.org>
+Message-ID: <20120626230235.GX30406@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduced by commit 6686732c8b8974fafbdd7886de0fcf77cf34ec07 [linux-next]
+On Tue, Jun 26, 2012 at 04:35:46PM -0600, Stephen Warren wrote:
 
-    "ARM: sa11x0/pxa: convert OS timer registers to IOMEM"
+> So I think this sm0 (and the sm1) entry might actually be correct; sm0
+> feeds vdd_core and sm1 feeds vdd_cpu. These rails have DVFS and hence
+> the voltage can vary. I guess I should change the regulator-name in
+> these cases to something more useful than the very first signal name on
+> the schematics too.
 
-which causes:
+Even if they feed these supplies are they capable of varying on this
+board if they're shared with other things?  This is one of the common
+issues with constraints...  But generally if the supply covers more than
+one thing the idiomatic thing is to list them all separated by / or
+something.
 
-arch/arm/mach-sa1100/cpu-sa1100.c:153:3: error: implicit declaration of function 'IOMEM'
+> That said, we don't actually have DVFS in the mainline kernel yet, and
+> correlating the regulator limits in our downstream kernels against the
+> DVFS tables we use is ... challenging; I'm not sure they're consistent
+> anyway:-(
 
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
+Well, if you're using the regulator API the regulator API limits will
+win if they're more constrained.  But this is half the problem with
+these silly constraints that just copy the regulator limits, you've no
+idea what the board is actually supposed to do.
 
-Feel free to squash into original if rebasing.
-Fixes http://kisskb.ellerman.id.au/kisskb/buildresult/6545966/
+> However, it probably doesn't make sense to vary sm2, since all that is
+> used for is to feed the TPS6586x's input pins for the the LDO regulators.
 
- arch/arm/mach-sa1100/cpu-sa1100.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Actually if we get clever then there's some fun to be had there.  If we
+can have all the LDOs specify the headroom they need then we should be
+able to arrange to vary the DCDC depending on what the needs of the
+currently active LDOs are which would improve power efficiency as the
+goal here is to drop the voltage as much as possible using the more
+efficient DCDC then regulate on from there with the LDOs.
 
-diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
-index 19b2053..829c6f1 100644
---- a/arch/arm/mach-sa1100/cpu-sa1100.c
-+++ b/arch/arm/mach-sa1100/cpu-sa1100.c
-@@ -86,6 +86,7 @@
- #include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/cpufreq.h>
- 
- #include <asm/cputype.h>
--- 
-1.7.9.1
+I keep considering doing this but don't have any real need for it
+myself, it's just amusing.  Might fall out of (or be similar to) some
+work I'm going to be doing soon for bypass modes though.
+
+> Likewise, all the LDO regulators are used for various peripherals in
+> general, and in the main it probably makes no sense for those rails to vary.
+
+This is typically very unusual, the devices on the rails are normally
+heavily constrained when active.
+
+> So, what I think I'll do for any regulators where the downstream board
+> files specify a voltage range, is boot the kernel and find out what
+> voltage is selected by default, and program both min-/max-microvolt to
+> that specific value. That way, there will be no behaviour change. We can
+> expand the ranges on the regulators later if/when we add DVFS etc. Does
+> that sound like a reasonable approach?
+
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/a89ae1f2/attachment-0001.sig>
