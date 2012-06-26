@@ -1,45 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 26 Jun 2012 10:04:32 +0100
-Subject: [PATCH 08/14] mfd: Add IRQ domain support for the AB8500
-In-Reply-To: <CACRpkdYszGAixL_2CiPLRJ2Pasq_GwxnR1np+y83miOXhanNQg@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
- <20120614183231.GA30185@sirena.org.uk> <4FDEEEBD.5070108@linaro.org>
- <20120618102003.GB12029@n2100.arm.linux.org.uk>
- <20120618185638.GY3974@opensource.wolfsonmicro.com>
- <4FE1C952.5000306@linaro.org>
- <CACRpkdYszGAixL_2CiPLRJ2Pasq_GwxnR1np+y83miOXhanNQg@mail.gmail.com>
-Message-ID: <4FE97B20.6000809@linaro.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 26 Jun 2012 11:04:18 +0200
+Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
+In-Reply-To: <1338084709-12043-1-git-send-email-marex@denx.de>
+References: <1338084709-12043-1-git-send-email-marex@denx.de>
+Message-ID: <4FE97B12.8040306@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/12 08:37, Linus Walleij wrote:
-> On Wed, Jun 20, 2012 at 3:00 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->> On 18/06/12 19:56, Mark Brown wrote:
->>>
->>> Yes, that's correct.  I'm surprised the code runs without crashing...
->>
->> Oddly the code ran perfectly.
->
-> So how did you test it?
->
-> The only way to generate an IRQ on the AB8500 with the mainline code is
-> to push the power button, that should generate an event from the
-> driver in drivers/input/misc/ab8500-ponkey.c that you can listen to
-> by doing cat on the proper /dev/input/eventN file.
->
-> Please test this scenario before and after the patch and you have some
-> indication that the IRQdomain is working.
+On 05/27/2012 04:11 AM, Marek Vasut wrote:
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Detlev Zundel <dzu@denx.de>
+> CC: Dong Aisheng <b29396@freescale.com>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> Cc: Wolfgang Denk <wd@denx.de>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |    2 ++
+>  arch/arm/mach-mxs/Kconfig    |    1 +
+>  2 files changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 119f183..13c6084 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -278,12 +278,14 @@
+>  			};
+>  
+>  			can0: can at 80032000 {
+> +				compatible = "fsl,p1010-flexcan";
+>  				reg = <0x80032000 2000>;
+>  				interrupts = <8>;
+>  				status = "disabled";
+>  			};
+>  
+>  			can1: can at 80034000 {
+> +				compatible = "fsl,p1010-flexcan";
+>  				reg = <0x80034000 2000>;
+>  				interrupts = <9>;
+>  				status = "disabled";
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 91cf062..0406f37 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -18,6 +18,7 @@ config SOC_IMX28
+>  	select CPU_ARM926T
+>  	select HAVE_PWM
+>  	select PINCTRL_IMX28
+> +	select MXS_HAVE_PLATFORM_FLEXCAN
 
-Yep, works perfectly fall and rise:
+This compiles in the code to create a flexcan platform device, which
+should not be needed in the DT case. You save some bytes if you use:
 
->            CPU0       CPU1
->   6:          0          2    ab8500  ab8500-ponkey-dbf
->   7:          0          2    ab8500  ab8500-ponkey-dbr
++       select HAVE_CAN_FLEXCAN if NET && CAN
+
+>  
+>  comment "MXS platforms:"
+>  
+
+Marc
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/fc2a62f9/attachment.sig>
