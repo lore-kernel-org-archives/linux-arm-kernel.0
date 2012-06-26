@@ -1,85 +1,52 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 26 Jun 2012 23:20:19 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201206261459.40766.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206252030.56025.arnd@arndb.de> <1340703613.1562.202.camel@vkoul-udesk3>
- <201206261459.40766.arnd@arndb.de>
-Message-ID: <1340733019.1562.242.camel@vkoul-udesk3>
+From: frankyl@broadcom.com (Franky Lin)
+Date: Tue, 26 Jun 2012 11:20:39 -0700
+Subject: Panda ES board hang when using GPIO as interrupt
+In-Reply-To: <CAC83ZvL2ozQD1DYmtKeFa1PB1pZ1JmBUKFWmDWnbJOCDL3sKNg@mail.gmail.com>
+References: <4FE8CF77.5080400@broadcom.com>
+ <CAC83ZvL2ozQD1DYmtKeFa1PB1pZ1JmBUKFWmDWnbJOCDL3sKNg@mail.gmail.com>
+Message-ID: <4FE9FD77.7050807@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-06-26 at 14:59 +0000, Arnd Bergmann wrote:
-> On Tuesday 26 June 2012, Vinod Koul wrote:
-> > Today, we just ask for a channel with specific mask. Further filtering
-> > is done in filter function as we request a channel, not a specific one.
-> > In most slave cases, we need a specific channel from a specific
-> > controller, and that is where DT can play a role. In addition to DMA
-> > resources for dma and client driver, I would expect DT to provide the
-> > channel mapping information, which is anyway known only by platform.
-> 
-> Can you describe what you mean by "channel mapping information"?
-> Is that not what we pass into the filter function?
-Today many dmaengine drivers have a filter function which is exported
-and then used by clients to filter out the channel. That is not a right
-way to do, so any future plan which is based on filter is not correct.
-IMHO dmaengine driver should *not* know anything about mapping. By
-mapping I refer to platform information which tells me which client can
-use which channel from which dmac.
-If the dmaengine hardware has mux then we have flexible mapping, other
-cases would be where request lines are hard wired, so mapping is pretty
-much static.
-This information if provided to dmaengine can result in dmaengine doing
-proper allocation of dma channels.
-One of the proposals we discussed sometime back:
-https://lkml.org/lkml/2012/3/8/26
+On 06/26/2012 12:21 AM, DebBarma, Tarun Kanti wrote:
+> On Tue, Jun 26, 2012 at 2:22 AM, Franky Lin <frankyl@broadcom.com> wrote:
+>> Hi Kevin, Tarun,
+>>
+>> We are using the expansion connector A on Panda board to mount a SDIO WiFi
+>> dongle on MMC2 with a level triggered interrupt signal connected to GPIO
+>> 138. It's been working fine until 3.5 rc1. The board hang randomly within 5
+>> mins during a network traffic test. After bisecting we found the culprit is
+>> "[PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()" [1].
+>>
+>> I noticed Kevin raised some similar cases on other platforms and also
+>> provided two patches in the patch mail thread. But unfortunately those two
+>> patches doesn't help in our case. I tested the driver with 3.5-rc3 mainline
+>> kernel and the issue is still there. I can only "fix" the hang by either
+>> reverting the commit or disabling CONFIG_PM_RUNTIME. Also, the hang only
+>> happens on Panda ES board. Old Panda with 4430 works good.
+>>
+>> Any thoughts and suggestions?
+> I just had a quick look at the code. Can you please check if the
+> attached patch solves
+> the issue? I just boot tested on Panda and Blaze.
+> --
+> Tarun
+>
 
-> > That should be a dmaengine binding and not client or controller
-> > specific. For different platforms this information can come from DT or
-> > something else.
-> > Then, once a channel is requested dmaengine knows what to provide.
-> > And as you see the filter becomes redundant.
-> 
-> But what code interprets the channel mapping then?
-only dmaengine. In this case the mapping comes from DT.
+Thanks for the prompt reply.
 
-> I think encoding a description for a dma request in a single number is
-> the last thing we want to do here. We've tried that with IRQ and GPIO
-> numbers and it got us into a huge mess that will need a long time to
-> get out of.
-No i wasn't thinking of a number. The mapping shouldn't be a global
-number at all, though that is a very easy but not very scalable
-solution.
-We need to take care of 1:1 mapping of client and channels as well as
-many:1  cases as well. A single global number cannot represent that
-properly.
+Booting is fine even without the patch and revert. The wifi dongle 
+generates interrupt whenever there is data packet available for host to 
+read. So during a traffic test a significant numbers of interrupt will 
+be triggered through the GPIO. So I assume it has something to do with 
+the interrupt GPIO.
 
-My idea is platform gives this information to dmaengine. Clients and
-dmaengine driver do not worry about it. That also paves way for arch
-independent clients and drivers.
-> 
-> Some platforms actually use IORESOURCE_DMA, which was useful to describe
-> ISA DMA channels, for encoding some form of channel or request number,
-> but this causes all sorts of problems. These are almost exclusively
-> used by those platforms that don't have a dmaengine driver yet, so I'd
-> hope that we can remove this as we convert those platforms over to
-> dmaengine and device tree.
-> 
-> The representation in device tree as we have it now is a combination of
-> a pointer to the dmaengine and a description of the request line in it,
-> typically a single small integer number local to the dmaengine. We should
-> not try to make that a global integer number again that just serves the
-> purpose of looking up the dmaengine and local number again.
-> 
-> IMHO no device driver should be bothered with any artificial resource
-> information, but instead I want all the DT parsing to happen in the
-> dmaengine code (or some wrapper around it) where it gets used. The only
-> thing that a device driver needs to know is that it wants to use a
-> channel based on what is described in the device tree.
-Sure, but I would expect the clients and dmacs to find information about
-their devices from DT?
-dmaengine should get only mapping information used for allocating
-channel to client.
+With the patch, the kernel still crashes. But the symptom is slightly 
+different. Now it has a panic log every time. See attachment.
 
--- 
-~Vinod
+Regards,
+Franky
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: panic.log
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/aa313b28/attachment.ksh>
