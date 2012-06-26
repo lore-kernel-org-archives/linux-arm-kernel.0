@@ -1,76 +1,31 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 26 Jun 2012 11:07:24 +0200
-Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
-In-Reply-To: <4FE97B12.8040306@pengutronix.de>
-References: <1338084709-12043-1-git-send-email-marex@denx.de>
- <4FE97B12.8040306@pengutronix.de>
-Message-ID: <4FE97BCC.7050904@pengutronix.de>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 26 Jun 2012 11:11:35 +0200
+Subject: [PATCH 3/3] net: fec: add phy-reset-interval for device tree probe
+In-Reply-To: <1340700308-8315-4-git-send-email-shawn.guo@linaro.org>
+References: <1340700308-8315-1-git-send-email-shawn.guo@linaro.org>
+ <1340700308-8315-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20457.31943.332545.171232@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 11:04 AM, Marc Kleine-Budde wrote:
-> On 05/27/2012 04:11 AM, Marek Vasut wrote:
->> Signed-off-by: Marek Vasut <marex@denx.de>
->> Cc: Detlev Zundel <dzu@denx.de>
->> CC: Dong Aisheng <b29396@freescale.com>
->> CC: Fabio Estevam <fabio.estevam@freescale.com>
->> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
->> CC: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Stefano Babic <sbabic@denx.de>
->> Cc: Wolfgang Denk <wd@denx.de>
->> ---
->>  arch/arm/boot/dts/imx28.dtsi |    2 ++
->>  arch/arm/mach-mxs/Kconfig    |    1 +
->>  2 files changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
->> index 119f183..13c6084 100644
->> --- a/arch/arm/boot/dts/imx28.dtsi
->> +++ b/arch/arm/boot/dts/imx28.dtsi
->> @@ -278,12 +278,14 @@
->>  			};
->>  
->>  			can0: can at 80032000 {
->> +				compatible = "fsl,p1010-flexcan";
->>  				reg = <0x80032000 2000>;
->>  				interrupts = <8>;
->>  				status = "disabled";
->>  			};
->>  
->>  			can1: can at 80034000 {
->> +				compatible = "fsl,p1010-flexcan";
->>  				reg = <0x80034000 2000>;
->>  				interrupts = <9>;
->>  				status = "disabled";
->> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
->> index 91cf062..0406f37 100644
->> --- a/arch/arm/mach-mxs/Kconfig
->> +++ b/arch/arm/mach-mxs/Kconfig
->> @@ -18,6 +18,7 @@ config SOC_IMX28
->>  	select CPU_ARM926T
->>  	select HAVE_PWM
->>  	select PINCTRL_IMX28
->> +	select MXS_HAVE_PLATFORM_FLEXCAN
-> 
-> This compiles in the code to create a flexcan platform device, which
-> should not be needed in the DT case. You save some bytes if you use:
-> 
-> +       select HAVE_CAN_FLEXCAN if NET && CAN
+Hi,
 
-...and put this select to MACH_MXS_DT, instead of SOC_IMX28
+Shawn Guo writes:
+> Different boards may require different phy reset interval time.  Add
+> property phy-reset-interval for device tree probe, so that the boards
+> that need a longer interval time can specify it in their device tree.
+>
+'phy-reset-duration' would be a more appropriate name.
 
-Marc
 
+Lothar Wa?mann
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+___________________________________________________________
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/737e6568/attachment.sig>
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
