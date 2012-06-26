@@ -1,55 +1,60 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 26 Jun 2012 10:30:26 +0530
-Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
-In-Reply-To: <1340630090.3395.85.camel@deskari>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>			
- <1340372890-10091-6-git-send-email-rnayak@ti.com>		
- <1340604478.12683.25.camel@lappyti> <4FE80C43.6090802@ti.com>	
- <1340611133.3395.3.camel@deskari> <4FE85005.4090303@ti.com>
- <1340630090.3395.85.camel@deskari>
-Message-ID: <4FE941EA.7050108@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 26 Jun 2012 10:39:59 +0530
+Subject: [PATCH v3 4/4] memory: emif: add device tree support to emif
+ driver
+In-Reply-To: <20120625182830.GA23850@kroah.com>
+References: <1339669764-27244-1-git-send-email-santosh.shilimkar@ti.com>
+ <1339669764-27244-5-git-send-email-santosh.shilimkar@ti.com>
+ <20120614154820.GG17140@kroah.com>
+ <CAMQu2gx5CCDyrvozX06neBnA8J2heg+HL7DOewDm5voxqbpetw@mail.gmail.com>
+ <CAMQu2gy7oj-+1qCteAFMXEeOL-Wdrs6e4gKWM=HsOukXcPuv-A@mail.gmail.com>
+ <20120625182830.GA23850@kroah.com>
+Message-ID: <CAMQu2gxDG=69X7UQPUoTLP5h1ZLpHngp=3C4vSDOS6L-N2XZSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 June 2012 06:44 PM, Tomi Valkeinen wrote:
-> venc and hdmi use clk_enable/disable in runtime PM callbacks (suspend&
-> resume). If I understand correctly, the callbacks are not called in
-> atomic context if pm_runtime_irq_safe() has not been used. And it is not
-> used in omapdss.
+On Mon, Jun 25, 2012 at 11:58 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
 >
-> dsi uses clk_enable/disable in a different manner, but not in atomic
-> context.
+> On Tue, Jun 19, 2012 at 02:33:11PM +0530, Shilimkar, Santosh wrote:
+> > @@ -1644,11 +1923,23 @@ static void __attribute__((unused))
+> > freq_post_notify_handling(void)
+> > ? ? ? spin_unlock_irqrestore(&emif_lock, irq_state);
+> > ?}
+> >
+> > +#if defined(CONFIG_OF)
+> > +static const struct of_device_id emif_of_match[] = {
+> > + ? ? ? ? ? ? { .compatible = "ti,emif-4d" },
+> > + ? ? ? ? ? ? { .compatible = "ti,emif-4d5" },
+> > + ? ? ? ? ? ? {},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, emif_of_match);
+> > +#endif
+> > +
+> > ?static struct platform_driver emif_driver = {
+> > ? ? ? .remove ? ? ? ? = __exit_p(emif_remove),
+> > ? ? ? .shutdown ? ? ? = emif_shutdown,
+> > ? ? ? .driver = {
+> > ? ? ? ? ? ? ? .name = "emif",
+> > +#if defined(CONFIG_OF)
+> > + ? ? ? ? ? ? .of_match_table = of_match_ptr(emif_of_match),
+> > +#endif
 >
-> So as far as I see, clocks are never handled in atomic context. Is
-> everything related to the base clk stuff already in mainline? Can I take
-> the clk_prepare/unprepare patch into my omapdss tree?
+> Are these two still #if defined needed?
+>
+> Also, what about the IS_DEFINED macro?
+>
+Yes. To avoid the build break in !DT build.
 
-Well the Common Clk framework is already in mainline, but we still don;t
-have CONFIG_COMMON_CLK enabled for our builds yet. So until we do so,
-clk_prepare/unprepare will just be stubs which do nothing.
-I will repost the patch getting rid of the clk_prepare/unprepare and
-adding clk_prepare_enable/disable_unprepare instead.
+> And, if you resend, please resend the whole series, I don't have the old
+> ones around anymore.
+>
+Ok. Will repost the entire series.
+As mentioned earlier, the series needs to go via OMAP tree beasue the
+other three
+patches are touching the platform files. I will need your ack on the
+$subject patch
+to queue that via Tony's linux-omap tree.
 
->
->
-> A question about clk_prepare/unprepare, not directly related: let's say
-> I have a driver for some HW block. The driver doesn't use clk functions,
-> but uses runtime PM. The driver also sets pm_runtime_irq_safe().
->
-> Now, the driver can call pm_runtime_get_sync() in an atomic context, and
-> this would lead to the underlying framework (hwmod, omap_device, I don't
-> know who =) enabling the func clock for that HW. But this would happen
-> in atomic context, so the underlying framework can't use clk_prepare.
->
-> How does the underlying framework handle that case? (sorry if that's a
-> stupid question =).
-
-No, its not a stupid question at all. I have been thinking about this
-too to figure out whats the best way to handle this. For now, the
-patches I posted, do an early clk_prepare (like I did for dss) for all
-hwmod clocks as I have no way to know which ones will have their
-_enable, _idle etc called in atomic context. Maybe I should see if there
-is a way I can do so only for those devices which end up calling a
-pm_runtime_irq_safe() and not do it early for all.
-
->
+Regards
+Santosh
