@@ -1,66 +1,26 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 26 Jun 2012 15:03:56 +0100
-Subject: [PATCH 7/9] I2C: MV64XXX: Add Device Tree support
-In-Reply-To: <1339324322-29388-8-git-send-email-andrew@lunn.ch>
-References: <1339324322-29388-8-git-send-email-andrew@lunn.ch>
-Message-ID: <4FE9C14C.2030804@codethink.co.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 22:07:19 +0800
+Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
+In-Reply-To: <4FE9A04F.8030109@pengutronix.de>
+References: <1338084709-12043-1-git-send-email-marex@denx.de>
+ <4FE97B12.8040306@pengutronix.de> <4FE97BCC.7050904@pengutronix.de>
+ <20120626112804.GC8858@S2101-09.ap.freescale.net>
+ <4FE9A04F.8030109@pengutronix.de>
+Message-ID: <20120626140717.GB9294@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/12 11:31, Andrew Lunn wrote:
-> Extends the driver to get properties from device tree. Also extend the
-> kirkwood DT support to supply the needed properties.
->
-> Signed-off-by: Andrew Lunn<andrew@lunn.ch>
-> ---
->   Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   35 +++++++++++++++++-
->   arch/arm/boot/dts/kirkwood.dtsi                    |   13 +++++++
->   arch/arm/mach-kirkwood/board-dt.c                  |    2 ++
->   drivers/i2c/busses/i2c-mv64xxx.c                   |   38 +++++++++++++++++---
->   4 files changed, 82 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> index b891ee2..89ef899 100644
-> --- a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> +++ b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> @@ -1,4 +1,4 @@
-> -* I2C
-> +* Marvell MMP I2C controller
->
->   Required properties :
->
-> @@ -32,3 +32,36 @@ Examples:
->   		interrupts =<58>;
->   	};
->
-> +* Marvell MV64XXX I2C controller
-> +
-> +Required properties :
-> +
-> + - reg         : Offset and length of the register set for the device
-> + - compatible  : should be "marvell,mv64xxx-i2c"
-> + - interrupts  : the interrupt number
-> + - frequency-m : m factor in baud rate calculation
-> +
-> +Recommended properties :
-> +
-> + - frequency-n : n factor in baud rate calculation
-> + - timeout-ms  : How long to wait for a transaction to complete
-> +
-> +Baud Rate:
-> +
-> +The baud rate is calculated thus:
-> +
-> +Fscl =          Ftclk
-> +       ------------------------------------------
-> +                                (frequency-n + 1)
-> +       10 *(frequency-m + 1) * 2
-> +
-> +Examples:
-
-I'd really rather see this calculated at run-time, given some
-systems can quite easily change their clocks.
+On Tue, Jun 26, 2012 at 01:43:11PM +0200, Marc Kleine-Budde wrote:
+> Yes, but the HAVE_CAN_FLEXCAN is used to make the driver available in
+> Kconfig. What about removing the "depends on HAVE_CAN_FLEXCAN" from the
+> driver symbol in Kconfig? I can push it via net-next and it will be
+> mainline in 3.6. You can remove the HAVE_CAN_FLEXCAN from the ARM (and
+> powerpc) trees.
+> 
+Ok, that works for me if you would like to have the CAN_FLEXCAN show
+up anyway for all the ARCHs, but otherwise we just end up with replacing
+"depends on HAVE_CAN_FLEXCAN" with "depends on ARCH_MXS || ARCH_MXC".
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Regards,
+Shawn
