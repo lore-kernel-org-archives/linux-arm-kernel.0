@@ -1,135 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Jun 2012 10:53:27 -0600
-Subject: Where to power on the wifi device before loading the driver.
-In-Reply-To: <20120626085605.GA6047@shlinux2.ap.freescale.net>
-References: <20120614121234.GC3913@opensource.wolfsonmicro.com>
- <4FDA092E.10301@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C377BFFE8D@HKMAIL01.nvidia.com>
- <4FDB5976.20809@wwwdotorg.org>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD61F@HKMAIL01.nvidia.com>
- <43E4817426ED174AA81263BCECB4351D138E8ACD6B@sc-vexch3.marvell.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD622@HKMAIL01.nvidia.com>
- <20120619091719.GZ3974@opensource.wolfsonmicro.com>
- <6B4D417B830BC44B8026029FD256F7F1C6EE2DD626@HKMAIL01.nvidia.com>
- <4FE112F2.7000506@wwwdotorg.org>
- <20120626085605.GA6047@shlinux2.ap.freescale.net>
-Message-ID: <4FE9E907.6050803@wwwdotorg.org>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Tue, 26 Jun 2012 18:55:29 +0200
+Subject: [PATCH 0/2] flexcan driver updates
+In-Reply-To: <1340700563-8386-1-git-send-email-shawn.guo@linaro.org>
+References: <1340700563-8386-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FE9E981.2080402@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(I'm adding everyone on thread "ARM: imx6q: add config-on-boot gpios" to
-the CC of this similar thread. Sorry if you think that's spam.)
+On 26.06.2012 10:49, Shawn Guo wrote:
 
-On 06/26/2012 02:56 AM, Dong Aisheng wrote:
-> On Tue, Jun 19, 2012 at 06:01:54PM -0600, Stephen Warren wrote:
-...
->> I think what we need is some way of matching a DT node to a device even
->> when that device was instantiated through some probing mechanism such as
->> SDIO or USB (and I've heard hints that one can already do this for PCI;
->> I should investigate).
->>
->> So, we start off with the plain SDHCI controller node:
->>
->> sdhci at 78000000 {
->> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->> 	reg = <0x78000000 0x200>;
->> 	interrupts = <0 14 0x04>;
->> };
->>
->> Then, we add a child node to represent the device that's attached:
->>
->> sdhci at 78000000 {
->> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->> 	reg = <0x78000000 0x200>;
->> 	interrupts = <0 14 0x04>;
->>
->> 	sdio-device {
->> 		reset-gpios = <...>;
->> 		enable-gpios = <...>;
->> 	};
->> };
->>
->> When the SDHCI controller/core instantiates the child device it finds on
->> the HW bus, it initializes that struct device's of_node with a pointer
->> to the sdio-device node above. From there, the child device can get DT
->> properties such as GPIOs in the usual way.
->>
->> However, there are still some issues that need thought here; what if (as
->> is I believe the case on Cardhu) we can in fact plug in multiple
->> different types of device into the socket? Might we end up with
->> something like:
->>
->> sdhci at 78000000 {
->> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->> 	reg = <0x78000000 0x200>;
->> 	interrupts = <0 14 0x04>;
->>
->> 	sdio-device-option at 0 {
->> 		compatible = "broadcom,bcm4239";
->> 		reset-gpios = <...>;
->> 		enable-gpios = <...>;
->> 	};
->>
->> 	sdio-device-option at 1 {
->> 		compatible = "broadcom,bcm4330";
->> 		reset-gpios = <...>;
->> 		enable-gpios = <...>;
->> 	};
->> };
->>
->> and match on compatible value?
->>
-> I like this idea.
-> We may extend the sdio_device_id to contain a compatible string,
-> then sdio core is responsible to pass the corresponding device node to the
-> sdio function driver once a match device found, this is sdio function independent.
-> The sdio function driver then are responsible to parse the device node to
-> fetch the needed information like reset-gpios and enable-gpios to do correct
-> initialization sequence.
+> Here are a couple of flexcan driver/bindings updates, which are meant
+> to get the driver more device tree friendly.
 > 
-> However, one known question for this model is that some WiFi may need reset the chip
-> via gpio first before being able to be enumerated.
+> Shawn Guo (2):
+>   net: flexcan: clock-frequency is optional for device tree probe
+>   net: flexcan: add transceiver switch gpio support
+> 
+>  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    6 ++++
+>  drivers/net/can/flexcan.c                          |   30 ++++++++++++++++++++
+>  2 files changed, 36 insertions(+), 0 deletions(-)
+> 
 
-Yes, that's exactly the issue that makes the above binding incorrect.
 
-In another thread on a very similar topic, I proposed a binding that
-would address this issue:
+Sorry Shawn, but your posting is pretty misplaced ...
 
-http://www.spinics.net/lists/linux-usb/msg66013.html
+Please check for the maintainers and mailing lists in the MAINTAINERS file
+that match your suggested changes:
 
-> sdhci at 78000000 {
-> 	compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> 	reg = <0x78000000 0x200>;
-> 	interrupts = <0 14 0x04>;
->
-> 	sdio-device {
-> 		reset-gpios = <...>;
-> 		enable-gpios = <...>;
-> 	};
-> };
+Documentation/devicetree/bindings/net/can/fsl-flexcan.txt =>
 
-> ehci {
->     /* The following node is dynamically detected, although the hub
->      * IC is physically soldered onto the board
->      */
->     hub {
->         hub { /* also dynamic */
->             port at 2 {
->                 child-supply = <&regulator>;
->                 reset-gpios = <&gpio 0 0>;
->             };
->         };
->     };
-> }
+OPEN FIRMWARE AND FLATTENED DEVICE TREE
+M:	Grant Likely <grant.likely@secretlab.ca>
+M:	Rob Herring <rob.herring@calxeda.com>
+L:	devicetree-discuss at lists.ozlabs.org (moderated for non-subscribers)
+W:	http://fdt.secretlab.ca
+T:	git git://git.secretlab.ca/git/linux-2.6.git
+S:	Maintained
+F:	Documentation/devicetree		<<<<<------------- !!!
+F:	drivers/of
+F:	include/linux/of*.h
+K:	of_get_property
+K:	of_match_table
 
-Presumably something similar could be set up with platform data.
 
-Basically, the SD controller or USB host/hub node contains a child that
-represents the socket/port/... that needs some services provided to it
-(power, reset de-asserted, even clocks). The services provided by that
-node are set up before enumeration, so that the device will respond to
-enumeration. Hopefully, the DT representation of this socket/port/..
-could be shared across arbitrary types of controller (so both SD and
-USB) and the driver the "implements" that node would be common code that
-SD and USB call into, rather than having them both re-implement it from
-scratch.
+drivers/net/can/flexcan.c =>
+
+CAN NETWORK DRIVERS
+M:	Wolfgang Grandegger <wg@grandegger.com>
+M:	Marc Kleine-Budde <mkl@pengutronix.de>
+L:	linux-can at vger.kernel.org
+W:	http://gitorious.org/linux-can
+T:	git git://gitorious.org/linux-can/linux-can-next.git
+S:	Maintained
+F:	drivers/net/can/			<<<<<------------- !!!
+F:	include/linux/can/dev.h
+F:	include/linux/can/error.h
+F:	include/linux/can/netlink.h
+F:	include/linux/can/platform/
+
+So please post your suggested changes for the flexcan driver on the mailing
+lists linux-can at vger.kernel.org and devicetree-discuss@lists.ozlabs.org
+
+Once the changes are discussed and accepted they can be pulled by Dave Miller
+from the CAN development git repository into the networking tree.
+
+Thanks,
+Oliver
