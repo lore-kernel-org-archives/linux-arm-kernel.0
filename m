@@ -1,34 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jun 2012 19:34:42 +0100
-Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
-In-Reply-To: <1340642293.1562.59.camel@vkoul-udesk3>
-References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
- <1340642293.1562.59.camel@vkoul-udesk3>
-Message-ID: <20120626183442.GA27261@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 26 Jun 2012 21:02:15 +0200
+Subject: i.MX28 die temperature
+In-Reply-To: <201206261012.13620.jbe@pengutronix.de>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <201206221919.57485.marek.vasut@gmail.com>
+ <201206261012.13620.jbe@pengutronix.de>
+Message-ID: <201206262102.15698.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 10:08:13PM +0530, Vinod Koul wrote:
-> Hi Russell,
+Dear Juergen Beisert,
+
+> Hi Marek,
 > 
-> What is the status of the virtual dma and the series you have posted
-> previously. Is it ready for merge?
+> Marek Vasut wrote:
+> > [...]
+> > 
+> > > > Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
+> > > 
+> > > Any progress here with inclusion in some git tree?
+> > 
+> > Well ... I recently raised from the dead. It's on the schedule, obviously
+> > help is welcome.
 > 
-> I would be away for 10days starting coming Thursday. So please let me
-> know
+> I tried a little bit with your driver. The disadvantage I see is, its
+> claims all the free AD channels. But a few of them can also act as a
+> touchscreen controller. Shouldn't be the driver handle the channel usage
+> dynamically?
 
-I have no idea.
+I wonder, I'd rather see this driver behave as a composite driver, what do you 
+think?
 
-I've just rebased all the DMA stuff onto -rc4, because -rc3 is just a
-whole load of problems for OMAP, and I'm still struggling with the
-stupid OMAP audio crap.  And what with people who know how the SDP4430
-works and/or OMAP audio works going on holiday too, I don't see much
-progress being made until August time.
+> Also this AD module on the SoC can measure the die
+> temperature, battery voltage and some other power supplies.
+> I see more than one framework this driver should connect to: simple ADC
+> (IIO), touchscreen controller (INPUT), die temp (POWER?), various voltages
+> (POWER? REGULATOR?). Should it be a multi function device?
 
-I've found that the only way I can get any audio out of the SDP4430
-platform is if I have something connected to the 3.5mm jack before
-powering up the board, and keep it connected.  So provided I do that
-I can test the OMAP audio stuff.
+Correct, making it a MFD device with common channel-management logic is the way 
+to go. And it's gonna be a few resends of this driver, that's for certain. I'm 
+not confident I'll be able to make it right at the first try ;-)
 
-Of course, finding out crap like that takes time away from my _one_
-day a _week_ that I'm working on OMAP stuff...
+INPUT -- touchscreen
+IIO -- die temp and LRADC (maybe random voltages?)
+POWER -- battery
+
+But all this MFD goo is quite simple, the hard part is the channel management 
+logic. From the top of my head, there're 16 channels, 8 can be sampled at the 
+same time and there are 4 configuration triggers. Making it one hell of a 
+complex hardware.
+
+I'll fix the remnants of SPI and start on this beast tonight or tomorrow. Since 
+there was some progress in the IIO, I believe I'll have to rework it a bit.
+
+> Juergen
+
+Best regards,
+Marek Vasut
