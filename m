@@ -1,24 +1,39 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 26 Jun 2012 12:15:23 +0300
-Subject: [PATCH v6 13/14] usb: otg: add basic mxs phy driver support
-In-Reply-To: <1340260875-21934-14-git-send-email-richard.zhao@freescale.com>
-References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
- <1340260875-21934-14-git-send-email-richard.zhao@freescale.com>
-Message-ID: <87fw9iv3h0.fsf@ashishki-desk.ger.corp.intel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 Jun 2012 11:42:50 +0200
+Subject: [PATCH v4 5/9] arm: mach-mvebu: add documentation for new device
+ tree bindings
+In-Reply-To: <20120626085324.GD25625@lunn.ch>
+References: <1340699313-29331-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340699313-29331-6-git-send-email-gregory.clement@free-electrons.com>
+ <20120626085324.GD25625@lunn.ch>
+Message-ID: <4FE9841A.1010707@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+On 06/26/2012 10:53 AM, Andrew Lunn wrote:>> +++ b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+>> @@ -0,0 +1,16 @@
+>> +MVEBU (Marvell SOCs: Orion, Kirkwood, Dove, Armada 370/XP) System Controller
+>> +----------------------------------------------------------------------------
+>
+> Orion5x, not Orion.
+>
+> and you are missing mv78xx0.
+>
 
-> +config USB_MXS_PHY
-> +	tristate "Freescale MXS USB PHY support"
-> +	select STMP_DEVICE
-> +	select USB_OTG_UTILS
+OK I will add them.
 
-There should also be a dependency on ARM (or maybe even ARCH_MXS),
-because you're using writel_relaxed() here, which only exists on arm and
-sh4 and enabling it on other architectures breaks compilation.
+> In general, we use Orion to mean the set Orion5x, Dove, Kirkwood, and
+> mv78xx0.
 
-Regards,
---
-Alex
+I knew that, then I forgot!
+
+>
+> 	Andrew
+>
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
