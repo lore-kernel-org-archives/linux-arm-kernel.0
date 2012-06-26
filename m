@@ -1,43 +1,41 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 26 Jun 2012 13:43:11 +0200
-Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
-In-Reply-To: <20120626112804.GC8858@S2101-09.ap.freescale.net>
-References: <1338084709-12043-1-git-send-email-marex@denx.de>
- <4FE97B12.8040306@pengutronix.de> <4FE97BCC.7050904@pengutronix.de>
- <20120626112804.GC8858@S2101-09.ap.freescale.net>
-Message-ID: <4FE9A04F.8030109@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 26 Jun 2012 13:47:01 +0200
+Subject: [PATCH] mtd/m25p80: add device tree probe support
+In-Reply-To: <20120626081546.GB4928@S2101-09.ap.freescale.net>
+References: <1311601063-16581-1-git-send-email-shawn.guo@linaro.org>
+ <201206251850.10839.marex@denx.de>
+ <20120626081546.GB4928@S2101-09.ap.freescale.net>
+Message-ID: <201206261347.01995.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 01:28 PM, Shawn Guo wrote:
-> On Tue, Jun 26, 2012 at 11:07:24AM +0200, Marc Kleine-Budde wrote:
->>> +       select HAVE_CAN_FLEXCAN if NET && CAN
->>
->> ...and put this select to MACH_MXS_DT, instead of SOC_IMX28
->>
-> Hmm, why?  Flexcan is a feature/block of SoC rather than a machine,
-> isn't it?
+Dear Shawn Guo,
 
-Yes, but the HAVE_CAN_FLEXCAN is used to make the driver available in
-Kconfig. What about removing the "depends on HAVE_CAN_FLEXCAN" from the
-driver symbol in Kconfig? I can push it via net-next and it will be
-mainline in 3.6. You can remove the HAVE_CAN_FLEXCAN from the ARM (and
-powerpc) trees.
+> On Mon, Jun 25, 2012 at 06:50:10PM +0200, Marek Vasut wrote:
+> > 116                         ssp2: ssp at 80014000 {
+> > 117                                 #address-cells = <1>;
+> > 118                                 #size-cells = <0>;
+> > 119                                 compatible = "fsl,imx28-spi";
+> > 120                                 pinctrl-names = "default";
+> > 121                                 pinctrl-0 = <&spi2_pins_a>;
+> > 122                                 status = "okay";
+> > 123
+> > 124                                 flash: m25p80 at 0 {
+> > 125                                         #address-cells = <1>;
+> > 126                                         #size-cells = <1>;
+> > 127                                         compatible = "m25p80";
+> > 128                                         spi-max-frequency =
+> > <25000000>; 129                                         reg = <0>;
+> > 130                                 };
+> > 131                         };
+> > 
+> > I use this + my SPI patches I submitted recently.
+> 
+> I do not have the flash on my imx28-evk board, but I just tested on
+> imx6q-sabrelite, and yes, it can be probed without the patch.  I'm
+> fine then.
 
-To avoid Kconfig hickups I'll keep the HAVE_CAN_FLEXCAN symbol in the
-net-tree as long as the select HAVE_CAN_FLEXCAN is still present.
+Good, let's discard this patch and close this issue :-)
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/e1a388a0/attachment.sig>
+Best regards,
+Marek Vasut
