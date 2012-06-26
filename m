@@ -1,30 +1,21 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 26 Jun 2012 09:54:03 +0100
-Subject: [PATCH V2] ASoC: tlv320aic3x: Fix codec pll configure bug
-In-Reply-To: <1340690623-18177-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1340690623-18177-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120626085403.GH30406@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 16:58:07 +0800
+Subject: [PATCH 0/4] pwm-mxs driver updates
+Message-ID: <1340701091-8488-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 11:33:43AM +0530, Hebbar, Gururaja wrote:
-> In sound/soc/codecs/tlv320aic3x.c
-> 
->         data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG);
->         snd_soc_write(codec, AIC3X_PLL_PROGA_REG,
->                       data | (pll_p << PLLP_SHIFT));
-> 
-> In the above code, pll-p value is OR'ed with previous value without
-> clearing it. Bug is not seen if pll-p value doesn't change across
-> Sampling frequency.
+The series makes a few updates on pwm-mxs driver to make it better.
 
-A better fix is to change the code to use snd_soc_update_bits() rather
-than open code it.  This is more idiomatic and will suppress writes if
-they don't change anything.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/ebaf029c/attachment.sig>
+Shawn Guo (4):
+  pwm: pwm-mxs: encode soc name in compatible string
+  pwm: pwm-mxs: use global reset function stmp_reset_block
+  pwm: pwm-mxs: use devm_* managed functions
+  pwm: pwm-mxs: add pinctrl support
+
+ Documentation/devicetree/bindings/pwm/mxs-pwm.txt |    4 +-
+ drivers/pwm/pwm-mxs.c                             |   36 ++++++++++-----------
+ 2 files changed, 19 insertions(+), 21 deletions(-)
+
+-- 
+1.7.5.4
