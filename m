@@ -1,30 +1,59 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 25 Jun 2012 18:55:51 -0700
-Subject: linux-next: adding the common clk tree
-Message-ID: <20120626015551.GW4402@gmail.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 25 Jun 2012 18:59:11 -0700
+Subject: [GIT PULL] Integrator common clock
+In-Reply-To: <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
+References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
+ <20120620212046.GI4402@gmail.com>
+ <CACRpkdaDUvfEV-7zTTyb+NbZ1WnN+iz+9QzDCVESeizCowOCsg@mail.gmail.com>
+ <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
+Message-ID: <CAJOA=zNJBXJhhVq5T=0YqOZrwS1jCy2uU4ZLGrBHEW2_63B_Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, Jun 22, 2012 at 2:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Jun 21, 2012 at 8:23 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Wed, Jun 20, 2012 at 11:20 PM, Mike Turquette <mturquette@ti.com> wrote:
+>>> On 20120619-08:53, Linus Walleij wrote:
+>>>> Hi ARM SoC people,
+>>>>
+>>>> would you consider pulling in the support form common clk in the Integrator,
+>>>> unless Mike shouts at me? I think I have adressed all review comments.
+>>>
+>>> Any reason for this code to go through the arm-soc tree instead of
+>>> common clk tree?
+>>
+>> There was the Nomadik changes set changing a lot of stuff
+>> that will probably conflict with drivers/clk/Makefile. But that's no
+>> big deal. (Usually Stepgen R fixes these up in -next anyway).
+>>
+>> So if you want it in clk instead, feel free to pull it! (Just
+>> tell the ARM SoC people...)
+>
+> I saw that an older version of the patches is on the clk-next branch
+> in your git, if you're carrying these please take the latest, I created
+> a branch based off v3.5-rc2 (as I see you're using this) at your
+> convenience:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> for-mike
+>
 
-Would you please add the clk-next branch of the common clock tree to
-linux-next?
+Hi Linus,
 
-git://git.linaro.org/people/mturquette/linux.git clk-next
+Thanks for this.  I'll take this into my clk-next tomorrow after I get
+some sleep.
 
-Thanks much!
+> A bigger problem however, is that this branch is not in linux-next
+> so it doesn't get merge and build testing.
+>
+> Are you submitting this to Mr Rothwell for testing RealSoonNow
+> or it it going up through ARM SoC or something?
+>
 
-For all of those Cc'd, I just wanted to say that I'm changing the way I
-manage clk-next.  The clk-next branch now WILL be rebased, and it's only
-purpose is to make it easy to test things in linux-next.  You can base
-work on it, but be prepare for breakage and shifting commit ids.
-
-If you don't want breakage and shifting commit ids then you might want
-to use my clk-fixes branch (stable) and my clk-3.x branch (stable).  As
-patches go through the linux-next cycle and appear stable I'll migrate
-them over to clk-3.x which won't ever be rebased.  This is the branch
-I'll send to Linus.  clk-next is simply comprised of merging clk-fixes,
-clk-3.x and whatever unstable patches I have laying around.
+Done!  Well, at least my request to Stephen is Done.  You are Cc'd.
 
 Regards,
 Mike
+
+> Yours,
+> Linus Walleij
