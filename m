@@ -1,37 +1,26 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 26 Jun 2012 07:51:01 -0500
-Subject: [GIT PULL] OMAP: TWL IRQ dead code removal
-Message-ID: <877guudyoa.fsf@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 21:40:52 +0800
+Subject: [PATCH v4] ARM: mx23: Add initial support for olinuxino board
+In-Reply-To: <20120626021806.GI2342@S2101-09.ap.freescale.net>
+References: <1340027512-8461-1-git-send-email-fabio.estevam@freescale.com>
+ <20120625160515.GF2342@S2101-09.ap.freescale.net>
+ <CAOMZO5D1=bTcYhCa34D9L5c5P+6Q=G3HCimAWq=LsjbWDPd+Eg@mail.gmail.com>
+ <20120626021806.GI2342@S2101-09.ap.freescale.net>
+Message-ID: <20120626134049.GA9294@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, Jun 26, 2012 at 10:18:08AM +0800, Shawn Guo wrote:
+> On Mon, Jun 25, 2012 at 01:23:35PM -0300, Fabio Estevam wrote:
+> > I will fix it. How do you want me to handle it? Via an incremental
+> > patch against your tree or should I post a new version of the patch?
+> > 
+> Send me an incremental change, and I will amend it into the original
+> one.
 
-Please pull the following cleanup which removes the now unused TWL irq
-base/end.  The drivers part has been acked by Samuel.
+Sorry, Fabio.  I'm rebasing my for-next branch to back out the patch,
+so please send me a new version instead.  Thanks.
 
-Kevin
-
-
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
-
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/cleanup/twl-irq
-
-for you to fetch changes up to 3e7b706ca5151849e4ca91f7f3d8d6d8d8f7b667:
-
-  mfd: twl: remove pdata->irq_base/_end, no more users (2012-06-19 15:24:34 -0700)
-
-----------------------------------------------------------------
-Kevin Hilman (2):
-      ARM: OMAP2+: TWL: remove usage of pdata->irq_base/_end
-      mfd: twl: remove pdata->irq_base/_end, no more users
-
- arch/arm/mach-omap2/board-2430sdp.c    |    3 ---
- arch/arm/mach-omap2/board-omap3logic.c |    3 ---
- arch/arm/mach-omap2/twl-common.c       |    9 ---------
- include/linux/i2c/twl.h                |    1 -
- 4 files changed, 16 deletions(-)
+-- 
+Regards,
+Shawn
