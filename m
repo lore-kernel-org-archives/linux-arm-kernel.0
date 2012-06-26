@@ -1,82 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Jun 2012 10:52:19 +0800
-Subject: [PATCH] ARM: mx28: Add LCD pinmux
-In-Reply-To: <1340477119-2835-1-git-send-email-marex@denx.de>
-References: <1340477119-2835-1-git-send-email-marex@denx.de>
-Message-ID: <20120626025216.GK2342@S2101-09.ap.freescale.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 26 Jun 2012 13:25:02 +1000
+Subject: linux-next: adding the common clk tree
+In-Reply-To: <20120626015551.GW4402@gmail.com>
+References: <20120626015551.GW4402@gmail.com>
+Message-ID: <20120626132502.7584f6acbfc23bdc3d6a8f8e@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 23, 2012 at 08:45:18PM +0200, Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Detlev Zundel <dzu@denx.de>
-> CC: Dong Aisheng <b29396@freescale.com>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> CC: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Wolfgang Denk <wd@denx.de>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   45 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 464303c..ab29cbe 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -221,6 +221,51 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				lcd_data_pins_8bpp_a: lcd at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 0x1030
-> +						0x1040 0x1050 0x1060 0x1070>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				lcd_data_pins_16bpp_a: lcd at 1 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 0x1030
-> +						0x1040 0x1050 0x1060 0x1070
-> +						0x1080 0x1090 0x10a0 0x10b0
-> +						0x10c0 0x10d0 0x10e0 0x10f0>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				lcd_data_pins_18bpp_a: lcd at 2 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 0x1030
-> +						0x1040 0x1050 0x1060 0x1070
-> +						0x1080 0x1090 0x10a0 0x10b0
-> +						0x10c0 0x10d0 0x10e0 0x10f0
-> +						0x1100 0x1110>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				lcd_data_pins_24bpp_a: lcd at 3 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 0x1030
-> +						0x1040 0x1050 0x1060 0x1070
-> +						0x1080 0x1090 0x10a0 0x10b0
-> +						0x10c0 0x10d0 0x10e0 0x10f0
-> +						0x1100 0x1110 0x1120 0x1130
-> +						0x1140 0x1150 0x1160 0x1170>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
+Hi Mike,
 
-We do not want to enumerate all the possible mux options.  Instead,
-please add mux setting when there is indeed a user for it.
+On Mon, 25 Jun 2012 18:55:51 -0700 Mike Turquette <mturquette@ti.com> wrote:
+>
+> Would you please add the clk-next branch of the common clock tree to
+> linux-next?
+> 
+> git://git.linaro.org/people/mturquette/linux.git clk-next
+> 
+> Thanks much!
+> 
+> For all of those Cc'd, I just wanted to say that I'm changing the way I
+> manage clk-next.  The clk-next branch now WILL be rebased, and it's only
+> purpose is to make it easy to test things in linux-next.  You can base
+> work on it, but be prepare for breakage and shifting commit ids.
+> 
+> If you don't want breakage and shifting commit ids then you might want
+> to use my clk-fixes branch (stable) and my clk-3.x branch (stable).  As
+> patches go through the linux-next cycle and appear stable I'll migrate
+> them over to clk-3.x which won't ever be rebased.  This is the branch
+> I'll send to Linus.  clk-next is simply comprised of merging clk-fixes,
+> clk-3.x and whatever unstable patches I have laying around.
+
+Maybe you have misunderstood the point of linux-next (is is an
+integration testing tree, not a development tree)?  I am wondering if, in
+particular, the clk-3.x branch (or something near that) may be more
+appropriate for linux-next inclusion (and maybe the clk-fixes branch in
+my "fixes to the current release" section)?
+
+This is what I tell everyone:
+
+You will need to ensure that the commits in your tree have been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+	Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
 
 -- 
-Regards,
-Shawn
+Cheers,
+Stephen Rothwell	sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/6d37a3af/attachment.sig>
