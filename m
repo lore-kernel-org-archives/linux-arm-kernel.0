@@ -1,50 +1,39 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 26 Jun 2012 08:54:05 +0200
-Subject: [PATCH v5 1/7] ARM: davinci, cp_intc: Add irq domain support
-In-Reply-To: <4FE89CCB.4090609@ti.com>
-References: <1338373143-7467-1-git-send-email-hs@denx.de>
- <1338373143-7467-2-git-send-email-hs@denx.de> <4FE89CCB.4090609@ti.com>
-Message-ID: <4FE95C8D.4000505@denx.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 26 Jun 2012 09:55:58 +0300
+Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
+In-Reply-To: <4FE941EA.7050108@ti.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1340372890-10091-6-git-send-email-rnayak@ti.com>
+ <1340604478.12683.25.camel@lappyti> <4FE80C43.6090802@ti.com>
+ <1340611133.3395.3.camel@deskari> <4FE85005.4090303@ti.com>
+ <1340630090.3395.85.camel@deskari> <4FE941EA.7050108@ti.com>
+Message-ID: <1340693758.2093.15.camel@lappyti>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sekhar,
+On Tue, 2012-06-26 at 10:30 +0530, Rajendra Nayak wrote:
 
-On 25.06.2012 19:15, Sekhar Nori wrote:
-> Hi Heiko,
->
-> On 5/30/2012 3:48 PM, Heiko Schocher wrote:
->> Signed-off-by: Heiko Schocher<hs@denx.de>
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Cc: Sekhar Nori<nsekhar@ti.com>
->> Cc: Wolfgang Denk<wd@denx.de>
->> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
->>
->> ---
->
-> Applying this patch with two changes:
->
-> 1) select IRQ_DOMAIN for CP_INTC arch/arm/mach-davinci/Kconfig. Without
-> this build breaks.
->
-> 2) Add some commit description. For future, please have some commit
-> description on all patches.
+> > So as far as I see, clocks are never handled in atomic context. Is
+> > everything related to the base clk stuff already in mainline? Can I take
+> > the clk_prepare/unprepare patch into my omapdss tree?
+> 
+> Well the Common Clk framework is already in mainline, but we still don;t
+> have CONFIG_COMMON_CLK enabled for our builds yet. So until we do so,
+> clk_prepare/unprepare will just be stubs which do nothing.
 
-Ok.
+But if I understood correctly, clk_prepare and clk_unprepare are anyway
+no-ops with dss clocks, even when CONFIG_COMMON_CLK is enabled?
 
-> I boot tested this on AM18x EVM. Also tested that GPIO interrupts are
-> not broken.
+My point was only to understand if I can safely take the patch into
+omapdss tree, instead of it going through l-o, to avoid any possible
+conflicts.
 
-Thanks!
+ Tomi
 
-BTW: What is with the "rest" of the patches in this patchset? I got no
-      more comments for them.
-
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/ab95f1a0/attachment.sig>
