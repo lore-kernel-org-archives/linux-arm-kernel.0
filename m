@@ -1,59 +1,37 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 25 Jun 2012 18:59:11 -0700
-Subject: [GIT PULL] Integrator common clock
-In-Reply-To: <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
-References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
- <20120620212046.GI4402@gmail.com>
- <CACRpkdaDUvfEV-7zTTyb+NbZ1WnN+iz+9QzDCVESeizCowOCsg@mail.gmail.com>
- <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
-Message-ID: <CAJOA=zNJBXJhhVq5T=0YqOZrwS1jCy2uU4ZLGrBHEW2_63B_Kg@mail.gmail.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Tue, 26 Jun 2012 02:05:05 +0000
+Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <4FE8871B.7060408@wwwdotorg.org>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
+ <4FD8AD42.6010702@gmail.com> <20120613152841.GA23590@richard-laptop>
+ <4FD8C4DB.4020908@gmail.com>
+ <20120614013343.GD29684@b20223-02.ap.freescale.net>
+ <4FE1DE53.4070202@gmail.com> <4FE1EF26.9080401@wwwdotorg.org>
+ <F281D0F91ED19E4D8E63A7504E8A649803BE3E73@039-SN2MPN1-023.039d.mgd.msft.net>
+ <4FE39EA2.8050809@wwwdotorg.org>
+ <F281D0F91ED19E4D8E63A7504E8A649803BE45CD@039-SN2MPN1-023.039d.mgd.msft.net>
+ <4FE8871B.7060408@wwwdotorg.org>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803BE6A92@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2012 at 2:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Jun 21, 2012 at 8:23 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Jun 20, 2012 at 11:20 PM, Mike Turquette <mturquette@ti.com> wrote:
->>> On 20120619-08:53, Linus Walleij wrote:
->>>> Hi ARM SoC people,
->>>>
->>>> would you consider pulling in the support form common clk in the Integrator,
->>>> unless Mike shouts at me? I think I have adressed all review comments.
->>>
->>> Any reason for this code to go through the arm-soc tree instead of
->>> common clk tree?
->>
->> There was the Nomadik changes set changing a lot of stuff
->> that will probably conflict with drivers/clk/Makefile. But that's no
->> big deal. (Usually Stepgen R fixes these up in -next anyway).
->>
->> So if you want it in clk instead, feel free to pull it! (Just
->> tell the ARM SoC people...)
->
-> I saw that an older version of the patches is on the clk-next branch
-> in your git, if you're carrying these please take the latest, I created
-> a branch based off v3.5-rc2 (as I see you're using this) at your
-> convenience:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> for-mike
->
+ 
+> 
+> But like you said, there's no way to tell what's attached to a USB or
+> SDIO port before probing it, at least if the port is at all
+> user-accessible. The class driver for the host-side of the port (USB hub
+> or SDIO controller) would be the one that needs to implement this, not
+> the class driver for the thing that could be plugged in (WiFi or 3G
+> device).
+> 
+Agree, I did not consider the situation that the class driver is loaded as 
+module and only be loaded when that kinds of device (wifi/3g) has found
+(through udev).
 
-Hi Linus,
+Maybe we have to add misc control (power/reset) for devices at sd or usb 
+controller driver's probe, and those gpio are belonged to controller's.  
 
-Thanks for this.  I'll take this into my clk-next tomorrow after I get
-some sleep.
-
-> A bigger problem however, is that this branch is not in linux-next
-> so it doesn't get merge and build testing.
->
-> Are you submitting this to Mr Rothwell for testing RealSoonNow
-> or it it going up through ARM SoC or something?
->
-
-Done!  Well, at least my request to Stephen is Done.  You are Cc'd.
-
-Regards,
-Mike
-
-> Yours,
-> Linus Walleij
+> > But the generic 3G and HUB devices are special, there is only one
+> common driver
+> > for each of them (drivers/usb/core/hub.c & drivers/serial/option.c)
