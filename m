@@ -1,31 +1,24 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 26 Jun 2012 11:11:35 +0200
-Subject: [PATCH 3/3] net: fec: add phy-reset-interval for device tree probe
-In-Reply-To: <1340700308-8315-4-git-send-email-shawn.guo@linaro.org>
-References: <1340700308-8315-1-git-send-email-shawn.guo@linaro.org>
- <1340700308-8315-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20457.31943.332545.171232@ipc1.ka-ro>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 26 Jun 2012 12:15:23 +0300
+Subject: [PATCH v6 13/14] usb: otg: add basic mxs phy driver support
+In-Reply-To: <1340260875-21934-14-git-send-email-richard.zhao@freescale.com>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+ <1340260875-21934-14-git-send-email-richard.zhao@freescale.com>
+Message-ID: <87fw9iv3h0.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Richard Zhao <richard.zhao@freescale.com> writes:
 
-Shawn Guo writes:
-> Different boards may require different phy reset interval time.  Add
-> property phy-reset-interval for device tree probe, so that the boards
-> that need a longer interval time can specify it in their device tree.
->
-'phy-reset-duration' would be a more appropriate name.
+> +config USB_MXS_PHY
+> +	tristate "Freescale MXS USB PHY support"
+> +	select STMP_DEVICE
+> +	select USB_OTG_UTILS
 
+There should also be a dependency on ARM (or maybe even ARCH_MXS),
+because you're using writel_relaxed() here, which only exists on arm and
+sh4 and enabling it on other architectures breaks compilation.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Regards,
+--
+Alex
