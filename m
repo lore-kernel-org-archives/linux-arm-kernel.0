@@ -1,38 +1,32 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 26 Jun 2012 19:13:29 -0400
-Subject: [PATCH] ARM: sa1100: fix jornada720 build failure on missing IOMEM
-Message-ID: <1340752409-11413-1-git-send-email-paul.gortmaker@windriver.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Jun 2012 17:16:07 -0600
+Subject: [PATCH 3/3] ARM: dt: tegra: paz00: add regulators
+In-Reply-To: <20120626230235.GX30406@opensource.wolfsonmicro.com>
+References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
+ <1340406842-27135-3-git-send-email-swarren@wwwdotorg.org>
+ <1963397.cqAXgGafFs@ax5200p> <20120624110306.GA16455@sirena.org.uk>
+ <4FEA3942.9040906@wwwdotorg.org>
+ <20120626230235.GX30406@opensource.wolfsonmicro.com>
+Message-ID: <4FEA42B7.9060802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduced by commit 6686732c8b8974fafbdd7886de0fcf77cf34ec07 [linux-next]
+On 06/26/2012 05:02 PM, Mark Brown wrote:
+> On Tue, Jun 26, 2012 at 04:35:46PM -0600, Stephen Warren wrote:
+> 
+>> So I think this sm0 (and the sm1) entry might actually be
+>> correct; sm0 feeds vdd_core and sm1 feeds vdd_cpu. These rails
+>> have DVFS and hence the voltage can vary. I guess I should change
+>> the regulator-name in these cases to something more useful than
+>> the very first signal name on the schematics too.
+> 
+> Even if they feed these supplies are they capable of varying on
+> this board if they're shared with other things?  This is one of the
+> common issues with constraints...  But generally if the supply
+> covers more than one thing the idiomatic thing is to list them all
+> separated by / or something.
 
-    "ARM: sa11x0/pxa: convert OS timer registers to IOMEM"
-
-which causes:
-
-arch/arm/mach-sa1100/jornada720_ssp.c:63:2: error: implicit declaration of function 'IOMEM'
-
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
-
-Feel free to squash into original if rebasing.
-Fixes http://kisskb.ellerman.id.au/kisskb/buildresult/6592200/
-
- arch/arm/mach-sa1100/jornada720_ssp.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
-index b412fc0..ee13507 100644
---- a/arch/arm/mach-sa1100/jornada720_ssp.c
-+++ b/arch/arm/mach-sa1100/jornada720_ssp.c
-@@ -14,6 +14,7 @@
- #include <linux/delay.h>
- #include <linux/errno.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
--- 
-1.7.9.1
+These two supplies aren't shared, it's just that the signal on the
+schematic ends up being named different things in different places; on
+the regulator page it's named vdd_sm0, but on some other page it gets
+renamed vdd_core.
