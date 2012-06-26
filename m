@@ -1,71 +1,105 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Jun 2012 00:02:36 +0100
-Subject: [PATCH 3/3] ARM: dt: tegra: paz00: add regulators
-In-Reply-To: <4FEA3942.9040906@wwwdotorg.org>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <1340406842-27135-3-git-send-email-swarren@wwwdotorg.org>
- <1963397.cqAXgGafFs@ax5200p> <20120624110306.GA16455@sirena.org.uk>
- <4FEA3942.9040906@wwwdotorg.org>
-Message-ID: <20120626230235.GX30406@opensource.wolfsonmicro.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 26 Jun 2012 16:05:03 -0700
+Subject: linux-next: adding the common clk tree
+In-Reply-To: <20120626132502.7584f6acbfc23bdc3d6a8f8e@canb.auug.org.au>
+References: <20120626015551.GW4402@gmail.com>
+ <20120626132502.7584f6acbfc23bdc3d6a8f8e@canb.auug.org.au>
+Message-ID: <20120626230503.GA4402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 04:35:46PM -0600, Stephen Warren wrote:
+On 20120626-13:25, Stephen Rothwell wrote:
+> Hi Mike,
+> 
+> On Mon, 25 Jun 2012 18:55:51 -0700 Mike Turquette <mturquette@ti.com> wrote:
+> >
+> > Would you please add the clk-next branch of the common clock tree to
+> > linux-next?
+> > 
+> > git://git.linaro.org/people/mturquette/linux.git clk-next
+> > 
+> > Thanks much!
+> > 
+> > For all of those Cc'd, I just wanted to say that I'm changing the way I
+> > manage clk-next.  The clk-next branch now WILL be rebased, and it's only
+> > purpose is to make it easy to test things in linux-next.  You can base
+> > work on it, but be prepare for breakage and shifting commit ids.
+> > 
+> > If you don't want breakage and shifting commit ids then you might want
+> > to use my clk-fixes branch (stable) and my clk-3.x branch (stable).  As
+> > patches go through the linux-next cycle and appear stable I'll migrate
+> > them over to clk-3.x which won't ever be rebased.  This is the branch
+> > I'll send to Linus.  clk-next is simply comprised of merging clk-fixes,
+> > clk-3.x and whatever unstable patches I have laying around.
+> 
+> Maybe you have misunderstood the point of linux-next (is is an
+> integration testing tree, not a development tree)?  I am wondering if, in
+> particular, the clk-3.x branch (or something near that) may be more
+> appropriate for linux-next inclusion (and maybe the clk-fixes branch in
+> my "fixes to the current release" section)?
+> 
 
-> So I think this sm0 (and the sm1) entry might actually be correct; sm0
-> feeds vdd_core and sm1 feeds vdd_cpu. These rails have DVFS and hence
-> the voltage can vary. I guess I should change the regulator-name in
-> these cases to something more useful than the very first signal name on
-> the schematics too.
+Hi Stephen,
 
-Even if they feed these supplies are they capable of varying on this
-board if they're shared with other things?  This is one of the common
-issues with constraints...  But generally if the supply covers more than
-one thing the idiomatic thing is to list them all separated by / or
-something.
+Let me explain how I planned to use linux-next and you can tell me if I
+have it all wrong.
 
-> That said, we don't actually have DVFS in the mainline kernel yet, and
-> correlating the regulator limits in our downstream kernels against the
-> DVFS tables we use is ... challenging; I'm not sure they're consistent
-> anyway:-(
+I had hoped to have three public branches:
 
-Well, if you're using the regulator API the regulator API limits will
-win if they're more constrained.  But this is half the problem with
-these silly constraints that just copy the regulator limits, you've no
-idea what the board is actually supposed to do.
+clk-fixes which would be fixes for the current -rc series
 
-> However, it probably doesn't make sense to vary sm2, since all that is
-> used for is to feed the TPS6586x's input pins for the the LDO regulators.
+clk-3.x which would be stable (never rebased) that I building up towards
+the next merge window
 
-Actually if we get clever then there's some fun to be had there.  If we
-can have all the LDOs specify the headroom they need then we should be
-able to arrange to vary the DCDC depending on what the needs of the
-currently active LDOs are which would improve power efficiency as the
-goal here is to drop the voltage as much as possible using the more
-efficient DCDC then regulate on from there with the LDOs.
+clk-next which would be the branch for you to pull
 
-I keep considering doing this but don't have any real need for it
-myself, it's just amusing.  Might fall out of (or be similar to) some
-work I'm going to be doing soon for bypass modes though.
+clk-next would essentially be built as the following:
 
-> Likewise, all the LDO regulators are used for various peripherals in
-> general, and in the main it probably makes no sense for those rails to vary.
+git checkout clk-next
+git reset --hard $linus-latest-tag
+git merge clk-fixes (only if not yet merged into the -rc bugfix window)
+git merge clk-3.x
+git am patches/clk/next/incoming/*.patch
 
-This is typically very unusual, the devices on the rails are normally
-heavily constrained when active.
+The goal would be to move patches out of the 'incoming' directory and
+into clk-3.x as soon as they had made it through a couple of rounds in
+linux-next and no one complained that things were broken.  All of this
+was just to keep clk-3.x very stable and not have me reverting or
+makings lots of little fixes to that as folks reported issues on the
+list.
 
-> So, what I think I'll do for any regulators where the downstream board
-> files specify a voltage range, is boot the kernel and find out what
-> voltage is selected by default, and program both min-/max-microvolt to
-> that specific value. That way, there will be no behaviour change. We can
-> expand the ranges on the regulators later if/when we add DVFS etc. Does
-> that sound like a reasonable approach?
+In fact, my goal is that the 'incoming' patches directory would be empty
+and clk-next would only be a fast-forward merge of clk-3.x by the time
+Linus' merge window opens.  So in that regard I am following the
+guidelines to treat my pull request to linux-next as the same thing I
+would send to Linus.
 
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/a89ae1f2/attachment-0001.sig>
+Finally, I have never meant to throw bad patches at linux-next, so
+perhaps I shouldn't have used the term "breakage" in my above mail.  I
+only meant that from the perspective of downstream developers pulling a
+rebased clk-next branch.  I do not intend to put patches into linux-next
+which are not unit tested first.
+
+So please let me know if I still have the concept wrong and I'll change
+things up.  Otherwise my clk-next fulfils all of the guidelines you've
+mentioned below for inclusion into linux-next.
+
+Thanks much,
+Mike
+
+> This is what I tell everyone:
+> 
+> You will need to ensure that the commits in your tree have been:
+>      * submitted under GPL v2 (or later) and include the Contributor's
+> 	Signed-off-by,
+>      * posted to the relevant mailing list,
+>      * reviewed by you (or another maintainer of your subsystem tree),
+>      * successfully unit tested, and 
+>      * destined for the current or next Linux merge window.
+> 
+> Basically, this should be just what you would send to Linus (or ask him
+> to fetch).  It is allowed to be rebased if you deem it necessary.
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell	sfr at canb.auug.org.au
