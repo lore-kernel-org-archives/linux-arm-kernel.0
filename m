@@ -1,68 +1,51 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 26 Jun 2012 07:38:55 -0500
-Subject: [GIT PULL] OMAP PM: move SmartReflex driver to drivers/avs
-Message-ID: <87zk7qdz8g.fsf@ti.com>
+Date: Tue, 26 Jun 2012 07:43:18 -0500
+Subject: [GIT PULL] OMAP3 PM: preformance enhancements
+Message-ID: <87obo6dz15.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tony,
 
-Please pull this series that move the SmartReflex driver out to
-drivers/avs.  The series includes some minimal cleanups necessary to
-cleanly do the move.
+Please pull the following PM/performance enhancements for v3.6.  I
+recently rebased it on your devel-pm branch to avoid some conflicts
+with the IO chain stuff recently merged from Paul.
 
-The drivers/* change has been Acked by Rafael and we agreed to merge it
-through the OMAP tree because of all the arch/arm/mach-omap2 changes
-in this series.
+This series had the goal of improving the responsiveness of the
+shallowest idle states.  Several reports came in that even when only
+hitting the shallowest idle states, there was a significant performance
+hit.  This series addresses the major sources of latency in the
+shallowest idle states.
 
 Kevin
 
+The following changes since commit 9a17d88e0586bb7189655f8f99484a872a474626:
 
-The following changes since commit cdd3a354a05b0c33fe33ab11a0fb0838396cad19:
-
-  Merge tag 'pm' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-05-22 09:41:01 -0700)
+  Merge tag 'omap-devel-c-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-pm (2012-06-25 07:41:17 -0700)
 
 are available in the git repository at:
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/pm/sr-move
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/pm/performance
 
-for you to fetch changes up to 21ff63ad131218048525fbd37d065ce61f03bcbd:
+for you to fetch changes up to 05011f711fc751456972d126bbb8081723629408:
 
-  ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/ (2012-05-31 16:36:30 -0700)
+  ARM: OMAP3: PM: cpuidle: optimize the clkdm idle latency in C1 state (2012-06-25 11:24:24 -0700)
 
 ----------------------------------------------------------------
-J Keerthy (1):
-      ARM: OMAP2+: Voltage: Move the omap_volt_data structure to plat
+Jean Pihet (3):
+      ARM: OMAP3: PM: cpuidle: default to C1 in next_valid_state
+      ARM: OMAP3: PM: cpuidle: optimize the PER latency in C1 state
+      ARM: OMAP3: PM: cpuidle: optimize the clkdm idle latency in C1 state
 
-Jean Pihet (9):
-      ARM: OMAP2+: SmartReflex: move the smartreflex header to include/linux/power
-      ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
-      ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of voltage domains.
-      ARM: OMAP3: hwmod: rename the smartreflex entries
-      ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
-      ARM: OMAP2+: SmartReflex: Use per-OPP data structure
-      ARM: OMAP2+: SmartReflex: Create per-opp debugfs node for errminlimit
-      ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
-      ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+Kevin Hilman (3):
+      ARM: OMAP2+: powerdomain: allow pre/post transtion to be per pwrdm
+      ARM: OMAP3: PM: call pre/post transition per powerdomain
+      ARM: OMAP3: PM: cleanup cam_pwrdm leftovers
 
- arch/arm/mach-omap2/Makefile                       |    5 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   12 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    3 +-
- arch/arm/mach-omap2/pm.h                           |    2 +-
- arch/arm/mach-omap2/smartreflex-class3.c           |   29 ++--
- arch/arm/mach-omap2/sr_device.c                    |   39 ++++-
- arch/arm/mach-omap2/voltage.h                      |   21 +--
- arch/arm/plat-omap/Kconfig                         |   31 ++--
- arch/arm/plat-omap/include/plat/voltage.h          |   21 ++-
- drivers/power/Kconfig                              |    2 +
- drivers/power/Makefile                             |    1 +
- drivers/power/avs/Kconfig                          |   12 ++
- drivers/power/avs/Makefile                         |    1 +
- .../mach-omap2 => drivers/power/avs}/smartreflex.c |  161 ++++++++------------
- .../linux/power}/smartreflex.h                     |   74 +++++++--
- 15 files changed, 235 insertions(+), 179 deletions(-)
- create mode 100644 drivers/power/avs/Kconfig
- create mode 100644 drivers/power/avs/Makefile
- rename {arch/arm/mach-omap2 => drivers/power/avs}/smartreflex.c (90%)
- rename {arch/arm/mach-omap2 => include/linux/power}/smartreflex.h (79%)
+ arch/arm/mach-omap2/cpuidle34xx.c         |   71 +++++++++++------------------
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 +-
+ arch/arm/mach-omap2/pm34xx.c              |   21 ++++++---
+ arch/arm/mach-omap2/powerdomain.c         |   16 +++++--
+ arch/arm/mach-omap2/powerdomain.h         |    4 +-
+ 5 files changed, 57 insertions(+), 59 deletions(-)
