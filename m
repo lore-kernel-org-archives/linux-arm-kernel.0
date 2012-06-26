@@ -1,26 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Jun 2012 22:07:19 +0800
-Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
-In-Reply-To: <4FE9A04F.8030109@pengutronix.de>
-References: <1338084709-12043-1-git-send-email-marex@denx.de>
- <4FE97B12.8040306@pengutronix.de> <4FE97BCC.7050904@pengutronix.de>
- <20120626112804.GC8858@S2101-09.ap.freescale.net>
- <4FE9A04F.8030109@pengutronix.de>
-Message-ID: <20120626140717.GB9294@S2101-09.ap.freescale.net>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Tue, 26 Jun 2012 14:07:48 +0000
+Subject: [PATCH V2] ASoC: tlv320aic3x: Fix codec pll configure bug
+In-Reply-To: <20120626085403.GH30406@opensource.wolfsonmicro.com>
+References: <1340690623-18177-1-git-send-email-gururaja.hebbar@ti.com>
+ <20120626085403.GH30406@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA2D2A2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 01:43:11PM +0200, Marc Kleine-Budde wrote:
-> Yes, but the HAVE_CAN_FLEXCAN is used to make the driver available in
-> Kconfig. What about removing the "depends on HAVE_CAN_FLEXCAN" from the
-> driver symbol in Kconfig? I can push it via net-next and it will be
-> mainline in 3.6. You can remove the HAVE_CAN_FLEXCAN from the ARM (and
-> powerpc) trees.
+On Tue, Jun 26, 2012 at 14:24:03, Mark Brown wrote:
+> On Tue, Jun 26, 2012 at 11:33:43AM +0530, Hebbar, Gururaja wrote:
+> > In sound/soc/codecs/tlv320aic3x.c
+> > 
+> >         data = snd_soc_read(codec, AIC3X_PLL_PROGA_REG);
+> >         snd_soc_write(codec, AIC3X_PLL_PROGA_REG,
+> >                       data | (pll_p << PLLP_SHIFT));
+> > 
+> > In the above code, pll-p value is OR'ed with previous value without
+> > clearing it. Bug is not seen if pll-p value doesn't change across
+> > Sampling frequency.
 > 
-Ok, that works for me if you would like to have the CAN_FLEXCAN show
-up anyway for all the ARCHs, but otherwise we just end up with replacing
-"depends on HAVE_CAN_FLEXCAN" with "depends on ARCH_MXS || ARCH_MXC".
+> A better fix is to change the code to use snd_soc_update_bits() rather
+> than open code it.  This is more idiomatic and will suppress writes if
+> they don't change anything.
+> 
 
--- 
-Regards,
-Shawn
+Sure will resend the patch. Thanks for the review
+
+
+Regards, 
+Gururaja
