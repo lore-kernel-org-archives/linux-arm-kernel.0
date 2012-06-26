@@ -1,35 +1,41 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 26 Jun 2012 08:58:42 +0000
-Subject: [PATCH v6 00/13] GPMC driver conversion
-In-Reply-To: <cover.1340367480.git.afzal@ti.com>
-References: <cover.1340367480.git.afzal@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99F0D2@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 17:00:10 +0800
+Subject: [PATCH] clk: mxs: add clkdev lookup for pwm
+Message-ID: <1340701210-8547-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Add pwm clock lookup for imx23 and imx28 booting from device tree.
 
-On Fri, Jun 22, 2012 at 18:25:38, Mohammed, Afzal wrote:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/clk/mxs/clk-imx23.c |    1 +
+ drivers/clk/mxs/clk-imx28.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-> This series is based on 3.5-rc1, and is dependent on [1,2,3], and has
-> been tested on omap3evm (smsc911x) rev G & C and beagle board(nand).
-> Also using private patches, nand & onenand was tested on omap3evm,
-> rev G & C respectively (as support for these were not in mainline)
-> 
-> All boards will work using the old existing interface. Further patch
-> series would convert all boards to use new interface.
-> 
-> Many of GPMC peripherals depend on bootloader for configuration.
-> This is going to be deprecated. feature-removal-schedule.txt will be
-> updated in one of the upcoming patch series.
-> 
-> Thanks to Tony & Jon for their various suggestions.
-> 
-> [PATCH 03/13] ARM: OMAP2+: gpmc: driver migration helper, is to be
-> reverted once all GPMC peripherals are migrated to use driver
-> interface.
-
-Please let me know your comments on this series.
-
-Regards
-Afzal
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index db2391c..7e03d41 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -189,6 +189,7 @@ int __init mx23_clocks_init(void)
+ 		}
+ 
+ 	clk_register_clkdev(clks[clk32k], NULL, "timrot");
++	clk_register_clkdev(clks[pwm], NULL, "80064000.pwm");
+ 	clk_register_clkdevs(clks[hbus], hbus_lookups, ARRAY_SIZE(hbus_lookups));
+ 	clk_register_clkdevs(clks[xbus], xbus_lookups, ARRAY_SIZE(xbus_lookups));
+ 	clk_register_clkdevs(clks[uart], uart_lookups, ARRAY_SIZE(uart_lookups));
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 7fad6c8..e3f6ea9 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -314,6 +314,7 @@ int __init mx28_clocks_init(void)
+ 
+ 	clk_register_clkdev(clks[clk32k], NULL, "timrot");
+ 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
++	clk_register_clkdev(clks[pwm], NULL, "80064000.pwm");
+ 	clk_register_clkdevs(clks[hbus], hbus_lookups, ARRAY_SIZE(hbus_lookups));
+ 	clk_register_clkdevs(clks[xbus], xbus_lookups, ARRAY_SIZE(xbus_lookups));
+ 	clk_register_clkdevs(clks[uart], uart_lookups, ARRAY_SIZE(uart_lookups));
+-- 
+1.7.5.4
