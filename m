@@ -1,45 +1,34 @@
 From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 26 Jun 2012 08:29:33 +0000
-Subject: [PATCH v4 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <4FE88DDE.60601@ti.com>
+Date: Tue, 26 Jun 2012 08:35:10 +0000
+Subject: [PATCH v4 1/3] ARM: OMAP2+: nand: unify init functions
+In-Reply-To: <4FE883F5.6040806@ti.com>
 References: <cover.1340354985.git.afzal@ti.com>
- <7a14edf83068261d8c07217873d14fe7f73975bc.1340354986.git.afzal@ti.com>
- <4FE88DDE.60601@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99F002@DBDE01.ent.ti.com>
+ <cdcf19df902fbfa0632371f94309f21544cdad21.1340354986.git.afzal@ti.com>
+ <4FE883F5.6040806@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99F02D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jon,
 
-On Mon, Jun 25, 2012 at 21:42:14, Hunter, Jon wrote:
-> On 06/22/2012 04:01 AM, Afzal Mohammed wrote:
+On Mon, Jun 25, 2012 at 20:59:57, Hunter, Jon wrote:
+> On 06/22/2012 04:00 AM, Afzal Mohammed wrote:
+> > Helper function for updating nand platform data has been
+> > added the capability to take timing structure arguement.
+> > Usage of omap_nand_flash_init() has been replaced by modifed
+> > one, omap_nand_flash_init was doing things similar to
+> > board_nand_init except that NAND CS# were being acquired
+> > based on bootloader setting. As CS# is hardwired for a given
+> > board, acquiring gpmc CS# has been removed, and updated with
+> > the value on board.
+> > 
+> > NAND CS# used in beagle board was found to be CS0.
+> > Thomas Weber <thomas.weber.linux@googlemail.com> reported
+> > that value of devkit8000 to be CS0. Overo board was found
+> > to be using CS0 based on u-boot, while google grep says
+> > omap3touchbook too has CS0.
 
-> > +static int hf, vhf, sync_read, sync_write, latency;
-> 
-> I am wondering if we can remove hf, vhf, sync_read/write variables
-> completely. We already have flags from sync_read/write and so we could
-> just use the cfg->flags variable and remove sync_read/write variables.
+> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-For default frequency, sync_write can get turned off, so flag may or
-may not be same as sync_write
-
-> 
-> At the same time, we could create flags for ONENAND_FREQ_HF and
-> ONENAND_FREQ_VHF or something like that. It could be nice to store the
-> latency in onenand_data too. In other words, keep all the configuration
-> in one place.
-
-I have a feeling as though platform data fields should not be altered once
-platform device is registered (as platform data being specific to the
-board, thinking further, should they be const?, except for a case
-where it is created by a common helper function for multiple boards with
-varying capabilities of peripheral).
-
-Other than sync_read, all others like hf, vhf, latency, sync_write are
-updated during driver callback, so if we are going to put these in
-platform private data fields, platform private data fields has to be
-updated after platform device is registered.
-
-Regards
+Thanks,
 Afzal
