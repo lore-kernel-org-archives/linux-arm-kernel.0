@@ -1,138 +1,32 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 26 Jun 2012 14:05:10 +0800
-Subject: [PATCH v11 2/4] MTD: at91: add dt parameters for Atmel PMECC
-In-Reply-To: <CACQ1gAgg4VREYPuZU1J+CkSRcypXdtqGvU-DiyJ=bTjb-3fRKQ@mail.gmail.com>
-References: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
- <1340618866-28776-3-git-send-email-josh.wu@atmel.com>
- <CACQ1gAgg4VREYPuZU1J+CkSRcypXdtqGvU-DiyJ=bTjb-3fRKQ@mail.gmail.com>
-Message-ID: <4FE95116.7080503@atmel.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 26 Jun 2012 11:38:07 +0530
+Subject: [PATCHv10 1/7] I2C: OMAP: I2C register restore only if context
+ is lost
+In-Reply-To: <20120625123000.GB30463@arwen.pp.htv.fi>
+References: <1340622702-21622-1-git-send-email-shubhrajyoti@ti.com>
+ <1340622702-21622-2-git-send-email-shubhrajyoti@ti.com>
+ <20120625123000.GB30463@arwen.pp.htv.fi>
+Message-ID: <4FE951C7.8070907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2012 6:35 PM, Richard Genoud wrote:
-> 2012/6/25 Josh Wu <josh.wu@atmel.com>:
->> Add DT support for PMECC parameters.
->>
->> Signed-off-by: Hong Xu <hong.xu@atmel.com>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   .../devicetree/bindings/mtd/atmel-nand.txt         |    9 ++++
->>   drivers/mtd/nand/atmel_nand.c                      |   52 +++++++++++++++++++-
->>   2 files changed, 60 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
->> index a200695..ed6927a 100644
->> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
->> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
->> @@ -16,6 +16,15 @@ Optional properties:
->>   - nand-ecc-mode : String, operation mode of the NAND ecc mode, soft by default.
->>    Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
->>    "soft_bch".
->> +- atmel,has-pmecc : boolean to enable Programmable Multibit ECC hardware.
->> +  Only supported by at91sam9x5 or later sam9 product.
->> +- atmel,pmecc-cap : error correct capability for Programmable Multibit ECC
->> +  Controller. Supported values are: 2, 4, 8, 12, 24.
->> +- atmel,pmecc-sector-size : sector size for ECC computation. Supported values
->> +  are: 512, 1024.
->> +- atmel,pmecc-lookup-table-offset : includes two offsets of lookup table in ROM
->> +  for different sector size. First one is for sector size 512, the next is for
->> +  sector size 1024.
->>   - nand-bus-width : 8 or 16 bus width if not present 8
->>   - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
->>
-> Maybe you should update the reg parameter documentation with the
-> needed resources.
+On Monday 25 June 2012 06:00 PM, Felipe Balbi wrote:
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> how will this ever work with DT ? 
+What you say makes sense however that is what currently
+most of the omap drivers do.
+
+Will check on this.
+> I say we get rid of the OMAP-specific
+> API and build this "context lost" status directly on dev_pm_info and
+> have something like pm_runtime_lost_context() or something with pm QoS
+> tell you if a device has lost its context.
 >
-
-I will update the reg parameter documentation and add one example for 
-PMECC setting. thanks.
-
->> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
->> index 7a41a04..b97ad9f 100644
->> --- a/drivers/mtd/nand/atmel_nand.c
->> +++ b/drivers/mtd/nand/atmel_nand.c
->> @@ -93,6 +93,11 @@ struct atmel_nand_host {
->>
->>         struct completion       comp;
->>         struct dma_chan         *dma_chan;
->> +
->> +       bool                    has_pmecc;
->> +       u8                      pmecc_corr_cap;
->> +       u16                     pmecc_sector_size;
->> +       u32                     pmecc_lookup_table_offset;
->>   };
->>
->>   static int cpu_has_dma(void)
->> @@ -481,7 +486,8 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
->>   static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
->>                                          struct device_node *np)
->>   {
->> -       u32 val;
->> +       u32 val, table_offset;
->> +       u32 offset[2];
->>         int ecc_mode;
->>         struct atmel_nand_data *board = &host->board;
->>         enum of_gpio_flags flags;
->> @@ -517,6 +523,50 @@ static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
->>         board->enable_pin = of_get_gpio(np, 1);
->>         board->det_pin = of_get_gpio(np, 2);
->>
->> +       host->has_pmecc = of_property_read_bool(np, "atmel,has-pmecc");
->> +
->> +       if (!(board->ecc_mode == NAND_ECC_HW) || !host->has_pmecc)
->> +               return 0;       /* Not using PMECC */
->> +
->> +       /* use PMECC, get correction capability, sector size and lookup
->> +        * table offset.
->> +        */
->> +       if (of_property_read_u32(np, "atmel,pmecc-cap", &val) != 0) {
->> +               dev_err(host->dev, "Cannot decide PMECC Capability\n");
->> +               return -EINVAL;
->> +       } else if ((val != 2) && (val != 4) && (val != 8) && (val != 12) &&
->> +           (val != 24)) {
->> +               dev_err(host->dev,
->> +                       "Unsupported PMECC correction capability: %d; should be 2, 4, 8, 12 or 24\n",
->> +                       val);
->> +               return -EINVAL;
->> +       }
->> +       host->pmecc_corr_cap = (u8)val;
->> +
->> +       if (of_property_read_u32(np, "atmel,pmecc-sector-size", &val) != 0) {
->> +               dev_err(host->dev, "Cannot decide PMECC Sector Size\n");
->> +               return -EINVAL;
->> +       } else if ((val != 512) && (val != 1024)) {
->> +               dev_err(host->dev,
->> +                       "Unsupported PMECC sector size: %d; should be 512 or 1024 bytes\n",
->> +                       val);
->> +               return -EINVAL;
->> +       }
->> +       host->pmecc_sector_size = (u16)val;
->> +
->> +       if (of_property_read_u32_array(np, "atmel,pmecc-lookup-table-offset",
->> +                       offset, 2) != 0) {
->> +               dev_err(host->dev, "Cannot get PMECC lookup table offset\n");
->> +               return -EINVAL;
->> +       }
->> +       table_offset = host->pmecc_sector_size == 512 ? offset[0] : offset[1];
->> +
->> +       if (!table_offset) {
->> +               dev_err(host->dev, "Invalid PMECC lookup table offset\n");
->> +               return -EINVAL;
->> +       }
->> +       host->pmecc_lookup_table_offset = table_offset;
->> +
->>         return 0;
->>   }
->>   #else
->> --
->> 1.7.9.5
->>
->>
->> ______________________________________________________
->> Linux MTD discussion mailing list
->> http://lists.infradead.org/mailman/listinfo/linux-mtd/
-> Richard.
+> Also, your commit log doesn't really state any problems you might have
+> reached before, or any improvements wrt latency coming out of suspend
+> and so on.
 >
-
-Best Regards,
-Josh Wu
+> IMHO, drivers need a generic way to differentiate if they're resuming
+> from OFF or RET, otherwise we will end up with a bunch of OMAP-specific
+> hackery on all drivers
