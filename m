@@ -1,56 +1,64 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Jun 2012 09:39:07 -0500
+Date: Tue, 26 Jun 2012 09:56:40 -0500
 Subject: [PATCH v4 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
  migration
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99F002@DBDE01.ent.ti.com>
+In-Reply-To: <4FE9C98B.2020003@ti.com>
 References: <cover.1340354985.git.afzal@ti.com>
  <7a14edf83068261d8c07217873d14fe7f73975bc.1340354986.git.afzal@ti.com>
  <4FE88DDE.60601@ti.com>
  <C8443D0743D26F4388EA172BF4E2A7A93E99F002@DBDE01.ent.ti.com>
-Message-ID: <4FE9C98B.2020003@ti.com>
+ <4FE9C98B.2020003@ti.com>
+Message-ID: <4FE9CDA8.40208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Afzal,
 
-On 06/26/2012 03:29 AM, Mohammed, Afzal wrote:
-> Hi Jon,
+On 06/26/2012 09:39 AM, Jon Hunter wrote:
+> Hi Afzal,
 > 
-> On Mon, Jun 25, 2012 at 21:42:14, Hunter, Jon wrote:
->> On 06/22/2012 04:01 AM, Afzal Mohammed wrote:
-> 
->>> +static int hf, vhf, sync_read, sync_write, latency;
+> On 06/26/2012 03:29 AM, Mohammed, Afzal wrote:
+>> Hi Jon,
 >>
->> I am wondering if we can remove hf, vhf, sync_read/write variables
->> completely. We already have flags from sync_read/write and so we could
->> just use the cfg->flags variable and remove sync_read/write variables.
-> 
-> For default frequency, sync_write can get turned off, so flag may or
-> may not be same as sync_write
-
-Good point. I missed that.
-
+>> On Mon, Jun 25, 2012 at 21:42:14, Hunter, Jon wrote:
+>>> On 06/22/2012 04:01 AM, Afzal Mohammed wrote:
 >>
->> At the same time, we could create flags for ONENAND_FREQ_HF and
->> ONENAND_FREQ_VHF or something like that. It could be nice to store the
->> latency in onenand_data too. In other words, keep all the configuration
->> in one place.
+>>>> +static int hf, vhf, sync_read, sync_write, latency;
+>>>
+>>> I am wondering if we can remove hf, vhf, sync_read/write variables
+>>> completely. We already have flags from sync_read/write and so we could
+>>> just use the cfg->flags variable and remove sync_read/write variables.
+>>
+>> For default frequency, sync_write can get turned off, so flag may or
+>> may not be same as sync_write
 > 
-> I have a feeling as though platform data fields should not be altered once
-> platform device is registered (as platform data being specific to the
-> board, thinking further, should they be const?, except for a case
-> where it is created by a common helper function for multiple boards with
-> varying capabilities of peripheral).
+> Good point. I missed that.
 > 
-> Other than sync_read, all others like hf, vhf, latency, sync_write are
-> updated during driver callback, so if we are going to put these in
-> platform private data fields, platform private data fields has to be
-> updated after platform device is registered.
+>>>
+>>> At the same time, we could create flags for ONENAND_FREQ_HF and
+>>> ONENAND_FREQ_VHF or something like that. It could be nice to store the
+>>> latency in onenand_data too. In other words, keep all the configuration
+>>> in one place.
+>>
+>> I have a feeling as though platform data fields should not be altered once
+>> platform device is registered (as platform data being specific to the
+>> board, thinking further, should they be const?, except for a case
+>> where it is created by a common helper function for multiple boards with
+>> varying capabilities of peripheral).
+>>
+>> Other than sync_read, all others like hf, vhf, latency, sync_write are
+>> updated during driver callback, so if we are going to put these in
+>> platform private data fields, platform private data fields has to be
+>> updated after platform device is registered.
+> 
+> May be this is splitting hairs then but I wonder if we should just have
+> a single global variable called onenand_flags for storing the current
+> state of sync_read, sync_write, vhf and hf. At least this would be only
+> one global instead of 4. Not a big deal.
 
-May be this is splitting hairs then but I wonder if we should just have
-a single global variable called onenand_flags for storing the current
-state of sync_read, sync_write, vhf and hf. At least this would be only
-one global instead of 4. Not a big deal.
+Apart from the above minor nit-pick, please add ...
+
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
 Cheers
 Jon
