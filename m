@@ -1,52 +1,34 @@
-From: frankyl@broadcom.com (Franky Lin)
-Date: Tue, 26 Jun 2012 11:20:39 -0700
-Subject: Panda ES board hang when using GPIO as interrupt
-In-Reply-To: <CAC83ZvL2ozQD1DYmtKeFa1PB1pZ1JmBUKFWmDWnbJOCDL3sKNg@mail.gmail.com>
-References: <4FE8CF77.5080400@broadcom.com>
- <CAC83ZvL2ozQD1DYmtKeFa1PB1pZ1JmBUKFWmDWnbJOCDL3sKNg@mail.gmail.com>
-Message-ID: <4FE9FD77.7050807@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Jun 2012 19:34:42 +0100
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+In-Reply-To: <1340642293.1562.59.camel@vkoul-udesk3>
+References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+ <1340642293.1562.59.camel@vkoul-udesk3>
+Message-ID: <20120626183442.GA27261@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 12:21 AM, DebBarma, Tarun Kanti wrote:
-> On Tue, Jun 26, 2012 at 2:22 AM, Franky Lin <frankyl@broadcom.com> wrote:
->> Hi Kevin, Tarun,
->>
->> We are using the expansion connector A on Panda board to mount a SDIO WiFi
->> dongle on MMC2 with a level triggered interrupt signal connected to GPIO
->> 138. It's been working fine until 3.5 rc1. The board hang randomly within 5
->> mins during a network traffic test. After bisecting we found the culprit is
->> "[PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()" [1].
->>
->> I noticed Kevin raised some similar cases on other platforms and also
->> provided two patches in the patch mail thread. But unfortunately those two
->> patches doesn't help in our case. I tested the driver with 3.5-rc3 mainline
->> kernel and the issue is still there. I can only "fix" the hang by either
->> reverting the commit or disabling CONFIG_PM_RUNTIME. Also, the hang only
->> happens on Panda ES board. Old Panda with 4430 works good.
->>
->> Any thoughts and suggestions?
-> I just had a quick look at the code. Can you please check if the
-> attached patch solves
-> the issue? I just boot tested on Panda and Blaze.
-> --
-> Tarun
->
+On Mon, Jun 25, 2012 at 10:08:13PM +0530, Vinod Koul wrote:
+> Hi Russell,
+> 
+> What is the status of the virtual dma and the series you have posted
+> previously. Is it ready for merge?
+> 
+> I would be away for 10days starting coming Thursday. So please let me
+> know
 
-Thanks for the prompt reply.
+I have no idea.
 
-Booting is fine even without the patch and revert. The wifi dongle 
-generates interrupt whenever there is data packet available for host to 
-read. So during a traffic test a significant numbers of interrupt will 
-be triggered through the GPIO. So I assume it has something to do with 
-the interrupt GPIO.
+I've just rebased all the DMA stuff onto -rc4, because -rc3 is just a
+whole load of problems for OMAP, and I'm still struggling with the
+stupid OMAP audio crap.  And what with people who know how the SDP4430
+works and/or OMAP audio works going on holiday too, I don't see much
+progress being made until August time.
 
-With the patch, the kernel still crashes. But the symptom is slightly 
-different. Now it has a panic log every time. See attachment.
+I've found that the only way I can get any audio out of the SDP4430
+platform is if I have something connected to the 3.5mm jack before
+powering up the board, and keep it connected.  So provided I do that
+I can test the OMAP audio stuff.
 
-Regards,
-Franky
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: panic.log
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/aa313b28/attachment.ksh>
+Of course, finding out crap like that takes time away from my _one_
+day a _week_ that I'm working on OMAP stuff...
