@@ -1,76 +1,120 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 26 Jun 2012 11:04:18 +0200
-Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
-In-Reply-To: <1338084709-12043-1-git-send-email-marex@denx.de>
-References: <1338084709-12043-1-git-send-email-marex@denx.de>
-Message-ID: <4FE97B12.8040306@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 17:05:44 +0800
+Subject: [PATCH] ARM: mxs: use auxdata to attach mxsfb_platform_data
+Message-ID: <1340701544-8667-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2012 04:11 AM, Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Detlev Zundel <dzu@denx.de>
-> CC: Dong Aisheng <b29396@freescale.com>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> CC: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Wolfgang Denk <wd@denx.de>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |    2 ++
->  arch/arm/mach-mxs/Kconfig    |    1 +
->  2 files changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 119f183..13c6084 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -278,12 +278,14 @@
->  			};
->  
->  			can0: can at 80032000 {
-> +				compatible = "fsl,p1010-flexcan";
->  				reg = <0x80032000 2000>;
->  				interrupts = <8>;
->  				status = "disabled";
->  			};
->  
->  			can1: can at 80034000 {
-> +				compatible = "fsl,p1010-flexcan";
->  				reg = <0x80034000 2000>;
->  				interrupts = <9>;
->  				status = "disabled";
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 91cf062..0406f37 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -18,6 +18,7 @@ config SOC_IMX28
->  	select CPU_ARM926T
->  	select HAVE_PWM
->  	select PINCTRL_IMX28
-> +	select MXS_HAVE_PLATFORM_FLEXCAN
+Use auxdata to attach mxsfb_platform_data for imx23-evk and imx28-evk.
+We take this as a temporary solution for removing those board files,
+and it should be updated to use common bindings for struct fb_videomode
+when it becomes available.
 
-This compiles in the code to create a flexcan platform device, which
-should not be needed in the DT case. You save some bytes if you use:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |   62 +++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 61 insertions(+), 1 deletions(-)
 
-+       select HAVE_CAN_FLEXCAN if NET && CAN
-
->  
->  comment "MXS platforms:"
->  
-
-Marc
-
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index d25abec..4e156d8 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -16,12 +16,57 @@
+ #include <linux/init.h>
+ #include <linux/init.h>
+ #include <linux/irqdomain.h>
++#include <linux/mxsfb.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <mach/common.h>
+ 
++static struct fb_videomode mx23evk_video_modes[] = {
++	{
++		.name		= "Samsung-LMS430HF02",
++		.refresh	= 60,
++		.xres		= 480,
++		.yres		= 272,
++		.pixclock	= 108096, /* picosecond (9.2 MHz) */
++		.left_margin	= 15,
++		.right_margin	= 8,
++		.upper_margin	= 12,
++		.lower_margin	= 4,
++		.hsync_len	= 1,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
++				  FB_SYNC_DOTCLK_FAILING_ACT,
++	},
++};
++
++static struct fb_videomode mx28evk_video_modes[] = {
++	{
++		.name		= "Seiko-43WVF1G",
++		.refresh	= 60,
++		.xres		= 800,
++		.yres		= 480,
++		.pixclock	= 29851, /* picosecond (33.5 MHz) */
++		.left_margin	= 89,
++		.right_margin	= 164,
++		.upper_margin	= 23,
++		.lower_margin	= 10,
++		.hsync_len	= 10,
++		.vsync_len	= 10,
++		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
++				  FB_SYNC_DOTCLK_FAILING_ACT,
++	},
++};
++
++static struct mxsfb_platform_data mxsfb_pdata __initdata;
++
++static struct of_dev_auxdata mxs_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("fsl,imx23-lcdif", 0x80030000, NULL, &mxsfb_pdata),
++	OF_DEV_AUXDATA("fsl,imx28-lcdif", 0x80030000, NULL, &mxsfb_pdata),
++	{ /* sentinel */ }
++};
++
+ static int __init mxs_icoll_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+@@ -133,6 +178,14 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 	}
+ }
+ 
++static void __init imx23_evk_init(void)
++{
++	mxsfb_pdata.mode_list = mx23evk_video_modes;
++	mxsfb_pdata.mode_count = ARRAY_SIZE(mx23evk_video_modes);
++	mxsfb_pdata.default_bpp = 32;
++	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
++}
++
+ static void __init imx28_evk_init(void)
+ {
+ 	struct clk *clk;
+@@ -143,15 +196,22 @@ static void __init imx28_evk_init(void)
+ 		clk_prepare_enable(clk);
+ 
+ 	update_fec_mac_prop(OUI_FSL);
++
++	mxsfb_pdata.mode_list = mx28evk_video_modes;
++	mxsfb_pdata.mode_count = ARRAY_SIZE(mx28evk_video_modes);
++	mxsfb_pdata.default_bpp = 32;
++	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
+ 
+ static void __init mxs_machine_init(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+ 		imx28_evk_init();
++	else if (of_machine_is_compatible("fsl,imx23-evk"))
++		imx23_evk_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+-				NULL, NULL);
++			     mxs_auxdata_lookup, NULL);
+ }
+ 
+ static const char *imx23_dt_compat[] __initdata = {
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/fc2a62f9/attachment.sig>
+1.7.5.4
