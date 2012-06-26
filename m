@@ -1,53 +1,249 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 Jun 2012 12:05:53 +0200
-Subject: [PATCH v4 3/9] arm: mach-mvebu: add source files
-In-Reply-To: <20120626084715.GC25625@lunn.ch>
-References: <1340699313-29331-1-git-send-email-gregory.clement@free-electrons.com>
- <1340699313-29331-4-git-send-email-gregory.clement@free-electrons.com>
- <20120626084715.GC25625@lunn.ch>
-Message-ID: <4FE98981.40903@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Jun 2012 03:17:12 -0700
+Subject: [PATCH 5/7] ARM: OMAP2: Use hwmod to initialize mmc for 2420
+In-Reply-To: <alpine.DEB.2.00.1205091426230.28088@utopia.booyaka.com>
+References: <20120424000607.17783.81686.stgit@muffinssi.local>
+ <20120424000835.17783.50945.stgit@muffinssi.local>
+ <alpine.DEB.2.00.1205081844530.28088@utopia.booyaka.com>
+ <alpine.DEB.2.00.1205091426230.28088@utopia.booyaka.com>
+Message-ID: <20120626101711.GA31393@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 10:47 AM, Andrew Lunn wrote:>> +#define ARMADA_370_XP_RESET_OFFSET		  0x60
->> +#define OTHER_MVEBU_RESET_OFFSET		 0x108
->> +#define MVEBU_RSTOUTN_MASK_OFFSET		   0x0
->> +#define   OTHER_MVEBU_RSTOUTN_MASK_RESET_OUT_EN	   0x4
->> +#define   ARMADA_370_XP_RSTOUTN_MASK_RESET_OUT_EN  0x1
->> +#define MVEBU_SYSTEM_SOFT_RESET_OFFSET		   0x4
->> +#define   MVEBU_SYSTEM_SOFT_RESET		   0x1
->> +
->> +#define OTHER_MVEBU_VARIANT	1
->> +#define ARMADA_370_XP_VARIANT	2
->
-> Hi Gregory
->
+* Paul Walmsley <paul@pwsan.com> [120509 13:31]:
+> Hi Tony,
+> 
+> On Tue, 8 May 2012, Paul Walmsley wrote:
+> 
+> > On Mon, 23 Apr 2012, Tony Lindgren wrote:
+> > 
+> > > This allows us to pass dma request lines in platform data to
+> > > MMC driver the same way as we already do for omap2430 and later.
+> > > 
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > This might save you some time, I updated this patch to move the device 
+> > creation code to arch/arm/mach-omap2/msdi.c and to change the hwmod name 
+> > to 'msdi1' to conform with the new data.  Updated patch below.
+> 
+> One other thing, the version that was sent yesterday was the 
+> second-to-last revision.  Also needed are the following includes in 
+> arch/arm/mach-omap2/msdi.c:
+> 
+> #include <linux/err.h>
+> 
+> #include "control.h"
 
-Hi Andrew,
+Looks like I had this forgotten in testing-misc.. It needed an update
+to add #if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
+for the omap242x_init_mmc() to avoid introducing a new build warning
+when MMC_OMAP is not selected at all.
 
-> Rather than OTHER, could you call this ORION?
->
+Also looking at the msdi.c file, that too should have the reset function
+in drivers/mmc/msdi.h as discussed earlier for other driver resets.
 
-I thought that one purpose of the next mach-mvebu directory, was to
-remove the references to orion.
+After that's fixed, then we only need to build in msdi.o when we have
 
-However, I agree that OTHER is not a really good name. We could
-consider indeed 'orion' as a legacy name for this subset of' mvebu'.
+obj-msdi-$(CONFIG_MMC_OMAP)		:= msdi.o
+obj-y					+= $(omap-msdi-m) $(omap-msdi-y)
 
-I don't have a strong opinion about it.
+But that's a separate patch, so I've applied the following version
+of $Subject patch into devel-driver branch.
 
-> I think it will then work on Orion5x, dove, kirkwood and mv78xx0.
->
-> I will try to test this on Orion5x and Kirkwood.
->
+Tony
 
-Thank you!
 
->   Thanks
-> 	Andrew
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 26 Jun 2012 03:14:20 -0700
+Subject: [PATCH] ARM: OMAP2: Use hwmod to initialize mmc for 2420
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This allows us to pass dma request lines in platform data to
+MMC driver the same way as we already do for omap2430 and later.
+
+Also note that we need to only build this code if MMC_OMAP
+is selected, so change Makefile accordingly and place it near
+the MMC_OMAP_HS in the Makefile.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 8cab358..91ef6699 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -27,7 +27,6 @@
+ 
+ #include "iomap.h"
+ #include <plat/board.h>
+-#include <plat/mmc.h>
+ #include <plat/dma.h>
+ #include <plat/omap_hwmod.h>
+ #include <plat/omap_device.h>
+@@ -603,75 +602,6 @@ static inline void omap_init_aes(void) { }
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
+-
+-static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
+-							*mmc_controller)
+-{
+-	if ((mmc_controller->slots[0].switch_pin > 0) && \
+-		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
+-					OMAP_PIN_INPUT_PULLUP);
+-	if ((mmc_controller->slots[0].gpio_wp > 0) && \
+-		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+-					OMAP_PIN_INPUT_PULLUP);
+-
+-	omap_mux_init_signal("sdmmc_cmd", 0);
+-	omap_mux_init_signal("sdmmc_clki", 0);
+-	omap_mux_init_signal("sdmmc_clko", 0);
+-	omap_mux_init_signal("sdmmc_dat0", 0);
+-	omap_mux_init_signal("sdmmc_dat_dir0", 0);
+-	omap_mux_init_signal("sdmmc_cmd_dir", 0);
+-	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
+-		omap_mux_init_signal("sdmmc_dat1", 0);
+-		omap_mux_init_signal("sdmmc_dat2", 0);
+-		omap_mux_init_signal("sdmmc_dat3", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir1", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir2", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir3", 0);
+-	}
+-
+-	/*
+-	 * Use internal loop-back in MMC/SDIO Module Input Clock
+-	 * selection
+-	 */
+-	if (mmc_controller->slots[0].internal_clock) {
+-		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
+-		v |= (1 << 24);
+-		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
+-	}
+-}
+-
+-void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+-{
+-	struct platform_device *pdev;
+-	struct omap_hwmod *oh;
+-	int id = 0;
+-	char *oh_name = "msdi1";
+-	char *dev_name = "mmci-omap";
+-
+-	if (!mmc_data[0]) {
+-		pr_err("%s fails: Incomplete platform data\n", __func__);
+-		return;
+-	}
+-
+-	omap242x_mmc_mux(mmc_data[0]);
+-
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (!oh) {
+-		pr_err("Could not look up %s\n", oh_name);
+-		return;
+-	}
+-	pdev = omap_device_build(dev_name, id, oh, mmc_data[0],
+-				 sizeof(struct omap_mmc_platform_data), NULL, 0, 0);
+-	if (IS_ERR(pdev))
+-		WARN(1, "Can'd build omap_device for %s:%s.\n",
+-					dev_name, oh->name);
+-}
+-
+-#endif
+-
+ #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
+ 	defined(CONFIG_VIDEO_OMAP2_VOUT_MODULE)
+ #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
+index ef2a692..fb5bc6c 100644
+--- a/arch/arm/mach-omap2/msdi.c
++++ b/arch/arm/mach-omap2/msdi.c
+@@ -22,11 +22,15 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/err.h>
+ 
+ #include <plat/omap_hwmod.h>
++#include <plat/omap_device.h>
+ #include <plat/mmc.h>
+ 
+ #include "common.h"
++#include "control.h"
++#include "mux.h"
+ 
+ /*
+  * MSDI_CON_OFFSET: offset in bytes of the MSDI IP block's CON register
+@@ -86,3 +90,72 @@ int omap_msdi_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
++
++#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
++
++static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
++				    *mmc_controller)
++{
++	if ((mmc_controller->slots[0].switch_pin > 0) && \
++		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
++		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
++					OMAP_PIN_INPUT_PULLUP);
++	if ((mmc_controller->slots[0].gpio_wp > 0) && \
++		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
++		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
++					OMAP_PIN_INPUT_PULLUP);
++
++	omap_mux_init_signal("sdmmc_cmd", 0);
++	omap_mux_init_signal("sdmmc_clki", 0);
++	omap_mux_init_signal("sdmmc_clko", 0);
++	omap_mux_init_signal("sdmmc_dat0", 0);
++	omap_mux_init_signal("sdmmc_dat_dir0", 0);
++	omap_mux_init_signal("sdmmc_cmd_dir", 0);
++	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
++		omap_mux_init_signal("sdmmc_dat1", 0);
++		omap_mux_init_signal("sdmmc_dat2", 0);
++		omap_mux_init_signal("sdmmc_dat3", 0);
++		omap_mux_init_signal("sdmmc_dat_dir1", 0);
++		omap_mux_init_signal("sdmmc_dat_dir2", 0);
++		omap_mux_init_signal("sdmmc_dat_dir3", 0);
++	}
++
++	/*
++	 * Use internal loop-back in MMC/SDIO Module Input Clock
++	 * selection
++	 */
++	if (mmc_controller->slots[0].internal_clock) {
++		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
++		v |= (1 << 24);
++		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
++	}
++}
++
++void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
++{
++	struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	int id = 0;
++	char *oh_name = "msdi1";
++	char *dev_name = "mmci-omap";
++
++	if (!mmc_data[0]) {
++		pr_err("%s fails: Incomplete platform data\n", __func__);
++		return;
++	}
++
++	omap242x_mmc_mux(mmc_data[0]);
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh) {
++		pr_err("Could not look up %s\n", oh_name);
++		return;
++	}
++	pdev = omap_device_build(dev_name, id, oh, mmc_data[0],
++				 sizeof(struct omap_mmc_platform_data), NULL, 0, 0);
++	if (IS_ERR(pdev))
++		WARN(1, "Can'd build omap_device for %s:%s.\n",
++					dev_name, oh->name);
++}
++
++#endif
