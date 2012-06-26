@@ -1,20 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Jun 2012 10:37:56 +0800
-Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
-In-Reply-To: <CAOMZO5BEVrPrgZ7E5xUE-_3zXb317mzqoZXaxXw1SNACuRzOPw@mail.gmail.com>
-References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BEVrPrgZ7E5xUE-_3zXb317mzqoZXaxXw1SNACuRzOPw@mail.gmail.com>
-Message-ID: <20120626023754.GJ2342@S2101-09.ap.freescale.net>
+From: pgaikwad@nvidia.com (Prashant G)
+Date: Tue, 26 Jun 2012 08:15:09 +0530
+Subject: [PATCH] ARM: tegra: Remove second instance of uart clk
+In-Reply-To: <4FE8AE9C.5000109@wwwdotorg.org>
+References: <1340610908-2729-1-git-send-email-pgaikwad@nvidia.com>
+ <4FE8AE9C.5000109@wwwdotorg.org>
+Message-ID: <4FE92235.20908@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 01:18:22PM -0300, Fabio Estevam wrote:
-> Any suggestions as to how to make the driver work on mx23?
-> 
-I won't be able to test it on my imx23-evk board, because the board
-design is somehow odd on vbus supply, which probably requires a board
-rework.
-
--- 
-Regards,
-Shawn
+On Tuesday 26 June 2012 12:01 AM, Stephen Warren wrote:
+> On 06/25/2012 01:55 AM, Prashant Gaikwad wrote:
+>> In Tegra30 clock file two clk objects were created for same UART clock.
+>> Remove the duplicates and add clock aliases instead.
+>>
+>> Update the Tegra20 clock file to make the names consistent.
+> Thanks, applied to Tegra's for-3.6/common-clk since I assume your common
+> clock work will depend on this.
+Thanks Stephen!!
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
