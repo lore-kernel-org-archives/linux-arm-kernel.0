@@ -1,49 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Jun 2012 19:33:24 +0800
-Subject: [PATCH 1/2] ARM:MX28: Add additionnal muxing options to iMX28 DTSI
-In-Reply-To: <20120626110202.06807982@skate>
-References: <1340356494-24664-1-git-send-email-maxime.ripard@free-electrons.com>
- <1340356494-24664-2-git-send-email-maxime.ripard@free-electrons.com>
- <20120625155047.GD2342@S2101-09.ap.freescale.net>
- <20120626110202.06807982@skate>
-Message-ID: <20120626113322.GD8858@S2101-09.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 26 Jun 2012 17:12:03 +0530
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FE8AB37.7030907@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+Message-ID: <4FE9A00B.6010908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 11:02:02AM +0200, Thomas Petazzoni wrote:
-> Hello Shawn,
-> 
-> Le Mon, 25 Jun 2012 23:50:49 +0800,
-> Shawn Guo <shawn.guo@linaro.org> a ?crit :
-> 
-> > then, pinctrl system will be able to report there are 2 pin groups for
-> > function "duart" in debugfs.
-> 
-> Ah nice, this explains why the mxs pinctrl driver creates a separate
-> group for each pinctrl DT subnode, but only creates a new function when
-> the name changes.
-> 
-> However, how would the mxs pinctrl driver handle the following case:
-> 
-> 	pinctrl {
-> 		duart_pins_a: duart at 0 {
-> 			...
-> 		}
-> 		something_pins: something at 0 {
-> 			...
-> 		}
-> 		duart_pins_b: duart at 1 {
-> 			...
-> 		}
-> 	}
-> 
-> Reading the driver code, I have the feeling that the logic that creates
-> the functions will only work if the different groups for a given
-> function are given as consecutive subnodes in the DT. Is this correct?
-> 
-That's correct.  We really need to put the pin groups for the same
-function together and have then sorted in "reg" value.
+Hi Daniel,
 
--- 
-Regards,
-Shawn
+On 6/25/2012 11:47 PM, Daniel Mack wrote:
+> On 21.06.2012 15:50, Daniel Mack wrote:
+>> On 18.06.2012 10:15, Hiremath, Vaibhav wrote:
+>>> On Mon, Jun 11, 2012 at 19:21:21, Jason Kridner wrote:
+>>>> From: Daniel Mack <zonque@gmail.com>
+>>>>> Hey,
+>>>>>
+>>>>> can anybody give me a quick wrap-up about the current state of AM33xx
+>>>>> based SoCs in mainline? What are the next steps to get things merged?
+>>>>
+>>>> There is a wiki page [1] that is intended to provide a summary, but I'm
+>>>> confident it is not up-to-date.  
+>>>
+>>> Page updated now...
+>>>
+>>> http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status#AM335x_Linux_Status
+>>
+>> Great, thanks. So if things get upstreamed, which is the repo/branch
+>> they appear in? In other words: where is the code people should write
+>> patches against? I couldn't find an answer to that yet.
+> 
+> ping?
+
+Bug fixes are always accepted against Linus's tree[1].
+
+For features, typically there is a -next branch that each subsystem
+maintainer has against which feature development happens. In case of
+OMAP, feature development happens against master branch of linux-omap
+tree[2]. One way to get to know the -next branches of all subsystem is
+to look at Next/Trees file of linux-next tree[3].
+
+Note that in case of ARM, sub-arch maintainers send the code to arm-soc
+maintainers who in turn have a branch which gets merged to linux-next.
+
+Hope that helps.
+
+Thanks,
+Sekhar
+
+[1] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git
+[2] http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git
+[3] http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git
