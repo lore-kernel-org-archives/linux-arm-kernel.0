@@ -1,29 +1,48 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 26 Jun 2012 14:44:16 -0700
-Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
-In-Reply-To: <4FE82B67.8010601@pengutronix.de>
-References: <1340615374-21352-1-git-send-email-mkl@pengutronix.de>
- <4FE82B67.8010601@pengutronix.de>
-Message-ID: <20120626214416.GB4878@kroah.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 26 Jun 2012 23:51:33 +0200
+Subject: [PATCH v7 01/14] usb: chipidea: remove unneeded NULL check
+In-Reply-To: <1340607391-16380-2-git-send-email-richard.zhao@freescale.com>
+References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
+ <1340607391-16380-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <201206262351.34006.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 11:12:07AM +0200, Marc Kleine-Budde wrote:
-> On 06/25/2012 11:09 AM, Marc Kleine-Budde wrote:
-> > If udc_start() fails the qh_pool dma-pool cannot be closed because
-> > it's still in use. This patch factors out the dma_pool_free() loop
-> > into destroy_eps() and calls it in the error path of udc_start(),
-> > too.
-> > 
-> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > ---
+Dear Richard Zhao,
+
+> From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 > 
-> This patch applies on top of Richard's just published imx-chipindea
-> tree. (https://github.com/riczhao/kernel-imx/commits/topics/usb-driver)
+> As reported by Dan Carpenter, there is a NULL check in udc_start() that
+> follows a dereference of the pointer that's being checked. However, at
+> that point udc pointer shouldn't ever be NULL and if it is, the dereference
+> should cause an oops.
+> 
+> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-As that tree is still changing, is someone going to pick this up and add
-it to that tree?
+This seems correct, please add my:
 
-thanks,
+Acked-by: Marek Vasut <marex@denx.de>
 
-greg k-h
+> ---
+>  drivers/usb/chipidea/udc.c |    3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> index 51f9694..cdb9212 100644
+> --- a/drivers/usb/chipidea/udc.c
+> +++ b/drivers/usb/chipidea/udc.c
+> @@ -1647,9 +1647,6 @@ static int udc_start(struct ci13xxx *udc)
+>  	struct device *dev = udc->dev;
+>  	int retval = 0;
+> 
+> -	if (!udc)
+> -		return -EINVAL;
+> -
+>  	spin_lock_init(&udc->lock);
+> 
+>  	udc->gadget.ops          = &usb_gadget_ops;
+
+Best regards,
+Marek Vasut
