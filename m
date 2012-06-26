@@ -1,61 +1,65 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 26 Jun 2012 13:25:02 +1000
-Subject: linux-next: adding the common clk tree
-In-Reply-To: <20120626015551.GW4402@gmail.com>
-References: <20120626015551.GW4402@gmail.com>
-Message-ID: <20120626132502.7584f6acbfc23bdc3d6a8f8e@canb.auug.org.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 25 Jun 2012 21:18:21 -0700
+Subject: [PATCH] gpio: samsung: add flags specifier to device-tree binding
+Message-ID: <1340684301-16836-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+This adds a flags field to the gpio specifier for Samsung. I didn't
+want to add yet another field in the already quite long specifier, so
+I decided to compress it together with the Pull Up/Down settings instead.
 
-On Mon, 25 Jun 2012 18:55:51 -0700 Mike Turquette <mturquette@ti.com> wrote:
->
-> Would you please add the clk-next branch of the common clock tree to
-> linux-next?
-> 
-> git://git.linaro.org/people/mturquette/linux.git clk-next
-> 
-> Thanks much!
-> 
-> For all of those Cc'd, I just wanted to say that I'm changing the way I
-> manage clk-next.  The clk-next branch now WILL be rebased, and it's only
-> purpose is to make it easy to test things in linux-next.  You can base
-> work on it, but be prepare for breakage and shifting commit ids.
-> 
-> If you don't want breakage and shifting commit ids then you might want
-> to use my clk-fixes branch (stable) and my clk-3.x branch (stable).  As
-> patches go through the linux-next cycle and appear stable I'll migrate
-> them over to clk-3.x which won't ever be rebased.  This is the branch
-> I'll send to Linus.  clk-next is simply comprised of merging clk-fixes,
-> clk-3.x and whatever unstable patches I have laying around.
+This is needed to, for example, have a gpio-keys input that is active low.
 
-Maybe you have misunderstood the point of linux-next (is is an
-integration testing tree, not a development tree)?  I am wondering if, in
-particular, the clk-3.x branch (or something near that) may be more
-appropriate for linux-next inclusion (and maybe the clk-fixes branch in
-my "fixes to the current release" section)?
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ Documentation/devicetree/bindings/gpio/gpio-samsung.txt | 9 +++++----
+ drivers/gpio/gpio-samsung.c                             | 5 ++++-
+ 2 files changed, 9 insertions(+), 5 deletions(-)
 
-This is what I tell everyone:
-
-You will need to ensure that the commits in your tree have been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+index 8f50fe5..c873e80 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+@@ -11,14 +11,15 @@ Required properties:
+      <[phandle of the gpio controller node]
+       [pin number within the gpio controller]
+       [mux function]
+-      [pull up/down]
++      [flags and pull up/down]
+       [drive strength]>
+ 
+   Values for gpio specifier:
+   - Pin number: is a value between 0 to 7.
+-  - Pull Up/Down: 0 - Pull Up/Down Disabled.
+-                  1 - Pull Down Enabled.
+-                  3 - Pull Up Enabled.
++  - Flags and Pull Up/Down: 0 - Pull Up/Down Disabled.
++                            1 - Pull Down Enabled.
++                            3 - Pull Up Enabled.
++          Bit 16 (0x00010000) - Input is active low.
+   - Drive Strength: 0 - 1x,
+                     1 - 3x,
+                     2 - 2x,
+diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+index b6453d0..92f7b2b 100644
+--- a/drivers/gpio/gpio-samsung.c
++++ b/drivers/gpio/gpio-samsung.c
+@@ -2681,11 +2681,14 @@ static int exynos_gpio_xlate(struct gpio_chip *gc,
+ 
+ 	if (s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(gpiospec->args[1])))
+ 		pr_warn("gpio_xlate: failed to set pin function\n");
+-	if (s3c_gpio_setpull(pin, gpiospec->args[2]))
++	if (s3c_gpio_setpull(pin, gpiospec->args[2] & 0xffff))
+ 		pr_warn("gpio_xlate: failed to set pin pull up/down\n");
+ 	if (s5p_gpio_set_drvstr(pin, gpiospec->args[3]))
+ 		pr_warn("gpio_xlate: failed to set pin drive strength\n");
+ 
++	if (flags)
++		*flags = gpiospec->args[2] >> 16;
++
+ 	return gpiospec->args[0];
+ }
+ 
 -- 
-Cheers,
-Stephen Rothwell	sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120626/6d37a3af/attachment.sig>
+1.7.10.1.488.g05fbf7a
