@@ -1,25 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Jun 2012 04:17:46 -0700
-Subject: [RFC PATCH v2 03/11] mfd: omap: control: core system control
- driver
-In-Reply-To: <4FE1DAA2.1000502@dev.rtsoft.ru>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <4FDF11C3.4010701@dev.rtsoft.ru>
- <20120620102224.GZ12766@atomide.com>
- <4FE1DAA2.1000502@dev.rtsoft.ru>
-Message-ID: <20120626111746.GE31393@atomide.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 26 Jun 2012 16:53:21 +0530
+Subject: [PATCHv10 1/7] I2C: OMAP: I2C register restore only if context
+ is lost
+In-Reply-To: <4FE951C7.8070907@ti.com>
+References: <1340622702-21622-1-git-send-email-shubhrajyoti@ti.com>
+ <1340622702-21622-2-git-send-email-shubhrajyoti@ti.com>
+ <20120625123000.GB30463@arwen.pp.htv.fi> <4FE951C7.8070907@ti.com>
+Message-ID: <4FE99BA9.9030107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120620 07:18]:
-> 
-> So,the same API set (omap_control_readl/omap_control_writel) was added to omap-control-core.c.
-> 
-> If omap-control-core.c should only service users from driver/ directory, than I agree - we can remove
-> omap_control_readl/omap_control_writel from omap-control-core.c.
->   But IIUC you are agree to "switch" arch/arm/mach-omap2/id.c from control.c to omap-control-core.c. If arch/arm/mach-omap2/id.c is switched to control.c, then I guess all arch/arm/mach-omap2/*.c should be "switched" to omap-control-core.c as well. But this means that omap-control-core.c should provide omap_control_readl/omap_control_writel API.
+On Tuesday 26 June 2012 11:38 AM, Shubhrajyoti wrote:
+> On Monday 25 June 2012 06:00 PM, Felipe Balbi wrote:
+>>> Cc: Kevin Hilman <khilman@ti.com>
+>>>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> how will this ever work with DT ? 
+> What you say makes sense however that is what currently
+> most of the omap drivers do.
+>
+> Will check on this.
+>> I say we get rid of the OMAP-specific
+>> API and build this "context lost" status directly on dev_pm_info and
+>> have something like pm_runtime_lost_context() or something with pm QoS
+>> tell you if a device has lost its context.
+>>
+>> Also, your commit log doesn't really state any problems you might have
+>> reached before,
+Didnt see any issues while reviewing found that the restore was done always.
+>>  or any improvements wrt latency coming out of suspend
+>> and so on.
+I am only restoring only 4-5 registers.
 
-Can't you just add something like int omap_ctrl_read_status(void)
-that id.c can use?
-
-Tony
+>>
+>> IMHO, drivers need a generic way to differentiate if they're resuming
+>> from OFF or RET, otherwise we will end up with a bunch of OMAP-specific
+>> hackery on all drivers
+>
