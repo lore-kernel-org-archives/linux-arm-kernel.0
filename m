@@ -1,20 +1,23 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 26 Jun 2012 16:28:34 +0530
-Subject: [PATCH 08/11] crypto: omap: add clk_prepare and clk_unprepare
-In-Reply-To: <alpine.DEB.2.00.1206260433010.12797@utopia.booyaka.com>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
- <1340372890-10091-9-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1206221257480.10198@utopia.booyaka.com>
- <4FE7F73D.6090402@ti.com>
- <alpine.DEB.2.00.1206260433010.12797@utopia.booyaka.com>
-Message-ID: <4FE995DA.2070001@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 19:14:45 +0800
+Subject: [PATCH 2/4] pwm: pwm-mxs: use global reset function
+ stmp_reset_block
+In-Reply-To: <20120626095703.GA20185@avionic-0098.mockup.avionic-design.de>
+References: <1340701091-8488-1-git-send-email-shawn.guo@linaro.org>
+ <1340701091-8488-3-git-send-email-shawn.guo@linaro.org>
+ <20120626095456.GA8687@avionic-0098.mockup.avionic-design.de>
+ <20120626095703.GA20185@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120626111443.GA8858@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 June 2012 04:09 PM, Paul Walmsley wrote:
-> Then at the same time, maybe get the rest of the drivers runtime-PM
-> converted and acked through their respective maintainers.
+On Tue, Jun 26, 2012 at 11:57:03AM +0200, Thierry Reding wrote:
+> > Doesn't this need a depends on/select STMP_DEVICE?
+> 
+> Upon closer investigation, select STMP_DEVICE seems to be correct.
+> 
+Yes, you are right.  Will fix it.  Thanks.
 
-So if I read your response correctly, you are saying all OMAP drivers
-being converted to use runtime PM is a pre-requisite for OMAP moving 
-over to use Common Clk framework?
+-- 
+Regards,
+Shawn
