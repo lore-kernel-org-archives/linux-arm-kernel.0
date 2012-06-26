@@ -1,59 +1,81 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 26 Jun 2012 21:02:15 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <201206261012.13620.jbe@pengutronix.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <201206221919.57485.marek.vasut@gmail.com>
- <201206261012.13620.jbe@pengutronix.de>
-Message-ID: <201206262102.15698.marek.vasut@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jun 2012 16:17:19 +0000
+Subject: [PATCH v4 3/9] arm: mach-mvebu: add source files
+In-Reply-To: <1340699313-29331-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1340699313-29331-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340699313-29331-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201206261617.20954.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
-
-> Hi Marek,
+On Tuesday 26 June 2012, Gregory Clement wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> Marek Vasut wrote:
-> > [...]
-> > 
-> > > > Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
-> > > 
-> > > Any progress here with inclusion in some git tree?
-> > 
-> > Well ... I recently raised from the dead. It's on the schedule, obviously
-> > help is welcome.
-> 
-> I tried a little bit with your driver. The disadvantage I see is, its
-> claims all the free AD channels. But a few of them can also act as a
-> touchscreen controller. Shouldn't be the driver handle the channel usage
-> dynamically?
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
 
-I wonder, I'd rather see this driver behave as a composite driver, what do you 
-think?
+This driver seems to do all the right things now, good work.
 
-> Also this AD module on the SoC can measure the die
-> temperature, battery voltage and some other power supplies.
-> I see more than one framework this driver should connect to: simple ADC
-> (IIO), touchscreen controller (INPUT), die temp (POWER?), various voltages
-> (POWER? REGULATOR?). Should it be a multi function device?
+> +static void __iomem *system_controller_base;
+> +static void __iomem *reset_base;
+> +static unsigned long rstoutn_mask_reset_out_en;
+> +
+> +/* System controller registers */
+> +#define ARMADA_370_XP_RESET_OFFSET		  0x60
+> +#define OTHER_MVEBU_RESET_OFFSET		 0x108
+> +#define MVEBU_RSTOUTN_MASK_OFFSET		   0x0
+> +#define   OTHER_MVEBU_RSTOUTN_MASK_RESET_OUT_EN	   0x4
+> +#define   ARMADA_370_XP_RSTOUTN_MASK_RESET_OUT_EN  0x1
+> +#define MVEBU_SYSTEM_SOFT_RESET_OFFSET		   0x4
+> +#define   MVEBU_SYSTEM_SOFT_RESET		   0x1
+> +
+> +#define OTHER_MVEBU_VARIANT	1
+> +#define ARMADA_370_XP_VARIANT	2
 
-Correct, making it a MFD device with common channel-management logic is the way 
-to go. And it's gonna be a few resends of this driver, that's for certain. I'm 
-not confident I'll be able to make it right at the first try ;-)
+I think this can be expressed nicer with pointers to data structures,
+like
 
-INPUT -- touchscreen
-IIO -- die temp and LRADC (maybe random voltages?)
-POWER -- battery
+static void __iomem *system_controller_base;
 
-But all this MFD goo is quite simple, the hard part is the channel management 
-logic. From the top of my head, there're 16 channels, 8 can be sampled at the 
-same time and there are 4 configuration triggers. Making it one hell of a 
-complex hardware.
+struct mvebu_system_controller {
+	u32 rstoutn_mask_offset;
+	u32 system_soft_reset_offset;
 
-I'll fix the remnants of SPI and start on this beast tonight or tomorrow. Since 
-there was some progress in the IIO, I believe I'll have to rework it a bit.
+	u32 rstoutn_mask_reset_out_en;
+	u32 system_soft_reset;
+};
 
-> Juergen
+const struct mvebu_system_controller armada_370_xp_system_controller = {
+	.rstoutn_mask_offset = 0x60,
+	.system_soft_reset_offset = 0x64,
+	.rstoutn_mask_reset_out_en = 0x1,
+	.system_soft_reset = 0x1,
+};
 
-Best regards,
-Marek Vasut
+const struct mvebu_system_controller orion_system_controller = {
+	.rstoutn_mask_offset = 0x108,
+	.system_soft_reset_offset = 0x10c,
+	.rstoutn_mask_reset_out_en = 0x4,
+	.system_soft_reset = 0x1,
+};
+
+static struct of_device_id of_system_controller_table[] = {
+	{.compatible = "marvell,orion-system-controller",
+	 .data = &orion,system_controller},
+	{.compatible = "marvell,armada-370-xp-system-controller",
+	 .data = &armada_370_xp_system_controller,
+	{ /* end of list */ },
+};
+
+> +void mvebu_restart(char mode, const char *cmd)
+> +{
+> +	if (!system_controller_base) {
+> +		pr_warn("Cannot restart, system-controller not available\n");
+> +		return;
+> +	}
+
+I guess returning here is a bug, you should just enter the endless
+loop.
+
+	Arnd
