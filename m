@@ -1,71 +1,48 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 26 Jun 2012 10:30:06 -0400 (EDT)
-Subject: pm runtime and system suspend resume
-In-Reply-To: <CAK9wHMRiTapv7LGtLES4_gR4-DWxWm7CU+L2Yw0e+tRUCN0wyA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1206261017440.1636-100000@iolanthe.rowland.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Jun 2012 15:33:14 +0100
+Subject: [RFC PATCH 0/8] Fix restart_block syscall restarting for 3.5
+In-Reply-To: <20120625091818.GB22128@mudshark.cambridge.arm.com>
+References: <1340377626-17075-1-git-send-email-will.deacon@arm.com>
+ <20120622193626.GG14083@ZenIV.linux.org.uk>
+ <20120625091818.GB22128@mudshark.cambridge.arm.com>
+Message-ID: <20120626143314.GO27996@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jun 2012, chao xie wrote:
+On Mon, Jun 25, 2012 at 10:18:18AM +0100, Will Deacon wrote:
+> Hi Al,
 
-> If we want to separate clocks off and phy off, what should we do?
+Hello again,
 
-Why do you want to separate them?
+> On Fri, Jun 22, 2012 at 08:36:26PM +0100, Al Viro wrote:
+> > On Fri, Jun 22, 2012 at 04:06:58PM +0100, Will Deacon wrote:
+> > > I reckon the first two reverts should go in for 3.5 unless anybody has
+> > > a better solution. The rest of the code is an RFC since, as Russell has
+> > > said before, the code is `rather yucky'.
+> > 
+> > See commit 76c3f4da3ee47b68304dbe0f64e86562e7945bf3 and a couiple before it in
+> > signal.git:
+> 
+> Thanks, I'll take a look (it may keep me occupied for some time...). Are
+> these destined for 3.5 or shall we press ahead with the two reverts for now
+> and fix this properly in the merge window?
 
-The Runtime PM framework doesn't have any notion of multiple low-power 
-states.  It recognizes only two possibilities: active and suspended.
+For what it's worth, your patches look correct to me. The main difference
+between my approach and yours is that I continue processing signals even
+after the restart requirements have been filled, aborting the restart later
+if further signal processing indicates that it's necessary to do so. With
+your patches we stop iterating through the signals as soon as we hit a
+restart and avoid the problem that way.
 
-If turning the clocks on and off is very quick, you can simply have the
-driver turn them on before each I/O operation and turn them off when
-the operation is finished.
+POSIX helpfully seems to avoid this scenario and given the asychronous
+nature of signals, I'm not sure it matters either way. The only thing I
+wonder about is whether restarting a syscall using restart_syscall(2) when
+there are further signals pending will cause the syscall to return
+-ERESTART_RESTARTBLOCK immediately and we'll go through this long-winded
+sequence for each pending signal without a handler installed...
 
-> in fact, in the driver, at some time, it can shutdown clock, and at
-> some time, it can shut down phy too. So what i want to do it make
-> runtime_idle to shut down the clocks while in runtime_suspend to
-> shutdown the clocks and phy.
+... or am I grossly confused?
 
-The runtime_idle routine is not supposed to turn anything off.  All it 
-should do is decide whether or not to call pm_runtime_suspend.  The 
-actual work of turning things on and off belongs in the driver's (or 
-subsystem's or PM domain's) runtime_resume and runtime_suspend 
-routines.
+Cheers,
 
-> So when the driver is in idle, and i can call pm_runtime_put which
-> will call runtime_idle to shutdown the clocks, while when the driver
-> want to turn off phy, it means it will enter deeper idle, so i need
-> call pm_runtime_put_sync_suspend.
-
-You can do that if you want, but it is not how the Runtime PM framework 
-was intended to work.  Instead of calling pm_runtime_put, why not just 
-turn off the clocks?
-
-Or why not turn off the clocks at the same time as the phy?
-
-> The question is if when driver calls pm_runtime_put_sync_suspend, the
-> driver has already called pm_runtime_put, the usaga_count is 0 now, so
-> driver has to call pm_runtime_get and then call
-> pm_runtime_put_sync_suspend.
-
-If you know the usage count is 0 already, you can just call
-pm_runtime_suspend directly.
-
-> PM runtime provide runtime_idle and runtime_suspend, but the device
-> status has only two kinds of status, active or no-active. It confuses
-> me.
-
-Idle means "the device is active but the usage count is 0".  The 
-purpose of the runtime_idle callback is to let your driver know that it 
-can start a suspend if it wants to.
-
-> It means that the pm runtime can not support multiple level of
-> power mode for device.
-
-That's right.
-
->  actually, i think it has provided two kinds of
-> callback runtime_idle and runtime_suspend, and it should maintain at
-> least 3 state, idle, suspend, active for the device.
-
-No, that's not how it was designed.
-
-Alan Stern
+Will
