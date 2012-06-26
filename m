@@ -1,84 +1,97 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Jun 2012 14:16:11 +0200
-Subject: [PATCH 4/7] ARM: mxs: Add SPI clock into clk framwork
-In-Reply-To: <20120626065428.GM2342@S2101-09.ap.freescale.net>
-References: <1340477033-2761-1-git-send-email-marex@denx.de>
- <1340477033-2761-4-git-send-email-marex@denx.de>
- <20120626065428.GM2342@S2101-09.ap.freescale.net>
-Message-ID: <201206261416.11599.marex@denx.de>
+Date: Tue, 26 Jun 2012 14:17:58 +0200
+Subject: [PATCH] ARM: mx28: Add LCD pinmux
+In-Reply-To: <20120626025216.GK2342@S2101-09.ap.freescale.net>
+References: <1340477119-2835-1-git-send-email-marex@denx.de>
+ <20120626025216.GK2342@S2101-09.ap.freescale.net>
+Message-ID: <201206261417.58300.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> On Sat, Jun 23, 2012 at 08:43:50PM +0200, Marek Vasut wrote:
+> On Sat, Jun 23, 2012 at 08:45:18PM +0200, Marek Vasut wrote:
 > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Chris Ball <cjb@laptop.org>
 > > Cc: Detlev Zundel <dzu@denx.de>
 > > CC: Dong Aisheng <b29396@freescale.com>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > CC: Fabio Estevam <fabio.estevam@freescale.com>
 > > Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
 > > CC: Shawn Guo <shawn.guo@linaro.org>
 > > Cc: Stefano Babic <sbabic@denx.de>
 > > Cc: Wolfgang Denk <wd@denx.de>
 > > ---
 > > 
-> >  drivers/clk/mxs/clk-imx28.c |    4 ++++
-> >  1 file changed, 4 insertions(+)
+> >  arch/arm/boot/dts/imx28.dtsi |   45
+> >  ++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 45
+> >  insertions(+)
 > > 
-> > diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> > index 003b0f3..d22b926 100644
-> > --- a/drivers/clk/mxs/clk-imx28.c
-> > +++ b/drivers/clk/mxs/clk-imx28.c
-> > @@ -149,21 +149,25 @@ static struct clk_lookup xbus_lookups[] __initdata
-> > = {
+> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> > index 464303c..ab29cbe 100644
+> > --- a/arch/arm/boot/dts/imx28.dtsi
+> > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > @@ -221,6 +221,51 @@
 > > 
-> >  static struct clk_lookup ssp0_lookups[] __initdata = {
-> >  
-> >  	{ .dev_id = "imx28-mmc.0", },
+> >  					fsl,pull-up = <0>;
+> >  				
+> >  				};
 > > 
-> > +	{ .dev_id = "imx28-spi.0", },
-> > 
-> >  	{ .dev_id = "80010000.ssp", },
-> >  
-> >  };
-> >  
-> >  static struct clk_lookup ssp1_lookups[] __initdata = {
-> >  
-> >  	{ .dev_id = "imx28-mmc.1", },
-> > 
-> > +	{ .dev_id = "imx28-spi.1", },
-> > 
-> >  	{ .dev_id = "80012000.ssp", },
-> >  
-> >  };
-> >  
-> >  static struct clk_lookup ssp2_lookups[] __initdata = {
-> >  
-> >  	{ .dev_id = "imx28-mmc.2", },
-> > 
-> > +	{ .dev_id = "imx28-spi.2", },
-> > 
-> >  	{ .dev_id = "80014000.ssp", },
-> >  
-> >  };
-> >  
-> >  static struct clk_lookup ssp3_lookups[] __initdata = {
-> >  
-> >  	{ .dev_id = "imx28-mmc.3", },
-> > 
-> > +	{ .dev_id = "imx28-spi.3", },
-> > 
-> >  	{ .dev_id = "80016000.ssp", },
-> >  
-> >  };
+> > +				lcd_data_pins_8bpp_a: lcd at 0 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 
+0x1030
+> > +						0x1040 0x1050 0x1060 0x1070>;
+> > +					fsl,drive-strength = <0>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				lcd_data_pins_16bpp_a: lcd at 1 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 
+0x1030
+> > +						0x1040 0x1050 0x1060 0x1070
+> > +						0x1080 0x1090 0x10a0 0x10b0
+> > +						0x10c0 0x10d0 0x10e0 0x10f0>;
+> > +					fsl,drive-strength = <0>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				lcd_data_pins_18bpp_a: lcd at 2 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 
+0x1030
+> > +						0x1040 0x1050 0x1060 0x1070
+> > +						0x1080 0x1090 0x10a0 0x10b0
+> > +						0x10c0 0x10d0 0x10e0 0x10f0
+> > +						0x1100 0x1110>;
+> > +					fsl,drive-strength = <0>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
+> > +				lcd_data_pins_24bpp_a: lcd at 3 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <0x1000 0x1010 0x1020 
+0x1030
+> > +						0x1040 0x1050 0x1060 0x1070
+> > +						0x1080 0x1090 0x10a0 0x10b0
+> > +						0x10c0 0x10d0 0x10e0 0x10f0
+> > +						0x1100 0x1110 0x1120 0x1130
+> > +						0x1140 0x1150 0x1160 0x1170>;
+> > +					fsl,drive-strength = <0>;
+> > +					fsl,voltage = <1>;
+> > +					fsl,pull-up = <0>;
+> > +				};
+> > +
 > 
-> These changes should not be needed, as the driver will only be probed
-> from device tree.
+> We do not want to enumerate all the possible mux options.  Instead,
+> please add mux setting when there is indeed a user for it.
 
-So why are those imx28-mmc there ? Shall these not be removed then ?
+Well, I'd prefer to have it ready to be used, instead of having partial slabs of 
+muxes. But whatever.
+
+Is anyone converting the LCD driver over to DT or not?
 
 Best regards,
 Marek Vasut
