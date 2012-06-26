@@ -1,37 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Jun 2012 20:31:43 +0800
-Subject: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
-In-Reply-To: <201206261422.55005.marex@denx.de>
-References: <1340477033-2761-1-git-send-email-marex@denx.de>
- <1340477033-2761-7-git-send-email-marex@denx.de>
- <20120626074342.GA4928@S2101-09.ap.freescale.net>
- <201206261422.55005.marex@denx.de>
-Message-ID: <20120626123141.GH8858@S2101-09.ap.freescale.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 26 Jun 2012 07:38:55 -0500
+Subject: [GIT PULL] OMAP PM: move SmartReflex driver to drivers/avs
+Message-ID: <87zk7qdz8g.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 02:22:54PM +0200, Marek Vasut wrote:
-> > > +static int __devexit mxs_spi_remove(struct platform_device *pdev)
-> > > +{
-> > > +	struct spi_master *host;
-> > > +	struct mxs_ssp *ssp;
-> > > +
-> > > +	host = platform_get_drvdata(pdev);
-> > > +	if (host)
-> > > +		return 0;
-> > 
-> > Hmm, why the check and return here?
-> 
-> If it's not set, things went _very_ wrong somewhere. Maybe BUG_ON() might be 
-> better?
-> 
-So shouldn't it be "if (!host)"?
+Tony,
 
-And I still do not understand how that could happen.  I think
-mxs_spi_remove will only be called in case that mxs_spi_probe
-succeeds, which means platform_set_drvdata must have been called
-already?
+Please pull this series that move the SmartReflex driver out to
+drivers/avs.  The series includes some minimal cleanups necessary to
+cleanly do the move.
 
--- 
-Regards,
-Shawn
+The drivers/* change has been Acked by Rafael and we agreed to merge it
+through the OMAP tree because of all the arch/arm/mach-omap2 changes
+in this series.
+
+Kevin
+
+
+The following changes since commit cdd3a354a05b0c33fe33ab11a0fb0838396cad19:
+
+  Merge tag 'pm' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-05-22 09:41:01 -0700)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/pm/sr-move
+
+for you to fetch changes up to 21ff63ad131218048525fbd37d065ce61f03bcbd:
+
+  ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/ (2012-05-31 16:36:30 -0700)
+
+----------------------------------------------------------------
+J Keerthy (1):
+      ARM: OMAP2+: Voltage: Move the omap_volt_data structure to plat
+
+Jean Pihet (9):
+      ARM: OMAP2+: SmartReflex: move the smartreflex header to include/linux/power
+      ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
+      ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of voltage domains.
+      ARM: OMAP3: hwmod: rename the smartreflex entries
+      ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
+      ARM: OMAP2+: SmartReflex: Use per-OPP data structure
+      ARM: OMAP2+: SmartReflex: Create per-opp debugfs node for errminlimit
+      ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
+      ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+
+ arch/arm/mach-omap2/Makefile                       |    5 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   12 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    3 +-
+ arch/arm/mach-omap2/pm.h                           |    2 +-
+ arch/arm/mach-omap2/smartreflex-class3.c           |   29 ++--
+ arch/arm/mach-omap2/sr_device.c                    |   39 ++++-
+ arch/arm/mach-omap2/voltage.h                      |   21 +--
+ arch/arm/plat-omap/Kconfig                         |   31 ++--
+ arch/arm/plat-omap/include/plat/voltage.h          |   21 ++-
+ drivers/power/Kconfig                              |    2 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/avs/Kconfig                          |   12 ++
+ drivers/power/avs/Makefile                         |    1 +
+ .../mach-omap2 => drivers/power/avs}/smartreflex.c |  161 ++++++++------------
+ .../linux/power}/smartreflex.h                     |   74 +++++++--
+ 15 files changed, 235 insertions(+), 179 deletions(-)
+ create mode 100644 drivers/power/avs/Kconfig
+ create mode 100644 drivers/power/avs/Makefile
+ rename {arch/arm/mach-omap2 => drivers/power/avs}/smartreflex.c (90%)
+ rename {arch/arm/mach-omap2 => include/linux/power}/smartreflex.h (79%)
