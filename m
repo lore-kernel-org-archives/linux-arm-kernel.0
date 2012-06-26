@@ -1,43 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 26 Jun 2012 07:48:35 -0500
-Subject: [GIT PULL] OMAP PM: misc. cleanup for v3.6
-Message-ID: <87d34mdysc.fsf@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 26 Jun 2012 14:50:27 +0200
+Subject: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
+In-Reply-To: <20120626123141.GH8858@S2101-09.ap.freescale.net>
+References: <1340477033-2761-1-git-send-email-marex@denx.de>
+ <201206261422.55005.marex@denx.de>
+ <20120626123141.GH8858@S2101-09.ap.freescale.net>
+Message-ID: <201206261450.27543.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Dear Shawn Guo,
 
-Please pull the following misc. PM cleanups for v3.6.
+> On Tue, Jun 26, 2012 at 02:22:54PM +0200, Marek Vasut wrote:
+> > > > +static int __devexit mxs_spi_remove(struct platform_device *pdev)
+> > > > +{
+> > > > +	struct spi_master *host;
+> > > > +	struct mxs_ssp *ssp;
+> > > > +
+> > > > +	host = platform_get_drvdata(pdev);
+> > > > +	if (host)
+> > > > +		return 0;
+> > > 
+> > > Hmm, why the check and return here?
+> > 
+> > If it's not set, things went _very_ wrong somewhere. Maybe BUG_ON() might
+> > be better?
+> 
+> So shouldn't it be "if (!host)"?
+> 
+> And I still do not understand how that could happen.  I think
+> mxs_spi_remove will only be called in case that mxs_spi_probe
+> succeeds, which means platform_set_drvdata must have been called
+> already?
 
-Kevin
+Ok, we can remove that altogether then.
 
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
-
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/cleanup/pm
-
-for you to fetch changes up to b110547e586eb5825bc1d04aa9147bff83b57672:
-
-  ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after bad one (2012-06-19 15:23:29 -0700)
-
-----------------------------------------------------------------
-Daniel Lezcano (1):
-      ARM: OMAP3/4: consolidate cpuidle Makefile
-
-Mark A. Greer (1):
-      ARM: OMAP3: PM: Only access IVA if one exists
-
-Nishanth Menon (1):
-      ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after bad one
-
- arch/arm/mach-omap2/Kconfig       |    2 ++
- arch/arm/mach-omap2/Makefile      |    7 +++++--
- arch/arm/mach-omap2/cpuidle34xx.c |    8 --------
- arch/arm/mach-omap2/cpuidle44xx.c |    8 --------
- arch/arm/mach-omap2/opp.c         |    3 +--
- arch/arm/mach-omap2/pm.h          |   17 +++++++++++++++--
- arch/arm/mach-omap2/pm34xx.c      |   15 ++++++++++-----
- 7 files changed, 33 insertions(+), 27 deletions(-)
+Best regards,
+Marek Vasut
