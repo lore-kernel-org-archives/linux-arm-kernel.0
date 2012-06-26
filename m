@@ -1,36 +1,39 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Tue, 26 Jun 2012 10:12:13 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <201206221919.57485.marek.vasut@gmail.com>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <201206221349.18326.jbe@pengutronix.de>
- <201206221919.57485.marek.vasut@gmail.com>
-Message-ID: <201206261012.13620.jbe@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Jun 2012 16:15:49 +0800
+Subject: [PATCH] mtd/m25p80: add device tree probe support
+In-Reply-To: <201206251850.10839.marex@denx.de>
+References: <1311601063-16581-1-git-send-email-shawn.guo@linaro.org>
+ <201206251801.22385.marex@denx.de>
+ <20120625161506.GH2342@S2101-09.ap.freescale.net>
+ <201206251850.10839.marex@denx.de>
+Message-ID: <20120626081546.GB4928@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-Marek Vasut wrote:
-> [...]
-> > > Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
-> >
-> > Any progress here with inclusion in some git tree?
->
-> Well ... I recently raised from the dead. It's on the schedule, obviously
-> help is welcome.
-
-I tried a little bit with your driver. The disadvantage I see is, its claims 
-all the free AD channels. But a few of them can also act as a touchscreen 
-controller. Shouldn't be the driver handle the channel usage dynamically? 
-Also this AD module on the SoC can measure the die temperature, battery 
-voltage and some other power supplies.
-I see more than one framework this driver should connect to: simple ADC (IIO), 
-touchscreen controller (INPUT), die temp (POWER?), various voltages (POWER? 
-REGULATOR?). Should it be a multi function device?
-
-Juergen
+On Mon, Jun 25, 2012 at 06:50:10PM +0200, Marek Vasut wrote:
+> 116                         ssp2: ssp at 80014000 {
+> 117                                 #address-cells = <1>;
+> 118                                 #size-cells = <0>;
+> 119                                 compatible = "fsl,imx28-spi";
+> 120                                 pinctrl-names = "default";
+> 121                                 pinctrl-0 = <&spi2_pins_a>;
+> 122                                 status = "okay";
+> 123 
+> 124                                 flash: m25p80 at 0 {
+> 125                                         #address-cells = <1>;
+> 126                                         #size-cells = <1>;
+> 127                                         compatible = "m25p80";
+> 128                                         spi-max-frequency = <25000000>;
+> 129                                         reg = <0>;
+> 130                                 };
+> 131                         };
+> 
+> I use this + my SPI patches I submitted recently.
+> 
+I do not have the flash on my imx28-evk board, but I just tested on
+imx6q-sabrelite, and yes, it can be probed without the patch.  I'm
+fine then.
 
 -- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
+Regards,
+Shawn
