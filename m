@@ -1,31 +1,33 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 27 Jun 2012 12:28:42 +0300
-Subject: [PATCH v11 0/4] MTD: at91: Add PMECC support for at91 nand
- flash driver
-In-Reply-To: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
-References: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1340789322.29342.9.camel@sauron.fi.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jun 2012 10:41:23 +0100
+Subject: [PATCH 2/2] ARM: delay: allow timer-based delay implementation
+ to be selected
+In-Reply-To: <4FEA6AE7.4050000@codeaurora.org>
+References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
+ <1340377774-17173-3-git-send-email-will.deacon@arm.com>
+ <4FE8DA7E.5040105@codeaurora.org>
+ <20120626104944.GE27996@mudshark.cambridge.arm.com>
+ <4FEA6AE7.4050000@codeaurora.org>
+Message-ID: <20120627094123.GB27431@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-06-25 at 18:07 +0800, Josh Wu wrote:
-> Those patches is based on v3.5-rc4
+On Wed, Jun 27, 2012 at 03:07:35AM +0100, Stephen Boyd wrote:
+> On 06/26/12 03:49, Will Deacon wrote:
+> > I suppose I could allow the function to fail if it's called after we've
+> > calibrated. What do you reckon?
+> >
+> 
+> Fair enough. Would anything actually go wrong if you called it twice? I
+> would think everything would be assigned to what it already is but I
+> haven't thought deeply about it. I don't really care to make the
+> function more complicated for a case that should never happen.
 
-Pushed patches 1 and 3. The other ones were not pushed because you was
-going to address review comments and re-send. Please, base them on the
-l2-mtd.git three, not v3.5-rcX. Thanks!
+If it's called once before calibration and again after calibration then that
+could cause problems if a different frequency is passed. However, I think we
+can probably leave the function as-is until we have the capacity to support
+multiple read_current_timer implementations in the same kernel. At that
+point, we'd probably have a way to register the current_timer which could
+also setup the delay loop.
 
-The l2-mtd.git tree is here:
-git://git.infradead.org/users/dedekind/l2-mtd.git
-
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/bb2e8c71/attachment-0001.sig>
+Will
