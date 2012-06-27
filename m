@@ -1,30 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 27 Jun 2012 13:37:26 -0600 (MDT)
-Subject: Current state of AM33xx patches
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5C1F7@DBDE01.ent.ti.com>
-References: <4FD5BA4C.9070706@gmail.com> <4FD5FD9E.5040203@ti.com>
- <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206271218540.27496@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206271306170.27496@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA5C1F7@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1206271335280.27496@utopia.booyaka.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 27 Jun 2012 15:46:04 -0400
+Subject: commit "ARM: dma-mapping: remove custom consistent dma region"
+Message-ID: <20120627194604.GA9445@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
+Hi Marek,
 
-> Shouldn't impact, but  still will apply now...will update you on this.
-> Can you also share me the .config file of yours??
+This commit in linux-next:
 
-Just sent it to you via private E-mail.  It's just omap2plus_defconfig 
-plus the two DT-related config options that you mentioned.
+commit feb930cb9beb75cbe1d1e798870599c3aa1b93ec
+Author: Marek Szyprowski <m.szyprowski@samsung.com>
+Date:   Fri Jun 8 12:08:32 2012 +0200
 
-One other minor comment, the kernel build system wouldn't build a kernel 
-following the exact sequence of steps that you mentioned earlier.  Rather 
-than building uImage-dtb.am335x-evm as a direct target, first I had to 
-build the uImage.
+    ARM: dma-mapping: remove custom consistent dma region
 
+seems to break the at91x40_defconfig (according to git bisect).
 
-- Paul
+  CC      arch/arm/mm/dma-mapping.o
+arch/arm/mm/dma-mapping.c: In function '__dma_alloc':
+arch/arm/mm/dma-mapping.c:575: error: macro "__alloc_from_pool" requires 4 arguments, but only 2 given
+arch/arm/mm/dma-mapping.c:575: error: '__alloc_from_pool' undeclared (first use in this function)
+arch/arm/mm/dma-mapping.c:575: error: (Each undeclared identifier is reported only once
+arch/arm/mm/dma-mapping.c:575: error: for each function it appears in.)
+make[2]: *** [arch/arm/mm/dma-mapping.o] Error 1
+make[1]: *** [arch/arm/mm/dma-mapping.o] Error 2
+
+See http://kisskb.ellerman.id.au/kisskb/buildresult/6596769/ for a full log.
+
+Please have a look when you get a chance.
+
+Thanks,
+Paul.
