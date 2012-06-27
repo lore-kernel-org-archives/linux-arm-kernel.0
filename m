@@ -1,126 +1,56 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:13:24 +0200
-Subject: [PATCH RESEND] gpio: gpio-lpc32xx: Add gpio_to_irq mapping
-Message-ID: <1340835204-17417-1-git-send-email-stigge@antcom.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 28 Jun 2012 00:19:46 +0200
+Subject: [RFC PATCHv1 2/2] ARM: socfpga: Add board support for Altera's
+ SOCFPGA Cyclone 5 HW
+In-Reply-To: <20120627210600.GB26023@elf.ucw.cz>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <1340805007-3313-3-git-send-email-dinguyen@altera.com>
+ <20120627162548.01adc769@skate> <20120627210600.GB26023@elf.ucw.cz>
+Message-ID: <20120628001946.1d91e028@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch helps mapping with gpio_to_irq for the GPIOs that are irq enabled.
+Le Wed, 27 Jun 2012 23:06:00 +0200,
+Pavel Machek <pavel@denx.de> a ?crit :
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Tested-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
----
-Applies to 3.5-rc4
+> > Just like the IRQ numbers, those defines for I/O registers are no
+> > longer needed with the device tree.
+> 
+> Yep. It shows we have more DT-ization to do.
+> 
+> arch/arm/mach-socfpga/include/mach/uncompress.h needs UART0
+> base... but device tree is not easily accessible at that point, right?
 
- drivers/gpio/gpio-lpc32xx.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+Yes, for those you still need fixed addresses, defined by #define, as
+the DT is not accessible yet.
 
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -28,6 +28,7 @@
- #include <mach/hardware.h>
- #include <mach/platform.h>
- #include <mach/gpio-lpc32xx.h>
-+#include <mach/irqs.h>
- 
- #define LPC32XX_GPIO_P3_INP_STATE		_GPREG(0x000)
- #define LPC32XX_GPIO_P3_OUTP_SET		_GPREG(0x004)
-@@ -367,6 +368,66 @@ static int lpc32xx_gpio_request(struct g
- 	return -EINVAL;
- }
- 
-+static int lpc32xx_gpio_to_irq_p01(struct gpio_chip *chip, unsigned offset)
-+{
-+	return IRQ_LPC32XX_P0_P1_IRQ;
-+}
-+
-+static const char lpc32xx_gpio_to_irq_gpio_p3_table[] = {
-+	IRQ_LPC32XX_GPIO_00,
-+	IRQ_LPC32XX_GPIO_01,
-+	IRQ_LPC32XX_GPIO_02,
-+	IRQ_LPC32XX_GPIO_03,
-+	IRQ_LPC32XX_GPIO_04,
-+	IRQ_LPC32XX_GPIO_05,
-+};
-+
-+static int lpc32xx_gpio_to_irq_gpio_p3(struct gpio_chip *chip, unsigned offset)
-+{
-+	if (offset < ARRAY_SIZE(lpc32xx_gpio_to_irq_gpio_p3_table))
-+		return lpc32xx_gpio_to_irq_gpio_p3_table[offset];
-+	return -ENXIO;
-+}
-+
-+static const char lpc32xx_gpio_to_irq_gpi_p3_table[] = {
-+	IRQ_LPC32XX_GPI_00,
-+	IRQ_LPC32XX_GPI_01,
-+	IRQ_LPC32XX_GPI_02,
-+	IRQ_LPC32XX_GPI_03,
-+	IRQ_LPC32XX_GPI_04,
-+	IRQ_LPC32XX_GPI_05,
-+	IRQ_LPC32XX_GPI_06,
-+	IRQ_LPC32XX_GPI_07,
-+	IRQ_LPC32XX_GPI_08,
-+	IRQ_LPC32XX_GPI_09,
-+	-ENXIO, /* 10 */
-+	-ENXIO, /* 11 */
-+	-ENXIO, /* 12 */
-+	-ENXIO, /* 13 */
-+	-ENXIO, /* 14 */
-+	-ENXIO, /* 15 */
-+	-ENXIO, /* 16 */
-+	-ENXIO, /* 17 */
-+	-ENXIO, /* 18 */
-+	IRQ_LPC32XX_GPI_19,
-+	-ENXIO, /* 20 */
-+	-ENXIO, /* 21 */
-+	-ENXIO, /* 22 */
-+	-ENXIO, /* 23 */
-+	-ENXIO, /* 24 */
-+	-ENXIO, /* 25 */
-+	-ENXIO, /* 26 */
-+	-ENXIO, /* 27 */
-+	IRQ_LPC32XX_GPI_28,
-+};
-+
-+static int lpc32xx_gpio_to_irq_gpi_p3(struct gpio_chip *chip, unsigned offset)
-+{
-+	if (offset < ARRAY_SIZE(lpc32xx_gpio_to_irq_gpi_p3_table))
-+		return lpc32xx_gpio_to_irq_gpi_p3_table[offset];
-+	return -ENXIO;
-+}
-+
- static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 	{
- 		.chip = {
-@@ -376,6 +437,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_p01,
- 			.base			= LPC32XX_GPIO_P0_GRP,
- 			.ngpio			= LPC32XX_GPIO_P0_MAX,
- 			.names			= gpio_p0_names,
-@@ -391,6 +453,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_p01,
- 			.base			= LPC32XX_GPIO_P1_GRP,
- 			.ngpio			= LPC32XX_GPIO_P1_MAX,
- 			.names			= gpio_p1_names,
-@@ -421,6 +484,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_output	= lpc32xx_gpio_dir_output_p3,
- 			.set			= lpc32xx_gpio_set_value_p3,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_gpio_p3,
- 			.base			= LPC32XX_GPIO_P3_GRP,
- 			.ngpio			= LPC32XX_GPIO_P3_MAX,
- 			.names			= gpio_p3_names,
-@@ -434,6 +498,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.direction_input	= lpc32xx_gpio_dir_in_always,
- 			.get			= lpc32xx_gpi_get_value,
- 			.request		= lpc32xx_gpio_request,
-+			.to_irq			= lpc32xx_gpio_to_irq_gpi_p3,
- 			.base			= LPC32XX_GPI_P3_GRP,
- 			.ngpio			= LPC32XX_GPI_P3_MAX,
- 			.names			= gpi_p3_names,
+> > > +	}, {
+> > > +		.virtual	= IO_ADDRESS(SOCFPGA_CLKMGR_BASE),
+> > > +		.pfn		= __phys_to_pfn(SOCFPGA_CLKMGR_BASE),
+> > > +		.length		= SZ_4K,
+> > > +		.type		= MT_DEVICE,
+> > > +	},
+> > > +};
+> > 
+> > Most of those static mappings should instead be turned into dynamic
+> > mappings created with ioremap(), at least for the timers.
+> 
+> Dynamic mappings so that we can use device tree -- not constants?
+
+Yes, that's at least one of the reason. I think there are others, but
+last time there was a discussion about static vs. dynamic mappings, I'm
+not sure I understood exactly the arguments on which ones should be
+used in which situation.
+
+> Thanks for great review,
+
+You're welcome!
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
