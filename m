@@ -1,37 +1,41 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 27 Jun 2012 14:13:52 +0200
-Subject: [PATCH] MTD: LPC32xx SLC NAND driver: Add error handling to write
- function
-Message-ID: <1340799232-23092-1-git-send-email-stigge@antcom.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Jun 2012 14:21:48 +0200
+Subject: [PATCH 1/3] usb: chipidea: pci: make platformdata static
+In-Reply-To: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
+References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1340799710-32696-2-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds error handling to the lpc32xx_nand_write_page_syndrome()
-function.
-
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/mtd/nand/lpc32xx_slc.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/usb/chipidea/ci13xxx_pci.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
-index 7e2e78d..b27b3b3 100644
---- a/drivers/mtd/nand/lpc32xx_slc.c
-+++ b/drivers/mtd/nand/lpc32xx_slc.c
-@@ -679,9 +679,12 @@ static int lpc32xx_nand_write_page_syndrome(struct mtd_info *mtd,
- {
- 	struct lpc32xx_nand_host *host = chip->priv;
- 	u8 *pb = chip->oob_poi + chip->ecc.layout->eccpos[0];
-+	int error;
+diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
+index 918e149..9f5c171 100644
+--- a/drivers/usb/chipidea/ci13xxx_pci.c
++++ b/drivers/usb/chipidea/ci13xxx_pci.c
+@@ -23,17 +23,17 @@
+ /******************************************************************************
+  * PCI block
+  *****************************************************************************/
+-struct ci13xxx_platform_data pci_platdata = {
++static struct ci13xxx_platform_data pci_platdata = {
+ 	.name		= UDC_DRIVER_NAME,
+ 	.capoffset	= DEF_CAPOFFSET,
+ };
  
- 	/* Write data, calculate ECC on outbound data */
--	lpc32xx_xfer(mtd, (u8 *)buf, chip->ecc.steps, 0);
-+	error = lpc32xx_xfer(mtd, (u8 *)buf, chip->ecc.steps, 0);
-+	if (error)
-+		return error;
+-struct ci13xxx_platform_data langwell_pci_platdata = {
++static struct ci13xxx_platform_data langwell_pci_platdata = {
+ 	.name		= UDC_DRIVER_NAME,
+ 	.capoffset	= 0,
+ };
  
- 	/*
- 	 * The calculated ECC needs some manual work done to it before
+-struct ci13xxx_platform_data penwell_pci_platdata = {
++static struct ci13xxx_platform_data penwell_pci_platdata = {
+ 	.name		= UDC_DRIVER_NAME,
+ 	.capoffset	= 0,
+ 	.power_budget	= 200,
 -- 
-1.7.10.4
+1.7.10
