@@ -1,34 +1,34 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:26:12 +0200
-Subject: [PATCH 2/8] ARM: LPC32xx: Add further bits to MMC init
+Date: Thu, 28 Jun 2012 00:26:18 +0200
+Subject: [PATCH 8/8] ARM: LPC32xx: Remove unused gpios
 In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
 References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340835978-20331-3-git-send-email-stigge@antcom.de>
+Message-ID: <1340835978-20331-9-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes sure certain MMC bits are cleared as they should for
-initialization.
+From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
+Remove SPI0_CS, MMC_CD and MMC_WP gpios as they moved to devicetree.
+
+Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-
 ---
- arch/arm/mach-lpc32xx/clock.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/mach-lpc32xx/phy3250.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -813,7 +813,11 @@ static int mmc_onoff_enable(struct clk *
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
++++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+@@ -51,12 +51,9 @@
+ /*
+  * Mapped GPIOLIB GPIOs
+  */
+-#define SPI0_CS_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
+ #define LCD_POWER_GPIO		LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
+ #define BKL_POWER_GPIO		LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
+ #define MMC_PWR_ENABLE_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 5)
+-#define MMC_CD_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 1)
+-#define MMC_WP_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 0)
  
- 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
- 		~(LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
--		  LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN);
-+		  LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN |
-+		  LPC32XX_CLKPWR_MSCARD_MSDIO_PIN_DIS |
-+		  LPC32XX_CLKPWR_MSCARD_MSDIO0_DIS |
-+		  LPC32XX_CLKPWR_MSCARD_MSDIO1_DIS |
-+		  LPC32XX_CLKPWR_MSCARD_MSDIO23_DIS);
- 
- 	/* If rate is 0, disable clock */
- 	if (enable != 0)
+ /*
+  * AMBA LCD controller
