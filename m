@@ -1,31 +1,91 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 27 Jun 2012 17:51:12 +0200
-Subject: [PATCH 1/4] mtd: lpc32xx_slc: Select AMBA_PL08X in Kconfig
-Message-ID: <1340812275-1197-1-git-send-email-stigge@antcom.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 27 Jun 2012 16:54:43 +0100
+Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <4FEB2CC3.7090305@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+On 27/06/12 14:54, Gregory Clement wrote:
+> Arnd, Olof,
+>
+> You'll find in this patch set the fifth version of the initial support
+> for a new family of ARMv7-compatible Marvell SoCs.
+>
+> Do you think this patch set has a chance of hitting the 3.6 merge
+> window ?
+>
+> We are willing to quickly resubmit updated versions to take into
+> account new comments. We have a lot more code to support those new
+> SoCs, and we would like to make progress in submitting those other
+> parts for the mainline.
+>
+> As for the previous releases, both the Armada 370 and the Armada XP
+> SoCs are supported in this directory, and we are able to build a
+> single kernel image that boots on both SoCs. Both SoCs use the PJ4B
+> processor, a Marvell-developed ARM core that implements the ARMv7
+> instruction set. We are currently using Marvell evaluation boards for
+> both of those SoCs, and the support for those boards is added in this
+> patch set.
+>
+> We remained focused on a limited preliminary support which only
+> includes the necessary code for timer and IRQ support, the serial
+> controller is a standard 16550-compatible one. The diffstat looks
+> like:
+>
+>   Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt      |   23 +
+>   Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt     |   11 +
+>   Documentation/devicetree/bindings/arm/armada-370-xp.txt           |   24 +
+>   Documentation/devicetree/bindings/arm/mvebu-system-controller.txt |   17 +
+>   MAINTAINERS                                                       |    8 +
+>   arch/arm/Kconfig                                                  |   14 +
+>   arch/arm/Makefile                                                 |    1 +
+>   arch/arm/boot/dts/armada-370-db.dts                               |   42 +
+>   arch/arm/boot/dts/armada-370-xp.dtsi                              |   68 ++
+>   arch/arm/boot/dts/armada-370.dtsi                                 |   35 +
+>   arch/arm/boot/dts/armada-xp-db.dts                                |   50 +
+>   arch/arm/boot/dts/armada-xp.dtsi                                  |   55 +
+>   arch/arm/configs/mvebu_defconfig                                  |   46 +
+>   arch/arm/mach-mvebu/Kconfig                                       |   16 +
+>   arch/arm/mach-mvebu/Makefile                                      |    2 +
+>   arch/arm/mach-mvebu/Makefile.boot                                 |    1 +
+>   arch/arm/mach-mvebu/armada-370-xp.c                               |   63 ++
+>   arch/arm/mach-mvebu/common.h                                      |   23 +
+>   arch/arm/mach-mvebu/include/mach/armada-370-xp.h                  |   22 +
+>   arch/arm/mach-mvebu/include/mach/debug-macro.S                    |   24 +
+>   arch/arm/mach-mvebu/include/mach/timex.h                          |   13 +
+>   arch/arm/mach-mvebu/include/mach/uncompress.h                     |   43 +
+>   arch/arm/mach-mvebu/irq-armada-370-xp.c                           |  133 +++
+>   arch/arm/mach-mvebu/system-controller.c                           |  100 ++
+>   drivers/clocksource/Kconfig                                       |    3 +
+>   drivers/clocksource/Makefile                                      |    3 +-
+>   drivers/clocksource/time-armada-370-xp.c                          |  242 +++++
+>   include/linux/time-armada-370-xp.h                                |   18 +
+>   28 files changed, 1099 insertions(+), 1 deletion(-)
+>
+> This patch set, and the support for those SoCs, started as a
+> collaborative effort from Marvell engineers (who have done the initial
+> development work) and Free Electrons engineers (who are reshaping the
+> code for mainline submission, adding device tree support, etc.). This
+> effort has also received contributions from Ben Dooks from Codethink.
 
-Since this driver depends on the amba pl08x dma driver, select it in Kconfig.
+It may be something wrong in my device-tree setup, but this is not
+booting for me:
 
-Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- drivers/mtd/nand/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+> Uncompressing Linux... done, booting the kernel.
+> <6>Booting Linux on physical CPU 0
+> <5>Linux version 3.5.0-rc4-11036-g90ad2b7-dirty (ben at rainbowdash) (gcc version 4.4.52
+> CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
+> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+> <6>Machine: Marvell Aramada 370/XP (Device Tree), model: Cogent CSB1726 SoM
+> Memory policy: ECC disabled, Data cache writeback
+> <0>Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index de69978..a9e8b73 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -417,6 +417,7 @@ config MTD_NAND_PXA3xx
- config MTD_NAND_SLC_LPC32XX
- 	tristate "NXP LPC32xx SLC Controller"
- 	depends on ARCH_LPC32XX
-+	select AMBA_PL08X
- 	help
- 	  Enables support for NXP's LPC32XX SLC (i.e. for Single Level Cell
- 	  chips) NAND controller. This is the default for the PHYTEC 3250
+This is the last thing I get before it stops. Any ideas on what went
+wrong?
+
 -- 
-1.7.10.4
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
