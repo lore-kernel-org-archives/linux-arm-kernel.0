@@ -1,40 +1,97 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 14:49:27 +0200
-Subject: [PATCH 0/3] usb: chipidea: fix error handling and add dr_role
- property
-In-Reply-To: <20120627124233.GA2256@richard-laptop>
-References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
- <20120627124233.GA2256@richard-laptop>
-Message-ID: <4FEB0157.5070404@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 27 Jun 2012 14:50:47 +0200
+Subject: [PATCH 00/11] Prepare for OMAP2+ movement to Common Clk
+In-Reply-To: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+Message-ID: <1397795.nxQGnEDtVe@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 02:42 PM, Richard Zhao wrote:
-> On Wed, Jun 27, 2012 at 02:21:47PM +0200, Marc Kleine-Budde wrote:
->> Hello,
->>
->> while hacking on the chipidea driver, I fixed the error path in
->> the udc part of the chipidea driver. Further I added the possibility
->> to limit the driver to host or device only mode. It's possible via
->> platformdata and device tree. For dt I selected the dr_role property
->> which is already used for other dual role usb drivers.
-> What's it based on then?
+Hi Rajendra,
 
-Your tree:
-https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+On Friday 22 June 2012 19:17:59 Rajendra Nayak wrote:
+> Hi,
+> 
+> This is a preparatory series for the OMAP Common Clk
+> conversion. They mostly add clk_prepare/clk_unprepare
+> in OMAP drivers and platform code. Also gets
+> rid of omap_clk_get_by_name() and uses clk_get(), and
+> removes all direct 'struct clk' dereferrencing and
+> uses helpers similar to what is provided by Common
+> Clk.
 
-Marc
+I think you've missed drivers/media/video/omap3isp/isp.c. Should I send a 
+patch for that ? Do these changes depend on anything not yet in mainline that 
+I should apply to my tree for testing ?
+
+> Patches are boot tested on OMAP2430sdp, 3630 Beagle-Xm
+> and 4460 Panda.
+> 
+> Some of these patches were earlier posted as part of
+> OMAP2+ Common Clk conversion series [1] which is now
+> split into a preparatory series and actual CCF conversion
+> series.
+> 
+> Patches from this series can be found here
+> git://github.com/rrnayak/linux.git prepare-common-clk-3.5-rc3
+> 
+> regards,
+> Rajendra
+> 
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70299.html
+> 
+> Rajendra Nayak (11):
+>   ARM: omap: clk: add clk_prepare and clk_unprepare
+>   mmc: omap: add clk_prepare and clk_unprepare
+>   hwrng: omap: add clk_prepare and clk_unprepare
+>   mfd: omap-usb: add clk_prepare and clk_unprepare
+>   OMAPDSS: add clk_prepare and clk_unprepare
+>   gpio/omap: add clk_prepare and clk_unprepare
+>   w1: omap_hdq: add clk_prepare and clk_unprepare
+>   crypto: omap: add clk_prepare and clk_unprepare
+>   iommu: omap: add clk_prepare and clk_unprepare
+>   ARM: omap: hwmod: get rid of all omap_clk_get_by_name usage
+>   ARM: omap: clk: Remove all direct dereferencing of struct clk
+> 
+>  arch/arm/mach-omap2/board-apollon.c          |    4 +-
+>  arch/arm/mach-omap2/board-h4.c               |    6 +-
+>  arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
+>  arch/arm/mach-omap2/clkt2xxx_apll.c          |    2 +-
+>  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    4 +-
+>  arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |   18 +++---
+>  arch/arm/mach-omap2/clkt_clksel.c            |   84 ++++++++++++++++-------
+>  arch/arm/mach-omap2/clkt_dpll.c              |   24 ++++---
+>  arch/arm/mach-omap2/clock.c                  |    9 ++-
+>  arch/arm/mach-omap2/clock2420_data.c         |   17 +++++
+>  arch/arm/mach-omap2/clock2430_data.c         |   21 +++++++
+>  arch/arm/mach-omap2/clock3xxx.c              |    8 +-
+>  arch/arm/mach-omap2/clock3xxx_data.c         |   24 +++++++
+>  arch/arm/mach-omap2/clock44xx_data.c         |   17 +++++
+>  arch/arm/mach-omap2/display.c                |    4 +-
+>  arch/arm/mach-omap2/dpll3xxx.c               |   45 ++++++++------
+>  arch/arm/mach-omap2/gpmc.c                   |    2 +-
+>  arch/arm/mach-omap2/omap_hwmod.c             |   21 ++++---
+>  arch/arm/mach-omap2/omap_phy_internal.c      |    3 +
+>  arch/arm/mach-omap2/pm.c                     |    2 +-
+>  arch/arm/mach-omap2/pm24xx.c                 |    2 +
+>  arch/arm/mach-omap2/usb-fs.c                 |    4 +-
+>  arch/arm/plat-omap/include/plat/clock.h      |    4 +
+>  arch/arm/plat-omap/omap_device.c             |    6 +-
+>  drivers/char/hw_random/omap-rng.c            |    6 +-
+>  drivers/crypto/omap-aes.c                    |    2 +
+>  drivers/crypto/omap-sham.c                   |    2 +
+>  drivers/gpio/gpio-omap.c                     |    2 +
+>  drivers/iommu/omap-iommu.c                   |    2 +
+>  drivers/mfd/omap-usb-host.c                  |   20 ++++++
+>  drivers/mmc/host/omap.c                      |    9 ++-
+>  drivers/mmc/host/omap_hsmmc.c                |    6 +-
+>  drivers/video/omap2/dss/dsi.c                |    5 +-
+>  drivers/video/omap2/dss/hdmi.c               |    5 +-
+>  drivers/video/omap2/dss/venc.c               |    5 +-
+>  drivers/w1/masters/omap_hdq.c                |    8 +-
+>  36 files changed, 292 insertions(+), 113 deletions(-)
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/90b62bf5/attachment.sig>
+Laurent Pinchart
