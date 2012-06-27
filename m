@@ -1,34 +1,53 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:26:18 +0200
-Subject: [PATCH 8/8] ARM: LPC32xx: Remove unused gpios
+Date: Thu, 28 Jun 2012 00:26:13 +0200
+Subject: [PATCH 3/8] ARM: LPC32xx: Remove wrong re-initialization of MMC clock
+ register
 In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
 References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340835978-20331-9-git-send-email-stigge@antcom.de>
+Message-ID: <1340835978-20331-4-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+This patch fixes a bug, (wrongfully) resetting the value of
+LPC32XX_CLKPWR_MS_CTRL back to its initial contents (after careful setup). This
+was discovered only with a board/bootloader combination (EA3250) where the
+contents of the respective register wasn't already at the correct value on
+Linux boot.
 
-Remove SPI0_CS, MMC_CD and MMC_WP gpios as they moved to devicetree.
-
-Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- arch/arm/mach-lpc32xx/phy3250.c |    3 ---
- 1 file changed, 3 deletions(-)
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -51,12 +51,9 @@
- /*
-  * Mapped GPIOLIB GPIOs
-  */
--#define SPI0_CS_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
- #define LCD_POWER_GPIO		LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
- #define BKL_POWER_GPIO		LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
- #define MMC_PWR_ENABLE_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 5)
--#define MMC_CD_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 1)
--#define MMC_WP_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 0)
+---
+ arch/arm/mach-lpc32xx/clock.c |   10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
+
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
++++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
+@@ -871,7 +871,7 @@ static unsigned long mmc_round_rate(stru
  
- /*
-  * AMBA LCD controller
+ static int mmc_set_rate(struct clk *clk, unsigned long rate)
+ {
+-	u32 oldclk, tmp;
++	u32 tmp;
+ 	unsigned long prate, div, crate = mmc_round_rate(clk, rate);
+ 
+ 	prate = clk->parent->get_rate(clk->parent);
+@@ -879,16 +879,12 @@ static int mmc_set_rate(struct clk *clk,
+ 	div = prate / crate;
+ 
+ 	/* The MMC clock must be on when accessing an MMC register */
+-	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
+-		LPC32XX_CLKPWR_MS_CTRL);
+ 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
+ 		~LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(0xf);
+-	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(div);
++	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(div) |
++		LPC32XX_CLKPWR_MSCARD_SDCARD_EN;
+ 	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
+ 
+-	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
+-
+ 	return 0;
+ }
+ 
