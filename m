@@ -1,51 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Jun 2012 07:54:11 -0500
-Subject: [PATCH v3 0/4] DT clock bindings
-In-Reply-To: <20120621175443.GL4402@gmail.com>
-References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
- <87bokd15x7.fsf@octavius.laptop.org> <4FE33723.3040403@gmail.com>
- <20120621175443.GL4402@gmail.com>
-Message-ID: <4FEB0273.9050707@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Jun 2012 15:06:40 +0200
+Subject: [PATCH 0/3] usb: chipidea: fix error handling and add dr_role
+ property
+In-Reply-To: <4FEB0157.5070404@pengutronix.de>
+References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
+ <20120627124233.GA2256@richard-laptop> <4FEB0157.5070404@pengutronix.de>
+Message-ID: <4FEB0560.60306@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2012 12:54 PM, Mike Turquette wrote:
-> On 20120621-10:00, Rob Herring wrote:
->> On 06/21/2012 02:27 AM, Chris Ball wrote:
+On 06/27/2012 02:49 PM, Marc Kleine-Budde wrote:
+> On 06/27/2012 02:42 PM, Richard Zhao wrote:
+>> On Wed, Jun 27, 2012 at 02:21:47PM +0200, Marc Kleine-Budde wrote:
+>>> Hello,
 >>>
->>> 2) Use alloc_bootmem() instead of kzalloc() in of_clk_add_provider(),
->>>    because we need to set up clocks during .init_early on ARM (which
->>>    happens pre-slab) so that they are available for platform init.
->>
->> This depends on 1 as the common clock code would have the same issue.
->> Generally, the first place clocks are needed is the timer init. At that
->> point, you can call kzalloc. This is where all the clock init used to be
->> done until init_early was added and some platforms have moved their
->> clock init. I don't think there was really ever much reason to move it
->> other than to make the timer init function only deal with timer setup.
->>
+>>> while hacking on the chipidea driver, I fixed the error path in
+>>> the udc part of the chipidea driver. Further I added the possibility
+>>> to limit the driver to host or device only mode. It's possible via
+>>> platformdata and device tree. For dt I selected the dr_role property
+>>> which is already used for other dual role usb drivers.
+>> What's it based on then?
 > 
-> Hi Rob,
-> 
-> Just FYI I've been looking at using alloc_bootmem in the common clk code
-> as a way to get rid of the static initialization stuff (which only
-> existed due to very early initialization of timers).
+> Your tree:
+> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
 
-The slab is up at the time timers are initialized. The only real problem
-is mixing clock init into the timer init functions and clk init in
-init_early is cleaner in that regard.
+If it doesn't apply, I'll resend the series. I just discovered some
+patches in between. Sorry.
 
-> The suggested change above to of_clk_add_provider would jive well with
-> my change to the common clk code.
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Are you planning this for 3.6? If not, then this can be addressed at the
-time the clk framework supports bootmem.
-
-I'm not so sure more users of bootmem are desired. There seems to be
-some effort/desire to remove it:
-
-http://lists.linux-foundation.org/pipermail/ksummit-2012-discuss/2012-June/000562.html
-https://lkml.org/lkml/2012/3/13/586
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/074886.html
-
-Rob
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/8335d551/attachment.sig>
