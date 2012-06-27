@@ -1,67 +1,111 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Wed, 27 Jun 2012 11:41:47 +0530
-Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
-In-Reply-To: <1340761532-27231-1-git-send-email-khilman@ti.com>
-References: <1340761532-27231-1-git-send-email-khilman@ti.com>
-Message-ID: <CAM=Q2cuLCT2VzcUgrpyRWiX61t1F+iWchO9iLC=Ka9MFVm4_bQ@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 27 Jun 2012 08:19:44 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FE9EFD8.6010608@wwwdotorg.org>
+References: <20120615061236.GA4081@avionic-0098.mockup.avionic-design.de>
+ <20120619133001.GB24138@avionic-0098.mockup.avionic-design.de>
+ <4FE0EFBB.6090206@firmworks.com>
+ <20120621064722.GA1122@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6Bpfqm-0yGiBOXEhF4kD3PTDYvWVr0babLZ4GkBLXJiA@mail.gmail.com>
+ <20120622110038.GA15212@avionic-0098.mockup.avionic-design.de>
+ <4FE4A4B3.9010200@wwwdotorg.org> <4FE4AB2F.8090402@wwwdotorg.org>
+ <20120625063456.GB11469@avionic-0098.adnet.avionic-design.de>
+ <4FE9EFD8.6010608@wwwdotorg.org>
+Message-ID: <20120627061944.GB8496@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-Thanks for the patch ,
-a doubt below
+On Tue, Jun 26, 2012 at 11:22:32AM -0600, Stephen Warren wrote:
+> On 06/25/2012 12:34 AM, Thierry Reding wrote:
+> > On Fri, Jun 22, 2012 at 11:28:15AM -0600, Stephen Warren wrote:
+> >> On 06/22/2012 11:00 AM, Stephen Warren wrote:
+> >>> On 06/22/2012 05:00 AM, Thierry Reding wrote: ...
+> >>>> Stephen: can you try to find out whether the Tegra PCIe
+> >>>> controller indeed implements ECAM, or if this scheme is
+> >>>> actually just a proprietary variant?
+> >>> 
+> >>> Sure. I have added this request to the bug I filed requesting
+> >>> more complete PCIe host documentation.
+> >> 
+> >> I've received unofficial confirmation that we do indeed implement
+> >> a non-standard/non-ECAM mapping, and what's in our driver matches
+> >> our HW.
+> > 
+> > What I don't quite see yet is how the extended configuration space
+> > is supposed to work with the current driver. The PCIE_CONF_* macros
+> > don't provide for registers >= 256. Passing a value higher than
+> > that will mess with the device function field.
+> 
+> The current downstream driver is incorrect for that case. We should be
+> updating it (at least, I filed a bug to do this).
+> 
+> Here's how the HW works (I believe this information should be in some
+> future version of the TRM):
 
-On Wed, Jun 27, 2012 at 7:15 AM, Kevin Hilman <khilman@ti.com> wrote:
-> In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
-> failure.
-So the failure means that the usecount is incremented. However the
-device was not
-enabled. In that case could we consider
+Definitely. I'm having a hard time grasping all of this by just looking
+at the code. Some sort of functional description (like what you provide
+here) would be really useful.
 
-   void pm_runtime_put_noidle(struct device *dev);
-    - decrement the device's usage counter
+> There are 3 address spaces:
+> 
+> * The CPU bus.
+> 
+> * An internal (to the PCIe controller) 40-bit address space.
+> Apparently the layout is HyperTransport-based. Whether HT defines
+> this, or whether our HW engineers are referring to our particular
+> implementation of HT, I'm not sure.
+> 
+> * The PCIe external bus.
+> 
+> Accesses from the CPU to the PCIe controller's 1GB aperture are mapped
+> into the 40-bit bus using the BAR configurations in the PCIe
+> controller; I believe this is what tegra_pcie_setup_translations() is
+> configuring in our downstream driver.
+> 
+> Accesses are then mapped from this 40-bit bus to the external 32-bit
+> bus, I believe using a hard-coded mapping, which I believe may be
+> inherited from (our implementation of?) HyperTransport
 
-Which will only decrement the counter and does not try to disable it.
+This seems to be what is referred to as the FPCI in the TRM and the
+driver.
 
-However I am not sure what happens if you try to disable an already
-disabled device.
+> For config and extended config accesses the mapping from the internal
+> to external bus is as follows:
+> 
+> In the case of PCICFG space,
+> addr[39:28]=12'hFDF,
+> addr[27:24]=4'hE means type 0 and addr[27:24]=4'hF means type 1,
+> addr[23:16]=bus number
+> addr[15:11]=device number
+> addr[10:8]=function number
+> addr[7:0]=register number
+> 
+> In the case of EXTCFG space,
+> addr[39:32]=8'hFE,
+> addr[31:28]=4'h0 means type 0 and addr[31:28]=4'h1 means type 1,
+> addr[27:24]=upper register number (i.e. register number[11:8])
+> addr[23:16]=bus number
+> addr[15:11]=device number
+> addr[10:8]=function number
+> addr[7:0]=register number (i.e. register number[7:0])
+> 
+> (in actual fact, the HW matches the top 16 or 12 bits to determine
+> config/ext-config and transaction type, so the top two fields in the
+> lists above should really be considered merged)
 
->
-> Without this, after a failed xfer, the runtime PM usecount will have
-> been incremented, but not decremented
+Yes, this actually matches with the driver. Config space accesses are
+mapped to 0xfdff0000 and ext. config space accesses go to 0xfe100000.
 
-Agree.
+> I hope this helps!
 
-> causing the usecount to never
-> reach zero after a failure. ?This keeps the device always runtime PM
-> enabled which keeps the enclosing power domain active, and prevents
-> full-chip retention/off from happening during idle.
->
-> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> This patch applies to current i2c-embedded/for-next branch
->
-> ?drivers/i2c/busses/i2c-omap.c | ? ?2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 9895fa7..b105733 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -582,7 +582,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->
-> ? ? ? ?r = pm_runtime_get_sync(dev->dev);
-> ? ? ? ?if (IS_ERR_VALUE(r))
-> - ? ? ? ? ? ? ? return r;
-> + ? ? ? ? ? ? ? goto out;
->
-> ? ? ? ?r = omap_i2c_wait_for_bb(dev);
-> ? ? ? ?if (r < 0)
-> --
-> 1.7.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+I don't know how this works out for what Bjorn had in mind, but at least
+it'll allow the driver to be fixed for extended config space accesses.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/1018957d/attachment.sig>
