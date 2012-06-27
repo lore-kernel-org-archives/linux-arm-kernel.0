@@ -1,27 +1,34 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 27 Jun 2012 17:26:17 +0200
-Subject: [PATCH v7] MTD: LPC32xx SLC NAND driver
-In-Reply-To: <1340800392.1799.17.camel@sauron.fi.intel.com>
-References: <1339064536-20553-1-git-send-email-stigge@antcom.de>
- <1340794007.29342.50.camel@sauron.fi.intel.com> <4FEAF90B.5030809@antcom.de>
- <1340800392.1799.17.camel@sauron.fi.intel.com>
-Message-ID: <4FEB2619.8020000@antcom.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 27 Jun 2012 15:27:02 +0000
+Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
+ non-omap1 platforms
+In-Reply-To: <20120627135816.GK3483@atomide.com>
+References: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5096A@DBDE01.ent.ti.com>
+ <20120627133950.GJ3483@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA5BAF8@DBDE01.ent.ti.com>
+ <20120627135816.GK3483@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5BCCA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 02:33 PM, Artem Bityutskiy wrote:
-> On Wed, 2012-06-27 at 14:14 +0200, Roland Stigge wrote:
->> Thanks for the note! I'm sending an incremental patch. There was 
->> actually only one place in the two functions that could fail
->> (return code of lpc32xx_xfer()).
+On Wed, Jun 27, 2012 at 19:28:17, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120627 06:54]:
+> > 
+> > There are few cleanup patches pending for your review, it would be good if 
+> > you provide your review comments.
 > 
-> Could you please check the MCL patch as well and re-send it against
-> the l2 tree?
+> Hmm care to post the Subject: lines for those? I may have marked
+> something as read accidentally..
 > 
-> I've squashed your change into the driver and pushed out, thanks!
 
-Yes, thanks!
+I will resubmit the patches again ontop of linux-omap/master, makes more sense.
 
-Will post an updated MLC against l2-mtd later today.
+These patches are,
 
-Roland
+ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses omap-device.o target so add one entry
+ARM: OMAP2+: CLEANUP: Move omap3 dpll ops to dpll3xxx.c
+ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct dpll_data
+
+Thanks,
+Vaibhav	
