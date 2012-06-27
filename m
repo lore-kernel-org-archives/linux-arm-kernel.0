@@ -1,218 +1,69 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 15:21:33 +0200
-Subject: [PATCH 3/3] usb: chipidea: ci13xxx-imx: add "dr_role" property
- to device tree bindings
-In-Reply-To: <20120627131115.GB2256@richard-laptop>
-References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
- <1340799710-32696-4-git-send-email-mkl@pengutronix.de>
- <20120627131115.GB2256@richard-laptop>
-Message-ID: <4FEB08DD.6000801@pengutronix.de>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 27 Jun 2012 18:59:40 +0530
+Subject: Panda ES board hang when using GPIO as interrupt
+In-Reply-To: <4FE9FD77.7050807@broadcom.com>
+References: <4FE8CF77.5080400@broadcom.com>
+ <CAC83ZvL2ozQD1DYmtKeFa1PB1pZ1JmBUKFWmDWnbJOCDL3sKNg@mail.gmail.com>
+ <4FE9FD77.7050807@broadcom.com>
+Message-ID: <CAC83ZvK_ve-d8jZo9mOQ5aidYxFV5r1FUbTqEC3LxvkikOoFHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 03:11 PM, Richard Zhao wrote:
-> On Wed, Jun 27, 2012 at 02:21:50PM +0200, Marc Kleine-Budde wrote:
->> This patch allows the device tree to limit the chipidea to host or
->> peripheral mode only.
+On Tue, Jun 26, 2012 at 11:50 PM, Franky Lin <frankyl@broadcom.com> wrote:
+> On 06/26/2012 12:21 AM, DebBarma, Tarun Kanti wrote:
 >>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    4 ++
->>  arch/arm/boot/dts/imx28.dtsi                       |    1 +
->>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->>  drivers/usb/chipidea/core.c                        |   40 +++++++++++++++++---
->>  include/linux/usb/chipidea.h                       |    9 +++++
->>  5 files changed, 51 insertions(+), 6 deletions(-)
+>> On Tue, Jun 26, 2012 at 2:22 AM, Franky Lin <frankyl@broadcom.com> wrote:
+>>>
+>>> Hi Kevin, Tarun,
+>>>
+>>> We are using the expansion connector A on Panda board to mount a SDIO
+>>> WiFi
+>>> dongle on MMC2 with a level triggered interrupt signal connected to GPIO
+>>> 138. It's been working fine until 3.5 rc1. The board hang randomly within
+>>> 5
+>>> mins during a network traffic test. After bisecting we found the culprit
+>>> is
+>>> "[PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()" [1].
+>>>
+>>> I noticed Kevin raised some similar cases on other platforms and also
+>>> provided two patches in the patch mail thread. But unfortunately those
+>>> two
+>>> patches doesn't help in our case. I tested the driver with 3.5-rc3
+>>> mainline
+>>> kernel and the issue is still there. I can only "fix" the hang by either
+>>> reverting the commit or disabling CONFIG_PM_RUNTIME. Also, the hang only
+>>> happens on Panda ES board. Old Panda with 4430 works good.
+>>>
+>>> Any thoughts and suggestions?
 >>
->> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->> index 8bcd071..f55f2d5 100644
->> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->> @@ -4,6 +4,9 @@ Required properties:
->>  - compatible: Should be "fsl,imx27-usb"
->>  - reg: Should contain registers location and length
->>  - interrupts: Should contain controller interrupt
->> +- dr_mode: indicates the working mode for "fsl,imx27-usb" compatible
->                                               ^^^^^^^^^^^^^
-> The word seems redundant?
-
-Yes, can remove it. (I reused the existing documentation from
-fsl-usb.txt, see below.)
-
->> +  controllers. Can be "host", "peripheral", or "otg". Defaults to
->> +  "otg" if not defined.
-
-> How about fsl,force-role = "host" or "gadget" ?
-> or fsl,force-host and fsl,force-gadget properties.
-> If you're trying to make it generic, do anyone else have the case
-> besides imx?
-
-I forgot to mention, that there are already two documented users of this
-property. They Both use peripheral instead of gadget. see:
-
-Documentation/devicetree/bindings/usb/tegra-usb.txt
-Documentation/devicetree/bindings/usb/fsl-usb.txt
-
->>  
->>  Optional properties:
->>  - fsl,usbphy: phandler of usb phy that connects to the only one port
->> @@ -17,4 +20,5 @@ usb at 02184000 { /* USB OTG */
->>  	interrupts = <0 43 0x04>;
->>  	fsl,usbphy = <&usbphy1>;
->>  	fsl,vbus-power-gpios = <&gpio3 22 0>;
->> +	dr_mode= "otg";
->>  };
->> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
->> index 65d6ae3..9cbf9b9 100644
->> --- a/arch/arm/boot/dts/imx28.dtsi
->> +++ b/arch/arm/boot/dts/imx28.dtsi
-> You can not put arch/ part in the same patch.
-
-Okay.
-
->> @@ -467,6 +467,7 @@
->>  			interrupts = <93>;
->>  			fsl,usbphy = <&usbphy0>;
->>  			status = "disabled";
->> +			dr_mode = "host";
->>  		};
->>  
->>  		usb1: usb at 80090000 {
->> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
->> index efae2be..8e926fb 100644
->> --- a/drivers/usb/chipidea/ci13xxx_imx.c
->> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
->> @@ -120,6 +120,9 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
->>  		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
->>  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
->>  	}
->> +
->> +	ci13xxx_get_dr_mode(pdev->dev.of_node, &ci13xxx_imx_platdata);
->> +
->>  	plat_ci = ci13xxx_add_device(&pdev->dev,
->>  				pdev->resource, pdev->num_resources,
->>  				&ci13xxx_imx_platdata);
->> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->> index 1083585..89d2cae 100644
->> --- a/drivers/usb/chipidea/core.c
->> +++ b/drivers/usb/chipidea/core.c
->> @@ -63,6 +63,7 @@
->>  #include <linux/kernel.h>
->>  #include <linux/slab.h>
->>  #include <linux/pm_runtime.h>
->> +#include <linux/of_platform.h>
-> It makes core code depends on of. Do you really mean it?
-
-No. I didn't test on non of-enabled archs. However I think there are
-of-stubs available:
-
-http://lxr.free-electrons.com/source/include/linux/of.h#L320
-
-Marc
-> 
-> Thanks
-> Richard
->>  #include <linux/usb/ch9.h>
->>  #include <linux/usb/gadget.h>
->>  #include <linux/usb/otg.h>
->> @@ -386,6 +387,23 @@ void ci13xxx_remove_device(struct platform_device *pdev)
->>  }
->>  EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
->>  
->> +void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
->> +{
->> +	const unsigned char *dr_mode;
->> +
->> +	dr_mode = of_get_property(of_node, "dr_mode", NULL);
->> +	if (!dr_mode)
->> +		return;
->> +
->> +	if (!strcmp(dr_mode, "host"))
->> +		pdata->flags |= CI13XXX_DR_MODE_HOST;
->> +	else if (!strcmp(dr_mode, "peripheral"))
->> +		pdata->flags |= CI13XXX_DR_MODE_PERIPHERAL;
->> +	else if (!strcmp(dr_mode, "otg"))
->> +		pdata->flags |= CI13XXX_DR_MODE_OTG;
->> +}
->> +EXPORT_SYMBOL_GPL(ci13xxx_get_dr_mode);
->> +
->>  static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->>  {
->>  	struct device	*dev = &pdev->dev;
->> @@ -446,13 +464,23 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->>  	}
->>  
->>  	/* initialize role(s) before the interrupt is requested */
->> -	ret = ci_hdrc_host_init(ci);
->> -	if (ret)
->> -		dev_info(dev, "doesn't support host\n");
->> +	/* default to otg */
->> +	if (!(ci->platdata->flags & CI13XXX_DR_MODE_MASK))
->> +		ci->platdata->flags |= CI13XXX_DR_MODE_OTG;
->> +
->> +	if (ci->platdata->flags &
->> +	    (CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_OTG)) {
->> +		ret = ci_hdrc_host_init(ci);
->> +		if (ret)
->> +			dev_info(dev, "doesn't support host\n");
->> +	}
->>  
->> -	ret = ci_hdrc_gadget_init(ci);
->> -	if (ret)
->> -		dev_info(dev, "doesn't support gadget\n");
->> +	if (ci->platdata->flags &
->> +	    (CI13XXX_DR_MODE_PERIPHERAL | CI13XXX_DR_MODE_OTG)) {
->> +		ret = ci_hdrc_gadget_init(ci);
->> +		if (ret)
->> +			dev_info(dev, "doesn't support gadget\n");
->> +	}
->>  
->>  	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
->>  		dev_err(dev, "no supported roles\n");
->> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
->> index 544825d..29ad908 100644
->> --- a/include/linux/usb/chipidea.h
->> +++ b/include/linux/usb/chipidea.h
->> @@ -19,6 +19,12 @@ struct ci13xxx_platform_data {
->>  #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
->>  #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
->>  #define CI13XXX_DISABLE_STREAMING	BIT(3)
->> +#define CI13XXX_DR_MODE_HOST		BIT(4)
->> +#define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
->> +#define CI13XXX_DR_MODE_OTG		BIT(6)
->> +#define CI13XXX_DR_MODE_MASK \
->> +	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL | \
->> +	 CI13XXX_DR_MODE_OTG)
->>  
->>  #define CI13XXX_CONTROLLER_RESET_EVENT		0
->>  #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
->> @@ -35,4 +41,7 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
->>  /* Remove ci13xxx device */
->>  void ci13xxx_remove_device(struct platform_device *pdev);
->>  
->> +/* Parse of-tree "dr_mode" property */
->> +void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
->> +
->>  #endif
->> -- 
->> 1.7.10
->>
+>> I just had a quick look at the code. Can you please check if the
+>> attached patch solves
+>> the issue? I just boot tested on Panda and Blaze.
 >> --
->> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Tarun
+>>
+>
+> Thanks for the prompt reply.
+>
+> Booting is fine even without the patch and revert. The wifi dongle generates
+> interrupt whenever there is data packet available for host to read. So
+> during a traffic test a significant numbers of interrupt will be triggered
+> through the GPIO. So I assume it has something to do with the interrupt
+> GPIO.
+>
+> With the patch, the kernel still crashes. But the symptom is slightly
+> different. Now it has a panic log every time. See attachment.
+I tried comparing the present code with older version with regard
+to enabled_non_wakeup_gpios check. The obvious difference I
+observed is that this check is performed after off-mode check,
+unlike the present case where the check is done just prior to
+off-mode check. But then, as Kevin pointed out, we need to understand
+the exact problem. I am trying to have a setup to reproduce the
+problem. BTW, you can ignore my patch because I realized that
+saved_datain is part of the workaround.
+---
+Tarun
 
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/39fed723/attachment.sig>
+>
+> Regards,
+> Franky
