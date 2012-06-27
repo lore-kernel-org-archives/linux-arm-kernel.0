@@ -1,31 +1,45 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 27 Jun 2012 17:26:45 +0100
-Subject: [PATCH 2/3] arm: mach-mvebu: check result of of_match_node()
-In-Reply-To: <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1340814406-26010-3-git-send-email-ben.dooks@codethink.co.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 27 Jun 2012 18:28:51 +0200
+Subject: [PATCH v2] clk: Add support for rate table based dividers
+In-Reply-To: <1340794893-20869-1-git-send-email-rnayak@ti.com>
+References: <1340794893-20869-1-git-send-email-rnayak@ti.com>
+Message-ID: <20120627162851.GT1623@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Report if of_match_node() fails.
+On Wed, Jun 27, 2012 at 04:31:33PM +0530, Rajendra Nayak wrote:
+> Some divider clks do not have any obvious relationship
+> between the divider and the value programmed in the
+> register. For instance, say a value of 1 could signify divide
+> by 6 and a value of 2 could signify divide by 4 etc.
+> Also there are dividers where not all values possible
+> based on the bitfield width are valid. For instance
+> a 3 bit wide bitfield can be used to program a value
+> from 0 to 7. However its possible that only 0 to 4
+> are valid values.
+> 
+> All these cases need the platform code to pass a simple
+> table of divider/value tuple, so the framework knows
+> the exact value to be written based on the divider
+> calculation and can also do better error checking.
+> 
+> This patch adds support for such rate table based
+> dividers.
+> 
+> Also since this means adding a new parameter to the
+> clk_register_divider(), update all existing users of
+> it.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/mach-mvebu/system-controller.c |    1 +
- 1 file changed, 1 insertion(+)
+I'm not sure whether we should overload the divider code with another
+type of divider. Maybe it would be better to add a new
+clk-divider-table.c for this? Just an idea, the result may or may not be
+better.
 
-diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-index f39023b..850f8d2 100644
---- a/arch/arm/mach-mvebu/system-controller.c
-+++ b/arch/arm/mach-mvebu/system-controller.c
-@@ -93,6 +93,7 @@ static int __init mvebu_system_controller_init(void)
- 	if (np) {
- 		const struct of_device_id *match =
- 		    of_match_node(of_system_controller_table, np);
-+		BUG_ON(!match);
- 		system_controller_base = of_iomap(np, 0);
- 		mvebu_sc = (struct mvebu_system_controller *)match->data;
- 	}
+Sascha
+
+
 -- 
-1.7.10
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
