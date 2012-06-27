@@ -1,54 +1,44 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Wed, 27 Jun 2012 14:33:15 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <4FEAF75E.5090505@cam.ac.uk>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <201206271400.11727.marex@denx.de> <4FEAF75E.5090505@cam.ac.uk>
-Message-ID: <201206271433.15303.jbe@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Jun 2012 05:33:55 -0700
+Subject: [GIT PULL] OMAP PM: misc. cleanup for v3.6
+In-Reply-To: <87d34mdysc.fsf@ti.com>
+References: <87d34mdysc.fsf@ti.com>
+Message-ID: <20120627123354.GF3483@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+* Kevin Hilman <khilman@ti.com> [120626 05:53]:
+> Tony,
+> 
+> Please pull the following misc. PM cleanups for v3.6.
+> 
+> Kevin
+> 
+> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+> 
+>   Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/cleanup/pm
+> 
+> for you to fetch changes up to b110547e586eb5825bc1d04aa9147bff83b57672:
+> 
+>   ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after bad one (2012-06-19 15:23:29 -0700)
+> 
+> ----------------------------------------------------------------
+> Daniel Lezcano (1):
+>       ARM: OMAP3/4: consolidate cpuidle Makefile
+> 
+> Mark A. Greer (1):
+>       ARM: OMAP3: PM: Only access IVA if one exists
+> 
+> Nishanth Menon (1):
+>       ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after bad one
 
-Jonathan Cameron wrote:
-> [...]
-> >>>>> [...]
-> >>>>>
-> >>>>>>> Take a look at:
-> >>>>>>> http://www.spinics.net/lists/linux-iio/msg04345.html
-> >>>>>>
-> >>>>>> Any progress here with inclusion in some git tree?
-> >>>>>
-> >>>>> Well ... I recently raised from the dead. It's on the schedule,
-> >>>>> obviously help is welcome.
-> >>>>
-> >>>> I tried a little bit with your driver. The disadvantage I see is, its
-> >>>> claims all the free AD channels. But a few of them can also act as a
-> >>>> touchscreen controller. Shouldn't be the driver handle the channel
-> >>>> usage dynamically?
-> >>>
-> >>> I wonder, I'd rather see this driver behave as a composite driver, what
-> >>> do you think?
-> >>
-> >> Alternative (though it's still in development) would be to use IIO
-> >> as the ADC layer and sit the other parts on top.
-> >
-> > I think you need to adjust a few bits there and there in the hardware to
-> > behave as a touchscreen. Will IIO be able to handle that somehow ?
->
-> No means of doing it yet.  I'm not entirely sure this can be done
-> generically. I'm not really familiar enough with touchscreen adcs as
-> none of my boards have one.  At worst I'm sure we can put some
-> hooks in to get hold of the underlying device if necessary.
-
-It requires a more or less complex state-machine to switch the used 4 or 5 
-pins to different modes to measure the X/Y position and the pressure. And 
-these pins interfere with the ADC input pins.
-
-> [...]
+Thanks I'll pull these into fixes-non-critical as all three patches seem
+to fix something.
 
 Regards,
-Juergen
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
+
+Tony
