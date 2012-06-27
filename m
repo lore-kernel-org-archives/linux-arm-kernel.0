@@ -1,57 +1,39 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 26 Jun 2012 20:43:32 -0500
-Subject: [PATCH 07/11] I2C: OMAP: Handle error check for pm runtime
-In-Reply-To: <1338288983-15026-8-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Tue, 29 May 2012 16:26:19 +0530")
-References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
- <1338288983-15026-8-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <874npxv8aj.fsf@ti.com>
+Date: Tue, 26 Jun 2012 18:45:32 -0700
+Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
+Message-ID: <1340761532-27231-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
+failure.
 
-> If PM runtime get_sync fails return with the error
-> so that no further reads/writes goes through the interface.
-> This will avoid possible abort. Add a error message in case
-> of failure with the cause of the failure.
->
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Without this, after a failed xfer, the runtime PM usecount will have
+been incremented, but not decremented causing the usecount to never
+reach zero after a failure.  This keeps the device always runtime PM
+enabled which keeps the enclosing power domain active, and prevents
+full-chip retention/off from happening during idle.
 
-This patch introduced a regression where the runtime PM usecount will
-never reach zero and so CORE retention is prevented after any xfer
-failures...
+Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+This patch applies to current i2c-embedded/for-next branch
 
-> ---
-> -v10 Use IS_ERR_VALUE
-> -v9 Fix the error handling
->
->  drivers/i2c/busses/i2c-omap.c |   14 +++++++++++---
->  1 files changed, 11 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 44e8cfa..c39b72f 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -585,7 +585,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  	int i;
->  	int r;
->  
-> -	pm_runtime_get_sync(dev->dev);
-> +	r = pm_runtime_get_sync(dev->dev);<
-> +	if (IS_ERR_VALUE(r))
-> +		return r;
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This return should be 'goto out' so the runtime PM usecount is
-decremented by the 'put'.  Otherwise, after failure, the usecount
-remains non-zero, so the device is considered 'active' and keeps the
-containing power domain active.
-
-I found this on a 3730/OveroSTORM where the suspend/resume of MMC fails
-because I2C is already suspended.  After the suspend though, the CORE
-powerdomain never again hits retention, and I tracked it down to this.
-
-I'll send a separate patch to fix this shortly.
-
-Kevin 
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 9895fa7..b105733 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -582,7 +582,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+-		return r;
++		goto out;
+ 
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
+-- 
+1.7.9.2
