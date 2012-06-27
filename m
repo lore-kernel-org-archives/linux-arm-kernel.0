@@ -1,52 +1,96 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 27 Jun 2012 21:01:19 +0200
-Subject: [PATCH V2] ARM: dt: tegra: paz00: add regulators
-In-Reply-To: <4FEB5741.6020400@wwwdotorg.org>
-References: <1340757060-27232-1-git-send-email-swarren@wwwdotorg.org>
- <21985997.TUGv5fZBXQ@ax5200p> <4FEB5741.6020400@wwwdotorg.org>
-Message-ID: <3814450.qCgZjqmj5N@ax5200p>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 27 Jun 2012 14:28:47 -0400
+Subject: [PATCH] ARM: Orion: Fix Virtual/Physical mixup with watchdog
+In-Reply-To: <1340028906-19262-1-git-send-email-andrew@lunn.ch>
+References: <1340028906-19262-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20120627182847.GD3112@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 June 2012 12:56:01 Stephen Warren wrote:
-> On 06/27/2012 12:50 PM, Marc Dietrich wrote:
-> > On Wednesday 27 June 2012 12:31:01 Mark Brown wrote:
-> >> On Tue, Jun 26, 2012 at 06:31:00PM -0600, Stephen Warren wrote:
-> >>> sm1: HW defaults and schematic match at 1.0v. marvin24's kernel had a
-> >>> max
-> >>> of 1.125v, but this wasn't applied since apply_uV wasn't set.
-> >> 
-> >> apply_uV is only valid if a single voltage is specified.
-> > 
-> > yes, that's why there is a ".apply_uV = (_minmv == _maxmv)" in the
-> > regulator macro.
-> > 
-> >> If a voltage
-> >> range were specified and it were acted on we'd take the lowest (not
-> >> highest) voltage allowed.
-> > 
-> > Sorry, I don't get it. In this case, the board wouldn't boot at all
-> > because
-> > nearly all supplies would be undervoltaged. I just checked and all
-> > voltages
-> > are actually set to the *highest* (max) value. Maybe they aren't changed
-> > at
-> > all?
+On Mon, Jun 18, 2012 at 04:15:06PM +0200, Andrew Lunn wrote:
+> The orion watchdog is expecting to be passed the physcial address of
+> the hardware, and will ioremap() it to give a virtual address it will
+> use as the base address for the hardware. However, when creating the
+> platform resource record, a virtual address was being used.
 > 
-> Yes, in the absence of any explicit action (i.e. a call to
-> regulator_set_voltage() elsewhere), the regulator core doesn't reprogram
-> the regulator at registration time, except for a few specific conditions
-> e.g. something like when min==max and apply_uV is set.
+> Add the necassary #define's so we can pass the physical address as
+> expected.
 > 
-> I imagine the DVFS code in your downstream kernel /is/ calling
-> regulator_set_voltage() later, assuming that config option is enabled
-> anyway. See arch/arm/mach-tegra/{dvfs.c,tegra2_dvfs.c}.
+> Tested on Kirkwood and Orion5x.
+> 
+> Cc: stable <stable@vger.kernel.org>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Great, so all the tables (except sm0/1) were moot :-( At least I learned 
-something again ;-)
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Stephen, I'm going to test your patch, just a few minutes ...
-
-Thanks
-
-Marc
+> ---
+>  arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    1 +
+>  arch/arm/mach-kirkwood/include/mach/kirkwood.h    |    1 +
+>  arch/arm/mach-orion5x/include/mach/bridge-regs.h  |    2 +-
+>  arch/arm/mach-orion5x/include/mach/orion5x.h      |    1 +
+>  arch/arm/plat-orion/common.c                      |    2 +-
+>  5 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+> index 3eee37a..a115142 100644
+> --- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+> +++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+> @@ -38,6 +38,7 @@
+>  #define IRQ_MASK_HIGH_OFF	0x0014
+>  
+>  #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
+> +#define TIMER_PHYS_BASE		(BRIDGE_PHYS_BASE | 0x0300)
+>  
+>  #define L2_CONFIG_REG		(BRIDGE_VIRT_BASE | 0x0128)
+>  #define L2_WRITETHROUGH		0x00000010
+> diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+> index fede3d5..c5b6851 100644
+> --- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+> +++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+> @@ -80,6 +80,7 @@
+>  #define  UART1_VIRT_BASE	(DEV_BUS_VIRT_BASE | 0x2100)
+>  
+>  #define BRIDGE_VIRT_BASE	(KIRKWOOD_REGS_VIRT_BASE | 0x20000)
+> +#define BRIDGE_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE | 0x20000)
+>  
+>  #define CRYPTO_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE | 0x30000)
+>  
+> diff --git a/arch/arm/mach-orion5x/include/mach/bridge-regs.h b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+> index 96484bc..11a3c1e 100644
+> --- a/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+> +++ b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+> @@ -35,5 +35,5 @@
+>  #define MAIN_IRQ_MASK		(ORION5X_BRIDGE_VIRT_BASE | 0x204)
+>  
+>  #define TIMER_VIRT_BASE		(ORION5X_BRIDGE_VIRT_BASE | 0x300)
+> -
+> +#define TIMER_PHYS_BASE		(ORION5X_BRIDGE_PHYS_BASE | 0x300)
+>  #endif
+> diff --git a/arch/arm/mach-orion5x/include/mach/orion5x.h b/arch/arm/mach-orion5x/include/mach/orion5x.h
+> index 2745f5d..683e085 100644
+> --- a/arch/arm/mach-orion5x/include/mach/orion5x.h
+> +++ b/arch/arm/mach-orion5x/include/mach/orion5x.h
+> @@ -82,6 +82,7 @@
+>  #define  UART1_VIRT_BASE		(ORION5X_DEV_BUS_VIRT_BASE | 0x2100)
+>  
+>  #define ORION5X_BRIDGE_VIRT_BASE	(ORION5X_REGS_VIRT_BASE | 0x20000)
+> +#define ORION5X_BRIDGE_PHYS_BASE	(ORION5X_REGS_PHYS_BASE | 0x20000)
+>  
+>  #define ORION5X_PCI_VIRT_BASE		(ORION5X_REGS_VIRT_BASE | 0x30000)
+>  
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 61fd837..c179378 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -582,7 +582,7 @@ void __init orion_spi_1_init(unsigned long mapbase)
+>   * Watchdog
+>   ****************************************************************************/
+>  static struct resource orion_wdt_resource =
+> -		DEFINE_RES_MEM(TIMER_VIRT_BASE, 0x28);
+> +		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
+>  
+>  static struct platform_device orion_wdt_device = {
+>  	.name		= "orion_wdt",
+> -- 
+> 1.7.10
+> 
