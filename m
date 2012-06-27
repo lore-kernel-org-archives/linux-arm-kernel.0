@@ -1,11 +1,10 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 27 Jun 2012 13:47:57 +0200
-Subject: [PATCH 1/2] ARM: dts: imx28: Add additionnal muxing options to
- iMX28 DTSI
-In-Reply-To: <1340785092-27035-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 27 Jun 2012 13:48:19 +0200
+Subject: [PATCH 2/2] ARM: MXS: Add Crystalfontz CFA-10036 DTS
+In-Reply-To: <1340785092-27035-3-git-send-email-maxime.ripard@free-electrons.com>
 References: <1340785092-27035-1-git-send-email-maxime.ripard@free-electrons.com>
- <1340785092-27035-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201206271347.57707.marex@denx.de>
+ <1340785092-27035-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201206271348.19397.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,49 +12,78 @@ Dear Maxime Ripard,
 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> Cc: Brian Lily <brian@crystalfontz.com>
 
 Reviewed-by: Marek Vasut <marex@denx.de>
 
+> Cc: Brian Lily <brian@crystalfontz.com>
 > ---
->  arch/arm/boot/dts/imx28.dtsi |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+>  arch/arm/boot/dts/cfa10036.dts |   43
+> ++++++++++++++++++++++++++++++++++++++++ arch/arm/mach-mxs/mach-mxs.c   | 
+>   1 +
+>  2 files changed, 44 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/cfa10036.dts
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 4634cb8..2b067d2 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -167,6 +167,14 @@
->  					fsl,pull-up = <0>;
->  				};
-> 
-> +				duart_pins_b: duart at 1 {
-> +					reg = <1>;
-> +					fsl,pinmux-ids = <0x3022 0x3032>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
+> diff --git a/arch/arm/boot/dts/cfa10036.dts
+> b/arch/arm/boot/dts/cfa10036.dts new file mode 100644
+> index 0000000..28b9326
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/cfa10036.dts
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright 2012 Free Electrons
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 > +
->  				mac0_pins_a: mac0 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <0x4000 0x4010 0x4020
-> @@ -196,6 +204,15 @@
->  					fsl,pull-up = <1>;
->  				};
-> 
-> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x2000 0x2010 0x2020
-> +						0x2030 0x2080 0x2090 0x20a0>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
+> +/dts-v1/;
+> +/include/ "imx28.dtsi"
 > +
->  				mmc0_cd_cfg: mmc0-cd-cfg {
->  					fsl,pinmux-ids = <0x2090>;
->  					fsl,pull-up = <0>;
+> +/ {
+> +	model = "Crystalfontz CFA-10036 Board";
+> +	compatible = "crystalfontz,cfa10036", "fsl,imx28";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;
+> +	};
+> +
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			ssp0: ssp at 80010000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&mmc0_4bit_pins_a
+> +					&mmc0_cd_cfg &mmc0_sck_cfg>;
+> +				bus-width = <4>;
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			duart: serial at 80074000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&duart_pins_b>;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 8cac94b..7f4d6a9 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -97,6 +97,7 @@ static const char *imx23_dt_compat[] __initdata = {
+>  };
+> 
+>  static const char *imx28_dt_compat[] __initdata = {
+> +	"crystalfontz,cfa10036",
+>  	"fsl,imx28-evk",
+>  	"fsl,imx28",
+>  	NULL,
 
 Best regards,
 Marek Vasut
