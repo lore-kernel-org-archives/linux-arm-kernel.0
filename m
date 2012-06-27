@@ -1,39 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 28 Jun 2012 00:29:25 +1000
-Subject: linux-next: adding the common clk tree
-In-Reply-To: <20120626230503.GA4402@gmail.com>
-References: <20120626015551.GW4402@gmail.com>
- <20120626132502.7584f6acbfc23bdc3d6a8f8e@canb.auug.org.au>
- <20120626230503.GA4402@gmail.com>
-Message-ID: <20120628002925.dd144b4782398042593b6b47@canb.auug.org.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Jun 2012 07:58:45 -0700
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+References: <cover.1340778002.git.afzal@ti.com>
+ <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+Message-ID: <20120627145844.GL3483@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+* Afzal Mohammed <afzal@ti.com> [120626 23:53]:
+> Reorganize gpmc-onenand initialization so that changes
+> required for gpmc driver migration can be made smooth.
+> 
+> Ensuring sync read/write are disabled in onenand cannot
+> be expected to work properly unless GPMC is setup, this
+> has been removed.
+> 
+> Refactor set_async_mode & set_sync_mode functions to
+> separate out timing calculation & actual configuration
+> (GPMC & OneNAND side).
 
-On Tue, 26 Jun 2012 16:05:03 -0700 Mike Turquette <mturquette@ti.com> wrote:
->
-> So please let me know if I still have the concept wrong and I'll change
-> things up.  Otherwise my clk-next fulfils all of the guidelines you've
-> mentioned below for inclusion into linux-next.
+The last patch in this series causes onenand not to show
+up on my n900. I believe the problem has been there earlier
+too, but I just did not notice it.
 
-OK, that all seems to be fine.  I would make one suggestion: that you
-create the clk-next branch like this:
+Without the last patch in this series I get:
 
-git checkout clk-next
-git reset --hard clk-3.x
-git merge clk-fixes
-git am patches/clk/next/incoming/*.patch
+[    1.650207] OneNAND driver initializing
+[    1.655487] omap2-onenand omap2-onenand: initializing on CS0, phys base 0x04000000, virtual base d0880000, freq 83 MHz
+[    1.666931] OneNAND Manufacturer: Numonyx (0x20)
+[    1.671905] Muxed OneNAND 256MB 1.8V 16-bit (0x40)
+[    1.676971] OneNAND version = 0x0031
+[    1.918762] Creating 6 MTD partitions on "omap2-onenand":
 
-or maybe just merge clk-fixes directly into clk-3.x when necessary or
-from time to time and base clk-next just in clk-3.x.
---
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120628/c338de11/attachment.sig>
+And with this patch applied I get:
+
+[    1.634643] OneNAND driver initializing
+[    1.640075] omap2-onenand omap2-onenand: initializing on CS0, phys base 0x04000000, virtual base d0880000, freq 54 MHz
+[    1.651519] OneNAND Manufacturer: Unknown (0xa0)
+
+Any ideas?
+
+Tony
