@@ -1,34 +1,28 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 28 Jun 2012 14:40:27 +0000
-Subject: [PATCH] ARM: OMAP2+: hwmod: Add new sysc_type3 into omap_hwmod
- required for am33xx
-In-Reply-To: <alpine.DEB.2.00.1204271934230.10308@utopia.booyaka.com>
-References: <1329481488-27771-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204271934230.10308@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA5D46A@DBDE01.ent.ti.com>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Wed, 27 Jun 2012 05:41:32 +0000
+Subject: how to specify dma_mask and coherent_dma_mask in hwmod
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 07:04:38, Paul Walmsley wrote:
-> On Fri, 17 Feb 2012, Vaibhav Hiremath wrote:
+> -----Original Message-----
+> From: N, Mugunthan V
+> Sent: Thursday, June 07, 2012 9:52 PM
+> To: 'linux-omap at vger.kernel.org'
+> Cc: 'linux-arm-kernel at lists.infradead.org'
+> Subject: how to specify dma_mask and coherent_dma_mask in hwmod
 > 
-> > In case of AM33xx family of devices (like cpsw) have different sysc
-> > bit field offsets defined,
-> > 
-> > sysc_type3:
-> > |  3     2  |  1    0  |
-> > | STDBYMODE | IDLEMODE |
-> > 
-> > So introduce new sysc_type3 in omap_hwmod common data.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Hi
 > 
-> Thanks, queued for 3.5.
-> 
+> While converting platform device registry to Hwmod for CPSW Ethernet
+> driver which is present in AM335X (OMAP2+), I am not finding a way to
+> specify
+> dma_mask and coherent_dma_mask.
+> Is there a way to specify dma_mask and coherent_dma_mask in hwmod?
 
-We missed this patch last time, can you pleas make sure to include it this 
-time.
+Ping, any one has comment on this?
 
-Thanks,
-Vaibhav
+> 
+> ---
+> Regards,
+> Mugunthan V N.
