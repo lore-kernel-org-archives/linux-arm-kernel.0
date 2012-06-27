@@ -1,39 +1,32 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 27 Jun 2012 19:37:52 +0800
-Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
-In-Reply-To: <20120626214416.GB4878@kroah.com>
-References: <1340615374-21352-1-git-send-email-mkl@pengutronix.de>
- <4FE82B67.8010601@pengutronix.de> <20120626214416.GB4878@kroah.com>
-Message-ID: <CANg6MZiqm769t+BqqmyveaiF64STHLHfTvQpB4T0kAMd9PfLgA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 27 Jun 2012 12:40:03 +0100
+Subject: [RFC 0/3] Add cyclic DMA support to OMAP DMA engine driver
+In-Reply-To: <20120625111847.GE19226@n2100.arm.linux.org.uk>
+References: <20120622085911.GA19026@n2100.arm.linux.org.uk>
+ <20120622123013.GA7586@sirena.org.uk>
+ <20120622131750.GB19226@n2100.arm.linux.org.uk>
+ <20120622161155.GM4037@opensource.wolfsonmicro.com>
+ <20120625111847.GE19226@n2100.arm.linux.org.uk>
+Message-ID: <20120627114003.GG308@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 5:44 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Mon, Jun 25, 2012 at 11:12:07AM +0200, Marc Kleine-Budde wrote:
->> On 06/25/2012 11:09 AM, Marc Kleine-Budde wrote:
->> > If udc_start() fails the qh_pool dma-pool cannot be closed because
->> > it's still in use. This patch factors out the dma_pool_free() loop
->> > into destroy_eps() and calls it in the error path of udc_start(),
->> > too.
->> >
->> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> > ---
->>
->> This patch applies on top of Richard's just published imx-chipindea
->> tree. (https://github.com/riczhao/kernel-imx/commits/topics/usb-driver)
->
-> As that tree is still changing, is someone going to pick this up and add
-> it to that tree?
-It's my tree.
-Marc, If you agree, I can queue it and send it out when my patch get upstreamed.
+On Mon, Jun 25, 2012 at 12:18:47PM +0100, Russell King - ARM Linux wrote:
 
-Thanks
-Richard
->
-> thanks,
->
-> greg k-h
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> It appears to be something to do with the jack detection that's going wrong.
+> If I start the audio with the jack disconnected, I never get anything out
+> of the board.  It requires the jack to be connected before the first use.
+> The on-board speakers used to work without the jack plugged in at one time
+> but they seem to be completely non-functional now.
+
+> Confused.
+
+Me too - there's nothing obvious in the code just from inspection that
+would affect this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/66482047/attachment.sig>
