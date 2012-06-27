@@ -1,57 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 27 Jun 2012 13:12:16 -0600 (MDT)
-Subject: Current state of AM33xx patches
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
-References: <4FD5BA4C.9070706@gmail.com> <4FD5FD9E.5040203@ti.com>
- <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206271218540.27496@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1206271306170.27496@utopia.booyaka.com>
+From: joseph@codesourcery.com (Joseph S. Myers)
+Date: Wed, 27 Jun 2012 19:17:21 +0000
+Subject: Detecting support for trapping floating-point exceptions on ARM
+In-Reply-To: <4FEB49B3.2030602@twiddle.net>
+References: <Pine.LNX.4.64.1206121900150.1359@digraph.polyomino.org.uk>
+ <4FEB49B3.2030602@twiddle.net>
+Message-ID: <Pine.LNX.4.64.1206271904570.32296@digraph.polyomino.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
+On Wed, 27 Jun 2012, Richard Henderson wrote:
 
-> On Thu, Jun 28, 2012 at 00:01:06, Paul Walmsley wrote:
-> > On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
+> On 06/12/2012 12:11 PM, Joseph S. Myers wrote:
+> > ARM VFPv3 and VFPv4 do not support trapping floating-point exceptions; 
+> > VFPv2, VFPv3U and VFPv4U do.  The lack of support causes the glibc 
+> > math/test-fenv test to fail on VFPv3 and VFPv4 systems.
 > > 
-> > The branch used was your am335x-upstream-staging branch, plus a minor 
-> > patch to allow the kernel to build on an am335x-only config (although for 
-> > the purposes of this test, omap2plus_defconfig was used).
->
-> Something seems to be wrong here???
-> The HEAD is,
+> > The natural fix for that would be for fesetenv (FE_NOMASK_ENV) to fail on 
+> > hardware not supporting trapping exceptions.  There is, however, no HWCAP 
+> > bit to indicate whether trapping floating-point exceptions is supported.  
+> > Could one be added to the kernel, or is there a good way fesetenv could 
+> > detect this from userspace without a new HWCAP bit?
 > 
-> commit 67e686682dc286d90a0ed47b7dc68fb54944d3d9
-> Author: AnilKumar Ch <anilkumar@ti.com>
-> Date:   Thu Jun 21 12:33:58 2012 +0530
-> 
->     arm/dts: Add support for AM335x BeagleBone
+> I don't suppose those SBZ/RAZ bits just so happen to be ignored in
+> actual hardware, so that you can write 1 and read it back and get 0
+> to see if exceptions are unsupported?
 
-As I wrote earlier, there's an extra patch on there to get a kernel built 
-with an AM33xx-only config to link, used here for build testing.  It 
-shouldn't affect the kernel's ability to start at all.  It's included 
-below.
+Good point.  I tested on one VFPv3 system and the bits did read back as 
+zero (and on one VFPv2 system and got back the expected 0x1f00).  And 
+DDI0406C (page 1552) says "They are reserved, RAZ/WI, on a system that 
+implements VFPv3 or VFPv4.", where RAZ/WI is "Read-As-Zero, Writes 
+Ignored.  In any implementation, the bit must read as 0, or all 0s for a 
+bit field, and writes to the field must be ignored.  Software can rely on 
+the bit reading as 0, or all 0s for a bit field, and on writes being 
+ignored." (page 2676), so this can be relied upon.  (This is a change in 
+the documentation from DDI0406B which said RAZ/SBZP.)  So it is possible 
+to test for this in userspace the way you suggest.
 
-
-- Paul
-
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index d09ccc1..e6f4117 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -385,8 +385,12 @@ void __init omap2430_init_late(void)
- /*
-  * Currently only board-omap3beagle.c should call this because of the
-  * same machine_id for 34xx and 36xx beagle.. Will get fixed with DT.
-+ *
-+ * XXX Due to the fact that the 33xx machine_init section is incorrectly
-+ * incorporated as part of an AM35xx board file, we had to expand the
-+ * following test to include CONFIG_SOC_AM33XX :-(
-  */
--#ifdef CONFIG_SOC_OMAP3430
-+#if defined(CONFIG_SOC_OMAP3430) || defined(CONFIG_SOC_AM33XX)
- void __init omap3_init_early(void)
- {
-        omap2_set_globals_3xxx();
+-- 
+Joseph S. Myers
+joseph at codesourcery.com
