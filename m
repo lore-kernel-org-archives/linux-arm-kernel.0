@@ -1,79 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Jun 2012 19:07:35 -0700
-Subject: [PATCH 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <20120626104944.GE27996@mudshark.cambridge.arm.com>
-References: <1340377774-17173-1-git-send-email-will.deacon@arm.com>
- <1340377774-17173-3-git-send-email-will.deacon@arm.com>
- <4FE8DA7E.5040105@codeaurora.org>
- <20120626104944.GE27996@mudshark.cambridge.arm.com>
-Message-ID: <4FEA6AE7.4050000@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 27 Jun 2012 10:13:38 +0800
+Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <201206270330.31669.marex@denx.de>
+References: <1339242351-8797-1-git-send-email-marex@denx.de>
+ <20120611063903.GD2552@S2101-09.ap.freescale.net>
+ <201206111254.21766.marex@denx.de>
+ <201206270330.31669.marex@denx.de>
+Message-ID: <20120627021336.GA9787@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/12 03:49, Will Deacon wrote:
-> On Mon, Jun 25, 2012 at 10:39:10PM +0100, Stephen Boyd wrote:
->> On 06/22/12 08:09, Will Deacon wrote:
->>> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
->>> index dbbeec4..675cee0 100644
->>> --- a/arch/arm/kernel/arch_timer.c
->>> +++ b/arch/arm/kernel/arch_timer.c
->>> @@ -32,6 +32,8 @@ static int arch_timer_ppi2;
->>>  
->>>  static struct clock_event_device __percpu **arch_timer_evt;
->>>  
->>> +extern void init_current_timer_delay(unsigned long freq);
->> Can we find a home for this in some header file?
-> I wondered about that...
->
-> The reason I didn't add it to a header file is that we really don't want it
-> to be called willy-nilly across the kernel. In fact, it must be called
-> exactly once by the clocksource backing read_current_timer when it knows
-> that the timer is live and ticking.
->
-> I suppose I could allow the function to fail if it's called after we've
-> calibrated. What do you reckon?
->
+On Wed, Jun 27, 2012 at 03:30:31AM +0200, Marek Vasut wrote:
+> Ok, I managed to replicate it just now. Scrap my previous email.
+> 
+> Still, any idea what can cause this?
+> 
+I just spent some time on it.  It looks like a document issue (dammit).
 
-Fair enough. Would anything actually go wrong if you called it twice? I
-would think everything would be assigned to what it already is but I
-haven't thought deeply about it. I don't really care to make the
-function more complicated for a case that should never happen.
+The HW_I2C_TIMING2 EXAMPLE tells the value is 0x0015000d which is the
+one you looked at and used.  But the register field figure tells it's
+0x00300030, which seems the real case.
 
-> It's actually a 32-bit multiply with a 64-bit result, so it's just a umull:
->
-> 00000050 <__timer_const_udelay>:
->   50:	e3003000	movw	r3, #0
->   54:	e3403000	movt	r3, #0
->   58:	e5932000	ldr	r2, [r3]
->   5c:	e0832290	umull	r2, r3, r0, r2
->   60:	e1a00f22	lsr	r0, r2, #30
->   64:	e1800103	orr	r0, r0, r3, lsl #2
->   68:	eaffffe4	b	0 <__timer_delay>
+The mxs_i2c_reset at probe changes the value to 0x0015000d which causes
+the first time playback nonfunctional, but the mxs_i2c_reset call in
+mxs_i2c_xfer_msg happens to reset the value back to 0x00300030, and
+then second time playback starts working.
 
-Ok. Maybe Russell can comment further. Or maybe it doesn't matter to
-save some cycles after Linus said that udelay() doesn't need to be that
-accurate.
+The changes below get everything work fine, both 100k and 400k.  So
+with the changes in, you can add:
 
->> It's unfortunate that we have to duplicate the same code and constants
->> in both C and assembly. With my approach we convert delay.S into C and
->> avoid the duplication.
-> It's probably easy enough to have a #define for the multiplier, I can do
-> that for v2.
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-I look forward to seeing how v2 works out.
+Regards,
+Shawn
 
->
->>> +
->>> +void __init init_current_timer_delay(unsigned long freq)
->>> +{
->>> +	pr_info("Switching to timer-based delay loop\n");
->> Might be worth printing the frequency here too.
-> Could do, but the timer itself probably prints that information already (at
-> least it does the arch timer).
+--8<---
 
-Sure. Thinking more about it I don't like my suggestion.
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index e38be56..c2467e9 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -112,13 +112,13 @@ struct mxs_i2c_speed_config {
+ const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
+        .timing0        = 0x00780030,
+        .timing1        = 0x00800030,
+-       .timing2        = 0x0015000d,
++       .timing2        = 0x00300030,
+ };
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
+        .timing0        = 0x000f0007,
+        .timing1        = 0x001f000f,
+-       .timing2        = 0x0015000d,
++       .timing2        = 0x00300030,
+ };
