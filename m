@@ -1,31 +1,42 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 27 Jun 2012 15:39:58 +0200
-Subject: [PATCH v2 2/4] pwm: pwm-mxs: use global reset function
- stmp_reset_block
-In-Reply-To: <1340804165-29331-1-git-send-email-shawn.guo@linaro.org>
-References: <1340701091-8488-3-git-send-email-shawn.guo@linaro.org>
- <1340804165-29331-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120627133958.GA19319@avionic-0098.mockup.avionic-design.de>
+From: kristoffer.ericson@gmail.com (Kristoffer Eriksson)
+Date: Wed, 27 Jun 2012 15:41:41 +0200
+Subject: [PATCH] ARM: sa1100: fix jornada720 build failure on missing IOMEM
+In-Reply-To: <1340752409-11413-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1340752409-11413-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <4FEB0D95.5070704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 09:36:05PM +0800, Shawn Guo wrote:
-> Use global reset function stmp_reset_block instead of mxs_reset_block
-> to remove <mach/common.h> inclusion.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+
+
+Paul Gortmaker skrev 2012-06-27 01:13:
+> Introduced by commit 6686732c8b8974fafbdd7886de0fcf77cf34ec07 [linux-next]
+>
+>      "ARM: sa11x0/pxa: convert OS timer registers to IOMEM"
+>
+> which causes:
+>
+> arch/arm/mach-sa1100/jornada720_ssp.c:63:2: error: implicit declaration of function 'IOMEM'
+>
+> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
 > ---
-> Changes since v1:
-> * Select STMP_DEVICE for PWM_MXS Kconfig option
-
-Thanks, I'll apply them to for-next. Hopefully Stephen will pick them up
-in linux-next real soon now. I've already sent the pull request.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/c39c921b/attachment.sig>
+>
+> Feel free to squash into original if rebasing.
+> Fixes http://kisskb.ellerman.id.au/kisskb/buildresult/6592200/
+>
+>   arch/arm/mach-sa1100/jornada720_ssp.c |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
+> index b412fc0..ee13507 100644
+> --- a/arch/arm/mach-sa1100/jornada720_ssp.c
+> +++ b/arch/arm/mach-sa1100/jornada720_ssp.c
+> @@ -14,6 +14,7 @@
+>   #include<linux/delay.h>
+>   #include<linux/errno.h>
+>   #include<linux/init.h>
+> +#include<linux/io.h>
+>   #include<linux/kernel.h>
+>   #include<linux/module.h>
+>   #include<linux/platform_device.h>
