@@ -1,144 +1,37 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 27 Jun 2012 11:08:19 +0200
-Subject: [PATCH v3] ARM: at91: add support for Telit EVK-PRO3 with Telit
- GE863-PRO3
-Message-ID: <1340788099-1117-1-git-send-email-fabio.porcedda@gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 27 Jun 2012 12:14:31 +0300
+Subject: [PATCH v11 0/4] MTD: at91: Add PMECC support for at91 nand
+ flash driver
+In-Reply-To: <4FEAC6B2.6030104@atmel.com>
+References: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
+ <1340768981.2317.7.camel@koala> <4FEA87E5.9010604@atmel.com>
+ <1340771320.2317.13.camel@koala> <4FEAC6B2.6030104@atmel.com>
+Message-ID: <1340788471.29342.4.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
----
- - changes for v3
-	- split the evk-pro3 from the ge863-pro3 to facilitate
-           the board customization
-        - add usb gadget and macb
- - changes for v2
-	- add empty line before the Signed-off-by line
+On Wed, 2012-06-27 at 10:39 +0200, Nicolas Ferre wrote:
+> AT91 is looked after carefully, yes it is.
+> 
+> The thing is that CAP9 SoC (the defconfig that you are using)
+> has been obsoleted then removed for 3.4:
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=9918ceafd4a9e013572e03983f528017c29bb1cb
 
- arch/arm/boot/dts/evk-pro3.dts    | 41 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ge863-pro3.dtsi | 52 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Makefile.boot  |  1 +
- 3 files changed, 94 insertions(+)
- create mode 100644 arch/arm/boot/dts/evk-pro3.dts
- create mode 100644 arch/arm/boot/dts/ge863-pro3.dtsi
+Ok, sorry for that phrase. I basically only need to do compile-testing.
+And I only care about atmel_nand, so I take a defconfig, disable most of
+the stuff, and use it for compilation. And when this minimal defconfig
+stops working, I get upstet. If you have any suggestion what should I
+base my configuration on, please, let me know.
 
-diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-new file mode 100644
-index 0000000..b7354e6
---- /dev/null
-+++ b/arch/arm/boot/dts/evk-pro3.dts
-@@ -0,0 +1,41 @@
-+/*
-+ * evk-pro3.dts - Device Tree file for Telit EVK-PRO3 with Telit GE863-PRO3
-+ *
-+ * Copyright (C) 2012 Telit,
-+ *               2012 Fabio Porcedda <fabio.porcedda@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "ge863-pro3.dtsi"
-+
-+/ {
-+	model = "Telit EVK-PRO3 for Telit GE863-PRO3";
-+	compatible = "telit,evk-pro3", "atmel,at91sam9260", "atmel,at91sam9";
-+
-+	ahb {
-+		apb {
-+			macb0: ethernet at fffc4000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			usb1: gadget at fffa4000 {
-+				atmel,vbus-gpio = <&pioC 5 0>;
-+				status = "okay";
-+			};
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			num-ports = <2>;
-+			status = "okay";
-+		};
-+	};
-+
-+	i2c at 0 {
-+		status = "okay";
-+	};
-+
-+};
-\ No newline at end of file
-diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
-new file mode 100644
-index 0000000..17136fc
---- /dev/null
-+++ b/arch/arm/boot/dts/ge863-pro3.dtsi
-@@ -0,0 +1,52 @@
-+/*
-+ * ge863_pro3.dtsi - Device Tree file for Telit GE863-PRO3
-+ *
-+ * Copyright (C) 2012 Telit,
-+ *               2012 Fabio Porcedda <fabio.porcedda@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "at91sam9260.dtsi"
-+
-+/ {
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <6000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			boot at 0 {
-+				label = "boot";
-+				reg = <0x0 0x7c0000>;
-+			};
-+
-+			root at 07c0000 {
-+				label = "root";
-+				reg = <0x7c0000 0x7840000>;
-+			};
-+		};
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=ubi0:rootfs ubi.mtd=1 rootfstype=ubifs";
-+	};
-+};
-diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
-index 9e84fe4..11c3ca7 100644
---- a/arch/arm/mach-at91/Makefile.boot
-+++ b/arch/arm/mach-at91/Makefile.boot
-@@ -16,6 +16,7 @@ endif
- # Keep dtb files sorted alphabetically for each SoC
- # sam9260
- dtb-$(CONFIG_MACH_AT91SAM_DT) += ethernut5.dtb
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += evk-pro3.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
- # sam9263
+Thanks!
+
 -- 
-1.7.11.1
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/bf5b8266/attachment.sig>
