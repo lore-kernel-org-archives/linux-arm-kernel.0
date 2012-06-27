@@ -1,83 +1,59 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Wed, 27 Jun 2012 08:57:13 +0900
-Subject: [PATCH] ARM: EXYNOS: Remove the L2 cache latency setting for
- EXYNOS5
-In-Reply-To: <CAPLVkLsgi3ST622ZhRusJz5OHV6MJYP7SNkj2Mh-QPos1AWyhQ@mail.gmail.com>
-References: <038301cd4f47$8202b420$86081c60$%kim@samsung.com>
- <CAPLVkLsgi3ST622ZhRusJz5OHV6MJYP7SNkj2Mh-QPos1AWyhQ@mail.gmail.com>
-Message-ID: <006d01cd53f7$6877ed90$3967c8b0$%kim@samsung.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 26 Jun 2012 17:04:30 -0700
+Subject: [GIT PULL] clk: fixes for 3.5-rc5
+Message-ID: <20120627000429.GA22738@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+Hi Linus,
 
-> I don't understand this. Do you mean that BL1 codes do it?
-> I also wonder how enable L2 cache at the exynos5.
-Yes, the latency configuration of L2 cache is located on IROM or BL1 code.
-It can remove the overhead about cache reset and cache flush.
-And, Kernel enables L2 cache.
-Thanks.
->
-> > no longer need that in the kernel. It helps to reduce
-> > booting time (no need cache disable and cache enable).
-> >
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?arch/arm/mach-exynos/common.c | ? 25 -------------------------
-> > ?1 files changed, 0 insertions(+), 25 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> > index 742edd3..0ec1a91 100644
-> > --- a/arch/arm/mach-exynos/common.c
-> > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -712,31 +712,6 @@ static int __init exynos4_l2x0_cache_init(void)
-> > ?early_initcall(exynos4_l2x0_cache_init);
-> > ?#endif
-> >
-> > -static int __init exynos5_l2_cache_init(void)
-> > -{
-> > - ? ? ? unsigned int val;
-> > -
-> > - ? ? ? if (!soc_is_exynos5250())
-> > - ? ? ? ? ? ? ? return 0;
-> > -
-> > - ? ? ? asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
-> > - ? ? ? ? ? ? ? ? ? ?"bic %0, %0, #(1 << 2)\n" ?/* cache disable */
-> > - ? ? ? ? ? ? ? ? ? ?"mcr p15, 0, %0, c1, c0, 0\n"
-> > - ? ? ? ? ? ? ? ? ? ?"mrc p15, 1, %0, c9, c0, 2\n"
-> > - ? ? ? ? ? ? ? ? ? ?: "=r"(val));
-> > -
-> > - ? ? ? val |= (1 << 9) | (1 << 5) | (2 << 6) | (2 << 0);
-> > -
-> > - ? ? ? asm volatile("mcr p15, 1, %0, c9, c0, 2\n" : : "r"(val));
-> > - ? ? ? asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
-> > - ? ? ? ? ? ? ? ? ? ?"orr %0, %0, #(1 << 2)\n" ?/* cache enable */
-> > - ? ? ? ? ? ? ? ? ? ?"mcr p15, 0, %0, c1, c0, 0\n"
-> > - ? ? ? ? ? ? ? ? ? ?: : "r"(val));
-> > -
-> > - ? ? ? return 0;
-> > -}
-> > -early_initcall(exynos5_l2_cache_init);
-> > -
-> > ?static int __init exynos_init(void)
-> > ?{
-> > ? ? ? ?printk(KERN_INFO "EXYNOS: Initializing architecture\n");
-> > --
-> > 1.7.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> --
-> - Joonyoung Shim
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The tag below has some fixes for users of the common clk framework.
+This is my first time sending you a pull request (and first time using a
+signed tag) so please let me know if I screwed something up.
+
+Thanks,
+Mike
+
+The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
+
+  Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/mturquette/linux.git tags/clk-fixes-for-linus
+
+for you to fetch changes up to d03ac61daa8d4d17cd83a5ab98e85b616b90c7ac:
+
+  clk: mxs: fix clock lookup after freeing init memory (2012-06-25 16:51:48 -0700)
+
+----------------------------------------------------------------
+clk-fixes-for-linus contains three NULL pointer fixes and two device
+regression fixups.  Two NULL pointer dereferences were in the common clk
+core due to lack of sanity checking and the third NPD was in the
+mxs-specific clock code due to incorrect use of __initdata.  The device
+regressions were the result of improper data: a wrong string name for
+matching DT data broke the SPEAr ethernet controller and another string
+matching problem in the mxs clock data resulted in a broken MMC
+controller.
+
+----------------------------------------------------------------
+Marc Kleine-Budde (1):
+      clk: mxs: fix clock lookup after freeing init memory
+
+Pawel Moll (1):
+      clk: Check parent for NULL in clk_change_rate
+
+Rajendra Nayak (1):
+      clk: Allow late cache allocation for clk->parents
+
+Shawn Guo (1):
+      clk: mxs: fix ref_io clock definition
+
+Stefan Roese (1):
+      clk: SPEAr600: Fix ethernet clock name for DT based probing
+
+ drivers/clk/clk.c                  |   26 +++++++++++++++++---------
+ drivers/clk/mxs/clk-imx23.c        |   12 ++++++------
+ drivers/clk/mxs/clk-imx28.c        |   32 ++++++++++++++++----------------
+ drivers/clk/spear/spear6xx_clock.c |    2 +-
+ 4 files changed, 40 insertions(+), 32 deletions(-)
