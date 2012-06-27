@@ -1,41 +1,43 @@
-From: joseph@codesourcery.com (Joseph S. Myers)
-Date: Wed, 27 Jun 2012 19:17:21 +0000
-Subject: Detecting support for trapping floating-point exceptions on ARM
-In-Reply-To: <4FEB49B3.2030602@twiddle.net>
-References: <Pine.LNX.4.64.1206121900150.1359@digraph.polyomino.org.uk>
- <4FEB49B3.2030602@twiddle.net>
-Message-ID: <Pine.LNX.4.64.1206271904570.32296@digraph.polyomino.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jun 2012 20:18:01 +0100
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <025701cd457e$d5065410$7f12fc30$@lge.com>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <025701cd457e$d5065410$7f12fc30$@lge.com>
+Message-ID: <20120627191801.GD25319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jun 2012, Richard Henderson wrote:
-
-> On 06/12/2012 12:11 PM, Joseph S. Myers wrote:
-> > ARM VFPv3 and VFPv4 do not support trapping floating-point exceptions; 
-> > VFPv2, VFPv3U and VFPv4U do.  The lack of support causes the glibc 
-> > math/test-fenv test to fail on VFPv3 and VFPv4 systems.
+On Fri, Jun 08, 2012 at 10:58:50PM +0900, Kim, Jong-Sung wrote:
+> > From: Minchan Kim [mailto:minchan at kernel.org]
+> > Sent: Tuesday, June 05, 2012 4:12 PM
 > > 
-> > The natural fix for that would be for fesetenv (FE_NOMASK_ENV) to fail on 
-> > hardware not supporting trapping exceptions.  There is, however, no HWCAP 
-> > bit to indicate whether trapping floating-point exceptions is supported.  
-> > Could one be added to the kernel, or is there a good way fesetenv could 
-> > detect this from userspace without a new HWCAP bit?
+> > If we do arm_memblock_steal with a page which is not aligned with section
+> > size, panic can happen during boot by page fault in map_lowmem.
+> > 
+> > Detail:
+> > 
+> > 1) mdesc->reserve can steal a page which is allocated at 0x1ffff000 by
+> > memblock
+> >    which prefers tail pages of regions.
+> > 2) map_lowmem maps 0x00000000 - 0x1fe00000
+> > 3) map_lowmem try to map 0x1fe00000 but it's not aligned by section due to
+> 1.
+> > 4) calling alloc_init_pte allocates a new page for new pte by
+> memblock_alloc
+> > 5) allocated memory for pte is 0x1fffe000 -> it's not mapped yet.
+> > 6) memset(ptr, 0, sz) in early_alloc_aligned got PANICed!
 > 
-> I don't suppose those SBZ/RAZ bits just so happen to be ignored in
-> actual hardware, so that you can write 1 and read it back and get 0
-> to see if exceptions are unsupported?
+> May I suggest another simple approach? The first continuous couples of
+> sections are always safely section-mapped inside alloc_init_section funtion.
+> So, by limiting memblock_alloc to the end of the first continuous couples of
+> sections at the start of map_lowmem, map_lowmem can safely memblock_alloc &
+> memset even if we have one or more section-unaligned memory regions. The
+> limit can be extended back to arm_lowmem_limit after the map_lowmem is done.
 
-Good point.  I tested on one VFPv3 system and the bits did read back as 
-zero (and on one VFPv2 system and got back the expected 0x1f00).  And 
-DDI0406C (page 1552) says "They are reserved, RAZ/WI, on a system that 
-implements VFPv3 or VFPv4.", where RAZ/WI is "Read-As-Zero, Writes 
-Ignored.  In any implementation, the bit must read as 0, or all 0s for a 
-bit field, and writes to the field must be ignored.  Software can rely on 
-the bit reading as 0, or all 0s for a bit field, and on writes being 
-ignored." (page 2676), so this can be relied upon.  (This is a change in 
-the documentation from DDI0406B which said RAZ/SBZP.)  So it is possible 
-to test for this in userspace the way you suggest.
+No.  What if the first block of memory is not large enough to handle all
+the allocations?
 
--- 
-Joseph S. Myers
-joseph at codesourcery.com
+I think the real problem is folk trying to reserve small amounts.  I have
+said all reservations must be aligned to 1MB.
