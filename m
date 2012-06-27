@@ -1,48 +1,76 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 10:59:07 +0200
-Subject: [PATCH 1/2] net: flexcan: clock-frequency is optional for device
- tree probe
-In-Reply-To: <20120627085600.GB9787@S2101-09.ap.freescale.net>
-References: <1340700563-8386-1-git-send-email-shawn.guo@linaro.org>
- <1340700563-8386-2-git-send-email-shawn.guo@linaro.org>
- <4FEAC89C.3000405@pengutronix.de>
- <20120627085600.GB9787@S2101-09.ap.freescale.net>
-Message-ID: <4FEACB5B.2040508@pengutronix.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 27 Jun 2012 10:02:10 +0100
+Subject: [PATCH v4 3/9] arm: mach-mvebu: add source files
+In-Reply-To: <201206261617.20954.arnd@arndb.de>
+References: <1340699313-29331-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340699313-29331-4-git-send-email-gregory.clement@free-electrons.com>
+ <201206261617.20954.arnd@arndb.de>
+Message-ID: <4FEACC12.7030703@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 10:56 AM, Shawn Guo wrote:
-> On Wed, Jun 27, 2012 at 10:47:24AM +0200, Marc Kleine-Budde wrote:
->> On 06/26/2012 10:49 AM, Shawn Guo wrote:
->>> The property clock-frequency is optional for device tree probe.  When
->>> it's absent, the flexcan driver will try to get the frequency from clk
->>> system by calling clk_get_rate.
->>>
->>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> 
-> Thanks.
-> 
+On 26/06/12 17:17, Arnd Bergmann wrote:
+> On Tuesday 26 June 2012, Gregory Clement wrote:
+>> From: Gregory CLEMENT<gregory.clement@free-electrons.com>
 >>
->> As Oliver pointed out, this doesn't go through the net tree.
->>
-> From what I have seen, device tree maintainers are generally fine with
-> having binding document updates go through subsystem tree.
+>> Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
+>> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Lior Amsalem<alior@marvell.com>
+>
+> This driver seems to do all the right things now, good work.
+>
+>> +static void __iomem *system_controller_base;
+>> +static void __iomem *reset_base;
+>> +static unsigned long rstoutn_mask_reset_out_en;
+>> +
+>> +/* System controller registers */
+>> +#define ARMADA_370_XP_RESET_OFFSET		  0x60
+>> +#define OTHER_MVEBU_RESET_OFFSET		 0x108
+>> +#define MVEBU_RSTOUTN_MASK_OFFSET		   0x0
+>> +#define   OTHER_MVEBU_RSTOUTN_MASK_RESET_OUT_EN	   0x4
+>> +#define   ARMADA_370_XP_RSTOUTN_MASK_RESET_OUT_EN  0x1
+>> +#define MVEBU_SYSTEM_SOFT_RESET_OFFSET		   0x4
+>> +#define   MVEBU_SYSTEM_SOFT_RESET		   0x1
+>> +
+>> +#define OTHER_MVEBU_VARIANT	1
+>> +#define ARMADA_370_XP_VARIANT	2
+>
+> I think this can be expressed nicer with pointers to data structures,
+> like
+>
+> static void __iomem *system_controller_base;
+>
+> struct mvebu_system_controller {
+> 	u32 rstoutn_mask_offset;
+> 	u32 system_soft_reset_offset;
+>
+> 	u32 rstoutn_mask_reset_out_en;
+> 	u32 system_soft_reset;
+> };
+>
+> const struct mvebu_system_controller armada_370_xp_system_controller = {
+> 	.rstoutn_mask_offset = 0x60,
+> 	.system_soft_reset_offset = 0x64,
+> 	.rstoutn_mask_reset_out_en = 0x1,
+> 	.system_soft_reset = 0x1,
+> };
 
-Okay. Then I'll take that patch.
+It would be nice to see these indented.
 
-Marc
+>
+>> +void mvebu_restart(char mode, const char *cmd)
+>> +{
+>> +	if (!system_controller_base) {
+>> +		pr_warn("Cannot restart, system-controller not available\n");
+>> +		return;
+>> +	}
+>
+> I guess returning here is a bug, you should just enter the endless
+> loop.
+
+Or just not registered... maybe there's a board watchdog or other
+device that could do the job.
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/80807306/attachment.sig>
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
