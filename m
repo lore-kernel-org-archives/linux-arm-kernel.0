@@ -1,57 +1,124 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 27 Jun 2012 07:28:40 +0300
-Subject: [PATCH v11 0/4] MTD: at91: Add PMECC support for at91 nand
- flash driver
-In-Reply-To: <4FEA87E5.9010604@atmel.com>
-References: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
- <1340768981.2317.7.camel@koala> <4FEA87E5.9010604@atmel.com>
-Message-ID: <1340771320.2317.13.camel@koala>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 27 Jun 2012 06:36:00 +0200
+Subject: usb, davinci: usb 2.0 problem on an am1808 based board
+In-Reply-To: <4FC4DB95.5050901@denx.de>
+References: <4EBC9DF1.90604@denx.de>
+ <20111111091912.GB19090@legolas.emea.dhcp.ti.com> <4EBEB29E.50705@mvista.com>
+ <4EC0F87B.4010104@denx.de> <4FA3AB27.7060205@denx.de>
+ <4FB49CA3.2080906@denx.de>
+ <A73F36158E33644199EB82C5EC81C7BC3E97C9C1@DBDE01.ent.ti.com>
+ <4FB9DC59.6050300@denx.de>
+ <A73F36158E33644199EB82C5EC81C7BC3E97D25D@DBDE01.ent.ti.com>
+ <4FBB3EA7.1070703@denx.de> <4FC4DB95.5050901@denx.de>
+Message-ID: <4FEA8DB0.3090204@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-27 at 12:11 +0800, Josh Wu wrote:
-> Hi, Artem
-> 
-> On 6/27/2012 11:49 AM, Artem Bityutskiy wrote:
-> > On Mon, 2012-06-25 at 18:07 +0800, Josh Wu wrote:
-> >> Those patches is based on v3.5-rc4
-> >>
-> >> Changes since v10,
-> >> 	add one more patch in this patch set, which add 'int' return value for write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
-> >> 	Instead of calling BUG(), atmel_nand_pmecc_write_page() will return -EIO when time out to read the pmecc status register.
-> >> 	increase the time-out duration to 100ms, which has more toleration.
-> >> 	add oob_required argument for pmecc read/write functions to align with v3.5-rc4.
-> > I have issues compiling l2-mtd.git tree (based on 3.5-rc5) with the
-> > attached defconfig. Probably not your fault, but may be you have a
-> > fix/suggestion? I did not have time to look closer. Aiaiai reports:
-> 
-> I think the name of kernel config for AT91 is changed, so you can try 
-> add following two line in your original config file.
-> 
-> CONFIG_SOC_AT91SAM9=y
-> CONFIG_SOC_AT91RM9200=y
-> 
-> run the make menuconfig will get new config, that can pass the compile.
+Hello Manjunathappa,
 
-I get "arm-unknown-linux-gnueabi-ld: no machine record defined". I think
-it wants me to select the board. I've tried one and get another
-compilation issue:
+On 29.05.2012 16:22, Heiko Schocher wrote:
+> Hello Manjunathappa,
+>
+> On 22.05.2012 09:22, Heiko Schocher wrote:
+>> Hello Manjunathappa,
+>>
+>> Manjunathappa, Prakash wrote:
+>>> Hi Heiko,
+>>>
+>>> On Mon, May 21, 2012 at 11:40:33, Heiko Schocher wrote:
+>>>> Hello Manjunathappa,
+>>>>
+>>>> Manjunathappa, Prakash wrote:
+>>>>> Hi Heiko,
+>>>>>
+>>>>> I do not know how putting delay helped MSC device detection.
+>>>>> Can you please check if MUSB is coming up in "b_idle" state(by
+>>>>> $cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode)?
+>>>>> State should move to b_peripheral on connecting gadget cable.
+>>>> We have connected the USB0_ID pin to ground -> host only mode, so
+>>>> I could not try this.
+>>>>
+>>>
+>>> Ok, So it is coming up in which state, "$cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode"?
+>>
+>> without the delay in da8xx_musb_interrupt() and the
+>> + musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
+>> change:
+>>
+>> booting Linux with USB stick attached shows:
+>> root at armv5te:~# cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode
+>> a_host
+>> root at armv5te:~#
+>>
+>> booting Linux without USB stick attached:
+>>
+>> root at armv5te:~# cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode
+>> a_wait_vrise
+>> root at armv5te:~#
+>>
+>> and connecting an usb stick:
+>>
+>> root at armv5te:~# cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode
+>> a_host
+>> root at armv5te:~#
+>>
+>>>>> If you connect MSC device via mini-A connector, state should change to "a_host".
+>>>>> OTG timer is responsible for above state changes, can you please check if below
+>>>>> changes are present?
+>>>>> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c index 4da7492..a1a692e 100644
+>>>>> --- a/drivers/usb/musb/da8xx.c
+>>>>> +++ b/drivers/usb/musb/da8xx.c
+>>>>> @@ -76,6 +76,7 @@
+>>>>> #define DA8XX_INTR_TX_SHIFT 0
+>>>>> #define DA8XX_INTR_TX_MASK (DA8XX_USB_TX_EP_MASK<< DA8XX_INTR_TX_SHIFT)
+>>>>>
+>>>>> +#define A_WAIT_BCON_TIMEOUT 1100 /* in ms */
+>>>>> #define DA8XX_MENTOR_CORE_OFFSET 0x400
+>>>>>
+>>>>> #define CFGCHIP2 IO_ADDRESS(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG)
+>>>>> @@ -443,6 +444,7 @@ static int da8xx_musb_init(struct musb *musb)
+>>>>> rev, __raw_readl(CFGCHIP2),
+>>>>> musb_readb(reg_base, DA8XX_USB_CTRL_REG));
+>>>>>
+>>>>> + musb->a_wait_bcon = A_WAIT_BCON_TIMEOUT;
+>>>>> musb->isr = da8xx_musb_interrupt;
+>>>>> return 0;
+>>>>> fail:
+>>>> No, this change is not in current mainline ...
+>>>>
+>>>> Added this patch, and I get:
+>>>>
+>>>> $ make -s uImage
+>>>> drivers/usb/musb/da8xx.c: In function 'da8xx_musb_init':
+>>>> drivers/usb/musb/da8xx.c:448:22: error: 'A_WAIT_BCON_TIMEOUT' undeclared (first use in this function)
+>>>> drivers/usb/musb/da8xx.c:448:22: note: each undeclared identifier is reported only once for each function it appears in
+>>>> make[3]: *** [drivers/usb/musb/da8xx.o] Error 1
+>>>> make[2]: *** [drivers/usb/musb] Error 2
+>>>> make[1]: *** [drivers/usb] Error 2
+>>>> make: *** [drivers] Error 2
+>>>> $
+>>>>
+>>>> Do you mean
+>>>>
+>>>> musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
+>>>>
+>>>> ? This is setup in musb_core.c::allocate_instance() as Sergei Shtylyov
+>>>> already commented ... nevertheless tried with this define your patch,
+>>>> and my USB stick gets detected too...
+>>>>
+>>>
+>>> Does that mean issue got fixed or Do you still have delay in da8xx_musb_interrupt handler?
+>>
+>> Without the delay in the da8xx_musb_interrupt() ...
+>
+> ping!
+>
+> How do we proceed here?
 
-arch/arm/mach-at91/built-in.o:(.arch.info.init+0xbc): undefined
-reference to `at91sam926x_timer'
+ping.
 
-It looks like AT91 stuff is not looked after carefully.
-
-Can you please send me a working defconfig based on the one I sent you -
-just modify it.
-
+bye,
+Heiko
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/eba33f8d/attachment-0001.sig>
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
