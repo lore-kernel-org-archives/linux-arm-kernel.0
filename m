@@ -1,57 +1,116 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 14:02:57 +0200
-Subject: [PATCH v7 08/14] USB: Chipidea: add ci13xxx device id management
-In-Reply-To: <201206271349.45641.marex@denx.de>
-References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
- <4FE83AA9.6030507@pengutronix.de>
- <20120627054231.GA21750@b20223-02.ap.freescale.net>
- <201206271349.45641.marex@denx.de>
-Message-ID: <4FEAF671.80508@pengutronix.de>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Wed, 27 Jun 2012 13:06:54 +0100
+Subject: i.MX28 die temperature
+In-Reply-To: <201206271400.11727.marex@denx.de>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <201206262102.15698.marek.vasut@gmail.com> <4FEAB48B.4010108@cam.ac.uk>
+ <201206271400.11727.marex@denx.de>
+Message-ID: <4FEAF75E.5090505@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 01:49 PM, Marek Vasut wrote:
-> Dear Richard Zhao,
-> 
->> On Mon, Jun 25, 2012 at 12:17:13PM +0200, Marc Kleine-Budde wrote:
->>> On 06/25/2012 12:03 PM, Richard Zhao wrote:
->>>> Could you use my USB test branch?
+On 6/27/2012 1:00 PM, Marek Vasut wrote:
+> Dear Jonathan Cameron,
+>
+>> On 6/26/2012 8:02 PM, Marek Vasut wrote:
+>>> Dear Juergen Beisert,
 >>>
->>> Same result:
+>>>> Hi Marek,
+>>>>
+>>>> Marek Vasut wrote:
+>>>>> [...]
+>>>>>
+>>>>>>> Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
+>>>>>>
+>>>>>> Any progress here with inclusion in some git tree?
+>>>>>
+>>>>> Well ... I recently raised from the dead. It's on the schedule,
+>>>>> obviously help is welcome.
+>>>>
+>>>> I tried a little bit with your driver. The disadvantage I see is, its
+>>>> claims all the free AD channels. But a few of them can also act as a
+>>>> touchscreen controller. Shouldn't be the driver handle the channel usage
+>>>> dynamically?
 >>>
->>> ci_hdrc ci_hdrc.0: remove, state 1
->>> usb usb1: USB disconnect, device number 1
->>> ci_hdrc ci_hdrc.0: USB bus 1 deregistered
->>> Unable to handle kernel NULL pointer dereference at virtual address
->>> 0000006c pgd = c6ba4000
->>> [0000006c] *pgd=46a68831, *pte=00000000, *ppte=00000000
->>> Internal error: Oops: 17 [#1] PREEMPT ARM
->>> Modules linked in: ci13xxx_imx(-) ci_hdrc imx_usbmisc
->>> CPU: 0    Not tainted  (3.5.0-rc4-00058-g01710ef #85)
-> 
-> Dumb question -- you use the same base revision of kernel, right?
+>>> I wonder, I'd rather see this driver behave as a composite driver, what
+>>> do you think?
+>>
+>> Alternative (though it's still in development) would be to use IIO
+>> as the ADC layer and sit the other parts on top.
+>
+> I think you need to adjust a few bits there and there in the hardware to behave
+> as a touchscreen. Will IIO be able to handle that somehow ?
+No means of doing it yet.  I'm not entirely sure this can be done 
+generically. I'm not really familiar enough with touchscreen adcs as 
+none of my boards have one.  At worst I'm sure we can put some
+hooks in to get hold of the underlying device if necessary.
 
-Yes, I used v3.5-rc4 as baseline, add some mx28 specific patches (nand,
-etc...), then I merged in Richard's use tree. In the above oops, as the
-asked, the USB test branch.
+>
+>> die temp and basic
+>> adc are fine but no one has taken on a touchscreen controller via that
+>> approach yet.
+>
+> Is there any example of these basic things already?
+Saddly only patches posted on the list for the interrupt driven side of 
+things. I have an updated version (that acutally works reasonably well) 
+but haven't posted as yet as want to take another look at some of the
+error cases when switching buffers in and out (all about rolling back
+sucessfully to a valid configuration when an invalid one has failed).
 
-In original oops I used
-https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+The hwmon stuff is in tree though as drivers/staging/iio/iio_hwmon.c   I 
+really ought to get round to posting that one for inclusion under 
+drivers/hmwon. Guenter was reasonably happy with the version that is
+there so shouldn't be too much trouble.
 
-Maybe it's some other part of the system that confuses the ida_* stuff.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/9bbf9825/attachment.sig>
+>
+>> They tend to have a nasty large number of extremely
+>> special purpose bits.  I've certainly not thought through how to handle
+>> those yet.
+>>
+>>>> Also this AD module on the SoC can measure the die
+>>>> temperature, battery voltage and some other power supplies.
+>>>> I see more than one framework this driver should connect to: simple ADC
+>>>> (IIO), touchscreen controller (INPUT), die temp (POWER?), various
+>>>> voltages (POWER? REGULATOR?). Should it be a multi function device?
+>>>
+>>> Correct, making it a MFD device with common channel-management logic is
+>>> the way to go. And it's gonna be a few resends of this driver, that's
+>>> for certain. I'm not confident I'll be able to make it right at the
+>>> first try ;-)
+>>>
+>>> INPUT -- touchscreen
+>>> IIO -- die temp and LRADC (maybe random voltages?)
+>>
+>> Mapping the die temp onto hwmon as obviously thats where it ultimately
+>> should appear.
+>
+> Ah correct.
+>
+>>> POWER -- battery
+>>>
+>>> But all this MFD goo is quite simple, the hard part is the channel
+>>> management logic. From the top of my head, there're 16 channels, 8 can
+>>> be sampled at the same time and there are 4 configuration triggers.
+>>> Making it one hell of a complex hardware.
+>>
+>> It is indeed a nasty beast. Good luck ;)
+>
+> Mmm ... sounds more like "condolences" :-D
+:)
+>
+>>> I'll fix the remnants of SPI and start on this beast tonight or tomorrow.
+>>> Since there was some progress in the IIO, I believe I'll have to rework
+>>> it a bit.
+>>>
+>>>> Juergen
+>>>
+>>> Best regards,
+>>> Marek Vasut
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> Best regards,
+> Marek Vasut
+>
