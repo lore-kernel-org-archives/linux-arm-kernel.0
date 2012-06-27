@@ -1,136 +1,72 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 27 Jun 2012 20:05:16 +0200
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <20120627162014.1494cdd7@skate>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <20120627162014.1494cdd7@skate>
-Message-ID: <20120627180516.GA17393@elf.ucw.cz>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 27 Jun 2012 11:06:35 -0700
+Subject: [PATCH v2] clk: Add support for rate table based dividers
+In-Reply-To: <20120627162851.GT1623@pengutronix.de>
+References: <1340794893-20869-1-git-send-email-rnayak@ti.com>
+ <20120627162851.GT1623@pengutronix.de>
+Message-ID: <20120627180635.GH22766@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> Below a few comments from my modest experience on the mach-mvebu SoC
-> support.
+On 20120627-18:28, Sascha Hauer wrote:
+> On Wed, Jun 27, 2012 at 04:31:33PM +0530, Rajendra Nayak wrote:
+> > Some divider clks do not have any obvious relationship
+> > between the divider and the value programmed in the
+> > register. For instance, say a value of 1 could signify divide
+> > by 6 and a value of 2 could signify divide by 4 etc.
+> > Also there are dividers where not all values possible
+> > based on the bitfield width are valid. For instance
+> > a 3 bit wide bitfield can be used to program a value
+> > from 0 to 7. However its possible that only 0 to 4
+> > are valid values.
+> > 
+> > All these cases need the platform code to pass a simple
+> > table of divider/value tuple, so the framework knows
+> > the exact value to be written based on the divider
+> > calculation and can also do better error checking.
+> > 
+> > This patch adds support for such rate table based
+> > dividers.
+> > 
+> > Also since this means adding a new parameter to the
+> > clk_register_divider(), update all existing users of
+> > it.
 > 
-> Le Wed, 27 Jun 2012 08:50:06 -0500,
-> <dinguyen@altera.com> a ?crit :
+> I'm not sure whether we should overload the divider code with another
+> type of divider. Maybe it would be better to add a new
+> clk-divider-table.c for this? Just an idea, the result may or may not be
+> better.
 > 
-> > +config ARCH_SOCFPGA
-> 
-> Is SOCFPGA a good name? It seems like a very generic name. Shouldn't it
-> be ARCH_ALTERA_SOCFPGA a better name? I suspect other vendors will
-> provide a SoC together with a FPGA.
 
-I guess for config option name, ALTERA_SOCFPGA is okay, but for
-directory name it would be a little bit long. Would that work?
+Sascha,
 
-> > +choice
-> > +	prompt "Altera SOCFPGA Platform"
-> > +	default MACH_SOCFPGA_CYCLONE5
-> > +	depends on ARCH_SOCFPGA
-> > +	help
-> > +		Select SOCFPGA platform type
-> > +
-> > +config MACH_SOCFPGA_CYCLONE5
-> > +	bool "SOCFPGA Cyclone5 platform"
-> > +	select HAVE_SMP
-> > +	select PLAT_SOCFPGA_ETH
-> > +	help
-> > +	  Include support for the Altera(R) Cyclone5 development platform.
-> > +endchoice
-> 
-> Why do you need a "choice" here? The code should be able to support
-> building multiple platforms at once. 
+I had the same concerns originally, but the code reuse in clk-divider.c
+is pretty good.  Before this patch I have it about 200 lines, most of
+which would have to be reproduced for a separate clk-rate-table.c.  So I
+think marginally added complexity is OK compared to code duplication
+(and duplicate bugfixes, etc).
 
-Should be bool, agreed.
+Rajendra,
 
-> And even more: for a given SoC
-> variant, we now generally only want one config options, the board-level
-> details being abstracted out by the device tree.
+After thinking about it a bit more I still think a separate
+clk_register_divider_table is needed.  Primarily this would reduce
+needless churn in having to update all existing users of
+clk_register_divider.  I also think that clearly separating the two
+functions will make it a bit easier on folks trying to port their clocks
+trees over.
 
-Will look into that later.
-
-> > index 0000000..7a1f3c0
-> > --- /dev/null
-> > +++ b/arch/arm/mach-socfpga/Makefile.boot
-> > @@ -0,0 +1,3 @@
-> > +zreladdr-y	:= 0x00008000
-> > +params_phys-y	:= 0x00000100
-> > +initrd_phys-y	:= 0x00800000
-> 
-> With the device tree, the params_phys-y and initrd_phys-y variables are
-> useless.
-
-Ok.
-
-> > +/*
-> > + * SOCFPGA interrupt sources
-> > + */
-> > +#define IRQ_SOCFPGA_CPU0_PARITY	(IRQ_SOCFPGA_GIC_START + 0)		/* CPU0 parity */
-> > +#define IRQ_SOCFPGA_CPU0_PARITY_BTAG	(IRQ_SOCFPGA_GIC_START + 1)		/* CPU0 parity BTAG		*/
-...
-> > +#define SOFTIRQ_SOCFPGA_GPIO_2_27	(IRQ_SOCFPGA_GIC_START + 268)
-> > +#define SOFTIRQ_SOCFPGA_GPIO_2_28	(IRQ_SOCFPGA_GIC_START + 269)
-> > +#define SOFTIRQ_SOCFPGA_GPIO_2_29	(IRQ_SOCFPGA_GIC_START + 270)
-> 
-> Those huge lists of IRQs are no longer useful with the device tree, you
-> can get rid of them.
-
-Ok.
-
-arch/arm/mach-socfpga/socfpga_cyclone5.c:119: error:
-'IRQ_SOCFPGA_L4_OSC1_TIMER0' undeclared (first use in this function)
-
-Looks like we'll meed a bit more of dt :-).
-
-> > +#define NR_IRQS			512
-> 
-> You should be looking at using SPARSE_IRQ to avoid having a maximum
-> number of irqs. See for example mach-highbank/.
-
-Is maximum number of interrupts a problem? 512 does not seem
-excessive.
-
-> > +static inline void arch_idle(void)
-> > +{
-> > +	/*
-> > +	 * This should do all the clock switching
-> > +	 * and wait for interrupt tricks
-> > +	 */
-> > +	cpu_do_idle();
-> > +}
-> > +
-> > +#endif
-> 
-> This isn't used anywhere, and the system.h header is being removed
-> from sub-architectures, if I understood correctly.
-
-Ok.
-
-> > index 101b968..2f9a81e 100644
-> > --- a/arch/arm/mm/Kconfig
-> > +++ b/arch/arm/mm/Kconfig
-> > @@ -381,7 +381,7 @@ config CPU_V6K
-> >  
-> >  # ARMv7
-> >  config CPU_V7
-> > -	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-> > +	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_SOCFPGA
-> >  	select CPU_32v6K
-> >  	select CPU_32v7
-> >  	select CPU_ABRT_EV7
-> 
-> Apparently, your SoC is ARMv7 only at the moment, so you don't need to
-> do this. Just keep the "select CPU_V7" in your ARCH_SOCFPGA option.
-
-Will take a look.
+Unless there is a technical reason why having two registration functions
+is a bad idea, can you send a V4 with that new registration function?
+I'll take it into clk-next.
 
 Thanks,
-										Pavel
+Mike
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> Sascha
+> 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
