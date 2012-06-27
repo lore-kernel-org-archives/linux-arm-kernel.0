@@ -1,47 +1,34 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 26 Jun 2012 17:47:10 -0700
-Subject: [PATCH 05/11] OMAPDSS: add clk_prepare and clk_unprepare
-In-Reply-To: <1340630090.3395.85.camel@deskari>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
- <1340372890-10091-6-git-send-email-rnayak@ti.com>
- <1340604478.12683.25.camel@lappyti> <4FE80C43.6090802@ti.com>
- <1340611133.3395.3.camel@deskari> <4FE85005.4090303@ti.com>
- <1340630090.3395.85.camel@deskari>
-Message-ID: <20120627004709.GA22766@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 27 Jun 2012 03:15:58 +0200
+Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <20120625154354.GC2342@S2101-09.ap.freescale.net>
+References: <1339242351-8797-1-git-send-email-marex@denx.de>
+ <201206232047.33228.marex@denx.de>
+ <20120625154354.GC2342@S2101-09.ap.freescale.net>
+Message-ID: <201206270315.58872.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120625-16:14, Tomi Valkeinen wrote:
-> A question about clk_prepare/unprepare, not directly related: let's say
-> I have a driver for some HW block. The driver doesn't use clk functions,
-> but uses runtime PM. The driver also sets pm_runtime_irq_safe().
+Dear Shawn Guo,
+
+> On Sat, Jun 23, 2012 at 08:47:32PM +0200, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > This patch configures the I2C bus timing registers according
+> > > to information passed via DT. Currently, 100kHz and 400kHz
+> > > modes are supported.
+> > 
+> > [...]
+> > 
+> > Is there any reason why this can not be merged other than the timing
+> > registers goo (which I believe shall stay as in the datasheet until we
+> > figure out if it's even reasonable to add some computation there).
 > 
-> Now, the driver can call pm_runtime_get_sync() in an atomic context, and
-> this would lead to the underlying framework (hwmod, omap_device, I don't
-> know who =) enabling the func clock for that HW. But this would happen
-> in atomic context, so the underlying framework can't use clk_prepare.
-> 
-> How does the underlying framework handle that case? (sorry if that's a
-> stupid question =).
-> 
+> I assume this is a question for Wolfram.  But I guess part of the reason
+> is there is still one comment from me staying unresolved.
 
-I think it's a good question!
+Shawn, I just re-tested the i2c with mpg123 playing "MPEG 1.0 layer III, VBR, 
+44100 Hz joint-stereo" and it worked on a first try ... can you retest please?
 
-If we're going to call clk_prepare_enable from within a runtime pm
-callback then I think we'll need to check if _irq_safe() is set and
-conditionally call only clk_enable in such a case.
-
-I'm not a runtime pm expert, but if the driver owns the responsibility
-of calling pm_runtime_irq_safe then the driver has the proper context
-to know that it should call clk_prepare BEFORE calling
-pm_runtime_get_sync.
-
-However if some other framework (outside of the driver) calls
-pm_runtime_irq_safe then it will be difficult for the driver to know
-what to do...
-
-Regards,
-Mike
-
->  Tomi
-> 
+Best regards,
+Marek Vasut
