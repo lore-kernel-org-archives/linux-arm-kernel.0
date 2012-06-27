@@ -1,41 +1,27 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 14:42:31 +0200
-Subject: [PATCH v7 06/14] USB: Chipidea: rename struct ci13xxx variables
- from udc to ci
-In-Reply-To: <1340607391-16380-7-git-send-email-richard.zhao@freescale.com>
-References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
- <1340607391-16380-7-git-send-email-richard.zhao@freescale.com>
-Message-ID: <4FEAFFB7.7010906@pengutronix.de>
+Date: Wed, 27 Jun 2012 14:49:27 +0200
+Subject: [PATCH 0/3] usb: chipidea: fix error handling and add dr_role
+ property
+In-Reply-To: <20120627124233.GA2256@richard-laptop>
+References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
+ <20120627124233.GA2256@richard-laptop>
+Message-ID: <4FEB0157.5070404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2012 08:56 AM, Richard Zhao wrote:
-> struct ci13xxx represent the controller, which may be device or host,
-> so name its variables as ci.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+On 06/27/2012 02:42 PM, Richard Zhao wrote:
+> On Wed, Jun 27, 2012 at 02:21:47PM +0200, Marc Kleine-Budde wrote:
+>> Hello,
+>>
+>> while hacking on the chipidea driver, I fixed the error path in
+>> the udc part of the chipidea driver. Further I added the possibility
+>> to limit the driver to host or device only mode. It's possible via
+>> platformdata and device tree. For dt I selected the dr_role property
+>> which is already used for other dual role usb drivers.
+> What's it based on then?
 
-nitpick: search-replace problem
-
-> --- a/drivers/usb/chipidea/udc.c
-> +++ b/drivers/usb/chipidea/udc.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * udc.c - ChipIdea UDC driver
-> + * ci.c - ChipIdea UDC driver
-      ^^^^
-
-:)
-
->   *
->   * Copyright (C) 2008 Chipidea - MIPS Technologies, Inc. All rights reserved.
->   *
-> @@ -66,11 +66,11 @@ static inline int hw_ep_bit(int num, int dir)
->  	return num + (dir ? 16 : 0);
->  }
->  
+Your tree:
+https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
 
 Marc
 
@@ -51,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 262 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/ebce7ba8/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/90b62bf5/attachment.sig>
