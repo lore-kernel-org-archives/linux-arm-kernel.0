@@ -1,34 +1,37 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 27 Jun 2012 14:14:03 +0200
-Subject: [PATCH v7] MTD: LPC32xx SLC NAND driver
-In-Reply-To: <1340794007.29342.50.camel@sauron.fi.intel.com>
-References: <1339064536-20553-1-git-send-email-stigge@antcom.de>
- <1340794007.29342.50.camel@sauron.fi.intel.com>
-Message-ID: <4FEAF90B.5030809@antcom.de>
+Date: Wed, 27 Jun 2012 14:13:52 +0200
+Subject: [PATCH] MTD: LPC32xx SLC NAND driver: Add error handling to write
+ function
+Message-ID: <1340799232-23092-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 12:46 PM, Artem Bityutskiy wrote:
-> On Thu, 2012-06-07 at 12:22 +0200, Roland Stigge wrote:
->> This patch adds support for the SLC NAND controller inside the
->> LPC32xx SoC.
->> 
->> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> Now the write_page and write_page_raw functions return an error
-> code, see this commit in the l2 tree:
-> 
-> http://git.infradead.org/users/dedekind/l2-mtd.git/commit/49c8d9ab3b70732665249f2d993f734378ebbba9
->
->  I've amended your SLC driver, see below the diff. But I think it
-> could return the real return code becuse it can fail - could you
-> please take a look and send an incremental patch?
-> 
-> Please, base your work on top of the l2-mtd tree: 
-> git://git.infradead.org/users/dedekind/l2-mtd.git
+This patch adds error handling to the lpc32xx_nand_write_page_syndrome()
+function.
 
-Thanks for the note! I'm sending an incremental patch. There was
-actually only one place in the two functions that could fail (return
-code of lpc32xx_xfer()).
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Roland
+---
+ drivers/mtd/nand/lpc32xx_slc.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
+index 7e2e78d..b27b3b3 100644
+--- a/drivers/mtd/nand/lpc32xx_slc.c
++++ b/drivers/mtd/nand/lpc32xx_slc.c
+@@ -679,9 +679,12 @@ static int lpc32xx_nand_write_page_syndrome(struct mtd_info *mtd,
+ {
+ 	struct lpc32xx_nand_host *host = chip->priv;
+ 	u8 *pb = chip->oob_poi + chip->ecc.layout->eccpos[0];
++	int error;
+ 
+ 	/* Write data, calculate ECC on outbound data */
+-	lpc32xx_xfer(mtd, (u8 *)buf, chip->ecc.steps, 0);
++	error = lpc32xx_xfer(mtd, (u8 *)buf, chip->ecc.steps, 0);
++	if (error)
++		return error;
+ 
+ 	/*
+ 	 * The calculated ECC needs some manual work done to it before
+-- 
+1.7.10.4
