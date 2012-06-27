@@ -1,161 +1,125 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 14:21:50 +0200
-Subject: [PATCH 3/3] usb: chipidea: ci13xxx-imx: add "dr_role" property to
- device tree bindings
-In-Reply-To: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
-References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1340799710-32696-4-git-send-email-mkl@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 27 Jun 2012 14:25:00 +0200
+Subject: i.MX28 die temperature
+In-Reply-To: <4FEAF75E.5090505@cam.ac.uk>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <201206271400.11727.marex@denx.de> <4FEAF75E.5090505@cam.ac.uk>
+Message-ID: <201206271425.00657.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the device tree to limit the chipidea to host or
-peripheral mode only.
+Dear Jonathan Cameron,
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    4 ++
- arch/arm/boot/dts/imx28.dtsi                       |    1 +
- drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
- drivers/usb/chipidea/core.c                        |   40 +++++++++++++++++---
- include/linux/usb/chipidea.h                       |    9 +++++
- 5 files changed, 51 insertions(+), 6 deletions(-)
+> On 6/27/2012 1:00 PM, Marek Vasut wrote:
+> > Dear Jonathan Cameron,
+> > 
+> >> On 6/26/2012 8:02 PM, Marek Vasut wrote:
+> >>> Dear Juergen Beisert,
+> >>> 
+> >>>> Hi Marek,
+> >>>> 
+> >>>> Marek Vasut wrote:
+> >>>>> [...]
+> >>>>> 
+> >>>>>>> Take a look at:
+> >>>>>>> http://www.spinics.net/lists/linux-iio/msg04345.html
+> >>>>>> 
+> >>>>>> Any progress here with inclusion in some git tree?
+> >>>>> 
+> >>>>> Well ... I recently raised from the dead. It's on the schedule,
+> >>>>> obviously help is welcome.
+> >>>> 
+> >>>> I tried a little bit with your driver. The disadvantage I see is, its
+> >>>> claims all the free AD channels. But a few of them can also act as a
+> >>>> touchscreen controller. Shouldn't be the driver handle the channel
+> >>>> usage dynamically?
+> >>> 
+> >>> I wonder, I'd rather see this driver behave as a composite driver, what
+> >>> do you think?
+> >> 
+> >> Alternative (though it's still in development) would be to use IIO
+> >> as the ADC layer and sit the other parts on top.
+> > 
+> > I think you need to adjust a few bits there and there in the hardware to
+> > behave as a touchscreen. Will IIO be able to handle that somehow ?
+> 
+> No means of doing it yet.  I'm not entirely sure this can be done
+> generically. I'm not really familiar enough with touchscreen adcs as
+> none of my boards have one.  At worst I'm sure we can put some
+> hooks in to get hold of the underlying device if necessary.
 
-diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-index 8bcd071..f55f2d5 100644
---- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-+++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-@@ -4,6 +4,9 @@ Required properties:
- - compatible: Should be "fsl,imx27-usb"
- - reg: Should contain registers location and length
- - interrupts: Should contain controller interrupt
-+- dr_mode: indicates the working mode for "fsl,imx27-usb" compatible
-+  controllers. Can be "host", "peripheral", or "otg". Defaults to
-+  "otg" if not defined.
- 
- Optional properties:
- - fsl,usbphy: phandler of usb phy that connects to the only one port
-@@ -17,4 +20,5 @@ usb at 02184000 { /* USB OTG */
- 	interrupts = <0 43 0x04>;
- 	fsl,usbphy = <&usbphy1>;
- 	fsl,vbus-power-gpios = <&gpio3 22 0>;
-+	dr_mode= "otg";
- };
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 65d6ae3..9cbf9b9 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -467,6 +467,7 @@
- 			interrupts = <93>;
- 			fsl,usbphy = <&usbphy0>;
- 			status = "disabled";
-+			dr_mode = "host";
- 		};
- 
- 		usb1: usb at 80090000 {
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index efae2be..8e926fb 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -120,6 +120,9 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
- 		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
- 	}
-+
-+	ci13xxx_get_dr_mode(pdev->dev.of_node, &ci13xxx_imx_platdata);
-+
- 	plat_ci = ci13xxx_add_device(&pdev->dev,
- 				pdev->resource, pdev->num_resources,
- 				&ci13xxx_imx_platdata);
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 1083585..89d2cae 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -63,6 +63,7 @@
- #include <linux/kernel.h>
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of_platform.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/otg.h>
-@@ -386,6 +387,23 @@ void ci13xxx_remove_device(struct platform_device *pdev)
- }
- EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
- 
-+void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
-+{
-+	const unsigned char *dr_mode;
-+
-+	dr_mode = of_get_property(of_node, "dr_mode", NULL);
-+	if (!dr_mode)
-+		return;
-+
-+	if (!strcmp(dr_mode, "host"))
-+		pdata->flags |= CI13XXX_DR_MODE_HOST;
-+	else if (!strcmp(dr_mode, "peripheral"))
-+		pdata->flags |= CI13XXX_DR_MODE_PERIPHERAL;
-+	else if (!strcmp(dr_mode, "otg"))
-+		pdata->flags |= CI13XXX_DR_MODE_OTG;
-+}
-+EXPORT_SYMBOL_GPL(ci13xxx_get_dr_mode);
-+
- static int __devinit ci_hdrc_probe(struct platform_device *pdev)
- {
- 	struct device	*dev = &pdev->dev;
-@@ -446,13 +464,23 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* initialize role(s) before the interrupt is requested */
--	ret = ci_hdrc_host_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support host\n");
-+	/* default to otg */
-+	if (!(ci->platdata->flags & CI13XXX_DR_MODE_MASK))
-+		ci->platdata->flags |= CI13XXX_DR_MODE_OTG;
-+
-+	if (ci->platdata->flags &
-+	    (CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_OTG)) {
-+		ret = ci_hdrc_host_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support host\n");
-+	}
- 
--	ret = ci_hdrc_gadget_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+	if (ci->platdata->flags &
-+	    (CI13XXX_DR_MODE_PERIPHERAL | CI13XXX_DR_MODE_OTG)) {
-+		ret = ci_hdrc_gadget_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support gadget\n");
-+	}
- 
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 544825d..29ad908 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -19,6 +19,12 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
-+#define CI13XXX_DR_MODE_HOST		BIT(4)
-+#define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
-+#define CI13XXX_DR_MODE_OTG		BIT(6)
-+#define CI13XXX_DR_MODE_MASK \
-+	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL | \
-+	 CI13XXX_DR_MODE_OTG)
- 
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
-@@ -35,4 +41,7 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
- /* Remove ci13xxx device */
- void ci13xxx_remove_device(struct platform_device *pdev);
- 
-+/* Parse of-tree "dr_mode" property */
-+void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
-+
- #endif
--- 
-1.7.10
+I'll think about this. Would mx233 board be enough for you?
+
+> >> die temp and basic
+> >> adc are fine but no one has taken on a touchscreen controller via that
+> >> approach yet.
+> > 
+> > Is there any example of these basic things already?
+> 
+> Saddly only patches posted on the list for the interrupt driven side of
+> things. I have an updated version (that acutally works reasonably well)
+> but haven't posted as yet as want to take another look at some of the
+> error cases when switching buffers in and out (all about rolling back
+> sucessfully to a valid configuration when an invalid one has failed).
+> 
+> The hwmon stuff is in tree though as drivers/staging/iio/iio_hwmon.c   I
+> really ought to get round to posting that one for inclusion under
+> drivers/hmwon. Guenter was reasonably happy with the version that is
+> there so shouldn't be too much trouble.
+
+Oh, will check it.
+
+> >> They tend to have a nasty large number of extremely
+> >> special purpose bits.  I've certainly not thought through how to handle
+> >> those yet.
+> >> 
+> >>>> Also this AD module on the SoC can measure the die
+> >>>> temperature, battery voltage and some other power supplies.
+> >>>> I see more than one framework this driver should connect to: simple
+> >>>> ADC (IIO), touchscreen controller (INPUT), die temp (POWER?), various
+> >>>> voltages (POWER? REGULATOR?). Should it be a multi function device?
+> >>> 
+> >>> Correct, making it a MFD device with common channel-management logic is
+> >>> the way to go. And it's gonna be a few resends of this driver, that's
+> >>> for certain. I'm not confident I'll be able to make it right at the
+> >>> first try ;-)
+> >>> 
+> >>> INPUT -- touchscreen
+> >>> IIO -- die temp and LRADC (maybe random voltages?)
+> >> 
+> >> Mapping the die temp onto hwmon as obviously thats where it ultimately
+> >> should appear.
+> > 
+> > Ah correct.
+> > 
+> >>> POWER -- battery
+> >>> 
+> >>> But all this MFD goo is quite simple, the hard part is the channel
+> >>> management logic. From the top of my head, there're 16 channels, 8 can
+> >>> be sampled at the same time and there are 4 configuration triggers.
+> >>> Making it one hell of a complex hardware.
+> >> 
+> >> It is indeed a nasty beast. Good luck ;)
+> > 
+> > Mmm ... sounds more like "condolences" :-D
+> :
+> :)
+> :
+> >>> I'll fix the remnants of SPI and start on this beast tonight or
+> >>> tomorrow. Since there was some progress in the IIO, I believe I'll
+> >>> have to rework it a bit.
+> >>> 
+> >>>> Juergen
+> >>> 
+> >>> Best regards,
+> >>> Marek Vasut
+> >>> --
+> >>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> >>> the body of a message to majordomo at vger.kernel.org
+> >>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> > Best regards,
+> > Marek Vasut
+
+Best regards,
+Marek Vasut
