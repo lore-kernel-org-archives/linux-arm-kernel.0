@@ -1,40 +1,33 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:32:14 +0200
-Subject: [PATCH RESEND] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER
- if GPIO not yet available
-Message-ID: <1340836334-20427-1-git-send-email-stigge@antcom.de>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 28 Jun 2012 00:58:26 +0200
+Subject: i.MX28 die temperature
+In-Reply-To: <201206271433.15303.jbe@pengutronix.de>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <4FEAF75E.5090505@cam.ac.uk> <201206271433.15303.jbe@pengutronix.de>
+Message-ID: <201206280058.26485.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
-respective GPIO is not (yet) available. This is useful if driver's probe()
-functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
-can be probed again later on.
+Dear Juergen Beisert,
 
-The function still returns -EINVAL on other errors (parse error or node doesn't
-exist). This way, the case of an optional/intentionally missing GPIO is handled
-appropriately.
+[...]
+> 
+> It requires a more or less complex state-machine to switch the used 4 or 5
+> pins to different modes to measure the X/Y position and the pressure. And
+> these pins interfere with the ADC input pins.
+> 
+> > [...]
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I said I'll go through it, but it seems the IIO changed again, so I'll need to 
+wrap my head around new stuff in there.
 
----
-Applies to v3.5-rc4
+Besides, I have a feeling that the driver, as is, just simply doesn't fit in as 
+it should. I'm discussing with Jonathan, since I can't really make heads or 
+tails from the IIO api. It's way too complex and unless I really missed 
+something, way underdocumented.
 
- drivers/gpio/gpiolib-of.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+> Regards,
+> Juergen
 
---- linux-2.6.orig/drivers/gpio/gpiolib-of.c
-+++ linux-2.6/drivers/gpio/gpiolib-of.c
-@@ -62,7 +62,10 @@ static int of_gpiochip_find_and_xlate(st
- int of_get_named_gpio_flags(struct device_node *np, const char *propname,
-                            int index, enum of_gpio_flags *flags)
- {
--	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
-+	/* Return -EPROBE_DEFER to support probe() functions to be called
-+	 * later when the GPIO actually becomes available
-+	 */
-+	struct gg_data gg_data = { .flags = flags, .out_gpio = -EPROBE_DEFER };
- 	int ret;
- 
- 	/* .of_xlate might decide to not fill in the flags, so clear it. */
+Best regards,
+Marek Vasut
