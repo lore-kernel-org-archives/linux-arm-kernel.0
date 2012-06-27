@@ -1,121 +1,64 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 27 Jun 2012 17:36:52 +0200
-Subject: [PATCH v5 3/9] arm: mach-mvebu: add source files
-In-Reply-To: <1340805290-9051-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340805290-9051-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120627153652.GE29702@lunn.ch>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 27 Jun 2012 17:51:13 +0200
+Subject: [PATCH 2/4] mtd: lpc32xx_slc: Make wp gpio optional
+In-Reply-To: <1340812275-1197-1-git-send-email-stigge@antcom.de>
+References: <1340812275-1197-1-git-send-email-stigge@antcom.de>
+Message-ID: <1340812275-1197-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-> new file mode 100644
-> index 0000000..14331ba
-> --- /dev/null
-> +++ b/arch/arm/mach-mvebu/system-controller.c
-> @@ -0,0 +1,100 @@
-> +/*
-> + * System controller support for Armada 370 and XP platforms.
-> + *
-> + * Copyright (C) 2012 Marvell
-> + *
-> + * Lior Amsalem <alior@marvell.com>
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * The Armada 370 and Armada XP SoCs both have a range of
-> + * miscellaneous registers, that do not belong to a particular device,
-> + * but rather provide system-level features. This basic
-> + * system-controller driver provides a device tree binding for those
-> + * registers, and implements utility functions offering various
-> + * features related to those registers.
-> + *
-> + * For now, the feature set is limited to restarting the platform by a
-> + * soft-reset, but it might be extended in the future.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/of_address.h>
-> +#include <linux/io.h>
-> +
-> +static void __iomem *system_controller_base;
-> +
-> +struct mvebu_system_controller {
-> +	u32 rstoutn_mask_offset;
-> +	u32 system_soft_reset_offset;
-> +
-> +	u32 rstoutn_mask_reset_out_en;
-> +	u32 system_soft_reset;
-> +};
-> +static struct mvebu_system_controller *mvebu_sc;
-> +
-> +const struct mvebu_system_controller armada_370_xp_system_controller = {
-> +	.rstoutn_mask_offset = 0x60,
-> +	.system_soft_reset_offset = 0x64,
-> +	.rstoutn_mask_reset_out_en = 0x1,
-> +	.system_soft_reset = 0x1,
-> +};
-> +
-> +const struct mvebu_system_controller orion_system_controller = {
-> +	.rstoutn_mask_offset = 0x108,
-> +	.system_soft_reset_offset = 0x10c,
-> +	.rstoutn_mask_reset_out_en = 0x4,
-> +	.system_soft_reset = 0x1,
-> +};
-> +
-> +static struct of_device_id of_system_controller_table[] = {
-> +	{.compatible = "marvell,orion-system-controller",
-> +	 .data = (void *) &orion_system_controller},
-> +	{.compatible = "marvell,armada-370-xp-system-controller",
-> +	 .data = (void *) &armada_370_xp_system_controller},
-> +	{ /* end of list */ },
-> +};
-> +
-> +void mvebu_restart(char mode, const char *cmd)
-> +{
-> +	if (!system_controller_base) {
-> +		pr_warn("Cannot restart, system-controller not available\n");
+From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-Does pr_warn() get shown by default? I would of probably gone for
-BUG_ON() or WARN_ON(), to make it clearer what has happened. It may
-not be a kernel bug, but a DT description bug, but it still a bug...
+This patch supports missing wp gpio.
 
-> +	} else {
-> +		/*
-> +		 * Enable soft reset to assert RSTOUTn.
-> +		 */
-> +		writel(mvebu_sc->rstoutn_mask_reset_out_en,
-> +			system_controller_base +
-> +			mvebu_sc->rstoutn_mask_offset);
-> +		/*
-> +		 * Assert soft reset.
-> +		 */
-> +		writel(mvebu_sc->system_soft_reset,
-> +			system_controller_base +
-> +			mvebu_sc->system_soft_reset_offset);
-> +	}
-> +	while (1)
-> +		;
-> +}
+Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+---
+ drivers/mtd/nand/lpc32xx_slc.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-I tested this on a Kirkwood QNAP with DT property:
-
-                system-controller at 20000 {
-                        compatible = "marvell,orion-system-controller";
-                        reg = <0x20000 0x1000>;
-                };
-
-and it works. So:
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-However Orion5x has a slightly different variant, so i would like to
-test it on that SoC as well. However, we don't have DT on Orion5x yet,
-so i need to simulate it.
-
-   Andrew
+diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
+index b27b3b3..ab72aca 100644
+--- a/drivers/mtd/nand/lpc32xx_slc.c
++++ b/drivers/mtd/nand/lpc32xx_slc.c
+@@ -192,7 +192,7 @@ struct lpc32xx_nand_cfg_slc {
+ 	u32     rhold;
+ 	u32     rsetup;
+ 	bool    use_bbt;
+-	unsigned wp_gpio;
++	int     wp_gpio;
+ 	struct mtd_partition *parts;
+ 	unsigned num_parts;
+ };
+@@ -295,7 +295,8 @@ static int lpc32xx_nand_device_ready(struct mtd_info *mtd)
+  */
+ static void lpc32xx_wp_enable(struct lpc32xx_nand_host *host)
+ {
+-	gpio_set_value(host->ncfg->wp_gpio, 0);
++	if (gpio_is_valid(host->ncfg->wp_gpio))
++		gpio_set_value(host->ncfg->wp_gpio, 0);
+ }
+ 
+ /*
+@@ -303,7 +304,8 @@ static void lpc32xx_wp_enable(struct lpc32xx_nand_host *host)
+  */
+ static void lpc32xx_wp_disable(struct lpc32xx_nand_host *host)
+ {
+-	gpio_set_value(host->ncfg->wp_gpio, 1);
++	if (gpio_is_valid(host->ncfg->wp_gpio))
++		gpio_set_value(host->ncfg->wp_gpio, 1);
+ }
+ 
+ /*
+@@ -819,7 +821,8 @@ static int __devinit lpc32xx_nand_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Missing platform data\n");
+ 		return -ENOENT;
+ 	}
+-	if (gpio_request(host->ncfg->wp_gpio, "NAND WP")) {
++	if (gpio_is_valid(host->ncfg->wp_gpio) &&
++			gpio_request(host->ncfg->wp_gpio, "NAND WP")) {
+ 		dev_err(&pdev->dev, "GPIO not available\n");
+ 		return -EBUSY;
+ 	}
+-- 
+1.7.10.4
