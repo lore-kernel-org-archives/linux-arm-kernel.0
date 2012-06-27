@@ -1,34 +1,121 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 27 Jun 2012 15:27:02 +0000
-Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
- non-omap1 platforms
-In-Reply-To: <20120627135816.GK3483@atomide.com>
-References: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5096A@DBDE01.ent.ti.com>
- <20120627133950.GJ3483@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA5BAF8@DBDE01.ent.ti.com>
- <20120627135816.GK3483@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA5BCCA@DBDE01.ent.ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Jun 2012 17:36:52 +0200
+Subject: [PATCH v5 3/9] arm: mach-mvebu: add source files
+In-Reply-To: <1340805290-9051-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340805290-9051-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20120627153652.GE29702@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 19:28:17, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120627 06:54]:
-> > 
-> > There are few cleanup patches pending for your review, it would be good if 
-> > you provide your review comments.
-> 
-> Hmm care to post the Subject: lines for those? I may have marked
-> something as read accidentally..
-> 
+> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+> new file mode 100644
+> index 0000000..14331ba
+> --- /dev/null
+> +++ b/arch/arm/mach-mvebu/system-controller.c
+> @@ -0,0 +1,100 @@
+> +/*
+> + * System controller support for Armada 370 and XP platforms.
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Lior Amsalem <alior@marvell.com>
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + * The Armada 370 and Armada XP SoCs both have a range of
+> + * miscellaneous registers, that do not belong to a particular device,
+> + * but rather provide system-level features. This basic
+> + * system-controller driver provides a device tree binding for those
+> + * registers, and implements utility functions offering various
+> + * features related to those registers.
+> + *
+> + * For now, the feature set is limited to restarting the platform by a
+> + * soft-reset, but it might be extended in the future.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of_address.h>
+> +#include <linux/io.h>
+> +
+> +static void __iomem *system_controller_base;
+> +
+> +struct mvebu_system_controller {
+> +	u32 rstoutn_mask_offset;
+> +	u32 system_soft_reset_offset;
+> +
+> +	u32 rstoutn_mask_reset_out_en;
+> +	u32 system_soft_reset;
+> +};
+> +static struct mvebu_system_controller *mvebu_sc;
+> +
+> +const struct mvebu_system_controller armada_370_xp_system_controller = {
+> +	.rstoutn_mask_offset = 0x60,
+> +	.system_soft_reset_offset = 0x64,
+> +	.rstoutn_mask_reset_out_en = 0x1,
+> +	.system_soft_reset = 0x1,
+> +};
+> +
+> +const struct mvebu_system_controller orion_system_controller = {
+> +	.rstoutn_mask_offset = 0x108,
+> +	.system_soft_reset_offset = 0x10c,
+> +	.rstoutn_mask_reset_out_en = 0x4,
+> +	.system_soft_reset = 0x1,
+> +};
+> +
+> +static struct of_device_id of_system_controller_table[] = {
+> +	{.compatible = "marvell,orion-system-controller",
+> +	 .data = (void *) &orion_system_controller},
+> +	{.compatible = "marvell,armada-370-xp-system-controller",
+> +	 .data = (void *) &armada_370_xp_system_controller},
+> +	{ /* end of list */ },
+> +};
+> +
+> +void mvebu_restart(char mode, const char *cmd)
+> +{
+> +	if (!system_controller_base) {
+> +		pr_warn("Cannot restart, system-controller not available\n");
 
-I will resubmit the patches again ontop of linux-omap/master, makes more sense.
+Does pr_warn() get shown by default? I would of probably gone for
+BUG_ON() or WARN_ON(), to make it clearer what has happened. It may
+not be a kernel bug, but a DT description bug, but it still a bug...
 
-These patches are,
+> +	} else {
+> +		/*
+> +		 * Enable soft reset to assert RSTOUTn.
+> +		 */
+> +		writel(mvebu_sc->rstoutn_mask_reset_out_en,
+> +			system_controller_base +
+> +			mvebu_sc->rstoutn_mask_offset);
+> +		/*
+> +		 * Assert soft reset.
+> +		 */
+> +		writel(mvebu_sc->system_soft_reset,
+> +			system_controller_base +
+> +			mvebu_sc->system_soft_reset_offset);
+> +	}
+> +	while (1)
+> +		;
+> +}
 
-ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses omap-device.o target so add one entry
-ARM: OMAP2+: CLEANUP: Move omap3 dpll ops to dpll3xxx.c
-ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct dpll_data
+I tested this on a Kirkwood QNAP with DT property:
 
-Thanks,
-Vaibhav	
+                system-controller at 20000 {
+                        compatible = "marvell,orion-system-controller";
+                        reg = <0x20000 0x1000>;
+                };
+
+and it works. So:
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+However Orion5x has a slightly different variant, so i would like to
+test it on that SoC as well. However, we don't have DT on Orion5x yet,
+so i need to simulate it.
+
+   Andrew
