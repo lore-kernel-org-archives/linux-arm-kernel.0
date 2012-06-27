@@ -1,52 +1,45 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:26:11 +0200
-Subject: [PATCH 1/8] ARM: LPC32xx: Init MMC via clock
-In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340835978-20331-2-git-send-email-stigge@antcom.de>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Thu, 28 Jun 2012 00:28:03 +0200
+Subject: [PATCH 1/1] ARM: OMAP: omap2plus_defconfig: Enable EXT4 support
+In-Reply-To: <1340489939-5390-1-git-send-email-javier@dowhile0.org>
+References: <1340489939-5390-1-git-send-email-javier@dowhile0.org>
+Message-ID: <CAAwP0s2eTWk2Uf0HZ13Lq5gA0HNp8V87znjd6rX6Uh0ZPy03PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves MMC/SD controller initialization from the board specific file
-phy3250.c to clock.c.
+On Sun, Jun 24, 2012 at 12:18 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> On OMAP boards that includes an SD card slot, an EXT4 partition could
+> be used to store the root file system. So, the kernel should have
+> built-in support for EXT4 to be able to mount the VFS root on boot.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> ---
+> ?arch/arm/configs/omap2plus_defconfig | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 9854ff4..f3087cb 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -197,6 +197,7 @@ CONFIG_RTC_DRV_TWL4030=y
+> ?CONFIG_EXT2_FS=y
+> ?CONFIG_EXT3_FS=y
+> ?# CONFIG_EXT3_FS_XATTR is not set
+> +CONFIG_EXT4_FS=y
+> ?CONFIG_QUOTA=y
+> ?CONFIG_QFMT_V2=y
+> ?CONFIG_MSDOS_FS=y
+> --
+> 1.7.7.6
+>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+Hi,
 
----
- arch/arm/mach-lpc32xx/clock.c   |    6 ++++--
- arch/arm/mach-lpc32xx/phy3250.c |    5 -----
- 2 files changed, 4 insertions(+), 7 deletions(-)
+any news about this patch?
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -812,11 +812,13 @@ static int mmc_onoff_enable(struct clk *
- 	u32 tmp;
- 
- 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
--		~LPC32XX_CLKPWR_MSCARD_SDCARD_EN;
-+		~(LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
-+		  LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN);
- 
- 	/* If rate is 0, disable clock */
- 	if (enable != 0)
--		tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_EN;
-+		tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
-+			LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN;
- 
- 	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
- 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -262,11 +262,6 @@ static void __init lpc3250_machine_init(
- 
- 	lpc32xx_serial_init();
- 
--	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
--	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
--		LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN;
--	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
--
- 	/* Test clock needed for UDA1380 initial init */
- 	__raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC |
- 		LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN,
+Is quite annoying to have to enable EXT4 support each time I want to
+try a new kernel on my board.
+
+Best regards,
+Javier
