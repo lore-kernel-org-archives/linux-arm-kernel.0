@@ -1,67 +1,35 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 27 Jun 2012 19:21:01 +0000
-Subject: Current state of AM33xx patches
-In-Reply-To: <alpine.DEB.2.00.1206271306170.27496@utopia.booyaka.com>
-References: <4FD5BA4C.9070706@gmail.com> <4FD5FD9E.5040203@ti.com>
- <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206271218540.27496@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206271306170.27496@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA5C1F7@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jun 2012 20:15:42 +0100
+Subject: [PATCH 1/4] mtd: lpc32xx_slc: Select AMBA_PL08X in Kconfig
+In-Reply-To: <1340812275-1197-1-git-send-email-stigge@antcom.de>
+References: <1340812275-1197-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120627191542.GC25319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 00:42:16, Paul Walmsley wrote:
-> On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
+On Wed, Jun 27, 2012 at 05:51:12PM +0200, Roland Stigge wrote:
+> From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 > 
-> > On Thu, Jun 28, 2012 at 00:01:06, Paul Walmsley wrote:
-> > > On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
-> > > 
-> > > The branch used was your am335x-upstream-staging branch, plus a minor 
-> > > patch to allow the kernel to build on an am335x-only config (although for 
-> > > the purposes of this test, omap2plus_defconfig was used).
-> >
-> > Something seems to be wrong here???
-> > The HEAD is,
-> > 
-> > commit 67e686682dc286d90a0ed47b7dc68fb54944d3d9
-> > Author: AnilKumar Ch <anilkumar@ti.com>
-> > Date:   Thu Jun 21 12:33:58 2012 +0530
-> > 
-> >     arm/dts: Add support for AM335x BeagleBone
+> Since this driver depends on the amba pl08x dma driver, select it in Kconfig.
 > 
-> As I wrote earlier, there's an extra patch on there to get a kernel built 
-> with an AM33xx-only config to link, used here for build testing.  It 
-> shouldn't affect the kernel's ability to start at all.  It's included 
-> below.
+> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> ---
+>  drivers/mtd/nand/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> 
-> - Paul
-> 
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index d09ccc1..e6f4117 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -385,8 +385,12 @@ void __init omap2430_init_late(void)
->  /*
->   * Currently only board-omap3beagle.c should call this because of the
->   * same machine_id for 34xx and 36xx beagle.. Will get fixed with DT.
-> + *
-> + * XXX Due to the fact that the 33xx machine_init section is incorrectly
-> + * incorporated as part of an AM35xx board file, we had to expand the
-> + * following test to include CONFIG_SOC_AM33XX :-(
->   */
-> -#ifdef CONFIG_SOC_OMAP3430
-> +#if defined(CONFIG_SOC_OMAP3430) || defined(CONFIG_SOC_AM33XX)
->  void __init omap3_init_early(void)
->  {
->         omap2_set_globals_3xxx();
-> 
-> 
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index de69978..a9e8b73 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -417,6 +417,7 @@ config MTD_NAND_PXA3xx
+>  config MTD_NAND_SLC_LPC32XX
+>  	tristate "NXP LPC32xx SLC Controller"
+>  	depends on ARCH_LPC32XX
+> +	select AMBA_PL08X
+>  	help
+>  	  Enables support for NXP's LPC32XX SLC (i.e. for Single Level Cell
+>  	  chips) NAND controller. This is the default for the PHYTEC 3250
 
-Shouldn't impact, but  still will apply now...will update you on this.
-Can you also share me the .config file of yours??
-
-Thanks,
-Vaibhav
+Surely not?  Drivers using DMA engine really should not depend on any
+particular DMA engine implementation.
