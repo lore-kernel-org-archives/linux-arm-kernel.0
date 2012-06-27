@@ -1,41 +1,41 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 27 Jun 2012 10:50:37 -0700
-Subject: linux-next: adding the common clk tree
-In-Reply-To: <20120628002925.dd144b4782398042593b6b47@canb.auug.org.au>
-References: <20120626015551.GW4402@gmail.com>
- <20120626132502.7584f6acbfc23bdc3d6a8f8e@canb.auug.org.au>
- <20120626230503.GA4402@gmail.com>
- <20120628002925.dd144b4782398042593b6b47@canb.auug.org.au>
-Message-ID: <20120627175037.GF22766@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 27 Jun 2012 19:52:34 +0200
+Subject: [PATCH 1/2] mtd mxc_nand: use 32bit copy functions
+In-Reply-To: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
+References: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120627175234.GF18096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120628-00:29, Stephen Rothwell wrote:
-> Hi Mike,
-> 
-> On Tue, 26 Jun 2012 16:05:03 -0700 Mike Turquette <mturquette@ti.com> wrote:
-> >
-> > So please let me know if I still have the concept wrong and I'll change
-> > things up.  Otherwise my clk-next fulfils all of the guidelines you've
-> > mentioned below for inclusion into linux-next.
-> 
-> OK, that all seems to be fine.  I would make one suggestion: that you
-> create the clk-next branch like this:
-> 
-> git checkout clk-next
-> git reset --hard clk-3.x
-> git merge clk-fixes
-> git am patches/clk/next/incoming/*.patch
-> 
-> or maybe just merge clk-fixes directly into clk-3.x when necessary or
-> from time to time and base clk-next just in clk-3.x.
+Hello,
 
-Using clk-3.x as a base for clk-next sounds fine to me.  I'll use the
-approach you outlined above.
+On Fri, May 25, 2012 at 04:22:41PM +0200, Sascha Hauer wrote:
+> The following commit changes the function used to copy from/to
+> the hardware buffer to memcpy_[from|to]io. This does not work
+> since the hardware cannot handle the byte accesses used by these
+> functions. Instead of reverting this patch introduce 32bit
+> correspondents of these functions.
+> 
+> commit 5775ba36ea9c760c2d7e697dac04f2f7fc95aa62
+> Author: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Date:   Tue Apr 24 10:05:22 2012 +0200
+> 
+>     mtd: mxc_nand: fix several sparse warnings about incorrect address space
+> 
+>     Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>     Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thanks much,
-Mike
+I don't know about the sparse problems this introduces, but without this
+patch the mxc-nand driver is broken, so it should really go in before
+3.5.
 
-> --
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
