@@ -1,116 +1,63 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Wed, 27 Jun 2012 13:06:54 +0100
-Subject: i.MX28 die temperature
-In-Reply-To: <201206271400.11727.marex@denx.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <201206262102.15698.marek.vasut@gmail.com> <4FEAB48B.4010108@cam.ac.uk>
- <201206271400.11727.marex@denx.de>
-Message-ID: <4FEAF75E.5090505@cam.ac.uk>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 27 Jun 2012 12:07:58 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
+References: <4FD5BA4C.9070706@gmail.com>	<4FD5FD9E.5040203@ti.com>
+ <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/27/2012 1:00 PM, Marek Vasut wrote:
-> Dear Jonathan Cameron,
->
->> On 6/26/2012 8:02 PM, Marek Vasut wrote:
->>> Dear Juergen Beisert,
->>>
->>>> Hi Marek,
->>>>
->>>> Marek Vasut wrote:
->>>>> [...]
->>>>>
->>>>>>> Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
->>>>>>
->>>>>> Any progress here with inclusion in some git tree?
->>>>>
->>>>> Well ... I recently raised from the dead. It's on the schedule,
->>>>> obviously help is welcome.
->>>>
->>>> I tried a little bit with your driver. The disadvantage I see is, its
->>>> claims all the free AD channels. But a few of them can also act as a
->>>> touchscreen controller. Shouldn't be the driver handle the channel usage
->>>> dynamically?
->>>
->>> I wonder, I'd rather see this driver behave as a composite driver, what
->>> do you think?
->>
->> Alternative (though it's still in development) would be to use IIO
->> as the ADC layer and sit the other parts on top.
->
-> I think you need to adjust a few bits there and there in the hardware to behave
-> as a touchscreen. Will IIO be able to handle that somehow ?
-No means of doing it yet.  I'm not entirely sure this can be done 
-generically. I'm not really familiar enough with touchscreen adcs as 
-none of my boards have one.  At worst I'm sure we can put some
-hooks in to get hold of the underlying device if necessary.
+On Sat, Jun 23, 2012 at 18:33:13, Domenico Andreoli wrote:
+> Hello,
+> 
+> On Mon, Jun 11, 2012 at 4:15 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+> >
+> > I do maintain wiki page which you should refer for any updates:
+> > http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status
+> >
+> > In order to get latest and greatest kernel to boot, you can use my repo:
+> > https://github.com/hvaibhav/am335x-linux
+> 
+> do you have any usable defconfig? I've some trouble with the build of
+> this branch and I'm not sure about the configuration.
+> 
+> > Also, note that, currently there will be very minimal feature-set
+> > supported in the kernel, so not sure how much can be leveraged for
+> > production use-cases.
+> 
+> I need something that boots to userspace, nothing more (but I'm happy
+> to test) :)
+> 
 
->
->> die temp and basic
->> adc are fine but no one has taken on a touchscreen controller via that
->> approach yet.
->
-> Is there any example of these basic things already?
-Saddly only patches posted on the list for the interrupt driven side of 
-things. I have an updated version (that acutally works reasonably well) 
-but haven't posted as yet as want to take another look at some of the
-error cases when switching buffers in and out (all about rolling back
-sucessfully to a valid configuration when an invalid one has failed).
+Sorry for delayed response, I went out of station, supposed to come back on 
+Monday itself but due to some known reason couldn't make it. I have just 
+resumed my work today. Sorry for inconvenience...
 
-The hwmon stuff is in tree though as drivers/staging/iio/iio_hwmon.c   I 
-really ought to get round to posting that one for inclusion under 
-drivers/hmwon. Guenter was reasonably happy with the version that is
-there so shouldn't be too much trouble.
+Coming back to your question,
 
->
->> They tend to have a nasty large number of extremely
->> special purpose bits.  I've certainly not thought through how to handle
->> those yet.
->>
->>>> Also this AD module on the SoC can measure the die
->>>> temperature, battery voltage and some other power supplies.
->>>> I see more than one framework this driver should connect to: simple ADC
->>>> (IIO), touchscreen controller (INPUT), die temp (POWER?), various
->>>> voltages (POWER? REGULATOR?). Should it be a multi function device?
->>>
->>> Correct, making it a MFD device with common channel-management logic is
->>> the way to go. And it's gonna be a few resends of this driver, that's
->>> for certain. I'm not confident I'll be able to make it right at the
->>> first try ;-)
->>>
->>> INPUT -- touchscreen
->>> IIO -- die temp and LRADC (maybe random voltages?)
->>
->> Mapping the die temp onto hwmon as obviously thats where it ultimately
->> should appear.
->
-> Ah correct.
->
->>> POWER -- battery
->>>
->>> But all this MFD goo is quite simple, the hard part is the channel
->>> management logic. From the top of my head, there're 16 channels, 8 can
->>> be sampled at the same time and there are 4 configuration triggers.
->>> Making it one hell of a complex hardware.
->>
->> It is indeed a nasty beast. Good luck ;)
->
-> Mmm ... sounds more like "condolences" :-D
-:)
->
->>> I'll fix the remnants of SPI and start on this beast tonight or tomorrow.
->>> Since there was some progress in the IIO, I believe I'll have to rework
->>> it a bit.
->>>
->>>> Juergen
->>>
->>> Best regards,
->>> Marek Vasut
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> Best regards,
-> Marek Vasut
->
+Omap2plus_defconfig should work for you, you should get linux prompt with 
+ramdisk image (which I use). Just to be more clear, and for your reference I am pasting steps which I use for testing, 
+
+Build Steps:
+============
+ - make ARCH=arm CROSS_COMPILE=<toolchain> distclean
+ - make ARCH=arm CROSS_COMPILE=<toolchain> omap2plus_defconfig
+ - Enable option CONFIG_ARM_APPENDED_DTB and CONFIG_ARM_ATAG_DTB_COMPAT
+ - make ARCH=arm CROSS_COMPILE=<toolchain> uImage-dtb.am335x-evm
+   (Since I am not using DT aware u-boot)
+
+Use the ramdisk image to boot kernel, since we do not have support for any 
+storage devices in the mainline.
+
+U-Boot commands to boot:
+========================
+setenv bootcmd 'mmc rescan 0; fatload mmc 0 81000000 uImage; fatload mmc 0 82000000 ramdisk-pm.gz; bootm 81000000'
+setenv bootargs 'console=ttyO0,115200n8 mem=128M root=/dev/ram rw initrd=0x82000000,16MB ramdisk_size=65536 earlyprintk=serial'
+boot
+
+
+Hope this will help you to boot the kernel on BeagleBone.
+
+Thanks,
+Vaibhav
