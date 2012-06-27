@@ -1,39 +1,53 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 27 Jun 2012 13:50:11 +0000
-Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
- non-omap1 platforms
-In-Reply-To: <20120627133950.GJ3483@atomide.com>
-References: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5096A@DBDE01.ent.ti.com>
- <20120627133950.GJ3483@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA5BAF8@DBDE01.ent.ti.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 27 Jun 2012 08:50:05 -0500
+Subject: [RFC]Add initial support for Altera's SOCFPGA hardward
+Message-ID: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 19:09:50, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120614 07:37]:
-> > On Mon, Jun 11, 2012 at 18:52:54, Hiremath, Vaibhav wrote:
-> > > As omap1 and omap2 will never be compiled together, due to
-> > > different compiler flags, so we can simply make
-> > > cpu_class_is_omap2() = true, for all non-omap1 platforms.
-> > > 
-> > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > > ---
-> > >  arch/arm/plat-omap/include/plat/cpu.h |    3 +--
-> > >  1 files changed, 1 insertions(+), 2 deletions(-)
-> > > 
-> > 
-> > Tony,
-> > 
-> > Ping???
-> 
-> Thanks applying into devel-am33xx branch.
-> 
+Hello,
 
-Thanks Tony,
+The following 2 patches are initial submissions for Altera's SOCFPGA on ARM platform. Advance and deep appreciation to those who will take the time to review and send comments.
 
-There are few cleanup patches pending for your review, it would be good if 
-you provide your review comments.
+[PATCH 1] Add defines for the SOCFPGA hardware
+ MAINTAINERS                                        |    5
+ arch/arm/Kconfig                                   |   19 +
+ arch/arm/Makefile                                  |    1 
+ arch/arm/mach-socfpga/Kconfig                      |   21 +
+ arch/arm/mach-socfpga/Makefile                     |    8 
+ arch/arm/mach-socfpga/Makefile.boot                |    3 
+ arch/arm/mach-socfpga/clock.c                      |   50 +++
+ arch/arm/mach-socfpga/common.c                     |  156 ++++++++++
+ arch/arm/mach-socfpga/common.h                     |   38 ++
+ arch/arm/mach-socfpga/dw_apb_timer.c               |  164 +++++++++++
+ arch/arm/mach-socfpga/headsmp.S                    |   41 ++
+ arch/arm/mach-socfpga/hotplug.c                    |  125 ++++++++
+ arch/arm/mach-socfpga/include/mach/clock.h         |   11 
+ arch/arm/mach-socfpga/include/mach/debug-macro.S   |   29 +
+ arch/arm/mach-socfpga/include/mach/dw_apb_timer.h  |   38 ++
+ arch/arm/mach-socfpga/include/mach/io.h            |   27 +
+ arch/arm/mach-socfpga/include/mach/iomap.h         |   37 ++
+ arch/arm/mach-socfpga/include/mach/irqs.h          |  305 +++++++++++++++++++++
+ arch/arm/mach-socfpga/include/mach/memory.h        |   32 ++
+ arch/arm/mach-socfpga/include/mach/smp.h           |   15 +
+ arch/arm/mach-socfpga/include/mach/socfpga-timer.h |   27 +
+ arch/arm/mach-socfpga/include/mach/system.h        |   31 ++
+ arch/arm/mach-socfpga/include/mach/timex.h         |   19 +
+ arch/arm/mach-socfpga/include/mach/uncompress.h    |   44 +++
+ arch/arm/mach-socfpga/localtimer.c                 |   34 ++
+ arch/arm/mach-socfpga/platsmp.c                    |  154 ++++++++++
+ arch/arm/mm/Kconfig                                |    2 
+ 27 files changed, 1435 insertions(+), 1 deletion(-)
+
+[PATCH 2] Add support for the SOCFPGA Cyclone V board
+boot/dts/socfpga.dtsi                        |   73 ++++++++++++
+ boot/dts/socfpga_cyclone5.dts                |   90 +++++++++++++++
+ configs/socfpga_defconfig                    |   84 ++++++++++++++
+ mach-socfpga/include/mach/clkdev.h           |   16 ++
+ mach-socfpga/include/mach/socfpga_cyclone5.h |   83 +++++++++++++
+ mach-socfpga/socfpga_cyclone5.c              |  161 +++++++++++++++++++++++++++
+ tools/mach-types                             |    1
+ 7 files changed, 508 insertions(+)
 
 Thanks,
-Vaibhav
+Dinh 
