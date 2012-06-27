@@ -1,9 +1,9 @@
 From: gregory.clement@free-electrons.com (Gregory Clement)
-Date: Wed, 27 Jun 2012 15:54:47 +0200
-Subject: [PATCH v5 6/9] arm: mach-mvebu: add defconfig
+Date: Wed, 27 Jun 2012 15:54:48 +0200
+Subject: [PATCH v5 7/9] arm: mach-mvebu: add compilation/configuration change
 In-Reply-To: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1340805290-9051-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1340805290-9051-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,61 +13,53 @@ Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/configs/mvebu_defconfig |   46 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 arch/arm/configs/mvebu_defconfig
+ arch/arm/Kconfig  |   14 ++++++++++++++
+ arch/arm/Makefile |    1 +
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-new file mode 100644
-index 0000000..2e86b31
---- /dev/null
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -0,0 +1,46 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_EXPERT=y
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_ARCH_MVEBU=y
-+CONFIG_MACH_ARMADA_370_XP=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_USE_OF=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_VFP=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_ISO9660_FS=y
-+CONFIG_JOLIET=y
-+CONFIG_UDF_FS=m
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_2=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_TIMER_STATS=y
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 65743f1..3c9f0ac 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -533,6 +533,18 @@ config ARCH_IXP4XX
+ 	help
+ 	  Support for Intel's IXP4XX (XScale) family of processors.
+ 
++config ARCH_MVEBU
++	bool "Marvell SOCs with Device Tree support"
++	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
++	select CLKSRC_MMIO
++	select GENERIC_IRQ_CHIP
++	select IRQ_DOMAIN
++	select COMMON_CLK
++	help
++	  Support for the Marvell SoC Family with device tree support
++
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
+ 	select CPU_V7
+@@ -987,6 +999,8 @@ endchoice
+ # Kconfigs may be included either alphabetically (according to the
+ # plat- suffix) or along side the corresponding mach-* source.
+ #
++source "arch/arm/mach-mvebu/Kconfig"
++
+ source "arch/arm/mach-at91/Kconfig"
+ 
+ source "arch/arm/mach-bcmring/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0298b00..f1a1a71 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -157,6 +157,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
+ machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
+ machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
+ machine-$(CONFIG_ARCH_MXS)		:= mxs
++machine-$(CONFIG_ARCH_MVEBU)		:= mvebu
+ machine-$(CONFIG_ARCH_NETX)		:= netx
+ machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
+ machine-$(CONFIG_ARCH_OMAP1)		:= omap1
 -- 
 1.7.9.5
