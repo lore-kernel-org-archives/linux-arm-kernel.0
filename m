@@ -1,91 +1,110 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 27 Jun 2012 16:54:43 +0100
-Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <4FEB2CC3.7090305@codethink.co.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 27 Jun 2012 17:02:20 +0100
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <025701cd457e$d5065410$7f12fc30$@lge.com>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <025701cd457e$d5065410$7f12fc30$@lge.com>
+Message-ID: <20120627160220.GA2310@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/12 14:54, Gregory Clement wrote:
-> Arnd, Olof,
->
-> You'll find in this patch set the fifth version of the initial support
-> for a new family of ARMv7-compatible Marvell SoCs.
->
-> Do you think this patch set has a chance of hitting the 3.6 merge
-> window ?
->
-> We are willing to quickly resubmit updated versions to take into
-> account new comments. We have a lot more code to support those new
-> SoCs, and we would like to make progress in submitting those other
-> parts for the mainline.
->
-> As for the previous releases, both the Armada 370 and the Armada XP
-> SoCs are supported in this directory, and we are able to build a
-> single kernel image that boots on both SoCs. Both SoCs use the PJ4B
-> processor, a Marvell-developed ARM core that implements the ARMv7
-> instruction set. We are currently using Marvell evaluation boards for
-> both of those SoCs, and the support for those boards is added in this
-> patch set.
->
-> We remained focused on a limited preliminary support which only
-> includes the necessary code for timer and IRQ support, the serial
-> controller is a standard 16550-compatible one. The diffstat looks
-> like:
->
->   Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt      |   23 +
->   Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt     |   11 +
->   Documentation/devicetree/bindings/arm/armada-370-xp.txt           |   24 +
->   Documentation/devicetree/bindings/arm/mvebu-system-controller.txt |   17 +
->   MAINTAINERS                                                       |    8 +
->   arch/arm/Kconfig                                                  |   14 +
->   arch/arm/Makefile                                                 |    1 +
->   arch/arm/boot/dts/armada-370-db.dts                               |   42 +
->   arch/arm/boot/dts/armada-370-xp.dtsi                              |   68 ++
->   arch/arm/boot/dts/armada-370.dtsi                                 |   35 +
->   arch/arm/boot/dts/armada-xp-db.dts                                |   50 +
->   arch/arm/boot/dts/armada-xp.dtsi                                  |   55 +
->   arch/arm/configs/mvebu_defconfig                                  |   46 +
->   arch/arm/mach-mvebu/Kconfig                                       |   16 +
->   arch/arm/mach-mvebu/Makefile                                      |    2 +
->   arch/arm/mach-mvebu/Makefile.boot                                 |    1 +
->   arch/arm/mach-mvebu/armada-370-xp.c                               |   63 ++
->   arch/arm/mach-mvebu/common.h                                      |   23 +
->   arch/arm/mach-mvebu/include/mach/armada-370-xp.h                  |   22 +
->   arch/arm/mach-mvebu/include/mach/debug-macro.S                    |   24 +
->   arch/arm/mach-mvebu/include/mach/timex.h                          |   13 +
->   arch/arm/mach-mvebu/include/mach/uncompress.h                     |   43 +
->   arch/arm/mach-mvebu/irq-armada-370-xp.c                           |  133 +++
->   arch/arm/mach-mvebu/system-controller.c                           |  100 ++
->   drivers/clocksource/Kconfig                                       |    3 +
->   drivers/clocksource/Makefile                                      |    3 +-
->   drivers/clocksource/time-armada-370-xp.c                          |  242 +++++
->   include/linux/time-armada-370-xp.h                                |   18 +
->   28 files changed, 1099 insertions(+), 1 deletion(-)
->
-> This patch set, and the support for those SoCs, started as a
-> collaborative effort from Marvell engineers (who have done the initial
-> development work) and Free Electrons engineers (who are reshaping the
-> code for mainline submission, adding device tree support, etc.). This
-> effort has also received contributions from Ben Dooks from Codethink.
+On Fri, Jun 08, 2012 at 10:58:50PM +0900, Kim, Jong-Sung wrote:
+> > From: Minchan Kim [mailto:minchan at kernel.org]
+> > Sent: Tuesday, June 05, 2012 4:12 PM
+> > 
+> > If we do arm_memblock_steal with a page which is not aligned with section
+> > size, panic can happen during boot by page fault in map_lowmem.
+> > 
+> > Detail:
+> > 
+> > 1) mdesc->reserve can steal a page which is allocated at 0x1ffff000 by
+> > memblock
+> >    which prefers tail pages of regions.
+> > 2) map_lowmem maps 0x00000000 - 0x1fe00000
+> > 3) map_lowmem try to map 0x1fe00000 but it's not aligned by section due to
+> 1.
+> > 4) calling alloc_init_pte allocates a new page for new pte by
+> memblock_alloc
+> > 5) allocated memory for pte is 0x1fffe000 -> it's not mapped yet.
+> > 6) memset(ptr, 0, sz) in early_alloc_aligned got PANICed!
+> 
+> May I suggest another simple approach? The first continuous couples of
+> sections are always safely section-mapped inside alloc_init_section funtion.
+> So, by limiting memblock_alloc to the end of the first continuous couples of
+> sections at the start of map_lowmem, map_lowmem can safely memblock_alloc &
+> memset even if we have one or more section-unaligned memory regions. The
+> limit can be extended back to arm_lowmem_limit after the map_lowmem is done.
 
-It may be something wrong in my device-tree setup, but this is not
-booting for me:
+By a strange coincidence, I hit exactly the same problem today.
 
-> Uncompressing Linux... done, booting the kernel.
-> <6>Booting Linux on physical CPU 0
-> <5>Linux version 3.5.0-rc4-11036-g90ad2b7-dirty (ben at rainbowdash) (gcc version 4.4.52
-> CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
-> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> <6>Machine: Marvell Aramada 370/XP (Device Tree), model: Cogent CSB1726 SoM
-> Memory policy: ECC disabled, Data cache writeback
-> <0>Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
+This approach looks nice and simple, but ...
 
-This is the last thing I get before it stops. Any ideas on what went
-wrong?
+> 
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index e5dad60..edf1e2d 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1094,6 +1094,11 @@ static void __init kmap_init(void)
+>  static void __init map_lowmem(void)
+>  {
+>  	struct memblock_region *reg;
+> +	phys_addr_t pmd_map_end;
+> +
+> +	pmd_map_end = (memblock.memory.regions[0].base +
+> +	               memblock.memory.regions[0].size) & PMD_MASK;
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+What does memblock.memory.regions[0] actually refer to at this point?
+Just before map_lowmem(), memblock_dump_all() gives me this:
+
+[    0.000000] MEMBLOCK configuration:
+[    0.000000]  memory size = 0x1ff00000 reserved size = 0x6220a5
+[    0.000000]  memory.cnt  = 0x1
+[    0.000000]  memory[0x0]     [0x00000080000000-0x0000009fefffff], 0x1ff00000 bytes
+[    0.000000]  reserved.cnt  = 0x4
+[    0.000000]  reserved[0x0]   [0x00000080004000-0x00000080007fff], 0x4000 bytes
+[    0.000000]  reserved[0x1]   [0x00000080008200-0x00000080582c83], 0x57aa84 bytes
+[    0.000000]  reserved[0x2]   [0x000000807d4e78-0x000000807d6603], 0x178c bytes
+[    0.000000]  reserved[0x3]   [0x00000080d00000-0x00000080da1e94], 0xa1e95 bytes
+
+For me, it appears that this block just contains the initial region
+passed in ATAG_MEM or on the command line, with some reservations
+for swapper_pg_dir, the kernel text/data, device tree and initramfs.
+
+So far as I can tell, the only memory guaranteed to be mapped here
+is the kernel image: there may be no guarantee that there is any unused
+space in this region which could be used to allocate extra page tables.
+The rest appears during the execution of map_lowmem().
+
+Cheers
+---Dave
+
+> +	memblock_set_current_limit(pmd_map_end);
+>  
+>  	/* Map all the lowmem memory banks. */
+>  	for_each_memblock(memory, reg) {
+> @@ -1113,6 +1118,8 @@ static void __init map_lowmem(void)
+>  
+>  		create_mapping(&map);
+>  	}
+> +
+> +	memblock_set_current_limit(arm_lowmem_limit);
+>  }
+>  
+>  /*
+> @@ -1123,8 +1130,6 @@ void __init paging_init(struct machine_desc *mdesc)
+>  {
+>  	void *zero_page;
+>  
+> -	memblock_set_current_limit(arm_lowmem_limit);
+> -
+>  	build_mem_type_table();
+>  	prepare_page_table();
+>  	map_lowmem();
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
