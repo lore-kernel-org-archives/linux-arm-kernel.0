@@ -1,31 +1,72 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 27 Jun 2012 14:47:57 +0800
-Subject: [PATCH v6 13/14] usb: otg: add basic mxs phy driver support
-In-Reply-To: <87fw9iv3h0.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
- <1340260875-21934-14-git-send-email-richard.zhao@freescale.com>
- <87fw9iv3h0.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120627064756.GF21750@b20223-02.ap.freescale.net>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 27 Jun 2012 12:03:07 +0530
+Subject: [PATCH v5 0/3] Prepare for GPMC driver conversion
+Message-ID: <cover.1340778002.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 12:15:23PM +0300, Alexander Shishkin wrote:
-> Richard Zhao <richard.zhao@freescale.com> writes:
-> 
-> > +config USB_MXS_PHY
-> > +	tristate "Freescale MXS USB PHY support"
-> > +	select STMP_DEVICE
-> > +	select USB_OTG_UTILS
-> 
-> There should also be a dependency on ARM (or maybe even ARCH_MXS),
-> because you're using writel_relaxed() here, which only exists on arm and
-> sh4 and enabling it on other architectures breaks compilation.
-Thanks for your view. I'll add
-	depends on ARCH_MXC || ARCH_MXS
 
-Richard
-> 
-> Regards,
-> --
-> Alex
-> 
+Hi,
+
+Objective of this series is to make things easy for GPMC driver
+conversion series by separating out more things from driver
+conversion series.
+
+This series,
+1. Unifies NAND platform initialization functions
+2. Prepares OneNAND platform code for gpmc driver migration
+3. Handles additional timings in Kernel
+
+This series is based on 3.5-rc1 & made on top of
+[PATCH v2 00/10] Prepare for GPMC driver conversion (w.r.t MTD)
+{http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70096.html}
+
+These changes has been tested with omap3evm & beagle board. Relevant
+GPMC peripherals that got tested by this were NAND (beagle) and
+OneNAND (using local patches for omap3evm)
+
+Regards
+Afzal
+
+v5:
+1. Use flags for sync_read/write, hv, vhf
+v4:
+1. Reorganize OneNAND set_sync/async functions in a better way
+v3:
+1. Refactor OneNAND set_sync/async functions to separate out timing
+ and configurations
+2. Handle bool type timings too
+3. Swap patches 2 & 3 due to dependency of OneNAND change on  newly
+ added bool type timings
+v2:
+1. Make use of timing api for setting clock activation time, and
+ remove direct writing to register for clock activation. Peripherals
+ making use of it were tusb6010 & onenand
+2. Move ensuring that async mode in OneNAND has been setup from
+ set_sync to setup function, improve commit message
+
+
+Afzal Mohammed (3):
+  ARM: OMAP2+: nand: unify init functions
+  ARM: OMAP2+: gpmc: handle additional timings
+  ARM: OMAP2+: onenand: prepare for gpmc driver migration
+
+ arch/arm/mach-omap2/board-devkit8000.c     |    8 +-
+ arch/arm/mach-omap2/board-flash.c          |   45 ++++---
+ arch/arm/mach-omap2/board-flash.h          |    6 +-
+ arch/arm/mach-omap2/board-igep0020.c       |    2 +-
+ arch/arm/mach-omap2/board-ldp.c            |    4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    8 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    8 +-
+ arch/arm/mach-omap2/board-overo.c          |    7 +-
+ arch/arm/mach-omap2/board-zoom.c           |    5 +-
+ arch/arm/mach-omap2/common-board-devices.c |   46 -------
+ arch/arm/mach-omap2/common-board-devices.h |    1 -
+ arch/arm/mach-omap2/gpmc-onenand.c         |  200 ++++++++++++++++------------
+ arch/arm/mach-omap2/gpmc.c                 |   45 +++++++
+ arch/arm/mach-omap2/usb-tusb6010.c         |    3 +-
+ arch/arm/plat-omap/include/plat/gpmc.h     |   19 +++
+ 15 files changed, 235 insertions(+), 172 deletions(-)
+
+-- 
+1.7.10.2
