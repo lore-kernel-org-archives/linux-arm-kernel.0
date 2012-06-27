@@ -1,23 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 27 Jun 2012 14:51:50 -0600 (MDT)
-Subject: [PATCH v2] arm: omap3: am35x: Set proper powerdomain states
-In-Reply-To: <1337109255-14704-1-git-send-email-mgreer@animalcreek.com>
-References: <1337109255-14704-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <alpine.DEB.2.00.1206271451180.27496@utopia.booyaka.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 27 Jun 2012 20:56:34 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <alpine.DEB.2.00.1206271400100.27496@utopia.booyaka.com>
+References: <4FD5BA4C.9070706@gmail.com> <4FD5FD9E.5040203@ti.com>
+ <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206271218540.27496@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206271306170.27496@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA5C1F7@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206271400100.27496@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5C2F4@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 May 2012, Mark A. Greer wrote:
-
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Thu, Jun 28, 2012 at 01:30:30, Paul Walmsley wrote:
+> Hi Vaibhav,
 > 
-> The am35x family of SoCs only support the PWRSTS_ON
-> state so create a new set of powerdomain structures
-> that ensure that only the ON state is entered.
+> By the way, maybe you could post a kernel image somewhere that we could 
+> test-boot?
 > 
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 
-Thanks, queued for 3.6.
+Is it accessible - http://uploadingit.com/folder/z1uttvfpr6fgjvzl/Home%20Folder
 
 
-- Paul
+Thanks,
+Vaibhav
