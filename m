@@ -1,37 +1,62 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 27 Jun 2012 12:14:31 +0300
-Subject: [PATCH v11 0/4] MTD: at91: Add PMECC support for at91 nand
- flash driver
-In-Reply-To: <4FEAC6B2.6030104@atmel.com>
-References: <1340618866-28776-1-git-send-email-josh.wu@atmel.com>
- <1340768981.2317.7.camel@koala> <4FEA87E5.9010604@atmel.com>
- <1340771320.2317.13.camel@koala> <4FEAC6B2.6030104@atmel.com>
-Message-ID: <1340788471.29342.4.camel@sauron.fi.intel.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Wed, 27 Jun 2012 17:14:45 +0800
+Subject: Could resource_size can be used for IORESOURCE_IRQ in device tree?
+In-Reply-To: <201206270832.16418.arnd@arndb.de>
+References: <CAMj5BkhkybgAAXbpLqUQvs0qhgLyKxdT0cMz8=5kaDdMwoL46Q@mail.gmail.com>
+ <201206270832.16418.arnd@arndb.de>
+Message-ID: <CAMj5Bkg_6eBXxxN0frcjFFV+Kpq4O+bq+sYb3oSbd-UzKGT=dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-27 at 10:39 +0200, Nicolas Ferre wrote:
-> AT91 is looked after carefully, yes it is.
-> 
-> The thing is that CAP9 SoC (the defconfig that you are using)
-> has been obsoleted then removed for 3.4:
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=9918ceafd4a9e013572e03983f528017c29bb1cb
+On Wed, Jun 27, 2012 at 4:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 27 June 2012, zhangfei gao wrote:
+>>
+>> Excuse me,
+>> I have one question when using device tree to get resource_size for
+>> IORESOURCE_IRQ
+>>
+>> Without dt,
+>> static struct resource
+>> {
+>> ? ? ? ? ? ? ? ? .start ?= 18,
+>> ? ? ? ? ? ? ? ? .end ? ?= 19,
+>> ? ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
+>> },
+>> iores = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> resource_size(iores) = 2 can be used to get how many irq.
+>> iores->start = 18; iores->end = 19;
+>
+> IMHO we should just discourage this from being done.
+> While the API allows you to put multiple interrupts
+> into a single resource, it does not generally work,
+> e.g. when the same device is used in another SoC that
+> puts connects the interrupt lines to non-contiguous
+> irqs.
+>
+> It also breaks down with sparse IRQs when you move
+> away from legacy irqdomains and the linux-internal numbers
+> that you put in the resource are not related to the hw
+> numbers any more.
+>
+>> Is there any API directly get resource number in dt, like resource_size(iores).
+>> The reason is interrupts is not constant, and we want to parse
+>> directly from resource.
+>> If only one irq, then driver parse irqs internally.
+>> Only if irq number same as channel number, then every channel have own irq.
+>> It seems inconvenient get irq number one by one and check whether they
+>> equals channel number or not.
+>
+> Which driver is it?
+>
+> I guess in any case the solution would be to split the platform IRQ resource
+> and change the driver to just read the IRQs individually like most other
+> drivers do.
+>
+> ? ? ? ?Arnd
 
-Ok, sorry for that phrase. I basically only need to do compile-testing.
-And I only care about atmel_nand, so I take a defconfig, disable most of
-the stuff, and use it for compilation. And when this minimal defconfig
-stops working, I get upstet. If you have any suggestion what should I
-base my configuration on, please, let me know.
+Thanks Arnd for kind explanation.
+Will change to read the IRQs individually.
+The only requirement is parse IORESOURCE_IRQ number first.
+Looks no existing API, so just use platform_get_irq one by one.
 
-Thanks!
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/bf5b8266/attachment.sig>
+Thanks a lot for the advice.
