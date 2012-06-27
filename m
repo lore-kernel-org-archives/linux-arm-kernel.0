@@ -1,96 +1,57 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 27 Jun 2012 14:28:47 -0400
-Subject: [PATCH] ARM: Orion: Fix Virtual/Physical mixup with watchdog
-In-Reply-To: <1340028906-19262-1-git-send-email-andrew@lunn.ch>
-References: <1340028906-19262-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20120627182847.GD3112@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 27 Jun 2012 13:12:16 -0600 (MDT)
+Subject: Current state of AM33xx patches
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
+References: <4FD5BA4C.9070706@gmail.com> <4FD5FD9E.5040203@ti.com>
+ <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206271218540.27496@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA5C1AB@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1206271306170.27496@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2012 at 04:15:06PM +0200, Andrew Lunn wrote:
-> The orion watchdog is expecting to be passed the physcial address of
-> the hardware, and will ioremap() it to give a virtual address it will
-> use as the base address for the hardware. However, when creating the
-> platform resource record, a virtual address was being used.
-> 
-> Add the necassary #define's so we can pass the physical address as
-> expected.
-> 
-> Tested on Kirkwood and Orion5x.
-> 
-> Cc: stable <stable@vger.kernel.org>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+> On Thu, Jun 28, 2012 at 00:01:06, Paul Walmsley wrote:
+> > On Wed, 27 Jun 2012, Hiremath, Vaibhav wrote:
+> > 
+> > The branch used was your am335x-upstream-staging branch, plus a minor 
+> > patch to allow the kernel to build on an am335x-only config (although for 
+> > the purposes of this test, omap2plus_defconfig was used).
+>
+> Something seems to be wrong here???
+> The HEAD is,
+> 
+> commit 67e686682dc286d90a0ed47b7dc68fb54944d3d9
+> Author: AnilKumar Ch <anilkumar@ti.com>
+> Date:   Thu Jun 21 12:33:58 2012 +0530
+> 
+>     arm/dts: Add support for AM335x BeagleBone
 
-> ---
->  arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    1 +
->  arch/arm/mach-kirkwood/include/mach/kirkwood.h    |    1 +
->  arch/arm/mach-orion5x/include/mach/bridge-regs.h  |    2 +-
->  arch/arm/mach-orion5x/include/mach/orion5x.h      |    1 +
->  arch/arm/plat-orion/common.c                      |    2 +-
->  5 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-> index 3eee37a..a115142 100644
-> --- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-> +++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-> @@ -38,6 +38,7 @@
->  #define IRQ_MASK_HIGH_OFF	0x0014
->  
->  #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
-> +#define TIMER_PHYS_BASE		(BRIDGE_PHYS_BASE | 0x0300)
->  
->  #define L2_CONFIG_REG		(BRIDGE_VIRT_BASE | 0x0128)
->  #define L2_WRITETHROUGH		0x00000010
-> diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-> index fede3d5..c5b6851 100644
-> --- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-> +++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-> @@ -80,6 +80,7 @@
->  #define  UART1_VIRT_BASE	(DEV_BUS_VIRT_BASE | 0x2100)
->  
->  #define BRIDGE_VIRT_BASE	(KIRKWOOD_REGS_VIRT_BASE | 0x20000)
-> +#define BRIDGE_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE | 0x20000)
->  
->  #define CRYPTO_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE | 0x30000)
->  
-> diff --git a/arch/arm/mach-orion5x/include/mach/bridge-regs.h b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
-> index 96484bc..11a3c1e 100644
-> --- a/arch/arm/mach-orion5x/include/mach/bridge-regs.h
-> +++ b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
-> @@ -35,5 +35,5 @@
->  #define MAIN_IRQ_MASK		(ORION5X_BRIDGE_VIRT_BASE | 0x204)
->  
->  #define TIMER_VIRT_BASE		(ORION5X_BRIDGE_VIRT_BASE | 0x300)
-> -
-> +#define TIMER_PHYS_BASE		(ORION5X_BRIDGE_PHYS_BASE | 0x300)
->  #endif
-> diff --git a/arch/arm/mach-orion5x/include/mach/orion5x.h b/arch/arm/mach-orion5x/include/mach/orion5x.h
-> index 2745f5d..683e085 100644
-> --- a/arch/arm/mach-orion5x/include/mach/orion5x.h
-> +++ b/arch/arm/mach-orion5x/include/mach/orion5x.h
-> @@ -82,6 +82,7 @@
->  #define  UART1_VIRT_BASE		(ORION5X_DEV_BUS_VIRT_BASE | 0x2100)
->  
->  #define ORION5X_BRIDGE_VIRT_BASE	(ORION5X_REGS_VIRT_BASE | 0x20000)
-> +#define ORION5X_BRIDGE_PHYS_BASE	(ORION5X_REGS_PHYS_BASE | 0x20000)
->  
->  #define ORION5X_PCI_VIRT_BASE		(ORION5X_REGS_VIRT_BASE | 0x30000)
->  
-> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> index 61fd837..c179378 100644
-> --- a/arch/arm/plat-orion/common.c
-> +++ b/arch/arm/plat-orion/common.c
-> @@ -582,7 +582,7 @@ void __init orion_spi_1_init(unsigned long mapbase)
->   * Watchdog
->   ****************************************************************************/
->  static struct resource orion_wdt_resource =
-> -		DEFINE_RES_MEM(TIMER_VIRT_BASE, 0x28);
-> +		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
->  
->  static struct platform_device orion_wdt_device = {
->  	.name		= "orion_wdt",
-> -- 
-> 1.7.10
-> 
+As I wrote earlier, there's an extra patch on there to get a kernel built 
+with an AM33xx-only config to link, used here for build testing.  It 
+shouldn't affect the kernel's ability to start at all.  It's included 
+below.
+
+
+- Paul
+
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index d09ccc1..e6f4117 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -385,8 +385,12 @@ void __init omap2430_init_late(void)
+ /*
+  * Currently only board-omap3beagle.c should call this because of the
+  * same machine_id for 34xx and 36xx beagle.. Will get fixed with DT.
++ *
++ * XXX Due to the fact that the 33xx machine_init section is incorrectly
++ * incorporated as part of an AM35xx board file, we had to expand the
++ * following test to include CONFIG_SOC_AM33XX :-(
+  */
+-#ifdef CONFIG_SOC_OMAP3430
++#if defined(CONFIG_SOC_OMAP3430) || defined(CONFIG_SOC_AM33XX)
+ void __init omap3_init_early(void)
+ {
+        omap2_set_globals_3xxx();
