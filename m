@@ -1,97 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Jun 2012 14:50:47 +0200
-Subject: [PATCH 00/11] Prepare for OMAP2+ movement to Common Clk
-In-Reply-To: <1340372890-10091-1-git-send-email-rnayak@ti.com>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
-Message-ID: <1397795.nxQGnEDtVe@avalon>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 27 Jun 2012 07:54:11 -0500
+Subject: [PATCH v3 0/4] DT clock bindings
+In-Reply-To: <20120621175443.GL4402@gmail.com>
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+ <87bokd15x7.fsf@octavius.laptop.org> <4FE33723.3040403@gmail.com>
+ <20120621175443.GL4402@gmail.com>
+Message-ID: <4FEB0273.9050707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+On 06/21/2012 12:54 PM, Mike Turquette wrote:
+> On 20120621-10:00, Rob Herring wrote:
+>> On 06/21/2012 02:27 AM, Chris Ball wrote:
+>>>
+>>> 2) Use alloc_bootmem() instead of kzalloc() in of_clk_add_provider(),
+>>>    because we need to set up clocks during .init_early on ARM (which
+>>>    happens pre-slab) so that they are available for platform init.
+>>
+>> This depends on 1 as the common clock code would have the same issue.
+>> Generally, the first place clocks are needed is the timer init. At that
+>> point, you can call kzalloc. This is where all the clock init used to be
+>> done until init_early was added and some platforms have moved their
+>> clock init. I don't think there was really ever much reason to move it
+>> other than to make the timer init function only deal with timer setup.
+>>
+> 
+> Hi Rob,
+> 
+> Just FYI I've been looking at using alloc_bootmem in the common clk code
+> as a way to get rid of the static initialization stuff (which only
+> existed due to very early initialization of timers).
 
-On Friday 22 June 2012 19:17:59 Rajendra Nayak wrote:
-> Hi,
-> 
-> This is a preparatory series for the OMAP Common Clk
-> conversion. They mostly add clk_prepare/clk_unprepare
-> in OMAP drivers and platform code. Also gets
-> rid of omap_clk_get_by_name() and uses clk_get(), and
-> removes all direct 'struct clk' dereferrencing and
-> uses helpers similar to what is provided by Common
-> Clk.
+The slab is up at the time timers are initialized. The only real problem
+is mixing clock init into the timer init functions and clk init in
+init_early is cleaner in that regard.
 
-I think you've missed drivers/media/video/omap3isp/isp.c. Should I send a 
-patch for that ? Do these changes depend on anything not yet in mainline that 
-I should apply to my tree for testing ?
+> The suggested change above to of_clk_add_provider would jive well with
+> my change to the common clk code.
 
-> Patches are boot tested on OMAP2430sdp, 3630 Beagle-Xm
-> and 4460 Panda.
-> 
-> Some of these patches were earlier posted as part of
-> OMAP2+ Common Clk conversion series [1] which is now
-> split into a preparatory series and actual CCF conversion
-> series.
-> 
-> Patches from this series can be found here
-> git://github.com/rrnayak/linux.git prepare-common-clk-3.5-rc3
-> 
-> regards,
-> Rajendra
-> 
-> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70299.html
-> 
-> Rajendra Nayak (11):
->   ARM: omap: clk: add clk_prepare and clk_unprepare
->   mmc: omap: add clk_prepare and clk_unprepare
->   hwrng: omap: add clk_prepare and clk_unprepare
->   mfd: omap-usb: add clk_prepare and clk_unprepare
->   OMAPDSS: add clk_prepare and clk_unprepare
->   gpio/omap: add clk_prepare and clk_unprepare
->   w1: omap_hdq: add clk_prepare and clk_unprepare
->   crypto: omap: add clk_prepare and clk_unprepare
->   iommu: omap: add clk_prepare and clk_unprepare
->   ARM: omap: hwmod: get rid of all omap_clk_get_by_name usage
->   ARM: omap: clk: Remove all direct dereferencing of struct clk
-> 
->  arch/arm/mach-omap2/board-apollon.c          |    4 +-
->  arch/arm/mach-omap2/board-h4.c               |    6 +-
->  arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
->  arch/arm/mach-omap2/clkt2xxx_apll.c          |    2 +-
->  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    4 +-
->  arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |   18 +++---
->  arch/arm/mach-omap2/clkt_clksel.c            |   84 ++++++++++++++++-------
->  arch/arm/mach-omap2/clkt_dpll.c              |   24 ++++---
->  arch/arm/mach-omap2/clock.c                  |    9 ++-
->  arch/arm/mach-omap2/clock2420_data.c         |   17 +++++
->  arch/arm/mach-omap2/clock2430_data.c         |   21 +++++++
->  arch/arm/mach-omap2/clock3xxx.c              |    8 +-
->  arch/arm/mach-omap2/clock3xxx_data.c         |   24 +++++++
->  arch/arm/mach-omap2/clock44xx_data.c         |   17 +++++
->  arch/arm/mach-omap2/display.c                |    4 +-
->  arch/arm/mach-omap2/dpll3xxx.c               |   45 ++++++++------
->  arch/arm/mach-omap2/gpmc.c                   |    2 +-
->  arch/arm/mach-omap2/omap_hwmod.c             |   21 ++++---
->  arch/arm/mach-omap2/omap_phy_internal.c      |    3 +
->  arch/arm/mach-omap2/pm.c                     |    2 +-
->  arch/arm/mach-omap2/pm24xx.c                 |    2 +
->  arch/arm/mach-omap2/usb-fs.c                 |    4 +-
->  arch/arm/plat-omap/include/plat/clock.h      |    4 +
->  arch/arm/plat-omap/omap_device.c             |    6 +-
->  drivers/char/hw_random/omap-rng.c            |    6 +-
->  drivers/crypto/omap-aes.c                    |    2 +
->  drivers/crypto/omap-sham.c                   |    2 +
->  drivers/gpio/gpio-omap.c                     |    2 +
->  drivers/iommu/omap-iommu.c                   |    2 +
->  drivers/mfd/omap-usb-host.c                  |   20 ++++++
->  drivers/mmc/host/omap.c                      |    9 ++-
->  drivers/mmc/host/omap_hsmmc.c                |    6 +-
->  drivers/video/omap2/dss/dsi.c                |    5 +-
->  drivers/video/omap2/dss/hdmi.c               |    5 +-
->  drivers/video/omap2/dss/venc.c               |    5 +-
->  drivers/w1/masters/omap_hdq.c                |    8 +-
->  36 files changed, 292 insertions(+), 113 deletions(-)
+Are you planning this for 3.6? If not, then this can be addressed at the
+time the clk framework supports bootmem.
 
--- 
-Regards,
+I'm not so sure more users of bootmem are desired. There seems to be
+some effort/desire to remove it:
 
-Laurent Pinchart
+http://lists.linux-foundation.org/pipermail/ksummit-2012-discuss/2012-June/000562.html
+https://lkml.org/lkml/2012/3/13/586
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/074886.html
+
+Rob
