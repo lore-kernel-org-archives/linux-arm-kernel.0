@@ -1,56 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Jun 2012 00:19:46 +0200
-Subject: [RFC PATCHv1 2/2] ARM: socfpga: Add board support for Altera's
- SOCFPGA Cyclone 5 HW
-In-Reply-To: <20120627210600.GB26023@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-3-git-send-email-dinguyen@altera.com>
- <20120627162548.01adc769@skate> <20120627210600.GB26023@elf.ucw.cz>
-Message-ID: <20120628001946.1d91e028@skate>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 28 Jun 2012 00:26:15 +0200
+Subject: [PATCH 5/8] ARM: LPC32xx: Defconfig update
+In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
+References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
+Message-ID: <1340835978-20331-6-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 27 Jun 2012 23:06:00 +0200,
-Pavel Machek <pavel@denx.de> a ?crit :
+This defconfig update for LPC32xx adds interrupt and polled gpio keyboard
+drivers.
 
-> > Just like the IRQ numbers, those defines for I/O registers are no
-> > longer needed with the device tree.
-> 
-> Yep. It shows we have more DT-ization to do.
-> 
-> arch/arm/mach-socfpga/include/mach/uncompress.h needs UART0
-> base... but device tree is not easily accessible at that point, right?
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-Yes, for those you still need fixed addresses, defined by #define, as
-the DT is not accessible yet.
+---
+ arch/arm/configs/lpc32xx_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-> > > +	}, {
-> > > +		.virtual	= IO_ADDRESS(SOCFPGA_CLKMGR_BASE),
-> > > +		.pfn		= __phys_to_pfn(SOCFPGA_CLKMGR_BASE),
-> > > +		.length		= SZ_4K,
-> > > +		.type		= MT_DEVICE,
-> > > +	},
-> > > +};
-> > 
-> > Most of those static mappings should instead be turned into dynamic
-> > mappings created with ioremap(), at least for the timers.
-> 
-> Dynamic mappings so that we can use device tree -- not constants?
-
-Yes, that's at least one of the reason. I think there are others, but
-last time there was a discussion about static vs. dynamic mappings, I'm
-not sure I understood exactly the arguments on which ones should be
-used in which situation.
-
-> Thanks for great review,
-
-You're welcome!
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+--- linux-2.6.orig/arch/arm/configs/lpc32xx_defconfig
++++ linux-2.6/arch/arm/configs/lpc32xx_defconfig
+@@ -18,6 +18,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_LPC32XX=y
++CONFIG_KEYBOARD_GPIO_POLLED=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -89,6 +90,7 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
+ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
+ CONFIG_KEYBOARD_LPC32XX=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
