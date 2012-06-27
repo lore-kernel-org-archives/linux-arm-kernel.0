@@ -1,38 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Jun 2012 20:45 +0200
-Subject: [PATCH 00/11] Prepare for OMAP2+ movement to Common Clk
-In-Reply-To: <1854687.1eeiLuW4oH@avalon>
-References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1206271033500.27496@utopia.booyaka.com>
- <1854687.1eeiLuW4oH@avalon>
-Message-ID: <2606265.VPQJMxIymh@avalon>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Wed, 27 Jun 2012 20:50:57 +0200
+Subject: [PATCH V2] ARM: dt: tegra: paz00: add regulators
+In-Reply-To: <20120627113100.GF308@opensource.wolfsonmicro.com>
+References: <1340757060-27232-1-git-send-email-swarren@wwwdotorg.org>
+ <20120627113100.GF308@opensource.wolfsonmicro.com>
+Message-ID: <21985997.TUGv5fZBXQ@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 June 2012 20:05:27 Laurent Pinchart wrote:
-> On Wednesday 27 June 2012 10:36:04 Paul Walmsley wrote:
-> > On Wed, 27 Jun 2012, Laurent Pinchart wrote:
-> > > I think you've missed drivers/media/video/omap3isp/isp.c. Should I send
-> > > a
-> > > patch for that ? Do these changes depend on anything not yet in mainline
-> > > that I should apply to my tree for testing ?
-> > 
-> > What would be ideal is if omap3isp could be converted to runtime PM for
-> > its internal IP block control. Almost all of the other OMAP on-chip oC
-> > drivers have been converted. Please let us know if more information or
-> > assistance is needed with this.
+On Wednesday 27 June 2012 12:31:01 Mark Brown wrote:
+> On Tue, Jun 26, 2012 at 06:31:00PM -0600, Stephen Warren wrote:
+> > sm1: HW defaults and schematic match at 1.0v. marvin24's kernel had a max
+> > of 1.125v, but this wasn't applied since apply_uV wasn't set.
 > 
-> How does that integrate with the clock framework ?
+> apply_uV is only valid if a single voltage is specified.  
 
-OK, I think I've found the information. I'll give this a try.
+yes, that's why there is a ".apply_uV = (_minmv == _maxmv)" in the regulator 
+macro.
 
-What is still not clear to me is how runtime PM and system PM interact. For 
-instance the OMAP3 ISP driver disables its clocks in the system PM suspend 
-handler, and restarts them in the system PM resume handler. How do I port that 
-to runtime PM, can I just call pm_runtime_put() and pm_runtime_get_sync() in 
-the system PM handlers ?
+> If a voltage
+> range were specified and it were acted on we'd take the lowest (not
+> highest) voltage allowed.
 
--- 
-Regards,
+Sorry, I don't get it. In this case, the board wouldn't boot at all because 
+nearly all supplies would be undervoltaged. I just checked and all voltages 
+are actually set to the *highest* (max) value. Maybe they aren't changed at 
+all?
 
-Laurent Pinchart
+Marc
