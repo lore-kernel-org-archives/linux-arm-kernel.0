@@ -1,88 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jun 2012 15:20:48 +0000
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1340804708.1562.253.camel@vkoul-udesk3>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206262027.47817.arnd@arndb.de> <1340804708.1562.253.camel@vkoul-udesk3>
-Message-ID: <201206271520.49276.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 27 Jun 2012 17:25:28 +0200
+Subject: [PATCH v7] MTD: LPC32xx SLC NAND driver
+In-Reply-To: <CAAAP30HemOV9svhVghLTWfZe95=P3CT-H7UsQ=xY6rC8=AfBsA@mail.gmail.com>
+References: <1339064536-20553-1-git-send-email-stigge@antcom.de>
+ <1340794007.29342.50.camel@sauron.fi.intel.com> <4FEAF90B.5030809@antcom.de>
+ <CAAAP30HemOV9svhVghLTWfZe95=P3CT-H7UsQ=xY6rC8=AfBsA@mail.gmail.com>
+Message-ID: <4FEB25E8.5060706@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 June 2012, Vinod Koul wrote:
-> On Tue, 2012-06-26 at 20:27 +0000, Arnd Bergmann wrote:
-> > On Tuesday 26 June 2012, Vinod Koul wrote:
-> > > On Tue, 2012-06-26 at 14:59 +0000, Arnd Bergmann wrote:
-> > If we instead modify the dmaengine code itself to know about DT
-> > rather than wrapping around it, we would not need this filter
-> > function, but we should still have a probe() function that is
-> > called by dmaengine code to interpret the data that is specific
-> > to one dmaengine driver.
-> I was hoping we can have dmaengine binding, that way dmaengine core code
-> knows about what to do when some client requests a channel.
-> > 
-> > > IMHO dmaengine driver should *not* know anything about mapping. By
-> > > mapping I refer to platform information which tells me which client can
-> > > use which channel from which dmac.
-> > 
-> > Agreed too. That information shoudd be part of the slave device-node
-> > in DT, as I have argued in this thread already. The slave device driver
-> > does not need to care about the format or the contents of it,
-> > but we need some code to interpret the contents. From all I can tell,
-> > the structure of this data cannot be completely generic because of
-> > all the special cases, so the code to interpret it would live in the
-> > probe() function I mentioned about that the dmaengine driver provides.
-> rather than slave driver, why dont we keep this binding within
-> dmaengine. That would make slave and clients completely independent.
+Hi!
 
-Sorry, I believe I was just using the wrong terminology, and what I named
-the slave here would just be the client.
+On 06/27/2012 02:26 PM, Alexandre Pereira da Silva wrote:
+> I think it's best in case of *_raw to use nand base default functions,
+> like in the MLC patch.
 
-This may have contributed to a lot of confusion before, so let's make
-sure I use the right terms now:
+Problem here (specific for this SLC controller) is that it expects us to
+access the data register via 16bit access while the actual data is only
+8bit wide.
 
-a) slave == dmac == dmaengine driver
-b) client == device driver, e.g. mmc
-c) common code == dmaengine layer
+This can't be done with the default nand functions, neither with the
+8bit nor 16bit variant.
 
-Is this correct?
+Roland
 
-> > > > I think encoding a description for a dma request in a single number is
-> > > > the last thing we want to do here. We've tried that with IRQ and GPIO
-> > > > numbers and it got us into a huge mess that will need a long time to
-> > > > get out of.
-> > > No i wasn't thinking of a number. The mapping shouldn't be a global
-> > > number at all, though that is a very easy but not very scalable
-> > > solution.
-> > > We need to take care of 1:1 mapping of client and channels as well as
-> > > many:1  cases as well. A single global number cannot represent that
-> > > properly.
-> > > 
-> > > My idea is platform gives this information to dmaengine. Clients and
-> > > dmaengine driver do not worry about it. That also paves way for arch
-> > > independent clients and drivers.
-> > 
-> > IMO the platform should have no part in this. I absolutely want to
-> > get rid of any platform-specific hardcoded tables in the kernel for
-> > stuff that can easily be run-time detected from the device tree.
-> > There are cases where hard-coding in the kernel is easier, but I don't
-> > think this is one of them.
->
-> Again, you got me wrong. We don't want any hardcoded table is kernel.
-> The information in table should come from whatever way that platform can
-> give me. For your case it should be DT.
-
-Ok, good.
-
-> We can have the map of which client can use which channel as DT binding
-> of dmaengine core. So dmaengine can easily arbitrate about channel
-> requests. Again this mapping information is not some even linux
-> independent.
-
-Why can't it be OS independent?
-
-Do you mean there must be a global table, or are you ok with putting
-the information about a channel into the device that uses the channel,
-as we do for most other subsystems (IRQ, GPIO, pinctrl, ...).
-If not, what is the problem with that approach?
-
-	Arnd
+PS: Nevertheless, I will post our SLC driver update series against the
+l2-mtd branch.
