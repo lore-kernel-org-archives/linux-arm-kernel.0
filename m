@@ -1,37 +1,46 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:26:15 +0200
-Subject: [PATCH 5/8] ARM: LPC32xx: Defconfig update
+Date: Thu, 28 Jun 2012 00:26:14 +0200
+Subject: [PATCH 4/8] ARM: LPC32xx: Update DTS file for EA3250 board
 In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
 References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340835978-20331-6-git-send-email-stigge@antcom.de>
+Message-ID: <1340835978-20331-5-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defconfig update for LPC32xx adds interrupt and polled gpio keyboard
-drivers.
+This DTS file update adds:
+* 3-channel ADC (for AD-IN on AD2, or 3-axis-accelerometer)
+* Interrupt key
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
 ---
- arch/arm/configs/lpc32xx_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/ea3250.dts |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
---- linux-2.6.orig/arch/arm/configs/lpc32xx_defconfig
-+++ linux-2.6/arch/arm/configs/lpc32xx_defconfig
-@@ -18,6 +18,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_LPC32XX=y
-+CONFIG_KEYBOARD_GPIO_POLLED=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -89,6 +90,7 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
- CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_LPC32XX=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
+--- linux-2.6.orig/arch/arm/boot/dts/ea3250.dts
++++ linux-2.6/arch/arm/boot/dts/ea3250.dts
+@@ -152,6 +152,23 @@
+ 			uart1: serial at 40014000 {
+ 				status = "okay";
+ 			};
++
++			/* 3-axis accelerometer X,Y,Z (or AD-IN instead of Z) */
++			adc at 40048000 {
++				status = "okay";
++			};
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		autorepeat;
++		button at 21 {
++			label = "GPIO Key UP";
++			linux,code = <103>;
++			gpios = <&gpio 4 1 0>; /* GPI_P3 1 */
+ 		};
+ 	};
+ };
