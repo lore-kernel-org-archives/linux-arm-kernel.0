@@ -1,43 +1,105 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jun 2012 15:06:40 +0200
-Subject: [PATCH 0/3] usb: chipidea: fix error handling and add dr_role
- property
-In-Reply-To: <4FEB0157.5070404@pengutronix.de>
-References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
- <20120627124233.GA2256@richard-laptop> <4FEB0157.5070404@pengutronix.de>
-Message-ID: <4FEB0560.60306@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Jun 2012 06:10:02 -0700
+Subject: [PATCH 2/2] ARM: omap: remove unused cpu detection macros
+In-Reply-To: <1340745209.1911.15.camel@x61.thuisdomein>
+References: <1340745209.1911.15.camel@x61.thuisdomein>
+Message-ID: <20120627131002.GH3483@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2012 02:49 PM, Marc Kleine-Budde wrote:
-> On 06/27/2012 02:42 PM, Richard Zhao wrote:
->> On Wed, Jun 27, 2012 at 02:21:47PM +0200, Marc Kleine-Budde wrote:
->>> Hello,
->>>
->>> while hacking on the chipidea driver, I fixed the error path in
->>> the udc part of the chipidea driver. Further I added the possibility
->>> to limit the driver to host or device only mode. It's possible via
->>> platformdata and device tree. For dt I selected the dr_role property
->>> which is already used for other dual role usb drivers.
->> What's it based on then?
+* Paul Bolle <pebolle@tiscali.nl> [120626 14:18]:
+> Now that OMAP730 and OMAP850 support is mostly unified, there's no
+> need for separate cpu detection macros for these architectures. At
+> least, currently there isn't, because both macros are unused.
+> cpu_is_7xx() seems to cover all possible uses.
 > 
-> Your tree:
-> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> 0) Entirely untested!
 
-If it doesn't apply, I'll resend the series. I just discovered some
-patches in between. Sorry.
+Seems to work :)
+ 
+> 1) And now the IS_OMAP_TYPE() macro "calls" for 730 and 850 are unused.
+> Not sure whether they should be removed too.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Yes those can go now too, I've applied the updated patch
+below into fixes-non-critical along with the first patch
+in this series.
+ 
+> 2) Note that cpu_is_omap343x(), cpu_is_omap447x(), and cpu_is_omap2423()
+> are all unused too. Reserved for future use, I guess.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/8335d551/attachment.sig>
+It seems that at least 447x will be used soon. The others
+we should be able to remove.
+
+Regards,
+
+Tony
+ 
+
+Author: Paul Bolle <pebolle@tiscali.nl>
+Date:   Tue Jun 26 23:13:29 2012 +0200
+
+    ARM: OMAP: remove unused cpu detection macros
+    
+    Now that OMAP730 and OMAP850 support is mostly unified, there's no
+    need for separate cpu detection macros for these architectures. At
+    least, currently there isn't, because both macros are unused.
+    cpu_is_7xx() seems to cover all possible uses.
+    
+    Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+    [tony at atomide.com: updated to also to remove related IS_OMAP_TYPE]
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index f2bdf15..e79e913 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -239,8 +239,6 @@ IS_AM_SUBCLASS(335x, 0x335)
+  * Macros to detect individual cpu types.
+  * These are only rarely needed.
+  * cpu_is_omap310():	True for OMAP310
+- * cpu_is_omap730():	True for OMAP730
+- * cpu_is_omap850():	True for OMAP850
+  * cpu_is_omap1510():	True for OMAP1510
+  * cpu_is_omap1610():	True for OMAP1610
+  * cpu_is_omap1611():	True for OMAP1611
+@@ -264,8 +262,6 @@ static inline int is_omap ##type (void)			\
+ }
+ 
+ IS_OMAP_TYPE(310, 0x0310)
+-IS_OMAP_TYPE(730, 0x0730)
+-IS_OMAP_TYPE(850, 0x0850)
+ IS_OMAP_TYPE(1510, 0x1510)
+ IS_OMAP_TYPE(1610, 0x1610)
+ IS_OMAP_TYPE(1611, 0x1611)
+@@ -281,8 +277,6 @@ IS_OMAP_TYPE(3505, 0x3517)
+ IS_OMAP_TYPE(3517, 0x3517)
+ 
+ #define cpu_is_omap310()		0
+-#define cpu_is_omap730()		0
+-#define cpu_is_omap850()		0
+ #define cpu_is_omap1510()		0
+ #define cpu_is_omap1610()		0
+ #define cpu_is_omap5912()		0
+@@ -304,19 +298,9 @@ IS_OMAP_TYPE(3517, 0x3517)
+ 
+ /*
+  * Whether we have MULTI_OMAP1 or not, we still need to distinguish
+- * between 730 vs 850, 310 vs. 1510 and 1611B/5912 vs. 1710.
++ * between 310 vs. 1510 and 1611B/5912 vs. 1710.
+  */
+ 
+-#if defined(CONFIG_ARCH_OMAP730)
+-# undef  cpu_is_omap730
+-# define cpu_is_omap730()		is_omap730()
+-#endif
+-
+-#if defined(CONFIG_ARCH_OMAP850)
+-# undef  cpu_is_omap850
+-# define cpu_is_omap850()		is_omap850()
+-#endif
+-
+ #if defined(CONFIG_ARCH_OMAP15XX)
+ # undef  cpu_is_omap310
+ # undef  cpu_is_omap1510
