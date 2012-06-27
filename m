@@ -1,36 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 27 Jun 2012 14:18:33 -0600 (MDT)
-Subject: [PATCH 0/3] ARM: OMAP2/3: DSS HWMOD fixes
-In-Reply-To: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.00.1206271416420.27496@utopia.booyaka.com>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Wed, 27 Jun 2012 22:28:26 +0200 (CEST)
+Subject: [PATCH] ARM: imx: fix i.MX35 CPU architecture
+Message-ID: <147037481.185152.1340828906821.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi
+The data sheet of the i.MX35 says it is an ARM1136JF-S processor, version r1p3,
+which, according to section "B.1. New instructions" of the ARM1136JF-S and
+ARM1136J-S Technical Reference Manual, makes the i.MX35 CPU architecture not
+only ARMv6, but ARMv6k.
 
-On Thu, 10 May 2012, Tomi Valkeinen wrote:
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+---
+ .../arch/arm/mach-imx/Kconfig                      |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> These patches fix DSS hwmod data related to sysc flags. I haven't seen any
-> problem produced by these missing bits, but by looking at the TRM it's clear
-> that they should be defined.
-> 
-> However, applying these will cause additional warnings to show during boot:
-> 
-> omap_hwmod: dss_dispc: softreset failed (waited 10000 usec)
-> omap_hwmod: dss_rfbi: softreset failed (waited 10000 usec)
-> 
-> Most likely the softreset fails even now, but as there's no check to verify it,
-> no warnings are visible.
-> 
-> I think the reason for the failing softreset is the same problem as we have on
-> OMAP4: dss_core hwmod should be enabled before other dss hwmods can be enabled
-> (and reset).
-
-Thanks, queued for 3.6.
-
-Not sure what to do about the softreset issues at the moment, due to 
-competing priorities.  But for sure the data should match the hardware.
-
-
-- Paul
+diff --git linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/Kconfig linux-next-HEAD-49289f3/arch/arm/mach-imx/Kconfig
+index eff4db5..0345e85 100644
+--- linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/Kconfig
++++ linux-next-HEAD-49289f3/arch/arm/mach-imx/Kconfig
+@@ -73,7 +73,7 @@ config SOC_IMX31
+ 
+ config SOC_IMX35
+ 	bool
+-	select CPU_V6
++	select CPU_V6K
+ 	select ARCH_MXC_IOMUX_V3
+ 	select COMMON_CLK
+ 	select HAVE_EPIT
