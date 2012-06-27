@@ -1,40 +1,34 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:26:17 +0200
-Subject: [PATCH 7/8] ARM: LPC32xx: Remove USB and I2C init from phy3250.c
+Date: Thu, 28 Jun 2012 00:26:12 +0200
+Subject: [PATCH 2/8] ARM: LPC32xx: Add further bits to MMC init
 In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
 References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340835978-20331-8-git-send-email-stigge@antcom.de>
+Message-ID: <1340835978-20331-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB and I2C initialization can be removed safely from the board specific
-phy3250.c, now that initialization moved to the generalized clock.c.
+This patch makes sure certain MMC bits are cleared as they should for
+initialization.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Tested-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
 ---
- arch/arm/mach-lpc32xx/phy3250.c |   12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/mach-lpc32xx/clock.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -248,18 +248,6 @@ static void __init lpc3250_machine_init(
- 	tmp |= LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_TFT16;
- 	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL);
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
++++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
+@@ -813,7 +813,11 @@ static int mmc_onoff_enable(struct clk *
  
--	/* Set up USB power */
--	tmp = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
--	tmp |= LPC32XX_CLKPWR_USBCTRL_HCLK_EN |
--		LPC32XX_CLKPWR_USBCTRL_USBI2C_EN;
--	__raw_writel(tmp, LPC32XX_CLKPWR_USB_CTRL);
--
--	/* Set up I2C pull levels */
--	tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
--	tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE |
--		LPC32XX_CLKPWR_I2CCLK_I2C2HI_DRIVE;
--	__raw_writel(tmp, LPC32XX_CLKPWR_I2C_CLK_CTRL);
--
- 	lpc32xx_serial_init();
+ 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
+ 		~(LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
+-		  LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN);
++		  LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN |
++		  LPC32XX_CLKPWR_MSCARD_MSDIO_PIN_DIS |
++		  LPC32XX_CLKPWR_MSCARD_MSDIO0_DIS |
++		  LPC32XX_CLKPWR_MSCARD_MSDIO1_DIS |
++		  LPC32XX_CLKPWR_MSCARD_MSDIO23_DIS);
  
- 	/* Test clock needed for UDA1380 initial init */
+ 	/* If rate is 0, disable clock */
+ 	if (enable != 0)
