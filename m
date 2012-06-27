@@ -1,124 +1,89 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 27 Jun 2012 06:36:00 +0200
-Subject: usb, davinci: usb 2.0 problem on an am1808 based board
-In-Reply-To: <4FC4DB95.5050901@denx.de>
-References: <4EBC9DF1.90604@denx.de>
- <20111111091912.GB19090@legolas.emea.dhcp.ti.com> <4EBEB29E.50705@mvista.com>
- <4EC0F87B.4010104@denx.de> <4FA3AB27.7060205@denx.de>
- <4FB49CA3.2080906@denx.de>
- <A73F36158E33644199EB82C5EC81C7BC3E97C9C1@DBDE01.ent.ti.com>
- <4FB9DC59.6050300@denx.de>
- <A73F36158E33644199EB82C5EC81C7BC3E97D25D@DBDE01.ent.ti.com>
- <4FBB3EA7.1070703@denx.de> <4FC4DB95.5050901@denx.de>
-Message-ID: <4FEA8DB0.3090204@denx.de>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Tue, 26 Jun 2012 23:51:54 -0500
+Subject: [PATCH v6] ARM: imx: Add basic imx6q thermal driver
+Message-ID: <1340772715-22117-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Manjunathappa,
+Based on v3.5-rc4
 
-On 29.05.2012 16:22, Heiko Schocher wrote:
-> Hello Manjunathappa,
->
-> On 22.05.2012 09:22, Heiko Schocher wrote:
->> Hello Manjunathappa,
->>
->> Manjunathappa, Prakash wrote:
->>> Hi Heiko,
->>>
->>> On Mon, May 21, 2012 at 11:40:33, Heiko Schocher wrote:
->>>> Hello Manjunathappa,
->>>>
->>>> Manjunathappa, Prakash wrote:
->>>>> Hi Heiko,
->>>>>
->>>>> I do not know how putting delay helped MSC device detection.
->>>>> Can you please check if MUSB is coming up in "b_idle" state(by
->>>>> $cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode)?
->>>>> State should move to b_peripheral on connecting gadget cable.
->>>> We have connected the USB0_ID pin to ground -> host only mode, so
->>>> I could not try this.
->>>>
->>>
->>> Ok, So it is coming up in which state, "$cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode"?
->>
->> without the delay in da8xx_musb_interrupt() and the
->> + musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
->> change:
->>
->> booting Linux with USB stick attached shows:
->> root at armv5te:~# cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode
->> a_host
->> root at armv5te:~#
->>
->> booting Linux without USB stick attached:
->>
->> root at armv5te:~# cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode
->> a_wait_vrise
->> root at armv5te:~#
->>
->> and connecting an usb stick:
->>
->> root at armv5te:~# cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode
->> a_host
->> root at armv5te:~#
->>
->>>>> If you connect MSC device via mini-A connector, state should change to "a_host".
->>>>> OTG timer is responsible for above state changes, can you please check if below
->>>>> changes are present?
->>>>> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c index 4da7492..a1a692e 100644
->>>>> --- a/drivers/usb/musb/da8xx.c
->>>>> +++ b/drivers/usb/musb/da8xx.c
->>>>> @@ -76,6 +76,7 @@
->>>>> #define DA8XX_INTR_TX_SHIFT 0
->>>>> #define DA8XX_INTR_TX_MASK (DA8XX_USB_TX_EP_MASK<< DA8XX_INTR_TX_SHIFT)
->>>>>
->>>>> +#define A_WAIT_BCON_TIMEOUT 1100 /* in ms */
->>>>> #define DA8XX_MENTOR_CORE_OFFSET 0x400
->>>>>
->>>>> #define CFGCHIP2 IO_ADDRESS(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG)
->>>>> @@ -443,6 +444,7 @@ static int da8xx_musb_init(struct musb *musb)
->>>>> rev, __raw_readl(CFGCHIP2),
->>>>> musb_readb(reg_base, DA8XX_USB_CTRL_REG));
->>>>>
->>>>> + musb->a_wait_bcon = A_WAIT_BCON_TIMEOUT;
->>>>> musb->isr = da8xx_musb_interrupt;
->>>>> return 0;
->>>>> fail:
->>>> No, this change is not in current mainline ...
->>>>
->>>> Added this patch, and I get:
->>>>
->>>> $ make -s uImage
->>>> drivers/usb/musb/da8xx.c: In function 'da8xx_musb_init':
->>>> drivers/usb/musb/da8xx.c:448:22: error: 'A_WAIT_BCON_TIMEOUT' undeclared (first use in this function)
->>>> drivers/usb/musb/da8xx.c:448:22: note: each undeclared identifier is reported only once for each function it appears in
->>>> make[3]: *** [drivers/usb/musb/da8xx.o] Error 1
->>>> make[2]: *** [drivers/usb/musb] Error 2
->>>> make[1]: *** [drivers/usb] Error 2
->>>> make: *** [drivers] Error 2
->>>> $
->>>>
->>>> Do you mean
->>>>
->>>> musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
->>>>
->>>> ? This is setup in musb_core.c::allocate_instance() as Sergei Shtylyov
->>>> already commented ... nevertheless tried with this define your patch,
->>>> and my USB stick gets detected too...
->>>>
->>>
->>> Does that mean issue got fixed or Do you still have delay in da8xx_musb_interrupt handler?
->>
->> Without the delay in the da8xx_musb_interrupt() ...
->
-> ping!
->
-> How do we proceed here?
+This patch add basic thermal driver support for the imx6q platform.  This
+was implemented by hooking into the linux thermal framework which provides
+sysfs temperature readings and other data and a method to shutdown the system
+if it gets too hot.
 
-ping.
+A major change in this revision is that cooling device implementation
+was removed as it is dependent on cpufreq and no imx6q cpufreq exist upstream
+and there is no recent activity on efforts to do so.
 
-bye,
-Heiko
+Other changes in v6.
+1.  Fixed several problems that were pointed out in v5 review.
+2.  Re-worked the sensor reading code to better handle suspend/resume case
+3.  Made various naming changes to make it more specific to the anatop
+ peripheral instead of the imx6q platform.  This should reduce the changes
+ required to use this driver in future platforms.
+4.  Removed test support for imx6q parts without calibrated temperature
+ sensor fuses.  These devices will simply exit thermal driver initialization
+ with a warning message.
+5.  Made the thermal driver and the anatopmfd driver defaulted to be enabled
+ in the Kconfig files which will still dependend on imx6q_soc being enabled.
+ Not sure if this is the right place to do this or if it should be done
+ in the defconfig file.
+
+Known future work will be to add back in cooling device support once cpufreq
+is supported.  Improvements to coincide with that work may involve adding
+the active cooling trip points into device tree for hardware application
+specific settings.
+
+link to previous submissions:
+v5" https://lkml.org/lkml/2012/6/20/57
+v4: http://comments.gmane.org/gmane.linux.acpi.devel/51779
+v3: http://www.spinics.net/lists/arm-kernel/msg155955.html
+v2: http://www.spinics.net/lists/arm-kernel/msg155790.html
+v1: http://www.spinics.net/lists/arm-kernel/msg155111.html
+
+Changes in v5:
+1. Modified to use anatop mfd driver for accessing anatop registers
+2. Made necessary changes to work with latest generic CPU cooling code.
+3. Added Config changes and functionality to allow testing on parts without
+ without programmed temperature sensor calibration values.
+4. General cleanup and addition of comments.
+
+Changes in v4:
+1.  Removed bad suspend/resume assignment into thermal class.  After further
+examination and discussion with SoC designers, a sequence is now used
+for making measurements that is is unaffected by system suspendresumes.
+Temp Sensor automatically powers off in hardware during the low power mode
+caused by a system suspend.
+2.  Moved some structures from static to dynamic allocation.
+3.  Added some noise handling to temperatuer sensor readings.
+
+Changes in v3:
+1. Fixed the various issues pointed out in v2
+2. Made other code cleanup and a bit of re-organizing
+3. Removed unecessary platform driver and device.
+
+Changes in v2:
+1. Cleaned up some style issues pointed out in v1
+2. Made various other code cleanup and re-organizing
+3. Added temperature sensor calibration
+4. Created platform driver and device to hook into pm suspend.
+
+
+Performed some basic testing to ensure proper cooling operating.  If
+you want to test this, full testing requires imx6q cpufreq
+implementation (not yet in v3.5).
+
+Robert Lee (1):
+  ARM: imx: Add basic imx6q thermal driver
+
+ arch/arm/boot/dts/imx6q.dtsi         |    5 +
+ drivers/mfd/Kconfig                  |    1 +
+ drivers/thermal/Kconfig              |    9 +
+ drivers/thermal/Makefile             |    1 +
+ drivers/thermal/imx_anatop_thermal.c |  465 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 481 insertions(+)
+ create mode 100644 drivers/thermal/imx_anatop_thermal.c
+
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+1.7.10
