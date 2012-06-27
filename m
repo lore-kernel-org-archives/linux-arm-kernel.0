@@ -1,45 +1,40 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Thu, 28 Jun 2012 00:28:03 +0200
-Subject: [PATCH 1/1] ARM: OMAP: omap2plus_defconfig: Enable EXT4 support
-In-Reply-To: <1340489939-5390-1-git-send-email-javier@dowhile0.org>
-References: <1340489939-5390-1-git-send-email-javier@dowhile0.org>
-Message-ID: <CAAwP0s2eTWk2Uf0HZ13Lq5gA0HNp8V87znjd6rX6Uh0ZPy03PA@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 28 Jun 2012 00:32:14 +0200
+Subject: [PATCH RESEND] gpio: of_get_named_gpio_flags() return -EPROBE_DEFER
+ if GPIO not yet available
+Message-ID: <1340836334-20427-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 24, 2012 at 12:18 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> On OMAP boards that includes an SD card slot, an EXT4 partition could
-> be used to store the root file system. So, the kernel should have
-> built-in support for EXT4 to be able to mount the VFS root on boot.
->
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
-> ?arch/arm/configs/omap2plus_defconfig | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index 9854ff4..f3087cb 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -197,6 +197,7 @@ CONFIG_RTC_DRV_TWL4030=y
-> ?CONFIG_EXT2_FS=y
-> ?CONFIG_EXT3_FS=y
-> ?# CONFIG_EXT3_FS_XATTR is not set
-> +CONFIG_EXT4_FS=y
-> ?CONFIG_QUOTA=y
-> ?CONFIG_QFMT_V2=y
-> ?CONFIG_MSDOS_FS=y
-> --
-> 1.7.7.6
->
+of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
+respective GPIO is not (yet) available. This is useful if driver's probe()
+functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
+can be probed again later on.
 
-Hi,
+The function still returns -EINVAL on other errors (parse error or node doesn't
+exist). This way, the case of an optional/intentionally missing GPIO is handled
+appropriately.
 
-any news about this patch?
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Is quite annoying to have to enable EXT4 support each time I want to
-try a new kernel on my board.
+---
+Applies to v3.5-rc4
 
-Best regards,
-Javier
+ drivers/gpio/gpiolib-of.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+--- linux-2.6.orig/drivers/gpio/gpiolib-of.c
++++ linux-2.6/drivers/gpio/gpiolib-of.c
+@@ -62,7 +62,10 @@ static int of_gpiochip_find_and_xlate(st
+ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
+                            int index, enum of_gpio_flags *flags)
+ {
+-	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
++	/* Return -EPROBE_DEFER to support probe() functions to be called
++	 * later when the GPIO actually becomes available
++	 */
++	struct gg_data gg_data = { .flags = flags, .out_gpio = -EPROBE_DEFER };
+ 	int ret;
+ 
+ 	/* .of_xlate might decide to not fill in the flags, so clear it. */
