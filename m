@@ -1,46 +1,39 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 28 Jun 2012 00:26:14 +0200
-Subject: [PATCH 4/8] ARM: LPC32xx: Update DTS file for EA3250 board
-In-Reply-To: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-References: <1340835978-20331-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340835978-20331-5-git-send-email-stigge@antcom.de>
+Date: Thu, 28 Jun 2012 00:26:10 +0200
+Subject: [PATCH 0/8] ARM: LPC32xx specific updates for next, second set
+Message-ID: <1340835978-20331-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This DTS file update adds:
-* 3-channel ADC (for AD-IN on AD2, or 3-axis-accelerometer)
-* Interrupt key
+This is the second round of patches for mach-lpc32xx, for v3.6. It builds upon
+the first round of 22 patches and includes clock updates that separate out
+initialization from the board specific init to clock.c.
+
+Further, a defconfig update for LPC32xx, dts file update and mmc bugfix is
+included.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
----
- arch/arm/boot/dts/ea3250.dts |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+--
 
---- linux-2.6.orig/arch/arm/boot/dts/ea3250.dts
-+++ linux-2.6/arch/arm/boot/dts/ea3250.dts
-@@ -152,6 +152,23 @@
- 			uart1: serial at 40014000 {
- 				status = "okay";
- 			};
-+
-+			/* 3-axis accelerometer X,Y,Z (or AD-IN instead of Z) */
-+			adc at 40048000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+		button at 21 {
-+			label = "GPIO Key UP";
-+			linux,code = <103>;
-+			gpios = <&gpio 4 1 0>; /* GPI_P3 1 */
- 		};
- 	};
- };
+You can also pull from
+
+  git://git.antcom.de/linux-2.6.git lpc32xx-next2
+
+Roland Stigge (6):
+ ARM: LPC32xx: Init MMC via clock
+ ARM: LPC32xx: Add further bits to MMC init
+ ARM: LPC32xx: Remove wrong re-initialization of MMC clock register
+ ARM: LPC32xx: Update DTS file for EA3250 board
+ ARM: LPC32xx: Defconfig update
+ ARM: LPC32xx: Remove USB and I2C init from phy3250.c
+Alexandre Pereira da Silva (2):
+ ARM: LPC32xx: Cleanup USB clock init
+ ARM: LPC32xx: Remove unused gpios
+
+ arch/arm/boot/dts/ea3250.dts                  |   17 ++++
+ arch/arm/configs/lpc32xx_defconfig            |    2 
+ arch/arm/mach-lpc32xx/clock.c                 |   90 ++++++++++++++++++++++----
+ arch/arm/mach-lpc32xx/include/mach/platform.h |   14 ++++
+ arch/arm/mach-lpc32xx/phy3250.c               |   20 -----
+ 5 files changed, 112 insertions(+), 31 deletions(-)
