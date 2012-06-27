@@ -1,59 +1,18 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 26 Jun 2012 17:04:30 -0700
-Subject: [GIT PULL] clk: fixes for 3.5-rc5
-Message-ID: <20120627000429.GA22738@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 27 Jun 2012 08:26:15 +0800
+Subject: [PATCH 0/2] flexcan driver updates
+In-Reply-To: <4FE9E981.2080402@hartkopp.net>
+References: <1340700563-8386-1-git-send-email-shawn.guo@linaro.org>
+ <4FE9E981.2080402@hartkopp.net>
+Message-ID: <CAAQ0ZWR5ohRsfMqn9cDAhjHejLRO7cMdGL_6dyMkwzD8zpjpOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 27 June 2012 00:55, Oliver Hartkopp <socketcan@hartkopp.net> wrote:
+> So please post your suggested changes for the flexcan driver on the mailing
+> lists linux-can at vger.kernel.org and devicetree-discuss at lists.ozlabs.org
+>
+Yes, you are right.  Will resend.  Thanks.
 
-The tag below has some fixes for users of the common clk framework.
-This is my first time sending you a pull request (and first time using a
-signed tag) so please let me know if I screwed something up.
-
-Thanks,
-Mike
-
-The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
-
-  Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/mturquette/linux.git tags/clk-fixes-for-linus
-
-for you to fetch changes up to d03ac61daa8d4d17cd83a5ab98e85b616b90c7ac:
-
-  clk: mxs: fix clock lookup after freeing init memory (2012-06-25 16:51:48 -0700)
-
-----------------------------------------------------------------
-clk-fixes-for-linus contains three NULL pointer fixes and two device
-regression fixups.  Two NULL pointer dereferences were in the common clk
-core due to lack of sanity checking and the third NPD was in the
-mxs-specific clock code due to incorrect use of __initdata.  The device
-regressions were the result of improper data: a wrong string name for
-matching DT data broke the SPEAr ethernet controller and another string
-matching problem in the mxs clock data resulted in a broken MMC
-controller.
-
-----------------------------------------------------------------
-Marc Kleine-Budde (1):
-      clk: mxs: fix clock lookup after freeing init memory
-
-Pawel Moll (1):
-      clk: Check parent for NULL in clk_change_rate
-
-Rajendra Nayak (1):
-      clk: Allow late cache allocation for clk->parents
-
-Shawn Guo (1):
-      clk: mxs: fix ref_io clock definition
-
-Stefan Roese (1):
-      clk: SPEAr600: Fix ethernet clock name for DT based probing
-
- drivers/clk/clk.c                  |   26 +++++++++++++++++---------
- drivers/clk/mxs/clk-imx23.c        |   12 ++++++------
- drivers/clk/mxs/clk-imx28.c        |   32 ++++++++++++++++----------------
- drivers/clk/spear/spear6xx_clock.c |    2 +-
- 4 files changed, 40 insertions(+), 32 deletions(-)
+Regards,
+Shawn
