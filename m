@@ -1,110 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 27 Jun 2012 17:02:20 +0100
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <025701cd457e$d5065410$7f12fc30$@lge.com>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <025701cd457e$d5065410$7f12fc30$@lge.com>
-Message-ID: <20120627160220.GA2310@linaro.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 27 Jun 2012 17:11:19 +0100
+Subject: [PATCH v5 4/9] arm: mach-mvebu: add support for Armada 370 and
+ Armada XP with DT
+In-Reply-To: <1340805290-9051-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340805290-9051-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <4FEB30A7.3000809@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 10:58:50PM +0900, Kim, Jong-Sung wrote:
-> > From: Minchan Kim [mailto:minchan at kernel.org]
-> > Sent: Tuesday, June 05, 2012 4:12 PM
-> > 
-> > If we do arm_memblock_steal with a page which is not aligned with section
-> > size, panic can happen during boot by page fault in map_lowmem.
-> > 
-> > Detail:
-> > 
-> > 1) mdesc->reserve can steal a page which is allocated at 0x1ffff000 by
-> > memblock
-> >    which prefers tail pages of regions.
-> > 2) map_lowmem maps 0x00000000 - 0x1fe00000
-> > 3) map_lowmem try to map 0x1fe00000 but it's not aligned by section due to
-> 1.
-> > 4) calling alloc_init_pte allocates a new page for new pte by
-> memblock_alloc
-> > 5) allocated memory for pte is 0x1fffe000 -> it's not mapped yet.
-> > 6) memset(ptr, 0, sz) in early_alloc_aligned got PANICed!
-> 
-> May I suggest another simple approach? The first continuous couples of
-> sections are always safely section-mapped inside alloc_init_section funtion.
-> So, by limiting memblock_alloc to the end of the first continuous couples of
-> sections at the start of map_lowmem, map_lowmem can safely memblock_alloc &
-> memset even if we have one or more section-unaligned memory regions. The
-> limit can be extended back to arm_lowmem_limit after the map_lowmem is done.
+On 27/06/12 14:54, Gregory Clement wrote:
+> [ben.dooks at codethink.co.uk: ensure error check on of_property_read_u32]
+> [ben.dooks at codethink.co.uk: use mpic address instead of bus-unit's ]
+> [ben.dooks at codethink.co.uk: BUG_ON() if the of_iomap() fails for mpic]
+> [ben.dooks at codethink.co.uk: move mpic per-cpu register base ]
+> [ben.dooks at codethink.co.uk: number fetch should use irqd_to_hwirq()]
+>
+> Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Lior Amsalem<alior@marvell.com>
+> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
 
-By a strange coincidence, I hit exactly the same problem today.
+[snip]
 
-This approach looks nice and simple, but ...
+> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+> index f0eaa21..1b1e679 100644
+> --- a/arch/arm/mach-mvebu/common.h
+> +++ b/arch/arm/mach-mvebu/common.h
+> @@ -17,4 +17,7 @@
+>
+>   void mvebu_restart(char mode, const char *cmd);
 
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e5dad60..edf1e2d 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1094,6 +1094,11 @@ static void __init kmap_init(void)
->  static void __init map_lowmem(void)
->  {
->  	struct memblock_region *reg;
-> +	phys_addr_t pmd_map_end;
-> +
-> +	pmd_map_end = (memblock.memory.regions[0].base +
-> +	               memblock.memory.regions[0].size) & PMD_MASK;
+If you set it when you probed the device, you'd not need
+to export it in the header.
 
-What does memblock.memory.regions[0] actually refer to at this point?
-Just before map_lowmem(), memblock_dump_all() gives me this:
+> +void armada_370_xp_init_irq(void);
+> +asmlinkage void  armada_370_xp_handle_irq(struct pt_regs *regs);
 
-[    0.000000] MEMBLOCK configuration:
-[    0.000000]  memory size = 0x1ff00000 reserved size = 0x6220a5
-[    0.000000]  memory.cnt  = 0x1
-[    0.000000]  memory[0x0]     [0x00000080000000-0x0000009fefffff], 0x1ff00000 bytes
-[    0.000000]  reserved.cnt  = 0x4
-[    0.000000]  reserved[0x0]   [0x00000080004000-0x00000080007fff], 0x4000 bytes
-[    0.000000]  reserved[0x1]   [0x00000080008200-0x00000080582c83], 0x57aa84 bytes
-[    0.000000]  reserved[0x2]   [0x000000807d4e78-0x000000807d6603], 0x178c bytes
-[    0.000000]  reserved[0x3]   [0x00000080d00000-0x00000080da1e94], 0xa1e95 bytes
+You shouldn't need linkage info with a function declaration.
 
-For me, it appears that this block just contains the initial region
-passed in ATAG_MEM or on the command line, with some reservations
-for swapper_pg_dir, the kernel text/data, device tree and initramfs.
 
-So far as I can tell, the only memory guaranteed to be mapped here
-is the kernel image: there may be no guarantee that there is any unused
-space in this region which could be used to allocate extra page tables.
-The rest appears during the execution of map_lowmem().
-
-Cheers
----Dave
-
-> +	memblock_set_current_limit(pmd_map_end);
->  
->  	/* Map all the lowmem memory banks. */
->  	for_each_memblock(memory, reg) {
-> @@ -1113,6 +1118,8 @@ static void __init map_lowmem(void)
->  
->  		create_mapping(&map);
->  	}
-> +
-> +	memblock_set_current_limit(arm_lowmem_limit);
->  }
->  
->  /*
-> @@ -1123,8 +1130,6 @@ void __init paging_init(struct machine_desc *mdesc)
->  {
->  	void *zero_page;
->  
-> -	memblock_set_current_limit(arm_lowmem_limit);
-> -
->  	build_mem_type_table();
->  	prepare_page_table();
->  	map_lowmem();
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
