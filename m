@@ -1,153 +1,227 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Wed, 27 Jun 2012 19:15:08 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201206262027.47817.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206261459.40766.arnd@arndb.de> <1340733019.1562.242.camel@vkoul-udesk3>
- <201206262027.47817.arnd@arndb.de>
-Message-ID: <1340804708.1562.253.camel@vkoul-udesk3>
+From: gregory.clement@free-electrons.com (Gregory Clement)
+Date: Wed, 27 Jun 2012 15:54:41 +0200
+Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+Message-ID: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-06-26 at 20:27 +0000, Arnd Bergmann wrote:
-> On Tuesday 26 June 2012, Vinod Koul wrote:
-> > On Tue, 2012-06-26 at 14:59 +0000, Arnd Bergmann wrote:
-> > > On Tuesday 26 June 2012, Vinod Koul wrote:
-> > > > Today, we just ask for a channel with specific mask. Further filtering
-> > > > is done in filter function as we request a channel, not a specific one.
-> > > > In most slave cases, we need a specific channel from a specific
-> > > > controller, and that is where DT can play a role. In addition to DMA
-> > > > resources for dma and client driver, I would expect DT to provide the
-> > > > channel mapping information, which is anyway known only by platform.
-> > > 
-> > > Can you describe what you mean by "channel mapping information"?
-> > > Is that not what we pass into the filter function?
-> >
-> > Today many dmaengine drivers have a filter function which is exported
-> > and then used by clients to filter out the channel. That is not a right
-> > way to do, so any future plan which is based on filter is not correct.
-> 
-> I agree that exporting a filter function from the dmaengine driver is
-> very wrong and should not be done because it requires that the device
-> driver knows which engine is used and that is contrary to the idea
-> of having an abstraction layer.
-> 
-> We were talking about using a filter function because that would be
-> easy to do without changing the core dmaengine code. However, in the
-> proposal, there would actually just be a single filter function that
-> gets used by all drivers that have DT bindings, and it can be
-> completely encapsulated in the of_dma_request_channel() function
-> so it does not have to be a global symbol.
-I kind of like this idea.
-> 
-> If we instead modify the dmaengine code itself to know about DT
-> rather than wrapping around it, we would not need this filter
-> function, but we should still have a probe() function that is
-> called by dmaengine code to interpret the data that is specific
-> to one dmaengine driver.
-I was hoping we can have dmaengine binding, that way dmaengine core code
-knows about what to do when some client requests a channel.
-> 
-> > IMHO dmaengine driver should *not* know anything about mapping. By
-> > mapping I refer to platform information which tells me which client can
-> > use which channel from which dmac.
-> 
-> Agreed too. That information shoudd be part of the slave device-node
-> in DT, as I have argued in this thread already. The slave device driver
-> does not need to care about the format or the contents of it,
-> but we need some code to interpret the contents. From all I can tell,
-> the structure of this data cannot be completely generic because of
-> all the special cases, so the code to interpret it would live in the
-> probe() function I mentioned about that the dmaengine driver provides.
-rather than slave driver, why dont we keep this binding within
-dmaengine. That would make slave and clients completely independent.
-> 
-> > > I think encoding a description for a dma request in a single number is
-> > > the last thing we want to do here. We've tried that with IRQ and GPIO
-> > > numbers and it got us into a huge mess that will need a long time to
-> > > get out of.
-> > No i wasn't thinking of a number. The mapping shouldn't be a global
-> > number at all, though that is a very easy but not very scalable
-> > solution.
-> > We need to take care of 1:1 mapping of client and channels as well as
-> > many:1  cases as well. A single global number cannot represent that
-> > properly.
-> > 
-> > My idea is platform gives this information to dmaengine. Clients and
-> > dmaengine driver do not worry about it. That also paves way for arch
-> > independent clients and drivers.
-> 
-> IMO the platform should have no part in this. I absolutely want to
-> get rid of any platform-specific hardcoded tables in the kernel for
-> stuff that can easily be run-time detected from the device tree.
-> There are cases where hard-coding in the kernel is easier, but I don't
-> think this is one of them.
-Again, you got me wrong. We don't want any hardcoded table is kernel.
-The information in table should come from whatever way that platform can
-give me. For your case it should be DT.
-We can have the map of which client can use which channel as DT binding
-of dmaengine core. So dmaengine can easily arbitrate about channel
-requests. Again this mapping information is not some even linux
-independent
-> 
-> > > Some platforms actually use IORESOURCE_DMA, which was useful to describe
-> > > ISA DMA channels, for encoding some form of channel or request number,
-> > > but this causes all sorts of problems. These are almost exclusively
-> > > used by those platforms that don't have a dmaengine driver yet, so I'd
-> > > hope that we can remove this as we convert those platforms over to
-> > > dmaengine and device tree.
-> > > 
-> > > The representation in device tree as we have it now is a combination of
-> > > a pointer to the dmaengine and a description of the request line in it,
-> > > typically a single small integer number local to the dmaengine. We should
-> > > not try to make that a global integer number again that just serves the
-> > > purpose of looking up the dmaengine and local number again.
-> > > 
-> > > IMHO no device driver should be bothered with any artificial resource
-> > > information, but instead I want all the DT parsing to happen in the
-> > > dmaengine code (or some wrapper around it) where it gets used. The only
-> > > thing that a device driver needs to know is that it wants to use a
-> > > channel based on what is described in the device tree.
-> > Sure, but I would expect the clients and dmacs to find information about
-> > their devices from DT?
-> > dmaengine should get only mapping information used for allocating
-> > channel to client.
-> 
-> Let's take a look at a concrete example. The
-> arch/arm/mach-ux500/board-mop500-sdi.c file defines dma channel
-> configuration for the mmc devices on the ux500 platform that looks
-> like
-> 
-> static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
->         .mode = STEDMA40_MODE_LOGICAL,
->         .dir = STEDMA40_MEM_TO_PERIPH,
->         .src_dev_type = STEDMA40_DEV_SRC_MEMORY,
->         .dst_dev_type = DB8500_DMA_DEV28_SD_MM2_TX,
->         .src_info.data_width = STEDMA40_WORD_WIDTH,
->         .dst_info.data_width = STEDMA40_WORD_WIDTH,
-> };
-> 
-> I want to move this information to the device tree in a way that the
-> device driver does not have to care about it. With the proposed
-> binding, this would mean we get an mmci device node with a property
-> containing something like
-> 
-> 	dma-requests = <&dma40  /* pointer to dma engine */
-> 			0x01    /* logical, mem to dev */
-> 			28      /* DEV28_SD_MM2_TX */
-> 			32>,	/* 32 bit width */
-> 		       <&dma40 0x02 32 32>; /* dev to mem channel */ 
-> 
-> The fact that this dmaengine driver requires two cells (request number
-> and data width) should only be known to the code that deals with that
-> one driver and that should interpret those two cells, while the first
-> two cells (pointer to dma-engine and direction) can be handled
-> by the common dmaengine layer.
-> 
-> In order to do that, we need some code in the dmaengine driver that
-> gets the property data as its argument.
-Yes but not thru the slave drivers. 
+Arnd, Olof,
 
+You'll find in this patch set the fifth version of the initial support
+for a new family of ARMv7-compatible Marvell SoCs.
 
--- 
-~Vinod
+Do you think this patch set has a chance of hitting the 3.6 merge
+window ?
+
+We are willing to quickly resubmit updated versions to take into
+account new comments. We have a lot more code to support those new
+SoCs, and we would like to make progress in submitting those other
+parts for the mainline.
+
+As for the previous releases, both the Armada 370 and the Armada XP
+SoCs are supported in this directory, and we are able to build a
+single kernel image that boots on both SoCs. Both SoCs use the PJ4B
+processor, a Marvell-developed ARM core that implements the ARMv7
+instruction set. We are currently using Marvell evaluation boards for
+both of those SoCs, and the support for those boards is added in this
+patch set.
+
+We remained focused on a limited preliminary support which only
+includes the necessary code for timer and IRQ support, the serial
+controller is a standard 16550-compatible one. The diffstat looks
+like:
+
+ Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt      |   23 +
+ Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt     |   11 +
+ Documentation/devicetree/bindings/arm/armada-370-xp.txt           |   24 +
+ Documentation/devicetree/bindings/arm/mvebu-system-controller.txt |   17 +
+ MAINTAINERS                                                       |    8 +
+ arch/arm/Kconfig                                                  |   14 +
+ arch/arm/Makefile                                                 |    1 +
+ arch/arm/boot/dts/armada-370-db.dts                               |   42 +
+ arch/arm/boot/dts/armada-370-xp.dtsi                              |   68 ++
+ arch/arm/boot/dts/armada-370.dtsi                                 |   35 +
+ arch/arm/boot/dts/armada-xp-db.dts                                |   50 +
+ arch/arm/boot/dts/armada-xp.dtsi                                  |   55 +
+ arch/arm/configs/mvebu_defconfig                                  |   46 +
+ arch/arm/mach-mvebu/Kconfig                                       |   16 +
+ arch/arm/mach-mvebu/Makefile                                      |    2 +
+ arch/arm/mach-mvebu/Makefile.boot                                 |    1 +
+ arch/arm/mach-mvebu/armada-370-xp.c                               |   63 ++
+ arch/arm/mach-mvebu/common.h                                      |   23 +
+ arch/arm/mach-mvebu/include/mach/armada-370-xp.h                  |   22 +
+ arch/arm/mach-mvebu/include/mach/debug-macro.S                    |   24 +
+ arch/arm/mach-mvebu/include/mach/timex.h                          |   13 +
+ arch/arm/mach-mvebu/include/mach/uncompress.h                     |   43 +
+ arch/arm/mach-mvebu/irq-armada-370-xp.c                           |  133 +++
+ arch/arm/mach-mvebu/system-controller.c                           |  100 ++
+ drivers/clocksource/Kconfig                                       |    3 +
+ drivers/clocksource/Makefile                                      |    3 +-
+ drivers/clocksource/time-armada-370-xp.c                          |  242 +++++
+ include/linux/time-armada-370-xp.h                                |   18 +
+ 28 files changed, 1099 insertions(+), 1 deletion(-)
+
+This patch set, and the support for those SoCs, started as a
+collaborative effort from Marvell engineers (who have done the initial
+development work) and Free Electrons engineers (who are reshaping the
+code for mainline submission, adding device tree support, etc.). This
+effort has also received contributions from Ben Dooks from Codethink.
+
+The patch set is based on your arm-soc/for-next branch (updated on Monday
+25th June).
+
+Changes between v4 and v5:
+
+ * For system controller mvebu_other is renamed to orion for a better
+   description of the subset including Dove, mv78xx0, Kirkwood and
+   Orion5x.
+
+ * The system controller code is improved following Arnd advices. Now
+   it uses pointers to data structures instead of defines and if/else
+   statements.
+
+ * The restart function never returns anymore, even if no system
+   controller was configured.
+
+ * The listing of the MVEBU family device tree in the binding
+   documentation for system controller is fixed.
+
+Changes between v3 and v4:
+
+ * If the system controller device is not found during initialization,
+   no more warnings are issued and the function doesn't fail.
+
+ * The system controller driver becomes more generic to handle the
+   other mvebu SoCs. Inside the device tree it is now called either
+   armada-370-xp-system-controller or mvebu-other-system-controller.
+   Then depending of the compatibility name the driver selects the
+   accurate offset and bit mask. The way to handle different variants
+   of the same controller was inspired by the of_serial.c file.
+
+ * A documentation was added for the "system-controller" binding
+
+ * The "select CPU_V7" was moved from ARCH_MVEBU in arch/arm/Kconfig
+   to MACH_ARMADA_370_XP in arch/arm/mach-mvebu/Kconfig. Thanks to this
+   the other mvebu" machines will be able to use CPU_V5
+
+ * Some armada_370_xp strings have been renamed to armada-370-xp to
+   keep the coherency with other parts of the code.
+
+Changes between v2 and v3:
+
+ * The timer support code has been moved to drivers/clocksource/ and
+   the necessary related changes have been made
+
+ * There is now a minimal "system-controller" driver that gets
+   instantiated through DT entries. This driver allows to expose the
+   features made available through a set of miscellaneous registers
+   that do not belong to any specific device in the SoC. For the
+   moment, we only use it to implement the .restart() hook.
+
+ * The defconfig has been changed to allow the support for up to four
+   8250-compatible serial ports, since Armada XP has four such
+   ports. The DTS file has been modified to enable those four ports,
+   and they have all been tested successfully on the Armada XP DB
+   development platform.
+
+ * Moved the "arm: mach-mvebu: add compilation/configuration change"
+   patch towards the end of the patch set
+
+ * Marked the "serial" device as "disabled" in the .dtsi file, and
+   enable the ones that are actually used in the board specific .dts
+   file.
+
+ * Dropped the _dt suffix as the device tree support is implicit now.
+
+ * Don't use anymore a MVEBU_REGS_PHYS_BASE define and reintroduce a
+   ARMADA_370_XP_REGS_PHYS_BASE define.
+
+Changes between v1 and v2:
+
+ * Use the mach-mvebu directory as suggested on the mailing-list. So
+   far, this directory only contains the support for Armada 370/XP,
+   but the plan is that it should ultimately contain the support for
+   all other SoCs produced by the Marvell Engineering Business Unit.
+
+ * Converted most the "armada" word by the "mvebu", but as some code
+   remains specific to the Armada 370 and Armada XP SOC, then created
+   also the aramada_370_xp suffix for this part. This suffix was
+   dedicated for the irq and timer part. It was also used for the
+   register related to the reset part. And of course it was also used
+   for the device tree part.
+
+ * Merged axp-dt.c and a370-dt.c files in one single
+   armada_370_xp-dt.c file.
+
+ * Deleted most of the mapping address in include/mach/armada.h and
+   split it in two headers file:
+
+  - mvebu.h which contains the virtual and physical mapping for the
+    internal registers of the mvebu SOC. This ones are mainly used for
+    the early print during boot.
+
+  - armada_370_xp which contains the registers offset and mask for
+    resetting the CPU.
+
+ * Removed unused headers such as
+  - hardware.h by directly including accurate header when needed
+  - gpio.h by removing the dependencies to PLAT-ORION
+  - io.h no more needed for CPI
+  - irqs.h by using SPARSE_IRQ
+  - system.h no more needed for new SOC
+
+ * Removed the PCI related code as it was not necessary for the
+  initial submission
+
+ * Removed all the PLAT-ORION dependencies remaining
+
+ * Ensured property reading checks for error when getting data from
+   device tree in the timer file. This was a patch from Ben Dooks with
+   the following comments:
+
+  "The call to of_property_read_u32() only checks for the value that
+   the clk variable is set to being non-zero, and not the return value
+   of the call itself.
+
+   This caused a system without the clock-frequency attribute to fail
+   to boot as it used a random value on the stack to setup the system
+   timers and thus cause an interrupt storm.
+
+   Also ensure clk is set to zero, to avoid warnings."
+
+ * Converted irq controller code to use SPARSE_IRQ
+
+ * Added the following bug fixes and improvements in irq.c from Ben
+   Dooks
+
+  - MPIC: BUG_ON() if the of_iomap() fails: Ensure that if either
+    resource is missing, we stop the kernel in a reasonably fatal way.
+
+  - MPIC: Move main register base to base of MPIC registers: The
+    current kernel driver had the MPIC base at the base of the block
+    containing the MPIC and not the MPIC itself. Change this value in
+    the driver and the .dtsi file
+
+    Also change the register size in the .dtsi to be the size of the
+    register range for the MIPC and not the block it is in.
+
+  - MPIC: Move per-cpu register base: The current kernel driver had
+    the MPIC per-cpu register base at the base of the per-cpu register
+    block and not at the base of the specific per-cpu interrupt
+    registers.
+
+    Move the driver and .dtsi to use the correct base and size.
+
+  - MPIC: number fetch should use irqd_to_hwirq(): The mask and unmask
+    routines are assuming that d->irq is a 1:1 mapping with the
+    interrupt hardware. Use the irqd_to_hwirq() call to map the
+    irq_data to the hardware irq number directly.
+
+  - MPIC: read number of interrupts from control register: Read the
+    number of MPIC interrupts from the controller and only register
+    that many.
+
+Best regards,
+
+Gregory Clement
