@@ -1,41 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Jun 2012 19:52:34 +0200
-Subject: [PATCH 1/2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
-References: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120627175234.GF18096@pengutronix.de>
+From: rth@twiddle.net (Richard Henderson)
+Date: Wed, 27 Jun 2012 10:58:11 -0700
+Subject: Detecting support for trapping floating-point exceptions on ARM
+In-Reply-To: <Pine.LNX.4.64.1206121900150.1359@digraph.polyomino.org.uk>
+References: <Pine.LNX.4.64.1206121900150.1359@digraph.polyomino.org.uk>
+Message-ID: <4FEB49B3.2030602@twiddle.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, May 25, 2012 at 04:22:41PM +0200, Sascha Hauer wrote:
-> The following commit changes the function used to copy from/to
-> the hardware buffer to memcpy_[from|to]io. This does not work
-> since the hardware cannot handle the byte accesses used by these
-> functions. Instead of reverting this patch introduce 32bit
-> correspondents of these functions.
+On 06/12/2012 12:11 PM, Joseph S. Myers wrote:
+> ARM VFPv3 and VFPv4 do not support trapping floating-point exceptions; 
+> VFPv2, VFPv3U and VFPv4U do.  The lack of support causes the glibc 
+> math/test-fenv test to fail on VFPv3 and VFPv4 systems.
 > 
-> commit 5775ba36ea9c760c2d7e697dac04f2f7fc95aa62
-> Author: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Date:   Tue Apr 24 10:05:22 2012 +0200
-> 
->     mtd: mxc_nand: fix several sparse warnings about incorrect address space
-> 
->     Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->     Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> The natural fix for that would be for fesetenv (FE_NOMASK_ENV) to fail on 
+> hardware not supporting trapping exceptions.  There is, however, no HWCAP 
+> bit to indicate whether trapping floating-point exceptions is supported.  
+> Could one be added to the kernel, or is there a good way fesetenv could 
+> detect this from userspace without a new HWCAP bit?
 
-I don't know about the sparse problems this introduces, but without this
-patch the mxc-nand driver is broken, so it should really go in before
-3.5.
+I don't suppose those SBZ/RAZ bits just so happen to be ignored in
+actual hardware, so that you can write 1 and read it back and get 0
+to see if exceptions are unsupported?
 
-Best regards
-Uwe
+Yes, that violates the spec as written, but if it just so happens to
+work in current hardware that might be good enough convince someone
+to adjust the spec to be slightly more handy.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+r~
