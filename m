@@ -1,67 +1,92 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 Jun 2012 21:45:24 +0800
-Subject: [PATCH v2 5/5] net: fec: add phy-reset-duration for device tree probe
-In-Reply-To: <1340804724-29410-1-git-send-email-shawn.guo@linaro.org>
-References: <1340804724-29410-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1340804724-29410-6-git-send-email-shawn.guo@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 27 Jun 2012 15:48:49 +0200
+Subject: [PATCH v6] ARM: imx: Add basic imx6q thermal driver
+In-Reply-To: <1340772715-22117-2-git-send-email-rob.lee@linaro.org>
+References: <1340772715-22117-1-git-send-email-rob.lee@linaro.org>
+ <1340772715-22117-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <20120627134849.GN1623@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Different boards may require different phy reset duration.  Add property
-phy-reset-duration for device tree probe, so that the boards that need
-a longer reset duration can specify it in their device tree.
+On Tue, Jun 26, 2012 at 11:51:55PM -0500, Robert Lee wrote:
+> +static inline int anatop_get_temp(int *temp, struct thermal_zone_device *tzdev)
+> +{
+> +	unsigned int n_meas;
+> +	unsigned int reg;
+> +	struct imx_anatop_tsdata *sd;
+> +
+> +	sd = &((struct imx_anatop_thdata *)tzdev->devdata)->sensor_data;
+> +
+> +
+> +	do {
+> +		/*
+> +		 * Every time we measure the temperature, we will power on the
+> +		 * temperature sensor, enable measurements, take a reading,
+> +		 * disable measurements, power off the temperature sensor.
+> +		 */
+> +		sd->handle_suspend = false;
+> +
+> +		anatop_write_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0, 0,
+> +			BM_ANADIG_TEMPSENSE0_POWER_DOWN);
+> +		anatop_write_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0,
+> +			BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
+> +			BM_ANADIG_TEMPSENSE0_MEASURE_TEMP);
+> +		/*
+> +		 * According to the anatop temp sensor designers, it may require
+> +		 * up to ~17us to complete a measurement (imx6q).
+> +		 * But this timing isn't checked on every part nor is it
+> +		 * specified in the datasheet,	so sleeping at least 1ms should
+> +		 * provide plenty of time.  Sleeping longer than 1ms is ok so no
+> +		 * need for usleep_range */
+> +		msleep(1);
+> +
+> +		reg = anatop_read_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0);
+> +
+> +		anatop_write_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0, 0,
+> +			BM_ANADIG_TEMPSENSE0_MEASURE_TEMP);
+> +		anatop_write_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0,
+> +			BM_ANADIG_TEMPSENSE0_POWER_DOWN,
+> +			BM_ANADIG_TEMPSENSE0_POWER_DOWN);
+> +
+> +	/* if we had a suspend and resume event, we will re-take the reading */
+> +	} while (sd->handle_suspend);
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- Documentation/devicetree/bindings/net/fsl-fec.txt |    4 ++++
- drivers/net/ethernet/freescale/fec.c              |    8 +++++++-
- 2 files changed, 11 insertions(+), 1 deletions(-)
+[...]
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-index 0428920..f7a2fef 100644
---- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -11,6 +11,10 @@ Required properties:
- Optional properties:
- - local-mac-address : 6 bytes, mac address
- - phy-reset-gpios : Should specify the gpio for phy reset
-+- phy-reset-duration : Reset duration in milliseconds.  Should present
-+  only if property "phy-reset-gpios" is available.  Missing the property
-+  will have the duration be 1 millisecond.  Numbers greater than 1000 are
-+  invalid and 1 millisecond will be used instead.
- 
- Example:
- 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index f174070..dafd797 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1507,11 +1507,17 @@ static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
- static void __devinit fec_reset_phy(struct platform_device *pdev)
- {
- 	int err, phy_reset;
-+	int msec = 1;
- 	struct device_node *np = pdev->dev.of_node;
- 
- 	if (!np)
- 		return;
- 
-+	of_property_read_u32(np, "phy-reset-duration", &msec);
-+	/* A sane reset duration should not be longer than 1s */
-+	if (msec > 1000)
-+		msec = 1;
-+
- 	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
- 	err = devm_gpio_request_one(&pdev->dev, phy_reset,
- 				    GPIOF_OUT_INIT_LOW, "phy-reset");
-@@ -1519,7 +1525,7 @@ static void __devinit fec_reset_phy(struct platform_device *pdev)
- 		pr_debug("FEC: failed to get gpio phy-reset: %d\n", err);
- 		return;
- 	}
--	msleep(1);
-+	msleep(msec);
- 	gpio_set_value(phy_reset, 1);
- }
- #else /* CONFIG_OF */
+> +static int anatop_thermal_suspend(struct platform_device *pdev,
+> +					pm_message_t state)
+> +{
+> +	struct imx_anatop_thdata *dd = platform_get_drvdata(pdev);
+> +	struct imx_anatop_tsdata *sd = &dd->sensor_data;
+> +
+> +	/* power off the sensor during suspend */
+> +	anatop_write_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0, 0,
+> +		BM_ANADIG_TEMPSENSE0_MEASURE_TEMP);
+> +
+> +	anatop_write_reg(sd->anatopmfd, HW_ANADIG_TEMPSENSE0,
+> +		BM_ANADIG_TEMPSENSE0_POWER_DOWN,
+> +		BM_ANADIG_TEMPSENSE0_POWER_DOWN);
+> +	return 0;
+> +}
+> +
+> +static int anatop_thermal_resume(struct platform_device *pdev)
+> +{
+> +	struct imx_anatop_thdata *dd = platform_get_drvdata(pdev);
+> +	struct imx_anatop_tsdata *sd = &dd->sensor_data;
+> +
+> +	sd->handle_suspend = true;
+> +	return 0;
+> +}
+
+I don't know how to handle this properly or if it's really needed, but
+the usage of this handle_suspend variable really looks suspicious. I've
+never seen a driver looping around a while-suspended-in-between. Someone
+else should have a look over this.
+
+Sascha
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
