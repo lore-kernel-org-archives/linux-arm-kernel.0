@@ -1,110 +1,75 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 27 Jun 2012 11:08:05 +0400
-Subject: [PATCH 2/2] ARM: i.MX51 iomux: added missing pin definitions
-In-Reply-To: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
-References: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1340780885-4094-2-git-send-email-shc_work@mail.ru>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Wed, 27 Jun 2012 08:21:47 +0100
+Subject: i.MX28 die temperature
+In-Reply-To: <201206262102.15698.marek.vasut@gmail.com>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <201206221919.57485.marek.vasut@gmail.com>
+ <201206261012.13620.jbe@pengutronix.de>
+ <201206262102.15698.marek.vasut@gmail.com>
+Message-ID: <4FEAB48B.4010108@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing definitions for DISP, GPT and CCM pads.
-These pins are not used by kernel, but may be helpful for custom boards.
-
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index 36c8989..2623e7a 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -107,11 +107,13 @@
- #define MX51_PAD_EIM_D25__UART2_CTS		IOMUX_PAD(0x414, 0x080, 4, __NA_, 0, MX51_UART_PAD_CTRL)
- #define MX51_PAD_EIM_D25__UART3_RXD		IOMUX_PAD(0x414, 0x080, 3, 0x9f4, 0, MX51_UART_PAD_CTRL)
- #define MX51_PAD_EIM_D25__USBOTG_DATA1		IOMUX_PAD(0x414, 0x080, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_EIM_D25__GPT_CMPOUT1		IOMUX_PAD(0x414, 0x080, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D26__EIM_D26		IOMUX_PAD(0x418, 0x084, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D26__KEY_COL7		IOMUX_PAD(0x418, 0x084, 1, 0x9cc, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D26__UART2_RTS		IOMUX_PAD(0x418, 0x084, 4, 0x9e8, 3, MX51_UART_PAD_CTRL)
- #define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, __NA_, 0, MX51_UART_PAD_CTRL)
- #define MX51_PAD_EIM_D26__USBOTG_DATA2		IOMUX_PAD(0x418, 0x084, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_EIM_D26__GPT_CMPOUT2		IOMUX_PAD(0x418, 0x084, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D27__AUD6_RXC		IOMUX_PAD(0x41c, 0x088, 5, 0x8f4, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D27__EIM_D27		IOMUX_PAD(0x41c, 0x088, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D27__GPIO2_9		IOMUX_PAD(0x41c, 0x088, 1, __NA_, 0, MX51_GPIO_PAD_CTRL)
-@@ -228,6 +230,7 @@
- #define MX51_PAD_EIM_CRE__EIM_CRE		IOMUX_PAD(0x4a0, 0x100, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_CRE__GPIO3_2		IOMUX_PAD(0x4a0, 0x100, 1, 0x97c, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_DRAM_CS1__DRAM_CS1		IOMUX_PAD(0x4d0, 0x104, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DRAM_CS1__CCM_CLKO		IOMUX_PAD(0x4d0, 0x104, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_WE_B__GPIO3_3		IOMUX_PAD(0x4e4, 0x108, 3, 0x980, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_WE_B__NANDF_WE_B		IOMUX_PAD(0x4e4, 0x108, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_WE_B__PATA_DIOW		IOMUX_PAD(0x4e4, 0x108, 1, __NA_, 0, NO_PAD_CTRL)
-@@ -256,12 +259,14 @@
- #define MX51_PAD_NANDF_RB1__GPIO3_9		IOMUX_PAD(0x4fc, 0x120, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB1__NANDF_RB1		IOMUX_PAD(0x4fc, 0x120, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB1__PATA_IORDY		IOMUX_PAD(0x4fc, 0x120, 1, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB1__GPT_CMPOUT2		IOMUX_PAD(0x4fc, 0x120, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB1__SD4_CMD		IOMUX_PAD(0x4fc, 0x120, 0x15, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__DISP2_WAIT		IOMUX_PAD(0x500, 0x124, 5, 0x9a8, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__ECSPI2_SCLK		IOMUX_PAD(0x500, 0x124, 2, __NA_, 0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__FEC_COL		IOMUX_PAD(0x500, 0x124, 1, 0x94c, 0, MX51_PAD_CTRL_2)
- #define MX51_PAD_NANDF_RB2__GPIO3_10		IOMUX_PAD(0x500, 0x124, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__NANDF_RB2		IOMUX_PAD(0x500, 0x124, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB2__GPT_CMPOUT3		IOMUX_PAD(0x500, 0x124, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__USBH3_H3_DP		IOMUX_PAD(0x500, 0x124, 0x17, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__USBH3_NXT		IOMUX_PAD(0x500, 0x124, 6, 0xa20, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB3__DISP1_WAIT		IOMUX_PAD(0x504, 0x128, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -637,7 +642,9 @@
- #define MX51_PAD_DISP1_DAT23__DISP2_DAT17	IOMUX_PAD(0x728, 0x328, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP1_DAT23__DISP2_SER_CS	IOMUX_PAD(0x728, 0x328, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DI1_PIN3__DI1_PIN3		IOMUX_PAD(0x72c, 0x32c, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DI1_DISP_CLK__DI1_DISP_CLK	IOMUX_PAD(0x730, __NA_, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DI1_PIN2__DI1_PIN2		IOMUX_PAD(0x734, 0x330, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DI1_PIN15__DI1_PIN15		IOMUX_PAD(0x738, __NA_, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DI_GP2__DISP1_SER_CLK		IOMUX_PAD(0x740, 0x338, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DI_GP2__DISP2_WAIT		IOMUX_PAD(0x740, 0x338, 2, 0x9a8, 1, NO_PAD_CTRL)
- #define MX51_PAD_DI_GP3__CSI1_DATA_EN		IOMUX_PAD(0x744, 0x33c, 3, 0x9a0, 1, NO_PAD_CTRL)
-@@ -780,6 +787,8 @@
- #define MX51_PAD_GPIO1_2__PWM1_PWMO		IOMUX_PAD(0x7d4, 0x3cc, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__GPIO1_3		IOMUX_PAD(0x7d8, 0x3d0, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__I2C2_SDA		IOMUX_PAD(0x7d8, 0x3d0, 0x12, 0x9bc, 3, MX51_I2C_PAD_CTRL)
-+#define MX51_PAD_GPIO1_3__CCM_CLKO2		IOMUX_PAD(0x7d8, 0x3d0, 5, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_3__GPT_CLKIN		IOMUX_PAD(0x7d8, 0x3d0, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__PLL2_BYP		IOMUX_PAD(0x7d8, 0x3d0, 7, 0x910, 1, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__PWM2_PWMO		IOMUX_PAD(0x7d8, 0x3d0, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7fc, 0x3d4, 0, __NA_, 0, NO_PAD_CTRL)
-@@ -788,13 +797,16 @@
- #define MX51_PAD_GPIO1_4__EIM_RDY		IOMUX_PAD(0x804, 0x3d8, 3, 0x938, 1, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_4__GPIO1_4		IOMUX_PAD(0x804, 0x3d8, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_4__WDOG1_WDOG_B		IOMUX_PAD(0x804, 0x3d8, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_4__GPT_CAPIN1		IOMUX_PAD(0x804, 0x3d8, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__CSI2_MCLK		IOMUX_PAD(0x808, 0x3dc, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__DISP2_PIN16		IOMUX_PAD(0x808, 0x3dc, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__GPIO1_5		IOMUX_PAD(0x808, 0x3dc, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__WDOG2_WDOG_B		IOMUX_PAD(0x808, 0x3dc, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_5__CCM_CLKO		IOMUX_PAD(0x808, 0x3dc, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_6__DISP2_PIN17		IOMUX_PAD(0x80c, 0x3e0, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_6__GPIO1_6		IOMUX_PAD(0x80c, 0x3e0, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_6__REF_EN_B		IOMUX_PAD(0x80c, 0x3e0, 3, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_6__GPT_CAPIN2		IOMUX_PAD(0x80c, 0x3e0, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_7__CCM_OUT_0		IOMUX_PAD(0x810, 0x3e4, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_7__GPIO1_7		IOMUX_PAD(0x810, 0x3e4, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_7__SD2_WP		IOMUX_PAD(0x810, 0x3e4, 6, __NA_, 0, MX51_ESDHC_PAD_CTRL)
-@@ -803,11 +815,13 @@
- #define MX51_PAD_GPIO1_8__GPIO1_8		IOMUX_PAD(0x814, 0x3e8, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_8__SD2_CD		IOMUX_PAD(0x814, 0x3e8, 6, __NA_, 0, MX51_ESDHC_PAD_CTRL)
- #define MX51_PAD_GPIO1_8__USBH3_PWR		IOMUX_PAD(0x814, 0x3e8, 1, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_8__CCM_CLKO2		IOMUX_PAD(0x814, 0x3e8, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__CCM_OUT_1		IOMUX_PAD(0x818, 0x3ec, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__DISP2_D1_CS		IOMUX_PAD(0x818, 0x3ec, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__DISP2_SER_CS		IOMUX_PAD(0x818, 0x3ec, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__GPIO1_9		IOMUX_PAD(0x818, 0x3ec, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__SD2_LCTL		IOMUX_PAD(0x818, 0x3ec, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__USBH3_OC		IOMUX_PAD(0x818, 0x3ec, 1, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_9__CCM_CLKO		IOMUX_PAD(0x818, 0x3ec, 4, __NA_, 0, NO_PAD_CTRL)
- 
- #endif /* __MACH_IOMUX_MX51_H__ */
--- 
-1.7.3.4
+On 6/26/2012 8:02 PM, Marek Vasut wrote:
+> Dear Juergen Beisert,
+>
+>> Hi Marek,
+>>
+>> Marek Vasut wrote:
+>>> [...]
+>>>
+>>>>> Take a look at: http://www.spinics.net/lists/linux-iio/msg04345.html
+>>>>
+>>>> Any progress here with inclusion in some git tree?
+>>>
+>>> Well ... I recently raised from the dead. It's on the schedule, obviously
+>>> help is welcome.
+>>
+>> I tried a little bit with your driver. The disadvantage I see is, its
+>> claims all the free AD channels. But a few of them can also act as a
+>> touchscreen controller. Shouldn't be the driver handle the channel usage
+>> dynamically?
+>
+> I wonder, I'd rather see this driver behave as a composite driver, what do you
+> think?
+Alternative (though it's still in development) would be to use IIO
+as the ADC layer and sit the other parts on top.  die temp and basic
+adc are fine but no one has taken on a touchscreen controller via that
+approach yet.  They tend to have a nasty large number of extremely 
+special purpose bits.  I've certainly not thought through how to handle
+those yet.
+>
+>> Also this AD module on the SoC can measure the die
+>> temperature, battery voltage and some other power supplies.
+>> I see more than one framework this driver should connect to: simple ADC
+>> (IIO), touchscreen controller (INPUT), die temp (POWER?), various voltages
+>> (POWER? REGULATOR?). Should it be a multi function device?
+>
+> Correct, making it a MFD device with common channel-management logic is the way
+> to go. And it's gonna be a few resends of this driver, that's for certain. I'm
+> not confident I'll be able to make it right at the first try ;-)
+>
+> INPUT -- touchscreen
+> IIO -- die temp and LRADC (maybe random voltages?)
+Mapping the die temp onto hwmon as obviously thats where it ultimately 
+should appear.
+> POWER -- battery
+>
+> But all this MFD goo is quite simple, the hard part is the channel management
+> logic. From the top of my head, there're 16 channels, 8 can be sampled at the
+> same time and there are 4 configuration triggers. Making it one hell of a
+> complex hardware.
+It is indeed a nasty beast. Good luck ;)
+>
+> I'll fix the remnants of SPI and start on this beast tonight or tomorrow. Since
+> there was some progress in the IIO, I believe I'll have to rework it a bit.
+>
+>> Juergen
+>
+> Best regards,
+> Marek Vasut
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
