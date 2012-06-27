@@ -1,29 +1,54 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 27 Jun 2012 20:42:36 +0800
-Subject: [PATCH 0/3] usb: chipidea: fix error handling and add dr_role
- property
-In-Reply-To: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
-References: <1340799710-32696-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20120627124233.GA2256@richard-laptop>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Jun 2012 14:42:31 +0200
+Subject: [PATCH v7 06/14] USB: Chipidea: rename struct ci13xxx variables
+ from udc to ci
+In-Reply-To: <1340607391-16380-7-git-send-email-richard.zhao@freescale.com>
+References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
+ <1340607391-16380-7-git-send-email-richard.zhao@freescale.com>
+Message-ID: <4FEAFFB7.7010906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 02:21:47PM +0200, Marc Kleine-Budde wrote:
-> Hello,
+On 06/25/2012 08:56 AM, Richard Zhao wrote:
+> struct ci13xxx represent the controller, which may be device or host,
+> so name its variables as ci.
 > 
-> while hacking on the chipidea driver, I fixed the error path in
-> the udc part of the chipidea driver. Further I added the possibility
-> to limit the driver to host or device only mode. It's possible via
-> platformdata and device tree. For dt I selected the dr_role property
-> which is already used for other dual role usb drivers.
-What's it based on then?
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-Thanks
-Richard
-> 
-> regards, Marc
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+nitpick: search-replace problem
+
+> --- a/drivers/usb/chipidea/udc.c
+> +++ b/drivers/usb/chipidea/udc.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * udc.c - ChipIdea UDC driver
+> + * ci.c - ChipIdea UDC driver
+      ^^^^
+
+:)
+
+>   *
+>   * Copyright (C) 2008 Chipidea - MIPS Technologies, Inc. All rights reserved.
+>   *
+> @@ -66,11 +66,11 @@ static inline int hw_ep_bit(int num, int dir)
+>  	return num + (dir ? 16 : 0);
+>  }
+>  
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120627/ebce7ba8/attachment-0001.sig>
