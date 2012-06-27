@@ -1,32 +1,70 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Wed, 27 Jun 2012 22:28:26 +0200 (CEST)
-Subject: [PATCH] ARM: imx: fix i.MX35 CPU architecture
-Message-ID: <147037481.185152.1340828906821.JavaMail.root@advansee.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 27 Jun 2012 22:25:53 +0200
+Subject: [PATCH 00/11] Prepare for OMAP2+ movement to Common Clk
+In-Reply-To: <alpine.DEB.2.00.1206271344200.27496@utopia.booyaka.com>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <2606265.VPQJMxIymh@avalon>
+ <alpine.DEB.2.00.1206271344200.27496@utopia.booyaka.com>
+Message-ID: <2172351.1193SiRd5m@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The data sheet of the i.MX35 says it is an ARM1136JF-S processor, version r1p3,
-which, according to section "B.1. New instructions" of the ARM1136JF-S and
-ARM1136J-S Technical Reference Manual, makes the i.MX35 CPU architecture not
-only ARMv6, but ARMv6k.
+Hi Paul,
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- .../arch/arm/mach-imx/Kconfig                      |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Wednesday 27 June 2012 13:59:21 Paul Walmsley wrote:
+> + Kevin
+> 
+> On Wed, 27 Jun 2012, Laurent Pinchart wrote:
+> > OK, I think I've found the information. I'll give this a try.
+> 
+> That sounds great.
 
-diff --git linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/Kconfig linux-next-HEAD-49289f3/arch/arm/mach-imx/Kconfig
-index eff4db5..0345e85 100644
---- linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/Kconfig
-+++ linux-next-HEAD-49289f3/arch/arm/mach-imx/Kconfig
-@@ -73,7 +73,7 @@ config SOC_IMX31
- 
- config SOC_IMX35
- 	bool
--	select CPU_V6
-+	select CPU_V6K
- 	select ARCH_MXC_IOMUX_V3
- 	select COMMON_CLK
- 	select HAVE_EPIT
+I'll repeat here what I've stated in my other mail, as Kevin is CC'ed.
+
+I haven't had much luck, pm_runtime_get_sync() doesn't seem to enable the ISP 
+clocks. I'd like to trace what happens (or rather doesn't happen), but I'm not 
+familiar with runtime PM internals. What's the call stack from 
+pm_runtime_get_sync() to the arch code that's supposed to enable clocks ?
+
+> > What is still not clear to me is how runtime PM and system PM interact.
+> > For instance the OMAP3 ISP driver disables its clocks in the system PM
+> > suspend handler, and restarts them in the system PM resume handler. How do
+> > I port that to runtime PM, can I just call pm_runtime_put() and
+> > pm_runtime_get_sync() in the system PM handlers ?
+> 
+> I've lost track of what the official guidance on this is.
+
+That's what has always bothered me with runtime PM, I've never been able to 
+find clear official guidelines (possibly because there are none).
+
+(Along with the fact that, for the OMAP3 ISP, I still don't see what benefits 
+the runtime PM complexity will bring)
+
+> But we have plenty of drivers that do this. A few examples are
+> drivers/mmc/host/omap_hsmmc.c, drivers/spi/spi-omap2-mcspi.c, and the DSS
+> drivers.
+> 
+> IMHO, if possible, for the driver's system suspend call, the best thing to
+> do is to check to see if the driver is currently doing something. If it is, 
+then ask it to stop. Then wait until it does. When it stops, that other part
+> of the driver is ideally what should do the pm_runtime_put*().
+
+I don't think I can do that. The omap3-isp driver implements a PM prepare 
+operation that stops all device activity, and a PM suspend operation that 
+turns off the clocks. The reason for that split is that the sensor (which has 
+its own device, its own driver and its own PM operations) needs to be 
+suspended after the ISP is stopped, but before the clocks are turned off.
+
+My suspend handler thus needs to stop the clocks without performing any other 
+operation. Calling pm_runtime_put() there is an option, I'll try it. It seems 
+to be legal, as the hsmmc driver uses pm_runtime_put_sync() in its suspend 
+handler. Is the _sync required there BTW ? Won't system suspend turn the 
+clocks off anyway ? Or would there be a problem at resume time ?
+
+> It's been a long time since I've looked, but I'd be surprised if we had
+> many drivers that operated like that...
+
+-- 
+Regards,
+
+Laurent Pinchart
