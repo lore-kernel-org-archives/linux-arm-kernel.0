@@ -1,49 +1,110 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 27 Jun 2012 11:08:04 +0400
-Subject: [PATCH 1/2] ARM: i.MX5x clocks: Add EPIT support
-Message-ID: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
+Date: Wed, 27 Jun 2012 11:08:05 +0400
+Subject: [PATCH 2/2] ARM: i.MX51 iomux: added missing pin definitions
+In-Reply-To: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
+References: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1340780885-4094-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Enhanced Periodic Interrupt Timer (EPIT)
-to clock subsystem.
+This patch adds missing definitions for DISP, GPT and CCM pads.
+These pins are not used by kernel, but may be helpful for custom boards.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index a2200c7..2944854 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -81,6 +81,7 @@ enum imx5_clks {
- 	ssi1_root_podf, ssi2_root_pred, ssi2_root_podf, ssi_ext1_pred,
- 	ssi_ext1_podf, ssi_ext2_pred, ssi_ext2_podf, ssi1_root_gate,
- 	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
-+	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
- 	clk_max
- };
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index 36c8989..2623e7a 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -107,11 +107,13 @@
+ #define MX51_PAD_EIM_D25__UART2_CTS		IOMUX_PAD(0x414, 0x080, 4, __NA_, 0, MX51_UART_PAD_CTRL)
+ #define MX51_PAD_EIM_D25__UART3_RXD		IOMUX_PAD(0x414, 0x080, 3, 0x9f4, 0, MX51_UART_PAD_CTRL)
+ #define MX51_PAD_EIM_D25__USBOTG_DATA1		IOMUX_PAD(0x414, 0x080, 2, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D25__GPT_CMPOUT1		IOMUX_PAD(0x414, 0x080, 5, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_D26__EIM_D26		IOMUX_PAD(0x418, 0x084, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_D26__KEY_COL7		IOMUX_PAD(0x418, 0x084, 1, 0x9cc, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_D26__UART2_RTS		IOMUX_PAD(0x418, 0x084, 4, 0x9e8, 3, MX51_UART_PAD_CTRL)
+ #define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, __NA_, 0, MX51_UART_PAD_CTRL)
+ #define MX51_PAD_EIM_D26__USBOTG_DATA2		IOMUX_PAD(0x418, 0x084, 2, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D26__GPT_CMPOUT2		IOMUX_PAD(0x418, 0x084, 5, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_D27__AUD6_RXC		IOMUX_PAD(0x41c, 0x088, 5, 0x8f4, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_D27__EIM_D27		IOMUX_PAD(0x41c, 0x088, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_D27__GPIO2_9		IOMUX_PAD(0x41c, 0x088, 1, __NA_, 0, MX51_GPIO_PAD_CTRL)
+@@ -228,6 +230,7 @@
+ #define MX51_PAD_EIM_CRE__EIM_CRE		IOMUX_PAD(0x4a0, 0x100, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_CRE__GPIO3_2		IOMUX_PAD(0x4a0, 0x100, 1, 0x97c, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_DRAM_CS1__DRAM_CS1		IOMUX_PAD(0x4d0, 0x104, 0, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_DRAM_CS1__CCM_CLKO		IOMUX_PAD(0x4d0, 0x104, 1, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_WE_B__GPIO3_3		IOMUX_PAD(0x4e4, 0x108, 3, 0x980, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_NANDF_WE_B__NANDF_WE_B		IOMUX_PAD(0x4e4, 0x108, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_WE_B__PATA_DIOW		IOMUX_PAD(0x4e4, 0x108, 1, __NA_, 0, NO_PAD_CTRL)
+@@ -256,12 +259,14 @@
+ #define MX51_PAD_NANDF_RB1__GPIO3_9		IOMUX_PAD(0x4fc, 0x120, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB1__NANDF_RB1		IOMUX_PAD(0x4fc, 0x120, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB1__PATA_IORDY		IOMUX_PAD(0x4fc, 0x120, 1, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_NANDF_RB1__GPT_CMPOUT2		IOMUX_PAD(0x4fc, 0x120, 4, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB1__SD4_CMD		IOMUX_PAD(0x4fc, 0x120, 0x15, __NA_, 0, MX51_SDHCI_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB2__DISP2_WAIT		IOMUX_PAD(0x500, 0x124, 5, 0x9a8, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB2__ECSPI2_SCLK		IOMUX_PAD(0x500, 0x124, 2, __NA_, 0, MX51_ECSPI_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB2__FEC_COL		IOMUX_PAD(0x500, 0x124, 1, 0x94c, 0, MX51_PAD_CTRL_2)
+ #define MX51_PAD_NANDF_RB2__GPIO3_10		IOMUX_PAD(0x500, 0x124, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB2__NANDF_RB2		IOMUX_PAD(0x500, 0x124, 0, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_NANDF_RB2__GPT_CMPOUT3		IOMUX_PAD(0x500, 0x124, 4, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB2__USBH3_H3_DP		IOMUX_PAD(0x500, 0x124, 0x17, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB2__USBH3_NXT		IOMUX_PAD(0x500, 0x124, 6, 0xa20, 0, NO_PAD_CTRL)
+ #define MX51_PAD_NANDF_RB3__DISP1_WAIT		IOMUX_PAD(0x504, 0x128, 5, __NA_, 0, NO_PAD_CTRL)
+@@ -637,7 +642,9 @@
+ #define MX51_PAD_DISP1_DAT23__DISP2_DAT17	IOMUX_PAD(0x728, 0x328, 5, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_DISP1_DAT23__DISP2_SER_CS	IOMUX_PAD(0x728, 0x328, 4, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_DI1_PIN3__DI1_PIN3		IOMUX_PAD(0x72c, 0x32c, 0, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_DI1_DISP_CLK__DI1_DISP_CLK	IOMUX_PAD(0x730, __NA_, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_DI1_PIN2__DI1_PIN2		IOMUX_PAD(0x734, 0x330, 0, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_DI1_PIN15__DI1_PIN15		IOMUX_PAD(0x738, __NA_, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_DI_GP2__DISP1_SER_CLK		IOMUX_PAD(0x740, 0x338, 0, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_DI_GP2__DISP2_WAIT		IOMUX_PAD(0x740, 0x338, 2, 0x9a8, 1, NO_PAD_CTRL)
+ #define MX51_PAD_DI_GP3__CSI1_DATA_EN		IOMUX_PAD(0x744, 0x33c, 3, 0x9a0, 1, NO_PAD_CTRL)
+@@ -780,6 +787,8 @@
+ #define MX51_PAD_GPIO1_2__PWM1_PWMO		IOMUX_PAD(0x7d4, 0x3cc, 1, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_3__GPIO1_3		IOMUX_PAD(0x7d8, 0x3d0, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_3__I2C2_SDA		IOMUX_PAD(0x7d8, 0x3d0, 0x12, 0x9bc, 3, MX51_I2C_PAD_CTRL)
++#define MX51_PAD_GPIO1_3__CCM_CLKO2		IOMUX_PAD(0x7d8, 0x3d0, 5, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO1_3__GPT_CLKIN		IOMUX_PAD(0x7d8, 0x3d0, 6, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_3__PLL2_BYP		IOMUX_PAD(0x7d8, 0x3d0, 7, 0x910, 1, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_3__PWM2_PWMO		IOMUX_PAD(0x7d8, 0x3d0, 1, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7fc, 0x3d4, 0, __NA_, 0, NO_PAD_CTRL)
+@@ -788,13 +797,16 @@
+ #define MX51_PAD_GPIO1_4__EIM_RDY		IOMUX_PAD(0x804, 0x3d8, 3, 0x938, 1, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_4__GPIO1_4		IOMUX_PAD(0x804, 0x3d8, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_4__WDOG1_WDOG_B		IOMUX_PAD(0x804, 0x3d8, 2, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO1_4__GPT_CAPIN1		IOMUX_PAD(0x804, 0x3d8, 6, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_5__CSI2_MCLK		IOMUX_PAD(0x808, 0x3dc, 6, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_5__DISP2_PIN16		IOMUX_PAD(0x808, 0x3dc, 3, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_5__GPIO1_5		IOMUX_PAD(0x808, 0x3dc, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_5__WDOG2_WDOG_B		IOMUX_PAD(0x808, 0x3dc, 2, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO1_5__CCM_CLKO		IOMUX_PAD(0x808, 0x3dc, 5, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_6__DISP2_PIN17		IOMUX_PAD(0x80c, 0x3e0, 4, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_6__GPIO1_6		IOMUX_PAD(0x80c, 0x3e0, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_6__REF_EN_B		IOMUX_PAD(0x80c, 0x3e0, 3, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO1_6__GPT_CAPIN2		IOMUX_PAD(0x80c, 0x3e0, 6, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_7__CCM_OUT_0		IOMUX_PAD(0x810, 0x3e4, 3, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_7__GPIO1_7		IOMUX_PAD(0x810, 0x3e4, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_7__SD2_WP		IOMUX_PAD(0x810, 0x3e4, 6, __NA_, 0, MX51_ESDHC_PAD_CTRL)
+@@ -803,11 +815,13 @@
+ #define MX51_PAD_GPIO1_8__GPIO1_8		IOMUX_PAD(0x814, 0x3e8, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_8__SD2_CD		IOMUX_PAD(0x814, 0x3e8, 6, __NA_, 0, MX51_ESDHC_PAD_CTRL)
+ #define MX51_PAD_GPIO1_8__USBH3_PWR		IOMUX_PAD(0x814, 0x3e8, 1, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO1_8__CCM_CLKO2		IOMUX_PAD(0x814, 0x3e8, 4, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_9__CCM_OUT_1		IOMUX_PAD(0x818, 0x3ec, 3, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_9__DISP2_D1_CS		IOMUX_PAD(0x818, 0x3ec, 2, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_9__DISP2_SER_CS		IOMUX_PAD(0x818, 0x3ec, 7, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_9__GPIO1_9		IOMUX_PAD(0x818, 0x3ec, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_9__SD2_LCTL		IOMUX_PAD(0x818, 0x3ec, 6, __NA_, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO1_9__USBH3_OC		IOMUX_PAD(0x818, 0x3ec, 1, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO1_9__CCM_CLKO		IOMUX_PAD(0x818, 0x3ec, 4, __NA_, 0, NO_PAD_CTRL)
  
-@@ -226,6 +227,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk[ssi3_root_gate] = imx_clk_gate2("ssi3_root_gate", "ssi3_root_sel", MXC_CCM_CCGR3, 26);
- 	clk[ssi_ext1_gate] = imx_clk_gate2("ssi_ext1_gate", "ssi_ext1_com_sel", MXC_CCM_CCGR3, 28);
- 	clk[ssi_ext2_gate] = imx_clk_gate2("ssi_ext2_gate", "ssi_ext2_com_sel", MXC_CCM_CCGR3, 30);
-+	clk[epit1_ipg_gate] = imx_clk_gate2("epit1_ipg_gate", "ipg", MXC_CCM_CCGR2, 2);
-+	clk[epit1_hf_gate] = imx_clk_gate2("epit1_hf_gate", "ipg", MXC_CCM_CCGR2, 4);
-+	clk[epit2_ipg_gate] = imx_clk_gate2("epit2_ipg_gate", "ipg", MXC_CCM_CCGR2, 6);
-+	clk[epit2_hf_gate] = imx_clk_gate2("epit2_hf_gate", "ipg", MXC_CCM_CCGR2, 8);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
- 		if (IS_ERR(clk[i]))
-@@ -279,6 +284,8 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[dummy], NULL, "imx-keypad");
- 	clk_register_clkdev(clk[tve_gate], NULL, "imx-tve.0");
- 	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx-tve.0");
-+	clk_register_clkdev(clk[epit1_ipg_gate], NULL, "imx-epit.0");
-+	clk_register_clkdev(clk[epit2_ipg_gate], NULL, "imx-epit.1");
- 
- 	/* Set SDHC parents to be PLL2 */
- 	clk_set_parent(clk[esdhc_a_sel], clk[pll2_sw]);
+ #endif /* __MACH_IOMUX_MX51_H__ */
 -- 
 1.7.3.4
