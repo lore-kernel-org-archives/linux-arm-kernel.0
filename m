@@ -1,26 +1,45 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Wed, 27 Jun 2012 16:49:54 -0300
-Subject: [PATCH 1/4] mtd: lpc32xx_slc: Select AMBA_PL08X in Kconfig
-In-Reply-To: <20120627193039.GF25319@n2100.arm.linux.org.uk>
-References: <1340812275-1197-1-git-send-email-stigge@antcom.de>
- <20120627191542.GC25319@n2100.arm.linux.org.uk>
- <CAAAP30Fdr2_tcgMYjCirVPCPTtrUgbeMb=7j=69wGtvJeiLsOA@mail.gmail.com>
- <20120627193039.GF25319@n2100.arm.linux.org.uk>
-Message-ID: <CAAAP30HE++jF084LZbG+yMgddKtwqUAwVxuiXr4RPD0B4-H_8A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 27 Jun 2012 21:56:11 +0200
+Subject: [PATCH 00/11] Prepare for OMAP2+ movement to Common Clk
+In-Reply-To: <2606265.VPQJMxIymh@avalon>
+References: <1340372890-10091-1-git-send-email-rnayak@ti.com>
+ <1854687.1eeiLuW4oH@avalon> <2606265.VPQJMxIymh@avalon>
+Message-ID: <2631798.VQ7ROEf9Xv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 4:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Well, the DMA engine API gets stubbed out when no DMA engine is selected,
-> so I'm not sure why spi-pl022 needs all those ifdefs (yes, you may wish
-> to do that if you want to shrink your driver private struct size.)
->
-> Provided the driver is capable of working without DMA engine, I don't see
-> any reason what so ever to make that driver select or depend on DMA engine
-> stuff.
+On Wednesday 27 June 2012 20:45:00 Laurent Pinchart wrote:
+> On Wednesday 27 June 2012 20:05:27 Laurent Pinchart wrote:
+> > On Wednesday 27 June 2012 10:36:04 Paul Walmsley wrote:
+> > > On Wed, 27 Jun 2012, Laurent Pinchart wrote:
+> > > > I think you've missed drivers/media/video/omap3isp/isp.c. Should I
+> > > > send
+> > > > a
+> > > > patch for that ? Do these changes depend on anything not yet in
+> > > > mainline
+> > > > that I should apply to my tree for testing ?
+> > > 
+> > > What would be ideal is if omap3isp could be converted to runtime PM for
+> > > its internal IP block control. Almost all of the other OMAP on-chip oC
+> > > drivers have been converted. Please let us know if more information or
+> > > assistance is needed with this.
+> > 
+> > How does that integrate with the clock framework ?
+> 
+> OK, I think I've found the information. I'll give this a try.
 
-Ok, so this one can be dropped.
+Not much luck, pm_runtime_get_sync() doesn't seem to enable the ISP clocks.
 
-It was proposed because of an build error in the past, but it's not
-happening anymore.
+I'm not familiar with runtime PM internals, what's the call stack from 
+pm_runtime_get_sync() to the arch code that's supposed to enable clocks ?
+
+> What is still not clear to me is how runtime PM and system PM interact. For
+> instance the OMAP3 ISP driver disables its clocks in the system PM suspend
+> handler, and restarts them in the system PM resume handler. How do I port
+> that to runtime PM, can I just call pm_runtime_put() and
+> pm_runtime_get_sync() in the system PM handlers ?
+
+-- 
+Regards,
+
+Laurent Pinchart
