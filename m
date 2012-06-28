@@ -1,90 +1,81 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 11:39:51 +0800
-Subject: [PATCH 2/2] ARM: MXS: Add Crystalfontz CFA-10036 DTS
-In-Reply-To: <1340785092-27035-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1340785092-27035-1-git-send-email-maxime.ripard@free-electrons.com>
- <1340785092-27035-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120628033949.GB30041@S2101-09.ap.freescale.net>
+Date: Thu, 28 Jun 2012 11:44:58 +0800
+Subject: [PATCH 02/11] ARM: dts: mxs: add hog-gpios for imx23-evk and imx28-evk
+In-Reply-To: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
+References: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1340855107-4664-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 10:18:12AM +0200, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-Unneeded new line.  I just removed it, changed the subject prefix to
-"ARM: mxs: ..." and applied the patch.
+Before gpio_request can directly ask pinctrl system to configure the
+requested pin into gpio mode, we use "hog" entry (pinctrl state of
+pin controller itself) to configure gpios.
 
-Regards,
-Shawn
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx23-evk.dts |   17 +++++++++++++++++
+ arch/arm/boot/dts/imx28-evk.dts |   21 +++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
 
-> Cc: Brian Lily <brian@crystalfontz.com>
-> ---
->  arch/arm/boot/dts/cfa10036.dts |   43 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/mach-mxs.c   |    1 +
->  2 files changed, 44 insertions(+)
->  create mode 100644 arch/arm/boot/dts/cfa10036.dts
-> 
-> diff --git a/arch/arm/boot/dts/cfa10036.dts b/arch/arm/boot/dts/cfa10036.dts
-> new file mode 100644
-> index 0000000..28b9326
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/cfa10036.dts
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Copyright 2012 Free Electrons
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx28.dtsi"
-> +
-> +/ {
-> +	model = "Crystalfontz CFA-10036 Board";
-> +	compatible = "crystalfontz,cfa10036", "fsl,imx28";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x08000000>;
-> +	};
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			ssp0: ssp at 80010000 {
-> +				compatible = "fsl,imx28-mmc";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&mmc0_4bit_pins_a
-> +					&mmc0_cd_cfg &mmc0_sck_cfg>;
-> +				bus-width = <4>;
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		apbx at 80040000 {
-> +			duart: serial at 80074000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&duart_pins_b>;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 8cac94b..7f4d6a9 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -97,6 +97,7 @@ static const char *imx23_dt_compat[] __initdata = {
->  };
->  
->  static const char *imx28_dt_compat[] __initdata = {
-> +	"crystalfontz,cfa10036",
->  	"fsl,imx28-evk",
->  	"fsl,imx28",
->  	NULL,
-> -- 
-> 1.7.9.5
-> 
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index 70bffa9..6a0912b 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -30,6 +30,23 @@
+ 				wp-gpios = <&gpio1 30 0>;
+ 				status = "okay";
+ 			};
++
++			pinctrl at 80018000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&hog_pins_a>;
++
++				hog_pins_a: hog-gpios at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x1123 /* MX23_PAD_LCD_RESET__GPIO_1_18 */
++						0x11d3 /* MX23_PAD_PWM3__GPIO_1_29 */
++						0x11e3 /* MX23_PAD_PWM4__GPIO_1_30 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++			};
+ 		};
+ 
+ 		apbx at 80040000 {
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 319c75a..505ae5e 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -44,6 +44,27 @@
+ 				wp-gpios = <&gpio0 28 0>;
+ 				status = "okay";
+ 			};
++
++			pinctrl at 80018000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&hog_pins_a>;
++
++				hog_pins_a: hog-gpios at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x20d3 /* MX28_PAD_SSP1_CMD__GPIO_2_13 */
++						0x20f3 /* MX28_PAD_SSP1_DATA3__GPIO_2_15 */
++						0x40d3 /* MX28_PAD_ENET0_RX_CLK__GPIO_4_13 */
++						0x20c3 /* MX28_PAD_SSP1_SCK__GPIO_2_12 */
++						0x31c3 /* MX28_PAD_PWM3__GPIO_3_28 */
++						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
++						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++			};
+ 		};
+ 
+ 		apbx at 80040000 {
+-- 
+1.7.5.4
