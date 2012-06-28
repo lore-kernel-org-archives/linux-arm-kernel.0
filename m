@@ -1,54 +1,78 @@
-From: neidhard.kim@lge.com (Kim, Jong-Sung)
-Date: Thu, 28 Jun 2012 15:08:39 +0900
-Subject: [PATCH] [RESEND] arm: limit memblock base address
- for	early_pte_alloc
-In-Reply-To: <20120627191801.GD25319@n2100.arm.linux.org.uk>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <025701cd457e$d5065410$7f12fc30$@lge.com>
- <20120627191801.GD25319@n2100.arm.linux.org.uk>
-Message-ID: <00e901cd54f4$76773650$6365a2f0$@lge.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Thu, 28 Jun 2012 14:14:39 +0800
+Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
+In-Reply-To: <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
+ <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FEBF64F.1010804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, June 28, 2012 4:18 AM
-> On Fri, Jun 08, 2012 at 10:58:50PM +0900, Kim, Jong-Sung wrote:
-> >
-> > May I suggest another simple approach? The first continuous couples of
-> > sections are always safely section-mapped inside alloc_init_section
-> funtion.
-> > So, by limiting memblock_alloc to the end of the first continuous
-> > couples of sections at the start of map_lowmem, map_lowmem can safely
-> > memblock_alloc & memset even if we have one or more section-unaligned
-> > memory regions. The limit can be extended back to arm_lowmem_limit after
-> the map_lowmem is done.
-> 
-> No.  What if the first block of memory is not large enough to handle all
-the
-> allocations?
-> 
-Thank you for your comment, Russell. I sent a modified patch not to limit to
-the first memory memblock_region as a reply to Dave's message.
-
-> I think the real problem is folk trying to reserve small amounts.  I have
-> said all reservations must be aligned to 1MB.
+Shawn Guo wrote:
+> The flexcan driver has function pointer transceiver_switch defined in
+> flexcan_platform_data for platform codes to hook up their transceiver
+> switch implementation.  However this does not cope with device tree
+> probe.
 >
-Ok, now I know your thought about arm_memblock_steal(). Then, how about
-adding a simple aligning to prevent the possible problem just like me:
+> It's been observed that platforms mostly use gpios to control the
+> switch of flexcan transceiver, like enable and standby.  The patch
+> adds transceiver switch gpios support into flexcan driver, so that
+> platforms booting from device tree can just define properties
+> phy-enable-gpios and phy-standby-gpios to have flexcan driver control
+> the gpios.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    2 +
+>  drivers/net/can/flexcan.c                          |   62 ++++++++++++++++++++
+>  2 files changed, 64 insertions(+), 0 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> index 8ff324e..e0dbac7 100644
+> --- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> +++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> @@ -15,6 +15,8 @@ Required properties:
+>  Optional properties:
+>  
+>  - clock-frequency : The oscillator frequency driving the flexcan device
+> +- phy-enable-gpios : Specify the gpio used to enable phy
+> +- phy-standby-gpios : Specify the gpio used to put phy into STANDBY mode
+>  
+>  Example:
+>  
+>   
+Do we need to add new added entries in the example section as well.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index f54d592..d0daf0d 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -324,6 +324,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size,
-phys
- 
-        BUG_ON(!arm_memblock_steal_permitted);
- 
-+       size = ALIGN(size, SECTION_SIZE);
-+
-        phys = memblock_alloc(size, align);
-        memblock_free(phys, size);
-        memblock_remove(phys, size);
+E.g.
 
-or, leaving a few comments about the restriction kindly..?
++        phy-enable-gpios = <&gpio1 4 0>; /* GPIO1_4, active high*/
++        phy-standby-gpios = <&gpio1 2 1>; /* GPIO1_2, active low */
+
+> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+> index 38c0690..1ce3f9e 100644
+> --- a/drivers/net/can/flexcan.c
+> +++ b/drivers/net/can/flexcan.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/can/platform/flexcan.h>
+>  #include <linux/clk.h>
+>  #include <linux/delay.h>
+> +#include <linux/gpio.h>
+>   
+It seems <linux/of_gpio.h> already unconditionally includes this header.
+>  #include <linux/if_arp.h>
+>  #include <linux/if_ether.h>
+>  #include <linux/interrupt.h>
+> @@ -34,6 +35,7 @@
+>  #include <linux/list.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pinctrl/consumer.h>
+>  
+>   
+
+Other looks fine to me.
+
+Regards,
+Hui.
