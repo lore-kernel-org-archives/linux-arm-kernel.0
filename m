@@ -1,57 +1,38 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 28 Jun 2012 07:22:14 +0200
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20459.59910.783086.760997@ipc1.ka-ro>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 28 Jun 2012 08:24:00 +0300
+Subject: [linux-pm] [PATCH v3 6/7] omap4: thermal: add basic CPU thermal
+ zone
+In-Reply-To: <4D68720C2E767A4AA6A8796D42C8EB59149DB0@BGSMSX101.gar.corp.intel.com>
+References: <4FEB4B57.6030109@dev.rtsoft.ru> <20120628051207.GF2471@besouro>
+ <4D68720C2E767A4AA6A8796D42C8EB59149DB0@BGSMSX101.gar.corp.intel.com>
+Message-ID: <20120628052400.GG2471@besouro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Durga,
 
-Shawn Guo writes:
-> The flexcan driver has function pointer transceiver_switch defined in
-> flexcan_platform_data for platform codes to hook up their transceiver
-> switch implementation.  However this does not cope with device tree
-> probe.
+On Thu, Jun 28, 2012 at 05:16:43AM +0000, R, Durgadoss wrote:
+> Hi,
 > 
-> It's been observed that platforms mostly use gpios to control the
-> switch of flexcan transceiver, like enable and standby.  The patch
-> adds transceiver switch gpios support into flexcan driver, so that
-> platforms booting from device tree can just define properties
-> phy-enable-gpios and phy-standby-gpios to have flexcan driver control
-> the gpios.
+> > > +
+> > > +	data = devm_kzalloc(bg_ptr->dev, sizeof(*data), GFP_KERNEL);
+> > > +	if (!data) {
+> > > +		dev_err(bg_ptr->dev, "kzalloc fail\n");
+> > > +		return -ENOMEM;
+> > > +	}
+> > > +	data->sensor_id = id;
+> > > +	data->bg_ptr = bg_ptr;
+> > > +	data->omap4_thermal = thermal_zone_device_register(domain, 0,
+> > > +				data, &omap4_thermal_ops, 0, 0, 0, 0);
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    2 +
->  drivers/net/can/flexcan.c                          |   62 ++++++++++++++++++++
->  2 files changed, 64 insertions(+), 0 deletions(-)
+> Please watch out for changes on this API.
+> The third argument is the flag for writeable trip points.
+> This patch is in linux-next. So, kindly have a look at this API
+> implementation in thermal_sys.c in linux-next, when you submit this patch
+> next time.
+
+Ok. Thanks for the heads up. I will have a look on linux-next.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> index 8ff324e..e0dbac7 100644
-> --- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> +++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> @@ -15,6 +15,8 @@ Required properties:
->  Optional properties:
->  
->  - clock-frequency : The oscillator frequency driving the flexcan device
-> +- phy-enable-gpios : Specify the gpio used to enable phy
-> +- phy-standby-gpios : Specify the gpio used to put phy into STANDBY mode
->  
-Why the plural form 'gpios'? It's just one gpio.
-s/gpios/gpio/ ?
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> Thanks,
+> Durga
