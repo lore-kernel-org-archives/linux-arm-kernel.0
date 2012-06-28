@@ -1,53 +1,207 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 28 Jun 2012 09:59:03 +0800
-Subject: [PATCH v7 06/14] USB: Chipidea: rename struct ci13xxx variables
- from udc to ci
-In-Reply-To: <4FEAFFB7.7010906@pengutronix.de>
-References: <1340607391-16380-1-git-send-email-richard.zhao@freescale.com>
- <1340607391-16380-7-git-send-email-richard.zhao@freescale.com>
- <4FEAFFB7.7010906@pengutronix.de>
-Message-ID: <20120628015902.GA14953@b20223-02.ap.freescale.net>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Wed, 27 Jun 2012 18:59:43 -0700
+Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix issues.
+In-Reply-To: <1339690919-12566-1-git-send-email-Russ.Dill@ti.com>
+References: <1339690919-12566-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <1340848783-9480-1-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 02:42:31PM +0200, Marc Kleine-Budde wrote:
-> On 06/25/2012 08:56 AM, Richard Zhao wrote:
-> > struct ci13xxx represent the controller, which may be device or host,
-> > so name its variables as ci.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> 
-> nitpick: search-replace problem
-> 
-> > --- a/drivers/usb/chipidea/udc.c
-> > +++ b/drivers/usb/chipidea/udc.c
-> > @@ -1,5 +1,5 @@
-> >  /*
-> > - * udc.c - ChipIdea UDC driver
-> > + * ci.c - ChipIdea UDC driver
->       ^^^^
-Nice catch!
+From: Russ Dill <Russ.Dill@gmail.com>
 
-Thanks
-Richard
-> 
-> :)
-> 
-> >   *
-> >   * Copyright (C) 2008 Chipidea - MIPS Technologies, Inc. All rights reserved.
-> >   *
-> > @@ -66,11 +66,11 @@ static inline int hw_ep_bit(int num, int dir)
-> >  	return num + (dir ? 16 : 0);
-> >  }
-> >  
-> 
-> Marc
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
+an issue where the ULPI PHYs were not held in reset while initializing
+the EHCI controller. However, it also changes behavior in
+omap-usb-host.c omap_usbhs_init by releasing reset while the
+configuration in that function was done.
+
+This change caused a regression on BB-xM where USB would not function
+if 'usb start' had been run from u-boot before booting. A change was
+made to release reset a little bit earlier which fixed the issue on
+BB-xM and did not cause any regressions on 3430 sdp, the board for
+which the fix was originally made.
+
+This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
+before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+
+The original fix to hold the EHCI controller in reset during
+initialization was correct, however it appears that changing
+omap_usbhs_init to not hold the PHYs in reset during it's
+configuration was incorrect. This patch first reverts both fixes, and
+then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
+reset as the original patch had done. It also is sure to incorporate
+the _cansleep change that has been made in the meantime.
+
+Tested on Beagleboard xM.
+
+v3 - Don't double free gpio
+v2 - Put cansleep gpiolib call outside of spinlock
+
+Signed-off-by: Russ Dill <Russ.Dill@gmail.com>
+---
+ drivers/mfd/omap-usb-host.c  |   48 +++++++++++++++++++++++++++++++++++++++++-
+ drivers/usb/host/ehci-omap.c |   26 +++++++----------------
+ 2 files changed, 55 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 7e96bb2..41088ec 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -25,6 +25,7 @@
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/spinlock.h>
++#include <linux/gpio.h>
+ #include <plat/cpu.h>
+ #include <plat/usb.h>
+ #include <linux/pm_runtime.h>
+@@ -500,8 +501,21 @@ static void omap_usbhs_init(struct device *dev)
+ 	dev_dbg(dev, "starting TI HSUSB Controller\n");
+ 
+ 	pm_runtime_get_sync(dev);
+-	spin_lock_irqsave(&omap->lock, flags);
+ 
++	if (pdata->ehci_data->phy_reset) {
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
++			gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
++					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
++			gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
++					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
++
++		/* Hold the PHY in RESET for enough time till DIR is high */
++		udelay(10);
++	}
++
++	spin_lock_irqsave(&omap->lock, flags);
+ 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
+ 	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
+ 
+@@ -581,9 +595,39 @@ static void omap_usbhs_init(struct device *dev)
+ 	}
+ 
+ 	spin_unlock_irqrestore(&omap->lock, flags);
++
++	if (pdata->ehci_data->phy_reset) {
++		/* Hold the PHY in RESET for enough time till
++		 * PHY is settled and ready
++		 */
++		udelay(10);
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
++			gpio_set_value_cansleep
++				(pdata->ehci_data->reset_gpio_port[0], 1);
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
++			gpio_set_value_cansleep
++				(pdata->ehci_data->reset_gpio_port[1], 1);
++	}
++
+ 	pm_runtime_put_sync(dev);
+ }
+ 
++static void omap_usbhs_deinit(struct device *dev)
++{
++	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
++	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
++
++	if (pdata->ehci_data->phy_reset) {
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
++			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
++
++		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
++			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
++	}
++}
++
+ 
+ /**
+  * usbhs_omap_probe - initialize TI-based HCDs
+@@ -767,6 +811,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+ 	goto end_probe;
+ 
+ err_alloc:
++	omap_usbhs_deinit(&pdev->dev);
+ 	iounmap(omap->tll_base);
+ 
+ err_tll:
+@@ -818,6 +863,7 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
+ {
+ 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
+ 
++	omap_usbhs_deinit(&pdev->dev);
+ 	iounmap(omap->tll_base);
+ 	iounmap(omap->uhh_base);
+ 	clk_put(omap->init_60m_fclk);
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index a44294d..35f4788 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -192,14 +192,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/* Hold PHYs in reset while initializing EHCI controller */
+ 	if (pdata->phy_reset) {
+ 		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+-			gpio_request_one(pdata->reset_gpio_port[0],
+-					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
++			gpio_set_value_cansleep(pdata->reset_gpio_port[0], 0);
+ 
+ 		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+-			gpio_request_one(pdata->reset_gpio_port[1],
+-					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
++			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 0);
+ 
+ 		/* Hold the PHY in RESET for enough time till DIR is high */
+ 		udelay(10);
+@@ -241,6 +240,11 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
+ 
+ 	ehci_reset(omap_ehci);
++	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
++	if (ret) {
++		dev_err(dev, "failed to add hcd with err %d\n", ret);
++		goto err_add_hcd;
++	}
+ 
+ 	if (pdata->phy_reset) {
+ 		/* Hold the PHY in RESET for enough time till
+@@ -255,12 +259,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 1);
+ 	}
+ 
+-	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+-	if (ret) {
+-		dev_err(dev, "failed to add hcd with err %d\n", ret);
+-		goto err_add_hcd;
+-	}
+-
+ 	/* root ports should always stay powered */
+ 	ehci_port_power(omap_ehci, 1);
+ 
+@@ -288,7 +286,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev				= &pdev->dev;
+ 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
+-	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
+ 
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+@@ -297,13 +294,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
+ 
+-	if (pdata->phy_reset) {
+-		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+-			gpio_free(pdata->reset_gpio_port[0]);
+-
+-		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+-			gpio_free(pdata->reset_gpio_port[1]);
+-	}
+ 	return 0;
+ }
+ 
+-- 
+1.7.10.4
