@@ -1,34 +1,46 @@
 From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Thu, 28 Jun 2012 21:28:50 +0530
-Subject: how to specify dma_mask and coherent_dma_mask in hwmod
-In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
-References: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
-Message-ID: <CAAe_U6L7hMyxEYTOHShkcivdB91PxKa5OA7Q0w2Lw6zyXjXYXw@mail.gmail.com>
+Date: Thu, 28 Jun 2012 21:33:11 +0530
+Subject: [PATCHv11 3/6] i2c: omap: Do not initialise the completion
+ everytime
+In-Reply-To: <1340896292-12112-4-git-send-email-shubhrajyoti@ti.com>
+References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
+ <1340896292-12112-4-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <CAAe_U6Jtoj3mixvp+vqNmkr-RC28AfNqZ0syEE5voEr+Odv3zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jun 27, 2012 at 11:11 AM, N, Mugunthan V <mugunthanvnm@ti.com> wrote:
->> -----Original Message-----
->> From: N, Mugunthan V
->> Sent: Thursday, June 07, 2012 9:52 PM
->> To: 'linux-omap at vger.kernel.org'
->> Cc: 'linux-arm-kernel at lists.infradead.org'
->> Subject: how to specify dma_mask and coherent_dma_mask in hwmod
->>
->> Hi
->>
->> While converting platform device registry to Hwmod for CPSW Ethernet
->> driver which is present in AM335X (OMAP2+), I am not finding a way to
->> specify
->> dma_mask and coherent_dma_mask.
->> Is there a way to specify dma_mask and coherent_dma_mask in hwmod?
+On Thu, Jun 28, 2012 at 8:41 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+> Use INIT_COMPLETION instead of init_completion in transfer.
 >
-> Ping, any one has comment on this?
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+> - Add Felipe's reviewed-by tag
 >
-Nope. You can specify dma_mask after creating the device as done in
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/usb-musb.c;h=c4a576856661014ea3bec9acc70f80e32d62c33b;hb=HEAD
+> ?drivers/i2c/busses/i2c-omap.c | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index b9915bb..6d05f18 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -490,7 +490,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+> ? ? ? ?w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
+> ? ? ? ?omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
+>
+> - ? ? ? init_completion(&dev->cmd_complete);
+> + ? ? ? INIT_COMPLETION(dev->cmd_complete);
+> ? ? ? ?dev->cmd_err = 0;
+>
+> ? ? ? ?w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
+> @@ -999,6 +999,7 @@ omap_i2c_probe(struct platform_device *pdev)
+> ? ? ? ?}
+>
+> ? ? ? ?platform_set_drvdata(pdev, dev);
+> + ? ? ? init_completion(&dev->cmd_complete);
+It should be INIT_COMPLETION here too.
 
-Regards
+Thanks
 Kishon
