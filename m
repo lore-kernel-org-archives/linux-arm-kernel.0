@@ -1,91 +1,86 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 11:45:03 +0800
-Subject: [PATCH 07/11] ARM: dts: imx28-evk: add flexan devices
+Date: Thu, 28 Jun 2012 11:45:00 +0800
+Subject: [PATCH 04/11] ARM: dts: imx23-evk: add auart device
 In-Reply-To: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
 References: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1340855107-4664-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1340855107-4664-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add flexan devices for imx28-evk board.
+Add auart device for imx23-evk board.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx28-evk.dts |   13 +++++++++++++
- arch/arm/boot/dts/imx28.dtsi    |   24 ++++++++++++++++++++++++
- 2 files changed, 37 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx23-evk.dts |    6 ++++++
+ arch/arm/boot/dts/imx23.dtsi    |   19 +++++++++++++++++++
+ 2 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index cf2ab2e..17bf6cf 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -65,6 +65,19 @@
- 					fsl,pull-up = <0>;
- 				};
- 			};
-+
-+			can0: can at 80032000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&can0_pins_a>;
-+				phy-enable-gpios = <&gpio2 13 0>;
-+				status = "okay";
-+			};
-+
-+			can1: can at 80034000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&can1_pins_a>;
-+				status = "okay";
-+			};
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index 8321fa3..9eca34f 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -51,6 +51,12 @@
  		};
  
  		apbx at 80040000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 42d6078..03ddaac 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -364,6 +364,28 @@
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <1>;
++			auart0: serial at 8006c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart0_pins_a>;
++				status = "okay";
++			};
++
+ 			duart: serial at 80070000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&duart_pins_a>;
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index daade4f..e78c1f4 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -18,6 +18,8 @@
+ 		gpio0 = &gpio0;
+ 		gpio1 = &gpio1;
+ 		gpio2 = &gpio2;
++		serial0 = &auart0;
++		serial1 = &auart1;
+ 	};
+ 
+ 	cpus {
+@@ -123,6 +125,19 @@
+ 					fsl,pull-up = <0>;
  				};
-+
-+				can0_pins_a: can0 at 0 {
+ 
++				auart0_pins_a: auart0 at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						0x0161 /* MX28_PAD_GPMI_RDY2__CAN0_TX */
-+						0x0171 /* MX28_PAD_GPMI_RDY3__CAN0_RX */
++						0x01c0 /* MX23_PAD_AUART1_RX__AUART1_RX */
++						0x01d0 /* MX23_PAD_AUART1_TX__AUART1_TX */
++						0x01a0 /* MX23_PAD_AUART1_CTS__AUART1_CTS */
++						0x01b0 /* MX23_PAD_AUART1_RTS__AUART1_RTS */
 +					>;
 +					fsl,drive-strength = <0>;
 +					fsl,voltage = <1>;
 +					fsl,pull-up = <0>;
 +				};
 +
-+				can1_pins_a: can1 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x0121 /* MX28_PAD_GPMI_CE2N__CAN1_TX */
-+						0x0131 /* MX28_PAD_GPMI_CE3N__CAN1_RX */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
+ 				mmc0_4bit_pins_a: mmc0-4bit at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+@@ -289,12 +304,16 @@
  			};
  
- 			digctl at 8001c000 {
-@@ -411,12 +433,14 @@
- 			};
- 
- 			can0: can at 80032000 {
-+				compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x80032000 2000>;
- 				interrupts = <8>;
+ 			auart0: serial@8006c000 {
++				compatible = "fsl,imx23-auart";
+ 				reg = <0x8006c000 0x2000>;
++				interrupts = <24 25 23>;
  				status = "disabled";
  			};
  
- 			can1: can at 80034000 {
-+				compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x80034000 2000>;
- 				interrupts = <9>;
+ 			auart1: serial at 8006e000 {
++				compatible = "fsl,imx23-auart";
+ 				reg = <0x8006e000 0x2000>;
++				interrupts = <59 60 58>;
  				status = "disabled";
+ 			};
+ 
 -- 
 1.7.5.4
