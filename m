@@ -1,41 +1,37 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 28 Jun 2012 11:37:18 +0800
-Subject: [PATCH v8 01/14] usb: chipidea: remove unneeded NULL check
+Date: Thu, 28 Jun 2012 11:37:20 +0800
+Subject: [PATCH v8 03/14] usb: chipidea: msm: add missing section annotation
 In-Reply-To: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
 References: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340854652-24717-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340854652-24717-4-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+From: Felipe Balbi <balbi@ti.com>
 
-As reported by Dan Carpenter, there is a NULL check in udc_start() that
-follows a dereference of the pointer that's being checked. However, at
-that point udc pointer shouldn't ever be NULL and if it is, the dereference
-should cause an oops.
+No functional changes, it will just free up some
+code if we don't have hotplug.
 
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 Acked-by: Marek Vasut <marex@denx.de>
 ---
- drivers/usb/chipidea/udc.c |    3 ---
- 1 file changed, 3 deletions(-)
+ drivers/usb/chipidea/ci13xxx_msm.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 51f9694..cdb9212 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1647,9 +1647,6 @@ static int udc_start(struct ci13xxx *udc)
- 	struct device *dev = udc->dev;
- 	int retval = 0;
+diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
+index 958069e..8d438b8 100644
+--- a/drivers/usb/chipidea/ci13xxx_msm.c
++++ b/drivers/usb/chipidea/ci13xxx_msm.c
+@@ -55,7 +55,7 @@ static struct ci13xxx_udc_driver ci13xxx_msm_udc_driver = {
+ 	.notify_event		= ci13xxx_msm_notify_event,
+ };
  
--	if (!udc)
--		return -EINVAL;
--
- 	spin_lock_init(&udc->lock);
- 
- 	udc->gadget.ops          = &usb_gadget_ops;
+-static int ci13xxx_msm_probe(struct platform_device *pdev)
++static int __devinit ci13xxx_msm_probe(struct platform_device *pdev)
+ {
+ 	struct platform_device *plat_ci;
+ 	int ret;
 -- 
 1.7.9.5
