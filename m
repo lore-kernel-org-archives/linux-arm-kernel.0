@@ -1,33 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jun 2012 14:30:21 +0000
-Subject: RF231 transceiver on at91sam9g20ek board
-In-Reply-To: <CAJmB2rBcRuNe0QfEGoJN1rQnRnr33gyE=nLt3Az=mGEWuR7mCg@mail.gmail.com>
-References: <CAJmB2rDxv45OP4otn7rmQcpzCvLujKm0j9_OqNW6PoyHuarTLw@mail.gmail.com>
- <201206221834.41869.arnd@arndb.de>
- <CAJmB2rBcRuNe0QfEGoJN1rQnRnr33gyE=nLt3Az=mGEWuR7mCg@mail.gmail.com>
-Message-ID: <201206281430.21916.arnd@arndb.de>
+Date: Thu, 28 Jun 2012 14:32:23 +0000
+Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
+In-Reply-To: <20120628114616.GE28922@opensource.wolfsonmicro.com>
+References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
+ <201206281121.56769.arnd@arndb.de>
+ <20120628114616.GE28922@opensource.wolfsonmicro.com>
+Message-ID: <201206281432.24061.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 June 2012, Alexander Smirnov wrote:
-> >
-> > It might not be the problem you are faced with but note that at91
-> > is moving towards probing all devices using the device tree, so
-> > starting with linux-3.4 you should be defining the device in the
-> > at91sam9g20ek.dts file for your board and use the generic
-> > board-dt.c file. The platform_data gets replaced with
-> > calls to of_get_gpio() in that case.
+On Thursday 28 June 2012, Mark Brown wrote:
+> Show Details
+>   On Thu, Jun 28, 2012 at 11:21:56AM +0000, Arnd Bergmann wrote:
 > 
-> Thank you for the reply!
+> > What platform is this driver for?
+> >  - If it's for an existing platform that does not have DT support, please
+> >    include the platform changes for that platform so we can see what gets
+> >    done in there.
 > 
-> Are you going to add SPI section to the device tree in the nearest
-> future or I can do it by myself and send you the patch? The reason is
-> that this week I merged at86rf230 driver to the 'net-next' tree, but
-> it won't work without platform data.
+> This is really not normal practice for device drivers, it'd be a serious
+> obstacle to getting drivers integrated if we have to have a board merged
+> with every driver.
 
-Jean-Christophe or Nicolas might now what the status is for atmel-spi.
-It seems like it would be trivial to just add the compatible string in
-the atmel-spi driver, which would let us probe all of its child devices
-using DT.
+But it would be very helpful to see how the platform data is set, especially
+with the callback. If the callback is just there to set up a regulator
+or clock, then it should be changed to a more generic way.
 
 	Arnd
