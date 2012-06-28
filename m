@@ -1,27 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 17:09:30 +0800
-Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
-In-Reply-To: <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
-References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
- <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
-Message-ID: <20120628090927.GB22990@S2101-09.ap.freescale.net>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 28 Jun 2012 10:23:21 +0100
+Subject: [PATCH 3/3] arm: mach-mvebu: system-controller only registers
+ restart if device exists
+In-Reply-To: <20120627191932.GE25319@n2100.arm.linux.org.uk>
+References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+ <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1340814406-26010-4-git-send-email-ben.dooks@codethink.co.uk>
+ <20120627191932.GE25319@n2100.arm.linux.org.uk>
+Message-ID: <4FEC2289.80808@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 27/06/12 20:19, Russell King - ARM Linux wrote:
+> On Wed, Jun 27, 2012 at 05:26:46PM +0100, Ben Dooks wrote:
+>> Change to only registering the restart hook if the device exists
+>> and can be enumerated in the device tree. Remove the header definiton
+>> and the restart entry in the machine file.
+>
+> NAK.  Please use the .restart method in the machine description rather
+> than directly using arm_pm_restart.  Thanks.
+>
+> arm_pm_restart only continues to exist because I could not work out how
+> to stop AT91 from using it.
 
-On Mon, Jun 11, 2012 at 12:47:15PM +0800, Shawn Guo wrote:
-> Shawn Guo (2):
->       ARM: imx6q: remove unneeded clkdev lookups
-
-We agreed that this one is actually a cleanup and can be held off
-until 3.6 ...
-
->       ARM: imx6q: fix suspend regression caused by common clk migration
-
-... but this is one is indeed a fix, which seems missed from your
-pull-request to Linus.
+So what should you do if your board doesn't support this method of
+resetting?
 
 -- 
-Regards,
-Shawn
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
