@@ -1,79 +1,171 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 28 Jun 2012 20:47:37 +0800
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20460.20182.552394.407578@ipc1.ka-ro>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <20120628113327.GJ6406@shlinux2.ap.freescale.net>
- <20120628114559.GE22990@S2101-09.ap.freescale.net>
- <4FEC487A.2050901@pengutronix.de>
- <20120628121817.GA5755@shlinux2.ap.freescale.net>
- <20460.20182.552394.407578@ipc1.ka-ro>
-Message-ID: <20120628124736.GA5778@shlinux2.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 28 Jun 2012 14:56:39 +0200
+Subject: [PATCH v12 1/2] MTD: at91: add dt parameters for Atmel PMECC
+In-Reply-To: <1340871698-477-2-git-send-email-josh.wu@atmel.com>
+References: <1340871698-477-1-git-send-email-josh.wu@atmel.com>
+ <1340871698-477-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <4FEC5487.7020904@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 08:32:22PM +0800, Lothar Wa?mann wrote:
-> Hi,
+On 06/28/2012 10:21 AM, Josh Wu :
+> Add DT support for PMECC parameters.
 > 
-> Dong Aisheng writes:
-> > On Thu, Jun 28, 2012 at 08:05:14PM +0800, Marc Kleine-Budde wrote:
-> > > On 06/28/2012 01:46 PM, Shawn Guo wrote:
-> > > > On Thu, Jun 28, 2012 at 07:33:28PM +0800, Dong Aisheng wrote:
-> > > >>> +		phy_stby_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
-> > > >>> +							"phy-standby-gpios",
-> > > >>> +							0, &flags);
-> > > >>> +		if (gpio_is_valid(phy_stby_gpio)) {
-> > > >>> +			if (flags == OF_GPIO_ACTIVE_LOW)
-> > > >>> +				phy_stby_high = false;
-> > > >>> +			err = devm_gpio_request_one(&pdev->dev, phy_stby_gpio,
-> > > >>> +						    GPIOF_DIR_OUT,
-> > > >>> +						    "phy-standby");
-> > > >>> +			if (err) {
-> > > >>> +				dev_err(&pdev->dev,
-> > > >>> +					"failed to request gpio %d: %d\n",
-> > > >>> +					phy_stby_gpio, err);
-> > > >>> +				goto failed_gpio;
-> > > >> I checked mx28 evk, it seems the phy only has a STB gpio and shared by both CAN0&CAN1.
-> > > >> I wonder the CAN1 probe may fail here.
-> > > >>
-> > > > It can be managed by dts.  Here is what I have in imx28-evk.dts, where
-> > > > only can0 has phy-enable-gpios property.
-> > > > 
-> > > > 
-> > > > 	can0: can at 80032000 {
-> > > > 		pinctrl-names = "default";
-> > > > 		pinctrl-0 = <&can0_pins_a>;
-> > > > 		phy-enable-gpios = <&gpio2 13 0>;
-> > > > 		status = "okay";
-> > > > 	};
-> > > > 
-> > > > 	can1: can at 80034000 {
-> > > > 		pinctrl-names = "default";
-> > > > 		pinctrl-0 = <&can1_pins_a>;
-> > > > 		status = "okay";
-> > > > 	};
-> > > 
-> > > Will this work if can0 is down and can1 is up?
-> > > 
-> > > Can we abstract the transceiver power as a regulator? Or a clock? :P
-> > > 
-> > Hmm, it may not be a power.
-> > For mx28evk, it's a STBY pin.
-> > So it may hard to abstract it as a regulator or clock.
-> > 
-> I have created a 'gpio-switch' driver in my private tree that can be
-> used for exactly this purpose. It takes care of the pin polarity and
-> initial state of the pins and can handle shared pins like in this
-> case. The client driver does not even need to care whether an actual
-> GPIO exists for the current platform.
-> 
-> I could prepare a patch and post it here.
-> 
-Would be glad to see your patches.
-It may be useful, not only for this case,
-we also meet some other issues, i'm not sure but may have similar requirement
-like SDIO WiFi reset, usb phy reset and etc.
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Regards
-Dong Aisheng
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+> changes:
+> since v11
+>    1. update the documentation for reg parameter
+>    2. add one example for PMECC support.
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         |   40 ++++++++++++++-
+>  drivers/mtd/nand/atmel_nand.c                      |   52 +++++++++++++++++++-
+>  2 files changed, 90 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> index a200695..d555421 100644
+> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> @@ -3,7 +3,9 @@ Atmel NAND flash
+>  Required properties:
+>  - compatible : "atmel,at91rm9200-nand".
+>  - reg : should specify localbus address and size used for the chip,
+> -	and if availlable the ECC.
+> +	and hardware ECC controller if available.
+> +	If the hardware ECC is PMECC, it should contain address and size for
+> +	PMECC, PMECC Error Location controller and ROM which has lookup tables.
+>  - atmel,nand-addr-offset : offset for the address latch.
+>  - atmel,nand-cmd-offset : offset for the command latch.
+>  - #address-cells, #size-cells : Must be present if the device has sub-nodes
+> @@ -16,6 +18,15 @@ Optional properties:
+>  - nand-ecc-mode : String, operation mode of the NAND ecc mode, soft by default.
+>    Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
+>    "soft_bch".
+> +- atmel,has-pmecc : boolean to enable Programmable Multibit ECC hardware.
+> +  Only supported by at91sam9x5 or later sam9 product.
+> +- atmel,pmecc-cap : error correct capability for Programmable Multibit ECC
+> +  Controller. Supported values are: 2, 4, 8, 12, 24.
+> +- atmel,pmecc-sector-size : sector size for ECC computation. Supported values
+> +  are: 512, 1024.
+> +- atmel,pmecc-lookup-table-offset : includes two offsets of lookup table in ROM
+> +  for different sector size. First one is for sector size 512, the next is for
+> +  sector size 1024.
+>  - nand-bus-width : 8 or 16 bus width if not present 8
+>  - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+>  
+> @@ -39,3 +50,30 @@ nand0: nand at 40000000,0 {
+>  		...
+>  	};
+>  };
+> +
+> +/* for PMECC supported chips */
+> +nand0: nand at 40000000 {
+> +	compatible = "atmel,at91rm9200-nand";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	reg = < 0x40000000 0x10000000	/* bus addr & size */
+> +		0xffffe000 0x00000600	/* PMECC addr & size */
+> +		0xffffe600 0x00000200	/* PMECC ERRLOC addr & size */
+> +		0x00100000 0x00100000	/* ROM addr & size */
+> +		>;
+> +	atmel,nand-addr-offset = <21>;	/* ale */
+> +	atmel,nand-cmd-offset = <22>;	/* cle */
+> +	nand-on-flash-bbt;
+> +	nand-ecc-mode = "hw";
+> +	atmel,has-pmecc;	/* enable PMECC */
+> +	atmel,pmecc-cap = <2>;
+> +	atmel,pmecc-sector-size = <512>;
+> +	atmel,pmecc-lookup-table-offset = <0x8000 0x10000>;
+> +	gpios = <&pioD 5 0	/* rdy */
+> +		 &pioD 4 0	/* nce */
+> +		 0		/* cd */
+> +		>;
+> +	partition at 0 {
+> +		...
+> +	};
+> +};
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 7a41a04..b97ad9f 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -93,6 +93,11 @@ struct atmel_nand_host {
+>  
+>  	struct completion	comp;
+>  	struct dma_chan		*dma_chan;
+> +
+> +	bool			has_pmecc;
+> +	u8			pmecc_corr_cap;
+> +	u16			pmecc_sector_size;
+> +	u32			pmecc_lookup_table_offset;
+>  };
+>  
+>  static int cpu_has_dma(void)
+> @@ -481,7 +486,8 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
+>  static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
+>  					 struct device_node *np)
+>  {
+> -	u32 val;
+> +	u32 val, table_offset;
+> +	u32 offset[2];
+>  	int ecc_mode;
+>  	struct atmel_nand_data *board = &host->board;
+>  	enum of_gpio_flags flags;
+> @@ -517,6 +523,50 @@ static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
+>  	board->enable_pin = of_get_gpio(np, 1);
+>  	board->det_pin = of_get_gpio(np, 2);
+>  
+> +	host->has_pmecc = of_property_read_bool(np, "atmel,has-pmecc");
+> +
+> +	if (!(board->ecc_mode == NAND_ECC_HW) || !host->has_pmecc)
+> +		return 0;	/* Not using PMECC */
+> +
+> +	/* use PMECC, get correction capability, sector size and lookup
+> +	 * table offset.
+> +	 */
+> +	if (of_property_read_u32(np, "atmel,pmecc-cap", &val) != 0) {
+> +		dev_err(host->dev, "Cannot decide PMECC Capability\n");
+> +		return -EINVAL;
+> +	} else if ((val != 2) && (val != 4) && (val != 8) && (val != 12) &&
+> +	    (val != 24)) {
+> +		dev_err(host->dev,
+> +			"Unsupported PMECC correction capability: %d; should be 2, 4, 8, 12 or 24\n",
+> +			val);
+> +		return -EINVAL;
+> +	}
+> +	host->pmecc_corr_cap = (u8)val;
+> +
+> +	if (of_property_read_u32(np, "atmel,pmecc-sector-size", &val) != 0) {
+> +		dev_err(host->dev, "Cannot decide PMECC Sector Size\n");
+> +		return -EINVAL;
+> +	} else if ((val != 512) && (val != 1024)) {
+> +		dev_err(host->dev,
+> +			"Unsupported PMECC sector size: %d; should be 512 or 1024 bytes\n",
+> +			val);
+> +		return -EINVAL;
+> +	}
+> +	host->pmecc_sector_size = (u16)val;
+> +
+> +	if (of_property_read_u32_array(np, "atmel,pmecc-lookup-table-offset",
+> +			offset, 2) != 0) {
+> +		dev_err(host->dev, "Cannot get PMECC lookup table offset\n");
+> +		return -EINVAL;
+> +	}
+> +	table_offset = host->pmecc_sector_size == 512 ? offset[0] : offset[1];
+> +
+> +	if (!table_offset) {
+> +		dev_err(host->dev, "Invalid PMECC lookup table offset\n");
+> +		return -EINVAL;
+> +	}
+> +	host->pmecc_lookup_table_offset = table_offset;
+> +
+>  	return 0;
+>  }
+>  #else
+> 
+
+
+-- 
+Nicolas Ferre
