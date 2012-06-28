@@ -1,24 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 13:30:40 +0800
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20459.59910.783086.760997@ipc1.ka-ro>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <20459.59910.783086.760997@ipc1.ka-ro>
-Message-ID: <20120628053038.GC30041@S2101-09.ap.freescale.net>
+From: neidhard.kim@lge.com (Kim, Jong-Sung)
+Date: Thu, 28 Jun 2012 14:43:17 +0900
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <20120627160220.GA2310@linaro.org>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <025701cd457e$d5065410$7f12fc30$@lge.com> <20120627160220.GA2310@linaro.org>
+Message-ID: <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 07:22:14AM +0200, Lothar Wa?mann wrote:
-> > +- phy-enable-gpios : Specify the gpio used to enable phy
-> > +- phy-standby-gpios : Specify the gpio used to put phy into STANDBY mode
-> >  
-> Why the plural form 'gpios'? It's just one gpio.
-> s/gpios/gpio/ ?
+> From: Dave Martin [mailto:dave.martin at linaro.org]
+> Sent: Thursday, June 28, 2012 1:02 AM
 > 
-It's a common pattern suggested by common gpio bindings
-Documentation/devicetree/bindings/gpio/gpio.txt.
+> For me, it appears that this block just contains the initial region passed
+> in ATAG_MEM or on the command line, with some reservations for
+> swapper_pg_dir, the kernel text/data, device tree and initramfs.
+> 
+> So far as I can tell, the only memory guaranteed to be mapped here is the
+> kernel image: there may be no guarantee that there is any unused space in
+> this region which could be used to allocate extra page tables.
+> The rest appears during the execution of map_lowmem().
+> 
+> Cheers
+> ---Dave
 
--- 
-Regards,
-Shawn
+Thank you for your comment, Dave! It was not that sophisticated choice, but
+I thought that normal embedded system trying to reduce the BOM would have a
+big-enough first memblock memory region. However you're right. There can be
+exceptional systems. Then, how do you think about following manner:
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e5dad60..0bc5316 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1094,6 +1094,16 @@ static void __init kmap_init(void)
+ static void __init map_lowmem(void)
+ {
+        struct memblock_region *reg;
++       phys_addr_t pmd_map_end = 0;
++
++       for_each_memblock(memory, reg) {
++               pmd_map_end = reg->base + reg->size;
++               if((reg->base | reg->size) & ~PMD_MASK)
++                       break;
++       }
++       if(pmd_map_end > lowmem_limit)
++               pmd_map_end = lowmem_limit;
++       memblock_set_current_limit(pmd_map_end & PMD_MASK);
+ 
+        /* Map all the lowmem memory banks. */
+        for_each_memblock(memory, reg) {
+@@ -1113,6 +1123,8 @@ static void __init map_lowmem(void)
+ 
+                create_mapping(&map);
+        }
++
++       memblock_set_current_limit(lowmem_limit);
+ }
+ 
+ /*
+@@ -1123,8 +1135,6 @@ void __init paging_init(struct machine_desc *mdesc)
+ {
+        void *zero_page;
+ 
+-       memblock_set_current_limit(arm_lowmem_limit);
+-
+        build_mem_type_table();
+        prepare_page_table();
+        map_lowmem();
+
+This will not limit the PTE-allocation to near the end of first bank.
