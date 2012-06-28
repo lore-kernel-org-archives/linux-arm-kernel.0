@@ -1,34 +1,111 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 28 Jun 2012 17:21:02 +0530
-Subject: [PATCH v1 06/11] arm/dts: Add twl6030-usb data
+Date: Thu, 28 Jun 2012 17:21:03 +0530
+Subject: [PATCH v1 07/11] drivers: usb: twl4030: Add device tree support for
+ twl4030 usb
 In-Reply-To: <1340884267-28908-1-git-send-email-kishon@ti.com>
 References: <1340884267-28908-1-git-send-email-kishon@ti.com>
-Message-ID: <1340884267-28908-7-git-send-email-kishon@ti.com>
+Message-ID: <1340884267-28908-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add twl6030-usb data node in twl6030 device tree file
+Add device tree support for twl6030 usb driver.
+Update the Documentation with device tree binding information.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/twl6030.dtsi |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/usb/twlxxxx-usb.txt        |   19 +++++++++++++
+ drivers/usb/otg/twl4030-usb.c                      |   28 +++++++++++++++----
+ 2 files changed, 41 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-index 3b2f351..6526366 100644
---- a/arch/arm/boot/dts/twl6030.dtsi
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -83,4 +83,11 @@
- 	clk32kg: regulator at 12 {
- 		compatible = "ti,twl6030-clk32kg";
- 	};
-+
-+	twl6030-usb {
-+		compatible = "ti,twl6030-usb";
-+		interrupts = < 4 10 >;
-+		regulator = "vusb";
-+		vusb-supply = <&vusb>;
-+	};
+diff --git a/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt b/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+index f293271..2d069e4 100644
+--- a/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
++++ b/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+@@ -16,3 +16,22 @@ twl6030-usb {
+ 	regulator = "vusb";
+ 	vusb-supply = <&vusb>;
  };
++
++TWL4030 USB PHY AND COMPARATOR
++ - compatible : Should be "ti,twl4030-usb"
++ - interrupts : The interrupt numbers to the cpu should be specified. First
++   interrupt number is the otg interrupt number that raises ID interrupts
++   and VBUS interrupts. The second interrupt number is optional.
++ - <supply-name>-supply : phandle to the regulator device tree node.
++   <supply-name> should be vusb1v5, vusb1v8 and vusb3v1
++ - usb_mode : The mode used by the phy to connect to the controller. "1"
++   specifies "ULPI" mode and "2" specifies "CEA2011_3PIN" mode.
++
++twl4030-usb {
++	compatible = "ti,twl4030-usb";
++	interrupts = < 10 4 >;
++	vusb1v5-supply = <&vusb1v5>;
++	vusb1v8-supply = <&vusb1v8>;
++	vusb3v1-supply = <&vusb3v1>;
++	usb_mode = <1>;
++};
+diff --git a/drivers/usb/otg/twl4030-usb.c b/drivers/usb/otg/twl4030-usb.c
+index 523cad5..a4e7434 100644
+--- a/drivers/usb/otg/twl4030-usb.c
++++ b/drivers/usb/otg/twl4030-usb.c
+@@ -585,23 +585,28 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
+ 	struct twl4030_usb	*twl;
+ 	int			status, err;
+ 	struct usb_otg		*otg;
+-
+-	if (!pdata) {
+-		dev_dbg(&pdev->dev, "platform_data not available\n");
+-		return -EINVAL;
+-	}
++	struct device_node	*np = pdev->dev.of_node;
+ 
+ 	twl = devm_kzalloc(&pdev->dev, sizeof *twl, GFP_KERNEL);
+ 	if (!twl)
+ 		return -ENOMEM;
+ 
++	if (np)
++		of_property_read_u32(np, "usb_mode",
++				(enum twl4030_usb_mode *)&twl->usb_mode);
++	else if (pdata)
++		twl->usb_mode = pdata->usb_mode;
++	else {
++		dev_err(&pdev->dev, "twl4030 initialized without pdata\n");
++		return -EINVAL;
++	}
++
+ 	otg = devm_kzalloc(&pdev->dev, sizeof *otg, GFP_KERNEL);
+ 	if (!otg)
+ 		return -ENOMEM;
+ 
+ 	twl->dev		= &pdev->dev;
+ 	twl->irq		= platform_get_irq(pdev, 0);
+-	twl->usb_mode		= pdata->usb_mode;
+ 	twl->vbus_supplied	= false;
+ 	twl->asleep		= 1;
+ 	twl->linkstat		= OMAP_MUSB_UNKNOWN;
+@@ -690,12 +695,23 @@ static int __exit twl4030_usb_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id twl4030_usb_id_table[] = {
++	{ .compatible = "ti,twl4030-usb" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, twl4030_usb_id_table);
++#else
++#define twl4030_usb_id_table NULL
++#endif
++
+ static struct platform_driver twl4030_usb_driver = {
+ 	.probe		= twl4030_usb_probe,
+ 	.remove		= __exit_p(twl4030_usb_remove),
+ 	.driver		= {
+ 		.name	= "twl4030_usb",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = twl4030_usb_id_table,
+ 	},
+ };
+ 
 -- 
 1.7.5.4
