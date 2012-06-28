@@ -1,52 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 28 Jun 2012 05:05:41 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <201206271433.15303.jbe@pengutronix.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <4FEAF75E.5090505@cam.ac.uk> <201206271433.15303.jbe@pengutronix.de>
-Message-ID: <201206280505.41201.marex@denx.de>
+From: zhouqiao@marvell.com (Qiao Zhou)
+Date: Thu, 28 Jun 2012 11:13:31 +0800
+Subject: [PATCH 0/3 V1] add 88pm80x mfd driver
+Message-ID: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
+change log [v1]:
+1, pm800 and pm805 are decoupled and probed separately;
+2, re-used the most of API for pm800 and pm805 per Arnd's comments;
+3, use regmap_irq, instead of previous 88pm80x_irq_data per Mark's comments.
+use regmap_add_irq_chip, and remove previous 88pm80x irq handling.
+4, remove callback function in rtc pdata per Arnd's comments.
+5, updated some coding style issue.
 
-[...]
+Qiao Zhou (3):
+  mfd: support 88pm80x in 80x driver
+  rtc: add rtc support to 88PM80X PMIC
+  input: add onkey support to 88PM80X PMIC
 
-So, I've been thinking about mapping channels and delay slots at runtime. Is it 
-really necessary? I know it's really cool and all, but it adds a lot of 
-complexity. For starters, I was thinking we should try to do static mapping. And 
-when that's all perfected, go further and try doing it dynamically. What do you 
-think about the following DT binding:
-
-lradc at 80050000 {
-        compatible = "fsl,imx28-lradc";
-        reg = <0x80050000 2000>;
-        interrupts = <10 14 15 16 17 18 19
-                        20 21 22 23 24 25>;
-        fsl,delay-freq = <10 100 50 60>;
-        fsl,delay-repeat = <3 10 5 6>;
-        fsl,delay-channels = <
-                0 2 0 3 0 4 0 5
-                1 8 1 9 2 12 3 13>;
-        status = "disabled";
-};
-
-fsl,delay-freq would be an array (for all four delay channels) of their sampling 
-frequencies.
-
-fsl,delay-repeat would be an array (for all four delay channels) of the 
-oversampling count.
-
-fsl,delay-channels would be an array (for all four delay channels) of touples of 
-delay channel, adc channel. In the above example, it's ADC channels 2,3,4,5 
-mapped to delay channel 0, ADC channels 8,9 mapped to delay channel 1 etc.
-
-Now, it might be dumb, advice is welcome!
-
-> > [...]
-> 
-> Regards,
-> Juergen
-
-Best regards,
-Marek Vasut
+ drivers/input/misc/88pm80x_onkey.c |  194 ++++++++++
+ drivers/input/misc/Kconfig         |   10 +
+ drivers/input/misc/Makefile        |    1 +
+ drivers/mfd/88pm80x-core.c         |  545 +++++++++++++++++++++++++++++
+ drivers/mfd/88pm80x-i2c.c          |  274 +++++++++++++++
+ drivers/mfd/Kconfig                |   12 +
+ drivers/mfd/Makefile               |    2 +
+ drivers/rtc/Kconfig                |   10 +
+ drivers/rtc/Makefile               |    1 +
+ drivers/rtc/rtc-88pm80x.c          |  370 ++++++++++++++++++++
+ include/linux/mfd/88pm80x.h        |  678 ++++++++++++++++++++++++++++++++++++
+ 11 files changed, 2097 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/input/misc/88pm80x_onkey.c
+ create mode 100644 drivers/mfd/88pm80x-core.c
+ create mode 100644 drivers/mfd/88pm80x-i2c.c
+ create mode 100644 drivers/rtc/rtc-88pm80x.c
+ create mode 100644 include/linux/mfd/88pm80x.h
