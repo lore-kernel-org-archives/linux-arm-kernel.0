@@ -1,168 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 11:34:46 +0800
-Subject: [PATCH v2 2/2] video: mxsfb: add simple device tree probe
-In-Reply-To: <1340701379-8619-3-git-send-email-shawn.guo@linaro.org>
-References: <1340701379-8619-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1340854486-4575-1-git-send-email-shawn.guo@linaro.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 28 Jun 2012 11:37:17 +0800
+Subject: [PATCH v8 00/14] add imx usb driver based on Greg next tree
+Message-ID: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple device tree probe support for mxsfb driver.  Before
-a common binding for struct fb_videomode is available, the driver will
-keep using struct mxsfb_platform_data.  That said, platform code will
-use auxdata to attach mxsfb_platform_data for device tree boot.
+The work is based on  ci13xxx rework done by Alexander Shishkin.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
-* Remove enable-active-low property and use of_get_named_gpio_flags
-  instead
+To let Greg pick up, I also added patches Alex queued that I depends on.
 
- Documentation/devicetree/bindings/fb/mxsfb.txt |   19 ++++++++
- drivers/video/mxsfb.c                          |   60 ++++++++++++++++++-----
- 2 files changed, 66 insertions(+), 13 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/fb/mxsfb.txt
+This patch series can also be found at:
+https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
 
-diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
-new file mode 100644
-index 0000000..b41e5e52
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
-@@ -0,0 +1,19 @@
-+* Freescale MXS LCD Interface (LCDIF)
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-lcdif".  Supported chips include
-+  imx23 and imx28.
-+- reg: Address and length of the register set for lcdif
-+- interrupts: Should contain lcdif interrupts
-+
-+Optional properties:
-+- panel-enable-gpios : Should specify the gpio for panel enable
-+
-+Examples:
-+
-+lcdif at 80030000 {
-+	compatible = "fsl,imx28-lcdif";
-+	reg = <0x80030000 2000>;
-+	interrupts = <38 86>;
-+	panel-enable-gpios = <&gpio3 30 0>;
-+};
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 08dad8d..49619b4 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -41,6 +41,8 @@
- 
- #include <linux/module.h>
- #include <linux/kernel.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/dma-mapping.h>
-@@ -750,16 +752,43 @@ static void __devexit mxsfb_free_videomem(struct mxsfb_info *host)
- 	}
- }
- 
-+static struct platform_device_id mxsfb_devtype[] = {
-+	{
-+		.name = "imx23-fb",
-+		.driver_data = MXSFB_V3,
-+	}, {
-+		.name = "imx28-fb",
-+		.driver_data = MXSFB_V4,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
-+
-+static const struct of_device_id mxsfb_dt_ids[] = {
-+	{ .compatible = "fsl,imx23-lcdif", .data = &mxsfb_devtype[0], },
-+	{ .compatible = "fsl,imx28-lcdif", .data = &mxsfb_devtype[1], },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxsfb_dt_ids);
-+
- static int __devinit mxsfb_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id =
-+			of_match_device(mxsfb_dt_ids, &pdev->dev);
- 	struct mxsfb_platform_data *pdata = pdev->dev.platform_data;
- 	struct resource *res;
- 	struct mxsfb_info *host;
- 	struct fb_info *fb_info;
- 	struct fb_modelist *modelist;
- 	struct pinctrl *pinctrl;
-+	int panel_enable;
-+	enum of_gpio_flags flags;
- 	int i, ret;
- 
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
-+
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "No platformdata. Giving up\n");
- 		return -ENODEV;
-@@ -807,6 +836,22 @@ static int __devinit mxsfb_probe(struct platform_device *pdev)
- 		goto error_getclock;
- 	}
- 
-+	panel_enable = of_get_named_gpio_flags(pdev->dev.of_node,
-+					       "panel-enable-gpios", 0, &flags);
-+	if (gpio_is_valid(panel_enable)) {
-+		unsigned long f = GPIOF_OUT_INIT_HIGH;
-+		if (flags == OF_GPIO_ACTIVE_LOW)
-+			f = GPIOF_OUT_INIT_LOW;
-+		ret = devm_gpio_request_one(&pdev->dev, panel_enable,
-+					    f, "panel-enable");
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"failed to request gpio %d: %d\n",
-+				panel_enable, ret);
-+			goto error_panel_enable;
-+		}
-+	}
-+
- 	fb_info->pseudo_palette = kmalloc(sizeof(u32) * 16, GFP_KERNEL);
- 	if (!fb_info->pseudo_palette) {
- 		ret = -ENOMEM;
-@@ -854,6 +899,7 @@ error_register:
- error_init_fb:
- 	kfree(fb_info->pseudo_palette);
- error_pseudo_pallette:
-+error_panel_enable:
- 	clk_put(host->clk);
- error_getclock:
- error_getpin:
-@@ -901,19 +947,6 @@ static void mxsfb_shutdown(struct platform_device *pdev)
- 	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
- }
- 
--static struct platform_device_id mxsfb_devtype[] = {
--	{
--		.name = "imx23-fb",
--		.driver_data = MXSFB_V3,
--	}, {
--		.name = "imx28-fb",
--		.driver_data = MXSFB_V4,
--	}, {
--		/* sentinel */
--	}
--};
--MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
--
- static struct platform_driver mxsfb_driver = {
- 	.probe = mxsfb_probe,
- 	.remove = __devexit_p(mxsfb_remove),
-@@ -921,6 +954,7 @@ static struct platform_driver mxsfb_driver = {
- 	.id_table = mxsfb_devtype,
- 	.driver = {
- 		   .name = DRIVER_NAME,
-+		   .of_match_table = mxsfb_dt_ids,
- 	},
- };
- 
+Status:
+  - this version only support host
+  - usbotg controler works at host role
+
+Changes since last version:
+ - mxs_phy: remove connected check
+ - search/repleace fix
+
+Alexander Shishkin (1):
+  usb: chipidea: remove unneeded NULL check
+
+Felipe Balbi (3):
+  usb: chipidea: drop useless arch-check
+  usb: chipidea: msm: add missing section annotation
+  usb: chipidea: msm: add remove method
+
+Richard Zhao (10):
+  USB: Chipidea: rename struct ci13xxx_udc_driver to struct
+    ci13xxx_platform_data
+  USB: Chipidea: rename struct ci13xxx variables from udc to ci
+  USB: Chipidea: add unified ci13xxx_{add,remove}_device for platform
+    drivers
+  USB: Chipidea: add ci13xxx device id management
+  usb: chipidea: select USB_EHCI_ROOT_HUB_TT in USB_CHIPIDEA_HOST of
+    Kconfig
+  usb: otg: add notify_connect/notify_disconnect callback
+  USB: notify phy when root hub port connect change
+  usb: chipidea: permit driver bindings pass phy pointer
+  usb: otg: add basic mxs phy driver support
+  usb: chipidea: add imx platform driver
+
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |   17 +
+ Documentation/devicetree/bindings/usb/mxs-phy.txt  |   13 +
+ drivers/usb/chipidea/Kconfig                       |    1 +
+ drivers/usb/chipidea/Makefile                      |    9 +-
+ drivers/usb/chipidea/ci.h                          |   32 +-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |  197 ++++++
+ drivers/usb/chipidea/ci13xxx_msm.c                 |   63 +-
+ drivers/usb/chipidea/ci13xxx_pci.c                 |   52 +-
+ drivers/usb/chipidea/core.c                        |   70 ++-
+ drivers/usb/chipidea/debug.c                       |  146 ++---
+ drivers/usb/chipidea/host.c                        |    3 +-
+ drivers/usb/chipidea/udc.c                         |  634 ++++++++++----------
+ drivers/usb/core/hub.c                             |    8 +
+ drivers/usb/otg/Kconfig                            |   10 +
+ drivers/usb/otg/Makefile                           |    1 +
+ drivers/usb/otg/mxs-phy.c                          |  190 ++++++
+ include/linux/usb/chipidea.h                       |   14 +-
+ include/linux/usb/otg.h                            |   21 +
+ 18 files changed, 991 insertions(+), 490 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
+ create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+ create mode 100644 drivers/usb/otg/mxs-phy.c
+
 -- 
-1.7.5.4
+1.7.9.5
