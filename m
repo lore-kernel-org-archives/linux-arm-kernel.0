@@ -1,36 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jun 2012 11:17:46 +0100
-Subject: [PATCH 3/3] arm: mach-mvebu: system-controller only registers
- restart if device exists
-In-Reply-To: <4FEC2289.80808@codethink.co.uk>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
- <1340814406-26010-4-git-send-email-ben.dooks@codethink.co.uk>
- <20120627191932.GE25319@n2100.arm.linux.org.uk>
- <4FEC2289.80808@codethink.co.uk>
-Message-ID: <20120628101746.GI19026@n2100.arm.linux.org.uk>
+From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
+Date: Thu, 28 Jun 2012 14:26:28 +0400
+Subject: [PATCH v3 2/7] mfd: omap: control: core system control driver
+In-Reply-To: <4FEC2E1D.5040309@dev.rtsoft.ru>
+References: <4FEB4B46.9020904@dev.rtsoft.ru> <20120628045028.GC2471@besouro>
+ <4FEC25CA.10105@dev.rtsoft.ru>
+ <CAGF5oy9heLnjcHj4H=hMK9NAkrDoOocR-Lbv1Z4cQ4G1C5kSeQ@mail.gmail.com>
+ <4FEC2E1D.5040309@dev.rtsoft.ru>
+Message-ID: <4FEC3154.9050103@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 10:23:21AM +0100, Ben Dooks wrote:
-> On 27/06/12 20:19, Russell King - ARM Linux wrote:
->> On Wed, Jun 27, 2012 at 05:26:46PM +0100, Ben Dooks wrote:
->>> Change to only registering the restart hook if the device exists
->>> and can be enumerated in the device tree. Remove the header definiton
->>> and the restart entry in the machine file.
->>
->> NAK.  Please use the .restart method in the machine description rather
->> than directly using arm_pm_restart.  Thanks.
->>
->> arm_pm_restart only continues to exist because I could not work out how
->> to stop AT91 from using it.
+On 06/28/2012 02:12 PM, Konstantin Baydarov wrote:
+> The interface(design) of omap-control-core.c has already been discussed many times :(
+> Eduardo, in his patch set, suggested following design:
+> - omap-control-core.c ioremaps SCM window and provide functions to read/write SCP register for bandgap and usb.
 >
-> So what should you do if your board doesn't support this method of
-> resetting?
+> IIRC, this approach didn't satisfy and it was suggested to have private read/write in bandgap and usb.
+>
+> So, my patch set introduces following design:
+> - omap-control-core.c don't provide read/write functions for bandgap and usb.
+> - bandgap and usb use their own private read/write functions
+> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped to the same virtual address. But the problem is that SMP memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach.
+I mean:
 
-Eh, what?
+- Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped. So each call of ioremap in omap-control-core.c, bandgap and usb drivers returns the same virtual address. But the problem is that SCM memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach(when each driver remaps the same IOMEM).
 
-Set the .restart method in MACHINE_DESC or DT_MACHINE_DESC.  Try to avoid
-using arm_pm_restart directly.
-
-Simples.
+>
+> Another possible design is:
+> - omap-control-core.c ioremaps and reserves SCM IOMEM window
+> - omap-control-core.c exports omap_control_get_base(virtual base address is returned) to use in bandgap and usb_phy driver.
+> - Bandgap and usb phy uses their own private read/write function.
+> IIUC, this way was suggested by Tony.
+>
+> I guess It's better to settle the design(interface) of omap-control-core.c, bandgap and usb phy and then submit the next version of patch set.
