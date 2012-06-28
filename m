@@ -1,88 +1,63 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 28 Jun 2012 17:41:39 +0200
-Subject: [PATCH-V3 3/3] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5D620@DBDE01.ent.ti.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
- <1340895567-22766-4-git-send-email-hvaibhav@ti.com> <4FEC72C2.7010106@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5D620@DBDE01.ent.ti.com>
-Message-ID: <4FEC7B33.5030500@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 28 Jun 2012 17:42:47 +0200
+Subject: i.MX28 die temperature
+In-Reply-To: <201206280505.41201.marex@denx.de>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <201206271433.15303.jbe@pengutronix.de> <201206280505.41201.marex@denx.de>
+Message-ID: <201206281742.47936.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2012 05:39 PM, Hiremath, Vaibhav wrote:
-> On Thu, Jun 28, 2012 at 20:35:38, Cousson, Benoit wrote:
->> Hi Vaibhav,
->>
->> One small comment.
->>
->> On 06/28/2012 04:59 PM, Vaibhav Hiremath wrote:
->>> The function __omap2_set_globals() can be common across all
->>> platforms/architectures, even in case of omap4, internally it
->>> calls same set of functions as in __omap2_set_globals() function
->>> (except for sdrc).
->>> This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
->>> so that we can reuse same function across omap2/3/4...
->>>
->>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Kevin Hilman <khilman@ti.com>
->>> Cc: Paul Walmsley <paul@pwsan.com>
->>>
->>> Changes from V1:
->>> 	- Added Makefile rule to build sdrc.c file for new
->>> 	  option SOC_HAS_OMAP2_SDRC (as per Kevin's comment).
->>> ---
->>>    arch/arm/mach-omap2/Kconfig  |    8 ++++++++
->>>    arch/arm/mach-omap2/Makefile |    3 ++-
->>>    arch/arm/mach-omap2/common.c |    8 +-------
->>>    arch/arm/mach-omap2/common.h |    5 +++++
->>>    4 files changed, 16 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->>> index 208b950..82d9d18 100644
->>> --- a/arch/arm/mach-omap2/Kconfig
->>> +++ b/arch/arm/mach-omap2/Kconfig
->>> @@ -21,12 +21,16 @@ config ARCH_OMAP2PLUS_TYPICAL
->>>    	help
->>>    	  Compile a kernel suitable for booting most boards
->>>
->>> +config SOC_HAS_OMAP2_SDRC
->>> +	bool "OMAP2 SDRAM Controller support"
->>> +
->>>    config ARCH_OMAP2
->>>    	bool "TI OMAP2"
->>>    	depends on ARCH_OMAP2PLUS
->>>    	default y
->>>    	select CPU_V6
->>>    	select MULTI_IRQ_HANDLER
->>> +	select SOC_HAS_OMAP2_SDRC
->>>
->>>    config ARCH_OMAP3
->>>    	bool "TI OMAP3"
->>> @@ -39,6 +43,7 @@ config ARCH_OMAP3
->>>    	select PM_OPP if PM
->>>    	select ARM_CPU_SUSPEND if PM
->>>    	select MULTI_IRQ_HANDLER
->>> +	select SOC_HAS_OMAP2_SDRC
->>>
->>>    config ARCH_OMAP4
->>>    	bool "TI OMAP4"
->>> @@ -66,16 +71,19 @@ config SOC_OMAP2420
->>>    	depends on ARCH_OMAP2
->>>    	default y
->>>    	select OMAP_DM_TIMER
->>> +	select SOC_HAS_OMAP2_SDRC
->>
->> OMAP4 does not have the SDRC but the EMIF like TI8XX.
->>
->
-> Benoit,
->
-> This selection is happening for SOC_OMAP2420 and not for OMAP4.
+Dear Marek Vasut,
 
-Hehe, indeed, I missed the context and was fooled by the config ARCH_OMAP4.
+> Dear Juergen Beisert,
+> 
+> [...]
+> 
+> So, I've been thinking about mapping channels and delay slots at runtime.
+> Is it really necessary? I know it's really cool and all, but it adds a lot
+> of complexity. For starters, I was thinking we should try to do static
+> mapping. And when that's all perfected, go further and try doing it
+> dynamically. What do you think about the following DT binding:
+> 
+> lradc at 80050000 {
+>         compatible = "fsl,imx28-lradc";
+>         reg = <0x80050000 2000>;
+>         interrupts = <10 14 15 16 17 18 19
+>                         20 21 22 23 24 25>;
+>         fsl,delay-freq = <10 100 50 60>;
+>         fsl,delay-repeat = <3 10 5 6>;
+>         fsl,delay-channels = <
+>                 0 2 0 3 0 4 0 5
+>                 1 8 1 9 2 12 3 13>;
 
-I don't have any comment then :-)
 
-Benoit
+btw. I don't like the idea of those tuples here ... any hint how to do it 
+better?
+
+>         status = "disabled";
+> };
+> 
+> fsl,delay-freq would be an array (for all four delay channels) of their
+> sampling frequencies.
+> 
+> fsl,delay-repeat would be an array (for all four delay channels) of the
+> oversampling count.
+> 
+> fsl,delay-channels would be an array (for all four delay channels) of
+> touples of delay channel, adc channel. In the above example, it's ADC
+> channels 2,3,4,5 mapped to delay channel 0, ADC channels 8,9 mapped to
+> delay channel 1 etc.
+> 
+> Now, it might be dumb, advice is welcome!
+> 
+> > > [...]
+> > 
+> > Regards,
+> > Juergen
+> 
+> Best regards,
+> Marek Vasut
+
+Best regards,
+Marek Vasut
