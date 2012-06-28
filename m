@@ -1,33 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Jun 2012 00:32:30 -0700
-Subject: [GIT PULL] omap fixes for v3.5-rc4
-Message-ID: <20120628073229.GC19842@atomide.com>
+From: alex.bluesman.smirnov@gmail.com (Alexander Smirnov)
+Date: Thu, 28 Jun 2012 11:47:43 +0400
+Subject: RF231 transceiver on at91sam9g20ek board
+In-Reply-To: <201206221834.41869.arnd@arndb.de>
+References: <CAJmB2rDxv45OP4otn7rmQcpzCvLujKm0j9_OqNW6PoyHuarTLw@mail.gmail.com>
+ <201206221834.41869.arnd@arndb.de>
+Message-ID: <CAJmB2rBcRuNe0QfEGoJN1rQnRnr33gyE=nLt3Az=mGEWuR7mCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
+Hi,
 
-  Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
+2012/6/22 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 20 June 2012, Alexander Smirnov wrote:
+>> I'm the developer of the IEEE 802.15.4 kernel branch, and currently
+>> I've faced with the problem regarding mach-at91 arch and hope you can
+>> advise me.
+>>
+>> I've been working with at86rf231 transceiver (RF231 extender)
+>> connected via SPI to at91sam9g20ek board. The driver works and tested
+>> for kernels up to 3.1 version (versions 3.2-latest haven't ever been
+>> tested yet).
+>> Several days ago I've ported the IEEE802.15.4 stack to the latest
+>> kernel and see some strange things: RF231 interrupt handler is
+>> permanently pulled right after driver's probe method (the RF231 chip
+>> is in disabled mode, so it can't generate interrupts at that moment).
+>> Also I've noticed that each ENTER key pressing in minicom generates a
+>> new interrupt. It looks like somebody else uses the same pin/pins for
+>> its needs...
+>>
+>> Do you have any ideas what can be changed since 3.1 kernel that this
+>> problem arose.
+>>
+>
+> It might not be the problem you are faced with but note that at91
+> is moving towards probing all devices using the device tree, so
+> starting with linux-3.4 you should be defining the device in the
+> at91sam9g20ek.dts file for your board and use the generic
+> board-dt.c file. The platform_data gets replaced with
+> calls to of_get_gpio() in that case.
 
-are available in the git repository at:
+Thank you for the reply!
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.5-rc4
+Are you going to add SPI section to the device tree in the nearest
+future or I can do it by myself and send you the patch? The reason is
+that this week I merged at86rf230 driver to the 'net-next' tree, but
+it won't work without platform data.
 
-for you to fetch changes up to e90b833ee1aae64b6fca2455001323ffe29e1698:
+Alex
 
-  ARM: OMAP4470: Fix OMAP4470 boot failure (2012-06-27 08:09:59 -0700)
-
-----------------------------------------------------------------
-Here's one more regression fix that I missed earlier, and a
-trivial fix to get omap4470 booting.
-
-----------------------------------------------------------------
-Jon Hunter (1):
-      ARM: OMAP4470: Fix OMAP4470 boot failure
-
-Kevin Hilman (1):
-      ARM: OMAP2+: nand: fix build error when CONFIG_MTD_ONENAND_OMAP2=n
-
- arch/arm/mach-omap2/board-flash.c    |    5 -----
- arch/arm/mach-omap2/clock44xx_data.c |    5 ++++-
- 2 files changed, 4 insertions(+), 6 deletions(-)
+>
+> ? ? ? ?Arnd
