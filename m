@@ -1,57 +1,102 @@
-From: frankyl@broadcom.com (Franky Lin)
-Date: Thu, 28 Jun 2012 14:24:33 -0700
-Subject: Panda ES board hang when using GPIO as interrupt
-In-Reply-To: <4FEC7B48.8040402@ti.com>
-References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
- <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
-Message-ID: <4FECCB91.7090609@broadcom.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 28 Jun 2012 16:55:08 -0500
+Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
+In-Reply-To: <CAM=Q2cuLCT2VzcUgrpyRWiX61t1F+iWchO9iLC=Ka9MFVm4_bQ@mail.gmail.com>
+ (Shubhrajyoti Datta's message of "Wed, 27 Jun 2012 11:41:47 +0530")
+References: <1340761532-27231-1-git-send-email-khilman@ti.com>
+ <CAM=Q2cuLCT2VzcUgrpyRWiX61t1F+iWchO9iLC=Ka9MFVm4_bQ@mail.gmail.com>
+Message-ID: <87lij7nltv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2012 08:42 AM, Jon Hunter wrote:
->
-> On 06/27/2012 07:41 PM, Franky Lin wrote:
->> On 06/26/2012 08:37 PM, Kevin Hilman wrote:
->>> "Franky Lin" <frankyl@broadcom.com> writes:
->>>> I noticed Kevin raised some similar cases on other platforms and also
->>>> provided two patches in the patch mail thread. But unfortunately those
->>>> two patches doesn't help in our case. I tested the driver with 3.5-rc3
->>>> mainline kernel and the issue is still there. I can only "fix" the
->>>> hang by either reverting the commit or disabling
->>>> CONFIG_PM_RUNTIME. Also, the hang only happens on Panda ES board. Old
->>>> Panda with 4430 works good.
->>>>
->>>> Any thoughts and suggestions?
->>>
->>> If reverting the patch fixes your problem, can you isolate down to which
->>> part of that patch causes the problem?  IOW, can you fix your problem if
->>> you undo just the hunk added in runtime_suspend or undo just the moved
->>> hunk runtime_resume?  Or is reverting both required?
->>>
->>> I suspect the added runtime_suspend hunk is causing the problems, so can
->>> you see if just undoing that part works[1].  If that works, I will give
->>> a bit more of a thinking on it tomorrow.
->>
->> runtime_suspend hunk is fine. The hang still exist after reverting it.
->> The culprit is the moved hunk in runtime_resume. Reverting it makes the
->> hang disappear.
->
-> Thanks. From reviewing the code the only thing that appears suspect based
-> upon your findings is the return if we find the context has not been lost.
-> We are not checking if "workaround_enabled" is set before we return.
->
-> Could you try the following change on top of v3.5-rc3?
->
+Hi Shubhrajyoti,
 
-The patch doesn't help. And I also managed to probe the signal. It's 
-active when it hung.
+Shubhrajyoti Datta <omaplinuxkernel@gmail.com> writes:
 
-> Also, could you add a print in the runtime_suspend/resume() functions so
-> we can see how often these are being called. In my case, I really don't see
-> these being exercised and I am wondering how often you see suspend/resume
-> being called in your setup.
+> Hi Kevin,
+> Thanks for the patch ,
+> a doubt below
 
-Well, the runtime_suspend/resume never get called during the test.
+Thanks for the review.
+
+> On Wed, Jun 27, 2012 at 7:15 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
+>> failure.
+> So the failure means that the usecount is incremented. However the
+> device was not
+> enabled. 
+
+Correct.
+
+> In that case could we consider
+>
+>    void pm_runtime_put_noidle(struct device *dev);
+>     - decrement the device's usage counter
+>
+> Which will only decrement the counter and does not try to disable it.
+
+No, that is not needed.
+
+> However I am not sure what happens if you try to disable an already
+> disabled device.
+
+The runtime PM core already knows that the device is not enabled so will
+not need to call the disable hooks.  It already needs this functionality
+to support the _get_noresume() and _put_noidle() calls.
+
+I tested this on 3730/OveroSTORM where I was seeing this i2c xfer
+failure (and thus a failure in MMC suspend, which uses I2C to control
+the regulator.)
+
+Hope that helps clarify,
+
+If so, Wolfram, can you queue this up in your i2c-embedded/for-next
+branch since this problem was introduced there.
 
 Thanks,
-Franky
+
+Kevin
+
+>>
+>> Without this, after a failed xfer, the runtime PM usecount will have
+>> been incremented, but not decremented
+>
+> Agree.
+>
+>> causing the usecount to never
+>> reach zero after a failure. ?This keeps the device always runtime PM
+>> enabled which keeps the enclosing power domain active, and prevents
+>> full-chip retention/off from happening during idle.
+>>
+>> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> This patch applies to current i2c-embedded/for-next branch
+>>
+>> ?drivers/i2c/busses/i2c-omap.c | ? ?2 +-
+>> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index 9895fa7..b105733 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -582,7 +582,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>>
+>> ? ? ? ?r = pm_runtime_get_sync(dev->dev);
+>> ? ? ? ?if (IS_ERR_VALUE(r))
+>> - ? ? ? ? ? ? ? return r;
+>> + ? ? ? ? ? ? ? goto out;
+>>
+>> ? ? ? ?r = omap_i2c_wait_for_bb(dev);
+>> ? ? ? ?if (r < 0)
+>> --
+>> 1.7.9.2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
