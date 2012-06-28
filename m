@@ -1,50 +1,170 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 28 Jun 2012 13:50:16 -0400 (EDT)
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <20120628090827.GH19026@n2100.arm.linux.org.uk>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <20120627161224.GB2310@linaro.org>
- <alpine.LFD.2.02.1206280019160.31003@xanadu.home>
- <20120628090827.GH19026@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1206281338170.31003@xanadu.home>
+From: mturquette@ti.com (Mike Turquette)
+Date: Thu, 28 Jun 2012 11:28:00 -0700
+Subject: [PATCH 4/6] ARM: tegra: Add clk_tegra structure and helper
+ functions
+In-Reply-To: <1340879846-12900-5-git-send-email-pgaikwad@nvidia.com>
+References: <1340879846-12900-1-git-send-email-pgaikwad@nvidia.com>
+ <1340879846-12900-5-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20120628182759.GA28424@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jun 2012, Russell King - ARM Linux wrote:
-
-> Err, I don't think you understand what's going on here.
+On 20120628-16:07, Prashant Gaikwad wrote:
+> Add Tegra platform specific clock structure clk_tegra and
+> some helper functions for generic clock framework.
 > 
-> The sequence is:
+> struct clk_tegra is the single strcture used for all types of
+> clocks. reset and cfg_ex ops moved to clk_tegra from clk_ops.
 > 
-> 1. setup the initial mappings so we can run the kernel in virtual space.
-> 2. provide the memory areas to memblock
-> 3. ask the platform to reserve whatever memory it wants from memblock
->    [this means using memblock_reserve or arm_memblock_steal).  The
->    reserved memory is *not* expected to be mapped at this point, and is
->    therefore inaccessible.
-> 4. Setup the lowmem mappings.
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-I do understand that pretty well so far.
+Hi Prashant,
 
-> And when we're setting up the lowmem mappings, we do *not* expect to
-> create any non-section page mappings, which again means we have no reason
-> to use the memblock allocator to obtain memory that we want to immediately
-> use.
+I'm happy to see Tegra getting ported over to the common clk framework.
 
-And why does this have to remain so?
+<snip>
+> +void tegra_clk_add(struct clk *clk)
+> +{
+> +	struct clk_tegra *c = to_clk_tegra(__clk_get_hw(clk));
+> +
+> +	mutex_lock(&clock_list_lock);
+> +	list_add(&c->node, &clocks);
+> +	mutex_unlock(&clock_list_lock);
+> +}
+> +
+> +struct clk *tegra_get_clock_by_name(const char *name)
+> +{
+> +	struct clk_tegra *c;
+> +	struct clk *ret = NULL;
+> +	mutex_lock(&clock_list_lock);
+> +	list_for_each_entry(c, &clocks, node) {
+> +		if (strcmp(__clk_get_name(c->hw.clk), name) == 0) {
+> +			ret = c->hw.clk;
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&clock_list_lock);
+> +	return ret;
+> +}
+> +
 
-> So I don't know where you're claim of being "fragile" is coming from.
+Are you planning to continue using an internal list of struct clk_tegra?
+OMAP had a similar list for the legacy clock framework but that was
+since removed and now lookups are done solely through clkdev.
 
-It doesn't come from anything you've described so far. It comes from 
-those previous attempts at lifting this limitation.  I think that my 
-proposal is much less fragile than the other ones.
+<snip>
+> +void tegra_periph_reset_deassert(struct clk *c)
+> +{
+> +	struct clk_tegra *clk = to_clk_tegra(__clk_get_hw(c));
+> +	BUG_ON(!clk->reset);
+> +	clk->reset(__clk_get_hw(c), false);
+> +}
+> +EXPORT_SYMBOL(tegra_periph_reset_deassert);
+> +
+> +void tegra_periph_reset_assert(struct clk *c)
+> +{
+> +	struct clk_tegra *clk = to_clk_tegra(__clk_get_hw(c));
+> +	BUG_ON(!clk->reset);
+> +	clk->reset(__clk_get_hw(c), true);
+> +}
+> +EXPORT_SYMBOL(tegra_periph_reset_assert);
+> +
+> +/* Several extended clock configuration bits (e.g., clock routing, clock
+> + * phase control) are included in PLL and peripheral clock source
+> + * registers. */
+> +int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
+> +{
+> +	int ret = 0;
+> +	struct clk_tegra *clk = to_clk_tegra(__clk_get_hw(c));
+> +
+> +	if (!clk->clk_cfg_ex) {
+> +		ret = -ENOSYS;
+> +		goto out;
+> +	}
+> +	ret = clk->clk_cfg_ex(__clk_get_hw(c), p, setting);
+> +
+> +out:
+> +	return ret;
+> +}
 
-> What is fragile is people wanting to use arm_memblock_steal() without
-> following the rules for it I layed down.
+We had some discussions in the past on your clock reset and external
+line request operations which you've had to put into struct clk_tegra.
 
-What about enhancing your rules if the technical limitations they were 
-based on are lifted?
+Do you need to expose those ops to code in drivers/*?  I consider that a
+reasonable litmus test to start considering if something should be moved
+into the generic clk.h api.
 
+<snip>
+> +enum clk_state {
+> +	UNINITIALIZED = 0,
+> +	ON,
+> +	OFF,
+> +};
 
-Nicolas
+How is clk_state used?  Might it be helpful to you if that was in the
+generic code in drivers/clk/clk.c?
+
+<snip>
+> +struct clk_tegra {
+> +	/* node for master clocks list */
+> +	struct list_head	node;	/* node for list of all clocks */
+> +	struct clk_lookup	lookup;
+> +	struct clk_hw		hw;
+> +
+> +	bool			set;
+> +	unsigned long		fixed_rate;
+> +	unsigned long		max_rate;
+> +	unsigned long		min_rate;
+> +	u32			flags;
+> +	const char		*name;
+> +
+> +	enum clk_state		state;
+> +	u32			div;
+> +	u32			mul;
+> +
+> +	u32				reg;
+> +	u32				reg_shift;
+> +
+> +	struct list_head		shared_bus_list;
+> +
+> +	union {
+> +		struct {
+> +			unsigned int			clk_num;
+> +		} periph;
+> +		struct {
+> +			unsigned long			input_min;
+> +			unsigned long			input_max;
+> +			unsigned long			cf_min;
+> +			unsigned long			cf_max;
+> +			unsigned long			vco_min;
+> +			unsigned long			vco_max;
+> +			const struct clk_pll_freq_table	*freq_table;
+> +			int				lock_delay;
+> +			unsigned long			fixed_rate;
+> +		} pll;
+> +		struct {
+> +			u32				sel;
+> +			u32				reg_mask;
+> +		} mux;
+> +		struct {
+> +			struct clk			*main;
+> +			struct clk			*backup;
+> +		} cpu;
+> +		struct {
+> +			struct list_head		node;
+> +			bool				enabled;
+> +			unsigned long			rate;
+> +		} shared_bus_user;
+> +	} u;
+> +
+> +	void (*reset)(struct clk_hw *, bool);
+> +	int (*clk_cfg_ex)(struct clk_hw *, enum tegra_clk_ex_param, u32);
+> +};
+
+I know this is an initial effort but I hope in time that struct
+clk_tegra can be broken up into separate clk types.  It would be even
+better if some of the Tegra clocks code be converted over to the common
+clk types in drivers/clk/clk-*.c
+
+Regards,
+Mike
