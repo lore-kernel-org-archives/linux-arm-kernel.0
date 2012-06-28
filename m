@@ -1,49 +1,104 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Thu, 28 Jun 2012 09:00:04 +0100
-Subject: i.MX28 die temperature
-In-Reply-To: <201206280058.26485.marex@denx.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <4FEAF75E.5090505@cam.ac.uk> <201206271433.15303.jbe@pengutronix.de>
- <201206280058.26485.marex@denx.de>
-Message-ID: <4FEC0F04.90001@cam.ac.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 28 Jun 2012 02:19:47 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP AM35xx: some fixes for 3.6
+Message-ID: <alpine.DEB.2.00.1206280218230.2338@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/27/2012 11:58 PM, Marek Vasut wrote:
-> Dear Juergen Beisert,
->
-> [...]
->>
->> It requires a more or less complex state-machine to switch the used 4 or 5
->> pins to different modes to measure the X/Y position and the pressure. And
->> these pins interfere with the ADC input pins.
->>
->>> [...]
->
-> I said I'll go through it, but it seems the IIO changed again, so I'll need to
-> wrap my head around new stuff in there.
-Yeah, sorry about that - people keep wanting new stuff ;)
->
-> Besides, I have a feeling that the driver, as is, just simply doesn't fit in as
-> it should. I'm discussing with Jonathan, since I can't really make heads or
-> tails from the IIO api. It's way too complex and unless I really missed
-> something, way underdocumented.
-Any documentation writers welcome!
-The real trick currently is to
-a) figure out what is similar an already present
-b) figure out if that driver is actually a good starting point. If it's
-left staging then it's clean, but there may be a closer 'clean' driver
-still in staging.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Having had documentation continually get left behind we did add
-a 'dummy' driver that covers most stuff with lots of comments.
-(still in staging at the mo staging/iio/iio_simple_dummy*)
+Hi Tony
+
+The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
+
+  Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git 
+
+for you to fetch changes up to a77e1c4d09c88f98ac2e653382d2c1861dbb736f:
+
+  Merge branches 'am35xx_hwmod_data_fixes_a_3.6', 'am35xx_emac_mdio_devel_3.6' and 'am35xx_prcm_data_devel_3.6' into am35xx_devel_3.6 (2012-06-28 00:13:19 -0600)
+
+- ----------------------------------------------------------------
+
+Some OMAP AM35xx fixes.
+
+The powerdomain and clockdomain data for the AM35xx are finally fixed.
+The AM35xx EMAC/MDIO Ethernet controller integration code has been
+converted to use the OMAP device and hwmod framework.  Also the UART4
+and HSOTGUSB warnings have been fixed.
+
+- ----------------------------------------------------------------
+
+Test logs are at:
+
+   http://www.pwsan.com/omap/testlogs/am35xx_devel_3.6/20120628014213/
+
+On 3530ES3 Beagle, wakeup from dynamic retention idle is broken; can
+be worked around by reverting commit
+91930652a23de0873a157aa1d9962cb878d64451 ("OMAP2+: UART: Add mechanism
+to probe uart pins and configure rx wakeup").  On 3530ES3 Beagle and
+37xx EVM, CORE powerdomain won't enter retention.  On 37xx EVM, CORE
+powerdomain won't enter off.  On 4430ES2 Panda, the serial port prints
+garbage at the end of long transmissions when dynamic idle is enabled.
+All of these problems are present with stock v3.5-rc4; none of them
+were added by this series.
 
 
->
->> Regards,
->> Juergen
->
-> Best regards,
-> Marek Vasut
->
+object size (delta in bytes from test_v3.5-rc4 (6b16351acbd415e66ba16bf7d473ece1574cf0bc)):
+  text 	  data 	   bss 	 total 	kernel
+     0 	     0 	     0 	     0 	5912osk_testconfig/vmlinux
+  +124 	 +2464 	     0 	 +2588 	am33xx_testconfig/vmlinux
+     0 	     0 	     0 	     0 	n800_b_testconfig/vmlinux
+     0 	     0 	     0 	     0 	n800_multi_omap2xxx/vmlinux
+     0 	     0 	     0 	     0 	n800_testconfig/vmlinux
+     0 	     0 	     0 	     0 	omap1510_defconfig/vmlinux
+     0 	     0 	     0 	     0 	omap1_defconfig/vmlinux
+     0 	     0 	     0 	     0 	omap2_4_testconfig/vmlinux
+  +104 	 +2520 	     0 	 +2624 	omap2plus_defconfig/vmlinux
+  +104 	 +2200 	     0 	 +2304 	omap2plus_no_pm/vmlinux
+  +104 	 +2456 	     0 	 +2560 	omap3_4_testconfig/vmlinux
+  +104 	 +2488 	     0 	 +2592 	omap3_testconfig/vmlinux
+     0 	     0 	     0 	     0 	omap4_testconfig/vmlinux
+
+
+Mark A. Greer (3):
+      ARM: OMAP AM35x: EMAC/MDIO integration: Add Davinci EMAC/MDIO hwmod support
+      ARM: OMAP AM35x: clockdomain data: Fix clockdomain dependencies
+      arm: omap3: am35x: Set proper powerdomain states
+
+Paul Walmsley (4):
+      ARM: OMAP AM35xx: clock and hwmod data: fix AM35xx HSOTGUSB hwmod
+      ARM: OMAP AM35xx: clock and hwmod data: fix UART4 data
+      ARM: OMAP: AM35xx: fix UART4 softreset
+      Merge branches 'am35xx_hwmod_data_fixes_a_3.6', 'am35xx_emac_mdio_devel_3.6' and 'am35xx_prcm_data_devel_3.6' into am35xx_devel_3.6
+
+ arch/arm/mach-omap2/am35xx-emac.c           |   90 +++++++--------
+ arch/arm/mach-omap2/clock3xxx_data.c        |   28 +++--
+ arch/arm/mach-omap2/clockdomains3xxx_data.c |  157 ++++++++++++++++++++++++---
+ arch/arm/mach-omap2/cm-regbits-34xx.h       |    4 +-
+ arch/arm/mach-omap2/include/mach/am35xx.h   |    2 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  |  143 ++++++++++++++++++++++--
+ arch/arm/mach-omap2/powerdomains3xxx_data.c |  139 ++++++++++++++++++++++--
+ arch/arm/mach-omap2/prcm-common.h           |    4 +-
+ 8 files changed, 471 insertions(+), 96 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJP7BM8AAoJEMePsQ0LvSpLwtoQAKjqee7aQanU7/8mbKqekQ9q
+HQpwUoRU0tu8dfUQmXwA+OuHQSGTL7wly/McmBSvDQLusT6o3cDqUDi0b3PP64zJ
+GIdBXb+0NbQyx29CkuHRBcOGAPS5m2StAwwuj2gugGt1rquMk9JHlcEZAWgjB3Yk
+jLduAMf16ECF+CjZifq6lAq+Ha+TXBQg8hJMf5bgfbGFQ3ax4SEi8QvLtB9OZ4NU
+nxjomr/zqwk8mlofeB1YFMPKyIFrodFWEJhoTy7HNmKlToselnSnUFapL6JuwDkC
+JbU0XvYEaesZJcbGLCB0OQDgNnKKwkCLzjFaDoZViFNJ2U4JljupkHN71HZ4y+W6
+SzPZDETutIxa3190NuN6LTYq8Oe+jwg+pbogKqgeODz89CKK8DbLQ6AIarkS3SX0
+w+1/TcVfwQtFRg/tZANC+nT4LP98po0SU+yZA6lMiFpEjw1BgKhosJPog0Dozd5V
+n/lmgGhb8KTT8KWv+iDva2PBuRN82NKISZHjc7oCPilzRBAcQm54jsEsA2KwwFaA
+PQC2gB+zOWRLAyqS2xneAIlnH0cOgmGFXS0RmsSQ2AvaYrK+PQHbPgQ7Sw+vUJx1
+finzAVGI5qOGZPt+L+OrSblPRdUAlLkfcTSJxYtvWlmzl3FGikGIbn1D+J3UlTbX
+h4exg8Cju+199gySOwcL
+=6PAM
+-----END PGP SIGNATURE-----
