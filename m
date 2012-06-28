@@ -1,31 +1,54 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 28 Jun 2012 00:08:13 -0600 (MDT)
-Subject: [PATCH v2] arm: omap3: am35x: Fix clockdomain dependencies
-In-Reply-To: <1334866606-8291-1-git-send-email-mgreer@animalcreek.com>
-References: <1334866606-8291-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <alpine.DEB.2.00.1206280007420.2338@utopia.booyaka.com>
+From: neidhard.kim@lge.com (Kim, Jong-Sung)
+Date: Thu, 28 Jun 2012 15:08:39 +0900
+Subject: [PATCH] [RESEND] arm: limit memblock base address
+ for	early_pte_alloc
+In-Reply-To: <20120627191801.GD25319@n2100.arm.linux.org.uk>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <025701cd457e$d5065410$7f12fc30$@lge.com>
+ <20120627191801.GD25319@n2100.arm.linux.org.uk>
+Message-ID: <00e901cd54f4$76773650$6365a2f0$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Apr 2012, Mark A. Greer wrote:
-
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Thursday, June 28, 2012 4:18 AM
+> On Fri, Jun 08, 2012 at 10:58:50PM +0900, Kim, Jong-Sung wrote:
+> >
+> > May I suggest another simple approach? The first continuous couples of
+> > sections are always safely section-mapped inside alloc_init_section
+> funtion.
+> > So, by limiting memblock_alloc to the end of the first continuous
+> > couples of sections at the start of map_lowmem, map_lowmem can safely
+> > memblock_alloc & memset even if we have one or more section-unaligned
+> > memory regions. The limit can be extended back to arm_lowmem_limit after
+> the map_lowmem is done.
 > 
-> The am35x family of SoCs do not have an IVA so
-> a parallel set of clockdomain dependencies are
-> required that are simililar to OMAP3 but without
-> any IVA dependencies.
+> No.  What if the first block of memory is not large enough to handle all
+the
+> allocations?
 > 
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
-> 
-> Paul, this is a respin of
-> 	"[PATCH 08/12] arm: omap3: am35x: Fix clockdomain dependencies"
-> 
-> with your comments [hopefully] addressed.  I'm breaking that long series
-> into smaller pieces because most of them really weren't related.
+Thank you for your comment, Russell. I sent a modified patch not to limit to
+the first memory memblock_region as a reply to Dave's message.
 
-Thanks, queued for 3.6.
+> I think the real problem is folk trying to reserve small amounts.  I have
+> said all reservations must be aligned to 1MB.
+>
+Ok, now I know your thought about arm_memblock_steal(). Then, how about
+adding a simple aligning to prevent the possible problem just like me:
 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index f54d592..d0daf0d 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -324,6 +324,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size,
+phys
+ 
+        BUG_ON(!arm_memblock_steal_permitted);
+ 
++       size = ALIGN(size, SECTION_SIZE);
++
+        phys = memblock_alloc(size, align);
+        memblock_free(phys, size);
+        memblock_remove(phys, size);
 
-- Paul
+or, leaving a few comments about the restriction kindly..?
