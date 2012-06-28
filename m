@@ -1,84 +1,52 @@
-From: eduardo.valentin@ti.com (Valentin, Eduardo)
-Date: Thu, 28 Jun 2012 13:55:13 +0300
-Subject: [PATCH v3 2/7] mfd: omap: control: core system control driver
-In-Reply-To: <CAGF5oy85XSfBtV_WFwYyWDHYmBbLGHK_9c9XhTFs1CgnSfyMLA@mail.gmail.com>
-References: <4FEB4B46.9020904@dev.rtsoft.ru> <20120628045028.GC2471@besouro>
- <4FEC25CA.10105@dev.rtsoft.ru>
- <CAGF5oy9heLnjcHj4H=hMK9NAkrDoOocR-Lbv1Z4cQ4G1C5kSeQ@mail.gmail.com>
- <4FEC2E1D.5040309@dev.rtsoft.ru> <4FEC3154.9050103@dev.rtsoft.ru>
- <CAGF5oy85XSfBtV_WFwYyWDHYmBbLGHK_9c9XhTFs1CgnSfyMLA@mail.gmail.com>
-Message-ID: <CAGF5oy-50evWVX8+U6qe0wwA0UXJUAXxXXbwrEkebSVtT8vxRA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 28 Jun 2012 12:57:20 +0200
+Subject: [PATCH] ARM: imx: fix i.MX35 CPU architecture
+In-Reply-To: <147037481.185152.1340828906821.JavaMail.root@advansee.com>
+References: <147037481.185152.1340828906821.JavaMail.root@advansee.com>
+Message-ID: <20120628105720.GA21278@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+On Wed, Jun 27, 2012 at 10:28:26PM +0200, Beno?t Th?baudeau wrote:
+> The data sheet of the i.MX35 says it is an ARM1136JF-S processor, version r1p3,
+> which, according to section "B.1. New instructions" of the ARM1136JF-S and
+> ARM1136J-S Technical Reference Manual, makes the i.MX35 CPU architecture not
+> only ARMv6, but ARMv6k.
 
-On Thu, Jun 28, 2012 at 1:51 PM, Valentin, Eduardo
-<eduardo.valentin@ti.com> wrote:
-> Hello,
->
-> On Thu, Jun 28, 2012 at 1:26 PM, Konstantin Baydarov
-> <kbaidarov@dev.rtsoft.ru> wrote:
->> On 06/28/2012 02:12 PM, Konstantin Baydarov wrote:
->>> The interface(design) of omap-control-core.c has already been discussed many times :(
->>> Eduardo, in his patch set, suggested following design:
->>> - omap-control-core.c ioremaps SCM window and provide functions to read/write SCP register for bandgap and usb.
->>>
->>> IIRC, this approach didn't satisfy and it was suggested to have private read/write in bandgap and usb.
->>>
->>> So, my patch set introduces following design:
->>> - omap-control-core.c don't provide read/write functions for bandgap and usb.
->>> - bandgap and usb use their own private read/write functions
->>> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped to the same virtual address. But the problem is that SMP memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach.
->> I mean:
->>
->> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped. So each call of ioremap in omap-control-core.c, bandgap and usb drivers returns the same virtual address. But the problem is that SCM memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach(when each driver remaps the same IOMEM).
->>
->>>
->>> Another possible design is:
->>> - omap-control-core.c ioremaps and reserves SCM IOMEM window
->>> - omap-control-core.c exports omap_control_get_base(virtual base address is returned) to use in bandgap and usb_phy driver.
->>> - Bandgap and usb phy uses their own private read/write function.
->>> IIUC, this way was suggested by Tony.
->
-> Well I understood slightly different :-)
->
-> I think the point is not really where to put the access functions, but
-> to have each driver handling a separate part of the the io window. As
-> I said before, so that they don't access each other io area.
->
-> If you have 1 io window, for the above mentioned constraint, you won't
-> protect anything. So, in that sense, it doesn't make much difference
-> if you have access functions in core, or in the children, as they are
-> all sharing the same io window. Of course, in case we put only 1 io
-> window, for me it is safer if that window is managed in only one
-> place, instead of several places.
->
-> The question is then, can we split the io area into smaller windows
-> for each children? Considering the children registers are not
-> contiguous :-(. In theory we can put several entries in the 'reg' DT
-> property, but that becomes a bit messy as it will change depending on
-> OMAP version. Anyways, if we split the scm io window into several io
-> smaller areas/chunks, then it makes sense to have access functions in
-> each children.
->
->>>
->>> I guess It's better to settle the design(interface) of omap-control-core.c, bandgap and usb phy and then submit the next version of patch set.
->>
->
-> Agreed. Here. We need to decide how to have this design and stick to it.
+Is this true for i.MX31 aswell? If not, we would have to add additional
+magic to enable CPU_V6K only when SOC_IMX31 is not selected.
 
-Once the design is agreed, the series can probably be split into
-parts, so we can have the scm core and its children worked separately
+Sascha
 
->
->
-> --
->
-> Eduardo Valentin
-
-
+> 
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+> ---
+>  .../arch/arm/mach-imx/Kconfig                      |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/Kconfig linux-next-HEAD-49289f3/arch/arm/mach-imx/Kconfig
+> index eff4db5..0345e85 100644
+> --- linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/Kconfig
+> +++ linux-next-HEAD-49289f3/arch/arm/mach-imx/Kconfig
+> @@ -73,7 +73,7 @@ config SOC_IMX31
+>  
+>  config SOC_IMX35
+>  	bool
+> -	select CPU_V6
+> +	select CPU_V6K
+>  	select ARCH_MXC_IOMUX_V3
+>  	select COMMON_CLK
+>  	select HAVE_EPIT
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-
-Eduardo Valentin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
