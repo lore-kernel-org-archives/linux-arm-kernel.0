@@ -1,40 +1,51 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Thu, 28 Jun 2012 15:10:08 +0300
-Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56AD496BE@IL-MB01.marvell.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 28 Jun 2012 14:10:21 +0200
+Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
+In-Reply-To: <20120628120835.GA3402@vandijck-laurijssen.be>
+References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
+ <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+ <4FEC329C.7070004@pengutronix.de>
+ <20120628112111.GC22990@S2101-09.ap.freescale.net>
+ <4FEC400F.8010506@pengutronix.de>
+ <20120628114108.GD22990@S2101-09.ap.freescale.net>
+ <20120628120835.GA3402@vandijck-laurijssen.be>
+Message-ID: <4FEC49AD.1000609@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Gregory Clement [mailto:gregory.clement at free-electrons.com]
-> Sent: Wednesday, June 27, 2012 4:55 PM
-> To: Arnd Bergmann; Olof Johansson
-> Cc: Ben Dooks; Jason Cooper; Andrew Lunn; Nicolas Pitre; Lior Amsalem;
-> Maen Suleiman; linux-arm-kernel at lists.infradead.org; Thomas Petazzoni;
-> Gregory Clement; Jon Masters; David Marlin; Tawfik Bayouk; Shadi Ammouri;
-> Eran Ben-Avi; Yehuda Yitschak; Nadav Haklai; Eric Miao
-> Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370 and
-> Armada XP SoC
+On 06/28/2012 02:08 PM, Kurt Van Dijck wrote:
+> On Thu, Jun 28, 2012 at 07:41:10PM +0800, Shawn Guo wrote:
+>> On Thu, Jun 28, 2012 at 01:29:19PM +0200, Marc Kleine-Budde wrote:
+>>> I mean which name is more precise, do these gpio enable/standy a "phy"
+>>> or a "transceiver". For example:
+>>> http://www.nxp.com/documents/application_note/AN00094.pdf, this document
+>>> says: TJA1041/1041A high speed CAN transceiver.
+>>>
+>> Isn't term "phy" (physical interface) generally meant to be the same
+>> thing as "transceiver"?  I just happened to like the shorter one as
+>> what Hui did in his patch.
 > 
-> Arnd, Olof,
+> 'trx' seemed the right abbreviation
+> http://www.acronymfinder.com/TRX.html
 > 
-> You'll find in this patch set the fifth version of the initial support for a new
-> family of ARMv7-compatible Marvell SoCs.
-> 
+> thanks to Oliver, in his email on May 9th.
 
-Hi Gregory, patch V5 tested by me and booted fine on Armada-XP board, also reboot command is now working.
+I was about to propose CamelCase to keep the variable names shorter:
 
-Tested-by: Lior Amsalem <alior@marvell.com>
-Thanks!
+bool transceiverStbyActiveLow;
 
-[snip]
-> 
-> Best regards,
-> 
-> Gregory Clement
+scnr, Marc
 
-Regards,
-Lior Amsalem
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120628/667b8137/attachment.sig>
