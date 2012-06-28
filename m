@@ -1,106 +1,42 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 28 Jun 2012 20:41:32 +0530
-Subject: [PATCHv11 6/6] i2c: omap: Recover from Bus Busy condition
+Date: Thu, 28 Jun 2012 20:41:27 +0530
+Subject: [PATCHv11 1/6] i2c: omap: Optimise the remove code
 In-Reply-To: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340896292-12112-7-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340896292-12112-2-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikram Pandita <vikram.pandita@ti.com>
+The omap_i2c_remove function may not be needed after
+device exit so the memory could be freed.
 
-In case a peripheral is driving SDA bus low (ie. a start condition), provide
-a constant clock output using the test mode of the OMAP I2C controller to
-try and clear the bus. Soft reset I2C controller after attempting the bus clear
-to ensure that controller is in a good state.
-
-Based upon Vikram Pandita's patch from TI Android 3.0.
-I acknowledge the contributions and suggestions of Jon and Hemant.
-
-A couple differences from the original patch ...
-1. Add a new function for bus clear
-2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
-   output a permanent clock. This bit needs to be set and typically it would
-   be set by the unidle function but this is not the case for all OMAP
-   generations.
-3. Program the SYSTEST setting only the bits we care about. However, restore
-   SYSTEST registers to there original state as some OMAP generations do not
-   implement perform a soft-reset.
-4. Clear the CON register after performing the bus clear, so when we call the
-   init function the controller is disabled and the init function will
-   re-enable later.
-
-Original patch can be found here:
-http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
-
-Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   30 +++++++++++++++++++++++++++---
- 1 files changed, 27 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 5058dfc..2500f19 100644
+index 9895fa7..b086076 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -148,16 +148,15 @@ enum {
- #define OMAP_I2C_SCLH_HSSCLH	8
- 
- /* I2C System Test Register (OMAP_I2C_SYSTEST): */
--#ifdef DEBUG
- #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
- #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
- #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
--#define OMAP_I2C_SYSTEST_TMODE_SHIFT	(12)		/* Test mode select */
-+#define OMAP_I2C_SYSTEST_TMODE_TEST	(2 << 12)	/* Test mode select */
-+#define OMAP_I2C_SYSTEST_TMODE_LOOP	(3 << 12)	/* Test mode select */
- #define OMAP_I2C_SYSTEST_SCL_I		(1 << 3)	/* SCL line sense in */
- #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
- #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
- #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
--#endif
- 
- /* OCP_SYSCONFIG bit definitions */
- #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
-@@ -458,6 +457,29 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
- 
- 	return 0;
+@@ -1102,8 +1102,7 @@ err_release_region:
+ 	return r;
  }
-+/*
-+ * Bus Clear
-+ */
-+static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
-+{
-+	u16 w;
-+
-+	/*
-+	 * Per the I2C specification, if we are stuck in a bus busy state
-+	 * we can attempt a bus clear to try and recover the bus by sending
-+	 *@least 9 clock pulses on SCL. Put the I2C in a test mode so it
-+	 * will output a continuous clock on SCL.
-+	 */
-+	w = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, (OMAP_I2C_SYSTEST_ST_EN
-+			   | OMAP_I2C_SYSTEST_TMODE_TEST));
-+	msleep(1);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, w);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	omap_i2c_init(dev);
-+	return omap_i2c_wait_for_bb(dev);
-+}
  
- /*
-  * Low level master read/write transaction.
-@@ -584,6 +606,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+-static int
+-omap_i2c_remove(struct platform_device *pdev)
++static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
+@@ -1187,7 +1186,7 @@ static struct dev_pm_ops omap_i2c_pm_ops = {
  
- 	r = omap_i2c_wait_for_bb(dev);
- 	if (r < 0)
-+		r = omap_i2c_bus_clear(dev);
-+	if (r < 0)
- 		goto out;
- 
- 	if (dev->set_mpu_wkup_lat != NULL)
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+-	.remove		= omap_i2c_remove,
++	.remove		= __devexit_p(omap_i2c_remove),
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+ 		.owner	= THIS_MODULE,
 -- 
 1.7.5.4
