@@ -1,72 +1,62 @@
-From: neidhard.kim@lge.com (Kim, Jong-Sung)
-Date: Thu, 28 Jun 2012 14:43:17 +0900
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <20120627160220.GA2310@linaro.org>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <025701cd457e$d5065410$7f12fc30$@lge.com> <20120627160220.GA2310@linaro.org>
-Message-ID: <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Thu, 28 Jun 2012 14:07:13 +0800
+Subject: [PATCH] bindings: update imx and mxs #gpio-cells
+In-Reply-To: <1340853337-4406-1-git-send-email-shawn.guo@linaro.org>
+References: <1340853337-4406-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FEBF491.8040003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Dave Martin [mailto:dave.martin at linaro.org]
-> Sent: Thursday, June 28, 2012 1:02 AM
-> 
-> For me, it appears that this block just contains the initial region passed
-> in ATAG_MEM or on the command line, with some reservations for
-> swapper_pg_dir, the kernel text/data, device tree and initramfs.
-> 
-> So far as I can tell, the only memory guaranteed to be mapped here is the
-> kernel image: there may be no guarantee that there is any unused space in
-> this region which could be used to allocate extra page tables.
-> The rest appears during the execution of map_lowmem().
-> 
-> Cheers
-> ---Dave
+Shawn Guo wrote:
+> The of_get_named_gpio_flags can retrieve the second cell of
+> gpio-specifier as the "flags".  The imx and mxs gpio driver do not
+> have their own .xlate callback, which means of_gpio_simple_xlate is
+> used and it's a 1:1 mapping between gpio controller flags and Linux
+> "enum of_gpio_flags".
+>
+> Update imx and mxs bindings document to make it clear.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |    5 +++--
+>  .../devicetree/bindings/gpio/gpio-mxs.txt          |    5 +++--
+>  2 files changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+> index 4363ae4..5f360e7 100644
+> --- a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+> +++ b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+> @@ -8,8 +8,9 @@ Required properties:
+>    by low 16 pins and the second one is for high 16 pins.
+>  - gpio-controller : Marks the device node as a gpio controller.
+>  - #gpio-cells : Should be two.  The first cell is the pin number and
+> -  the second cell is used to specify optional parameters (currently
+> -  unused).
+> +  the second cell is used to specify the gpio polarity:
+> +      0 = active high
+> +      1 = active low
+>   
+Agree with this design, looks good to me.
 
-Thank you for your comment, Dave! It was not that sophisticated choice, but
-I thought that normal embedded system trying to reduce the BOM would have a
-big-enough first memblock memory region. However you're right. There can be
-exceptional systems. Then, how do you think about following manner:
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e5dad60..0bc5316 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1094,6 +1094,16 @@ static void __init kmap_init(void)
- static void __init map_lowmem(void)
- {
-        struct memblock_region *reg;
-+       phys_addr_t pmd_map_end = 0;
-+
-+       for_each_memblock(memory, reg) {
-+               pmd_map_end = reg->base + reg->size;
-+               if((reg->base | reg->size) & ~PMD_MASK)
-+                       break;
-+       }
-+       if(pmd_map_end > lowmem_limit)
-+               pmd_map_end = lowmem_limit;
-+       memblock_set_current_limit(pmd_map_end & PMD_MASK);
- 
-        /* Map all the lowmem memory banks. */
-        for_each_memblock(memory, reg) {
-@@ -1113,6 +1123,8 @@ static void __init map_lowmem(void)
- 
-                create_mapping(&map);
-        }
-+
-+       memblock_set_current_limit(lowmem_limit);
- }
- 
- /*
-@@ -1123,8 +1135,6 @@ void __init paging_init(struct machine_desc *mdesc)
- {
-        void *zero_page;
- 
--       memblock_set_current_limit(arm_lowmem_limit);
--
-        build_mem_type_table();
-        prepare_page_table();
-        map_lowmem();
-
-This will not limit the PTE-allocation to near the end of first bank.
+Regards,
+Hui.
+>  
+>  Example:
+>  
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mxs.txt b/Documentation/devicetree/bindings/gpio/gpio-mxs.txt
+> index 0c35673..1e677a4 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-mxs.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-mxs.txt
+> @@ -13,8 +13,9 @@ Required properties for GPIO node:
+>  - interrupts : Should be the port interrupt shared by all 32 pins.
+>  - gpio-controller : Marks the device node as a gpio controller.
+>  - #gpio-cells : Should be two.  The first cell is the pin number and
+> -  the second cell is used to specify optional parameters (currently
+> -  unused).
+> +  the second cell is used to specify the gpio polarity:
+> +      0 = active high
+> +      1 = active low
+>  - interrupt-controller: Marks the device node as an interrupt controller.
+>  - #interrupt-cells : Should be 2.  The first cell is the GPIO number.
+>    The second cell bits[3:0] is used to specify trigger type and level flags:
+>   
