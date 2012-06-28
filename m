@@ -1,63 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 28 Jun 2012 17:42:47 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <201206280505.41201.marex@denx.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <201206271433.15303.jbe@pengutronix.de> <201206280505.41201.marex@denx.de>
-Message-ID: <201206281742.47936.marex@denx.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Jun 2012 17:42:54 +0200
+Subject: How to use ARM ETM/ETB at linux?
+In-Reply-To: <CAHrpEqRk4SQ+8LHCOX0zwtZjnTe=k0c_GCJMqvYMZBUa-dJq=A@mail.gmail.com>
+References: <CAHrpEqRk4SQ+8LHCOX0zwtZjnTe=k0c_GCJMqvYMZBUa-dJq=A@mail.gmail.com>
+Message-ID: <CACRpkdZv+Kp0apmLcZQgY07z1YQ3gC8r+d9Ed-c0OZLTo7DN6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
+On Thu, Jun 21, 2012 at 7:38 AM, Frank Li <lznuaa@gmail.com> wrote:
 
-> Dear Juergen Beisert,
-> 
-> [...]
-> 
-> So, I've been thinking about mapping channels and delay slots at runtime.
-> Is it really necessary? I know it's really cool and all, but it adds a lot
-> of complexity. For starters, I was thinking we should try to do static
-> mapping. And when that's all perfected, go further and try doing it
-> dynamically. What do you think about the following DT binding:
-> 
-> lradc at 80050000 {
->         compatible = "fsl,imx28-lradc";
->         reg = <0x80050000 2000>;
->         interrupts = <10 14 15 16 17 18 19
->                         20 21 22 23 24 25>;
->         fsl,delay-freq = <10 100 50 60>;
->         fsl,delay-repeat = <3 10 5 6>;
->         fsl,delay-channels = <
->                 0 2 0 3 0 4 0 5
->                 1 8 1 9 2 12 3 13>;
+> Anyone use ARM ETM/ETB before?
 
+I know for sure that Arve has been making good use of the ETB+ETB,
+since there are some nice patches for it in the Android source tree,
+but I don't know how he's using it :-)
 
-btw. I don't like the idea of those tuples here ... any hint how to do it 
-better?
+John Stultz recently submitted some of Arves patches upstream so let's
+ask these gentlemen how they use it.
 
->         status = "disabled";
-> };
-> 
-> fsl,delay-freq would be an array (for all four delay channels) of their
-> sampling frequencies.
-> 
-> fsl,delay-repeat would be an array (for all four delay channels) of the
-> oversampling count.
-> 
-> fsl,delay-channels would be an array (for all four delay channels) of
-> touples of delay channel, adc channel. In the above example, it's ADC
-> channels 2,3,4,5 mapped to delay channel 0, ADC channels 8,9 mapped to
-> delay channel 1 etc.
-> 
-> Now, it might be dumb, advice is welcome!
-> 
-> > > [...]
-> > 
-> > Regards,
-> > Juergen
-> 
-> Best regards,
-> Marek Vasut
+Yours,
+Linus Walleij
 
-Best regards,
-Marek Vasut
+>
+> I run.
+> echo 1 > /sys/devices/etm/trace_running
+>
+> root at freescale /$ echo v >/proc/sysrq-trigger
+> SysRq : etm
+> Trace buffer contents length: 4
+> --- ETB buffer begin ---
+> 01000000000000000000000000000000
+>
+> --- ETB buffer end ---
+>
+>
+> best regards
+> Frank Li
+
+Yours,
+Linus Walleij
