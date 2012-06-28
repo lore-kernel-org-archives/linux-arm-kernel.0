@@ -1,42 +1,55 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 28 Jun 2012 17:21:00 +0530
-Subject: [PATCH v1 04/11] arm: omap: hwmod: add a new addr space in otg for
- writing to control module
+Date: Thu, 28 Jun 2012 17:21:04 +0530
+Subject: [PATCH v1 08/11] arm/dts: Add twl4030-usb data
 In-Reply-To: <1340884267-28908-1-git-send-email-kishon@ti.com>
 References: <1340884267-28908-1-git-send-email-kishon@ti.com>
-Message-ID: <1340884267-28908-5-git-send-email-kishon@ti.com>
+Message-ID: <1340884267-28908-9-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mailbox register for usb otg in omap is present in control module.
-On detection of any events VBUS or ID, this register should be written
-to send the notification to musb core.
-
-Till we have a separate control module driver to write to control module,
-omap2430 will handle the register writes to control module by itself. So
-a new address space to represent this control module register is added
-to usb_otg_hs.
+Add twl4030-usb data node in twl4030 device tree file.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/twl4030.dtsi |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 249ff76..2c28754 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -5897,6 +5897,11 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
- 		.pa_end		= 0x4a0ab003,
- 		.flags		= ADDR_TYPE_RT
- 	},
-+	{
-+		.pa_start	= 0x4a00233c,
-+		.pa_end		= 0x4a00233f,
-+		.flags		= ADDR_TYPE_RT
-+	},
- 	{ }
- };
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+index 22f4d13..66534a3 100644
+--- a/arch/arm/boot/dts/twl4030.dtsi
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -37,6 +37,18 @@
+ 		regulator-max-microvolt = <3150000>;
+ 	};
  
++	vusb1v5: regulator at 3 {
++		compatible = "ti,twl4030-vusb1v5";
++	};
++
++	vusb1v8: regulator at 4 {
++		compatible = "ti,twl4030-vusb1v8";
++	};
++
++	vusb3v1: regulator at 5 {
++		compatible = "ti,twl4030-vusb3v1";
++	};
++
+ 	twl_gpio: gpio {
+ 		compatible = "ti,twl4030-gpio";
+ 		gpio-controller;
+@@ -44,4 +56,13 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 	};
++
++	twl4030-usb {
++		compatible = "ti,twl4030-usb";
++		interrupts = < 10 4 >;
++		usb1v5-supply = <&vusb1v5>;
++		usb1v8-supply = <&vusb1v8>;
++		usb3v1-supply = <&vusb3v1>;
++		usb_mode = <1>;
++	};
+ };
 -- 
 1.7.5.4
