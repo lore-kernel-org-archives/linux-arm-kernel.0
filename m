@@ -1,61 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jun 2012 10:08:27 +0100
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <alpine.LFD.2.02.1206280019160.31003@xanadu.home>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <20120627161224.GB2310@linaro.org>
- <alpine.LFD.2.02.1206280019160.31003@xanadu.home>
-Message-ID: <20120628090827.GH19026@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Jun 2012 17:09:30 +0800
+Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
+In-Reply-To: <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
+References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
+ <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
+Message-ID: <20120628090927.GB22990@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 12:33:02AM -0400, Nicolas Pitre wrote:
-> I propose the following two patches instead -- both patches are included 
-> inline not to break the email thread.  What do you think?
-> 
-> ---------- >8
-> 
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date: Wed, 27 Jun 2012 23:02:31 -0400
-> Subject: [PATCH] ARM: head.S: simplify initial page table mapping
-> 
-> Let's map the initial RAM up to the end of the kernel.bss plus 64MB
-> instead of the strict kernel image area.  This simplifies the code
-> as the kernel image only needs to be handled specially in the XIP case.
-> This also give some room for the early memory allocator to use before
-> the real mapping is finally installed with the actual amount of memory.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Hi Olof,
 
-Why is this needed?  The initial allocation is sufficient, and you really
-should not be wanting to _allocate_ memory in your ->reserve method and
-have it be _usable_ at that point.
+On Mon, Jun 11, 2012 at 12:47:15PM +0800, Shawn Guo wrote:
+> Shawn Guo (2):
+>       ARM: imx6q: remove unneeded clkdev lookups
 
-> Early on the only accessible memory comes from the initial mapping
-> performed in head.S, minus those page table entries cleared in
-> prepare_page_table().  Eventually the full lowmem is available once
-> map_lowmem() has mapped it.  Let's have this properly reflected in the
-> memblock allocator limit.
+We agreed that this one is actually a cleanup and can be held off
+until 3.6 ...
 
-Err, I don't think you understand what's going on here.
+>       ARM: imx6q: fix suspend regression caused by common clk migration
 
-The sequence is:
+... but this is one is indeed a fix, which seems missed from your
+pull-request to Linus.
 
-1. setup the initial mappings so we can run the kernel in virtual space.
-2. provide the memory areas to memblock
-3. ask the platform to reserve whatever memory it wants from memblock
-   [this means using memblock_reserve or arm_memblock_steal).  The
-   reserved memory is *not* expected to be mapped at this point, and is
-   therefore inaccessible.
-4. Setup the lowmem mappings.
-
-And when we're setting up the lowmem mappings, we do *not* expect to
-create any non-section page mappings, which again means we have no reason
-to use the memblock allocator to obtain memory that we want to immediately
-use.
-
-So I don't know where you're claim of being "fragile" is coming from.
-
-What is fragile is people wanting to use arm_memblock_steal() without
-following the rules for it I layed down.
+-- 
+Regards,
+Shawn
