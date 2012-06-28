@@ -1,243 +1,299 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 28 Jun 2012 23:52:05 -0400
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
-Message-ID: <1340941925-14591-3-git-send-email-shijie8@gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 28 Jun 2012 15:51:51 +0000
+Subject: [PATCH-V2 2/4] ARM: OMAP3+: clock: Move common clksel_rate &
+ clock data to common file
+In-Reply-To: <1338285402-11306-3-git-send-email-hvaibhav@ti.com>
+References: <1338285402-11306-1-git-send-email-hvaibhav@ti.com>
+ <1338285402-11306-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5D6E4@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huang Shijie <b32955@freescale.com>
+On Tue, May 29, 2012 at 15:26:40, Hiremath, Vaibhav wrote:
+> From: Paul Walmsley <paul@pwsan.com>
+> 
+> OMAP3, OMAP4 and AM33xx share some common data like, clksel_rate
+> oscillator clock input (Virtual clock nodes), required for
+> clock tree; so move common data to common data file so that it
+> can be reused.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> [hvaibhav at ti.com: Created separate commit from Paul's developement
+>   branch]
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 
-The gpmi nand driver may needs several clocks(MX6Q needs five clocks).
+Paul,
 
-In the old clock framework, all these clocks are chained together,
-all you need is to manipulate the first clock.
+Any comments on this approach? If you are ok, I would want to split
+this patch and take it forward separately.
 
-But the kernel uses the common clk framework now, which forces us to
-get the clocks one by one. When we use them, we have to enable them
-one by one too.
+Thanks,
+Vaibhav
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
-Signed-off-by: Huang Shijie <shijie8@gmail.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   43 ++++++++++++++++++----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   63 +++++++++++++++++++++++++++-----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    3 +-
- 3 files changed, 91 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index a1f4332..c3778c0 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -124,12 +124,40 @@ error:
- 	return -ETIMEDOUT;
- }
- 
-+static int __gpmi_enable_clk(struct gpmi_nand_data *this, bool v)
-+{
-+	struct clk *clk;
-+	int ret;
-+	int i;
-+
-+	for (i = 0; i < GPMI_CLK_MAX; i++) {
-+		clk = this->resources.clock[i];
-+		if (!clk)
-+			break;
-+
-+		if (v) {
-+			ret = clk_prepare_enable(clk);
-+			if (ret)
-+				goto err_clk;
-+		} else {
-+			clk_disable_unprepare(clk);
-+		}
-+	}
-+	return 0;
-+
-+err_clk:
-+	return ret;
-+}
-+
-+#define gpmi_enable_clk(x) __gpmi_enable_clk(x, true)
-+#define gpmi_disable_clk(x) __gpmi_enable_clk(x, false)
-+
- int gpmi_init(struct gpmi_nand_data *this)
- {
- 	struct resources *r = &this->resources;
- 	int ret;
- 
--	ret = clk_prepare_enable(r->clock);
-+	ret = gpmi_enable_clk(this);
- 	if (ret)
- 		goto err_out;
- 	ret = gpmi_reset_block(r->gpmi_regs, false);
-@@ -149,7 +177,7 @@ int gpmi_init(struct gpmi_nand_data *this)
- 	/* Select BCH ECC. */
- 	writel(BM_GPMI_CTRL1_BCH_MODE, r->gpmi_regs + HW_GPMI_CTRL1_SET);
- 
--	clk_disable_unprepare(r->clock);
-+	gpmi_disable_clk(this);
- 	return 0;
- err_out:
- 	return ret;
-@@ -205,7 +233,7 @@ int bch_set_geometry(struct gpmi_nand_data *this)
- 	ecc_strength  = bch_geo->ecc_strength >> 1;
- 	page_size     = bch_geo->page_size;
- 
--	ret = clk_prepare_enable(r->clock);
-+	ret = gpmi_enable_clk(this);
- 	if (ret)
- 		goto err_out;
- 
-@@ -240,7 +268,7 @@ int bch_set_geometry(struct gpmi_nand_data *this)
- 	writel(BM_BCH_CTRL_COMPLETE_IRQ_EN,
- 				r->bch_regs + HW_BCH_CTRL_SET);
- 
--	clk_disable_unprepare(r->clock);
-+	gpmi_disable_clk(this);
- 	return 0;
- err_out:
- 	return ret;
-@@ -716,7 +744,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
- 	int ret;
- 
- 	/* Enable the clock. */
--	ret = clk_prepare_enable(r->clock);
-+	ret = gpmi_enable_clk(this);
- 	if (ret) {
- 		pr_err("We failed in enable the clk\n");
- 		goto err_out;
-@@ -727,7 +755,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
- 		gpmi_regs + HW_GPMI_TIMING1);
- 
- 	/* Get the timing information we need. */
--	nfc->clock_frequency_in_hz = clk_get_rate(r->clock);
-+	nfc->clock_frequency_in_hz = clk_get_rate(r->clock[0]);
- 	clock_period_in_ns = 1000000000 / nfc->clock_frequency_in_hz;
- 
- 	gpmi_nfc_compute_hardware_timing(this, &hw);
-@@ -784,8 +812,7 @@ err_out:
- 
- void gpmi_end(struct gpmi_nand_data *this)
- {
--	struct resources *r = &this->resources;
--	clk_disable_unprepare(r->clock);
-+	gpmi_disable_clk(this);
- }
- 
- /* Clears a BCH interrupt. */
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 941cfb7..edda3b1 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -464,9 +464,59 @@ acquire_err:
- 	return -EINVAL;
- }
- 
-+static void gpmi_put_clks(struct gpmi_nand_data *this)
-+{
-+	struct resources *r = &this->resources;
-+	struct clk *clk;
-+	int i;
-+
-+	for (i = 0; i < GPMI_CLK_MAX; i++) {
-+		clk = r->clock[i];
-+		if (clk) {
-+			clk_put(clk);
-+			r->clock[i] = NULL;
-+		}
-+	}
-+}
-+
-+static char *extra_clks_for_mx6q[] = {
-+	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
-+};
-+
-+static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
-+{
-+	struct resources *r = &this->resources;
-+	char **extra_clks = NULL;
-+	struct clk *clk;
-+	int i;
-+
-+	r->clock[0] = clk_get(&this->pdev->dev, NULL);
-+	if (IS_ERR(r->clock[0]))
-+		goto err_clock;
-+
-+	/* Get extra clocks */
-+	if (GPMI_IS_MX6Q(this))
-+		extra_clks = extra_clks_for_mx6q;
-+	if (!extra_clks)
-+		return 0;
-+
-+	for (i = 1; i < GPMI_CLK_MAX; i++) {
-+		clk = clk_get(NULL, extra_clks[i - 1]);
-+		if (IS_ERR(clk))
-+			goto err_clock;
-+
-+		r->clock[i] = clk;
-+	}
-+	return 0;
-+
-+err_clock:
-+	pr_err("failed in finding the clocks.\n");
-+	gpmi_put_clks(this);
-+	return -ENOMEM;
-+}
-+
- static int __devinit acquire_resources(struct gpmi_nand_data *this)
- {
--	struct resources *res = &this->resources;
- 	struct pinctrl *pinctrl;
- 	int ret;
- 
-@@ -492,12 +542,9 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
- 		goto exit_pin;
- 	}
- 
--	res->clock = clk_get(&this->pdev->dev, NULL);
--	if (IS_ERR(res->clock)) {
--		pr_err("can not get the clock\n");
--		ret = -ENOENT;
-+	ret = gpmi_get_clks(this);
-+	if (ret)
- 		goto exit_clock;
--	}
- 	return 0;
- 
- exit_clock:
-@@ -512,9 +559,7 @@ exit_regs:
- 
- static void release_resources(struct gpmi_nand_data *this)
- {
--	struct resources *r = &this->resources;
--
--	clk_put(r->clock);
-+	gpmi_put_clks(this);
- 	release_register_block(this);
- 	release_bch_irq(this);
- 	release_dma_channels(this);
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index ce5daa1..1547a60 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -22,6 +22,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/fsl/mxs-dma.h>
- 
-+#define GPMI_CLK_MAX 5 /* MX6Q needs five clocks */
- struct resources {
- 	void          *gpmi_regs;
- 	void          *bch_regs;
-@@ -29,7 +30,7 @@ struct resources {
- 	unsigned int  bch_high_interrupt;
- 	unsigned int  dma_low_channel;
- 	unsigned int  dma_high_channel;
--	struct clk    *clock;
-+	struct clk    *clock[GPMI_CLK_MAX];
- };
- 
- /**
--- 
-1.7.4.4
+> ---
+> I would like propose further data moment from clock tree perspective,
+> 
+>  - Move all "clksel_rate" to common clock data, since one or the
+>    multiple clocktree's will use them.
+>  - Move virtual clk data structures to common clock data.
+>  - Move 32k clk structure to common clock data.
+> 
+>  arch/arm/mach-omap2/clock.h             |   12 +++++
+>  arch/arm/mach-omap2/clock3xxx_data.c    |   20 ++------
+>  arch/arm/mach-omap2/clock44xx_data.c    |   72 -----------------------------
+>  arch/arm/mach-omap2/clock_common_data.c |   77 +++++++++++++++++++++++++++++++
+>  4 files changed, 93 insertions(+), 88 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+> index a1bb23a..980b0a4 100644
+> --- a/arch/arm/mach-omap2/clock.h
+> +++ b/arch/arm/mach-omap2/clock.h
+> @@ -155,4 +155,16 @@ extern const struct clkops clkops_omap3_noncore_dpll_ops;
+>  extern const struct clkops clkops_omap3_core_dpll_ops;
+>  extern const struct clkops clkops_omap4_dpllmx_ops;
+> 
+> +/* clksel_rate blocks shared between OMAP44xx and AM33xx */
+> +extern const struct clksel_rate div_1_0_rates[];
+> +extern const struct clksel_rate div_1_1_rates[];
+> +extern const struct clksel_rate div_1_2_rates[];
+> +extern const struct clksel_rate div_1_3_rates[];
+> +extern const struct clksel_rate div_1_4_rates[];
+> +extern const struct clksel_rate div31_1to31_rates[];
+> +
+> +/* clocks shared between various OMAP SoCs */
+> +extern struct clk virt_19200000_ck;
+> +extern struct clk virt_26000000_ck;
+> +
+>  #endif
+> diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+> index 452b613..160ced3 100644
+> --- a/arch/arm/mach-omap2/clock3xxx_data.c
+> +++ b/arch/arm/mach-omap2/clock3xxx_data.c
+> @@ -93,18 +93,6 @@ static struct clk virt_16_8m_ck = {
+>  	.rate		= 16800000,
+>  };
+> 
+> -static struct clk virt_19_2m_ck = {
+> -	.name		= "virt_19_2m_ck",
+> -	.ops		= &clkops_null,
+> -	.rate		= 19200000,
+> -};
+> -
+> -static struct clk virt_26m_ck = {
+> -	.name		= "virt_26m_ck",
+> -	.ops		= &clkops_null,
+> -	.rate		= 26000000,
+> -};
+> -
+>  static struct clk virt_38_4m_ck = {
+>  	.name		= "virt_38_4m_ck",
+>  	.ops		= &clkops_null,
+> @@ -145,8 +133,8 @@ static const struct clksel osc_sys_clksel[] = {
+>  	{ .parent = &virt_12m_ck,   .rates = osc_sys_12m_rates },
+>  	{ .parent = &virt_13m_ck,   .rates = osc_sys_13m_rates },
+>  	{ .parent = &virt_16_8m_ck, .rates = osc_sys_16_8m_rates },
+> -	{ .parent = &virt_19_2m_ck, .rates = osc_sys_19_2m_rates },
+> -	{ .parent = &virt_26m_ck,   .rates = osc_sys_26m_rates },
+> +	{ .parent = &virt_19200000_ck, .rates = osc_sys_19_2m_rates },
+> +	{ .parent = &virt_26000000_ck,   .rates = osc_sys_26m_rates },
+>  	{ .parent = &virt_38_4m_ck, .rates = osc_sys_38_4m_rates },
+>  	{ .parent = NULL },
+>  };
+> @@ -3230,8 +3218,8 @@ static struct omap_clk omap3xxx_clks[] = {
+>  	CLK(NULL,	"virt_12m_ck",	&virt_12m_ck,	CK_3XXX),
+>  	CLK(NULL,	"virt_13m_ck",	&virt_13m_ck,	CK_3XXX),
+>  	CLK(NULL,	"virt_16_8m_ck", &virt_16_8m_ck, CK_3430ES2PLUS | CK_AM35XX  | CK_36XX),
+> -	CLK(NULL,	"virt_19_2m_ck", &virt_19_2m_ck, CK_3XXX),
+> -	CLK(NULL,	"virt_26m_ck",	&virt_26m_ck,	CK_3XXX),
+> +	CLK(NULL,	"virt_19200000_ck", &virt_19200000_ck, CK_3XXX),
+> +	CLK(NULL,	"virt_26000000_ck",	&virt_26000000_ck,	CK_3XXX),
+>  	CLK(NULL,	"virt_38_4m_ck", &virt_38_4m_ck, CK_3XXX),
+>  	CLK(NULL,	"osc_sys_ck",	&osc_sys_ck,	CK_3XXX),
+>  	CLK(NULL,	"sys_ck",	&sys_ck,	CK_3XXX),
+> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+> index 2172f66..66c2e27 100644
+> --- a/arch/arm/mach-omap2/clock44xx_data.c
+> +++ b/arch/arm/mach-omap2/clock44xx_data.c
+> @@ -106,18 +106,6 @@ static struct clk virt_16800000_ck = {
+>  	.rate		= 16800000,
+>  };
+> 
+> -static struct clk virt_19200000_ck = {
+> -	.name		= "virt_19200000_ck",
+> -	.ops		= &clkops_null,
+> -	.rate		= 19200000,
+> -};
+> -
+> -static struct clk virt_26000000_ck = {
+> -	.name		= "virt_26000000_ck",
+> -	.ops		= &clkops_null,
+> -	.rate		= 26000000,
+> -};
+> -
+>  static struct clk virt_27000000_ck = {
+>  	.name		= "virt_27000000_ck",
+>  	.ops		= &clkops_null,
+> @@ -130,31 +118,6 @@ static struct clk virt_38400000_ck = {
+>  	.rate		= 38400000,
+>  };
+> 
+> -static const struct clksel_rate div_1_0_rates[] = {
+> -	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
+> -	{ .div = 0 },
+> -};
+> -
+> -static const struct clksel_rate div_1_1_rates[] = {
+> -	{ .div = 1, .val = 1, .flags = RATE_IN_4430 },
+> -	{ .div = 0 },
+> -};
+> -
+> -static const struct clksel_rate div_1_2_rates[] = {
+> -	{ .div = 1, .val = 2, .flags = RATE_IN_4430 },
+> -	{ .div = 0 },
+> -};
+> -
+> -static const struct clksel_rate div_1_3_rates[] = {
+> -	{ .div = 1, .val = 3, .flags = RATE_IN_4430 },
+> -	{ .div = 0 },
+> -};
+> -
+> -static const struct clksel_rate div_1_4_rates[] = {
+> -	{ .div = 1, .val = 4, .flags = RATE_IN_4430 },
+> -	{ .div = 0 },
+> -};
+> -
+>  static const struct clksel_rate div_1_5_rates[] = {
+>  	{ .div = 1, .val = 5, .flags = RATE_IN_4430 },
+>  	{ .div = 0 },
+> @@ -288,41 +251,6 @@ static struct clk dpll_abe_x2_ck = {
+>  	.recalc		= &omap3_clkoutx2_recalc,
+>  };
+> 
+> -static const struct clksel_rate div31_1to31_rates[] = {
+> -	{ .div = 1, .val = 1, .flags = RATE_IN_4430 },
+> -	{ .div = 2, .val = 2, .flags = RATE_IN_4430 },
+> -	{ .div = 3, .val = 3, .flags = RATE_IN_4430 },
+> -	{ .div = 4, .val = 4, .flags = RATE_IN_4430 },
+> -	{ .div = 5, .val = 5, .flags = RATE_IN_4430 },
+> -	{ .div = 6, .val = 6, .flags = RATE_IN_4430 },
+> -	{ .div = 7, .val = 7, .flags = RATE_IN_4430 },
+> -	{ .div = 8, .val = 8, .flags = RATE_IN_4430 },
+> -	{ .div = 9, .val = 9, .flags = RATE_IN_4430 },
+> -	{ .div = 10, .val = 10, .flags = RATE_IN_4430 },
+> -	{ .div = 11, .val = 11, .flags = RATE_IN_4430 },
+> -	{ .div = 12, .val = 12, .flags = RATE_IN_4430 },
+> -	{ .div = 13, .val = 13, .flags = RATE_IN_4430 },
+> -	{ .div = 14, .val = 14, .flags = RATE_IN_4430 },
+> -	{ .div = 15, .val = 15, .flags = RATE_IN_4430 },
+> -	{ .div = 16, .val = 16, .flags = RATE_IN_4430 },
+> -	{ .div = 17, .val = 17, .flags = RATE_IN_4430 },
+> -	{ .div = 18, .val = 18, .flags = RATE_IN_4430 },
+> -	{ .div = 19, .val = 19, .flags = RATE_IN_4430 },
+> -	{ .div = 20, .val = 20, .flags = RATE_IN_4430 },
+> -	{ .div = 21, .val = 21, .flags = RATE_IN_4430 },
+> -	{ .div = 22, .val = 22, .flags = RATE_IN_4430 },
+> -	{ .div = 23, .val = 23, .flags = RATE_IN_4430 },
+> -	{ .div = 24, .val = 24, .flags = RATE_IN_4430 },
+> -	{ .div = 25, .val = 25, .flags = RATE_IN_4430 },
+> -	{ .div = 26, .val = 26, .flags = RATE_IN_4430 },
+> -	{ .div = 27, .val = 27, .flags = RATE_IN_4430 },
+> -	{ .div = 28, .val = 28, .flags = RATE_IN_4430 },
+> -	{ .div = 29, .val = 29, .flags = RATE_IN_4430 },
+> -	{ .div = 30, .val = 30, .flags = RATE_IN_4430 },
+> -	{ .div = 31, .val = 31, .flags = RATE_IN_4430 },
+> -	{ .div = 0 },
+> -};
+> -
+>  static const struct clksel dpll_abe_m2x2_div[] = {
+>  	{ .parent = &dpll_abe_x2_ck, .rates = div31_1to31_rates },
+>  	{ .parent = NULL },
+> diff --git a/arch/arm/mach-omap2/clock_common_data.c b/arch/arm/mach-omap2/clock_common_data.c
+> index 6424d46..b9f3ba6 100644
+> --- a/arch/arm/mach-omap2/clock_common_data.c
+> +++ b/arch/arm/mach-omap2/clock_common_data.c
+> @@ -43,3 +43,80 @@ const struct clksel_rate dsp_ick_rates[] = {
+>  	{ .div = 3, .val = 3, .flags = RATE_IN_243X },
+>  	{ .div = 0 },
+>  };
+> +
+> +
+> +/* clksel_rate blocks shared between OMAP44xx and AM33xx */
+> +
+> +const struct clksel_rate div_1_0_rates[] = {
+> +	{ .div = 1, .val = 0, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 0 },
+> +};
+> +
+> +const struct clksel_rate div_1_1_rates[] = {
+> +	{ .div = 1, .val = 1, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 0 },
+> +};
+> +
+> +const struct clksel_rate div_1_2_rates[] = {
+> +	{ .div = 1, .val = 2, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 0 },
+> +};
+> +
+> +const struct clksel_rate div_1_3_rates[] = {
+> +	{ .div = 1, .val = 3, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 0 },
+> +};
+> +
+> +const struct clksel_rate div_1_4_rates[] = {
+> +	{ .div = 1, .val = 4, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 0 },
+> +};
+> +
+> +const struct clksel_rate div31_1to31_rates[] = {
+> +	{ .div = 1, .val = 1, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 2, .val = 2, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 3, .val = 3, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 4, .val = 4, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 5, .val = 5, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 6, .val = 6, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 7, .val = 7, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 8, .val = 8, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 9, .val = 9, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 10, .val = 10, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 11, .val = 11, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 12, .val = 12, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 13, .val = 13, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 14, .val = 14, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 15, .val = 15, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 16, .val = 16, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 17, .val = 17, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 18, .val = 18, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 19, .val = 19, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 20, .val = 20, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 21, .val = 21, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 22, .val = 22, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 23, .val = 23, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 24, .val = 24, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 25, .val = 25, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 26, .val = 26, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 27, .val = 27, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 28, .val = 28, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 29, .val = 29, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 30, .val = 30, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 31, .val = 31, .flags = RATE_IN_4430 | RATE_IN_AM33XX },
+> +	{ .div = 0 },
+> +};
+> +
+> +/* Clocks shared between various OMAP SoCs */
+> +
+> +struct clk virt_19200000_ck = {
+> +	.name		= "virt_19200000_ck",
+> +	.ops		= &clkops_null,
+> +	.rate		= 19200000,
+> +};
+> +
+> +struct clk virt_26000000_ck = {
+> +	.name		= "virt_26000000_ck",
+> +	.ops		= &clkops_null,
+> +	.rate		= 26000000,
+> +};
+> --
+> 1.7.0.4
+> 
+> 
