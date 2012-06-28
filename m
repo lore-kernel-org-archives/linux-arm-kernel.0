@@ -1,31 +1,40 @@
-From: kurt.van.dijck@eia.be (Kurt Van Dijck)
-Date: Thu, 28 Jun 2012 14:08:35 +0200
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20120628114108.GD22990@S2101-09.ap.freescale.net>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <4FEC329C.7070004@pengutronix.de>
- <20120628112111.GC22990@S2101-09.ap.freescale.net>
- <4FEC400F.8010506@pengutronix.de>
- <20120628114108.GD22990@S2101-09.ap.freescale.net>
-Message-ID: <20120628120835.GA3402@vandijck-laurijssen.be>
+From: alior@marvell.com (Lior Amsalem)
+Date: Thu, 28 Jun 2012 15:10:08 +0300
+Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56AD496BE@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 07:41:10PM +0800, Shawn Guo wrote:
-> On Thu, Jun 28, 2012 at 01:29:19PM +0200, Marc Kleine-Budde wrote:
-> > I mean which name is more precise, do these gpio enable/standy a "phy"
-> > or a "transceiver". For example:
-> > http://www.nxp.com/documents/application_note/AN00094.pdf, this document
-> > says: TJA1041/1041A high speed CAN transceiver.
-> > 
-> Isn't term "phy" (physical interface) generally meant to be the same
-> thing as "transceiver"?  I just happened to like the shorter one as
-> what Hui did in his patch.
+> -----Original Message-----
+> From: Gregory Clement [mailto:gregory.clement at free-electrons.com]
+> Sent: Wednesday, June 27, 2012 4:55 PM
+> To: Arnd Bergmann; Olof Johansson
+> Cc: Ben Dooks; Jason Cooper; Andrew Lunn; Nicolas Pitre; Lior Amsalem;
+> Maen Suleiman; linux-arm-kernel at lists.infradead.org; Thomas Petazzoni;
+> Gregory Clement; Jon Masters; David Marlin; Tawfik Bayouk; Shadi Ammouri;
+> Eran Ben-Avi; Yehuda Yitschak; Nadav Haklai; Eric Miao
+> Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370 and
+> Armada XP SoC
+> 
+> Arnd, Olof,
+> 
+> You'll find in this patch set the fifth version of the initial support for a new
+> family of ARMv7-compatible Marvell SoCs.
+> 
 
-'trx' seemed the right abbreviation
-http://www.acronymfinder.com/TRX.html
+Hi Gregory, patch V5 tested by me and booted fine on Armada-XP board, also reboot command is now working.
 
-thanks to Oliver, in his email on May 9th.
+Tested-by: Lior Amsalem <alior@marvell.com>
+Thanks!
 
-Kurt
+[snip]
+> 
+> Best regards,
+> 
+> Gregory Clement
+
+Regards,
+Lior Amsalem
