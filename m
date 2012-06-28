@@ -1,42 +1,89 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 28 Jun 2012 02:25:59 -0400 (EDT)
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <025701cd457e$d5065410$7f12fc30$@lge.com> <20120627160220.GA2310@linaro.org>
- <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
-Message-ID: <alpine.LFD.2.02.1206280223250.31003@xanadu.home>
+From: eduardo.valentin@ti.com (Valentin, Eduardo)
+Date: Thu, 28 Jun 2012 09:29:35 +0300
+Subject: [PATCH v3 0/7] OMAP System Control Module
+In-Reply-To: <20120628044343.GA2471@besouro>
+References: <4FEB4B30.2040305@dev.rtsoft.ru>
+	<20120628044343.GA2471@besouro>
+Message-ID: <CAGF5oy925c96QqwjqMEaUYDon+mSVGd2dtgnWrzwnrq0rN14Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jun 2012, Kim, Jong-Sung wrote:
+Hello Konstantin,
 
-> > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > Sent: Thursday, June 28, 2012 1:02 AM
-> > 
-> > For me, it appears that this block just contains the initial region passed
-> > in ATAG_MEM or on the command line, with some reservations for
-> > swapper_pg_dir, the kernel text/data, device tree and initramfs.
-> > 
-> > So far as I can tell, the only memory guaranteed to be mapped here is the
-> > kernel image: there may be no guarantee that there is any unused space in
-> > this region which could be used to allocate extra page tables.
-> > The rest appears during the execution of map_lowmem().
-> > 
-> > Cheers
-> > ---Dave
-> 
-> Thank you for your comment, Dave! It was not that sophisticated choice, but
-> I thought that normal embedded system trying to reduce the BOM would have a
-> big-enough first memblock memory region. However you're right. There can be
-> exceptional systems. Then, how do you think about following manner:
-[...]
+On Thu, Jun 28, 2012 at 7:43 AM, Eduardo Valentin
+<eduardo.valentin@ti.com> wrote:
+> Hello,
+>
+> On Wed, Jun 27, 2012 at 10:04:32PM +0400, Konstantin Baydarov wrote:
+>> ?Hello.
+>>
+>> This is a next version of series of patches(based on Eduardo Valentin's patch set) adding a basic support for system control module, on OMAP4+ context. It is a working in progress.
+>>
+>> Main changes since previous patch set version:
+>> - Bandgap and usb phy: drivers are now independent from control module driver, they use their own functions to acess scm registers.
+>
+> Well, I believe the idea of having them with their own io resource was to avoid
+> children drivers accessing each other io areas. Is this now working?
+>
+>> - omap-control-core: resources aren't hardcoded, they are specified in dts file.
+>> - omap-control-core: Control module is a built-in driver - added control module select to ARCH_HAS_CONTROL_MODULE and ARCH_OMAP4.
+>> Probably, no configuration option is required!
+>
+> Why is this? I suppose the idea is to have the arch config selecting that flag.
+>
+>> - omap-control-core: Added early init call that ioremaps control module IOMEM window, this allows access of SCM registers very early, for example from omap_type()
+>
+> Is this going to be reserved as well? if yes, how children are going to have
+> their own access functions?
+>
+>> - omap-control-core: Removed device pointer from omap-control-core API arguments, becuase there can be only one instance control
+>> module device.
+>> - omap-control-core: removed omap_control_get, omap_control_readl, omap_control_writel
+>
+> fine, assuming the io split works...
+>
+>> - omap-control-core: added omap_control_status_read that is used early in omap_type
+>> - Bandgap and usb phy: Added private spinlocks for bandgap and usb drivers.
+>> - Bandgap: Check the type of bandgap dynamically in bandgap driver probe function by reading
+>> omap core control module revision register CONTROL_GEN_CORE_REVISION.
+>
+> this has some issue... I will post comment on the patch
+>
+>> - Bandgap and usb phy: Parent SCM platform device IOMEM resources is used to get the base address of SCM window.
+>
+> Ohh.. Then what is the point of having them using their own io access functions,
+> nothing is again protected as you have only 1 io resource which is shared.
+> And now is even worse because you have several io access function..
+> I think this is moving backwards.
+>
+>> - Bandgap masks defines were moved to drivers/thermal/omap-bandgap.c.
+>>
+>> TODO list for bandgap driver:
+>> - Reserve omap-control-core IOMEM window.
+>> - Improve thermal zone definition for OMAP4
+>> - Introduce the thermal zones for OMAP5
+>
+> Based on the review comments on RFC patch series, there are more
+> things to be done.
+>
+> I have the O4 and O5 zone definition ready. But that work depends
+> on generic CPU cooling patches. I have also looked the driver support
+> for 4430. But the probing and io resource split is still based on
+> previous design. I have also a patch which does the remapping in the
+> bandgap driver. But really, for this to work it would require to have
+> several entries in the reg property. And that is going to change from
+> BG version to BG version.
+>
+> I can prepare some patches for this.
 
-This still has some possibilities for failure.
+You can find the updated patches here:
+git at gitorious.org:thermal-framework/thermal-framework.git
+thermal_work/omap/bandgap_clean
 
-Please have a look at the two patches I've posted to fix this in a 
-better way.
+But, as I said they are based on the generic cpu cooling. And the zone
+registration follows the API as in linux-next.
 
 
-Nicolas
+-- 
+
+Eduardo Valentin
