@@ -1,56 +1,46 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 11:45:01 +0800
-Subject: [PATCH 05/11] ARM: dts: imx28-evk: add vmmc-supply for mmc device
+Date: Thu, 28 Jun 2012 11:45:02 +0800
+Subject: [PATCH 06/11] ARM: dts: imx28-evk: add missing properties for fec
 In-Reply-To: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
 References: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1340855107-4664-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1340855107-4664-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vmmc-supply for mmc device, so that the power to mmc slot can be
-turned on by mmc driver if bootloader hasn't done it.
-
-Also remove "okay" status for mmc1/ssp1, as the device has pin conflict
-with gpmi-nand.  Actually the device is already disabled since the
-mxs-mmc driver adopts pinctrl support because there is no pinctrl setup
-for the device in dts.  Make this explicit by removing "okay" status.
+Add missing properties for fec, phy-supply, phy-reset-gpios and
+phy-reset-duration, which are required by fec driver for successfully
+probe fec from device tree, if bootloader hasn't set those things up.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx28-evk.dts |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx28-evk.dts |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 505ae5e..28b94d3 100644
+index 28b94d3..cf2ab2e 100644
 --- a/arch/arm/boot/dts/imx28-evk.dts
 +++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -35,6 +35,7 @@
- 					&mmc0_cd_cfg &mmc0_sck_cfg>;
- 				bus-width = <8>;
- 				wp-gpios = <&gpio2 12 0>;
-+				vmmc-supply = <&reg_vddio_sd0>;
- 				status = "okay";
- 			};
+@@ -120,6 +120,9 @@
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
++			phy-supply = <&reg_fec_3v3>;
++			phy-reset-gpios = <&gpio4 13 0>;
++			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
  
-@@ -42,7 +43,6 @@
- 				compatible = "fsl,imx28-mmc";
- 				bus-width = <8>;
- 				wp-gpios = <&gpio0 28 0>;
--				status = "okay";
- 			};
- 
- 			pinctrl at 80018000 {
-@@ -141,6 +141,14 @@
+@@ -149,6 +152,14 @@
  			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
+ 			gpio = <&gpio3 28 0>;
  		};
 +
-+		reg_vddio_sd0: vddio-sd0 {
++		reg_fec_3v3: fec-3v3 {
 +			compatible = "regulator-fixed";
-+			regulator-name = "vddio-sd0";
++			regulator-name = "fec-3v3";
 +			regulator-min-microvolt = <3300000>;
 +			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio3 28 0>;
++			gpio = <&gpio2 15 0>;
 +		};
  	};
  
