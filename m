@@ -1,64 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 11:37:59 +0800
-Subject: [PATCH 1/2] ARM: dts: imx28: Add additionnal muxing options to
- iMX28 DTSI
-In-Reply-To: <1340785092-27035-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1340785092-27035-1-git-send-email-maxime.ripard@free-electrons.com>
- <1340785092-27035-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120628033757.GA30041@S2101-09.ap.freescale.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 28 Jun 2012 11:37:19 +0800
+Subject: [PATCH v8 02/14] usb: chipidea: drop useless arch-check
+In-Reply-To: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
+References: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340854652-24717-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 10:18:11AM +0200, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Cc: Brian Lily <brian@crystalfontz.com>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 4634cb8..2b067d2 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -167,6 +167,14 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				duart_pins_b: duart at 1 {
-> +					reg = <1>;
-> +					fsl,pinmux-ids = <0x3022 0x3032>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
+From: Felipe Balbi <balbi@ti.com>
 
-This should be put right after duart_pins_a.  I fixed it up and applied
-the patch.
+msm glue layer compiles on all arches just
+fine. Let's drop the unnecessary ARCH check
+so we have easier compile tests.
 
-Regards,
-Shawn
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Acked-by: Marek Vasut <marex@denx.de>
+---
+ drivers/usb/chipidea/Makefile |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
->  				mac0_pins_a: mac0 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <0x4000 0x4010 0x4020
-> @@ -196,6 +204,15 @@
->  					fsl,pull-up = <1>;
->  				};
->  
-> +				mmc0_4bit_pins_a: mmc0-4bit at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x2000 0x2010 0x2020
-> +						0x2030 0x2080 0x2090 0x20a0>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
-> +
->  				mmc0_cd_cfg: mmc0-cd-cfg {
->  					fsl,pinmux-ids = <0x2090>;
->  					fsl,pull-up = <0>;
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index cc34937..b69900a 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -5,10 +5,12 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+ 
++# Glue/Bridge layers go here
++
++obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
++
++# PCI doesn't provide stubs, need to check
+ ifneq ($(CONFIG_PCI),)
+ 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
+ endif
+ 
+-ifneq ($(CONFIG_ARCH_MSM),)
+-	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
+-endif
+-- 
+1.7.9.5
