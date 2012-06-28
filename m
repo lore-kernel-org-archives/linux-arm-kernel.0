@@ -1,72 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 Jun 2012 16:32:28 -0600
-Subject: [PATCH] ARM: tegra: use of_default_bus_match_table
-Message-ID: <1340922748-24131-1-git-send-email-swarren@wwwdotorg.org>
+From: frankyl@broadcom.com (Franky Lin)
+Date: Thu, 28 Jun 2012 15:53:27 -0700
+Subject: Panda ES board hang when using GPIO as interrupt
+In-Reply-To: <4FECD2E5.1060603@ti.com>
+References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
+ <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
+ <4FECCB91.7090609@broadcom.com> <4FECD2E5.1060603@ti.com>
+Message-ID: <4FECE067.7000809@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 06/28/2012 02:55 PM, Jon Hunter wrote:
+> Ok. Any way to manually reset the wlan module to deactivate the gpio
+> when it is hung? I am wondering if the gpio is deactivated if the board
+> comes back to life, indicating it is stuck in the interrupt somewhere.
 
-of_default_bus_match_table is a table of default bus types supported by
-of_platform_populate(). Since Tegra has no need to support any specific
-custom list of bus types, modify the DT board files to use this default
-list.
+The only way I can think of is removing the module manually. But it 
+didn't bring the board back to live.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-dt-tegra20.c |    7 +------
- arch/arm/mach-tegra/board-dt-tegra30.c |    7 +------
- 2 files changed, 2 insertions(+), 12 deletions(-)
+> Well, at least that is consistent with what I see, but also perplexing
+> that it takes sometime to fail. Can you try the following as a debug
+> patch to see if it is in the context restore that is the problem. From
+> your testing and bisect, the only possible difference in the current
+> kernel is that it could perform the context restore when acquiring the gpio.
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index c4ed172..a2401bd 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1341,6 +1341,8 @@ void omap2_gpio_resume_after_idle(void)
+>   #if defined(CONFIG_PM_RUNTIME)
+>   static void omap_gpio_restore_context(struct gpio_bank *bank)
+>   {
+> +       return;
+> +
+>          __raw_writel(bank->context.wake_en,
+>                                  bank->base + bank->regs->wkup_en);
+>          __raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
+>
 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 8b4e6e1..510b485 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -81,11 +81,6 @@ static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
- 	{ NULL,		NULL,		0,		0},
- };
- 
--static struct of_device_id tegra_dt_match_table[] __initdata = {
--	{ .compatible = "simple-bus", },
--	{}
--};
--
- static void __init tegra_dt_init(void)
- {
- 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
-@@ -94,7 +89,7 @@ static void __init tegra_dt_init(void)
- 	 * Finished with the static registrations now; fill in the missing
- 	 * devices
- 	 */
--	of_platform_populate(NULL, tegra_dt_match_table,
-+	of_platform_populate(NULL, of_default_bus_match_table,
- 				tegra20_auxdata_lookup, NULL);
- }
- 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
-index 4f76fa7..48a2ef8 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-@@ -36,11 +36,6 @@
- #include "board.h"
- #include "clock.h"
- 
--static struct of_device_id tegra_dt_match_table[] __initdata = {
--	{ .compatible = "simple-bus", },
--	{}
--};
--
- struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000000, "sdhci-tegra.0", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000200, "sdhci-tegra.1", NULL),
-@@ -74,7 +69,7 @@ static void __init tegra30_dt_init(void)
- {
- 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
- 
--	of_platform_populate(NULL, tegra_dt_match_table,
-+	of_platform_populate(NULL, of_default_bus_match_table,
- 				tegra30_auxdata_lookup, NULL);
- }
- 
--- 
-1.7.0.4
+This one works! It can run more than 20 mins.
+
+I found one interesting thing. When I added the print info to see when 
+runtime_suspend/resume get called, it seems like the suspend/resume is 
+unbalance during boot. Resume got called more than suspend. So I hack 
+the code to make sure suspend and resume are called in pair. A resume 
+without suspend will do nothing and return immediately. This also makes 
+the hang vanish.
+
+Regards,
+Franky
