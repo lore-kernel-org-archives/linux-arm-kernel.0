@@ -1,30 +1,61 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 28 Jun 2012 10:46:11 +0200
-Subject: [PATCH] ARM: i.MX SSI: Removed an unnecessary setting SSI_SCR_NET
- bit
-In-Reply-To: <1340865557-4626-1-git-send-email-shc_work@mail.ru>
-References: <1340865557-4626-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20460.6611.441889.115771@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jun 2012 10:08:27 +0100
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <alpine.LFD.2.02.1206280019160.31003@xanadu.home>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <20120627161224.GB2310@linaro.org>
+ <alpine.LFD.2.02.1206280019160.31003@xanadu.home>
+Message-ID: <20120628090827.GH19026@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 28, 2012 at 12:33:02AM -0400, Nicolas Pitre wrote:
+> I propose the following two patches instead -- both patches are included 
+> inline not to break the email thread.  What do you think?
+> 
+> ---------- >8
+> 
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date: Wed, 27 Jun 2012 23:02:31 -0400
+> Subject: [PATCH] ARM: head.S: simplify initial page table mapping
+> 
+> Let's map the initial RAM up to the end of the kernel.bss plus 64MB
+> instead of the strict kernel image area.  This simplifies the code
+> as the kernel image only needs to be handled specially in the XIP case.
+> This also give some room for the early memory allocator to use before
+> the real mapping is finally installed with the actual amount of memory.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Alexander Shiyan writes:
-> This patch removes unnecessary setting of SSI_SCR_NET bit in code
-> of setup format for i.MX SSI. This bit is we are already setup at
-                                         ^^^^^^^^^
-parse error.
+Why is this needed?  The initial allocation is sufficient, and you really
+should not be wanting to _allocate_ memory in your ->reserve method and
+have it be _usable_ at that point.
 
+> Early on the only accessible memory comes from the initial mapping
+> performed in head.S, minus those page table entries cleared in
+> prepare_page_table().  Eventually the full lowmem is available once
+> map_lowmem() has mapped it.  Let's have this properly reflected in the
+> memblock allocator limit.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Err, I don't think you understand what's going on here.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+The sequence is:
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1. setup the initial mappings so we can run the kernel in virtual space.
+2. provide the memory areas to memblock
+3. ask the platform to reserve whatever memory it wants from memblock
+   [this means using memblock_reserve or arm_memblock_steal).  The
+   reserved memory is *not* expected to be mapped at this point, and is
+   therefore inaccessible.
+4. Setup the lowmem mappings.
+
+And when we're setting up the lowmem mappings, we do *not* expect to
+create any non-section page mappings, which again means we have no reason
+to use the memblock allocator to obtain memory that we want to immediately
+use.
+
+So I don't know where you're claim of being "fragile" is coming from.
+
+What is fragile is people wanting to use arm_memblock_steal() without
+following the rules for it I layed down.
