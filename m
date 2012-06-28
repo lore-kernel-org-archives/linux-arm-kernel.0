@@ -1,54 +1,37 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 28 Jun 2012 19:48:16 +0800
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20120628114559.GE22990@S2101-09.ap.freescale.net>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <20120628113327.GJ6406@shlinux2.ap.freescale.net>
- <20120628114559.GE22990@S2101-09.ap.freescale.net>
-Message-ID: <20120628114815.GL6406@shlinux2.ap.freescale.net>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Thu, 28 Jun 2012 17:28:14 +0530
+Subject: [PATCH 2/4] ARM: OMAP2+: Move the stubbed prm and cm functions to
+ prcm.c file and make them __weak.
+In-Reply-To: <CAJ7qFSdiMgM3S5Q+XaFAGrgcL5M5f8CLHyKSRtBKu4AK6ei-BA@mail.gmail.com>
+References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
+ <1336669615-16454-3-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.00.1205101140230.32719@utopia.booyaka.com>
+ <CAJ7qFSdiMgM3S5Q+XaFAGrgcL5M5f8CLHyKSRtBKu4AK6ei-BA@mail.gmail.com>
+Message-ID: <CAJ7qFSfu3yyj8YqETTzx+wipi1Nbf5m5fDLC26Tfojav+Lb56Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 07:46:02PM +0800, Shawn Guo wrote:
-> On Thu, Jun 28, 2012 at 07:33:28PM +0800, Dong Aisheng wrote:
-> > > +		phy_stby_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
-> > > +							"phy-standby-gpios",
-> > > +							0, &flags);
-> > > +		if (gpio_is_valid(phy_stby_gpio)) {
-> > > +			if (flags == OF_GPIO_ACTIVE_LOW)
-> > > +				phy_stby_high = false;
-> > > +			err = devm_gpio_request_one(&pdev->dev, phy_stby_gpio,
-> > > +						    GPIOF_DIR_OUT,
-> > > +						    "phy-standby");
-> > > +			if (err) {
-> > > +				dev_err(&pdev->dev,
-> > > +					"failed to request gpio %d: %d\n",
-> > > +					phy_stby_gpio, err);
-> > > +				goto failed_gpio;
-> > I checked mx28 evk, it seems the phy only has a STB gpio and shared by both CAN0&CAN1.
-> > I wonder the CAN1 probe may fail here.
-> > 
-> It can be managed by dts.  Here is what I have in imx28-evk.dts, where
-> only can0 has phy-enable-gpios property.
-> 
-> 
-> 	can0: can at 80032000 {
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&can0_pins_a>;
-> 		phy-enable-gpios = <&gpio2 13 0>;
-> 		status = "okay";
-> 	};
-> 
-> 	can1: can at 80034000 {
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&can1_pins_a>;
-> 		status = "okay";
-> 	};
-Yes, that is a solution.
-But it may not so reasonable since dts file should represent hw, but here
-we have to do some trick by we know how driver works.
-Maybe we need find a better solution.
+ Ping..
 
-Regards
-Dong Aisheng
+Thanks,
+ Sricharan
+
+On Thu, Jun 14, 2012 at 5:26 PM, R, Sricharan <r.sricharan@ti.com> wrote:
+> Hi Paul,
+>
+>>> Some prm and cm registers read/write and status functions
+>>> are built only for some custom OMAP2+ builds and are stubbed
+>>> in header files for other builds under ifdef statements.
+>>> But this results in adding new CONFIG_ARCH_OMAPXXX
+>>> checks when SOCs are added in the future. So move them
+>>> to a common place for OMAP2+ and make them 'weak' implementations.
+>>
+>> Thanks for the patch. ?These stubs aren't needed any longer, so we can
+>> just get rid of them; no need to mark them __weak. ?I've got a patch to
+>> just drop them here to be posted soon as part of a larger PRCM cleanup.
+>>
+>>
+> ?Is the PRCM cleanup series available now ?
+>
+> Thanks,
+> ?Sricharan
