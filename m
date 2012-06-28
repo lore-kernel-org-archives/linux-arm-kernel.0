@@ -1,50 +1,79 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 28 Jun 2012 12:44:30 +0000
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <20120628123207.GG19842@atomide.com>
-References: <cover.1340778002.git.afzal@ti.com>
- <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
- <20120627145844.GL3483@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
- <20120628123207.GG19842@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A0812@DBDE01.ent.ti.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 28 Jun 2012 20:47:37 +0800
+Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
+In-Reply-To: <20460.20182.552394.407578@ipc1.ka-ro>
+References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
+ <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+ <20120628113327.GJ6406@shlinux2.ap.freescale.net>
+ <20120628114559.GE22990@S2101-09.ap.freescale.net>
+ <4FEC487A.2050901@pengutronix.de>
+ <20120628121817.GA5755@shlinux2.ap.freescale.net>
+ <20460.20182.552394.407578@ipc1.ka-ro>
+Message-ID: <20120628124736.GA5778@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Thu, Jun 28, 2012 at 18:02:07, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120628 02:36]:
-
-> > diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-> > index c8a9487..bbae674 100644
-> > --- a/arch/arm/mach-omap2/gpmc-onenand.c
-> > +++ b/arch/arm/mach-omap2/gpmc-onenand.c
-> > @@ -364,6 +364,8 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
-> >         struct gpmc_timings t;
-> >         int ret;
-> > 
-> > +       omap2_onenand_set_async_mode(onenand_base);
-> > +
-> >         t = omap2_onenand_calc_async_timings();
-> > 
-> >         ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
+On Thu, Jun 28, 2012 at 08:32:22PM +0800, Lothar Wa?mann wrote:
+> Hi,
 > 
-> Yes that seems to do the trick, thanks! I can fold that into the
-> breaking patch when applying.
-
-
-Also following needs to be removed from commit message,
-
-"Ensuring sync read/write are disabled in onenand cannot
-be expected to work properly unless GPMC is setup, this
-has been removed."
-
-With the above diff we are in effect disabling sync mode in
-onenand before GPMC has been setup in the Kernel
-
-If you want, I can sent a new series too.
+> Dong Aisheng writes:
+> > On Thu, Jun 28, 2012 at 08:05:14PM +0800, Marc Kleine-Budde wrote:
+> > > On 06/28/2012 01:46 PM, Shawn Guo wrote:
+> > > > On Thu, Jun 28, 2012 at 07:33:28PM +0800, Dong Aisheng wrote:
+> > > >>> +		phy_stby_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+> > > >>> +							"phy-standby-gpios",
+> > > >>> +							0, &flags);
+> > > >>> +		if (gpio_is_valid(phy_stby_gpio)) {
+> > > >>> +			if (flags == OF_GPIO_ACTIVE_LOW)
+> > > >>> +				phy_stby_high = false;
+> > > >>> +			err = devm_gpio_request_one(&pdev->dev, phy_stby_gpio,
+> > > >>> +						    GPIOF_DIR_OUT,
+> > > >>> +						    "phy-standby");
+> > > >>> +			if (err) {
+> > > >>> +				dev_err(&pdev->dev,
+> > > >>> +					"failed to request gpio %d: %d\n",
+> > > >>> +					phy_stby_gpio, err);
+> > > >>> +				goto failed_gpio;
+> > > >> I checked mx28 evk, it seems the phy only has a STB gpio and shared by both CAN0&CAN1.
+> > > >> I wonder the CAN1 probe may fail here.
+> > > >>
+> > > > It can be managed by dts.  Here is what I have in imx28-evk.dts, where
+> > > > only can0 has phy-enable-gpios property.
+> > > > 
+> > > > 
+> > > > 	can0: can at 80032000 {
+> > > > 		pinctrl-names = "default";
+> > > > 		pinctrl-0 = <&can0_pins_a>;
+> > > > 		phy-enable-gpios = <&gpio2 13 0>;
+> > > > 		status = "okay";
+> > > > 	};
+> > > > 
+> > > > 	can1: can at 80034000 {
+> > > > 		pinctrl-names = "default";
+> > > > 		pinctrl-0 = <&can1_pins_a>;
+> > > > 		status = "okay";
+> > > > 	};
+> > > 
+> > > Will this work if can0 is down and can1 is up?
+> > > 
+> > > Can we abstract the transceiver power as a regulator? Or a clock? :P
+> > > 
+> > Hmm, it may not be a power.
+> > For mx28evk, it's a STBY pin.
+> > So it may hard to abstract it as a regulator or clock.
+> > 
+> I have created a 'gpio-switch' driver in my private tree that can be
+> used for exactly this purpose. It takes care of the pin polarity and
+> initial state of the pins and can handle shared pins like in this
+> case. The client driver does not even need to care whether an actual
+> GPIO exists for the current platform.
+> 
+> I could prepare a patch and post it here.
+> 
+Would be glad to see your patches.
+It may be useful, not only for this case,
+we also meet some other issues, i'm not sure but may have similar requirement
+like SDIO WiFi reset, usb phy reset and etc.
 
 Regards
-Afzal
+Dong Aisheng
