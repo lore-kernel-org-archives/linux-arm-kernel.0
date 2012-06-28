@@ -1,60 +1,49 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 28 Jun 2012 14:24:32 +0200
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20120628121302.GI22990@S2101-09.ap.freescale.net>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <4FEC329C.7070004@pengutronix.de>
- <20120628112111.GC22990@S2101-09.ap.freescale.net>
- <4FEC400F.8010506@pengutronix.de>
- <20120628114108.GD22990@S2101-09.ap.freescale.net>
- <20460.18717.17688.965250@ipc1.ka-ro>
- <20120628121302.GI22990@S2101-09.ap.freescale.net>
-Message-ID: <20460.19712.158996.397146@ipc1.ka-ro>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Jun 2012 05:32:07 -0700
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+References: <cover.1340778002.git.afzal@ti.com>
+ <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+ <20120627145844.GL3483@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+Message-ID: <20120628123207.GG19842@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo writes:
-> On Thu, Jun 28, 2012 at 02:07:57PM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Shawn Guo writes:
-> > > On Thu, Jun 28, 2012 at 01:29:19PM +0200, Marc Kleine-Budde wrote:
-> > > > I mean which name is more precise, do these gpio enable/standy a "phy"
-> > > > or a "transceiver". For example:
-> > > > http://www.nxp.com/documents/application_note/AN00094.pdf, this document
-> > > > says: TJA1041/1041A high speed CAN transceiver.
-> > > > 
-> > > Isn't term "phy" (physical interface) generally meant to be the same
-> > > thing as "transceiver"?  I just happened to like the shorter one as
-> > > what Hui did in his patch.
-> > > 
-> > > But it does not really matter to me, will change the name since you
-> > > care about it.
-> > > 
-> > A transceiver is just a dumb piece of hardware, while a PHY contains
-> > some intelligence of its own.
-> > 
-> Then, it sounds more like a PHY than transceiver, since it's an IC
-> chip with some control over it.
+* Mohammed, Afzal <afzal@ti.com> [120628 02:36]:
+> Hi Tony,
 > 
-The 'I' in 'IC' does not stand for 'intelligent', but for
-'integrated'. ;)
-A can transceiver is usually merely a switchable buffer. There are no
-registers to configure it or an internal processor that does some
-magic.
+> On Wed, Jun 27, 2012 at 20:28:45, Tony Lindgren wrote:
+> 
+> > The last patch in this series causes onenand not to show
+> > up on my n900. I believe the problem has been there earlier
+> > too, but I just did not notice it.
+> 
+> Sorry for the delayed response, could reach workplace a short
+> while ago only
+> 
+> Could the diff [1] be tried and check whether it resolves the issue,
+> 
+> Regards
+> Afzal
+> 
+> [1]
+> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+> index c8a9487..bbae674 100644
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -364,6 +364,8 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+>         struct gpmc_timings t;
+>         int ret;
+> 
+> +       omap2_onenand_set_async_mode(onenand_base);
+> +
+>         t = omap2_onenand_calc_async_timings();
+> 
+>         ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
 
+Yes that seems to do the trick, thanks! I can fold that into the
+breaking patch when applying.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Tony
