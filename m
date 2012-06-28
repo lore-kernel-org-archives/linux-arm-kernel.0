@@ -1,48 +1,38 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 28 Jun 2012 16:07:20 +0530
-Subject: [PATCH 0/6] Port Tegra to generic clk framework
-Message-ID: <1340879846-12900-1-git-send-email-pgaikwad@nvidia.com>
+Date: Thu, 28 Jun 2012 16:07:23 +0530
+Subject: [PATCH 3/6] ARM: tegra: Rename tegra20 clock file
+In-Reply-To: <1340879846-12900-1-git-send-email-pgaikwad@nvidia.com>
+References: <1340879846-12900-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <1340879846-12900-4-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set ports Tegra clock code to generic clock framework.
+Make the name consistent with other files.
+s/tegra2/tegra20
 
-Depends on
-[PATCH v3 0/9] Add clk_prepare/clk_unprepare series
-[PATCH] ARM: tegra: Remove second instance of uart clk
-[PATCH] dma: tegra: add clk_prepare/clk_unprepare
-[PATCH] ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+---
+ arch/arm/mach-tegra/Makefile                       |    2 +-
+ .../{tegra2_clocks.c => tegra20_clocks.c}          |    0
+ 2 files changed, 1 insertions(+), 1 deletions(-)
+ rename arch/arm/mach-tegra/{tegra2_clocks.c => tegra20_clocks.c} (100%)
 
-Tested on Ventana and Cardhu
-
-Prashant Gaikwad (6):
-  ARM: tegra30: Separate out clk ops and clk data
-  ARM: tegra20: Separate out clk ops and clk data
-  ARM: tegra: Rename tegra20 clock file
-  ARM: tegra: Add clk_tegra structure and helper functions
-  ARM: tegra: Port tegra to generic clock framework
-  ARM: tegra: Remove duplicate code
-
- arch/arm/Kconfig                          |    1 +
- arch/arm/mach-tegra/Makefile              |    4 +-
- arch/arm/mach-tegra/clock.c               |  570 +-------
- arch/arm/mach-tegra/clock.h               |   40 +-
- arch/arm/mach-tegra/common.c              |    1 -
- arch/arm/mach-tegra/include/mach/clk.h    |    3 +
- arch/arm/mach-tegra/tegra20_clocks.c      | 1498 +++++++++++++++++
- arch/arm/mach-tegra/tegra20_clocks.h      |   41 +
- arch/arm/mach-tegra/tegra20_clocks_data.c | 1127 +++++++++++++
- arch/arm/mach-tegra/tegra2_clocks.c       | 2464 ----------------------------
- arch/arm/mach-tegra/tegra30_clocks.c      | 2474 +++++++++--------------------
- arch/arm/mach-tegra/tegra30_clocks.h      |   53 +
- arch/arm/mach-tegra/tegra30_clocks_data.c | 1374 ++++++++++++++++
- 13 files changed, 4935 insertions(+), 4715 deletions(-)
- create mode 100644 arch/arm/mach-tegra/tegra20_clocks.c
- create mode 100644 arch/arm/mach-tegra/tegra20_clocks.h
- create mode 100644 arch/arm/mach-tegra/tegra20_clocks_data.c
- delete mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
- create mode 100644 arch/arm/mach-tegra/tegra30_clocks.h
- create mode 100644 arch/arm/mach-tegra/tegra30_clocks_data.c
-
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 141bf4b..452c105 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -11,7 +11,7 @@ obj-y					+= flowctrl.o
+ obj-y					+= powergate.o
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+ obj-$(CONFIG_CPU_IDLE)			+= sleep.o
+-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks_data.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks.o
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
+similarity index 100%
+rename from arch/arm/mach-tegra/tegra2_clocks.c
+rename to arch/arm/mach-tegra/tegra20_clocks.c
 -- 
 1.7.4.1
