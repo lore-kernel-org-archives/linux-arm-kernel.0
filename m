@@ -1,152 +1,142 @@
-From: pantelis.antoniou@gmail.com (Pantelis Antoniou)
-Date: Thu, 28 Jun 2012 10:06:23 +0300
-Subject: [PATCH 1/1] ARM: only call smp_send_stop() on SMP
-In-Reply-To: <20120624085943.GC19226@n2100.arm.linux.org.uk>
-References: <1340511667-4976-1-git-send-email-javier@dowhile0.org>
- <20120624085943.GC19226@n2100.arm.linux.org.uk>
-Message-ID: <7C9043C3-3C05-4455-9CCF-A08617CA9D77@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Jun 2012 15:07:44 +0800
+Subject: [PATCH] ARM: fiq: change FIQ_START to a variable
+Message-ID: <1340867264-23043-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Err,
+The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
+makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
+a nubmer of platforms have FIQ_START defined in mach/irqs.h for FIQ
+support.
 
-There was a patch been sent in response that did exactly as you asked.
+  arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
+  arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
+  arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
 
-http://lkml.indiana.edu/hypermail/linux/kernel/1205.3/00433.html
+If SPARSE_IRQ is enabled for any of these platforms, the following
+compile error will be seen.
 
-Regards
+  arch/arm/kernel/fiq.c: In function ?enable_fiq?:
+  arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
+  arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
+  arch/arm/kernel/fiq.c: In function ?disable_fiq?:
+  arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
 
--- Pantelis
+The patch changes fiq code to have init_FIQ take FIQ_START from
+platforms as a parameter and assign it to variable fiq_start which
+is to replace FIQ_START uses in enable_fiq/disable_fiq.
 
-On Jun 24, 2012, at 11:59 AM, Russell King - ARM Linux wrote:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/include/asm/mach/irq.h |    2 +-
+ arch/arm/kernel/fiq.c           |    9 ++++++---
+ arch/arm/mach-rpc/irq.c         |    2 +-
+ arch/arm/plat-mxc/avic.c        |    2 +-
+ arch/arm/plat-mxc/tzic.c        |    2 +-
+ arch/arm/plat-s3c24xx/irq.c     |    2 +-
+ 6 files changed, 11 insertions(+), 8 deletions(-)
 
-> See this thread:
-> 
-> http://lists.arm.linux.org.uk/lurker/thread/20120523.200015.2fdfd505.en.html
-> 
-> There are times when I wonder why I bother replying to email on mailing
-> lists.  No patch ever came from my responses on this subject.  Not going
-> to repeat it again.  Fed up.
-> 
-> On Sun, Jun 24, 2012 at 06:21:07AM +0200, Javier Martinez Canillas wrote:
->> On reboot or poweroff (machine_shutdown()) a call to smp_send_stop() is
->> made (to stop the others CPU's) when CONFIG_SMP=y.
->> 
->> arch/arm/kernel/process.c:
->> 
->> void machine_shutdown(void)
->> {
->> #ifdef CONFIG_SMP
->>       smp_send_stop();
->> #endif
->> }
->> 
->> smp_send_stop() calls the function pointer smp_cross_call(), which is set
->> on the smp_init_cpus() function for OMAP processors.
->> 
->> arch/arm/mach-omap2/omap-smp.c:
->> 
->> void __init smp_init_cpus(void)
->> {
->> ...
->> 	set_smp_cross_call(gic_raise_softirq);
->> ...
->> }
->> 
->> But the ARM setup_arch() function only calls smp_init_cpus()
->> if CONFIG_SMP=y && is_smp().
->> 
->> arm/kernel/setup.c:
->> 
->> void __init setup_arch(char **cmdline_p)
->> {
->> ...
->> #ifdef CONFIG_SMP
->> 	if (is_smp())
->> 		smp_init_cpus();
->> #endif
->> ...
->> }
->> 
->> Newer OMAP CPU's are SMP machines so omap2plus_defconfig sets
->> CONFIG_SMP=y. Unfortunately on an OMAP UP machine is_smp()
->> returns false and smp_init_cpus() is never called and the
->> smp_cross_call() function remains NULL.
->> 
->> If the machine is rebooted or powered off, smp_send_stop() will
->> be called (since CONFIG_SMP=y) leading to the following error:
->> 
->> [   42.815551] Restarting system.
->> [   42.819030] Unable to handle kernel NULL pointer dereference at virtual address 00000000
->> [   42.827667] pgd = d7a74000
->> [   42.830566] [00000000] *pgd=96ce7831, *pte=00000000, *ppte=00000000
->> [   42.837249] Internal error: Oops: 80000007 [#1] SMP ARM
->> [   42.842773] Modules linked in:
->> [   42.846008] CPU: 0    Not tainted  (3.5.0-rc3-next-20120622-00002-g62e87ba-dirty #44)
->> [   42.854278] PC is at 0x0
->> [   42.856994] LR is at smp_send_stop+0x4c/0xe4
->> [   42.861511] pc : [<00000000>]    lr : [<c00183a4>]    psr: 60000013
->> [   42.861511] sp : d6c85e70  ip : 00000000  fp : 00000000
->> [   42.873626] r10: 00000000  r9 : d6c84000  r8 : 00000002
->> [   42.879150] r7 : c07235a0  r6 : c06dd2d0  r5 : 000f4241  r4 : d6c85e74
->> [   42.886047] r3 : 00000000  r2 : 00000000  r1 : 00000006  r0 : d6c85e74
->> [   42.892944] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
->> [   42.900482] Control: 10c5387d  Table: 97a74019  DAC: 00000015
->> [   42.906555] Process reboot (pid: 1166, stack limit = 0xd6c842f8)
->> [   42.912902] Stack: (0xd6c85e70 to 0xd6c86000)
->> [   42.917510] 5e60:                                     c07235a0 00000000 00000000 d6c84000
->> [   42.926177] 5e80: 01234567 c00143d0 4321fedc c00511bc d6c85ebc 00000168 00000460 00000000
->> [   42.934814] 5ea0: c1017950 a0000013 c1017900 d8014390 d7ec3858 c0498e48 c1017950 00000000
->> [   42.943481] 5ec0: d6ddde10 d6c85f78 00000003 00000000 d6ddde10 d6c84000 00000000 00000000
->> [   42.952117] 5ee0: 00000002 00000000 00000000 c0088c88 00000002 00000000 00000000 c00f4b90
->> [   42.960784] 5f00: 00000000 d6c85ebc d8014390 d7e311c8 60000013 00000103 00000002 d6c84000
->> [   42.969421] 5f20: c00f3274 d6e00a00 00000001 60000013 d6c84000 00000000 00000000 c00895d4
->> [   42.978057] 5f40: 00000002 d8007c80 d781f000 c00f6150 d8010cc0 c00f3274 d781f000 d6c84000
->> [   42.986694] 5f60: c0013020 d6e00a00 00000001 20000010 0001257c ef000000 00000000 c00895d4
->> [   42.995361] 5f80: 00000002 00000001 00000003 00000000 00000001 00000003 00000000 00000058
->> [   43.003997] 5fa0: c00130c8 c0012f00 00000001 00000003 fee1dead 28121969 01234567 00000002
->> [   43.012634] 5fc0: 00000001 00000003 00000000 00000058 00012584 0001257c 00000001 00000000
->> [   43.021270] 5fe0: 000124bc bec5cc6c 00008f9c 4a2f7c40 20000010 fee1dead 00000000 00000000
->> [   43.029968] [<c00183a4>] (smp_send_stop+0x4c/0xe4) from [<c00143d0>] (machine_restart+0xc/0x4c)
->> [   43.039154] [<c00143d0>] (machine_restart+0xc/0x4c) from [<c00511bc>] (sys_reboot+0x144/0x1f0)
->> [   43.048278] [<c00511bc>] (sys_reboot+0x144/0x1f0) from [<c0012f00>] (ret_fast_syscall+0x0/0x3c)
->> [   43.057464] Code: bad PC value
->> [   43.060760] ---[ end trace c3988d1dd0b8f0fb ]---
->> 
->> An is_smp() check is also necessary besides shilding the smp_send_stop()
->> call around CONFIG_SMP.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->> ---
->> arch/arm/kernel/process.c |    4 +++-
->> 1 files changed, 3 insertions(+), 1 deletions(-)
->> 
->> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
->> index 864580a..a9043b8 100644
->> --- a/arch/arm/kernel/process.c
->> +++ b/arch/arm/kernel/process.c
->> @@ -38,6 +38,7 @@
->> #include <asm/thread_notify.h>
->> #include <asm/stacktrace.h>
->> #include <asm/mach/time.h>
->> +#include <asm/smp_plat.h>
->> 
->> #ifdef CONFIG_CC_STACKPROTECTOR
->> #include <linux/stackprotector.h>
->> @@ -240,7 +241,8 @@ __setup("reboot=", reboot_setup);
->> void machine_shutdown(void)
->> {
->> #ifdef CONFIG_SMP
->> -	smp_send_stop();
->> +	if (is_smp())
->> +		smp_send_stop();
->> #endif
->> }
->> 
->> -- 
->> 1.7.7.6
->> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index febe495..15cb035 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -17,7 +17,7 @@ struct seq_file;
+ /*
+  * This is internal.  Do not use it.
+  */
+-extern void init_FIQ(void);
++extern void init_FIQ(int);
+ extern int show_fiq_list(struct seq_file *, int);
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index c32f845..2adda11 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -122,14 +122,16 @@ void release_fiq(struct fiq_handler *f)
+ 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+ }
+ 
++static int fiq_start;
++
+ void enable_fiq(int fiq)
+ {
+-	enable_irq(fiq + FIQ_START);
++	enable_irq(fiq + fiq_start);
+ }
+ 
+ void disable_fiq(int fiq)
+ {
+-	disable_irq(fiq + FIQ_START);
++	disable_irq(fiq + fiq_start);
+ }
+ 
+ EXPORT_SYMBOL(set_fiq_handler);
+@@ -140,7 +142,8 @@ EXPORT_SYMBOL(release_fiq);
+ EXPORT_SYMBOL(enable_fiq);
+ EXPORT_SYMBOL(disable_fiq);
+ 
+-void __init init_FIQ(void)
++void __init init_FIQ(int start)
+ {
+ 	no_fiq_insn = *(unsigned long *)0xffff001c;
++	fiq_start = start;
+ }
+diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
+index cf0e669..3e4fa84 100644
+--- a/arch/arm/mach-rpc/irq.c
++++ b/arch/arm/mach-rpc/irq.c
+@@ -163,6 +163,6 @@ void __init rpc_init_irq(void)
+ 		}
+ 	}
+ 
+-	init_FIQ();
++	init_FIQ(FIQ_START);
+ }
+ 
+diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
+index e612cc1..f3d671f 100644
+--- a/arch/arm/plat-mxc/avic.c
++++ b/arch/arm/plat-mxc/avic.c
+@@ -217,7 +217,7 @@ void __init mxc_init_irq(void __iomem *irqbase)
+ 
+ #ifdef CONFIG_FIQ
+ 	/* Initialize FIQ */
+-	init_FIQ();
++	init_FIQ(FIQ_START);
+ #endif
+ 
+ 	printk(KERN_INFO "MXC IRQ initialized\n");
+diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+index abc90e4..c60a7e4 100644
+--- a/arch/arm/plat-mxc/tzic.c
++++ b/arch/arm/plat-mxc/tzic.c
+@@ -192,7 +192,7 @@ void __init tzic_init_irq(void __iomem *irqbase)
+ 
+ #ifdef CONFIG_FIQ
+ 	/* Initialize FIQ */
+-	init_FIQ();
++	init_FIQ(FIQ_START);
+ #endif
+ 
+ 	pr_info("TrustZone Interrupt Controller (TZIC) initialized\n");
+diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
+index bc42c04..fe57bbb 100644
+--- a/arch/arm/plat-s3c24xx/irq.c
++++ b/arch/arm/plat-s3c24xx/irq.c
+@@ -533,7 +533,7 @@ void __init s3c24xx_init_irq(void)
+ 	int i;
+ 
+ #ifdef CONFIG_FIQ
+-	init_FIQ();
++	init_FIQ(FIQ_START);
+ #endif
+ 
+ 	irqdbf("s3c2410_init_irq: clearing interrupt status flags\n");
+-- 
+1.7.5.4
