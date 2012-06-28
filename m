@@ -1,154 +1,32 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 28 Jun 2012 20:29:27 +0530
-Subject: [PATCH-V3 3/3] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef around
- __omap2_set_globals
-In-Reply-To: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1340895567-22766-4-git-send-email-hvaibhav@ti.com>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Thu, 28 Jun 2012 17:08:30 +0200 (CEST)
+Subject: [PATCH] ARM: imx: fix i.MX35 CPU architecture
+In-Reply-To: <20120628105720.GA21278@pengutronix.de>
+Message-ID: <2054987969.254809.1340896110005.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function __omap2_set_globals() can be common across all
-platforms/architectures, even in case of omap4, internally it
-calls same set of functions as in __omap2_set_globals() function
-(except for sdrc).
-This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
-so that we can reuse same function across omap2/3/4...
+On Thu, Jun 28, 2012 at 12:57:20PM +0200, Sascha Hauer wrote:
+> On Wed, Jun 27, 2012 at 10:28:26PM +0200, Beno?t Th?baudeau wrote:
+> > The data sheet of the i.MX35 says it is an ARM1136JF-S processor,
+> > version r1p3,
+> > which, according to section "B.1. New instructions" of the
+> > ARM1136JF-S and
+> > ARM1136J-S Technical Reference Manual, makes the i.MX35 CPU
+> > architecture not
+> > only ARMv6, but ARMv6k.
+> 
+> Is this true for i.MX31 aswell?
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
+No.
 
-Changes from V1:
-	- Added Makefile rule to build sdrc.c file for new
-	  option SOC_HAS_OMAP2_SDRC (as per Kevin's comment).
----
- arch/arm/mach-omap2/Kconfig  |    8 ++++++++
- arch/arm/mach-omap2/Makefile |    3 ++-
- arch/arm/mach-omap2/common.c |    8 +-------
- arch/arm/mach-omap2/common.h |    5 +++++
- 4 files changed, 16 insertions(+), 8 deletions(-)
+> If not, we would have to add
+> additional
+> magic to enable CPU_V6K only when SOC_IMX31 is not selected.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 208b950..82d9d18 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -21,12 +21,16 @@ config ARCH_OMAP2PLUS_TYPICAL
- 	help
- 	  Compile a kernel suitable for booting most boards
+Why? That could be "select CPU_V6K if !SOC_IMX31", but e.g. CPU_V7 is selected
+by SOC_IMX5 whether or not SOC_IMX31 or SOC_IMX35 is selected, and CPU_V6/6K/7
+conflicts are handled with priorities by the ARM infrastructure.
 
-+config SOC_HAS_OMAP2_SDRC
-+	bool "OMAP2 SDRAM Controller support"
-+
- config ARCH_OMAP2
- 	bool "TI OMAP2"
- 	depends on ARCH_OMAP2PLUS
- 	default y
- 	select CPU_V6
- 	select MULTI_IRQ_HANDLER
-+	select SOC_HAS_OMAP2_SDRC
-
- config ARCH_OMAP3
- 	bool "TI OMAP3"
-@@ -39,6 +43,7 @@ config ARCH_OMAP3
- 	select PM_OPP if PM
- 	select ARM_CPU_SUSPEND if PM
- 	select MULTI_IRQ_HANDLER
-+	select SOC_HAS_OMAP2_SDRC
-
- config ARCH_OMAP4
- 	bool "TI OMAP4"
-@@ -66,16 +71,19 @@ config SOC_OMAP2420
- 	depends on ARCH_OMAP2
- 	default y
- 	select OMAP_DM_TIMER
-+	select SOC_HAS_OMAP2_SDRC
-
- config SOC_OMAP2430
- 	bool "OMAP2430 support"
- 	depends on ARCH_OMAP2
- 	default y
-+	select SOC_HAS_OMAP2_SDRC
-
- config SOC_OMAP3430
- 	bool "OMAP3430 support"
- 	depends on ARCH_OMAP3
- 	default y
-+	select SOC_HAS_OMAP2_SDRC
-
- config SOC_TI81XX
- 	bool "TI81XX support"
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index e5c17d3..3767164 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -6,7 +6,7 @@
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
- 	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o
-
--omap-2-3-common				= irq.o sdrc.o
-+omap-2-3-common				= irq.o
- hwmod-common				= omap_hwmod.o \
- 					  omap_hwmod_common_data.o
- clock-common				= clock.o clock_common_data.o \
-@@ -23,6 +23,7 @@ obj-y += mcbsp.o
- endif
-
- obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
-+obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
-
- # SMP support ONLY available for OMAP4
-
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 8a6953a..7978e5e 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -29,8 +29,6 @@
-
- /* Global address base setup code */
-
--#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
--
- static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
- {
- 	omap2_set_globals_tap(omap2_globals);
-@@ -39,8 +37,6 @@ static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
- 	omap2_set_globals_prcm(omap2_globals);
- }
-
--#endif
--
- #if defined(CONFIG_SOC_OMAP2420)
-
- static struct omap_globals omap242x_globals = {
-@@ -171,9 +167,7 @@ static struct omap_globals omap4_globals = {
-
- void __init omap2_set_globals_443x(void)
- {
--	omap2_set_globals_tap(&omap4_globals);
--	omap2_set_globals_control(&omap4_globals);
--	omap2_set_globals_prcm(&omap4_globals);
-+	__omap2_set_globals(&omap4_globals);
- }
-
- void __init omap4_map_io(void)
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 5d99c1b..404f172 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -174,7 +174,12 @@ void omap2_set_globals_am33xx(void);
-
- /* These get called from omap2_set_globals_xxxx(), do not call these */
- void omap2_set_globals_tap(struct omap_globals *);
-+#if defined(CONFIG_SOC_HAS_OMAP2_SDRC)
- void omap2_set_globals_sdrc(struct omap_globals *);
-+#else
-+static inline void omap2_set_globals_sdrc(struct omap_globals *omap2_globals)
-+{ }
-+#endif
- void omap2_set_globals_control(struct omap_globals *);
- void omap2_set_globals_prcm(struct omap_globals *);
-
---
-1.7.0.4
+Regards,
+Beno?t
