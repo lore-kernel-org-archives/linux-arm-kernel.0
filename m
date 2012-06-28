@@ -1,40 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 19:52:26 +0800
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 28 Jun 2012 19:48:16 +0800
 Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20120628114108.GD22990@S2101-09.ap.freescale.net>
+In-Reply-To: <20120628114559.GE22990@S2101-09.ap.freescale.net>
 References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
  <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <4FEC329C.7070004@pengutronix.de>
- <20120628112111.GC22990@S2101-09.ap.freescale.net>
- <4FEC400F.8010506@pengutronix.de>
- <20120628114108.GD22990@S2101-09.ap.freescale.net>
-Message-ID: <20120628115224.GF22990@S2101-09.ap.freescale.net>
+ <20120628113327.GJ6406@shlinux2.ap.freescale.net>
+ <20120628114559.GE22990@S2101-09.ap.freescale.net>
+Message-ID: <20120628114815.GL6406@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 07:41:10PM +0800, Shawn Guo wrote:
-> On Thu, Jun 28, 2012 at 01:29:19PM +0200, Marc Kleine-Budde wrote:
-> > I mean which name is more precise, do these gpio enable/standy a "phy"
-> > or a "transceiver". For example:
-> > http://www.nxp.com/documents/application_note/AN00094.pdf, this document
-> > says: TJA1041/1041A high speed CAN transceiver.
+On Thu, Jun 28, 2012 at 07:46:02PM +0800, Shawn Guo wrote:
+> On Thu, Jun 28, 2012 at 07:33:28PM +0800, Dong Aisheng wrote:
+> > > +		phy_stby_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+> > > +							"phy-standby-gpios",
+> > > +							0, &flags);
+> > > +		if (gpio_is_valid(phy_stby_gpio)) {
+> > > +			if (flags == OF_GPIO_ACTIVE_LOW)
+> > > +				phy_stby_high = false;
+> > > +			err = devm_gpio_request_one(&pdev->dev, phy_stby_gpio,
+> > > +						    GPIOF_DIR_OUT,
+> > > +						    "phy-standby");
+> > > +			if (err) {
+> > > +				dev_err(&pdev->dev,
+> > > +					"failed to request gpio %d: %d\n",
+> > > +					phy_stby_gpio, err);
+> > > +				goto failed_gpio;
+> > I checked mx28 evk, it seems the phy only has a STB gpio and shared by both CAN0&CAN1.
+> > I wonder the CAN1 probe may fail here.
 > > 
-> Isn't term "phy" (physical interface) generally meant to be the same
-> thing as "transceiver"?  I just happened to like the shorter one as
-> what Hui did in his patch.
+> It can be managed by dts.  Here is what I have in imx28-evk.dts, where
+> only can0 has phy-enable-gpios property.
 > 
-> But it does not really matter to me, will change the name since you
-> care about it.
 > 
-Do you care the variable name also?  If so, we will get:
+> 	can0: can at 80032000 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&can0_pins_a>;
+> 		phy-enable-gpios = <&gpio2 13 0>;
+> 		status = "okay";
+> 	};
+> 
+> 	can1: can at 80034000 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&can1_pins_a>;
+> 		status = "okay";
+> 	};
+Yes, that is a solution.
+But it may not so reasonable since dts file should represent hw, but here
+we have to do some trick by we know how driver works.
+Maybe we need find a better solution.
 
-        int transceiver_en_gpio;
-        int transceiver_stby_gpio;
-        bool transceiver_en_high;
-        bool transceiver_stby_high;
-
-So everything becomes long :)
-
--- 
-Regards,
-Shawn
+Regards
+Dong Aisheng
