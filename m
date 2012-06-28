@@ -1,40 +1,26 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 28 Jun 2012 09:17:45 -0700
-Subject: [PATCH] drivers/rtc/rtc-twl.c: fix threaded IRQ to use IRQF_ONESHOT
-Message-ID: <1340900265-11962-1-git-send-email-khilman@ti.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 28 Jun 2012 16:31:22 +0000
+Subject: how to specify dma_mask and coherent_dma_mask in hwmod
+In-Reply-To: <alpine.DEB.2.00.1206280950440.2338@utopia.booyaka.com>
+References: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EAED507@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206280950440.2338@utopia.booyaka.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EAED713@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Requesting a threaded interrupt without a primary handler and without
-IRQF_ONESHOT is dangerous, and after commit 1c6c6952 (genirq: Reject
-bogus threaded irq requests), these requests are rejected.  This
-causes ->probe() to fail, and the RTC driver not to be availble.
+Hi Paul,
 
-To fix, add IRQF_ONESHOT to the IRQ flags.
+On Thu, Jun 28, 2012 at 21:22:54, Paul Walmsley wrote:
+[...]
+> 
+> dma_mask and coherent_dma_mask can be specified during 
+> device creation.  See usb_musb_init() in arch/arm/mach-omap2/usb-musb.c 
+> for an example.
+> 
 
-Tested on OMAP3730/OveroSTORM and OMAP4430/Panda board using rtcwake
-to wake from system suspend multiple times.
+Thanks for pointing this out. Should omap_device_build() start handling this
+or would that be an overkill?
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-This fix is needed in v3.5.
-Applies on top of v3.5-rc4.
-
- drivers/rtc/rtc-twl.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-index 258abea..c5d06fe 100644
---- a/drivers/rtc/rtc-twl.c
-+++ b/drivers/rtc/rtc-twl.c
-@@ -510,7 +510,7 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
- 	}
- 
- 	ret = request_threaded_irq(irq, NULL, twl_rtc_interrupt,
--				   IRQF_TRIGGER_RISING,
-+				   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
- 				   dev_name(&rtc->dev), rtc);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "IRQ is not free.\n");
--- 
-1.7.9.2
+Regards,
+Vaibhav B.
