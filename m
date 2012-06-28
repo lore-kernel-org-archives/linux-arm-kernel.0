@@ -1,44 +1,69 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 28 Jun 2012 13:49:52 +0300
-Subject: [PATCH] ARM: OMAP2: twl-common: fix compiler warnings
-Message-ID: <1340880592-21700-1-git-send-email-t-kristo@ti.com>
+From: eduardo.valentin@ti.com (Valentin, Eduardo)
+Date: Thu, 28 Jun 2012 13:51:33 +0300
+Subject: [PATCH v3 2/7] mfd: omap: control: core system control driver
+In-Reply-To: <4FEC3154.9050103@dev.rtsoft.ru>
+References: <4FEB4B46.9020904@dev.rtsoft.ru> <20120628045028.GC2471@besouro>
+ <4FEC25CA.10105@dev.rtsoft.ru>
+ <CAGF5oy9heLnjcHj4H=hMK9NAkrDoOocR-Lbv1Z4cQ4G1C5kSeQ@mail.gmail.com>
+ <4FEC2E1D.5040309@dev.rtsoft.ru> <4FEC3154.9050103@dev.rtsoft.ru>
+Message-ID: <CAGF5oy85XSfBtV_WFwYyWDHYmBbLGHK_9c9XhTFs1CgnSfyMLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP2 does not use the external voltage controller code for TWL, and
-thus OMAP2 only compilation generates following warnings:
+Hello,
 
-arch/arm/mach-omap2/twl-common.c:51: warning: 'twl_set_voltage' defined but not used
-arch/arm/mach-omap2/twl-common.c:57: warning: 'twl_get_voltage' defined but not used
+On Thu, Jun 28, 2012 at 1:26 PM, Konstantin Baydarov
+<kbaidarov@dev.rtsoft.ru> wrote:
+> On 06/28/2012 02:12 PM, Konstantin Baydarov wrote:
+>> The interface(design) of omap-control-core.c has already been discussed many times :(
+>> Eduardo, in his patch set, suggested following design:
+>> - omap-control-core.c ioremaps SCM window and provide functions to read/write SCP register for bandgap and usb.
+>>
+>> IIRC, this approach didn't satisfy and it was suggested to have private read/write in bandgap and usb.
+>>
+>> So, my patch set introduces following design:
+>> - omap-control-core.c don't provide read/write functions for bandgap and usb.
+>> - bandgap and usb use their own private read/write functions
+>> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped to the same virtual address. But the problem is that SMP memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach.
+> I mean:
+>
+> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped. So each call of ioremap in omap-control-core.c, bandgap and usb drivers returns the same virtual address. But the problem is that SCM memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach(when each driver remaps the same IOMEM).
+>
+>>
+>> Another possible design is:
+>> - omap-control-core.c ioremaps and reserves SCM IOMEM window
+>> - omap-control-core.c exports omap_control_get_base(virtual base address is returned) to use in bandgap and usb_phy driver.
+>> - Bandgap and usb phy uses their own private read/write function.
+>> IIUC, this way was suggested by Tony.
 
-This patch moves the code in question behind ARCH specific flags and
-eliminates these warnings.
+Well I understood slightly different :-)
 
-Reported-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/twl-common.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I think the point is not really where to put the access functions, but
+to have each driver handling a separate part of the the io window. As
+I said before, so that they don't access each other io area.
 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 119d5a9..5447c13 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -48,6 +48,7 @@ static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
- 	},
- };
- 
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- static int twl_set_voltage(void *data, int target_uV)
- {
- 	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-@@ -59,6 +60,7 @@ static int twl_get_voltage(void *data)
- 	struct voltagedomain *voltdm = (struct voltagedomain *)data;
- 	return voltdm_get_voltage(voltdm);
- }
-+#endif
- 
- void __init omap_pmic_init(int bus, u32 clkrate,
- 			   const char *pmic_type, int pmic_irq,
+If you have 1 io window, for the above mentioned constraint, you won't
+protect anything. So, in that sense, it doesn't make much difference
+if you have access functions in core, or in the children, as they are
+all sharing the same io window. Of course, in case we put only 1 io
+window, for me it is safer if that window is managed in only one
+place, instead of several places.
+
+The question is then, can we split the io area into smaller windows
+for each children? Considering the children registers are not
+contiguous :-(. In theory we can put several entries in the 'reg' DT
+property, but that becomes a bit messy as it will change depending on
+OMAP version. Anyways, if we split the scm io window into several io
+smaller areas/chunks, then it makes sense to have access functions in
+each children.
+
+>>
+>> I guess It's better to settle the design(interface) of omap-control-core.c, bandgap and usb phy and then submit the next version of patch set.
+>
+
+Agreed. Here. We need to decide how to have this design and stick to it.
+
+
 -- 
-1.7.4.1
+
+Eduardo Valentin
