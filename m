@@ -1,72 +1,52 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Thu, 28 Jun 2012 16:59:46 +0200 (CEST)
-Subject: [PATCH 2 of 2] ARM: imx: fix mx51 ehci setup errors
-Message-ID: <1438563136.254282.1340895586756.JavaMail.root@advansee.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Thu, 28 Jun 2012 20:29:24 +0530
+Subject: [PATCH-V3 0/3] ARM: OMAP2+: Cleanup series in order to remove
+ ARCH_OMAPx dependency
+Message-ID: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch completes commit 08406f5 by fixing the following issues, according to
-the reference manual:
-* MXC_OTG_UCTRL_OPM_BIT disables (masks) the power/oc pins if set, like H1PM and
-  H2PM, not the opposite.
-* MXC_OTG_PHYCTRL_OC_DIS_BIT disables the oc pin if set, like H1_OC_DIS, not the
-  opposite.
-* Typos in comments.
+In current implementation, some places we are still using
+ARCH_OMAPx config option, making it difficult to add new devices;
+for example, while adding am33xx device support I came across multiple
+instances where I had to patch the existing code to make it work for
+am33xx.
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- .../arch/arm/mach-imx/ehci-imx5.c                  |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+This patch tries to cleanup existing code for some of the
+ARCH_OMAP2/3/4 dependency on the code.
 
-diff --git linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/ehci-imx5.c linux-next-HEAD-49289f3/arch/arm/mach-imx/ehci-imx5.c
-index 49e3b34..a6a4afb 100644
---- linux-next-HEAD-49289f3.orig/arch/arm/mach-imx/ehci-imx5.c
-+++ linux-next-HEAD-49289f3/arch/arm/mach-imx/ehci-imx5.c
-@@ -88,11 +88,11 @@ int mx51_initialize_usb_hw(int port, unsigned int flags)
- 			else
- 				v &= ~MXC_OTG_PHYCTRL_OC_POL_BIT;
- 			if (flags & MXC_EHCI_POWER_PINS_ENABLED) {
--				/* OC/USBPWR is not used */
--				v |= MXC_OTG_PHYCTRL_OC_DIS_BIT;
--			} else {
- 				/* OC/USBPWR is used */
- 				v &= ~MXC_OTG_PHYCTRL_OC_DIS_BIT;
-+			} else {
-+				/* OC/USBPWR is not used */
-+				v |= MXC_OTG_PHYCTRL_OC_DIS_BIT;
- 			}
- 			if (flags & MXC_EHCI_PWR_PIN_ACTIVE_HIGH)
- 				v |= MXC_OTG_PHYCTRL_PWR_POL_BIT;
-@@ -106,9 +106,9 @@ int mx51_initialize_usb_hw(int port, unsigned int flags)
- 			else
- 				v &= ~MXC_OTG_UCTRL_OWIE_BIT;/* OTG wakeup disable */
- 			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
--				v |= MXC_OTG_UCTRL_OPM_BIT;
--			else
- 				v &= ~MXC_OTG_UCTRL_OPM_BIT;
-+			else
-+				v |= MXC_OTG_UCTRL_OPM_BIT;
- 			__raw_writel(v, usbother_base + MXC_USBCTRL_OFFSET);
- 		}
- 		break;
-@@ -124,7 +124,7 @@ int mx51_initialize_usb_hw(int port, unsigned int flags)
- 		}
- 
- 		if (flags & MXC_EHCI_POWER_PINS_ENABLED)
--			v &= ~MXC_H1_UCTRL_H1PM_BIT; /* HOST1 power mask used*/
-+			v &= ~MXC_H1_UCTRL_H1PM_BIT; /* HOST1 power mask unused*/
- 		else
- 			v |= MXC_H1_UCTRL_H1PM_BIT; /* HOST1 power mask used*/
- 		__raw_writel(v, usbother_base + MXC_USBCTRL_OFFSET);
-@@ -157,7 +157,7 @@ int mx51_initialize_usb_hw(int port, unsigned int flags)
- 		}
- 
- 		if (flags & MXC_EHCI_POWER_PINS_ENABLED)
--			v &= ~MXC_H2_UCTRL_H2PM_BIT; /* HOST2 power mask used*/
-+			v &= ~MXC_H2_UCTRL_H2PM_BIT; /* HOST2 power mask unused*/
- 		else
- 			v |= MXC_H2_UCTRL_H2PM_BIT; /* HOST2 power mask used*/
- 		__raw_writel(v, usbother_base + MXC_USBH2CTRL_OFFSET);
+NOTE: Patch series has been build tested for all possible
+      combination of OMAP2, 3, 4 configurations.
+
+History on Patch-series:
+========================
+Changes from V2:
+	- Rebased against latest linux-omap/master
+	- Removed [Patch 4/4], fixed it separately as independent patch.
+	  Already in Mainline.
+	- Fixed comments form KevinH, added Makefile rule for sdrc.c
+
+Changes from V1:
+	- Fixed comments from Tony
+	- Config option name of SOC_HAS_SDRC changed to
+	  SOC_HAS_OMAP2_SDRC
+	- Config option name for SOC_HAS_DPLL_xxx flags
+	  to SOC_HAS_OMAP3_DPLL_xxx.
+
+
+
+Vaibhav Hiremath (3):
+  ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses omap-device.o target so add
+    one entry
+  ARM: OMAP2+: CLEANUP: Move omap3 dpll ops to dpll3xxx.c
+  ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef around
+    __omap2_set_globals
+
+ arch/arm/mach-omap2/Kconfig    |    8 ++++++++
+ arch/arm/mach-omap2/Makefile   |    3 ++-
+ arch/arm/mach-omap2/clock.c    |   18 ------------------
+ arch/arm/mach-omap2/common.c   |    8 +-------
+ arch/arm/mach-omap2/common.h   |    5 +++++
+ arch/arm/mach-omap2/dpll3xxx.c |   14 ++++++++++++++
+ arch/arm/plat-omap/Makefile    |    4 +---
+ 7 files changed, 31 insertions(+), 29 deletions(-)
