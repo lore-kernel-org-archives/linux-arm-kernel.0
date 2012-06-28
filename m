@@ -1,77 +1,56 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 28 Jun 2012 17:05:38 +0200
-Subject: [PATCH-V3 3/3] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <1340895567-22766-4-git-send-email-hvaibhav@ti.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
- <1340895567-22766-4-git-send-email-hvaibhav@ti.com>
-Message-ID: <4FEC72C2.7010106@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 28 Jun 2012 17:08:25 +0200
+Subject: RF231 transceiver on at91sam9g20ek board
+In-Reply-To: <201206281430.21916.arnd@arndb.de>
+References: <CAJmB2rDxv45OP4otn7rmQcpzCvLujKm0j9_OqNW6PoyHuarTLw@mail.gmail.com>
+ <201206221834.41869.arnd@arndb.de>
+ <CAJmB2rBcRuNe0QfEGoJN1rQnRnr33gyE=nLt3Az=mGEWuR7mCg@mail.gmail.com>
+ <201206281430.21916.arnd@arndb.de>
+Message-ID: <4FEC7369.3050003@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+On 06/28/2012 04:30 PM, Arnd Bergmann :
+> On Thursday 28 June 2012, Alexander Smirnov wrote:
+>>>
+>>> It might not be the problem you are faced with but note that at91
+>>> is moving towards probing all devices using the device tree, so
+>>> starting with linux-3.4 you should be defining the device in the
+>>> at91sam9g20ek.dts file for your board and use the generic
+>>> board-dt.c file. The platform_data gets replaced with
+>>> calls to of_get_gpio() in that case.
+>>
+>> Thank you for the reply!
+>>
+>> Are you going to add SPI section to the device tree in the nearest
+>> future or I can do it by myself and send you the patch? The reason is
+>> that this week I merged at86rf230 driver to the 'net-next' tree, but
+>> it won't work without platform data.
+> 
+> Jean-Christophe or Nicolas might now what the status is for atmel-spi.
+> It seems like it would be trivial to just add the compatible string in
+> the atmel-spi driver, which would let us probe all of its child devices
+> using DT.
 
-One small comment.
+Dear Alexander,
 
-On 06/28/2012 04:59 PM, Vaibhav Hiremath wrote:
-> The function __omap2_set_globals() can be common across all
-> platforms/architectures, even in case of omap4, internally it
-> calls same set of functions as in __omap2_set_globals() function
-> (except for sdrc).
-> This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
-> so that we can reuse same function across omap2/3/4...
->
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
->
-> Changes from V1:
-> 	- Added Makefile rule to build sdrc.c file for new
-> 	  option SOC_HAS_OMAP2_SDRC (as per Kevin's comment).
-> ---
->   arch/arm/mach-omap2/Kconfig  |    8 ++++++++
->   arch/arm/mach-omap2/Makefile |    3 ++-
->   arch/arm/mach-omap2/common.c |    8 +-------
->   arch/arm/mach-omap2/common.h |    5 +++++
->   4 files changed, 16 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 208b950..82d9d18 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -21,12 +21,16 @@ config ARCH_OMAP2PLUS_TYPICAL
->   	help
->   	  Compile a kernel suitable for booting most boards
->
-> +config SOC_HAS_OMAP2_SDRC
-> +	bool "OMAP2 SDRAM Controller support"
-> +
->   config ARCH_OMAP2
->   	bool "TI OMAP2"
->   	depends on ARCH_OMAP2PLUS
->   	default y
->   	select CPU_V6
->   	select MULTI_IRQ_HANDLER
-> +	select SOC_HAS_OMAP2_SDRC
->
->   config ARCH_OMAP3
->   	bool "TI OMAP3"
-> @@ -39,6 +43,7 @@ config ARCH_OMAP3
->   	select PM_OPP if PM
->   	select ARM_CPU_SUSPEND if PM
->   	select MULTI_IRQ_HANDLER
-> +	select SOC_HAS_OMAP2_SDRC
->
->   config ARCH_OMAP4
->   	bool "TI OMAP4"
-> @@ -66,16 +71,19 @@ config SOC_OMAP2420
->   	depends on ARCH_OMAP2
->   	default y
->   	select OMAP_DM_TIMER
-> +	select SOC_HAS_OMAP2_SDRC
+There has been an attempt to move the spi-atmel.c driver to device tree.
+You can check the status of the discussion in by searching the message
+subjects:
 
-OMAP4 does not have the SDRC but the EMIF like TI8XX.
+[PATCH 1/4 v4] of_spi: add generic binding support to specify cs gpio
+[PATCH 1/4 v5] of_spi: add generic binding support to specify cs gpio
 
-Regards,
-Benoit
+I guess that you can take these patches as examples for moving to device
+tree on your AT91 based board (beware you should set pin muxing in your
+bootloader).
+
+There is a "work in progress" snapshot of this work in at91 git tree/branch:
+git://github.com/at91linux/linux-at91.git   ghnew/j/for-3.5-wip
+
+commit: 5f31f2573e7e9369500118e1b8fd026392fc0982
+commit: 93fd57e73502656a139879518b397711cc305c6a
+
+Best regards,
+-- 
+Nicolas Ferre
