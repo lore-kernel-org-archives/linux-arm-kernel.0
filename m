@@ -1,31 +1,66 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 28 Jun 2012 10:23:21 +0100
-Subject: [PATCH 3/3] arm: mach-mvebu: system-controller only registers
- restart if device exists
-In-Reply-To: <20120627191932.GE25319@n2100.arm.linux.org.uk>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
- <1340814406-26010-4-git-send-email-ben.dooks@codethink.co.uk>
- <20120627191932.GE25319@n2100.arm.linux.org.uk>
-Message-ID: <4FEC2289.80808@codethink.co.uk>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Thu, 28 Jun 2012 15:01:53 +0530
+Subject: [PATCH v3 0/2] OMAP:IOMMU:flush L1 and L2 caches
+Message-ID: <CADysL2b9bTqAZ6f48nGThosYn5mTGiSNFgKLyLROVk4XeDZDCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/12 20:19, Russell King - ARM Linux wrote:
-> On Wed, Jun 27, 2012 at 05:26:46PM +0100, Ben Dooks wrote:
->> Change to only registering the restart hook if the device exists
->> and can be enumerated in the device tree. Remove the header definiton
->> and the restart entry in the machine file.
->
-> NAK.  Please use the .restart method in the machine description rather
-> than directly using arm_pm_restart.  Thanks.
->
-> arm_pm_restart only continues to exist because I could not work out how
-> to stop AT91 from using it.
+>From a5dc6e2ebee40b4f6cf51c1ec3c67476ffb8efc3 Mon Sep 17 00:00:00 2001
+From: Ramesh Gupta G <grgupta@ti.com>
+Date: Thu, 28 Jun 2012 11:53:54 +0530
+Subject: [PATCH v3 0/2] OMAP:IOMMU:flush L1 and L2 caches
 
-So what should you do if your board doesn't support this method of
-resetting?
+This patch series is the next version to
+- add a new cache maintenance api to support non-coherent iommu drivers.
+- flush both L1 and L2 caches from OMAP iommu whenever the page table
+  memory is updated.
+
+Changes since the previous patch set
+- Renamed the new api to reflect the purpose.
+- Fixed the kernel compilation issues by adding the
+  new api support for all the ARM versions.
+- Validated the changes on the Pandaboard.
+- Compile tested the kernel for all other ARM configurations.
+
+The implementation of the new api is based on
+the approach[1] discussed.
+
+[1]http://marc.info/?l=linux-kernel&m=131316512713815&w=2
+
+Signed-off-by: Ramesh Gupta G <grgupta@ti.com>
+
+Ramesh Gupta G (2):
+  ARM: new cache maintenance api for iommu
+  OMAP:IOMMU:flush L1 and L2 caches
+
+ arch/arm/include/asm/cacheflush.h |   26 ++++++++++++++++++++++++++
+ arch/arm/include/asm/glue-cache.h |    1 +
+ arch/arm/mm/cache-fa.S            |   15 +++++++++++++++
+ arch/arm/mm/cache-v3.S            |   14 +++++++++++++-
+ arch/arm/mm/cache-v4.S            |   15 +++++++++++++++
+ arch/arm/mm/cache-v4wb.S          |   21 +++++++++++++++++++++
+ arch/arm/mm/cache-v4wt.S          |   17 +++++++++++++++++
+ arch/arm/mm/cache-v6.S            |   20 ++++++++++++++++++++
+ arch/arm/mm/cache-v7.S            |   21 +++++++++++++++++++++
+ arch/arm/mm/proc-arm1020.S        |   22 ++++++++++++++++++++++
+ arch/arm/mm/proc-arm1020e.S       |   20 ++++++++++++++++++++
+ arch/arm/mm/proc-arm1022.S        |   20 ++++++++++++++++++++
+ arch/arm/mm/proc-arm1026.S        |   20 ++++++++++++++++++++
+ arch/arm/mm/proc-arm920.S         |   17 +++++++++++++++++
+ arch/arm/mm/proc-arm922.S         |   17 +++++++++++++++++
+ arch/arm/mm/proc-arm925.S         |   22 ++++++++++++++++++++++
+ arch/arm/mm/proc-arm926.S         |   22 ++++++++++++++++++++++
+ arch/arm/mm/proc-arm940.S         |   26 ++++++++++++++++++++++++++
+ arch/arm/mm/proc-arm946.S         |   24 ++++++++++++++++++++++++
+ arch/arm/mm/proc-feroceon.S       |   30 ++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-macros.S         |    1 +
+ arch/arm/mm/proc-mohawk.S         |   18 ++++++++++++++++++
+ arch/arm/mm/proc-xsc3.S           |   17 +++++++++++++++++
+ arch/arm/mm/proc-xscale.S         |   19 +++++++++++++++++++
+ drivers/iommu/omap-iommu.c        |   26 +++++++++-----------------
+ 25 files changed, 453 insertions(+), 18 deletions(-)
+
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+regards
+Ramesh Gupta G
