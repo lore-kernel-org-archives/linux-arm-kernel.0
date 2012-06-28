@@ -1,159 +1,116 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 28 Jun 2012 17:21:05 +0530
-Subject: [PATCH v1 09/11] drivers: usb: musb: Add device tree support for omap
- musb glue
+Date: Thu, 28 Jun 2012 17:21:06 +0530
+Subject: [PATCH v1 10/11] arm/dts: omap: Add usb_otg and glue data
 In-Reply-To: <1340884267-28908-1-git-send-email-kishon@ti.com>
 References: <1340884267-28908-1-git-send-email-kishon@ti.com>
-Message-ID: <1340884267-28908-10-git-send-email-kishon@ti.com>
+Message-ID: <1340884267-28908-11-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added device tree support for omap musb driver and updated the
-Documentation with device tree binding information.
+Add usb otg data node in omap4/omap3 device tree file. Also update
+the node with board specific setting in omapx-<board>.dts file.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/usb/omap-usb.txt |   34 ++++++++++++-
- drivers/usb/musb/omap2430.c                        |   52 ++++++++++++++++++++
- 2 files changed, 85 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+ arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+ arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+ arch/arm/boot/dts/omap4-panda.dts  |    6 ++++++
+ arch/arm/boot/dts/omap4-sdp.dts    |    6 ++++++
+ arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+ 6 files changed, 40 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
-index 80a28c9..39cdffb 100644
---- a/Documentation/devicetree/bindings/usb/omap-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-@@ -1,4 +1,4 @@
--OMAP USB PHY
-+OMAP USB PHY AND GLUE
- 
- OMAP USB2 PHY
- 
-@@ -14,3 +14,35 @@ usb2phy at 0x4a0ad080 {
- 	compatible = "ti,omap-usb2";
- 	reg = <0x4a0ad080 0x58>;
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 5b4506c..f3d7076 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -67,3 +67,9 @@
+ &mmc3 {
+ 	status = "disable";
  };
 +
-+OMAP MUSB GLUE
-+ - compatible : Should be "ti,musb-omap2430"
-+ - ti,hwmods : must be "usb_otg_hs"
-+ - multipoint : Should be "1" indicating the musb controller supports
-+   multipoint. This is a MUSB configuration-specific setting.
-+ - num_eps : Specifies the number of endpoints. This is also a
-+   MUSB configuration-specific setting. Should be set to "16"
-+ - ram_bits : Specifies the ram address size. Should be set to "12"
-+ - interface_type : This is a board specific setting to describe the type of
-+   interface between the controller and the phy. It should be "0" or "1"
-+   specifying ULPI and UTMI respectively.
-+ - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
-+   represents PERIPHERAL.
-+ - power : Should be "50". This signifies the controller can supply upto
-+   100mA when operating in host mode.
-+
-+SOC specific device node entry
-+usb_otg_hs: usb_otg_hs at 4a0ab000 {
-+	compatible = "ti,musb-omap2430";
-+	ti,hwmods = "usb_otg_hs";
-+	multipoint = <1>;
-+	num_eps = <16>;
-+	ram_bits = <12>;
++&usb_otg_hs {
++	interface_type = <0>;
++	mode = <3>;
++	power = <50>;
 +};
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index 2eee16e..8963b3d 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -18,3 +18,9 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ };
 +
-+Board specific device node entry
++&usb_otg_hs {
++	interface_type = <0>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 99474fa..2f565d6 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -215,5 +215,13 @@
+ 			compatible = "ti,omap3-hsmmc";
+ 			ti,hwmods = "mmc3";
+ 		};
++
++		usb_otg_hs: usb_otg_hs at 4a0ab000 {
++			compatible = "ti,musb-omap2430";
++			ti,hwmods = "usb_otg_hs";
++			multipoint = <1>;
++			num_eps = <16>;
++			ram_bits = <12>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index 1efe0c5..0825fa7 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -89,3 +89,9 @@
+ 	ti,non-removable;
+ 	bus-width = <4>;
+ };
++
 +&usb_otg_hs {
 +	interface_type = <1>;
 +	mode = <3>;
 +	power = <50>;
 +};
-diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-index a50bd73..c750f11 100644
---- a/drivers/usb/musb/omap2430.c
-+++ b/drivers/usb/musb/omap2430.c
-@@ -30,6 +30,7 @@
- #include <linux/init.h>
- #include <linux/list.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
-@@ -469,8 +470,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
- static int __devinit omap2430_probe(struct platform_device *pdev)
- {
- 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
-+	struct omap_musb_board_data	*data;
- 	struct platform_device		*musb;
- 	struct omap2430_glue		*glue;
-+	struct device_node		*np = pdev->dev.of_node;
-+	struct musb_hdrc_config		*config;
- 	struct resource			*res;
- 	int				ret = -ENOMEM;
- 
-@@ -500,6 +504,43 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
- 	if (glue->control_otghs == NULL)
- 		dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
- 
-+	if (np) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&pdev->dev,
-+				"failed to allocate musb platfrom data\n");
-+			ret = -ENOMEM;
-+			goto err1;
-+		}
-+
-+		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+		if (!data) {
-+			dev_err(&pdev->dev,
-+					"failed to allocate musb board data\n");
-+			ret = -ENOMEM;
-+			goto err1;
-+		}
-+
-+		config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
-+		if (!data) {
-+			dev_err(&pdev->dev,
-+				"failed to allocate musb hdrc config\n");
-+			goto err1;
-+		}
-+
-+		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
-+		of_property_read_u32(np, "interface_type",
-+						(u32 *)&data->interface_type);
-+		of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
-+		of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
-+		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
-+		of_property_read_u32(np, "power", (u32 *)&pdata->power);
-+		config->multipoint = of_property_read_bool(np, "multipoint");
-+
-+		pdata->board_data	= data;
-+		pdata->config		= config;
-+	}
-+
- 	pdata->platform_ops		= &omap2430_ops;
- 
- 	platform_set_drvdata(pdev, glue);
-@@ -597,12 +638,23 @@ static struct dev_pm_ops omap2430_pm_ops = {
- #define DEV_PM_OPS	NULL
- #endif
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id omap2430_id_table[] = {
-+	{ .compatible = "ti,musb-omap2430" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, omap2430_id_table);
-+#else
-+#define omap2430_id_table NULL
-+#endif
-+
- static struct platform_driver omap2430_driver = {
- 	.probe		= omap2430_probe,
- 	.remove		= __devexit_p(omap2430_remove),
- 	.driver		= {
- 		.name	= "musb-omap2430",
- 		.pm	= DEV_PM_OPS,
-+		.of_match_table = omap2430_id_table,
- 	},
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index d08c4d1..5244d51 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -158,3 +158,9 @@
+ 	bus-width = <4>;
+ 	ti,non-removable;
  };
- 
++
++&usb_otg_hs {
++	interface_type = <1>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 4d2dcc1..bc7b3c3 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -285,5 +285,13 @@
+ 				      <0x4a002300 0x1>;
+ 			};
+ 		};
++
++		usb_otg_hs: usb_otg_hs at 4a0ab000 {
++			compatible = "ti,musb-omap2430";
++			ti,hwmods = "usb_otg_hs";
++			multipoint = <1>;
++			num_eps = <16>;
++			ram_bits = <12>;
++		};
+ 	};
+ };
 -- 
 1.7.5.4
