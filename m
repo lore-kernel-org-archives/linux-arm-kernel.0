@@ -1,66 +1,30 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Thu, 28 Jun 2012 13:38:50 -0700
-Subject: How to use ARM ETM/ETB at linux?
-In-Reply-To: <CACRpkdZv+Kp0apmLcZQgY07z1YQ3gC8r+d9Ed-c0OZLTo7DN6A@mail.gmail.com>
-References: <CAHrpEqRk4SQ+8LHCOX0zwtZjnTe=k0c_GCJMqvYMZBUa-dJq=A@mail.gmail.com>
- <CACRpkdZv+Kp0apmLcZQgY07z1YQ3gC8r+d9Ed-c0OZLTo7DN6A@mail.gmail.com>
-Message-ID: <CAMP5Xgf=bxYJNpOp7od2jrG-SEKiVo=hGjMCMn6KVjKyw2+uJw@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 28 Jun 2012 16:50:51 -0400 (EDT)
+Subject: [PATCH] ARM: Orion: Fix WDT compile for Dove and MV78xx0
+In-Reply-To: <1340915288-22437-1-git-send-email-andrew@lunn.ch>
+References: <1340915288-22437-1-git-send-email-andrew@lunn.ch>
+Message-ID: <alpine.LFD.2.02.1206281647010.31003@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 8:42 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Jun 21, 2012 at 7:38 AM, Frank Li <lznuaa@gmail.com> wrote:
->
->> Anyone use ARM ETM/ETB before?
->
-> I know for sure that Arve has been making good use of the ETB+ETB,
-> since there are some nice patches for it in the Android source tree,
-> but I don't know how he's using it :-)
->
+On Thu, 28 Jun 2012, Andrew Lunn wrote:
 
-I have not used it a lot, but I made changes to make it work on
-systems with Cortex A8, A9 and A15 cpus. I found it most useful to
-debug watchdog resets, but I had to manually figure out where in the
-buffer the data starts since the pointers were lost on a reset.
+> Commit 0fa1f0609a0c1fe8b2be3c0089a2cb48f7fda521 (ARM: Orion: Fix
+> Virtual/Physical mixup with watchdog) broke the Dove & MV78xx0
+> build. Although these two SoC don't use the watchdog, the shared
+> platform code still needs to build. Add the necessary defines.
+> 
+> Reported-by: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-> John Stultz recently submitted some of Arves patches upstream so let's
-> ask these gentlemen how they use it.
->
-> Yours,
-> Linus Walleij
->
->>
->> I run.
->> echo 1 > /sys/devices/etm/trace_running
->>
->> root at freescale /$ echo v >/proc/sysrq-trigger
->> SysRq : etm
->> Trace buffer contents length: 4
->> --- ETB buffer begin ---
->> 01000000000000000000000000000000
->>
->> --- ETB buffer end ---
+With this patch applied on top of commit ccce27c0fe (mainline as of 10 
+minutes ago):
 
-Make sure you don't have trace-funnels between the trace cell and the
-trace buffer that need to be configured. All the SOCs I used have at
-least one trace funnel in the way that by default did not not pass any
-data through. The driver has no code to configure these (the channels
-used are SOC specific and usually not well documented).
-
-Also, at least one SOC I used would not output any trace data with the
-default configuration since it considered the kernel to be executing
-in secure mode. One of the patches from the android tree fixes this.
+$ make dove_defconfig && make zImage
+[...]
+  CC      arch/arm/plat-orion/common.o 
+arch/arm/plat-orion/common.c:585:3: error: 'BRIDGE_PHYS_BASE' undeclared here (not in a function)
+make[1]: *** [arch/arm/plat-orion/common.o] Error 1
 
 
->>
->>
->> best regards
->> Frank Li
->
-> Yours,
-> Linus Walleij
-
-
-
--- 
-Arve Hj?nnev?g
+Nicolas
