@@ -1,33 +1,64 @@
-From: neidhard.kim@lge.com (Kim, Jong-Sung)
-Date: Thu, 28 Jun 2012 15:54:49 +0900
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <alpine.LFD.2.02.1206280223250.31003@xanadu.home>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
- <025701cd457e$d5065410$7f12fc30$@lge.com> <20120627160220.GA2310@linaro.org>
- <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
- <alpine.LFD.2.02.1206280223250.31003@xanadu.home>
-Message-ID: <010e01cd54fa$e9c93fd0$bd5bbf70$@lge.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Thu, 28 Jun 2012 15:01:46 +0800
+Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
+In-Reply-To: <20120628063426.GA22990@S2101-09.ap.freescale.net>
+References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
+ <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+ <4FEBF64F.1010804@gmail.com>
+ <20120628063426.GA22990@S2101-09.ap.freescale.net>
+Message-ID: <4FEC015A.7050602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Nicolas Pitre [mailto:nicolas.pitre at linaro.org]
-> Sent: Thursday, June 28, 2012 3:26 PM
-> 
-> On Thu, 28 Jun 2012, Kim, Jong-Sung wrote:
-> 
-> > Thank you for your comment, Dave! It was not that sophisticated
-> > choice, but I thought that normal embedded system trying to reduce the
-> > BOM would have a big-enough first memblock memory region. However
-> > you're right. There can be exceptional systems. Then, how do you think
-> about following manner:
-> [...]
-> 
-> This still has some possibilities for failure.
-> 
-Can you kindly describe the possible failure path?
+Shawn Guo wrote:
+> On Thu, Jun 28, 2012 at 02:14:39PM +0800, Hui Wang wrote:
+>   
+>>> diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+>>> index 8ff324e..e0dbac7 100644
+>>> --- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+>>> +++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+>>> @@ -15,6 +15,8 @@ Required properties:
+>>> Optional properties:
+>>> - clock-frequency : The oscillator frequency driving the flexcan device
+>>> +- phy-enable-gpios : Specify the gpio used to enable phy
+>>> +- phy-standby-gpios : Specify the gpio used to put phy into STANDBY mode
+>>> Example:
+>>>       
+>> Do we need to add new added entries in the example section as well.
+>>
+>> E.g.
+>>
+>> +        phy-enable-gpios = <&gpio1 4 0>; /* GPIO1_4, active high*/
+>> +        phy-standby-gpios = <&gpio1 2 1>; /* GPIO1_2, active low */
+>>
+>>     
+> I chose not to because after all these two are optional properties.
+>
+>   
+OK.
+>>> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+>>> index 38c0690..1ce3f9e 100644
+>>> --- a/drivers/net/can/flexcan.c
+>>> +++ b/drivers/net/can/flexcan.c
+>>> @@ -26,6 +26,7 @@
+>>> #include <linux/can/platform/flexcan.h>
+>>> #include <linux/clk.h>
+>>> #include <linux/delay.h>
+>>> +#include <linux/gpio.h>
+>>>       
+>> It seems <linux/of_gpio.h> already unconditionally includes this header.
+>>     
+>
+> Documentation/SubmitChecklist
+>
+> 1: If you use a facility then #include the file that defines/declares
+>    that facility.  Don't depend on other header files pulling in ones
+>    that you use.
+>
+>   
+Got it.
 
-> Please have a look at the two patches I've posted to fix this in a better
-> way.
-> 
-I'm setting up for your elegant patches. ;-)
+OK to me.
+
+Regards,
+Hui.
