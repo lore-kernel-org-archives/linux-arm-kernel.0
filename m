@@ -1,89 +1,40 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 28 Jun 2012 16:55:49 -0500
-Subject: Panda ES board hang when using GPIO as interrupt
-In-Reply-To: <4FECCB91.7090609@broadcom.com>
-References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
- <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
- <4FECCB91.7090609@broadcom.com>
-Message-ID: <4FECD2E5.1060603@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 29 Jun 2012 00:09:38 +0200
+Subject: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
+In-Reply-To: <1340885853.84699.YahooMailClassic@web124903.mail.ne1.yahoo.com>
+References: <1340885853.84699.YahooMailClassic@web124903.mail.ne1.yahoo.com>
+Message-ID: <201206290009.38518.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Alain-Serge Nagni,
 
-On 06/28/2012 04:24 PM, Franky Lin wrote:
-> On 06/28/2012 08:42 AM, Jon Hunter wrote:
->>
->> On 06/27/2012 07:41 PM, Franky Lin wrote:
->>> On 06/26/2012 08:37 PM, Kevin Hilman wrote:
->>>> "Franky Lin" <frankyl@broadcom.com> writes:
->>>>> I noticed Kevin raised some similar cases on other platforms and also
->>>>> provided two patches in the patch mail thread. But unfortunately those
->>>>> two patches doesn't help in our case. I tested the driver with 3.5-rc3
->>>>> mainline kernel and the issue is still there. I can only "fix" the
->>>>> hang by either reverting the commit or disabling
->>>>> CONFIG_PM_RUNTIME. Also, the hang only happens on Panda ES board. Old
->>>>> Panda with 4430 works good.
->>>>>
->>>>> Any thoughts and suggestions?
->>>>
->>>> If reverting the patch fixes your problem, can you isolate down to
->>>> which
->>>> part of that patch causes the problem?  IOW, can you fix your
->>>> problem if
->>>> you undo just the hunk added in runtime_suspend or undo just the moved
->>>> hunk runtime_resume?  Or is reverting both required?
->>>>
->>>> I suspect the added runtime_suspend hunk is causing the problems, so
->>>> can
->>>> you see if just undoing that part works[1].  If that works, I will give
->>>> a bit more of a thinking on it tomorrow.
->>>
->>> runtime_suspend hunk is fine. The hang still exist after reverting it.
->>> The culprit is the moved hunk in runtime_resume. Reverting it makes the
->>> hang disappear.
->>
->> Thanks. From reviewing the code the only thing that appears suspect based
->> upon your findings is the return if we find the context has not been
->> lost.
->> We are not checking if "workaround_enabled" is set before we return.
->>
->> Could you try the following change on top of v3.5-rc3?
->>
-> 
-> The patch doesn't help. And I also managed to probe the signal. It's
-> active when it hung.
+> Hi Fabio and Marek,
+>  So I did rebuild the Kernel and UBoot to support device tree.  I did
+> reboot the system and this time I?m not having any kernel panic. Which is
+> a good signJ. After investigation I notice that the  SSP2 node status is
+> marked ?disabled? (in the file imx28.dtsi).  So there is no way based on
+> the patch that was publish to have the imx-spi driver loaded in the kernel
+> at boot time. 
+> Mareck,
+>  I guess that  you have a piece of code that you forgot to publish? If not
+> how can I have your SPI drive to run? 
+>  Right now I guess that the next step would be to define the SPI node in
+> the im28-evk.dts file.  I will open a thread to see if anybody as a
+> solution for that. What is your take on that?
+>  
+> Thanks guys,
+> Alain-Serge         
 
-Ok. Any way to manually reset the wlan module to deactivate the gpio
-when it is hung? I am wondering if the gpio is deactivated if the board
-comes back to life, indicating it is stuck in the interrupt somewhere.
+[...]
 
->> Also, could you add a print in the runtime_suspend/resume() functions so
->> we can see how often these are being called. In my case, I really
->> don't see
->> these being exercised and I am wondering how often you see suspend/resume
->> being called in your setup.
-> 
-> Well, the runtime_suspend/resume never get called during the test.
+Fabio already answered your question. Lemme teach you a few more rules:
+1) Do not top post in the email conversation ;-)
+2) About DT. You're supposed to include imx28.dtsi in your imx28-yourboard.dts 
+file. Then everything that's already defined in the imx28.dtsi will be present 
+in your imx28-yourboard.dts . But the key thing is, if you define something 
+again, it will override the stuff already defined in the imx28.dtsi file. But 
+you don't have to redefine everything, just redefine what you need changed.
 
-Well, at least that is consistent with what I see, but also perplexing
-that it takes sometime to fail. Can you try the following as a debug
-patch to see if it is in the context restore that is the problem. From
-your testing and bisect, the only possible difference in the current
-kernel is that it could perform the context restore when acquiring the gpio.
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index c4ed172..a2401bd 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1341,6 +1341,8 @@ void omap2_gpio_resume_after_idle(void)
- #if defined(CONFIG_PM_RUNTIME)
- static void omap_gpio_restore_context(struct gpio_bank *bank)
- {
-+       return;
-+
-        __raw_writel(bank->context.wake_en,
-                                bank->base + bank->regs->wkup_en);
-        __raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
-
-Cheers
-Jon
+Best regards,
+Marek Vasut
