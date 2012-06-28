@@ -1,31 +1,33 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 28 Jun 2012 10:39:17 +0400
-Subject: [PATCH] ARM: i.MX SSI: Removed an unnecessary setting SSI_SCR_NET bit
-Message-ID: <1340865557-4626-1-git-send-email-shc_work@mail.ru>
+From: neidhard.kim@lge.com (Kim, Jong-Sung)
+Date: Thu, 28 Jun 2012 15:54:49 +0900
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <alpine.LFD.2.02.1206280223250.31003@xanadu.home>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <025701cd457e$d5065410$7f12fc30$@lge.com> <20120627160220.GA2310@linaro.org>
+ <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
+ <alpine.LFD.2.02.1206280223250.31003@xanadu.home>
+Message-ID: <010e01cd54fa$e9c93fd0$bd5bbf70$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes unnecessary setting of SSI_SCR_NET bit in code
-of setup format for i.MX SSI. This bit is we are already setup at
-the end of this procedure by setting IMX_SSI_NET bit in platform-data,
-passed to SSI-init.
+> From: Nicolas Pitre [mailto:nicolas.pitre at linaro.org]
+> Sent: Thursday, June 28, 2012 3:26 PM
+> 
+> On Thu, 28 Jun 2012, Kim, Jong-Sung wrote:
+> 
+> > Thank you for your comment, Dave! It was not that sophisticated
+> > choice, but I thought that normal embedded system trying to reduce the
+> > BOM would have a big-enough first memblock memory region. However
+> > you're right. There can be exceptional systems. Then, how do you think
+> about following manner:
+> [...]
+> 
+> This still has some possibilities for failure.
+> 
+Can you kindly describe the possible failure path?
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- sound/soc/fsl/imx-ssi.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-index 28dd76c..2b1a630 100644
---- a/sound/soc/fsl/imx-ssi.c
-+++ b/sound/soc/fsl/imx-ssi.c
-@@ -96,7 +96,6 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 	case SND_SOC_DAIFMT_I2S:
- 		/* data on rising edge of bclk, frame low 1clk before data */
- 		strcr |= SSI_STCR_TFSI | SSI_STCR_TEFS | SSI_STCR_TXBIT0;
--		scr |= SSI_SCR_NET;
- 		if (ssi->flags & IMX_SSI_USE_I2S_SLAVE) {
- 			scr &= ~SSI_I2S_MODE_MASK;
- 			scr |= SSI_SCR_I2S_MODE_SLAVE;
--- 
-1.7.3.4
+> Please have a look at the two patches I've posted to fix this in a better
+> way.
+> 
+I'm setting up for your elegant patches. ;-)
