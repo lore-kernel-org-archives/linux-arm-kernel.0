@@ -1,133 +1,68 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 28 Jun 2012 20:45:10 +0530
-Subject: [PATCH] ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
-Message-ID: <1340896510-13043-1-git-send-email-hvaibhav@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 28 Jun 2012 18:40:21 +0300
+Subject: [PATCH v12 0/2] MTD: at91: Add PMECC support for at91 nand
+ flash driver
+In-Reply-To: <1340871698-477-1-git-send-email-josh.wu@atmel.com>
+References: <1340871698-477-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1340898021.3070.123.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per recent discussion on the linux-omap list, we are
-moving in the direction where, we will have only architecture,
-ARCH_OMAP2PLUS and all devices/platforms will be treated
-as a SoC underneath.
+On Thu, 2012-06-28 at 16:21 +0800, Josh Wu wrote:
+> Those patches is based on the l2-mtd.git three.
+> 
+> Since there are two patches of v11 already pushed, so this version v12 only includes the left two patches.
+> which includes the modification according to Richard Genoud's review suggestion.
+> 
+> Changes since v11,
+> 	add documentation for atmel nand reg parameter and one example for PMECC support.
+> 	fix the bug: no error reported when fail to get resoures of PMECC ERRLOC or ROM.
+> 	fix the bug: no correction when ecc data has bit flipped.
+> 	add clearer debug information for data correction.
+> 
+> Josh Wu (2):
+>   MTD: at91: add dt parameters for Atmel PMECC
+>   MTD: at91: atmel_nand: Update driver to support Programmable Multibit
+>     ECC controller
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         |   40 +-
+>  drivers/mtd/nand/atmel_nand.c                      |  801 +++++++++++++++++++-
+>  drivers/mtd/nand/atmel_nand_ecc.h                  |  114 ++-
+>  3 files changed, 951 insertions(+), 4 deletions(-)
 
-So the first step in this direction is to adopt this change
-for all new devices getting in, converting
-cpu_is_am33xx/335x() ==> soc_is_am33xx/335x()
+Aiaiai is not 100% happy, could you take a look?
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>t status
----
- arch/arm/mach-omap2/clock3xxx_data.c  |    2 +-
- arch/arm/mach-omap2/id.c              |    4 ++--
- arch/arm/plat-omap/include/plat/cpu.h |   15 +++++++++------
- arch/arm/plat-omap/sram.c             |    6 +++---
- 4 files changed, 15 insertions(+), 12 deletions(-)
+dedekind at blue:~/git/maintaining$ ../aiaiai/aiaiai-concat-mboxes ~/tmp/wu* | ./verify ../l2-mtd/ atmel_nand
+Tested the patch(es) on top of the following commits:
+9328bb5 Quick fixes - applied by aiaiai
+ea3b6ef mtd: fix bogus inequation
+0960e57 mtd: move mtd_read_oob() definition out of mtd.h
+0560176 mtd: nand_bbt: refactor check_pattern_no_oob()
 
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 71a1d33..7300982 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3491,7 +3491,7 @@ int __init omap3xxx_clk_init(void)
- 	} else if (cpu_is_ti816x()) {
- 		cpu_mask = RATE_IN_TI816X;
- 		cpu_clkflg = CK_TI816X;
--	} else if (cpu_is_am33xx()) {
-+	} else if (soc_is_am33xx()) {
- 		cpu_mask = RATE_IN_AM33XX;
- 	} else if (cpu_is_ti814x()) {
- 		cpu_mask = RATE_IN_TI814X;
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 00486a8..37eb95a 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -44,7 +44,7 @@ int omap_type(void)
- 
- 	if (cpu_is_omap24xx()) {
- 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
--	} else if (cpu_is_am33xx()) {
-+	} else if (soc_is_am33xx()) {
- 		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
- 	} else if (cpu_is_omap34xx()) {
- 		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
-@@ -189,7 +189,7 @@ static void __init omap3_cpuinfo(void)
- 		cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
- 	} else if (cpu_is_ti816x()) {
- 		cpu_name = "TI816X";
--	} else if (cpu_is_am335x()) {
-+	} else if (soc_is_am335x()) {
- 		cpu_name =  "AM335X";
- 	} else if (cpu_is_ti814x()) {
- 		cpu_name = "TI814X";
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 430081a..8c84d05 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -150,8 +150,8 @@ IS_AM_SUBCLASS(335x, 0x335)
- #define cpu_is_ti816x()			0
- #define cpu_is_ti814x()			0
- #define soc_is_am35xx()			0
--#define cpu_is_am33xx()			0
--#define cpu_is_am335x()			0
-+#define soc_is_am33xx()			0
-+#define soc_is_am335x()			0
- #define cpu_is_omap44xx()		0
- #define cpu_is_omap443x()		0
- #define cpu_is_omap446x()		0
-@@ -328,8 +328,6 @@ IS_OMAP_TYPE(3430, 0x3430)
- # undef cpu_is_ti816x
- # undef cpu_is_ti814x
- # undef soc_is_am35xx
--# undef cpu_is_am33xx
--# undef cpu_is_am335x
- # define cpu_is_omap3430()		is_omap3430()
- # undef cpu_is_omap3630
- # define cpu_is_omap3630()		is_omap363x()
-@@ -337,8 +335,13 @@ IS_OMAP_TYPE(3430, 0x3430)
- # define cpu_is_ti816x()		is_ti816x()
- # define cpu_is_ti814x()		is_ti814x()
- # define soc_is_am35xx()		is_am35xx()
--# define cpu_is_am33xx()		is_am33xx()
--# define cpu_is_am335x()		is_am335x()
-+#endif
-+
-+# if defined(CONFIG_SOC_AM33XX)
-+# undef soc_is_am33xx
-+# undef soc_is_am335x
-+# define soc_is_am33xx()		is_am33xx()
-+# define soc_is_am335x()		is_am335x()
- #endif
- 
- # if defined(CONFIG_ARCH_OMAP4)
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 477363c..746bac7 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -85,7 +85,7 @@ static int is_sram_locked(void)
- 			__raw_writel(0xCFDE, OMAP24XX_VA_READPERM0);  /* all i-read */
- 			__raw_writel(0xCFDE, OMAP24XX_VA_WRITEPERM0); /* all i-write */
- 		}
--		if (cpu_is_omap34xx() && !cpu_is_am33xx()) {
-+		if (cpu_is_omap34xx() && !soc_is_am33xx()) {
- 			__raw_writel(0xFFFF, OMAP34XX_VA_REQINFOPERM0); /* all q-vects */
- 			__raw_writel(0xFFFF, OMAP34XX_VA_READPERM0);  /* all i-read */
- 			__raw_writel(0xFFFF, OMAP34XX_VA_WRITEPERM0); /* all i-write */
-@@ -123,7 +123,7 @@ static void __init omap_detect_sram(void)
- 				omap_sram_size = 0x800; /* 2K */
- 			}
- 		} else {
--			if (cpu_is_am33xx()) {
-+			if (soc_is_am33xx()) {
- 				omap_sram_start = AM33XX_SRAM_PA;
- 				omap_sram_size = 0x10000; /* 64K */
- 			} else if (cpu_is_omap34xx()) {
-@@ -386,7 +386,7 @@ int __init omap_sram_init(void)
- 		omap242x_sram_init();
- 	else if (cpu_is_omap2430())
- 		omap243x_sram_init();
--	else if (cpu_is_am33xx())
-+	else if (soc_is_am33xx())
- 		am33xx_sram_init();
- 	else if (cpu_is_omap34xx())
- 		omap34xx_sram_init();
+--------------------------------------------------------------------------------
+
+Successfully built configuration "arm-at91cap9_defconfig,arm,arm-unknown-linux-gnueabi-", results:
+
+--- before_patching.log
++++ after_patching.log
+@@ @@
++drivers/mtd/nand/atmel_nand.c: In function 'pmecc_correct_data':
++drivers/mtd/nand/atmel_nand.c:680:38: warning: variable 'ecc_size' set but not used [-Wunused-but-set-variable]
++drivers/mtd/nand/atmel_nand.c:480:32: error: bad constant expression [sparse]
++drivers/mtd/nand/atmel_nand.c:488:35: error: bad constant expression [sparse]
++drivers/mtd/nand/atmel_nand.c:633:32: error: bad constant expression [sparse]
++drivers/mtd/nand/atmel_nand.c:635:35: error: bad constant expression [sparse]
+
+--------------------------------------------------------------------------------
+
+
 -- 
-1.7.0.4
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120628/7dc4e586/attachment.sig>
