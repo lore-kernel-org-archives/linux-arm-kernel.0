@@ -1,32 +1,59 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Jun 2012 11:44:56 +0800
-Subject: [PATCH 00/11] mxs dts updates
-Message-ID: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 28 Jun 2012 11:45:01 +0800
+Subject: [PATCH 05/11] ARM: dts: imx28-evk: add vmmc-supply for mmc device
+In-Reply-To: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
+References: <1340855107-4664-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1340855107-4664-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series makes a bunch of mxs dts updates to provide an equivalent
-device tree support of imx23-evk and imx28-evk board files which are
-meant to be removed completely soon.
+Add vmmc-supply for mmc device, so that the power to mmc slot can be
+turned on by mmc driver if bootloader hasn't done it.
 
-Shawn Guo (11):
-  ARM: dts: mxs: add comments for pinmux-ids
-  ARM: dts: mxs: add hog-gpios for imx23-evk and imx28-evk
-  ARM: dts: imx23-evk: updates for mmc device
-  ARM: dts: imx23-evk: add auart device
-  ARM: dts: imx28-evk: add vmmc-supply for mmc device
-  ARM: dts: imx28-evk: add missing properties for fec
-  ARM: dts: imx28-evk: add flexan devices
-  ARM: dts: imx28-evk: add heartbeat gpio-leds
-  ARM: dts: mxs: enable rtc for imx23 and imx28
-  ARM: dts: mxs: add pwm-backlight for imx23-evk and imx28-evk
-  ARM: dts: mxs: add lcd support for imx23-evk and imx28-evk
+Also remove "okay" status for mmc1/ssp1, as the device has pin conflict
+with gpmi-nand.  Actually the device is already disabled since the
+mxs-mmc driver adopts pinctrl support because there is no pinctrl setup
+for the device in dts.  Make this explicit by removing "okay" status.
 
- arch/arm/boot/dts/imx23-evk.dts |   60 +++++++++++-
- arch/arm/boot/dts/imx23.dtsi    |  118 ++++++++++++++++++++--
- arch/arm/boot/dts/imx28-evk.dts |   83 +++++++++++++++
- arch/arm/boot/dts/imx28.dtsi    |  211 +++++++++++++++++++++++++++++++++------
- 4 files changed, 434 insertions(+), 38 deletions(-)
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx28-evk.dts |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 505ae5e..28b94d3 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -35,6 +35,7 @@
+ 					&mmc0_cd_cfg &mmc0_sck_cfg>;
+ 				bus-width = <8>;
+ 				wp-gpios = <&gpio2 12 0>;
++				vmmc-supply = <&reg_vddio_sd0>;
+ 				status = "okay";
+ 			};
+ 
+@@ -42,7 +43,6 @@
+ 				compatible = "fsl,imx28-mmc";
+ 				bus-width = <8>;
+ 				wp-gpios = <&gpio0 28 0>;
+-				status = "okay";
+ 			};
+ 
+ 			pinctrl at 80018000 {
+@@ -141,6 +141,14 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		reg_vddio_sd0: vddio-sd0 {
++			compatible = "regulator-fixed";
++			regulator-name = "vddio-sd0";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio3 28 0>;
++		};
+ 	};
+ 
+ 	sound {
 -- 
 1.7.5.4
