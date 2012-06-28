@@ -1,78 +1,42 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 28 Jun 2012 14:14:39 +0800
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4FEBF64F.1010804@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 28 Jun 2012 02:25:59 -0400 (EDT)
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+ <025701cd457e$d5065410$7f12fc30$@lge.com> <20120627160220.GA2310@linaro.org>
+ <00e801cd54f0$eb8a3540$c29e9fc0$@lge.com>
+Message-ID: <alpine.LFD.2.02.1206280223250.31003@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> The flexcan driver has function pointer transceiver_switch defined in
-> flexcan_platform_data for platform codes to hook up their transceiver
-> switch implementation.  However this does not cope with device tree
-> probe.
->
-> It's been observed that platforms mostly use gpios to control the
-> switch of flexcan transceiver, like enable and standby.  The patch
-> adds transceiver switch gpios support into flexcan driver, so that
-> platforms booting from device tree can just define properties
-> phy-enable-gpios and phy-standby-gpios to have flexcan driver control
-> the gpios.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    2 +
->  drivers/net/can/flexcan.c                          |   62 ++++++++++++++++++++
->  2 files changed, 64 insertions(+), 0 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> index 8ff324e..e0dbac7 100644
-> --- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> +++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> @@ -15,6 +15,8 @@ Required properties:
->  Optional properties:
->  
->  - clock-frequency : The oscillator frequency driving the flexcan device
-> +- phy-enable-gpios : Specify the gpio used to enable phy
-> +- phy-standby-gpios : Specify the gpio used to put phy into STANDBY mode
->  
->  Example:
->  
->   
-Do we need to add new added entries in the example section as well.
+On Thu, 28 Jun 2012, Kim, Jong-Sung wrote:
 
-E.g.
+> > From: Dave Martin [mailto:dave.martin at linaro.org]
+> > Sent: Thursday, June 28, 2012 1:02 AM
+> > 
+> > For me, it appears that this block just contains the initial region passed
+> > in ATAG_MEM or on the command line, with some reservations for
+> > swapper_pg_dir, the kernel text/data, device tree and initramfs.
+> > 
+> > So far as I can tell, the only memory guaranteed to be mapped here is the
+> > kernel image: there may be no guarantee that there is any unused space in
+> > this region which could be used to allocate extra page tables.
+> > The rest appears during the execution of map_lowmem().
+> > 
+> > Cheers
+> > ---Dave
+> 
+> Thank you for your comment, Dave! It was not that sophisticated choice, but
+> I thought that normal embedded system trying to reduce the BOM would have a
+> big-enough first memblock memory region. However you're right. There can be
+> exceptional systems. Then, how do you think about following manner:
+[...]
 
-+        phy-enable-gpios = <&gpio1 4 0>; /* GPIO1_4, active high*/
-+        phy-standby-gpios = <&gpio1 2 1>; /* GPIO1_2, active low */
+This still has some possibilities for failure.
 
-> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-> index 38c0690..1ce3f9e 100644
-> --- a/drivers/net/can/flexcan.c
-> +++ b/drivers/net/can/flexcan.c
-> @@ -26,6 +26,7 @@
->  #include <linux/can/platform/flexcan.h>
->  #include <linux/clk.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio.h>
->   
-It seems <linux/of_gpio.h> already unconditionally includes this header.
->  #include <linux/if_arp.h>
->  #include <linux/if_ether.h>
->  #include <linux/interrupt.h>
-> @@ -34,6 +35,7 @@
->  #include <linux/list.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/platform_device.h>
->  #include <linux/pinctrl/consumer.h>
->  
->   
+Please have a look at the two patches I've posted to fix this in a 
+better way.
 
-Other looks fine to me.
 
-Regards,
-Hui.
+Nicolas
