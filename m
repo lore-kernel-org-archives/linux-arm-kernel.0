@@ -1,102 +1,156 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 28 Jun 2012 14:07:36 -0400 (EDT)
-Subject: [PATCH v5 3/9] arm: mach-mvebu: add source files
-In-Reply-To: <20120627153652.GE29702@lunn.ch>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340805290-9051-4-git-send-email-gregory.clement@free-electrons.com>
- <20120627153652.GE29702@lunn.ch>
-Message-ID: <alpine.LFD.2.02.1206281354030.31003@xanadu.home>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Thu, 28 Jun 2012 13:06:53 -0700
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
+References: <cover.1338222460.git.rubini@gnudd.com>
+ <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
+Message-ID: <4FECB95D.7010200@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jun 2012, Andrew Lunn wrote:
+On 05/28/2012 09:37 AM, Alessandro Rubini wrote:
+> The sta2x11 I/O Hub is a bridge from PCIe to AMBA. It reuses a number
+> of amba drivers and needs to activate core bus support.
+>
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> ---
+>   arch/x86/Kconfig |    4 ++++
+>   1 files changed, 4 insertions(+), 0 deletions(-)
 
-> > diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-> > new file mode 100644
-> > index 0000000..14331ba
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mvebu/system-controller.c
-> > @@ -0,0 +1,100 @@
-> > +/*
-> > + * System controller support for Armada 370 and XP platforms.
-> > + *
-> > + * Copyright (C) 2012 Marvell
-> > + *
-> > + * Lior Amsalem <alior@marvell.com>
-> > + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + *
-> > + * The Armada 370 and Armada XP SoCs both have a range of
-> > + * miscellaneous registers, that do not belong to a particular device,
-> > + * but rather provide system-level features. This basic
-> > + * system-controller driver provides a device tree binding for those
-> > + * registers, and implements utility functions offering various
-> > + * features related to those registers.
-> > + *
-> > + * For now, the feature set is limited to restarting the platform by a
-> > + * soft-reset, but it might be extended in the future.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/init.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/io.h>
-> > +
-> > +static void __iomem *system_controller_base;
-> > +
-> > +struct mvebu_system_controller {
-> > +	u32 rstoutn_mask_offset;
-> > +	u32 system_soft_reset_offset;
-> > +
-> > +	u32 rstoutn_mask_reset_out_en;
-> > +	u32 system_soft_reset;
-> > +};
-> > +static struct mvebu_system_controller *mvebu_sc;
-> > +
-> > +const struct mvebu_system_controller armada_370_xp_system_controller = {
-> > +	.rstoutn_mask_offset = 0x60,
-> > +	.system_soft_reset_offset = 0x64,
-> > +	.rstoutn_mask_reset_out_en = 0x1,
-> > +	.system_soft_reset = 0x1,
-> > +};
-> > +
-> > +const struct mvebu_system_controller orion_system_controller = {
-> > +	.rstoutn_mask_offset = 0x108,
-> > +	.system_soft_reset_offset = 0x10c,
-> > +	.rstoutn_mask_reset_out_en = 0x4,
-> > +	.system_soft_reset = 0x1,
-> > +};
-> > +
-> > +static struct of_device_id of_system_controller_table[] = {
-> > +	{.compatible = "marvell,orion-system-controller",
-> > +	 .data = (void *) &orion_system_controller},
-> > +	{.compatible = "marvell,armada-370-xp-system-controller",
-> > +	 .data = (void *) &armada_370_xp_system_controller},
-> > +	{ /* end of list */ },
-> > +};
-> > +
-> > +void mvebu_restart(char mode, const char *cmd)
-> > +{
-> > +	if (!system_controller_base) {
-> > +		pr_warn("Cannot restart, system-controller not available\n");
-> 
-> Does pr_warn() get shown by default? I would of probably gone for
-> BUG_ON() or WARN_ON(), to make it clearer what has happened. It may
-> not be a kernel bug, but a DT description bug, but it still a bug...
-
-In this case, this is unlikely to be a data corrupting critical bug, 
-therefore it is not appropriate to use BUG() which purpose is to kill 
-the kernel.  And if the panic timeout used to reboot the kernel is set 
-then you'll enter an infinite loop.
-
-BUG()/BUG_ON() must be used only when there is no hope for the kernel to 
-move on sensibly and that serious data corruption is at risk.  External 
-data such as DT should ideally be validated with proper diagnostic 
-messages rather than triggering BUG().
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index 91dea918..112718f 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -500,6 +500,7 @@ config STA2X11
+>  	select SWIOTLB
+>  	select MFD_STA2X11
+>  	select ARCH_REQUIRE_GPIOLIB
+> +	select ARM_AMBA
+>  	default n
+>  	---help---
+>  	  This adds support for boards based on the STA2X11 IO-Hub,
+> @@ -2173,6 +2174,9 @@ config GEOS
+>
+>  endif # X86_32
+>
+> +config ARM_AMBA
+> +        bool
+> +
+>  config AMD_NB
+>  	def_bool y
+>  	depends on CPU_SUP_AMD && PCI
 
 
-Nicolas
+Nacked-by: H. Peter Anvin <hpa@zytor.com>
+
+This brings in tons of code into the x86 all{yes,mod}config builds, and 
+as perhaps one could expect some of it doesn't compile.  For example:
+
+
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c: In function 
+?dmac_alloc_resources?:
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:2056:2: warning: 
+passing argument 3 of ?dma_alloc_attrs? from incompatible
+  pointer type [enabled by default]
+In file included from 
+/home/hpa/kernel/tip.x86-platform/include/linux/dma-mapping.h:73:0,
+                  from 
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:22:
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/dma-mapping.h:130:1: 
+note: expected ?dma_addr_t *? but argument is of typ
+e ?u32 *?
+   CC      sound/pci/au88x0/au8830.o
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:73:0: warning: 
+"DS" redefined [enabled by default]
+In file included from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/ptrace.h:5:0,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/vm86.h:130,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/processor.h:10,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/thread_info.h:22,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/thread_info.h:54,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/preempt.h:9,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/spinlock.h:50,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/vmalloc.h:4,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/io.h:195,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/io.h:22,
+                  from 
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:15:
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/ptrace-abi.h:13:0: note: 
+this is the location of the previous definition
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:89:0: warning: 
+"ES" redefined [enabled by default]
+In file included from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/ptrace.h:5:0,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/vm86.h:130,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/processor.h:10,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/thread_info.h:22,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/thread_info.h:54,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/preempt.h:9,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/spinlock.h:50,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/vmalloc.h:4,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/io.h:195,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/io.h:22,
+                  from 
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:15:
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/ptrace-abi.h:14:0: note: 
+this is the location of the previous definition
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:100:0: warning: 
+"CS" redefined [enabled by default]
+In file included from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/ptrace.h:5:0,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/vm86.h:130,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/processor.h:10,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/thread_info.h:22,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/thread_info.h:54,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/preempt.h:9,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/spinlock.h:50,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/vmalloc.h:4,
+                  from 
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/io.h:195,
+                  from 
+/home/hpa/kernel/tip.x86-platform/include/linux/io.h:22,
+                  from 
+/home/hpa/kernel/tip.x86-platform/drivers/dma/pl330.c:15:
+/home/hpa/kernel/tip.x86-platform/arch/x86/include/asm/ptrace-abi.h:19:0: note: 
+this is the location of the previous definition
+   CC      drivers/dma/pch_dma.o
+   CC      drivers/dma/amba-pl08x.o
+/home/hpa/kernel/tip.x86-platform/drivers/dma/amba-pl08x.c:86:32: fatal 
+error: asm/hardware/pl080.h: No such file or directory
+compilation terminated.
+make[4]: *** [drivers/dma/amba-pl08x.o] Error 1
+make[3]: *** [drivers/dma] Error 2
+make[2]: *** [drivers] Error 2
+make[2]: *** Waiting for unfinished jobs....
+
+
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
