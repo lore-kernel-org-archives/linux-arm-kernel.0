@@ -1,65 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Jun 2012 23:32:36 -0700
-Subject: [PATCH v3 3/7] OMAP2+: use control module mfd driver in omap_type
-In-Reply-To: <4FEB4B4A.1040204@dev.rtsoft.ru>
-References: <4FEB4B4A.1040204@dev.rtsoft.ru>
-Message-ID: <20120628063235.GA19842@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Jun 2012 14:34:29 +0800
+Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
+In-Reply-To: <4FEBF64F.1010804@gmail.com>
+References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
+ <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+ <4FEBF64F.1010804@gmail.com>
+Message-ID: <20120628063426.GA22990@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120627 11:09]:
-> OMAP system control module can be probed early, then
-> omap_type is safe to use its APIs.
+On Thu, Jun 28, 2012 at 02:14:39PM +0800, Hui Wang wrote:
+> >diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> >index 8ff324e..e0dbac7 100644
+> >--- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> >+++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> >@@ -15,6 +15,8 @@ Required properties:
+> > Optional properties:
+> > - clock-frequency : The oscillator frequency driving the flexcan device
+> >+- phy-enable-gpios : Specify the gpio used to enable phy
+> >+- phy-standby-gpios : Specify the gpio used to put phy into STANDBY mode
+> > Example:
+> Do we need to add new added entries in the example section as well.
 > 
-> TODO: add support for other omap versions
+> E.g.
 > 
-> Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
-> ---
->  arch/arm/mach-omap2/id.c |    9 +++++----
->  1 files changed, 5 insertions(+), 4 deletions(-)
+> +        phy-enable-gpios = <&gpio1 4 0>; /* GPIO1_4, active high*/
+> +        phy-standby-gpios = <&gpio1 2 1>; /* GPIO1_2, active low */
 > 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 00486a8..1b0cec8 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -18,6 +18,7 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/mfd/omap_control.h>
->  
->  #include <asm/cputype.h>
->  
-> @@ -43,13 +44,13 @@ int omap_type(void)
->  	u32 val = 0;
->  
->  	if (cpu_is_omap24xx()) {
-> -		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
-> +		val = omap_control_status_read(OMAP24XX_CONTROL_STATUS);
->  	} else if (cpu_is_am33xx()) {
-> -		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
-> +		val = omap_control_status_read(AM33XX_CONTROL_STATUS);
->  	} else if (cpu_is_omap34xx()) {
-> -		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
-> +		val = omap_control_status_read(OMAP343X_CONTROL_STATUS);
->  	} else if (cpu_is_omap44xx()) {
-> -		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
-> +		val = omap_control_status_read(OMAP4_CTRL_MODULE_CORE_STATUS);
->  	} else {
->  		pr_err("Cannot detect omap type!\n");
->  		goto out;
+I chose not to because after all these two are optional properties.
 
-I think you should keep the CONTROL_STATUS defines private to the
-SCM core driver, there should be no need to pass it here. Just
-make it int omap_control_status_read(void).
+> >diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+> >index 38c0690..1ce3f9e 100644
+> >--- a/drivers/net/can/flexcan.c
+> >+++ b/drivers/net/can/flexcan.c
+> >@@ -26,6 +26,7 @@
+> > #include <linux/can/platform/flexcan.h>
+> > #include <linux/clk.h>
+> > #include <linux/delay.h>
+> >+#include <linux/gpio.h>
+> It seems <linux/of_gpio.h> already unconditionally includes this header.
 
-Of course that means that the SCM core is initialized to some extent
-to know where to find the CONTROL_STATUS register. That should
-probably be done as part of the set_globals calls done in init_early
-in mach-omap2/io.c file.
+Documentation/SubmitChecklist
 
+1: If you use a facility then #include the file that defines/declares
+   that facility.  Don't depend on other header files pulling in ones
+   that you use.
+
+-- 
 Regards,
-
-Tony
+Shawn
