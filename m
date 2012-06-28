@@ -1,73 +1,37 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Fri, 29 Jun 2012 17:20:59 +0800
-Subject: How to use ARM ETM/ETB at linux?
-In-Reply-To: <CAHrpEqQ35ut30VGBjJY+AMRkf0ufssepEwFJk4ALARdLMhc4fA@mail.gmail.com>
-References: <CAHrpEqRk4SQ+8LHCOX0zwtZjnTe=k0c_GCJMqvYMZBUa-dJq=A@mail.gmail.com>
- <CACRpkdZv+Kp0apmLcZQgY07z1YQ3gC8r+d9Ed-c0OZLTo7DN6A@mail.gmail.com>
- <CAMP5Xgf=bxYJNpOp7od2jrG-SEKiVo=hGjMCMn6KVjKyw2+uJw@mail.gmail.com>
- <CAHrpEqQ35ut30VGBjJY+AMRkf0ufssepEwFJk4ALARdLMhc4fA@mail.gmail.com>
-Message-ID: <CAHrpEqSd_pxxhtafRD5tYA411V+=diZui6hzP_AsUqMGFMy+=A@mail.gmail.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Thu, 28 Jun 2012 21:26:42 +0530
+Subject: how to specify dma_mask and coherent_dma_mask in hwmod
+In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
+References: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
+Message-ID: <CAAe_U6Jw7WrWRAQrVF0XTwBp+F4Fw0zCFVxoZmWdBLSjUS+_Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+On Wed, Jun 27, 2012 at 11:11 AM, N, Mugunthan V <mugunthanvnm@ti.com>wrote:
+
+> > -----Original Message-----
+> > From: N, Mugunthan V
+> > Sent: Thursday, June 07, 2012 9:52 PM
+> > To: 'linux-omap at vger.kernel.org'
+> > Cc: 'linux-arm-kernel at lists.infradead.org'
+> > Subject: how to specify dma_mask and coherent_dma_mask in hwmod
+> >
+> > Hi
+> >
+> > While converting platform device registry to Hwmod for CPSW Ethernet
+> > driver which is present in AM335X (OMAP2+), I am not finding a way to
+> > specify
+> > dma_mask and coherent_dma_mask.
+> > Is there a way to specify dma_mask and coherent_dma_mask in hwmod?
 >
-> Thank you for your reply. I will check trace-funnel with our IC team
-> owner and update you.
-> I have picked up below patch. Anything missed?
->
-> * | 2d4660b ARM: etm: Power down etm(s) when tracing is not enabled
-> * | 6e48ba5 ARM: etm: Support multiple ETMs/PTMs.
-> * | c1db5d4 ARM: etm: Return the entire trace buffer if it is empty after reset
-> * | 5b9dda1 ARM: etm: Add some missing locks and error checks
-> * | 1a6825a ARM: etm: Configure data tracing
-> * | 22a917b ARM: etm: Allow range selection
-> * | 684b02b ARM: etm: Don't try to clear the buffer full status after reading th
-> * | 86827c5 ARM: etm: Don't limit tracing to only non-secure code.
-> * | 936c25b ARM: etm: Don't require clock control
->
 
+Nope. You can specify dma_mask after creating the device as done in
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/usb-musb.c;h=c4a576856661014ea3bec9acc70f80e32d62c33b;hb=HEAD
 
-Our SOC have trace-funnel. I config it and enable port. First time, I
-dump etb and everything is 0xFFFFFF. After run the same command twice,
-I get data 0000000000800c01000000000000000000000000
-
-write 0x02144fb0 = 0xc5acce55 /unlock CSTF
-write 0x02144000 = 0x31  //open port 1, I have tried open all ports
-and same result.
-write 0x02144fb0 = 0 //lock CSTF.
-
-root at freescale /sys/devices/etm$ echo v >/proc/sysrq-trigger
-SysRq : etm
-Trace buffer contents length: 1
---- ETB buffer begin ---
-ffffffff
-
---- ETB buffer end ---
-root at freescale /sys/devices/etm$ echo v >/proc/sysrq-trigger
-SysRq : etm
-Trace buffer contents length: 1
---- ETB buffer begin ---
-ffffffff
-
---- ETB buffer end ---
-root at freescale /sys/devices/etm$ echo v >/proc/sysrq-trigger
-SysRq : etm
-Trace buffer contents length: 5
---- ETB buffer begin ---
-0000000000800c01000000000000000000000000
-
-
->
->>
->>>>
->>>>
->>>> best regards
->>>> Frank Li
->>>
->>> Yours,
->>> Linus Walleij
->>
->>
->>
->> --
->> Arve Hj?nnev?g
+Regards
+Kishon
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120628/269c4d6a/attachment.html>
