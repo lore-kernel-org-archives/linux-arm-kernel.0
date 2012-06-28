@@ -1,207 +1,52 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 27 Jun 2012 18:59:43 -0700
-Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix issues.
-In-Reply-To: <1339690919-12566-1-git-send-email-Russ.Dill@ti.com>
-References: <1339690919-12566-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <1340848783-9480-1-git-send-email-Russ.Dill@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 28 Jun 2012 05:05:41 +0200
+Subject: i.MX28 die temperature
+In-Reply-To: <201206271433.15303.jbe@pengutronix.de>
+References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
+ <4FEAF75E.5090505@cam.ac.uk> <201206271433.15303.jbe@pengutronix.de>
+Message-ID: <201206280505.41201.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russ Dill <Russ.Dill@gmail.com>
+Dear Juergen Beisert,
 
-'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
-an issue where the ULPI PHYs were not held in reset while initializing
-the EHCI controller. However, it also changes behavior in
-omap-usb-host.c omap_usbhs_init by releasing reset while the
-configuration in that function was done.
+[...]
 
-This change caused a regression on BB-xM where USB would not function
-if 'usb start' had been run from u-boot before booting. A change was
-made to release reset a little bit earlier which fixed the issue on
-BB-xM and did not cause any regressions on 3430 sdp, the board for
-which the fix was originally made.
+So, I've been thinking about mapping channels and delay slots at runtime. Is it 
+really necessary? I know it's really cool and all, but it adds a lot of 
+complexity. For starters, I was thinking we should try to do static mapping. And 
+when that's all perfected, go further and try doing it dynamically. What do you 
+think about the following DT binding:
 
-This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
-before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+lradc at 80050000 {
+        compatible = "fsl,imx28-lradc";
+        reg = <0x80050000 2000>;
+        interrupts = <10 14 15 16 17 18 19
+                        20 21 22 23 24 25>;
+        fsl,delay-freq = <10 100 50 60>;
+        fsl,delay-repeat = <3 10 5 6>;
+        fsl,delay-channels = <
+                0 2 0 3 0 4 0 5
+                1 8 1 9 2 12 3 13>;
+        status = "disabled";
+};
 
-The original fix to hold the EHCI controller in reset during
-initialization was correct, however it appears that changing
-omap_usbhs_init to not hold the PHYs in reset during it's
-configuration was incorrect. This patch first reverts both fixes, and
-then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
-reset as the original patch had done. It also is sure to incorporate
-the _cansleep change that has been made in the meantime.
+fsl,delay-freq would be an array (for all four delay channels) of their sampling 
+frequencies.
 
-Tested on Beagleboard xM.
+fsl,delay-repeat would be an array (for all four delay channels) of the 
+oversampling count.
 
-v3 - Don't double free gpio
-v2 - Put cansleep gpiolib call outside of spinlock
+fsl,delay-channels would be an array (for all four delay channels) of touples of 
+delay channel, adc channel. In the above example, it's ADC channels 2,3,4,5 
+mapped to delay channel 0, ADC channels 8,9 mapped to delay channel 1 etc.
 
-Signed-off-by: Russ Dill <Russ.Dill@gmail.com>
----
- drivers/mfd/omap-usb-host.c  |   48 +++++++++++++++++++++++++++++++++++++++++-
- drivers/usb/host/ehci-omap.c |   26 +++++++----------------
- 2 files changed, 55 insertions(+), 19 deletions(-)
+Now, it might be dumb, advice is welcome!
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 7e96bb2..41088ec 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -25,6 +25,7 @@
- #include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/spinlock.h>
-+#include <linux/gpio.h>
- #include <plat/cpu.h>
- #include <plat/usb.h>
- #include <linux/pm_runtime.h>
-@@ -500,8 +501,21 @@ static void omap_usbhs_init(struct device *dev)
- 	dev_dbg(dev, "starting TI HSUSB Controller\n");
- 
- 	pm_runtime_get_sync(dev);
--	spin_lock_irqsave(&omap->lock, flags);
- 
-+	if (pdata->ehci_data->phy_reset) {
-+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-+			gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
-+					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
-+
-+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
-+			gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
-+					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
-+
-+		/* Hold the PHY in RESET for enough time till DIR is high */
-+		udelay(10);
-+	}
-+
-+	spin_lock_irqsave(&omap->lock, flags);
- 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
- 	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
- 
-@@ -581,9 +595,39 @@ static void omap_usbhs_init(struct device *dev)
- 	}
- 
- 	spin_unlock_irqrestore(&omap->lock, flags);
-+
-+	if (pdata->ehci_data->phy_reset) {
-+		/* Hold the PHY in RESET for enough time till
-+		 * PHY is settled and ready
-+		 */
-+		udelay(10);
-+
-+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-+			gpio_set_value_cansleep
-+				(pdata->ehci_data->reset_gpio_port[0], 1);
-+
-+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
-+			gpio_set_value_cansleep
-+				(pdata->ehci_data->reset_gpio_port[1], 1);
-+	}
-+
- 	pm_runtime_put_sync(dev);
- }
- 
-+static void omap_usbhs_deinit(struct device *dev)
-+{
-+	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
-+	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-+
-+	if (pdata->ehci_data->phy_reset) {
-+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-+			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
-+
-+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
-+			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
-+	}
-+}
-+
- 
- /**
-  * usbhs_omap_probe - initialize TI-based HCDs
-@@ -767,6 +811,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
- 	goto end_probe;
- 
- err_alloc:
-+	omap_usbhs_deinit(&pdev->dev);
- 	iounmap(omap->tll_base);
- 
- err_tll:
-@@ -818,6 +863,7 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
- {
- 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
- 
-+	omap_usbhs_deinit(&pdev->dev);
- 	iounmap(omap->tll_base);
- 	iounmap(omap->uhh_base);
- 	clk_put(omap->init_60m_fclk);
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index a44294d..35f4788 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -192,14 +192,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	/* Hold PHYs in reset while initializing EHCI controller */
- 	if (pdata->phy_reset) {
- 		if (gpio_is_valid(pdata->reset_gpio_port[0]))
--			gpio_request_one(pdata->reset_gpio_port[0],
--					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
-+			gpio_set_value_cansleep(pdata->reset_gpio_port[0], 0);
- 
- 		if (gpio_is_valid(pdata->reset_gpio_port[1]))
--			gpio_request_one(pdata->reset_gpio_port[1],
--					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
-+			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 0);
- 
- 		/* Hold the PHY in RESET for enough time till DIR is high */
- 		udelay(10);
-@@ -241,6 +240,11 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
- 
- 	ehci_reset(omap_ehci);
-+	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-+	if (ret) {
-+		dev_err(dev, "failed to add hcd with err %d\n", ret);
-+		goto err_add_hcd;
-+	}
- 
- 	if (pdata->phy_reset) {
- 		/* Hold the PHY in RESET for enough time till
-@@ -255,12 +259,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 1);
- 	}
- 
--	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
--	if (ret) {
--		dev_err(dev, "failed to add hcd with err %d\n", ret);
--		goto err_add_hcd;
--	}
--
- 	/* root ports should always stay powered */
- 	ehci_port_power(omap_ehci, 1);
- 
-@@ -288,7 +286,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- {
- 	struct device *dev				= &pdev->dev;
- 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
--	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
- 
- 	usb_remove_hcd(hcd);
- 	disable_put_regulator(dev->platform_data);
-@@ -297,13 +294,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(dev);
- 	pm_runtime_disable(dev);
- 
--	if (pdata->phy_reset) {
--		if (gpio_is_valid(pdata->reset_gpio_port[0]))
--			gpio_free(pdata->reset_gpio_port[0]);
--
--		if (gpio_is_valid(pdata->reset_gpio_port[1]))
--			gpio_free(pdata->reset_gpio_port[1]);
--	}
- 	return 0;
- }
- 
--- 
-1.7.10.4
+> > [...]
+> 
+> Regards,
+> Juergen
+
+Best regards,
+Marek Vasut
