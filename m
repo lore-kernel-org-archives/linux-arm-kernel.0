@@ -1,41 +1,24 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 28 Jun 2012 15:53:46 +0200
-Subject: [PATCH v2 1/4] usb: chipidea: pci: make platformdata static
-In-Reply-To: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1340891629-13145-2-git-send-email-mkl@pengutronix.de>
+Date: Thu, 28 Jun 2012 15:53:45 +0200
+Subject: [PATCH v2 0/4] usb: chipidea: fix error handling and add dr_role
+ property
+Message-ID: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/usb/chipidea/ci13xxx_pci.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+while hacking on the chipidea driver, I fixed the error path in
+the udc part of the chipidea driver. Further I added the possibility
+to limit the driver to host or device only mode. It's possible via
+platformdata and device tree. For dt I selected the dr_role property
+which is already used for other dual role usb drivers.
 
-diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
-index 918e149..9f5c171 100644
---- a/drivers/usb/chipidea/ci13xxx_pci.c
-+++ b/drivers/usb/chipidea/ci13xxx_pci.c
-@@ -23,17 +23,17 @@
- /******************************************************************************
-  * PCI block
-  *****************************************************************************/
--struct ci13xxx_platform_data pci_platdata = {
-+static struct ci13xxx_platform_data pci_platdata = {
- 	.name		= UDC_DRIVER_NAME,
- 	.capoffset	= DEF_CAPOFFSET,
- };
- 
--struct ci13xxx_platform_data langwell_pci_platdata = {
-+static struct ci13xxx_platform_data langwell_pci_platdata = {
- 	.name		= UDC_DRIVER_NAME,
- 	.capoffset	= 0,
- };
- 
--struct ci13xxx_platform_data penwell_pci_platdata = {
-+static struct ci13xxx_platform_data penwell_pci_platdata = {
- 	.name		= UDC_DRIVER_NAME,
- 	.capoffset	= 0,
- 	.power_budget	= 200,
--- 
-1.7.10
+Changes since v1:
+- rebase to Richard's Tree
+  https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+- remove redundant wording from devicetree binding documentation
+- move dtsi changes into seperate patch
+- also change imx23.dtsi
+- tested on compile time non OF tree platforms (amd64)
+  of.h provides proper stubs.
+
+regards, Marc
