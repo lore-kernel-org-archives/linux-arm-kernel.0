@@ -1,44 +1,42 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 28 Jun 2012 20:41:30 +0530
-Subject: [PATCHv11 4/6] i2c: omap: Remove the definition of SYSS_RESETDONE_MASK
+Date: Thu, 28 Jun 2012 20:41:29 +0530
+Subject: [PATCHv11 3/6] i2c: omap: Do not initialise the completion everytime
 In-Reply-To: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340896292-12112-5-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340896292-12112-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the definition of SYSS_RESETDONE_MASK and use the
-one in omap_hwmod.h.
+Use INIT_COMPLETION instead of init_completion in transfer.
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
-- Add Felipe's reviewed by tag
+- Add Felipe's reviewed-by tag
 
- drivers/i2c/busses/i2c-omap.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6d05f18..4bbf288 100644
+index b9915bb..6d05f18 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -43,6 +43,7 @@
- #include <linux/slab.h>
- #include <linux/i2c-omap.h>
- #include <linux/pm_runtime.h>
-+#include <plat/omap_hwmod.h>
+@@ -490,7 +490,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
+ 	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
  
- /* I2C controller revisions */
- #define OMAP_I2C_OMAP1_REV_2		0x20
-@@ -158,9 +159,6 @@ enum {
- #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
- #endif
+-	init_completion(&dev->cmd_complete);
++	INIT_COMPLETION(dev->cmd_complete);
+ 	dev->cmd_err = 0;
  
--/* OCP_SYSSTATUS bit definitions */
--#define SYSS_RESETDONE_MASK		(1 << 0)
--
- /* OCP_SYSCONFIG bit definitions */
- #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
- #define SYSC_SIDLEMODE_MASK		(0x3 << 3)
+ 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
+@@ -999,6 +999,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	platform_set_drvdata(pdev, dev);
++	init_completion(&dev->cmd_complete);
+ 
+ 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
+ 
 -- 
 1.7.5.4
