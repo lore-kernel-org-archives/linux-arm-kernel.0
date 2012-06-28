@@ -1,68 +1,83 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 28 Jun 2012 18:40:21 +0300
-Subject: [PATCH v12 0/2] MTD: at91: Add PMECC support for at91 nand
- flash driver
-In-Reply-To: <1340871698-477-1-git-send-email-josh.wu@atmel.com>
-References: <1340871698-477-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1340898021.3070.123.camel@sauron.fi.intel.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 28 Jun 2012 15:36:53 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
+ around __omap2_set_globals
+In-Reply-To: <4FEC72C2.7010106@ti.com>
+References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
+ <1340895567-22766-4-git-send-email-hvaibhav@ti.com> <4FEC72C2.7010106@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5D5F3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-06-28 at 16:21 +0800, Josh Wu wrote:
-> Those patches is based on the l2-mtd.git three.
+On Thu, Jun 28, 2012 at 20:35:38, Cousson, Benoit wrote:
+> Hi Vaibhav,
 > 
-> Since there are two patches of v11 already pushed, so this version v12 only includes the left two patches.
-> which includes the modification according to Richard Genoud's review suggestion.
+> One small comment.
 > 
-> Changes since v11,
-> 	add documentation for atmel nand reg parameter and one example for PMECC support.
-> 	fix the bug: no error reported when fail to get resoures of PMECC ERRLOC or ROM.
-> 	fix the bug: no correction when ecc data has bit flipped.
-> 	add clearer debug information for data correction.
+> On 06/28/2012 04:59 PM, Vaibhav Hiremath wrote:
+> > The function __omap2_set_globals() can be common across all
+> > platforms/architectures, even in case of omap4, internally it
+> > calls same set of functions as in __omap2_set_globals() function
+> > (except for sdrc).
+> > This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
+> > so that we can reuse same function across omap2/3/4...
+> >
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> >
+> > Changes from V1:
+> > 	- Added Makefile rule to build sdrc.c file for new
+> > 	  option SOC_HAS_OMAP2_SDRC (as per Kevin's comment).
+> > ---
+> >   arch/arm/mach-omap2/Kconfig  |    8 ++++++++
+> >   arch/arm/mach-omap2/Makefile |    3 ++-
+> >   arch/arm/mach-omap2/common.c |    8 +-------
+> >   arch/arm/mach-omap2/common.h |    5 +++++
+> >   4 files changed, 16 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > index 208b950..82d9d18 100644
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -21,12 +21,16 @@ config ARCH_OMAP2PLUS_TYPICAL
+> >   	help
+> >   	  Compile a kernel suitable for booting most boards
+> >
+> > +config SOC_HAS_OMAP2_SDRC
+> > +	bool "OMAP2 SDRAM Controller support"
+> > +
+> >   config ARCH_OMAP2
+> >   	bool "TI OMAP2"
+> >   	depends on ARCH_OMAP2PLUS
+> >   	default y
+> >   	select CPU_V6
+> >   	select MULTI_IRQ_HANDLER
+> > +	select SOC_HAS_OMAP2_SDRC
+> >
+> >   config ARCH_OMAP3
+> >   	bool "TI OMAP3"
+> > @@ -39,6 +43,7 @@ config ARCH_OMAP3
+> >   	select PM_OPP if PM
+> >   	select ARM_CPU_SUSPEND if PM
+> >   	select MULTI_IRQ_HANDLER
+> > +	select SOC_HAS_OMAP2_SDRC
+> >
+> >   config ARCH_OMAP4
+> >   	bool "TI OMAP4"
+> > @@ -66,16 +71,19 @@ config SOC_OMAP2420
+> >   	depends on ARCH_OMAP2
+> >   	default y
+> >   	select OMAP_DM_TIMER
+> > +	select SOC_HAS_OMAP2_SDRC
 > 
-> Josh Wu (2):
->   MTD: at91: add dt parameters for Atmel PMECC
->   MTD: at91: atmel_nand: Update driver to support Programmable Multibit
->     ECC controller
+> OMAP4 does not have the SDRC but the EMIF like TI8XX.
 > 
->  .../devicetree/bindings/mtd/atmel-nand.txt         |   40 +-
->  drivers/mtd/nand/atmel_nand.c                      |  801 +++++++++++++++++++-
->  drivers/mtd/nand/atmel_nand_ecc.h                  |  114 ++-
->  3 files changed, 951 insertions(+), 4 deletions(-)
 
-Aiaiai is not 100% happy, could you take a look?
+Good catch :) 
 
-dedekind at blue:~/git/maintaining$ ../aiaiai/aiaiai-concat-mboxes ~/tmp/wu* | ./verify ../l2-mtd/ atmel_nand
-Tested the patch(es) on top of the following commits:
-9328bb5 Quick fixes - applied by aiaiai
-ea3b6ef mtd: fix bogus inequation
-0960e57 mtd: move mtd_read_oob() definition out of mtd.h
-0560176 mtd: nand_bbt: refactor check_pattern_no_oob()
+Will fix it and send next version shortly.
 
---------------------------------------------------------------------------------
-
-Successfully built configuration "arm-at91cap9_defconfig,arm,arm-unknown-linux-gnueabi-", results:
-
---- before_patching.log
-+++ after_patching.log
-@@ @@
-+drivers/mtd/nand/atmel_nand.c: In function 'pmecc_correct_data':
-+drivers/mtd/nand/atmel_nand.c:680:38: warning: variable 'ecc_size' set but not used [-Wunused-but-set-variable]
-+drivers/mtd/nand/atmel_nand.c:480:32: error: bad constant expression [sparse]
-+drivers/mtd/nand/atmel_nand.c:488:35: error: bad constant expression [sparse]
-+drivers/mtd/nand/atmel_nand.c:633:32: error: bad constant expression [sparse]
-+drivers/mtd/nand/atmel_nand.c:635:35: error: bad constant expression [sparse]
-
---------------------------------------------------------------------------------
-
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120628/7dc4e586/attachment.sig>
+Thanks,
+Vaibhav
