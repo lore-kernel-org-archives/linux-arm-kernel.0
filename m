@@ -1,28 +1,47 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 29 Jun 2012 12:01:19 +0530
-Subject: [PATCH v2] clk: Add support for rate table based dividers
-In-Reply-To: <20120627180635.GH22766@gmail.com>
-References: <1340794893-20869-1-git-send-email-rnayak@ti.com>
- <20120627162851.GT1623@pengutronix.de> <20120627180635.GH22766@gmail.com>
-Message-ID: <4FED4BB7.6070706@ti.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 29 Jun 2012 12:03:18 +0530
+Subject: [PATCH 1/2] ARM: OMAP2: Overo: init I2C before MMC to fix MMC
+ suspend/resume failure
+In-Reply-To: <1340902892-9542-2-git-send-email-khilman@ti.com>
+References: <1340902892-9542-1-git-send-email-khilman@ti.com>
+ <1340902892-9542-2-git-send-email-khilman@ti.com>
+Message-ID: <4FED4C2E.4030309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-> After thinking about it a bit more I still think a separate
-> clk_register_divider_table is needed.  Primarily this would reduce
-> needless churn in having to update all existing users of
-> clk_register_divider.  I also think that clearly separating the two
-> functions will make it a bit easier on folks trying to port their clocks
-> trees over.
+Hi Kevin,
+On Thursday 28 June 2012 10:31 PM, Kevin Hilman wrote:
+> In order for suspend/resume dependencies to work correctly, I2C has to
+> be initialized (more specifically, registered with the driver core)
+> before MMC.
+Agree.
+>   Without this, the MMC driver fails to adjust the VMMC
+> regulator (using i2c writes) during the suspend path.
 >
-> Unless there is a technical reason why having two registration functions
-> is a bad idea, can you send a V4 with that new registration function?
-> I'll take it into clk-next.
->
-Nope, no technical reason why it can't be done. I'll do what you
-suggested and post a v4 soon.
+> Problem found testing suspend/resume on 3730/OveroSTORM platform.
+Not related to your patch.
+Was just thinking if
+arch/arm/mach-omap2/board-omap3beagle.c
+arch/arm/mach-omap2/board-3430sdp.c
 
-thanks,
-Rajendra
+should also be patched.
+
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-overo.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+> index 8fa2fc3..779734d 100644
+> --- a/arch/arm/mach-omap2/board-overo.c
+> +++ b/arch/arm/mach-omap2/board-overo.c
+> @@ -494,8 +494,8 @@ static void __init overo_init(void)
+>  
+>  	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+> -	omap_hsmmc_init(mmc);
+>  	overo_i2c_init();
+> +	omap_hsmmc_init(mmc);
+>  	omap_display_init(&overo_dss_data);
+>  	omap_serial_init();
+>  	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
