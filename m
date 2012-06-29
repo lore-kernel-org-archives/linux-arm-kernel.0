@@ -1,68 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jun 2012 14:18:58 +0000
-Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
-In-Reply-To: <CAN1soZwwWhNC2pQjwYz-jUjNrnnPfshyPQJL-8uM6z6BKvCwMA@mail.gmail.com>
-References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
- <201206281432.24061.arnd@arndb.de>
- <CAN1soZwwWhNC2pQjwYz-jUjNrnnPfshyPQJL-8uM6z6BKvCwMA@mail.gmail.com>
-Message-ID: <201206291418.59108.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Jun 2012 07:20:32 -0700
+Subject: [PATCH] ARM: OMAP2+: PM: fix IRQ_NOAUTOEN removal by mis-merge
+In-Reply-To: <1340978614-12558-1-git-send-email-khilman@ti.com>
+References: <1340978614-12558-1-git-send-email-khilman@ti.com>
+Message-ID: <20120629142032.GI4202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 June 2012, Haojian Zhuang wrote:
-> On Thu, Jun 28, 2012 at 10:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 28 June 2012, Mark Brown wrote:
-> >> Show Details
-> >>   On Thu, Jun 28, 2012 at 11:21:56AM +0000, Arnd Bergmann wrote:
-> >>
-> >> > What platform is this driver for?
-> >> >  - If it's for an existing platform that does not have DT support, please
-> >> >    include the platform changes for that platform so we can see what gets
-> >> >    done in there.
-> >>
-> >> This is really not normal practice for device drivers, it'd be a serious
-> >> obstacle to getting drivers integrated if we have to have a board merged
-> >> with every driver.
-> >
-> > But it would be very helpful to see how the platform data is set, especially
-> > with the callback. If the callback is just there to set up a regulator
-> > or clock, then it should be changed to a more generic way.
+* Kevin Hilman <khilman@ti.com> [120629 07:08]:
+> commit 99b59df0 (ARM: OMAP3: PM: fix shared PRCM interrupt leave
+> disabled at boot) added IRQ_NOAUTOEN to the PRCM interrupt so it could
+> be enabled later if needed.  However, this commit was partially undone
+> when merging the IO daisy chain rework in 9a17d88e (Merge tag
+> 'omap-devel-c-for-3.6' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into
+> devel-pm
 > 
-> No, the callbacks is not used to set up a regulator or clock. They're used to
-> configure the logic that are not integrated into drivers yet. For example, one
-> special regulator needs active in sleep mode; some power saving configuration
-> with board; accessing special register for fuse or OTP, .... Could we set up
-> milestones for this? I agree that we need to move to DT support. But we have
-> the interface of OF_DEV_AUXDATA in machine driver. We can use them to
-> deliver platform data even with callback into drivers.
+> This patch adds back the IRQ_NOAUTOEN fix that was removed by the
+> merge resolution.
+> 
+> This also fixes the following boot-time warning that showed up after
+> merging the IO daisy chain rework:
+> 
+> [    3.849334] WARNING: at kernel/irq/manage.c:436 enable_irq+0x3c/0x78()
+> [    3.856231] Unbalanced enable for IRQ 297
+> [    3.860473] Modules linked in:
+> [    3.863739] [<c001a114>] (unwind_backtrace+0x0/0xf0) from [<c003c7e8>] (warn_slowpath_common+0x4c/0x64)
+> [    3.873687] [<c003c7e8>] (warn_slowpath_common+0x4c/0x64) from [<c003c894>] (warn_slowpath_fmt+0x30/0x40)
+> [    3.883819] [<c003c894>] (warn_slowpath_fmt+0x30/0x40) from [<c00993e0>] (enable_irq+0x3c/0x78)
+> [    3.893035] [<c00993e0>] (enable_irq+0x3c/0x78) from [<c067b1e8>] (omap3_pm_init+0x328/0x5f4)
+> [    3.902099] [<c067b1e8>] (omap3_pm_init+0x328/0x5f4) from [<c067161c>] (init_machine_late+0x1c/0x28)
+> [    3.911773] [<c067161c>] (init_machine_late+0x1c/0x28) from [<c0008648>] (do_one_initcall+0x34/0x178)
+> [    3.921539] [<c0008648>] (do_one_initcall+0x34/0x178) from [<c066e8f4>] (kernel_init+0xfc/0x1c0)
+> [    3.930847] [<c066e8f4>] (kernel_init+0xfc/0x1c0) from [<c00140b0>] (kernel_thread_exit+0x0/0x8)
+> [    3.940246] ---[ end trace 55a0ad32ca2ca682 ]---
+> 
+> Reported-by: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Tony, this applies on top of your current devel-pm branch.
 
-Yes, this is complex enough that using auxdata sounds like the right approach
-in this case for now, thanks for the explanation.
+Thanks applying into devel-pm.
 
-> By the way, this PMIC is installed on new platforms that are not
-> submitted patches
-> into mainline yet. They're used and verified in internal code without
-> DT support. The
-> plan is submitting PMIC pathces before the new platform. If we only
-> support DT, we
-> can't verify these code.
-
-Well, as long as no platform in the mainline kernel supports this driver,
-it does not matter the upstream maintainers whether the code has been
-verified. The more important question is whether it is done the right way.
-
-My usual recommendation for cases like this is to submit the driver in the
-way it would be written if all the other code using it was already perfect.
-In your internal verification, you already carry patches to add the new
-platform support, so you can add more patches to work around missing parts
-of the driver, like adding back the platform_data. What is more important
-for you is that you get as much as possible upstream in a version that has
-been reviewed and acked by the relevant maintainers.
-
-I guess it's ok here to leave the platform data in for now, as it sounds
-that it can take a longer time (if ever) to fully eliminate it. However,
-I think it would be nice to also add preliminary DT bindings for the
-things that can be DT properties.
-
-
- 	Arnd
+Tony
