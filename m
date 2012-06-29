@@ -1,47 +1,50 @@
-From: frankyl@broadcom.com (Franky Lin)
-Date: Thu, 28 Jun 2012 17:59:04 -0700
-Subject: Panda ES board hang when using GPIO as interrupt
-In-Reply-To: <4FECEE9A.5070300@ti.com>
-References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
- <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
- <4FECCB91.7090609@broadcom.com> <4FECD2E5.1060603@ti.com>
- <4FECE067.7000809@broadcom.com> <4FECE1BD.80906@ti.com>
- <4FECE45E.6040506@broadcom.com> <4FECEE9A.5070300@ti.com>
-Message-ID: <4FECFDD8.5060105@broadcom.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 29 Jun 2012 09:18:07 +0800
+Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
+In-Reply-To: <201206281432.24061.arnd@arndb.de>
+References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
+ <201206281121.56769.arnd@arndb.de>
+ <20120628114616.GE28922@opensource.wolfsonmicro.com>
+ <201206281432.24061.arnd@arndb.de>
+Message-ID: <CAN1soZwwWhNC2pQjwYz-jUjNrnnPfshyPQJL-8uM6z6BKvCwMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2012 04:54 PM, Jon Hunter wrote:
-> I am wondering if this could be the bug ... on start-up I see that we do
-> a context restore on bank1 during the probe which is before we have done
-> the first suspend! In other words, we could restore a bad/uninitialised
-> context for bank1. In the case of bank1, the loss count starts at 1 and
-> not 0 and so we falsely think we need to perform a restore :-(
+On Thu, Jun 28, 2012 at 10:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 28 June 2012, Mark Brown wrote:
+>> Show Details
+>> ? On Thu, Jun 28, 2012 at 11:21:56AM +0000, Arnd Bergmann wrote:
+>>
+>> > What platform is this driver for?
+>> > ?- If it's for an existing platform that does not have DT support, please
+>> > ? ?include the platform changes for that platform so we can see what gets
+>> > ? ?done in there.
+>>
+>> This is really not normal practice for device drivers, it'd be a serious
+>> obstacle to getting drivers integrated if we have to have a board merged
+>> with every driver.
 >
-> [    0.176269] omap_gpio_runtime_resume: bank @ 0xfc310000
-> [    0.177276] omap_gpio_runtime_resume: count 0, now 1
-> [    0.177276] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
-> [    0.177642] omap_gpio_runtime_suspend: bank @ 0xfc310000
+> But it would be very helpful to see how the platform data is set, especially
+> with the callback. If the callback is just there to set up a regulator
+> or clock, then it should be changed to a more generic way.
 >
-> Can you try ...
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index c4ed172..9623408 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1086,6 +1086,9 @@ static int __devinit omap_gpio_probe(struct
-> platform_device *pdev)
->   #ifdef CONFIG_OF_GPIO
->          bank->chip.of_node = of_node_get(node);
->   #endif
-> +       if (bank->get_context_loss_count)
-> +               bank->context_loss_count =
-> +                               bank->get_context_loss_count(bank->dev);
->
->          bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
->          if (bank->irq_base < 0) {
->
+> ? ? ? ?Arnd
 
-Looks like you found the culprit. :) It does fix the problem.
+No, the callbacks is not used to set up a regulator or clock. They're used to
+configure the logic that are not integrated into drivers yet. For example, one
+special regulator needs active in sleep mode; some power saving configuration
+with board; accessing special register for fuse or OTP, .... Could we set up
+milestones for this? I agree that we need to move to DT support. But we have
+the interface of OF_DEV_AUXDATA in machine driver. We can use them to
+deliver platform data even with callback into drivers.
 
-Franky
+By the way, this PMIC is installed on new platforms that are not
+submitted patches
+into mainline yet. They're used and verified in internal code without
+DT support. The
+plan is submitting PMIC pathces before the new platform. If we only
+support DT, we
+can't verify these code.
+
+Regards
+Haojian
