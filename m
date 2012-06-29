@@ -1,72 +1,64 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 29 Jun 2012 07:02:21 -0500
-Subject: [PATCH] I2C: OMAP: fix runtime PM get/put balance on error
-In-Reply-To: <1340960868-7371-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Fri, 29 Jun 2012 14:37:48 +0530")
-References: <1340960868-7371-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <874npunx6a.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Jun 2012 05:03:25 -0700
+Subject: [PATCH 2/3] OMAP2+ devices add mac address allocation register api
+In-Reply-To: <4FED7E6A.4090207@linaro.org>
+References: <20120629054404.11091.31289.stgit@build.warmcat.com>
+ <20120629055516.11091.82899.stgit@build.warmcat.com>
+ <20120629094055.GB4202@atomide.com> <4FED7E6A.4090207@linaro.org>
+Message-ID: <20120629120325.GD4202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+* Andy Green <andy.green@linaro.org> [120629 03:12]:
+> On 06/29/12 17:40, the mail apparently from Tony Lindgren included:
+> >
+> >This is a bit similar to platform data callback functions that we are
+> >trying to get rid of. And as the question "how do we replace platform
+> >data callback functions" is still open for things like this, few
+> >questions come to mind that should be discussed:
+> >
+> >1. How is this a better solution to passing the generated mac address in
+> >    platform data to the driver?
+> 
+> Well, I initially did this over a year ago as a generic way to pass
+> platform data to devices that are appearing through deferred or
+> async probing, like USB bus and SDIO bus.  It was not understood
+> what the goal was by the people looking after those subsystems.
 
->     ensure pm_runtime_put() is called, on pm_runtime_get_sync()
->     failure.
->
->     Without this, after a failed call, the runtime PM usecount will have
->     been incremented, but not decremented causing the usecount to never
->     reach zero after a failure. Thanks to Kevin for educating about it. 
->     While at it also fix a missing pm_runtime_disable in the probe error
->     path.
+OK..
+ 
+> >2. Is this really how we want to pass the board generated mac addresses
+> >    and other dynamically generated data to the drivers that are device
+> >    tree based?
+> 
+> The issue is that both these busses have an async probe, in the case
+> of USB stack the maintainer was not interested last year in adding
+> platform data.  Maybe it changed but that's my understanding.
 
-This is the same subject and changelog as the patch I sent, but is a
-different patch.  
+OK, I'd like to hear Arnds comments on the #2 above too as this is
+a more generic issue.
+ 
+> >3. What about mac address in board-generic.c when booting panda with
+> >    device tree?
+> 
+> I don't mind adapting it for that case.
 
-Please write a new subject and a changelog specific to your patch.
+Just to try to think about some alternatives, how about something like
+this: This all could be a driver called soft-mac or something that does
+what your patches are doing. Except then it would be completely generic
+and would be able to take device names and mac addresses from platform
+data or from devicetree.
+ 
+> >Also, what happens if the user has set the mac address and you replugs the
+> >cable or device? Do we now overwrite it? Might be worth checking that this
+> >follows the standard behaviour..
+> 
+> This is only useful for devices that are soldered on your board, and
+> have deterministic "device paths" as is the case with Panda Ethernet
+> and Wlan module that both benefit from this treatment.  If you mean
+> pulling the RJ45 cable, it doesn't change anything about the MAC I
+> can confirm.
 
-As this changes the error/failure path, please be specific about how
-the failure modes were tested, and on which platforms.
+OK
 
-> Cc: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |    7 +++----
->  1 files changed, 3 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 2500f19..c8e5c76 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1113,10 +1113,10 @@ err_free_irq:
->  	free_irq(dev->irq, dev);
->  err_unuse_clocks:
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> +err_free_mem:
->  	pm_runtime_put(dev->dev);
->  	iounmap(dev->base);
-
-This doesn't look right.  At least one of the gotos for this label, the
-ioremap has failed.
-
->  	pm_runtime_disable(&pdev->dev);
-> -err_free_mem:
->  	platform_set_drvdata(pdev, NULL);
->  	kfree(dev);
->  err_release_region:
-> @@ -1136,10 +1136,9 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
->  	free_irq(dev->irq, dev);
->  	i2c_del_adapter(&dev->adapter);
->  	ret = pm_runtime_get_sync(&pdev->dev);
-> -	if (IS_ERR_VALUE(ret))
-> -		return ret;
-> +	if (!IS_ERR_VALUE(ret))
-> +		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-
-this change isn't described in changelog
-
-> -	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  	iounmap(dev->base);
-
-Kevin
+Tony
