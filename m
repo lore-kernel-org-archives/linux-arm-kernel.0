@@ -1,62 +1,83 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 29 Jun 2012 16:04:52 -0500
-Subject: [PATCH RESEND] ARM: OMAP2+: Fix Wake-up power domain power status
-Message-ID: <1341003892-14424-1-git-send-email-jon-hunter@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 29 Jun 2012 17:07:52 -0400
+Subject: [PATCH v3 4/4] memory: emif: add device tree support to emif
+ driver
+In-Reply-To: <CAMQu2gx2RT0iyo+LD1TyTJg9FRSUD8SK2tA=nxAoULzQOa6L7A@mail.gmail.com>
+References: <20120614154820.GG17140@kroah.com>
+ <CAMQu2gx5CCDyrvozX06neBnA8J2heg+HL7DOewDm5voxqbpetw@mail.gmail.com>
+ <CAMQu2gy7oj-+1qCteAFMXEeOL-Wdrs6e4gKWM=HsOukXcPuv-A@mail.gmail.com>
+ <20120625182830.GA23850@kroah.com>
+ <CAMQu2gxDG=69X7UQPUoTLP5h1ZLpHngp=3C4vSDOS6L-N2XZSw@mail.gmail.com>
+ <4FE9467A.2050906@ti.com>
+ <CAMQu2gzOszT54ZU0Z3-9k=mMM7yTCH_MCZV=gRKwGoGRj0zjaA@mail.gmail.com>
+ <4FE947F7.9030000@ti.com>
+ <CAMQu2gwzFV-79CuEAmOHCZ7XivXrALjXkoB+J-QpgJkZ_PoRVg@mail.gmail.com>
+ <CAMQu2gx2RT0iyo+LD1TyTJg9FRSUD8SK2tA=nxAoULzQOa6L7A@mail.gmail.com>
+Message-ID: <20120629210752.GA13859@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note: Re-sending with updated kernel doc.
+On Fri, Jun 29, 2012 at 07:16:19PM +0530, Shilimkar, Santosh wrote:
+> Greg,
+> 
+> On Tue, Jun 26, 2012 at 1:19 PM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+> >
+> > On Tue, Jun 26, 2012 at 10:56 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> > > On Tuesday 26 June 2012 10:53 AM, Shilimkar, Santosh wrote:
+> > >>
+> > >> On Tue, Jun 26, 2012 at 10:49 AM, Rajendra Nayak<rnayak@ti.com> ?wrote:
+> > >>>
+> > >>> On Tuesday 26 June 2012 10:39 AM, Shilimkar, Santosh wrote:
+> > >>>>>>
+> > >>>>>>
+> > >>>>>> +#if defined(CONFIG_OF)
+> > >>>>>>>
+> > >>>>>>> ?> ? ?+static const struct of_device_id emif_of_match[] = {
+> > >>>>>>> ?> ? ?+ ? ? ? ? ? ? { .compatible = "ti,emif-4d" },
+> > >>>>>>> ?> ? ?+ ? ? ? ? ? ? { .compatible = "ti,emif-4d5" },
+> > >>>>>>> ?> ? ?+ ? ? ? ? ? ? {},
+> > >>>>>>> ?> ? ?+};
+> > >>>>>>> ?> ? ?+MODULE_DEVICE_TABLE(of, emif_of_match);
+> > >>>>>>> ?> ? ?+#endif
+> > >>>>>>> ?> ? ?+
+> > >>>>>>> ?> ? ? ?static struct platform_driver emif_driver = {
+> > >>>>>>> ?> ? ? ? ? ? .remove ? ? ? ? = __exit_p(emif_remove),
+> > >>>>>>> ?> ? ? ? ? ? .shutdown ? ? ? = emif_shutdown,
+> > >>>>>>> ?> ? ? ? ? ? .driver = {
+> > >>>>>>> ?> ? ? ? ? ? ? ? ? ? .name = "emif",
+> > >>>>>>> ?> ? ?+#if defined(CONFIG_OF)
+> > >>>>>>> ?> ? ?+ ? ? ? ? ? ? .of_match_table = of_match_ptr(emif_of_match),
+> > >>>>>>> ?> ? ?+#endif
+> > >>>>>
+> > >>>>>
+> > >>>>>>
+> > >>>>>> ?Are these two still #if defined needed?
+> > >>>>>>
+> > >>>>>> ?Also, what about the IS_DEFINED macro?
+> > >>>>>>
+> > >>>>
+> > >>>> Yes. To avoid the build break in !DT build.
+> > >>>>
+> > >>>
+> > >>> No, infact of_match_ptr is there just so you can avoid a
+> > >>> #ifdef around and not break !CONFIG_OF.
+> > >>
+> > >>
+> > >> Need to recheck but the build was throwing error becasue of
+> > >> "emif_of_match"
+> > >> mostly.
+> > >
+> > >
+> > > You still need the first one. I meant the second one around
+> > > 'of_match_ptr' should be removed.
+> > >
+> > > With !CONFIG_OF, of_match_ptr(_ptr) is just defined as NULL.
+> > >
+> > Yep. That make sense too.
+> > Will drop the second check.
+> >
+> Posted the entire series again with updated $subject patch.
+> With your ack, I will ask Tony to pull this series for 3.6.
 
-The wake-up power domain is an alway-on power domain and so this power domain
-does not have a power state status (PM_PWSTST_xxx) register that indicates the
-current state. However, during the registering of the wake-up power domain the
-state of the domain is queried by calling pwrdm_read_pwrst(). This actually
-tries to read a register that does not exist and returns a value of 0 that
-indicates that the current state is OFF. The OFF state count of the wake-up
-power domain is then set to 1 and the current state to OFF. Both of which are
-incorrect.
-
-To fix this, if a power domain only supports the ON state, do not attempt to
-read the power state status register and simply return ON as the current power
-state.
-
-This is based upon Tony's current linux-omap master branch.
-
-Testing:
-- Boot tested on OMAP4460 panda.
-- Boot tested on OMAP3430 beagle and validated CORE RET still working (using
-  Paul's 32k timer patch [1]).
-
-[1] http://marc.info/?l=linux-omap&m=134000053229888&w=2
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/powerdomain.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index eefe179..69b36e1 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -526,7 +526,8 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-  *
-  * Return the powerdomain @pwrdm's current power state.	Returns -EINVAL
-  * if the powerdomain pointer is null or returns the current power state
-- * upon success.
-+ * upon success. Note that if the power domain only supports the ON state
-+ * then just return ON as the current state.
-  */
- int pwrdm_read_pwrst(struct powerdomain *pwrdm)
- {
-@@ -535,6 +536,9 @@ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
- 	if (!pwrdm)
- 		return -EINVAL;
- 
-+	if (pwrdm->pwrsts == PWRSTS_ON)
-+		return PWRDM_POWER_ON;
-+
- 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
- 		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
- 
--- 
-1.7.9.5
+Sent them where?  I didn't see a copy here :(
