@@ -1,97 +1,94 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 29 Jun 2012 11:17:55 +0530
-Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
-In-Reply-To: <87lij7nltv.fsf@ti.com>
-References: <1340761532-27231-1-git-send-email-khilman@ti.com>
- <CAM=Q2cuLCT2VzcUgrpyRWiX61t1F+iWchO9iLC=Ka9MFVm4_bQ@mail.gmail.com>
- <87lij7nltv.fsf@ti.com>
-Message-ID: <4FED418B.8030100@ti.com>
+From: andy.green@linaro.org (Andy Green)
+Date: Fri, 29 Jun 2012 13:55:11 +0800
+Subject: [PATCH 1/3] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <20120629054404.11091.31289.stgit@build.warmcat.com>
+References: <20120629054404.11091.31289.stgit@build.warmcat.com>
+Message-ID: <20120629055509.11091.2780.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 June 2012 03:25 AM, Kevin Hilman wrote:
-> Hi Shubhrajyoti,
->
-> Shubhrajyoti Datta <omaplinuxkernel@gmail.com> writes:
->
->> Hi Kevin,
->> Thanks for the patch ,
->> a doubt below
-> Thanks for the review.
->
->> On Wed, Jun 27, 2012 at 7:15 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
->>> failure.
->> So the failure means that the usecount is incremented. However the
->> device was not
->> enabled. 
-> Correct.
->
->> In that case could we consider
->>
->>    void pm_runtime_put_noidle(struct device *dev);
->>     - decrement the device's usage counter
->>
->> Which will only decrement the counter and does not try to disable it.
-> No, that is not needed.
->
->> However I am not sure what happens if you try to disable an already
->> disabled device.
-> The runtime PM core already knows that the device is not enabled so will
-> not need to call the disable hooks.  It already needs this functionality
-> to support the _get_noresume() and _put_noidle() calls.
->
-> I tested this on 3730/OveroSTORM where I was seeing this i2c xfer
-> failure (and thus a failure in MMC suspend, which uses I2C to control
-> the regulator.)
->
-> Hope that helps clarify,
-Thanks a lot for the clarification.
-> If so, Wolfram, can you queue this up in your i2c-embedded/for-next
-> branch since this problem was introduced there.
->
-> Thanks,
->
-> Kevin
->
->>> Without this, after a failed xfer, the runtime PM usecount will have
->>> been incremented, but not decremented
->> Agree.
->>
->>> causing the usecount to never
->>> reach zero after a failure.  This keeps the device always runtime PM
->>> enabled which keeps the enclosing power domain active, and prevents
->>> full-chip retention/off from happening during idle.
-Reviewed-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->>> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
->>> Signed-off-by: Kevin Hilman <khilman@ti.com>
->>> ---
->>> This patch applies to current i2c-embedded/for-next branch
->>>
->>>  drivers/i2c/busses/i2c-omap.c |    2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->>> index 9895fa7..b105733 100644
->>> --- a/drivers/i2c/busses/i2c-omap.c
->>> +++ b/drivers/i2c/busses/i2c-omap.c
->>> @@ -582,7 +582,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->>>
->>>        r = pm_runtime_get_sync(dev->dev);
->>>        if (IS_ERR_VALUE(r))
->>> -               return r;
->>> +               goto out;
->>>
->>>        r = omap_i2c_wait_for_bb(dev);
->>>        if (r < 0)
->>> --
->>> 1.7.9.2
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+From: Andy Green <andy@warmcat.com>
+
+Introduce a generic helper function that can generate a valid MAC
+address using data from the OMAP unique CPU ID register.
+
+For comparison purposes this produces a MAC address of
+
+  2e:40:70:f0:12:06
+
+for the ethernet device on my Panda.
+
+The MAC address space has space set aside for these kind of "locally
+administered" MAC addresses, analogous to IPv4 10.x.x.x range, and this
+patch marks the generated MAC addresses as such.
+
+The patch leaves two bits allowing elaborating 4 different MACs from the
+generated data.
+
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ arch/arm/mach-omap2/id.c              |   39 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/include/mach/id.h |    1 +
+ 2 files changed, 40 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 00486a8..2a44c42 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
+ 	else
+ 		tap_prod_id = 0x0208;
+ }
++
++/*
++ * this uses the unique per-cpu info from the cpu fuses set at factory to
++ * generate a 6-byte MAC address.  Two bits in the generated code are used
++ * to elaborate the generated address into four, so it can be used on multiple
++ * network interfaces.
++ */
++
++void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype)
++{
++	struct omap_die_id odi;
++	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
++
++	omap_get_die_id(&odi);
++
++	mac[0] = odi.id_2;
++	mac[1] = odi.id_2 >> 8;
++	mac[2] = odi.id_1;
++	mac[3] = odi.id_1 >> 8;
++	mac[4] = odi.id_1 >> 16;
++	mac[5] = odi.id_1 >> 24;
++
++	/* XOR other chip-specific data with ID */
++
++	tap ^= odi.id_3;
++
++	mac[0] ^= tap;
++	mac[1] ^= tap >> 8;
++	mac[2] ^= tap >> 16;
++	mac[3] ^= tap >> 24;
++
++	/* allow four MACs from this same basic data */
++
++	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
++
++	/* mark it as not multicast, and outside official 80211 MAC namespace */
++
++	mac[0] = (mac[0] & ~1) | 2;
++}
+diff --git a/arch/arm/mach-omap2/include/mach/id.h b/arch/arm/mach-omap2/include/mach/id.h
+index 02ed3aa..373313a 100644
+--- a/arch/arm/mach-omap2/include/mach/id.h
++++ b/arch/arm/mach-omap2/include/mach/id.h
+@@ -18,5 +18,6 @@ struct omap_die_id {
+ };
+ 
+ void omap_get_die_id(struct omap_die_id *odi);
++void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype);
+ 
+ #endif
