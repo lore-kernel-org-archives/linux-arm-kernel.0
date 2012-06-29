@@ -1,47 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 29 Jun 2012 13:28:47 +0200
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Fri, 29 Jun 2012 14:34:24 +0300
 Subject: [PATCH 1/2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <1340969124.3070.155.camel@sauron.fi.intel.com>
+In-Reply-To: <20120525145901.GS30400@pengutronix.de>
 References: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
- <20120627175234.GF18096@pengutronix.de>
- <1340969124.3070.155.camel@sauron.fi.intel.com>
-Message-ID: <20120629112847.GD12019@pengutronix.de>
+ <1337957902.30969.46.camel@sauron.fi.intel.com>
+ <20120525145901.GS30400@pengutronix.de>
+Message-ID: <1340969664.3070.162.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+On Fri, 2012-05-25 at 16:59 +0200, Sascha Hauer wrote:
+> > WARNING:LONG_LINE: line over 80 characters
+> > #103: FILE: drivers/mtd/nand/mxc_nand.c:276:
+> > +static void memcpy32_fromio(void *trg, const volatile void __iomem  *src, size_t size)
+> > 
+> > WARNING:VOLATILE: Use of volatile is usually wrong: see Documentation/volatile-considered-harmful.txt
+> > #103: FILE: drivers/mtd/nand/mxc_nand.c:276:
+> > +static void memcpy32_fromio(void *trg, const volatile void __iomem  *src, size_t size)
+> 
+> This makes me wonder a bit, I basically copied the prototype from
+> the _memcpy_*_io template from arch/arm/kernel/io.c. Should they
+> be wrong?
 
-On Fri, Jun 29, 2012 at 02:25:24PM +0300, Artem Bityutskiy wrote:
-> On Wed, 2012-06-27 at 19:52 +0200, Uwe Kleine-K?nig wrote:
-> > I don't know about the sparse problems this introduces, but without this
-> > patch the mxc-nand driver is broken, so it should really go in before
-> > 3.5.
-> 
-> The problems, AFAIU, are that you cannot directly dereference __iomem
-> pointers, you always need to use helpers like 'readl()'. This patch
-> introduces the following warnings:
-> 
-> +drivers/mtd/nand/mxc_nand.c:281:33: warning: incorrect type in initializer (different address spaces) [sparse]
-> +drivers/mtd/nand/mxc_nand.c:281:33:    expected unsigned int const volatile [usertype] *s [sparse]
-> +drivers/mtd/nand/mxc_nand.c:281:33:    got void const volatile [noderef] <asn:2>*src [sparse]
-> +drivers/mtd/nand/mxc_nand.c:284 memcpy32_fromio() warn: side effect in macro '__raw_readl' doing 's++' [smatch]
-> +drivers/mtd/nand/mxc_nand.c:284:24: warning: incorrect type in argument 1 (different address spaces) [sparse]
-> +drivers/mtd/nand/mxc_nand.c:284:24:    expected void const volatile [noderef] <asn:2>*<noident> [sparse]
-> +drivers/mtd/nand/mxc_nand.c:284:24:    got unsigned int const volatile [usertype] * [sparse]
-> +drivers/mtd/nand/mxc_nand.c:290:27: warning: incorrect type in initializer (different address spaces) [sparse]
-> +drivers/mtd/nand/mxc_nand.c:290:27:    expected unsigned int volatile [usertype] *t [sparse]
-> +drivers/mtd/nand/mxc_nand.c:290:27:    got void volatile [noderef] <asn:2>*trg [sparse]
-> +drivers/mtd/nand/mxc_nand.c:294 memcpy32_toio() warn: side effect in macro '__raw_writel' doing 't++' [smatch]
-> +drivers/mtd/nand/mxc_nand.c:294:17: warning: incorrect type in argument 1 (different address spaces) [sparse]
-> +drivers/mtd/nand/mxc_nand.c:294:17:    expected void const volatile [noderef] <asn:2>*<noident> [sparse]
-> +drivers/mtd/nand/mxc_nand.c:294:17:    got unsigned int volatile [usertype] * [sparse]
-> 
-> The "volitile" should be also removed.
-Did you see that Sascha posted a v2?
+Well, this is arch-specific code. In there we may make various
+assumptions about CPU not doing re-ordering. You are changing generic
+code, you should not do assumptions like this.
 
-Best regards
-Uwe
+How about adding these functions to arch/arm/kernel/io.c instead?
+
+> otoh I also wondered why there were volatiles in arch/arm/kernel/io.c
+> in the first place ;)
+
+Not sure, probably in that file we assume that the memory is
+strongly-ordered.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/942ccb1a/attachment.sig>
