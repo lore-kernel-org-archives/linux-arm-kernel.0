@@ -1,32 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jun 2012 05:44:27 -0700
-Subject: [PATCH-V3 3/3] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <4FEC7B33.5030500@ti.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
- <1340895567-22766-4-git-send-email-hvaibhav@ti.com>
- <4FEC72C2.7010106@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5D620@DBDE01.ent.ti.com>
- <4FEC7B33.5030500@ti.com>
-Message-ID: <20120629124427.GE4202@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jun 2012 20:45:56 +0800
+Subject: [PATCH] ARM: fiq: change FIQ_START to a variable
+In-Reply-To: <20120629121317.GC16319@n2100.arm.linux.org.uk>
+References: <1340867264-23043-1-git-send-email-shawn.guo@linaro.org>
+ <20120629120057.GF29197@S2101-09.ap.freescale.net>
+ <20120629121317.GC16319@n2100.arm.linux.org.uk>
+Message-ID: <20120629124554.GH29197@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [120628 08:46]:
-> On 06/28/2012 05:39 PM, Hiremath, Vaibhav wrote:
-> >On Thu, Jun 28, 2012 at 20:35:38, Cousson, Benoit wrote:
-> >>
-> >>OMAP4 does not have the SDRC but the EMIF like TI8XX.
-> >>
-> >
-> >Benoit,
-> >
-> >This selection is happening for SOC_OMAP2420 and not for OMAP4.
-> 
-> Hehe, indeed, I missed the context and was fooled by the config ARCH_OMAP4.
-> 
-> I don't have any comment then :-)
+On Fri, Jun 29, 2012 at 01:13:17PM +0100, Russell King - ARM Linux wrote:
+> To be frank, I've not been paying attention to it.  This patch looks okey
+> as a stop gap solution but in the longer run it must stop using the genirq
+> stuff, as I've already said.
 
-That's very close to Acked-by then?
+So can I have your ack to bless the patch going through arm-soc tree
+as the part of imx sparse-irq series?  Thanks.
 
-Tony
+-- 
+Regards,
+Shawn
