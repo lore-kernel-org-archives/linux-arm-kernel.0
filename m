@@ -1,60 +1,162 @@
-From: shijie.zhang@intel.com (Zhang, Shijie)
-Date: Fri, 29 Jun 2012 01:34:43 +0000
-Subject: [PATCHv11 3/6] i2c: omap: Do not initialise the completion
- everytime
-In-Reply-To: <CAAe_U6Jtoj3mixvp+vqNmkr-RC28AfNqZ0syEE5voEr+Odv3zg@mail.gmail.com>
-References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
- <1340896292-12112-4-git-send-email-shubhrajyoti@ti.com>
- <CAAe_U6Jtoj3mixvp+vqNmkr-RC28AfNqZ0syEE5voEr+Odv3zg@mail.gmail.com>
-Message-ID: <F432D66873BF804996E7E830C3B891790FD37C8E@SHSMSX102.ccr.corp.intel.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 29 Jun 2012 09:43:53 +0800
+Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode"
+ property to device tree bindings
+In-Reply-To: <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
+References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
+ <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
+Message-ID: <20120629014352.GA28923@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No, it should be init_completion(&dev->cmd_complete); in probe, we need to initialize the wait queue, which will be used when using "complete(......)"
-
-
------Original Message-----
-From: linux-i2c-owner@vger.kernel.org [mailto:linux-i2c-owner at vger.kernel.org] On Behalf Of ABRAHAM, KISHON VIJAY
-Sent: Friday, June 29, 2012 12:03 AM
-To: Shubhrajyoti D
-Cc: linux-omap at vger.kernel.org; linux-i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org; ben-linux at fluff.org; tony at atomide.com; w.sang at pengutronix.de
-Subject: Re: [PATCHv11 3/6] i2c: omap: Do not initialise the completion everytime
-
-Hi,
-
-On Thu, Jun 28, 2012 at 8:41 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> Use INIT_COMPLETION instead of init_completion in transfer.
->
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
+> This patch allows the device tree to limit the chipidea to host or
+> peripheral mode only.
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 > ---
-> - Add Felipe's reviewed-by tag
->
-> ?drivers/i2c/busses/i2c-omap.c | ? ?3 ++-
-> ?1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c 
-> b/drivers/i2c/busses/i2c-omap.c index b9915bb..6d05f18 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -490,7 +490,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter 
-> *adap,
-> ? ? ? ?w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
-> ? ? ? ?omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
->
-> - ? ? ? init_completion(&dev->cmd_complete);
-> + ? ? ? INIT_COMPLETION(dev->cmd_complete);
-> ? ? ? ?dev->cmd_err = 0;
->
-> ? ? ? ?w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT; @@ 
-> -999,6 +999,7 @@ omap_i2c_probe(struct platform_device *pdev)
-> ? ? ? ?}
->
-> ? ? ? ?platform_set_drvdata(pdev, dev);
-> + ? ? ? init_completion(&dev->cmd_complete);
-It should be INIT_COMPLETION here too.
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+>  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
+>  include/linux/usb/chipidea.h                       |    9 +++++
+>  4 files changed, 50 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> index 5a0ad66..67f97f56 100644
+> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -4,6 +4,8 @@ Required properties:
+>  - compatible: Should be "fsl,imx27-usb"
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain controller interrupt
+> +- dr_mode: indicates the working mode for compatible controllers. Can
+> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
+By default, it should be decided by capability registers. Only bad hw
+design needs such settings. So, why not name it as force-xxx? If it's
+not specific to imx, it doesn't needs to has prefix "fsl,".
+>  
+>  Optional properties:
+>  - fsl,usbphy: phandler of usb phy that connects to the only one port
+> @@ -14,4 +16,5 @@ usb at 02184000 { /* USB OTG */
+>  	reg = <0x02184000 0x200>;
+>  	interrupts = <0 43 0x04>;
+>  	fsl,usbphy = <&usbphy1>;
+> +	dr_mode= "otg";
+>  };
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> index efae2be..8e926fb 100644
+> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -120,6 +120,9 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+>  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
+>  	}
+> +
+> +	ci13xxx_get_dr_mode(pdev->dev.of_node, &ci13xxx_imx_platdata);
+> +
+>  	plat_ci = ci13xxx_add_device(&pdev->dev,
+>  				pdev->resource, pdev->num_resources,
+>  				&ci13xxx_imx_platdata);
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 1083585..aa8b1856 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -63,6 +63,8 @@
+>  #include <linux/kernel.h>
+>  #include <linux/slab.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/usb/ch9.h>
+>  #include <linux/usb/gadget.h>
+>  #include <linux/usb/otg.h>
+> @@ -386,6 +388,23 @@ void ci13xxx_remove_device(struct platform_device *pdev)
+>  }
+>  EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
+>  
+> +void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
+> +{
+> +	const unsigned char *dr_mode;
+> +
+> +	dr_mode = of_get_property(of_node, "dr_mode", NULL);
+> +	if (!dr_mode)
+> +		return;
+> +
+> +	if (!strcmp(dr_mode, "host"))
+> +		pdata->flags |= CI13XXX_DR_MODE_HOST;
+> +	else if (!strcmp(dr_mode, "peripheral"))
+> +		pdata->flags |= CI13XXX_DR_MODE_PERIPHERAL;
+> +	else if (!strcmp(dr_mode, "otg"))
+> +		pdata->flags |= CI13XXX_DR_MODE_OTG;
+> +}
+> +EXPORT_SYMBOL_GPL(ci13xxx_get_dr_mode);
+If you make the property name generic, this function is not specific to
+chipidea. IMHO, the function is simple, if we do it in individual
+drivers, it's ok too.
+> +
+>  static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+>  {
+>  	struct device	*dev = &pdev->dev;
+> @@ -446,13 +465,23 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* initialize role(s) before the interrupt is requested */
+> -	ret = ci_hdrc_host_init(ci);
+> -	if (ret)
+> -		dev_info(dev, "doesn't support host\n");
+> +	/* default to otg */
+> +	if (!(ci->platdata->flags & CI13XXX_DR_MODE_MASK))
+> +		ci->platdata->flags |= CI13XXX_DR_MODE_OTG;
+> +
+> +	if (ci->platdata->flags &
+> +	    (CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_OTG)) {
+> +		ret = ci_hdrc_host_init(ci);
+> +		if (ret)
+> +			dev_info(dev, "doesn't support host\n");
+> +	}
+>  
+> -	ret = ci_hdrc_gadget_init(ci);
+> -	if (ret)
+> -		dev_info(dev, "doesn't support gadget\n");
+> +	if (ci->platdata->flags &
+> +	    (CI13XXX_DR_MODE_PERIPHERAL | CI13XXX_DR_MODE_OTG)) {
+> +		ret = ci_hdrc_gadget_init(ci);
+> +		if (ret)
+> +			dev_info(dev, "doesn't support gadget\n");
+> +	}
+>  
+>  	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+>  		dev_err(dev, "no supported roles\n");
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index 544825d..29ad908 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -19,6 +19,12 @@ struct ci13xxx_platform_data {
+>  #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+>  #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+>  #define CI13XXX_DISABLE_STREAMING	BIT(3)
+> +#define CI13XXX_DR_MODE_HOST		BIT(4)
+> +#define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
+> +#define CI13XXX_DR_MODE_OTG		BIT(6)
+All we need is CI13XXX_DR_FORCE_HOST and CI13XXX_DR_FORCE_DEVICE.
 
 Thanks
-Kishon
---
-To unsubscribe from this list: send the line "unsubscribe linux-i2c" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Richard
+> +#define CI13XXX_DR_MODE_MASK \
+> +	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL | \
+> +	 CI13XXX_DR_MODE_OTG)
+>  
+>  #define CI13XXX_CONTROLLER_RESET_EVENT		0
+>  #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+> @@ -35,4 +41,7 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
+>  /* Remove ci13xxx device */
+>  void ci13xxx_remove_device(struct platform_device *pdev);
+>  
+> +/* Parse of-tree "dr_mode" property */
+> +void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
+> +
+>  #endif
+> -- 
+> 1.7.10
+> 
+> 
