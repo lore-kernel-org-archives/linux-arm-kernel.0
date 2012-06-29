@@ -1,27 +1,36 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Fri, 29 Jun 2012 10:13:58 -0300
-Subject: [PATCH v10] MTD: LPC32xx MLC NAND driver
-In-Reply-To: <1340975067.3070.180.camel@sauron.fi.intel.com>
-References: <1340834129-15545-1-git-send-email-stigge@antcom.de>
- <1340973434.3070.168.camel@sauron.fi.intel.com>
- <CAAAP30HZ1Z5U44wLwSEfcaJSLmVp8AbXPTCagS31hnoCy_tf-g@mail.gmail.com>
- <1340975067.3070.180.camel@sauron.fi.intel.com>
-Message-ID: <CAAAP30FzY5KgYfnX7=UukZ3MTwfWaypZs+H2bNn15yKmx8VnvA@mail.gmail.com>
+From: clemens@ladisch.de (Clemens Ladisch)
+Date: Fri, 29 Jun 2012 15:16:54 +0200
+Subject: [PATCH] common: dma-mapping: add support for generic dma_mmap_*
+ calls
+In-Reply-To: <00a501cd55f7$323946f0$96abd4d0$%szyprowski@samsung.com>
+References: <1339741135-7841-1-git-send-email-m.szyprowski@samsung.com>
+ <4FED8D03.10507@ladisch.de>
+ <00a501cd55f7$323946f0$96abd4d0$%szyprowski@samsung.com>
+Message-ID: <4FEDAAC6.2050202@ladisch.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 10:04 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Fri, 2012-06-29 at 09:56 -0300, Alexandre Pereira da Silva wrote:
->> > @@ @@
->> > +drivers/mtd/nand/lpc32xx_mlc.c: In function 'lpc32xx_nand_probe':
->> > +drivers/mtd/nand/lpc32xx_mlc.c:679:10: warning: variable 'sr' set but not used [-Wunused-but-set-variable]
+Marek Szyprowski wrote:
+> On Friday, June 29, 2012 1:10 PM Clemens Ladisch wrote:
+>> Marek Szyprowski wrote:
+>>> +++ b/drivers/base/dma-mapping.c
+>>> ...
+>>> +int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+>>> +		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>>> +{
+>>> +	int ret = -ENXIO;
+>>> +	...
+>>> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+>>> +		return ret;
+>>
+>> This will return -ENXIO if dma_mmap_from_coherent() succeeds.
 >
-> gcc 4.6, aiaiai uses W=1 when building.
->
->> > +drivers/mtd/nand/lpc32xx_mlc.c:561:24: error: bad constant expression [sparse]
->
-> This is sparse, not gcc.
+> Thanks for spotting this!
 
-Does the oob area need to be ecc protected? If not I suggest to just
-remove the read_oob and write_oob and let this to nand_base. I think
-this is too much overhead to read 6 bytes.
+Sorry, I was wrong; ret is actually set by dma_mmap_from_coherent's
+output parameter.  (That function's documentation appears to be
+incomplete.)
+
+
+Regards,
+Clemens
