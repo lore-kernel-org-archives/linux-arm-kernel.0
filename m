@@ -1,32 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 29 Jun 2012 11:32:30 -0600
-Subject: [PATCH 3/3] ARM: dt: tegra: paz00: add regulators
-In-Reply-To: <20120626230235.GX30406@opensource.wolfsonmicro.com>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <1340406842-27135-3-git-send-email-swarren@wwwdotorg.org>
- <1963397.cqAXgGafFs@ax5200p> <20120624110306.GA16455@sirena.org.uk>
- <4FEA3942.9040906@wwwdotorg.org>
- <20120626230235.GX30406@opensource.wolfsonmicro.com>
-Message-ID: <4FEDE6AE.4080409@wwwdotorg.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 29 Jun 2012 17:33:30 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FEC7394.9030208@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2012 05:02 PM, Mark Brown wrote:
-> On Tue, Jun 26, 2012 at 04:35:46PM -0600, Stephen Warren wrote:
+On Thu, Jun 28, 2012 at 20:39:08, Daniel Mack wrote:
+> On 27.06.2012 14:13, Hiremath, Vaibhav wrote:
 > 
->> So I think this sm0 (and the sm1) entry might actually be
->> correct; sm0 feeds vdd_core and sm1 feeds vdd_cpu. These rails
->> have DVFS and hence the voltage can vary. I guess I should change
->> the regulator-name in these cases to something more useful than
->> the very first signal name on the schematics too.
+> > Just to clarify from AM335x perspective,
+> > 
+> > In case of AM335x, since the patches and complete BasePort support is still
+> > not present in the Mainline (neither in Linus's tree not in linux-omap), you 
+> > need to use my Repo (https://github.com/hvaibhav: Closely follows linux-
+> > omap/master) in order to test something on BeagleBone platform.
 > 
-> Even if they feed these supplies are they capable of varying on
-> this board if they're shared with other things?  This is one of the
-> common issues with constraints...  But generally if the supply
-> covers more than one thing the idiomatic thing is to list them all
-> separated by / or something.
+> Great, that is the information I've been looking for.
+> 
+> Your am335x-upstream-staging branch works for me on a custom AM335x
+> based board using a custom DT config.
+> 
+> I'll dig through the sources and come back once I know which parts are
+> missing.
+> 
 
-Just FYI, the particular choice of "/" as a separator doesn't work
-well, because then /sys/kernel/debug/regulator/${regulator-name} can't
-be created. I guess I'll use a comma. I assume it's not worth fixing
-the regulator core to s@/@,@ when generating the debugfs filenames?
+Great to hear that you could able to get this working on your board.
+Please let me know if you need any help.
+
+Thanks,
+Vaibhav
