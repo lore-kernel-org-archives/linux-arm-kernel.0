@@ -1,85 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Jun 2012 18:33:50 +0100
-Subject: [PATCH v2 1/2] ARM: arch timer: implement read_current_timer and
- get_cycles
-In-Reply-To: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1340991231-17682-2-git-send-email-will.deacon@arm.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 29 Jun 2012 17:43:47 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FEDB37C.4070604@visionsystems.de>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com> <4FEDB37C.4070604@visionsystems.de>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA5FC0F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements read_current_timer using the architected timers
-when they are selected via CONFIG_ARM_ARCH_TIMER. If they are detected
-not to be usable at runtime, we return -ENXIO to the caller.
+On Fri, Jun 29, 2012 at 19:24:04, Yegor Yefremov wrote:
+> Am 28.06.2012 17:09, schrieb Daniel Mack:
+> > On 27.06.2012 14:13, Hiremath, Vaibhav wrote:
+> > 
+> >> Just to clarify from AM335x perspective,
+> >>
+> >> In case of AM335x, since the patches and complete BasePort support is still
+> >> not present in the Mainline (neither in Linus's tree not in linux-omap), you 
+> >> need to use my Repo (https://github.com/hvaibhav: Closely follows linux-
+> >> omap/master) in order to test something on BeagleBone platform.
+> > 
+> > Great, that is the information I've been looking for.
+> > 
+> > Your am335x-upstream-staging branch works for me on a custom AM335x
+> > based board using a custom DT config.
+> > 
+> > I'll dig through the sources and come back once I know which parts are
+> > missing.
+> 
+> Do you have LCD screen attached? I need a functioning framebuffer driver. So far if I start x-server I get various errors:
+> 
+> (EE) FBDEV(0): internal error: miCreateDefColormap failed in FBDevScreenInit()
+> 
 
-Furthermore, if read_current_timer is exported then we can implement
-get_cycles in terms of it for use as both an entropy source and for
-implementing __udelay and friends.
+Did you get a chance to dig on this? Do you have further level of details 
+from driver perspective? Which IOCTL is failing here? What is return value?
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/arch_timer.h |    3 +++
- arch/arm/include/asm/timex.h      |   10 ++++++----
- arch/arm/kernel/arch_timer.c      |    8 ++++++++
- 3 files changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index ed2e95d..62e7547 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -1,7 +1,10 @@
- #ifndef __ASMARM_ARCH_TIMER_H
- #define __ASMARM_ARCH_TIMER_H
- 
-+#include <asm/errno.h>
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
-+#define ARCH_HAS_READ_CURRENT_TIMER
- int arch_timer_of_register(void);
- int arch_timer_sched_clock_init(void);
- #else
-diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
-index 3be8de3..ce11944 100644
---- a/arch/arm/include/asm/timex.h
-+++ b/arch/arm/include/asm/timex.h
-@@ -12,13 +12,15 @@
- #ifndef _ASMARM_TIMEX_H
- #define _ASMARM_TIMEX_H
- 
-+#include <asm/arch_timer.h>
- #include <mach/timex.h>
- 
- typedef unsigned long cycles_t;
- 
--static inline cycles_t get_cycles (void)
--{
--	return 0;
--}
-+#ifdef ARCH_HAS_READ_CURRENT_TIMER
-+#define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
-+#else
-+#define get_cycles()	(0)
-+#endif
- 
- #endif
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index dd58035..dbbeec4 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -223,6 +223,14 @@ static cycle_t arch_counter_read(struct clocksource *cs)
- 	return arch_counter_get_cntpct();
- }
- 
-+int read_current_timer(unsigned long *timer_val)
-+{
-+	if (!arch_timer_rate)
-+		return -ENXIO;
-+	*timer_val = arch_counter_get_cntpct();
-+	return 0;
-+}
-+
- static struct clocksource clocksource_counter = {
- 	.name	= "arch_sys_counter",
- 	.rating	= 400,
--- 
-1.7.4.1
+Thanks,
+Vaibhav
