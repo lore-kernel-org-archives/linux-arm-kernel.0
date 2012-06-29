@@ -1,43 +1,32 @@
-From: alex.bluesman.smirnov@gmail.com (Alexander Smirnov)
-Date: Fri, 29 Jun 2012 16:53:01 +0400
-Subject: RF231 transceiver on at91sam9g20ek board
-In-Reply-To: <4FEC7369.3050003@atmel.com>
-References: <CAJmB2rDxv45OP4otn7rmQcpzCvLujKm0j9_OqNW6PoyHuarTLw@mail.gmail.com>
- <201206221834.41869.arnd@arndb.de>
- <CAJmB2rBcRuNe0QfEGoJN1rQnRnr33gyE=nLt3Az=mGEWuR7mCg@mail.gmail.com>
- <201206281430.21916.arnd@arndb.de> <4FEC7369.3050003@atmel.com>
-Message-ID: <CAJmB2rBpa=iK6yhd3=CikampfypU+4MaUfM-GQMLZhN7QNUteA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jun 2012 20:53:49 +0800
+Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
+In-Reply-To: <20120629124158.GA32473@shlinux2.ap.freescale.net>
+References: <20120629020650.GB28932@S2101-09.ap.freescale.net>
+ <20120629063329.GE5844@shlinux2.ap.freescale.net>
+ <20461.30070.771087.830745@ipc1.ka-ro>
+ <20120629093437.GK5844@shlinux2.ap.freescale.net>
+ <20461.30991.63507.369439@ipc1.ka-ro>
+ <20120629095433.GO5844@shlinux2.ap.freescale.net>
+ <20120629111334.GB29197@S2101-09.ap.freescale.net>
+ <20120629121437.GQ5844@shlinux2.ap.freescale.net>
+ <20120629124154.GG29197@S2101-09.ap.freescale.net>
+ <20120629124158.GA32473@shlinux2.ap.freescale.net>
+Message-ID: <20120629125346.GI29197@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Dear Alexander,
->
-> There has been an attempt to move the spi-atmel.c driver to device tree.
-> You can check the status of the discussion in by searching the message
-> subjects:
->
-> [PATCH 1/4 v4] of_spi: add generic binding support to specify cs gpio
-> [PATCH 1/4 v5] of_spi: add generic binding support to specify cs gpio
->
-> I guess that you can take these patches as examples for moving to device
-> tree on your AT91 based board (beware you should set pin muxing in your
-> bootloader).
->
-> There is a "work in progress" snapshot of this work in at91 git tree/branch:
-> git://github.com/at91linux/linux-at91.git ? ghnew/j/for-3.5-wip
->
-> commit: 5f31f2573e7e9369500118e1b8fd026392fc0982
-> commit: 93fd57e73502656a139879518b397711cc305c6a
+On Fri, Jun 29, 2012 at 08:41:59PM +0800, Dong Aisheng wrote:
+> I know this.
+> You may missed my point.
+> I mean extra clocks introduced for imx6q which is not exist on imx28.
+> For your proposal, the gpmi driver will acquire all clocks including
+> imx6q's.
+> So when get imx6q's gpmi clock like "gpmi-bch" like clk_get(dev, "gpmi-bch"),
+> it may fail for imx28.
+> 
+What I was saying is it will not fail.
 
-Dear at91 team,
-
-thank you very much for the hints!
-
-Alex
-
->
-> Best regards,
-> --
-> Nicolas Ferre
->
->
+-- 
+Regards,
+Shawn
