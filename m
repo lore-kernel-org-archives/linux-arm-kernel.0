@@ -1,62 +1,36 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Fri, 29 Jun 2012 13:55:26 +0800
-Subject: [PATCH 3/3] OMAP4 PANDA register ethernet and wlan for automatic
- mac allocation
-In-Reply-To: <20120629054404.11091.31289.stgit@build.warmcat.com>
-References: <20120629054404.11091.31289.stgit@build.warmcat.com>
-Message-ID: <20120629055524.11091.57217.stgit@build.warmcat.com>
+From: andy@warmcat.com (Andy Green)
+Date: Fri, 29 Jun 2012 13:55:04 +0800
+Subject: [PATCH 0/3] Add ability to set defaultless network device MAC
+ addresses to deterministic computed locally administered values
+Message-ID: <20120629054404.11091.31289.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Green <andy@warmcat.com>
+The following series adds some code to generate legal, locally administered
+MAC addresses from OMAP4 CPU Die ID fuse data, and then adds an api to
+devices.c allowing board files to register device paths for network devices
+that wish to use them.
 
-This provides the board-specific device paths needed to get
-the panda boardfile working with the MAC address fixup api.
+On PandaBoard / ES, two devices have no board-level MAC either assigned by
+the manufacturer or stored on the board, the last patch in the series adds
+these device paths and gets them set when the network device is registered.
 
-On Pandaboard / ES, neither the onboard Ethernet or onboard WLAN
-module have onboard arrangements for MAC storage, without this
-series yielding randomized MAC per-boot and consequent DHCP problems,
-or in the case of wlan0 a MAC set by a firmware file in the rootfs
-which unless customized yields a MAC of 00:00:00:00:00:00.  No
-official MAC is reserved for either network device even if you do
-take the approach to customize the firmware file.
+The patches are against today's linux-omap.
 
-This gets sane, consistent MAC addresses on both devices which
-should stand a good probability of differing between PandaBoards.
-
-Signed-off-by: Andy Green <andy.green@linaro.org>
 ---
- arch/arm/mach-omap2/board-omap4panda.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 982fb26..07a17b0 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -486,6 +486,15 @@ static void omap4_panda_init_rev(void)
- 	}
- }
- 
-+/*
-+ * These device paths represent onboard network devices which have
-+ * no MAC address set at boot, and need synthetic ones assigning
-+ */
-+static const char * const panda_fixup_mac_device_paths[] = {
-+	"usb1/1-1/1-1.1/1-1.1:1.0",	/* smsc USB <-> Ethernet bridge */
-+	"wl12xx",			/* wlan0 module */
-+};
-+
- static void __init omap4_panda_init(void)
- {
- 	int package = OMAP_PACKAGE_CBS;
-@@ -496,6 +505,10 @@ static void __init omap4_panda_init(void)
- 	omap4_mux_init(board_mux, NULL, package);
- 
- 	omap_panda_wlan_data.irq = gpio_to_irq(GPIO_WIFI_IRQ);
-+
-+	omap_register_mac_device_fixup_paths(panda_fixup_mac_device_paths,
-+				     ARRAY_SIZE(panda_fixup_mac_device_paths));
-+
- 	ret = wl12xx_set_platform_data(&omap_panda_wlan_data);
- 	if (ret)
- 		pr_err("error setting wl12xx data: %d\n", ret);
+Andy Green (3):
+      OMAP2+: add cpu id register to MAC address helper
+      OMAP2+ devices add mac address allocation register api
+      OMAP4 PANDA register ethernet and wlan for automatic mac allocation
+
+
+ arch/arm/mach-omap2/board-omap4panda.c |   13 +++++
+ arch/arm/mach-omap2/common.h           |    2 +
+ arch/arm/mach-omap2/devices.c          |   89 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/id.c               |   39 ++++++++++++++
+ arch/arm/mach-omap2/include/mach/id.h  |    1 
+ 5 files changed, 144 insertions(+)
+
+-- 
+Signature
