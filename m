@@ -1,52 +1,87 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Jun 2012 17:04:34 +0100
-Subject: [PATCH 04/15] mfd: ab8500: Register devices using the newly DT:ed
- MFD API
-In-Reply-To: <20120629150924.GG22806@sortiz-mobl>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-5-git-send-email-lee.jones@linaro.org>
- <20120629150924.GG22806@sortiz-mobl>
-Message-ID: <4FEDD212.4020209@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 29 Jun 2012 12:06:02 -0400 (EDT)
+Subject: [PATCH v2] ARM: Orion: Fix WDT compile for Dove and MV78xx0
+In-Reply-To: <1340954759-32085-1-git-send-email-andrew@lunn.ch>
+References: <1340954759-32085-1-git-send-email-andrew@lunn.ch>
+Message-ID: <alpine.LFD.2.02.1206291205240.31003@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/12 16:09, Samuel Ortiz wrote:
-> Hi Lee,
->
-> On Wed, Jun 20, 2012 at 01:56:40PM +0100, Lee Jones wrote:
->> Now the MFD API is Device Tree aware we can use it for platform
->> registration again, even when booting with DT enabled. To aid in
->> Device Node pointer allocation we provide each cell with the
->> associative compatible string.
->>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>   arch/arm/mach-ux500/board-mop500.c |    1 -
->>   drivers/input/misc/ab8500-ponkey.c |    6 ----
->>   drivers/mfd/ab8500-core.c          |   64 ++++++++++++++++++++++--------------
->>   drivers/mfd/ab8500-debugfs.c       |    6 ----
->>   drivers/mfd/ab8500-gpadc.c         |    6 ----
->>   drivers/mfd/ab8500-sysctrl.c       |    6 ----
->>   drivers/misc/ab8500-pwm.c          |    6 ----
->>   drivers/regulator/ab8500.c         |    6 ----
->>   drivers/rtc/rtc-ab8500.c           |    7 ----
->>   drivers/usb/otg/ab8500-usb.c       |    6 ----
->>   10 files changed, 39 insertions(+), 75 deletions(-)
-> This one does not apply properly against my for-next branch. Could you please
-> generate a new one for me ?
+On Fri, 29 Jun 2012, Andrew Lunn wrote:
 
-Hmm... we have a problem.
+> Commit 0fa1f0609a0c1fe8b2be3c0089a2cb48f7fda521 (ARM: Orion: Fix
+> Virtual/Physical mixup with watchdog) broke the Dove & MV78xx0
+> build. Although these two SoC don't use the watchdog, the shared
+> platform code still needs to build. Add the necessary defines.
+> 
+> Cc: stable at vger.kernel.org
+> Reported-by: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-I have the new patch based on -next, but I can't test it, as -next is 
-broken for Snowball. Hence why I'm still using rc2. Do you want it anyway?
+Tested-by: Nicolas Pitre <nico@linaro.org>
 
-Kind regards,
-Lee
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> ---
+>  arch/arm/mach-dove/include/mach/bridge-regs.h    |    1 +
+>  arch/arm/mach-dove/include/mach/dove.h           |    1 +
+>  arch/arm/mach-mv78xx0/include/mach/bridge-regs.h |    1 +
+>  arch/arm/mach-mv78xx0/include/mach/mv78xx0.h     |    2 ++
+>  4 files changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/mach-dove/include/mach/bridge-regs.h b/arch/arm/mach-dove/include/mach/bridge-regs.h
+> index 226949d..f953bb5 100644
+> --- a/arch/arm/mach-dove/include/mach/bridge-regs.h
+> +++ b/arch/arm/mach-dove/include/mach/bridge-regs.h
+> @@ -50,5 +50,6 @@
+>  #define POWER_MANAGEMENT	(BRIDGE_VIRT_BASE | 0x011c)
+>  
+>  #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
+> +#define TIMER_PHYS_BASE         (BRIDGE_PHYS_BASE | 0x0300)
+>  
+>  #endif
+> diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+> index ad1165d..d52b0ef 100644
+> --- a/arch/arm/mach-dove/include/mach/dove.h
+> +++ b/arch/arm/mach-dove/include/mach/dove.h
+> @@ -78,6 +78,7 @@
+>  
+>  /* North-South Bridge */
+>  #define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x20000)
+> +#define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x20000)
+>  
+>  /* Cryptographic Engine */
+>  #define DOVE_CRYPT_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x30000)
+> diff --git a/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h b/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
+> index c64dbb9..eb187e0 100644
+> --- a/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
+> +++ b/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
+> @@ -31,5 +31,6 @@
+>  #define IRQ_MASK_HIGH_OFF	0x0014
+>  
+>  #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
+> +#define TIMER_PHYS_BASE		(BRIDGE_PHYS_BASE | 0x0300)
+>  
+>  #endif
+> diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+> index 3674497..e807c4c 100644
+> --- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+> +++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+> @@ -42,6 +42,7 @@
+>  #define MV78XX0_CORE0_REGS_PHYS_BASE	0xf1020000
+>  #define MV78XX0_CORE1_REGS_PHYS_BASE	0xf1024000
+>  #define MV78XX0_CORE_REGS_VIRT_BASE	0xfe400000
+> +#define MV78XX0_CORE_REGS_PHYS_BASE	0xfe400000
+>  #define MV78XX0_CORE_REGS_SIZE		SZ_16K
+>  
+>  #define MV78XX0_PCIE_IO_PHYS_BASE(i)	(0xf0800000 + ((i) << 20))
+> @@ -59,6 +60,7 @@
+>   * Core-specific peripheral registers.
+>   */
+>  #define BRIDGE_VIRT_BASE	(MV78XX0_CORE_REGS_VIRT_BASE)
+> +#define BRIDGE_PHYS_BASE	(MV78XX0_CORE_REGS_PHYS_BASE)
+>  
+>  /*
+>   * Register Map
+> -- 
+> 1.7.10
+> 
