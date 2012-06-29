@@ -1,162 +1,65 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 29 Jun 2012 09:43:53 +0800
-Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode"
- property to device tree bindings
-In-Reply-To: <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
-Message-ID: <20120629014352.GA28923@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jun 2012 09:50:18 +0800
+Subject: [PATCH 1/3] ARM: imx6q: add clocks for gpmi-nand
+In-Reply-To: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
+References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
+Message-ID: <20120629015015.GA28932@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
-> This patch allows the device tree to limit the chipidea to host or
-> peripheral mode only.
+On Thu, Jun 28, 2012 at 11:52:03PM -0400, Huang Shijie wrote:
+> Add clocks for gpmi-nand.
 > 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
->  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
->  include/linux/usb/chipidea.h                       |    9 +++++
->  4 files changed, 50 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index 5a0ad66..67f97f56 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -4,6 +4,8 @@ Required properties:
->  - compatible: Should be "fsl,imx27-usb"
->  - reg: Should contain registers location and length
->  - interrupts: Should contain controller interrupt
-> +- dr_mode: indicates the working mode for compatible controllers. Can
-> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
-By default, it should be decided by capability registers. Only bad hw
-design needs such settings. So, why not name it as force-xxx? If it's
-not specific to imx, it doesn't needs to has prefix "fsl,".
->  
->  Optional properties:
->  - fsl,usbphy: phandler of usb phy that connects to the only one port
-> @@ -14,4 +16,5 @@ usb at 02184000 { /* USB OTG */
->  	reg = <0x02184000 0x200>;
->  	interrupts = <0 43 0x04>;
->  	fsl,usbphy = <&usbphy1>;
-> +	dr_mode= "otg";
->  };
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index efae2be..8e926fb 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -120,6 +120,9 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
->  		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
->  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
->  	}
-> +
-> +	ci13xxx_get_dr_mode(pdev->dev.of_node, &ci13xxx_imx_platdata);
-> +
->  	plat_ci = ci13xxx_add_device(&pdev->dev,
->  				pdev->resource, pdev->num_resources,
->  				&ci13xxx_imx_platdata);
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 1083585..aa8b1856 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -63,6 +63,8 @@
->  #include <linux/kernel.h>
->  #include <linux/slab.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/usb/ch9.h>
->  #include <linux/usb/gadget.h>
->  #include <linux/usb/otg.h>
-> @@ -386,6 +388,23 @@ void ci13xxx_remove_device(struct platform_device *pdev)
->  }
->  EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
->  
-> +void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
-> +{
-> +	const unsigned char *dr_mode;
-> +
-> +	dr_mode = of_get_property(of_node, "dr_mode", NULL);
-> +	if (!dr_mode)
-> +		return;
-> +
-> +	if (!strcmp(dr_mode, "host"))
-> +		pdata->flags |= CI13XXX_DR_MODE_HOST;
-> +	else if (!strcmp(dr_mode, "peripheral"))
-> +		pdata->flags |= CI13XXX_DR_MODE_PERIPHERAL;
-> +	else if (!strcmp(dr_mode, "otg"))
-> +		pdata->flags |= CI13XXX_DR_MODE_OTG;
-> +}
-> +EXPORT_SYMBOL_GPL(ci13xxx_get_dr_mode);
-If you make the property name generic, this function is not specific to
-chipidea. IMHO, the function is simple, if we do it in individual
-drivers, it's ok too.
-> +
->  static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->  {
->  	struct device	*dev = &pdev->dev;
-> @@ -446,13 +465,23 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->  	}
->  
->  	/* initialize role(s) before the interrupt is requested */
-> -	ret = ci_hdrc_host_init(ci);
-> -	if (ret)
-> -		dev_info(dev, "doesn't support host\n");
-> +	/* default to otg */
-> +	if (!(ci->platdata->flags & CI13XXX_DR_MODE_MASK))
-> +		ci->platdata->flags |= CI13XXX_DR_MODE_OTG;
-> +
-> +	if (ci->platdata->flags &
-> +	    (CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_OTG)) {
-> +		ret = ci_hdrc_host_init(ci);
-> +		if (ret)
-> +			dev_info(dev, "doesn't support host\n");
-> +	}
->  
-> -	ret = ci_hdrc_gadget_init(ci);
-> -	if (ret)
-> -		dev_info(dev, "doesn't support gadget\n");
-> +	if (ci->platdata->flags &
-> +	    (CI13XXX_DR_MODE_PERIPHERAL | CI13XXX_DR_MODE_OTG)) {
-> +		ret = ci_hdrc_gadget_init(ci);
-> +		if (ret)
-> +			dev_info(dev, "doesn't support gadget\n");
-> +	}
->  
->  	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
->  		dev_err(dev, "no supported roles\n");
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index 544825d..29ad908 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -19,6 +19,12 @@ struct ci13xxx_platform_data {
->  #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
->  #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
->  #define CI13XXX_DISABLE_STREAMING	BIT(3)
-> +#define CI13XXX_DR_MODE_HOST		BIT(4)
-> +#define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
-> +#define CI13XXX_DR_MODE_OTG		BIT(6)
-All we need is CI13XXX_DR_FORCE_HOST and CI13XXX_DR_FORCE_DEVICE.
+> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-Thanks
-Richard
-> +#define CI13XXX_DR_MODE_MASK \
-> +	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL | \
-> +	 CI13XXX_DR_MODE_OTG)
->  
->  #define CI13XXX_CONTROLLER_RESET_EVENT		0
->  #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
-> @@ -35,4 +41,7 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
->  /* Remove ci13xxx device */
->  void ci13xxx_remove_device(struct platform_device *pdev);
->  
-> +/* Parse of-tree "dr_mode" property */
-> +void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
-> +
->  #endif
+Why double sign off?
+
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 12d9040..f293bcd 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -151,7 +151,7 @@ enum mx6q_clks {
+>  	esai, gpt_ipg, gpt_ipg_per, gpu2d_core, gpu3d_core, hdmi_iahb,
+>  	hdmi_isfr, i2c1, i2c2, i2c3, iim, enfc, ipu1, ipu1_di0, ipu1_di1, ipu2,
+>  	ipu2_di0, ldb_di0, ldb_di1, ipu2_di1, hsi_tx, mlb, mmdc_ch0_axi,
+> -	mmdc_ch1_axi, ocram, openvg_axi, pcie_axi, pwm1, pwm2, pwm3, pwm4,
+> +	mmdc_ch1_axi, ocram, openvg_axi, pcie_axi, pwm1, pwm2, pwm3, pwm4, per1_bch,
+>  	gpmi_bch_apb, gpmi_bch, gpmi_io, gpmi_apb, sata, sdma, spba, ssi1,
+>  	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
+>  	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
+> @@ -357,6 +357,7 @@ int __init mx6q_clocks_init(void)
+>  	clk[ocram]        = imx_clk_gate2("ocram",         "ahb",               base + 0x74, 28);
+>  	clk[openvg_axi]   = imx_clk_gate2("openvg_axi",    "axi",               base + 0x74, 30);
+>  	clk[pcie_axi]     = imx_clk_gate2("pcie_axi",      "pcie_axi_sel",      base + 0x78, 0);
+> +	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "usdhc3",            base + 0x78, 12);
+>  	clk[pwm1]         = imx_clk_gate2("pwm1",          "ipg_per",           base + 0x78, 16);
+>  	clk[pwm2]         = imx_clk_gate2("pwm2",          "ipg_per",           base + 0x78, 18);
+>  	clk[pwm3]         = imx_clk_gate2("pwm3",          "ipg_per",           base + 0x78, 20);
+> @@ -394,6 +395,11 @@ int __init mx6q_clocks_init(void)
+>  	clk_register_clkdev(clk[twd], NULL, "smp_twd");
+>  	clk_register_clkdev(clk[usboh3], NULL, "usboh3");
+>  	clk_register_clkdev(clk[apbh_dma], NULL, "110000.dma-apbh");
+> +	clk_register_clkdev(clk[per1_bch], "per1_bch", NULL);
+> +	clk_register_clkdev(clk[gpmi_bch_apb], "gpmi_bch_apb", NULL);
+> +	clk_register_clkdev(clk[gpmi_bch], "gpmi_bch", NULL);
+> +	clk_register_clkdev(clk[gpmi_apb], "gpmi_apb", NULL);
+
+These do not look like right.  The dev_id should not be NULL if they
+are for device driver to look up.
+
+> +	clk_register_clkdev(clk[gpmi_io], NULL, "112000.gpmi-nand");
+>  	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+>  	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+>  	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
 > -- 
-> 1.7.10
+> 1.7.4.4
 > 
-> 
+
+-- 
+Regards,
+Shawn
