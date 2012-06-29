@@ -1,24 +1,21 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 29 Jun 2012 10:22:54 +0200
-Subject: [PATCH 2/8] mmc: spi: Rename IMX2[38]_MMC to IMX2[38]_SSP
+Date: Fri, 29 Jun 2012 10:22:57 +0200
+Subject: [PATCH 5/8] mmc: spi: Pull out the SSP clock configuration function
 In-Reply-To: <1340958180-2291-1-git-send-email-marex@denx.de>
 References: <1340958180-2291-1-git-send-email-marex@denx.de>
-Message-ID: <1340958180-2291-2-git-send-email-marex@denx.de>
+Message-ID: <1340958180-2291-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the SSP controller can act as both SPI and MMC host,
-renaming the enum to properly reflect the naming seems
-appropriate.
+Pull out the MMC clock configuration function and make it
+into SSP clock configuration function, so it can be used by
+the SPI driver too.
 
-Based on previous attempt by:
-Fabio Estevam <fabio.estevam@freescale.com>
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chris Ball <cjb@laptop.org>
 Cc: Detlev Zundel <dzu@denx.de>
 CC: Dong Aisheng <b29396@freescale.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
 Cc: Rob Herring <rob.herring@calxeda.com>
@@ -26,95 +23,160 @@ CC: Shawn Guo <shawn.guo@linaro.org>
 Cc: Stefano Babic <sbabic@denx.de>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/mmc/host/mxs-mmc.c  |   18 +++++++++---------
- include/linux/spi/mxs-spi.h |    8 ++++----
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/clk/mxs/Makefile    |    2 +-
+ drivers/clk/mxs/clk-ssp.c   |   61 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/mxs-mmc.c  |   39 +--------------------------
+ include/linux/spi/mxs-spi.h |    2 ++
+ 4 files changed, 65 insertions(+), 39 deletions(-)
+ create mode 100644 drivers/clk/mxs/clk-ssp.c
 
+diff --git a/drivers/clk/mxs/Makefile b/drivers/clk/mxs/Makefile
+index 7bedeec..a6a2223 100644
+--- a/drivers/clk/mxs/Makefile
++++ b/drivers/clk/mxs/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for mxs specific clk
+ #
+ 
+-obj-y += clk.o clk-pll.o clk-ref.o clk-div.o clk-frac.o
++obj-y += clk.o clk-pll.o clk-ref.o clk-div.o clk-frac.o clk-ssp.o
+ 
+ obj-$(CONFIG_SOC_IMX23) += clk-imx23.o
+ obj-$(CONFIG_SOC_IMX28) += clk-imx28.o
+diff --git a/drivers/clk/mxs/clk-ssp.c b/drivers/clk/mxs/clk-ssp.c
+new file mode 100644
+index 0000000..b3c1e16
+--- /dev/null
++++ b/drivers/clk/mxs/clk-ssp.c
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2012 DENX Software Engineering, GmbH
++ *
++ * Pulled from code:
++ * Portions copyright (C) 2003 Russell King, PXA MMCI Driver
++ * Portions copyright (C) 2004-2005 Pierre Ossman, W83L51xD SD/MMC driver
++ *
++ * Copyright 2008 Embedded Alley Solutions, Inc.
++ * Copyright 2009-2011 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/spi/mxs-spi.h>
++
++void mxs_ssp_set_clk_rate(struct mxs_ssp *ssp, unsigned int rate)
++{
++	unsigned int ssp_clk, ssp_sck;
++	u32 clock_divide, clock_rate;
++	u32 val;
++
++	ssp_clk = clk_get_rate(ssp->clk);
++
++	for (clock_divide = 2; clock_divide <= 254; clock_divide += 2) {
++		clock_rate = DIV_ROUND_UP(ssp_clk, rate * clock_divide);
++		clock_rate = (clock_rate > 0) ? clock_rate - 1 : 0;
++		if (clock_rate <= 255)
++			break;
++	}
++
++	if (clock_divide > 254) {
++		dev_err(ssp->dev,
++			"%s: cannot set clock to %d\n", __func__, rate);
++		return;
++	}
++
++	ssp_sck = ssp_clk / clock_divide / (1 + clock_rate);
++
++	val = readl(ssp->base + HW_SSP_TIMING(ssp));
++	val &= ~(BM_SSP_TIMING_CLOCK_DIVIDE | BM_SSP_TIMING_CLOCK_RATE);
++	val |= BF_SSP(clock_divide, TIMING_CLOCK_DIVIDE);
++	val |= BF_SSP(clock_rate, TIMING_CLOCK_RATE);
++	writel(val, ssp->base + HW_SSP_TIMING(ssp));
++
++	ssp->clk_rate = ssp_sck;
++
++	dev_dbg(ssp->dev,
++		"%s: clock_divide %d, clock_rate %d, ssp_clk %d, rate_actual %d, rate_requested %d\n",
++		__func__, clock_divide, clock_rate, ssp_clk, ssp_sck, rate);
++}
 diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 6a14e10..97d3df2 100644
+index d5f2421..7701e08 100644
 --- a/drivers/mmc/host/mxs-mmc.c
 +++ b/drivers/mmc/host/mxs-mmc.c
-@@ -78,7 +78,7 @@ struct mxs_mmc_host {
- 	enum dma_transfer_direction	slave_dirn;
- 	u32				ssp_pio_words[SSP_PIO_NUM];
- 
--	enum mxs_mmc_id			devid;
-+	enum mxs_ssp_id			devid;
- 	unsigned char			bus_width;
- 	spinlock_t			lock;
- 	int				sdio_irq_en;
-@@ -601,22 +601,22 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
- 	return true;
+@@ -501,43 +501,6 @@ static void mxs_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 	mxs_mmc_start_cmd(host, mrq->cmd);
  }
  
--static struct platform_device_id mxs_mmc_ids[] = {
-+static struct platform_device_id mxs_ssp_ids[] = {
- 	{
- 		.name = "imx23-mmc",
--		.driver_data = IMX23_MMC,
-+		.driver_data = IMX23_SSP,
- 	}, {
- 		.name = "imx28-mmc",
--		.driver_data = IMX28_MMC,
-+		.driver_data = IMX28_SSP,
- 	}, {
- 		/* sentinel */
- 	}
- };
--MODULE_DEVICE_TABLE(platform, mxs_mmc_ids);
-+MODULE_DEVICE_TABLE(platform, mxs_ssp_ids);
+-static void mxs_mmc_set_clk_rate(struct mxs_mmc_host *host, unsigned int rate)
+-{
+-	struct mxs_ssp *ssp = &host->ssp;
+-	unsigned int ssp_clk, ssp_sck;
+-	u32 clock_divide, clock_rate;
+-	u32 val;
+-
+-	ssp_clk = clk_get_rate(ssp->clk);
+-
+-	for (clock_divide = 2; clock_divide <= 254; clock_divide += 2) {
+-		clock_rate = DIV_ROUND_UP(ssp_clk, rate * clock_divide);
+-		clock_rate = (clock_rate > 0) ? clock_rate - 1 : 0;
+-		if (clock_rate <= 255)
+-			break;
+-	}
+-
+-	if (clock_divide > 254) {
+-		dev_err(mmc_dev(host->mmc),
+-			"%s: cannot set clock to %d\n", __func__, rate);
+-		return;
+-	}
+-
+-	ssp_sck = ssp_clk / clock_divide / (1 + clock_rate);
+-
+-	val = readl(ssp->base + HW_SSP_TIMING(ssp));
+-	val &= ~(BM_SSP_TIMING_CLOCK_DIVIDE | BM_SSP_TIMING_CLOCK_RATE);
+-	val |= BF_SSP(clock_divide, TIMING_CLOCK_DIVIDE);
+-	val |= BF_SSP(clock_rate, TIMING_CLOCK_RATE);
+-	writel(val, ssp->base + HW_SSP_TIMING(ssp));
+-
+-	ssp->clk_rate = ssp_sck;
+-
+-	dev_dbg(mmc_dev(host->mmc),
+-		"%s: clock_divide %d, clock_rate %d, ssp_clk %d, rate_actual %d, rate_requested %d\n",
+-		__func__, clock_divide, clock_rate, ssp_clk, ssp_sck, rate);
+-}
+-
+ static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct mxs_mmc_host *host = mmc_priv(mmc);
+@@ -550,7 +513,7 @@ static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		host->bus_width = 0;
  
- static const struct of_device_id mxs_mmc_dt_ids[] = {
--	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_MMC, },
--	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_MMC, },
-+	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_SSP, },
-+	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_SSP, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, mxs_mmc_dt_ids);
-@@ -654,7 +654,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	}
+ 	if (ios->clock)
+-		mxs_mmc_set_clk_rate(host, ios->clock);
++		mxs_ssp_set_clk_rate(&host->ssp, ios->clock);
+ }
  
- 	if (np) {
--		host->devid = (enum mxs_mmc_id) of_id->data;
-+		host->devid = (enum mxs_ssp_id) of_id->data;
- 		/*
- 		 * TODO: This is a temporary solution and should be changed
- 		 * to use generic DMA binding later when the helpers get in.
-@@ -818,7 +818,7 @@ static const struct dev_pm_ops mxs_mmc_pm_ops = {
- static struct platform_driver mxs_mmc_driver = {
- 	.probe		= mxs_mmc_probe,
- 	.remove		= mxs_mmc_remove,
--	.id_table	= mxs_mmc_ids,
-+	.id_table	= mxs_ssp_ids,
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
+ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 diff --git a/include/linux/spi/mxs-spi.h b/include/linux/spi/mxs-spi.h
-index b7ccd57..c08aef5 100644
+index 0cb2767..2bc8abb 100644
 --- a/include/linux/spi/mxs-spi.h
 +++ b/include/linux/spi/mxs-spi.h
-@@ -24,7 +24,7 @@
- #ifndef __LINUX_SPI_MXS_SPI_H__
- #define __LINUX_SPI_MXS_SPI_H__
- 
--#define ssp_is_old(host)	((host)->devid == IMX23_MMC)
-+#define ssp_is_old(host)	((host)->devid == IMX23_SSP)
- 
- /* SSP registers */
- #define HW_SSP_CTRL0				0x000
-@@ -101,9 +101,9 @@
- 
- #define SSP_PIO_NUM	3
- 
--enum mxs_mmc_id {
--	IMX23_MMC,
--	IMX28_MMC,
-+enum mxs_ssp_id {
-+	IMX23_SSP,
-+	IMX28_SSP,
+@@ -136,4 +136,6 @@ struct mxs_ssp {
+ 	enum mxs_ssp_id			devid;
  };
  
++void mxs_ssp_set_clk_rate(struct mxs_ssp *ssp, unsigned int rate);
++
  #endif	/* __LINUX_SPI_MXS_SPI_H__ */
 -- 
 1.7.10
