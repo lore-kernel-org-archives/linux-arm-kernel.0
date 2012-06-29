@@ -1,37 +1,45 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 29 Jun 2012 17:48:51 +0800
-Subject: [PATCH v8 03/14] usb: chipidea: msm: add missing section annotation
+Date: Fri, 29 Jun 2012 17:48:50 +0800
+Subject: [PATCH v8 02/14] usb: chipidea: drop useless arch-check
 In-Reply-To: <1340963342-28735-1-git-send-email-richard.zhao@freescale.com>
 References: <1340963342-28735-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1340963342-28735-4-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1340963342-28735-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-No functional changes, it will just free up some
-code if we don't have hotplug.
+msm glue layer compiles on all arches just
+fine. Let's drop the unnecessary ARCH check
+so we have easier compile tests.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 Acked-by: Marek Vasut <marex@denx.de>
 ---
- drivers/usb/chipidea/ci13xxx_msm.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/chipidea/Makefile |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
-index 958069e..8d438b8 100644
---- a/drivers/usb/chipidea/ci13xxx_msm.c
-+++ b/drivers/usb/chipidea/ci13xxx_msm.c
-@@ -55,7 +55,7 @@ static struct ci13xxx_udc_driver ci13xxx_msm_udc_driver = {
- 	.notify_event		= ci13xxx_msm_notify_event,
- };
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index cc34937..b69900a 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -5,10 +5,12 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
  
--static int ci13xxx_msm_probe(struct platform_device *pdev)
-+static int __devinit ci13xxx_msm_probe(struct platform_device *pdev)
- {
- 	struct platform_device *plat_ci;
- 	int ret;
++# Glue/Bridge layers go here
++
++obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
++
++# PCI doesn't provide stubs, need to check
+ ifneq ($(CONFIG_PCI),)
+ 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
+ endif
+ 
+-ifneq ($(CONFIG_ARCH_MSM),)
+-	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
+-endif
 -- 
 1.7.9.5
