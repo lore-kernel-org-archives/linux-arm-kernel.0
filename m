@@ -1,24 +1,30 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 29 Jun 2012 18:42:08 +0530
-Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
-In-Reply-To: <20120629145718.697b6955@endymion.delvare>
-References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
- <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
- <20120629144002.3b4a31ee@endymion.delvare>
- <20120629145718.697b6955@endymion.delvare>
-Message-ID: <4FEDA9A8.1050504@ti.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 29 Jun 2012 15:24:19 +0200
+Subject: [PATCH 18/22] mfd: Remove redundant Kconfig entry
+In-Reply-To: <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120629132419.GM4846@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 June 2012 06:27 PM, Jean Delvare wrote:
-> drivers/gpu/drm/nouveau/nouveau_bios.c:3535:3: warning: (near initialization for ?msg[1].actual?) [enabled by default]
->
-> This needs to be all fixed (converted to C99-style struct
-> initialization) before your patch is considered for inclusion. And
-> there may be more that my config did not spot.
-Yes,agree.
+Hi Lee,
 
-The idea of this patch was if the idea is agreed upon then.
-then fixing all the callers could be worked on.
+On Wed, May 30, 2012 at 12:47:36PM +0800, Lee Jones wrote:
+> During ab8500-core clean-up the Kconfig entry for AB8500_I2C_CORE
+> was left remnant. This patch simply removes it.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/Kconfig |   10 ----------
+>  1 file changed, 10 deletions(-)
+Applied as well, thanks.
 
-However do you agree with this approach?
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
