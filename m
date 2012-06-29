@@ -1,30 +1,27 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 29 Jun 2012 15:24:19 +0200
-Subject: [PATCH 18/22] mfd: Remove redundant Kconfig entry
-In-Reply-To: <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120629132419.GM4846@sortiz-mobl>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Fri, 29 Jun 2012 10:13:58 -0300
+Subject: [PATCH v10] MTD: LPC32xx MLC NAND driver
+In-Reply-To: <1340975067.3070.180.camel@sauron.fi.intel.com>
+References: <1340834129-15545-1-git-send-email-stigge@antcom.de>
+ <1340973434.3070.168.camel@sauron.fi.intel.com>
+ <CAAAP30HZ1Z5U44wLwSEfcaJSLmVp8AbXPTCagS31hnoCy_tf-g@mail.gmail.com>
+ <1340975067.3070.180.camel@sauron.fi.intel.com>
+Message-ID: <CAAAP30FzY5KgYfnX7=UukZ3MTwfWaypZs+H2bNn15yKmx8VnvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Fri, Jun 29, 2012 at 10:04 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> On Fri, 2012-06-29 at 09:56 -0300, Alexandre Pereira da Silva wrote:
+>> > @@ @@
+>> > +drivers/mtd/nand/lpc32xx_mlc.c: In function 'lpc32xx_nand_probe':
+>> > +drivers/mtd/nand/lpc32xx_mlc.c:679:10: warning: variable 'sr' set but not used [-Wunused-but-set-variable]
+>
+> gcc 4.6, aiaiai uses W=1 when building.
+>
+>> > +drivers/mtd/nand/lpc32xx_mlc.c:561:24: error: bad constant expression [sparse]
+>
+> This is sparse, not gcc.
 
-On Wed, May 30, 2012 at 12:47:36PM +0800, Lee Jones wrote:
-> During ab8500-core clean-up the Kconfig entry for AB8500_I2C_CORE
-> was left remnant. This patch simply removes it.
-> 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/Kconfig |   10 ----------
->  1 file changed, 10 deletions(-)
-Applied as well, thanks.
-
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Does the oob area need to be ecc protected? If not I suggest to just
+remove the read_oob and write_oob and let this to nand_base. I think
+this is too much overhead to read 6 bytes.
