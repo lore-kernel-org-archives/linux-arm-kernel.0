@@ -1,34 +1,36 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Fri, 29 Jun 2012 16:35:27 +0530
-Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
+Date: Fri, 29 Jun 2012 16:35:25 +0530
+Subject: [RFC PATCH 1/3] i2c: add 'actual' field to struct i2c_msg
 In-Reply-To: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
 References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1340967927-27354-2-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In i2c_smbus_xfer_emulated initialise the actual bytes
-to zero.
+In case of a NACK, it's wise to tell our clients
+drivers about how many bytes were actually transferred.
+
+Support this by adding an extra field to the struct
+i2c_msg which gets incremented the amount of bytes
+actually transferred.
 
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/i2c-core.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ include/linux/i2c.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index a6ad32b..fa7f799 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -1949,8 +1949,8 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter *adapter, u16 addr,
- 	unsigned char msgbuf0[I2C_SMBUS_BLOCK_MAX+3];
- 	unsigned char msgbuf1[I2C_SMBUS_BLOCK_MAX+2];
- 	int num = read_write == I2C_SMBUS_READ ? 2 : 1;
--	struct i2c_msg msg[2] = { { addr, flags, 1, msgbuf0 },
--	                          { addr, flags | I2C_M_RD, 0, msgbuf1 }
-+	struct i2c_msg msg[2] = { { addr, flags, 1, 0, msgbuf0 },
-+				  { addr, flags | I2C_M_RD, 0, 0, msgbuf1 }
- 	                        };
- 	int i;
- 	u8 partial_pec = 0;
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index ddfa041..0cb6b83 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -547,6 +547,7 @@ struct i2c_msg {
+ #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+ #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+ 	__u16 len;		/* msg length				*/
++	__u16 actual;		/* actual bytes transferred             */
+ 	__u8 *buf;		/* pointer to msg data			*/
+ };
+ 
 -- 
 1.7.5.4
