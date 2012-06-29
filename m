@@ -1,70 +1,88 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 29 Jun 2012 11:27:04 +0200
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20120628121817.GA5755@shlinux2.ap.freescale.net>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
- <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
- <20120628113327.GJ6406@shlinux2.ap.freescale.net>
- <20120628114559.GE22990@S2101-09.ap.freescale.net>
- <4FEC487A.2050901@pengutronix.de>
- <20120628121817.GA5755@shlinux2.ap.freescale.net>
-Message-ID: <4FED74E8.4040805@pengutronix.de>
+Date: Fri, 29 Jun 2012 11:29:03 +0200
+Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode" property
+ to device tree bindings
+In-Reply-To: <20120629084509.GB28923@b20223-02.ap.freescale.net>
+References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
+ <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
+ <20120629014352.GA28923@b20223-02.ap.freescale.net>
+ <4FED5D77.3050009@pengutronix.de>
+ <20120629084509.GB28923@b20223-02.ap.freescale.net>
+Message-ID: <4FED755F.6080302@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2012 02:18 PM, Dong Aisheng wrote:
-> On Thu, Jun 28, 2012 at 08:05:14PM +0800, Marc Kleine-Budde wrote:
->> On 06/28/2012 01:46 PM, Shawn Guo wrote:
->>> On Thu, Jun 28, 2012 at 07:33:28PM +0800, Dong Aisheng wrote:
->>>>> +		phy_stby_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
->>>>> +							"phy-standby-gpios",
->>>>> +							0, &flags);
->>>>> +		if (gpio_is_valid(phy_stby_gpio)) {
->>>>> +			if (flags == OF_GPIO_ACTIVE_LOW)
->>>>> +				phy_stby_high = false;
->>>>> +			err = devm_gpio_request_one(&pdev->dev, phy_stby_gpio,
->>>>> +						    GPIOF_DIR_OUT,
->>>>> +						    "phy-standby");
->>>>> +			if (err) {
->>>>> +				dev_err(&pdev->dev,
->>>>> +					"failed to request gpio %d: %d\n",
->>>>> +					phy_stby_gpio, err);
->>>>> +				goto failed_gpio;
->>>> I checked mx28 evk, it seems the phy only has a STB gpio and shared by both CAN0&CAN1.
->>>> I wonder the CAN1 probe may fail here.
+On 06/29/2012 10:45 AM, Richard Zhao wrote:
+> On Fri, Jun 29, 2012 at 09:47:03AM +0200, Marc Kleine-Budde wrote:
+>>
+>> Cc'ed Devicetree Discussions
+>>
+>> On 06/29/2012 03:43 AM, Richard Zhao wrote:
+>>> On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
+>>>> This patch allows the device tree to limit the chipidea to host or
+>>>> peripheral mode only.
 >>>>
->>> It can be managed by dts.  Here is what I have in imx28-evk.dts, where
->>> only can0 has phy-enable-gpios property.
->>>
->>>
->>> 	can0: can at 80032000 {
->>> 		pinctrl-names = "default";
->>> 		pinctrl-0 = <&can0_pins_a>;
->>> 		phy-enable-gpios = <&gpio2 13 0>;
->>> 		status = "okay";
->>> 	};
->>>
->>> 	can1: can at 80034000 {
->>> 		pinctrl-names = "default";
->>> 		pinctrl-0 = <&can1_pins_a>;
->>> 		status = "okay";
->>> 	};
+>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>>>> ---
+>>>>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
+>>>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+>>>>  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
+>>>>  include/linux/usb/chipidea.h                       |    9 +++++
+>>>>  4 files changed, 50 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>>>> index 5a0ad66..67f97f56 100644
+>>>> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>>>> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>>>> @@ -4,6 +4,8 @@ Required properties:
+>>>>  - compatible: Should be "fsl,imx27-usb"
+>>>>  - reg: Should contain registers location and length
+>>>>  - interrupts: Should contain controller interrupt
+>>>> +- dr_mode: indicates the working mode for compatible controllers. Can
+>>>> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
 >>
->> Will this work if can0 is down and can1 is up?
+>>> By default, it should be decided by capability registers. Only bad hw
+>>> design needs such settings. So, why not name it as force-xxx? If it's
+>>> not specific to imx, it doesn't needs to has prefix "fsl,".
 >>
->> Can we abstract the transceiver power as a regulator? Or a clock? :P
->>
-> Hmm, it may not be a power.
-> For mx28evk, it's a STBY pin.
-> So it may hard to abstract it as a regulator or clock.
+>> It's not a bad hardware design if you don't route or enable all ports a
+>> soc offers. In modern socs you cannot enable all ports anyway.
+> I'm not sure about your case, but generally, it's not about ports.
+> It's about ID pin. If ID pin is not connect correctly, we may need to
+> force it to host or device working mode. The 'force" here means it
+> won't follow the capability registers and ID pin.
 
-I just talked to Sascha, He pointed out, that there already is regulator
-that toggles a gpio (only one, not several). I haven't looked at the
-details, but a regulator should solve the "two CAN ports share the same
-transceiver/phy" problem.
+The device tree is used to describe the hardware. How would you describe
+a system, which has just a USB device connector? And the hardware guys
+used the not needed id-pin for a LED?
+
+>> The property isn't prefixed with "fsl,", it's just "dr_mode".
+>>
+>> Why not "force-xxx"? I had a look at Documentation/devicetree/bindings/usb:
+>>
+>> tegra-usb.txt:
+>>>   - dr_mode : dual role mode. Indicates the working mode for
+>>>    nvidia,tegra20-ehci compatible controllers.  Can be "host", "peripheral",
+>>>    or "otg".  Default to "host" if not defined for backward compatibility.
+>>>       host means this is a host controller
+>>>       peripheral means it is device controller
+>>>       otg means it can operate as either ("on the go")
+>>
+>> fsl-usb.txt:
+>>>  - dr_mode : indicates the working mode for "fsl-usb2-dr" compatible
+>>>    controllers.  Can be "host", "peripheral", or "otg".  Default to
+>>>    "host" if not defined for backward compatibility.
+>>>
+>>
+>> So why invent something new, if there seems to be a pattern?
+> I'm not sure they mean the same things, because the default value is
+> different. Event if they're same, why not make them all with sensible
+> name?
+
+Sensible name sounds good. Devicetree Discussions, we need an official
+name for the property and its values :)
 
 Marc
-
 -- 
 Pengutronix e.K.                  | Marc Kleine-Budde           |
 Industrial Linux Solutions        | Phone: +49-231-2826-924     |
@@ -77,4 +95,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 262 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/6732d95d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/eeee92d3/attachment.sig>
