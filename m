@@ -1,60 +1,39 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Fri, 29 Jun 2012 09:37:14 +0530
-Subject: Panda ES board hang when using GPIO as interrupt
-In-Reply-To: <4FECFDD8.5060105@broadcom.com>
-References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
- <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
- <4FECCB91.7090609@broadcom.com> <4FECD2E5.1060603@ti.com>
- <4FECE067.7000809@broadcom.com> <4FECE1BD.80906@ti.com>
- <4FECE45E.6040506@broadcom.com> <4FECEE9A.5070300@ti.com>
- <4FECFDD8.5060105@broadcom.com>
-Message-ID: <CAC83ZvJJw-7Xt4Ey4_OT70D6MGHEfwURYVuj5wYTLe5oYiMuRw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 29 Jun 2012 07:14:28 +0200
+Subject: [PATCH] ARM: dma-mapping: fix build break on no-MMU platform
+In-Reply-To: <1340614047-5824-3-git-send-email-m.szyprowski@samsung.com>
+References: <1340614047-5824-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1340946868-18178-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 6:29 AM, Franky Lin <frankyl@broadcom.com> wrote:
-> On 06/28/2012 04:54 PM, Jon Hunter wrote:
->>
->> I am wondering if this could be the bug ... on start-up I see that we do
->> a context restore on bank1 during the probe which is before we have done
->> the first suspend! In other words, we could restore a bad/uninitialised
->> context for bank1. In the case of bank1, the loss count starts at 1 and
->> not 0 and so we falsely think we need to perform a restore :-(
->>
->> [ ? ?0.176269] omap_gpio_runtime_resume: bank @ 0xfc310000
->> [ ? ?0.177276] omap_gpio_runtime_resume: count 0, now 1
->> [ ? ?0.177276] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
->> [ ? ?0.177642] omap_gpio_runtime_suspend: bank @ 0xfc310000
->>
->> Can you try ...
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index c4ed172..9623408 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -1086,6 +1086,9 @@ static int __devinit omap_gpio_probe(struct
->> platform_device *pdev)
->> ?#ifdef CONFIG_OF_GPIO
->> ? ? ? ? bank->chip.of_node = of_node_get(node);
->> ?#endif
->> + ? ? ? if (bank->get_context_loss_count)
->> + ? ? ? ? ? ? ? bank->context_loss_count =
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->get_context_loss_count(bank->dev);
->>
->> ? ? ? ? bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
->> ? ? ? ? if (bank->irq_base < 0) {
->>
->
-> Looks like you found the culprit. :) It does fix the problem.
-So this looks similar to what NeilBrown <neilb@suse.de> reported in
-another thread.
-The reason was context_loss_count = 1 for GPIO BANK#0 which of course is in the
-WKUP domain. In fact he tried out with the same fix. Anyways, we
-should hear from
-Kevin now whether it is feasible to fix the context_loss_count for the WKUP GPIO
-bank or to put the workaround here in the gpio driver.
---
-Tarun
->
-> Franky
->
+This patch fixes the following build break on no-MMU ARM architectures:
+
+arch/arm/mm/dma-mapping.c:576:39: error: macro "__alloc_from_pool" requires 4 arguments, but only 2 given
+arch/arm/mm/dma-mapping.c: In function ?__dma_alloc?:
+arch/arm/mm/dma-mapping.c:576: error: ?__alloc_from_pool? undeclared (first use in this function)
+arch/arm/mm/dma-mapping.c:576: error: (Each undeclared identifier is reported only once
+arch/arm/mm/dma-mapping.c:576: error: for each function it appears in.)
+make[1]: *** [arch/arm/mm/dma-mapping.o] Error 1
+
+Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/mm/dma-mapping.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c10dab8..c65a180 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -514,7 +514,7 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
+ 
+ #define __get_dma_pgprot(attrs, prot)	__pgprot(0)
+ #define __alloc_remap_buffer(dev, size, gfp, prot, ret, c)	NULL
+-#define __alloc_from_pool(dev, size, ret_page, c)		NULL
++#define __alloc_from_pool(size, ret_page)			NULL
+ #define __alloc_from_contiguous(dev, size, prot, ret)		NULL
+ #define __free_from_pool(cpu_addr, size)			0
+ #define __free_from_contiguous(dev, page, size)			do { } while (0)
+-- 
+1.7.1.569.g6f426
