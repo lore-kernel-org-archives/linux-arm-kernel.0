@@ -1,248 +1,60 @@
-From: snijsure@grid-net.com (Subodh Nijsure)
-Date: Thu, 28 Jun 2012 20:35:33 -0700
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <1340941925-14591-3-git-send-email-shijie8@gmail.com>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
- <1340941925-14591-3-git-send-email-shijie8@gmail.com>
-Message-ID: <4FED2285.2030307@grid-net.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 29 Jun 2012 09:37:14 +0530
+Subject: Panda ES board hang when using GPIO as interrupt
+In-Reply-To: <4FECFDD8.5060105@broadcom.com>
+References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
+ <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
+ <4FECCB91.7090609@broadcom.com> <4FECD2E5.1060603@ti.com>
+ <4FECE067.7000809@broadcom.com> <4FECE1BD.80906@ti.com>
+ <4FECE45E.6040506@broadcom.com> <4FECEE9A.5070300@ti.com>
+ <4FECFDD8.5060105@broadcom.com>
+Message-ID: <CAC83ZvJJw-7Xt4Ey4_OT70D6MGHEfwURYVuj5wYTLe5oYiMuRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2012 08:52 PM, Huang Shijie wrote:
-> From: Huang Shijie <b32955@freescale.com>
+On Fri, Jun 29, 2012 at 6:29 AM, Franky Lin <frankyl@broadcom.com> wrote:
+> On 06/28/2012 04:54 PM, Jon Hunter wrote:
+>>
+>> I am wondering if this could be the bug ... on start-up I see that we do
+>> a context restore on bank1 during the probe which is before we have done
+>> the first suspend! In other words, we could restore a bad/uninitialised
+>> context for bank1. In the case of bank1, the loss count starts at 1 and
+>> not 0 and so we falsely think we need to perform a restore :-(
+>>
+>> [ ? ?0.176269] omap_gpio_runtime_resume: bank @ 0xfc310000
+>> [ ? ?0.177276] omap_gpio_runtime_resume: count 0, now 1
+>> [ ? ?0.177276] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
+>> [ ? ?0.177642] omap_gpio_runtime_suspend: bank @ 0xfc310000
+>>
+>> Can you try ...
+>>
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index c4ed172..9623408 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -1086,6 +1086,9 @@ static int __devinit omap_gpio_probe(struct
+>> platform_device *pdev)
+>> ?#ifdef CONFIG_OF_GPIO
+>> ? ? ? ? bank->chip.of_node = of_node_get(node);
+>> ?#endif
+>> + ? ? ? if (bank->get_context_loss_count)
+>> + ? ? ? ? ? ? ? bank->context_loss_count =
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->get_context_loss_count(bank->dev);
+>>
+>> ? ? ? ? bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+>> ? ? ? ? if (bank->irq_base < 0) {
+>>
 >
-> The gpmi nand driver may needs several clocks(MX6Q needs five clocks).
+> Looks like you found the culprit. :) It does fix the problem.
+So this looks similar to what NeilBrown <neilb@suse.de> reported in
+another thread.
+The reason was context_loss_count = 1 for GPIO BANK#0 which of course is in the
+WKUP domain. In fact he tried out with the same fix. Anyways, we
+should hear from
+Kevin now whether it is feasible to fix the context_loss_count for the WKUP GPIO
+bank or to put the workaround here in the gpio driver.
+--
+Tarun
 >
-> In the old clock framework, all these clocks are chained together,
-> all you need is to manipulate the first clock.
+> Franky
 >
-> But the kernel uses the common clk framework now, which forces us to
-> get the clocks one by one. When we use them, we have to enable them
-> one by one too.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
-I will test this on MX28 platform, given that some of these things may 
-span multiple platform should we include platforms the patch was tested 
-on or request that someone with access to specific platform test this?
-
--Subodh
-> ---
->   drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   43 ++++++++++++++++++----
->   drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   63 +++++++++++++++++++++++++++-----
->   drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    3 +-
->   3 files changed, 91 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> index a1f4332..c3778c0 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> @@ -124,12 +124,40 @@ error:
->   	return -ETIMEDOUT;
->   }
->   
-> +static int __gpmi_enable_clk(struct gpmi_nand_data *this, bool v)
-> +{
-> +	struct clk *clk;
-> +	int ret;
-> +	int i;
-> +
-> +	for (i = 0; i < GPMI_CLK_MAX; i++) {
-> +		clk = this->resources.clock[i];
-> +		if (!clk)
-> +			break;
-> +
-> +		if (v) {
-> +			ret = clk_prepare_enable(clk);
-> +			if (ret)
-> +				goto err_clk;
-> +		} else {
-> +			clk_disable_unprepare(clk);
-> +		}
-> +	}
-> +	return 0;
-> +
-> +err_clk:
-> +	return ret;
-> +}
-> +
-> +#define gpmi_enable_clk(x) __gpmi_enable_clk(x, true)
-> +#define gpmi_disable_clk(x) __gpmi_enable_clk(x, false)
-> +
->   int gpmi_init(struct gpmi_nand_data *this)
->   {
->   	struct resources *r = &this->resources;
->   	int ret;
->   
-> -	ret = clk_prepare_enable(r->clock);
-> +	ret = gpmi_enable_clk(this);
->   	if (ret)
->   		goto err_out;
->   	ret = gpmi_reset_block(r->gpmi_regs, false);
-> @@ -149,7 +177,7 @@ int gpmi_init(struct gpmi_nand_data *this)
->   	/* Select BCH ECC. */
->   	writel(BM_GPMI_CTRL1_BCH_MODE, r->gpmi_regs + HW_GPMI_CTRL1_SET);
->   
-> -	clk_disable_unprepare(r->clock);
-> +	gpmi_disable_clk(this);
->   	return 0;
->   err_out:
->   	return ret;
-> @@ -205,7 +233,7 @@ int bch_set_geometry(struct gpmi_nand_data *this)
->   	ecc_strength  = bch_geo->ecc_strength >> 1;
->   	page_size     = bch_geo->page_size;
->   
-> -	ret = clk_prepare_enable(r->clock);
-> +	ret = gpmi_enable_clk(this);
->   	if (ret)
->   		goto err_out;
->   
-> @@ -240,7 +268,7 @@ int bch_set_geometry(struct gpmi_nand_data *this)
->   	writel(BM_BCH_CTRL_COMPLETE_IRQ_EN,
->   				r->bch_regs + HW_BCH_CTRL_SET);
->   
-> -	clk_disable_unprepare(r->clock);
-> +	gpmi_disable_clk(this);
->   	return 0;
->   err_out:
->   	return ret;
-> @@ -716,7 +744,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
->   	int ret;
->   
->   	/* Enable the clock. */
-> -	ret = clk_prepare_enable(r->clock);
-> +	ret = gpmi_enable_clk(this);
->   	if (ret) {
->   		pr_err("We failed in enable the clk\n");
->   		goto err_out;
-> @@ -727,7 +755,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
->   		gpmi_regs + HW_GPMI_TIMING1);
->   
->   	/* Get the timing information we need. */
-> -	nfc->clock_frequency_in_hz = clk_get_rate(r->clock);
-> +	nfc->clock_frequency_in_hz = clk_get_rate(r->clock[0]);
->   	clock_period_in_ns = 1000000000 / nfc->clock_frequency_in_hz;
->   
->   	gpmi_nfc_compute_hardware_timing(this, &hw);
-> @@ -784,8 +812,7 @@ err_out:
->   
->   void gpmi_end(struct gpmi_nand_data *this)
->   {
-> -	struct resources *r = &this->resources;
-> -	clk_disable_unprepare(r->clock);
-> +	gpmi_disable_clk(this);
->   }
->   
->   /* Clears a BCH interrupt. */
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index 941cfb7..edda3b1 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -464,9 +464,59 @@ acquire_err:
->   	return -EINVAL;
->   }
->   
-> +static void gpmi_put_clks(struct gpmi_nand_data *this)
-> +{
-> +	struct resources *r = &this->resources;
-> +	struct clk *clk;
-> +	int i;
-> +
-> +	for (i = 0; i < GPMI_CLK_MAX; i++) {
-> +		clk = r->clock[i];
-> +		if (clk) {
-> +			clk_put(clk);
-> +			r->clock[i] = NULL;
-> +		}
-> +	}
-> +}
-> +
-> +static char *extra_clks_for_mx6q[] = {
-> +	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
-> +};
-> +
-> +static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
-> +{
-> +	struct resources *r = &this->resources;
-> +	char **extra_clks = NULL;
-> +	struct clk *clk;
-> +	int i;
-> +
-> +	r->clock[0] = clk_get(&this->pdev->dev, NULL);
-> +	if (IS_ERR(r->clock[0]))
-> +		goto err_clock;
-> +
-> +	/* Get extra clocks */
-> +	if (GPMI_IS_MX6Q(this))
-> +		extra_clks = extra_clks_for_mx6q;
-> +	if (!extra_clks)
-> +		return 0;
-> +
-> +	for (i = 1; i < GPMI_CLK_MAX; i++) {
-> +		clk = clk_get(NULL, extra_clks[i - 1]);
-> +		if (IS_ERR(clk))
-> +			goto err_clock;
-> +
-> +		r->clock[i] = clk;
-> +	}
-> +	return 0;
-> +
-> +err_clock:
-> +	pr_err("failed in finding the clocks.\n");
-> +	gpmi_put_clks(this);
-> +	return -ENOMEM;
-> +}
-> +
->   static int __devinit acquire_resources(struct gpmi_nand_data *this)
->   {
-> -	struct resources *res = &this->resources;
->   	struct pinctrl *pinctrl;
->   	int ret;
->   
-> @@ -492,12 +542,9 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
->   		goto exit_pin;
->   	}
->   
-> -	res->clock = clk_get(&this->pdev->dev, NULL);
-> -	if (IS_ERR(res->clock)) {
-> -		pr_err("can not get the clock\n");
-> -		ret = -ENOENT;
-> +	ret = gpmi_get_clks(this);
-> +	if (ret)
->   		goto exit_clock;
-> -	}
->   	return 0;
->   
->   exit_clock:
-> @@ -512,9 +559,7 @@ exit_regs:
->   
->   static void release_resources(struct gpmi_nand_data *this)
->   {
-> -	struct resources *r = &this->resources;
-> -
-> -	clk_put(r->clock);
-> +	gpmi_put_clks(this);
->   	release_register_block(this);
->   	release_bch_irq(this);
->   	release_dma_channels(this);
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> index ce5daa1..1547a60 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> @@ -22,6 +22,7 @@
->   #include <linux/dma-mapping.h>
->   #include <linux/fsl/mxs-dma.h>
->   
-> +#define GPMI_CLK_MAX 5 /* MX6Q needs five clocks */
->   struct resources {
->   	void          *gpmi_regs;
->   	void          *bch_regs;
-> @@ -29,7 +30,7 @@ struct resources {
->   	unsigned int  bch_high_interrupt;
->   	unsigned int  dma_low_channel;
->   	unsigned int  dma_high_channel;
-> -	struct clk    *clock;
-> +	struct clk    *clock[GPMI_CLK_MAX];
->   };
->   
->   /**
