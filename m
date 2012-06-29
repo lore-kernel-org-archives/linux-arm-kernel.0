@@ -1,37 +1,288 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Jun 2012 19:13:36 +0800
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <20120629095433.GO5844@shlinux2.ap.freescale.net>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
- <1340941925-14591-3-git-send-email-shijie8@gmail.com>
- <20120629020650.GB28932@S2101-09.ap.freescale.net>
- <20120629063329.GE5844@shlinux2.ap.freescale.net>
- <20461.30070.771087.830745@ipc1.ka-ro>
- <20120629093437.GK5844@shlinux2.ap.freescale.net>
- <20461.30991.63507.369439@ipc1.ka-ro>
- <20120629095433.GO5844@shlinux2.ap.freescale.net>
-Message-ID: <20120629111334.GB29197@S2101-09.ap.freescale.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 29 Jun 2012 13:15:14 +0200
+Subject: [PATCH v8 14/14] usb: chipidea: add imx platform driver
+In-Reply-To: <1340963342-28735-15-git-send-email-richard.zhao@freescale.com>
+References: <1340963342-28735-1-git-send-email-richard.zhao@freescale.com>
+ <1340963342-28735-15-git-send-email-richard.zhao@freescale.com>
+Message-ID: <4FED8E42.9020400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 05:54:33PM +0800, Dong Aisheng wrote:
-> > > > No, that's silly. You would have to change the driver for each
-> > > > new platform that the driver can support.
-> > > > 
-> > > If the new platform is fully compatible with exist platforms, then no.
-> > > If need more clocks, then in either way, we have to add support in driver.
-> > > 
-> > Even if it had fewer clocks you would have to change the driver!
-> > 
-> Yes.
-> For your case, you need create some dummy clock, right?
-> If yes, i would intend to explictly to define it for a new type
-> of IP.
+On 06/29/2012 11:49 AM, Richard Zhao wrote:
+> This patch supports only the host-mode functionality so far.
 > 
-I'm with Lothar on this.  At least for imx28 case, we do not even need
-dummy clock, because NULL con_id in clkdev lookup will have all those
-clocks match the only one gpmi-nand clock on imx28, as I already said.
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Peter Chen <peter.chen@freescale.com>
+> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Tested-by: Subodh Nijsure <snijsure@grid-net.com>
+> ---
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |   18 ++
+>  drivers/usb/chipidea/Makefile                      |    3 +
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |  198 ++++++++++++++++++++
+>  3 files changed, 219 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> new file mode 100644
+> index 0000000..2c29041
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -0,0 +1,18 @@
+> +* Freescale i.MX ci13xxx usb controllers
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx27-usb"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain controller interrupt
+> +
+> +Optional properties:
+> +- fsl,usbphy: phandler of usb phy that connects to the only one port
+> +- vbus-supply: regulator for vbus
+> +
+> +Examples:
+> +usb at 02184000 { /* USB OTG */
+> +	compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+> +	reg = <0x02184000 0x200>;
+> +	interrupts = <0 43 0x04>;
+> +	fsl,usbphy = <&usbphy1>;
+> +};
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index b69900a..5c66d9c 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -14,3 +14,6 @@ ifneq ($(CONFIG_PCI),)
+>  	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
+>  endif
+>  
+> +ifneq ($(CONFIG_OF_DEVICE),)
+> +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
+> +endif
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> new file mode 100644
+> index 0000000..ef60d06
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -0,0 +1,198 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> + * on behalf of DENX Software Engineering GmbH
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/usb/chipidea.h>
+> +#include <linux/clk.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#include "ci.h"
+> +
+> +#define pdev_to_phy(pdev) \
+> +	((struct usb_phy *)platform_get_drvdata(pdev))
+> +
+> +struct ci13xxx_imx_data {
+> +	struct device_node *phy_np;
+> +	struct usb_phy *phy;
+> +	struct platform_device *ci_pdev;
+> +	struct clk *clk;
+> +	struct regulator *reg_vbus;
+> +};
+> +
+> +static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
+> +	.name			= "ci13xxx_imx",
+> +	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+> +				  CI13XXX_PULLUP_ON_VBUS |
+> +				  CI13XXX_DISABLE_STREAMING,
+> +	.capoffset		= DEF_CAPOFFSET,
+> +};
+> +
+> +static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+> +{
+> +	struct ci13xxx_imx_data *data;
+> +	struct platform_device *plat_ci, *phy_pdev;
+> +	struct device_node *phy_np;
+> +	struct resource *res;
+> +	struct regulator *reg_vbus;
+> +	int ret;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data) {
+> +		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Can't get device resources!\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->clk)) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+> +		return PTR_ERR(data->clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(data->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to prepare or enable clock, err=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+> +	if (phy_np) {
+> +		data->phy_np = phy_np;
+> +		phy_pdev = of_find_device_by_node(phy_np);
+> +		if (phy_pdev) {
+> +			struct usb_phy *phy;
+> +			phy = pdev_to_phy(phy_pdev);
+> +			if (phy &&
+> +			    try_module_get(phy_pdev->dev.driver->owner)) {
+> +				usb_phy_init(phy);
+> +				data->phy = phy;
+> +			}
+> +		}
+> +	}
+
+what about using devm_usb_get_phy_by_phandle() as proposed in Kishon's
+patch: "drivers: usb: otg: add device tree support to otg library".
+
+Marc
+
+> +
+> +	/* we only support host now, so enable vbus here */
+> +	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+> +	if (!IS_ERR(reg_vbus)) {
+> +		ret = regulator_enable(reg_vbus);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"Failed to enable vbus regulator, err=%d\n",
+> +				ret);
+> +			goto put_np;
+> +		}
+> +		data->reg_vbus = reg_vbus;
+> +	} else {
+> +		reg_vbus = NULL;
+> +	}
+> +
+> +	ci13xxx_imx_platdata.phy = data->phy;
+> +
+> +	if (!pdev->dev.dma_mask) {
+> +		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
+> +				      sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+> +		if (!pdev->dev.dma_mask) {
+> +			ret = -ENOMEM;
+> +			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
+> +			goto err;
+> +		}
+> +		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> +		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
+> +	}
+> +	plat_ci = ci13xxx_add_device(&pdev->dev,
+> +				pdev->resource, pdev->num_resources,
+> +				&ci13xxx_imx_platdata);
+> +	if (IS_ERR(plat_ci)) {
+> +		ret = PTR_ERR(plat_ci);
+> +		dev_err(&pdev->dev,
+> +			"Can't register ci_hdrc platform device, err=%d\n",
+> +			ret);
+> +		goto err;
+> +	}
+> +
+> +	data->ci_pdev = plat_ci;
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	pm_runtime_no_callbacks(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+> +	return 0;
+> +
+> +err:
+> +	if (reg_vbus)
+> +		regulator_disable(reg_vbus);
+> +put_np:
+> +	if (phy_np)
+> +		of_node_put(phy_np);
+> +	clk_disable_unprepare(data->clk);
+> +	return ret;
+> +}
+> +
+> +static int __devexit ci13xxx_imx_remove(struct platform_device *pdev)
+> +{
+> +	struct ci13xxx_imx_data *data = platform_get_drvdata(pdev);
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +	ci13xxx_remove_device(data->ci_pdev);
+> +
+> +	if (data->reg_vbus)
+> +		regulator_disable(data->reg_vbus);
+> +
+> +	if (data->phy) {
+> +		usb_phy_shutdown(data->phy);
+> +		module_put(data->phy->dev->driver->owner);
+> +	}
+> +
+> +	of_node_put(data->phy_np);
+> +
+> +	clk_disable_unprepare(data->clk);
+> +
+> +	platform_set_drvdata(pdev, NULL);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci13xxx_imx_dt_ids[] = {
+> +	{ .compatible = "fsl,imx27-usb", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ci13xxx_imx_dt_ids);
+> +
+> +static struct platform_driver ci13xxx_imx_driver = {
+> +	.probe = ci13xxx_imx_probe,
+> +	.remove = __devexit_p(ci13xxx_imx_remove),
+> +	.driver = {
+> +		.name = "imx_usb",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = ci13xxx_imx_dt_ids,
+> +	 },
+> +};
+> +
+> +module_platform_driver(ci13xxx_imx_driver);
+> +
+> +MODULE_ALIAS("platform:imx-usb");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("CI13xxx i.MX USB binding");
+> +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
+> +MODULE_AUTHOR("Richard Zhao <richard.zhao@freescale.com>");
+
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/3661d899/attachment.sig>
