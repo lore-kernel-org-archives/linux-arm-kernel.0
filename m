@@ -1,60 +1,270 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Fri, 29 Jun 2012 17:03:20 +0800
-Subject: [PATCH 2/3] OMAP2+ devices add mac address allocation register api
-In-Reply-To: <201206290851.47054.arnd@arndb.de>
-References: <20120629054404.11091.31289.stgit@build.warmcat.com>
- <20120629055516.11091.82899.stgit@build.warmcat.com>
- <201206290851.47054.arnd@arndb.de>
-Message-ID: <4FED6F58.3090506@linaro.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 29 Jun 2012 17:03:39 +0800
+Subject: [PATCH v8 14/14] usb: chipidea: add imx platform driver
+In-Reply-To: <1340854652-24717-15-git-send-email-richard.zhao@freescale.com>
+References: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
+ <1340854652-24717-15-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120629090338.GC28923@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/12 16:51, the mail apparently from Arnd Bergmann included:
-> On Friday 29 June 2012, Andy Green wrote:
->> +static int omap_panda_netdev_event(struct notifier_block *this,
->> +                                               unsigned long event, void *ptr)
->> +{
->> +       struct net_device *dev = ptr;
->> +       struct sockaddr sa;
->> +       int n;
->> +
->> +       if (event != NETDEV_REGISTER)
->> +               return NOTIFY_DONE;
->> +
->> +       n = omap_device_path_need_mac(dev->dev.parent);
->> +       if (n < 0)
->> +               return NOTIFY_DONE;
->> +
->> +       sa.sa_family = dev->type;
->> +       omap2_die_id_to_ethernet_mac(sa.sa_data, n);
->> +       dev->netdev_ops->ndo_set_mac_address(dev, &sa);
->> +
->> +       return NOTIFY_DONE;
->> +}
->> +
->> +static struct notifier_block omap_panda_netdev_notifier = {
->> +       .notifier_call = omap_panda_netdev_event,
->> +       .priority = 1,
->> +};
->> +
->> +int omap_register_mac_device_fixup_paths(const char * const *paths, int count)
->> +{
->> +       mac_device_fixup_paths = paths;
->> +       count_mac_device_fixup_paths = count;
->> +
->> +       return register_netdevice_notifier(&omap_panda_netdev_notifier);
->> +}
->
-> The omap_panda_netdev_event and omap_panda_netdev_notifier symbols should probably
-> lose the "panda_" part of their names, because they are now located in a common
-> file and are not panda specific any more.
+On Thu, Jun 28, 2012 at 11:37:31AM +0800, Richard Zhao wrote:
+> This patch supports only the host-mode functionality so far.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Peter Chen <peter.chen@freescale.com>
+> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Tested-by: Subodh Nijsure <snijsure@grid-net.com>
+> ---
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |   17 ++
+>  drivers/usb/chipidea/Makefile                      |    3 +
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |  197 ++++++++++++++++++++
+>  3 files changed, 217 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> new file mode 100644
+> index 0000000..5a0ad66
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -0,0 +1,17 @@
+> +* Freescale i.MX ci13xxx usb controllers
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx27-usb"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain controller interrupt
+> +
+> +Optional properties:
+> +- fsl,usbphy: phandler of usb phy that connects to the only one port
+> +
+> +Examples:
+> +usb at 02184000 { /* USB OTG */
+> +	compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+> +	reg = <0x02184000 0x200>;
+> +	interrupts = <0 43 0x04>;
+> +	fsl,usbphy = <&usbphy1>;
+> +};
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index b69900a..5c66d9c 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -14,3 +14,6 @@ ifneq ($(CONFIG_PCI),)
+>  	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
+>  endif
+>  
+> +ifneq ($(CONFIG_OF_DEVICE),)
+> +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
+> +endif
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> new file mode 100644
+> index 0000000..efae2be
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -0,0 +1,197 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> + * on behalf of DENX Software Engineering GmbH
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/usb/chipidea.h>
+> +#include <linux/clk.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#include "ci.h"
+> +
+> +#define pdev_to_phy(pdev) \
+> +	((struct usb_phy *)platform_get_drvdata(pdev))
+> +
+> +struct ci13xxx_imx_data {
+> +	struct device_node *phy_np;
+> +	struct usb_phy *phy;
+> +	struct platform_device *ci_pdev;
+> +	struct clk *clk;
+> +	struct regulator *reg_vbus;
+> +};
+> +
+> +static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
+> +	.name			= "ci13xxx_imx",
+> +	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+> +				  CI13XXX_PULLUP_ON_VBUS |
+> +				  CI13XXX_DISABLE_STREAMING,
+> +	.capoffset		= DEF_CAPOFFSET,
+> +};
+> +
+> +static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+> +{
+> +	struct ci13xxx_imx_data *data;
+> +	struct platform_device *plat_ci, *phy_pdev;
+> +	struct device_node *phy_np;
+> +	struct resource *res;
+> +	struct regulator *reg_vbus;
+> +	int ret;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data) {
+> +		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Can't get device resources!\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->clk)) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+> +		return PTR_ERR(data->clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(data->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to prepare or enable clock, err=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+> +	if (phy_np) {
+> +		data->phy_np = phy_np;
+> +		phy_pdev = of_find_device_by_node(phy_np);
+> +		if (phy_pdev) {
+> +			struct usb_phy *phy;
+> +			phy = pdev_to_phy(phy_pdev);
+> +			if (phy &&
+> +			    try_module_get(phy_pdev->dev.driver->owner)) {
+> +				usb_phy_init(phy);
+> +				data->phy = phy;
+> +			}
+> +		}
+> +	}
+> +
+> +	/* we only support host now, so enable vbus here */
+> +	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+> +	if (!IS_ERR(reg_vbus)) {
+> +		ret = regulator_enable(reg_vbus);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"Failed to enable vbus regulator, err=%d\n",
+> +				ret);
+> +			goto put_np;
+> +		}
+> +		data->reg_vbus = reg_vbus;
+> +	} else {
+> +		reg_vbus = NULL;
+> +	}
+> +
+> +	ci13xxx_imx_platdata.phy = data->phy;
+> +
+> +	if (!pdev->dev.dma_mask) {
+> +		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
+> +				      sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+> +		if (!pdev->dev.dma_mask) {
+> +			ret = -ENOMEM;
+> +			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
+> +			goto err;
+> +		}
+> +		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> +		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
+> +	}
+> +	plat_ci = ci13xxx_add_device(&pdev->dev,
+> +				pdev->resource, pdev->num_resources,
+> +				&ci13xxx_imx_platdata);
+> +	if (IS_ERR(plat_ci)) {
+> +		ret = PTR_ERR(plat_ci);
+> +		dev_err(&pdev->dev,
+> +			"Can't register ci_hdrc platform device, err=%d\n",
+> +			ret);
+> +		goto err;
+> +	}
+> +
+> +	data->ci_pdev = plat_ci;
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	pm_runtime_no_callbacks(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+> +	return 0;
+> +
+> +err:
+> +	if (reg_vbus)
+> +		regulator_disable(reg_vbus);
+> +put_np:
+> +	if (phy_np)
+> +		of_node_put(phy_np);
+> +	clk_disable_unprepare(data->clk);
+> +	return ret;
+> +}
+> +
+> +static int __devexit ci13xxx_imx_remove(struct platform_device *pdev)
+> +{
+> +	struct ci13xxx_imx_data *data = platform_get_drvdata(pdev);
+> +
+> +	ci13xxx_remove_device(data->ci_pdev);
+It lacks pm_runtime_disable.
 
-Good point thanks, I'll sort it out after waiting for any more comments.
-
--Andy
-
--- 
-Andy Green | TI Landing Team Leader
-Linaro.org ? Open source software for ARM SoCs | Follow Linaro
-http://facebook.com/pages/Linaro/155974581091106  - 
-http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
+> +
+> +	if (data->reg_vbus)
+> +		regulator_disable(data->reg_vbus);
+> +
+> +	if (data->phy) {
+> +		usb_phy_shutdown(data->phy);
+> +		module_put(data->phy->dev->driver->owner);
+> +	}
+> +
+> +	of_node_put(data->phy_np);
+> +
+> +	clk_disable_unprepare(data->clk);
+> +
+> +	platform_set_drvdata(pdev, NULL);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci13xxx_imx_dt_ids[] = {
+> +	{ .compatible = "fsl,imx27-usb", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ci13xxx_imx_dt_ids);
+> +
+> +static struct platform_driver ci13xxx_imx_driver = {
+> +	.probe = ci13xxx_imx_probe,
+> +	.remove = __devexit_p(ci13xxx_imx_remove),
+> +	.driver = {
+> +		.name = "imx_usb",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = ci13xxx_imx_dt_ids,
+> +	 },
+> +};
+> +
+> +module_platform_driver(ci13xxx_imx_driver);
+> +
+> +MODULE_ALIAS("platform:imx-usb");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("CI13xxx i.MX USB binding");
+> +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
+> +MODULE_AUTHOR("Richard Zhao <richard.zhao@freescale.com>");
+> -- 
+> 1.7.9.5
+> 
