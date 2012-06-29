@@ -1,55 +1,59 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 29 Jun 2012 15:37:14 +0300
-Subject: [PATCH v10] MTD: LPC32xx MLC NAND driver
-In-Reply-To: <1340834129-15545-1-git-send-email-stigge@antcom.de>
-References: <1340834129-15545-1-git-send-email-stigge@antcom.de>
-Message-ID: <1340973434.3070.168.camel@sauron.fi.intel.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 29 Jun 2012 14:33:20 +0200
+Subject: [RFC PATCH 1/3] i2c: add 'actual' field to struct i2c_msg
+In-Reply-To: <1340967927-27354-2-git-send-email-shubhrajyoti@ti.com>
+References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
+ <1340967927-27354-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120629143320.42f51c0a@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-27 at 23:55 +0200, Roland Stigge wrote:
-> This patch adds a driver for the MLC NAND controller of the LPC32xx SoC.
+On Fri, 29 Jun 2012 16:35:25 +0530, Shubhrajyoti D wrote:
+> In case of a NACK, it's wise to tell our clients
+> drivers about how many bytes were actually transferred.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> Support this by adding an extra field to the struct
+> i2c_msg which gets incremented the amount of bytes
+> actually transferred.
+> 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 > ---
+>  include/linux/i2c.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index ddfa041..0cb6b83 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -547,6 +547,7 @@ struct i2c_msg {
+>  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+>  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+>  	__u16 len;		/* msg length				*/
+> +	__u16 actual;		/* actual bytes transferred             */
+>  	__u8 *buf;		/* pointer to msg data			*/
+>  };
+>  
 
-Aiaiai complains like this about your patch, please, take a look:
+David Brownell discussed this a long time ago:
+http://marc.info/?l=linux-i2c&m=121103523020494&w=2
 
---------------------------------------------------------------------------------
+This structure is exported to user-space through i2c-dev, so changing
+it is tough if possible at all. You first have to ensure that the
+change doesn't alter the structure size. In other words, the field you
+add must fit in a padding hole the structure had previously. This
+appears to be the case here, but I'm not sure how to prove it for all
+supported architectures.
 
-Successfully built configuration "arm-lpc32xx_defconfig,arm,arm-unknown-linux-gnueabi-", results:
-
---- before_patching.log
-+++ after_patching.log
-@@ @@
-+drivers/mtd/nand/lpc32xx_mlc.c: In function 'lpc32xx_nand_probe':
-+drivers/mtd/nand/lpc32xx_mlc.c:679:10: warning: variable 'sr' set but not used [-Wunused-but-set-variable]
-+drivers/mtd/nand/lpc32xx_mlc.c:561:24: error: bad constant expression [sparse]
-
---------------------------------------------------------------------------------
-
-checkpatch.pl has some complaints:
-
---------------------------------------------------------------------------------
-
-checkpatch.pl results for patch "[PATCH] MTD: LPC32xx MLC NAND driver"
-
-ERROR:INITIALISED_STATIC: do not initialise statics to 0 or NULL
-#339: FILE: drivers/mtd/nand/lpc32xx_mlc.c:224:
-+static int use_dma = 0;
-
-total: 1 errors, 0 warnings, 1004 lines checked
-
---------------------------------------------------------------------------------
+Then, as you are inserting a field in the middle of the structure, you
+must ensure that every initialization follows C99. And you have to do
+that _before_ the above change, not after as you did in patch 3/3. This
+needs to be done in both the whole kernel tree and as many user-space
+applications as possible. At least i2c-tools is clean, but there must
+be other (possibly unpublished) tools using this API, which your change
+may break. We can't fix them all, but at least we will have to document
+the change clearly and explain how to fix in case of breakage. The i2c
+wiki might be the right place for that.
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/09247dba/attachment.sig>
+Jean Delvare
