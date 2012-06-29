@@ -1,21 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jun 2012 11:33:13 +0100
-Subject: [BUILD BREAKAGE] versatile, LEDS updates
-Message-ID: <20120629103313.GA16319@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 29 Jun 2012 13:37:55 +0300
+Subject: [PATCH 2/4] mtd: lpc32xx_slc: Make wp gpio optional
+In-Reply-To: <1340812275-1197-2-git-send-email-stigge@antcom.de>
+References: <1340812275-1197-1-git-send-email-stigge@antcom.de>
+ <1340812275-1197-2-git-send-email-stigge@antcom.de>
+Message-ID: <1340966275.3070.146.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've just added Versatile to the build system, and the result is not
-encouraging.  The integration of the LEDS code into Versatile breaks
-its build:
+On Wed, 2012-06-27 at 17:51 +0200, Roland Stigge wrote:
+> From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> 
+> This patch supports missing wp gpio.
+> 
+> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=1281
+Pushed patches 2-4, thanks!
 
-arch/arm/plat-versatile/leds.c: In function 'versatile_leds_init':
-arch/arm/plat-versatile/leds.c:91: error: 'struct led_classdev' has no member named 'trigger_data'
-
-This needs fixing before the LEDS code goes into mainline.
-
-How well tested is the LEDS code?  Was it only tested with a set of
-specifically updated configurations (it looks that way to me.)  Was
-it ever tested with randconfig?
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/e252d3cf/attachment.sig>
