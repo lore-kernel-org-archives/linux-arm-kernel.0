@@ -1,98 +1,97 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 29 Jun 2012 11:29:03 +0200
-Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode" property
- to device tree bindings
-In-Reply-To: <20120629084509.GB28923@b20223-02.ap.freescale.net>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
- <20120629014352.GA28923@b20223-02.ap.freescale.net>
- <4FED5D77.3050009@pengutronix.de>
- <20120629084509.GB28923@b20223-02.ap.freescale.net>
-Message-ID: <4FED755F.6080302@pengutronix.de>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 29 Jun 2012 11:29:26 +0200
+Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
+In-Reply-To: <20120629063329.GE5844@shlinux2.ap.freescale.net>
+References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
+ <1340941925-14591-3-git-send-email-shijie8@gmail.com>
+ <20120629020650.GB28932@S2101-09.ap.freescale.net>
+ <20120629063329.GE5844@shlinux2.ap.freescale.net>
+Message-ID: <20461.30070.771087.830745@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2012 10:45 AM, Richard Zhao wrote:
-> On Fri, Jun 29, 2012 at 09:47:03AM +0200, Marc Kleine-Budde wrote:
->>
->> Cc'ed Devicetree Discussions
->>
->> On 06/29/2012 03:43 AM, Richard Zhao wrote:
->>> On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
->>>> This patch allows the device tree to limit the chipidea to host or
->>>> peripheral mode only.
->>>>
->>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>>> ---
->>>>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
->>>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->>>>  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
->>>>  include/linux/usb/chipidea.h                       |    9 +++++
->>>>  4 files changed, 50 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->>>> index 5a0ad66..67f97f56 100644
->>>> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->>>> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->>>> @@ -4,6 +4,8 @@ Required properties:
->>>>  - compatible: Should be "fsl,imx27-usb"
->>>>  - reg: Should contain registers location and length
->>>>  - interrupts: Should contain controller interrupt
->>>> +- dr_mode: indicates the working mode for compatible controllers. Can
->>>> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
->>
->>> By default, it should be decided by capability registers. Only bad hw
->>> design needs such settings. So, why not name it as force-xxx? If it's
->>> not specific to imx, it doesn't needs to has prefix "fsl,".
->>
->> It's not a bad hardware design if you don't route or enable all ports a
->> soc offers. In modern socs you cannot enable all ports anyway.
-> I'm not sure about your case, but generally, it's not about ports.
-> It's about ID pin. If ID pin is not connect correctly, we may need to
-> force it to host or device working mode. The 'force" here means it
-> won't follow the capability registers and ID pin.
+Hi,
 
-The device tree is used to describe the hardware. How would you describe
-a system, which has just a USB device connector? And the hardware guys
-used the not needed id-pin for a LED?
+Dong Aisheng writes:
+> On Fri, Jun 29, 2012 at 10:06:52AM +0800, Shawn Guo wrote:
+> > On Thu, Jun 28, 2012 at 11:52:05PM -0400, Huang Shijie wrote:
+> > > From: Huang Shijie <b32955@freescale.com>
+> > > 
+> > > The gpmi nand driver may needs several clocks(MX6Q needs five clocks).
+> > > 
+> > > In the old clock framework, all these clocks are chained together,
+> > > all you need is to manipulate the first clock.
+> > > 
+> > > But the kernel uses the common clk framework now, which forces us to
+> > > get the clocks one by one. When we use them, we have to enable them
+> > > one by one too.
+> > > 
+[...]
+> > > +static char *extra_clks_for_mx6q[] = {
+> > > +	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
+> > > +};
+> > > +
+> > > +static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
+> > > +{
+> > > +	struct resources *r = &this->resources;
+> > > +	char **extra_clks = NULL;
+> > > +	struct clk *clk;
+> > > +	int i;
+> > > +
+> > > +	r->clock[0] = clk_get(&this->pdev->dev, NULL);
+> > > +	if (IS_ERR(r->clock[0]))
+> > > +		goto err_clock;
+> > > +
+> > > +	/* Get extra clocks */
+> > > +	if (GPMI_IS_MX6Q(this))
+> > > +		extra_clks = extra_clks_for_mx6q;
+> > 
+> > We probably do not need this tweaking.  We can have the driver always
+> > take all those 5 clocks, and I think the current imx28 clock driver
+> > can just work with it, because the gpmi-nand clkdev lookup has NULL
+> > con_id and all those 5 clocks can match the same one on imx28.
+> > 
+> Will mx28 fail if doing like that?
+> clk_get will fail if no clock found.
+> struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+> {
+>         struct clk_lookup *cl;
+> 
+>         mutex_lock(&clocks_mutex);
+>         cl = clk_find(dev_id, con_id);
+>         if (cl && !__clk_get(cl->clk))
+>                 cl = NULL;
+>         mutex_unlock(&clocks_mutex);
+> 
+>         return cl ? cl->clk : ERR_PTR(-ENOENT);
+> }
+> EXPORT_SYMBOL(clk_get_sys);
+> 
+> Furthermore, find unnecessary clock for mx28 seems not a good choice.
+> Probably a better way is to define each SoC required clocks and get them
+> respectively. It's explicit and clear.
+> 
+No, that's silly. You would have to change the driver for each
+new platform that the driver can support.
 
->> The property isn't prefixed with "fsl,", it's just "dr_mode".
->>
->> Why not "force-xxx"? I had a look at Documentation/devicetree/bindings/usb:
->>
->> tegra-usb.txt:
->>>   - dr_mode : dual role mode. Indicates the working mode for
->>>    nvidia,tegra20-ehci compatible controllers.  Can be "host", "peripheral",
->>>    or "otg".  Default to "host" if not defined for backward compatibility.
->>>       host means this is a host controller
->>>       peripheral means it is device controller
->>>       otg means it can operate as either ("on the go")
->>
->> fsl-usb.txt:
->>>  - dr_mode : indicates the working mode for "fsl-usb2-dr" compatible
->>>    controllers.  Can be "host", "peripheral", or "otg".  Default to
->>>    "host" if not defined for backward compatibility.
->>>
->>
->> So why invent something new, if there seems to be a pattern?
-> I'm not sure they mean the same things, because the default value is
-> different. Event if they're same, why not make them all with sensible
-> name?
+Instead the driver should request the maximum number of clocks that
+the existing set of platforms provide and all platforms with fewer
+clocks should provide an appropriate number of dummy clocks.
 
-Sensible name sounds good. Devicetree Discussions, we need an official
-name for the property and its values :)
+This way new platforms can be supported without any change to the
+driver and only if a platform requires even more clocks (like in this
+particular case) would some code outside that platform have to be
+changed at all.
 
-Marc
+
+Lothar Wa?mann
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+___________________________________________________________
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/eeee92d3/attachment.sig>
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
