@@ -1,47 +1,50 @@
-From: andreas@biessmann.de (=?UTF-8?B?QW5kcmVhcyBCaWXDn21hbm4=?=)
-Date: Fri, 29 Jun 2012 22:44:48 +0200
-Subject: [PATCH] arm:gemini: fix irq.c
-In-Reply-To: <1338981778-19938-1-git-send-email-andreas@biessmann.de>
-References: <1338981778-19938-1-git-send-email-andreas@biessmann.de>
-Message-ID: <4FEE13C0.10505@biessmann.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 29 Jun 2012 15:49:11 -0500
+Subject: [PATCH] ARM: OMAP2+: Fix Wake-up power domain power status
+Message-ID: <1341002951-11839-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.06.12 13:22, Andreas Bie?mann wrote:
-> Commit 9f97da78bf018206fb623cd351d454af2f105fe0 moved disable_hlt() from
-> arch/arm/include/asm/system.h to arch/arm/include/asm/system_misc.h but missed
-> to change arch/arm/mach-gemini/irq.c.
-> 
-> This patch fixes following error:
-> 
-> ---8<---
-> arch/arm/mach-gemini/irq.c: In function 'gemini_init_irq':
-> arch/arm/mach-gemini/irq.c:79:2: error: implicit declaration of function 'disable_hlt' [-Werror=implicit-function-declaration]
-> --->8---
-> 
-> Signed-off-by: Andreas Bie?mann <andreas@biessmann.de>
-> cc: Hans Ulli Kroll <ulli.kroll@googlemail.com> 
-> cc: Russell King <linux@arm.linux.org.uk>
-> cc: linux-arm-kernel at lists.infradead.org
-> ---
-> Note: this is broken since 3.4 release, 3.3 is sane.
+The wake-up power domain is an alway-on power domain and so this power domain
+does not have a power state status (PM_PWSTST_xxx) register that indicates the
+current state. However, during the registering of the wake-up power domain the
+state of the domain is queried by calling pwrdm_read_pwrst(). This actually
+tries to read a register that does not exist and returns a value of 0 that
+indicates that the current state is OFF. The OFF state count of the wake-up
+power domain is then set to 1 and the current state to OFF. Both of which are
+incorrect.
 
-ping
+To fix this, if a power domain only supports the ON state, do not attempt to
+read the power state status register and simply return ON as the current power
+state.
 
-> 
->  arch/arm/mach-gemini/irq.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
-> index ca70e5f..020852d 100644
-> --- a/arch/arm/mach-gemini/irq.c
-> +++ b/arch/arm/mach-gemini/irq.c
-> @@ -17,6 +17,7 @@
->  #include <linux/sched.h>
->  #include <asm/irq.h>
->  #include <asm/mach/irq.h>
-> +#include <asm/system_misc.h>
->  #include <mach/hardware.h>
->  
->  #define IRQ_SOURCE(base_addr)	(base_addr + 0x00)
-> 
+This is based upon Tony's current linux-omap master branch.
+
+Testing:
+- Boot tested on OMAP4460 panda.
+- Boot tested on OMAP3430 beagle and validated CORE RET still working (using
+  Paul's 32k timer patch [1]).
+
+[1] http://marc.info/?l=linux-omap&m=134000053229888&w=2
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index eefe179..8a509b1 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -535,6 +535,9 @@ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
+ 	if (!pwrdm)
+ 		return -EINVAL;
+ 
++	if (pwrdm->pwrsts == PWRSTS_ON)
++		return PWRDM_POWER_ON;
++
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
+ 		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
+ 
+-- 
+1.7.9.5
