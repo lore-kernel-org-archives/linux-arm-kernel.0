@@ -1,31 +1,64 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 29 Jun 2012 17:41:35 +0200
-Subject: [PATCH RESEND] mfd: anatop: permit adata be NULL when access
- register
-In-Reply-To: <1338774989-4416-1-git-send-email-richard.zhao@freescale.com>
-References: <1338774989-4416-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120629154135.GL22806@sortiz-mobl>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 29 Jun 2012 11:33:33 -0400 (EDT)
+Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
+ issues.
+In-Reply-To: <1340848783-9480-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1206291104270.1638-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Wed, 27 Jun 2012, Russ Dill wrote:
 
-On Mon, Jun 04, 2012 at 09:56:29AM +0800, Richard Zhao wrote:
-> From: Richard Zhao <richard.zhao@linaro.org>
+> From: Russ Dill <Russ.Dill@gmail.com>
 > 
-> It makes anatop register access easier. Anatop has many misc registers,
-> which may not be a specific driver.
+> 'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
+> an issue where the ULPI PHYs were not held in reset while initializing
+> the EHCI controller. However, it also changes behavior in
+> omap-usb-host.c omap_usbhs_init by releasing reset while the
+> configuration in that function was done.
 > 
-> There's only one anatop device for a running system, so we use a global
-> variable to store struct anatop.
-Even though I understand it's quite unlikely that you'll never get 2 anatop
-blocks on the same system, the below patch is not really nice.
-Please make your driver support N > 1 instances of your hardware, even though
-it's only for the sake of code cleanness.
+> This change caused a regression on BB-xM where USB would not function
+> if 'usb start' had been run from u-boot before booting. A change was
+> made to release reset a little bit earlier which fixed the issue on
+> BB-xM and did not cause any regressions on 3430 sdp, the board for
+> which the fix was originally made.
+> 
+> This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
+> before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+> 
+> The original fix to hold the EHCI controller in reset during
+> initialization was correct, however it appears that changing
+> omap_usbhs_init to not hold the PHYs in reset during it's
+> configuration was incorrect. This patch first reverts both fixes, and
+> then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
+> reset as the original patch had done. It also is sure to incorporate
+> the _cansleep change that has been made in the meantime.
+> 
+> Tested on Beagleboard xM.
 
-Cheers,
-Samuel.
+Looking at the result of this patch, there seem to be a few mistakes 
+remaining in the probe routine.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+If the regulator_get() call fails, the failure is logged but ignored.  
+Is that really the right thing to do?
+
+The pm_runtime_get_sync() call occurs before the probe is finished.  
+This means that ehci-hcd's resume routine will try to power-up the 
+device before its data structures have been initialized.  That can't be 
+right.
+
+The "get clocks" section occurs after the call to usb_add_hcd().  This
+means the controller will start running before the clock references are
+acquired -- so the clocks might still be turned off.  That can't be
+right either.
+
+If the clk_get(dev, "utmi_p1_gfclk") call fails, the error path never 
+calls usb_remove_hcd().
+
+The "err_add_hcd" pathway never calls usb_put_hcd().
+
+I'm going to resubmit my most recent patch based the current 
+ehci-omap.c, but you or someone else will still have to fix these 
+problems.
+
+Alan Stern
