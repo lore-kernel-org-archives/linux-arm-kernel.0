@@ -1,71 +1,88 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 29 Jun 2012 17:03:39 +0800
-Subject: [PATCH v8 14/14] usb: chipidea: add imx platform driver
-In-Reply-To: <1340854652-24717-15-git-send-email-richard.zhao@freescale.com>
+Date: Fri, 29 Jun 2012 17:04:30 +0800
+Subject: [PATCH v8 13/14] usb: otg: add basic mxs phy driver support
+In-Reply-To: <1340854652-24717-14-git-send-email-richard.zhao@freescale.com>
 References: <1340854652-24717-1-git-send-email-richard.zhao@freescale.com>
- <1340854652-24717-15-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120629090338.GC28923@b20223-02.ap.freescale.net>
+ <1340854652-24717-14-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120629090429.GD28923@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 11:37:31AM +0800, Richard Zhao wrote:
-> This patch supports only the host-mode functionality so far.
+On Thu, Jun 28, 2012 at 11:37:30AM +0800, Richard Zhao wrote:
+> mxs phy is used in Freescale i.MX SoCs, for example
+> imx23, imx28, imx6Q. This patch adds the basic host
+> support.
 > 
 > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 > Signed-off-by: Marek Vasut <marex@denx.de>
 > Cc: Peter Chen <peter.chen@freescale.com>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
 > ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |   17 ++
->  drivers/usb/chipidea/Makefile                      |    3 +
->  drivers/usb/chipidea/ci13xxx_imx.c                 |  197 ++++++++++++++++++++
->  3 files changed, 217 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |   13 ++
+>  drivers/usb/otg/Kconfig                           |   10 ++
+>  drivers/usb/otg/Makefile                          |    1 +
+>  drivers/usb/otg/mxs-phy.c                         |  190 +++++++++++++++++++++
+>  4 files changed, 214 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
+>  create mode 100644 drivers/usb/otg/mxs-phy.c
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
 > new file mode 100644
-> index 0000000..5a0ad66
+> index 0000000..5835b27
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -0,0 +1,17 @@
-> +* Freescale i.MX ci13xxx usb controllers
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -0,0 +1,13 @@
+> +* Freescale MXS USB Phy Device
 > +
 > +Required properties:
-> +- compatible: Should be "fsl,imx27-usb"
+> +- compatible: Should be "fsl,imx23-usbphy"
 > +- reg: Should contain registers location and length
-> +- interrupts: Should contain controller interrupt
+> +- interrupts: Should contain phy interrupt
 > +
-> +Optional properties:
-> +- fsl,usbphy: phandler of usb phy that connects to the only one port
-> +
-> +Examples:
-> +usb at 02184000 { /* USB OTG */
-> +	compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-> +	reg = <0x02184000 0x200>;
-> +	interrupts = <0 43 0x04>;
-> +	fsl,usbphy = <&usbphy1>;
+> +Example:
+> +usbphy1: usbphy at 020c9000 {
+> +	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+> +	reg = <0x020c9000 0x1000>;
+> +	interrupts = <0 44 0x04>;
 > +};
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index b69900a..5c66d9c 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -14,3 +14,6 @@ ifneq ($(CONFIG_PCI),)
->  	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
->  endif
+> diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
+> index 5c87db0..13fd1ddf 100644
+> --- a/drivers/usb/otg/Kconfig
+> +++ b/drivers/usb/otg/Kconfig
+> @@ -116,6 +116,16 @@ config FSL_USB2_OTG
+>  	help
+>  	  Enable this to support Freescale USB OTG transceiver.
 >  
-> +ifneq ($(CONFIG_OF_DEVICE),)
-> +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
-> +endif
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> +config USB_MXS_PHY
+> +	tristate "Freescale MXS USB PHY support"
+> +	depends on ARCH_MXC || ARCH_MXS
+> +	select STMP_DEVICE
+> +	select USB_OTG_UTILS
+> +	help
+> +	  Enable this to support the Freescale MXS USB PHY.
+> +
+> +	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
+> +
+>  config USB_MV_OTG
+>  	tristate "Marvell USB OTG support"
+>  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
+> diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
+> index 41aa509..a844b8d 100644
+> --- a/drivers/usb/otg/Makefile
+> +++ b/drivers/usb/otg/Makefile
+> @@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
+>  obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
+>  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
+>  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
+> +obj-$(CONFIG_USB_MXS_PHY)	+= mxs-phy.o
+>  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
+> diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
 > new file mode 100644
-> index 0000000..efae2be
+> index 0000000..1748b8e
 > --- /dev/null
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -0,0 +1,197 @@
+> +++ b/drivers/usb/otg/mxs-phy.c
+> @@ -0,0 +1,190 @@
 > +/*
 > + * Copyright 2012 Freescale Semiconductor, Inc.
 > + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
@@ -80,191 +97,186 @@ On Thu, Jun 28, 2012 at 11:37:31AM +0800, Richard Zhao wrote:
 > + */
 > +
 > +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_gpio.h>
+> +#include <linux/kernel.h>
 > +#include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/usb/chipidea.h>
 > +#include <linux/clk.h>
-> +#include <linux/regulator/consumer.h>
+> +#include <linux/usb/otg.h>
+> +#include <linux/stmp_device.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
 > +
-> +#include "ci.h"
+> +#define DRIVER_NAME "mxs_phy"
 > +
-> +#define pdev_to_phy(pdev) \
-> +	((struct usb_phy *)platform_get_drvdata(pdev))
+> +#define HW_USBPHY_PWD				0x00
+> +#define HW_USBPHY_CTRL				0x30
+> +#define HW_USBPHY_CTRL_SET			0x34
+> +#define HW_USBPHY_CTRL_CLR			0x38
 > +
-> +struct ci13xxx_imx_data {
-> +	struct device_node *phy_np;
-> +	struct usb_phy *phy;
-> +	struct platform_device *ci_pdev;
+> +#define BM_USBPHY_CTRL_SFTRST			BIT(31)
+> +#define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+> +#define BM_USBPHY_CTRL_ENUTMILEVEL3		BIT(15)
+> +#define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+> +#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+> +
+> +struct mxs_phy {
+> +	struct usb_phy phy;
 > +	struct clk *clk;
-> +	struct regulator *reg_vbus;
 > +};
 > +
-> +static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
-> +	.name			= "ci13xxx_imx",
-> +	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
-> +				  CI13XXX_PULLUP_ON_VBUS |
-> +				  CI13XXX_DISABLE_STREAMING,
-> +	.capoffset		= DEF_CAPOFFSET,
-> +};
+> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
 > +
-> +static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+> +static void mxs_phy_hw_init(struct mxs_phy *mxs_phy)
 > +{
-> +	struct ci13xxx_imx_data *data;
-> +	struct platform_device *plat_ci, *phy_pdev;
-> +	struct device_node *phy_np;
-> +	struct resource *res;
-> +	struct regulator *reg_vbus;
-> +	int ret;
+> +	void __iomem *base = mxs_phy->phy.io_priv;
 > +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data) {
-> +		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-> +		return -ENOMEM;
-> +	}
+> +	stmp_reset_block(base + HW_USBPHY_CTRL);
+> +
+> +	/* Power up the PHY */
+> +	writel_relaxed(0, base + HW_USBPHY_PWD);
+> +
+> +	/* enable FS/LS device */
+> +	writel_relaxed(BM_USBPHY_CTRL_ENUTMILEVEL2 |
+> +			BM_USBPHY_CTRL_ENUTMILEVEL3,
+> +			base + HW_USBPHY_CTRL_SET);
+> +}
+> +
+> +static int mxs_phy_init(struct usb_phy *phy)
+> +{
+> +	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
+> +
+> +	clk_prepare_enable(mxs_phy->clk);
+> +	mxs_phy_hw_init(mxs_phy);
+> +
+> +	return 0;
+> +}
+> +
+> +static void mxs_phy_shutdown(struct usb_phy *phy)
+> +{
+> +	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
+> +
+> +	writel_relaxed(BM_USBPHY_CTRL_CLKGATE,
+> +			phy->io_priv + HW_USBPHY_CTRL_SET);
+> +
+> +	clk_disable_unprepare(mxs_phy->clk);
+> +}
+> +
+> +static int mxs_phy_on_connect(struct usb_phy *phy, int port)
+> +{
+> +	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
+unused variable.
+
+> +
+> +	dev_dbg(phy->dev, "Connect on port %d\n", port);
+> +
+> +	mxs_phy_hw_init(to_mxs_phy(phy));
+> +	writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+> +			phy->io_priv + HW_USBPHY_CTRL_SET);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mxs_phy_on_disconnect(struct usb_phy *phy, int port)
+> +{
+> +	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
+unused variable.
+
+> +
+> +	dev_dbg(phy->dev, "Disconnect on port %d\n", port);
+> +
+> +	writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+> +			phy->io_priv + HW_USBPHY_CTRL_CLR);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mxs_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	struct clk *clk;
+> +	struct mxs_phy *mxs_phy;
 > +
 > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 > +	if (!res) {
-> +		dev_err(&pdev->dev, "Can't get device resources!\n");
+> +		dev_err(&pdev->dev, "can't get device resources\n");
 > +		return -ENOENT;
 > +	}
 > +
-> +	data->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(data->clk)) {
+> +	base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!base)
+> +		return -EBUSY;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
 > +		dev_err(&pdev->dev,
-> +			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
-> +		return PTR_ERR(data->clk);
+> +			"can't get the clock, err=%ld", PTR_ERR(clk));
+> +		return PTR_ERR(clk);
 > +	}
 > +
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to prepare or enable clock, err=%d\n", ret);
-> +		return ret;
+> +	mxs_phy = devm_kzalloc(&pdev->dev, sizeof(*mxs_phy), GFP_KERNEL);
+> +	if (!mxs_phy) {
+> +		dev_err(&pdev->dev, "Failed to allocate USB PHY structure!\n");
+> +		return -ENOMEM;
 > +	}
 > +
-> +	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
-> +	if (phy_np) {
-> +		data->phy_np = phy_np;
-> +		phy_pdev = of_find_device_by_node(phy_np);
-> +		if (phy_pdev) {
-> +			struct usb_phy *phy;
-> +			phy = pdev_to_phy(phy_pdev);
-> +			if (phy &&
-> +			    try_module_get(phy_pdev->dev.driver->owner)) {
-> +				usb_phy_init(phy);
-> +				data->phy = phy;
-> +			}
-> +		}
-> +	}
+> +	mxs_phy->phy.io_priv		= base;
+> +	mxs_phy->phy.dev		= &pdev->dev;
+> +	mxs_phy->phy.label		= DRIVER_NAME;
+> +	mxs_phy->phy.init		= mxs_phy_init;
+> +	mxs_phy->phy.shutdown		= mxs_phy_shutdown;
+> +	mxs_phy->phy.notify_connect	= mxs_phy_on_connect;
+> +	mxs_phy->phy.notify_disconnect	= mxs_phy_on_disconnect;
 > +
-> +	/* we only support host now, so enable vbus here */
-> +	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> +	if (!IS_ERR(reg_vbus)) {
-> +		ret = regulator_enable(reg_vbus);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"Failed to enable vbus regulator, err=%d\n",
-> +				ret);
-> +			goto put_np;
-> +		}
-> +		data->reg_vbus = reg_vbus;
-> +	} else {
-> +		reg_vbus = NULL;
-> +	}
+> +	ATOMIC_INIT_NOTIFIER_HEAD(&mxs_phy->phy.notifier);
 > +
-> +	ci13xxx_imx_platdata.phy = data->phy;
+> +	mxs_phy->clk = clk;
 > +
-> +	if (!pdev->dev.dma_mask) {
-> +		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-> +				      sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> +		if (!pdev->dev.dma_mask) {
-> +			ret = -ENOMEM;
-> +			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
-> +			goto err;
-> +		}
-> +		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-> +		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
-> +	}
-> +	plat_ci = ci13xxx_add_device(&pdev->dev,
-> +				pdev->resource, pdev->num_resources,
-> +				&ci13xxx_imx_platdata);
-> +	if (IS_ERR(plat_ci)) {
-> +		ret = PTR_ERR(plat_ci);
-> +		dev_err(&pdev->dev,
-> +			"Can't register ci_hdrc platform device, err=%d\n",
-> +			ret);
-> +		goto err;
-> +	}
-> +
-> +	data->ci_pdev = plat_ci;
-> +	platform_set_drvdata(pdev, data);
-> +
-> +	pm_runtime_no_callbacks(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
+> +	platform_set_drvdata(pdev, &mxs_phy->phy);
 > +
 > +	return 0;
-> +
-> +err:
-> +	if (reg_vbus)
-> +		regulator_disable(reg_vbus);
-> +put_np:
-> +	if (phy_np)
-> +		of_node_put(phy_np);
-> +	clk_disable_unprepare(data->clk);
-> +	return ret;
 > +}
 > +
-> +static int __devexit ci13xxx_imx_remove(struct platform_device *pdev)
+> +static int __devexit mxs_phy_remove(struct platform_device *pdev)
 > +{
-> +	struct ci13xxx_imx_data *data = platform_get_drvdata(pdev);
-> +
-> +	ci13xxx_remove_device(data->ci_pdev);
-It lacks pm_runtime_disable.
-
-> +
-> +	if (data->reg_vbus)
-> +		regulator_disable(data->reg_vbus);
-> +
-> +	if (data->phy) {
-> +		usb_phy_shutdown(data->phy);
-> +		module_put(data->phy->dev->driver->owner);
-> +	}
-> +
-> +	of_node_put(data->phy_np);
-> +
-> +	clk_disable_unprepare(data->clk);
-> +
 > +	platform_set_drvdata(pdev, NULL);
 > +
 > +	return 0;
 > +}
 > +
-> +static const struct of_device_id ci13xxx_imx_dt_ids[] = {
-> +	{ .compatible = "fsl,imx27-usb", },
+> +static const struct of_device_id mxs_phy_dt_ids[] = {
+> +	{ .compatible = "fsl,imx23-usbphy", },
 > +	{ /* sentinel */ }
 > +};
-> +MODULE_DEVICE_TABLE(of, ci13xxx_imx_dt_ids);
+> +MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
 > +
-> +static struct platform_driver ci13xxx_imx_driver = {
-> +	.probe = ci13xxx_imx_probe,
-> +	.remove = __devexit_p(ci13xxx_imx_remove),
+> +static struct platform_driver mxs_phy_driver = {
+> +	.probe = mxs_phy_probe,
+> +	.remove = __devexit_p(mxs_phy_remove),
 > +	.driver = {
-> +		.name = "imx_usb",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = ci13xxx_imx_dt_ids,
+> +		.name = DRIVER_NAME,
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = mxs_phy_dt_ids,
 > +	 },
 > +};
 > +
-> +module_platform_driver(ci13xxx_imx_driver);
+> +static int __init mxs_phy_module_init(void)
+> +{
+> +	return platform_driver_register(&mxs_phy_driver);
+> +}
+> +postcore_initcall(mxs_phy_module_init);
 > +
-> +MODULE_ALIAS("platform:imx-usb");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("CI13xxx i.MX USB binding");
+> +static void __exit mxs_phy_module_exit(void)
+> +{
+> +	platform_driver_unregister(&mxs_phy_driver);
+> +}
+> +module_exit(mxs_phy_module_exit);
+> +
+> +MODULE_ALIAS("platform:mxs-usb-phy");
 > +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
 > +MODULE_AUTHOR("Richard Zhao <richard.zhao@freescale.com>");
+> +MODULE_DESCRIPTION("Freescale MXS USB PHY driver");
+> +MODULE_LICENSE("GPL");
 > -- 
 > 1.7.9.5
 > 
