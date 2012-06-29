@@ -1,88 +1,80 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 29 Jun 2012 17:19:01 +0800
-Subject: [PATCH 2/2] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <1340958243-2332-2-git-send-email-marex@denx.de>
-References: <1340958243-2332-1-git-send-email-marex@denx.de>
- <1340958243-2332-2-git-send-email-marex@denx.de>
-Message-ID: <20120629091900.GJ5844@shlinux2.ap.freescale.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 29 Jun 2012 11:27:04 +0200
+Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
+In-Reply-To: <20120628121817.GA5755@shlinux2.ap.freescale.net>
+References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>
+ <1340853701-4488-3-git-send-email-shawn.guo@linaro.org>
+ <20120628113327.GJ6406@shlinux2.ap.freescale.net>
+ <20120628114559.GE22990@S2101-09.ap.freescale.net>
+ <4FEC487A.2050901@pengutronix.de>
+ <20120628121817.GA5755@shlinux2.ap.freescale.net>
+Message-ID: <4FED74E8.4040805@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 04:24:03PM +0800, Marek Vasut wrote:
-> This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
-> via DT. The DMA operation is enabled by default.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Detlev Zundel <dzu@denx.de>
-> CC: Dong Aisheng <b29396@freescale.com>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> Cc: linux-i2c at vger.kernel.org
-> CC: Sascha Hauer <s.hauer@pengutronix.de>
-> CC: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    4 +
->  arch/arm/boot/dts/imx28.dtsi                      |    2 +
->  drivers/i2c/busses/i2c-mxs.c                      |  267 +++++++++++++++++++--
->  3 files changed, 251 insertions(+), 22 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> index d2bf750..9497ee0 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> @@ -5,6 +5,10 @@ Required properties:
->  - reg: Should contain registers location and length
->  - interrupts: Should contain ERROR and DMA interrupts
->  - clock-frequency: desired I2C bus clock frequency in Hz.
-> +- fsl,i2c-dma-channel: APBX DMA channel for the I2C
-Shoundn't this be optional?
+On 06/28/2012 02:18 PM, Dong Aisheng wrote:
+> On Thu, Jun 28, 2012 at 08:05:14PM +0800, Marc Kleine-Budde wrote:
+>> On 06/28/2012 01:46 PM, Shawn Guo wrote:
+>>> On Thu, Jun 28, 2012 at 07:33:28PM +0800, Dong Aisheng wrote:
+>>>>> +		phy_stby_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+>>>>> +							"phy-standby-gpios",
+>>>>> +							0, &flags);
+>>>>> +		if (gpio_is_valid(phy_stby_gpio)) {
+>>>>> +			if (flags == OF_GPIO_ACTIVE_LOW)
+>>>>> +				phy_stby_high = false;
+>>>>> +			err = devm_gpio_request_one(&pdev->dev, phy_stby_gpio,
+>>>>> +						    GPIOF_DIR_OUT,
+>>>>> +						    "phy-standby");
+>>>>> +			if (err) {
+>>>>> +				dev_err(&pdev->dev,
+>>>>> +					"failed to request gpio %d: %d\n",
+>>>>> +					phy_stby_gpio, err);
+>>>>> +				goto failed_gpio;
+>>>> I checked mx28 evk, it seems the phy only has a STB gpio and shared by both CAN0&CAN1.
+>>>> I wonder the CAN1 probe may fail here.
+>>>>
+>>> It can be managed by dts.  Here is what I have in imx28-evk.dts, where
+>>> only can0 has phy-enable-gpios property.
+>>>
+>>>
+>>> 	can0: can at 80032000 {
+>>> 		pinctrl-names = "default";
+>>> 		pinctrl-0 = <&can0_pins_a>;
+>>> 		phy-enable-gpios = <&gpio2 13 0>;
+>>> 		status = "okay";
+>>> 	};
+>>>
+>>> 	can1: can at 80034000 {
+>>> 		pinctrl-names = "default";
+>>> 		pinctrl-0 = <&can1_pins_a>;
+>>> 		status = "okay";
+>>> 	};
+>>
+>> Will this work if can0 is down and can1 is up?
+>>
+>> Can we abstract the transceiver power as a regulator? Or a clock? :P
+>>
+> Hmm, it may not be a power.
+> For mx28evk, it's a STBY pin.
+> So it may hard to abstract it as a regulator or clock.
 
-> +	/*
-> +	 * The last descriptor must have this callback,
-> +	 * to finish the DMA transaction.
-> +	 */
-> +	desc->callback = mxs_i2c_dma_irq_callback;
-> +	desc->callback_param = i2c;
-> +
-> +	/* Start the transfer. */
-> +	dmaengine_submit(desc);
-> +	dma_async_issue_pending(i2c->dmach);
-> +	return 0;
-> +
-> +/* Read failpath. */
-> +read_init_dma_fail:
-> +	dma_unmap_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
-> +select_init_dma_fail:
-> +	dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
-> +select_init_pio_fail:
-> +	return 1;
-look strange why return 1;
-> +
-> +
-One more unnecessary line?
+I just talked to Sascha, He pointed out, that there already is regulator
+that toggles a gpio (only one, not several). I haven't looked at the
+details, but a regulator should solve the "two CAN ports share the same
+transceiver/phy" problem.
 
-> +/* Write failpath. */
-> +write_init_dma_fail:
-> +	dma_unmap_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
-> +write_init_pio_fail:
-> +	return 1;
-> +}
-> +
-..
-> @@ -291,6 +459,7 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
->  
->  timeout:
->  	dev_dbg(i2c->dev, "Timeout!\n");
-> +	mxs_i2c_dma_finish(i2c);
-Shared with pio?
+Marc
 
->  	mxs_i2c_reset(i2c);
->  	return -ETIMEDOUT;
->  }
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Regards
-Dong Aisheng
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/6732d95d/attachment.sig>
