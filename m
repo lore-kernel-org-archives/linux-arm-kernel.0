@@ -1,202 +1,78 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 29 Jun 2012 14:33:30 +0800
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <20120629020650.GB28932@S2101-09.ap.freescale.net>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
- <1340941925-14591-3-git-send-email-shijie8@gmail.com>
- <20120629020650.GB28932@S2101-09.ap.freescale.net>
-Message-ID: <20120629063329.GE5844@shlinux2.ap.freescale.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 29 Jun 2012 09:25:58 +0200
+Subject: [PATCH v2] ARM: Orion: Fix WDT compile for Dove and MV78xx0
+Message-ID: <1340954759-32085-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 10:06:52AM +0800, Shawn Guo wrote:
-> On Thu, Jun 28, 2012 at 11:52:05PM -0400, Huang Shijie wrote:
-> > From: Huang Shijie <b32955@freescale.com>
-> > 
-> > The gpmi nand driver may needs several clocks(MX6Q needs five clocks).
-> > 
-> > In the old clock framework, all these clocks are chained together,
-> > all you need is to manipulate the first clock.
-> > 
-> > But the kernel uses the common clk framework now, which forces us to
-> > get the clocks one by one. When we use them, we have to enable them
-> > one by one too.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > Signed-off-by: Huang Shijie <shijie8@gmail.com>
-> > ---
-> >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   43 ++++++++++++++++++----
-> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   63 +++++++++++++++++++++++++++-----
-> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    3 +-
-> >  3 files changed, 91 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > index a1f4332..c3778c0 100644
-> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > @@ -124,12 +124,40 @@ error:
-> >  	return -ETIMEDOUT;
-> >  }
-> >  
-> > +static int __gpmi_enable_clk(struct gpmi_nand_data *this, bool v)
-> > +{
-> > +	struct clk *clk;
-> > +	int ret;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < GPMI_CLK_MAX; i++) {
-> > +		clk = this->resources.clock[i];
-> > +		if (!clk)
-> > +			break;
-> > +
-> > +		if (v) {
-> > +			ret = clk_prepare_enable(clk);
-> > +			if (ret)
-> > +				goto err_clk;
-> > +		} else {
-> > +			clk_disable_unprepare(clk);
-> > +		}
-> > +	}
-> > +	return 0;
-> > +
-> > +err_clk:
-> > +	return ret;
-> > +}
-> > +
-> > +#define gpmi_enable_clk(x) __gpmi_enable_clk(x, true)
-> > +#define gpmi_disable_clk(x) __gpmi_enable_clk(x, false)
-> > +
-> >  int gpmi_init(struct gpmi_nand_data *this)
-> >  {
-> >  	struct resources *r = &this->resources;
-> >  	int ret;
-> >  
-> > -	ret = clk_prepare_enable(r->clock);
-> > +	ret = gpmi_enable_clk(this);
-> >  	if (ret)
-> >  		goto err_out;
-> >  	ret = gpmi_reset_block(r->gpmi_regs, false);
-> > @@ -149,7 +177,7 @@ int gpmi_init(struct gpmi_nand_data *this)
-> >  	/* Select BCH ECC. */
-> >  	writel(BM_GPMI_CTRL1_BCH_MODE, r->gpmi_regs + HW_GPMI_CTRL1_SET);
-> >  
-> > -	clk_disable_unprepare(r->clock);
-> > +	gpmi_disable_clk(this);
-> >  	return 0;
-> >  err_out:
-> >  	return ret;
-> > @@ -205,7 +233,7 @@ int bch_set_geometry(struct gpmi_nand_data *this)
-> >  	ecc_strength  = bch_geo->ecc_strength >> 1;
-> >  	page_size     = bch_geo->page_size;
-> >  
-> > -	ret = clk_prepare_enable(r->clock);
-> > +	ret = gpmi_enable_clk(this);
-> >  	if (ret)
-> >  		goto err_out;
-> >  
-> > @@ -240,7 +268,7 @@ int bch_set_geometry(struct gpmi_nand_data *this)
-> >  	writel(BM_BCH_CTRL_COMPLETE_IRQ_EN,
-> >  				r->bch_regs + HW_BCH_CTRL_SET);
-> >  
-> > -	clk_disable_unprepare(r->clock);
-> > +	gpmi_disable_clk(this);
-> >  	return 0;
-> >  err_out:
-> >  	return ret;
-> > @@ -716,7 +744,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
-> >  	int ret;
-> >  
-> >  	/* Enable the clock. */
-> > -	ret = clk_prepare_enable(r->clock);
-> > +	ret = gpmi_enable_clk(this);
-> >  	if (ret) {
-> >  		pr_err("We failed in enable the clk\n");
-> >  		goto err_out;
-> > @@ -727,7 +755,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
-> >  		gpmi_regs + HW_GPMI_TIMING1);
-> >  
-> >  	/* Get the timing information we need. */
-> > -	nfc->clock_frequency_in_hz = clk_get_rate(r->clock);
-> > +	nfc->clock_frequency_in_hz = clk_get_rate(r->clock[0]);
-> >  	clock_period_in_ns = 1000000000 / nfc->clock_frequency_in_hz;
-> >  
-> >  	gpmi_nfc_compute_hardware_timing(this, &hw);
-> > @@ -784,8 +812,7 @@ err_out:
-> >  
-> >  void gpmi_end(struct gpmi_nand_data *this)
-> >  {
-> > -	struct resources *r = &this->resources;
-> > -	clk_disable_unprepare(r->clock);
-> > +	gpmi_disable_clk(this);
-> >  }
-> >  
-> >  /* Clears a BCH interrupt. */
-> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> > index 941cfb7..edda3b1 100644
-> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> > @@ -464,9 +464,59 @@ acquire_err:
-> >  	return -EINVAL;
-> >  }
-> >  
-> > +static void gpmi_put_clks(struct gpmi_nand_data *this)
-> > +{
-> > +	struct resources *r = &this->resources;
-> > +	struct clk *clk;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < GPMI_CLK_MAX; i++) {
-> > +		clk = r->clock[i];
-> > +		if (clk) {
-> > +			clk_put(clk);
-> > +			r->clock[i] = NULL;
-> > +		}
-> > +	}
-> > +}
-> > +
-> > +static char *extra_clks_for_mx6q[] = {
-> > +	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
-> > +};
-> > +
-> > +static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
-> > +{
-> > +	struct resources *r = &this->resources;
-> > +	char **extra_clks = NULL;
-> > +	struct clk *clk;
-> > +	int i;
-> > +
-> > +	r->clock[0] = clk_get(&this->pdev->dev, NULL);
-> > +	if (IS_ERR(r->clock[0]))
-> > +		goto err_clock;
-> > +
-> > +	/* Get extra clocks */
-> > +	if (GPMI_IS_MX6Q(this))
-> > +		extra_clks = extra_clks_for_mx6q;
-> 
-> We probably do not need this tweaking.  We can have the driver always
-> take all those 5 clocks, and I think the current imx28 clock driver
-> can just work with it, because the gpmi-nand clkdev lookup has NULL
-> con_id and all those 5 clocks can match the same one on imx28.
-> 
-Will mx28 fail if doing like that?
-clk_get will fail if no clock found.
-struct clk *clk_get_sys(const char *dev_id, const char *con_id)
-{
-        struct clk_lookup *cl;
+Commit 0fa1f0609a0c1fe8b2be3c0089a2cb48f7fda521 (ARM: Orion: Fix
+Virtual/Physical mixup with watchdog) broke the Dove & MV78xx0
+build. Although these two SoC don't use the watchdog, the shared
+platform code still needs to build. Add the necessary defines.
 
-        mutex_lock(&clocks_mutex);
-        cl = clk_find(dev_id, con_id);
-        if (cl && !__clk_get(cl->clk))
-                cl = NULL;
-        mutex_unlock(&clocks_mutex);
+Cc: stable at vger.kernel.org
+Reported-by: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-dove/include/mach/bridge-regs.h    |    1 +
+ arch/arm/mach-dove/include/mach/dove.h           |    1 +
+ arch/arm/mach-mv78xx0/include/mach/bridge-regs.h |    1 +
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h     |    2 ++
+ 4 files changed, 5 insertions(+)
 
-        return cl ? cl->clk : ERR_PTR(-ENOENT);
-}
-EXPORT_SYMBOL(clk_get_sys);
-
-Furthermore, find unnecessary clock for mx28 seems not a good choice.
-Probably a better way is to define each SoC required clocks and get them
-respectively. It's explicit and clear.
-
-Regards
-Dong Aisheng
+diff --git a/arch/arm/mach-dove/include/mach/bridge-regs.h b/arch/arm/mach-dove/include/mach/bridge-regs.h
+index 226949d..f953bb5 100644
+--- a/arch/arm/mach-dove/include/mach/bridge-regs.h
++++ b/arch/arm/mach-dove/include/mach/bridge-regs.h
+@@ -50,5 +50,6 @@
+ #define POWER_MANAGEMENT	(BRIDGE_VIRT_BASE | 0x011c)
+ 
+ #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
++#define TIMER_PHYS_BASE         (BRIDGE_PHYS_BASE | 0x0300)
+ 
+ #endif
+diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+index ad1165d..d52b0ef 100644
+--- a/arch/arm/mach-dove/include/mach/dove.h
++++ b/arch/arm/mach-dove/include/mach/dove.h
+@@ -78,6 +78,7 @@
+ 
+ /* North-South Bridge */
+ #define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x20000)
++#define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x20000)
+ 
+ /* Cryptographic Engine */
+ #define DOVE_CRYPT_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x30000)
+diff --git a/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h b/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
+index c64dbb9..eb187e0 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
++++ b/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
+@@ -31,5 +31,6 @@
+ #define IRQ_MASK_HIGH_OFF	0x0014
+ 
+ #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
++#define TIMER_PHYS_BASE		(BRIDGE_PHYS_BASE | 0x0300)
+ 
+ #endif
+diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+index 3674497..e807c4c 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
++++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+@@ -42,6 +42,7 @@
+ #define MV78XX0_CORE0_REGS_PHYS_BASE	0xf1020000
+ #define MV78XX0_CORE1_REGS_PHYS_BASE	0xf1024000
+ #define MV78XX0_CORE_REGS_VIRT_BASE	0xfe400000
++#define MV78XX0_CORE_REGS_PHYS_BASE	0xfe400000
+ #define MV78XX0_CORE_REGS_SIZE		SZ_16K
+ 
+ #define MV78XX0_PCIE_IO_PHYS_BASE(i)	(0xf0800000 + ((i) << 20))
+@@ -59,6 +60,7 @@
+  * Core-specific peripheral registers.
+  */
+ #define BRIDGE_VIRT_BASE	(MV78XX0_CORE_REGS_VIRT_BASE)
++#define BRIDGE_PHYS_BASE	(MV78XX0_CORE_REGS_PHYS_BASE)
+ 
+ /*
+  * Register Map
+-- 
+1.7.10
