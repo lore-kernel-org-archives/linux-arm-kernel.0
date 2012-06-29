@@ -1,30 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jun 2012 12:45:32 +0100
-Subject: [BUILD BREAKAGE] versatile, LEDS updates
-In-Reply-To: <20120629103313.GA16319@n2100.arm.linux.org.uk>
-References: <20120629103313.GA16319@n2100.arm.linux.org.uk>
-Message-ID: <20120629114532.GB16319@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jun 2012 19:47:16 +0800
+Subject: [PATCH 1/2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <201206291133.09379.marex@denx.de>
+References: <1340958243-2332-1-git-send-email-marex@denx.de>
+ <20120629090602.GI5844@shlinux2.ap.freescale.net>
+ <201206291133.09379.marex@denx.de>
+Message-ID: <20120629114714.GE29197@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 11:33:13AM +0100, Russell King - ARM Linux wrote:
-> I've just added Versatile to the build system, and the result is not
-> encouraging.  The integration of the LEDS code into Versatile breaks
-> its build:
+On Fri, Jun 29, 2012 at 11:33:09AM +0200, Marek Vasut wrote:
+> > I did not check spec,
+> > is it possible the supplied clock changed?
 > 
-> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=1281
+> It's possible indeed ... Shawn?
 > 
-> arch/arm/plat-versatile/leds.c: In function 'versatile_leds_init':
-> arch/arm/plat-versatile/leds.c:91: error: 'struct led_classdev' has no member named 'trigger_data'
-> 
-> This needs fixing before the LEDS code goes into mainline.
-> 
-> How well tested is the LEDS code?  Was it only tested with a set of
-> specifically updated configurations (it looks that way to me.)  Was
-> it ever tested with randconfig?
+It's technically possible, but probably not practically.  The imx28 RM
+does not mention i2c clock at all, and I was told by designer that i2c
+always runs at the same frequency as apbx, which sources from ref_xtal
+(always 24 MHz).  Though there is a divider for apbx clock, it seems
+every single running system sets the divider as 1 all the time.  That
+said, what I have seen is the i2c clock is always 24 MHz.
 
-BTW, this is the *EXACT* same error I reported on 3rd August 2011 with
-the LEDS subsystem.
-
-Arnd: please drop the LEDS updates from arm-soc until the point that I
-raised 11 months ago is addressed and resolved.
+-- 
+Regards,
+Shawn
