@@ -1,195 +1,60 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Fri, 29 Jun 2012 15:43:36 +0530
-Subject: [PATCHv3 16/17] i2c: omap: resize fifos before each message
-In-Reply-To: <1340964817-8599-1-git-send-email-shubhrajyoti@ti.com>
-References: <1340964817-8599-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1340964817-8599-17-git-send-email-shubhrajyoti@ti.com>
+Date: Fri, 29 Jun 2012 15:43:20 +0530
+Subject: [PATCHv3 00/17] I2C Big cleanup
+Message-ID: <1340964817-8599-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+I have dropped a few patches from the series and also
+tested every single patch on my pandaboard.
 
-This patch will try to avoid the usage of
-draining feature by reconfiguring the FIFO
-the start condition of each message based
-on the message's size.
+There's still lots of work to be done on the i2c-omap.c
+driver but it's now easier to read, IMO.
 
-By doing that, we will be better utilizing
-the FIFO when doing big transfers.
+Changes since v1:
+       - removed tabification on patch 6/17
+       - removed dev_err() which was introduced on patch 09/17
+Changes since v2:
+	- do not set full fifo depth in the RDR interrupt.
+	- some changelog updates.
+	- rebase to the Wolfram's tree.
 
-While at that also drop the now uneeded
-check for dev->buf_len as we always know
-the amount of data to be transmitted.
+Tested on omap4sdp and 3430sdp.
+Functional testing.
+Also did suspend resume.
+For omap3 the per domain seems to be OK.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   83 +++++++++++++++++++++++++----------------
- 1 files changed, 51 insertions(+), 32 deletions(-)
+This applies on Wolfram's i2c-embedded/for-next branch
+plus the below series
+http://www.spinics.net/lists/linux-omap/msg72901.html
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 1196417..ac3bdae 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -190,6 +190,7 @@ struct omap_i2c_dev {
- 	u8			*regs;
- 	size_t			buf_len;
- 	struct i2c_adapter	adapter;
-+	u8			threshold;
- 	u8			fifo_size;	/* use as flag and value
- 						 * fifo_size==0 implies no fifo
- 						 * if set, should be trsh+1
-@@ -415,13 +416,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
- 	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
- 
--	if (dev->fifo_size) {
--		/* Note: setup required fifo size - 1. RTRSH and XTRSH */
--		buf = (dev->fifo_size - 1) << 8 | OMAP_I2C_BUF_RXFIF_CLR |
--			(dev->fifo_size - 1) | OMAP_I2C_BUF_TXFIF_CLR;
--		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, buf);
--	}
--
- 	/* Take the I2C module out of reset: */
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
- 
-@@ -482,6 +476,45 @@ static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
- 	return omap_i2c_wait_for_bb(dev);
- }
- 
-+static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
-+{
-+	u16		buf;
-+
-+	if (dev->flags & OMAP_I2C_FLAG_NO_FIFO)
-+		return;
-+
-+	/*
-+	 * Set up notification threshold based on message size. We're doing
-+	 * this to try and avoid draining feature as much as possible. Whenever
-+	 * we have big messages to transfer (bigger than our total fifo size)
-+	 * then we might use draining feature to transfer the remaining bytes.
-+	 */
-+
-+	dev->threshold = clamp(size, (u8) 1, dev->fifo_size);
-+
-+	buf = omap_i2c_read_reg(dev, OMAP_I2C_BUF_REG);
-+
-+	if (is_rx) {
-+		/* Clear RX Threshold */
-+		buf &= ~(0x3f << 8);
-+		buf |= ((dev->threshold - 1) << 8) | OMAP_I2C_BUF_RXFIF_CLR;
-+	} else {
-+		/* Clear TX Threshold */
-+		buf &= ~0x3f;
-+		buf |= (dev->threshold - 1) | OMAP_I2C_BUF_TXFIF_CLR;
-+	}
-+
-+	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, buf);
-+
-+	if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
-+		dev->b_hw = 1; /* Enable hardware fixes */
-+
-+	/* calculate wakeup latency constraint for MPU */
-+	if (dev->set_mpu_wkup_lat != NULL)
-+		dev->latency = (1000000 * dev->threshold) /
-+			(1000 * dev->speed / 8);
-+}
-+
- /*
-  * Low level master read/write transaction.
-  */
-@@ -498,6 +531,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	if (msg->len == 0)
- 		return -EINVAL;
- 
-+	dev->receiver = !!(msg->flags & I2C_M_RD);
-+	omap_i2c_resize_fifo(dev, msg->len, dev->receiver);
-+
- 	omap_i2c_write_reg(dev, OMAP_I2C_SA_REG, msg->addr);
- 
- 	/* REVISIT: Could the STB bit of I2C_CON be used with probing? */
-@@ -513,7 +549,6 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 
- 	INIT_COMPLETION(dev->cmd_complete);
- 	dev->cmd_err = 0;
--	dev->receiver = !!(msg->flags & I2C_M_RD);
- 
- 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
- 
-@@ -779,12 +814,6 @@ static void omap_i2c_receive_data(struct omap_i2c_dev *dev, u8 num_bytes,
- 	u16		w;
- 
- 	while (num_bytes--) {
--		if (!dev->buf_len) {
--			dev_err(dev->dev, "%s without data",
--					is_rdr ? "RDR" : "RRDY");
--			break;
--		}
--
- 		w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
- 		*dev->buf++ = w;
- 		dev->buf_len--;
-@@ -794,10 +823,8 @@ static void omap_i2c_receive_data(struct omap_i2c_dev *dev, u8 num_bytes,
- 		 * omap4 is 8 bit wide
- 		 */
- 		if (dev->flags & OMAP_I2C_FLAG_16BIT_DATA_REG) {
--			if (dev->buf_len) {
--				*dev->buf++ = w >> 8;
--				dev->buf_len--;
--			}
-+			*dev->buf++ = w >> 8;
-+			dev->buf_len--;
- 		}
- 	}
- }
-@@ -808,12 +835,6 @@ static int omap_i2c_transmit_data(struct omap_i2c_dev *dev, u8 num_bytes,
- 	u16		w;
- 
- 	while (num_bytes--) {
--		if (!dev->buf_len) {
--			dev_err(dev->dev, "%s without data",
--					is_xdr ? "XDR" : "XRDY");
--			break;
--		}
--
- 		w = *dev->buf++;
- 		dev->buf_len--;
- 
-@@ -822,10 +843,8 @@ static int omap_i2c_transmit_data(struct omap_i2c_dev *dev, u8 num_bytes,
- 		 * omap4 is 8 bit wide
- 		 */
- 		if (dev->flags & OMAP_I2C_FLAG_16BIT_DATA_REG) {
--			if (dev->buf_len) {
--				w |= *dev->buf++ << 8;
--				dev->buf_len--;
--			}
-+			w |= *dev->buf++ << 8;
-+			dev->buf_len--;
- 		}
- 
- 		if (dev->errata & I2C_OMAP_ERRATA_I462) {
-@@ -923,8 +942,8 @@ complete:
- 		if (stat & OMAP_I2C_STAT_RRDY) {
- 			u8 num_bytes = 1;
- 
--			if (dev->fifo_size)
--				num_bytes = dev->fifo_size;
-+			if (dev->threshold)
-+				num_bytes = dev->threshold;
- 
- 			omap_i2c_receive_data(dev, num_bytes, false);
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RRDY);
-@@ -953,8 +972,8 @@ complete:
- 			u8 num_bytes = 1;
- 			int ret;
- 
--			if (dev->fifo_size)
--				num_bytes = dev->fifo_size;
-+			if (dev->threshold)
-+				num_bytes = dev->threshold;
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
- 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git for_next/omap/big_cleanup
+
+
+
+Felipe Balbi (17):
+  i2c: omap: switch to devm_* API
+  i2c: omap: simplify num_bytes handling
+  i2c: omap: decrease indentation level on data handling
+  i2c: omap: add blank lines
+  i2c: omap: simplify omap_i2c_ack_stat()
+  i2c: omap: split out [XR]DR and [XR]RDY
+  i2c: omap: improve i462 errata handling
+  i2c: omap: re-factor receive/transmit data loop
+  i2c: omap: switch over to do {} while loop
+  i2c: omap: ack IRQ in parts
+  i2c: omap: switch to platform_get_irq()
+  i2c: omap: bus: add a receiver flag
+  i2c: omap: simplify errata check
+  i2c: omap: always return IRQ_HANDLED
+  i2c: omap: simplify IRQ exit path
+  i2c: omap: resize fifos before each message
+  i2c: omap: get rid of the "complete" label
+
+ drivers/i2c/busses/i2c-omap.c |  394 ++++++++++++++++++++++++-----------------
+ 1 files changed, 232 insertions(+), 162 deletions(-)
+
 -- 
 1.7.5.4
