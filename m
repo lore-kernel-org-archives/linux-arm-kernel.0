@@ -1,46 +1,34 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Fri, 29 Jun 2012 14:34:24 +0300
-Subject: [PATCH 1/2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <20120525145901.GS30400@pengutronix.de>
-References: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
- <1337957902.30969.46.camel@sauron.fi.intel.com>
- <20120525145901.GS30400@pengutronix.de>
-Message-ID: <1340969664.3070.162.camel@sauron.fi.intel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jun 2012 19:30:49 +0800
+Subject: [PATCH V2] MXS: Add DT binding support into stmp3xxx-rtc
+In-Reply-To: <4FED8CA1.5000800@pengutronix.de>
+References: <1339181804-22822-1-git-send-email-marex@denx.de>
+ <20120625043711.GA18156@S2101-09.ap.freescale.net>
+ <4FED8CA1.5000800@pengutronix.de>
+Message-ID: <20120629113047.GD29197@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-25 at 16:59 +0200, Sascha Hauer wrote:
-> > WARNING:LONG_LINE: line over 80 characters
-> > #103: FILE: drivers/mtd/nand/mxc_nand.c:276:
-> > +static void memcpy32_fromio(void *trg, const volatile void __iomem  *src, size_t size)
+On Fri, Jun 29, 2012 at 01:08:17PM +0200, Marc Kleine-Budde wrote:
+> On 06/25/2012 06:37 AM, Shawn Guo wrote:
+> > On Fri, Jun 08, 2012 at 08:56:44PM +0200, Marek Vasut wrote:
+> >> Add simple binding for the stmp3xxx-rtc.
+> >>
+> >> Signed-off-by: Marek Vasut <marex@denx.de>
+> >> Cc: Alessandro Zummo <a.zummo@towertech.it>
 > > 
-> > WARNING:VOLATILE: Use of volatile is usually wrong: see Documentation/volatile-considered-harmful.txt
-> > #103: FILE: drivers/mtd/nand/mxc_nand.c:276:
-> > +static void memcpy32_fromio(void *trg, const volatile void __iomem  *src, size_t size)
+> > Hi Alessandro,
+> > 
+> > The patch has some changes on arch/arm/boot/dts/imx28.dtsi, and also we
+> > need the patch to convert some board files over to device tree.  May I
+> > have your ack to queue the patch on my tree?
 > 
-> This makes me wonder a bit, I basically copied the prototype from
-> the _memcpy_*_io template from arch/arm/kernel/io.c. Should they
-> be wrong?
+> The interrupt numbers are not as the driver expects them..
+> 
+Right.  I sent a v3 fixing it.
 
-Well, this is arch-specific code. In there we may make various
-assumptions about CPU not doing re-ordering. You are changing generic
-code, you should not do assumptions like this.
-
-How about adding these functions to arch/arm/kernel/io.c instead?
-
-> otoh I also wondered why there were volatiles in arch/arm/kernel/io.c
-> in the first place ;)
-
-Not sure, probably in that file we assume that the memory is
-strongly-ordered.
+http://article.gmane.org/gmane.linux.drivers.devicetree/17133
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/942ccb1a/attachment.sig>
+Regards,
+Shawn
