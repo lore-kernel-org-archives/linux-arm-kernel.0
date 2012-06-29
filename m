@@ -1,85 +1,73 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 29 Jun 2012 09:51:49 -0600
-Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode" property
- to device tree bindings
-In-Reply-To: <20120629084509.GB28923@b20223-02.ap.freescale.net>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
- <20120629014352.GA28923@b20223-02.ap.freescale.net>
- <4FED5D77.3050009@pengutronix.de>
- <20120629084509.GB28923@b20223-02.ap.freescale.net>
-Message-ID: <4FEDCF15.9040000@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 29 Jun 2012 10:53:04 -0500
+Subject: Panda ES board hang when using GPIO as interrupt
+In-Reply-To: <CAC83ZvJJw-7Xt4Ey4_OT70D6MGHEfwURYVuj5wYTLe5oYiMuRw@mail.gmail.com>
+References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
+ <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
+ <4FECCB91.7090609@broadcom.com> <4FECD2E5.1060603@ti.com>
+ <4FECE067.7000809@broadcom.com> <4FECE1BD.80906@ti.com>
+ <4FECE45E.6040506@broadcom.com> <4FECEE9A.5070300@ti.com>
+ <4FECFDD8.5060105@broadcom.com>
+ <CAC83ZvJJw-7Xt4Ey4_OT70D6MGHEfwURYVuj5wYTLe5oYiMuRw@mail.gmail.com>
+Message-ID: <4FEDCF60.9020800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2012 02:45 AM, Richard Zhao wrote:
-> On Fri, Jun 29, 2012 at 09:47:03AM +0200, Marc Kleine-Budde wrote:
->>
->> Cc'ed Devicetree Discussions
->>
->> On 06/29/2012 03:43 AM, Richard Zhao wrote:
->>> On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
->>>> This patch allows the device tree to limit the chipidea to host or
->>>> peripheral mode only.
->>>>
->>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>>> ---
->>>>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
->>>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->>>>  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
->>>>  include/linux/usb/chipidea.h                       |    9 +++++
->>>>  4 files changed, 50 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->>>> index 5a0ad66..67f97f56 100644
->>>> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->>>> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
->>>> @@ -4,6 +4,8 @@ Required properties:
->>>>  - compatible: Should be "fsl,imx27-usb"
->>>>  - reg: Should contain registers location and length
->>>>  - interrupts: Should contain controller interrupt
->>>> +- dr_mode: indicates the working mode for compatible controllers. Can
->>>> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
->>
->>> By default, it should be decided by capability registers. Only bad hw
->>> design needs such settings. So, why not name it as force-xxx? If it's
->>> not specific to imx, it doesn't needs to has prefix "fsl,".
->>
->> It's not a bad hardware design if you don't route or enable all ports a
->> soc offers. In modern socs you cannot enable all ports anyway.
->
-> I'm not sure about your case, but generally, it's not about ports.
-> It's about ID pin. If ID pin is not connect correctly, we may need to
-> force it to host or device working mode. The 'force" here means it
-> won't follow the capability registers and ID pin.
->>
->> The property isn't prefixed with "fsl,", it's just "dr_mode".
->>
->> Why not "force-xxx"? I had a look at Documentation/devicetree/bindings/usb:
->>
->> tegra-usb.txt:
->>>   - dr_mode : dual role mode. Indicates the working mode for
->>>    nvidia,tegra20-ehci compatible controllers.  Can be "host", "peripheral",
->>>    or "otg".  Default to "host" if not defined for backward compatibility.
->>>       host means this is a host controller
->>>       peripheral means it is device controller
->>>       otg means it can operate as either ("on the go")
->>
->> fsl-usb.txt:
->>>  - dr_mode : indicates the working mode for "fsl-usb2-dr" compatible
->>>    controllers.  Can be "host", "peripheral", or "otg".  Default to
->>>    "host" if not defined for backward compatibility.
+
+On 06/28/2012 11:07 PM, DebBarma, Tarun Kanti wrote:
+> On Fri, Jun 29, 2012 at 6:29 AM, Franky Lin <frankyl@broadcom.com> wrote:
+>> On 06/28/2012 04:54 PM, Jon Hunter wrote:
+>>>
+>>> I am wondering if this could be the bug ... on start-up I see that we do
+>>> a context restore on bank1 during the probe which is before we have done
+>>> the first suspend! In other words, we could restore a bad/uninitialised
+>>> context for bank1. In the case of bank1, the loss count starts at 1 and
+>>> not 0 and so we falsely think we need to perform a restore :-(
+>>>
+>>> [    0.176269] omap_gpio_runtime_resume: bank @ 0xfc310000
+>>> [    0.177276] omap_gpio_runtime_resume: count 0, now 1
+>>> [    0.177276] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
+>>> [    0.177642] omap_gpio_runtime_suspend: bank @ 0xfc310000
+>>>
+>>> Can you try ...
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index c4ed172..9623408 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -1086,6 +1086,9 @@ static int __devinit omap_gpio_probe(struct
+>>> platform_device *pdev)
+>>>  #ifdef CONFIG_OF_GPIO
+>>>         bank->chip.of_node = of_node_get(node);
+>>>  #endif
+>>> +       if (bank->get_context_loss_count)
+>>> +               bank->context_loss_count =
+>>> +                               bank->get_context_loss_count(bank->dev);
+>>>
+>>>         bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+>>>         if (bank->irq_base < 0) {
 >>>
 >>
->> So why invent something new, if there seems to be a pattern?
->
-> I'm not sure they mean the same things, because the default value is
-> different. Event if they're same, why not make them all with sensible
-> name?
+>> Looks like you found the culprit. :) It does fix the problem.
+> So this looks similar to what NeilBrown <neilb@suse.de> reported in
+> another thread.
+> The reason was context_loss_count = 1 for GPIO BANK#0 which of course is in the
+> WKUP domain. In fact he tried out with the same fix. Anyways, we
+> should hear from
+> Kevin now whether it is feasible to fix the context_loss_count for the WKUP GPIO
+> bank or to put the workaround here in the gpio driver.
 
-I'm not quite sure what the question is I'm being asked here.
+Ok, so I have been looking at this some more today. I believe that the
+actual bug is that we are not checking to see if "loses_context" is true
+before populating "get_context_loss_count" (see omap dmtimer driver).
+For bank0 loses_context is false and so we should never be calling
+"get_context_loss_count" in the first place.
 
-I certainly think that new bindings should follow existing precedent
-where possible for representing the same data. dr_mode is that precedent
-for a USB host's operating mode. Tegra chose to use that because of
-precedent in fsl-usb.txt IIRC.
+I will send out a patch to fix this and will copy Kevin and Franky.
+
+Franky, if you can test and confirm it works that would be great.
+
+Kevin, if you can review that would be great too.
+
+Cheers
+Jon
