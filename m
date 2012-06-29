@@ -1,73 +1,52 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 29 Jun 2012 10:53:04 -0500
-Subject: Panda ES board hang when using GPIO as interrupt
-In-Reply-To: <CAC83ZvJJw-7Xt4Ey4_OT70D6MGHEfwURYVuj5wYTLe5oYiMuRw@mail.gmail.com>
-References: <4FE8CF77.5080400@broadcom.com> <87txxxs9we.fsf@ti.com>
- <4FEBA854.5010508@broadcom.com> <4FEC7B48.8040402@ti.com>
- <4FECCB91.7090609@broadcom.com> <4FECD2E5.1060603@ti.com>
- <4FECE067.7000809@broadcom.com> <4FECE1BD.80906@ti.com>
- <4FECE45E.6040506@broadcom.com> <4FECEE9A.5070300@ti.com>
- <4FECFDD8.5060105@broadcom.com>
- <CAC83ZvJJw-7Xt4Ey4_OT70D6MGHEfwURYVuj5wYTLe5oYiMuRw@mail.gmail.com>
-Message-ID: <4FEDCF60.9020800@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 29 Jun 2012 17:04:34 +0100
+Subject: [PATCH 04/15] mfd: ab8500: Register devices using the newly DT:ed
+ MFD API
+In-Reply-To: <20120629150924.GG22806@sortiz-mobl>
+References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
+ <1340197011-5435-5-git-send-email-lee.jones@linaro.org>
+ <20120629150924.GG22806@sortiz-mobl>
+Message-ID: <4FEDD212.4020209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/28/2012 11:07 PM, DebBarma, Tarun Kanti wrote:
-> On Fri, Jun 29, 2012 at 6:29 AM, Franky Lin <frankyl@broadcom.com> wrote:
->> On 06/28/2012 04:54 PM, Jon Hunter wrote:
->>>
->>> I am wondering if this could be the bug ... on start-up I see that we do
->>> a context restore on bank1 during the probe which is before we have done
->>> the first suspend! In other words, we could restore a bad/uninitialised
->>> context for bank1. In the case of bank1, the loss count starts at 1 and
->>> not 0 and so we falsely think we need to perform a restore :-(
->>>
->>> [    0.176269] omap_gpio_runtime_resume: bank @ 0xfc310000
->>> [    0.177276] omap_gpio_runtime_resume: count 0, now 1
->>> [    0.177276] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
->>> [    0.177642] omap_gpio_runtime_suspend: bank @ 0xfc310000
->>>
->>> Can you try ...
->>>
->>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>> index c4ed172..9623408 100644
->>> --- a/drivers/gpio/gpio-omap.c
->>> +++ b/drivers/gpio/gpio-omap.c
->>> @@ -1086,6 +1086,9 @@ static int __devinit omap_gpio_probe(struct
->>> platform_device *pdev)
->>>  #ifdef CONFIG_OF_GPIO
->>>         bank->chip.of_node = of_node_get(node);
->>>  #endif
->>> +       if (bank->get_context_loss_count)
->>> +               bank->context_loss_count =
->>> +                               bank->get_context_loss_count(bank->dev);
->>>
->>>         bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
->>>         if (bank->irq_base < 0) {
->>>
+On 29/06/12 16:09, Samuel Ortiz wrote:
+> Hi Lee,
+>
+> On Wed, Jun 20, 2012 at 01:56:40PM +0100, Lee Jones wrote:
+>> Now the MFD API is Device Tree aware we can use it for platform
+>> registration again, even when booting with DT enabled. To aid in
+>> Device Node pointer allocation we provide each cell with the
+>> associative compatible string.
 >>
->> Looks like you found the culprit. :) It does fix the problem.
-> So this looks similar to what NeilBrown <neilb@suse.de> reported in
-> another thread.
-> The reason was context_loss_count = 1 for GPIO BANK#0 which of course is in the
-> WKUP domain. In fact he tried out with the same fix. Anyways, we
-> should hear from
-> Kevin now whether it is feasible to fix the context_loss_count for the WKUP GPIO
-> bank or to put the workaround here in the gpio driver.
+>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>   arch/arm/mach-ux500/board-mop500.c |    1 -
+>>   drivers/input/misc/ab8500-ponkey.c |    6 ----
+>>   drivers/mfd/ab8500-core.c          |   64 ++++++++++++++++++++++--------------
+>>   drivers/mfd/ab8500-debugfs.c       |    6 ----
+>>   drivers/mfd/ab8500-gpadc.c         |    6 ----
+>>   drivers/mfd/ab8500-sysctrl.c       |    6 ----
+>>   drivers/misc/ab8500-pwm.c          |    6 ----
+>>   drivers/regulator/ab8500.c         |    6 ----
+>>   drivers/rtc/rtc-ab8500.c           |    7 ----
+>>   drivers/usb/otg/ab8500-usb.c       |    6 ----
+>>   10 files changed, 39 insertions(+), 75 deletions(-)
+> This one does not apply properly against my for-next branch. Could you please
+> generate a new one for me ?
 
-Ok, so I have been looking at this some more today. I believe that the
-actual bug is that we are not checking to see if "loses_context" is true
-before populating "get_context_loss_count" (see omap dmtimer driver).
-For bank0 loses_context is false and so we should never be calling
-"get_context_loss_count" in the first place.
+Hmm... we have a problem.
 
-I will send out a patch to fix this and will copy Kevin and Franky.
+I have the new patch based on -next, but I can't test it, as -next is 
+broken for Snowball. Hence why I'm still using rc2. Do you want it anyway?
 
-Franky, if you can test and confirm it works that would be great.
+Kind regards,
+Lee
 
-Kevin, if you can review that would be great too.
-
-Cheers
-Jon
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
