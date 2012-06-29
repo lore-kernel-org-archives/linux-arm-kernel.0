@@ -1,46 +1,85 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Jun 2012 18:33:49 +0100
-Subject: [PATCH v2 0/2] Use architected timers for delay loop
-Message-ID: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 29 Jun 2012 18:33:50 +0100
+Subject: [PATCH v2 1/2] ARM: arch timer: implement read_current_timer and
+ get_cycles
+In-Reply-To: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1340991231-17682-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch implements read_current_timer using the architected timers
+when they are selected via CONFIG_ARM_ARCH_TIMER. If they are detected
+not to be usable at runtime, we return -ENXIO to the caller.
 
-This is version 2 of the patches originally posted here:
+Furthermore, if read_current_timer is exported then we can implement
+get_cycles in terms of it for use as both an entropy source and for
+implementing __udelay and friends.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105719.html
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h |    3 +++
+ arch/arm/include/asm/timex.h      |   10 ++++++----
+ arch/arm/kernel/arch_timer.c      |    8 ++++++++
+ 3 files changed, 17 insertions(+), 4 deletions(-)
 
-Thanks to Stephen, Rob and Russell for their comments. The changes since
-version 1 are:
-
-	- Fixed compilation breakage when arch timers are not configured
-	- Use common definitions for mult/shift between C and asm
-
-Tested on A15 and A9 vexpress platforms (i.e. with and without the
-architected timers).
-
-All comments welcome,
-
-Will
-
-
-Will Deacon (2):
-  ARM: arch timer: implement read_current_timer and get_cycles
-  ARM: delay: allow timer-based delay implementation to be selected
-
- arch/arm/include/asm/arch_timer.h      |    3 +
- arch/arm/include/asm/delay.h           |   32 ++++++++++++---
- arch/arm/include/asm/timex.h           |   10 +++--
- arch/arm/kernel/arch_timer.c           |   11 +++++
- arch/arm/kernel/armksyms.c             |    3 +-
- arch/arm/lib/Makefile                  |    2 +-
- arch/arm/lib/{delay.S => delay-loop.S} |   20 ++++-----
- arch/arm/lib/delay.c                   |   66 ++++++++++++++++++++++++++++++++
- arch/arm/mach-sa1100/sleep.S           |    8 ++--
- 9 files changed, 126 insertions(+), 29 deletions(-)
- rename arch/arm/lib/{delay.S => delay-loop.S} (81%)
- create mode 100644 arch/arm/lib/delay.c
-
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index ed2e95d..62e7547 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -1,7 +1,10 @@
+ #ifndef __ASMARM_ARCH_TIMER_H
+ #define __ASMARM_ARCH_TIMER_H
+ 
++#include <asm/errno.h>
++
+ #ifdef CONFIG_ARM_ARCH_TIMER
++#define ARCH_HAS_READ_CURRENT_TIMER
+ int arch_timer_of_register(void);
+ int arch_timer_sched_clock_init(void);
+ #else
+diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
+index 3be8de3..ce11944 100644
+--- a/arch/arm/include/asm/timex.h
++++ b/arch/arm/include/asm/timex.h
+@@ -12,13 +12,15 @@
+ #ifndef _ASMARM_TIMEX_H
+ #define _ASMARM_TIMEX_H
+ 
++#include <asm/arch_timer.h>
+ #include <mach/timex.h>
+ 
+ typedef unsigned long cycles_t;
+ 
+-static inline cycles_t get_cycles (void)
+-{
+-	return 0;
+-}
++#ifdef ARCH_HAS_READ_CURRENT_TIMER
++#define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
++#else
++#define get_cycles()	(0)
++#endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index dd58035..dbbeec4 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -223,6 +223,14 @@ static cycle_t arch_counter_read(struct clocksource *cs)
+ 	return arch_counter_get_cntpct();
+ }
+ 
++int read_current_timer(unsigned long *timer_val)
++{
++	if (!arch_timer_rate)
++		return -ENXIO;
++	*timer_val = arch_counter_get_cntpct();
++	return 0;
++}
++
+ static struct clocksource clocksource_counter = {
+ 	.name	= "arch_sys_counter",
+ 	.rating	= 400,
 -- 
 1.7.4.1
