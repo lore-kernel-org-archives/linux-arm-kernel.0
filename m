@@ -1,35 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jun 2012 08:50:28 +0000
-Subject: [PATCH 0/3] Add ability to set defaultless network device MAC
- addresses to deterministic computed locally administered values
-In-Reply-To: <20120629054404.11091.31289.stgit@build.warmcat.com>
+Date: Fri, 29 Jun 2012 08:51:46 +0000
+Subject: [PATCH 2/3] OMAP2+ devices add mac address allocation register api
+In-Reply-To: <20120629055516.11091.82899.stgit@build.warmcat.com>
 References: <20120629054404.11091.31289.stgit@build.warmcat.com>
-Message-ID: <201206290850.28541.arnd@arndb.de>
+ <20120629055516.11091.82899.stgit@build.warmcat.com>
+Message-ID: <201206290851.47054.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 29 June 2012, Andy Green wrote:
-> The following series adds some code to generate legal, locally administered
-> MAC addresses from OMAP4 CPU Die ID fuse data, and then adds an api to
-> devices.c allowing board files to register device paths for network devices
-> that wish to use them.
-> 
-> On PandaBoard / ES, two devices have no board-level MAC either assigned by
-> the manufacturer or stored on the board, the last patch in the series adds
-> these device paths and gets them set when the network device is registered.
-> 
-> The patches are against today's linux-omap.
-> 
+> +static int omap_panda_netdev_event(struct notifier_block *this,
+> +                                               unsigned long event, void *ptr)
+> +{
+> +       struct net_device *dev = ptr;
+> +       struct sockaddr sa;
+> +       int n;
+> +
+> +       if (event != NETDEV_REGISTER)
+> +               return NOTIFY_DONE;
+> +
+> +       n = omap_device_path_need_mac(dev->dev.parent);
+> +       if (n < 0)
+> +               return NOTIFY_DONE;
+> +
+> +       sa.sa_family = dev->type;
+> +       omap2_die_id_to_ethernet_mac(sa.sa_data, n);
+> +       dev->netdev_ops->ndo_set_mac_address(dev, &sa);
+> +
+> +       return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block omap_panda_netdev_notifier = {
+> +       .notifier_call = omap_panda_netdev_event,
+> +       .priority = 1,
+> +};
+> +
+> +int omap_register_mac_device_fixup_paths(const char * const *paths, int count)
+> +{
+> +       mac_device_fixup_paths = paths;
+> +       count_mac_device_fixup_paths = count;
+> +
+> +       return register_netdevice_notifier(&omap_panda_netdev_notifier);
+> +}
 
-I had already provided my
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-when we discussed this last year, and Steven also gave his
-
-Tested-by: Steven Rostedt <rostedt@goodmis.org>
-
-I have one comment to the second patch, which is changed slightly
-from the older version.
+The omap_panda_netdev_event and omap_panda_netdev_notifier symbols should probably
+lose the "panda_" part of their names, because they are now located in a common
+file and are not panda specific any more.
 
 	Arnd
