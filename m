@@ -1,157 +1,108 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Jun 2012 20:00:59 +0800
-Subject: [PATCH] ARM: fiq: change FIQ_START to a variable
-In-Reply-To: <1340867264-23043-1-git-send-email-shawn.guo@linaro.org>
-References: <1340867264-23043-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120629120057.GF29197@S2101-09.ap.freescale.net>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 29 Jun 2012 13:01:31 +0100
+Subject: [PATCH] ARM: pxa: hx4700: Use DEFINE_RES_* macros consistently
+Message-ID: <mailman.21.1340971296.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 03:07:44PM +0800, Shawn Guo wrote:
-> The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
-> makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
-> a nubmer of platforms have FIQ_START defined in mach/irqs.h for FIQ
-> support.
-> 
->   arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
->   arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
->   arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
-> 
-> If SPARSE_IRQ is enabled for any of these platforms, the following
-> compile error will be seen.
-> 
->   arch/arm/kernel/fiq.c: In function ?enable_fiq?:
->   arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
->   arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
->   arch/arm/kernel/fiq.c: In function ?disable_fiq?:
->   arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
-> 
-> The patch changes fiq code to have init_FIQ take FIQ_START from
-> platforms as a parameter and assign it to variable fiq_start which
-> is to replace FIQ_START uses in enable_fiq/disable_fiq.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+This patch replaces the remaining inline struct resource definitions
+with equivalent DEFINE_RES_* macro calls.
+The source file is reduced in size; the object file is unchanged.
 
-Hi Russell,
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: Philipp Zabel <philipp.zabel@gmail.com>
+---
+ arch/arm/mach-pxa/hx4700.c |   56 +++++++++----------------------------------
+ 1 files changed, 12 insertions(+), 44 deletions(-)
 
-Sorry for the pushing.  But the whole imx sparse-irq series is being
-held by this compile issue.  Can we consider the patch a solution for
-the issue?
-
-Regards,
-Shawn
-
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/include/asm/mach/irq.h |    2 +-
->  arch/arm/kernel/fiq.c           |    9 ++++++---
->  arch/arm/mach-rpc/irq.c         |    2 +-
->  arch/arm/plat-mxc/avic.c        |    2 +-
->  arch/arm/plat-mxc/tzic.c        |    2 +-
->  arch/arm/plat-s3c24xx/irq.c     |    2 +-
->  6 files changed, 11 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-> index febe495..15cb035 100644
-> --- a/arch/arm/include/asm/mach/irq.h
-> +++ b/arch/arm/include/asm/mach/irq.h
-> @@ -17,7 +17,7 @@ struct seq_file;
->  /*
->   * This is internal.  Do not use it.
->   */
-> -extern void init_FIQ(void);
-> +extern void init_FIQ(int);
->  extern int show_fiq_list(struct seq_file *, int);
->  
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
-> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-> index c32f845..2adda11 100644
-> --- a/arch/arm/kernel/fiq.c
-> +++ b/arch/arm/kernel/fiq.c
-> @@ -122,14 +122,16 @@ void release_fiq(struct fiq_handler *f)
->  	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
->  }
->  
-> +static int fiq_start;
-> +
->  void enable_fiq(int fiq)
->  {
-> -	enable_irq(fiq + FIQ_START);
-> +	enable_irq(fiq + fiq_start);
->  }
->  
->  void disable_fiq(int fiq)
->  {
-> -	disable_irq(fiq + FIQ_START);
-> +	disable_irq(fiq + fiq_start);
->  }
->  
->  EXPORT_SYMBOL(set_fiq_handler);
-> @@ -140,7 +142,8 @@ EXPORT_SYMBOL(release_fiq);
->  EXPORT_SYMBOL(enable_fiq);
->  EXPORT_SYMBOL(disable_fiq);
->  
-> -void __init init_FIQ(void)
-> +void __init init_FIQ(int start)
->  {
->  	no_fiq_insn = *(unsigned long *)0xffff001c;
-> +	fiq_start = start;
->  }
-> diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
-> index cf0e669..3e4fa84 100644
-> --- a/arch/arm/mach-rpc/irq.c
-> +++ b/arch/arm/mach-rpc/irq.c
-> @@ -163,6 +163,6 @@ void __init rpc_init_irq(void)
->  		}
->  	}
->  
-> -	init_FIQ();
-> +	init_FIQ(FIQ_START);
->  }
->  
-> diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-> index e612cc1..f3d671f 100644
-> --- a/arch/arm/plat-mxc/avic.c
-> +++ b/arch/arm/plat-mxc/avic.c
-> @@ -217,7 +217,7 @@ void __init mxc_init_irq(void __iomem *irqbase)
->  
->  #ifdef CONFIG_FIQ
->  	/* Initialize FIQ */
-> -	init_FIQ();
-> +	init_FIQ(FIQ_START);
->  #endif
->  
->  	printk(KERN_INFO "MXC IRQ initialized\n");
-> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-> index abc90e4..c60a7e4 100644
-> --- a/arch/arm/plat-mxc/tzic.c
-> +++ b/arch/arm/plat-mxc/tzic.c
-> @@ -192,7 +192,7 @@ void __init tzic_init_irq(void __iomem *irqbase)
->  
->  #ifdef CONFIG_FIQ
->  	/* Initialize FIQ */
-> -	init_FIQ();
-> +	init_FIQ(FIQ_START);
->  #endif
->  
->  	pr_info("TrustZone Interrupt Controller (TZIC) initialized\n");
-> diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-> index bc42c04..fe57bbb 100644
-> --- a/arch/arm/plat-s3c24xx/irq.c
-> +++ b/arch/arm/plat-s3c24xx/irq.c
-> @@ -533,7 +533,7 @@ void __init s3c24xx_init_irq(void)
->  	int i;
->  
->  #ifdef CONFIG_FIQ
-> -	init_FIQ();
-> +	init_FIQ(FIQ_START);
->  #endif
->  
->  	irqdbf("s3c2410_init_irq: clearing interrupt status flags\n");
-> -- 
-> 1.7.5.4
-> 
-> 
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index d3de84b..e631198 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -296,27 +296,11 @@ static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
+ 
+ static struct resource asic3_resources[] = {
+ 	/* GPIO part */
+-	[0] = {
+-		.start	= ASIC3_PHYS,
+-		.end	= ASIC3_PHYS + ASIC3_MAP_SIZE_16BIT - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= PXA_GPIO_TO_IRQ(GPIO12_HX4700_ASIC3_IRQ),
+-		.end	= PXA_GPIO_TO_IRQ(GPIO12_HX4700_ASIC3_IRQ),
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	[0] = DEFINE_RES_MEM(ASIC3_PHYS, ASIC3_MAP_SIZE_16BIT),
++	[1] = DEFINE_RES_IRQ(PXA_GPIO_TO_IRQ(GPIO12_HX4700_ASIC3_IRQ)),
+ 	/* SD part */
+-	[2] = {
+-		.start	= ASIC3_SD_PHYS,
+-		.end	= ASIC3_SD_PHYS + ASIC3_MAP_SIZE_16BIT - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[3] = {
+-		.start	= PXA_GPIO_TO_IRQ(GPIO66_HX4700_ASIC3_nSDIO_IRQ),
+-		.end	= PXA_GPIO_TO_IRQ(GPIO66_HX4700_ASIC3_nSDIO_IRQ),
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	[2] = DEFINE_RES_MEM(ASIC3_SD_PHYS, ASIC3_MAP_SIZE_16BIT),
++	[3] = DEFINE_RES_IRQ(PXA_GPIO_TO_IRQ(GPIO66_HX4700_ASIC3_nSDIO_IRQ)),
+ };
+ 
+ static struct asic3_platform_data asic3_platform_data = {
+@@ -343,11 +327,7 @@ static struct platform_device asic3 = {
+  */
+ 
+ static struct resource egpio_resources[] = {
+-	[0] = {
+-		.start = PXA_CS5_PHYS,
+-		.end   = PXA_CS5_PHYS + 0x4 - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM(PXA_CS5_PHYS, 0x4),
+ };
+ 
+ static struct htc_egpio_chip egpio_chips[] = {
+@@ -537,11 +517,7 @@ static struct w100fb_mach_info w3220_info = {
+ };
+ 
+ static struct resource w3220_resources[] = {
+-	[0] = {
+-		.start	= ATI_W3220_PHYS,
+-		.end	= ATI_W3220_PHYS + 0x00ffffff,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM(ATI_W3220_PHYS, SZ_16M),
+ };
+ 
+ static struct platform_device w3220 = {
+@@ -683,20 +659,12 @@ static struct pda_power_pdata power_supply_info = {
+ };
+ 
+ static struct resource power_supply_resources[] = {
+-	[0] = {
+-		.name  = "ac",
+-		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
+-		         IORESOURCE_IRQ_LOWEDGE,
+-		.start = PXA_GPIO_TO_IRQ(GPIOD9_nAC_IN),
+-		.end   = PXA_GPIO_TO_IRQ(GPIOD9_nAC_IN),
+-	},
+-	[1] = {
+-		.name  = "usb",
+-		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
+-		         IORESOURCE_IRQ_LOWEDGE,
+-		.start = PXA_GPIO_TO_IRQ(GPIOD14_nUSBC_DETECT),
+-		.end   = PXA_GPIO_TO_IRQ(GPIOD14_nUSBC_DETECT),
+-	},
++	[0] = DEFINE_RES_NAMED(PXA_GPIO_TO_IRQ(GPIOD9_nAC_IN), 1, "ac",
++		IORESOURCE_IRQ |
++		IORESOURCE_IRQ_HIGHEDGE | IORESOURCE_IRQ_LOWEDGE),
++	[1] = DEFINE_RES_NAMED(PXA_GPIO_TO_IRQ(GPIOD14_nUSBC_DETECT), 1, "usb",
++		IORESOURCE_IRQ |
++		IORESOURCE_IRQ_HIGHEDGE | IORESOURCE_IRQ_LOWEDGE),
+ };
+ 
+ static struct platform_device power_supply = {
+-- 
+1.7.3.4
