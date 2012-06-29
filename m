@@ -1,93 +1,246 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 29 Jun 2012 16:28:36 -0500
-Subject: [PATCH v3 4/4] memory: emif: add device tree support to emif
- driver
-In-Reply-To: <20120629210752.GA13859@kroah.com>
-References: <20120614154820.GG17140@kroah.com>
- <CAMQu2gx5CCDyrvozX06neBnA8J2heg+HL7DOewDm5voxqbpetw@mail.gmail.com>
- <CAMQu2gy7oj-+1qCteAFMXEeOL-Wdrs6e4gKWM=HsOukXcPuv-A@mail.gmail.com>
- <20120625182830.GA23850@kroah.com>
- <CAMQu2gxDG=69X7UQPUoTLP5h1ZLpHngp=3C4vSDOS6L-N2XZSw@mail.gmail.com>
- <4FE9467A.2050906@ti.com>
- <CAMQu2gzOszT54ZU0Z3-9k=mMM7yTCH_MCZV=gRKwGoGRj0zjaA@mail.gmail.com>
- <4FE947F7.9030000@ti.com>
- <CAMQu2gwzFV-79CuEAmOHCZ7XivXrALjXkoB+J-QpgJkZ_PoRVg@mail.gmail.com>
- <CAMQu2gx2RT0iyo+LD1TyTJg9FRSUD8SK2tA=nxAoULzQOa6L7A@mail.gmail.com>
- <20120629210752.GA13859@kroah.com>
-Message-ID: <4FEE1E04.1060600@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 29 Jun 2012 16:04:24 -0600
+Subject: [PATCH V2] ARM: dt: tegra: seaboard: add regulators
+Message-ID: <1341007464-16391-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Stephen Warren <swarren@nvidia.com>
 
-On 06/29/2012 04:07 PM, Greg Kroah-Hartman wrote:
-> On Fri, Jun 29, 2012 at 07:16:19PM +0530, Shilimkar, Santosh wrote:
->> Greg,
->>
->> On Tue, Jun 26, 2012 at 1:19 PM, Shilimkar, Santosh
->> <santosh.shilimkar@ti.com> wrote:
->>>
->>> On Tue, Jun 26, 2012 at 10:56 AM, Rajendra Nayak <rnayak@ti.com> wrote:
->>>> On Tuesday 26 June 2012 10:53 AM, Shilimkar, Santosh wrote:
->>>>>
->>>>> On Tue, Jun 26, 2012 at 10:49 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
->>>>>>
->>>>>> On Tuesday 26 June 2012 10:39 AM, Shilimkar, Santosh wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> +#if defined(CONFIG_OF)
->>>>>>>>>>
->>>>>>>>>>  >    +static const struct of_device_id emif_of_match[] = {
->>>>>>>>>>  >    +             { .compatible = "ti,emif-4d" },
->>>>>>>>>>  >    +             { .compatible = "ti,emif-4d5" },
->>>>>>>>>>  >    +             {},
->>>>>>>>>>  >    +};
->>>>>>>>>>  >    +MODULE_DEVICE_TABLE(of, emif_of_match);
->>>>>>>>>>  >    +#endif
->>>>>>>>>>  >    +
->>>>>>>>>>  >      static struct platform_driver emif_driver = {
->>>>>>>>>>  >           .remove         = __exit_p(emif_remove),
->>>>>>>>>>  >           .shutdown       = emif_shutdown,
->>>>>>>>>>  >           .driver = {
->>>>>>>>>>  >                   .name = "emif",
->>>>>>>>>>  >    +#if defined(CONFIG_OF)
->>>>>>>>>>  >    +             .of_match_table = of_match_ptr(emif_of_match),
->>>>>>>>>>  >    +#endif
->>>>>>>>
->>>>>>>>
->>>>>>>>>
->>>>>>>>>  Are these two still #if defined needed?
->>>>>>>>>
->>>>>>>>>  Also, what about the IS_DEFINED macro?
->>>>>>>>>
->>>>>>>
->>>>>>> Yes. To avoid the build break in !DT build.
->>>>>>>
->>>>>>
->>>>>> No, infact of_match_ptr is there just so you can avoid a
->>>>>> #ifdef around and not break !CONFIG_OF.
->>>>>
->>>>>
->>>>> Need to recheck but the build was throwing error becasue of
->>>>> "emif_of_match"
->>>>> mostly.
->>>>
->>>>
->>>> You still need the first one. I meant the second one around
->>>> 'of_match_ptr' should be removed.
->>>>
->>>> With !CONFIG_OF, of_match_ptr(_ptr) is just defined as NULL.
->>>>
->>> Yep. That make sense too.
->>> Will drop the second check.
->>>
->> Posted the entire series again with updated $subject patch.
->> With your ack, I will ask Tony to pull this series for 3.6.
-> 
-> Sent them where?  I didn't see a copy here :(
+Seaboard uses a TPS6586x regulator. Instantiate this, and hook up a
+couple of fixed GPIO-controlled regulators too.
 
-Hi Greg, should have hit both linux-omap and linux-arm. See:
+Two data sources were used for the data encoded here:
+* The HW defaults, as extracted from real HW.
+* The schematic, which specifies a voltage for each LDO rail.
 
-http://marc.info/?l=linux-omap&m=134097764625471&w=2
+In most cases these sources matched. Differences are:
 
-Cheers
-Jon
+ldo0: The HW default is 1.2v. The schematic states this should be 3.3v.
+On similar board designs, this rail is typically used for the PCIe clock
+which requires 3.3v. Note that this rail isn't actually used on this
+board.
+
+ldo6: The HW default on Springbank is 2.85v. The HW default on Seaboard
+is 1.8v. The schematics for both Springbank and Seaboard match at 2.85v.
+However, internal research indicates that the schematics are incorrectly
+labelled, and 1.8v is correct. The ChromeOS kernel also uses 1.8v.
+
+Note that these settings don't entirely match those in the ChromeOS
+kernel found at the URL below. However, the selected values generally
+cause no behavior change in the kernel, and so were picked to avoid
+regressions.
+
+repo http://git.chromium.org/chromiumos/third_party/kernel.git
+branch chromeos-3.2
+file arch/arm/mach-tegra/board-seaboard-power.c
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2:
+* Made all constraints match the HW defaults to avoid behavior changes,
+  with exceptions noted above.
+* Removed vin-supply properties from LDO nodes; the driver and binding
+  need to be updated to support specifying the parent regulators before
+  we can put these into DT.
+* Use the enumerated-bus compatible value for the /regulators node.
+* Enhanced all regulator-name properties to list all signal names directly
+  derived from the regulator pins.
+* Added ldo_rtc regulator.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-seaboard.dts |  164 ++++++++++++++++++++++++++++++++
+ 1 files changed, 164 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index 85e621a..3dad941 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -374,6 +374,141 @@
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+ 
++		pmic: tps6586x at 34 {
++			compatible = "ti,tps6586x";
++			reg = <0x34>;
++			interrupts = <0 86 0x4>;
++
++			#gpio-cells = <2>;
++			gpio-controller;
++
++			regulators {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				regulator at 0 {
++					reg = <0>;
++					regulator-compatible = "sm0";
++					regulator-name = "vdd_sm0,vdd_core";
++					regulator-min-microvolt = <1300000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++				};
++
++				regulator at 1 {
++					reg = <1>;
++					regulator-compatible = "sm1";
++					regulator-name = "vdd_sm1,vdd_cpu";
++					regulator-min-microvolt = <1125000>;
++					regulator-max-microvolt = <1125000>;
++					regulator-always-on;
++				};
++
++				sm2_reg: regulator at 2 {
++					reg = <2>;
++					regulator-compatible = "sm2";
++					regulator-name = "vdd_sm2,vin_ldo*";
++					regulator-min-microvolt = <3700000>;
++					regulator-max-microvolt = <3700000>;
++					regulator-always-on;
++				};
++
++				regulator at 3 {
++					reg = <3>;
++					regulator-compatible = "ldo0";
++					regulator-name = "vdd_ldo0";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				regulator at 4 {
++					reg = <4>;
++					regulator-compatible = "ldo1";
++					regulator-name = "vdd_ldo1,avdd_pll*";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				regulator at 5 {
++					reg = <5>;
++					regulator-compatible = "ldo2";
++					regulator-name = "vdd_ldo2,vdd_rtc";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++
++				regulator at 6 {
++					reg = <6>;
++					regulator-compatible = "ldo3";
++					regulator-name = "vdd_ldo3,avdd_usb*";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++
++				regulator at 7 {
++					reg = <7>;
++					regulator-compatible = "ldo4";
++					regulator-name = "vdd_ldo4,avdd_osc,vddio_sys";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				regulator at 8 {
++					reg = <8>;
++					regulator-compatible = "ldo5";
++					regulator-name = "vdd_ldo5,vcore_mmc";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++
++				regulator at 9 {
++					reg = <9>;
++					regulator-compatible = "ldo6";
++					regulator-name = "vdd_ldo6,avdd_vdac,vddio_vi,vddio_cam";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				regulator at 10 {
++					reg = <10>;
++					regulator-compatible = "ldo7";
++					regulator-name = "vdd_ldo7,avdd_hdmi,vdd_fuse";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				regulator at 11 {
++					reg = <11>;
++					regulator-compatible = "ldo8";
++					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				regulator at 12 {
++					reg = <12>;
++					regulator-compatible = "ldo9";
++					regulator-name = "vdd_ldo9,avdd_2v85,vdd_ddr_rx";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++
++				regulator at 13 {
++					reg = <13>;
++					regulator-compatible = "ldo_rtc";
++					regulator-name = "vdd_rtc_out,vdd_cell";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++			};
++		};
++
+ 		temperature-sensor at 4c {
+ 			compatible = "nct1008";
+ 			reg = <0x4c>;
+@@ -387,6 +522,10 @@
+ 		};
+ 	};
+ 
++	pmc {
++		nvidia,invert-interrupt;
++	};
++
+ 	memory-controller at 0x7000f400 {
+ 		emc-table at 190000 {
+ 			reg = <190000>;
+@@ -473,6 +612,31 @@
+ 		};
+ 	};
+ 
++	regulators {
++		compatible = "enumerated-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "vdd_1v5";
++			regulator-min-microvolt = <1500000>;
++			regulator-max-microvolt = <1500000>;
++			gpio = <&pmic 0 0>;
++		};
++
++		regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "vdd_1v2";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			gpio = <&pmic 1 0>;
++			enable-active-high;
++		};
++	};
++
+ 	sound {
+ 		compatible = "nvidia,tegra-audio-wm8903-seaboard",
+ 			     "nvidia,tegra-audio-wm8903";
+-- 
+1.7.0.4
