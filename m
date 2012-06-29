@@ -1,36 +1,37 @@
-From: clemens@ladisch.de (Clemens Ladisch)
-Date: Fri, 29 Jun 2012 15:16:54 +0200
-Subject: [PATCH] common: dma-mapping: add support for generic dma_mmap_*
- calls
-In-Reply-To: <00a501cd55f7$323946f0$96abd4d0$%szyprowski@samsung.com>
-References: <1339741135-7841-1-git-send-email-m.szyprowski@samsung.com>
- <4FED8D03.10507@ladisch.de>
- <00a501cd55f7$323946f0$96abd4d0$%szyprowski@samsung.com>
-Message-ID: <4FEDAAC6.2050202@ladisch.de>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 29 Jun 2012 15:18:32 +0200
+Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
+In-Reply-To: <4FEDA9A8.1050504@ti.com>
+References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
+ <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
+ <20120629144002.3b4a31ee@endymion.delvare>
+ <20120629145718.697b6955@endymion.delvare>
+ <4FEDA9A8.1050504@ti.com>
+Message-ID: <20120629151832.0cb26bea@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> On Friday, June 29, 2012 1:10 PM Clemens Ladisch wrote:
->> Marek Szyprowski wrote:
->>> +++ b/drivers/base/dma-mapping.c
->>> ...
->>> +int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
->>> +		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
->>> +{
->>> +	int ret = -ENXIO;
->>> +	...
->>> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
->>> +		return ret;
->>
->> This will return -ENXIO if dma_mmap_from_coherent() succeeds.
->
-> Thanks for spotting this!
+On Fri, 29 Jun 2012 18:42:08 +0530, Shubhrajyoti wrote:
+> On Friday 29 June 2012 06:27 PM, Jean Delvare wrote:
+> > drivers/gpu/drm/nouveau/nouveau_bios.c:3535:3: warning: (near initialization for ?msg[1].actual?) [enabled by default]
+> >
+> > This needs to be all fixed (converted to C99-style struct
+> > initialization) before your patch is considered for inclusion. And
+> > there may be more that my config did not spot.
+> Yes,agree.
+> 
+> The idea of this patch was if the idea is agreed upon then.
+> then fixing all the callers could be worked on.
 
-Sorry, I was wrong; ret is actually set by dma_mmap_from_coherent's
-output parameter.  (That function's documentation appears to be
-incomplete.)
+This is worth fixing anyway, C99-style initialization is always good to
+move to.
 
+> However do you agree with this approach?
 
-Regards,
-Clemens
+Well you've seen the caveats I mentioned, this will be no easy ride. If
+you are willing to take the risk, spend the time documenting the
+change, and help people if there are issues, then I'm OK. At least as
+long as someone else doesn't come saying it's a very bad idea ;)
+
+-- 
+Jean Delvare
