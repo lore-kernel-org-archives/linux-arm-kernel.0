@@ -1,30 +1,32 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 29 Jun 2012 13:37:55 +0300
-Subject: [PATCH 2/4] mtd: lpc32xx_slc: Make wp gpio optional
-In-Reply-To: <1340812275-1197-2-git-send-email-stigge@antcom.de>
-References: <1340812275-1197-1-git-send-email-stigge@antcom.de>
- <1340812275-1197-2-git-send-email-stigge@antcom.de>
-Message-ID: <1340966275.3070.146.camel@sauron.fi.intel.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Fri, 29 Jun 2012 16:35:24 +0530
+Subject: [RFC PATCH 0/3] I2C: Report the actual transferred bytes 
+Message-ID: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-27 at 17:51 +0200, Roland Stigge wrote:
-> From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> 
-> This patch supports missing wp gpio.
-> 
-> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+Currently the I2C core reports only a negative number on errors.
+However some of the users in case of errors want to re-transfer only
+the remaining bytes.
 
-Pushed patches 2-4, thanks!
+The patch series tries to add a actual field to the msg which
+can be checked by the user.
+
+Also a patch to implement the actual bytes transferred in case of
+i2c-omap.
+
+
+Felipe Balbi (1):
+  i2c: omap: implement handling for 'actual' bytes transferred
+
+Shubhrajyoti D (2):
+  i2c: add 'actual' field to struct i2c_msg
+  i2c: inititalise the actual transferred to zero
+
+ drivers/i2c/busses/i2c-omap.c |    5 +++++
+ drivers/i2c/i2c-core.c        |    4 ++--
+ include/linux/i2c.h           |    1 +
+ 3 files changed, 8 insertions(+), 2 deletions(-)
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/e252d3cf/attachment.sig>
+1.7.5.4
