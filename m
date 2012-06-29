@@ -1,42 +1,55 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 29 Jun 2012 20:14:38 +0800
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <20120629111334.GB29197@S2101-09.ap.freescale.net>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
- <1340941925-14591-3-git-send-email-shijie8@gmail.com>
- <20120629020650.GB28932@S2101-09.ap.freescale.net>
- <20120629063329.GE5844@shlinux2.ap.freescale.net>
- <20461.30070.771087.830745@ipc1.ka-ro>
- <20120629093437.GK5844@shlinux2.ap.freescale.net>
- <20461.30991.63507.369439@ipc1.ka-ro>
- <20120629095433.GO5844@shlinux2.ap.freescale.net>
- <20120629111334.GB29197@S2101-09.ap.freescale.net>
-Message-ID: <20120629121437.GQ5844@shlinux2.ap.freescale.net>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 29 Jun 2012 15:37:14 +0300
+Subject: [PATCH v10] MTD: LPC32xx MLC NAND driver
+In-Reply-To: <1340834129-15545-1-git-send-email-stigge@antcom.de>
+References: <1340834129-15545-1-git-send-email-stigge@antcom.de>
+Message-ID: <1340973434.3070.168.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 07:13:36PM +0800, Shawn Guo wrote:
-> On Fri, Jun 29, 2012 at 05:54:33PM +0800, Dong Aisheng wrote:
-> > > > > No, that's silly. You would have to change the driver for each
-> > > > > new platform that the driver can support.
-> > > > > 
-> > > > If the new platform is fully compatible with exist platforms, then no.
-> > > > If need more clocks, then in either way, we have to add support in driver.
-> > > > 
-> > > Even if it had fewer clocks you would have to change the driver!
-> > > 
-> > Yes.
-> > For your case, you need create some dummy clock, right?
-> > If yes, i would intend to explictly to define it for a new type
-> > of IP.
-> > 
-> I'm with Lothar on this.  At least for imx28 case, we do not even need
-> dummy clock, because NULL con_id in clkdev lookup will have all those
-> clocks match the only one gpmi-nand clock on imx28, as I already said.
+On Wed, 2012-06-27 at 23:55 +0200, Roland Stigge wrote:
+> This patch adds a driver for the MLC NAND controller of the LPC32xx SoC.
 > 
-I'm not quite understand. Can you clarify a bit more?
-For extra clocks need by mx6q like "gpmi_bch", they're indeed have con_id.
-Getting them will not fail on imx28 without dummy clock?
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+> ---
 
-Regards
-Dong Aisheng
+Aiaiai complains like this about your patch, please, take a look:
+
+--------------------------------------------------------------------------------
+
+Successfully built configuration "arm-lpc32xx_defconfig,arm,arm-unknown-linux-gnueabi-", results:
+
+--- before_patching.log
++++ after_patching.log
+@@ @@
++drivers/mtd/nand/lpc32xx_mlc.c: In function 'lpc32xx_nand_probe':
++drivers/mtd/nand/lpc32xx_mlc.c:679:10: warning: variable 'sr' set but not used [-Wunused-but-set-variable]
++drivers/mtd/nand/lpc32xx_mlc.c:561:24: error: bad constant expression [sparse]
+
+--------------------------------------------------------------------------------
+
+checkpatch.pl has some complaints:
+
+--------------------------------------------------------------------------------
+
+checkpatch.pl results for patch "[PATCH] MTD: LPC32xx MLC NAND driver"
+
+ERROR:INITIALISED_STATIC: do not initialise statics to 0 or NULL
+#339: FILE: drivers/mtd/nand/lpc32xx_mlc.c:224:
++static int use_dma = 0;
+
+total: 1 errors, 0 warnings, 1004 lines checked
+
+--------------------------------------------------------------------------------
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/09247dba/attachment.sig>
