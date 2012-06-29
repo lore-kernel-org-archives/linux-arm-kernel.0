@@ -1,32 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Jun 2012 20:53:49 +0800
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <20120629124158.GA32473@shlinux2.ap.freescale.net>
-References: <20120629020650.GB28932@S2101-09.ap.freescale.net>
- <20120629063329.GE5844@shlinux2.ap.freescale.net>
- <20461.30070.771087.830745@ipc1.ka-ro>
- <20120629093437.GK5844@shlinux2.ap.freescale.net>
- <20461.30991.63507.369439@ipc1.ka-ro>
- <20120629095433.GO5844@shlinux2.ap.freescale.net>
- <20120629111334.GB29197@S2101-09.ap.freescale.net>
- <20120629121437.GQ5844@shlinux2.ap.freescale.net>
- <20120629124154.GG29197@S2101-09.ap.freescale.net>
- <20120629124158.GA32473@shlinux2.ap.freescale.net>
-Message-ID: <20120629125346.GI29197@S2101-09.ap.freescale.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 29 Jun 2012 07:55:02 -0500
+Subject: [PATCH 1/1] ARM: OMAP3: PM: don't explicitly enable the IO-chain
+ interrupt
+In-Reply-To: <1340933123-30401-1-git-send-email-javier@dowhile0.org> (Javier
+ Martinez Canillas's message of "Fri, 29 Jun 2012 03:25:23 +0200")
+References: <1340933123-30401-1-git-send-email-javier@dowhile0.org>
+Message-ID: <87obo2mg61.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 08:41:59PM +0800, Dong Aisheng wrote:
-> I know this.
-> You may missed my point.
-> I mean extra clocks introduced for imx6q which is not exist on imx28.
-> For your proposal, the gpmi driver will acquire all clocks including
-> imx6q's.
-> So when get imx6q's gpmi clock like "gpmi-bch" like clk_get(dev, "gpmi-bch"),
-> it may fail for imx28.
-> 
-What I was saying is it will not fail.
++Paul
 
--- 
-Regards,
-Shawn
+Javier Martinez Canillas <javier@dowhile0.org> writes:
+
+> commit 99b59df0 ARM: OMAP3: PM: fix shared PRCM interrupt leave disabled at boot
+>
+> set the IRQ_NOAUTOEN flag to the PCRM IO-chain irq to avoid this
+> interrupt until the PM core code is ready to handle the interrupts.
+>
+> It seems that this is not needed anymore after the OMAP PRCM I/O chain
+> code re-implementation introduced on merge commit:
+>
+> 9a17d88 Merge tag 'omap-devel-c-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/
+>
+> The IRQ_NOAUTOEN flags is not set for the PRCM I/O irq anymore on the
+> new implementation. This has the effect that a request_irq() for the
+> PRCM I/O chain irq will auto-enable the requested IRQ and a later call
+> to enable_irq() will lead to the following warning:
+
+I noticed that warning too, but I don't think $SUBJECT patch is the
+right fix.
+
+We still need the IRQ_NOAUTOEN so that cases where PM is not enabled,
+the IO chain interrupts are not enabled.
+
+Looking closer, it looks like the merge of omap-devel-c-for-3.6 removed
+the IRQ_NOAUTOEN in the merge resolution, which wasn't right.
+
+I'll cook up a fix for this.
+
+Kevin
