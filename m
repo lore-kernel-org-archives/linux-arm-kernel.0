@@ -1,93 +1,47 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 29 Jun 2012 22:39:20 +0200
-Subject: [PATCH v2] Build a zImage or uImage with dtb already appended
-In-Reply-To: <20110802143148.21599.22870.stgit@ponder>
-References: <20110802143148.21599.22870.stgit@ponder>
-Message-ID: <20120629203919.GA18617@raptus.dandreoli.com>
+From: andreas@biessmann.de (=?UTF-8?B?QW5kcmVhcyBCaWXDn21hbm4=?=)
+Date: Fri, 29 Jun 2012 22:44:48 +0200
+Subject: [PATCH] arm:gemini: fix irq.c
+In-Reply-To: <1338981778-19938-1-git-send-email-andreas@biessmann.de>
+References: <1338981778-19938-1-git-send-email-andreas@biessmann.de>
+Message-ID: <4FEE13C0.10505@biessmann.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Domenico Andreoli <domenico.andreoli@linux.com>
-
-Add new targets to build zImage and uImage with DTB appended (i.e. make
-'uImage-dtb.am335x-bone' or 'make zImage-dtb.omap3-evm').
-
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-
----
-
-On Tue, Aug 02, 2011 at 03:31:48PM +0100, Grant Likely wrote:
-> Do not commit to mainline; this is a useful hack only for now.
+On 06.06.12 13:22, Andreas Bie?mann wrote:
+> Commit 9f97da78bf018206fb623cd351d454af2f105fe0 moved disable_hlt() from
+> arch/arm/include/asm/system.h to arch/arm/include/asm/system_misc.h but missed
+> to change arch/arm/mach-gemini/irq.c.
 > 
+> This patch fixes following error:
+> 
+> ---8<---
+> arch/arm/mach-gemini/irq.c: In function 'gemini_init_irq':
+> arch/arm/mach-gemini/irq.c:79:2: error: implicit declaration of function 'disable_hlt' [-Werror=implicit-function-declaration]
+> --->8---
+> 
+> Signed-off-by: Andreas Bie?mann <andreas@biessmann.de>
+> cc: Hans Ulli Kroll <ulli.kroll@googlemail.com> 
+> cc: Russell King <linux@arm.linux.org.uk>
+> cc: linux-arm-kernel at lists.infradead.org
+> ---
+> Note: this is broken since 3.4 release, 3.3 is sane.
 
-Is this a better moment for this patch?
+ping
 
-Anyway, here is an update for v3.5-rc4. Added zImage-dtb.* as a valid
-target and the .gitignore entries.
-
-cheers
-Domenico
-
----
- arch/arm/Makefile        |    6 ++++++
- arch/arm/boot/.gitignore |    2 ++
- arch/arm/boot/Makefile   |    7 +++++++
- 3 files changed, 15 insertions(+)
-
-Index: b/arch/arm/Makefile
-===================================================================
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -283,6 +283,12 @@ zImage Image xipImage bootpImage uImage:
- zinstall uinstall install: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
- 
-+zImage-dtb.%:
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+
-+uImage-dtb.%:
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+
- %.dtb:
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
- 
-Index: b/arch/arm/boot/Makefile
-===================================================================
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -55,6 +55,9 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux
- 	$(call if_changed,objcopy)
- 	@echo '  Kernel: $@ is ready'
- 
-+$(obj)/zImage-dtb.%:	$(obj)/%.dtb $(obj)/zImage
-+	cat $(obj)/zImage $< > $@
-+
- endif
- 
- targets += $(dtb-y)
-@@ -90,6 +93,10 @@ $(obj)/uImage:	$(obj)/zImage FORCE
- 	$(call if_changed,uimage)
- 	@echo '  Image $@ is ready'
- 
-+$(obj)/uImage-dtb.%:	$(obj)/zImage-dtb.% FORCE
-+	$(call if_changed,uimage)
-+	@echo '  Image $@ is ready'
-+
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
- 	@:
-Index: b/arch/arm/boot/.gitignore
-===================================================================
---- a/arch/arm/boot/.gitignore
-+++ b/arch/arm/boot/.gitignore
-@@ -1,6 +1,8 @@
- Image
- zImage
-+zImage-dtb.*
- xipImage
- bootpImage
- uImage
-+uImage-dtb.*
- *.dtb
+> 
+>  arch/arm/mach-gemini/irq.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
+> index ca70e5f..020852d 100644
+> --- a/arch/arm/mach-gemini/irq.c
+> +++ b/arch/arm/mach-gemini/irq.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/sched.h>
+>  #include <asm/irq.h>
+>  #include <asm/mach/irq.h>
+> +#include <asm/system_misc.h>
+>  #include <mach/hardware.h>
+>  
+>  #define IRQ_SOURCE(base_addr)	(base_addr + 0x00)
+> 
