@@ -1,44 +1,165 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 29 Jun 2012 17:47:53 +0800
-Subject: [PATCH v13 0/2] MTD: at91: Add PMECC support for at91 nand flash
- driver
-Message-ID: <1340963275-32104-1-git-send-email-josh.wu@atmel.com>
+Date: Fri, 29 Jun 2012 17:47:54 +0800
+Subject: [PATCH v13 1/2] MTD: at91: add dt parameters for Atmel PMECC
+In-Reply-To: <1340963275-32104-1-git-send-email-josh.wu@atmel.com>
+References: <1340963275-32104-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1340963275-32104-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those patches is based on the l2-mtd.git three.
+Add DT support for PMECC parameters.
 
-Changes
-since v12,
-	fix compile warning.
-	fix compile error for sparse compiler:
-		drivers/mtd/nand/atmel_nand.c:480:32: error: bad constant expression [sparse]
-		drivers/mtd/nand/atmel_nand.c:488:35: error: bad constant expression [sparse]
-		drivers/mtd/nand/atmel_nand.c:633:32: error: bad constant expression [sparse]
-		drivers/mtd/nand/atmel_nand.c:635:35: error: bad constant expression [sparse]
-	   the error is caused by the dynamic 2d array: smu[cap + 2][2 * cap + 1].
-           since the smu is allocated when driver is probed, and the length of the smu depend on PMECC correction capablity.
-	   so when I declare the type of smu by following line: (cap is declared as const type)
-		 int16_t (*smu)[2 * cap + 1];
-	   Sparse compiler reports above errors.
-	   for fixing this compile error, I use one dimention array instead of 2d array, for instance: all smu[i][j] changes to smu[i * num + j]. num equal to 2 * cap + 1.
-	   I tested it in sparse 0.4.4
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+changes:
+since v11
+   1. update the documentation for reg parameter
+   2. add one example for PMECC support.
 
-since v11,
-	add documentation for atmel nand reg parameter and one example for PMECC support.
-	fix the bug: no error reported when fail to get resoures of PMECC ERRLOC or ROM.
-	fix the bug: no correction when ecc data has bit flipped.
-	add clearer debug information for data correction.
+ .../devicetree/bindings/mtd/atmel-nand.txt         |   40 ++++++++++++++-
+ drivers/mtd/nand/atmel_nand.c                      |   52 +++++++++++++++++++-
+ 2 files changed, 90 insertions(+), 2 deletions(-)
 
-Josh Wu (2):
-  MTD: at91: add dt parameters for Atmel PMECC
-  MTD: at91: atmel_nand: Update driver to support Programmable Multibit
-    ECC controller
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |   40 +-
- drivers/mtd/nand/atmel_nand.c                      |  799 +++++++++++++++++++-
- drivers/mtd/nand/atmel_nand_ecc.h                  |  114 ++-
- 3 files changed, 949 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index a200695..d555421 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -3,7 +3,9 @@ Atmel NAND flash
+ Required properties:
+ - compatible : "atmel,at91rm9200-nand".
+ - reg : should specify localbus address and size used for the chip,
+-	and if availlable the ECC.
++	and hardware ECC controller if available.
++	If the hardware ECC is PMECC, it should contain address and size for
++	PMECC, PMECC Error Location controller and ROM which has lookup tables.
+ - atmel,nand-addr-offset : offset for the address latch.
+ - atmel,nand-cmd-offset : offset for the command latch.
+ - #address-cells, #size-cells : Must be present if the device has sub-nodes
+@@ -16,6 +18,15 @@ Optional properties:
+ - nand-ecc-mode : String, operation mode of the NAND ecc mode, soft by default.
+   Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
+   "soft_bch".
++- atmel,has-pmecc : boolean to enable Programmable Multibit ECC hardware.
++  Only supported by at91sam9x5 or later sam9 product.
++- atmel,pmecc-cap : error correct capability for Programmable Multibit ECC
++  Controller. Supported values are: 2, 4, 8, 12, 24.
++- atmel,pmecc-sector-size : sector size for ECC computation. Supported values
++  are: 512, 1024.
++- atmel,pmecc-lookup-table-offset : includes two offsets of lookup table in ROM
++  for different sector size. First one is for sector size 512, the next is for
++  sector size 1024.
+ - nand-bus-width : 8 or 16 bus width if not present 8
+ - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+ 
+@@ -39,3 +50,30 @@ nand0: nand at 40000000,0 {
+ 		...
+ 	};
+ };
++
++/* for PMECC supported chips */
++nand0: nand at 40000000 {
++	compatible = "atmel,at91rm9200-nand";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	reg = < 0x40000000 0x10000000	/* bus addr & size */
++		0xffffe000 0x00000600	/* PMECC addr & size */
++		0xffffe600 0x00000200	/* PMECC ERRLOC addr & size */
++		0x00100000 0x00100000	/* ROM addr & size */
++		>;
++	atmel,nand-addr-offset = <21>;	/* ale */
++	atmel,nand-cmd-offset = <22>;	/* cle */
++	nand-on-flash-bbt;
++	nand-ecc-mode = "hw";
++	atmel,has-pmecc;	/* enable PMECC */
++	atmel,pmecc-cap = <2>;
++	atmel,pmecc-sector-size = <512>;
++	atmel,pmecc-lookup-table-offset = <0x8000 0x10000>;
++	gpios = <&pioD 5 0	/* rdy */
++		 &pioD 4 0	/* nce */
++		 0		/* cd */
++		>;
++	partition at 0 {
++		...
++	};
++};
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 7a41a04..b97ad9f 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -93,6 +93,11 @@ struct atmel_nand_host {
+ 
+ 	struct completion	comp;
+ 	struct dma_chan		*dma_chan;
++
++	bool			has_pmecc;
++	u8			pmecc_corr_cap;
++	u16			pmecc_sector_size;
++	u32			pmecc_lookup_table_offset;
+ };
+ 
+ static int cpu_has_dma(void)
+@@ -481,7 +486,8 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
+ static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
+ 					 struct device_node *np)
+ {
+-	u32 val;
++	u32 val, table_offset;
++	u32 offset[2];
+ 	int ecc_mode;
+ 	struct atmel_nand_data *board = &host->board;
+ 	enum of_gpio_flags flags;
+@@ -517,6 +523,50 @@ static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
+ 	board->enable_pin = of_get_gpio(np, 1);
+ 	board->det_pin = of_get_gpio(np, 2);
+ 
++	host->has_pmecc = of_property_read_bool(np, "atmel,has-pmecc");
++
++	if (!(board->ecc_mode == NAND_ECC_HW) || !host->has_pmecc)
++		return 0;	/* Not using PMECC */
++
++	/* use PMECC, get correction capability, sector size and lookup
++	 * table offset.
++	 */
++	if (of_property_read_u32(np, "atmel,pmecc-cap", &val) != 0) {
++		dev_err(host->dev, "Cannot decide PMECC Capability\n");
++		return -EINVAL;
++	} else if ((val != 2) && (val != 4) && (val != 8) && (val != 12) &&
++	    (val != 24)) {
++		dev_err(host->dev,
++			"Unsupported PMECC correction capability: %d; should be 2, 4, 8, 12 or 24\n",
++			val);
++		return -EINVAL;
++	}
++	host->pmecc_corr_cap = (u8)val;
++
++	if (of_property_read_u32(np, "atmel,pmecc-sector-size", &val) != 0) {
++		dev_err(host->dev, "Cannot decide PMECC Sector Size\n");
++		return -EINVAL;
++	} else if ((val != 512) && (val != 1024)) {
++		dev_err(host->dev,
++			"Unsupported PMECC sector size: %d; should be 512 or 1024 bytes\n",
++			val);
++		return -EINVAL;
++	}
++	host->pmecc_sector_size = (u16)val;
++
++	if (of_property_read_u32_array(np, "atmel,pmecc-lookup-table-offset",
++			offset, 2) != 0) {
++		dev_err(host->dev, "Cannot get PMECC lookup table offset\n");
++		return -EINVAL;
++	}
++	table_offset = host->pmecc_sector_size == 512 ? offset[0] : offset[1];
++
++	if (!table_offset) {
++		dev_err(host->dev, "Invalid PMECC lookup table offset\n");
++		return -EINVAL;
++	}
++	host->pmecc_lookup_table_offset = table_offset;
++
+ 	return 0;
+ }
+ #else
 -- 
 1.7.9.5
