@@ -1,81 +1,97 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 29 Jun 2012 13:52:40 +0800
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <20120629020650.GB28932@S2101-09.ap.freescale.net>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
- <1340941925-14591-3-git-send-email-shijie8@gmail.com>
- <20120629020650.GB28932@S2101-09.ap.freescale.net>
-Message-ID: <4FED42A8.40301@freescale.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 29 Jun 2012 11:17:55 +0530
+Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
+In-Reply-To: <87lij7nltv.fsf@ti.com>
+References: <1340761532-27231-1-git-send-email-khilman@ti.com>
+ <CAM=Q2cuLCT2VzcUgrpyRWiX61t1F+iWchO9iLC=Ka9MFVm4_bQ@mail.gmail.com>
+ <87lij7nltv.fsf@ti.com>
+Message-ID: <4FED418B.8030100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?06?29? 10:06, Shawn Guo ??:
->>   		gpmi_regs + HW_GPMI_TIMING1);
->> >  
->> >    	/* Get the timing information we need. */
->> >  -	nfc->clock_frequency_in_hz = clk_get_rate(r->clock);
->> >  +	nfc->clock_frequency_in_hz = clk_get_rate(r->clock[0]);
->> >    	clock_period_in_ns = 1000000000 / nfc->clock_frequency_in_hz;
->> >  
->> >    	gpmi_nfc_compute_hardware_timing(this,&hw);
->> >  @@ -784,8 +812,7 @@ err_out:
->> >  
->> >    void gpmi_end(struct gpmi_nand_data *this)
->> >    {
->> >  -	struct resources *r =&this->resources;
->> >  -	clk_disable_unprepare(r->clock);
->> >  +	gpmi_disable_clk(this);
->> >    }
->> >  
->> >    /* Clears a BCH interrupt. */
->> >  diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->> >  index 941cfb7..edda3b1 100644
->> >  --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->> >  +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->> >  @@ -464,9 +464,59 @@ acquire_err:
->> >    	return -EINVAL;
->> >    }
->> >  
->> >  +static void gpmi_put_clks(struct gpmi_nand_data *this)
->> >  +{
->> >  +	struct resources *r =&this->resources;
->> >  +	struct clk *clk;
->> >  +	int i;
->> >  +
->> >  +	for (i = 0; i<  GPMI_CLK_MAX; i++) {
->> >  +		clk = r->clock[i];
->> >  +		if (clk) {
->> >  +			clk_put(clk);
->> >  +			r->clock[i] = NULL;
->> >  +		}
->> >  +	}
->> >  +}
->> >  +
->> >  +static char *extra_clks_for_mx6q[] = {
->> >  +	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
->> >  +};
->> >  +
->> >  +static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
->> >  +{
->> >  +	struct resources *r =&this->resources;
->> >  +	char **extra_clks = NULL;
->> >  +	struct clk *clk;
->> >  +	int i;
->> >  +
->> >  +	r->clock[0] = clk_get(&this->pdev->dev, NULL);
->> >  +	if (IS_ERR(r->clock[0]))
->> >  +		goto err_clock;
->> >  +
->> >  +	/* Get extra clocks */
->> >  +	if (GPMI_IS_MX6Q(this))
->> >  +		extra_clks = extra_clks_for_mx6q;
-> We probably do not need this tweaking.  We can have the driver always
-> take all those 5 clocks, and I think the current imx28 clock driver
-> can just work with it, because the gpmi-nand clkdev lookup has NULL
-> con_id and all those 5 clocks can match the same one on imx28.
+On Friday 29 June 2012 03:25 AM, Kevin Hilman wrote:
+> Hi Shubhrajyoti,
 >
-I think your method makes the code hard to understand.
-My code is more clear in logic.
-
-thanks
-Huang Shijie
+> Shubhrajyoti Datta <omaplinuxkernel@gmail.com> writes:
+>
+>> Hi Kevin,
+>> Thanks for the patch ,
+>> a doubt below
+> Thanks for the review.
+>
+>> On Wed, Jun 27, 2012 at 7:15 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>> In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
+>>> failure.
+>> So the failure means that the usecount is incremented. However the
+>> device was not
+>> enabled. 
+> Correct.
+>
+>> In that case could we consider
+>>
+>>    void pm_runtime_put_noidle(struct device *dev);
+>>     - decrement the device's usage counter
+>>
+>> Which will only decrement the counter and does not try to disable it.
+> No, that is not needed.
+>
+>> However I am not sure what happens if you try to disable an already
+>> disabled device.
+> The runtime PM core already knows that the device is not enabled so will
+> not need to call the disable hooks.  It already needs this functionality
+> to support the _get_noresume() and _put_noidle() calls.
+>
+> I tested this on 3730/OveroSTORM where I was seeing this i2c xfer
+> failure (and thus a failure in MMC suspend, which uses I2C to control
+> the regulator.)
+>
+> Hope that helps clarify,
+Thanks a lot for the clarification.
+> If so, Wolfram, can you queue this up in your i2c-embedded/for-next
+> branch since this problem was introduced there.
+>
+> Thanks,
+>
+> Kevin
+>
+>>> Without this, after a failed xfer, the runtime PM usecount will have
+>>> been incremented, but not decremented
+>> Agree.
+>>
+>>> causing the usecount to never
+>>> reach zero after a failure.  This keeps the device always runtime PM
+>>> enabled which keeps the enclosing power domain active, and prevents
+>>> full-chip retention/off from happening during idle.
+Reviewed-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>>> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
+>>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>>> ---
+>>> This patch applies to current i2c-embedded/for-next branch
+>>>
+>>>  drivers/i2c/busses/i2c-omap.c |    2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>>> index 9895fa7..b105733 100644
+>>> --- a/drivers/i2c/busses/i2c-omap.c
+>>> +++ b/drivers/i2c/busses/i2c-omap.c
+>>> @@ -582,7 +582,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>>>
+>>>        r = pm_runtime_get_sync(dev->dev);
+>>>        if (IS_ERR_VALUE(r))
+>>> -               return r;
+>>> +               goto out;
+>>>
+>>>        r = omap_i2c_wait_for_bb(dev);
+>>>        if (r < 0)
+>>> --
+>>> 1.7.9.2
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
