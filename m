@@ -1,44 +1,42 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 29 Jun 2012 14:40:02 +0200
-Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
-In-Reply-To: <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
-References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
- <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120629144002.3b4a31ee@endymion.delvare>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jun 2012 20:41:57 +0800
+Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
+In-Reply-To: <20120629121437.GQ5844@shlinux2.ap.freescale.net>
+References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
+ <1340941925-14591-3-git-send-email-shijie8@gmail.com>
+ <20120629020650.GB28932@S2101-09.ap.freescale.net>
+ <20120629063329.GE5844@shlinux2.ap.freescale.net>
+ <20461.30070.771087.830745@ipc1.ka-ro>
+ <20120629093437.GK5844@shlinux2.ap.freescale.net>
+ <20461.30991.63507.369439@ipc1.ka-ro>
+ <20120629095433.GO5844@shlinux2.ap.freescale.net>
+ <20120629111334.GB29197@S2101-09.ap.freescale.net>
+ <20120629121437.GQ5844@shlinux2.ap.freescale.net>
+Message-ID: <20120629124154.GG29197@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jun 2012 16:35:27 +0530, Shubhrajyoti D wrote:
-> In i2c_smbus_xfer_emulated initialise the actual bytes
-> to zero.
+On Fri, Jun 29, 2012 at 08:14:38PM +0800, Dong Aisheng wrote:
+> > I'm with Lothar on this.  At least for imx28 case, we do not even need
+> > dummy clock, because NULL con_id in clkdev lookup will have all those
+> > clocks match the only one gpmi-nand clock on imx28, as I already said.
+> > 
+> I'm not quite understand. Can you clarify a bit more?
+> For extra clocks need by mx6q like "gpmi_bch", they're indeed have con_id.
+> Getting them will not fail on imx28 without dummy clock?
 > 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/i2c-core.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index a6ad32b..fa7f799 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -1949,8 +1949,8 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter *adapter, u16 addr,
->  	unsigned char msgbuf0[I2C_SMBUS_BLOCK_MAX+3];
->  	unsigned char msgbuf1[I2C_SMBUS_BLOCK_MAX+2];
->  	int num = read_write == I2C_SMBUS_READ ? 2 : 1;
-> -	struct i2c_msg msg[2] = { { addr, flags, 1, msgbuf0 },
-> -	                          { addr, flags | I2C_M_RD, 0, msgbuf1 }
-> +	struct i2c_msg msg[2] = { { addr, flags, 1, 0, msgbuf0 },
-> +				  { addr, flags | I2C_M_RD, 0, 0, msgbuf1 }
->  	                        };
->  	int i;
->  	u8 partial_pec = 0;
+You need to look at how imx28 registers clkdev for gpmi-nand.
 
-Please convert to C99-style initialization while you're there. And this
-should be done first. Initializing i2c_msg.actual maybe rather belong
-to i2c_transfer though, so that all callers don't have to care.
+static struct clk_lookup gpmi_lookups[] __initdata = {
+        { .dev_id = "imx28-gpmi-nand", },
+        { .dev_id = "8000c000.gpmi", },
+};
 
-Are you sure there are no other places that need the same fix in the
-kernel tree?
+clk_register_clkdevs(clks[gpmi], gpmi_lookups, ARRAY_SIZE(gpmi_lookups));
+
+As you can see, con_id is NULL for imx28 case.  As NULL is actually
+a wildcard for looking up, all the gpmi-nand clocks match it.
 
 -- 
-Jean Delvare
+Regards,
+Shawn
