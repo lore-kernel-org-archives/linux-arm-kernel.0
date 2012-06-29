@@ -1,27 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Jun 2012 19:47:16 +0800
-Subject: [PATCH 1/2] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <201206291133.09379.marex@denx.de>
-References: <1340958243-2332-1-git-send-email-marex@denx.de>
- <20120629090602.GI5844@shlinux2.ap.freescale.net>
- <201206291133.09379.marex@denx.de>
-Message-ID: <20120629114714.GE29197@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Jun 2012 04:55:11 -0700
+Subject: [PATCH 3/3] OMAP4 PANDA register ethernet and wlan for
+ automatic mac allocation
+In-Reply-To: <20120629055524.11091.57217.stgit@build.warmcat.com>
+References: <20120629054404.11091.31289.stgit@build.warmcat.com>
+ <20120629055524.11091.57217.stgit@build.warmcat.com>
+Message-ID: <20120629115511.GC4202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 11:33:09AM +0200, Marek Vasut wrote:
-> > I did not check spec,
-> > is it possible the supplied clock changed?
-> 
-> It's possible indeed ... Shawn?
-> 
-It's technically possible, but probably not practically.  The imx28 RM
-does not mention i2c clock at all, and I was told by designer that i2c
-always runs at the same frequency as apbx, which sources from ref_xtal
-(always 24 MHz).  Though there is a divider for apbx clock, it seems
-every single running system sets the divider as 1 all the time.  That
-said, what I have seen is the i2c clock is always 24 MHz.
+* Andy Green <andy.green@linaro.org> [120628 23:00]:
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -486,6 +486,15 @@ static void omap4_panda_init_rev(void)
+>  	}
+>  }
+>  
+> +/*
+> + * These device paths represent onboard network devices which have
+> + * no MAC address set at boot, and need synthetic ones assigning
+> + */
+> +static const char * const panda_fixup_mac_device_paths[] = {
+> +	"usb1/1-1/1-1.1/1-1.1:1.0",	/* smsc USB <-> Ethernet bridge */
+> +	"wl12xx",			/* wlan0 module */
+> +};
 
--- 
-Regards,
-Shawn
+I suspect the "usb1/1-1/1-1.1/1-1.1:1.0" naming is not valid
+if you change the order of loading of musb_hdrc and ehci modules?
+Might be worth checking..
+
+Tony
