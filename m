@@ -1,174 +1,42 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 29 Jun 2012 22:53:49 +0800
-Subject: [PATCH v8 14/14] usb: chipidea: add imx platform driver
-In-Reply-To: <4FED8E42.9020400@pengutronix.de>
-References: <1340963342-28735-1-git-send-email-richard.zhao@freescale.com>
- <1340963342-28735-15-git-send-email-richard.zhao@freescale.com>
- <4FED8E42.9020400@pengutronix.de>
-Message-ID: <20120629145347.GA2151@richard-laptop>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 29 Jun 2012 17:09:24 +0200
+Subject: [PATCH 04/15] mfd: ab8500: Register devices using the newly
+ DT:ed MFD API
+In-Reply-To: <1340197011-5435-5-git-send-email-lee.jones@linaro.org>
+References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
+ <1340197011-5435-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120629150924.GG22806@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 01:15:14PM +0200, Marc Kleine-Budde wrote:
-> On 06/29/2012 11:49 AM, Richard Zhao wrote:
-> > This patch supports only the host-mode functionality so far.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Peter Chen <peter.chen@freescale.com>
-> > Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
-> > ---
-> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |   18 ++
-> >  drivers/usb/chipidea/Makefile                      |    3 +
-> >  drivers/usb/chipidea/ci13xxx_imx.c                 |  198 ++++++++++++++++++++
-> >  3 files changed, 219 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > new file mode 100644
-> > index 0000000..2c29041
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > @@ -0,0 +1,18 @@
-> > +* Freescale i.MX ci13xxx usb controllers
-> > +
-> > +Required properties:
-> > +- compatible: Should be "fsl,imx27-usb"
-> > +- reg: Should contain registers location and length
-> > +- interrupts: Should contain controller interrupt
-> > +
-> > +Optional properties:
-> > +- fsl,usbphy: phandler of usb phy that connects to the only one port
-> > +- vbus-supply: regulator for vbus
-> > +
-> > +Examples:
-> > +usb at 02184000 { /* USB OTG */
-> > +	compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-> > +	reg = <0x02184000 0x200>;
-> > +	interrupts = <0 43 0x04>;
-> > +	fsl,usbphy = <&usbphy1>;
-> > +};
-> > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> > index b69900a..5c66d9c 100644
-> > --- a/drivers/usb/chipidea/Makefile
-> > +++ b/drivers/usb/chipidea/Makefile
-> > @@ -14,3 +14,6 @@ ifneq ($(CONFIG_PCI),)
-> >  	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
-> >  endif
-> >  
-> > +ifneq ($(CONFIG_OF_DEVICE),)
-> > +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
-> > +endif
-> > diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> > new file mode 100644
-> > index 0000000..ef60d06
-> > --- /dev/null
-> > +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> > @@ -0,0 +1,198 @@
-> > +/*
-> > + * Copyright 2012 Freescale Semiconductor, Inc.
-> > + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-> > + * on behalf of DENX Software Engineering GmbH
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/pm_runtime.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/usb/chipidea.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/regulator/consumer.h>
-> > +
-> > +#include "ci.h"
-> > +
-> > +#define pdev_to_phy(pdev) \
-> > +	((struct usb_phy *)platform_get_drvdata(pdev))
-> > +
-> > +struct ci13xxx_imx_data {
-> > +	struct device_node *phy_np;
-> > +	struct usb_phy *phy;
-> > +	struct platform_device *ci_pdev;
-> > +	struct clk *clk;
-> > +	struct regulator *reg_vbus;
-> > +};
-> > +
-> > +static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
-> > +	.name			= "ci13xxx_imx",
-> > +	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
-> > +				  CI13XXX_PULLUP_ON_VBUS |
-> > +				  CI13XXX_DISABLE_STREAMING,
-> > +	.capoffset		= DEF_CAPOFFSET,
-> > +};
-> > +
-> > +static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
-> > +{
-> > +	struct ci13xxx_imx_data *data;
-> > +	struct platform_device *plat_ci, *phy_pdev;
-> > +	struct device_node *phy_np;
-> > +	struct resource *res;
-> > +	struct regulator *reg_vbus;
-> > +	int ret;
-> > +
-> > +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> > +	if (!data) {
-> > +		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	if (!res) {
-> > +		dev_err(&pdev->dev, "Can't get device resources!\n");
-> > +		return -ENOENT;
-> > +	}
-> > +
-> > +	data->clk = devm_clk_get(&pdev->dev, NULL);
-> > +	if (IS_ERR(data->clk)) {
-> > +		dev_err(&pdev->dev,
-> > +			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
-> > +		return PTR_ERR(data->clk);
-> > +	}
-> > +
-> > +	ret = clk_prepare_enable(data->clk);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev,
-> > +			"Failed to prepare or enable clock, err=%d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
-> > +	if (phy_np) {
-> > +		data->phy_np = phy_np;
-> > +		phy_pdev = of_find_device_by_node(phy_np);
-> > +		if (phy_pdev) {
-> > +			struct usb_phy *phy;
-> > +			phy = pdev_to_phy(phy_pdev);
-> > +			if (phy &&
-> > +			    try_module_get(phy_pdev->dev.driver->owner)) {
-> > +				usb_phy_init(phy);
-> > +				data->phy = phy;
-> > +			}
-> > +		}
-> > +	}
-> 
-> what about using devm_usb_get_phy_by_phandle() as proposed in Kishon's
-> patch: "drivers: usb: otg: add device tree support to otg library".
-I won't use it until it's accepted.
+Hi Lee,
 
-Thanks
-Richard
+On Wed, Jun 20, 2012 at 01:56:40PM +0100, Lee Jones wrote:
+> Now the MFD API is Device Tree aware we can use it for platform
+> registration again, even when booting with DT enabled. To aid in
+> Device Node pointer allocation we provide each cell with the
+> associative compatible string.
 > 
-> Marc
-> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500.c |    1 -
+>  drivers/input/misc/ab8500-ponkey.c |    6 ----
+>  drivers/mfd/ab8500-core.c          |   64 ++++++++++++++++++++++--------------
+>  drivers/mfd/ab8500-debugfs.c       |    6 ----
+>  drivers/mfd/ab8500-gpadc.c         |    6 ----
+>  drivers/mfd/ab8500-sysctrl.c       |    6 ----
+>  drivers/misc/ab8500-pwm.c          |    6 ----
+>  drivers/regulator/ab8500.c         |    6 ----
+>  drivers/rtc/rtc-ab8500.c           |    7 ----
+>  drivers/usb/otg/ab8500-usb.c       |    6 ----
+>  10 files changed, 39 insertions(+), 75 deletions(-)
+This one does not apply properly against my for-next branch. Could you please
+generate a new one for me ?
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
