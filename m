@@ -1,30 +1,24 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 29 Jun 2012 15:21:25 +0200
-Subject: [PATCH 16/22] mfd: ab8500-gpadc: Enable IRQF_ONESHOT when
- requesting a threaded IRQ
-In-Reply-To: <1338353260-10097-17-git-send-email-lee.jones@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-17-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120629132125.GL4846@sortiz-mobl>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 29 Jun 2012 18:42:08 +0530
+Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
+In-Reply-To: <20120629145718.697b6955@endymion.delvare>
+References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
+ <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
+ <20120629144002.3b4a31ee@endymion.delvare>
+ <20120629145718.697b6955@endymion.delvare>
+Message-ID: <4FEDA9A8.1050504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Friday 29 June 2012 06:27 PM, Jean Delvare wrote:
+> drivers/gpu/drm/nouveau/nouveau_bios.c:3535:3: warning: (near initialization for ?msg[1].actual?) [enabled by default]
+>
+> This needs to be all fixed (converted to C99-style struct
+> initialization) before your patch is considered for inclusion. And
+> there may be more that my config did not spot.
+Yes,agree.
 
-On Wed, May 30, 2012 at 12:47:34PM +0800, Lee Jones wrote:
-> The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
-> 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/ab8500-gpadc.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-Patch applied, thanks.
+The idea of this patch was if the idea is agreed upon then.
+then fixing all the callers could be worked on.
 
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+However do you agree with this approach?
