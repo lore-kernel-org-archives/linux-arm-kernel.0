@@ -1,39 +1,25 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 29 Jun 2012 16:04:24 -0600
-Subject: [PATCH V2] ARM: dt: tegra: seaboard: add regulators
-Message-ID: <1341007464-16391-1-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 29 Jun 2012 16:04:46 -0600
+Subject: [PATCH V2] ARM: dt: tegra: ventana: add regulators
+Message-ID: <1341007486-16429-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Seaboard uses a TPS6586x regulator. Instantiate this, and hook up a
+Ventana uses a TPS6586x regulator. Instantiate this, and hook up a
 couple of fixed GPIO-controlled regulators too.
 
-Two data sources were used for the data encoded here:
-* The HW defaults, as extracted from real HW.
-* The schematic, which specifies a voltage for each LDO rail.
+The data was chosen to match the PMIC HW defaults, with the following
+exception:
 
-In most cases these sources matched. Differences are:
+ldo0: The HW default is 1.2v. On similar board designs, this rail is
+typically used for the PCIe clock which requires 3.3v. Note that this
+rail isn't actually used on this board.
 
-ldo0: The HW default is 1.2v. The schematic states this should be 3.3v.
-On similar board designs, this rail is typically used for the PCIe clock
-which requires 3.3v. Note that this rail isn't actually used on this
-board.
-
-ldo6: The HW default on Springbank is 2.85v. The HW default on Seaboard
-is 1.8v. The schematics for both Springbank and Seaboard match at 2.85v.
-However, internal research indicates that the schematics are incorrectly
-labelled, and 1.8v is correct. The ChromeOS kernel also uses 1.8v.
-
-Note that these settings don't entirely match those in the ChromeOS
-kernel found at the URL below. However, the selected values generally
-cause no behavior change in the kernel, and so were picked to avoid
-regressions.
-
-repo http://git.chromium.org/chromiumos/third_party/kernel.git
-branch chromeos-3.2
-file arch/arm/mach-tegra/board-seaboard-power.c
+ldo6: The HW default is 2.85v. The schematics are unlabelled. Internal
+research indicates that 1.8v is correct. Our downstream kernel also uses
+1.8v.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
@@ -43,24 +29,26 @@ v2:
 * Removed vin-supply properties from LDO nodes; the driver and binding
   need to be updated to support specifying the parent regulators before
   we can put these into DT.
+* Rename vdd_pnl regulator-name to match schematic.
+* Added vdd_bl regulator.
+* Fix typo in regulator at 3 reg property.
 * Use the enumerated-bus compatible value for the /regulators node.
 * Enhanced all regulator-name properties to list all signal names directly
   derived from the regulator pins.
 * Added ldo_rtc regulator.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-seaboard.dts |  164 ++++++++++++++++++++++++++++++++
- 1 files changed, 164 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra20-ventana.dts |  184 +++++++++++++++++++++++++++++++++
+ 1 files changed, 184 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 85e621a..3dad941 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -374,6 +374,141 @@
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index be90544..2934fe1 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -289,6 +289,145 @@
+ 	i2c at 7000d000 {
  		status = "okay";
  		clock-frequency = <400000>;
- 
++
 +		pmic: tps6586x at 34 {
 +			compatible = "ti,tps6586x";
 +			reg = <0x34>;
@@ -77,8 +65,8 @@ index 85e621a..3dad941 100644
 +					reg = <0>;
 +					regulator-compatible = "sm0";
 +					regulator-name = "vdd_sm0,vdd_core";
-+					regulator-min-microvolt = <1300000>;
-+					regulator-max-microvolt = <1300000>;
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
 +					regulator-always-on;
 +				};
 +
@@ -86,8 +74,8 @@ index 85e621a..3dad941 100644
 +					reg = <1>;
 +					regulator-compatible = "sm1";
 +					regulator-name = "vdd_sm1,vdd_cpu";
-+					regulator-min-microvolt = <1125000>;
-+					regulator-max-microvolt = <1125000>;
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
 +					regulator-always-on;
 +				};
 +
@@ -155,7 +143,7 @@ index 85e621a..3dad941 100644
 +				regulator at 9 {
 +					reg = <9>;
 +					regulator-compatible = "ldo6";
-+					regulator-name = "vdd_ldo6,avdd_vdac,vddio_vi,vddio_cam";
++					regulator-name = "vdd_ldo6,avdd_vdac";
 +					regulator-min-microvolt = <1800000>;
 +					regulator-max-microvolt = <1800000>;
 +				};
@@ -195,23 +183,15 @@ index 85e621a..3dad941 100644
 +				};
 +			};
 +		};
-+
- 		temperature-sensor at 4c {
- 			compatible = "nct1008";
- 			reg = <0x4c>;
-@@ -387,6 +522,10 @@
- 		};
- 	};
- 
-+	pmc {
-+		nvidia,invert-interrupt;
 +	};
 +
- 	memory-controller at 0x7000f400 {
- 		emc-table at 190000 {
- 			reg = <190000>;
-@@ -473,6 +612,31 @@
- 		};
++	pmc {
++		nvidia,invert-interrupt;
+ 	};
+ 
+ 	usb at c5000000 {
+@@ -317,6 +456,51 @@
+ 		bus-width = <8>;
  	};
  
 +	regulators {
@@ -237,10 +217,30 @@ index 85e621a..3dad941 100644
 +			gpio = <&pmic 1 0>;
 +			enable-active-high;
 +		};
++
++		regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "vdd_pnl";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <2800000>;
++			gpio = <&gpio 22 0>; /* gpio PC6 */
++			enable-active-high;
++		};
++
++		regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "vdd_bl";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <2800000>;
++			gpio = <&gpio 176 0>; /* gpio PW0 */
++			enable-active-high;
++		};
 +	};
 +
  	sound {
- 		compatible = "nvidia,tegra-audio-wm8903-seaboard",
+ 		compatible = "nvidia,tegra-audio-wm8903-ventana",
  			     "nvidia,tegra-audio-wm8903";
 -- 
 1.7.0.4
