@@ -1,28 +1,30 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Fri, 29 Jun 2012 14:46:09 +0300
-Subject: [PATCH v2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
-References: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1340970369.3070.166.camel@sauron.fi.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jun 2012 12:45:32 +0100
+Subject: [BUILD BREAKAGE] versatile, LEDS updates
+In-Reply-To: <20120629103313.GA16319@n2100.arm.linux.org.uk>
+References: <20120629103313.GA16319@n2100.arm.linux.org.uk>
+Message-ID: <20120629114532.GB16319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-05-29 at 10:16 +0200, Sascha Hauer wrote:
-> The following commit changes the function used to copy from/to
-> the hardware buffer to memcpy_[from|to]io. This does not work
-> since the hardware cannot handle the byte accesses used by these
-> functions. Instead of reverting this patch introduce 32bit
-> correspondents of these functions.
+On Fri, Jun 29, 2012 at 11:33:13AM +0100, Russell King - ARM Linux wrote:
+> I've just added Versatile to the build system, and the result is not
+> encouraging.  The integration of the LEDS code into Versatile breaks
+> its build:
+> 
+> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=1281
+> 
+> arch/arm/plat-versatile/leds.c: In function 'versatile_leds_init':
+> arch/arm/plat-versatile/leds.c:91: error: 'struct led_classdev' has no member named 'trigger_data'
+> 
+> This needs fixing before the LEDS code goes into mainline.
+> 
+> How well tested is the LEDS code?  Was it only tested with a set of
+> specifically updated configurations (it looks that way to me.)  Was
+> it ever tested with randconfig?
 
-Pushed to l2-mtd.git, thanks!
+BTW, this is the *EXACT* same error I reported on 3rd August 2011 with
+the LEDS subsystem.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/f0d9ca4a/attachment-0001.sig>
+Arnd: please drop the LEDS updates from arm-soc until the point that I
+raised 11 months ago is addressed and resolved.
