@@ -1,60 +1,35 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 29 Jun 2012 03:25:23 +0200
-Subject: [PATCH 1/1] ARM: OMAP3: PM: don't explicitly enable the IO-chain
- interrupt
-Message-ID: <1340933123-30401-1-git-send-email-javier@dowhile0.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 29 Jun 2012 02:29:31 +0100
+Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
+In-Reply-To: <CAN1soZwwWhNC2pQjwYz-jUjNrnnPfshyPQJL-8uM6z6BKvCwMA@mail.gmail.com>
+References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
+ <201206281121.56769.arnd@arndb.de>
+ <20120628114616.GE28922@opensource.wolfsonmicro.com>
+ <201206281432.24061.arnd@arndb.de>
+ <CAN1soZwwWhNC2pQjwYz-jUjNrnnPfshyPQJL-8uM6z6BKvCwMA@mail.gmail.com>
+Message-ID: <20120629012930.GM28922@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 99b59df0 ARM: OMAP3: PM: fix shared PRCM interrupt leave disabled at boot
+On Fri, Jun 29, 2012 at 09:18:07AM +0800, Haojian Zhuang wrote:
+> On Thu, Jun 28, 2012 at 10:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-set the IRQ_NOAUTOEN flag to the PCRM IO-chain irq to avoid this
-interrupt until the PM core code is ready to handle the interrupts.
+> > But it would be very helpful to see how the platform data is set, especially
+> > with the callback. If the callback is just there to set up a regulator
+> > or clock, then it should be changed to a more generic way.
 
-It seems that this is not needed anymore after the OMAP PRCM I/O chain
-code re-implementation introduced on merge commit:
+> No, the callbacks is not used to set up a regulator or clock. They're used to
+> configure the logic that are not integrated into drivers yet. For example, one
+> special regulator needs active in sleep mode; some power saving configuration
 
-9a17d88 Merge tag 'omap-devel-c-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/
-
-The IRQ_NOAUTOEN flags is not set for the PRCM I/O irq anymore on the
-new implementation. This has the effect that a request_irq() for the
-PRCM I/O chain irq will auto-enable the requested IRQ and a later call
-to enable_irq() will lead to the following warning:
-
-[    3.849334] WARNING: at kernel/irq/manage.c:436 enable_irq+0x3c/0x78()
-[    3.856231] Unbalanced enable for IRQ 297
-[    3.860473] Modules linked in:
-[    3.863739] [<c001a114>] (unwind_backtrace+0x0/0xf0) from [<c003c7e8>] (warn_slowpath_common+0x4c/0x64)
-[    3.873687] [<c003c7e8>] (warn_slowpath_common+0x4c/0x64) from [<c003c894>] (warn_slowpath_fmt+0x30/0x40)
-[    3.883819] [<c003c894>] (warn_slowpath_fmt+0x30/0x40) from [<c00993e0>] (enable_irq+0x3c/0x78)
-[    3.893035] [<c00993e0>] (enable_irq+0x3c/0x78) from [<c067b1e8>] (omap3_pm_init+0x328/0x5f4)
-[    3.902099] [<c067b1e8>] (omap3_pm_init+0x328/0x5f4) from [<c067161c>] (init_machine_late+0x1c/0x28)
-[    3.911773] [<c067161c>] (init_machine_late+0x1c/0x28) from [<c0008648>] (do_one_initcall+0x34/0x178)
-[    3.921539] [<c0008648>] (do_one_initcall+0x34/0x178) from [<c066e8f4>] (kernel_init+0xfc/0x1c0)
-[    3.930847] [<c066e8f4>] (kernel_init+0xfc/0x1c0) from [<c00140b0>] (kernel_thread_exit+0x0/0x8)
-[    3.940246] ---[ end trace 55a0ad32ca2ca682 ]---
-
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
----
-
-This patch was generated on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-branch: master
-
- arch/arm/mach-omap2/pm34xx.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index e4fc88c..6f14e26 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -693,7 +693,6 @@ int __init omap3_pm_init(void)
- 	ret = request_irq(omap_prcm_event_to_irq("io"),
- 		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
- 		omap3_pm_init);
--	enable_irq(omap_prcm_event_to_irq("io"));
- 
- 	if (ret) {
- 		pr_err("pm: Failed to request pm_io irq\n");
--- 
-1.7.7.6
+This is a *totally* normal pattern for PMICs, normally the things that
+are being configured by Linux would be configured prior to Linux
+starting and the callback is basically there for overriding things so we
+can fix up mistakes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/bd351af7/attachment.sig>
