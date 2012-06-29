@@ -1,25 +1,21 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 29 Jun 2012 13:36:36 +0300
-Subject: [PATCH v13 0/2] MTD: at91: Add PMECC support for at91 nand
- flash driver
-In-Reply-To: <1340963275-32104-1-git-send-email-josh.wu@atmel.com>
-References: <1340963275-32104-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1340966196.3070.145.camel@sauron.fi.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jun 2012 11:33:13 +0100
+Subject: [BUILD BREAKAGE] versatile, LEDS updates
+Message-ID: <20120629103313.GA16319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-06-29 at 17:47 +0800, Josh Wu wrote:
-> Those patches is based on the l2-mtd.git three.
+I've just added Versatile to the build system, and the result is not
+encouraging.  The integration of the LEDS code into Versatile breaks
+its build:
 
-Pushed to l2-mtd.git, thanks!
+http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=1281
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/54bdc8a2/attachment.sig>
+arch/arm/plat-versatile/leds.c: In function 'versatile_leds_init':
+arch/arm/plat-versatile/leds.c:91: error: 'struct led_classdev' has no member named 'trigger_data'
+
+This needs fixing before the LEDS code goes into mainline.
+
+How well tested is the LEDS code?  Was it only tested with a set of
+specifically updated configurations (it looks that way to me.)  Was
+it ever tested with randconfig?
