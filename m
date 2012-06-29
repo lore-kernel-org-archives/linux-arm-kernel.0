@@ -1,55 +1,72 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 29 Jun 2012 13:26:09 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP2+: PM: fix IRQ_NOAUTOEN removal by mis-merge
-In-Reply-To: <1340978614-12558-1-git-send-email-khilman@ti.com>
-References: <1340978614-12558-1-git-send-email-khilman@ti.com>
-Message-ID: <alpine.DEB.2.00.1206291324270.2338@utopia.booyaka.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 29 Jun 2012 14:54:47 -0500
+Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform.
+In-Reply-To: <20120627204018.0bfef362@skate>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <1340805007-3313-2-git-send-email-dinguyen@altera.com>
+ <20120627162014.1494cdd7@skate> <20120627180516.GA17393@elf.ucw.cz>
+ <20120627204018.0bfef362@skate>
+Message-ID: <1340999687.8634.9.camel@dinguyen-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jun 2012, Kevin Hilman wrote:
-
-> commit 99b59df0 (ARM: OMAP3: PM: fix shared PRCM interrupt leave
-> disabled at boot) added IRQ_NOAUTOEN to the PRCM interrupt so it could
-> be enabled later if needed.  However, this commit was partially undone
-> when merging the IO daisy chain rework in 9a17d88e (Merge tag
-> 'omap-devel-c-for-3.6' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into
-> devel-pm
+On Wed, 2012-06-27 at 20:40 +0200, Thomas Petazzoni wrote:
+> Le Wed, 27 Jun 2012 20:05:16 +0200,
+> Pavel Machek <pavel@denx.de> a ?crit :
 > 
-> This patch adds back the IRQ_NOAUTOEN fix that was removed by the
-> merge resolution.
+> > > Is SOCFPGA a good name? It seems like a very generic name. Shouldn't it
+> > > be ARCH_ALTERA_SOCFPGA a better name? I suspect other vendors will
+> > > provide a SoC together with a FPGA.
+> > 
+> > I guess for config option name, ALTERA_SOCFPGA is okay, but for
+> > directory name it would be a little bit long. Would that work?
 > 
-> This also fixes the following boot-time warning that showed up after
-> merging the IO daisy chain rework:
+> Hum, yes, maybe. Maybe just MACH_ALTERA, and mach-altera then?
+> Hopefully others will have better ideas.
+
+First off, thanks for the thoughtful review, its very much appreciated.
+
+Unless its a really strong objection, I'd like to stick with
+mach-socfpga. This is a name that Altera has started to market this hw
+around and I would like to stick with it.
+
 > 
-> [    3.849334] WARNING: at kernel/irq/manage.c:436 enable_irq+0x3c/0x78()
-> [    3.856231] Unbalanced enable for IRQ 297
-> [    3.860473] Modules linked in:
-> [    3.863739] [<c001a114>] (unwind_backtrace+0x0/0xf0) from [<c003c7e8>] (warn_slowpath_common+0x4c/0x64)
-> [    3.873687] [<c003c7e8>] (warn_slowpath_common+0x4c/0x64) from [<c003c894>] (warn_slowpath_fmt+0x30/0x40)
-> [    3.883819] [<c003c894>] (warn_slowpath_fmt+0x30/0x40) from [<c00993e0>] (enable_irq+0x3c/0x78)
-> [    3.893035] [<c00993e0>] (enable_irq+0x3c/0x78) from [<c067b1e8>] (omap3_pm_init+0x328/0x5f4)
-> [    3.902099] [<c067b1e8>] (omap3_pm_init+0x328/0x5f4) from [<c067161c>] (init_machine_late+0x1c/0x28)
-> [    3.911773] [<c067161c>] (init_machine_late+0x1c/0x28) from [<c0008648>] (do_one_initcall+0x34/0x178)
-> [    3.921539] [<c0008648>] (do_one_initcall+0x34/0x178) from [<c066e8f4>] (kernel_init+0xfc/0x1c0)
-> [    3.930847] [<c066e8f4>] (kernel_init+0xfc/0x1c0) from [<c00140b0>] (kernel_thread_exit+0x0/0x8)
-> [    3.940246] ---[ end trace 55a0ad32ca2ca682 ]---
+> > > And even more: for a given SoC
+> > > variant, we now generally only want one config options, the board-level
+> > > details being abstracted out by the device tree.
+> > 
+> > Will look into that later.
 > 
-> Reported-by: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Ok. If you look at other platforms, they now typically have only one
+> DT_MACHINE_START, and one configuration option associated to it, for
+> each SoC variant. The different boards are only described using DT.
+> 
+> > Ok.
+> > 
+> > arch/arm/mach-socfpga/socfpga_cyclone5.c:119: error:
+> > 'IRQ_SOCFPGA_L4_OSC1_TIMER0' undeclared (first use in this function)
+> > 
+> > Looks like we'll meed a bit more of dt :-).
+> 
+> Yes, you need more DT. You need a DT node for the timer, which will
+> contain all the details like base I/O address and IRQ.
+> 
+> > > > +#define NR_IRQS			512
+> > > 
+> > > You should be looking at using SPARSE_IRQ to avoid having a maximum
+> > > number of irqs. See for example mach-highbank/.
+> > 
+> > Is maximum number of interrupts a problem? 512 does not seem
+> > excessive.
+> 
+> Regardless of the value of NR_IRQS, there is apparently a trend to use
+> SPARSE_IRQ anyway. However, I am not at the best place to explain why
+> SPARSE_IRQ is now considered the right thing to use.
+> 
+> Best regards,
+> 
+> Thomas
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
-
-Looks indeed like I mismerged it.  One thing to note however is that the 
-warning that you quoted didn't show up during any of the boot testing of 
-that branch:
-
-http://www.pwsan.com/omap/bootlogs/20120621/io_chain_devel_3.6__fafcdd53220f44d7ae2f06a9ce20c8d550df2d9b/
-
-So I'm guessing that the patch that triggered the warning was something 
-else that got merged in the meantime.
-
-
-- Paul
+BR,
+Dinh
