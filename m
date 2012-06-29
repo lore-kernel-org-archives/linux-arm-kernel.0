@@ -1,66 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jun 2012 02:05:16 -0700
-Subject: [PATCH 1/3] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <20120629055509.11091.2780.stgit@build.warmcat.com>
-References: <20120629054404.11091.31289.stgit@build.warmcat.com>
- <20120629055509.11091.2780.stgit@build.warmcat.com>
-Message-ID: <20120629090515.GA4202@atomide.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 29 Jun 2012 12:09:33 +0300
+Subject: [PATCH v12 0/2] MTD: at91: Add PMECC support for at91 nand
+ flash driver
+In-Reply-To: <4FED6EAB.3000802@atmel.com>
+References: <1340871698-477-1-git-send-email-josh.wu@atmel.com>
+ <1340898021.3070.123.camel@sauron.fi.intel.com>
+ <4FED6EAB.3000802@atmel.com>
+Message-ID: <1340960973.3070.136.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andy Green <andy.green@linaro.org> [120628 22:59]:
+On Fri, 2012-06-29 at 17:00 +0800, Josh Wu wrote:
+> > +drivers/mtd/nand/atmel_nand.c:480:32: error: bad constant expression [sparse]
+> > +drivers/mtd/nand/atmel_nand.c:488:35: error: bad constant expression [sparse]
+> > +drivers/mtd/nand/atmel_nand.c:633:32: error: bad constant expression [sparse]
+> > +drivers/mtd/nand/atmel_nand.c:635:35: error: bad constant expression [sparse]
 > 
-> Introduce a generic helper function that can generate a valid MAC
-> address using data from the OMAP unique CPU ID register.
-...
+> I use CodeSourcery 2010q1, and no any error reported. So it seems 
+> related with the compiler.
 
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
->  	else
->  		tap_prod_id = 0x0208;
->  }
-> +
-> +/*
-> + * this uses the unique per-cpu info from the cpu fuses set at factory to
-> + * generate a 6-byte MAC address.  Two bits in the generated code are used
-> + * to elaborate the generated address into four, so it can be used on multiple
-> + * network interfaces.
-> + */
-> +
-> +void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype)
-> +{
-> +	struct omap_die_id odi;
-> +	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
-> +
-> +	omap_get_die_id(&odi);
-> +
-> +	mac[0] = odi.id_2;
-> +	mac[1] = odi.id_2 >> 8;
-> +	mac[2] = odi.id_1;
-> +	mac[3] = odi.id_1 >> 8;
-> +	mac[4] = odi.id_1 >> 16;
-> +	mac[5] = odi.id_1 >> 24;
-> +
-> +	/* XOR other chip-specific data with ID */
-> +
-> +	tap ^= odi.id_3;
-> +
-> +	mac[0] ^= tap;
-> +	mac[1] ^= tap >> 8;
-> +	mac[2] ^= tap >> 16;
-> +	mac[3] ^= tap >> 24;
-> +
-> +	/* allow four MACs from this same basic data */
-> +
-> +	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
-> +
-> +	/* mark it as not multicast, and outside official 80211 MAC namespace */
-> +
-> +	mac[0] = (mac[0] & ~1) | 2;
-> +}
+They are from sparse, not gcc.
 
-Let's just make this omap_die_id_to_ethernet_mac, no need to keep the
-omap2 naming there as this should not conflict with any omap1 stuff.
+> When I send out the next version of the patch, Could you please test it 
+> about above fix? since I don't have Sparse compiler in my hand. Thanks.
 
-Tony
+I will feed it to aiaiai, but you can also do it easily if you want. You
+can download my maintaining scripts from here:
+http://git.infradead.org/users/dedekind/maintaining.git
+and there is the documentation. You can use aiaiai in general for
+checking your patching before submitting out. Catches some embarrassing
+errors sometimes :-)
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120629/30dc8c8e/attachment.sig>
