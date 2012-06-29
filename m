@@ -1,37 +1,55 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 29 Jun 2012 15:18:32 +0200
-Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
-In-Reply-To: <4FEDA9A8.1050504@ti.com>
-References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
- <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
- <20120629144002.3b4a31ee@endymion.delvare>
- <20120629145718.697b6955@endymion.delvare>
- <4FEDA9A8.1050504@ti.com>
-Message-ID: <20120629151832.0cb26bea@endymion.delvare>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Fri, 29 Jun 2012 15:25:02 +0200
+Subject: [PATCH 1/1] ARM: OMAP3: PM: don't explicitly enable the IO-chain
+ interrupt
+In-Reply-To: <87obo2mg61.fsf@ti.com>
+References: <1340933123-30401-1-git-send-email-javier@dowhile0.org>
+ <87obo2mg61.fsf@ti.com>
+Message-ID: <CAAwP0s2F2pfBUpMzDaGJvoDNtQ+mFCTMnN43MoYD=k-rRT1mGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jun 2012 18:42:08 +0530, Shubhrajyoti wrote:
-> On Friday 29 June 2012 06:27 PM, Jean Delvare wrote:
-> > drivers/gpu/drm/nouveau/nouveau_bios.c:3535:3: warning: (near initialization for ?msg[1].actual?) [enabled by default]
-> >
-> > This needs to be all fixed (converted to C99-style struct
-> > initialization) before your patch is considered for inclusion. And
-> > there may be more that my config did not spot.
-> Yes,agree.
-> 
-> The idea of this patch was if the idea is agreed upon then.
-> then fixing all the callers could be worked on.
+On Fri, Jun 29, 2012 at 2:55 PM, Kevin Hilman <khilman@ti.com> wrote:
+> +Paul
+>
+> Javier Martinez Canillas <javier@dowhile0.org> writes:
+>
+>> commit 99b59df0 ARM: OMAP3: PM: fix shared PRCM interrupt leave disabled at boot
+>>
+>> set the IRQ_NOAUTOEN flag to the PCRM IO-chain irq to avoid this
+>> interrupt until the PM core code is ready to handle the interrupts.
+>>
+>> It seems that this is not needed anymore after the OMAP PRCM I/O chain
+>> code re-implementation introduced on merge commit:
+>>
+>> 9a17d88 Merge tag 'omap-devel-c-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/
+>>
+>> The IRQ_NOAUTOEN flags is not set for the PRCM I/O irq anymore on the
+>> new implementation. This has the effect that a request_irq() for the
+>> PRCM I/O chain irq will auto-enable the requested IRQ and a later call
+>> to enable_irq() will lead to the following warning:
+>
+> I noticed that warning too, but I don't think $SUBJECT patch is the
+> right fix.
+>
+> We still need the IRQ_NOAUTOEN so that cases where PM is not enabled,
+> the IO chain interrupts are not enabled.
+>
+> Looking closer, it looks like the merge of omap-devel-c-for-3.6 removed
+> the IRQ_NOAUTOEN in the merge resolution, which wasn't right.
+>
+> I'll cook up a fix for this.
+>
+> Kevin
+>
+>
 
-This is worth fixing anyway, C99-style initialization is always good to
-move to.
+Hi Kevin,
 
-> However do you agree with this approach?
+Yes, I can confirme you that the IRQ_NOAUTOEN was gone. I didn't know
+if the right solution was to set that flag again or to just remove the
+duplicated enable_irq(). I should had tag my patch with RFC instead of
+PATCH I guess :-)
 
-Well you've seen the caveats I mentioned, this will be no easy ride. If
-you are willing to take the risk, spend the time documenting the
-change, and help people if there are issues, then I'm OK. At least as
-long as someone else doesn't come saying it's a very bad idea ;)
-
--- 
-Jean Delvare
+Thanks a lot and best regards,
+Javier
