@@ -1,78 +1,66 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Fri, 29 Jun 2012 22:03:29 +0800
-Subject: [PATCH 2/3] OMAP2+ devices add mac address allocation register api
-In-Reply-To: <201206291345.49878.arnd@arndb.de>
-References: <20120629054404.11091.31289.stgit@build.warmcat.com>
- <4FED7E6A.4090207@linaro.org> <20120629120325.GD4202@atomide.com>
- <201206291345.49878.arnd@arndb.de>
-Message-ID: <4FEDB5B1.8000703@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 29 Jun 2012 09:07:14 -0500
+Subject: [PATCH 1/1] ARM: OMAP3: PM: don't explicitly enable the IO-chain
+ interrupt
+In-Reply-To: <CAAwP0s2F2pfBUpMzDaGJvoDNtQ+mFCTMnN43MoYD=k-rRT1mGw@mail.gmail.com>
+ (Javier Martinez Canillas's message of "Fri, 29 Jun 2012 15:25:02
+ +0200")
+References: <1340933123-30401-1-git-send-email-javier@dowhile0.org>
+ <87obo2mg61.fsf@ti.com>
+ <CAAwP0s2F2pfBUpMzDaGJvoDNtQ+mFCTMnN43MoYD=k-rRT1mGw@mail.gmail.com>
+Message-ID: <87y5n6ky99.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/12 21:45, the mail apparently from Arnd Bergmann included:
-> On Friday 29 June 2012, Tony Lindgren wrote:
->> * Andy Green <andy.green@linaro.org> [120629 03:12]:
->>>> 2. Is this really how we want to pass the board generated mac addresses
->>>>     and other dynamically generated data to the drivers that are device
->>>>     tree based?
->>>
->>> The issue is that both these busses have an async probe, in the case
->>> of USB stack the maintainer was not interested last year in adding
->>> platform data.  Maybe it changed but that's my understanding.
+Javier Martinez Canillas <martinez.javier@gmail.com> writes:
+
+> On Fri, Jun 29, 2012 at 2:55 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> +Paul
 >>
->> OK, I'd like to hear Arnds comments on the #2 above too as this is
->> a more generic issue.
->
-> In case we have a device tree, we should just be using the USB binding
-> to find the specific device node, and add the property there. Then
-> the device driver can use of_get_mac_address() on the usb device itself.
->
-> I'm not sure what it takes to add the link for the device node in the
-> usb probing code, but my feeling is that it's not too hard.
->
-> Right now, USB is probed entirely without DT, so the patch is about
-> the best we can do.
-
-Yes none of this was really hard the problem with more generic approach 
-was getting comprehension and not auto-reject at the other subsystems. 
-To be fair USB is USB and DT is Arm-specific issue.
-
->>>> 3. What about mac address in board-generic.c when booting panda with
->>>>     device tree?
->>>
->>> I don't mind adapting it for that case.
+>> Javier Martinez Canillas <javier@dowhile0.org> writes:
 >>
->> Just to try to think about some alternatives, how about something like
->> this: This all could be a driver called soft-mac or something that does
->> what your patches are doing. Except then it would be completely generic
->> and would be able to take device names and mac addresses from platform
->> data or from devicetree.
+>>> commit 99b59df0 ARM: OMAP3: PM: fix shared PRCM interrupt leave disabled at boot
+>>>
+>>> set the IRQ_NOAUTOEN flag to the PCRM IO-chain irq to avoid this
+>>> interrupt until the PM core code is ready to handle the interrupts.
+>>>
+>>> It seems that this is not needed anymore after the OMAP PRCM I/O chain
+>>> code re-implementation introduced on merge commit:
+>>>
+>>> 9a17d88 Merge tag 'omap-devel-c-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/
+>>>
+>>> The IRQ_NOAUTOEN flags is not set for the PRCM I/O irq anymore on the
+>>> new implementation. This has the effect that a request_irq() for the
+>>> PRCM I/O chain irq will auto-enable the requested IRQ and a later call
+>>> to enable_irq() will lead to the following warning:
+>>
+>> I noticed that warning too, but I don't think $SUBJECT patch is the
+>> right fix.
+>>
+>> We still need the IRQ_NOAUTOEN so that cases where PM is not enabled,
+>> the IO chain interrupts are not enabled.
+>>
+>> Looking closer, it looks like the merge of omap-devel-c-for-3.6 removed
+>> the IRQ_NOAUTOEN in the merge resolution, which wasn't right.
+>>
+>> I'll cook up a fix for this.
+>>
+>> Kevin
+>>
+>>
 >
-> That driver would be completely generic to all platforms, but be
-> very specific to finding the mac address of a device, as opposed to
-> other properties.
+> Hi Kevin,
 >
-> I suspect that if we do that, we will still need a way to bind a
-> device_node to a usb device for the purpose of finding other
-> properties, such as external regulators or clocks that are connected
-> to a hardwired USB device.
+> Yes, I can confirme you that the IRQ_NOAUTOEN was gone. I didn't know
+> if the right solution was to set that flag again or to just remove the
+> duplicated enable_irq(). I should had tag my patch with RFC instead of
+> PATCH I guess :-)
 
-There's no standardized exposure of logical regulators over USB afaik so 
-you won't be able to 'find' them without a VID:PID -bound specific 
-driver that already knew about them.
+No worries.   I just sent a patch adding back the IRQ_NOAUTOEN.
 
-> Normally USB tends to just work because the device is expected to
-> be hot-pluggable anyway. If the USB device is soldered to the
-> board, the hardware designers can take some shortcuts
+Thanks for reporting the bug.  I had noticed the boot time errors to but
+had not yet got to looking into them.  Your patch made me dig deeper.
 
-Tony's point about modularized host drivers coming in random order seems 
-to be a fair one.  We don't build ehci modular so we don't care about it 
-but from maintainer pov it's a legit issue.
+Thanks,
 
--Andy
-
--- 
-Andy Green | TI Landing Team Leader
-Linaro.org ? Open source software for ARM SoCs | Follow Linaro
-http://facebook.com/pages/Linaro/155974581091106  - 
-http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
+Kevin
