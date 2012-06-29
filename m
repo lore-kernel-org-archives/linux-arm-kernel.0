@@ -1,76 +1,46 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Fri, 29 Jun 2012 17:13:27 +0800
-Subject: [PATCH 1/3] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <20120629090515.GA4202@atomide.com>
-References: <20120629054404.11091.31289.stgit@build.warmcat.com>
- <20120629055509.11091.2780.stgit@build.warmcat.com>
- <20120629090515.GA4202@atomide.com>
-Message-ID: <4FED71B7.80308@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 29 Jun 2012 11:15:48 +0200
+Subject: [PATCH] ARM: imx: fix i.MX35 CPU architecture
+In-Reply-To: <2054987969.254809.1340896110005.JavaMail.root@advansee.com>
+References: <20120628105720.GA21278@pengutronix.de>
+ <2054987969.254809.1340896110005.JavaMail.root@advansee.com>
+Message-ID: <20120629091548.GH24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/12 17:05, the mail apparently from Tony Lindgren included:
-> * Andy Green <andy.green@linaro.org> [120628 22:59]:
->>
->> Introduce a generic helper function that can generate a valid MAC
->> address using data from the OMAP unique CPU ID register.
-> ...
->
->> --- a/arch/arm/mach-omap2/id.c
->> +++ b/arch/arm/mach-omap2/id.c
->> @@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
->>   	else
->>   		tap_prod_id = 0x0208;
->>   }
->> +
->> +/*
->> + * this uses the unique per-cpu info from the cpu fuses set at factory to
->> + * generate a 6-byte MAC address.  Two bits in the generated code are used
->> + * to elaborate the generated address into four, so it can be used on multiple
->> + * network interfaces.
->> + */
->> +
->> +void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype)
->> +{
->> +	struct omap_die_id odi;
->> +	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
->> +
->> +	omap_get_die_id(&odi);
->> +
->> +	mac[0] = odi.id_2;
->> +	mac[1] = odi.id_2 >> 8;
->> +	mac[2] = odi.id_1;
->> +	mac[3] = odi.id_1 >> 8;
->> +	mac[4] = odi.id_1 >> 16;
->> +	mac[5] = odi.id_1 >> 24;
->> +
->> +	/* XOR other chip-specific data with ID */
->> +
->> +	tap ^= odi.id_3;
->> +
->> +	mac[0] ^= tap;
->> +	mac[1] ^= tap >> 8;
->> +	mac[2] ^= tap >> 16;
->> +	mac[3] ^= tap >> 24;
->> +
->> +	/* allow four MACs from this same basic data */
->> +
->> +	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
->> +
->> +	/* mark it as not multicast, and outside official 80211 MAC namespace */
->> +
->> +	mac[0] = (mac[0] & ~1) | 2;
->> +}
->
-> Let's just make this omap_die_id_to_ethernet_mac, no need to keep the
-> omap2 naming there as this should not conflict with any omap1 stuff.
+On Thu, Jun 28, 2012 at 05:08:30PM +0200, Beno?t Th?baudeau wrote:
+> On Thu, Jun 28, 2012 at 12:57:20PM +0200, Sascha Hauer wrote:
+> > On Wed, Jun 27, 2012 at 10:28:26PM +0200, Beno?t Th?baudeau wrote:
+> > > The data sheet of the i.MX35 says it is an ARM1136JF-S processor,
+> > > version r1p3,
+> > > which, according to section "B.1. New instructions" of the
+> > > ARM1136JF-S and
+> > > ARM1136J-S Technical Reference Manual, makes the i.MX35 CPU
+> > > architecture not
+> > > only ARMv6, but ARMv6k.
+> > 
+> > Is this true for i.MX31 aswell?
+> 
+> No.
+> 
+> > If not, we would have to add
+> > additional
+> > magic to enable CPU_V6K only when SOC_IMX31 is not selected.
+> 
+> Why? That could be "select CPU_V6K if !SOC_IMX31", but e.g. CPU_V7 is selected
+> by SOC_IMX5 whether or not SOC_IMX31 or SOC_IMX35 is selected, and CPU_V6/6K/7
+> conflicts are handled with priorities by the ARM infrastructure.
 
-Okay, will do thanks.
+A boot test on i.MX31 shows that you are probably right. I remember a
+time when enabling CPU_V6K caused trouble, but it seems this has been
+sorted out.
 
--Andy
+So, applied this one.
+
+Sascha
 
 -- 
-Andy Green | TI Landing Team Leader
-Linaro.org ? Open source software for ARM SoCs | Follow Linaro
-http://facebook.com/pages/Linaro/155974581091106  - 
-http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
