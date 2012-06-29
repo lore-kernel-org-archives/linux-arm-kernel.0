@@ -1,95 +1,146 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 29 Jun 2012 17:34:38 +0800
-Subject: [PATCH 3/3] mtd: gpmi: change the code for clocks
-In-Reply-To: <20461.30070.771087.830745@ipc1.ka-ro>
-References: <1340941925-14591-1-git-send-email-shijie8@gmail.com>
- <1340941925-14591-3-git-send-email-shijie8@gmail.com>
- <20120629020650.GB28932@S2101-09.ap.freescale.net>
- <20120629063329.GE5844@shlinux2.ap.freescale.net>
- <20461.30070.771087.830745@ipc1.ka-ro>
-Message-ID: <20120629093437.GK5844@shlinux2.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Jun 2012 02:40:55 -0700
+Subject: [PATCH 2/3] OMAP2+ devices add mac address allocation register api
+In-Reply-To: <20120629055516.11091.82899.stgit@build.warmcat.com>
+References: <20120629054404.11091.31289.stgit@build.warmcat.com>
+ <20120629055516.11091.82899.stgit@build.warmcat.com>
+Message-ID: <20120629094055.GB4202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 05:29:26PM +0800, Lothar Wa?mann wrote:
-> Hi,
+* Andy Green <andy.green@linaro.org> [120628 22:59]:
+> From: Andy Green <andy@warmcat.com>
 > 
-> Dong Aisheng writes:
-> > On Fri, Jun 29, 2012 at 10:06:52AM +0800, Shawn Guo wrote:
-> > > On Thu, Jun 28, 2012 at 11:52:05PM -0400, Huang Shijie wrote:
-> > > > From: Huang Shijie <b32955@freescale.com>
-> > > > 
-> > > > The gpmi nand driver may needs several clocks(MX6Q needs five clocks).
-> > > > 
-> > > > In the old clock framework, all these clocks are chained together,
-> > > > all you need is to manipulate the first clock.
-> > > > 
-> > > > But the kernel uses the common clk framework now, which forces us to
-> > > > get the clocks one by one. When we use them, we have to enable them
-> > > > one by one too.
-> > > > 
-> [...]
-> > > > +static char *extra_clks_for_mx6q[] = {
-> > > > +	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
-> > > > +};
-> > > > +
-> > > > +static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
-> > > > +{
-> > > > +	struct resources *r = &this->resources;
-> > > > +	char **extra_clks = NULL;
-> > > > +	struct clk *clk;
-> > > > +	int i;
-> > > > +
-> > > > +	r->clock[0] = clk_get(&this->pdev->dev, NULL);
-> > > > +	if (IS_ERR(r->clock[0]))
-> > > > +		goto err_clock;
-> > > > +
-> > > > +	/* Get extra clocks */
-> > > > +	if (GPMI_IS_MX6Q(this))
-> > > > +		extra_clks = extra_clks_for_mx6q;
-> > > 
-> > > We probably do not need this tweaking.  We can have the driver always
-> > > take all those 5 clocks, and I think the current imx28 clock driver
-> > > can just work with it, because the gpmi-nand clkdev lookup has NULL
-> > > con_id and all those 5 clocks can match the same one on imx28.
-> > > 
-> > Will mx28 fail if doing like that?
-> > clk_get will fail if no clock found.
-> > struct clk *clk_get_sys(const char *dev_id, const char *con_id)
-> > {
-> >         struct clk_lookup *cl;
-> > 
-> >         mutex_lock(&clocks_mutex);
-> >         cl = clk_find(dev_id, con_id);
-> >         if (cl && !__clk_get(cl->clk))
-> >                 cl = NULL;
-> >         mutex_unlock(&clocks_mutex);
-> > 
-> >         return cl ? cl->clk : ERR_PTR(-ENOENT);
-> > }
-> > EXPORT_SYMBOL(clk_get_sys);
-> > 
-> > Furthermore, find unnecessary clock for mx28 seems not a good choice.
-> > Probably a better way is to define each SoC required clocks and get them
-> > respectively. It's explicit and clear.
-> > 
-> No, that's silly. You would have to change the driver for each
-> new platform that the driver can support.
+> This exposes a new API in devices.c that lets a board register
+> a list of device paths representing network devices that have
+> no arrangements for their MAC address to be set by the board.
 > 
-If the new platform is fully compatible with exist platforms, then no.
-If need more clocks, then in either way, we have to add support in driver.
+> It watches network device registrations via a notifier and
+> gives the devices requiring them a synthetic - but constant for
+> a given board - MAC address immediately.
+...
 
-> Instead the driver should request the maximum number of clocks that
-> the existing set of platforms provide and all platforms with fewer
-> clocks should provide an appropriate number of dummy clocks.
-> 
-I wish we can not use dummy since it's easy causing misleading until
-we have no other better way to go.
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -39,6 +42,9 @@
+>  #define L3_MODULES_MAX_LEN 12
+>  #define L3_MODULES 3
+>  
+> +static const char * const *mac_device_fixup_paths;
+> +int count_mac_device_fixup_paths;
 
-> This way new platforms can be supported without any change to the
-> driver and only if a platform requires even more clocks (like in this
-> particular case) would some code outside that platform have to be
-> changed at all.
+This too should be static it seems to me. Or just make the
+paths array NULL terminated to get rid of the count.
 
-Regards
-Dong Aisheng
+>  static int __init omap3_l3_init(void)
+>  {
+>  	struct omap_hwmod *oh;
+> @@ -627,6 +633,89 @@ static void omap_init_vout(void)
+>  static inline void omap_init_vout(void) {}
+>  #endif
+>  
+> +static int omap_device_path_need_mac(struct device *dev)
+> +{
+> +	const char **try = (const char **)mac_device_fixup_paths;
+
+This cast you should be able to remove by setting the types right
+to start with?
+
+> +	const char *path;
+> +	int count = count_mac_device_fixup_paths;
+> +	const char *p;
+> +	int len;
+> +	struct device *devn;
+> +
+> +	while (count--) {
+> +
+> +		p = *try + strlen(*try);
+> +		devn = dev;
+> +
+> +		while (devn) {
+> +
+> +			path = dev_name(devn);
+> +			len = strlen(path);
+> +
+> +			if ((p - *try) < len) {
+> +				devn = NULL;
+> +				continue;
+> +			}
+> +
+> +			p -= len;
+> +
+> +			if (strncmp(path, p, len)) {
+> +				devn = NULL;
+> +				continue;
+> +			}
+> +
+> +			devn = devn->parent;
+> +			if (p == *try)
+> +				return count;
+> +
+> +			if (devn != NULL && (p - *try) < 2)
+> +				devn = NULL;
+> +
+> +			p--;
+> +			if (devn != NULL && *p != '/')
+> +				devn = NULL;
+> +		}
+> +
+> +		try++;
+> +	}
+> +
+> +	return -ENOENT;
+> +}
+
+I don't quite like having this device parsing code here. This should
+probably be a generic helper function somewhere under drivers. I would
+assume other SoCs could use it too?
+
+> +static int omap_panda_netdev_event(struct notifier_block *this,
+> +						unsigned long event, void *ptr)
+> +{
+> +	struct net_device *dev = ptr;
+> +	struct sockaddr sa;
+> +	int n;
+> +
+> +	if (event != NETDEV_REGISTER)
+> +		return NOTIFY_DONE;
+> +
+> +	n = omap_device_path_need_mac(dev->dev.parent);
+> +	if (n < 0)
+> +		return NOTIFY_DONE;
+> +
+> +	sa.sa_family = dev->type;
+> +	omap2_die_id_to_ethernet_mac(sa.sa_data, n);
+> +	dev->netdev_ops->ndo_set_mac_address(dev, &sa);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block omap_panda_netdev_notifier = {
+> +	.notifier_call = omap_panda_netdev_event,
+> +	.priority = 1,
+> +};
+
+This is a bit similar to platform data callback functions that we are
+trying to get rid of. And as the question "how do we replace platform
+data callback functions" is still open for things like this, few
+questions come to mind that should be discussed:
+
+1. How is this a better solution to passing the generated mac address in
+   platform data to the driver?
+
+2. Is this really how we want to pass the board generated mac addresses
+   and other dynamically generated data to the drivers that are device
+   tree based?
+
+3. What about mac address in board-generic.c when booting panda with
+   device tree?
+
+Also, what happens if the user has set the mac address and you replugs the
+cable or device? Do we now overwrite it? Might be worth checking that this
+follows the standard behaviour..
+
+Regards,
+
+Tony
