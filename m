@@ -1,146 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jun 2012 02:40:55 -0700
-Subject: [PATCH 2/3] OMAP2+ devices add mac address allocation register api
-In-Reply-To: <20120629055516.11091.82899.stgit@build.warmcat.com>
-References: <20120629054404.11091.31289.stgit@build.warmcat.com>
- <20120629055516.11091.82899.stgit@build.warmcat.com>
-Message-ID: <20120629094055.GB4202@atomide.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Fri, 29 Jun 2012 17:38:07 +0800
+Subject: [PATCH 2/2] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <201206291130.17060.marex@denx.de>
+References: <1340958243-2332-1-git-send-email-marex@denx.de>
+ <1340958243-2332-2-git-send-email-marex@denx.de>
+ <20120629091900.GJ5844@shlinux2.ap.freescale.net>
+ <201206291130.17060.marex@denx.de>
+Message-ID: <20120629093806.GL5844@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andy Green <andy.green@linaro.org> [120628 22:59]:
-> From: Andy Green <andy@warmcat.com>
+On Fri, Jun 29, 2012 at 05:30:16PM +0800, Marek Vasut wrote:
+> Dear Dong Aisheng,
 > 
-> This exposes a new API in devices.c that lets a board register
-> a list of device paths representing network devices that have
-> no arrangements for their MAC address to be set by the board.
+> > On Fri, Jun 29, 2012 at 04:24:03PM +0800, Marek Vasut wrote:
+> > > This patch implements DMA support into mxs-i2c. DMA transfers are now
+> > > enabled via DT. The DMA operation is enabled by default.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Detlev Zundel <dzu@denx.de>
+> > > CC: Dong Aisheng <b29396@freescale.com>
+> > > CC: Fabio Estevam <fabio.estevam@freescale.com>
+> > > Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> > > Cc: linux-i2c at vger.kernel.org
+> > > CC: Sascha Hauer <s.hauer@pengutronix.de>
+> > > CC: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Stefano Babic <sbabic@denx.de>
+> > > CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > Cc: Wolfgang Denk <wd@denx.de>
+> > > Cc: Wolfram Sang <w.sang@pengutronix.de>
+> > > ---
+> > > 
+> > >  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    4 +
+> > >  arch/arm/boot/dts/imx28.dtsi                      |    2 +
+> > >  drivers/i2c/busses/i2c-mxs.c                      |  267
+> > >  +++++++++++++++++++-- 3 files changed, 251 insertions(+), 22
+> > >  deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> > > b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt index
+> > > d2bf750..9497ee0 100644
+> > > --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> > > 
+> > > @@ -5,6 +5,10 @@ Required properties:
+> > >  - reg: Should contain registers location and length
+> > >  - interrupts: Should contain ERROR and DMA interrupts
+> > >  - clock-frequency: desired I2C bus clock frequency in Hz.
+> > > 
+> > > +- fsl,i2c-dma-channel: APBX DMA channel for the I2C
+> > 
+> > Shoundn't this be optional?
 > 
-> It watches network device registrations via a notifier and
-> gives the devices requiring them a synthetic - but constant for
-> a given board - MAC address immediately.
-...
+> DMA channel? No, why?
+> 
+User can use pio mode, so actually it's optional.
+Is it reasonable?
 
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -39,6 +42,9 @@
->  #define L3_MODULES_MAX_LEN 12
->  #define L3_MODULES 3
->  
-> +static const char * const *mac_device_fixup_paths;
-> +int count_mac_device_fixup_paths;
+> > 
+> > > +	/*
+> > > +	 * The last descriptor must have this callback,
+> > > +	 * to finish the DMA transaction.
+> > > +	 */
+> > > +	desc->callback = mxs_i2c_dma_irq_callback;
+> > > +	desc->callback_param = i2c;
+> > > +
+> > > +	/* Start the transfer. */
+> > > +	dmaengine_submit(desc);
+> > > +	dma_async_issue_pending(i2c->dmach);
+> > > +	return 0;
+> > > +
+> > > +/* Read failpath. */
+> > > +read_init_dma_fail:
+> > > +	dma_unmap_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
+> > > +select_init_dma_fail:
+> > > +	dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
+> > > +select_init_pio_fail:
+> > > +	return 1;
+> > 
+> > look strange why return 1;
+> 
+> Because it failed. -Esomething might be better ?
+> 
+i think yes.
 
-This too should be static it seems to me. Or just make the
-paths array NULL terminated to get rid of the count.
-
->  static int __init omap3_l3_init(void)
->  {
->  	struct omap_hwmod *oh;
-> @@ -627,6 +633,89 @@ static void omap_init_vout(void)
->  static inline void omap_init_vout(void) {}
->  #endif
->  
-> +static int omap_device_path_need_mac(struct device *dev)
-> +{
-> +	const char **try = (const char **)mac_device_fixup_paths;
-
-This cast you should be able to remove by setting the types right
-to start with?
-
-> +	const char *path;
-> +	int count = count_mac_device_fixup_paths;
-> +	const char *p;
-> +	int len;
-> +	struct device *devn;
-> +
-> +	while (count--) {
-> +
-> +		p = *try + strlen(*try);
-> +		devn = dev;
-> +
-> +		while (devn) {
-> +
-> +			path = dev_name(devn);
-> +			len = strlen(path);
-> +
-> +			if ((p - *try) < len) {
-> +				devn = NULL;
-> +				continue;
-> +			}
-> +
-> +			p -= len;
-> +
-> +			if (strncmp(path, p, len)) {
-> +				devn = NULL;
-> +				continue;
-> +			}
-> +
-> +			devn = devn->parent;
-> +			if (p == *try)
-> +				return count;
-> +
-> +			if (devn != NULL && (p - *try) < 2)
-> +				devn = NULL;
-> +
-> +			p--;
-> +			if (devn != NULL && *p != '/')
-> +				devn = NULL;
-> +		}
-> +
-> +		try++;
-> +	}
-> +
-> +	return -ENOENT;
-> +}
-
-I don't quite like having this device parsing code here. This should
-probably be a generic helper function somewhere under drivers. I would
-assume other SoCs could use it too?
-
-> +static int omap_panda_netdev_event(struct notifier_block *this,
-> +						unsigned long event, void *ptr)
-> +{
-> +	struct net_device *dev = ptr;
-> +	struct sockaddr sa;
-> +	int n;
-> +
-> +	if (event != NETDEV_REGISTER)
-> +		return NOTIFY_DONE;
-> +
-> +	n = omap_device_path_need_mac(dev->dev.parent);
-> +	if (n < 0)
-> +		return NOTIFY_DONE;
-> +
-> +	sa.sa_family = dev->type;
-> +	omap2_die_id_to_ethernet_mac(sa.sa_data, n);
-> +	dev->netdev_ops->ndo_set_mac_address(dev, &sa);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block omap_panda_netdev_notifier = {
-> +	.notifier_call = omap_panda_netdev_event,
-> +	.priority = 1,
-> +};
-
-This is a bit similar to platform data callback functions that we are
-trying to get rid of. And as the question "how do we replace platform
-data callback functions" is still open for things like this, few
-questions come to mind that should be discussed:
-
-1. How is this a better solution to passing the generated mac address in
-   platform data to the driver?
-
-2. Is this really how we want to pass the board generated mac addresses
-   and other dynamically generated data to the drivers that are device
-   tree based?
-
-3. What about mac address in board-generic.c when booting panda with
-   device tree?
-
-Also, what happens if the user has set the mac address and you replugs the
-cable or device? Do we now overwrite it? Might be worth checking that this
-follows the standard behaviour..
-
-Regards,
-
-Tony
+Regards
+Dong Aisheng
