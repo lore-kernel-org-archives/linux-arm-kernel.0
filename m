@@ -1,23 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 30 Jun 2012 21:47:35 +0200
-Subject: linux-next: adding the common clk tree
-In-Reply-To: <20120626015551.GW4402@gmail.com>
-References: <20120626015551.GW4402@gmail.com>
-Message-ID: <CACRpkdayZUcA13p8iTRXLb4BestbAQhNP+a1nesYkcDEGFs=WA@mail.gmail.com>
+Date: Sat, 30 Jun 2012 21:50:17 +0200
+Subject: [PATCH] ARM: u300: convert to common clock
+In-Reply-To: <1340142265-14549-1-git-send-email-linus.walleij@stericsson.com>
+References: <1340142265-14549-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CACRpkdakK9LPfZa8zWCE415GLc_n+tPqGJPQr6g1O2K0ptd-UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2012 at 3:55 AM, Mike Turquette <mturquette@ti.com> wrote:
+On Tue, Jun 19, 2012 at 11:44 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
 
-> Would you please add the clk-next branch of the common clock tree to
-> linux-next?
+> From: Linus Walleij <linus.walleij@linaro.org>
 >
-> git://git.linaro.org/people/mturquette/linux.git clk-next
+> This converts the U300 clock implementation over to use the common
+> struct clk and moves the implementation down into drivers/clk.
+> Since VCO isn't used in tree it was removed, it's not hard to
+> put it back in if need be.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-So I don't see this being pulled into -next, is it just a slip,
-I though the structure of the branch was agreed upon and all?
-
-(I have patches in there, that's why I'm hammering.)
+Mike if this looks allright, could you merge it into the clk-next branch?
 
 Yours,
 Linus Walleij
