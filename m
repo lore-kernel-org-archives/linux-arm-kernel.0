@@ -1,50 +1,62 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 30 Jun 2012 10:12:21 +0530
-Subject: [PATCH v4 4/4] memory: emif: add device tree support to emif
- driver
-In-Reply-To: <20120630042356.GC1816@kroah.com>
-References: <1340977407-7594-1-git-send-email-santosh.shilimkar@ti.com>
- <1340977407-7594-5-git-send-email-santosh.shilimkar@ti.com>
- <CAMQu2gz6jdcR4hQPPbmyO8vrkdmppHeCkZmV3_9w27LOzKrUuA@mail.gmail.com>
- <20120630042356.GC1816@kroah.com>
-Message-ID: <CAMQu2gy0MmP4JLW4P1FreJqMMEBYSTjkLHJb8WX=aXLA6hxtZg@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sat, 30 Jun 2012 11:33:38 +0200
+Subject: Current state of AM33xx patches
+In-Reply-To: <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+Message-ID: <4FEEC7F2.8070507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 30, 2012 at 9:53 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Sat, Jun 30, 2012 at 09:38:41AM +0530, Shilimkar, Santosh wrote:
->> (+ Greg, By mistake the your name got dropped cc from list)
+Hi Paul,
+
+On 30.06.2012 04:11, Paul Walmsley wrote:
+> On Fri, 29 Jun 2012, Daniel Mack wrote:
+> 
+>> Correct me if I'm mistaken, but this isn't really what DT was designed
+>> for. In this context, it is used as a simple list of devices to probe,
+>> not as a abstracted description of the hardware resources and their
+>> interconnects.
 >>
->> On Fri, Jun 29, 2012 at 7:13 PM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
->> > From: Aneesh V <aneesh@ti.com>
->> >
->> > Device tree support for the EMIF driver.
->> >
->> > Reviewed-by: Benoit Cousson <b-cousson@ti.com>
->> > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
->> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
->> > Signed-off-by: Aneesh V <aneesh@ti.com>
->> > [santosh.shilimkar at ti.com: Rebased against 3.5-rc]
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > ---
->> > ?drivers/memory/emif.c | ?291 ++++++++++++++++++++++++++++++++++++++++++++++++-
->> > ?1 file changed, 290 insertions(+), 1 deletion(-)
->
-> Wouldn't this just be better off as a separate file that only gets build
-> if CONFIG_OF is set, as I'm sure that other systems are going to want
-> access to these "read the device tree values" functions, right?
->
-Probably yes. At least separate the LPDDR2 memory
-generic parameter DT read code. There are parameters like phy
-type which is specific to OMAP controllers so that still need to kept
-inside EMIF driver. So there in driver, few lines of code will be there
-under CONFIG_OF.
+>> The question is: is that the way things should be kept for OMAP/AM33xx? 
+>> Or should work be done to move all that hwmod stuff to proper 
+>> clk/irq/res definitions that can be used from DT generically?
+> 
+> Eventually the MPU address space, MPU interrupt controller IRQ line data, 
+> system DMA controller data, and some of the other common resource 
+> information are probably going to migrate from the hwmod data into the DT 
+> blob.
+> 
+> And probably some of the power management-related data will migrate to the 
+> IP block driver code used for a particular SoC.
+> 
+> Probably the best time for this to happen is after the PRM/CM/SCM drivers 
+> are written, and an omap_bus layer is created from the existing hwmod 
+> code.  The planning that we've done in conjunction with the ARM DT people 
+> involves getting DT board file handling done first, which is really what 
+> DT makes the most sense for.  Then looking at the on-chip SoC stuff 
+> afterwards.
+> 
+>> As there's actually no need to care for legacy users at all (as no board 
+>> support for AM33xx is mainline),
+> 
+> The hwmod data is unrelated to the board files.
+> 
+> The "legacy" user here is the hwmod code.  It uses the data to create 
+> devices for the IP blocks on the SoC, to reset those IP blocks at kernel 
+> init, and to implement IP block power management via the runtime PM layer.
 
-I can extract those functions which can be commonly used and put them
-in another file under drivers/memory/
+Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
+the components I need.
 
-Is that fine with you ?
+Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
 
-Regards
-Santosh
+
+Daniel
