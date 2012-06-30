@@ -1,36 +1,39 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 30 Jun 2012 14:09:02 +0200
-Subject: [PATCH 10/10] ARM: S3C24XX: Correct CAMIF interrupt definitions
-In-Reply-To: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <1341058142-30438-11-git-send-email-sylvester.nawrocki@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 30 Jun 2012 14:32:16 +0200
+Subject: [PATCH v10] MTD: LPC32xx MLC NAND driver
+In-Reply-To: <1340973434.3070.168.camel@sauron.fi.intel.com>
+References: <1340834129-15545-1-git-send-email-stigge@antcom.de>
+ <1340973434.3070.168.camel@sauron.fi.intel.com>
+Message-ID: <4FEEF1D0.5060404@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Properly define the CAMIF interrupt resources. This device have two
-interrupts - corresponding to the "codec" and "preview" data paths.
-IRQ_CAM is handled internally by the architecture and demultiplexed
-to IRQ_S3C2440_CAM_C and IRQ_S3C2440_CAM_P - these interrupts only
-should be handled in the driver.
+Hi Artem!
 
-Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
----
- arch/arm/plat-samsung/devs.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Thanks for the notes!
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 1d214cb..6303974 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -126,7 +126,8 @@ struct platform_device s3c_device_adc = {
- #ifdef CONFIG_CPU_S3C2440
- static struct resource s3c_camif_resource[] = {
- 	[0] = DEFINE_RES_MEM(S3C2440_PA_CAMIF, S3C2440_SZ_CAMIF),
--	[1] = DEFINE_RES_IRQ(IRQ_CAM),
-+	[1] = DEFINE_RES_IRQ(IRQ_S3C2440_CAM_C),
-+	[2] = DEFINE_RES_IRQ(IRQ_S3C2440_CAM_P),
- };
- 
- struct platform_device s3c_device_camif = {
--- 
-1.7.4.1
+On 29/06/12 14:37, Artem Bityutskiy wrote:
+> Successfully built configuration
+> "arm-lpc32xx_defconfig,arm,arm-unknown-linux-gnueabi-", results:
+> 
+> --- before_patching.log +++ after_patching.log @@ @@ 
+> +drivers/mtd/nand/lpc32xx_mlc.c: In function 'lpc32xx_nand_probe': 
+> +drivers/mtd/nand/lpc32xx_mlc.c:679:10: warning: variable 'sr' set
+> but not used [-Wunused-but-set-variable] 
+> +drivers/mtd/nand/lpc32xx_mlc.c:561:24: error: bad constant
+> expression [sparse]
+
+This is because sparse doesn't understand this local variable:
+
+uint8_t buf[mtd->writesize];
+
+(but gcc does).
+
+Are you sure we need to support sparse?
+
+The above construction is quite convenient for this case and I'd
+prefer this to allocating another buffer dynamically.
+
+Thanks in advance,
+
+Roland
