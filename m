@@ -1,210 +1,108 @@
 From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 30 Jun 2012 14:08:59 +0200
-Subject: [PATCH 07/10] ARM: S3C24XX: Remove unused GPIO definitions for port J
+Date: Sat, 30 Jun 2012 14:09:00 +0200
+Subject: [PATCH 08/10] ARM: S3C24XX: Remove unused GPIO definitions for
+ Openmoko GTA02 board
 In-Reply-To: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
 References: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <1341058142-30438-8-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <1341058142-30438-9-git-send-email-sylvester.nawrocki@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need now for individual GPIO port J pin control bit
-definitions, the GPIO0..12 pins can be configured using the gpiolib
-API. The GPJ* register address offset definitions for S3C2413 are
-moved to the common mach-s3c24xx/include/mach/regs-gpio.h header.
-These are still used outside of the gpio-samsung driver by PM code.
+mach-s3c24xx/include/mach/gta02.h header file contains defines
+which are now not used anywhere, remove them.
 
-Switching GPJ port to camera function can be done for example with:
-s3c_gpio_cfgall_range(S3C2410_GPJ(0), 13, S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
-
+Cc: Nelson Castillo <arhuaco@freaks-unidos.net>
 Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 ---
- arch/arm/mach-s3c24xx/include/mach/regs-gpio.h  |   17 +++++-
- arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h |   70 -----------------------
- arch/arm/mach-s3c24xx/mach-gta02.c              |    1 -
- arch/arm/mach-s3c24xx/mach-rx1950.c             |    1 -
- arch/arm/mach-s3c24xx/pm-s3c2412.c              |    1 -
- arch/arm/mach-s3c24xx/s3c2412.c                 |    1 -
- arch/arm/mach-s3c24xx/s3c244x.c                 |    1 -
- 7 files changed, 15 insertions(+), 77 deletions(-)
- delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h
+ arch/arm/mach-s3c24xx/include/mach/gta02.h |   69 ----------------------------
+ 1 files changed, 0 insertions(+), 69 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h b/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
-index cac1ad6..a11a638 100644
---- a/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
-+++ b/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
-@@ -302,7 +302,7 @@
- /* S3C2410:
-  * Port G consists of 8 GPIO/IRQ/Special function
-  *
-- * GPGCON has 2 bits for each of the input pins on port F
-+ * GPGCON has 2 bits for each of the input pins on port G
-  *   00 = 0 input, 1 output, 2 interrupt (EINT0..7), 3 special func
-  *
-  * pull up works like all other ports.
-@@ -366,7 +366,7 @@
- 
- /* Port H consists of11 GPIO/serial/Misc pins
-  *
-- * GPGCON has 2 bits for each of the input pins on port F
-+ * GPHCON has 2 bits for each of the input pins on port H
-  *   00 = 0 input, 1 output, 2 interrupt (EINT0..7), 3 special func
-  *
-  * pull up works like all other ports.
-@@ -427,6 +427,19 @@
-  * for the 2412/2413 from the 2410/2440/2442
- */
- 
-+/*
-+ * Port J consists of 13 GPIO/Camera pins. GPJCON has 2 bits
-+ * for each of the pins on port J.
-+ *   00 - input, 01 output, 10 - camera
-+ *
-+ * Pull up works like all other ports.
-+ */
-+
-+#define S3C2413_GPJCON	   S3C2410_GPIOREG(0x80)
-+#define S3C2413_GPJDAT	   S3C2410_GPIOREG(0x84)
-+#define S3C2413_GPJUP	   S3C2410_GPIOREG(0x88)
-+#define S3C2413_GPJSLPCON  S3C2410_GPIOREG(0x8C)
-+
- /* S3C2443 and above */
- #define S3C2440_GPJCON	   S3C2410_GPIOREG(0xD0)
- #define S3C2440_GPJDAT	   S3C2410_GPIOREG(0xD4)
-diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h b/arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h
-deleted file mode 100644
-index 19575e0..0000000
---- a/arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h
-+++ /dev/null
-@@ -1,70 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/regs-gpioj.h
-- *
-- * Copyright (c) 2004 Simtec Electronics <linux@simtec.co.uk>
-- *		      http://www.simtec.co.uk/products/SWLINUX/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * S3C2440 GPIO J register definitions
--*/
--
--
--#ifndef __ASM_ARCH_REGS_GPIOJ_H
--#define __ASM_ARCH_REGS_GPIOJ_H "gpioj"
--
--/* Port J consists of 13 GPIO/Camera pins
-- *
-- * GPJCON has 2 bits for each of the input pins on port F
-- *   00 = 0 input, 1 output, 2 Camera
-- *
-- * pull up works like all other ports.
--*/
--
--#define S3C2413_GPJCON		S3C2410_GPIOREG(0x80)
--#define S3C2413_GPJDAT		S3C2410_GPIOREG(0x84)
--#define S3C2413_GPJUP		S3C2410_GPIOREG(0x88)
--#define S3C2413_GPJSLPCON	S3C2410_GPIOREG(0x8C)
--
--#define S3C2440_GPJ0_OUTP       (0x01 << 0)
--#define S3C2440_GPJ0_CAMDATA0   (0x02 << 0)
--
--#define S3C2440_GPJ1_OUTP       (0x01 << 2)
--#define S3C2440_GPJ1_CAMDATA1   (0x02 << 2)
--
--#define S3C2440_GPJ2_OUTP       (0x01 << 4)
--#define S3C2440_GPJ2_CAMDATA2   (0x02 << 4)
--
--#define S3C2440_GPJ3_OUTP       (0x01 << 6)
--#define S3C2440_GPJ3_CAMDATA3   (0x02 << 6)
--
--#define S3C2440_GPJ4_OUTP       (0x01 << 8)
--#define S3C2440_GPJ4_CAMDATA4   (0x02 << 8)
--
--#define S3C2440_GPJ5_OUTP       (0x01 << 10)
--#define S3C2440_GPJ5_CAMDATA5   (0x02 << 10)
--
--#define S3C2440_GPJ6_OUTP       (0x01 << 12)
--#define S3C2440_GPJ6_CAMDATA6   (0x02 << 12)
--
--#define S3C2440_GPJ7_OUTP       (0x01 << 14)
--#define S3C2440_GPJ7_CAMDATA7   (0x02 << 14)
--
--#define S3C2440_GPJ8_OUTP       (0x01 << 16)
--#define S3C2440_GPJ8_CAMPCLK    (0x02 << 16)
--
--#define S3C2440_GPJ9_OUTP       (0x01 << 18)
--#define S3C2440_GPJ9_CAMVSYNC   (0x02 << 18)
--
--#define S3C2440_GPJ10_OUTP      (0x01 << 20)
--#define S3C2440_GPJ10_CAMHREF   (0x02 << 20)
--
--#define S3C2440_GPJ11_OUTP      (0x01 << 22)
--#define S3C2440_GPJ11_CAMCLKOUT (0x02 << 22)
--
--#define S3C2440_GPJ12_OUTP      (0x01 << 24)
--#define S3C2440_GPJ12_CAMRESET  (0x02 << 24)
--
--#endif	/* __ASM_ARCH_REGS_GPIOJ_H */
--
-diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
-index 0f29f64..92e1f93 100644
---- a/arch/arm/mach-s3c24xx/mach-gta02.c
-+++ b/arch/arm/mach-s3c24xx/mach-gta02.c
-@@ -71,7 +71,6 @@
- 
- #include <mach/regs-irq.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-gpioj.h>
- #include <mach/fb.h>
- 
- #include <plat/usb-control.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index a6762aa..7ee73f2 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -42,7 +42,6 @@
- #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-s3c24xx/include/mach/gta02.h b/arch/arm/mach-s3c24xx/include/mach/gta02.h
+index 3a56a22..2173934 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/gta02.h
++++ b/arch/arm/mach-s3c24xx/include/mach/gta02.h
+@@ -3,82 +3,13 @@
  
  #include <mach/regs-gpio.h>
--#include <mach/regs-gpioj.h>
- #include <mach/regs-lcd.h>
- #include <mach/h1940.h>
- #include <mach/fb.h>
-diff --git a/arch/arm/mach-s3c24xx/pm-s3c2412.c b/arch/arm/mach-s3c24xx/pm-s3c2412.c
-index d045885..c60f67a 100644
---- a/arch/arm/mach-s3c24xx/pm-s3c2412.c
-+++ b/arch/arm/mach-s3c24xx/pm-s3c2412.c
-@@ -26,7 +26,6 @@
- #include <asm/irq.h>
  
- #include <mach/regs-power.h>
--#include <mach/regs-gpioj.h>
- #include <mach/regs-gpio.h>
- #include <mach/regs-dsc.h>
+-/* Different hardware revisions, passed in ATAG_REVISION by u-boot */
+-#define GTA02v1_SYSTEM_REV	0x00000310
+-#define GTA02v2_SYSTEM_REV	0x00000320
+-#define GTA02v3_SYSTEM_REV	0x00000330
+-#define GTA02v4_SYSTEM_REV	0x00000340
+-#define GTA02v5_SYSTEM_REV	0x00000350
+-/* since A7 is basically same as A6, we use A6 PCB ID */
+-#define GTA02v6_SYSTEM_REV	0x00000360
+-
+-#define GTA02_GPIO_n3DL_GSM	S3C2410_GPA(13)	/* v1 + v2 + v3 only */
+-
+-#define GTA02_GPIO_PWR_LED1	S3C2410_GPB(0)
+-#define GTA02_GPIO_PWR_LED2	S3C2410_GPB(1)
+ #define GTA02_GPIO_AUX_LED	S3C2410_GPB(2)
+-#define GTA02_GPIO_VIBRATOR_ON	S3C2410_GPB(3)
+-#define GTA02_GPIO_MODEM_RST	S3C2410_GPB(5)
+-#define GTA02_GPIO_BT_EN	S3C2410_GPB(6)
+-#define GTA02_GPIO_MODEM_ON	S3C2410_GPB(7)
+-#define GTA02_GPIO_EXTINT8	S3C2410_GPB(8)
+ #define GTA02_GPIO_USB_PULLUP	S3C2410_GPB(9)
+-
+-#define GTA02_GPIO_PIO5		S3C2410_GPC(5)	/* v3 + v4 only */
+-
+-#define GTA02v3_GPIO_nG1_CS	S3C2410_GPD(12)	/* v3 + v4 only */
+-#define GTA02v3_GPIO_nG2_CS	S3C2410_GPD(13)	/* v3 + v4 only */
+-#define GTA02v5_GPIO_HDQ	S3C2410_GPD(14)   /* v5 + */
+-
+-#define GTA02_GPIO_nG1_INT	S3C2410_GPF(0)
+-#define GTA02_GPIO_IO1		S3C2410_GPF(1)
+-#define GTA02_GPIO_PIO_2	S3C2410_GPF(2)	/* v2 + v3 + v4 only */
+-#define GTA02_GPIO_JACK_INSERT	S3C2410_GPF(4)
+-#define GTA02_GPIO_WLAN_GPIO1	S3C2410_GPF(5)	/* v2 + v3 + v4 only */
+ #define GTA02_GPIO_AUX_KEY	S3C2410_GPF(6)
+ #define GTA02_GPIO_HOLD_KEY	S3C2410_GPF(7)
+-
+-#define GTA02_GPIO_3D_IRQ	S3C2410_GPG(4)
+-#define GTA02v2_GPIO_nG2_INT	S3C2410_GPG(8)	/* v2 + v3 + v4 only */
+-#define GTA02v3_GPIO_nUSB_OC	S3C2410_GPG(9)	/* v3 + v4 only */
+-#define GTA02v3_GPIO_nUSB_FLT	S3C2410_GPG(10)	/* v3 + v4 only */
+-#define GTA02v3_GPIO_nGSM_OC	S3C2410_GPG(11)	/* v3 + v4 only */
+-
+ #define GTA02_GPIO_AMP_SHUT	S3C2410_GPJ(1)	/* v2 + v3 + v4 only */
+-#define GTA02v1_GPIO_WLAN_GPIO10	S3C2410_GPJ(2)
+ #define GTA02_GPIO_HP_IN	S3C2410_GPJ(2)	/* v2 + v3 + v4 only */
+-#define GTA02_GPIO_INT0		S3C2410_GPJ(3)	/* v2 + v3 + v4 only */
+-#define GTA02_GPIO_nGSM_EN	S3C2410_GPJ(4)
+-#define GTA02_GPIO_3D_RESET	S3C2410_GPJ(5)
+-#define GTA02_GPIO_nDL_GSM	S3C2410_GPJ(6)	/* v4 + v5 only */
+-#define GTA02_GPIO_WLAN_GPIO0	S3C2410_GPJ(7)
+-#define GTA02v1_GPIO_BAT_ID	S3C2410_GPJ(8)
+-#define GTA02_GPIO_KEEPACT	S3C2410_GPJ(8)
+-#define GTA02v1_GPIO_HP_IN	S3C2410_GPJ(10)
+-#define GTA02_CHIP_PWD		S3C2410_GPJ(11)	/* v2 + v3 + v4 only */
+-#define GTA02_GPIO_nWLAN_RESET	S3C2410_GPJ(12)	/* v2 + v3 + v4 only */
  
-diff --git a/arch/arm/mach-s3c24xx/s3c2412.c b/arch/arm/mach-s3c24xx/s3c2412.c
-index d4bc7f9..6c5f403 100644
---- a/arch/arm/mach-s3c24xx/s3c2412.c
-+++ b/arch/arm/mach-s3c24xx/s3c2412.c
-@@ -39,7 +39,6 @@
- #include <plat/regs-serial.h>
- #include <mach/regs-power.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-gpioj.h>
- #include <mach/regs-dsc.h>
- #include <plat/regs-spi.h>
- #include <mach/regs-s3c2412.h>
-diff --git a/arch/arm/mach-s3c24xx/s3c244x.c b/arch/arm/mach-s3c24xx/s3c244x.c
-index 6f74118..b0b60a1 100644
---- a/arch/arm/mach-s3c24xx/s3c244x.c
-+++ b/arch/arm/mach-s3c24xx/s3c244x.c
-@@ -36,7 +36,6 @@
- #include <mach/regs-clock.h>
- #include <plat/regs-serial.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-gpioj.h>
- #include <mach/regs-dsc.h>
+-#define GTA02_IRQ_GSENSOR_1	IRQ_EINT0
+-#define GTA02_IRQ_MODEM		IRQ_EINT1
+-#define GTA02_IRQ_PIO_2		IRQ_EINT2	/* v2 + v3 + v4 only */
+-#define GTA02_IRQ_nJACK_INSERT	IRQ_EINT4
+-#define GTA02_IRQ_WLAN_GPIO1	IRQ_EINT5
+-#define GTA02_IRQ_AUX		IRQ_EINT6
+-#define GTA02_IRQ_nHOLD		IRQ_EINT7
+ #define GTA02_IRQ_PCF50633	IRQ_EINT9
+-#define GTA02_IRQ_3D		IRQ_EINT12
+-#define GTA02_IRQ_GSENSOR_2	IRQ_EINT16	/* v2 + v3 + v4 only */
+-#define GTA02v3_IRQ_nUSB_OC	IRQ_EINT17	/* v3 + v4 only */
+-#define GTA02v3_IRQ_nUSB_FLT	IRQ_EINT18	/* v3 + v4 only */
+-#define GTA02v3_IRQ_nGSM_OC	IRQ_EINT19	/* v3 + v4 only */
+-
+-/* returns 00 000 on GTA02 A5 and earlier, A6 returns 01 001 */
+-#define GTA02_PCB_ID1_0		S3C2410_GPC(13)
+-#define GTA02_PCB_ID1_1		S3C2410_GPC(15)
+-#define GTA02_PCB_ID1_2		S3C2410_GPD(0)
+-#define GTA02_PCB_ID2_0		S3C2410_GPD(3)
+-#define GTA02_PCB_ID2_1		S3C2410_GPD(4)
+-
+-int gta02_get_pcb_revision(void);
  
- #include <plat/s3c2410.h>
+ #endif /* _GTA02_H */
 -- 
 1.7.4.1
