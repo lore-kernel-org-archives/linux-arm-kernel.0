@@ -1,32 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 30 Jun 2012 21:04:37 +0000
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <20120627204018.0bfef362@skate>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <20120627180516.GA17393@elf.ucw.cz> <20120627204018.0bfef362@skate>
-Message-ID: <201206302104.37937.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 30 Jun 2012 15:26:13 -0700
+Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
+In-Reply-To: <20120628090927.GB22990@S2101-09.ap.freescale.net>
+References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
+ <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
+ <20120628090927.GB22990@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMifAQ-LYVPzimE_p8BpO32bLx8ycObYDWcMuTWbOFw3NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 June 2012, Thomas Petazzoni wrote:
-> > > > +#define NR_IRQS                  512
-> > > 
-> > > You should be looking at using SPARSE_IRQ to avoid having a maximum
-> > > number of irqs. See for example mach-highbank/.
-> > 
-> > Is maximum number of interrupts a problem? 512 does not seem
-> > excessive.
-> 
-> Regardless of the value of NR_IRQS, there is apparently a trend to use
-> SPARSE_IRQ anyway. However, I am not at the best place to explain why
-> SPARSE_IRQ is now considered the right thing to use.
+Hi,
 
-The main reason for me is to get rid of a hardcoded NR_IRQS constant,
-whihc is a blocker for multiplatform kernels. New platforms should
-do all they can to allow being built together with other platforms
-in the same kernel. While we're not there yet, doing sparse irq
-is an important step in the right direction and should not be hard
-to do for new code.
+On Thu, Jun 28, 2012 at 2:09 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Hi Olof,
+>
+> On Mon, Jun 11, 2012 at 12:47:15PM +0800, Shawn Guo wrote:
+>> Shawn Guo (2):
+>>       ARM: imx6q: remove unneeded clkdev lookups
+>
+> We agreed that this one is actually a cleanup and can be held off
+> until 3.6 ...
+>
+>>       ARM: imx6q: fix suspend regression caused by common clk migration
+>
+> ... but this is one is indeed a fix, which seems missed from your
+> pull-request to Linus.
 
-	Arnd
+Hi,
+
+Yes, given that the branch had contents that wasn't suitable for
+3.5-rc I didn't pull it. In the past, most maintainers will rebuild
+the branch and send a fresh pull request.
+
+I cherry-picked the patch above into our fixes branch now -- it sounds
+like that's what you expected me to do this time? In the future,
+please do send a refreshed pull request in this situations if you
+don't mind (or be explicit if you want me to cherry-pick).
+
+
+Thanks,
+
+
+-Olof
