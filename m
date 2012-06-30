@@ -1,281 +1,374 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 29 Jun 2012 21:53:26 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP4: hwmod data: temporarily remove data for the
- usb_host_fs and aess IP blocks
-Message-ID: <alpine.DEB.2.00.1206292151290.2338@utopia.booyaka.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 30 Jun 2012 09:38:41 +0530
+Subject: [PATCH v4 4/4] memory: emif: add device tree support to emif
+ driver
+In-Reply-To: <1340977407-7594-5-git-send-email-santosh.shilimkar@ti.com>
+References: <1340977407-7594-1-git-send-email-santosh.shilimkar@ti.com>
+ <1340977407-7594-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAMQu2gz6jdcR4hQPPbmyO8vrkdmppHeCkZmV3_9w27LOzKrUuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+(+ Greg, By mistake the your name got dropped cc from list)
 
-The OMAP4 usb_host_fs (OHCI) and AESS IP blocks require some special
-programming for them to enter idle.  Without this programming, they
-will prevent the rest of the chip from entering full chip idle.
-
-To implement the idle programming cleanly, this will take some
-coordination between maintainers.  This is likely to take some time,
-so it is probably best to leave this for 3.6 or 3.7.  So, in the
-meantime, simply remove this data.
-
-Later, once the appropriate support is available, this patch can be
-reverted.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
----
-Intended for v3.5-rc.
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  178 ----------------------------
- 1 file changed, 178 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index f30e861..95cbfe6 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -296,60 +296,6 @@ static struct omap_hwmod omap44xx_ocp_wp_noc_hwmod = {
-  */
- 
- /*
-- * 'aess' class
-- * audio engine sub system
-- */
--
--static struct omap_hwmod_class_sysconfig omap44xx_aess_sysc = {
--	.rev_offs	= 0x0000,
--	.sysc_offs	= 0x0010,
--	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
--	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART |
--			   MSTANDBY_SMART_WKUP),
--	.sysc_fields	= &omap_hwmod_sysc_type2,
--};
--
--static struct omap_hwmod_class omap44xx_aess_hwmod_class = {
--	.name	= "aess",
--	.sysc	= &omap44xx_aess_sysc,
--};
--
--/* aess */
--static struct omap_hwmod_irq_info omap44xx_aess_irqs[] = {
--	{ .irq = 99 + OMAP44XX_IRQ_GIC_START },
--	{ .irq = -1 }
--};
--
--static struct omap_hwmod_dma_info omap44xx_aess_sdma_reqs[] = {
--	{ .name = "fifo0", .dma_req = 100 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo1", .dma_req = 101 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo2", .dma_req = 102 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo3", .dma_req = 103 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo4", .dma_req = 104 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo5", .dma_req = 105 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo6", .dma_req = 106 + OMAP44XX_DMA_REQ_START },
--	{ .name = "fifo7", .dma_req = 107 + OMAP44XX_DMA_REQ_START },
--	{ .dma_req = -1 }
--};
--
--static struct omap_hwmod omap44xx_aess_hwmod = {
--	.name		= "aess",
--	.class		= &omap44xx_aess_hwmod_class,
--	.clkdm_name	= "abe_clkdm",
--	.mpu_irqs	= omap44xx_aess_irqs,
--	.sdma_reqs	= omap44xx_aess_sdma_reqs,
--	.main_clk	= "aess_fck",
--	.prcm = {
--		.omap4 = {
--			.clkctrl_offs = OMAP4_CM1_ABE_AESS_CLKCTRL_OFFSET,
--			.context_offs = OMAP4_RM_ABE_AESS_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
--		},
--	},
--};
--
--/*
-  * 'c2c' class
-  * chip 2 chip interface used to plug the ape soc (omap) with an external modem
-  * soc
-@@ -3285,55 +3231,6 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
- };
- 
- /*
-- * 'usb_host_fs' class
-- * full-speed usb host controller
-- */
--
--/* The IP is not compliant to type1 / type2 scheme */
--static struct omap_hwmod_sysc_fields omap_hwmod_sysc_type_usb_host_fs = {
--	.midle_shift	= 4,
--	.sidle_shift	= 2,
--	.srst_shift	= 1,
--};
--
--static struct omap_hwmod_class_sysconfig omap44xx_usb_host_fs_sysc = {
--	.rev_offs	= 0x0000,
--	.sysc_offs	= 0x0210,
--	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET),
--	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			   SIDLE_SMART_WKUP),
--	.sysc_fields	= &omap_hwmod_sysc_type_usb_host_fs,
--};
--
--static struct omap_hwmod_class omap44xx_usb_host_fs_hwmod_class = {
--	.name	= "usb_host_fs",
--	.sysc	= &omap44xx_usb_host_fs_sysc,
--};
--
--/* usb_host_fs */
--static struct omap_hwmod_irq_info omap44xx_usb_host_fs_irqs[] = {
--	{ .name = "std", .irq = 89 + OMAP44XX_IRQ_GIC_START },
--	{ .name = "smi", .irq = 90 + OMAP44XX_IRQ_GIC_START },
--	{ .irq = -1 }
--};
--
--static struct omap_hwmod omap44xx_usb_host_fs_hwmod = {
--	.name		= "usb_host_fs",
--	.class		= &omap44xx_usb_host_fs_hwmod_class,
--	.clkdm_name	= "l3_init_clkdm",
--	.mpu_irqs	= omap44xx_usb_host_fs_irqs,
--	.main_clk	= "usb_host_fs_fck",
--	.prcm = {
--		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L3INIT_USB_HOST_FS_CLKCTRL_OFFSET,
--			.context_offs = OMAP4_RM_L3INIT_USB_HOST_FS_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
--		},
--	},
--};
--
--/*
-  * 'usb_host_hs' class
-  * high-speed multi-port usb host controller
-  */
-@@ -3863,14 +3760,6 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__l3_main_2 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--/* usb_host_fs -> l3_main_2 */
--static struct omap_hwmod_ocp_if omap44xx_usb_host_fs__l3_main_2 = {
--	.master		= &omap44xx_usb_host_fs_hwmod,
--	.slave		= &omap44xx_l3_main_2_hwmod,
--	.clk		= "l3_div_ck",
--	.user		= OCP_USER_MPU | OCP_USER_SDMA,
--};
--
- /* usb_host_hs -> l3_main_2 */
- static struct omap_hwmod_ocp_if omap44xx_usb_host_hs__l3_main_2 = {
- 	.master		= &omap44xx_usb_host_hs_hwmod,
-@@ -3921,14 +3810,6 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__l3_main_3 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--/* aess -> l4_abe */
--static struct omap_hwmod_ocp_if omap44xx_aess__l4_abe = {
--	.master		= &omap44xx_aess_hwmod,
--	.slave		= &omap44xx_l4_abe_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU | OCP_USER_SDMA,
--};
--
- /* dsp -> l4_abe */
- static struct omap_hwmod_ocp_if omap44xx_dsp__l4_abe = {
- 	.master		= &omap44xx_dsp_hwmod,
-@@ -4003,42 +3884,6 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__ocp_wp_noc = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
--	{
--		.pa_start	= 0x401f1000,
--		.pa_end		= 0x401f13ff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
--/* l4_abe -> aess */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__aess = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_aess_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.addr		= omap44xx_aess_addrs,
--	.user		= OCP_USER_MPU,
--};
--
--static struct omap_hwmod_addr_space omap44xx_aess_dma_addrs[] = {
--	{
--		.pa_start	= 0x490f1000,
--		.pa_end		= 0x490f13ff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
--/* l4_abe -> aess (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__aess_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_aess_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.addr		= omap44xx_aess_dma_addrs,
--	.user		= OCP_USER_SDMA,
--};
--
- /* l3_main_2 -> c2c */
- static struct omap_hwmod_ocp_if omap44xx_l3_main_2__c2c = {
- 	.master		= &omap44xx_l3_main_2_hwmod,
-@@ -5847,24 +5692,6 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__uart4 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--static struct omap_hwmod_addr_space omap44xx_usb_host_fs_addrs[] = {
--	{
--		.pa_start	= 0x4a0a9000,
--		.pa_end		= 0x4a0a93ff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
--/* l4_cfg -> usb_host_fs */
--static struct omap_hwmod_ocp_if omap44xx_l4_cfg__usb_host_fs = {
--	.master		= &omap44xx_l4_cfg_hwmod,
--	.slave		= &omap44xx_usb_host_fs_hwmod,
--	.clk		= "l4_div_ck",
--	.addr		= omap44xx_usb_host_fs_addrs,
--	.user		= OCP_USER_MPU | OCP_USER_SDMA,
--};
--
- static struct omap_hwmod_addr_space omap44xx_usb_host_hs_addrs[] = {
- 	{
- 		.name		= "uhh",
-@@ -6014,13 +5841,11 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_iva__l3_main_2,
- 	&omap44xx_l3_main_1__l3_main_2,
- 	&omap44xx_l4_cfg__l3_main_2,
--	&omap44xx_usb_host_fs__l3_main_2,
- 	&omap44xx_usb_host_hs__l3_main_2,
- 	&omap44xx_usb_otg_hs__l3_main_2,
- 	&omap44xx_l3_main_1__l3_main_3,
- 	&omap44xx_l3_main_2__l3_main_3,
- 	&omap44xx_l4_cfg__l3_main_3,
--	&omap44xx_aess__l4_abe,
- 	&omap44xx_dsp__l4_abe,
- 	&omap44xx_l3_main_1__l4_abe,
- 	&omap44xx_mpu__l4_abe,
-@@ -6029,8 +5854,6 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l4_cfg__l4_wkup,
- 	&omap44xx_mpu__mpu_private,
- 	&omap44xx_l4_cfg__ocp_wp_noc,
--	&omap44xx_l4_abe__aess,
--	&omap44xx_l4_abe__aess_dma,
- 	&omap44xx_l3_main_2__c2c,
- 	&omap44xx_l4_wkup__counter_32k,
- 	&omap44xx_l4_cfg__ctrl_module_core,
-@@ -6136,7 +5959,6 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l4_per__uart2,
- 	&omap44xx_l4_per__uart3,
- 	&omap44xx_l4_per__uart4,
--	&omap44xx_l4_cfg__usb_host_fs,
- 	&omap44xx_l4_cfg__usb_host_hs,
- 	&omap44xx_l4_cfg__usb_otg_hs,
- 	&omap44xx_l4_cfg__usb_tll_hs,
--- 
-1.7.10
+On Fri, Jun 29, 2012 at 7:13 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> From: Aneesh V <aneesh@ti.com>
+>
+> Device tree support for the EMIF driver.
+>
+> Reviewed-by: Benoit Cousson <b-cousson@ti.com>
+> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Aneesh V <aneesh@ti.com>
+> [santosh.shilimkar at ti.com: Rebased against 3.5-rc]
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> ?drivers/memory/emif.c | ?291 ++++++++++++++++++++++++++++++++++++++++++++++++-
+> ?1 file changed, 290 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
+> index 33a4396..101997b 100644
+> --- a/drivers/memory/emif.c
+> +++ b/drivers/memory/emif.c
+> @@ -18,6 +18,7 @@
+> ?#include <linux/platform_device.h>
+> ?#include <linux/interrupt.h>
+> ?#include <linux/slab.h>
+> +#include <linux/of.h>
+> ?#include <linux/debugfs.h>
+> ?#include <linux/seq_file.h>
+> ?#include <linux/module.h>
+> @@ -49,6 +50,7 @@
+> ?* ? ? ? ? ? ? ? ? ? ? ? ? ? ? frequency in effect at the moment)
+> ?* @plat_data: ? ? ? ? ? ? ? ? Pointer to saved platform data.
+> ?* @debugfs_root: ? ? ? ? ? ? ?dentry to the root folder for EMIF in debugfs
+> + * @np_ddr: ? ? ? ? ? ? ? ? ? ?Pointer to ddr device tree node
+> ?*/
+> ?struct emif_data {
+> ? ? ? ?u8 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?duplicate;
+> @@ -63,6 +65,7 @@ struct emif_data {
+> ? ? ? ?struct emif_regs ? ? ? ? ? ? ? ?*curr_regs;
+> ? ? ? ?struct emif_platform_data ? ? ? *plat_data;
+> ? ? ? ?struct dentry ? ? ? ? ? ? ? ? ? *debugfs_root;
+> + ? ? ? struct device_node ? ? ? ? ? ? ?*np_ddr;
+> ?};
+>
+> ?static struct emif_data *emif1;
+> @@ -1148,6 +1151,278 @@ static int is_custom_config_valid(struct emif_custom_configs *cust_cfgs,
+> ? ? ? ?return valid;
+> ?}
+>
+> +#if defined(CONFIG_OF)
+> +static void __init_or_module of_get_custom_configs(struct device_node *np_emif,
+> + ? ? ? ? ? ? ? struct emif_data *emif)
+> +{
+> + ? ? ? struct emif_custom_configs ? ? ?*cust_cfgs = NULL;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? ? ? ? ? len;
+> + ? ? ? const int ? ? ? ? ? ? ? ? ? ? ? *lpmode, *poll_intvl;
+> +
+> + ? ? ? lpmode = of_get_property(np_emif, "low-power-mode", &len);
+> + ? ? ? poll_intvl = of_get_property(np_emif, "temp-alert-poll-interval", &len);
+> +
+> + ? ? ? if (lpmode || poll_intvl)
+> + ? ? ? ? ? ? ? cust_cfgs = devm_kzalloc(emif->dev, sizeof(*cust_cfgs),
+> + ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
+> +
+> + ? ? ? if (!cust_cfgs)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? if (lpmode) {
+> + ? ? ? ? ? ? ? cust_cfgs->mask |= EMIF_CUSTOM_CONFIG_LPMODE;
+> + ? ? ? ? ? ? ? cust_cfgs->lpmode = *lpmode;
+> + ? ? ? ? ? ? ? of_property_read_u32(np_emif,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "low-power-mode-timeout-performance",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cust_cfgs->lpmode_timeout_performance);
+> + ? ? ? ? ? ? ? of_property_read_u32(np_emif,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "low-power-mode-timeout-power",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cust_cfgs->lpmode_timeout_power);
+> + ? ? ? ? ? ? ? of_property_read_u32(np_emif,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "low-power-mode-freq-threshold",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cust_cfgs->lpmode_freq_threshold);
+> + ? ? ? }
+> +
+> + ? ? ? if (poll_intvl) {
+> + ? ? ? ? ? ? ? cust_cfgs->mask |=
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL;
+> + ? ? ? ? ? ? ? cust_cfgs->temp_alert_poll_interval_ms = *poll_intvl;
+> + ? ? ? }
+> +
+> + ? ? ? if (!is_custom_config_valid(cust_cfgs, emif->dev)) {
+> + ? ? ? ? ? ? ? devm_kfree(emif->dev, cust_cfgs);
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? emif->plat_data->custom_configs = cust_cfgs;
+> +}
+> +
+> +static void __init_or_module of_get_min_tck(struct device_node *np,
+> + ? ? ? ? ? ? ? struct emif_data *emif)
+> +{
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? ret = 0;
+> + ? ? ? struct lpddr2_min_tck ? *min;
+> +
+> + ? ? ? min = devm_kzalloc(emif->dev, sizeof(*min), GFP_KERNEL);
+> + ? ? ? if (!min)
+> + ? ? ? ? ? ? ? goto default_min_tck;
+> +
+> + ? ? ? ret |= of_property_read_u32(np, "tRPab-min-tck", &min->tRPab);
+> + ? ? ? ret |= of_property_read_u32(np, "tRCD-min-tck", &min->tRCD);
+> + ? ? ? ret |= of_property_read_u32(np, "tWR-min-tck", &min->tWR);
+> + ? ? ? ret |= of_property_read_u32(np, "tRASmin-min-tck", &min->tRASmin);
+> + ? ? ? ret |= of_property_read_u32(np, "tRRD-min-tck", &min->tRRD);
+> + ? ? ? ret |= of_property_read_u32(np, "tWTR-min-tck", &min->tWTR);
+> + ? ? ? ret |= of_property_read_u32(np, "tXP-min-tck", &min->tXP);
+> + ? ? ? ret |= of_property_read_u32(np, "tRTP-min-tck", &min->tRTP);
+> + ? ? ? ret |= of_property_read_u32(np, "tCKE-min-tck", &min->tCKE);
+> + ? ? ? ret |= of_property_read_u32(np, "tCKESR-min-tck", &min->tCKESR);
+> + ? ? ? ret |= of_property_read_u32(np, "tFAW-min-tck", &min->tFAW);
+> +
+> + ? ? ? if (ret) {
+> + ? ? ? ? ? ? ? devm_kfree(emif->dev, min);
+> + ? ? ? ? ? ? ? goto default_min_tck;
+> + ? ? ? }
+> +
+> + ? ? ? emif->plat_data->min_tck = min;
+> + ? ? ? return;
+> +
+> +default_min_tck:
+> + ? ? ? dev_warn(emif->dev, "%s: using default min-tck values\n", __func__);
+> + ? ? ? emif->plat_data->min_tck = &lpddr2_jedec_min_tck;
+> +}
+> +
+> +static int __init_or_module of_do_get_timings(struct device_node *np,
+> + ? ? ? ? ? ? ? struct lpddr2_timings *tim)
+> +{
+> + ? ? ? int ret;
+> +
+> + ? ? ? ret = of_property_read_u32(np, "max-freq", &tim->max_freq);
+> + ? ? ? ret |= of_property_read_u32(np, "min-freq", &tim->min_freq);
+> + ? ? ? ret |= of_property_read_u32(np, "tRPab", &tim->tRPab);
+> + ? ? ? ret |= of_property_read_u32(np, "tRCD", &tim->tRCD);
+> + ? ? ? ret |= of_property_read_u32(np, "tWR", &tim->tWR);
+> + ? ? ? ret |= of_property_read_u32(np, "tRAS-min", &tim->tRAS_min);
+> + ? ? ? ret |= of_property_read_u32(np, "tRRD", &tim->tRRD);
+> + ? ? ? ret |= of_property_read_u32(np, "tWTR", &tim->tWTR);
+> + ? ? ? ret |= of_property_read_u32(np, "tXP", &tim->tXP);
+> + ? ? ? ret |= of_property_read_u32(np, "tRTP", &tim->tRTP);
+> + ? ? ? ret |= of_property_read_u32(np, "tCKESR", &tim->tCKESR);
+> + ? ? ? ret |= of_property_read_u32(np, "tDQSCK-max", &tim->tDQSCK_max);
+> + ? ? ? ret |= of_property_read_u32(np, "tFAW", &tim->tFAW);
+> + ? ? ? ret |= of_property_read_u32(np, "tZQCS", &tim->tZQCS);
+> + ? ? ? ret |= of_property_read_u32(np, "tZQCL", &tim->tZQCL);
+> + ? ? ? ret |= of_property_read_u32(np, "tZQinit", &tim->tZQinit);
+> + ? ? ? ret |= of_property_read_u32(np, "tRAS-max-ns", &tim->tRAS_max_ns);
+> + ? ? ? ret |= of_property_read_u32(np, "tDQSCK-max-derated",
+> + ? ? ? ? ? ? ? &tim->tDQSCK_max_derated);
+> +
+> + ? ? ? return ret;
+> +}
+> +
+> +static void __init_or_module of_get_ddr_timings(struct device_node *np_ddr,
+> + ? ? ? ? ? ? ? struct emif_data *emif)
+> +{
+> + ? ? ? struct lpddr2_timings ? *timings = NULL;
+> + ? ? ? u32 ? ? ? ? ? ? ? ? ? ? arr_sz = 0, i = 0;
+> + ? ? ? struct device_node ? ? ?*np_tim;
+> + ? ? ? char ? ? ? ? ? ? ? ? ? ?*tim_compat;
+> +
+> + ? ? ? switch (emif->plat_data->device_info->type) {
+> + ? ? ? case DDR_TYPE_LPDDR2_S2:
+> + ? ? ? case DDR_TYPE_LPDDR2_S4:
+> + ? ? ? ? ? ? ? tim_compat = "jedec,lpddr2-timings";
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? dev_warn(emif->dev, "%s: un-supported memory type\n", __func__);
+> + ? ? ? }
+> +
+> + ? ? ? for_each_child_of_node(np_ddr, np_tim)
+> + ? ? ? ? ? ? ? if (of_device_is_compatible(np_tim, tim_compat))
+> + ? ? ? ? ? ? ? ? ? ? ? arr_sz++;
+> +
+> + ? ? ? if (arr_sz)
+> + ? ? ? ? ? ? ? timings = devm_kzalloc(emif->dev, sizeof(*timings) * arr_sz,
+> + ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
+> +
+> + ? ? ? if (!timings)
+> + ? ? ? ? ? ? ? goto default_timings;
+> +
+> + ? ? ? for_each_child_of_node(np_ddr, np_tim) {
+> + ? ? ? ? ? ? ? if (of_device_is_compatible(np_tim, tim_compat)) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (of_do_get_timings(np_tim, &timings[i])) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? devm_kfree(emif->dev, timings);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto default_timings;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? i++;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? emif->plat_data->timings = timings;
+> + ? ? ? emif->plat_data->timings_arr_size = arr_sz;
+> +
+> + ? ? ? return;
+> +
+> +default_timings:
+> + ? ? ? get_default_timings(emif);
+> +
+> + ? ? ? return;
+> +}
+> +
+> +static void __init_or_module of_get_ddr_info(struct device_node *np_emif,
+> + ? ? ? ? ? ? ? struct device_node *np_ddr,
+> + ? ? ? ? ? ? ? struct ddr_device_info *dev_info)
+> +{
+> + ? ? ? u32 density = 0, io_width = 0;
+> + ? ? ? int len;
+> +
+> + ? ? ? if (of_find_property(np_emif, "cs1-used", &len))
+> + ? ? ? ? ? ? ? dev_info->cs1_used = true;
+> +
+> + ? ? ? if (of_find_property(np_emif, "cal-resistor-per-cs", &len))
+> + ? ? ? ? ? ? ? dev_info->cal_resistors_per_cs = true;
+> +
+> + ? ? ? if (of_device_is_compatible(np_ddr , "jedec,lpddr2-s4"))
+> + ? ? ? ? ? ? ? dev_info->type = DDR_TYPE_LPDDR2_S4;
+> + ? ? ? else if (of_device_is_compatible(np_ddr , "jedec,lpddr2-s2"))
+> + ? ? ? ? ? ? ? dev_info->type = DDR_TYPE_LPDDR2_S2;
+> +
+> + ? ? ? of_property_read_u32(np_ddr, "density", &density);
+> + ? ? ? of_property_read_u32(np_ddr, "io-width", &io_width);
+> +
+> + ? ? ? /* Convert from density in Mb to the density encoding in jedc_ddr.h */
+> + ? ? ? if (density & (density - 1))
+> + ? ? ? ? ? ? ? dev_info->density = 0;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? dev_info->density = __fls(density) - 5;
+> +
+> + ? ? ? /* Convert from io_width in bits to io_width encoding in jedc_ddr.h */
+> + ? ? ? if (io_width & (io_width - 1))
+> + ? ? ? ? ? ? ? dev_info->io_width = 0;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? dev_info->io_width = __fls(io_width) - 1;
+> +}
+> +
+> +static struct emif_data * __init_or_module of_get_device_details(
+> + ? ? ? ? ? ? ? struct device_node *np_emif, struct device *dev)
+> +{
+> + ? ? ? struct emif_data ? ? ? ? ? ? ? ?*emif = NULL;
+> + ? ? ? struct ddr_device_info ? ? ? ? ?*dev_info = NULL;
+> + ? ? ? struct emif_platform_data ? ? ? *pd = NULL;
+> + ? ? ? struct device_node ? ? ? ? ? ? ?*np_ddr;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? ? ? ? ? len;
+> +
+> + ? ? ? np_ddr = of_parse_phandle(np_emif, "device-handle", 0);
+> + ? ? ? if (!np_ddr)
+> + ? ? ? ? ? ? ? goto error;
+> + ? ? ? emif ? ?= devm_kzalloc(dev, sizeof(struct emif_data), GFP_KERNEL);
+> + ? ? ? pd ? ? ?= devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
+> + ? ? ? dev_info = devm_kzalloc(dev, sizeof(*dev_info), GFP_KERNEL);
+> +
+> + ? ? ? if (!emif || !pd || !dev_info) {
+> + ? ? ? ? ? ? ? dev_err(dev, "%s: of_get_device_details() failure!!\n",
+> + ? ? ? ? ? ? ? ? ? ? ? __func__);
+> + ? ? ? ? ? ? ? goto error;
+> + ? ? ? }
+> +
+> + ? ? ? emif->plat_data ? ? ? ? = pd;
+> + ? ? ? pd->device_info ? ? ? ? = dev_info;
+> + ? ? ? emif->dev ? ? ? ? ? ? ? = dev;
+> + ? ? ? emif->np_ddr ? ? ? ? ? ?= np_ddr;
+> + ? ? ? emif->temperature_level = SDRAM_TEMP_NOMINAL;
+> +
+> + ? ? ? if (of_device_is_compatible(np_emif, "ti,emif-4d"))
+> + ? ? ? ? ? ? ? emif->plat_data->ip_rev = EMIF_4D;
+> + ? ? ? else if (of_device_is_compatible(np_emif, "ti,emif-4d5"))
+> + ? ? ? ? ? ? ? emif->plat_data->ip_rev = EMIF_4D5;
+> +
+> + ? ? ? of_property_read_u32(np_emif, "phy-type", &pd->phy_type);
+> +
+> + ? ? ? if (of_find_property(np_emif, "hw-caps-ll-interface", &len))
+> + ? ? ? ? ? ? ? pd->hw_caps |= EMIF_HW_CAPS_LL_INTERFACE;
+> +
+> + ? ? ? of_get_ddr_info(np_emif, np_ddr, dev_info);
+> + ? ? ? if (!is_dev_data_valid(pd->device_info->type, pd->device_info->density,
+> + ? ? ? ? ? ? ? ? ? ? ? pd->device_info->io_width, pd->phy_type, pd->ip_rev,
+> + ? ? ? ? ? ? ? ? ? ? ? emif->dev)) {
+> + ? ? ? ? ? ? ? dev_err(dev, "%s: invalid device data!!\n", __func__);
+> + ? ? ? ? ? ? ? goto error;
+> + ? ? ? }
+> + ? ? ? /*
+> + ? ? ? ?* For EMIF instances other than EMIF1 see if the devices connected
+> + ? ? ? ?* are exactly same as on EMIF1(which is typically the case). If so,
+> + ? ? ? ?* mark it as a duplicate of EMIF1. This will save some memory and
+> + ? ? ? ?* computation.
+> + ? ? ? ?*/
+> + ? ? ? if (emif1 && emif1->np_ddr == np_ddr) {
+> + ? ? ? ? ? ? ? emif->duplicate = true;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? } else if (emif1) {
+> + ? ? ? ? ? ? ? dev_warn(emif->dev, "%s: Non-symmetric DDR geometry\n",
+> + ? ? ? ? ? ? ? ? ? ? ? __func__);
+> + ? ? ? }
+> +
+> +
+> + ? ? ? of_get_custom_configs(np_emif, emif);
+> + ? ? ? of_get_ddr_timings(np_ddr, emif);
+> + ? ? ? of_get_min_tck(np_ddr, emif);
+> + ? ? ? goto out;
+> +
+> +error:
+> + ? ? ? return NULL;
+> +out:
+> + ? ? ? return emif;
+> +}
+> +
+> +#else
+> +
+> +static struct emif_data * __init_or_module of_get_device_details(
+> + ? ? ? ? ? ? ? struct device_node *np_emif, struct device *dev)
+> +{
+> + ? ? ? return NULL;
+> +}
+> +#endif
+> +
+> ?static struct emif_data *__init_or_module get_device_details(
+> ? ? ? ? ? ? ? ?struct platform_device *pdev)
+> ?{
+> @@ -1267,7 +1542,11 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
+> ? ? ? ?struct resource ? ? ? ? *res;
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? irq;
+>
+> - ? ? ? emif = get_device_details(pdev);
+> + ? ? ? if (pdev->dev.of_node)
+> + ? ? ? ? ? ? ? emif = of_get_device_details(pdev->dev.of_node, &pdev->dev);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? emif = get_device_details(pdev);
+> +
+> ? ? ? ?if (!emif) {
+> ? ? ? ? ? ? ? ?pr_err("%s: error getting device data\n", __func__);
+> ? ? ? ? ? ? ? ?goto error;
+> @@ -1644,11 +1923,21 @@ static void __attribute__((unused)) freq_post_notify_handling(void)
+> ? ? ? ?spin_unlock_irqrestore(&emif_lock, irq_state);
+> ?}
+>
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id emif_of_match[] = {
+> + ? ? ? ? ? ? ? { .compatible = "ti,emif-4d" },
+> + ? ? ? ? ? ? ? { .compatible = "ti,emif-4d5" },
+> + ? ? ? ? ? ? ? {},
+> +};
+> +MODULE_DEVICE_TABLE(of, emif_of_match);
+> +#endif
+> +
+> ?static struct platform_driver emif_driver = {
+> ? ? ? ?.remove ? ? ? ? = __exit_p(emif_remove),
+> ? ? ? ?.shutdown ? ? ? = emif_shutdown,
+> ? ? ? ?.driver = {
+> ? ? ? ? ? ? ? ?.name = "emif",
+> + ? ? ? ? ? ? ? .of_match_table = of_match_ptr(emif_of_match),
+> ? ? ? ?},
+> ?};
+>
+> --
+> 1.7.9.5
+>
