@@ -1,104 +1,61 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 30 Jun 2012 09:44:05 +0530
-Subject: [PATCH v3 4/4] memory: emif: add device tree support to emif
- driver
-In-Reply-To: <20120630025057.GA3482@kroah.com>
-References: <CAMQu2gy7oj-+1qCteAFMXEeOL-Wdrs6e4gKWM=HsOukXcPuv-A@mail.gmail.com>
- <20120625182830.GA23850@kroah.com>
- <CAMQu2gxDG=69X7UQPUoTLP5h1ZLpHngp=3C4vSDOS6L-N2XZSw@mail.gmail.com>
- <4FE9467A.2050906@ti.com>
- <CAMQu2gzOszT54ZU0Z3-9k=mMM7yTCH_MCZV=gRKwGoGRj0zjaA@mail.gmail.com>
- <4FE947F7.9030000@ti.com>
- <CAMQu2gwzFV-79CuEAmOHCZ7XivXrALjXkoB+J-QpgJkZ_PoRVg@mail.gmail.com>
- <CAMQu2gx2RT0iyo+LD1TyTJg9FRSUD8SK2tA=nxAoULzQOa6L7A@mail.gmail.com>
- <20120629210752.GA13859@kroah.com> <4FEE1E04.1060600@ti.com>
- <20120630025057.GA3482@kroah.com>
-Message-ID: <CAMQu2gzBxYT1axeLpbDrRJMJa9jB+D7BkQCLZH_bfO96AzT+mg@mail.gmail.com>
+Date: Sat, 30 Jun 2012 09:48:03 +0530
+Subject: [PATCH] gpio/omap: fix invalid context restore of gpio bank-0
+In-Reply-To: <1340990551-19426-1-git-send-email-jon-hunter@ti.com>
+References: <1340990551-19426-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <CAMQu2gx+tCujB0a+2zL8RGdJe5Y2VLPOyPUOPkys3VS7JdaKbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 30, 2012 at 8:20 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Fri, Jun 29, 2012 at 04:28:36PM -0500, Jon Hunter wrote:
->>
->> On 06/29/2012 04:07 PM, Greg Kroah-Hartman wrote:
->> > On Fri, Jun 29, 2012 at 07:16:19PM +0530, Shilimkar, Santosh wrote:
->> >> Greg,
->> >>
->> >> On Tue, Jun 26, 2012 at 1:19 PM, Shilimkar, Santosh
->> >> <santosh.shilimkar@ti.com> wrote:
->> >>>
->> >>> On Tue, Jun 26, 2012 at 10:56 AM, Rajendra Nayak <rnayak@ti.com> wrote:
->> >>>> On Tuesday 26 June 2012 10:53 AM, Shilimkar, Santosh wrote:
->> >>>>>
->> >>>>> On Tue, Jun 26, 2012 at 10:49 AM, Rajendra Nayak<rnayak@ti.com> ?wrote:
->> >>>>>>
->> >>>>>> On Tuesday 26 June 2012 10:39 AM, Shilimkar, Santosh wrote:
->> >>>>>>>>>
->> >>>>>>>>>
->> >>>>>>>>> +#if defined(CONFIG_OF)
->> >>>>>>>>>>
->> >>>>>>>>>> ?> ? ?+static const struct of_device_id emif_of_match[] = {
->> >>>>>>>>>> ?> ? ?+ ? ? ? ? ? ? { .compatible = "ti,emif-4d" },
->> >>>>>>>>>> ?> ? ?+ ? ? ? ? ? ? { .compatible = "ti,emif-4d5" },
->> >>>>>>>>>> ?> ? ?+ ? ? ? ? ? ? {},
->> >>>>>>>>>> ?> ? ?+};
->> >>>>>>>>>> ?> ? ?+MODULE_DEVICE_TABLE(of, emif_of_match);
->> >>>>>>>>>> ?> ? ?+#endif
->> >>>>>>>>>> ?> ? ?+
->> >>>>>>>>>> ?> ? ? ?static struct platform_driver emif_driver = {
->> >>>>>>>>>> ?> ? ? ? ? ? .remove ? ? ? ? = __exit_p(emif_remove),
->> >>>>>>>>>> ?> ? ? ? ? ? .shutdown ? ? ? = emif_shutdown,
->> >>>>>>>>>> ?> ? ? ? ? ? .driver = {
->> >>>>>>>>>> ?> ? ? ? ? ? ? ? ? ? .name = "emif",
->> >>>>>>>>>> ?> ? ?+#if defined(CONFIG_OF)
->> >>>>>>>>>> ?> ? ?+ ? ? ? ? ? ? .of_match_table = of_match_ptr(emif_of_match),
->> >>>>>>>>>> ?> ? ?+#endif
->> >>>>>>>>
->> >>>>>>>>
->> >>>>>>>>>
->> >>>>>>>>> ?Are these two still #if defined needed?
->> >>>>>>>>>
->> >>>>>>>>> ?Also, what about the IS_DEFINED macro?
->> >>>>>>>>>
->> >>>>>>>
->> >>>>>>> Yes. To avoid the build break in !DT build.
->> >>>>>>>
->> >>>>>>
->> >>>>>> No, infact of_match_ptr is there just so you can avoid a
->> >>>>>> #ifdef around and not break !CONFIG_OF.
->> >>>>>
->> >>>>>
->> >>>>> Need to recheck but the build was throwing error becasue of
->> >>>>> "emif_of_match"
->> >>>>> mostly.
->> >>>>
->> >>>>
->> >>>> You still need the first one. I meant the second one around
->> >>>> 'of_match_ptr' should be removed.
->> >>>>
->> >>>> With !CONFIG_OF, of_match_ptr(_ptr) is just defined as NULL.
->> >>>>
->> >>> Yep. That make sense too.
->> >>> Will drop the second check.
->> >>>
->> >> Posted the entire series again with updated $subject patch.
->> >> With your ack, I will ask Tony to pull this series for 3.6.
->> >
->> > Sent them where? ?I didn't see a copy here :(
->>
-My bad. Accidentally in reworked patch, CC line got dropped.
-
->> Hi Greg, should have hit both linux-omap and linux-arm. See:
->>
->> http://marc.info/?l=linux-omap&m=134097764625471&w=2
+On Fri, Jun 29, 2012 at 10:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+> Currently the gpio _runtime_resume/suspend functions are calling the
+> get_context_loss_count() platform function if the function is populated for
+> a gpio bank. This function is used to determine if the gpio bank logic state
+> needs to be restored due to a power transition. This function will be populated
+> for all banks, but it should only be called for banks that have the
+> "loses_context" variable set. It is pointless to call this if loses_context is
+> false as we know the context will never be lost and will not need restoring.
 >
-> Ah, two lists I am not on, so how would I know to be able to ack them?
-> Please always cc: people you wish to review patches, otherwise it could
-> get lost, or as in this case, the people might not even be on the lists
-> you send the patches to.
+> For all OMAP2+ devices gpio bank-0 is in an always-on power domain and so will
+> never lose context. We found that the get_context_loss_count() was being called
+> for bank-0 during the probe and returning 1 instead of 0 indicating that the
+> context had been lost. This was causing the context restore function to be
+> called at probe time for this bank and because the context had never been saved,
+> was restoring an invalid state. This ultimately resulted in a crash [1].
 >
-I just bounced the $subject patch looping you.
+> There are multiple bugs here that need to be addressed ...
+>
+> 1. Why the always-on power domain returns a context loss count of 1? This needs
+> ? to be fixed in the power domain code. However, the gpio driver should not
+> ? assume the loss count is 0 to begin with.
+Indeed. GPIO driver should not assume the value.
 
-Regards
-Santosh
+> 2. The omap gpio driver should never be calling get_context_loss_count for a
+> ? gpio bank in a always-on domain. This is pointless and adds unneccessary
+> ? overhead.
+Make sense too.
+
+> 3. The OMAP gpio driver assumes that the initial power domain context loss count
+> ? will be 0 at the time the gpio driver is probed. However, it could be
+> ? possible that this is not the case and an invalid context restore could be
+> ? performed during the probe. To avoid this otherwise only populated the
+> ? get_context_loss_count() function pointer after the initial call to
+> ? pm_runtime_get() has occurred. This will ensure that the first
+> ? pm_runtime_put() initialised the loss count correctly.
+>
+> This patch addresses issues 2 and 3 above.
+>
+> [1] http://marc.info/?l=linux-omap&m=134065775323775&w=2
+>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Cc: Franky Lin <frankyl@broadcom.com>
+>
+> Reported-by: Franky Lin <frankyl@broadcom.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+Thanks Jon for sorting this out. Patch looks good to me.
+
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
