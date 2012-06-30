@@ -1,99 +1,63 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sat, 30 Jun 2012 09:40:04 +0800
-Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode"
- property to device tree bindings
-In-Reply-To: <4FED755F.6080302@pengutronix.de>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
- <20120629014352.GA28923@b20223-02.ap.freescale.net>
- <4FED5D77.3050009@pengutronix.de>
- <20120629084509.GB28923@b20223-02.ap.freescale.net>
- <4FED755F.6080302@pengutronix.de>
-Message-ID: <20120630014002.GC2489@richard-laptop>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 29 Jun 2012 20:11:12 -0600 (MDT)
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FEDF54D.4030609@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+Message-ID: <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 11:29:03AM +0200, Marc Kleine-Budde wrote:
-> On 06/29/2012 10:45 AM, Richard Zhao wrote:
-> > On Fri, Jun 29, 2012 at 09:47:03AM +0200, Marc Kleine-Budde wrote:
-> >>
-> >> Cc'ed Devicetree Discussions
-> >>
-> >> On 06/29/2012 03:43 AM, Richard Zhao wrote:
-> >>> On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
-> >>>> This patch allows the device tree to limit the chipidea to host or
-> >>>> peripheral mode only.
-> >>>>
-> >>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >>>> ---
-> >>>>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
-> >>>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
-> >>>>  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
-> >>>>  include/linux/usb/chipidea.h                       |    9 +++++
-> >>>>  4 files changed, 50 insertions(+), 6 deletions(-)
-> >>>>
-> >>>> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >>>> index 5a0ad66..67f97f56 100644
-> >>>> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >>>> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >>>> @@ -4,6 +4,8 @@ Required properties:
-> >>>>  - compatible: Should be "fsl,imx27-usb"
-> >>>>  - reg: Should contain registers location and length
-> >>>>  - interrupts: Should contain controller interrupt
-> >>>> +- dr_mode: indicates the working mode for compatible controllers. Can
-> >>>> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
-> >>
-> >>> By default, it should be decided by capability registers. Only bad hw
-> >>> design needs such settings. So, why not name it as force-xxx? If it's
-> >>> not specific to imx, it doesn't needs to has prefix "fsl,".
-> >>
-> >> It's not a bad hardware design if you don't route or enable all ports a
-> >> soc offers. In modern socs you cannot enable all ports anyway.
-> > I'm not sure about your case, but generally, it's not about ports.
-> > It's about ID pin. If ID pin is not connect correctly, we may need to
-> > force it to host or device working mode. The 'force" here means it
-> > won't follow the capability registers and ID pin.
-> 
-> The device tree is used to describe the hardware. How would you describe
-> a system, which has just a USB device connector? And the hardware guys
-> used the not needed id-pin for a LED?
-I see your case. Ideally, hw should pull-up or pull-down id pin. We may
-not take it as a common case. As I mentioned in another mail, we may
-interpret property in imx driver.
+On Fri, 29 Jun 2012, Daniel Mack wrote:
 
-Thanks
-Richard
-> 
-> >> The property isn't prefixed with "fsl,", it's just "dr_mode".
-> >>
-> >> Why not "force-xxx"? I had a look at Documentation/devicetree/bindings/usb:
-> >>
-> >> tegra-usb.txt:
-> >>>   - dr_mode : dual role mode. Indicates the working mode for
-> >>>    nvidia,tegra20-ehci compatible controllers.  Can be "host", "peripheral",
-> >>>    or "otg".  Default to "host" if not defined for backward compatibility.
-> >>>       host means this is a host controller
-> >>>       peripheral means it is device controller
-> >>>       otg means it can operate as either ("on the go")
-> >>
-> >> fsl-usb.txt:
-> >>>  - dr_mode : indicates the working mode for "fsl-usb2-dr" compatible
-> >>>    controllers.  Can be "host", "peripheral", or "otg".  Default to
-> >>>    "host" if not defined for backward compatibility.
-> >>>
-> >>
-> >> So why invent something new, if there seems to be a pattern?
-> > I'm not sure they mean the same things, because the default value is
-> > different. Event if they're same, why not make them all with sensible
-> > name?
-> 
-> Sensible name sounds good. Devicetree Discussions, we need an official
-> name for the property and its values :)
-> 
-> Marc
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+> Correct me if I'm mistaken, but this isn't really what DT was designed
+> for. In this context, it is used as a simple list of devices to probe,
+> not as a abstracted description of the hardware resources and their
+> interconnects.
+>
+> The question is: is that the way things should be kept for OMAP/AM33xx? 
+> Or should work be done to move all that hwmod stuff to proper 
+> clk/irq/res definitions that can be used from DT generically?
+
+Eventually the MPU address space, MPU interrupt controller IRQ line data, 
+system DMA controller data, and some of the other common resource 
+information are probably going to migrate from the hwmod data into the DT 
+blob.
+
+And probably some of the power management-related data will migrate to the 
+IP block driver code used for a particular SoC.
+
+Probably the best time for this to happen is after the PRM/CM/SCM drivers 
+are written, and an omap_bus layer is created from the existing hwmod 
+code.  The planning that we've done in conjunction with the ARM DT people 
+involves getting DT board file handling done first, which is really what 
+DT makes the most sense for.  Then looking at the on-chip SoC stuff 
+afterwards.
+
+> As there's actually no need to care for legacy users at all (as no board 
+> support for AM33xx is mainline),
+
+The hwmod data is unrelated to the board files.
+
+The "legacy" user here is the hwmod code.  It uses the data to create 
+devices for the IP blocks on the SoC, to reset those IP blocks at kernel 
+init, and to implement IP block power management via the runtime PM layer.
+
+> shouldn't things be done right in the first place?
+
+Well, all this is distinct from what the 'right' thing is or was.
+
+It should be noted that from the power management and multiple bus 
+initiator perspectives, the process of migrating from hwmod data to DT 
+will be lossy.  For example, DT uses a single-root perspective of the 
+device hierarchy, and does not explicitly encode the interconnections 
+between IP blocks.
+
+
+- Paul
