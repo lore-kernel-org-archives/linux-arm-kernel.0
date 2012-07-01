@@ -1,50 +1,51 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 01 Jul 2012 17:40:44 +0200
-Subject: [GIT PULL]
-In-Reply-To: <CAOesGMhbRnU3wExk88Wkc2=YwbuNpt_uPEsAfmZh6_os9CkqiA@mail.gmail.com>
-References: <4FDF9419.2090601@antcom.de>
- <CAOesGMhbRnU3wExk88Wkc2=YwbuNpt_uPEsAfmZh6_os9CkqiA@mail.gmail.com>
-Message-ID: <4FF06F7C.8050701@antcom.de>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Sun,  1 Jul 2012 19:19:42 +0200
+Subject: [PATCH 0/5] AT91SAM9G46/M11: add crypto drivers
+Message-ID: <1341163187-14946-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch serie adds the support for the crypto engine available in
+the Atmel SAM9G46 http://www.atmel.com/devices/SAM9G46.aspx and SAM9M11
+http://www.atmel.com/devices/SAM9M11.aspx
 
-On 01/07/12 01:29, Olof Johansson wrote:
->> This time, purely mach-lpc32xx specific patches.
->>
->> Please tell if sth. is missing, so I can know if I can build upon that. (I'm
->> already collecting new patches on top of this branch.)
-> 
-> I'm very sorry for the slow response to this pull request.
-> 
-> The contents of it in itself looks good, but given the amount of
-> patches that you are building up now, I think it's time to start
-> organizing into topic branches that fit the structure of arm-soc a bit
-> better.
-> 
-> In other words, it makes sense to separate out things such as dts
-> updates in their own branch, core SoC updates in one, etc.
-> 
-> Given that you've based other work on top of this combined branch now,
-> and the fact that I should have gotten back to you sooner about it,
-> I'm going to pull it in under our next/soc branch this time. But I'd
-> like to see more topic-oriented pull requests in the future, ideally
-> for your updates here but definitely in the branches you stage for
-> 3.7.
+For each driver the choice between PDC/DMA or PIO was optimized to
+maximize the performances (benchmarks will soon be available on
+the linux4sam wiki http://www.at91.com/).
 
-I'm fine with this.
+These drivers were tested on both devices : the last patch adds a few
+missing tests to tcrypt.
 
-Building upon the branch you just pulled, I'll separate out the further
-patches into topic branches. Is there a certain set of those which I
-should use to adjust to arm-soc structure? E.g.:
+This work was sponsored by Atmel.
 
-lpc32xx/core
-lpc32xx/defconfig
-lpc32xx/dts
+Nicolas Royer (5):
+  ARM: AT91SAM9G45: add crypto peripherals
+  crypto: add Atmel AES driver
+  crypto: add Atmel DES/TDES driver
+  crypto: add Atmel SHA1/SHA256 driver
+  crypto: add new tests to tcrypt
 
-?
+ arch/arm/mach-at91/at91sam9g45.c              |   13 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c      |  128 +++
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +
+ crypto/tcrypt.c                               |   50 +-
+ drivers/crypto/Kconfig                        |   47 +
+ drivers/crypto/Makefile                       |    5 +-
+ drivers/crypto/atmel-aes-regs.h               |   62 ++
+ drivers/crypto/atmel-aes.c                    | 1206 ++++++++++++++++++++++++
+ drivers/crypto/atmel-sha-regs.h               |   46 +
+ drivers/crypto/atmel-sha.c                    | 1112 ++++++++++++++++++++++
+ drivers/crypto/atmel-tdes-regs.h              |   89 ++
+ drivers/crypto/atmel-tdes.c                   | 1215 +++++++++++++++++++++++++
+ include/linux/platform_data/atmel-aes.h       |   22 +
+ 13 files changed, 3990 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/crypto/atmel-aes-regs.h
+ create mode 100644 drivers/crypto/atmel-aes.c
+ create mode 100644 drivers/crypto/atmel-sha-regs.h
+ create mode 100644 drivers/crypto/atmel-sha.c
+ create mode 100644 drivers/crypto/atmel-tdes-regs.h
+ create mode 100644 drivers/crypto/atmel-tdes.c
+ create mode 100644 include/linux/platform_data/atmel-aes.h
 
-Thanks for pointing this out!
-
-Roland
+-- 
+1.7.7.6
