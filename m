@@ -1,119 +1,53 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 1 Jul 2012 15:36:31 +0800
-Subject: [PATCH] ARM: pxa: hx4700: Use DEFINE_RES_* macros consistently
-In-Reply-To: <4fed991c.064eb40a.42ba.ffffe85cSMTPIN_ADDED@mx.google.com>
-References: <4fed991c.064eb40a.42ba.ffffe85cSMTPIN_ADDED@mx.google.com>
-Message-ID: <CAN1soZwYoB2=SAHx8GsVDOQEVX27DtDbLy2ihLB4J4yxwNsP3g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 1 Jul 2012 01:45:40 -0700
+Subject: [PATCH] gpio/omap: fix invalid context restore of gpio bank-0
+In-Reply-To: <CAMQu2gx+tCujB0a+2zL8RGdJe5Y2VLPOyPUOPkys3VS7JdaKbg@mail.gmail.com>
+References: <1340990551-19426-1-git-send-email-jon-hunter@ti.com>
+ <CAMQu2gx+tCujB0a+2zL8RGdJe5Y2VLPOyPUOPkys3VS7JdaKbg@mail.gmail.com>
+Message-ID: <20120701084540.GK4202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 8:01 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> This patch replaces the remaining inline struct resource definitions
-> with equivalent DEFINE_RES_* macro calls.
-> The source file is reduced in size; the object file is unchanged.
->
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> Cc: Philipp Zabel <philipp.zabel@gmail.com>
-> ---
-> ?arch/arm/mach-pxa/hx4700.c | ? 56 +++++++++----------------------------------
-> ?1 files changed, 12 insertions(+), 44 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-> index d3de84b..e631198 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -296,27 +296,11 @@ static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
->
-> ?static struct resource asic3_resources[] = {
-> ? ? ? ? /* GPIO part */
-> - ? ? ? [0] = {
-> - ? ? ? ? ? ? ? .start ?= ASIC3_PHYS,
-> - ? ? ? ? ? ? ? .end ? ?= ASIC3_PHYS + ASIC3_MAP_SIZE_16BIT - 1,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> - ? ? ? },
-> - ? ? ? [1] = {
-> - ? ? ? ? ? ? ? .start ?= PXA_GPIO_TO_IRQ(GPIO12_HX4700_ASIC3_IRQ),
-> - ? ? ? ? ? ? ? .end ? ?= PXA_GPIO_TO_IRQ(GPIO12_HX4700_ASIC3_IRQ),
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
-> - ? ? ? },
-> + ? ? ? [0] = DEFINE_RES_MEM(ASIC3_PHYS, ASIC3_MAP_SIZE_16BIT),
-> + ? ? ? [1] = DEFINE_RES_IRQ(PXA_GPIO_TO_IRQ(GPIO12_HX4700_ASIC3_IRQ)),
-> ? ? ? ? /* SD part */
-> - ? ? ? [2] = {
-> - ? ? ? ? ? ? ? .start ?= ASIC3_SD_PHYS,
-> - ? ? ? ? ? ? ? .end ? ?= ASIC3_SD_PHYS + ASIC3_MAP_SIZE_16BIT - 1,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> - ? ? ? },
-> - ? ? ? [3] = {
-> - ? ? ? ? ? ? ? .start ?= PXA_GPIO_TO_IRQ(GPIO66_HX4700_ASIC3_nSDIO_IRQ),
-> - ? ? ? ? ? ? ? .end ? ?= PXA_GPIO_TO_IRQ(GPIO66_HX4700_ASIC3_nSDIO_IRQ),
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
-> - ? ? ? },
-> + ? ? ? [2] = DEFINE_RES_MEM(ASIC3_SD_PHYS, ASIC3_MAP_SIZE_16BIT),
-> + ? ? ? [3] = DEFINE_RES_IRQ(PXA_GPIO_TO_IRQ(GPIO66_HX4700_ASIC3_nSDIO_IRQ)),
-> ?};
->
-> ?static struct asic3_platform_data asic3_platform_data = {
-> @@ -343,11 +327,7 @@ static struct platform_device asic3 = {
-> ? */
->
-> ?static struct resource egpio_resources[] = {
-> - ? ? ? [0] = {
-> - ? ? ? ? ? ? ? .start = PXA_CS5_PHYS,
-> - ? ? ? ? ? ? ? .end ? = PXA_CS5_PHYS + 0x4 - 1,
-> - ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> - ? ? ? },
-> + ? ? ? [0] = DEFINE_RES_MEM(PXA_CS5_PHYS, 0x4),
-> ?};
->
-> ?static struct htc_egpio_chip egpio_chips[] = {
-> @@ -537,11 +517,7 @@ static struct w100fb_mach_info w3220_info = {
-> ?};
->
-> ?static struct resource w3220_resources[] = {
-> - ? ? ? [0] = {
-> - ? ? ? ? ? ? ? .start ?= ATI_W3220_PHYS,
-> - ? ? ? ? ? ? ? .end ? ?= ATI_W3220_PHYS + 0x00ffffff,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> - ? ? ? },
-> + ? ? ? [0] = DEFINE_RES_MEM(ATI_W3220_PHYS, SZ_16M),
-> ?};
->
-> ?static struct platform_device w3220 = {
-> @@ -683,20 +659,12 @@ static struct pda_power_pdata power_supply_info = {
-> ?};
->
-> ?static struct resource power_supply_resources[] = {
-> - ? ? ? [0] = {
-> - ? ? ? ? ? ? ? .name ?= "ac",
-> - ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
-> - ? ? ? ? ? ? ? ? ? ? ? ?IORESOURCE_IRQ_LOWEDGE,
-> - ? ? ? ? ? ? ? .start = PXA_GPIO_TO_IRQ(GPIOD9_nAC_IN),
-> - ? ? ? ? ? ? ? .end ? = PXA_GPIO_TO_IRQ(GPIOD9_nAC_IN),
-> - ? ? ? },
-> - ? ? ? [1] = {
-> - ? ? ? ? ? ? ? .name ?= "usb",
-> - ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
-> - ? ? ? ? ? ? ? ? ? ? ? ?IORESOURCE_IRQ_LOWEDGE,
-> - ? ? ? ? ? ? ? .start = PXA_GPIO_TO_IRQ(GPIOD14_nUSBC_DETECT),
-> - ? ? ? ? ? ? ? .end ? = PXA_GPIO_TO_IRQ(GPIOD14_nUSBC_DETECT),
-> - ? ? ? },
-> + ? ? ? [0] = DEFINE_RES_NAMED(PXA_GPIO_TO_IRQ(GPIOD9_nAC_IN), 1, "ac",
-> + ? ? ? ? ? ? ? IORESOURCE_IRQ |
-> + ? ? ? ? ? ? ? IORESOURCE_IRQ_HIGHEDGE | IORESOURCE_IRQ_LOWEDGE),
-> + ? ? ? [1] = DEFINE_RES_NAMED(PXA_GPIO_TO_IRQ(GPIOD14_nUSBC_DETECT), 1, "usb",
-> + ? ? ? ? ? ? ? IORESOURCE_IRQ |
-> + ? ? ? ? ? ? ? IORESOURCE_IRQ_HIGHEDGE | IORESOURCE_IRQ_LOWEDGE),
-> ?};
->
-> ?static struct platform_device power_supply = {
-> --
-> 1.7.3.4
->
->
->
->
-Applied
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120629 21:23]:
+> On Fri, Jun 29, 2012 at 10:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+> > Currently the gpio _runtime_resume/suspend functions are calling the
+> > get_context_loss_count() platform function if the function is populated for
+> > a gpio bank. This function is used to determine if the gpio bank logic state
+> > needs to be restored due to a power transition. This function will be populated
+> > for all banks, but it should only be called for banks that have the
+> > "loses_context" variable set. It is pointless to call this if loses_context is
+> > false as we know the context will never be lost and will not need restoring.
+> >
+> > For all OMAP2+ devices gpio bank-0 is in an always-on power domain and so will
+> > never lose context. We found that the get_context_loss_count() was being called
+> > for bank-0 during the probe and returning 1 instead of 0 indicating that the
+> > context had been lost. This was causing the context restore function to be
+> > called at probe time for this bank and because the context had never been saved,
+> > was restoring an invalid state. This ultimately resulted in a crash [1].
+> >
+> > There are multiple bugs here that need to be addressed ...
+> >
+> > 1. Why the always-on power domain returns a context loss count of 1? This needs
+> > ? to be fixed in the power domain code. However, the gpio driver should not
+> > ? assume the loss count is 0 to begin with.
+> Indeed. GPIO driver should not assume the value.
+> 
+> > 2. The omap gpio driver should never be calling get_context_loss_count for a
+> > ? gpio bank in a always-on domain. This is pointless and adds unneccessary
+> > ? overhead.
+> Make sense too.
+> 
+> > 3. The OMAP gpio driver assumes that the initial power domain context loss count
+> > ? will be 0 at the time the gpio driver is probed. However, it could be
+> > ? possible that this is not the case and an invalid context restore could be
+> > ? performed during the probe. To avoid this otherwise only populated the
+> > ? get_context_loss_count() function pointer after the initial call to
+> > ? pm_runtime_get() has occurred. This will ensure that the first
+> > ? pm_runtime_put() initialised the loss count correctly.
+> >
+> > This patch addresses issues 2 and 3 above.
 
-Regards
-Haojian
+Should this one be Cc: stable? If this is a regression, then the regression
+causing commit should be mentioned.
+
+Tony
