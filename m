@@ -1,199 +1,91 @@
 From: pavel@denx.de (Pavel Machek)
-Date: Sun, 1 Jul 2012 20:10:38 +0200
+Date: Sun, 1 Jul 2012 20:41:10 +0200
 Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
  SOCFPGA platform.
-In-Reply-To: <20120630185743.GA4536@elf.ucw.cz>
+In-Reply-To: <201206302104.37937.arnd@arndb.de>
 References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <20120627162014.1494cdd7@skate> <20120630185743.GA4536@elf.ucw.cz>
-Message-ID: <20120701181038.GA26573@elf.ucw.cz>
+ <20120627180516.GA17393@elf.ucw.cz> <20120627204018.0bfef362@skate>
+ <201206302104.37937.arnd@arndb.de>
+Message-ID: <20120701184110.GA30680@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > I don't think the ARM maintainers want more implementations of the
-> > clock API. New SoCs should instead use the new clock framework in
-> > drivers/clk/. See Documentation/clk.txt for details. You can for
-> > example look at the mxs or spear implementations for examples.
-> 
-> Agreed. Looks like fixed-rates.
-> 
-> > > +	{
-> > > +		.dev_id		= "dma-pl330",
-> > > +		.clk		= &l4_main_clk,
-> > > +	}
-> > > +};
+On Sat 2012-06-30 21:04:37, Arnd Bergmann wrote:
+> On Wednesday 27 June 2012, Thomas Petazzoni wrote:
+> > > > > +#define NR_IRQS                  512
+> > > > 
+> > > > You should be looking at using SPARSE_IRQ to avoid having a maximum
+> > > > number of irqs. See for example mach-highbank/.
+> > > 
+> > > Is maximum number of interrupts a problem? 512 does not seem
+> > > excessive.
 > > 
-> > These should use the clock framework.
+> > Regardless of the value of NR_IRQS, there is apparently a trend to use
+> > SPARSE_IRQ anyway. However, I am not at the best place to explain why
+> > SPARSE_IRQ is now considered the right thing to use.
 > 
-> Yep. Something like this? (Untested)
+> The main reason for me is to get rid of a hardcoded NR_IRQS constant,
+> whihc is a blocker for multiplatform kernels. New platforms should
+> do all they can to allow being built together with other platforms
+> in the same kernel. While we're not there yet, doing sparse irq
+> is an important step in the right direction and should not be hard
+> to do for new code.
 
-Did not work, apparently
+Something as easy as this? But it does not seem to boot here :-(.
 
-socfpga_init_early() is too early to call clk_*(). This one actually
-finishes kernel boot.
+								Pavel
 
-Worrying thing is that if I don't call it at all, it also finishes
-kernel boot. So how does one test this properly?
-									Pavel
-
-
-
-diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-index 37863d1..81358e6 100644
---- a/arch/arm/mach-socfpga/Kconfig
-+++ b/arch/arm/mach-socfpga/Kconfig
-@@ -3,6 +3,7 @@ config MACH_SOCFPGA_CYCLONE5
- 	bool "SOCFPGA Cyclone5 platform"
- 	select HAVE_SMP
- 	select PLAT_SOCFPGA_ETH
-+	select COMMON_CLK
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b1578e1..d203253 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -263,6 +263,7 @@ config ARCH_SOCFPGA
+ 	select GPIO_PL061 if GPIOLIB
+ 	select NEED_MACH_MEMORY_H
+ 	select USE_OF
++	select SPARSE_IRQ
  	help
- 	  Include support for the Altera(R) Cyclone5 development platform.
+ 	  This enables support for Altera SOCFPGA Cyclone V platform
  
-diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-index 5502add..3e79bb0 100644
---- a/arch/arm/mach-socfpga/Makefile
-+++ b/arch/arm/mach-socfpga/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel.
- #
+diff --git a/arch/arm/mach-socfpga/include/mach/irqs.h b/arch/arm/mach-socfpga/include/mach/irqs.h
+index da50124..565ca59 100644
+--- a/arch/arm/mach-socfpga/include/mach/irqs.h
++++ b/arch/arm/mach-socfpga/include/mach/irqs.h
+@@ -27,8 +27,6 @@
+ #define IRQ_SOCFPGA_CLK_MAN            (IRQ_SOCFPGA_GIC_START + 173)   /* Clock manager */
  
--obj-y					:= common.o clock.o dw_apb_timer.o
-+obj-y					:= common.o dw_apb_timer.o
- obj-$(CONFIG_MACH_SOCFPGA_CYCLONE5)	+= socfpga_cyclone5.o
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-\ No newline at end of file
-diff --git a/arch/arm/mach-socfpga/common.c b/arch/arm/mach-socfpga/common.c
-index 331040e..0df10ef 100644
---- a/arch/arm/mach-socfpga/common.c
-+++ b/arch/arm/mach-socfpga/common.c
-@@ -22,6 +22,7 @@
- #include <linux/clkdev.h>
- #include <linux/gfp.h>
- #include <linux/of_platform.h>
-+#include <linux/clk-provider.h>
  
- #include <mach/iomap.h>
+-#define NR_IRQS			512
+-
+ #define MAX_GIC_NR		1
+ 
+ #endif	/* __MACH_IRQS_H */
+diff --git a/arch/arm/mach-socfpga/socfpga_cyclone5.c b/arch/arm/mach-socfpga/socfpga_cyclone5.c
+index f6498cc..674bac3 100644
+--- a/arch/arm/mach-socfpga/socfpga_cyclone5.c
++++ b/arch/arm/mach-socfpga/socfpga_cyclone5.c
+@@ -24,6 +24,7 @@
+ #include <mach/socfpga-timer.h>
+ #include <mach/dw_apb_timer.h>
  #include <mach/socfpga_cyclone5.h>
-@@ -49,51 +50,6 @@ extern struct dma_pl330_platdata dma_platform_data;
- #define SOCFPGA_MPU_PERIHCLK_FREQ_HZ			(800000000 / 4)
- #define SOCFPGA_L4_MAIN_CLK					(400000000)
++#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -133,6 +134,11 @@ static void socfpga_cyclone5_restart(char mode, const char *cmd)
  
--static struct clk dummy_apb_pclk;
--static struct clk dummy_i2c_clk = {
--	.rate   = 100000000,
--};
--static struct clk dummy_spim_clk = {
--	.rate   = 100000000,
--};
--static struct clk mpu_periphclk = {
--	.rate   = SOCFPGA_MPU_PERIHCLK_FREQ_HZ,
--};
--
--static struct clk l4_main_clk = {
--	.rate   = SOCFPGA_L4_MAIN_CLK,
--};
--
--static struct clk_lookup lookups[] = {
--	{	/* Bus clock */
--		.con_id		= "apb_pclk",
--		.clk		= &dummy_apb_pclk,
--	},
--	{
--		.dev_id		= "ffc04000.i2c",
--		.clk		= &dummy_i2c_clk,
--	},
--	{
--		.dev_id		= "ffc05000.i2c",
--		.clk		= &dummy_i2c_clk,
--	},
--	{
--		.dev_id		= "dw-spi-mmio.0",
--		.clk		= &dummy_spim_clk,
--	},
--	{
--		.dev_id		= "dw-spi-mmio.1",
--		.clk		= &dummy_spim_clk,
--	},
--	{
--		.dev_id		= "smp_twd",
--		.clk		= &mpu_periphclk,
--	},
--	{
--		.dev_id		= "dma-pl330",
--		.clk		= &l4_main_clk,
--	}
--};
- 
- struct plat_serial8250_port uart_platform_data[] = {
- 		{
-@@ -103,11 +59,46 @@ struct plat_serial8250_port uart_platform_data[] = {
- 		},
- };
- 
-+void __init socfpga_init_clocks(void)
-+{
-+	struct clk *dummy_apb_pclk;
-+	struct clk *dummy_i2c_clk;
-+	struct clk *dummy_spim_clk;
-+	struct clk *mpu_periphclk;
-+	struct clk *l4_main_clk;
-+
-+	dummy_apb_pclk = clk_register_fixed_rate(NULL, "apb", NULL, 0, 0);
-+	dummy_i2c_clk  = clk_register_fixed_rate(NULL, "i2c", NULL, 0, 100000000);
-+	dummy_spim_clk = clk_register_fixed_rate(NULL, "spim", NULL, 0, 100000000);
-+	mpu_periphclk  = clk_register_fixed_rate(NULL, "mpu_periph", NULL, 0, SOCFPGA_MPU_PERIHCLK_FREQ_HZ);
-+	l4_main_clk    = clk_register_fixed_rate(NULL, "l4_main", NULL, 0, SOCFPGA_L4_MAIN_CLK);
-+
-+	{ 
-+		static struct clk_lookup lookups[7];
-+		lookups[0].con_id	= "apb_pclk"; 	/* Bus clock */
-+		lookups[0].clk		= dummy_apb_pclk;
-+		lookups[1].dev_id	= "ffc04000.i2c";
-+		lookups[1].clk		= dummy_i2c_clk;
-+		lookups[2].dev_id	= "ffc05000.i2c";
-+		lookups[2].clk		= dummy_i2c_clk;
-+		lookups[3].dev_id	= "dw-spi-mmio.0";
-+		lookups[3].clk		= dummy_spim_clk;
-+		lookups[4].dev_id	= "dw-spi-mmio.1";
-+		lookups[4].clk		= dummy_spim_clk;
-+		lookups[5].dev_id	= "smp_twd";
-+		lookups[5].clk		= mpu_periphclk;
-+		lookups[6].dev_id	= "dma-pl330";
-+		lookups[6].clk		= l4_main_clk;
-+		clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+	}
-+}
-+
- void __init socfpga_init_early(void)
+ static void __init socfpga_cyclone5_init(void)
  {
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- }
- 
-+//initcall(socfpga_init_clocks);
++	int i;
++	for (i = 0; i < 512; i++) {
++		dynamic_irq_init(i);
++	}
 +
- /*
-  * Where is the timer (VA)?
-  */
-diff --git a/arch/arm/mach-socfpga/include/mach/clock.h b/arch/arm/mach-socfpga/include/mach/clock.h
-index 5187064..de9d3b2 100644
---- a/arch/arm/mach-socfpga/include/mach/clock.h
-+++ b/arch/arm/mach-socfpga/include/mach/clock.h
-@@ -1,11 +1,4 @@
- #ifndef __MACH_CLOCK_H
- #define __MACH_CLOCK_H
- 
--struct clk;
--
--struct clk_ops {
--	long	(*round)(struct clk *, unsigned long);
--	int	(*set)(struct clk *, unsigned long);
--};
--
- #endif
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* 8-way, 64K/way, evmon/parity/share */
+ 	l2x0_of_init(0x00760000, 0xfe000fff);
+
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
