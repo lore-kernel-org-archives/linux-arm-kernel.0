@@ -1,86 +1,26 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 1 Jul 2012 14:55:05 +0800
-Subject: [PATCH v4] ARM: pxa: hx4700: Fix basic suspend/resume
-In-Reply-To: <4fd60135.0b52d80a.43ea.422eSMTPIN_ADDED@mx.google.com>
-References: <4fd60135.0b52d80a.43ea.422eSMTPIN_ADDED@mx.google.com>
-Message-ID: <CAN1soZx9t_1DRbpVEKgefw-G5nHxQXjscjtWteqS91r+Kq79Hw@mail.gmail.com>
+Date: Sun, 1 Jul 2012 15:27:25 +0800
+Subject: [PATCH] ARM: pxa: remove eseries.h
+In-Reply-To: <CAMPhdO99maVhhpzLC_v9ZBdt=2=KNAg4oEn+wbQYmhYTEtTGgw@mail.gmail.com>
+References: <1339505386.30984.123.camel@x61.thuisdomein>
+ <CAMPhdO99maVhhpzLC_v9ZBdt=2=KNAg4oEn+wbQYmhYTEtTGgw@mail.gmail.com>
+Message-ID: <CAN1soZxwF1sw-w6UQsCNo_FQ-Soq9b3J8XiF+WGYxezn8dix9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 10:31 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> Basic suspend/resume is fixed by ensuring that the PGSR registers are
-> set correctly before sleep mode is entered. In particular four of the
-> active low resets need to be driven high while in sleep mode, otherwise
-> the unit resets itself instead of suspending. Another problem was that
-> the PCFR_GPROD bit is set by the HTC bootloader; this caused GPIO reset
-> (i.e. the reset button) to fail immediately after returning from sleep
-> mode.
+On Tue, Jun 12, 2012 at 9:19 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Tue, Jun 12, 2012 at 8:49 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+>> Commit e478fe4cd50b86e95fadc415438b63fa94060b7d ("[ARM] pxa: merge all
+>> eseries board code into eseries.c") removed all six files that included
+>> eseries.h. Everything that this header provides is now either local to
+>> eseries.c or entirely unused. It was apparently just an oversight to
+>> keep this header. This header can safely be removed.
+>>
+>> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 >
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> Cc: Philipp Zabel <philipp.zabel@gmail.com>
-> ---
+> That was long time ago. I'm basically good with the removal. Haojian, could
+> you give a simple test maybe?
 >
-> V4:
-> Rebased from linux-3.3-rc6 to linux-3.5-rc2.
->
-> ?arch/arm/mach-pxa/hx4700.c | ? 15 ++++++++++++++-
-> ?1 files changed, 14 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-> index d09da6a..d3de84b 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -127,7 +127,11 @@ static unsigned long hx4700_pin_config[] __initdata = {
-> ? ? ? ? GPIO19_SSP2_SCLK,
-> ? ? ? ? GPIO86_SSP2_RXD,
-> ? ? ? ? GPIO87_SSP2_TXD,
-> - ? ? ? GPIO88_GPIO,
-> + ? ? ? GPIO88_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* TSC2046_CS */
-> +
-> + ? ? ? /* BQ24022 Regulator */
-> + ? ? ? GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT, ? ? ?/* BQ24022_nCHARGE_EN */
-> + ? ? ? GPIO96_GPIO | MFP_LPM_KEEP_OUTPUT, ? ? ?/* BQ24022_ISET2 */
->
-> ? ? ? ? /* HX4700 specific input GPIOs */
-> ? ? ? ? GPIO12_GPIO | WAKEUP_ON_EDGE_RISE, ? ? ?/* ASIC3_IRQ */
-> @@ -135,6 +139,10 @@ static unsigned long hx4700_pin_config[] __initdata = {
-> ? ? ? ? GPIO14_GPIO, ? ?/* nWLAN_IRQ */
->
-> ? ? ? ? /* HX4700 specific output GPIOs */
-> + ? ? ? GPIO61_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* W3220_nRESET */
-> + ? ? ? GPIO71_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* ASIC3_nRESET */
-> + ? ? ? GPIO81_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CPU_GP_nRESET */
-> + ? ? ? GPIO116_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ?/* CPU_HW_nRESET */
-> ? ? ? ? GPIO102_GPIO | MFP_LPM_DRIVE_LOW, ? ? ? /* SYNAPTICS_POWER_ON */
->
-> ? ? ? ? GPIO10_GPIO, ? ?/* GSM_IRQ */
-> @@ -872,14 +880,19 @@ static struct gpio global_gpios[] = {
-> ? ? ? ? { GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
-> ? ? ? ? { GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
-> ? ? ? ? { GPIO32_HX4700_RS232_ON, ? ? ? ? GPIOF_OUT_INIT_HIGH, "RS232_ON" },
-> + ? ? ? { GPIO61_HX4700_W3220_nRESET, ? ? GPIOF_OUT_INIT_HIGH, "W3220_nRESET" },
-> ? ? ? ? { GPIO71_HX4700_ASIC3_nRESET, ? ? GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
-> + ? ? ? { GPIO81_HX4700_CPU_GP_nRESET, ? ?GPIOF_OUT_INIT_HIGH, "CPU_GP_nRESET" },
-> ? ? ? ? { GPIO82_HX4700_EUART_RESET, ? ? ?GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
-> + ? ? ? { GPIO116_HX4700_CPU_HW_nRESET, ? GPIOF_OUT_INIT_HIGH, "CPU_HW_nRESET" },
-> ?};
->
-> ?static void __init hx4700_init(void)
-> ?{
-> ? ? ? ? int ret;
->
-> + ? ? ? PCFR = PCFR_GPR_EN | PCFR_OPDE;
-> +
-> ? ? ? ? pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
-> ? ? ? ? gpio_set_wake(GPIO12_HX4700_ASIC3_IRQ, 1);
-> ? ? ? ? ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
-> --
-> 1.7.3.4
->
->
->
->
-
 Applied
 
 Regards
