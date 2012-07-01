@@ -1,39 +1,48 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun,  1 Jul 2012 12:44:02 +0300
-Subject: [PATCH] remoteproc/omap: fix randconfig unmet direct dependencies
-Message-ID: <1341135842-22006-1-git-send-email-ohad@wizery.com>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Sun, 1 Jul 2012 12:44:01 +0200
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <4FECB95D.7010200@zytor.com>
+References: <4FECB95D.7010200@zytor.com>
+ <cover.1338222460.git.rubini@gnudd.com>
+ <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
+Message-ID: <20120701104401.GA4352@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP_REMOTEPROC selects REMOTEPROC, which depends on EXPERIMENTAL,
-so let's have OMAP_REMOTEPROC depend on EXPERIMENTAL too, in order
-to avoid the below randconfig warnings.
+>> The sta2x11 I/O Hub is a bridge from PCIe to AMBA. It reuses a number
+>> of amba drivers and needs to activate core bus support.
 
-This will also (indirectly) take care of the RPMSG unmet dependencies
-warnings.
+> Nacked-by: H. Peter Anvin <hpa@zytor.com>
+> 
+> This brings in tons of code into the x86 all{yes,mod}config builds, and 
+> as perhaps one could expect some of it doesn't compile.  For example:
 
-warning: (OMAP_REMOTEPROC) selects REMOTEPROC which has unmet direct dependencies (EXPERIMENTAL)
-warning: (OMAP_REMOTEPROC) selects RPMSG which has unmet direct dependencies (EXPERIMENTAL)
-warning: (OMAP_REMOTEPROC) selects REMOTEPROC which has unmet direct dependencies (EXPERIMENTAL)
-warning: (OMAP_REMOTEPROC) selects RPMSG which has unmet direct dependencies (EXPERIMENTAL)
+Ok. I apologize for not checking this. Actually, I only fixed the ones
+that I needed to compile.
 
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- drivers/remoteproc/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+How should I address the problem? (original code, published on
+sourceforge was simply replicating a number of amba drivers into pci
+drivers, but I don't think massive code duplication is ever sensible,
+thus I preferred to reuse the existing drivers).
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index ff6f55c..726804e 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -8,6 +8,7 @@ config REMOTEPROC
- 
- config OMAP_REMOTEPROC
- 	tristate "OMAP remoteproc support"
-+	depends on EXPERIMENTAL
- 	depends on ARCH_OMAP4
- 	depends on OMAP_IOMMU
- 	select REMOTEPROC
--- 
-1.7.10.rc3.743.gaa3bb87
+I doubt all amba drivers can easily be made x86-compatible.
+I see these possible approaces, all of them with their cons
+
+  1- add STA2X11 dependencies to ARM_AMBA _and_ the drivers that do work
+
+  2- leave CONFIG_ARM_AMBA undefined and play select file in Makefiles
+   using obj-$(CONFIG_STA2X11)
+
+  3- add ARM dependencies to the drivers that do not compile on x86
+
+  any other option?
+
+(1) and (2) bring chipset-specific stuff into the amba world, which is
+bad, especially since I suspect other similar bridges will appear soon.
+
+(3) looks like a temporary hack and stuff can be fixed over time, but
+it has the disadvantage of adding a big number of needless drivers in
+the dsitributions' packages -- like my nacked patch did.
+
+thanks
+/alessandro
