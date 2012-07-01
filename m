@@ -1,32 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 1 Jul 2012 11:59:35 +0100
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <20120701104401.GA4352@mail.gnudd.com>
-References: <4FECB95D.7010200@zytor.com>
- <cover.1338222460.git.rubini@gnudd.com>
- <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
- <20120701104401.GA4352@mail.gnudd.com>
-Message-ID: <20120701105934.GD16319@n2100.arm.linux.org.uk>
+From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
+Date: Sun, 01 Jul 2012 13:03:53 +0200
+Subject: [PATCH 0/2] MC13xxx: fix access on i.mx31
+In-Reply-To: <20120629130945.GK4846@sortiz-mobl>
+References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
+ <20120629130945.GK4846@sortiz-mobl>
+Message-ID: <2001108.iID9Ml5VFE@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 01, 2012 at 12:44:01PM +0200, Alessandro Rubini wrote:
-> How should I address the problem? (original code, published on
-> sourceforge was simply replicating a number of amba drivers into pci
-> drivers, but I don't think massive code duplication is ever sensible,
-> thus I preferred to reuse the existing drivers).
+Le vendredi 29 juin 2012 15:09:45 Samuel Ortiz a ?crit :
+> Hi Philippe,
+> 
+> On Tue, May 29, 2012 at 11:06:27AM +0200, Philippe R?tornaz wrote:
+> > Hello
+> > 
+> > This patchset fixes the mc13xxx regression introduced by:
+> > "mfd: Use regmap for the mc13xxx-core register access".
+> > 
+> > The first patch correct the write_flag_mask to use the correct value
+> > and remove the invalid bits_per_word in the probe.
+> > 
+> > The second patch workaround an silicon errata on some imx SoC.
+> 
+> Both patches applied to my for-linus branch. They'll be part of the MFD
+> fixes pull request for 3.5.
 
-I think the answer is... those primecell drivers need fixing in some way.
-Re-defining CS, DS and ES in drivers is rather silly given that they're
-x86 segment register names - so if PL330 can be fixed to make its names
-more specific, that sorts it out.
+Thank you very much ! 
 
-As for PL08x, which depends on asm/hardware/pl080.h, I think that's going
-to have to be a config dependency - it would be nice to move that header
-into drivers/dma and make it private to the amba-pl08x driver, but we have
-definitions in there which platforms supply to the pl08x driver via
-platform data.  I'd rather not stuff the register definitions into
-include/linux/platform_data/...
-
-Note also that hpa has only reported the first errors he encountered, so
-there may be more, and that's somehting which needs checking.
+Philippe
