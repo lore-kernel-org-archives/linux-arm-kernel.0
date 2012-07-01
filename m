@@ -1,30 +1,30 @@
-From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
-Date: Sun, 01 Jul 2012 13:03:53 +0200
-Subject: [PATCH 0/2] MC13xxx: fix access on i.mx31
-In-Reply-To: <20120629130945.GK4846@sortiz-mobl>
-References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
- <20120629130945.GK4846@sortiz-mobl>
-Message-ID: <2001108.iID9Ml5VFE@laptop>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Sun, 1 Jul 2012 13:04:54 +0200
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <20120701105934.GD16319@n2100.arm.linux.org.uk>
+References: <20120701105934.GD16319@n2100.arm.linux.org.uk>
+ <4FECB95D.7010200@zytor.com> <cover.1338222460.git.rubini@gnudd.com>
+ <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
+ <20120701104401.GA4352@mail.gnudd.com>
+Message-ID: <20120701110454.GA17531@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le vendredi 29 juin 2012 15:09:45 Samuel Ortiz a ?crit :
-> Hi Philippe,
-> 
-> On Tue, May 29, 2012 at 11:06:27AM +0200, Philippe R?tornaz wrote:
-> > Hello
-> > 
-> > This patchset fixes the mc13xxx regression introduced by:
-> > "mfd: Use regmap for the mc13xxx-core register access".
-> > 
-> > The first patch correct the write_flag_mask to use the correct value
-> > and remove the invalid bits_per_word in the probe.
-> > 
-> > The second patch workaround an silicon errata on some imx SoC.
-> 
-> Both patches applied to my for-linus branch. They'll be part of the MFD
-> fixes pull request for 3.5.
+> I think the answer is... those primecell drivers need fixing in some way.
 
-Thank you very much ! 
+Ok. I'm going to attack them and make a report.
 
-Philippe
+> As for PL08x, which depends on asm/hardware/pl080.h,
+
+We have pl080 under PCI, so we have patches in the queue to fix this
+header problem.  I just didn't submit them yet, but now they are part
+of this fixup effort and I'll check them over.
+
+> Note also that hpa has only reported the first errors he encountered, so
+> there may be more, and that's somehting which needs checking.
+
+Yes. I'm going to make a status report soon, counting and classifying
+all errors I encounter when enabling all amba drivers under x86.
+
+thanks
+/alessandro
