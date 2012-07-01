@@ -1,77 +1,65 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 1 Jul 2012 02:01:17 -0700
-Subject: [GIT PULL 6/6] am33xx changes for v3.6 merge window
-In-Reply-To: <pull-1341133277-501333>
-Message-ID: <mailman.26.1341133306.1417.linux-arm-kernel@lists.infradead.org>
+Date: Sun, 1 Jul 2012 02:39:49 -0700
+Subject: [GIT PULL 2/6] omap cleanup for v3.6 merge window
+In-Reply-To: <E1SlGGy-0003tf-Lc@merlin.infradead.org>
+References: <pull-1341133277-501333> <E1SlGGy-0003tf-Lc@merlin.infradead.org>
+Message-ID: <20120701093949.GM4202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+* Tony Lindgren <tony@atomide.com> [120701 02:28]:
+> The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
+> 
+>   Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-for-v3.6
+> 
+> for you to fetch changes up to 472fd5401561f94698f4c8f9dbbbfbf76ab55626:
+> 
+>   Merge branch 'cleanup-hwmod' into cleanup (2012-06-28 05:47:01 -0700)
+> 
+> ----------------------------------------------------------------
+> 
+> Here is some more omap clean-up. The biggest changes are
+> hwmod, clock, and System Control Module cleanup, and the removal
+> of the last instance of omap_read/write usage for omap2+ with
+> the removal of unused USB OHCI Full Speed driver support. The
+> removed OHCI is only currently used for omap1 as the actively
+> used omap2+ boards have either MUSB or another instance of
+> OHCI+EHCI that's more usable.
+> 
+> ----------------------------------------------------------------
 
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+This one has a merge conflict with the non-critical fixes in 1/6
+of this series that can be resolved as below.
 
-are available in the git repository at:
+Tony
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-am33xx-for-v3.6
-
-for you to fetch changes up to 6fd8246b1c1167c983b089f9eaafa13ef9ca7adf:
-
-  Merge tag 'omap-devel-a-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-am33xx (2012-06-22 01:50:22 -0700)
-
-----------------------------------------------------------------
-
-Here are changes to add support for am33xx processors for the
-clock, power, and voltagedomains.
-
-----------------------------------------------------------------
-Afzal Mohammed (2):
-      ARM: OMAP2+: am33xx: Add low level debugging support
-      ARM: OMAP2+: am33xx: Add AM335XEVM machine support
-
-Tony Lindgren (1):
-      Merge tag 'omap-devel-a-for-3.6' of git://git.kernel.org/.../pjw/omap-pending into devel-am33xx
-
-Vaibhav Hiremath (6):
-      ARM: OMAP2+: control: Add AM33XX control reg & sec clkctrl offset
-      ARM: OMAP AM33xx: voltagedomain: Add voltage domain data
-      ARM: OMAP AM33xx: PRM: add PRM support
-      ARM: OMAP AM33xx: CM: Introduce AM33xx CM APIs and register level details
-      ARM: OMAP AM33xx: powerdomains: add AM335x support
-      ARM: OMAP AM33xx: clockdomains: Add clockdomain data and respective operations
-
- arch/arm/mach-omap2/Makefile                   |    6 +
- arch/arm/mach-omap2/board-generic.c            |   18 +
- arch/arm/mach-omap2/clockdomain.h              |    2 +
- arch/arm/mach-omap2/clockdomain33xx.c          |   74 +++
- arch/arm/mach-omap2/clockdomains33xx_data.c    |  196 +++++++
- arch/arm/mach-omap2/cm-regbits-33xx.h          |  687 ++++++++++++++++++++++++
- arch/arm/mach-omap2/cm33xx.c                   |  313 +++++++++++
- arch/arm/mach-omap2/cm33xx.h                   |  420 +++++++++++++++
- arch/arm/mach-omap2/common.h                   |    3 +
- arch/arm/mach-omap2/control.h                  |   39 +-
- arch/arm/mach-omap2/include/mach/debug-macro.S |   17 +-
- arch/arm/mach-omap2/io.c                       |   13 +
- arch/arm/mach-omap2/irq.c                      |    2 +-
- arch/arm/mach-omap2/powerdomain.h              |   23 +-
- arch/arm/mach-omap2/powerdomain33xx.c          |  229 ++++++++
- arch/arm/mach-omap2/powerdomains33xx_data.c    |  185 +++++++
- arch/arm/mach-omap2/prm-regbits-33xx.h         |  357 ++++++++++++
- arch/arm/mach-omap2/prm33xx.c                  |  135 +++++
- arch/arm/mach-omap2/prm33xx.h                  |  129 +++++
- arch/arm/mach-omap2/timer.c                    |    5 +
- arch/arm/mach-omap2/voltage.h                  |    1 +
- arch/arm/mach-omap2/voltagedomains33xx_data.c  |   43 ++
- arch/arm/plat-omap/include/plat/serial.h       |    4 +
- arch/arm/plat-omap/include/plat/uncompress.h   |    6 +
- 24 files changed, 2887 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clockdomain33xx.c
- create mode 100644 arch/arm/mach-omap2/clockdomains33xx_data.c
- create mode 100644 arch/arm/mach-omap2/cm-regbits-33xx.h
- create mode 100644 arch/arm/mach-omap2/cm33xx.c
- create mode 100644 arch/arm/mach-omap2/cm33xx.h
- create mode 100644 arch/arm/mach-omap2/powerdomain33xx.c
- create mode 100644 arch/arm/mach-omap2/powerdomains33xx_data.c
- create mode 100644 arch/arm/mach-omap2/prm-regbits-33xx.h
- create mode 100644 arch/arm/mach-omap2/prm33xx.c
- create mode 100644 arch/arm/mach-omap2/prm33xx.h
- create mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+--- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+@@@ -452,15 -345,20 +452,14 @@@ static struct clkdm_autodep clkdm_am35x
+   *
+   */
+  
+ -static struct clockdomain *clockdomains_omap3430_common[] __initdata = {
+ +static struct clockdomain *clockdomains_common[] __initdata = {
+  	&wkup_common_clkdm,
+- 	&cm_common_clkdm,
+- 	&prm_common_clkdm,
++ 	&mpu_3xxx_clkdm,
+  	&neon_clkdm,
+ -	&iva2_clkdm,
+ -	&d2d_clkdm,
+  	&core_l3_3xxx_clkdm,
+  	&core_l4_3xxx_clkdm,
+ -	&dss_3xxx_clkdm,
+ -	&cam_clkdm,
+ -	&per_clkdm,
+  	&emu_clkdm,
+  	&dpll1_clkdm,
+ -	&dpll2_clkdm,
+  	&dpll3_clkdm,
+  	&dpll4_clkdm,
+  	NULL
