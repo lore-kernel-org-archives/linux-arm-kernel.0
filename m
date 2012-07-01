@@ -1,114 +1,46 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Sun,  1 Jul 2012 19:19:47 +0200
-Subject: [PATCH 5/5] crypto: add new tests to tcrypt
-In-Reply-To: <1341163187-14946-1-git-send-email-eric@eukrea.com>
-References: <1341163187-14946-1-git-send-email-eric@eukrea.com>
-Message-ID: <1341163187-14946-6-git-send-email-eric@eukrea.com>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Sun, 1 Jul 2012 19:36:28 +0200
+Subject: [PATCH 01/10] ARM: S3C24XX: Free the backlight gpio requested in
+ Mini2440 board code
+In-Reply-To: <1341058142-30438-2-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <1341058142-30438-2-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <201207011936.28536.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Royer <nicolas@eukrea.com>
+Sylwester Nawrocki wrote:
+> The backlight gpio must not be left requested in the board
+> code, otherwise s3c24xx_led driver can't successfully claim it.
+> So request the backlight gpio, configure it to proper state and
+> gpio_free right away.
+>
+> This change is required for converting the s3c24xx_led driver
+> to the gpiolib API.
+>
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> ---
+>  arch/arm/mach-s3c24xx/mach-mini2440.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c
+> b/arch/arm/mach-s3c24xx/mach-mini2440.c index f092b18..bd6d252 100644
+> --- a/arch/arm/mach-s3c24xx/mach-mini2440.c
+> +++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> @@ -634,8 +634,8 @@ static void __init mini2440_init(void)
+>  	s3c_gpio_cfgpin(S3C2410_GPC(0), S3C2410_GPC0_LEND);
+>
+>  	/* Turn the backlight early on */
+> -	WARN_ON(gpio_request(S3C2410_GPG(4), "backlight"));
+> -	gpio_direction_output(S3C2410_GPG(4), 1);
+> +	WARN_ON(gpio_request_one(S3C2410_GPG(4), GPIOF_OUT_INIT_HIGH, NULL));
+> +	gpio_free(S3C2410_GPG(4));
+>
+>  	/* remove pullup on optional PWM backlight -- unused on 3.5 and 7"s */
+>  	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
 
-- set sg buffers size equals to message size
-- add cfb & ofb tests for AES, DES & TDES
+Acked-by: jbe at pengutronix.de
 
-Signed-off-by: Nicolas Royer <nicolas@eukrea.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Eric B?nard <eric@eukrea.com>
-Tested-by: Eric B?nard <eric@eukrea.com>
----
- crypto/tcrypt.c |   50 +++++++++++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 45 insertions(+), 5 deletions(-)
-
-diff --git a/crypto/tcrypt.c b/crypto/tcrypt.c
-index 8f147bf..a9296bd 100644
---- a/crypto/tcrypt.c
-+++ b/crypto/tcrypt.c
-@@ -809,7 +809,7 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int sec,
- 			       struct cipher_speed_template *template,
- 			       unsigned int tcount, u8 *keysize)
- {
--	unsigned int ret, i, j, iv_len;
-+	unsigned int ret, i, j, k, iv_len;
- 	struct tcrypt_result tresult;
- 	const char *key;
- 	char iv[128];
-@@ -883,11 +883,23 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int sec,
- 			}
- 
- 			sg_init_table(sg, TVMEMSIZE);
--			sg_set_buf(sg, tvmem[0] + *keysize,
-+
-+			k = *keysize + *b_size;
-+			if (k > PAGE_SIZE) {
-+				sg_set_buf(sg, tvmem[0] + *keysize,
- 				   PAGE_SIZE - *keysize);
--			for (j = 1; j < TVMEMSIZE; j++) {
--				sg_set_buf(sg + j, tvmem[j], PAGE_SIZE);
--				memset(tvmem[j], 0xff, PAGE_SIZE);
-+				k -= PAGE_SIZE;
-+				j = 1;
-+				while (k > PAGE_SIZE) {
-+					sg_set_buf(sg + j, tvmem[j], PAGE_SIZE);
-+					memset(tvmem[j], 0xff, PAGE_SIZE);
-+					j++;
-+					k -= PAGE_SIZE;
-+				}
-+				sg_set_buf(sg + j, tvmem[j], k);
-+				memset(tvmem[j], 0xff, k);
-+			} else {
-+				sg_set_buf(sg, tvmem[0] + *keysize, *b_size);
- 			}
- 
- 			iv_len = crypto_ablkcipher_ivsize(tfm);
-@@ -1512,6 +1524,14 @@ static int do_test(int m)
- 				   speed_template_16_24_32);
- 		test_acipher_speed("ctr(aes)", DECRYPT, sec, NULL, 0,
- 				   speed_template_16_24_32);
-+		test_acipher_speed("cfb(aes)", ENCRYPT, sec, NULL, 0,
-+				   speed_template_16_24_32);
-+		test_acipher_speed("cfb(aes)", DECRYPT, sec, NULL, 0,
-+				   speed_template_16_24_32);
-+		test_acipher_speed("ofb(aes)", ENCRYPT, sec, NULL, 0,
-+				   speed_template_16_24_32);
-+		test_acipher_speed("ofb(aes)", DECRYPT, sec, NULL, 0,
-+				   speed_template_16_24_32);
- 		break;
- 
- 	case 501:
-@@ -1527,6 +1547,18 @@ static int do_test(int m)
- 		test_acipher_speed("cbc(des3_ede)", DECRYPT, sec,
- 				   des3_speed_template, DES3_SPEED_VECTORS,
- 				   speed_template_24);
-+		test_acipher_speed("cfb(des3_ede)", ENCRYPT, sec,
-+				   des3_speed_template, DES3_SPEED_VECTORS,
-+				   speed_template_24);
-+		test_acipher_speed("cfb(des3_ede)", DECRYPT, sec,
-+				   des3_speed_template, DES3_SPEED_VECTORS,
-+				   speed_template_24);
-+		test_acipher_speed("ofb(des3_ede)", ENCRYPT, sec,
-+				   des3_speed_template, DES3_SPEED_VECTORS,
-+				   speed_template_24);
-+		test_acipher_speed("ofb(des3_ede)", DECRYPT, sec,
-+				   des3_speed_template, DES3_SPEED_VECTORS,
-+				   speed_template_24);
- 		break;
- 
- 	case 502:
-@@ -1538,6 +1570,14 @@ static int do_test(int m)
- 				   speed_template_8);
- 		test_acipher_speed("cbc(des)", DECRYPT, sec, NULL, 0,
- 				   speed_template_8);
-+		test_acipher_speed("cfb(des)", ENCRYPT, sec, NULL, 0,
-+				   speed_template_8);
-+		test_acipher_speed("cfb(des)", DECRYPT, sec, NULL, 0,
-+				   speed_template_8);
-+		test_acipher_speed("ofb(des)", ENCRYPT, sec, NULL, 0,
-+				   speed_template_8);
-+		test_acipher_speed("ofb(des)", DECRYPT, sec, NULL, 0,
-+				   speed_template_8);
- 		break;
- 
- 	case 503:
 -- 
-1.7.7.6
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
