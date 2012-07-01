@@ -1,65 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 1 Jul 2012 02:39:49 -0700
-Subject: [GIT PULL 2/6] omap cleanup for v3.6 merge window
-In-Reply-To: <E1SlGGy-0003tf-Lc@merlin.infradead.org>
-References: <pull-1341133277-501333> <E1SlGGy-0003tf-Lc@merlin.infradead.org>
-Message-ID: <20120701093949.GM4202@atomide.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun,  1 Jul 2012 12:44:02 +0300
+Subject: [PATCH] remoteproc/omap: fix randconfig unmet direct dependencies
+Message-ID: <1341135842-22006-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120701 02:28]:
-> The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
-> 
->   Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-for-v3.6
-> 
-> for you to fetch changes up to 472fd5401561f94698f4c8f9dbbbfbf76ab55626:
-> 
->   Merge branch 'cleanup-hwmod' into cleanup (2012-06-28 05:47:01 -0700)
-> 
-> ----------------------------------------------------------------
-> 
-> Here is some more omap clean-up. The biggest changes are
-> hwmod, clock, and System Control Module cleanup, and the removal
-> of the last instance of omap_read/write usage for omap2+ with
-> the removal of unused USB OHCI Full Speed driver support. The
-> removed OHCI is only currently used for omap1 as the actively
-> used omap2+ boards have either MUSB or another instance of
-> OHCI+EHCI that's more usable.
-> 
-> ----------------------------------------------------------------
+OMAP_REMOTEPROC selects REMOTEPROC, which depends on EXPERIMENTAL,
+so let's have OMAP_REMOTEPROC depend on EXPERIMENTAL too, in order
+to avoid the below randconfig warnings.
 
-This one has a merge conflict with the non-critical fixes in 1/6
-of this series that can be resolved as below.
+This will also (indirectly) take care of the RPMSG unmet dependencies
+warnings.
 
-Tony
+warning: (OMAP_REMOTEPROC) selects REMOTEPROC which has unmet direct dependencies (EXPERIMENTAL)
+warning: (OMAP_REMOTEPROC) selects RPMSG which has unmet direct dependencies (EXPERIMENTAL)
+warning: (OMAP_REMOTEPROC) selects REMOTEPROC which has unmet direct dependencies (EXPERIMENTAL)
+warning: (OMAP_REMOTEPROC) selects RPMSG which has unmet direct dependencies (EXPERIMENTAL)
 
---- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-@@@ -452,15 -345,20 +452,14 @@@ static struct clkdm_autodep clkdm_am35x
-   *
-   */
-  
- -static struct clockdomain *clockdomains_omap3430_common[] __initdata = {
- +static struct clockdomain *clockdomains_common[] __initdata = {
-  	&wkup_common_clkdm,
-- 	&cm_common_clkdm,
-- 	&prm_common_clkdm,
-+ 	&mpu_3xxx_clkdm,
-  	&neon_clkdm,
- -	&iva2_clkdm,
- -	&d2d_clkdm,
-  	&core_l3_3xxx_clkdm,
-  	&core_l4_3xxx_clkdm,
- -	&dss_3xxx_clkdm,
- -	&cam_clkdm,
- -	&per_clkdm,
-  	&emu_clkdm,
-  	&dpll1_clkdm,
- -	&dpll2_clkdm,
-  	&dpll3_clkdm,
-  	&dpll4_clkdm,
-  	NULL
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/remoteproc/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+index ff6f55c..726804e 100644
+--- a/drivers/remoteproc/Kconfig
++++ b/drivers/remoteproc/Kconfig
+@@ -8,6 +8,7 @@ config REMOTEPROC
+ 
+ config OMAP_REMOTEPROC
+ 	tristate "OMAP remoteproc support"
++	depends on EXPERIMENTAL
+ 	depends on ARCH_OMAP4
+ 	depends on OMAP_IOMMU
+ 	select REMOTEPROC
+-- 
+1.7.10.rc3.743.gaa3bb87
