@@ -1,58 +1,43 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Sun, 01 Jul 2012 07:13:10 -0700
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <20120701104401.GA4352@mail.gnudd.com>
-References: <4FECB95D.7010200@zytor.com>
- <cover.1338222460.git.rubini@gnudd.com>
- <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
- <20120701104401.GA4352@mail.gnudd.com>
-Message-ID: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 1 Jul 2012 22:20:00 +0800
+Subject: [PATCHv2] ARM: dts: cfa10036: Add Power LED to the CFA-10036 board
+In-Reply-To: <1340955569-16513-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1340955569-16513-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120701141958.GC21595@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no problem with adding ARM or !X86 dependencies to drivers now and fixing them later or as required.
+On Fri, Jun 29, 2012 at 09:39:29AM +0200, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Brian Lilly <brian@crystalfontz.com>
 
-Alessandro Rubini <rubini@gnudd.com> wrote:
+Applied, thanks.
 
->>> The sta2x11 I/O Hub is a bridge from PCIe to AMBA. It reuses a
->number
->>> of amba drivers and needs to activate core bus support.
->
->> Nacked-by: H. Peter Anvin <hpa@zytor.com>
->> 
->> This brings in tons of code into the x86 all{yes,mod}config builds,
->and 
->> as perhaps one could expect some of it doesn't compile.  For example:
->
->Ok. I apologize for not checking this. Actually, I only fixed the ones
->that I needed to compile.
->
->How should I address the problem? (original code, published on
->sourceforge was simply replicating a number of amba drivers into pci
->drivers, but I don't think massive code duplication is ever sensible,
->thus I preferred to reuse the existing drivers).
->
->I doubt all amba drivers can easily be made x86-compatible.
->I see these possible approaces, all of them with their cons
->
-> 1- add STA2X11 dependencies to ARM_AMBA _and_ the drivers that do work
->
->  2- leave CONFIG_ARM_AMBA undefined and play select file in Makefiles
->   using obj-$(CONFIG_STA2X11)
->
->  3- add ARM dependencies to the drivers that do not compile on x86
->
->  any other option?
->
->(1) and (2) bring chipset-specific stuff into the amba world, which is
->bad, especially since I suspect other similar bridges will appear soon.
->
->(3) looks like a temporary hack and stuff can be fixed over time, but
->it has the disadvantage of adding a big number of needless drivers in
->the dsitributions' packages -- like my nacked patch did.
->
->thanks
->/alessandro
+Regards,
+Shawn
 
--- 
-Sent from my mobile phone. Please excuse brevity and lack of formatting.
+> ---
+>  arch/arm/boot/dts/cfa10036.dts |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/cfa10036.dts b/arch/arm/boot/dts/cfa10036.dts
+> index 28b9326..c03a577 100644
+> --- a/arch/arm/boot/dts/cfa10036.dts
+> +++ b/arch/arm/boot/dts/cfa10036.dts
+> @@ -40,4 +40,13 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		power {
+> +			gpios = <&gpio3 4 1>;
+> +			default-state = "on";
+> +		};
+> +	};
+>  };
+> -- 
+> 1.7.9.5
+> 
