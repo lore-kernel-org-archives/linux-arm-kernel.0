@@ -1,44 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Jul 2012 08:47:37 +0200
-Subject: [PATCH] clk: __clk_set_parent: set uninitialized variable
-In-Reply-To: <4FF13839.5000804@ti.com>
-References: <1341177539-27716-1-git-send-email-mkl@pengutronix.de>
- <4FF13839.5000804@ti.com>
-Message-ID: <20120702064737.GB22016@pengutronix.de>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Mon,  2 Jul 2012 09:11:13 +0200
+Subject: [PATCH] da8xx-fb: add missing FB_BLANK operations
+Message-ID: <1341213073-2986-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 11:27:13AM +0530, Rajendra Nayak wrote:
-> On Monday 02 July 2012 02:48 AM, Marc Kleine-Budde wrote:
-> >This patch fixes the following warning:
-> >
-> >     drivers/clk/clk.c: In function '__clk_set_parent':
-> >     drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in this function [-Wuninitialized]
-> >
-> >which has been introduced with commit:
-> 
-> hmm, are you sure about that? The below commit neither introduces the
-> variable 'i', nor seem to change the way the variable is used in the
-> function.
-It does. The following hunk:
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
--       for (i = 0; i < clk->num_parents; i++)
--               if (clk->parents[i] == parent)
--                       break;
-+       if (clk->parents)
-+               for (i = 0; i < clk->num_parents; i++)
-+                       if (clk->parents[i] == parent)
-+                               break;
-+       else
-+               clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
-+                                                               GFP_KERNEL);
+add FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND and FB_BLANK_HSYNC_SUSPEND
+modes (copy drivers/video/omap2/omapfb/omapfb-main.c implementation).
+Otherwise X-server will complain about invalid parameter.
 
-results in i being uninitialized if clk->parents is NULL. But I wonder
-if for this case i should be set to clk->num_parents instead of 0?
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ drivers/video/da8xx-fb.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+index 29577bf..9879edc 100644
+--- a/drivers/video/da8xx-fb.c
++++ b/drivers/video/da8xx-fb.c
+@@ -987,6 +987,9 @@ static int cfb_blank(int blank, struct fb_info *info)
+ 
+ 		lcd_enable_raster();
+ 		break;
++	case FB_BLANK_NORMAL:
++	case FB_BLANK_VSYNC_SUSPEND:
++	case FB_BLANK_HSYNC_SUSPEND:
+ 	case FB_BLANK_POWERDOWN:
+ 		if (par->panel_power_ctrl)
+ 			par->panel_power_ctrl(0);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.7
