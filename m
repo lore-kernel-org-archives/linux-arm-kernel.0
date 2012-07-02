@@ -1,37 +1,99 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 2 Jul 2012 22:54:34 +0300
-Subject: [PATCH 1/2] remoteproc: maintain a generic child device for each
- rproc
-In-Reply-To: <4FF1F145.2050408@codeaurora.org>
-References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
- <4FC5DBFA.2030300@codeaurora.org>
- <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
- <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
- <4FF1F145.2050408@codeaurora.org>
-Message-ID: <CAK=WgbZ+=MGU5juuOP+_vtUe4d_46j=Rd0cqYi7q2i-9T35R5w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 02 Jul 2012 14:04:12 -0600
+Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode" property
+ to device tree bindings
+In-Reply-To: <20120630011906.GA2489@richard-laptop>
+References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
+ <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
+ <20120629014352.GA28923@b20223-02.ap.freescale.net>
+ <4FED5D77.3050009@pengutronix.de>
+ <20120629084509.GB28923@b20223-02.ap.freescale.net>
+ <4FEDCF15.9040000@wwwdotorg.org> <20120630011906.GA2489@richard-laptop>
+Message-ID: <4FF1FEBC.3040107@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2012 at 10:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Great! It looks like device_type doesn't have any list iteration support
-> though. Is that requirement gone?
+On 06/29/2012 07:19 PM, Richard Zhao wrote:
+> On Fri, Jun 29, 2012 at 09:51:49AM -0600, Stephen Warren wrote:
+>> On 06/29/2012 02:45 AM, Richard Zhao wrote:
+>>> On Fri, Jun 29, 2012 at 09:47:03AM +0200, Marc Kleine-Budde wrote:
+>>>>
+>>>> Cc'ed Devicetree Discussions
+>>>>
+>>>> On 06/29/2012 03:43 AM, Richard Zhao wrote:
+>>>>> On Thu, Jun 28, 2012 at 03:53:48PM +0200, Marc Kleine-Budde wrote:
+>>>>>> This patch allows the device tree to limit the chipidea to host or
+>>>>>> peripheral mode only.
+>>>>>>
+>>>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>>>>>> ---
+>>>>>>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++
+>>>>>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+>>>>>>  drivers/usb/chipidea/core.c                        |   41 +++++++++++++++++---
+>>>>>>  include/linux/usb/chipidea.h                       |    9 +++++
+>>>>>>  4 files changed, 50 insertions(+), 6 deletions(-)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>>>>>> index 5a0ad66..67f97f56 100644
+>>>>>> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>>>>>> @@ -4,6 +4,8 @@ Required properties:
+>>>>>>  - compatible: Should be "fsl,imx27-usb"
+>>>>>>  - reg: Should contain registers location and length
+>>>>>>  - interrupts: Should contain controller interrupt
+>>>>>> +- dr_mode: indicates the working mode for compatible controllers. Can
+>>>>>> +  be "host", "peripheral", or "otg". Defaults to "otg" if not defined.
+>>>>
+>>>>> By default, it should be decided by capability registers. Only bad hw
+>>>>> design needs such settings. So, why not name it as force-xxx? If it's
+>>>>> not specific to imx, it doesn't needs to has prefix "fsl,".
+>>>>
+>>>> It's not a bad hardware design if you don't route or enable all ports a
+>>>> soc offers. In modern socs you cannot enable all ports anyway.
+>>>
+>>> I'm not sure about your case, but generally, it's not about ports.
+>>> It's about ID pin. If ID pin is not connect correctly, we may need to
+>>> force it to host or device working mode. The 'force" here means it
+>>> won't follow the capability registers and ID pin.
+>>>>
+>>>> The property isn't prefixed with "fsl,", it's just "dr_mode".
+>>>>
+>>>> Why not "force-xxx"? I had a look at Documentation/devicetree/bindings/usb:
+>>>>
+>>>> tegra-usb.txt:
+>>>>>   - dr_mode : dual role mode. Indicates the working mode for
+>>>>>    nvidia,tegra20-ehci compatible controllers.  Can be "host", "peripheral",
+>>>>>    or "otg".  Default to "host" if not defined for backward compatibility.
+>>>>>       host means this is a host controller
+>>>>>       peripheral means it is device controller
+>>>>>       otg means it can operate as either ("on the go")
+>>>>
+>>>> fsl-usb.txt:
+>>>>>  - dr_mode : indicates the working mode for "fsl-usb2-dr" compatible
+>>>>>    controllers.  Can be "host", "peripheral", or "otg".  Default to
+>>>>>    "host" if not defined for backward compatibility.
+>>>>>
+>>>>
+>>>> So why invent something new, if there seems to be a pattern?
+>>>
+>>> I'm not sure they mean the same things, because the default value is
+>>> different. Event if they're same, why not make them all with sensible
+>>> name?
+>>
+>> I'm not quite sure what the question is I'm being asked here.
+>>
+>> I certainly think that new bindings should follow existing precedent
+>> where possible for representing the same data. dr_mode is that precedent
+>> for a USB host's operating mode. Tegra chose to use that because of
+>> precedent in fsl-usb.txt IIRC.
+>
+> For imx, in most cases, we don't use dr_mode. The role is decided by
+> CAP_DCCPARAMS and ID pin. For tegra and fsl-usb, it looks like the role
+> is totally decided by dt property. So I suggested use force-xxx to let
+> everyone know it does not follow the default action. I don't quite
+> insist on the naming, because dr_mode is similar (not same).
 
-Pretty much, yeah. I'll soon post a separate patch which removes the
-get_by_name functionality (together with its related klist).
-
-> Will you resend this as part of a series? It will be easier to review then.
-
-Not sure. There's a collection of discrete patches that I've been
-posting, but they really aren't an organic series: as long as the
-dependencies are met, each and every one of them is applicable even if
-applied alone.
-
-So I'd prefer (when possible) to treat patches in a discrete fashion
-so we can start applying them and unblock others who depend on them
-(e.g. Fernando's runtime PM work depends on this one).
-
-But if you prefer me to send this one patch differently to make it
-easier to review, let me know!
-
-Thanks,
-Ohad.
+Hmm. I think it'd be reasonable to use dr_mode like the other bindings,
+and have the default case be decided by the ID pin when dr_mode isn't
+specified. Having different defaults for different bindings seems pretty
+reasonable to me.
