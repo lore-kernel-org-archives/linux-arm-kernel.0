@@ -1,31 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 02 Jul 2012 16:24:41 +0100
-Subject: [PATCH 11/14] usb: otg: Enable probing of the ab8500 during a
- Device Tree boot
-In-Reply-To: <1339428307-3850-12-git-send-email-lee.jones@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-12-git-send-email-lee.jones@linaro.org>
-Message-ID: <4FF1BD39.8020800@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 Jul 2012 15:30:23 +0000
+Subject: [PATCH v6] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201207021530.23809.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/12 16:25, Lee Jones wrote:
-> Without this patch, if Device Tree is enabled the AB8500 USB OTG driver
-> wouldn't get probed at all, as there is no reference to it from platform
-> code. This patch ensures the driver is probed during normal DT start-up.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: linux-usb at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/usb/otg/ab8500-usb.c |    6 ++++++
->   1 file changed, 6 insertions(+)
+On Monday 02 July 2012, Thomas Petazzoni wrote:
+> You'll find in this patch set the sixth version of the initial support
+> for a new family of ARMv7-compatible Marvell SoCs.
+> 
+> Do you think this patch set has a chance of hitting the 3.6 merge
+> window?
 
-Please don't take this patch now, it was been superseded.
+Yes, definitely.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> We are willing to quickly resubmit updated versions to take into
+> account new comments. We have a lot more code to support those new
+> SoCs, and we would like to make progress in submitting those other
+> parts for the mainline.
+
+I think it's time to just take your current version into arm-soc
+and do all other patches on top. I'll wait for an Ack from
+Ben, Andrew and Andrew first though.
+
+	Arnd
