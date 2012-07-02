@@ -1,115 +1,76 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Mon, 02 Jul 2012 06:28:44 +0000
-Subject: [PATCH 2/3] mx3fb: support pan display with fb_set_var
-In-Reply-To: <1339376810-8247-2-git-send-email-Ying.Liu@freescale.com>
-References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
- <1339376810-8247-2-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <4FF13F9C.5050104@gmx.de>
+From: keshava_mgowda@ti.com (Munegowda, Keshava)
+Date: Mon, 2 Jul 2012 12:06:08 +0530
+Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
+ issues.
+In-Reply-To: <Pine.LNX.4.44L0.1206291104270.1638-100000@iolanthe.rowland.org>
+References: <1340848783-9480-1-git-send-email-Russ.Dill@ti.com>
+ <Pine.LNX.4.44L0.1206291104270.1638-100000@iolanthe.rowland.org>
+Message-ID: <CAP05o4+NhGgmZkUymmKEGY9szrot6ND_3oDedbMHpc_+sW0HHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2012 01:06 AM, Liu Ying wrote:
-> Users may call FBIOPUT_VSCREENINFO ioctrl to do pan display.
-> This ioctrl relies on fb_set_var() to do the job. fb_set_var()
-> calls the custom fb_set_par() method and then calls the custom
-> fb_pan_display() method. Before calling the custom fb_pan_display()
-> method, info->var is already updated from the new *var in fb_set_var().
-> And, the custom fb_pan_display() method checks if xoffset and yoffset
-> in info->var and the new *var are different before doing actual panning,
-> which prevents the panning from happening within fb_set_var() context.
-> This patch caches the current var info locally in mx3fb driver so that
-> pan display with fb_set_var is supported.
-> 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+On Fri, Jun 29, 2012 at 9:03 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Wed, 27 Jun 2012, Russ Dill wrote:
+>
+>> From: Russ Dill <Russ.Dill@gmail.com>
+>>
+>> 'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
+>> an issue where the ULPI PHYs were not held in reset while initializing
+>> the EHCI controller. However, it also changes behavior in
+>> omap-usb-host.c omap_usbhs_init by releasing reset while the
+>> configuration in that function was done.
+>>
+>> This change caused a regression on BB-xM where USB would not function
+>> if 'usb start' had been run from u-boot before booting. A change was
+>> made to release reset a little bit earlier which fixed the issue on
+>> BB-xM and did not cause any regressions on 3430 sdp, the board for
+>> which the fix was originally made.
+>>
+>> This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
+>> before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
+>>
+>> The original fix to hold the EHCI controller in reset during
+>> initialization was correct, however it appears that changing
+>> omap_usbhs_init to not hold the PHYs in reset during it's
+>> configuration was incorrect. This patch first reverts both fixes, and
+>> then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
+>> reset as the original patch had done. It also is sure to incorporate
+>> the _cansleep change that has been made in the meantime.
+>>
+>> Tested on Beagleboard xM.
+>
+> Looking at the result of this patch, there seem to be a few mistakes
+> remaining in the probe routine.
+>
+> If the regulator_get() call fails, the failure is logged but ignored.
+> Is that really the right thing to do?
+>
+> The pm_runtime_get_sync() call occurs before the probe is finished.
+> This means that ehci-hcd's resume routine will try to power-up the
+> device before its data structures have been initialized.  That can't be
+> right.
+>
+> The "get clocks" section occurs after the call to usb_add_hcd().  This
+> means the controller will start running before the clock references are
+> acquired -- so the clocks might still be turned off.  That can't be
+> right either.
+>
+> If the clk_get(dev, "utmi_p1_gfclk") call fails, the error path never
+> calls usb_remove_hcd().
+>
+> The "err_add_hcd" pathway never calls usb_put_hcd().
+>
+> I'm going to resubmit my most recent patch based the current
+> ehci-omap.c, but you or someone else will still have to fix these
+> problems.
+>
+> Alan Stern
+>
 
-Applied patches 2 and 3 of this series.
+Hi Rus Dill,
+    once Alan post his changes on ehci-omap.c, please re-base this
+patch on top of it.
+so that, I will rebase UHH-TLL split series on top your patch.
 
-
-Thanks,
-
-Florian Tobias Schandinat
-
-> ---
->  drivers/video/mx3fb.c |   33 ++++++++++++++++++++++++++-------
->  1 files changed, 26 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-> index d53db60..2dd11c4 100644
-> --- a/drivers/video/mx3fb.c
-> +++ b/drivers/video/mx3fb.c
-> @@ -268,7 +268,7 @@ struct mx3fb_info {
->  	dma_cookie_t			cookie;
->  	struct scatterlist		sg[2];
->  
-> -	u32				sync;	/* preserve var->sync flags */
-> +	struct fb_var_screeninfo	cur_var; /* current var info */
->  };
->  
->  static void mx3fb_dma_done(void *);
-> @@ -723,7 +723,7 @@ static void mx3fb_dma_done(void *arg)
->  
->  static int __set_par(struct fb_info *fbi, bool lock)
->  {
-> -	u32 mem_len;
-> +	u32 mem_len, cur_xoffset, cur_yoffset;
->  	struct ipu_di_signal_cfg sig_cfg;
->  	enum ipu_panel mode = IPU_PANEL_TFT;
->  	struct mx3fb_info *mx3_fbi = fbi->par;
-> @@ -805,8 +805,25 @@ static int __set_par(struct fb_info *fbi, bool lock)
->  	video->out_height	= fbi->var.yres;
->  	video->out_stride	= fbi->var.xres_virtual;
->  
-> -	if (mx3_fbi->blank == FB_BLANK_UNBLANK)
-> +	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
->  		sdc_enable_channel(mx3_fbi);
-> +		/*
-> +		 * sg[0] points to fb smem_start address
-> +		 * and is actually active in controller.
-> +		 */
-> +		mx3_fbi->cur_var.xoffset = 0;
-> +		mx3_fbi->cur_var.yoffset = 0;
-> +	}
-> +
-> +	/*
-> +	 * Preserve xoffset and yoffest in case they are
-> +	 * inactive in controller as fb is blanked.
-> +	 */
-> +	cur_xoffset = mx3_fbi->cur_var.xoffset;
-> +	cur_yoffset = mx3_fbi->cur_var.yoffset;
-> +	mx3_fbi->cur_var = fbi->var;
-> +	mx3_fbi->cur_var.xoffset = cur_xoffset;
-> +	mx3_fbi->cur_var.yoffset = cur_yoffset;
->  
->  	return 0;
->  }
-> @@ -926,8 +943,8 @@ static int mx3fb_check_var(struct fb_var_screeninfo *var, struct fb_info *fbi)
->  	var->grayscale = 0;
->  
->  	/* Preserve sync flags */
-> -	var->sync |= mx3_fbi->sync;
-> -	mx3_fbi->sync |= var->sync;
-> +	var->sync |= mx3_fbi->cur_var.sync;
-> +	mx3_fbi->cur_var.sync |= var->sync;
->  
->  	return 0;
->  }
-> @@ -1073,8 +1090,8 @@ static int mx3fb_pan_display(struct fb_var_screeninfo *var,
->  		return -EINVAL;
->  	}
->  
-> -	if (fbi->var.xoffset == var->xoffset &&
-> -	    fbi->var.yoffset == var->yoffset)
-> +	if (mx3_fbi->cur_var.xoffset == var->xoffset &&
-> +	    mx3_fbi->cur_var.yoffset == var->yoffset)
->  		return 0;	/* No change, do nothing */
->  
->  	y_bottom = var->yoffset;
-> @@ -1157,6 +1174,8 @@ static int mx3fb_pan_display(struct fb_var_screeninfo *var,
->  	else
->  		fbi->var.vmode &= ~FB_VMODE_YWRAP;
->  
-> +	mx3_fbi->cur_var = fbi->var;
-> +
->  	mutex_unlock(&mx3_fbi->mutex);
->  
->  	dev_dbg(fbi->device, "Update complete\n");
+regards
+keshava
