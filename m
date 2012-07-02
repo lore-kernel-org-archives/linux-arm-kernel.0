@@ -1,121 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  2 Jul 2012 17:39:27 +0200
-Subject: [PATCH 2/9] arm: mach-mvebu: add header
+Date: Mon,  2 Jul 2012 17:39:34 +0200
+Subject: [PATCH 9/9] ARM: mvebu: MPIC: read number of interrupts from control
+ register
 In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341243574-3258-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ben Dooks <ben.dooks@codethink.co.uk>
+
+Read the number of MPIC interrupts from the controller and only register
+that many.
+
+[gregory.clement at free-electrons.com: rename armada symbol name to fit
+with new name: armada_370_xp]
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/mach-mvebu/include/mach/debug-macro.S |   24 +++++++++++++
- arch/arm/mach-mvebu/include/mach/timex.h       |   13 +++++++
- arch/arm/mach-mvebu/include/mach/uncompress.h  |   43 ++++++++++++++++++++++++
- 3 files changed, 80 insertions(+)
- create mode 100644 arch/arm/mach-mvebu/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-mvebu/include/mach/timex.h
- create mode 100644 arch/arm/mach-mvebu/include/mach/uncompress.h
+ arch/arm/mach-mvebu/irq-armada-370-xp.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/include/mach/debug-macro.S b/arch/arm/mach-mvebu/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..2282576
---- /dev/null
-+++ b/arch/arm/mach-mvebu/include/mach/debug-macro.S
-@@ -0,0 +1,24 @@
-+/*
-+ * Early serial output macro for Marvell  SoC
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index 645a8d3..5f5f939 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -29,13 +29,12 @@
+ #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+ #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
+ 
++#define ARMADA_370_XP_INT_CONTROL		(0x00)
+ #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
+ #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
+ 
+ #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
+ 
+-#define ARMADA_370_XP_NR_IRQS			(115)
+-
+ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+ static struct irq_domain *armada_370_xp_mpic_domain;
+@@ -81,14 +80,18 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 					     struct device_node *parent)
+ {
++	u32 control;
 +
-+#include <mach/armada-370-xp.h>
+ 	main_int_base = of_iomap(node, 0);
+ 	per_cpu_int_base = of_iomap(node, 1);
+ 
+ 	BUG_ON(!main_int_base);
+ 	BUG_ON(!per_cpu_int_base);
+ 
++	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
 +
-+	.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =ARMADA_370_XP_REGS_PHYS_BASE
-+	ldr	\rv, =ARMADA_370_XP_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
-+	.endm
-+
-+#define UART_SHIFT	2
-+#include <asm/hardware/debug-8250.S>
-diff --git a/arch/arm/mach-mvebu/include/mach/timex.h b/arch/arm/mach-mvebu/include/mach/timex.h
-new file mode 100644
-index 0000000..ab324a3
---- /dev/null
-+++ b/arch/arm/mach-mvebu/include/mach/timex.h
-@@ -0,0 +1,13 @@
-+/*
-+ * Marvell Armada SoC time definitions
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#define CLOCK_TICK_RATE		(100 * HZ)
-diff --git a/arch/arm/mach-mvebu/include/mach/uncompress.h b/arch/arm/mach-mvebu/include/mach/uncompress.h
-new file mode 100644
-index 0000000..d6a100c
---- /dev/null
-+++ b/arch/arm/mach-mvebu/include/mach/uncompress.h
-@@ -0,0 +1,43 @@
-+/*
-+ * Marvell Armada SoC kernel uncompression UART routines
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <mach/armada-370-xp.h>
-+
-+#define UART_THR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
-+								+ 0x12000))
-+#define UART_LSR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
-+								+ 0x12014))
-+
-+#define LSR_THRE	0x20
-+
-+static void putc(const char c)
-+{
-+	int i;
-+
-+	for (i = 0; i < 0x1000; i++) {
-+		/* Transmit fifo not full? */
-+		if (*UART_LSR & LSR_THRE)
-+			break;
-+	}
-+
-+	*UART_THR = c;
-+}
-+
-+static void flush(void)
-+{
-+}
-+
-+/*
-+ * nothing to do
-+ */
-+#define arch_decomp_setup()
-+#define arch_decomp_wdog()
+ 	armada_370_xp_mpic_domain =
+-	    irq_domain_add_linear(node, ARMADA_370_XP_NR_IRQS,
++	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+ 				  &armada_370_xp_mpic_irq_ops, NULL);
+ 
+ 	if (!armada_370_xp_mpic_domain)
 -- 
 1.7.9.5
