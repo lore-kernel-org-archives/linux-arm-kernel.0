@@ -1,46 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 2 Jul 2012 13:36:27 +0200
-Subject: [PATCH v5 3/9] arm: mach-mvebu: add source files
-In-Reply-To: <20120627153652.GE29702@lunn.ch>
+Date: Mon, 2 Jul 2012 13:37:03 +0200
+Subject: [PATCH v5 4/9] arm: mach-mvebu: add support for Armada 370 and
+ Armada XP with DT
+In-Reply-To: <4FEB30A7.3000809@codethink.co.uk>
 References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340805290-9051-4-git-send-email-gregory.clement@free-electrons.com>
- <20120627153652.GE29702@lunn.ch>
-Message-ID: <20120702133627.4f7baec0@skate>
+ <1340805290-9051-5-git-send-email-gregory.clement@free-electrons.com>
+ <4FEB30A7.3000809@codethink.co.uk>
+Message-ID: <20120702133703.7c693ed3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 27 Jun 2012 17:36:52 +0200,
-Andrew Lunn <andrew@lunn.ch> a ?crit :
+Le Wed, 27 Jun 2012 17:11:19 +0100,
+Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
 
-> > +void mvebu_restart(char mode, const char *cmd)
-> > +{
-> > +	if (!system_controller_base) {
-> > +		pr_warn("Cannot restart, system-controller not available\n");
+> > diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+> > index f0eaa21..1b1e679 100644
+> > --- a/arch/arm/mach-mvebu/common.h
+> > +++ b/arch/arm/mach-mvebu/common.h
+> > @@ -17,4 +17,7 @@
+> >
+> >   void mvebu_restart(char mode, const char *cmd);
 > 
-> Does pr_warn() get shown by default? I would of probably gone for
-> BUG_ON() or WARN_ON(), to make it clearer what has happened. It may
-> not be a kernel bug, but a DT description bug, but it still a bug...
+> If you set it when you probed the device, you'd not need
+> to export it in the header.
 
->From my testing, pr_warn() messages are shown by default, but I've
-turned this message into a pr_err() to be sure, and we've expanded the
-message a bit to make it clear that the problem comes from the DT.
+As per the discussion with Russell King on your patch 3/3 about the
+restart() hook, we had to keep this function prototype as it is.
 
-> I tested this on a Kirkwood QNAP with DT property:
+> > +void armada_370_xp_init_irq(void);
+> > +asmlinkage void  armada_370_xp_handle_irq(struct pt_regs *regs);
 > 
->                 system-controller at 20000 {
->                         compatible = "marvell,orion-system-controller";
->                         reg = <0x20000 0x1000>;
->                 };
-> 
-> and it works. So:
-> 
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> However Orion5x has a slightly different variant, so i would like to
-> test it on that SoC as well. However, we don't have DT on Orion5x yet,
-> so i need to simulate it.
+> You shouldn't need linkage info with a function declaration.
 
-Thanks!
+Good point, fixed!
+
+Thanks,
 
 Thomas
 -- 
