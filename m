@@ -1,9 +1,7 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  2 Jul 2012 17:35:51 -0300
-Subject: [PATCH 2/2] ARM: mxs: defconfig: Enable CONFIG_COMMON_CLK_DEBUG
-In-Reply-To: <1341261351-7924-1-git-send-email-festevam@gmail.com>
-References: <1341261351-7924-1-git-send-email-festevam@gmail.com>
-Message-ID: <1341261351-7924-2-git-send-email-festevam@gmail.com>
+Date: Mon,  2 Jul 2012 17:35:50 -0300
+Subject: [PATCH 1/2] ARM: imx: defconfig: Enable CONFIG_COMMON_CLK_DEBUG
+Message-ID: <1341261351-7924-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,20 +12,33 @@ CONFIG_COMMON_CLK_DEBUG option, in order to easily inspect the clock tree.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/configs/mxs_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 5406c23..caa9ae1 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -111,6 +111,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_DS1307=m
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index e05a2f1..208c5df 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -177,6 +177,7 @@ CONFIG_RTC_DRV_MXC=y
  CONFIG_DMADEVICES=y
- CONFIG_MXS_DMA=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_IMX_DMA=y
 +CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_EXT3_FS=y
+ # CONFIG_IOMMU_SUPPORT is not set
  # CONFIG_DNOTIFY is not set
- CONFIG_FSCACHE=m
+ # CONFIG_PROC_PAGE_MONITOR is not set
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index b1d3675..f517b55 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -181,6 +181,7 @@ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
++CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
 -- 
 1.7.1
