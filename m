@@ -1,62 +1,88 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 2 Jul 2012 10:10:24 +0800
-Subject: [PATCH v3 1/3] ARM: imx6q: add clocks for gpmi-nand
-In-Reply-To: <1341200327-8144-2-git-send-email-shijie8@gmail.com>
-References: <1341200327-8144-1-git-send-email-shijie8@gmail.com>
- <1341200327-8144-2-git-send-email-shijie8@gmail.com>
-Message-ID: <20120702021022.GC21003@S2101-09.ap.freescale.net>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Mon, 2 Jul 2012 10:18:33 +0800
+Subject: [PATCH 3/3] mx3fb: avoid screen flash when panning with fb_set_var
+In-Reply-To: <1339376810-8247-3-git-send-email-Ying.Liu@freescale.com>
+References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
+ <1339376810-8247-3-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <CA+8Hj82acvrhechhxfRSkhm9eefaPKc9VZhhRALVrtwQ6rx8=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 01, 2012 at 11:38:45PM -0400, Huang Shijie wrote:
-> Add clocks for gpmi-nand.
-> 
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+Hi, Guennadi,
+
+Could you please review the second(2/3) patch and the third(3/3) patch
+of this series?
+I have addressed your comments you gave in the previous review cycle.
+
+Thanks.
+
+2012/6/11, Liu Ying <Ying.Liu@freescale.com>:
+> Users may call FBIOPUT_VSCREENINFO ioctrl to do pan display.
+> This ioctrl relies on fb_set_var() to do the job. fb_set_var()
+> calls custom fb_set_par() method and then calls custom
+> fb_pan_display() method. The current implementation of mx3fb
+> reinitializes IPU display controller every time the custom
+> fb_set_par() method is called, which makes the screen flash
+> if fb_set_var() is called to do panning frequently. This patch
+> compares the new var info with the cached old one to decide
+> whether we really need to reinitialize IPU display controller.
+> We ignore xoffset and yoffset update because it doesn't require
+> to reinitialize the controller. Users may specify activate field
+> of var info with FB_ACTIVATE_NOW and FB_ACTIVATE_FORCE to
+> reinialize the controller by force.
+>
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 > ---
->  arch/arm/mach-imx/clk-imx6q.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 12d9040..a837528 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -151,7 +151,7 @@ enum mx6q_clks {
->  	esai, gpt_ipg, gpt_ipg_per, gpu2d_core, gpu3d_core, hdmi_iahb,
->  	hdmi_isfr, i2c1, i2c2, i2c3, iim, enfc, ipu1, ipu1_di0, ipu1_di1, ipu2,
->  	ipu2_di0, ldb_di0, ldb_di1, ipu2_di1, hsi_tx, mlb, mmdc_ch0_axi,
-> -	mmdc_ch1_axi, ocram, openvg_axi, pcie_axi, pwm1, pwm2, pwm3, pwm4,
-> +	mmdc_ch1_axi, ocram, openvg_axi, pcie_axi, pwm1, pwm2, pwm3, pwm4, per1_bch,
->  	gpmi_bch_apb, gpmi_bch, gpmi_io, gpmi_apb, sata, sdma, spba, ssi1,
->  	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
->  	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
-> @@ -357,6 +357,7 @@ int __init mx6q_clocks_init(void)
->  	clk[ocram]        = imx_clk_gate2("ocram",         "ahb",               base + 0x74, 28);
->  	clk[openvg_axi]   = imx_clk_gate2("openvg_axi",    "axi",               base + 0x74, 30);
->  	clk[pcie_axi]     = imx_clk_gate2("pcie_axi",      "pcie_axi_sel",      base + 0x78, 0);
-> +	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "usdhc3",            base + 0x78, 12);
->  	clk[pwm1]         = imx_clk_gate2("pwm1",          "ipg_per",           base + 0x78, 16);
->  	clk[pwm2]         = imx_clk_gate2("pwm2",          "ipg_per",           base + 0x78, 18);
->  	clk[pwm3]         = imx_clk_gate2("pwm3",          "ipg_per",           base + 0x78, 20);
-> @@ -394,6 +395,11 @@ int __init mx6q_clocks_init(void)
->  	clk_register_clkdev(clk[twd], NULL, "smp_twd");
->  	clk_register_clkdev(clk[usboh3], NULL, "usboh3");
->  	clk_register_clkdev(clk[apbh_dma], NULL, "110000.dma-apbh");
-> +	clk_register_clkdev(clk[per1_bch], "per1_bch", "112000.gpmi-nand");
-> +	clk_register_clkdev(clk[gpmi_bch_apb], "gpmi_bch_apb", "112000.gpmi-nand");
-> +	clk_register_clkdev(clk[gpmi_bch], "gpmi_bch", "112000.gpmi-nand");
-> +	clk_register_clkdev(clk[gpmi_apb], "gpmi_apb", "112000.gpmi-nand");
-> +	clk_register_clkdev(clk[gpmi_io], NULL, "112000.gpmi-nand");
+>  drivers/video/mx3fb.c |   22 +++++++++++++++++++++-
+>  1 files changed, 21 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+> index 2dd11c4..7d0aa7b 100644
+> --- a/drivers/video/mx3fb.c
+> +++ b/drivers/video/mx3fb.c
+> @@ -721,6 +721,26 @@ static void mx3fb_dma_done(void *arg)
+>  	complete(&mx3_fbi->flip_cmpl);
+>  }
+>
+> +static bool mx3fb_must_set_par(struct fb_info *fbi)
+> +{
+> +	struct mx3fb_info *mx3_fbi = fbi->par;
+> +	struct fb_var_screeninfo old_var = mx3_fbi->cur_var;
+> +	struct fb_var_screeninfo new_var = fbi->var;
+> +
+> +	if ((fbi->var.activate & FB_ACTIVATE_FORCE) &&
+> +	    (fbi->var.activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW)
+> +		return true;
+> +
+> +	/*
+> +	 * Ignore xoffset and yoffset update,
+> +	 * because pan display handles this case.
+> +	 */
+> +	old_var.xoffset = new_var.xoffset;
+> +	old_var.yoffset = new_var.yoffset;
+> +
+> +	return !!memcmp(&old_var, &new_var, sizeof(struct fb_var_screeninfo));
+> +}
+> +
+>  static int __set_par(struct fb_info *fbi, bool lock)
+>  {
+>  	u32 mem_len, cur_xoffset, cur_yoffset;
+> @@ -844,7 +864,7 @@ static int mx3fb_set_par(struct fb_info *fbi)
+>
+>  	mutex_lock(&mx3_fbi->mutex);
+>
+> -	ret = __set_par(fbi, true);
+> +	ret = mx3fb_must_set_par(fbi) ? __set_par(fbi, true) : 0;
+>
+>  	mutex_unlock(&mx3_fbi->mutex);
+>
+> --
+> 1.7.1
+>
+>
+>
 
-It's a little bit strange to me that this clock still gets NULL con_id
-while all other gpmi-nand clocks have proper con_id assigned.
-
->  	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
->  	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
->  	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
-> -- 
-> 1.7.4.4
-> 
 
 -- 
-Regards,
-Shawn
+Best Regards,
+Liu Ying
