@@ -1,114 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Jul 2012 12:07:00 -0700
-Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
-References: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4FF1F154.3050506@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 2 Jul 2012 21:08:38 +0200
+Subject: [PATCH 2/9] arm: mach-mvebu: add header
+In-Reply-To: <20120702183330.GG1348@lunn.ch>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120702183330.GG1348@lunn.ch>
+Message-ID: <20120702210838.37c78fda@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/12 09:09, Shawn Guo wrote:
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index 08cbdb9..511ddcb 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -1087,4 +1087,14 @@ config RTC_DRV_MXC
->  	   This driver can also be built as a module, if so, the module
->  	   will be called "rtc-mxc".
->  
-> +config RTC_DRV_SNVS
-> +	tristate "Freescale SNVS RTC support"
-> +	depends on ARCH_MXC
+Hello Andrew,
 
-If you want more build coverage you can depend on HAS_IOMEM and drop the
-ARCH_MXC part.
+Le Mon, 2 Jul 2012 20:33:30 +0200,
+Andrew Lunn <andrew@lunn.ch> a ?crit :
 
-> +	help
-> +	   If you say yes here you get support for the Freescale SNVS
-> +	   Low Power (LP) RTC module.
-> +
-> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-> new file mode 100644
-> index 0000000..761c91f
-> --- /dev/null
-> +++ b/drivers/rtc/rtc-snvs.c
-> @@ -0,0 +1,350 @@
-> +/*
-> + * Copyright (C) 2011-2012 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/delay.h>
+> What physical address does this come out to? All Orion platforms have
+> the serial port at the same place, 0xf1012000. If 370/XP is the same,
+> i suggest dropping this #include, hard code the address, and we share
+> the implementation for all SoCs. 
+> 
+> If however, the ASIC engineers have decided to move it, we need some
+> extra logic to handle different base addresses for Dove and 370/XP
+> which should be supportable in one kernel binary.
 
-Is this include used?
+As per armada-370-xp.h:
 
-> +
-> +static struct rtc_class_ops snvs_rtc_ops = {
+#define ARMADA_370_XP_REGS_PHYS_BASE    0xd0000000
 
-const?
+The physical address of the internal registers is 0xd0000000. It does
+not seem to be configurable using the address decoding mechanism.
 
-> +static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
-> +{
-> +	struct device *dev = dev_id;
-> +	struct snvs_rtc_data *data = dev_get_drvdata(dev);
+OMAP has some logic to handle this kind of problems, see
+plat-omap/include/plat/uncompress.h. We can quite certainly overcome
+this problem somehow.
 
-Why not just pass the svsns_rtc_data to request_irq() so you can cast
-dev_id directly?
+Best regards,
 
-> +static int __devinit snvs_rtc_probe(struct platform_device *pdev)
-> +{
-> +	struct snvs_rtc_data *data;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->ioaddr = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!data->ioaddr)
-> +		return -EADDRNOTAVAIL;
-> +
-> +	data->irq = platform_get_irq(pdev, 0);
-
-What if this irq fails to exist?
-
-
-> +static const struct of_device_id __devinitdata snvs_dt_ids[] = {
-
-Is this supposed to be __devinitconst?
-
-> +	{ .compatible = "fsl,sec-v4.0-mon" },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, snvs_dt_ids);
-
-Surround this of_device table in #ifdef CONFIG_OF?
-
-> +
-> +static struct platform_driver snvs_rtc_driver = {
-> +	.driver = {
-> +		.name	= "snvs_rtc",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = snvs_dt_ids,
-
-.of_match_table = of_match_ptr(svns_dt_ids)
-
-> +	},
-> +	.probe		= snvs_rtc_probe,
-> +	.remove		= __devexit_p(snvs_rtc_remove),
-> +	.suspend	= snvs_rtc_suspend,
-> +	.resume		= snvs_rtc_resume,
-
-Can you use dev_pm_ops?
-
+Thomas
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
