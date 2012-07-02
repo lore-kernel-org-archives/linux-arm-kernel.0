@@ -1,76 +1,50 @@
-From: sha@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Jul 2012 11:33:19 +0200
-Subject: [PATCH v2 1/2] arm: imx: enable flexcan on imx25, imx35, imx53,
- imx6q
-In-Reply-To: <1341219781-26107-2-git-send-email-mkl@pengutronix.de>
-References: <1341219781-26107-1-git-send-email-mkl@pengutronix.de>
- <1341219781-26107-2-git-send-email-mkl@pengutronix.de>
-Message-ID: <20120702093319.GN2698@pengutronix.de>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 2 Jul 2012 09:43:21 +0000
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <20120702063651.GO4202@atomide.com>
+References: <cover.1340778002.git.afzal@ti.com>
+ <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+ <20120627145844.GL3483@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+ <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
+ <20120702063651.GO4202@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A1BB7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+Hi Tony,
 
-In case you want to apply this one:
+On Mon, Jul 02, 2012 at 12:06:51, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [120628 09:48]:
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
-On Mon, Jul 02, 2012 at 11:03:00AM +0200, Marc Kleine-Budde wrote:
-> Aas the flexcan driver has DT binding for some time now. This patch makes
-> the flexcan driver available in the can drivers menu if a SOC with flexcan
-> is enabled.
+> > The above change seems to imply that Tony's n900 is dependent on the bootloader settings
+> > and not those being set by the kernel. Ideally, we should not need to set the async mode
+> > in the onenand before we set the onenand timings in the gpmc (per Afzal's changelog
+> > comment). This appears backwards.
 > 
-> Cc: Sascha Hauer <sha@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  arch/arm/mach-imx/Kconfig |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index eff4db5..c296851 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -52,6 +52,7 @@ config SOC_IMX25
->  	select ARCH_MX25
->  	select COMMON_CLK
->  	select CPU_ARM926T
-> +	select HAVE_CAN_FLEXCAN if CAN
->  	select ARCH_MXC_IOMUX_V3
->  	select MXC_AVIC
->  
-> @@ -79,6 +80,7 @@ config SOC_IMX35
->  	select HAVE_EPIT
->  	select MXC_AVIC
->  	select SMP_ON_UP if SMP
-> +	select HAVE_CAN_FLEXCAN if CAN
->  
->  config SOC_IMX5
->  	select CPU_V7
-> @@ -105,6 +107,7 @@ config	SOC_IMX53
->  	select SOC_IMX5
->  	select ARCH_MX5
->  	select ARCH_MX53
-> +	select HAVE_CAN_FLEXCAN if CAN
->  
->  if ARCH_IMX_V4_V5
->  
-> @@ -826,6 +829,7 @@ config SOC_IMX6Q
->  	select COMMON_CLK
->  	select CPU_V7
->  	select HAVE_ARM_SCU
-> +	select HAVE_CAN_FLEXCAN if CAN
->  	select HAVE_IMX_GPC
->  	select HAVE_IMX_MMDC
->  	select HAVE_IMX_SRC
-> -- 
-> 1.7.10
-> 
-> 
+> That should not be the case, I'm more likely to believe in Afzal's explanation.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Not sure whether you are fine with fixing up this patch with added diff
+
+Assuming inferences so far is not wrong, right now this patch with the added diff
+would be perfectly fine.
+
+Problem would happen when we are at a stage to do gpmc reset using hwmod [seems
+miles to go before I sleep {or read gpmc hwmod reset} ;)]. If bootloader left
+onenand configured in sync mode, to switch onenand to async mode, first configuring
+gpmc to sync mode would be required & for that we need frequency information
+from onenand and to get that information from onenand, gpmc has to be configured
+for sync mode and to configure gpmc to sync mode ....
+
+Seems like chicken and egg problem.
+
+N900, I believe is board-rx51, could not get proper schematic for onenand
+connections, nor do I have the Numonyx datsheet, or the board, hence not
+sure whether resetting onenand may resolve the issue. But if you feel that
+it is the right solution & it would resolve the issue, and if you can let
+me know gpio connected (if any) to onenand reset or else some pointers to
+achieving it, I can try making a patch to do onenand reset
+
+Regards
+Afzal
