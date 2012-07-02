@@ -1,36 +1,113 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Jul 2012 12:06:45 -0700
-Subject: [PATCH 1/2] remoteproc: maintain a generic child device for each
- rproc
-In-Reply-To: <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
-References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
- <4FC5DBFA.2030300@codeaurora.org>
- <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
- <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
-Message-ID: <4FF1F145.2050408@codeaurora.org>
+Date: Mon, 02 Jul 2012 12:07:00 -0700
+Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
+In-Reply-To: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
+References: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FF1F154.3050506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/12 01:13, Ohad Ben-Cohen wrote:
-> On Wed, May 30, 2012 at 3:16 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> In this case, I was more wondering between using a class to a device type.
->>
->>> I recall seeing a thread where
->>> someone said classes were on the way out and shouldn't be used but I
->>> can't find it anymore.
->> I also remembered a similar discussion at a plumbers mini-conf about
->> 2-3 years ago too, so I looked at device_type as an alternative to
->> class. The former looks somewhat simpler, but I couldn't find any
->> major advantage for using one over the other, and both seem to be in
->> use by many subsystems.
-> Moving to device_type is so trivial that I gave it a spin (and moved
-> to IDA too while at it):
+On 07/02/12 09:09, Shawn Guo wrote:
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index 08cbdb9..511ddcb 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1087,4 +1087,14 @@ config RTC_DRV_MXC
+>  	   This driver can also be built as a module, if so, the module
+>  	   will be called "rtc-mxc".
+>  
+> +config RTC_DRV_SNVS
+> +	tristate "Freescale SNVS RTC support"
+> +	depends on ARCH_MXC
 
-Great! It looks like device_type doesn't have any list iteration support
-though. Is that requirement gone? If that requirement is still there I
-would think we need something like a class or bus still.
+If you want more build coverage you can depend on HAS_IOMEM and drop the
+ARCH_MXC part.
 
-Will you resend this as part of a series? It will be easier to review then.
+> +	help
+> +	   If you say yes here you get support for the Freescale SNVS
+> +	   Low Power (LP) RTC module.
+> +
+> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+> new file mode 100644
+> index 0000000..761c91f
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-snvs.c
+> @@ -0,0 +1,350 @@
+> +/*
+> + * Copyright (C) 2011-2012 Freescale Semiconductor, Inc.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/delay.h>
+
+Is this include used?
+
+> +
+> +static struct rtc_class_ops snvs_rtc_ops = {
+
+const?
+
+> +static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
+> +{
+> +	struct device *dev = dev_id;
+> +	struct snvs_rtc_data *data = dev_get_drvdata(dev);
+
+Why not just pass the svsns_rtc_data to request_irq() so you can cast
+dev_id directly?
+
+> +static int __devinit snvs_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct snvs_rtc_data *data;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->ioaddr = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!data->ioaddr)
+> +		return -EADDRNOTAVAIL;
+> +
+> +	data->irq = platform_get_irq(pdev, 0);
+
+What if this irq fails to exist?
+
+
+> +static const struct of_device_id __devinitdata snvs_dt_ids[] = {
+
+Is this supposed to be __devinitconst?
+
+> +	{ .compatible = "fsl,sec-v4.0-mon" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, snvs_dt_ids);
+
+Surround this of_device table in #ifdef CONFIG_OF?
+
+> +
+> +static struct platform_driver snvs_rtc_driver = {
+> +	.driver = {
+> +		.name	= "snvs_rtc",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = snvs_dt_ids,
+
+.of_match_table = of_match_ptr(svns_dt_ids)
+
+> +	},
+> +	.probe		= snvs_rtc_probe,
+> +	.remove		= __devexit_p(snvs_rtc_remove),
+> +	.suspend	= snvs_rtc_suspend,
+> +	.resume		= snvs_rtc_resume,
+
+Can you use dev_pm_ops?
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
