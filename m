@@ -1,63 +1,45 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Mon, 2 Jul 2012 18:37:36 -0500
-Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
-References: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120702183736.e8e4136d4bf206b55c8653a5@freescale.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 2 Jul 2012 16:57:28 -0700
+Subject: [PATCH] ARM: u300: convert to common clock
+In-Reply-To: <CACRpkdakK9LPfZa8zWCE415GLc_n+tPqGJPQr6g1O2K0ptd-UA@mail.gmail.com>
+References: <1340142265-14549-1-git-send-email-linus.walleij@stericsson.com>
+ <CACRpkdakK9LPfZa8zWCE415GLc_n+tPqGJPQr6g1O2K0ptd-UA@mail.gmail.com>
+Message-ID: <CAJOA=zPK64oEp7Yo9+3gqssPOM0yvzF738N4_ZL0cjh2QFTV-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Jul 2012 00:09:15 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
+On Sat, Jun 30, 2012 at 12:50 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Jun 19, 2012 at 11:44 PM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+>
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This converts the U300 clock implementation over to use the common
+>> struct clk and moves the implementation down into drivers/clk.
+>> Since VCO isn't used in tree it was removed, it's not hard to
+>> put it back in if need be.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Mike if this looks allright, could you merge it into the clk-next branch?
 
->  create mode 100644 Documentation/devicetree/bindings/rtc/snvs-rtc.txt
->  create mode 100644 drivers/rtc/rtc-snvs.c
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/snvs-rtc.txt b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
-> new file mode 100644
-> index 0000000..18e7c5c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
-> @@ -0,0 +1,19 @@
-> +* Freescale Secure Non-Volatile Storage (SNVS) RTC
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,sec-v4.0-mon"
-> +  See Documentation/devicetree/bindings/crypto/fsl-sec4.txt for details.
-> +- reg: Physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: Two interrupt numbers to the cpu should be specified. First
-> +  interrupt number is the consolidated interrupt in non TrustZone. The second
-> +  interrupt number is the security interrupt in TrustZone. The number of cells
-> +  representing a interrupt depends on the parent interrupt controller.
-> +
-> +Example:
-> +
-> +snvs at 020cc000 {
-> +	compatible = "fsl,sec-v4.0-mon";
-> +	reg = <0x020cc000 0x4000>;
-> +	interrupts = <0 19 0x04 0 20 0x04>;
-> +};
+With a negative diff of 805 lines, who could say 'no' to this patch?
+But seriously the changes do look good.  I fixed up a small conflict
+in the clk Makefile due to your earlier integrator/icst patches.  The
+only other thing is that some of the headers included in
+drivers/clk/clk-u300.c are unnecessary.  I hate blocking a patch on
+such trivial stuff, but maybe you could clean that up down the road
+some day?  For now I've taken it into clk-next.
 
-Instead of duplicating the binding documentation entry, can this be
-merged in with crypto/fsl-sec4.txt?  Also, don't we need the rtc to
-be a 'sub-device' of "fsl,sec-vX.Y-mon", and to have its own
-compatible, e.g., "fsl,sec-v4.0-mon-rtc-lp"?
+Thanks,
+Mike
 
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index 08cbdb9..511ddcb 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -1087,4 +1087,14 @@ config RTC_DRV_MXC
->  	   This driver can also be built as a module, if so, the module
->  	   will be called "rtc-mxc".
->  
-> +config RTC_DRV_SNVS
-> +	tristate "Freescale SNVS RTC support"
-> +	depends on ARCH_MXC
-
-should also depend on || FSL_SOC - it was mentioned in the
-review of the last version of this patch that this h/w exists on
-other, non-ARM based, SoCs.
-
-Kim
+>
+> Yours,
+> Linus Walleij
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
