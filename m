@@ -1,35 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  2 Jul 2012 16:50:27 -0300
-Subject: [PATCH 2/2] ARM: imx6q-sabresd.dts: Add watchdog support
-In-Reply-To: <1341258627-3469-1-git-send-email-festevam@gmail.com>
-References: <1341258627-3469-1-git-send-email-festevam@gmail.com>
-Message-ID: <1341258627-3469-2-git-send-email-festevam@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 2 Jul 2012 22:54:34 +0300
+Subject: [PATCH 1/2] remoteproc: maintain a generic child device for each
+ rproc
+In-Reply-To: <4FF1F145.2050408@codeaurora.org>
+References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
+ <4FC5DBFA.2030300@codeaurora.org>
+ <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
+ <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
+ <4FF1F145.2050408@codeaurora.org>
+Message-ID: <CAK=WgbZ+=MGU5juuOP+_vtUe4d_46j=Rd0cqYi7q2i-9T35R5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, Jul 2, 2012 at 10:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Great! It looks like device_type doesn't have any list iteration support
+> though. Is that requirement gone?
 
-Add watchdog support.
+Pretty much, yeah. I'll soon post a separate patch which removes the
+get_by_name functionality (together with its related klist).
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabresd.dts |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> Will you resend this as part of a series? It will be easier to review then.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-index 07509a1..f3002d2 100644
---- a/arch/arm/boot/dts/imx6q-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-@@ -29,6 +29,10 @@
- 					status = "okay";
- 				};
- 			};
-+
-+			wdog at 020bc000 { /* WDOG1 */
-+				status = "okay";
-+			};
- 		};
- 
- 		aips-bus at 02100000 { /* AIPS2 */
--- 
-1.7.1
+Not sure. There's a collection of discrete patches that I've been
+posting, but they really aren't an organic series: as long as the
+dependencies are met, each and every one of them is applicable even if
+applied alone.
+
+So I'd prefer (when possible) to treat patches in a discrete fashion
+so we can start applying them and unblock others who depend on them
+(e.g. Fernando's runtime PM work depends on this one).
+
+But if you prefer me to send this one patch differently to make it
+easier to review, let me know!
+
+Thanks,
+Ohad.
