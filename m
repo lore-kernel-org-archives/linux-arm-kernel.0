@@ -1,29 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 Jul 2012 15:30:23 +0000
-Subject: [PATCH v6] arm: Add basic support for new Marvell Armada 370 and
- Armada XP SoC
-In-Reply-To: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201207021530.23809.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon,  2 Jul 2012 17:39:31 +0200
+Subject: [PATCH 6/9] arm: mach-mvebu: add defconfig
+In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341243574-3258-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Thomas Petazzoni wrote:
-> You'll find in this patch set the sixth version of the initial support
-> for a new family of ARMv7-compatible Marvell SoCs.
-> 
-> Do you think this patch set has a chance of hitting the 3.6 merge
-> window?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+---
+ arch/arm/configs/mvebu_defconfig |   46 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 arch/arm/configs/mvebu_defconfig
 
-Yes, definitely.
-
-> We are willing to quickly resubmit updated versions to take into
-> account new comments. We have a lot more code to support those new
-> SoCs, and we would like to make progress in submitting those other
-> parts for the mainline.
-
-I think it's time to just take your current version into arm-soc
-and do all other patches on top. I'll wait for an Ack from
-Ben, Andrew and Andrew first though.
-
-	Arnd
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+new file mode 100644
+index 0000000..2e86b31
+--- /dev/null
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -0,0 +1,46 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_EXPERT=y
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_ARCH_MVEBU=y
++CONFIG_MACH_ARMADA_370_XP=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_USE_OF=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_VFP=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_FS_XATTR is not set
++CONFIG_ISO9660_FS=y
++CONFIG_JOLIET=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_CODEPAGE_850=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_2=y
++CONFIG_NLS_UTF8=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_TIMER_STATS=y
++# CONFIG_DEBUG_BUGVERBOSE is not set
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
+-- 
+1.7.9.5
