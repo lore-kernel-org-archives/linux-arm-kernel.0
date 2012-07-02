@@ -1,41 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 2 Jul 2012 11:26:52 +0200
-Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <4FF16919.3090302@codethink.co.uk>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <4FEB2CC3.7090305@codethink.co.uk> <20120702103016.28b2637e@skate>
- <4FF16797.8070405@codethink.co.uk> <20120702111947.2ce2b3cc@skate>
- <4FF16919.3090302@codethink.co.uk>
-Message-ID: <20120702112652.77d5abbe@skate>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  2 Jul 2012 11:30:34 +0200
+Subject: [PATCH] ARM: imx: assert SCC gate stays enabled
+Message-ID: <1341221434-15233-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 02 Jul 2012 10:25:45 +0100,
-Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
+The SCC clock is needed in internal boot mode and so must keep enabled.
+This same issue was fixed for the pre-common-clk code in commit
 
-> Ah, thank you. I had it updating the dtb with the ATAGS before
-> parsing the device tree in my previous setup.
-> 
-> Anyone looking into fixing the problem where it goes bang without
-> a useful error message if there has been no memory registered?
+	3d6e614 (mx35: Fix boot ROM hang in internal boot mode)
 
-Well, to some extent, the message:
+Cc: John Ogness <jogness@linutronix.de>
+Cc: Hans J. Koch <hjk@hansjkoch.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx35.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
-
-is a quite good indication that a memory allocation "below 0x0" is
-failing, which so early in this boot, most likely means that you don't
-have memory at all :-)
-
-But yes, maybe there could be a more useful check at some point in the
-boot process.
-
-Regards,
-
-Thomas
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index 920a8cc..c6422fb 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -201,7 +201,6 @@ int __init mx35_clocks_init()
+ 			pr_err("i.MX35 clk %d: register failed with %ld\n",
+ 				i, PTR_ERR(clk[i]));
+ 
+-
+ 	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
+ 	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
+ 	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
+@@ -264,6 +263,14 @@ int __init mx35_clocks_init()
+ 	clk_prepare_enable(clk[iim_gate]);
+ 	clk_prepare_enable(clk[emi_gate]);
+ 
++	/*
++	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
++	 * before conversion to common clk also enabled UART1 (which isn't
++	 * handled here and not needed for mmc) and IIM (which is enabled
++	 * unconditionally above).
++	 */
++	clk_prepare_enable(clk[scc_gate]);
++
+ 	imx_print_silicon_rev("i.MX35", mx35_revision());
+ 
+ #ifdef CONFIG_MXC_USE_EPIT
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10
