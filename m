@@ -1,49 +1,58 @@
-From: sha@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Jul 2012 10:06:41 +0200
-Subject: [PATCH 1/2] arm: imx: enable flexcan on imx25, imx35, imx53, imx6q
-In-Reply-To: <4FF153A0.3030404@pengutronix.de>
-References: <1341175565-13218-1-git-send-email-mkl@pengutronix.de>
- <1341175565-13218-2-git-send-email-mkl@pengutronix.de>
- <20120702075054.GF2698@pengutronix.de>
- <4FF153A0.3030404@pengutronix.de>
-Message-ID: <20120702080641.GG2698@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Jul 2012 01:10:19 -0700
+Subject: [RESEND PATCH V3 1/2] arm/dts: OMAP2: Add support for
+ OMAP2420H4 Board
+In-Reply-To: <1339548046-27988-2-git-send-email-jon-hunter@ti.com>
+References: <1339548046-27988-1-git-send-email-jon-hunter@ti.com>
+ <1339548046-27988-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20120702081018.GD1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 09:54:08AM +0200, Marc Kleine-Budde wrote:
-> On 07/02/2012 09:50 AM, Sascha Hauer wrote:
-> > On Sun, Jul 01, 2012 at 10:46:04PM +0200, Marc Kleine-Budde wrote:
-> >> Cc: Sascha Hauer <sha@pengutronix.de>
-> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >> ---
-> >>  arch/arm/mach-imx/Kconfig |    4 ++++
-> >>  1 file changed, 4 insertions(+)
-> >>
-> >> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> >> index eff4db5..c296851 100644
-> >> --- a/arch/arm/mach-imx/Kconfig
-> >> +++ b/arch/arm/mach-imx/Kconfig
-> >> @@ -52,6 +52,7 @@ config SOC_IMX25
-> >>  	select ARCH_MX25
-> >>  	select COMMON_CLK
-> >>  	select CPU_ARM926T
-> >> +	select HAVE_CAN_FLEXCAN if CAN
-> > 
-> > Do we need the 'if CAN' here? It seems yes, since HAVE_CAN_FLEXCAN is
-> > inside the "CAN Device Drivers" menu which depends on CAN. Shouldn't the
-> > HAVE_CAN_FLECAN be outside the menu?
+* Jon Hunter <jon-hunter@ti.com> [120612 17:45]:
+> Simple DTS file for OMAP2420H4 board adding memory information to allow
+> device-tree testing on an OMAP2420. OMAP2420H4 board has 64MB of RAM.
 > 
-> Yes, we can move the HAVE_CAN_FLEXCAN outside of that menu, but it still
-> depends on CONFIG_NET.
+> Verified that kernel boots with DT using a simple RAMDISK file-system on
+> OMAP2420H4.
 
-Ok, then we have no choice. I just asked because it seems unnatural that
-the presence of a hardware device depends on config options.
+Thanks, applying into dt branch.
 
-Sascha
+Tony
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/boot/dts/omap2420-h4.dts |   20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/omap2420-h4.dts
+> 
+> diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
+> new file mode 100644
+> index 0000000..25b50b7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap2420-h4.dts
+> @@ -0,0 +1,20 @@
+> +/*
+> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap2.dtsi"
+> +
+> +/ {
+> +	model = "TI OMAP2420 H4 board";
+> +	compatible = "ti,omap2420-h4", "ti,omap2420", "ti,omap2";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x84000000>; /* 64 MB */
+> +	};
+> +};
+> -- 
+> 1.7.9.5
+> 
