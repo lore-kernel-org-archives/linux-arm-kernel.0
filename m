@@ -1,37 +1,36 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 2 Jul 2012 16:33:01 -0700
-Subject: [PATCH v4] clk: Add support for rate table based dividers
-In-Reply-To: <1340976992-9316-1-git-send-email-rnayak@ti.com>
-References: <1340976992-9316-1-git-send-email-rnayak@ti.com>
-Message-ID: <CAJOA=zO27M3YLSpEZRmumRhGHdQQ+Km7_CyP48UtQo6NseTG-w@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 3 Jul 2012 09:33:21 +1000
+Subject: linux-next: adding the common clk tree
+In-Reply-To: <CACRpkdayZUcA13p8iTRXLb4BestbAQhNP+a1nesYkcDEGFs=WA@mail.gmail.com>
+References: <20120626015551.GW4402@gmail.com>
+ <CACRpkdayZUcA13p8iTRXLb4BestbAQhNP+a1nesYkcDEGFs=WA@mail.gmail.com>
+Message-ID: <20120703093321.d261f6a118f03d6296af54e9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 6:36 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> Some divider clks do not have any obvious relationship
-> between the divider and the value programmed in the
-> register. For instance, say a value of 1 could signify divide
-> by 6 and a value of 2 could signify divide by 4 etc.
-> Also there are dividers where not all values possible
-> based on the bitfield width are valid. For instance
-> a 3 bit wide bitfield can be used to program a value
-> from 0 to 7. However its possible that only 0 to 4
-> are valid values.
->
-> All these cases need the platform code to pass a simple
-> table of divider/value tuple, so the framework knows
-> the exact value to be written based on the divider
-> calculation and can also do better error checking.
->
-> This patch adds support for such rate table based
-> dividers and as part of the support adds a new
-> registration function 'clk_register_divider_table()'
-> and a new macro for static definition
-> 'DEFINE_CLK_DIVIDER_TABLE'.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Hi Linus,
 
-Thanks for updating this one.  I've taken it into clk-next.
+On Sat, 30 Jun 2012 21:47:35 +0200 Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> On Tue, Jun 26, 2012 at 3:55 AM, Mike Turquette <mturquette@ti.com> wrote:
+> 
+> > Would you please add the clk-next branch of the common clock tree to
+> > linux-next?
+> >
+> > git://git.linaro.org/people/mturquette/linux.git clk-next
+> 
+> So I don't see this being pulled into -next, is it just a slip,
+> I though the structure of the branch was agreed upon and all?
 
-Regards,
-Mike
+I am waiting for Mike to let me know its all ready to add ...
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/e1f5dade/attachment.sig>
