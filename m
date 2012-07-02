@@ -1,127 +1,121 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  2 Jul 2012 17:39:30 +0200
-Subject: [PATCH 5/9] arm: mach-mvebu: add documentation for new device tree
- bindings
+Date: Mon,  2 Jul 2012 17:39:27 +0200
+Subject: [PATCH 2/9] arm: mach-mvebu: add header
 In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341243574-3258-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   23 +++++++++++++++++++
- .../bindings/arm/armada-370-xp-timer.txt           |   11 +++++++++
- .../devicetree/bindings/arm/armada-370-xp.txt      |   24 ++++++++++++++++++++
- .../bindings/arm/mvebu-system-controller.txt       |   17 ++++++++++++++
- 4 files changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
- create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+ arch/arm/mach-mvebu/include/mach/debug-macro.S |   24 +++++++++++++
+ arch/arm/mach-mvebu/include/mach/timex.h       |   13 +++++++
+ arch/arm/mach-mvebu/include/mach/uncompress.h  |   43 ++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-mvebu/include/mach/timex.h
+ create mode 100644 arch/arm/mach-mvebu/include/mach/uncompress.h
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
+diff --git a/arch/arm/mach-mvebu/include/mach/debug-macro.S b/arch/arm/mach-mvebu/include/mach/debug-macro.S
 new file mode 100644
-index 0000000..70c0dc5
+index 0000000..2282576
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-@@ -0,0 +1,23 @@
-+Marvell Armada 370 and Armada XP Interrupt Controller
-+-----------------------------------------------------
-+
-+Required properties:
-+- compatible: Should be "marvell,mpic"
-+- interrupt-controller: Identifies the node as an interrupt controller.
-+- #interrupt-cells: The number of cells to define the interrupts. Should be 1.
-+  The cell is the IRQ number
-+- reg: Should contain PMIC registers location and length. First pair
-+  for the main interrupt registers, second pair for the per-CPU
-+  interrupt registers
-+
-+Example:
-+
-+        mpic: interrupt-controller at d0020000 {
-+              compatible = "marvell,mpic";
-+              #interrupt-cells = <1>;
-+              #address-cells = <1>;
-+              #size-cells = <1>;
-+              interrupt-controller;
-+              reg = <0xd0020000 0x1000>,
-+                    <0xd0021000 0x1000>;
-+        };
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-new file mode 100644
-index 0000000..d14dc7f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-@@ -0,0 +1,11 @@
-+Marvell Armada 370 and Armada XP Global Timers
-+----------------------------------------------
-+
-+Required properties:
-+- compatible: Should be "marvell,timer"
-+- interrupts: Should contain the list of Global Timer interrupts
-+- reg: Should contain the base address of the Global Timer registers
-+
-+Optional properties:
-+- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-+  Mhz fixed mode (available on Armada XP and not on Armada 370)
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp.txt b/Documentation/devicetree/bindings/arm/armada-370-xp.txt
-new file mode 100644
-index 0000000..c6ed90e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp.txt
++++ b/arch/arm/mach-mvebu/include/mach/debug-macro.S
 @@ -0,0 +1,24 @@
-+Marvell Armada 370 and Armada XP Platforms Device Tree Bindings
-+---------------------------------------------------------------
++/*
++ * Early serial output macro for Marvell  SoC
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+Boards with a SoC of the Marvell Armada 370 and Armada XP families
-+shall have the following property:
++#include <mach/armada-370-xp.h>
 +
-+Required root node property:
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =ARMADA_370_XP_REGS_PHYS_BASE
++	ldr	\rv, =ARMADA_370_XP_REGS_VIRT_BASE
++	orr	\rp, \rp, #0x00012000
++	orr	\rv, \rv, #0x00012000
++	.endm
 +
-+compatible: must contain "marvell,armada-370-xp"
-+
-+In addition, boards using the Marvell Armada 370 SoC shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada370"
-+
-+In addition, boards using the Marvell Armada XP SoC shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armadaxp"
-+
-diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
++#define UART_SHIFT	2
++#include <asm/hardware/debug-8250.S>
+diff --git a/arch/arm/mach-mvebu/include/mach/timex.h b/arch/arm/mach-mvebu/include/mach/timex.h
 new file mode 100644
-index 0000000..081c6a7
+index 0000000..ab324a3
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
-@@ -0,0 +1,17 @@
-+MVEBU System Controller
-+-----------------------
-+MVEBU (Marvell SOCs: Armada 370/XP, Dove, mv78xx0, Kirkwood, Orion5x)
++++ b/arch/arm/mach-mvebu/include/mach/timex.h
+@@ -0,0 +1,13 @@
++/*
++ * Marvell Armada SoC time definitions
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+Required properties:
++#define CLOCK_TICK_RATE		(100 * HZ)
+diff --git a/arch/arm/mach-mvebu/include/mach/uncompress.h b/arch/arm/mach-mvebu/include/mach/uncompress.h
+new file mode 100644
+index 0000000..d6a100c
+--- /dev/null
++++ b/arch/arm/mach-mvebu/include/mach/uncompress.h
+@@ -0,0 +1,43 @@
++/*
++ * Marvell Armada SoC kernel uncompression UART routines
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+- compatible: one of:
-+	- "marvell,orion-system-controller"
-+	- "marvell,armada-370-xp-system-controller"
-+- reg: Should contain system controller registers location and length.
++#include <mach/armada-370-xp.h>
 +
-+Example:
++#define UART_THR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
++								+ 0x12000))
++#define UART_LSR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
++								+ 0x12014))
 +
-+	system-controller at d0018200 {
-+		compatible = "marvell,armada-370-xp-system-controller";
-+		reg = <0xd0018200 0x500>;
-+	};
++#define LSR_THRE	0x20
++
++static void putc(const char c)
++{
++	int i;
++
++	for (i = 0; i < 0x1000; i++) {
++		/* Transmit fifo not full? */
++		if (*UART_LSR & LSR_THRE)
++			break;
++	}
++
++	*UART_THR = c;
++}
++
++static void flush(void)
++{
++}
++
++/*
++ * nothing to do
++ */
++#define arch_decomp_setup()
++#define arch_decomp_wdog()
 -- 
 1.7.9.5
