@@ -1,35 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 Jul 2012 21:31:19 +0000
-Subject: [PATCH 2/9] arm: mach-mvebu: add header
-In-Reply-To: <20120702191616.GJ1348@lunn.ch>
-References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120702210838.37c78fda@skate> <20120702191616.GJ1348@lunn.ch>
-Message-ID: <201207022131.19558.arnd@arndb.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 02 Jul 2012 23:40:14 +0200
+Subject: [PATCH] ARM: mmp: remove mach/gpio-pxa.h
+Message-ID: <1341265214.1911.151.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Andrew Lunn wrote:
-> > OMAP has some logic to handle this kind of problems, see
-> > plat-omap/include/plat/uncompress.h. We can quite certainly overcome
-> > this problem somehow.
-> 
-> That file says:
-> 
->          * Initialize the port based on the machine ID from the bootloader.
-> 
-> Which when using DT we don't have.
-> 
-> As you said, we can overcome this somehow. We just need to be aware
-> there will be changes here.
-> 
-> It would also be nice if Marvell ASIC engineers didn't randomly move
-> things around in the address space....
+Commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f ("ARM: pxa: change gpio
+to platform device") removed all includes of mach/gpio-pxa.h. It kept
+this unused header in the tree. Using it can't work, as it itself
+includes the non-existent header plat/gpio-pxa.h. This header can safely
+be removed.
 
-For now, I'd suggest you don't try too hard to make this work for the
-a combination of the mvebu platforms. There has been some discussion
-about a solution that will work across multiple platform directories.
-While that might take a little longer, I assume that we will find some
-way to do it, so let's first unify all the other header files within
-mvebu.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Tested only with various git commands on the (history of the) tree.
 
-	Arnd
+ arch/arm/mach-mmp/include/mach/gpio-pxa.h |   29 -----------------------------
+ 1 files changed, 0 insertions(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
+
+diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+deleted file mode 100644
+index 0e135a5..0000000
+--- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
++++ /dev/null
+@@ -1,29 +0,0 @@
+-#ifndef __ASM_MACH_GPIO_PXA_H
+-#define __ASM_MACH_GPIO_PXA_H
+-
+-#include <mach/addr-map.h>
+-#include <mach/cputype.h>
+-#include <mach/irqs.h>
+-
+-#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+-
+-#define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+-#define GPIO_REG(x)	(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
+-
+-#define gpio_to_bank(gpio)	((gpio) >> 5)
+-
+-/* NOTE: these macros are defined here to make optimization of
+- * gpio_{get,set}_value() to work when 'gpio' is a constant.
+- * Usage of these macros otherwise is no longer recommended,
+- * use generic GPIO API whenever possible.
+- */
+-#define GPIO_bit(gpio)	(1 << ((gpio) & 0x1f))
+-
+-#define GPLR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x00)
+-#define GPDR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x0c)
+-#define GPSR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x18)
+-#define GPCR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x24)
+-
+-#include <plat/gpio-pxa.h>
+-
+-#endif /* __ASM_MACH_GPIO_PXA_H */
+-- 
+1.7.7.6
