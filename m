@@ -1,124 +1,27 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 02 Jul 2012 14:12:08 +0530
-Subject: [PATCH v2] clk: __clk_set_parent: set uninitialized variable
-In-Reply-To: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
-References: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <4FF15EDF.7030806@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 2 Jul 2012 14:14:45 +0530
+Subject: [PATCH 1/4] Revert "arm/dts: Add support for TI AM335x EVM board"
+In-Reply-To: <20120702084021.GF1122@atomide.com>
+References: <1340358050-29560-1-git-send-email-anilkumar@ti.com>
+ <1340358050-29560-2-git-send-email-anilkumar@ti.com>
+ <20120702084021.GF1122@atomide.com>
+Message-ID: <4FF15F7D.1090108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012 01:11 PM, Marc Kleine-Budde wrote:
-> This patch fixes the following warning:
->
->      drivers/clk/clk.c: In function '__clk_set_parent':
->      drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in this function [-Wuninitialized]
->
-> which has been introduced with commit:
->
->      commit 7975059db572eb47f0fb272a62afeae272a4b209
->      Author: Rajendra Nayak<rnayak@ti.com>
->      Date:   Wed Jun 6 14:41:31 2012 +0530
->
->          clk: Allow late cache allocation for clk->parents
->
-> This patch applies to linux-3.5-rc5
->
-> Cc: Rajendra Nayak<rnayak@ti.com>
-> Signed-off-by: Marc Kleine-Budde<mkl@pengutronix.de>
-> ---
-> Hello,
->
-> here an updated version. Changes since v1:
-> - Set i to clk->num_parents as Uwe pointed out.
 
-I started looking at how to avoid this initing
-of i to clk->parents (which is correct for the logic
-used below, but somehow seems error prone if someone
-happens to change the logic without noticing the init
-part)
-This is what I came up with, not tested at all, but
-worth considering if Mike dislikes the idea of initing
-i to clk->parents.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index dcbe056..af737cc 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1067,26 +1067,23 @@ static int __clk_set_parent(struct clk *clk, 
-struct clk *parent)
+On 7/2/2012 2:10 PM, Tony Lindgren wrote:
+> * AnilKumar Ch <anilkumar@ti.com> [120622 02:45]:
+>> This reverts commit 6c54bbb42678c99685c8e7fd09267e1cb8c2ae40.
+> 
+> As that has not been merged yet, I'll just drop it and set up
+> a new devel-dt branch. Applying the reset into devel-dt.
+> 
 
-         old_parent = clk->parent;
+Yeah, that's better.
 
--       /* find index of new parent clock using cached parent ptrs */
--       if (clk->parents)
--               for (i = 0; i < clk->num_parents; i++)
--                       if (clk->parents[i] == parent)
--                               break;
--       else
-+       if (!clk->parents)
-                 clk->parents = kzalloc((sizeof(struct clk*) * 
-clk->num_parents), 
-     GFP_KERNEL);
--
-         /*
--        * find index of new parent clock using string name comparison
--        * also try to cache the parent to avoid future calls to 
-__clk_lookup
-+        * find index of new parent clock using cached parent ptrs,
-+        * or if not yet cached, use string name comparison and cache
-+        * them now to avoid future calls to __clk_lookup.
-          */
--       if (i == clk->num_parents)
--               for (i = 0; i < clk->num_parents; i++)
--                       if (!strcmp(clk->parent_names[i], parent->name)) {
--                               if (clk->parents)
--                                       clk->parents[i] = 
-__clk_lookup(parent->name);
--                               break;
--                       }
-+       for (i = 0; i < clk->num_parents; i++) {
-+               if (clk->parents && clk->parents[i] == parent)
-+                       break;
-+               else if (!strcmp(clk->parent_names[i], parent->name)) {
-+                       if (clk->parents)
-+                               clk->parents[i] = 
-__clk_lookup(parent->name);
-+                       break;
-+               }
-+       }
+Care to include it into you next pull request.
 
-         if (i == clk->num_parents) {
-                 pr_debug("%s: clock %s is not a possible parent of 
-clock %s\n",
-
-regards,
-Rajendra
-
->
-> regards, Marc
->
->   drivers/clk/clk.c |    6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index dcbe056..9a75635 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1068,13 +1068,15 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
->   	old_parent = clk->parent;
->
->   	/* find index of new parent clock using cached parent ptrs */
-> -	if (clk->parents)
-> +	if (clk->parents) {
->   		for (i = 0; i<  clk->num_parents; i++)
->   			if (clk->parents[i] == parent)
->   				break;
-> -	else
-> +	} else {
-> +		i = clk->num_parents
->   		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
->   								GFP_KERNEL);
-> +	}
->
->   	/*
->   	 * find index of new parent clock using string name comparison
+Thanks,
+Vaibhav
