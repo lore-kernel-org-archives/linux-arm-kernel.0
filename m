@@ -1,83 +1,49 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 2 Jul 2012 23:53:32 +0200
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <201207021652.52787.arnd@arndb.de>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <201206302104.37937.arnd@arndb.de>
- <20120701184110.GA30680@elf.ucw.cz>
- <201207021652.52787.arnd@arndb.de>
-Message-ID: <20120702215331.GA6173@elf.ucw.cz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Jul 2012 23:01:17 +0100
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <4FF1D15E.7040301@ti.com>
+References: <20120608094708.GC19062@mudshark.cambridge.arm.com>
+ <4FD21930.4000800@ti.com>
+ <20120611173930.GD28235@mudshark.cambridge.arm.com>
+ <4FD64083.3020800@ti.com>
+ <20120612092842.GA2991@mudshark.cambridge.arm.com>
+ <4FD7B1DC.30108@ti.com>
+ <20120612213150.GC24380@mudshark.cambridge.arm.com>
+ <4FD7C597.7060501@ti.com>
+ <20120702095539.GD22239@mudshark.cambridge.arm.com>
+ <4FF1D15E.7040301@ti.com>
+Message-ID: <20120702220117.GD25234@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >  static void __init socfpga_cyclone5_init(void)
-> >  {
-> > +       int i;
-> > +       for (i = 0; i < 512; i++) {
-> > +               dynamic_irq_init(i);
-> > +       }
-> > +
-> >  #ifdef CONFIG_CACHE_L2X0
-> >         /* 8-way, 64K/way, evmon/parity/share */
-> >         l2x0_of_init(0x00760000, 0xfe000fff);
+On Mon, Jul 02, 2012 at 05:50:38PM +0100, Jon Hunter wrote:
+> On 07/02/2012 04:55 AM, Will Deacon wrote:
 > > 
+> > Did you have any luck getting to the bottom of this?
 > 
-> This looks wrong, I think what you should do instead is
-> to call irq_domain_add_legacy() for each controller you
-> register as the first step, and then try to convert the
-> controllers to use irq_domain_add_linear() as the second
-> step. See also Documentation/IRQ-domain.txt.
+> I am still waiting for feedback from design. They were trying to confirm
+> my observations. Unfortunately, it is taking some time. I will ping them
+> again.
 
-Stupid me, GIC already has irq_domain support, so the switch to
-sparse_irq is as simple as:
+Ok, thanks. If pinging doesn't work, bribery can be quite effective with
+hardware guys :)
 
-							Pavel
+> > It would be good to take your PMU suspend/resume patches once we know that
+> > they will get used.
+> 
+> Yes that would be good. I could drop the 4460 specific changes for now
+> and make 4460 work in the same way as 4430 (using CTI) for the time
+> being and see if we can get these in. However, I recall that was not
+> working for you, but it was working fine for me.
 
-Signed-off-by: Pavel Machek <pavel@denx.de>
+Indeed, that hack didn't help me and I'd rather not commit it if it only
+partially fixes the problem. A better bet might just be to go with your
+original approach and see how many bug reports we receive. That might also
+help us narrow down the problem, but it's your call.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b1578e1..d203253 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -263,6 +263,7 @@ config ARCH_SOCFPGA
- 	select GPIO_PL061 if GPIOLIB
- 	select NEED_MACH_MEMORY_H
- 	select USE_OF
-+	select SPARSE_IRQ
- 	help
- 	  This enables support for Altera SOCFPGA Cyclone V platform
- 
-diff --git a/arch/arm/mach-socfpga/include/mach/irqs.h b/arch/arm/mach-socfpga/include/mach/irqs.h
-index da50124..565ca59 100644
---- a/arch/arm/mach-socfpga/include/mach/irqs.h
-+++ b/arch/arm/mach-socfpga/include/mach/irqs.h
-@@ -27,8 +27,6 @@
- #define IRQ_SOCFPGA_CLK_MAN            (IRQ_SOCFPGA_GIC_START + 173)   /* Clock manager */
- 
- 
--#define NR_IRQS			512
--
- #define MAX_GIC_NR		1
- 
- #endif	/* __MACH_IRQS_H */
-diff --git a/arch/arm/mach-socfpga/socfpga_cyclone5.c b/arch/arm/mach-socfpga/socfpga_cyclone5.c
-index f6498cc..d8cd89b 100644
---- a/arch/arm/mach-socfpga/socfpga_cyclone5.c
-+++ b/arch/arm/mach-socfpga/socfpga_cyclone5.c
-@@ -24,6 +24,7 @@
- #include <mach/socfpga-timer.h>
- #include <mach/dw_apb_timer.h>
- #include <mach/socfpga_cyclone5.h>
-+#include <mach/irqs.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+In the meantime, I pushed what I think is the latest drop of your series to
+a new branch on kernel.org:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4-dev
 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Will
