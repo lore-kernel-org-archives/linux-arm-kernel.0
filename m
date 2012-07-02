@@ -1,61 +1,76 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Mon, 02 Jul 2012 17:23:21 +0530
-Subject: [PATCH v2 00/17] Big OMAP I2C Cleanup
-In-Reply-To: <20120702113712.GB2730@arwen.pp.htv.fi>
-References: <1339691067-919-1-git-send-email-balbi@ti.com>
- <20120614175950.GE14419@pengutronix.de> <4FE99432.8030300@ti.com>
- <20120702113712.GB2730@arwen.pp.htv.fi>
-Message-ID: <4FF18BB1.3050503@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 2 Jul 2012 14:54:23 +0300
+Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
+In-Reply-To: <20120629151832.0cb26bea@endymion.delvare>
+References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
+ <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
+ <20120629144002.3b4a31ee@endymion.delvare>
+ <20120629145718.697b6955@endymion.delvare>
+ <4FEDA9A8.1050504@ti.com>
+ <20120629151832.0cb26bea@endymion.delvare>
+Message-ID: <20120702115422.GC2730@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012 05:07 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Tue, Jun 26, 2012 at 04:21:30PM +0530, Shubhrajyoti wrote:
->> On Thursday 14 June 2012 11:29 PM, Wolfram Sang wrote:
->>>> 	- removed dev_err() which was introduced on patch 09/17
->>> To prevent the list being flooded, I would appreciate if you could wait
->>> a few days to collect reviews before resending. It will take some time
->>> until I pick this series anyhow, because I want people to have time to
->>> donate Tested-by tags.
->> Felipe thats a good cleanup.
->> The series look good to me.
->>
->> Also draining interrupt I had some queries.
->> Looks good to me.
->>
->> I have tested it after rebasing.
-> rebasing on top of what ? 
-On top of embedded i2c branch of Wolfram.
+Hi,
 
-> You should resend the series so that I know
-> what changes you have made to my original patchset. Make sure to list on
-> the commit log what where the changes you made, so that it looks
-> something like this commit below where I changed commit log a bit:
-Will do that.
-Thanks,
+On Fri, Jun 29, 2012 at 03:18:32PM +0200, Jean Delvare wrote:
+> On Fri, 29 Jun 2012 18:42:08 +0530, Shubhrajyoti wrote:
+> > On Friday 29 June 2012 06:27 PM, Jean Delvare wrote:
+> > > drivers/gpu/drm/nouveau/nouveau_bios.c:3535:3: warning: (near initialization for ?msg[1].actual?) [enabled by default]
+> > >
+> > > This needs to be all fixed (converted to C99-style struct
+> > > initialization) before your patch is considered for inclusion. And
+> > > there may be more that my config did not spot.
+> > Yes,agree.
+> > 
+> > The idea of this patch was if the idea is agreed upon then.
+> > then fixing all the callers could be worked on.
+> 
+> This is worth fixing anyway, C99-style initialization is always good to
+> move to.
+> 
+> > However do you agree with this approach?
+> 
+> Well you've seen the caveats I mentioned, this will be no easy ride. If
+> you are willing to take the risk, spend the time documenting the
+> change, and help people if there are issues, then I'm OK. At least as
+> long as someone else doesn't come saying it's a very bad idea ;)
 
-> | commit 3daf74d78dfcd552445c35f1b82a271ca305ceb9
-> | Author: Pratyush Anand <pratyush.anand@st.com>
-> | Date:   Sat Jun 23 02:23:08 2012 +0530
-> | 
-> | usb: dwc3: remove WARN_ON from dwc_stop_active_transfer
-> | 
-> | Now we are sure that, if res_trans_idx is zero, then endpoint has been
-> | stopped. So it's safe to just return if endpoint is already stopped. No
-> | need to generate warning anymore.
-> | 
-> | While doing so, it's better to return when res_trans_idx is zero and
-> | decrease one level of indentation.
-> | 
-> | Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> | 
-> | [ balbi at ti.com: slightly changed commit log ]
-> | 
-> | Signed-off-by: Felipe Balbi <balbi@ti.com>
->
->> Tested-by : Shubhrajyoti <shubhrajyoti@ti.com>
-> since you will send, you should, probably, add your Signed-off-by,
-> instead of Tested-by. dunno.
->
+This approach is a hard-requirement for devices which will pose any
+interface/feedback with user. We have been working with a piezo driver
+from TI (drv2665) and it will be used (in most cases at least) to give
+the user a feedback based on e.g. touchscreen event.
+
+Imagine drv2665 responds with a NAK while we're in the middle of driving
+a wave through it (keep in mind a wave could take seconds to finish,
+depending on the usecase), if we don't have a way to tell users that we
+have writen X bytes, how should we make sure to continue driving the
+wave from the exact byte where we got a NAK ?
+
+If can't make sure that detail is true, then such usecases (as piezo
+drivers) will never work.
+
+Another approach would be to not add any field to struct i2c_msg but
+instead return either the amount of bytes transferred, or an error case.
+This would mean a series that would:
+
+1) fix all users of struct i2c_master_send() and the like to check for
+	errors as if (ret < 0) instead of if (ret);
+2) fix all i2c buses to return the amount of bytes written instead of
+	zero or error case
+3) fix Documentation to state that we're now returning the amount of
+	bytes, instead of zero or errno.
+
+I'm not sure what will have minimum impact to userland, though. What do
+you say Jean ? What would you prefer ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/29c54463/attachment.sig>
