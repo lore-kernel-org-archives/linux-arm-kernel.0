@@ -1,70 +1,155 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Jul 2012 12:54:27 +0200
-Subject: [RFC] Support for 'Coda' video codec IP.
-In-Reply-To: <CACKLOr1oZZPZBNv+p9p3Vf5oY4K8K65_dJ5qkJO6NqeP2=2unw@mail.gmail.com>
-References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
- <20120619181717.GE28394@pengutronix.de>
- <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
- <20120620090126.GO28394@pengutronix.de>
- <20120620100015.GA30243@sirena.org.uk>
- <20120620130941.GB2253@S2101-09.ap.freescale.net>
- <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
- <20120620143336.GE2253@S2101-09.ap.freescale.net>
- <CACKLOr1oZZPZBNv+p9p3Vf5oY4K8K65_dJ5qkJO6NqeP2=2unw@mail.gmail.com>
-Message-ID: <20120702105427.GP2698@pengutronix.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 2 Jul 2012 14:06:01 +0300
+Subject: [PATCHv4 2/2] ARM: dma-mapping: remove custom consistent dma
+ region
+In-Reply-To: <1340614047-5824-3-git-send-email-m.szyprowski@samsung.com>
+References: <1340614047-5824-1-git-send-email-m.szyprowski@samsung.com>
+ <1340614047-5824-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120702140601.124e307e493bff4f05efb0b1@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 12:36:46PM +0200, javier Martin wrote:
-> Hi Sascha,
-> I almost have a final version ready which includes multi-instance
-> support (not tested though) [1]. As I stated, we assumed the extra
-> effort of looking at your code in [2] in order to provide a mechanism
-> that preserves compatibility between VPUs in i.MX21, i.MX51 and
-> i.MX53. This is the only thing left in order to send the driver for
-> mainline submission.
-> 
-> While I was reading your code I found out that you keep the following
-> formats for v1 (codadx6-i.MX27) codec:
-> 
-> static int vpu_v1_codecs[VPU_CODEC_MAX] = {
-> 	[VPU_CODEC_AVC_DEC] = 2,
-> 	[VPU_CODEC_VC1_DEC] = -1,
-> 	[VPU_CODEC_MP2_DEC] = -1,
-> 	[VPU_CODEC_DV3_DEC] = -1,
-> 	[VPU_CODEC_RV_DEC] = -1,
-> 	[VPU_CODEC_MJPG_DEC] = 0x82,
-> 	[VPU_CODEC_AVC_ENC] = 3,
-> 	[VPU_CODEC_MP4_ENC] = 1,
-> 	[VPU_CODEC_MJPG_ENC] = 0x83,
-> };
-> 
-> As I understand, this means the following operations are supported:
-> 
-> 1- H264 decoding.
-> 2- H264 encoding
-> 3- MP4 encoding.
-> 4- MJPG  decoding.
-> 5- MJPG encoding.
-> 
-> I totally agree with MP4 and H264 formats but, are you sure about
-> MJPG? I have a i.MX27 v1 codec (codadx6) but I didn't know that this
-> codec supported MJPG. Have you tested this code with an i.MX27 and
-> MJPG? Where did you find out that it supports this format?
+Hi Marek,
 
-We haven't tested MJPG on the i.MX27. The table above is from the
-original Freescale code, so I assume it's correct and I assume that
-the coda dx6 can do MJPEG.
+On Mon, 25 Jun 2012 10:47:27 +0200
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-> Are you
-> using firmware version 2.2.4 for v1 codecs?
+> This patch changes dma-mapping subsystem to use generic vmalloc areas
+> for all consistent dma allocations. This increases the total size limit
+> of the consistent allocations and removes platform hacks and a lot of
+> duplicated code.
+> 
+> Atomic allocations are served from special pool preallocated on boot,
+> becasue vmalloc areas cannot be reliably created in atomic context.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  Documentation/kernel-parameters.txt |    2 +-
+>  arch/arm/include/asm/dma-mapping.h  |    2 +-
+>  arch/arm/mm/dma-mapping.c           |  505 +++++++++++++----------------------
+>  arch/arm/mm/mm.h                    |    3 +
+>  include/linux/vmalloc.h             |    1 +
+>  mm/vmalloc.c                        |   10 +-
+>  6 files changed, 194 insertions(+), 329 deletions(-)
+> 
+......
+> -static int __init consistent_init(void)
+> -{
+> -       int ret = 0;
+> -       pgd_t *pgd;
+> -       pud_t *pud;
+> -       pmd_t *pmd;
+> -       pte_t *pte;
+> -       int i = 0;
+> -       unsigned long base = consistent_base;
+> -       unsigned long num_ptes = (CONSISTENT_END - base) >> PMD_SHIFT;
+> -
+> -       if (IS_ENABLED(CONFIG_CMA) && !IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU))
+> -               return 0;
+> -
+> -       consistent_pte = kmalloc(num_ptes * sizeof(pte_t), GFP_KERNEL);
+> -       if (!consistent_pte) {
+> -               pr_err("%s: no memory\n", __func__);
+> -               return -ENOMEM;
+> -       }
+> -
+> -       pr_debug("DMA memory: 0x%08lx - 0x%08lx:\n", base, CONSISTENT_END);
+> -       consistent_head.vm_start = base;
+> -
+> -       do {
+> -               pgd = pgd_offset(&init_mm, base);
+> -
+> -               pud = pud_alloc(&init_mm, pgd, base);
+> -               if (!pud) {
+> -                       pr_err("%s: no pud tables\n", __func__);
+> -                       ret = -ENOMEM;
+> -                       break;
+> -               }
+> -
+> -               pmd = pmd_alloc(&init_mm, pud, base);
+> -               if (!pmd) {
+> -                       pr_err("%s: no pmd tables\n", __func__);
+> -                       ret = -ENOMEM;
+> -                       break;
+> -               }
+> -               WARN_ON(!pmd_none(*pmd));
+> -
+> -               pte = pte_alloc_kernel(pmd, base);
+> -               if (!pte) {
+> -                       pr_err("%s: no pte tables\n", __func__);
+> -                       ret = -ENOMEM;
+> -                       break;
+> -               }
+> -
+> -               consistent_pte[i++] = pte;
+> -               base += PMD_SIZE;
+> -       } while (base < CONSISTENT_END);
+> -
+> -       return ret;
+> -}
+> -core_initcall(consistent_init);
+> -
+>  static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>                                      pgprot_t prot, struct page **ret_page);
+> 
+> -static struct arm_vmregion_head coherent_head = {
+> -       .vm_lock        = __SPIN_LOCK_UNLOCKED(&coherent_head.vm_lock),
+> -       .vm_list        = LIST_HEAD_INIT(coherent_head.vm_list),
+> +static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
+> +                                pgprot_t prot, struct page **ret_page,
+> +                                const void *caller);
+> +
+> +static void *
+> +__dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
+> +       const void *caller)
+> +{
+> +       struct vm_struct *area;
+> +       unsigned long addr;
+> +
+> +       area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+> +                                 caller);
+> +       if (!area)
+> +               return NULL;
+> +       addr = (unsigned long)area->addr;
+> +       area->phys_addr = __pfn_to_phys(page_to_pfn(page));
+> +
+> +       if (ioremap_page_range(addr, addr + size, area->phys_addr, prot)) {
+> +               vunmap((void *)addr);
+> +               return NULL;
+> +       }
+> +       return (void *)addr;
+> +}
 
-No, 2.2.5
+The above "ioremap_page_range()" seems to be executed against normal
+pages(liner kernel mapping) with setting a new prot, because pages were
+passed from __dma_alloc_buffer(){..alloc_pages()...}. For me, this is
+creating another page mapping with different pgprot, and it can cause
+the pgprot inconsistency. This reminds me of the following old patch.
 
-Sascha
+  [RFC PATCH] Avoid aliasing mappings in DMA coherent allocator
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/106815.html
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think that this is why ioremap() isn't allowed with RAM.
+
+  __arm_ioremap_pfn_caller() doens't allow RAM remapping.
+  
+  193 void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+  194         unsigned long offset, size_t size, unsigned int mtype, void *caller)
+  195 {
+  196         const struct mem_type *type;
+  197         int err;
+  ... .
+  240         /*                                                                                                                                                                                  
+  241          * Don't allow RAM to be mapped - this causes problems with ARMv6+                                                                                                                  
+  242          */
+  243         if (WARN_ON(pfn_valid(pfn)))
+  244                 return NULL;
+  ...
+
+So my question is:
+1, is the above ioremap_page_range() creating another page mapping
+   with a new pgprot, in addition to liner mapping?
+2, If so, is it safe for pgprot inconsistency from different vaddrs?
+
+I hope that my questins are making sense.
