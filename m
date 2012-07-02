@@ -1,67 +1,65 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  2 Jul 2012 17:39:34 +0200
-Subject: [PATCH 9/9] ARM: mvebu: MPIC: read number of interrupts from control
- register
+Date: Mon,  2 Jul 2012 17:39:32 +0200
+Subject: [PATCH 7/9] arm: mach-mvebu: add compilation/configuration change
 In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341243574-3258-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341243574-3258-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Read the number of MPIC interrupts from the controller and only register
-that many.
-
-[gregory.clement at free-electrons.com: rename armada symbol name to fit
-with new name: armada_370_xp]
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/mach-mvebu/irq-armada-370-xp.c |    9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig  |   14 ++++++++++++++
+ arch/arm/Makefile |    1 +
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index 645a8d3..5f5f939 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -29,13 +29,12 @@
- #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
- #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8e02882..519b5e0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -533,6 +533,18 @@ config ARCH_IXP4XX
+ 	help
+ 	  Support for Intel's IXP4XX (XScale) family of processors.
  
-+#define ARMADA_370_XP_INT_CONTROL		(0x00)
- #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
- #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
- 
- #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
- 
--#define ARMADA_370_XP_NR_IRQS			(115)
--
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-@@ -81,14 +80,18 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
- static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
-+	u32 control;
++config ARCH_MVEBU
++	bool "Marvell SOCs with Device Tree support"
++	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
++	select CLKSRC_MMIO
++	select GENERIC_IRQ_CHIP
++	select IRQ_DOMAIN
++	select COMMON_CLK
++	help
++	  Support for the Marvell SoC Family with device tree support
 +
- 	main_int_base = of_iomap(node, 0);
- 	per_cpu_int_base = of_iomap(node, 1);
- 
- 	BUG_ON(!main_int_base);
- 	BUG_ON(!per_cpu_int_base);
- 
-+	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
+ 	select CPU_V7
+@@ -987,6 +999,8 @@ endchoice
+ # Kconfigs may be included either alphabetically (according to the
+ # plat- suffix) or along side the corresponding mach-* source.
+ #
++source "arch/arm/mach-mvebu/Kconfig"
 +
- 	armada_370_xp_mpic_domain =
--	    irq_domain_add_linear(node, ARMADA_370_XP_NR_IRQS,
-+	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
- 				  &armada_370_xp_mpic_irq_ops, NULL);
+ source "arch/arm/mach-at91/Kconfig"
  
- 	if (!armada_370_xp_mpic_domain)
+ source "arch/arm/mach-bcmring/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0298b00..f1a1a71 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -157,6 +157,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
+ machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
+ machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
+ machine-$(CONFIG_ARCH_MXS)		:= mxs
++machine-$(CONFIG_ARCH_MVEBU)		:= mvebu
+ machine-$(CONFIG_ARCH_NETX)		:= netx
+ machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
+ machine-$(CONFIG_ARCH_OMAP1)		:= omap1
 -- 
 1.7.9.5
