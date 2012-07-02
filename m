@@ -1,44 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 2 Jul 2012 20:33:30 +0200
-Subject: [PATCH 2/9] arm: mach-mvebu: add header
-In-Reply-To: <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20120702183330.GG1348@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 02 Jul 2012 12:06:45 -0700
+Subject: [PATCH 1/2] remoteproc: maintain a generic child device for each
+ rproc
+In-Reply-To: <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
+References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
+ <4FC5DBFA.2030300@codeaurora.org>
+ <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
+ <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
+Message-ID: <4FF1F145.2050408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +++ b/arch/arm/mach-mvebu/include/mach/uncompress.h
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Marvell Armada SoC kernel uncompression UART routines
-> + *
-> + * Copyright (C) 2012 Marvell
-> + *
-> + * Lior Amsalem <alior@marvell.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <mach/armada-370-xp.h>
-> +
-> +#define UART_THR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
-> +								+ 0x12000))
-> +#define UART_LSR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
-> +								+ 0x12014))
-> +
+On 06/29/12 01:13, Ohad Ben-Cohen wrote:
+> On Wed, May 30, 2012 at 3:16 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> In this case, I was more wondering between using a class to a device type.
+>>
+>>> I recall seeing a thread where
+>>> someone said classes were on the way out and shouldn't be used but I
+>>> can't find it anymore.
+>> I also remembered a similar discussion at a plumbers mini-conf about
+>> 2-3 years ago too, so I looked at device_type as an alternative to
+>> class. The former looks somewhat simpler, but I couldn't find any
+>> major advantage for using one over the other, and both seem to be in
+>> use by many subsystems.
+> Moving to device_type is so trivial that I gave it a spin (and moved
+> to IDA too while at it):
 
-Hi Thomas
+Great! It looks like device_type doesn't have any list iteration support
+though. Is that requirement gone? If that requirement is still there I
+would think we need something like a class or bus still.
 
-What physical address does this come out to? All Orion platforms have
-the serial port at the same place, 0xf1012000. If 370/XP is the same,
-i suggest dropping this #include, hard code the address, and we share
-the implementation for all SoCs. 
+Will you resend this as part of a series? It will be easier to review then.
 
-If however, the ASIC engineers have decided to move it, we need some
-extra logic to handle different base addresses for Dove and 370/XP
-which should be supportable in one kernel binary.
-
-      Andrew
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
