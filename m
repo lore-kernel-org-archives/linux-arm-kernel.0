@@ -1,66 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Jul 2012 11:26:03 +0200
-Subject: [PATCH 1/2] ARM: i.MX5x clocks: Add EPIT support
-In-Reply-To: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
-References: <1340780885-4094-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20120702092603.GK2698@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 2 Jul 2012 11:26:52 +0200
+Subject: [PATCH v5] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <4FF16919.3090302@codethink.co.uk>
+References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
+ <4FEB2CC3.7090305@codethink.co.uk> <20120702103016.28b2637e@skate>
+ <4FF16797.8070405@codethink.co.uk> <20120702111947.2ce2b3cc@skate>
+ <4FF16919.3090302@codethink.co.uk>
+Message-ID: <20120702112652.77d5abbe@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2012 at 11:08:04AM +0400, Alexander Shiyan wrote:
-> This patch adds support for Enhanced Periodic Interrupt Timer (EPIT)
-> to clock subsystem.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Le Mon, 02 Jul 2012 10:25:45 +0100,
+Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
 
-Applied (both)
-
-Thanks
- Sascha
-
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
+> Ah, thank you. I had it updating the dtb with the ATAGS before
+> parsing the device tree in my previous setup.
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index a2200c7..2944854 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -81,6 +81,7 @@ enum imx5_clks {
->  	ssi1_root_podf, ssi2_root_pred, ssi2_root_podf, ssi_ext1_pred,
->  	ssi_ext1_podf, ssi_ext2_pred, ssi_ext2_podf, ssi1_root_gate,
->  	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
-> +	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
->  	clk_max
->  };
->  
-> @@ -226,6 +227,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk[ssi3_root_gate] = imx_clk_gate2("ssi3_root_gate", "ssi3_root_sel", MXC_CCM_CCGR3, 26);
->  	clk[ssi_ext1_gate] = imx_clk_gate2("ssi_ext1_gate", "ssi_ext1_com_sel", MXC_CCM_CCGR3, 28);
->  	clk[ssi_ext2_gate] = imx_clk_gate2("ssi_ext2_gate", "ssi_ext2_com_sel", MXC_CCM_CCGR3, 30);
-> +	clk[epit1_ipg_gate] = imx_clk_gate2("epit1_ipg_gate", "ipg", MXC_CCM_CCGR2, 2);
-> +	clk[epit1_hf_gate] = imx_clk_gate2("epit1_hf_gate", "ipg", MXC_CCM_CCGR2, 4);
-> +	clk[epit2_ipg_gate] = imx_clk_gate2("epit2_ipg_gate", "ipg", MXC_CCM_CCGR2, 6);
-> +	clk[epit2_hf_gate] = imx_clk_gate2("epit2_hf_gate", "ipg", MXC_CCM_CCGR2, 8);
->  
->  	for (i = 0; i < ARRAY_SIZE(clk); i++)
->  		if (IS_ERR(clk[i]))
-> @@ -279,6 +284,8 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_register_clkdev(clk[dummy], NULL, "imx-keypad");
->  	clk_register_clkdev(clk[tve_gate], NULL, "imx-tve.0");
->  	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx-tve.0");
-> +	clk_register_clkdev(clk[epit1_ipg_gate], NULL, "imx-epit.0");
-> +	clk_register_clkdev(clk[epit2_ipg_gate], NULL, "imx-epit.1");
->  
->  	/* Set SDHC parents to be PLL2 */
->  	clk_set_parent(clk[esdhc_a_sel], clk[pll2_sw]);
-> -- 
-> 1.7.3.4
-> 
-> 
+> Anyone looking into fixing the problem where it goes bang without
+> a useful error message if there has been no memory registered?
 
+Well, to some extent, the message:
+
+Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
+
+is a quite good indication that a memory allocation "below 0x0" is
+failing, which so early in this boot, most likely means that you don't
+have memory at all :-)
+
+But yes, maybe there could be a more useful check at some point in the
+boot process.
+
+Regards,
+
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
