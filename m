@@ -1,44 +1,301 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  2 Jul 2012 17:35:50 -0300
-Subject: [PATCH 1/2] ARM: imx: defconfig: Enable CONFIG_COMMON_CLK_DEBUG
-Message-ID: <1341261351-7924-1-git-send-email-festevam@gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 02 Jul 2012 22:49:48 +0200
+Subject: [PATCH] ARM: remove asm/locks.h
+Message-ID: <1341262188.1911.147.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Commit 64ac24e738823161693bf791f87adc802cf529ff ("Generic semaphore
+implementation") removed the last include of this header. Apparently it
+was just an oversight to keep this header. It can safely be removed now.
 
-With the common clock framework in place, it is useful to enable
-CONFIG_COMMON_CLK_DEBUG option, in order to easily inspect the clock tree.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+Tested only with various git commands on the (history of the) tree.
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index e05a2f1..208c5df 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -177,6 +177,7 @@ CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
-+CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
- # CONFIG_DNOTIFY is not set
- # CONFIG_PROC_PAGE_MONITOR is not set
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index b1d3675..f517b55 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -181,6 +181,7 @@ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
-+CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
+ arch/arm/include/asm/locks.h |  274 ------------------------------------------
+ 1 files changed, 0 insertions(+), 274 deletions(-)
+ delete mode 100644 arch/arm/include/asm/locks.h
+
+diff --git a/arch/arm/include/asm/locks.h b/arch/arm/include/asm/locks.h
+deleted file mode 100644
+index ef4c897..0000000
+--- a/arch/arm/include/asm/locks.h
++++ /dev/null
+@@ -1,274 +0,0 @@
+-/*
+- *  arch/arm/include/asm/locks.h
+- *
+- *  Copyright (C) 2000 Russell King
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- *  Interrupt safe locking assembler. 
+- */
+-#ifndef __ASM_PROC_LOCKS_H
+-#define __ASM_PROC_LOCKS_H
+-
+-#if __LINUX_ARM_ARCH__ >= 6
+-
+-#define __down_op(ptr,fail)			\
+-	({					\
+-	__asm__ __volatile__(			\
+-	"@ down_op\n"				\
+-"1:	ldrex	lr, [%0]\n"			\
+-"	sub	lr, lr, %1\n"			\
+-"	strex	ip, lr, [%0]\n"			\
+-"	teq	ip, #0\n"			\
+-"	bne	1b\n"				\
+-"	teq	lr, #0\n"			\
+-"	movmi	ip, %0\n"			\
+-"	blmi	" #fail				\
+-	:					\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	})
+-
+-#define __down_op_ret(ptr,fail)			\
+-	({					\
+-		unsigned int ret;		\
+-	__asm__ __volatile__(			\
+-	"@ down_op_ret\n"			\
+-"1:	ldrex	lr, [%1]\n"			\
+-"	sub	lr, lr, %2\n"			\
+-"	strex	ip, lr, [%1]\n"			\
+-"	teq	ip, #0\n"			\
+-"	bne	1b\n"				\
+-"	teq	lr, #0\n"			\
+-"	movmi	ip, %1\n"			\
+-"	movpl	ip, #0\n"			\
+-"	blmi	" #fail "\n"			\
+-"	mov	%0, ip"				\
+-	: "=&r" (ret)				\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	ret;					\
+-	})
+-
+-#define __up_op(ptr,wake)			\
+-	({					\
+-	smp_mb();				\
+-	__asm__ __volatile__(			\
+-	"@ up_op\n"				\
+-"1:	ldrex	lr, [%0]\n"			\
+-"	add	lr, lr, %1\n"			\
+-"	strex	ip, lr, [%0]\n"			\
+-"	teq	ip, #0\n"			\
+-"	bne	1b\n"				\
+-"	cmp	lr, #0\n"			\
+-"	movle	ip, %0\n"			\
+-"	blle	" #wake				\
+-	:					\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	})
+-
+-/*
+- * The value 0x01000000 supports up to 128 processors and
+- * lots of processes.  BIAS must be chosen such that sub'ing
+- * BIAS once per CPU will result in the long remaining
+- * negative.
+- */
+-#define RW_LOCK_BIAS      0x01000000
+-#define RW_LOCK_BIAS_STR "0x01000000"
+-
+-#define __down_op_write(ptr,fail)		\
+-	({					\
+-	__asm__ __volatile__(			\
+-	"@ down_op_write\n"			\
+-"1:	ldrex	lr, [%0]\n"			\
+-"	sub	lr, lr, %1\n"			\
+-"	strex	ip, lr, [%0]\n"			\
+-"	teq	ip, #0\n"			\
+-"	bne	1b\n"				\
+-"	teq	lr, #0\n"			\
+-"	movne	ip, %0\n"			\
+-"	blne	" #fail				\
+-	:					\
+-	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	})
+-
+-#define __up_op_write(ptr,wake)			\
+-	({					\
+-	smp_mb();				\
+-	__asm__ __volatile__(			\
+-	"@ up_op_write\n"			\
+-"1:	ldrex	lr, [%0]\n"			\
+-"	adds	lr, lr, %1\n"			\
+-"	strex	ip, lr, [%0]\n"			\
+-"	teq	ip, #0\n"			\
+-"	bne	1b\n"				\
+-"	movcs	ip, %0\n"			\
+-"	blcs	" #wake				\
+-	:					\
+-	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
+-	: "ip", "lr", "cc");			\
+-	})
+-
+-#define __down_op_read(ptr,fail)		\
+-	__down_op(ptr, fail)
+-
+-#define __up_op_read(ptr,wake)			\
+-	({					\
+-	smp_mb();				\
+-	__asm__ __volatile__(			\
+-	"@ up_op_read\n"			\
+-"1:	ldrex	lr, [%0]\n"			\
+-"	add	lr, lr, %1\n"			\
+-"	strex	ip, lr, [%0]\n"			\
+-"	teq	ip, #0\n"			\
+-"	bne	1b\n"				\
+-"	teq	lr, #0\n"			\
+-"	moveq	ip, %0\n"			\
+-"	bleq	" #wake				\
+-	:					\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	})
+-
+-#else
+-
+-#define __down_op(ptr,fail)			\
+-	({					\
+-	__asm__ __volatile__(			\
+-	"@ down_op\n"				\
+-"	mrs	ip, cpsr\n"			\
+-"	orr	lr, ip, #128\n"			\
+-"	msr	cpsr_c, lr\n"			\
+-"	ldr	lr, [%0]\n"			\
+-"	subs	lr, lr, %1\n"			\
+-"	str	lr, [%0]\n"			\
+-"	msr	cpsr_c, ip\n"			\
+-"	movmi	ip, %0\n"			\
+-"	blmi	" #fail				\
+-	:					\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	})
+-
+-#define __down_op_ret(ptr,fail)			\
+-	({					\
+-		unsigned int ret;		\
+-	__asm__ __volatile__(			\
+-	"@ down_op_ret\n"			\
+-"	mrs	ip, cpsr\n"			\
+-"	orr	lr, ip, #128\n"			\
+-"	msr	cpsr_c, lr\n"			\
+-"	ldr	lr, [%1]\n"			\
+-"	subs	lr, lr, %2\n"			\
+-"	str	lr, [%1]\n"			\
+-"	msr	cpsr_c, ip\n"			\
+-"	movmi	ip, %1\n"			\
+-"	movpl	ip, #0\n"			\
+-"	blmi	" #fail "\n"			\
+-"	mov	%0, ip"				\
+-	: "=&r" (ret)				\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	ret;					\
+-	})
+-
+-#define __up_op(ptr,wake)			\
+-	({					\
+-	smp_mb();				\
+-	__asm__ __volatile__(			\
+-	"@ up_op\n"				\
+-"	mrs	ip, cpsr\n"			\
+-"	orr	lr, ip, #128\n"			\
+-"	msr	cpsr_c, lr\n"			\
+-"	ldr	lr, [%0]\n"			\
+-"	adds	lr, lr, %1\n"			\
+-"	str	lr, [%0]\n"			\
+-"	msr	cpsr_c, ip\n"			\
+-"	movle	ip, %0\n"			\
+-"	blle	" #wake				\
+-	:					\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	})
+-
+-/*
+- * The value 0x01000000 supports up to 128 processors and
+- * lots of processes.  BIAS must be chosen such that sub'ing
+- * BIAS once per CPU will result in the long remaining
+- * negative.
+- */
+-#define RW_LOCK_BIAS      0x01000000
+-#define RW_LOCK_BIAS_STR "0x01000000"
+-
+-#define __down_op_write(ptr,fail)		\
+-	({					\
+-	__asm__ __volatile__(			\
+-	"@ down_op_write\n"			\
+-"	mrs	ip, cpsr\n"			\
+-"	orr	lr, ip, #128\n"			\
+-"	msr	cpsr_c, lr\n"			\
+-"	ldr	lr, [%0]\n"			\
+-"	subs	lr, lr, %1\n"			\
+-"	str	lr, [%0]\n"			\
+-"	msr	cpsr_c, ip\n"			\
+-"	movne	ip, %0\n"			\
+-"	blne	" #fail				\
+-	:					\
+-	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	})
+-
+-#define __up_op_write(ptr,wake)			\
+-	({					\
+-	__asm__ __volatile__(			\
+-	"@ up_op_write\n"			\
+-"	mrs	ip, cpsr\n"			\
+-"	orr	lr, ip, #128\n"			\
+-"	msr	cpsr_c, lr\n"			\
+-"	ldr	lr, [%0]\n"			\
+-"	adds	lr, lr, %1\n"			\
+-"	str	lr, [%0]\n"			\
+-"	msr	cpsr_c, ip\n"			\
+-"	movcs	ip, %0\n"			\
+-"	blcs	" #wake				\
+-	:					\
+-	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
+-	: "ip", "lr", "cc");			\
+-	smp_mb();				\
+-	})
+-
+-#define __down_op_read(ptr,fail)		\
+-	__down_op(ptr, fail)
+-
+-#define __up_op_read(ptr,wake)			\
+-	({					\
+-	smp_mb();				\
+-	__asm__ __volatile__(			\
+-	"@ up_op_read\n"			\
+-"	mrs	ip, cpsr\n"			\
+-"	orr	lr, ip, #128\n"			\
+-"	msr	cpsr_c, lr\n"			\
+-"	ldr	lr, [%0]\n"			\
+-"	adds	lr, lr, %1\n"			\
+-"	str	lr, [%0]\n"			\
+-"	msr	cpsr_c, ip\n"			\
+-"	moveq	ip, %0\n"			\
+-"	bleq	" #wake				\
+-	:					\
+-	: "r" (ptr), "I" (1)			\
+-	: "ip", "lr", "cc");			\
+-	})
+-
+-#endif
+-
+-#endif
 -- 
-1.7.1
+1.7.7.6
