@@ -1,58 +1,43 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 2 Jul 2012 17:14:37 +0200
-Subject: [PATCH 04/15] mfd: ab8500: Register devices using the newly
- DT:ed MFD API
-In-Reply-To: <4FF17202.9080106@linaro.org>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-5-git-send-email-lee.jones@linaro.org>
- <20120629150924.GG22806@sortiz-mobl> <4FEDD212.4020209@linaro.org>
- <20120629185047.GY22806@sortiz-mobl> <4FF17202.9080106@linaro.org>
-Message-ID: <20120702151437.GO22065@sortiz-mobl>
+Date: Mon, 2 Jul 2012 17:23:20 +0200
+Subject: [PATCH 07/29] mfd: omap-usb: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <4FF18305.2020301@ti.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-8-git-send-email-rnayak@ti.com>
+ <20120702111850.GC22065@sortiz-mobl> <4FF18305.2020301@ti.com>
+Message-ID: <20120702152320.GP22065@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Rajendra,
 
-On Mon, Jul 02, 2012 at 11:03:46AM +0100, Lee Jones wrote:
-> >>> This one does not apply properly against my for-next branch. Could you please
-> >>> generate a new one for me ?
+On Mon, Jul 02, 2012 at 04:46:21PM +0530, Rajendra Nayak wrote:
+> Hi Samuel,
+> 
+> On Monday 02 July 2012 04:48 PM, Samuel Ortiz wrote:
+> >Hi Rajendra,
+> >
+> >On Thu, Jun 14, 2012 at 06:16:56PM +0530, Rajendra Nayak wrote:
+> >>As we move to Common clk framework use clk_prepare_enable()
+> >>instead of clk_enable() and similarly clk_disable_unprepare()
+> >>instead of clk_disable()
 > >>
-> >> Hmm... we have a problem.
-> >>
-> >> I have the new patch based on -next, but I can't test it, as -next
-> >> is broken for Snowball. Hence why I'm still using rc2. Do you want
-> >> it anyway?
-> > Yes. And once Snowball is working with -next, I'll take a patch fix from you
-> > if necessary.
+> >>Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> >>Cc: Samuel Ortiz<sameo@linux.intel.com>
+> >>---
+> >>  drivers/mfd/omap-usb-host.c |   28 ++++++++++++++--------------
+> >>  1 files changed, 14 insertions(+), 14 deletions(-)
+> >Patch applied, many thanks.
 > 
-> Okay, this one applies on -next:
-> 
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Wed, 20 Jun 2012 08:48:33 +0100
-> Subject: [PATCH 1/1] mfd: ab8500: Register devices using the newly DT:ed MFD
->  API
-> 
-> Now the MFD API is Device Tree aware we can use it for platform
-> registration again, even when booting with DT enabled. To aid in
-> Device Node pointer allocation we provide each cell with the
-> associative compatible string.
-> 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500.c |    1 -
->  drivers/mfd/ab8500-core.c          |   64 ++++++++++++++++++++++--------------
->  drivers/mfd/ab8500-debugfs.c       |    6 ----
->  drivers/mfd/ab8500-gpadc.c         |    6 ----
->  drivers/mfd/ab8500-sysctrl.c       |    6 ----
->  drivers/misc/ab8500-pwm.c          |    6 ----
->  drivers/regulator/ab8500.c         |    6 ----
->  drivers/rtc/rtc-ab8500.c           |    7 ----
->  drivers/usb/otg/ab8500-usb.c       |    6 ----
->  9 files changed, 39 insertions(+), 69 deletions(-)
-Applied, although rtc-ab8500.c and ab8500-usb.c did not need any changes.
-Please check commit 47e1f40fcb12f976e7769f75c04c65828ed5da75 on my for-next
-branch to see if I missed anything.
+> Sorry, I was asked to base these changes on top of work done by
+> Keshava [1], to split the driver, which is still under review/not
+> pulled.
+> I am waiting for those to settle to repost these changes.
+> Can you please drop this one for now?
+I just did, although I think Keshava could have based his work on top of
+yours, as he's rebasing his patchset at the moment.
+Anyway, patch is removed now.
 
 Cheers,
 Samuel.
