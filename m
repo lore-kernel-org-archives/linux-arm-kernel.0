@@ -1,27 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Jul 2012 12:14:55 -0700
-Subject: [PATCH v2 1/2] ARM: arch timer: implement read_current_timer
- and get_cycles
-In-Reply-To: <1340991231-17682-2-git-send-email-will.deacon@arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-2-git-send-email-will.deacon@arm.com>
-Message-ID: <4FF1F32F.9060609@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 2 Jul 2012 21:16:16 +0200
+Subject: [PATCH 2/9] arm: mach-mvebu: add header
+In-Reply-To: <20120702210838.37c78fda@skate>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120702183330.GG1348@lunn.ch> <20120702210838.37c78fda@skate>
+Message-ID: <20120702191616.GJ1348@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/12 10:33, Will Deacon wrote:
-> This patch implements read_current_timer using the architected timers
-> when they are selected via CONFIG_ARM_ARCH_TIMER. If they are detected
-> not to be usable at runtime, we return -ENXIO to the caller.
->
-> Furthermore, if read_current_timer is exported then we can implement
-> get_cycles in terms of it for use as both an entropy source and for
-> implementing __udelay and friends.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> OMAP has some logic to handle this kind of problems, see
+> plat-omap/include/plat/uncompress.h. We can quite certainly overcome
+> this problem somehow.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+That file says:
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+         * Initialize the port based on the machine ID from the bootloader.
+
+Which when using DT we don't have.
+
+As you said, we can overcome this somehow. We just need to be aware
+there will be changes here.
+
+It would also be nice if Marvell ASIC engineers didn't randomly move
+things around in the address space....
+
+       Andrew
