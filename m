@@ -1,48 +1,59 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 02 Jul 2012 12:54:30 +0530
-Subject: [PATCH] clk: __clk_set_parent: set uninitialized variable
-In-Reply-To: <20120702064737.GB22016@pengutronix.de>
-References: <1341177539-27716-1-git-send-email-mkl@pengutronix.de>
- <4FF13839.5000804@ti.com> <20120702064737.GB22016@pengutronix.de>
-Message-ID: <4FF14CAE.9040304@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon,  2 Jul 2012 09:41:42 +0200
+Subject: [PATCH v2] clk: __clk_set_parent: set uninitialized variable
+Message-ID: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012 12:17 PM, Uwe Kleine-K?nig wrote:
-> On Mon, Jul 02, 2012 at 11:27:13AM +0530, Rajendra Nayak wrote:
->> On Monday 02 July 2012 02:48 AM, Marc Kleine-Budde wrote:
->>> This patch fixes the following warning:
->>>
->>>      drivers/clk/clk.c: In function '__clk_set_parent':
->>>      drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in this function [-Wuninitialized]
->>>
->>> which has been introduced with commit:
->>
->> hmm, are you sure about that? The below commit neither introduces the
->> variable 'i', nor seem to change the way the variable is used in the
->> function.
-> It does. The following hunk:
->
-> -       for (i = 0; i<  clk->num_parents; i++)
-> -               if (clk->parents[i] == parent)
-> -                       break;
-> +       if (clk->parents)
-> +               for (i = 0; i<  clk->num_parents; i++)
-> +                       if (clk->parents[i] == parent)
-> +                               break;
-> +       else
-> +               clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
-> +                                                               GFP_KERNEL);
->
-> results in i being uninitialized if clk->parents is NULL. But I wonder
+This patch fixes the following warning:
 
-ok, got it.
+    drivers/clk/clk.c: In function '__clk_set_parent':
+    drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in this function [-Wuninitialized]
 
-> if for this case i should be set to clk->num_parents instead of 0?
+which has been introduced with commit:
 
-yes, that seems like the right thing to do.
+    commit 7975059db572eb47f0fb272a62afeae272a4b209
+    Author: Rajendra Nayak <rnayak@ti.com>
+    Date:   Wed Jun 6 14:41:31 2012 +0530
 
->
-> Best regards
-> Uwe
->
+        clk: Allow late cache allocation for clk->parents
+
+This patch applies to linux-3.5-rc5
+
+Cc: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+Hello,
+
+here an updated version. Changes since v1:
+- Set i to clk->num_parents as Uwe pointed out.
+
+regards, Marc
+
+ drivers/clk/clk.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index dcbe056..9a75635 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1068,13 +1068,15 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+ 	old_parent = clk->parent;
+ 
+ 	/* find index of new parent clock using cached parent ptrs */
+-	if (clk->parents)
++	if (clk->parents) {
+ 		for (i = 0; i < clk->num_parents; i++)
+ 			if (clk->parents[i] == parent)
+ 				break;
+-	else
++	} else {
++		i = clk->num_parents
+ 		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
+ 								GFP_KERNEL);
++	}
+ 
+ 	/*
+ 	 * find index of new parent clock using string name comparison
+-- 
+1.7.10
