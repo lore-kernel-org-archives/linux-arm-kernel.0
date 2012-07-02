@@ -1,71 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  2 Jul 2012 13:33:26 +0200
-Subject: [PATCH 6/9] arm: mach-mvebu: add defconfig
+Date: Mon,  2 Jul 2012 13:33:29 +0200
+Subject: [PATCH 9/9] ARM: mvebu: MPIC: read number of interrupts from control
+ register
 In-Reply-To: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341228809-17824-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341228809-17824-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ben Dooks <ben.dooks@codethink.co.uk>
+
+Read the number of MPIC interrupts from the controller and only register
+that many.
+
+[gregory.clement at free-electrons.com: rename armada symbol name to fit
+with new name: armada_370_xp]
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/configs/mvebu_defconfig |   46 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 arch/arm/configs/mvebu_defconfig
+ arch/arm/mach-mvebu/irq-armada-370-xp.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-new file mode 100644
-index 0000000..2e86b31
---- /dev/null
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -0,0 +1,46 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_EXPERT=y
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_ARCH_MVEBU=y
-+CONFIG_MACH_ARMADA_370_XP=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_USE_OF=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_VFP=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_ISO9660_FS=y
-+CONFIG_JOLIET=y
-+CONFIG_UDF_FS=m
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_2=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_TIMER_STATS=y
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index 645a8d3..5f5f939 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -29,13 +29,12 @@
+ #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+ #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
+ 
++#define ARMADA_370_XP_INT_CONTROL		(0x00)
+ #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
+ #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
+ 
+ #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
+ 
+-#define ARMADA_370_XP_NR_IRQS			(115)
+-
+ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+ static struct irq_domain *armada_370_xp_mpic_domain;
+@@ -81,14 +80,18 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 					     struct device_node *parent)
+ {
++	u32 control;
++
+ 	main_int_base = of_iomap(node, 0);
+ 	per_cpu_int_base = of_iomap(node, 1);
+ 
+ 	BUG_ON(!main_int_base);
+ 	BUG_ON(!per_cpu_int_base);
+ 
++	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
++
+ 	armada_370_xp_mpic_domain =
+-	    irq_domain_add_linear(node, ARMADA_370_XP_NR_IRQS,
++	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+ 				  &armada_370_xp_mpic_irq_ops, NULL);
+ 
+ 	if (!armada_370_xp_mpic_domain)
 -- 
 1.7.9.5
