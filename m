@@ -1,68 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 1 Jul 2012 23:36:51 -0700
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <4FEC89B9.3090404@ti.com>
-References: <cover.1340778002.git.afzal@ti.com>
- <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
- <20120627145844.GL3483@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
- <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
-Message-ID: <20120702063651.GO4202@atomide.com>
+From: andy.green@linaro.org (Andy Green)
+Date: Mon, 02 Jul 2012 14:40:49 +0800
+Subject: [PATCH 2 1/4] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <20120702063545.26782.98908.stgit@build.warmcat.com>
+References: <20120702063545.26782.98908.stgit@build.warmcat.com>
+Message-ID: <20120702064046.26782.32399.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [120628 09:48]:
-> 
-> [    2.792510] OneNAND driver initializing
-> [    2.797576] omap2-onenand omap2-onenand: initializing on CS2, phys base 0x20000000, virtual base c88c0000, freq 0 MHz
-> [    2.808929] OneNAND Manufacturer: Samsung (0xec)
-> [    2.808990] Muxed OneNAND 256MB 1.8V 16-bit (0x40)
-> [    2.814208] OneNAND version = 0x002c
-> 
-> The above change seems to imply that Tony's n900 is dependent on the bootloader settings
-> and not those being set by the kernel. Ideally, we should not need to set the async mode
-> in the onenand before we set the onenand timings in the gpmc (per Afzal's changelog
-> comment). This appears backwards.
+From: Andy Green <andy@warmcat.com>
 
-That should not be the case, I'm more likely to believe in Afzal's explanation.
+Introduce a generic helper function that can generate a valid MAC
+address using data from the OMAP unique CPU ID register.
+
+For comparison purposes this produces a MAC address of
+
+  2e:20:3c:ea:46:01
+
+for the ethernet device on my PandaBoard ES.
+
+The MAC address space has space set aside for these kind of "locally
+administered" MAC addresses, analogous to IPv4 10.x.x.x range, and this
+patch marks the generated MAC addresses as such.
+
+The patch leaves two bits allowing elaborating 4 different MACs from the
+generated data.
+
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ arch/arm/mach-omap2/id.c              |   39 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/include/mach/id.h |    1 +
+ 2 files changed, 40 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 00486a8..2a44c42 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
+ 	else
+ 		tap_prod_id = 0x0208;
+ }
++
++/*
++ * this uses the unique per-cpu info from the cpu fuses set at factory to
++ * generate a 6-byte MAC address.  Two bits in the generated code are used
++ * to elaborate the generated address into four, so it can be used on multiple
++ * network interfaces.
++ */
++
++void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype)
++{
++	struct omap_die_id odi;
++	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
++
++	omap_get_die_id(&odi);
++
++	mac[0] = odi.id_2;
++	mac[1] = odi.id_2 >> 8;
++	mac[2] = odi.id_1;
++	mac[3] = odi.id_1 >> 8;
++	mac[4] = odi.id_1 >> 16;
++	mac[5] = odi.id_1 >> 24;
++
++	/* XOR other chip-specific data with ID */
++
++	tap ^= odi.id_3;
++
++	mac[0] ^= tap;
++	mac[1] ^= tap >> 8;
++	mac[2] ^= tap >> 16;
++	mac[3] ^= tap >> 24;
++
++	/* allow four MACs from this same basic data */
++
++	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
++
++	/* mark it as not multicast, and outside official 80211 MAC namespace */
++
++	mac[0] = (mac[0] & ~1) | 2;
++}
+diff --git a/arch/arm/mach-omap2/include/mach/id.h b/arch/arm/mach-omap2/include/mach/id.h
+index 02ed3aa..373313a 100644
+--- a/arch/arm/mach-omap2/include/mach/id.h
++++ b/arch/arm/mach-omap2/include/mach/id.h
+@@ -18,5 +18,6 @@ struct omap_die_id {
+ };
  
-> The other thing to note is that the 3430sdp has samsung onenand where as the n900 has
-> Numonyx. The gpmc-onenand.c only has one set of settings that it is using for all
-> devices. However, it would appear that at least the async settings are not working for
-> the Numonyx. Therefore, may be we need to get a dump of Tony's n900 settings and make
-> sure the right settings are being used for the appropriate board. 
-
-Hmm I would assume the n900 onenand settings are the most tested settings we have.
-And AFAIK have also been tested with L3 frequency scaling. So let's assume they're
-mostly right.
+ void omap_get_die_id(struct omap_die_id *odi);
++void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype);
  
-> These onenand settings are really killing us. I don't want us to have to spend alot
-> of time re-calculating this stuff but the way it has been written to begin with is not
-> driver friendly. I really wonder if we need to have some sort of callback for the 
-> onenand timings from the driver. It is ugly, but the alternative is that someone needs
-> to sit down and re-calculate all the timings again to get them into a driver friendly
-> format. Furthermore, it seems that onenand is no longer available from the likes of
-> samsung and numonyx (micron) so it is hard to justify re-calculating everything again.
-> I am not even sure if we have all the datasheets!
-> 
-> Let me know your thoughts.
-
-I don't think we should spend much time working on the recalculations. Let's rather
-use these known working cases as examples. If they don't work, it's likely that
-adding any new devices won't work either.
-
-For the timings, we should allow specifying either cycles or time values in the
-data struct. And always just use the cycle value directly if specified, and
-othewise use the time value. We may be able to limit the registers where we need
-to allow either cycle or time value depending on the device futher.
-
-In general, I doubt that we can come up with better calculations. The existing
-code pretty well already follows the device spec timings. And using cycle values
-for some registers is the right thing to do according to the connected device
-specs no matter what the frequency is. In those cases converting from time values
-to cycles does not make sense.
-
-Regards,
-
-Tony
+ #endif
