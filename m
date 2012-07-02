@@ -1,68 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 02 Jul 2012 10:52:32 -0700
-Subject: [PATCH RESEND] ARM: OMAP2+: Fix Wake-up power domain power status
-In-Reply-To: <1341003892-14424-1-git-send-email-jon-hunter@ti.com> (Jon
- Hunter's message of "Fri, 29 Jun 2012 16:04:52 -0500")
-References: <1341003892-14424-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <87k3ym6of3.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 Jul 2012 16:52:51 +0000
+Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform.
+In-Reply-To: <20120701184110.GA30680@elf.ucw.cz>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <201206302104.37937.arnd@arndb.de> <20120701184110.GA30680@elf.ucw.cz>
+Message-ID: <201207021652.52787.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter <jon-hunter@ti.com> writes:
-
-> Note: Re-sending with updated kernel doc.
->
-> The wake-up power domain is an alway-on power domain and so this power domain
-> does not have a power state status (PM_PWSTST_xxx) register that indicates the
-> current state. However, during the registering of the wake-up power domain the
-> state of the domain is queried by calling pwrdm_read_pwrst(). This actually
-> tries to read a register that does not exist and returns a value of 0 that
-> indicates that the current state is OFF. The OFF state count of the wake-up
-> power domain is then set to 1 and the current state to OFF. Both of which are
-> incorrect.
->
-> To fix this, if a power domain only supports the ON state, do not attempt to
-> read the power state status register and simply return ON as the current power
-> state.
->
-> This is based upon Tony's current linux-omap master branch.
->
-> Testing:
-> - Boot tested on OMAP4460 panda.
-> - Boot tested on OMAP3430 beagle and validated CORE RET still working (using
->   Paul's 32k timer patch [1]).
->
-> [1] http://marc.info/?l=linux-omap&m=134000053229888&w=2
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-
-Acked-by: Kevin Hilman <khilman@ti.com>
-
-
-> ---
->  arch/arm/mach-omap2/powerdomain.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index eefe179..69b36e1 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -526,7 +526,8 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
->   *
->   * Return the powerdomain @pwrdm's current power state.	Returns -EINVAL
->   * if the powerdomain pointer is null or returns the current power state
-> - * upon success.
-> + * upon success. Note that if the power domain only supports the ON state
-> + * then just return ON as the current state.
->   */
->  int pwrdm_read_pwrst(struct powerdomain *pwrdm)
->  {
-> @@ -535,6 +536,9 @@ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
->  	if (!pwrdm)
->  		return -EINVAL;
+On Sunday 01 July 2012, Pavel Machek wrote:
+> @@ -133,6 +134,11 @@ static void socfpga_cyclone5_restart(char mode, const char *cmd)
 >  
-> +	if (pwrdm->pwrsts == PWRSTS_ON)
-> +		return PWRDM_POWER_ON;
+>  static void __init socfpga_cyclone5_init(void)
+>  {
+> +       int i;
+> +       for (i = 0; i < 512; i++) {
+> +               dynamic_irq_init(i);
+> +       }
 > +
->  	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
->  		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
+>  #ifdef CONFIG_CACHE_L2X0
+>         /* 8-way, 64K/way, evmon/parity/share */
+>         l2x0_of_init(0x00760000, 0xfe000fff);
+> 
+
+This looks wrong, I think what you should do instead is
+to call irq_domain_add_legacy() for each controller you
+register as the first step, and then try to convert the
+controllers to use irq_domain_add_linear() as the second
+step. See also Documentation/IRQ-domain.txt.
+
+	Arnd
