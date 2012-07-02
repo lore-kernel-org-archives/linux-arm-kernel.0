@@ -1,29 +1,17 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Jul 2012 09:59:11 +0100
-Subject: [PATCH 2/2] remoteproc: remove the now-redundant kref
-In-Reply-To: <CAK=WgbZu1hYOd27r259b2v48VFYeOZ4UE5sD2awZDxgBgjAsXw@mail.gmail.com>
-References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
- <1338017791-9442-2-git-send-email-ohad@wizery.com>
- <4FC5DD74.4030202@codeaurora.org>
- <CAK=WgbbwaMAnTGcivC9ZR8K-MtTqHAV3+BgUmk8WjCaayifJxw@mail.gmail.com>
- <4FCD272E.1020300@codeaurora.org>
- <CAK=WgbZu1hYOd27r259b2v48VFYeOZ4UE5sD2awZDxgBgjAsXw@mail.gmail.com>
-Message-ID: <20120702085911.GA16639@n2100.arm.linux.org.uk>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon,  2 Jul 2012 11:02:59 +0200
+Subject: [PATCH v2 0/2] arm: imx/mxs: enable flexcan driver
+Message-ID: <1341219781-26107-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 11:52:27AM +0300, Ohad Ben-Cohen wrote:
-> Simplify the unregister/free interfaces, and make them easier
-> to understand and use, by moving to a symmetric and consistent
-> alloc() -> register() -> unregister() -> free() flow.
+Hello,
 
-The naming in the driver model is:
+as the flexcan driver has DT binding for some time now. This patch makes
+the flexcan driver available in the can drivers menu if a SOC with flexcan
+is enabled.
 
-alloc() -> add() -> del() -> put()
+Changes since v2:
+- improve commit message as requested by Shawn
 
-where alloc() is an allocation + initialization, and
-
-register() -> unregister()
-
-where register() is initialization + add() and
-unregister() is del() + put().
+regards, Marc
