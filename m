@@ -1,48 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 02 Jul 2012 10:57:21 +0100
-Subject: [PATCH 03/15] mfd: Make MFD core code Device Tree and IRQ domain
- aware
-In-Reply-To: <20120629184927.GX22806@sortiz-mobl>
-References: <1340197011-5435-1-git-send-email-lee.jones@linaro.org>
- <1340197011-5435-4-git-send-email-lee.jones@linaro.org>
- <20120629145503.GF22806@sortiz-mobl> <4FEDC141.8090000@linaro.org>
- <20120629184927.GX22806@sortiz-mobl>
-Message-ID: <4FF17081.9000005@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Jul 2012 11:03:25 +0100
+Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
+In-Reply-To: <4FF1685A.9070506@marvell.com>
+References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
+ <201206281121.56769.arnd@arndb.de> <4FED196D.6090500@marvell.com>
+ <201206291358.28788.arnd@arndb.de> <4FF152D3.9040706@marvell.com>
+ <4FF1685A.9070506@marvell.com>
+Message-ID: <20120702100324.GC25093@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sam,
+On Mon, Jul 02, 2012 at 05:22:34PM +0800, Qiao Zhou wrote:
+> On 07/02/2012 03:50 PM, Qiao Zhou wrote:
 
-Something like this what you were after?
+> >Here I have a question about the implementation specifically with
+> >88pm800. this chip has 3 register pages, and 3 i2c address corresponding
+> >to each page. so it requires an additional parameter to point out the
+> >page(i2c) to be accessed. currently I didn't think of a good API to
+> >export for such purpose. seems to me, the 88pm800 chip is already bound
+> >to i2c interface, and using regmap directly is a better solution. could
+> >you give some suggestions?
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Mon, 2 Jul 2012 10:50:19 +0100
-Subject: [PATCH] MFD: Attaching a node to new 'struct mfd_cell' of_compatible
- variable
+> is it OK to export another two groups of r/w interface for gpadc and
+> power page separately in 88pm800? such as pm800_gpadc_read_reg() /
+> pm800_power_read_reg() etc?  Appreciate any comments.
 
-Applying a succinct description to the of_compatible variable recently
-added to the mfd_cell struct. Also link to the documentation page where
-more information can be found about compatible properties.
-
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- include/linux/mfd/core.h |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/include/linux/mfd/core.h b/include/linux/mfd/core.h
-index 99b7eb1..3a8435a 100644
---- a/include/linux/mfd/core.h
-+++ b/include/linux/mfd/core.h
-@@ -36,6 +36,10 @@ struct mfd_cell {
- 	/* platform data passed to the sub devices drivers */
- 	void			*platform_data;
- 	size_t			pdata_size;
-+	/*
-+	 * Device Tree compatible string
-+	 * See: Documentation/devicetree/usage-model.txt Chapter 2.2 for details
-+	 */
- 	const char		*of_compatible;
- 
- 	/*
--- 
-1.7.9.5
+What do you mean by pages?  regmap has paging support which just maps
+everything into a single flat register map from the point of view of
+callers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/6fd60484/attachment.sig>
