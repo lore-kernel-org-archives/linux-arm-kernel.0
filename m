@@ -1,34 +1,31 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 2 Jul 2012 18:19:18 +0300
-Subject: [PATCH] remoteproc: block premature rproc booting
-In-Reply-To: <81C3A93C17462B4BBD7E272753C10579232F86BE4C@EXDCVYMBSTM005.EQ1STM.local>
-References: <1337687472-23009-1-git-send-email-ohad@wizery.com>
- <4FBDFC4A.1060602@codeaurora.org>
- <CAK=WgbaP5qSso_Eu=Oup4eqLDcorZ-qf=mysMKiEvOS=m7yLmg@mail.gmail.com>
- <4FCD276A.80505@codeaurora.org>
- <CAK=WgbZo-8GXY9bVYGk0XZvqKrdaJZWeNkK1FhRWnH5doGYLjA@mail.gmail.com>
- <CAK=WgbZb367zq0QCUuwFU+KtBY0gw_+rsN9fm2YnM-heT+54jA@mail.gmail.com>
- <81C3A93C17462B4BBD7E272753C10579232F86BE4C@EXDCVYMBSTM005.EQ1STM.local>
-Message-ID: <CAK=WgbYG8kuzYUi54Kh4udsrOiX_f1E=1XW+TpeYhoyPtXwq-w@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 02 Jul 2012 16:23:34 +0100
+Subject: [PATCH 02/14] rtc: Ensure correct probing of the AB8500 RTC when
+ Device Tree is enabled
+In-Reply-To: <1339428307-3850-3-git-send-email-lee.jones@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <4FF1BCF6.1090608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2012 at 6:15 PM, Sjur BRENDELAND
-<sjur.brandeland@stericsson.com> wrote:
->> Sjur, Ludovic, Loic - what remoteproc API are you using today?
->>
->> We'd like to get rid of the existing get/put interface and instead
->> have everyone use the boot/shutdown one, just like rpmsg is doing
->> today.
->>
->> Are you ok with this change?
+On 11/06/12 16:24, Lee Jones wrote:
+> Without this patch, if Device Tree is enabled the AB8500 RTC wouldn't
+> get probed at all, as there is no reference to it from platform code.
+> This patch ensures the driver is probed during normal DT start-up.
 >
-> Yes, I'm ok with this,
-> but I cannot answer for Loic and Ludovic.
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: rtc-linux at googlegroups.com
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/rtc/rtc-ab8500.c |    8 +++++++-
+>   1 file changed, 7 insertions(+), 1 deletion(-)
 
-Thanks, Sjur.
+Please don't take this patch now, it was been superseded.
 
-I think Ludovic and Loic should be ok with this because their use
-cases are very much like OMAP's (mostly rpmsg drivers).
-
-Ohad.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
