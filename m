@@ -1,75 +1,85 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 2 Jul 2012 11:50:38 -0500
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <20120702095539.GD22239@mudshark.cambridge.arm.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
- <20120608094708.GC19062@mudshark.cambridge.arm.com> <4FD21930.4000800@ti.com>
- <20120611173930.GD28235@mudshark.cambridge.arm.com> <4FD64083.3020800@ti.com>
- <20120612092842.GA2991@mudshark.cambridge.arm.com> <4FD7B1DC.30108@ti.com>
- <20120612213150.GC24380@mudshark.cambridge.arm.com> <4FD7C597.7060501@ti.com>
- <20120702095539.GD22239@mudshark.cambridge.arm.com>
-Message-ID: <4FF1D15E.7040301@ti.com>
+Date: Mon, 2 Jul 2012 12:25:20 -0500
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <20120702063651.GO4202@atomide.com>
+References: <cover.1340778002.git.afzal@ti.com>
+ <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+ <20120627145844.GL3483@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+ <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
+ <20120702063651.GO4202@atomide.com>
+Message-ID: <4FF1D980.4040100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
 
-On 07/02/2012 04:55 AM, Will Deacon wrote:
-> Hi Jon,
-> 
-> Did you have any luck getting to the bottom of this?
-
-I am still waiting for feedback from design. They were trying to confirm
-my observations. Unfortunately, it is taking some time. I will ping them
-again.
-
-> It would be good to take your PMU suspend/resume patches once we know that
-> they will get used.
-
-Yes that would be good. I could drop the 4460 specific changes for now
-and make 4460 work in the same way as 4430 (using CTI) for the time
-being and see if we can get these in. However, I recall that was not
-working for you, but it was working fine for me.
-
-> On Tue, Jun 12, 2012 at 11:41:27PM +0100, Jon Hunter wrote:
->> On 06/12/2012 04:31 PM, Will Deacon wrote:
->>> That's understandable -- one of the CPUs is likely more loaded than the
->>> other. However, I'd like to confirm whether or not you see what I see. With
->>> the 4430_init hack on a 4460, if I run:
->>>
->>> # taskset 0x2 perf top
->>>
->>> then I get no samples. If I do:
->>>
->>> # taskset 0x1 perf top
->>>
->>> then I *do* get samples and from *both* CPUs. So it smells more like an
->>> issue poking some configuration registers from CPU1 rather than the IRQ
->>> path being broken. As I said before, if I don't do the extra init hack
->>> then I don't get this problem (but event counters don't tick).
+On 07/02/2012 01:36 AM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [120628 09:48]:
 >>
->> In both cases, I see interrupts on both CPUs. However, typically more on
->> the CPU that perf is running on (which is probably to be expected). And
->> I confirm that the only change I made was ...
-> 
-> [...]
-> 
->> When you boot the kernel what 4460 rev does it show (very early in the
->> kernel boot log)? Mine shows ...
+>> [    2.792510] OneNAND driver initializing
+>> [    2.797576] omap2-onenand omap2-onenand: initializing on CS2, phys base 0x20000000, virtual base c88c0000, freq 0 MHz
+>> [    2.808929] OneNAND Manufacturer: Samsung (0xec)
+>> [    2.808990] Muxed OneNAND 256MB 1.8V 16-bit (0x40)
+>> [    2.814208] OneNAND version = 0x002c
 >>
->> [    0.000000] OMAP4460 ES1.1
+>> The above change seems to imply that Tony's n900 is dependent on the bootloader settings
+>> and not those being set by the kernel. Ideally, we should not need to set the async mode
+>> in the onenand before we set the onenand timings in the gpmc (per Afzal's changelog
+>> comment). This appears backwards.
 > 
-> Snap: [    0.000000] OMAP4460 ES1.1
+> That should not be the case, I'm more likely to believe in Afzal's explanation.
 
-Ok.
+Right I agree with Afzal's explanation now too.
 
->> However, the A9 version has not changed between ES1.0 and ES1.1. Both
->> should be r2p10.
+>> The other thing to note is that the 3430sdp has samsung onenand where as the n900 has
+>> Numonyx. The gpmc-onenand.c only has one set of settings that it is using for all
+>> devices. However, it would appear that at least the async settings are not working for
+>> the Numonyx. Therefore, may be we need to get a dump of Tony's n900 settings and make
+>> sure the right settings are being used for the appropriate board. 
 > 
-> Yup, that's what /proc/cpuinfo says.
+> Hmm I would assume the n900 onenand settings are the most tested settings we have.
+> And AFAIK have also been tested with L3 frequency scaling. So let's assume they're
+> mostly right.
+>  
+>> These onenand settings are really killing us. I don't want us to have to spend alot
+>> of time re-calculating this stuff but the way it has been written to begin with is not
+>> driver friendly. I really wonder if we need to have some sort of callback for the 
+>> onenand timings from the driver. It is ugly, but the alternative is that someone needs
+>> to sit down and re-calculate all the timings again to get them into a driver friendly
+>> format. Furthermore, it seems that onenand is no longer available from the likes of
+>> samsung and numonyx (micron) so it is hard to justify re-calculating everything again.
+>> I am not even sure if we have all the datasheets!
+>>
+>> Let me know your thoughts.
+> 
+> I don't think we should spend much time working on the recalculations. Let's rather
+> use these known working cases as examples. If they don't work, it's likely that
+> adding any new devices won't work either.
+> 
+> For the timings, we should allow specifying either cycles or time values in the
+> data struct. And always just use the cycle value directly if specified, and
+> othewise use the time value. We may be able to limit the registers where we need
+> to allow either cycle or time value depending on the device futher.
+> 
+> In general, I doubt that we can come up with better calculations. The existing
+> code pretty well already follows the device spec timings. And using cycle values
+> for some registers is the right thing to do according to the connected device
+> specs no matter what the frequency is. In those cases converting from time values
+> to cycles does not make sense.
 
-Hmmm ... so that does not explain the observation that you made with 4460.
+Ok agree, but the problem here is how to provide the timings to the
+driver. The onenand code is doing a lot of rounding based upon the gpmc
+clock before it presents the timings (in nano-seconds) to the gpmc
+function to calculate the final timings and program the gpmc
+chip-select. So therefore I think that we have the following options ...
+
+1. The simplest is to continue using a global variable for storing the
+gpmc f-clk handle and have the OneNAND timings calculated prior to
+probing the gpmc driver.
+
+2. Provide some sort of "retime" callback that the gpmc driver can call
+at probe time to calculate the timings.
 
 Cheers
 Jon
