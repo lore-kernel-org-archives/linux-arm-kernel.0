@@ -1,48 +1,435 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 Jul 2012 15:58:50 +0000
-Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
-In-Reply-To: <4FF174AA.3020001@marvell.com>
-References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
- <20120702101228.GD25093@opensource.wolfsonmicro.com>
- <4FF174AA.3020001@marvell.com>
-Message-ID: <201207021558.51246.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Jul 2012 00:09:15 +0800
+Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
+Message-ID: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Qiao Zhou wrote:
-> On 07/02/2012 06:12 PM, Mark Brown wrote:
-> > On Mon, Jul 02, 2012 at 06:09:57PM +0800, Qiao Zhou wrote:
-> >> On 07/02/2012 06:03 PM, Mark Brown wrote:
-> >
-> >>> What do you mean by pages?  regmap has paging support which just maps
-> >>> everything into a single flat register map from the point of view of
-> >>> callers.
-> >
-> >> Mark, let me explain: the 88pm800 chip has three i2c address
-> >> internally, which we called different page instead. it confuses you
-> >> with the register page_read/write operation. there are registers in
-> >> each i2c address domain, and we need to use different i2c client to
-> >> access reg in different domain. such as some common regs are in the
-> >> page of i2c_addr = 0x30, and power related regs are in the page of
-> >> i2c_addr = 0x31, and gpadc related regs are in the page of 0x32.
-> >
-> > These aren't what people normally call pages, those are just separate
-> > I2C devices from a Linux point of view.
-> >
-> Mark, surely I'll pay attention to the terms used. thanks!
-> due to there separate I2C devices, does it make sense to export separate 
-> r/w interface for them? do you have suggestion in such case?
+Add an RTC driver for Freescale Secure Non-Volatile Storage (SNVS)
+Low Power (LP) RTC.
 
-(adding the i2c mailing list to get more insight)
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+---
+ Documentation/devicetree/bindings/rtc/snvs-rtc.txt |   19 +
+ drivers/rtc/Kconfig                                |   10 +
+ drivers/rtc/Makefile                               |    1 +
+ drivers/rtc/rtc-snvs.c                             |  350 ++++++++++++++++++++
+ 4 files changed, 380 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+ create mode 100644 drivers/rtc/rtc-snvs.c
 
-I think in case of device tree based probing, it would be straightforward
-to represent 88pm800 as a single device with three addresses in the "reg"
-property, while the natural linux representation would be one regular
-i2c_client device with two dummies. Do we or should we have any
-infrastructure to deal with this?
-
-If this is a common scenario, we could probably let regmap handle it
-entirely internally and represent the i2c client with its dummies
-as a single regmap.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/rtc/snvs-rtc.txt b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+new file mode 100644
+index 0000000..18e7c5c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+@@ -0,0 +1,19 @@
++* Freescale Secure Non-Volatile Storage (SNVS) RTC
++
++Required properties:
++- compatible: Should be "fsl,sec-v4.0-mon"
++  See Documentation/devicetree/bindings/crypto/fsl-sec4.txt for details.
++- reg: Physical base address of the controller and length of memory mapped
++  region.
++- interrupts: Two interrupt numbers to the cpu should be specified. First
++  interrupt number is the consolidated interrupt in non TrustZone. The second
++  interrupt number is the security interrupt in TrustZone. The number of cells
++  representing a interrupt depends on the parent interrupt controller.
++
++Example:
++
++snvs at 020cc000 {
++	compatible = "fsl,sec-v4.0-mon";
++	reg = <0x020cc000 0x4000>;
++	interrupts = <0 19 0x04 0 20 0x04>;
++};
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 08cbdb9..511ddcb 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1087,4 +1087,14 @@ config RTC_DRV_MXC
+ 	   This driver can also be built as a module, if so, the module
+ 	   will be called "rtc-mxc".
+ 
++config RTC_DRV_SNVS
++	tristate "Freescale SNVS RTC support"
++	depends on ARCH_MXC
++	help
++	   If you say yes here you get support for the Freescale SNVS
++	   Low Power (LP) RTC module.
++
++	   This driver can also be built as a module, if so, the module
++	   will be called "rtc-snvs".
++
+ endif # RTC_CLASS
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index 2973921..0e3ff92 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -95,6 +95,7 @@ obj-$(CONFIG_RTC_DRV_S35390A)	+= rtc-s35390a.o
+ obj-$(CONFIG_RTC_DRV_S3C)	+= rtc-s3c.o
+ obj-$(CONFIG_RTC_DRV_SA1100)	+= rtc-sa1100.o
+ obj-$(CONFIG_RTC_DRV_SH)	+= rtc-sh.o
++obj-$(CONFIG_RTC_DRV_SNVS)	+= rtc-snvs.o
+ obj-$(CONFIG_RTC_DRV_SPEAR)	+= rtc-spear.o
+ obj-$(CONFIG_RTC_DRV_STARFIRE)	+= rtc-starfire.o
+ obj-$(CONFIG_RTC_DRV_STK17TA8)	+= rtc-stk17ta8.o
+diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+new file mode 100644
+index 0000000..761c91f
+--- /dev/null
++++ b/drivers/rtc/rtc-snvs.c
+@@ -0,0 +1,350 @@
++/*
++ * Copyright (C) 2011-2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
++
++#define SNVS_LPCR		0x38
++#define SNVS_LPSR		0x4c
++#define SNVS_LPSRTCMR		0x50
++#define SNVS_LPSRTCLR		0x54
++#define SNVS_LPTAR		0x58
++#define SNVS_LPPGDR		0x64
++
++#define SNVS_LPCR_SRTC_ENV	(1 << 0)
++#define SNVS_LPCR_LPTA_EN	(1 << 1)
++#define SNVS_LPCR_LPWUI_EN	(1 << 3)
++#define SNVS_LPSR_LPTA		(1 << 0)
++
++#define SNVS_LPPGDR_INIT	0x41736166
++#define CNTR_TO_SECS_SH		15
++
++struct snvs_rtc_data {
++	struct rtc_device *rtc;
++	void __iomem *ioaddr;
++	int irq;
++	spinlock_t lock;
++};
++
++static u32 rtc_read_lp_counter(void __iomem *ioaddr)
++{
++	u64 read1, read2;
++
++	do {
++		read1 = readl(ioaddr + SNVS_LPSRTCMR);
++		read1 <<= 32;
++		read1 |= readl(ioaddr + SNVS_LPSRTCLR);
++
++		read2 = readl(ioaddr + SNVS_LPSRTCMR);
++		read2 <<= 32;
++		read2 |= readl(ioaddr + SNVS_LPSRTCLR);
++	} while (read1 != read2);
++
++	/* Convert 47-bit counter to 32-bit raw second count */
++	return (u32) (read1 >> CNTR_TO_SECS_SH);
++}
++
++static void rtc_write_sync_lp(void __iomem *ioaddr)
++{
++	u32 count1, count2, count3;
++	int i;
++
++	/* Wait for 3 CKIL cycles */
++	for (i = 0; i < 3; i++) {
++		do {
++			count1 = readl(ioaddr + SNVS_LPSRTCLR);
++			count2 = readl(ioaddr + SNVS_LPSRTCLR);
++		} while (count1 != count2);
++
++		/* Now wait until counter value changes */
++		do {
++			do {
++				count2 = readl(ioaddr + SNVS_LPSRTCLR);
++				count3 = readl(ioaddr + SNVS_LPSRTCLR);
++			} while (count2 != count3);
++		} while (count3 == count1);
++	}
++}
++
++static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
++{
++	unsigned long timeout = jiffies + msecs_to_jiffies(1);
++	unsigned long flags;
++	u32 lpcr;
++
++	spin_lock_irqsave(&data->lock, flags);
++
++	lpcr = readl(data->ioaddr + SNVS_LPCR);
++	if (enable)
++		lpcr |= SNVS_LPCR_SRTC_ENV;
++	else
++		lpcr &= ~SNVS_LPCR_SRTC_ENV;
++	writel(lpcr, data->ioaddr + SNVS_LPCR);
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	while (1) {
++		lpcr = readl(data->ioaddr + SNVS_LPCR);
++
++		if (enable) {
++			if (lpcr & SNVS_LPCR_SRTC_ENV)
++				break;
++		} else {
++			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
++				break;
++		}
++
++		if (time_after(jiffies, timeout))
++			return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
++static int snvs_rtc_read_time(struct device *dev, struct rtc_time *tm)
++{
++	struct snvs_rtc_data *data = dev_get_drvdata(dev);
++	unsigned long time = rtc_read_lp_counter(data->ioaddr);
++
++	rtc_time_to_tm(time, tm);
++
++	return 0;
++}
++
++static int snvs_rtc_set_time(struct device *dev, struct rtc_time *tm)
++{
++	struct snvs_rtc_data *data = dev_get_drvdata(dev);
++	unsigned long time;
++
++	rtc_tm_to_time(tm, &time);
++
++	/* Disable RTC first */
++	snvs_rtc_enable(data, false);
++
++	/* Write 32-bit time to 47-bit timer, leaving 15 LSBs blank */
++	writel(time << CNTR_TO_SECS_SH, data->ioaddr + SNVS_LPSRTCLR);
++	writel(time >> (32 - CNTR_TO_SECS_SH), data->ioaddr + SNVS_LPSRTCMR);
++
++	/* Enable RTC again */
++	snvs_rtc_enable(data, true);
++
++	return 0;
++}
++
++static int snvs_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct snvs_rtc_data *data = dev_get_drvdata(dev);
++	u32 lptar, lpsr;
++
++	lptar = readl(data->ioaddr + SNVS_LPTAR);
++	rtc_time_to_tm(lptar, &alrm->time);
++
++	lpsr = readl(data->ioaddr + SNVS_LPSR);
++	alrm->pending = (lpsr & SNVS_LPSR_LPTA) ? 1 : 0;
++
++	return 0;
++}
++
++static int snvs_rtc_alarm_irq_enable(struct device *dev, unsigned int enable)
++{
++	struct snvs_rtc_data *data = dev_get_drvdata(dev);
++	u32 lpcr;
++	unsigned long flags;
++
++	spin_lock_irqsave(&data->lock, flags);
++
++	lpcr = readl(data->ioaddr + SNVS_LPCR);
++	if (enable)
++		lpcr |= (SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN);
++	else
++		lpcr &= ~(SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN);
++	writel(lpcr, data->ioaddr + SNVS_LPCR);
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	rtc_write_sync_lp(data->ioaddr);
++
++	return 0;
++}
++
++static int snvs_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct snvs_rtc_data *data = dev_get_drvdata(dev);
++	struct rtc_time *alrm_tm = &alrm->time;
++	unsigned long time;
++	unsigned long flags;
++	u32 lpcr;
++
++	rtc_tm_to_time(alrm_tm, &time);
++
++	spin_lock_irqsave(&data->lock, flags);
++
++	/* Have to clear LPTA_EN before programming new alarm time in LPTAR */
++	lpcr = readl(data->ioaddr + SNVS_LPCR);
++	lpcr &= ~SNVS_LPCR_LPTA_EN;
++	writel(lpcr, data->ioaddr + SNVS_LPCR);
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	writel(time, data->ioaddr + SNVS_LPTAR);
++
++	/* Clear alarm interrupt status bit */
++	writel(SNVS_LPSR_LPTA, data->ioaddr + SNVS_LPSR);
++
++	return snvs_rtc_alarm_irq_enable(dev, alrm->enabled);
++}
++
++static struct rtc_class_ops snvs_rtc_ops = {
++	.read_time = snvs_rtc_read_time,
++	.set_time = snvs_rtc_set_time,
++	.read_alarm = snvs_rtc_read_alarm,
++	.set_alarm = snvs_rtc_set_alarm,
++	.alarm_irq_enable = snvs_rtc_alarm_irq_enable,
++};
++
++static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
++{
++	struct device *dev = dev_id;
++	struct snvs_rtc_data *data = dev_get_drvdata(dev);
++	u32 lpsr;
++	u32 events = 0;
++
++	lpsr = readl(data->ioaddr + SNVS_LPSR);
++
++	if (lpsr & SNVS_LPSR_LPTA) {
++		events |= (RTC_AF | RTC_IRQF);
++
++		/* RTC alarm should be one-shot */
++		snvs_rtc_alarm_irq_enable(dev, 0);
++
++		rtc_update_irq(data->rtc, 1, events);
++	}
++
++	/* clear interrupt status */
++	writel(lpsr, data->ioaddr + SNVS_LPSR);
++
++	return events ? IRQ_HANDLED : IRQ_NONE;
++}
++
++static int __devinit snvs_rtc_probe(struct platform_device *pdev)
++{
++	struct snvs_rtc_data *data;
++	struct resource *res;
++	int ret;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	data->ioaddr = devm_request_and_ioremap(&pdev->dev, res);
++	if (!data->ioaddr)
++		return -EADDRNOTAVAIL;
++
++	data->irq = platform_get_irq(pdev, 0);
++
++	platform_set_drvdata(pdev, data);
++
++	spin_lock_init(&data->lock);
++
++	/* Initialize glitch detect */
++	writel(SNVS_LPPGDR_INIT, data->ioaddr + SNVS_LPPGDR);
++
++	/* Clear interrupt status */
++	writel(0xffffffff, data->ioaddr + SNVS_LPSR);
++
++	/* Enable RTC */
++	snvs_rtc_enable(data, true);
++
++	device_init_wakeup(&pdev->dev, true);
++
++	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
++			       0, "rtc alarm", &pdev->dev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
++			data->irq, ret);
++		return ret;
++	}
++
++	data->rtc = rtc_device_register(pdev->name, &pdev->dev,
++					&snvs_rtc_ops, THIS_MODULE);
++	if (IS_ERR(data->rtc)) {
++		ret = PTR_ERR(data->rtc);
++		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int __devexit snvs_rtc_remove(struct platform_device *pdev)
++{
++	struct snvs_rtc_data *data = platform_get_drvdata(pdev);
++
++	rtc_device_unregister(data->rtc);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int snvs_rtc_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct snvs_rtc_data *data = platform_get_drvdata(pdev);
++
++	if (device_may_wakeup(&pdev->dev))
++		enable_irq_wake(data->irq);
++
++	return 0;
++}
++
++static int snvs_rtc_resume(struct platform_device *pdev)
++{
++	struct snvs_rtc_data *data = platform_get_drvdata(pdev);
++
++	if (device_may_wakeup(&pdev->dev))
++		disable_irq_wake(data->irq);
++
++	return 0;
++}
++#else
++#define snvs_rtc_suspend NULL
++#define snvs_rtc_resume NULL
++#endif
++
++static const struct of_device_id __devinitdata snvs_dt_ids[] = {
++	{ .compatible = "fsl,sec-v4.0-mon" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, snvs_dt_ids);
++
++static struct platform_driver snvs_rtc_driver = {
++	.driver = {
++		.name	= "snvs_rtc",
++		.owner	= THIS_MODULE,
++		.of_match_table = snvs_dt_ids,
++	},
++	.probe		= snvs_rtc_probe,
++	.remove		= __devexit_p(snvs_rtc_remove),
++	.suspend	= snvs_rtc_suspend,
++	.resume		= snvs_rtc_resume,
++};
++module_platform_driver(snvs_rtc_driver);
++
++MODULE_AUTHOR("Freescale Semiconductor, Inc.");
++MODULE_DESCRIPTION("Freescale SNVS RTC Driver");
++MODULE_LICENSE("GPL");
+-- 
+1.7.5.4
