@@ -1,41 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 02 Jul 2012 13:38:04 -0600
-Subject: Conflicts between Tegra PWM tree and common clock patches
-In-Reply-To: <20120702192454.GA1299@avionic-0098.mockup.avionic-design.de>
-References: <4FF1DBC8.2000406@wwwdotorg.org>
- <20120702192454.GA1299@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4FF1F89C.20907@wwwdotorg.org>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Mon, 02 Jul 2012 12:41:59 -0700
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <20120702183324.GA29030@opensource.wolfsonmicro.com>
+References: <4FECB95D.7010200@zytor.com> <20120701104401.GA4352@mail.gnudd.com>
+ <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+ <201207021658.27755.arnd@arndb.de> <20120702180518.GA25995@sirena.org.uk>
+ <4FF1E37D.7050103@zytor.com>
+ <20120702183324.GA29030@opensource.wolfsonmicro.com>
+Message-ID: <4FF1F987.3030501@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2012 01:24 PM, Thierry Reding wrote:
-> On Mon, Jul 02, 2012 at 11:35:04AM -0600, Stephen Warren wrote:
->> Thierry,
->> 
->> The following commits in your PWM tree conflict with some Tegra
->> clock driver re-structuring that's part of the common clock
->> conversion on Tegra.
->> 
->> df6da47 ARM: tegra: Provide clock for only one PWM controller 
->> 65e7385 ARM: tegra: Fix PWM clock programming
->> 
->> To alleviate this, could we either:
->> 
->> a) Remove those two commits from your tree and into the Tegra
->> tree. I think this won't cause any runtime issues, since Tegra
->> PWM is a feature we aren't using yet, so it's OK if the branch
->> it's made to work in is not the PWM branch.
->> 
->> b) If your branch is stable, I can merge it into the Tegra tree
->> in order to resolve the conflicts there. However, for this to
->> work, you need to 100% guarantee that the branch won't be rebased
->> between now and when you send Linus a pull request for 3.6.
+On 07/02/2012 11:33 AM, Mark Brown wrote:
 > 
-> I'd very much prefer a). Both patches touch only Tegra code anyway
-> so there's no harm to take them through the Tegra tree. Both
-> patches are also not dependent on the PWM framework in any way.
+>> Last I saw I saw a patch to that effect, asked what the benefit
+>> was, and got no answer.
+> 
+> Are you positive about that?  I don't recall you replying any of
+> the times I sent out the patch and my mail archive isn't
+> contradicting me either.
+> 
 
-OK, I'll pick the patches into the Tegra tree as soon as fetching your
-repo shows they aren't there.
+I said last time I saw a patch to that effect; it might not have been
+from you.  I might not have seen yours for whatever reason (including
+losing it on my end.)
 
-Thanks!
+	-hpa
