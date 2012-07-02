@@ -1,38 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Jul 2012 04:07:31 -0600 (MDT)
-Subject: Current state of AM33xx patches
-In-Reply-To: <4FEEC7F2.8070507@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
-Message-ID: <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+From: bob.beckett@gmail.com (Robert Beckett)
+Date: Mon, 2 Jul 2012 14:48:13 +0100
+Subject: arm_vmregion_alloc call
+In-Reply-To: <CAOmFF13Cif=K62oHR3QEg-ni0X0EopxtOXM7LGkF9FJd2WCZKg@mail.gmail.com>
+References: <CAOmFF13Cif=K62oHR3QEg-ni0X0EopxtOXM7LGkF9FJd2WCZKg@mail.gmail.com>
+Message-ID: <CAOmFF133BYMg3kLrM=D4R1Q=fxU-8qe6SMdFErwwQ3DWF33cxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 30 Jun 2012, Daniel Mack wrote:
+Hello all,
 
-> Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
-> the components I need.
+I just debugged a problem with a USB driver where it was calling
+dma_alloc_coherent with a GFP_DMA32 flag.
+It turned out that in __dma_alloc_remap, it clears the GFP_DMA and
+GFP_HIGHMEM flags when calling arm_vmregion_alloc so that it does not clash
+with the slab allocator flag requirements, but it does not clear GFP_DMA32.
+The GFP_SLAB_BUG_MASK includes GFP_DMA32, so this looks like a bug to me.
+Should it be clearing GFP_DMA32 as well as GFP_DMA and GFP_HIGHMEM ?
 
-Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod data 
-for the AM33xx.  There might be some missing integration code to build the 
-devices for the newer IP blocks, though.
+I checked in the latest kernel.org code, and the issue is still there.
 
-> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
+Is this a bug, or should it just be calling with GFP_DMA instead of
+GFP_DMA32?
 
-Mainline has:
+For now, I am working around it by using GFP_DMA in the dma_alloc_coherent
+call as we have no GFP_DMA lower limit, so GFP_DMA and GFP_DMA32 are the
+same on my architecture.
 
-drivers/net/ethernet/ti/davinci_emac.c
-drivers/net/ethernet/ti/davinci_mdio.c
+Any advice appreciated,
 
-Those might work for you.
+Thanks
 
-
-- Paul
+Bob
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/2b683745/attachment-0001.html>
