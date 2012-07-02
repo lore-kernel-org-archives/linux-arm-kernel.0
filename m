@@ -1,65 +1,88 @@
 From: jason77.wang@gmail.com (Hui Wang)
-Date: Mon, 2 Jul 2012 10:55:55 +0800
-Subject: [PATCH v2 2/2] net: flexcan: add transceiver switch gpios support
-In-Reply-To: <20460.19712.158996.397146@ipc1.ka-ro>
-References: <1340853701-4488-1-git-send-email-shawn.guo@linaro.org>	<1340853701-4488-3-git-send-email-shawn.guo@linaro.org>	<4FEC329C.7070004@pengutronix.de>	<20120628112111.GC22990@S2101-09.ap.freescale.net>	<4FEC400F.8010506@pengutronix.de>	<20120628114108.GD22990@S2101-09.ap.freescale.net>	<20460.18717.17688.965250@ipc1.ka-ro>	<20120628121302.GI22990@S2101-09.ap.freescale.net>
- <20460.19712.158996.397146@ipc1.ka-ro>
-Message-ID: <4FF10DBB.1020106@gmail.com>
+Date: Mon, 2 Jul 2012 13:39:05 +0800
+Subject: [PATCH v3 3/3] mtd: gpmi: change the code for clocks
+In-Reply-To: <1341200327-8144-4-git-send-email-shijie8@gmail.com>
+References: <1341200327-8144-1-git-send-email-shijie8@gmail.com>
+ <1341200327-8144-4-git-send-email-shijie8@gmail.com>
+Message-ID: <4FF133F9.50704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lothar Wa?mann wrote:
-> Hi,
+Huang Shijie wrote:
+> The gpmi nand driver may needs several clocks(MX6Q needs five clocks).
 >
-> Shawn Guo writes:
->   
->> On Thu, Jun 28, 2012 at 02:07:57PM +0200, Lothar Wa?mann wrote:
->>     
->>> Hi,
->>>
->>> Shawn Guo writes:
->>>       
->>>> On Thu, Jun 28, 2012 at 01:29:19PM +0200, Marc Kleine-Budde wrote:
->>>>         
->>>>> I mean which name is more precise, do these gpio enable/standy a "phy"
->>>>> or a "transceiver". For example:
->>>>> http://www.nxp.com/documents/application_note/AN00094.pdf, this document
->>>>> says: TJA1041/1041A high speed CAN transceiver.
->>>>>
->>>>>           
->>>> Isn't term "phy" (physical interface) generally meant to be the same
->>>> thing as "transceiver"?  I just happened to like the shorter one as
->>>> what Hui did in his patch.
->>>>
->>>> But it does not really matter to me, will change the name since you
->>>> care about it.
->>>>
->>>>         
->>> A transceiver is just a dumb piece of hardware, while a PHY contains
->>> some intelligence of its own.
->>>
->>>       
->> Then, it sounds more like a PHY than transceiver, since it's an IC
->> chip with some control over it.
->>
->>     
-> The 'I' in 'IC' does not stand for 'intelligent', but for
-> 'integrated'. ;)
-> A can transceiver is usually merely a switchable buffer. There are no
-> registers to configure it or an internal processor that does some
-> magic.
+> In the old clock framework, all these clocks are chained together,
+> all you need is to manipulate the first clock.
 >
+> But the kernel uses the common clk framework now, which forces us to
+> get the clocks one by one. When we use them, we have to enable them
+> one by one too.
+>
+> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx6q-arm2.dts       |    2 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   43 ++++++++++++++---
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   82 ++++++++++++++++++++++++++++----
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    3 +-
+>  4 files changed, 111 insertions(+), 19 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+> index 14e72e2..027a2f8 100644
+> --- a/arch/arm/boot/dts/imx6q-arm2.dts
+> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
+> @@ -25,7 +25,7 @@
+>  		gpmi-nand at 00112000 {
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&pinctrl_gpmi_nand_1>;
+> -			status = "disabled"; /* gpmi nand conflicts with SD */
+> +			status = "okay"; /* gpmi nand conflicts with SD */
+>  		};
+>  
+>  		aips-bus at 02100000 { /* AIPS2 */
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> index a1f4332..c3778c0 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> @@ -124,12 +124,40 @@ error:
+>  	return -ETIMEDOUT;
+>  }
+>  
+> +static int __gpmi_enable_clk(struct gpmi_nand_data *this, bool v)
+> +{
+> +	struct clk *clk;
+> +	int ret;
+> +	int i;
+> +
+> +	for (i = 0; i < GPMI_CLK_MAX; i++) {
+> +		clk = this->resources.clock[i];
+> +		if (!clk)
+> +			break;
+> +
+> +		if (v) {
+> +			ret = clk_prepare_enable(clk);
+> +			if (ret)
+> +				goto err_clk;
+> +		} else {
+> +			clk_disable_unprepare(clk);
+> +		}
+> +	}
+> +	return 0;
+> +
+> +err_clk:
 >   
-Sorry for reply late, in my first patch, i chose "phy" instead of "xcvr" 
-because the MC33902 datasheet tell me it is a "high speed CAN physical 
-interface", and it includes "an internal 5.0 V supply for the CAN bus 
-transceiver".
+Doesn't this design introduce clk_enalbe/disable un-balance problems?
 
-And from the diagram in the page 1 of the MC33902 datasheet, the MC33902 
-includes bus xcvr, i/o control logic, power supply and external 
-regulator control logic. As a result i decided to use phy in the driver.
+Suppose you successfully enabled 1st and 2nd clocks, and failed at the 
+third clock, this function will return, then the caller function will 
+check the return value and call
+
+__gpmi_enable_clk(this, 0), in this function, it will unconditionally disable all five clocks.
+
 
 Regards,
 Hui.
-> Lothar Wa?mann
+
+> +	return ret;
+> +}
+> +
 >   
