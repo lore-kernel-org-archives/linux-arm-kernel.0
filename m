@@ -1,24 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 Jul 2012 20:58:34 +0000
-Subject: [GIT PULL] at91: first batch of cleanup for 3.6
-In-Reply-To: <4FF19B6D.3010704@atmel.com>
-References: <4FF19B6D.3010704@atmel.com>
-Message-ID: <201207022058.34442.arnd@arndb.de>
+Date: Mon, 2 Jul 2012 21:06:56 +0000
+Subject: [GIT PULL] prima2 GPIO support in pinmux
+In-Reply-To: <CAGsJ_4xcJCdt=wjNt6pcH1uQg+uHcsScDDtQvgNVRtsosPi=kg@mail.gmail.com>
+References: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
+ <CAGsJ_4xcJCdt=wjNt6pcH1uQg+uHcsScDDtQvgNVRtsosPi=kg@mail.gmail.com>
+Message-ID: <201207022106.57244.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Nicolas Ferre wrote:
-> The following changes since commit
-> 6887a4131da3adaab011613776d865f4bcfb5678:
+On Monday 02 July 2012, Barry Song wrote:
 > 
->   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+> Note this has been acked by Linus Walleij, he suggested to go through
+> prima2 arm-soc.
 > 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-for-next-cleanup
 
-Pulled into next/cleanup
+Ok, I've pulled this into a new next/pinctrl branch for now, we'll see if
+there are other pinctrl changes going through arm-soc for 3.6, if not we can
+fold it into the next/drivers branch.
 
-Thanks,
+I've added Linus' Acked-by to the merge changeset.
 
 	Arnd
