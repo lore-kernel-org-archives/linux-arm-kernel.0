@@ -1,27 +1,75 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 2 Jul 2012 09:39:49 -0700
-Subject: [RFC PATCH v2] MTD: nand: add return value for
- write_page()/write_page_raw() functions in structure of nand_ecc_ctrl.
-In-Reply-To: <4FE83A66.9090100@atmel.com>
-References: <1339567570-4816-1-git-send-email-josh.wu@atmel.com>
- <4FE13CB2.3000605@atmel.com>
- <CAN8TOE8iDtzw4eTKa6tJ5oBxbaDUxg9nDLaKBhW4D86vGWxGJg@mail.gmail.com>
- <4FE29CB8.3000404@atmel.com>
- <CAN8TOE9ebFAfJHaG2-po0LeLi=wTq9YZ9pNFXhQE0PLt5TQxeg@mail.gmail.com>
- <4FE83A66.9090100@atmel.com>
-Message-ID: <CAN8TOE8LNQSeFW2G_xmeSxz-PvqLcW_WtJMjt5bLnwsz2pAA4g@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 2 Jul 2012 11:50:38 -0500
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <20120702095539.GD22239@mudshark.cambridge.arm.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
+ <20120608094708.GC19062@mudshark.cambridge.arm.com> <4FD21930.4000800@ti.com>
+ <20120611173930.GD28235@mudshark.cambridge.arm.com> <4FD64083.3020800@ti.com>
+ <20120612092842.GA2991@mudshark.cambridge.arm.com> <4FD7B1DC.30108@ti.com>
+ <20120612213150.GC24380@mudshark.cambridge.arm.com> <4FD7C597.7060501@ti.com>
+ <20120702095539.GD22239@mudshark.cambridge.arm.com>
+Message-ID: <4FF1D15E.7040301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 3:16 AM, Josh Wu <josh.wu@atmel.com> wrote:
-> According to your advice, I resent a new patch series, which merge this
-> patch with PMECC.
+Hi Will,
 
-Thanks, it looks good.
+On 07/02/2012 04:55 AM, Will Deacon wrote:
+> Hi Jon,
+> 
+> Did you have any luck getting to the bottom of this?
 
-BTW, this affects Mike Dunn, who was planning on touching the docg4.c
-portion. Mike: note that the write_page() functions in docg4.c have
-been changed to fix the "error" we were discussing with return codes
-(see l2-mtd-2.6.git).
+I am still waiting for feedback from design. They were trying to confirm
+my observations. Unfortunately, it is taking some time. I will ping them
+again.
 
-Brian
+> It would be good to take your PMU suspend/resume patches once we know that
+> they will get used.
+
+Yes that would be good. I could drop the 4460 specific changes for now
+and make 4460 work in the same way as 4430 (using CTI) for the time
+being and see if we can get these in. However, I recall that was not
+working for you, but it was working fine for me.
+
+> On Tue, Jun 12, 2012 at 11:41:27PM +0100, Jon Hunter wrote:
+>> On 06/12/2012 04:31 PM, Will Deacon wrote:
+>>> That's understandable -- one of the CPUs is likely more loaded than the
+>>> other. However, I'd like to confirm whether or not you see what I see. With
+>>> the 4430_init hack on a 4460, if I run:
+>>>
+>>> # taskset 0x2 perf top
+>>>
+>>> then I get no samples. If I do:
+>>>
+>>> # taskset 0x1 perf top
+>>>
+>>> then I *do* get samples and from *both* CPUs. So it smells more like an
+>>> issue poking some configuration registers from CPU1 rather than the IRQ
+>>> path being broken. As I said before, if I don't do the extra init hack
+>>> then I don't get this problem (but event counters don't tick).
+>>
+>> In both cases, I see interrupts on both CPUs. However, typically more on
+>> the CPU that perf is running on (which is probably to be expected). And
+>> I confirm that the only change I made was ...
+> 
+> [...]
+> 
+>> When you boot the kernel what 4460 rev does it show (very early in the
+>> kernel boot log)? Mine shows ...
+>>
+>> [    0.000000] OMAP4460 ES1.1
+> 
+> Snap: [    0.000000] OMAP4460 ES1.1
+
+Ok.
+
+>> However, the A9 version has not changed between ES1.0 and ES1.1. Both
+>> should be r2p10.
+> 
+> Yup, that's what /proc/cpuinfo says.
+
+Hmmm ... so that does not explain the observation that you made with 4460.
+
+Cheers
+Jon
