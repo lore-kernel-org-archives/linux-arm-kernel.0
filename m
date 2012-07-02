@@ -1,87 +1,45 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 2 Jul 2012 13:26:38 -0500
-Subject: [PATCH] gpio/omap: fix invalid context restore of gpio bank-0
-In-Reply-To: <87mx3i595b.fsf@ti.com>
-References: <1340990551-19426-1-git-send-email-jon-hunter@ti.com>
- <87mx3i595b.fsf@ti.com>
-Message-ID: <4FF1E7DE.10409@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Jul 2012 19:33:24 +0100
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <4FF1E37D.7050103@zytor.com>
+References: <4FECB95D.7010200@zytor.com> <20120701104401.GA4352@mail.gnudd.com>
+ <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+ <201207021658.27755.arnd@arndb.de>
+ <20120702180518.GA25995@sirena.org.uk> <4FF1E37D.7050103@zytor.com>
+Message-ID: <20120702183324.GA29030@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 02, 2012 at 11:07:57AM -0700, H. Peter Anvin wrote:
 
-On 07/02/2012 01:07 PM, Kevin Hilman wrote:
-> + Neil Brown
-> 
-> Hi Jon,
-> 
-> Jon Hunter <jon-hunter@ti.com> writes:
-> 
->> Currently the gpio _runtime_resume/suspend functions are calling the
->> get_context_loss_count() platform function if the function is populated for
->> a gpio bank. This function is used to determine if the gpio bank logic state
->> needs to be restored due to a power transition. This function will be populated
->> for all banks, but it should only be called for banks that have the
->> "loses_context" variable set. It is pointless to call this if loses_context is
->> false as we know the context will never be lost and will not need restoring.
->>
->> For all OMAP2+ devices gpio bank-0 is in an always-on power domain and so will
->> never lose context. We found that the get_context_loss_count() was being called
->> for bank-0 during the probe and returning 1 instead of 0 indicating that the
->> context had been lost. This was causing the context restore function to be
->> called at probe time for this bank and because the context had never been saved,
->> was restoring an invalid state. This ultimately resulted in a crash [1].
->>
->> There are multiple bugs here that need to be addressed ...
->>
->> 1. Why the always-on power domain returns a context loss count of 1? This needs
->>    to be fixed in the power domain code. However, the gpio driver should not
->>    assume the loss count is 0 to begin with.
->> 2. The omap gpio driver should never be calling get_context_loss_count for a
->>    gpio bank in a always-on domain. This is pointless and adds unneccessary
->>    overhead.
->> 3. The OMAP gpio driver assumes that the initial power domain context loss count
->>    will be 0 at the time the gpio driver is probed. However, it could be
->>    possible that this is not the case and an invalid context restore could be
->>    performed during the probe. To avoid this otherwise only populated the
-> 
-> The 'To avoid this...' sentence here doesn't read well.  Looks like you
-> need to:
-> 
-> s/otherwise//
+> If there is a dependency there it should be registered, regardless if
+> x86 enables the clock API.
 
-Yes, I meant to have dropped "otherwise" here. Thanks!
+Not really, what we *should* have is the clock API available (at least
+for build purposes) everywhere.  The current situation where the API is
+randomly available on some architectures makes it unusuable in generic
+code which is nuts and wasting time and effort, you either need ifdefs
+or Kconfig hoop jumping in all the users which isn't at all sane and
+means if you're doing anything generic you still need a backup plan.
 
-> s/populated/populate/
+What should be happening with this is the same as happens with all the
+other similar APIs - the API should stub itself out where it's not
+provided and the default should be that all architectures use the
+generic implementation.  The overwhelming majority of clock API usage is
+just enabling the clock only while the device is running to save power
+when it isn't which is totally amenable to stubbing out on platforms
+that don't support that level of power management.
 
-Yes that too! I must have re-worded and screwed it up royally :-(
+> Last I saw I saw a patch to that effect, asked what the benefit was, and
+> got no answer.
 
-> ?
-> 
->>    get_context_loss_count() function pointer after the initial call to
->>    pm_runtime_get() has occurred. This will ensure that the first
->>    pm_runtime_put() initialised the loss count correctly.
->>
->> This patch addresses issues 2 and 3 above.
->> [1] http://marc.info/?l=linux-omap&m=134065775323775&w=2
->>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Linus Walleij <linus.walleij@stericsson.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->> Cc: Franky Lin <frankyl@broadcom.com>
->>
->> Reported-by: Franky Lin <frankyl@broadcom.com>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> 
-> Thanks for digging inot this bug Jon.  The same bug was brought up by
-> Neil Brown (Cc'd) in a different thread.
-> 
-> Neil, it looks to me that this fix will address the problems you were
-> seeing as well.  Care to test, and respond with your ack/tested-by if it
-> works for you?  Thanks.
-
-Neil let me know your thoughts and if you are ok, I can clean-up the
-changelog and re-send.
-
-Cheers
-Jon
+Are you positive about that?  I don't recall you replying any of the
+times I sent out the patch and my mail archive isn't contradicting me
+either.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/408ce986/attachment.sig>
