@@ -1,37 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  2 Jul 2012 17:39:33 +0200
-Subject: [PATCH 8/9] arm: mach-mvebu: add entry to MAINTAINERS
-In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341243574-3258-9-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 Jul 2012 15:40:25 +0000
+Subject: [BUILD BREAKAGE] versatile, LEDS updates
+In-Reply-To: <20120702083924.GG16319@n2100.arm.linux.org.uk>
+References: <20120629103313.GA16319@n2100.arm.linux.org.uk>
+ <20120629114532.GB16319@n2100.arm.linux.org.uk>
+ <20120702083924.GG16319@n2100.arm.linux.org.uk>
+Message-ID: <201207021540.26382.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Lior Amsalem <alior@marvell.com>
----
- MAINTAINERS |    8 ++++++++
- 1 file changed, 8 insertions(+)
+On Monday 02 July 2012, Russell King - ARM Linux wrote:
+> 
+> Arnd,
+> 
+> You said on IRC that you would drop the LEDS patches until we had a working
+> version, but it still seems to be in arm-soc, and therefore the Versatile
+> build continues to fail.
+> 
+> When will you remove the LEDS patches?
+> 
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index eb22272..050b7fe 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -894,6 +894,14 @@ ARM/MAGICIAN MACHINE SUPPORT
- M:	Philipp Zabel <philipp.zabel@gmail.com>
- S:	Maintained
- 
-+ARM/Marvell Armada 370 and Armada XP SOC support
-+M:	Gregory Clement <gregory.clement@free-electrons.com>
-+M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+M:	Lior Amsalem <alior@marvell.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-mvebu/
-+
- ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
- M:	Jason Cooper <jason@lakedaemon.net>
- M:	Andrew Lunn <andrew@lunn.ch>
--- 
-1.7.9.5
+Sorry for the delay, I've dropped them once more now.
+
+Bryan,
+
+Please fix this situation and address the problems that Russell has pointed
+out multiple times if you want these patches to go into v3.6.
+
+	Arnd
