@@ -1,51 +1,43 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 02 Jul 2012 09:54:08 +0200
-Subject: [PATCH 1/2] arm: imx: enable flexcan on imx25, imx35, imx53, imx6q
-In-Reply-To: <20120702075054.GF2698@pengutronix.de>
-References: <1341175565-13218-1-git-send-email-mkl@pengutronix.de>
- <1341175565-13218-2-git-send-email-mkl@pengutronix.de>
- <20120702075054.GF2698@pengutronix.de>
-Message-ID: <4FF153A0.3030404@pengutronix.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 2 Jul 2012 15:55:28 +0800
+Subject: [GIT PULL] prima2 GPIO support in pinmux
+In-Reply-To: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
+References: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
+Message-ID: <CAGsJ_4xcJCdt=wjNt6pcH1uQg+uHcsScDDtQvgNVRtsosPi=kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2012 09:50 AM, Sascha Hauer wrote:
-> On Sun, Jul 01, 2012 at 10:46:04PM +0200, Marc Kleine-Budde wrote:
->> Cc: Sascha Hauer <sha@pengutronix.de>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->>  arch/arm/mach-imx/Kconfig |    4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> index eff4db5..c296851 100644
->> --- a/arch/arm/mach-imx/Kconfig
->> +++ b/arch/arm/mach-imx/Kconfig
->> @@ -52,6 +52,7 @@ config SOC_IMX25
->>  	select ARCH_MX25
->>  	select COMMON_CLK
->>  	select CPU_ARM926T
->> +	select HAVE_CAN_FLEXCAN if CAN
-> 
-> Do we need the 'if CAN' here? It seems yes, since HAVE_CAN_FLEXCAN is
-> inside the "CAN Device Drivers" menu which depends on CAN. Shouldn't the
-> HAVE_CAN_FLECAN be outside the menu?
+Note this has been acked by Linus Walleij, he suggested to go through
+prima2 arm-soc.
 
-Yes, we can move the HAVE_CAN_FLEXCAN outside of that menu, but it still
-depends on CONFIG_NET.
+-barry
 
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/ae72385b/attachment.sig>
+2012/7/2 Barry Song <21cnbao@gmail.com>:
+> Hi Olof, Arnd,
+>
+> Please pull the following GPIO support in pinmux for 3.6.
+>
+> Regards,
+> Barry
+>
+> The following changes since commit ca24a145573124732152daff105ba68cc9a2b545:
+>
+>   Merge branch 'fixes' of git://git.linaro.org/people/rmk/linux-arm
+> (2012-07-01 11:02:25 -0700)
+>
+> are available in the git repository at:
+>
+>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git prima2/drivers
+>
+> Barry Song (1):
+>       PINCTRL: SiRF: add GPIO and GPIO irq support in CSR SiRFprimaII
+>
+>  arch/arm/Kconfig                         |    1 +
+>  arch/arm/mach-prima2/include/mach/gpio.h |   13 +
+>  arch/arm/mach-prima2/include/mach/irqs.h |    2 +-
+>  drivers/pinctrl/pinctrl-sirf.c           |  489
+> +++++++++++++++++++++++++++++-
+>  4 files changed, 503 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-prima2/include/mach/gpio.h
+>
+>
