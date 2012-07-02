@@ -1,38 +1,39 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 2 Jul 2012 10:04:12 +0000
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <4FEDB889.5010503@ti.com>
-References: <cover.1340778002.git.afzal@ti.com>
- <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
- <20120627145844.GL3483@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
- <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A0D32@DBDE01.ent.ti.com>
- <4FEDB889.5010503@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A1BEC@DBDE01.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 Jul 2012 12:05:06 +0200
+Subject: [PATCH, RFC] i.MX DRM support
+In-Reply-To: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120702100506.GI24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Fri, Jun 29, 2012 at 19:45:37, Hunter, Jon wrote:
-> On 06/29/2012 01:15 AM, Mohammed, Afzal wrote:
-
-> > I have a different opinion, even with the existing code, with the default
-> > timings for onenand, Numonyx is working in async mode, reason being that
-> > frequency is being obtained with read operation executed in async mode
-> > (later based on this frequency, code calculates sync timings & then set
-> > to sync mode)
+On Thu, Jun 14, 2012 at 03:43:22PM +0200, Sascha Hauer wrote:
+> Hi All,
 > 
-> I don't follow "frequency is being obtained with read operation executed
-> in async mode". Can you give a code reference?
+> The following is the state-of-the-art i.MX IPU (Image Processing Unit)
+> DRM support.
+> 
+> This code is around for quite some time now and has been posted several
+> times with different APIs, first with plain old framebuffer support, now
+> DRM, first platform device binding, now devicetree. Unfortunately there's
+> quite much code needed to get something useful out of the IPU, so these
+> patches haven't received a lot of attention from people not involved in
+> i.MX. I think we have now come to a point where this code needs more public
+> exposure and where it's easier to talk in incremental changes instead of
+> blobs. Therefore I request this to go to staging for some cycles.
 
-In the present code, for sync mode, omap2_onenand_set_sync_mode() invokes
-omap2_onenand_set_async_mode() initially, to set onenand & gpmc to async mode,
-then invokes omap2_onenand_get_freq() to get frequency, here finding out
-frequency from onenand is done by reading relevant onenand register
-in async mode.
+Dave, Greg,
 
-Regards
-Afzal
+Comments to this one? I addressed the comments I received so far and am
+about to respin this series. Is it ok to put this to staging? If yes,
+should I move the whole stuff into drivers/staging/ or should it stay
+in drivers/gpu/drm with just a Kconfig dependency on STAGING?
+
+Thanks
+ Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
