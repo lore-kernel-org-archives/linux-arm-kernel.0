@@ -1,43 +1,49 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Mon, 02 Jul 2012 09:04:26 +0100
-Subject: Current state of AM33xx patches
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5FC34@DBDE01.ent.ti.com>
-References: <4FD5BA4C.9070706@gmail.com>	<4FD5FD9E.5040203@ti.com>
- <CADjby3UTVBKWRZUBRNTX9Bh4TqQJsoWQrrBxW6HuqSNZCUcvCw@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7DE@DBDE01.ent.ti.com>
- <4FEDB9BD.7060405@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EA5FC34@DBDE01.ent.ti.com>
-Message-ID: <4FF1560A.9000805@mimc.co.uk>
+From: sha@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 Jul 2012 10:06:41 +0200
+Subject: [PATCH 1/2] arm: imx: enable flexcan on imx25, imx35, imx53, imx6q
+In-Reply-To: <4FF153A0.3030404@pengutronix.de>
+References: <1341175565-13218-1-git-send-email-mkl@pengutronix.de>
+ <1341175565-13218-2-git-send-email-mkl@pengutronix.de>
+ <20120702075054.GF2698@pengutronix.de>
+ <4FF153A0.3030404@pengutronix.de>
+Message-ID: <20120702080641.GG2698@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/12 18:56, Hiremath, Vaibhav wrote:
-> On Fri, Jun 29, 2012 at 19:50:45, Mark Jackson wrote:
->>
->> This does appear to work using the ramdisk, but there seems to be no support for booting off MMC.
->>
+On Mon, Jul 02, 2012 at 09:54:08AM +0200, Marc Kleine-Budde wrote:
+> On 07/02/2012 09:50 AM, Sascha Hauer wrote:
+> > On Sun, Jul 01, 2012 at 10:46:04PM +0200, Marc Kleine-Budde wrote:
+> >> Cc: Sascha Hauer <sha@pengutronix.de>
+> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> >> ---
+> >>  arch/arm/mach-imx/Kconfig |    4 ++++
+> >>  1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> >> index eff4db5..c296851 100644
+> >> --- a/arch/arm/mach-imx/Kconfig
+> >> +++ b/arch/arm/mach-imx/Kconfig
+> >> @@ -52,6 +52,7 @@ config SOC_IMX25
+> >>  	select ARCH_MX25
+> >>  	select COMMON_CLK
+> >>  	select CPU_ARM926T
+> >> +	select HAVE_CAN_FLEXCAN if CAN
+> > 
+> > Do we need the 'if CAN' here? It seems yes, since HAVE_CAN_FLEXCAN is
+> > inside the "CAN Device Drivers" menu which depends on CAN. Shouldn't the
+> > HAVE_CAN_FLECAN be outside the menu?
 > 
-> This is known thing and clearly mentioned/highlighted above.
-> 
-> "Use the ramdisk image to boot kernel, since we do not have support for any 
-> storage devices in the mainline."
+> Yes, we can move the HAVE_CAN_FLEXCAN outside of that menu, but it still
+> depends on CONFIG_NET.
 
-Oops ... missed that, sorry !!
+Ok, then we have no choice. I just asked because it seems unnatural that
+the presence of a hardware device depends on config options.
 
-<snip>
+Sascha
 
->> All in all, the AM335x code does seem to be very fragmented.  Is that just because these are
->> non-trivial changes going in ?
->>
-> 
-> Not really true.
-> 
-> The answer is simple, if you are looking for production quality code then 
-> certainly you should use something based on PSP release (SDK) and if you 
-> want to stay close to Mainline and would like to contribute towards it, you 
-> have to understand the process, dependencies, development and discussions 
-> happening on the list.
 
-Okay.  Thanks for explaining.
-
-Mark
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
