@@ -1,48 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  2 Jul 2012 11:30:34 +0200
-Subject: [PATCH] ARM: imx: assert SCC gate stays enabled
-Message-ID: <1341221434-15233-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 Jul 2012 11:31:54 +0200
+Subject: [PATCH] gpio/mxc: make irqs work for fsl,imx21-gpio devices
+In-Reply-To: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120702093154.GM2698@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCC clock is needed in internal boot mode and so must keep enabled.
-This same issue was fixed for the pre-common-clk code in commit
+[Added Linus to Cc]
 
-	3d6e614 (mx35: Fix boot ROM hang in internal boot mode)
+Has this been applied? Linus, it seems you handle gpio patches now, you
+probably missed it because you haven't been on Cc.
 
-Cc: John Ogness <jogness@linutronix.de>
-Cc: Hans J. Koch <hjk@hansjkoch.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx35.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Sascha
 
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 920a8cc..c6422fb 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -201,7 +201,6 @@ int __init mx35_clocks_init()
- 			pr_err("i.MX35 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
- 
--
- 	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
- 	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
- 	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
-@@ -264,6 +263,14 @@ int __init mx35_clocks_init()
- 	clk_prepare_enable(clk[iim_gate]);
- 	clk_prepare_enable(clk[emi_gate]);
- 
-+	/*
-+	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
-+	 * before conversion to common clk also enabled UART1 (which isn't
-+	 * handled here and not needed for mmc) and IIM (which is enabled
-+	 * unconditionally above).
-+	 */
-+	clk_prepare_enable(clk[scc_gate]);
-+
- 	imx_print_silicon_rev("i.MX35", mx35_revision());
- 
- #ifdef CONFIG_MXC_USE_EPIT
+On Wed, Jun 06, 2012 at 11:49:23AM +0200, Uwe Kleine-K?nig wrote:
+> The chained handler was set for the platform device with id == 0.
+> When the gpio devices are instantiated by a device tree, all have id ==
+> -1 and so the handler was unset resulting in unusable gpio irqs on
+> i.MX21 and i.MX27 (when using oftree).
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> I'm not sure this is material for stable because it never worked before.
+> 
+> Best regards
+> Uwe
+> 
+>  drivers/gpio/gpio-mxc.c |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index e791476..5c42daf 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -398,10 +398,12 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+>  	writel(~0, port->base + GPIO_ISR);
+>  
+>  	if (mxc_gpio_hwtype == IMX21_GPIO) {
+> -		/* setup one handler for all GPIO interrupts */
+> -		if (pdev->id == 0)
+> -			irq_set_chained_handler(port->irq,
+> -						mx2_gpio_irq_handler);
+> +		/*
+> +		 * Setup one handler for all GPIO interrupts. Actually setting
+> +		 * the handler is needed only once, but doing it for every port
+> +		 * is more robust and easier.
+> +		 */
+> +		irq_set_chained_handler(port->irq, mx2_gpio_irq_handler);
+>  	} else {
+>  		/* setup one handler for each entry */
+>  		irq_set_chained_handler(port->irq, mx3_gpio_irq_handler);
+> -- 
+> 1.7.10
+> 
+> 
+
 -- 
-1.7.10
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
