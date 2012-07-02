@@ -1,15 +1,44 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Mon, 2 Jul 2012 15:51:05 +0800
-Subject: Question about memory protected between user-space and kernel-space
-Message-ID: <CAFNq8R640GRmLvJ_M2bUr8+JG1DaxvDAoS9=xehfUu=46PWsRg@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 2 Jul 2012 07:51:24 +0000
+Subject: [PATCH] da8xx-fb: add missing FB_BLANK operations
+In-Reply-To: <1341213073-2986-1-git-send-email-yegorslists@googlemail.com>
+References: <1341213073-2986-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA60AE9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general, virtual address above 3GB could be only accessible by
-kernel-domain itself, and be blocked by user-domain.
+On Mon, Jul 02, 2012 at 12:41:13, yegorslists at googlemail.com wrote:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+> 
+> add FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND and FB_BLANK_HSYNC_SUSPEND
+> modes (copy drivers/video/omap2/omapfb/omapfb-main.c implementation).
+> Otherwise X-server will complain about invalid parameter.
+> 
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> ---
+>  drivers/video/da8xx-fb.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+> index 29577bf..9879edc 100644
+> --- a/drivers/video/da8xx-fb.c
+> +++ b/drivers/video/da8xx-fb.c
+> @@ -987,6 +987,9 @@ static int cfb_blank(int blank, struct fb_info *info)
+>  
+>  		lcd_enable_raster();
+>  		break;
+> +	case FB_BLANK_NORMAL:
+> +	case FB_BLANK_VSYNC_SUSPEND:
+> +	case FB_BLANK_HSYNC_SUSPEND:
+>  	case FB_BLANK_POWERDOWN:
+>  		if (par->panel_power_ctrl)
+>  			par->panel_power_ctrl(0);
 
-Could you please give a brief introduction how to implement it?
 
-In my scene, the protected above rely to the DAC register (CP15 C3
-register). But in kernel code, the domain value in PTE of user mapping
-and kernel mapping are the same.
++ linux-fbdev & Florian
+
+You should always send Fbdev patches to linux-fbdev list.
+
+
+Thanks,
+Vaibhav
