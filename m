@@ -1,155 +1,31 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 2 Jul 2012 14:06:01 +0300
-Subject: [PATCHv4 2/2] ARM: dma-mapping: remove custom consistent dma
- region
-In-Reply-To: <1340614047-5824-3-git-send-email-m.szyprowski@samsung.com>
-References: <1340614047-5824-1-git-send-email-m.szyprowski@samsung.com>
- <1340614047-5824-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120702140601.124e307e493bff4f05efb0b1@nvidia.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 2 Jul 2012 13:18:50 +0200
+Subject: [PATCH 07/29] mfd: omap-usb: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <1339678038-23082-8-git-send-email-rnayak@ti.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-8-git-send-email-rnayak@ti.com>
+Message-ID: <20120702111850.GC22065@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Rajendra,
 
-On Mon, 25 Jun 2012 10:47:27 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-
-> This patch changes dma-mapping subsystem to use generic vmalloc areas
-> for all consistent dma allocations. This increases the total size limit
-> of the consistent allocations and removes platform hacks and a lot of
-> duplicated code.
+On Thu, Jun 14, 2012 at 06:16:56PM +0530, Rajendra Nayak wrote:
+> As we move to Common clk framework use clk_prepare_enable()
+> instead of clk_enable() and similarly clk_disable_unprepare()
+> instead of clk_disable()
 > 
-> Atomic allocations are served from special pool preallocated on boot,
-> becasue vmalloc areas cannot be reliably created in atomic context.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
 > ---
->  Documentation/kernel-parameters.txt |    2 +-
->  arch/arm/include/asm/dma-mapping.h  |    2 +-
->  arch/arm/mm/dma-mapping.c           |  505 +++++++++++++----------------------
->  arch/arm/mm/mm.h                    |    3 +
->  include/linux/vmalloc.h             |    1 +
->  mm/vmalloc.c                        |   10 +-
->  6 files changed, 194 insertions(+), 329 deletions(-)
-> 
-......
-> -static int __init consistent_init(void)
-> -{
-> -       int ret = 0;
-> -       pgd_t *pgd;
-> -       pud_t *pud;
-> -       pmd_t *pmd;
-> -       pte_t *pte;
-> -       int i = 0;
-> -       unsigned long base = consistent_base;
-> -       unsigned long num_ptes = (CONSISTENT_END - base) >> PMD_SHIFT;
-> -
-> -       if (IS_ENABLED(CONFIG_CMA) && !IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU))
-> -               return 0;
-> -
-> -       consistent_pte = kmalloc(num_ptes * sizeof(pte_t), GFP_KERNEL);
-> -       if (!consistent_pte) {
-> -               pr_err("%s: no memory\n", __func__);
-> -               return -ENOMEM;
-> -       }
-> -
-> -       pr_debug("DMA memory: 0x%08lx - 0x%08lx:\n", base, CONSISTENT_END);
-> -       consistent_head.vm_start = base;
-> -
-> -       do {
-> -               pgd = pgd_offset(&init_mm, base);
-> -
-> -               pud = pud_alloc(&init_mm, pgd, base);
-> -               if (!pud) {
-> -                       pr_err("%s: no pud tables\n", __func__);
-> -                       ret = -ENOMEM;
-> -                       break;
-> -               }
-> -
-> -               pmd = pmd_alloc(&init_mm, pud, base);
-> -               if (!pmd) {
-> -                       pr_err("%s: no pmd tables\n", __func__);
-> -                       ret = -ENOMEM;
-> -                       break;
-> -               }
-> -               WARN_ON(!pmd_none(*pmd));
-> -
-> -               pte = pte_alloc_kernel(pmd, base);
-> -               if (!pte) {
-> -                       pr_err("%s: no pte tables\n", __func__);
-> -                       ret = -ENOMEM;
-> -                       break;
-> -               }
-> -
-> -               consistent_pte[i++] = pte;
-> -               base += PMD_SIZE;
-> -       } while (base < CONSISTENT_END);
-> -
-> -       return ret;
-> -}
-> -core_initcall(consistent_init);
-> -
->  static void *__alloc_from_contiguous(struct device *dev, size_t size,
->                                      pgprot_t prot, struct page **ret_page);
-> 
-> -static struct arm_vmregion_head coherent_head = {
-> -       .vm_lock        = __SPIN_LOCK_UNLOCKED(&coherent_head.vm_lock),
-> -       .vm_list        = LIST_HEAD_INIT(coherent_head.vm_list),
-> +static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
-> +                                pgprot_t prot, struct page **ret_page,
-> +                                const void *caller);
-> +
-> +static void *
-> +__dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
-> +       const void *caller)
-> +{
-> +       struct vm_struct *area;
-> +       unsigned long addr;
-> +
-> +       area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
-> +                                 caller);
-> +       if (!area)
-> +               return NULL;
-> +       addr = (unsigned long)area->addr;
-> +       area->phys_addr = __pfn_to_phys(page_to_pfn(page));
-> +
-> +       if (ioremap_page_range(addr, addr + size, area->phys_addr, prot)) {
-> +               vunmap((void *)addr);
-> +               return NULL;
-> +       }
-> +       return (void *)addr;
-> +}
+>  drivers/mfd/omap-usb-host.c |   28 ++++++++++++++--------------
+>  1 files changed, 14 insertions(+), 14 deletions(-)
+Patch applied, many thanks.
 
-The above "ioremap_page_range()" seems to be executed against normal
-pages(liner kernel mapping) with setting a new prot, because pages were
-passed from __dma_alloc_buffer(){..alloc_pages()...}. For me, this is
-creating another page mapping with different pgprot, and it can cause
-the pgprot inconsistency. This reminds me of the following old patch.
+Cheers,
+Samuel.
 
-  [RFC PATCH] Avoid aliasing mappings in DMA coherent allocator
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/106815.html
-
-I think that this is why ioremap() isn't allowed with RAM.
-
-  __arm_ioremap_pfn_caller() doens't allow RAM remapping.
-  
-  193 void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
-  194         unsigned long offset, size_t size, unsigned int mtype, void *caller)
-  195 {
-  196         const struct mem_type *type;
-  197         int err;
-  ... .
-  240         /*                                                                                                                                                                                  
-  241          * Don't allow RAM to be mapped - this causes problems with ARMv6+                                                                                                                  
-  242          */
-  243         if (WARN_ON(pfn_valid(pfn)))
-  244                 return NULL;
-  ...
-
-So my question is:
-1, is the above ioremap_page_range() creating another page mapping
-   with a new pgprot, in addition to liner mapping?
-2, If so, is it safe for pgprot inconsistency from different vaddrs?
-
-I hope that my questins are making sense.
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
