@@ -1,39 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Jul 2012 12:05:06 +0200
-Subject: [PATCH, RFC] i.MX DRM support
-In-Reply-To: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
-References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120702100506.GI24458@pengutronix.de>
+From: zhouqiao@marvell.com (Qiao Zhou)
+Date: Mon, 02 Jul 2012 18:09:57 +0800
+Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
+In-Reply-To: <20120702100324.GC25093@opensource.wolfsonmicro.com>
+References: <1340853214-5429-1-git-send-email-zhouqiao@marvell.com>
+ <201206281121.56769.arnd@arndb.de> <4FED196D.6090500@marvell.com>
+ <201206291358.28788.arnd@arndb.de> <4FF152D3.9040706@marvell.com>
+ <4FF1685A.9070506@marvell.com>
+ <20120702100324.GC25093@opensource.wolfsonmicro.com>
+Message-ID: <4FF17375.3030809@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 03:43:22PM +0200, Sascha Hauer wrote:
-> Hi All,
-> 
-> The following is the state-of-the-art i.MX IPU (Image Processing Unit)
-> DRM support.
-> 
-> This code is around for quite some time now and has been posted several
-> times with different APIs, first with plain old framebuffer support, now
-> DRM, first platform device binding, now devicetree. Unfortunately there's
-> quite much code needed to get something useful out of the IPU, so these
-> patches haven't received a lot of attention from people not involved in
-> i.MX. I think we have now come to a point where this code needs more public
-> exposure and where it's easier to talk in incremental changes instead of
-> blobs. Therefore I request this to go to staging for some cycles.
-
-Dave, Greg,
-
-Comments to this one? I addressed the comments I received so far and am
-about to respin this series. Is it ok to put this to staging? If yes,
-should I move the whole stuff into drivers/staging/ or should it stay
-in drivers/gpu/drm with just a Kconfig dependency on STAGING?
-
-Thanks
- Sascha
+On 07/02/2012 06:03 PM, Mark Brown wrote:
+> On Mon, Jul 02, 2012 at 05:22:34PM +0800, Qiao Zhou wrote:
+>> On 07/02/2012 03:50 PM, Qiao Zhou wrote:
+>
+>>> Here I have a question about the implementation specifically with
+>>> 88pm800. this chip has 3 register pages, and 3 i2c address corresponding
+>>> to each page. so it requires an additional parameter to point out the
+>>> page(i2c) to be accessed. currently I didn't think of a good API to
+>>> export for such purpose. seems to me, the 88pm800 chip is already bound
+>>> to i2c interface, and using regmap directly is a better solution. could
+>>> you give some suggestions?
+>
+>> is it OK to export another two groups of r/w interface for gpadc and
+>> power page separately in 88pm800? such as pm800_gpadc_read_reg() /
+>> pm800_power_read_reg() etc?  Appreciate any comments.
+>
+> What do you mean by pages?  regmap has paging support which just maps
+> everything into a single flat register map from the point of view of
+> callers.
+>
+Mark, let me explain: the 88pm800 chip has three i2c address internally, 
+which we called different page instead. it confuses you with the 
+register page_read/write operation. there are registers in each i2c 
+address domain, and we need to use different i2c client to access reg in 
+different domain. such as some common regs are in the page of i2c_addr = 
+0x30, and power related regs are in the page of i2c_addr = 0x31, and 
+gpadc related regs are in the page of 0x32.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Best Regards
+Qiao
