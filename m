@@ -1,34 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 2 Jul 2012 13:35:14 +0200
-Subject: review comments
-In-Reply-To: <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1340805290-9051-1-git-send-email-gregory.clement@free-electrons.com>
- <1340814406-26010-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20120702133514.591b2672@skate>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 2 Jul 2012 14:33:15 +0300
+Subject: [PATCH v2 05/17] i2c: omap: split out [XR]DR and [XR]RDY
+In-Reply-To: <4FE991DA.5070301@ti.com>
+References: <1339691067-919-1-git-send-email-balbi@ti.com>
+ <1339691067-919-6-git-send-email-balbi@ti.com>
+ <4FE991DA.5070301@ti.com>
+Message-ID: <20120702113314.GA2730@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jun 26, 2012 at 04:11:30PM +0530, Shubhrajyoti wrote:
+> Hi Felipe,
+> On Thursday 14 June 2012 09:54 PM, Felipe Balbi wrote:
+> >  			return IRQ_HANDLED;
+> >  		}
+> >  
+> > -		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
+> > +		if (stat & OMAP_I2C_STAT_RDR) {
+> >  			u8 num_bytes = 1;
+> >  
+> > +			if (dev->fifo_size)
+> > +				num_bytes = dev->fifo_size;
+> In case of a draining interrupt. The byte count may not be the fifo size.
+> Do you agree?
 
-Le Wed, 27 Jun 2012 17:26:43 +0100,
-Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
+hmm... indeed, that should be dev->buf_len... can you fix that up or
+want me to resend ?
 
-> A few things to think about from my first pass of this latest
-> patch set.
-
-Thanks, I have taken patches 1/3 and 2/3, but since they were fairly
-minor fixes and we wanted to keep a clean and nice patch set for this
-initial set of patches, I've folded them into the existing
-corresponding patches. Of course, I've added a notification in the
-commit log of your contributions.
-
-As per the discussion with Russell King, I haven't taken your patch 3/3.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/5923dc39/attachment.sig>
