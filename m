@@ -1,82 +1,110 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 2 Jul 2012 13:13:17 +0200
-Subject: [RFC] Support for 'Coda' video codec IP.
-In-Reply-To: <20120702105427.GP2698@pengutronix.de>
-References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
- <20120619181717.GE28394@pengutronix.de>
- <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
- <20120620090126.GO28394@pengutronix.de>
- <20120620100015.GA30243@sirena.org.uk>
- <20120620130941.GB2253@S2101-09.ap.freescale.net>
- <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
- <20120620143336.GE2253@S2101-09.ap.freescale.net>
- <CACKLOr1oZZPZBNv+p9p3Vf5oY4K8K65_dJ5qkJO6NqeP2=2unw@mail.gmail.com>
- <20120702105427.GP2698@pengutronix.de>
-Message-ID: <CACKLOr1shAodE9FDD9dZ1dgAKy4PyPRQAsyMOiNzqQ0uQFTYGA@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 2 Jul 2012 13:12:41 +0200
+Subject: [PATCH, RFC] i.MX DRM support
+In-Reply-To: <20120702100506.GI24458@pengutronix.de>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+ <20120702100506.GI24458@pengutronix.de>
+Message-ID: <4FF18229.7030907@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 July 2012 12:54, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, Jul 02, 2012 at 12:36:46PM +0200, javier Martin wrote:
->> Hi Sascha,
->> I almost have a final version ready which includes multi-instance
->> support (not tested though) [1]. As I stated, we assumed the extra
->> effort of looking at your code in [2] in order to provide a mechanism
->> that preserves compatibility between VPUs in i.MX21, i.MX51 and
->> i.MX53. This is the only thing left in order to send the driver for
->> mainline submission.
+On 02.07.2012 12:05, Sascha Hauer wrote:
+> On Thu, Jun 14, 2012 at 03:43:22PM +0200, Sascha Hauer wrote:
+>> Hi All,
 >>
->> While I was reading your code I found out that you keep the following
->> formats for v1 (codadx6-i.MX27) codec:
+>> The following is the state-of-the-art i.MX IPU (Image Processing Unit)
+>> DRM support.
 >>
->> static int vpu_v1_codecs[VPU_CODEC_MAX] = {
->>       [VPU_CODEC_AVC_DEC] = 2,
->>       [VPU_CODEC_VC1_DEC] = -1,
->>       [VPU_CODEC_MP2_DEC] = -1,
->>       [VPU_CODEC_DV3_DEC] = -1,
->>       [VPU_CODEC_RV_DEC] = -1,
->>       [VPU_CODEC_MJPG_DEC] = 0x82,
->>       [VPU_CODEC_AVC_ENC] = 3,
->>       [VPU_CODEC_MP4_ENC] = 1,
->>       [VPU_CODEC_MJPG_ENC] = 0x83,
->> };
->>
->> As I understand, this means the following operations are supported:
->>
->> 1- H264 decoding.
->> 2- H264 encoding
->> 3- MP4 encoding.
->> 4- MJPG  decoding.
->> 5- MJPG encoding.
->>
->> I totally agree with MP4 and H264 formats but, are you sure about
->> MJPG? I have a i.MX27 v1 codec (codadx6) but I didn't know that this
->> codec supported MJPG. Have you tested this code with an i.MX27 and
->> MJPG? Where did you find out that it supports this format?
->
-> We haven't tested MJPG on the i.MX27. The table above is from the
-> original Freescale code, so I assume it's correct and I assume that
-> the coda dx6 can do MJPEG.
+>> This code is around for quite some time now and has been posted several
+>> times with different APIs, first with plain old framebuffer support, now
+>> DRM, first platform device binding, now devicetree. Unfortunately there's
+>> quite much code needed to get something useful out of the IPU, so these
+>> patches haven't received a lot of attention from people not involved in
+>> i.MX. I think we have now come to a point where this code needs more public
+>> exposure and where it's easier to talk in incremental changes instead of
+>> blobs. Therefore I request this to go to staging for some cycles.
+> 
+> Dave, Greg,
+> 
+> Comments to this one? I addressed the comments I received so far and am
+> about to respin this series. Is it ok to put this to staging? If yes,
+> should I move the whole stuff into drivers/staging/ or should it stay
+> in drivers/gpu/drm with just a Kconfig dependency on STAGING?
 
-Fabio, could you confirm that the VPU in the i.MX27 supports MJPG too?
+We are very interested in this, so +1 from my side for this.
 
->> Are you
->> using firmware version 2.2.4 for v1 codecs?
->
-> No, 2.2.5
+Many thanks and best regards
 
-Where did you get that firmware version? The only related download I
-can find in [1] is
-'MX273DS_FULL_VPU_SW_AND_VPU_FIRMWARE_2.2.4_WINCE_TO2.X_ONLY' which
-includes firmware 2.2.4.
+Dirk
 
-[1] http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=i.MX27&nodeId=018rH3ZrDR66AF&fpsp=1&tab=Design_Tools_Tab
+Btw.: Based on
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/work/gpu/imx-drm-ipu-complete
+
+with [1] below I fixed some compiler warnings.
+
+I have some additional warnings
+
+drivers/gpu/drm/drm_edid.c: In function 'drm_find_cea_extension':
+drivers/gpu/drm/drm_edid.c:1466: warning: array subscript is above array 
+bounds
+drivers/gpu/drm/drm_edid.c: In function 'drm_detect_hdmi_monitor':
+drivers/gpu/drm/drm_edid.c:1466: warning: array subscript is above array 
+bounds
+drivers/gpu/drm/drm_edid.c: In function 'drm_detect_monitor_audio':
+drivers/gpu/drm/drm_edid.c:1466: warning: array subscript is above array 
+bounds
+drivers/gpu/drm/drm_edid.c: In function 'drm_edid_to_eld':
+drivers/gpu/drm/drm_edid.c:1466: warning: array subscript is above array 
+bounds
+drivers/gpu/drm/drm_edid.c: In function 'drm_add_edid_modes':
+drivers/gpu/drm/drm_edid.c:1466: warning: array subscript is above array 
+bounds
+drivers/gpu/drm/drm_edid.c:1466: warning: array subscript is above array 
+bounds
+
+but these seems to be compiler specific and not related to Sacha's patches.
+
+[1]
+
+From: Dirk Behme <dirk.behme@de.bosch.com>
+Subject: [PATCH 1/2] DRM i.MX: ldb: Fix compiler warnings
+
+Fix the compiler warnings
+
+drivers/gpu/drm/imx/imx-ldb.c: In function 'imx_ldb_encoder_mode_fixup':
+drivers/gpu/drm/imx/imx-ldb.c:118: warning: unused variable 'imx_ldb_ch'
+drivers/gpu/drm/imx/imx-ldb.c: In function 'imx_ldb_encoder_prepare':
+drivers/gpu/drm/imx/imx-ldb.c:134: warning: format '%ld' expects type 
+'long int', but argument 6 has type 'int'
+
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+
+---
+  drivers/gpu/drm/imx/imx-ldb.c |    4 ++--
+  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Index: freescale-linux-2.6-imx.git/drivers/gpu/drm/imx/imx-ldb.c
+===================================================================
+--- freescale-linux-2.6-imx.git.orig/drivers/gpu/drm/imx/imx-ldb.c
++++ freescale-linux-2.6-imx.git/drivers/gpu/drm/imx/imx-ldb.c
+@@ -115,9 +115,9 @@ static bool imx_ldb_encoder_mode_fixup(s
+                            struct drm_display_mode *mode,
+                            struct drm_display_mode *adjusted_mode)
+  {
++/*
+         struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+
+-/*
+         adjusted_mode->clock = clk_round_rate(imx_ldb_ch->clk_pll,
+                         adjusted_mode->clock * 1000) / 1000;
+  */
+@@ -131,7 +131,7 @@ static void imx_ldb_encoder_prepare(stru
+         int ret;
+         struct drm_display_mode *mode = &encoder->crtc->mode;
+
+-       dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
++       dev_dbg(ldb->dev, "%s: now: %ld want: %d\n", __func__,
+                         clk_get_rate(imx_ldb_ch->clk_pll),
+                         mode->clock * 1000 * 7);
+         clk_set_rate(imx_ldb_ch->clk_pll, mode->clock * 1000 * 7);
