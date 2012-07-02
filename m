@@ -1,61 +1,61 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 02 Jul 2012 15:17:45 +0530
-Subject: [PATCH v2 1/3] ARM: omap: clk: add clk_prepare and clk_unprepare
-In-Reply-To: <alpine.DEB.2.00.1206291416180.2338@utopia.booyaka.com>
-References: <1340786915-29507-1-git-send-email-rnayak@ti.com>
- <1340786915-29507-2-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1206291416180.2338@utopia.booyaka.com>
-Message-ID: <4FF16E41.8020906@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Jul 2012 10:55:39 +0100
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <4FD7C597.7060501@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
+ <20120608094708.GC19062@mudshark.cambridge.arm.com>
+ <4FD21930.4000800@ti.com>
+ <20120611173930.GD28235@mudshark.cambridge.arm.com>
+ <4FD64083.3020800@ti.com>
+ <20120612092842.GA2991@mudshark.cambridge.arm.com>
+ <4FD7B1DC.30108@ti.com>
+ <20120612213150.GC24380@mudshark.cambridge.arm.com>
+ <4FD7C597.7060501@ti.com>
+Message-ID: <20120702095539.GD22239@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 30 June 2012 01:49 AM, Paul Walmsley wrote:
-> Hi
->
-> On Wed, 27 Jun 2012, Rajendra Nayak wrote:
->
->> As part of Common Clk Framework (CCF) the clk_enable() operation
->> was split into a clk_prepare() which could sleep, and a clk_enable()
->> which should never sleep. Similarly the clk_disable() was
->> split into clk_disable() and clk_unprepare(). This was
->> needed to handle complex cases where in a clk gate/ungate
->> would require a slow and a fast part to be implemented.
->> None of the clocks below seem to be in the 'complex' clocks
->> category and are just simple clocks which are enabled/disabled
->> through simple register writes.
->> Most of the instances also seem to be called in non-atomic
->> context which means its safe to move all of those from
->> using a clk_enable() to clk_prepare_enable() and clk_disable() to
->> clk_disable_unprepare().
->> For a few others where there is a possibility they get called from
->> an interrupt or atomic context, there is an additonal clk_prepare()
->> done before a clk_enable() and a clk_unprepare()
->> after a clk_disable().
->> This is in preparation of OMAP moving to CCF.
->>
->> Based on initial changes from Mike turquette.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->
-> This patch generates quite a few checkpatch warnings:
->
-> WARNING: please, no space before tabs
-> #294: FILE: arch/arm/mach-omap2/clock3xxx_data.c:3479:
-> +^ICLK(NULL, ^I"mcbsp4_ick",^I&mcbsp2_ick,^ICK_3XXX),$
->
-> etc.
->
-> Please fix these.
->
-> The 80 column warnings from checkpatch on the CLK(... lines can be
-> ignored.
+Hi Jon,
 
-Sorry, I seemed to have overlooked these thinking all to be 80 column
-warnings. Will fix all the non 80 column warnings and repost.
+Did you have any luck getting to the bottom of this?
 
-regards,
-Rajendra
+It would be good to take your PMU suspend/resume patches once we know that
+they will get used.
 
->
->
-> - Paul
+On Tue, Jun 12, 2012 at 11:41:27PM +0100, Jon Hunter wrote:
+> On 06/12/2012 04:31 PM, Will Deacon wrote:
+> > That's understandable -- one of the CPUs is likely more loaded than the
+> > other. However, I'd like to confirm whether or not you see what I see. With
+> > the 4430_init hack on a 4460, if I run:
+> > 
+> > # taskset 0x2 perf top
+> > 
+> > then I get no samples. If I do:
+> > 
+> > # taskset 0x1 perf top
+> > 
+> > then I *do* get samples and from *both* CPUs. So it smells more like an
+> > issue poking some configuration registers from CPU1 rather than the IRQ
+> > path being broken. As I said before, if I don't do the extra init hack
+> > then I don't get this problem (but event counters don't tick).
+> 
+> In both cases, I see interrupts on both CPUs. However, typically more on
+> the CPU that perf is running on (which is probably to be expected). And
+> I confirm that the only change I made was ...
+
+[...]
+
+> When you boot the kernel what 4460 rev does it show (very early in the
+> kernel boot log)? Mine shows ...
+> 
+> [    0.000000] OMAP4460 ES1.1
+
+Snap: [    0.000000] OMAP4460 ES1.1
+
+> However, the A9 version has not changed between ES1.0 and ES1.1. Both
+> should be r2p10.
+
+Yup, that's what /proc/cpuinfo says.
+
+Will
