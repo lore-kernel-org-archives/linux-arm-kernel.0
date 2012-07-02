@@ -1,69 +1,57 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 2 Jul 2012 14:54:23 +0300
-Subject: [RFC PATCH 3/3] i2c: inititalise the actual transferred to zero
-In-Reply-To: <20120629151832.0cb26bea@endymion.delvare>
-References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
- <1340967927-27354-4-git-send-email-shubhrajyoti@ti.com>
- <20120629144002.3b4a31ee@endymion.delvare>
- <20120629145718.697b6955@endymion.delvare>
- <4FEDA9A8.1050504@ti.com>
- <20120629151832.0cb26bea@endymion.delvare>
-Message-ID: <20120702115422.GC2730@arwen.pp.htv.fi>
+Date: Mon, 2 Jul 2012 14:56:20 +0300
+Subject: [PATCHv3 06/17] i2c: omap: split out [XR]DR and [XR]RDY
+In-Reply-To: <1340964817-8599-7-git-send-email-shubhrajyoti@ti.com>
+References: <1340964817-8599-1-git-send-email-shubhrajyoti@ti.com>
+ <1340964817-8599-7-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120702115620.GD2730@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Jun 29, 2012 at 03:18:32PM +0200, Jean Delvare wrote:
-> On Fri, 29 Jun 2012 18:42:08 +0530, Shubhrajyoti wrote:
-> > On Friday 29 June 2012 06:27 PM, Jean Delvare wrote:
-> > > drivers/gpu/drm/nouveau/nouveau_bios.c:3535:3: warning: (near initialization for ?msg[1].actual?) [enabled by default]
-> > >
-> > > This needs to be all fixed (converted to C99-style struct
-> > > initialization) before your patch is considered for inclusion. And
-> > > there may be more that my config did not spot.
-> > Yes,agree.
-> > 
-> > The idea of this patch was if the idea is agreed upon then.
-> > then fixing all the callers could be worked on.
+On Fri, Jun 29, 2012 at 03:43:26PM +0530, Shubhrajyoti D wrote:
+> From: Felipe Balbi <balbi@ti.com>
 > 
-> This is worth fixing anyway, C99-style initialization is always good to
-> move to.
+> While they do pretty much the same thing, there
+> are a few peculiarities. Specially WRT erratas,
+> it's best to split those out and re-factor the
+> read/write loop to another function which both
+> cases call.
 > 
-> > However do you agree with this approach?
+> This last part will be done on another patch.
 > 
-> Well you've seen the caveats I mentioned, this will be no easy ride. If
-> you are willing to take the risk, spend the time documenting the
-> change, and help people if there are issues, then I'm OK. At least as
-> long as someone else doesn't come saying it's a very bad idea ;)
+> While at that, also avoid an unncessary register
+> read since dev->fifo_len will always contain the
+> correct amount of data to be transferred.
 
-This approach is a hard-requirement for devices which will pose any
-interface/feedback with user. We have been working with a piezo driver
-from TI (drv2665) and it will be used (in most cases at least) to give
-the user a feedback based on e.g. touchscreen event.
+this statement isn't valid anymore, but I'd like it to be. See below
 
-Imagine drv2665 responds with a NAK while we're in the middle of driving
-a wave through it (keep in mind a wave could take seconds to finish,
-depending on the usecase), if we don't have a way to tell users that we
-have writen X bytes, how should we make sure to continue driving the
-wave from the exact byte where we got a NAK ?
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |  126 ++++++++++++++++++++++++++++++----------
+>  1 files changed, 94 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 359ee08..45bd731 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -820,36 +820,64 @@ complete:
+>  			return IRQ_HANDLED;
+>  		}
+>  
+> -		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
+> +		if (stat & OMAP_I2C_STAT_RDR) {
+>  			u8 num_bytes = 1;
+>  
+> +			if (dev->fifo_size)
+> +				num_bytes = (omap_i2c_read_reg(dev,
+> +						OMAP_I2C_BUFSTAT_REG) >> 8)
+> +						& 0x3F;
 
-If can't make sure that detail is true, then such usecases (as piezo
-drivers) will never work.
-
-Another approach would be to not add any field to struct i2c_msg but
-instead return either the amount of bytes transferred, or an error case.
-This would mean a series that would:
-
-1) fix all users of struct i2c_master_send() and the like to check for
-	errors as if (ret < 0) instead of if (ret);
-2) fix all i2c buses to return the amount of bytes written instead of
-	zero or error case
-3) fix Documentation to state that we're now returning the amount of
-	bytes, instead of zero or errno.
-
-I'm not sure what will have minimum impact to userland, though. What do
-you say Jean ? What would you prefer ?
+I wanted to avoid reading registers if we don't have to. This value will
+be sitting in dev->buf_len.
 
 -- 
 balbi
@@ -73,4 +61,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/29c54463/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/bd1ec352/attachment.sig>
