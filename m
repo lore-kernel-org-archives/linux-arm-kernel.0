@@ -1,100 +1,63 @@
-From: neilb@suse.de (NeilBrown)
-Date: Tue, 3 Jul 2012 09:34:04 +1000
-Subject: [PATCH] gpio/omap: fix invalid context restore of gpio bank-0
-In-Reply-To: <4FF1E7DE.10409@ti.com>
-References: <1340990551-19426-1-git-send-email-jon-hunter@ti.com>
- <87mx3i595b.fsf@ti.com> <4FF1E7DE.10409@ti.com>
-Message-ID: <20120703093404.2a9b5aba@notabene.brown>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Mon, 2 Jul 2012 18:37:36 -0500
+Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
+In-Reply-To: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
+References: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120702183736.e8e4136d4bf206b55c8653a5@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Jul 2012 13:26:38 -0500 Jon Hunter <jon-hunter@ti.com> wrote:
+On Tue, 3 Jul 2012 00:09:15 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
+>  create mode 100644 Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+>  create mode 100644 drivers/rtc/rtc-snvs.c
 > 
-> On 07/02/2012 01:07 PM, Kevin Hilman wrote:
-> > + Neil Brown
-> > 
-> > Hi Jon,
-> > 
-> > Jon Hunter <jon-hunter@ti.com> writes:
-> > 
-> >> Currently the gpio _runtime_resume/suspend functions are calling the
-> >> get_context_loss_count() platform function if the function is populated for
-> >> a gpio bank. This function is used to determine if the gpio bank logic state
-> >> needs to be restored due to a power transition. This function will be populated
-> >> for all banks, but it should only be called for banks that have the
-> >> "loses_context" variable set. It is pointless to call this if loses_context is
-> >> false as we know the context will never be lost and will not need restoring.
-> >>
-> >> For all OMAP2+ devices gpio bank-0 is in an always-on power domain and so will
-> >> never lose context. We found that the get_context_loss_count() was being called
-> >> for bank-0 during the probe and returning 1 instead of 0 indicating that the
-> >> context had been lost. This was causing the context restore function to be
-> >> called at probe time for this bank and because the context had never been saved,
-> >> was restoring an invalid state. This ultimately resulted in a crash [1].
-> >>
-> >> There are multiple bugs here that need to be addressed ...
-> >>
-> >> 1. Why the always-on power domain returns a context loss count of 1? This needs
-> >>    to be fixed in the power domain code. However, the gpio driver should not
-> >>    assume the loss count is 0 to begin with.
-> >> 2. The omap gpio driver should never be calling get_context_loss_count for a
-> >>    gpio bank in a always-on domain. This is pointless and adds unneccessary
-> >>    overhead.
-> >> 3. The OMAP gpio driver assumes that the initial power domain context loss count
-> >>    will be 0 at the time the gpio driver is probed. However, it could be
-> >>    possible that this is not the case and an invalid context restore could be
-> >>    performed during the probe. To avoid this otherwise only populated the
-> > 
-> > The 'To avoid this...' sentence here doesn't read well.  Looks like you
-> > need to:
-> > 
-> > s/otherwise//
-> 
-> Yes, I meant to have dropped "otherwise" here. Thanks!
-> 
-> > s/populated/populate/
-> 
-> Yes that too! I must have re-worded and screwed it up royally :-(
-> 
-> > ?
-> > 
-> >>    get_context_loss_count() function pointer after the initial call to
-> >>    pm_runtime_get() has occurred. This will ensure that the first
-> >>    pm_runtime_put() initialised the loss count correctly.
-> >>
-> >> This patch addresses issues 2 and 3 above.
-> >> [1] http://marc.info/?l=linux-omap&m=134065775323775&w=2
-> >>
-> >> Cc: Grant Likely <grant.likely@secretlab.ca>
-> >> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> >> Cc: Kevin Hilman <khilman@ti.com>
-> >> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> >> Cc: Franky Lin <frankyl@broadcom.com>
-> >>
-> >> Reported-by: Franky Lin <frankyl@broadcom.com>
-> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> > 
-> > Thanks for digging inot this bug Jon.  The same bug was brought up by
-> > Neil Brown (Cc'd) in a different thread.
-> > 
-> > Neil, it looks to me that this fix will address the problems you were
-> > seeing as well.  Care to test, and respond with your ack/tested-by if it
-> > works for you?  Thanks.
-> 
-> Neil let me know your thoughts and if you are ok, I can clean-up the
-> changelog and re-send.
+> diff --git a/Documentation/devicetree/bindings/rtc/snvs-rtc.txt b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+> new file mode 100644
+> index 0000000..18e7c5c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+> @@ -0,0 +1,19 @@
+> +* Freescale Secure Non-Volatile Storage (SNVS) RTC
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,sec-v4.0-mon"
+> +  See Documentation/devicetree/bindings/crypto/fsl-sec4.txt for details.
+> +- reg: Physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: Two interrupt numbers to the cpu should be specified. First
+> +  interrupt number is the consolidated interrupt in non TrustZone. The second
+> +  interrupt number is the security interrupt in TrustZone. The number of cells
+> +  representing a interrupt depends on the parent interrupt controller.
+> +
+> +Example:
+> +
+> +snvs at 020cc000 {
+> +	compatible = "fsl,sec-v4.0-mon";
+> +	reg = <0x020cc000 0x4000>;
+> +	interrupts = <0 19 0x04 0 20 0x04>;
+> +};
 
-Yes, works for me and looks sensible.
+Instead of duplicating the binding documentation entry, can this be
+merged in with crypto/fsl-sec4.txt?  Also, don't we need the rtc to
+be a 'sub-device' of "fsl,sec-vX.Y-mon", and to have its own
+compatible, e.g., "fsl,sec-v4.0-mon-rtc-lp"?
 
- Tested-by: NeilBrown <neilb@suse.de>
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index 08cbdb9..511ddcb 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1087,4 +1087,14 @@ config RTC_DRV_MXC
+>  	   This driver can also be built as a module, if so, the module
+>  	   will be called "rtc-mxc".
+>  
+> +config RTC_DRV_SNVS
+> +	tristate "Freescale SNVS RTC support"
+> +	depends on ARCH_MXC
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/11adf637/attachment-0001.sig>
+should also depend on || FSL_SOC - it was mentioned in the
+review of the last version of this patch that this h/w exists on
+other, non-ARM based, SoCs.
+
+Kim
