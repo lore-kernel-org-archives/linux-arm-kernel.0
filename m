@@ -1,38 +1,142 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 2 Jul 2012 17:41:15 +0200
-Subject: [PATCH v6] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <201207021530.23809.arnd@arndb.de>
-References: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201207021530.23809.arnd@arndb.de>
-Message-ID: <20120702174115.1a7f7af6@skate>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 2 Jul 2012 17:45:06 +0200
+Subject: [PATCH 1/2] ARM: at91/defconfig: change the MCI driver to use in
+ defconfigs
+Message-ID: <24f5c4b6e6f2933eb22979283db6174f378d9b36.1341243806.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 2 Jul 2012 15:30:23 +0000,
-Arnd Bergmann <arnd@arndb.de> a ?crit :
+Since atmel-mci driver supports all atmel mci versions,
+use it instead of the deprecated at91_mci driver.
 
-> > Do you think this patch set has a chance of hitting the 3.6 merge
-> > window?
-> 
-> Yes, definitely.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/at91rm9200_defconfig  |    2 +-
+ arch/arm/configs/at91sam9261_defconfig |    2 +-
+ arch/arm/configs/at91sam9263_defconfig |    2 +-
+ arch/arm/configs/at91sam9g20_defconfig |    2 +-
+ arch/arm/configs/at91sam9rl_defconfig  |    2 +-
+ arch/arm/configs/cpu9260_defconfig     |    2 +-
+ arch/arm/configs/cpu9g20_defconfig     |    2 +-
+ arch/arm/configs/qil-a9260_defconfig   |    2 +-
+ arch/arm/configs/stamp9g20_defconfig   |    1 -
+ 9 files changed, 8 insertions(+), 9 deletions(-)
 
-Excellent, thanks.
-
-> > We are willing to quickly resubmit updated versions to take into
-> > account new comments. We have a lot more code to support those new
-> > SoCs, and we would like to make progress in submitting those other
-> > parts for the mainline.
-> 
-> I think it's time to just take your current version into arm-soc
-> and do all other patches on top. I'll wait for an Ack from
-> Ben, Andrew and Andrew first though.
-
-I guess you wanted to say "Andrew and Jason", right?
-
-Thomas
+diff --git a/arch/arm/configs/at91rm9200_defconfig b/arch/arm/configs/at91rm9200_defconfig
+index d54e2ac..4ae57a3 100644
+--- a/arch/arm/configs/at91rm9200_defconfig
++++ b/arch/arm/configs/at91rm9200_defconfig
+@@ -232,7 +232,7 @@ CONFIG_USB_GADGET=y
+ CONFIG_USB_ETH=m
+ CONFIG_USB_MASS_STORAGE=m
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=y
++CONFIG_MMC_ATMELMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/at91sam9261_defconfig b/arch/arm/configs/at91sam9261_defconfig
+index ade6b2f..1e8712e 100644
+--- a/arch/arm/configs/at91sam9261_defconfig
++++ b/arch/arm/configs/at91sam9261_defconfig
+@@ -128,7 +128,7 @@ CONFIG_USB_GADGETFS=m
+ CONFIG_USB_FILE_STORAGE=m
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/at91sam9263_defconfig b/arch/arm/configs/at91sam9263_defconfig
+index 585e7e0..d2050ca 100644
+--- a/arch/arm/configs/at91sam9263_defconfig
++++ b/arch/arm/configs/at91sam9263_defconfig
+@@ -137,7 +137,7 @@ CONFIG_USB_FILE_STORAGE=m
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+ CONFIG_SDIO_UART=m
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_ATMEL_PWM=y
+diff --git a/arch/arm/configs/at91sam9g20_defconfig b/arch/arm/configs/at91sam9g20_defconfig
+index 994d331..e1b0e80 100644
+--- a/arch/arm/configs/at91sam9g20_defconfig
++++ b/arch/arm/configs/at91sam9g20_defconfig
+@@ -99,7 +99,7 @@ CONFIG_USB_GADGETFS=m
+ CONFIG_USB_FILE_STORAGE=m
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/at91sam9rl_defconfig b/arch/arm/configs/at91sam9rl_defconfig
+index ad562ee..7cf8785 100644
+--- a/arch/arm/configs/at91sam9rl_defconfig
++++ b/arch/arm/configs/at91sam9rl_defconfig
+@@ -60,7 +60,7 @@ CONFIG_AT91SAM9X_WATCHDOG=y
+ CONFIG_FB=y
+ CONFIG_FB_ATMEL=y
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_AT91SAM9=y
+ CONFIG_EXT2_FS=y
+diff --git a/arch/arm/configs/cpu9260_defconfig b/arch/arm/configs/cpu9260_defconfig
+index bbf729e..921480c 100644
+--- a/arch/arm/configs/cpu9260_defconfig
++++ b/arch/arm/configs/cpu9260_defconfig
+@@ -82,7 +82,7 @@ CONFIG_USB_STORAGE=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/cpu9g20_defconfig b/arch/arm/configs/cpu9g20_defconfig
+index e7d7942..ea116cb 100644
+--- a/arch/arm/configs/cpu9g20_defconfig
++++ b/arch/arm/configs/cpu9g20_defconfig
+@@ -82,7 +82,7 @@ CONFIG_USB_STORAGE=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/qil-a9260_defconfig b/arch/arm/configs/qil-a9260_defconfig
+index 2bb100b..42d5db1 100644
+--- a/arch/arm/configs/qil-a9260_defconfig
++++ b/arch/arm/configs/qil-a9260_defconfig
+@@ -86,7 +86,7 @@ CONFIG_USB_STORAGE=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
++CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/stamp9g20_defconfig b/arch/arm/configs/stamp9g20_defconfig
+index d5e260b..52f1488 100644
+--- a/arch/arm/configs/stamp9g20_defconfig
++++ b/arch/arm/configs/stamp9g20_defconfig
+@@ -100,7 +100,6 @@ CONFIG_USB_ETH=m
+ CONFIG_USB_FILE_STORAGE=m
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+-# CONFIG_MMC_AT91 is not set
+ CONFIG_MMC_ATMELMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10
