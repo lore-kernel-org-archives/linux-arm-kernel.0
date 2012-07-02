@@ -1,94 +1,47 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Mon, 02 Jul 2012 14:40:49 +0800
-Subject: [PATCH 2 1/4] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <20120702063545.26782.98908.stgit@build.warmcat.com>
-References: <20120702063545.26782.98908.stgit@build.warmcat.com>
-Message-ID: <20120702064046.26782.32399.stgit@build.warmcat.com>
+From: andy@warmcat.com (Andy Green)
+Date: Mon, 02 Jul 2012 14:40:41 +0800
+Subject: [PATCH 2 0/4] Add ability to set defaultless network device MAC
+ addresses to deterministic computed locally administered values
+Message-ID: <20120702063545.26782.98908.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Green <andy@warmcat.com>
+The following series adds some code to generate legal, locally administered
+MAC addresses from OMAP4 CPU Die ID fuse data, and then adds a helper at
+net/ethernet taking care of accepting device path / MAC mapping registrations
+and running a notifier to enforce the requested MAC when the matching network
+device turns up.
 
-Introduce a generic helper function that can generate a valid MAC
-address using data from the OMAP unique CPU ID register.
+On PandaBoard / ES, two devices have no board-level MAC either assigned by
+the manufacturer or stored on the board, the last patch in the series adds
+these device paths and gets them set when the network device is registered.
 
-For comparison purposes this produces a MAC address of
+Lastly for convenient testing, there's a little patch on omap2plus_defconfig
+that will get Ethernet and WLAN up on Pandaboard.
 
-  2e:20:3c:ea:46:01
+The patches are against today's linux-omap.
 
-for the ethernet device on my PandaBoard ES.
+Thanks to Tony Lindgren and Arnd Bergmann for comments leading to the
+helper in net/ethernet.
 
-The MAC address space has space set aside for these kind of "locally
-administered" MAC addresses, analogous to IPv4 10.x.x.x range, and this
-patch marks the generated MAC addresses as such.
-
-The patch leaves two bits allowing elaborating 4 different MACs from the
-generated data.
-
-Signed-off-by: Andy Green <andy.green@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Tested-by: Steven Rostedt <rostedt@goodmis.org>
 ---
- arch/arm/mach-omap2/id.c              |   39 +++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/include/mach/id.h |    1 +
- 2 files changed, 40 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 00486a8..2a44c42 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
- 	else
- 		tap_prod_id = 0x0208;
- }
-+
-+/*
-+ * this uses the unique per-cpu info from the cpu fuses set at factory to
-+ * generate a 6-byte MAC address.  Two bits in the generated code are used
-+ * to elaborate the generated address into four, so it can be used on multiple
-+ * network interfaces.
-+ */
-+
-+void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype)
-+{
-+	struct omap_die_id odi;
-+	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
-+
-+	omap_get_die_id(&odi);
-+
-+	mac[0] = odi.id_2;
-+	mac[1] = odi.id_2 >> 8;
-+	mac[2] = odi.id_1;
-+	mac[3] = odi.id_1 >> 8;
-+	mac[4] = odi.id_1 >> 16;
-+	mac[5] = odi.id_1 >> 24;
-+
-+	/* XOR other chip-specific data with ID */
-+
-+	tap ^= odi.id_3;
-+
-+	mac[0] ^= tap;
-+	mac[1] ^= tap >> 8;
-+	mac[2] ^= tap >> 16;
-+	mac[3] ^= tap >> 24;
-+
-+	/* allow four MACs from this same basic data */
-+
-+	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
-+
-+	/* mark it as not multicast, and outside official 80211 MAC namespace */
-+
-+	mac[0] = (mac[0] & ~1) | 2;
-+}
-diff --git a/arch/arm/mach-omap2/include/mach/id.h b/arch/arm/mach-omap2/include/mach/id.h
-index 02ed3aa..373313a 100644
---- a/arch/arm/mach-omap2/include/mach/id.h
-+++ b/arch/arm/mach-omap2/include/mach/id.h
-@@ -18,5 +18,6 @@ struct omap_die_id {
- };
- 
- void omap_get_die_id(struct omap_die_id *odi);
-+void omap2_die_id_to_ethernet_mac(u8 *mac, int subtype);
- 
- #endif
+Andy Green (4):
+      OMAP2+: add cpu id register to MAC address helper
+      net ethernet introduce mac_la_ap helper
+      OMAP4 PANDA register ethernet and wlan for automatic mac allocation
+      config test config extending omap2plus with wl12xx etc
+
+
+ arch/arm/configs/omap2plus_defconfig   |   35 +++----
+ arch/arm/mach-omap2/Kconfig            |    1 
+ arch/arm/mach-omap2/board-omap4panda.c |   30 ++++++
+ arch/arm/mach-omap2/id.c               |   39 ++++++++
+ arch/arm/mach-omap2/include/mach/id.h  |    1 
+ include/net/mac-la-ap.h                |   28 +++++
+ net/Kconfig                            |   14 +++
+ net/ethernet/Makefile                  |    2 
+ net/ethernet/mac-la-ap.c               |  165 ++++++++++++++++++++++++++++++++
+ 9 files changed, 294 insertions(+), 21 deletions(-)
+ create mode 100644 include/net/mac-la-ap.h
+ create mode 100644 net/ethernet/mac-la-ap.c
