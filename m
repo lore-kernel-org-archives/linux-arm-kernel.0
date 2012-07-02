@@ -1,30 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 Jul 2012 15:40:25 +0000
-Subject: [BUILD BREAKAGE] versatile, LEDS updates
-In-Reply-To: <20120702083924.GG16319@n2100.arm.linux.org.uk>
-References: <20120629103313.GA16319@n2100.arm.linux.org.uk>
- <20120629114532.GB16319@n2100.arm.linux.org.uk>
- <20120702083924.GG16319@n2100.arm.linux.org.uk>
-Message-ID: <201207021540.26382.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 2 Jul 2012 17:41:15 +0200
+Subject: [PATCH v6] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <201207021530.23809.arnd@arndb.de>
+References: <1341228809-17824-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201207021530.23809.arnd@arndb.de>
+Message-ID: <20120702174115.1a7f7af6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Russell King - ARM Linux wrote:
-> 
-> Arnd,
-> 
-> You said on IRC that you would drop the LEDS patches until we had a working
-> version, but it still seems to be in arm-soc, and therefore the Versatile
-> build continues to fail.
-> 
-> When will you remove the LEDS patches?
-> 
+Le Mon, 2 Jul 2012 15:30:23 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-Sorry for the delay, I've dropped them once more now.
+> > Do you think this patch set has a chance of hitting the 3.6 merge
+> > window?
+> 
+> Yes, definitely.
 
-Bryan,
+Excellent, thanks.
 
-Please fix this situation and address the problems that Russell has pointed
-out multiple times if you want these patches to go into v3.6.
+> > We are willing to quickly resubmit updated versions to take into
+> > account new comments. We have a lot more code to support those new
+> > SoCs, and we would like to make progress in submitting those other
+> > parts for the mainline.
+> 
+> I think it's time to just take your current version into arm-soc
+> and do all other patches on top. I'll wait for an Ack from
+> Ben, Andrew and Andrew first though.
 
-	Arnd
+I guess you wanted to say "Andrew and Jason", right?
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
