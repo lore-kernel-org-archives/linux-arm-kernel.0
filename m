@@ -1,36 +1,21 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 2 Jul 2012 11:17:02 +0800
-Subject: [GIT PULL] prima2 GPIO support in pinmux
-Message-ID: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
+From: lokeshvutla@ti.com (Vutla, Lokesh)
+Date: Mon, 2 Jul 2012 10:49:37 +0530
+Subject: [PATCH] Watchdog: OMAP: Fix the runtime pm code to avoid module
+ getting stuck intransition state.
+In-Reply-To: <CAMQu2gwUgPewy98L+yF5bcdrqXRLZftb3utLNg5HV1jBscGpTQ@mail.gmail.com>
+References: <1339996996-3257-1-git-send-email-lokeshvutla@ti.com>
+ <CAMQu2gwUgPewy98L+yF5bcdrqXRLZftb3utLNg5HV1jBscGpTQ@mail.gmail.com>
+Message-ID: <CAJ1gdcaJoajaT-74VtbyzmYr3Rb_xYqy8+KULHZkdPj521eHEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+Gentle ping on this......
 
-Please pull the following GPIO support in pinmux for 3.6.
 
-Regards,
-Barry
 
-The following changes since commit ca24a145573124732152daff105ba68cc9a2b545:
-
-  Merge branch 'fixes' of
-git://git.linaro.org/people/rmk/linux-arm(2012-07-01 11:02:25 -0700)
-
-are available in the git repository at:
-
-  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git prima2/drivers
-
-Barry Song (1):
-      PINCTRL: SiRF: add GPIO and GPIO irq support in CSR SiRFprimaII
-
- arch/arm/Kconfig                         |    1 +
- arch/arm/mach-prima2/include/mach/gpio.h |   13 +
- arch/arm/mach-prima2/include/mach/irqs.h |    2 +-
- drivers/pinctrl/pinctrl-sirf.c           |  489
-+++++++++++++++++++++++++++++-
- 4 files changed, 503 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-prima2/include/mach/gpio.h
+Thanks n regards
+Lokesh Vutla
+LDC MPUSS Platform Team
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/8461aa4f/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/9d857084/attachment-0001.html>
