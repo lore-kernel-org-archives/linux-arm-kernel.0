@@ -1,34 +1,29 @@
-From: bob.beckett@gmail.com (Robert Beckett)
-Date: Mon, 2 Jul 2012 14:57:48 +0100
-Subject: arm_vmregion_alloc call
-Message-ID: <CAOmFF10btho+hqFSKpkqr_QDOWbFzOTKNHJL2FsZ9BvHM7DdHQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 2 Jul 2012 10:05:38 -0400 (EDT)
+Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
+ issues.
+In-Reply-To: <CAP05o4JctmjdAk+S--v9T0PM0kabFN50ESyiPiwAYXNUX5yyBg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1207021003050.6472-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Mon, 2 Jul 2012, Munegowda, Keshava wrote:
 
-I just debugged a problem with a USB driver where it was calling
-dma_alloc_coherent with a GFP_DMA32 flag.
-It turned out that in __dma_alloc_remap, it clears the GFP_DMA and
-GFP_HIGHMEM flags when calling arm_vmregion_alloc so that it does not
-clash with the slab allocator flag requirements, but it does not clear
-GFP_DMA32. The GFP_SLAB_BUG_MASK includes GFP_DMA32, so this looks
-like a bug to me. Should it be clearing GFP_DMA32 as well as GFP_DMA
-and GFP_HIGHMEM ?
+> Hi Samuel
+>        please drop this patch for now , since Alan stern has mentioned
+> improvements for this patch and we
+> need to wait for Alan's new patch on ehci-omap.c and then Rus dill
+> patch and my usbhs tll
+> patch series need to be rebased.
 
-I checked in the latest kernel.org code, and the issue is still there.
+No, that's okay.  I rebased my patch on top of Russ's; see
 
-Is this a bug, or should it just be calling with GFP_DMA instead of GFP_DMA32?
+	http://marc.info/?l=linux-usb&m=134098478928668&w=2
 
-For now, I am working around it by using GFP_DMA in the
-dma_alloc_coherent call as we have no GFP_DMA lower limit, so GFP_DMA
-and GFP_DMA32 are the same on my architecture.
+so Russ's patch should be kept.  My patch needed other changes also, so
+this wasn't a big deal.
 
-Any advice appreciated,
+The extra problems I mentioned in an earlier email will still need to
+be fixed after both Russ's patch and my own are merged.
 
-Thanks
-
-Bob
-
-p.s. apologies if this sent multiple times, Im trying to work around
-the mailing list "suspicious header" moderation...
+Alan Stern
