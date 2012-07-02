@@ -1,37 +1,146 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 2 Jul 2012 12:05:53 +0300
-Subject: [PATCH 2/2] remoteproc: remove the now-redundant kref
-In-Reply-To: <20120702085911.GA16639@n2100.arm.linux.org.uk>
-References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
- <1338017791-9442-2-git-send-email-ohad@wizery.com>
- <4FC5DD74.4030202@codeaurora.org>
- <CAK=WgbbwaMAnTGcivC9ZR8K-MtTqHAV3+BgUmk8WjCaayifJxw@mail.gmail.com>
- <4FCD272E.1020300@codeaurora.org>
- <CAK=WgbZu1hYOd27r259b2v48VFYeOZ4UE5sD2awZDxgBgjAsXw@mail.gmail.com>
- <20120702085911.GA16639@n2100.arm.linux.org.uk>
-Message-ID: <CAK=WgbaV2ehq=Y2AFojG6r4HuiGQ+_hEC+azxBJDfrWEi=DTTA@mail.gmail.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Mon, 02 Jul 2012 11:11:23 +0200
+Subject: [PATCH v3 3/5] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <1340205562-7653-4-git-send-email-vincent.guittot@linaro.org>
+References: <1340205562-7653-1-git-send-email-vincent.guittot@linaro.org>
+ <1340205562-7653-4-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1341220283.28750.138.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2012 at 11:59 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jul 02, 2012 at 11:52:27AM +0300, Ohad Ben-Cohen wrote:
->> Simplify the unregister/free interfaces, and make them easier
->> to understand and use, by moving to a symmetric and consistent
->> alloc() -> register() -> unregister() -> free() flow.
->
-> The naming in the driver model is:
->
-> alloc() -> add() -> del() -> put()
->
-> where alloc() is an allocation + initialization, and
->
-> register() -> unregister()
->
-> where register() is initialization + add() and
-> unregister() is del() + put().
+On Wed, 2012-06-20 at 17:19 +0200, Vincent Guittot wrote:
+> +#ifdef CONFIG_OF
+> +struct cpu_efficiency {
+> +       const char *compatible;
+> +       unsigned long efficiency;
+> +};
+> +
+> +/*
+> + * Table of relative efficiency of each processors
+> + * The efficiency value must fit in 20bit. The final
+> + * cpu_scale value must be in the range
+> + * 0 < cpu_scale < 2*SCHED_POWER_SCALE.
 
-I wasn't sure if it'd help to adopt the driver model's naming, but I
-guess it just might do, so I'll do that.
+This wants a why.. I suspects its to do with keeping capacity on 1.
 
-Thanks!
+> + * Processors that are not defined in the table,
+> + * use the default SCHED_POWER_SCALE value for cpu_scale.
+> + */
+> +struct cpu_efficiency table_efficiency[] = {
+> +       {"arm,cortex-a15", 3891},
+> +       {"arm,cortex-a7",  2048},
+> +       {NULL, },
+> +};
+> +
+> +struct cpu_capacity {
+> +       unsigned long hwid;
+> +       unsigned long capacity;
+> +};
+> +
+> +struct cpu_capacity *cpu_capacity;
+> +
+> +unsigned long middle_capacity = 1;
+
+It would be very nice to not have to learn to read device-tree nonsense
+to work on the scheduler, how about something like this:?
+
+/*
+ * Iterate all cpus and set the efficiency (as per table_efficiency)
+ * also calculate the middle efficiency:
+ *   (max{eff_i} - min{eff_i}) / 2
+ * This is later used to scale the cpu_power field such that an
+ * 'average' cpu is of middle power. Also see the comments near
+ * table_efficiency[] and update_cpu_power().
+ */
+
+> +static void __init parse_dt_topology(void)
+> +{
+> +       struct cpu_efficiency *cpu_eff;
+> +       struct device_node *cn = NULL;
+> +       unsigned long min_capacity = (unsigned long)(-1);
+> +       unsigned long max_capacity = 0;
+> +       unsigned long capacity = 0;
+> +       int alloc_size, cpu = 0;
+> +
+> +       alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
+> +       cpu_capacity = (struct cpu_capacity *)kzalloc(alloc_size, GFP_NOWAIT);
+> +
+> +       while ((cn = of_find_node_by_type(cn, "cpu"))) {
+> +               const u32 *rate, *reg;
+> +               int len;
+> +
+> +               if (cpu >= num_possible_cpus())
+> +                       break;
+> +
+> +               for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
+> +                       if (of_device_is_compatible(cn, cpu_eff->compatible))
+> +                               break;
+> +
+> +               if (cpu_eff->compatible == NULL)
+> +                       continue;
+> +
+> +               rate = of_get_property(cn, "clock-frequency", &len);
+> +               if (!rate || len != 4) {
+> +                       pr_err("%s missing clock-frequency property\n",
+> +                               cn->full_name);
+> +                       continue;
+> +               }
+> +
+> +               reg = of_get_property(cn, "reg", &len);
+> +               if (!reg || len != 4) {
+> +                       pr_err("%s missing reg property\n", cn->full_name);
+> +                       continue;
+> +               }
+> +
+> +               capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
+> +
+> +               /* Save min capacity of the system */
+> +               if (capacity < min_capacity)
+> +                       min_capacity = capacity;
+> +
+> +               /* Save max capacity of the system */
+> +               if (capacity > max_capacity)
+> +                       max_capacity = capacity;
+> +
+> +               cpu_capacity[cpu].capacity = capacity;
+> +               cpu_capacity[cpu++].hwid = be32_to_cpup(reg);
+> +       }
+> +
+> +       if (cpu < num_possible_cpus())
+> +               cpu_capacity[cpu].hwid = (unsigned long)(-1);
+> +
+> +       middle_capacity = (min_capacity + max_capacity) >> 11;
+> +}
+> +
+> +void update_cpu_power(unsigned int cpu, unsigned long hwid)
+> +{
+> +       unsigned int idx = 0;
+> +
+> +       /* look for the cpu's hwid in the cpu capacity table */
+
+This smells like an O(n^2) loop.. ARM has only small cpu counts so this
+isn't an immediate issue, would still be nice to make a note of it
+though.
+
+> +       for (idx = 0; idx < num_possible_cpus(); idx++) {
+> +               if (cpu_capacity[idx].hwid == hwid)
+> +                       break;
+> +
+> +               if (cpu_capacity[idx].hwid == -1)
+> +                       return;
+> +       }
+> +
+> +       if (idx == num_possible_cpus())
+> +               return;
+> +
+> +       set_power_scale(cpu, cpu_capacity[idx].capacity / middle_capacity);
+
+OK, but there's no guarantee here you'll stay within that
+[1,2*SCHED_POWER_SCALE-1] range. This might want a comment and or
+runtime verification so that when people extend the table_efficiency[]
+wrongly we'll get notice, humm?
+
+> +       printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
+> +               cpu, arch_scale_freq_power(NULL, cpu));
+> +} 
