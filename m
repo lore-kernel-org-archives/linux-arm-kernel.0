@@ -1,44 +1,51 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 2 Jul 2012 07:51:24 +0000
-Subject: [PATCH] da8xx-fb: add missing FB_BLANK operations
-In-Reply-To: <1341213073-2986-1-git-send-email-yegorslists@googlemail.com>
-References: <1341213073-2986-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA60AE9@DBDE01.ent.ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 02 Jul 2012 09:54:08 +0200
+Subject: [PATCH 1/2] arm: imx: enable flexcan on imx25, imx35, imx53, imx6q
+In-Reply-To: <20120702075054.GF2698@pengutronix.de>
+References: <1341175565-13218-1-git-send-email-mkl@pengutronix.de>
+ <1341175565-13218-2-git-send-email-mkl@pengutronix.de>
+ <20120702075054.GF2698@pengutronix.de>
+Message-ID: <4FF153A0.3030404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 12:41:13, yegorslists at googlemail.com wrote:
-> From: Yegor Yefremov <yegorslists@googlemail.com>
+On 07/02/2012 09:50 AM, Sascha Hauer wrote:
+> On Sun, Jul 01, 2012 at 10:46:04PM +0200, Marc Kleine-Budde wrote:
+>> Cc: Sascha Hauer <sha@pengutronix.de>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> ---
+>>  arch/arm/mach-imx/Kconfig |    4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index eff4db5..c296851 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>> @@ -52,6 +52,7 @@ config SOC_IMX25
+>>  	select ARCH_MX25
+>>  	select COMMON_CLK
+>>  	select CPU_ARM926T
+>> +	select HAVE_CAN_FLEXCAN if CAN
 > 
-> add FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND and FB_BLANK_HSYNC_SUSPEND
-> modes (copy drivers/video/omap2/omapfb/omapfb-main.c implementation).
-> Otherwise X-server will complain about invalid parameter.
-> 
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> ---
->  drivers/video/da8xx-fb.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
-> index 29577bf..9879edc 100644
-> --- a/drivers/video/da8xx-fb.c
-> +++ b/drivers/video/da8xx-fb.c
-> @@ -987,6 +987,9 @@ static int cfb_blank(int blank, struct fb_info *info)
->  
->  		lcd_enable_raster();
->  		break;
-> +	case FB_BLANK_NORMAL:
-> +	case FB_BLANK_VSYNC_SUSPEND:
-> +	case FB_BLANK_HSYNC_SUSPEND:
->  	case FB_BLANK_POWERDOWN:
->  		if (par->panel_power_ctrl)
->  			par->panel_power_ctrl(0);
+> Do we need the 'if CAN' here? It seems yes, since HAVE_CAN_FLEXCAN is
+> inside the "CAN Device Drivers" menu which depends on CAN. Shouldn't the
+> HAVE_CAN_FLECAN be outside the menu?
 
+Yes, we can move the HAVE_CAN_FLEXCAN outside of that menu, but it still
+depends on CONFIG_NET.
 
-+ linux-fbdev & Florian
+Marc
 
-You should always send Fbdev patches to linux-fbdev list.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-
-Thanks,
-Vaibhav
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/ae72385b/attachment.sig>
