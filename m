@@ -1,59 +1,82 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 2 Jul 2012 13:22:17 +0200
-Subject: [PATCH v3] ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset fix
- issues.
-In-Reply-To: <1339691061-12778-1-git-send-email-Russ.Dill@ti.com>
-References: <1339691061-12778-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <20120702112217.GD22065@sortiz-mobl>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 2 Jul 2012 13:13:17 +0200
+Subject: [RFC] Support for 'Coda' video codec IP.
+In-Reply-To: <20120702105427.GP2698@pengutronix.de>
+References: <1340115094-859-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120619181717.GE28394@pengutronix.de>
+ <CACKLOr1zCp2NfLjBrHjtXpmsFMHqhoHFPpghN=Tyf3YAcyRrYg@mail.gmail.com>
+ <20120620090126.GO28394@pengutronix.de>
+ <20120620100015.GA30243@sirena.org.uk>
+ <20120620130941.GB2253@S2101-09.ap.freescale.net>
+ <CACKLOr28vm9n08VSOim=riB54os665be1CHdUqFXk+3MqPqtWQ@mail.gmail.com>
+ <20120620143336.GE2253@S2101-09.ap.freescale.net>
+ <CACKLOr1oZZPZBNv+p9p3Vf5oY4K8K65_dJ5qkJO6NqeP2=2unw@mail.gmail.com>
+ <20120702105427.GP2698@pengutronix.de>
+Message-ID: <CACKLOr1shAodE9FDD9dZ1dgAKy4PyPRQAsyMOiNzqQ0uQFTYGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russ,
+On 2 July 2012 12:54, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Jul 02, 2012 at 12:36:46PM +0200, javier Martin wrote:
+>> Hi Sascha,
+>> I almost have a final version ready which includes multi-instance
+>> support (not tested though) [1]. As I stated, we assumed the extra
+>> effort of looking at your code in [2] in order to provide a mechanism
+>> that preserves compatibility between VPUs in i.MX21, i.MX51 and
+>> i.MX53. This is the only thing left in order to send the driver for
+>> mainline submission.
+>>
+>> While I was reading your code I found out that you keep the following
+>> formats for v1 (codadx6-i.MX27) codec:
+>>
+>> static int vpu_v1_codecs[VPU_CODEC_MAX] = {
+>>       [VPU_CODEC_AVC_DEC] = 2,
+>>       [VPU_CODEC_VC1_DEC] = -1,
+>>       [VPU_CODEC_MP2_DEC] = -1,
+>>       [VPU_CODEC_DV3_DEC] = -1,
+>>       [VPU_CODEC_RV_DEC] = -1,
+>>       [VPU_CODEC_MJPG_DEC] = 0x82,
+>>       [VPU_CODEC_AVC_ENC] = 3,
+>>       [VPU_CODEC_MP4_ENC] = 1,
+>>       [VPU_CODEC_MJPG_ENC] = 0x83,
+>> };
+>>
+>> As I understand, this means the following operations are supported:
+>>
+>> 1- H264 decoding.
+>> 2- H264 encoding
+>> 3- MP4 encoding.
+>> 4- MJPG  decoding.
+>> 5- MJPG encoding.
+>>
+>> I totally agree with MP4 and H264 formats but, are you sure about
+>> MJPG? I have a i.MX27 v1 codec (codadx6) but I didn't know that this
+>> codec supported MJPG. Have you tested this code with an i.MX27 and
+>> MJPG? Where did you find out that it supports this format?
+>
+> We haven't tested MJPG on the i.MX27. The table above is from the
+> original Freescale code, so I assume it's correct and I assume that
+> the coda dx6 can do MJPEG.
 
-On Thu, Jun 14, 2012 at 09:24:21AM -0700, Russ Dill wrote:
-> From: Russ Dill <Russ.Dill@gmail.com>
-> 
-> 'ARM: OMAP3: USB: Fix the EHCI ULPI PHY reset issue' (1fcb57d0) fixes
-> an issue where the ULPI PHYs were not held in reset while initializing
-> the EHCI controller. However, it also changes behavior in
-> omap-usb-host.c omap_usbhs_init by releasing reset while the
-> configuration in that function was done.
-> 
-> This change caused a regression on BB-xM where USB would not function
-> if 'usb start' had been run from u-boot before booting. A change was
-> made to release reset a little bit earlier which fixed the issue on
-> BB-xM and did not cause any regressions on 3430 sdp, the board for
-> which the fix was originally made.
-> 
-> This new fix, 'USB: EHCI: OMAP: Finish ehci omap phy reset cycle
-> before adding hcd.', (3aa2ae74) caused a regression on OMAP5.
-> 
-> The original fix to hold the EHCI controller in reset during
-> initialization was correct, however it appears that changing
-> omap_usbhs_init to not hold the PHYs in reset during it's
-> configuration was incorrect. This patch first reverts both fixes, and
-> then changes ehci_hcd_omap_probe in ehci-omap.c to hold the PHYs in
-> reset as the original patch had done. It also is sure to incorporate
-> the _cansleep change that has been made in the meantime.
-> 
-> I've tested this on Beagleboard xM, I'd really like to get an ack from
-> the 3430 sdp and OMAP5 guys before getting this merged.
-> 
-> v3 - Brown paper bag its too early in the morning actually run
->      git commit amend fix
-> v2 - Put cansleep gpiolib call outside of spinlock
-> 
-> Signed-off-by: Russ Dill <Russ.Dill@gmail.com>
-> ---
->  drivers/mfd/omap-usb-host.c  |   48 +++++++++++++++++++++++++++++++++++++++++-
->  drivers/usb/host/ehci-omap.c |   18 +++++++---------
->  2 files changed, 55 insertions(+), 11 deletions(-)
-I applied this one to my for-linus branch, it will be part of my next 3.5 pull
-request to Linus.
+Fabio, could you confirm that the VPU in the i.MX27 supports MJPG too?
 
-Cheers,
-Samuel.
+>> Are you
+>> using firmware version 2.2.4 for v1 codecs?
+>
+> No, 2.2.5
+
+Where did you get that firmware version? The only related download I
+can find in [1] is
+'MX273DS_FULL_VPU_SW_AND_VPU_FIRMWARE_2.2.4_WINCE_TO2.X_ONLY' which
+includes firmware 2.2.4.
+
+[1] http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=i.MX27&nodeId=018rH3ZrDR66AF&fpsp=1&tab=Design_Tools_Tab
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
