@@ -1,28 +1,32 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 02 Jul 2012 12:41:59 -0700
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <20120702183324.GA29030@opensource.wolfsonmicro.com>
-References: <4FECB95D.7010200@zytor.com> <20120701104401.GA4352@mail.gnudd.com>
- <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
- <201207021658.27755.arnd@arndb.de> <20120702180518.GA25995@sirena.org.uk>
- <4FF1E37D.7050103@zytor.com>
- <20120702183324.GA29030@opensource.wolfsonmicro.com>
-Message-ID: <4FF1F987.3030501@zytor.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  2 Jul 2012 16:50:26 -0300
+Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add watchdog support
+Message-ID: <1341258627-3469-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2012 11:33 AM, Mark Brown wrote:
-> 
->> Last I saw I saw a patch to that effect, asked what the benefit
->> was, and got no answer.
-> 
-> Are you positive about that?  I don't recall you replying any of
-> the times I sent out the patch and my mail archive isn't
-> contradicting me either.
-> 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I said last time I saw a patch to that effect; it might not have been
-from you.  I might not have seen yours for whatever reason (including
-losing it on my end.)
+Add watchdog support.
 
-	-hpa
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index e0ec929..99581a0 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -42,6 +42,9 @@
+ 				};
+ 			};
+ 
++			wdog at 020bc000 { /* WDOG1 */
++				status = "okay";
++			};
+ 		};
+ 
+ 		aips-bus at 02100000 { /* AIPS2 */
+-- 
+1.7.1
