@@ -1,75 +1,35 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 02 Jul 2012 08:57:11 +1000
-Subject: [PATCH] arm: ep93xx: Enable i2c support for ep9302
-In-Reply-To: <CAL4-wQqxz_9xuZESseNvmJ=jwkdoF85TV750U79PY1MC=dbw=A@mail.gmail.com>
-References: <alpine.LFD.2.00.1206101542100.21012@FC9.localdomain>
- <4FD534A5.1030301@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F0020698D1354E@AUSP01VMBX24.collaborationhost.net>
- <4FD66843.6000504@gmail.com>
- <CAL4-wQqxz_9xuZESseNvmJ=jwkdoF85TV750U79PY1MC=dbw=A@mail.gmail.com>
-Message-ID: <4FF0D5C7.9090904@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 2 Jul 2012 09:52:09 +0800
+Subject: [PATCH RESEND 3/5] can: flexcan: adopt pinctrl support
+In-Reply-To: <4FF0D401.4050101@pengutronix.de>
+References: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
+ <1336352040-28447-4-git-send-email-shawn.guo@linaro.org>
+ <4FF0D401.4050101@pengutronix.de>
+Message-ID: <20120702015206.GA21003@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/12 05:33, Martin Guy wrote:
-
-> On 11 June 2012 23:50, Ryan Mallon <rmallon@gmail.com> wrote:
->> On 12/06/12 01:45, H Hartley Sweeten wrote:
->>
->>> On Sunday, June 10, 2012 4:58 PM, Ryan Mallon wrote:
->>>> On 10/06/12 22:44, Todor Colov wrote:
->>>>>
->>>>> Enable i2c support for ep9302. i2c support is needed when external RTC is
->>>>> used.
->>>>>
->>>>> Signed-off-by: Todor Colov <todorcolov@gmail.com>
->>>>
->>>> Thanks. Applied to ep93xx-fixes.
->>>
->>> Ryan,
->>>
->>> I'm not sure about this patch...
->>>
->>> The EDB9302 does not have a built-on external RTC connected to the I2C
->>> bus. The EECLK and EEDAT pins are simply routed to two headers. They are
->>> not connected to any I2C devices built onto the board.
->>>
->>> This patch will cause _all_ edb9302 boards to bind the ds1337 driver to the
->>> I2C bus but that device will only exist if a user has connected the part
->>> externally to the board.
->>>
->>> Just my 2 cents...
->>
->>
->> Hmm, the binding is not really a problem, since it will just fail if the
->> ds1337 device is not present at that i2c address. I guess the main problem
->> is if there are users of the edb9302 who want i2c on the headers and others
->> who want to use the pins as gpio. Without being able to auto-detect such
->> boards at runtime (which seems very unlikely) I can't think of a good
->> solution to this, other than it being time for me to do more DT reading :-).
->>
->> I'm inclined to leave the patch in. The ep93xx doesn't have a lot of users,
->> so I think it is okay to tailor it a bit to the users we do have. I'm happy
->> to revert it, and find a better solution if this breaks someone else's
->> setup.
+On Mon, Jul 02, 2012 at 12:49:37AM +0200, Marc Kleine-Budde wrote:
+> > +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> > +	if (IS_ERR(pinctrl))
+> > +		return PTR_ERR(pinctrl);
+> > +
+> >  	if (pdev->dev.of_node) {
+> >  		const u32 *clock_freq_p;
 > 
-> Hi folks
->  Can I add that the SimpleMachines.it Sim.One board, based on the
-> EP9307, has a DS1337 on the I2C bus, for which the define is
-> machine_is_sim_one()  However, the existing Linux kernel already
-> read/writes this chip successfully, so I'm not sure what advantage
-> this change would bring for that board.
+> I'm on mx28 and trying to load the flexcan driver via DT, but
+> devm_pinctrl_get_select_default fails with -19.
+> 
+You need to have pinctrl state setup in dts, some like:
 
+http://article.gmane.org/gmane.linux.ports.arm.kernel/174148
 
-Hi Martin,
+> What am I doing wrong? Will this fail with the same error on non DT
+> platforms?
+> 
+No, it will not, because a dummy pinctrl state is provided by
+calling pinctrl_provide_dummies() in mx28_soc_init().
 
-Sorry for the late reply, I've been on holiday. The change only affects
-the Cirrus EDB-9302 board. The Sim.one is managed by a separate board file.
-
-> If you would like to test
-> your patch on that board too, we may be able to ship you an enginering
-> sample; if that would be useful please reply by private email.
-
-I already have one of the Sim.one boards. Thanks.
-
-~Ryan
+-- 
+Regards,
+Shawn
