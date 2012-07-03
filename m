@@ -1,47 +1,94 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 02 Jul 2012 23:48:42 -0400 (EDT)
-Subject: [PATCH 2/9] arm: mach-mvebu: add header
-In-Reply-To: <20120702191616.GJ1348@lunn.ch>
-References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120702183330.GG1348@lunn.ch> <20120702210838.37c78fda@skate>
- <20120702191616.GJ1348@lunn.ch>
-Message-ID: <alpine.LFD.2.02.1207022313550.31003@xanadu.home>
+From: andy.green@linaro.org (Andy Green)
+Date: Tue, 03 Jul 2012 12:22:26 +0800
+Subject: [PATCH 3 1/4] OMAP: add cpu id register to MAC address helper
+In-Reply-To: <20120703041937.32697.46015.stgit@build.warmcat.com>
+References: <20120703041937.32697.46015.stgit@build.warmcat.com>
+Message-ID: <20120703042224.32697.5128.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Jul 2012, Andrew Lunn wrote:
+From: Andy Green <andy@warmcat.com>
 
-> It would also be nice if Marvell ASIC engineers didn't randomly move
-> things around in the address space....
+Introduce a generic helper function that can generate a valid MAC
+address using data from the OMAP unique CPU ID register.
 
-They didn't.  The _software_ engineers did.
+For comparison purposes this produces a MAC address of
 
-As you might know, the Orion and Kirkwood SOCs have programmable 
-physical windows for most things, including PCI IO window, PCI mem 
-window, SDRAM window, NAND controller window, bridge peripheral window, 
-etc.  
+  2e:20:3c:ea:46:01
 
-So you can change your physical address space as you wish.  This was 
-made to accommodate whether you are a PCI host or a PCI client (think 
-wifi cards which are in the later category but still with this window 
-control block).  This is also how the various SDRAM banks are remapped to 
-appear as a contiguous chunk of physical memory regardless of the 
-populated memory size in each bank.
+for the ethernet device on my PandaBoard ES.
 
-Most of this is being partly set up (or set again) in the various 
-addr-map.c files.
+The MAC address space has space set aside for these kind of "locally
+administered" MAC addresses, analogous to IPv4 10.x.x.x range, and this
+patch marks the generated MAC addresses as such.
 
-Now it seems that all the u-Boot implementations for Orion/Kirkwood out 
-there have always moved the window containing the serial ports from its 
-default 0xd0000000 address to 0xf1000000.  Why they did that I have no 
-idea.  And Linux simply took those remapped physical addresses as 
-authoritative.
+The patch leaves two bits allowing elaborating 4 different MACs from the
+generated data.
 
-And whether or not Armada 370/XP still have this physical remap ability 
-I don't know.  And if it does, then why didn't it follow the same 
-0xf1000000 tradition as all the other mvebu targets before them I don't 
-know either.  Maybe this could be considered?
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ arch/arm/mach-omap2/id.c              |   39 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/include/mach/id.h |    1 +
+ 2 files changed, 40 insertions(+)
 
-
-Nicolas
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 00486a8..faff686 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
+ 	else
+ 		tap_prod_id = 0x0208;
+ }
++
++/*
++ * this uses the unique per-cpu info from the cpu fuses set at factory to
++ * generate a 6-byte MAC address.  Two bits in the generated code are used
++ * to elaborate the generated address into four, so it can be used on multiple
++ * network interfaces.
++ */
++
++void omap_die_id_to_ethernet_mac(u8 *mac, int subtype)
++{
++	struct omap_die_id odi;
++	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
++
++	omap_get_die_id(&odi);
++
++	mac[0] = odi.id_2;
++	mac[1] = odi.id_2 >> 8;
++	mac[2] = odi.id_1;
++	mac[3] = odi.id_1 >> 8;
++	mac[4] = odi.id_1 >> 16;
++	mac[5] = odi.id_1 >> 24;
++
++	/* XOR other chip-specific data with ID */
++
++	tap ^= odi.id_3;
++
++	mac[0] ^= tap;
++	mac[1] ^= tap >> 8;
++	mac[2] ^= tap >> 16;
++	mac[3] ^= tap >> 24;
++
++	/* allow four MACs from this same basic data */
++
++	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
++
++	/* mark it as not multicast, and outside official 80211 MAC namespace */
++
++	mac[0] = (mac[0] & ~1) | 2;
++}
+diff --git a/arch/arm/mach-omap2/include/mach/id.h b/arch/arm/mach-omap2/include/mach/id.h
+index 02ed3aa..d6c8d63 100644
+--- a/arch/arm/mach-omap2/include/mach/id.h
++++ b/arch/arm/mach-omap2/include/mach/id.h
+@@ -18,5 +18,6 @@ struct omap_die_id {
+ };
+ 
+ void omap_get_die_id(struct omap_die_id *odi);
++void omap_die_id_to_ethernet_mac(u8 *mac, int subtype);
+ 
+ #endif
