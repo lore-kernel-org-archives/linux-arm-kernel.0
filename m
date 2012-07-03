@@ -1,43 +1,42 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Mon, 2 Jul 2012 15:27:10 +0200
-Subject: [RFC PATCH 1/3] i2c: add 'actual' field to struct i2c_msg
-In-Reply-To: <1340967927-27354-2-git-send-email-shubhrajyoti@ti.com>
-References: <1340967927-27354-1-git-send-email-shubhrajyoti@ti.com>
- <1340967927-27354-2-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120702152710.37af312a@endymion.delvare>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon,  2 Jul 2012 21:39:30 -0400
+Subject: [PATCH v4 0/2] add gpmi support for imx6q
+Message-ID: <1341279572-6098-1-git-send-email-shijie8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jun 2012 16:35:25 +0530, Shubhrajyoti D wrote:
-> In case of a NACK, it's wise to tell our clients
-> drivers about how many bytes were actually transferred.
-> 
-> Support this by adding an extra field to the struct
-> i2c_msg which gets incremented the amount of bytes
-> actually transferred.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  include/linux/i2c.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index ddfa041..0cb6b83 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -547,6 +547,7 @@ struct i2c_msg {
->  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
->  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
->  	__u16 len;		/* msg length				*/
-> +	__u16 actual;		/* actual bytes transferred             */
->  	__u8 *buf;		/* pointer to msg data			*/
->  };
->  
+This patch set adds the gpmi-nand support for imx6q.
 
-Oh, as a side note: I don't much like the name "actual". It's not
-really clear what it means. I don't have a perfect name to propose as a
-replacement, but maybe "transferred" or even just "done" would do.
+I prefer to add the clocks in the gpmi-nand driver.
+Yes, it will change the gpmi nand driver, but we have to do so.
+The reason is :
+  We will support the ONFI nand in mx6q in the future. If the ONFI nand is
+  set to Sync mode, we have to __change__ the clocks explicitly.
+
+Test this patch set on imx6q-arm2 board and imx28-evk board.
+
+v3 --> v4:
+	[1] add con_id for gpmi nand
+	[2] balance the clk_prepare_enable()/clk_disable_unprepare()
+	    in __gpmi_enable_clk();
+	[3] do not send the second patch which is applied to Shawn's tree.
+
+v2 --> v3:
+	[1] fix a bug the clocks.
+
+v1 --> v2:
+	[1] add dev_id for the gpmi-nand's clocks.
+	[2] set the default values for these clocks.
+
+Huang Shijie (2):
+  ARM: imx6q: add clocks for gpmi-nand
+  mtd: gpmi: change the code for clocks
+
+ arch/arm/mach-imx/clk-imx6q.c          |    8 +++-
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   45 ++++++++++++++---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   82 ++++++++++++++++++++++++++++----
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    3 +-
+ 4 files changed, 119 insertions(+), 19 deletions(-)
 
 -- 
-Jean Delvare
+1.7.4.4
