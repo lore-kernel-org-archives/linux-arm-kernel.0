@@ -1,45 +1,105 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 2 Jul 2012 16:57:28 -0700
-Subject: [PATCH] ARM: u300: convert to common clock
-In-Reply-To: <CACRpkdakK9LPfZa8zWCE415GLc_n+tPqGJPQr6g1O2K0ptd-UA@mail.gmail.com>
-References: <1340142265-14549-1-git-send-email-linus.walleij@stericsson.com>
- <CACRpkdakK9LPfZa8zWCE415GLc_n+tPqGJPQr6g1O2K0ptd-UA@mail.gmail.com>
-Message-ID: <CAJOA=zPK64oEp7Yo9+3gqssPOM0yvzF738N4_ZL0cjh2QFTV-A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 02 Jul 2012 17:05:35 -0700
+Subject: [PATCH] gpio/omap: fix invalid context restore of gpio bank-0
+In-Reply-To: <20120703093404.2a9b5aba@notabene.brown> (NeilBrown's message of
+ "Tue, 3 Jul 2012 09:34:04 +1000")
+References: <1340990551-19426-1-git-send-email-jon-hunter@ti.com>
+ <87mx3i595b.fsf@ti.com> <4FF1E7DE.10409@ti.com>
+ <20120703093404.2a9b5aba@notabene.brown>
+Message-ID: <87txxp4skw.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 30, 2012 at 12:50 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Tue, Jun 19, 2012 at 11:44 PM, Linus Walleij
-> <linus.walleij@stericsson.com> wrote:
->
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This converts the U300 clock implementation over to use the common
->> struct clk and moves the implementation down into drivers/clk.
->> Since VCO isn't used in tree it was removed, it's not hard to
->> put it back in if need be.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Mike if this looks allright, could you merge it into the clk-next branch?
+NeilBrown <neilb@suse.de> writes:
 
-With a negative diff of 805 lines, who could say 'no' to this patch?
-But seriously the changes do look good.  I fixed up a small conflict
-in the clk Makefile due to your earlier integrator/icst patches.  The
-only other thing is that some of the headers included in
-drivers/clk/clk-u300.c are unnecessary.  I hate blocking a patch on
-such trivial stuff, but maybe you could clean that up down the road
-some day?  For now I've taken it into clk-next.
-
-Thanks,
-Mike
-
+> On Mon, 2 Jul 2012 13:26:38 -0500 Jon Hunter <jon-hunter@ti.com> wrote:
 >
-> Yours,
-> Linus Walleij
+>> 
+>> On 07/02/2012 01:07 PM, Kevin Hilman wrote:
+>> > + Neil Brown
+>> > 
+>> > Hi Jon,
+>> > 
+>> > Jon Hunter <jon-hunter@ti.com> writes:
+>> > 
+>> >> Currently the gpio _runtime_resume/suspend functions are calling the
+>> >> get_context_loss_count() platform function if the function is populated for
+>> >> a gpio bank. This function is used to determine if the gpio bank logic state
+>> >> needs to be restored due to a power transition. This function will be populated
+>> >> for all banks, but it should only be called for banks that have the
+>> >> "loses_context" variable set. It is pointless to call this if loses_context is
+>> >> false as we know the context will never be lost and will not need restoring.
+>> >>
+>> >> For all OMAP2+ devices gpio bank-0 is in an always-on power domain and so will
+>> >> never lose context. We found that the get_context_loss_count() was being called
+>> >> for bank-0 during the probe and returning 1 instead of 0 indicating that the
+>> >> context had been lost. This was causing the context restore function to be
+>> >> called at probe time for this bank and because the context had never been saved,
+>> >> was restoring an invalid state. This ultimately resulted in a crash [1].
+>> >>
+>> >> There are multiple bugs here that need to be addressed ...
+>> >>
+>> >> 1. Why the always-on power domain returns a context loss count of 1? This needs
+>> >>    to be fixed in the power domain code. However, the gpio driver should not
+>> >>    assume the loss count is 0 to begin with.
+>> >> 2. The omap gpio driver should never be calling get_context_loss_count for a
+>> >>    gpio bank in a always-on domain. This is pointless and adds unneccessary
+>> >>    overhead.
+>> >> 3. The OMAP gpio driver assumes that the initial power domain context loss count
+>> >>    will be 0 at the time the gpio driver is probed. However, it could be
+>> >>    possible that this is not the case and an invalid context restore could be
+>> >>    performed during the probe. To avoid this otherwise only populated the
+>> > 
+>> > The 'To avoid this...' sentence here doesn't read well.  Looks like you
+>> > need to:
+>> > 
+>> > s/otherwise//
+>> 
+>> Yes, I meant to have dropped "otherwise" here. Thanks!
+>> 
+>> > s/populated/populate/
+>> 
+>> Yes that too! I must have re-worded and screwed it up royally :-(
+>> 
+>> > ?
+>> > 
+>> >>    get_context_loss_count() function pointer after the initial call to
+>> >>    pm_runtime_get() has occurred. This will ensure that the first
+>> >>    pm_runtime_put() initialised the loss count correctly.
+>> >>
+>> >> This patch addresses issues 2 and 3 above.
+>> >> [1] http://marc.info/?l=linux-omap&m=134065775323775&w=2
+>> >>
+>> >> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> >> Cc: Linus Walleij <linus.walleij@stericsson.com>
+>> >> Cc: Kevin Hilman <khilman@ti.com>
+>> >> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> >> Cc: Franky Lin <frankyl@broadcom.com>
+>> >>
+>> >> Reported-by: Franky Lin <frankyl@broadcom.com>
+>> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> > 
+>> > Thanks for digging inot this bug Jon.  The same bug was brought up by
+>> > Neil Brown (Cc'd) in a different thread.
+>> > 
+>> > Neil, it looks to me that this fix will address the problems you were
+>> > seeing as well.  Care to test, and respond with your ack/tested-by if it
+>> > works for you?  Thanks.
+>> 
+>> Neil let me know your thoughts and if you are ok, I can clean-up the
+>> changelog and re-send.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Yes, works for me and looks sensible.
+>
+>  Tested-by: NeilBrown <neilb@suse.de>
+>
+
+Great!  Thanks for testing.
+
+Jon, please make the minor changelog edits, collect the reviewed-by and
+tested-by tags and repost.  I'll then queue this up for Grant.
+
+Based on your earlier comments, this only affects v3.5, so no
+need to push it into stable, correct?
+
+Kevin
