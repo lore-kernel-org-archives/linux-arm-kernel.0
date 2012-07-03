@@ -1,82 +1,43 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 3 Jul 2012 16:42:18 +0530
-Subject: [PATCH] clk: fix parent validation in __clk_set_parent()
-Message-ID: <1341313938-17861-1-git-send-email-rnayak@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Jul 2012 04:18:30 -0700
+Subject: [PATCH 1/4] Revert "arm/dts: Add support for TI AM335x EVM board"
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9E911E@DBDE01.ent.ti.com>
+References: <1340358050-29560-1-git-send-email-anilkumar@ti.com>
+ <1340358050-29560-2-git-send-email-anilkumar@ti.com>
+ <20120702084021.GF1122@atomide.com> <4FF15F7D.1090108@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9E911E@DBDE01.ent.ti.com>
+Message-ID: <20120703111830.GK1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The below commit introduced a bug in __clk_set_parent()
-which could cause it to *skip* the parent validation
-which makes sure the parent passed to the api is a valid
-one.
+* AnilKumar, Chimata <anilkumar@ti.com> [120703 03:34]:
+> Hi Tony,
+> 
+> On Mon, Jul 02, 2012 at 14:14:45, Hiremath, Vaibhav wrote:
+> > 
+> > 
+> > On 7/2/2012 2:10 PM, Tony Lindgren wrote:
+> > > * AnilKumar Ch <anilkumar@ti.com> [120622 02:45]:
+> > >> This reverts commit 6c54bbb42678c99685c8e7fd09267e1cb8c2ae40.
+> > > 
+> > > As that has not been merged yet, I'll just drop it and set up
+> > > a new devel-dt branch. Applying the reset into devel-dt.
+> > > 
+> > 
+> > Yeah, that's better.
+> > 
+> > Care to include it into you next pull request.
 
-    commit 7975059db572eb47f0fb272a62afeae272a4b209
-    Author: Rajendra Nayak <rnayak@ti.com>
-    Date:   Wed Jun 6 14:41:31 2012 +0530
-
-        clk: Allow late cache allocation for clk->parents
-
-This was identified by the following compiler warning..
-
-    drivers/clk/clk.c: In function '__clk_set_parent':
-    drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in this function [-Wuninitialized]
-
-.. as reported by Marc Kleine-Budde.
-
-There were various options discussed on how to fix this, one
-being initing 'i' to clk->num_parents, but the below approach
-was found to be more appropriate as it also makes the 'parent
-validation' code simpler to read.
-
-Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- drivers/clk/clk.c |   28 +++++++++++++---------------
- 1 files changed, 13 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 8996f46..46317cb 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1067,26 +1067,24 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+Yes that's the plan.
  
- 	old_parent = clk->parent;
- 
--	/* find index of new parent clock using cached parent ptrs */
--	if (clk->parents)
--		for (i = 0; i < clk->num_parents; i++)
--			if (clk->parents[i] == parent)
--				break;
--	else
-+	if (!clk->parents)
- 		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
- 								GFP_KERNEL);
- 
- 	/*
--	 * find index of new parent clock using string name comparison
--	 * also try to cache the parent to avoid future calls to __clk_lookup
-+	 * find index of new parent clock using cached parent ptrs,
-+	 * or if not yet cached, use string name comparison and cache
-+	 * them now to avoid future calls to __clk_lookup.
- 	 */
--	if (i == clk->num_parents)
--		for (i = 0; i < clk->num_parents; i++)
--			if (!strcmp(clk->parent_names[i], parent->name)) {
--				if (clk->parents)
--					clk->parents[i] = __clk_lookup(parent->name);
--				break;
--			}
-+	for (i = 0; i < clk->num_parents; i++) {
-+		if (clk->parents && clk->parents[i] == parent)
-+			break;
-+		else if (!strcmp(clk->parent_names[i], parent->name)) {
-+			if (clk->parents)
-+				clk->parents[i] = __clk_lookup(parent->name);
-+			break;
-+		}
-+	}
- 
- 	if (i == clk->num_parents) {
- 		pr_debug("%s: clock %s is not a possible parent of clock %s\n",
--- 
-1.7.1
+> devel-dt branch is created but these patches are not pushed yet.
+> 
+> Let me know do you have any comments on the patches.
+
+Oops, sorry yes looks like I only dropped the one you wanted
+to revert but forgot to apply the new ones. Applied now to
+devel-dt and pushed out.
+
+Regards,
+
+Tony
