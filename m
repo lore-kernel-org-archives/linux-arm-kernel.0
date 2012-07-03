@@ -1,40 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Jul 2012 10:29:48 -0600
-Subject: [PATCH v2 0/6] Port Tegra to generic clk framework
-In-Reply-To: <1341313761-22118-1-git-send-email-pgaikwad@nvidia.com>
-References: <1341313761-22118-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <4FF31DFC.8030708@wwwdotorg.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 3 Jul 2012 17:56:35 +0100
+Subject: [PATCH] can: flexcan: add a regulator for transceiver
+In-Reply-To: <20120703152813.GI22705@S2101-09.ap.freescale.net>
+References: <1341319571-27763-1-git-send-email-shawn.guo@linaro.org>
+ <20120703130747.GD25995@sirena.org.uk>
+ <20120703141829.GG22705@S2101-09.ap.freescale.net>
+ <20120703144646.GT29030@opensource.wolfsonmicro.com>
+ <20120703152813.GI22705@S2101-09.ap.freescale.net>
+Message-ID: <20120703165635.GV29030@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2012 05:09 AM, Prashant Gaikwad wrote:
-> This patch set ports Tegra clock code to generic clock framework.
-> 
-> Depends on
-> [PATCH v3 0/9] Add clk_prepare/clk_unprepare series
-> [PATCH] ARM: tegra: Remove second instance of uart clk
-> [PATCH] dma: tegra: add clk_prepare/clk_unprepare
-> [PATCH] ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
-> 
-> Tested on Ventana and Cardhu
-> 
-> v2:
->  - Rebased on Tegra's for-3.6/common-clk
+On Tue, Jul 03, 2012 at 11:28:15PM +0800, Shawn Guo wrote:
+> On Tue, Jul 03, 2012 at 03:46:47PM +0100, Mark Brown wrote:
 
-OK, this applies to for-3.6/common-clk without issue now. However, there
-are still runtime problems:
+> > No, I really do mean a fixed voltage regulator.  Dummy regulators should
+> > essentially never be used in production.
 
-On Tegra20(Ventana), running Tegra's for-next branch with these patches
-merged in, if I play audio, the sound is much too low a pitch; the I2S
-clock must be being set too low. Also, if I play the same file twice,
-once encoded as 48KHz once encoded as 44.1KHz, the pitch is different.
+> In that case, my patch may need to stay unchanged.  Some systems have
+> a supply controlled by gpio and we need to have it be a Linux regulator
+> to switch it, while other systems have the supply non-switchable which
+> can be reasonably invisible to software.  That said, the regulator is
+> optional and the failure of devm_regulator_get should not make the
+> driver probe fail.
 
-On Tegra20(Ventana), running next-20120703 plus a few local patches for
-regulators plus these common clock patches, then I see the same
-segfaults during boot that I mentioned before. It seems something in
-linux-next not in Tegra's for-next branch is breaking the common clock
-code for us.
+No, really.
 
-Neither problem is seen on Cardhu with the same kernels.
+> I guess your suggestion here is to make the regulator mandatory for
+> the driver, which means those non-switchable supplies have to be
+> also defined as Linux regulators for every single system.  I'm not
+> sure we want to do that just for saving a regulator pointer check.
 
-Can you please investigate and fix these issues? Thanks.
+If we go down that route what we need to do is to go through and remove
+all error checking for failure to get regulators and make the regulator
+API silently handle this since exactly the same thing applies to almost
+every supply in the system.
+
+What we shouldn't be doing is open coding this stupidity in every single
+regulator API user, that's just a pointless waste of everyone's time.
