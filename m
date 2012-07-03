@@ -1,61 +1,27 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Tue, 3 Jul 2012 15:00:42 +0200
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
-References: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
- <4FECB95D.7010200@zytor.com> <cover.1338222460.git.rubini@gnudd.com>
- <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
- <20120701104401.GA4352@mail.gnudd.com>
-Message-ID: <20120703130042.GA10007@mail.gnudd.com>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarh)
+Date: Tue, 03 Jul 2012 15:03:44 +0200
+Subject: [PATCH 0/3] ARM: dts: dove: Basic devicetree support for Marvell
+ Dove
+In-Reply-To: <20120703125017.GB17534@lunn.ch>
+References: <1341318868-24567-2-git-send-email-sebastian.hesselbarth@googlemail.com>
+ <20120703125017.GB17534@lunn.ch>
+Message-ID: <4FF2EDB0.3040707@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Anvin:
-> There is no problem with adding ARM or !X86 dependencies to drivers
-> now and fixing them later or as required.
+On 07/03/2012 02:50 PM, Andrew Lunn wrote:
+>>   create mode 100644 arch/arm/boot/dts/dove-cm-a510.dtsi
+>>   create mode 100644 arch/arm/boot/dts/dove-dove-db.dtsi
+>
+> These two should be dts files, not dtsi. They are not include files.
 
-Ok. This is my summary of the compilation errors I have when
-enabling ARM_AMBA undex x86 and enabling everything that appears
-in "make oldconfig":
+Ok, I will move them to .dts files for v2 of the patches
 
+> I also noticed a few mrvl in the compatibility strings. We have
+> decided to use marvell.
 
-This is a sum up of the errors in all driver that are
-enabled by telling "CONFIG_ARM_AMBA=y" in the x86 config.
+I am fine with 'marvell' instead of 'mrvl'. But the name change
+has not been commited to arm-soc, yet? I can create a patch to
+rename all occurrences of mrvl to marvell if you like.
 
-   drivers/dma/pl330.c: register names conflict with arch symbols
-     proposed fix: use proper prefix names
-
-   drivers/dma/amba-pl08x.c: needs <asm/hardware/pl080.h>
-     proposed fix: move pl080.h to include/linux
-
-   drivers/gpio/gpio-pl061.c: uses chained_irq_enter/exit
-     proposed fix: depend on CONFIG_ARM (the function only exists in arm)
-
-   drivers/mmc/host/mmci.c: uses <asm/sizes.h>
-   drivers/mmc/host/mmci.c: uses readsl/writesl
-     proposed fix: use linux/sizes.h and provide readsl/writesl like others do
-
-   drivers/spi/spi-pl022.c: warning for an integer size mismatch
-     proposed fix: none by now
-
-   drivers/watchdog/sp805_wdt.c: uses writel_relaxed
-     proposed fix: depend on CONFIG_ARM (this is a spear-only cell by now)
-
-
-So, if you agree, I would:
-
-    - fix the two dma engines (checking pl080 against russell's pending
-    patches)
-
-    - make pl061 and sp805_wdt.c depends on CONFIG_ARM
-
-    - temporarily do the same for mmci, which I'll make work soon as
-    I have it under my pci bridge
-
-    - ignore the warning on spi-pl022 until I find a fix
-
-    - resubmit my enabling of arm_amba for x86 and my pci-to-amba bridge
-    driver.
-
-thanks
-/alessandro
+Sebastian
