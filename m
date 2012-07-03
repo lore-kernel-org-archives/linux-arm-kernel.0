@@ -1,57 +1,60 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 2 Jul 2012 18:49:27 -0700
-Subject: [PATCH 4/6] ARM: tegra: Add clk_tegra structure and helper
- functions
-In-Reply-To: <4FF24B59.1060508@wwwdotorg.org>
-References: <1340879846-12900-1-git-send-email-pgaikwad@nvidia.com>
- <1340879846-12900-5-git-send-email-pgaikwad@nvidia.com>
- <20120628182759.GA28424@gmail.com> <4FED688E.9090408@nvidia.com>
- <CAJOA=zMt-HWKrgQ-pD-wH0s_Nao5sJA13+ESJSBkHQ_3OBurtg@mail.gmail.com>
- <4FF24B59.1060508@wwwdotorg.org>
-Message-ID: <CAJOA=zMEb49YOrz2ZdSL31tHCSROF3J6Gz4ZHYeik82RnWVfLg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 3 Jul 2012 11:49:53 +1000
+Subject: linux-next: adding the common clk tree
+In-Reply-To: <20120626015551.GW4402@gmail.com>
+References: <20120626015551.GW4402@gmail.com>
+Message-ID: <20120703114953.24ca1e562374259f934c27cf@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2012 at 6:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 07/02/2012 06:09 PM, Turquette, Mike wrote:
->> On Fri, Jun 29, 2012 at 1:34 AM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
->>> On Thursday 28 June 2012 11:58 PM, Mike Turquette wrote:
->>>> We had some discussions in the past on your clock reset and external
->>>> line request operations which you've had to put into struct clk_tegra.
->>>>
->>>> Do you need to expose those ops to code in drivers/*? ?I consider that a
->>>> reasonable litmus test to start considering if something should be moved
->>>> into the generic clk.h api.
->>>
->>>
->>> Yes, we need these ops in drivers. Peter has sent a patch proposing to move
->>> these ops to generic clk.
->>>
->>> In addition, we also need mechanism/ops to change rate and parent from
->>> clk_ops implementation. There was some discussion but I do not know the
->>> latest status.
->>>
->>
->> Hi Prashant,
->>
->> OK, that is good to know. ?I haven't forgotten about this topic. ?I'm
->> still trying to think of the best way to expose less-common operations
->> to drivers...
->>
->> Based on Stephen's feedback in patch 0 I'll be waiting for another
->> version of this series before taking into clk-next.
+Hi Mike,
+
+On Mon, 25 Jun 2012 18:55:51 -0700 Mike Turquette <mturquette@ti.com> wrote:
 >
-> Oh, does this series depend on stuff in clk-next? I was intending to
-> take it through the Tegra tree, since it definitely depends on (in
-> complex ways through context if nothing else due to to large
-> split/rename patches) a bunch of commits in Tegra's for-3.6/common-clk
-> branch.
+> Would you please add the clk-next branch of the common clock tree to
+> linux-next?
+> 
+> git://git.linaro.org/people/mturquette/linux.git clk-next
 
-Oops.  I just completely zoned out and went into "clk-next maintenance
-mode".  Yeah you had already mentioned that this was for the Tegra
-tree.
+This will be added form today.
 
-Nothing to see here, move along!
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgment of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
 
-Regards,
-Mike
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+	Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
+
+-- 
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
+
+Legal Stuff:
+By participating in linux-next, your subsystem tree contributions are
+public and will be included in the linux-next trees.  You may be sent
+e-mail messages indicating errors or other issues when the
+patches/commits from your subsystem tree are merged and tested in
+linux-next.  These messages may also be cross-posted to the linux-next
+mailing list, the linux-kernel mailing list, etc.  The linux-next tree
+project and IBM (my employer) make no warranties regarding the linux-next
+project, the testing procedures, the results, the e-mails, etc.  If you
+don't agree to these ground rules, let me know and I'll remove your tree
+from participation in linux-next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/a657ab5b/attachment.sig>
