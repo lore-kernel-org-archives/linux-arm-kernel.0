@@ -1,26 +1,64 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 03 Jul 2012 09:20:30 +0200
-Subject: [PATCH] ARM: remove asm/locks.h
-In-Reply-To: <20120702215203.GA25234@mudshark.cambridge.arm.com>
-References: <1341262188.1911.147.camel@x61.thuisdomein>
- <20120702215203.GA25234@mudshark.cambridge.arm.com>
-Message-ID: <1341300030.1911.179.camel@x61.thuisdomein>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 3 Jul 2012 09:20:40 +0200
+Subject: [PATCH 2/9] arm: mach-mvebu: add header
+In-Reply-To: <20120703070927.GA17004@lunn.ch>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120702183330.GG1348@lunn.ch> <20120702210838.37c78fda@skate>
+ <20120702191616.GJ1348@lunn.ch>
+ <alpine.LFD.2.02.1207022313550.31003@xanadu.home>
+ <20120703070927.GA17004@lunn.ch>
+Message-ID: <20120703092040.7f6f6262@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Hello,
 
-On Mon, 2012-07-02 at 22:52 +0100, Will Deacon wrote:
-> On Mon, Jul 02, 2012 at 09:49:48PM +0100, Paul Bolle wrote:
-> > Tested only with various git commands on the (history of the) tree.
+Le Tue, 3 Jul 2012 09:09:27 +0200,
+Andrew Lunn <andrew@lunn.ch> a ?crit :
+
+> > Now it seems that all the u-Boot implementations for Orion/Kirkwood out 
+> > there have always moved the window containing the serial ports from its 
+> > default 0xd0000000 address to 0xf1000000.  Why they did that I have no 
+> > idea.  And Linux simply took those remapped physical addresses as 
+> > authoritative.
+> > 
+> > And whether or not Armada 370/XP still have this physical remap ability 
+> > I don't know.  And if it does, then why didn't it follow the same 
+> > 0xf1000000 tradition as all the other mvebu targets before them I don't 
+> > know either.  Maybe this could be considered?
 > 
-> Not sure I follow, but since this is all dead code I can't see any tests
-> failing without it.
+> Thomas, Gregory, could you look at this?
 
-The purpose of that disclaimer is to stress that only git commands were
-used to determine that removing this header is correct and safe. But
-perhaps saying that I therefore "tested" this patch with git commands is
-confusing.
+Yes, we will look into this with Marvell engineers.
 
+> Are the uboot source open, or are you using a proprietary Marvell
+> version?
 
-Paul Bolle
+As far as I know, there is no support in upstream U-Boot for Armada 370
+and XP. We're currently using the internal Marvell U-Boot.
+
+> When Arnd first proposed moving everything into one directory, i had a
+> quick look at the memory map. The Orions have more than just the
+> serial ports at the same address. If i remember correctly, I2C, SPI,
+> PCIE0, USB0, XOR, and ETH0 are all at the same physical
+> address. Unfortunately, they have different virtual addresses. So I
+> played around unifying the virtual address map.
+> 
+> Doing this will allow some code simplification, header file
+> simplification, and sharing of some .dtsi and DT across all Orion
+> systems.
+> 
+> Its not something i want to do right now, but having 370/XP the same
+> as Orion would be a step towards this.
+
+That sounds like a good idea of course, if possible.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
