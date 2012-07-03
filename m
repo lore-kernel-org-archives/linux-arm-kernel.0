@@ -1,42 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Jul 2012 23:04:08 +0800
-Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120702183736.e8e4136d4bf206b55c8653a5@freescale.com>
-References: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
- <20120702183736.e8e4136d4bf206b55c8653a5@freescale.com>
-Message-ID: <20120703150406.GH22705@S2101-09.ap.freescale.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 3 Jul 2012 10:10:03 -0500
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9A22B7@DBDE01.ent.ti.com>
+References: <cover.1340778002.git.afzal@ti.com>
+ <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+ <20120627145844.GL3483@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+ <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
+ <20120702063651.GO4202@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A1BB7@DBDE01.ent.ti.com>
+ <4FF1DA5F.9000409@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A22B7@DBDE01.ent.ti.com>
+Message-ID: <4FF30B4B.8060203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 06:37:36PM -0500, Kim Phillips wrote:
-> Instead of duplicating the binding documentation entry, can this be
-> merged in with crypto/fsl-sec4.txt?
 
-Yes. We can do that.  But I would still keep a plain
-Documentation/devicetree/bindings/rtc/snvs-rtc.txt there with only
-a pointer to Documentation/devicetree/bindings/crypto/fsl-sec4.txt.
-Otherwise, I'm afraid that people will hardly know the bindings of
-snvs-rtc is documented in fsl-sec4.txt.
-
-> Also, don't we need the rtc to
-> be a 'sub-device' of "fsl,sec-vX.Y-mon", and to have its own
-> compatible, e.g., "fsl,sec-v4.0-mon-rtc-lp"?
+On 07/02/2012 11:35 PM, Mohammed, Afzal wrote:
+> Hi Jon,
 > 
-Sounds sensible.  But how will reg and interrupts properties be
-documented?  The registers for lp-rtc is not so consecutive and
-interrupts are shared by hp and lp.
-
-> > +config RTC_DRV_SNVS
-> > +	tristate "Freescale SNVS RTC support"
-> > +	depends on ARCH_MXC
+> On Mon, Jul 02, 2012 at 22:59:03, Hunter, Jon wrote:
+>> On 07/02/2012 04:43 AM, Mohammed, Afzal wrote:
 > 
-> should also depend on || FSL_SOC - it was mentioned in the
-> review of the last version of this patch that this h/w exists on
-> other, non-ARM based, SoCs.
+>>> Not sure whether you are fine with fixing up this patch with added diff
+>>>
+>>> Assuming inferences so far is not wrong, right now this patch with the added diff
+>>> would be perfectly fine.
+>>>
+>>> Problem would happen when we are at a stage to do gpmc reset using hwmod [seems
+>>> miles to go before I sleep {or read gpmc hwmod reset} ;)]. If bootloader left
+>>> onenand configured in sync mode, to switch onenand to async mode, first configuring
+>>> gpmc to sync mode would be required & for that we need frequency information
+>>> from onenand and to get that information from onenand, gpmc has to be configured
+>>> for sync mode and to configure gpmc to sync mode ....
+>>
+>> You are concerned about hwmod performing a reset of the gpmc during
+>> boot? We should be able to use the HWMOD_INIT_NO_RESET flag to prevent
+>> this. Would that work?
 > 
-I would not do that until the driver is tested on FSL_SOC.  Also I'm
-considering to take Stephen's suggestion to drop even ARCH_MXC.
+> Yes that will work in the short term, the reason I am trying to avoid no
+> reset flag in the long term is to prevent this board support being broken,
+> please refer Paul's requirement [1] in accepting gpmc hwmod patch
 
--- 
-Regards,
-Shawn
+Ok, thanks for the reminder.
+
+So we have 2 options here ...
+
+1. Use the HWMOD_INIT_NO_RESET for now and your updated version of this
+patch
+2. See if there is a gpio available to control the OneNAND reset on the
+n900.
+
+Do you agree? Any other options?
+
+Cheers
+Jon
