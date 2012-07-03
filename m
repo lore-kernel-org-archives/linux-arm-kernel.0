@@ -1,83 +1,83 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 3 Jul 2012 15:44:57 -0300
-Subject: [PATCH 1/2] ARM: mx27pdk: Add audio support
-Message-ID: <1341341098-9510-1-git-send-email-fabio.estevam@freescale.com>
+Date: Tue, 3 Jul 2012 15:44:05 -0300
+Subject: [PATCH 2/2] ASoC: imx-mc13783: Add audmux settings for mx27pdk
+In-Reply-To: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
+References: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1341341045-9472-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx27pdk has a mc13783 audio codec.
+mx27pdk board also has a mc13783 codec.
 
-Add support for it.
+Add support for it and do a run-time machine type check to perform the correct
+audiomux settings.
 
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: <alsa-devel@alsa-project.org>
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-imx/Kconfig         |    1 +
- arch/arm/mach-imx/mach-mx27_3ds.c |   21 ++++++++++++++++++++-
- 2 files changed, 21 insertions(+), 1 deletions(-)
+ sound/soc/fsl/imx-mc13783.c |   49 +++++++++++++++++++++++++++++--------------
+ 1 files changed, 33 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0da882a..deb9f37 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -300,6 +300,7 @@ config MACH_MX27_3DS
- 	select IMX_HAVE_PLATFORM_IMX_FB
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
-+	select IMX_HAVE_PLATFORM_IMX_SSI
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MX2_CAMERA
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index c6d385c..3dc944e 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -160,6 +160,11 @@ static const int mx27pdk_pins[] __initconst = {
- 	PB21_PF_CSI_HSYNC,
- 	CSI_PWRDWN | GPIO_GPIO | GPIO_OUT,
- 	CSI_RESET | GPIO_GPIO | GPIO_OUT,
-+	/* SSI4 */
-+	PC16_PF_SSI4_FS,
-+	PC17_PF_SSI4_RXD,
-+	PC18_PF_SSI4_TXD,
-+	PC19_PF_SSI4_CLK,
- };
- 
- static struct gpio mx27_3ds_camera_gpios[] = {
-@@ -331,13 +336,24 @@ static struct mc13xxx_regulator_init_data mx27_3ds_regulators[] = {
- };
- 
- /* MC13783 */
-+static struct mc13xxx_codec_platform_data mx27_3ds_codec = {
-+	.dac_ssi_port = MC13783_SSI1_PORT,
-+	.adc_ssi_port = MC13783_SSI1_PORT,
-+};
-+
- static struct mc13xxx_platform_data mc13783_pdata = {
- 	.regulators = {
- 		.regulators = mx27_3ds_regulators,
- 		.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
- 
- 	},
--	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC,
-+	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC |
-+						MC13XXX_USE_CODEC,
-+	.codec = &mx27_3ds_codec,
-+};
-+
-+static struct imx_ssi_platform_data mx27_3ds_ssi_pdata = {
-+	.flags = IMX_SSI_DMA | IMX_SSI_NET,
- };
- 
- /* SPI */
-@@ -513,6 +529,9 @@ static void __init mx27pdk_init(void)
+diff --git a/sound/soc/fsl/imx-mc13783.c b/sound/soc/fsl/imx-mc13783.c
+index f59c349..549b31f 100644
+--- a/sound/soc/fsl/imx-mc13783.c
++++ b/sound/soc/fsl/imx-mc13783.c
+@@ -111,22 +111,39 @@ static int __devinit imx_mc13783_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
- 	imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
-+	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
-+
-+	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
- }
+-	imx_audmux_v2_configure_port(MX31_AUDMUX_PORT4_SSI_PINS_4,
+-		IMX_AUDMUX_V2_PTCR_SYN,
+-		IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0) |
+-		IMX_AUDMUX_V2_PDCR_MODE(1) |
+-		IMX_AUDMUX_V2_PDCR_INMMASK(0xfc));
+-	imx_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
+-		IMX_AUDMUX_V2_PTCR_SYN |
+-		IMX_AUDMUX_V2_PTCR_TFSDIR |
+-		IMX_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
+-		IMX_AUDMUX_V2_PTCR_TCLKDIR |
+-		IMX_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
+-		IMX_AUDMUX_V2_PTCR_RFSDIR |
+-		IMX_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
+-		IMX_AUDMUX_V2_PTCR_RCLKDIR |
+-		IMX_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4),
+-		IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT4_SSI_PINS_4));
++	if (machine_is_mx31_3ds()) {
++		imx_audmux_v2_configure_port(MX31_AUDMUX_PORT4_SSI_PINS_4,
++			IMX_AUDMUX_V2_PTCR_SYN,
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0) |
++			IMX_AUDMUX_V2_PDCR_MODE(1) |
++			IMX_AUDMUX_V2_PDCR_INMMASK(0xfc));
++		imx_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
++			IMX_AUDMUX_V2_PTCR_SYN |
++			IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR |
++			IMX_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			IMX_AUDMUX_V2_PTCR_RFSDIR |
++			IMX_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			IMX_AUDMUX_V2_PTCR_RCLKDIR |
++			IMX_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4),
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT4_SSI_PINS_4));
++	} else if (machine_is_mx27_3ds()) {
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_TFSDIR |
++			IMX_AUDMUX_V1_PCR_TCLKDIR |
++			IMX_AUDMUX_V1_PCR_RFSDIR |
++			IMX_AUDMUX_V1_PCR_RCLKDIR |
++			IMX_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			IMX_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
++		);
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
++		);
++	}
  
- static void __init mx27pdk_timer_init(void)
+ 	return ret;
+ }
 -- 
 1.7.1
