@@ -1,24 +1,35 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 03 Jul 2012 15:59:39 +0530
-Subject: [PATCH v2] clk: __clk_set_parent: set uninitialized variable
-In-Reply-To: <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
-References: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
- <4FF15EDF.7030806@ti.com>
- <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
-Message-ID: <4FF2C993.3060202@ti.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 3 Jul 2012 10:29:38 +0000
+Subject: [PATCH 1/4] Revert "arm/dts: Add support for TI AM335x EVM board"
+In-Reply-To: <4FF15F7D.1090108@ti.com>
+References: <1340358050-29560-1-git-send-email-anilkumar@ti.com>
+ <1340358050-29560-2-git-send-email-anilkumar@ti.com>
+ <20120702084021.GF1122@atomide.com> <4FF15F7D.1090108@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9E911E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 July 2012 04:59 AM, Turquette, Mike wrote:
-> Hi Rajendra and Marc,
->
-> I prefer the code flow in Rajendra's change.  It seems more readable
-> and has a negative diffstat;-)
->
-> $ git diff --stat
->   drivers/clk/clk.c |   28 +++++++++++++---------------
->   1 file changed, 13 insertions(+), 15 deletions(-)
->
-> Rajendra, can you test and send a proper patch for the same?
+Hi Tony,
 
-Sure, will do.
+On Mon, Jul 02, 2012 at 14:14:45, Hiremath, Vaibhav wrote:
+> 
+> 
+> On 7/2/2012 2:10 PM, Tony Lindgren wrote:
+> > * AnilKumar Ch <anilkumar@ti.com> [120622 02:45]:
+> >> This reverts commit 6c54bbb42678c99685c8e7fd09267e1cb8c2ae40.
+> > 
+> > As that has not been merged yet, I'll just drop it and set up
+> > a new devel-dt branch. Applying the reset into devel-dt.
+> > 
+> 
+> Yeah, that's better.
+> 
+> Care to include it into you next pull request.
+> 
+
+devel-dt branch is created but these patches are not pushed yet.
+
+Let me know do you have any comments on the patches.
+
+Thanks
+AnilKumar
