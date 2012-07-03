@@ -1,28 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jul 2012 04:48:56 -0700
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 3 Jul 2012 11:55:56 +0000
 Subject: [GIT PULL 6/6] am33xx changes for v3.6 merge window
-In-Reply-To: <4FF2D83C.7060409@ti.com>
-References: <E1SlGLI-0004Vt-0L@merlin.infradead.org> <4FF2D83C.7060409@ti.com>
-Message-ID: <20120703114856.GL1122@atomide.com>
+In-Reply-To: <20120703114856.GL1122@atomide.com>
+References: <E1SlGLI-0004Vt-0L@merlin.infradead.org>
+ <4FF2D83C.7060409@ti.com> <20120703114856.GL1122@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA6237A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120703 04:37]:
+On Tue, Jul 03, 2012 at 17:18:56, Tony Lindgren wrote:
+> * Vaibhav Hiremath <hvaibhav@ti.com> [120703 04:37]:
+> > 
+> > Few patches got missed in this pull request,
+> > 
+> > ARM: OMAP2+: am33xx: Make am33xx as a separate class
+> > ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
 > 
-> Few patches got missed in this pull request,
+> OK, at least the first needs to be rebased to apply.
 > 
-> ARM: OMAP2+: am33xx: Make am33xx as a separate class
-> ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
+> Can you please refresh those against current devel-am33xx
+> branch at commit 6fd8246b1c1167c983b089f9eaafa13ef9ca7adf and
+> repost?
+> 
+> I'll do a separate pull request for those once they are
+> ready.
+> 
 
-OK, at least the first needs to be rebased to apply.
+Thanks Tony, I will resubmit them again today.
+Also, request you to review and merge Cleanup patch-series I had posted
+few days back.
 
-Can you please refresh those against current devel-am33xx
-branch at commit 6fd8246b1c1167c983b089f9eaafa13ef9ca7adf and
-repost?
-
-I'll do a separate pull request for those once they are
-ready.
-
-Regards,
-
-Tony
+Thanks,
+Vaibhav
