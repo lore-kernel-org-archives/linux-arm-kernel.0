@@ -1,63 +1,65 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Jul 2012 20:07:42 +0530
-Subject: [PATCHv4 04/18] i2c: omap: add blank lines
+Date: Tue, 3 Jul 2012 20:07:49 +0530
+Subject: [PATCHv4 11/18] i2c: omap: switch to platform_get_irq()
 In-Reply-To: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
 References: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1341326276-25434-5-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1341326276-25434-12-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-trivial patch to aid readability. No functional
-changes.
+that's a nice helper from drivers core which
+will give us the exact IRQ number, instead
+of a pointer to an IRQ resource.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 0da00ac..31c4e55 100644
+index 30db822..46d099e 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -805,6 +805,7 @@ complete:
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
- 		}
-+
- 		/*
- 		 * ProDB0017052: Clear ARDY bit twice
- 		 */
-@@ -817,6 +818,7 @@ complete:
- 			omap_i2c_complete_cmd(dev, err);
- 			return IRQ_HANDLED;
- 		}
-+
- 		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
- 			u8 num_bytes = 1;
+@@ -1012,11 +1012,12 @@ omap_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev;
+ 	struct i2c_adapter	*adap;
+-	struct resource		*mem, *irq;
++	struct resource		*mem;
+ 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+ 	struct device_node	*node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
+ 	irq_handler_t isr;
++	int irq;
+ 	int r;
  
-@@ -863,6 +865,7 @@ complete:
- 				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
- 			continue;
- 		}
+ 	/* NOTE: driver uses the static register mapping */
+@@ -1025,10 +1026,11 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "no mem resource?\n");
+ 		return -ENODEV;
+ 	}
+-	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+-	if (!irq) {
 +
- 		if (stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR)) {
- 			u8 num_bytes = 1;
- 			if (dev->fifo_size) {
-@@ -910,10 +913,12 @@ complete:
- 				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
- 			continue;
- 		}
-+
- 		if (stat & OMAP_I2C_STAT_ROVR) {
- 			dev_err(dev->dev, "Receive overrun\n");
- 			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
- 		}
-+
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
- 			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
+ 		dev_err(&pdev->dev, "no irq resource?\n");
+-		return -ENODEV;
++		return irq;
+ 	}
+ 
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
+@@ -1062,7 +1064,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	dev->dev = &pdev->dev;
+-	dev->irq = irq->start;
++	dev->irq = irq;
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 	init_completion(&dev->cmd_complete);
 -- 
 1.7.5.4
