@@ -1,48 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 3 Jul 2012 12:17:44 +0200
-Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add watchdog support
-In-Reply-To: <20120703030337.GD22106@S2101-09.ap.freescale.net>
-References: <1341258627-3469-1-git-send-email-festevam@gmail.com>
- <20120703030337.GD22106@S2101-09.ap.freescale.net>
-Message-ID: <20120703101744.GW2698@pengutronix.de>
+From: changbinx.du@intel.com (Du, ChangbinX)
+Date: Tue, 3 Jul 2012 10:23:21 +0000
+Subject: [PATCH] ARM: mm: fix unitialized variable warning
+Message-ID: <0C18FE92A7765D4EB9EE5D38D86A563A0A18BB@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2012 at 11:03:39AM +0800, Shawn Guo wrote:
-> On Mon, Jul 02, 2012 at 04:50:26PM -0300, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Add watchdog support.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6q-sabrelite.dts |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > index e0ec929..99581a0 100644
-> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > @@ -42,6 +42,9 @@
-> >  				};
-> >  			};
-> >  
-> > +			wdog at 020bc000 { /* WDOG1 */
-> > +				status = "okay";
-> > +			};
-> 
-> I'm wondering if it makes more sense to have wdog, rtc, such completely
-> soc internal stuff always enabled in <soc>.dtsi.
+arch/arm/mm/alignment.c: In function ?do_alignment?:
+arch/arm/mm/alignment.c:327:15: warning: ?offset.un? may be used uninitialized in this function [-Wuninitialized]
+arch/arm/mm/alignment.c:749:21: note: ?offset.un? was declared here
 
-+1 for the watchdog
+Signed-off-by: Du, Changbin <changbin.du@gmail.com>
+---
+ arch/arm/mm/alignment.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'm not so sure about the rtc though, since one important component of
-the RTC is not completely internal to the SoC: the battery.
-
-Sascha
-
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 9107231..387a6cd 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -746,7 +746,7 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
+ static int
+ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ {
+-	union offset_union offset;
++	union offset_union uninitialized_var(offset);
+ 	unsigned long instr = 0, instrptr;
+ 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
+ 	unsigned int type;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
