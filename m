@@ -1,48 +1,137 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
-Date: Tue,  3 Jul 2012 14:32:33 +0200
-Subject: [PATCH 0/3] ARM: dts: dove: Basic devicetree support for Marvell Dove
-In-Reply-To: <1341318756-24524-1-git-send-email-sebastian.hesselbarth@googlemail.com>
-References: <1341318756-24524-1-git-send-email-sebastian.hesselbarth@googlemail.com>
-Message-ID: <1341318756-24524-2-git-send-email-sebastian.hesselbarth@googlemail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 03 Jul 2012 18:04:07 +0530
+Subject: [PATCH 02/29] clk: Add CLK_IS_BASIC flag to identify basic clocks
+In-Reply-To: <1339678038-23082-3-git-send-email-rnayak@ti.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-3-git-send-email-rnayak@ti.com>
+Message-ID: <4FF2E6BF.1060504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add very basic devicetree support for Marvell Dove.
-It is based on Kirkwood dts and therefore supports uart and rtc by
-dt only.
+Hi Mike,
 
-The patches have not been tested on neither Dove-DB nor CM-A510 but
-on SolidRun Cubox that is not supported by mainline kernel, yet.
+On Thursday 14 June 2012 06:16 PM, Rajendra Nayak wrote:
+> Most platforms end up using a mix of basic clock types and
+> some which use clk_hw_foo struct for filling in custom platform
+> information when the clocks don't fit into basic types supported.
+>
+> In platform code, its useful to know if a clock is using a basic
+> type or clk_hw_foo, which helps platforms know if they can
+> safely use to_clk_hw_foo to derive the clk_hw_foo pointer from
+> clk_hw.
+>
+> Mark all basic clocks with a CLK_IS_BASIC flag.
+>
+> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+While you have already pulled all of my other patches touching
+the Common Clk framework, which were part of this series, this is
+one patch where there hasn't been any discussion. Do you have any
+thoughts on this patch?
+See 'Patch 15/29:  ARM: omap: clk: list all clk_hw_omap clks to
+enable/disable autoidle' how I use this to create a clk_hw_omap
+specific list to handle clock autoidle in OMAP.
 
-Sebastian Hesselbarth (3):
-  ARM: dts: dove: Add devicetree descriptors
-  ARM: dts: dove: Add devicetree-based board setup
-  ARM: dts: dove: Integrate devicetree support
+regards,
+Rajendra
 
- arch/arm/boot/dts/dove-cm-a510.dtsi |   27 ++++++++++
- arch/arm/boot/dts/dove-dove-db.dtsi |   27 ++++++++++
- arch/arm/boot/dts/dove.dtsi         |   55 +++++++++++++++++++++
- arch/arm/mach-dove/Kconfig          |   20 ++++++++
- arch/arm/mach-dove/Makefile         |    4 ++
- arch/arm/mach-dove/Makefile.boot    |    3 ++
- arch/arm/mach-dove/board-cm-a510.c  |   86 ++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/board-dove-db.c  |   92 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/board-dt.c       |   73 +++++++++++++++++++++++++++
- arch/arm/mach-dove/common.c         |   17 ++++---
- arch/arm/mach-dove/common.h         |   25 ++++++++++
- 12 files changed, 444 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/boot/dts/dove-cm-a510.dtsi
- create mode 100644 arch/arm/boot/dts/dove-dove-db.dtsi
- create mode 100644 arch/arm/boot/dts/dove.dtsi
- create mode 100644 arch/arm/mach-dove/board-cm-a510.c
- create mode 100644 arch/arm/mach-dove/board-dove-db.c
- create mode 100644 arch/arm/mach-dove/board-dt.c
-
--- 
-1.7.10
+> ---
+>   drivers/clk/clk-divider.c      |    2 +-
+>   drivers/clk/clk-fixed-factor.c |    2 +-
+>   drivers/clk/clk-fixed-rate.c   |    2 +-
+>   drivers/clk/clk-gate.c         |    2 +-
+>   drivers/clk/clk-mux.c          |    2 +-
+>   include/linux/clk-private.h    |    2 +-
+>   include/linux/clk-provider.h   |    1 +
+>   7 files changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index e4911ee..53f9dd7 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -266,7 +266,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+>
+>   	init.name = name;
+>   	init.ops =&clk_divider_ops;
+> -	init.flags = flags;
+> +	init.flags = flags | CLK_IS_BASIC;
+>   	init.parent_names = (parent_name ?&parent_name: NULL);
+>   	init.num_parents = (parent_name ? 1 : 0);
+>
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index c8c003e..a489985 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -82,7 +82,7 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>
+>   	init.name = name;
+>   	init.ops =&clk_fixed_factor_ops;
+> -	init.flags = flags;
+> +	init.flags = flags | CLK_IS_BASIC;
+>   	init.parent_names =&parent_name;
+>   	init.num_parents = 1;
+>
+> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+> index cbd2462..7e14645 100644
+> --- a/drivers/clk/clk-fixed-rate.c
+> +++ b/drivers/clk/clk-fixed-rate.c
+> @@ -63,7 +63,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>
+>   	init.name = name;
+>   	init.ops =&clk_fixed_rate_ops;
+> -	init.flags = flags;
+> +	init.flags = flags | CLK_IS_BASIC;
+>   	init.parent_names = (parent_name ?&parent_name: NULL);
+>   	init.num_parents = (parent_name ? 1 : 0);
+>
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index 578465e..15114fe 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -130,7 +130,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+>
+>   	init.name = name;
+>   	init.ops =&clk_gate_ops;
+> -	init.flags = flags;
+> +	init.flags = flags | CLK_IS_BASIC;
+>   	init.parent_names = (parent_name ?&parent_name: NULL);
+>   	init.num_parents = (parent_name ? 1 : 0);
+>
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index fd36a8e..508c032 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -106,7 +106,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+>
+>   	init.name = name;
+>   	init.ops =&clk_mux_ops;
+> -	init.flags = flags;
+> +	init.flags = flags | CLK_IS_BASIC;
+>   	init.parent_names = parent_names;
+>   	init.num_parents = num_parents;
+>
+> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> index 2479239..0835bda 100644
+> --- a/include/linux/clk-private.h
+> +++ b/include/linux/clk-private.h
+> @@ -64,7 +64,7 @@ struct clk {
+>   		.parent_names = _parent_names,			\
+>   		.num_parents = ARRAY_SIZE(_parent_names),	\
+>   		.parents = _parents,				\
+> -		.flags = _flags,				\
+> +		.flags = _flags | CLK_IS_BASIC,			\
+>   	}
+>
+>   #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index aa63aca..4b94f59 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -25,6 +25,7 @@
+>   #define CLK_SET_RATE_PARENT	BIT(2) /* propagate rate change up one level */
+>   #define CLK_IGNORE_UNUSED	BIT(3) /* do not gate even if unused */
+>   #define CLK_IS_ROOT		BIT(4) /* root clk, has no parent */
+> +#define CLK_IS_BASIC		BIT(5) /* Basic clk, can't do a to_clk_foo() */
+>
+>   struct clk_hw;
+>
