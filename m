@@ -1,150 +1,77 @@
-From: jiri.prchal@aksignal.cz (Jiri Prchal)
-Date: Tue,  3 Jul 2012 16:27:46 +0200
-Subject: [PATCH] arm: at91: Add new board
-Message-ID: <1341325666-5425-1-git-send-email-jiri.prchal@aksignal.cz>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 3 Jul 2012 20:07:48 +0530
+Subject: [PATCHv4 10/18] i2c: omap: ack IRQ in parts
+In-Reply-To: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
+References: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1341326276-25434-11-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'd like to add support for our "CDU" board based up on Telit's module GE863 Pro3.
-It has more uarts, leds, another nand partitioning.
+From: Felipe Balbi <balbi@ti.com>
 
-Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+According to flow diagrams on OMAP TRMs,
+we should ACK the IRQ as they happen.
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- arch/arm/boot/dts/cdu.dtsi |  126 ++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 126 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/cdu.dtsi
+ drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++------------
+ 1 files changed, 16 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/cdu.dtsi b/arch/arm/boot/dts/cdu.dtsi
-new file mode 100644
-index 0000000..0f9ed04
---- /dev/null
-+++ b/arch/arm/boot/dts/cdu.dtsi
-@@ -0,0 +1,126 @@
-+/*
-+ * cdu.dtsi - Device Tree file for AKsignal CDU
-+ *
-+ * Copyright (C) 2012 AKsignal Brno,
-+ *               2012 Jiri Prchal <jiri.prchal@aksignal.cz>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "at91sam9260.dtsi"
-+
-+/ {
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <6000000>;
-+		};
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs";
-+	};
-+
-+	ahb {
-+		apb {
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			usart0: serial at fffb0000 {
-+				status = "okay";
-+			};
-+
-+			usart1: serial at fffb4000 {
-+				status = "okay";
-+				linux,rs485-enabled-at-boot-time;
-+				rs485-rts-delay = <0 0>;
-+				};
-+
-+			usart2: serial at fffb8000 {
-+				status = "okay";
-+				linux,rs485-enabled-at-boot-time;
-+				rs485-rts-delay = <0 0>;
-+			};
-+
-+			usart3: serial at fffd0000 {
-+				status = "okay";
-+				linux,rs485-enabled-at-boot-time;
-+				rs485-rts-delay = <0 0>;
-+			};
-+
-+			macb0: ethernet at fffbc000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			usb1: gadget at fffa4000 {
-+				atmel,vbus-gpio = <&pioC 15 0>;
-+				status = "okay";
-+			};
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			num-ports = <2>;
-+			status = "okay";
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			bootstrap at 0 {
-+				label = "bootstrap";
-+				reg = <0x0 0x40000>;
-+			};
-+
-+			uboot at 40000 {
-+				label = "uboot";
-+				reg = <0x40000 0x80000>;
-+			};
-+			ubootenv at c0000 {
-+				label = "ubootenv";
-+				reg = <0xc0000 0x40000>;
-+			};
-+			kernel at 100000 {
-+				label = "kernel";
-+				reg = <0x100000 0x400000>;
-+			};
-+			rootfs at 500000 {
-+				label = "rootfs";
-+				reg = <0x500000 0x7b00000>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		red {
-+			gpios = <&pioC 10 0>;
-+			linux,default-trigger = "none";
-+		};
-+
-+		green {
-+			gpios = <&pioA 5 1>;
-+			linux,default-trigger = "none";
-+			default-state = "on";
-+		};
-+
-+		yellow {
-+			gpios = <&pioB 20 1>;
-+			linux,default-trigger = "none";
-+		};
-+
-+		blue {
-+			gpios = <&pioB 21 1>;
-+			linux,default-trigger = "none";
-+		};
-+	};
-+};
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 6c8f135..30db822 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -869,21 +869,19 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 		}
+ 
+ complete:
+-		/*
+-		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
+-		 * acked after the data operation is complete.
+-		 * Ref: TRM SWPU114Q Figure 18-31
+-		 */
+-		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, stat &
+-				~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
+-				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
+-
+-		if (stat & OMAP_I2C_STAT_NACK)
++		if (stat & OMAP_I2C_STAT_NACK) {
+ 			err |= OMAP_I2C_STAT_NACK;
++			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
++			omap_i2c_complete_cmd(dev, err);
++			return IRQ_HANDLED;
++		}
+ 
+ 		if (stat & OMAP_I2C_STAT_AL) {
+ 			dev_err(dev->dev, "Arbitration lost\n");
+ 			err |= OMAP_I2C_STAT_AL;
++			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
++			omap_i2c_complete_cmd(dev, err);
++			return IRQ_HANDLED;
+ 		}
+ 
+ 		/*
+@@ -960,12 +958,18 @@ complete:
+ 
+ 		if (stat & OMAP_I2C_STAT_ROVR) {
+ 			dev_err(dev->dev, "Receive overrun\n");
+-			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
++			err |= OMAP_I2C_STAT_ROVR;
++			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
++			omap_i2c_complete_cmd(dev, err);
++			return IRQ_HANDLED;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_XUDF) {
+ 			dev_err(dev->dev, "Transmit underflow\n");
+-			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
++			err |= OMAP_I2C_STAT_XUDF;
++			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
++			omap_i2c_complete_cmd(dev, err);
++			return IRQ_HANDLED;
+ 		}
+ 	} while (stat);
+ 
 -- 
-1.7.7
+1.7.5.4
