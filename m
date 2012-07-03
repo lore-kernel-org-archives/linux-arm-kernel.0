@@ -1,70 +1,110 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Jul 2012 20:07:55 +0530
-Subject: [PATCHv4 17/18] i2c: omap: get rid of the "complete" label
+Date: Tue, 3 Jul 2012 20:07:45 +0530
+Subject: [PATCHv4 07/18] i2c: omap: improve i462 errata handling
 In-Reply-To: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
 References: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1341326276-25434-18-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1341326276-25434-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-we can ack stat and complete the command from
-the errata handling itself.
+Make it not depend on ISR's local variables
+in order to make it easier to re-factor the
+transmit data loop.
+Also since we are waiting for XUDF just before
+writing data lets not service the underflow.
+This is anyways going to go once we write
+the data.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
+[Avoid flagging the XUDF]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   16 +++++++++++++---
- 1 files changed, 13 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   43 ++++++++++++++++++++++++++++------------
+ 1 files changed, 30 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index f64916f..8940eb3 100644
+index 5c2460d..1715c35 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -794,6 +794,17 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev)
- 		if (stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+@@ -744,27 +744,30 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
+  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
+  * them from the memory to the I2C interface.
+  */
+-static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
++static int errata_omap3_i462(struct omap_i2c_dev *dev)
+ {
+ 	unsigned long timeout = 10000;
++	u16 stat;
+ 
+-	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
+-		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
++	do {
++		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
++		if (stat & OMAP_I2C_STAT_XUDF)
++			break;
++
++		if (stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
  			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
  							OMAP_I2C_STAT_XDR));
-+			if (stat & OMAP_I2C_STAT_NACK) {
-+				dev->cmd_err |= OMAP_I2C_STAT_NACK;
-+				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-+			}
-+
-+			if (stat & OMAP_I2C_STAT_AL) {
-+				dev_err(dev->dev, "Arbitration lost\n");
-+				dev->cmd_err |= OMAP_I2C_STAT_AL;
-+				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-+			}
-+
- 			return -EIO;
+-			return -ETIMEDOUT;
++			return -EIO;
  		}
  
-@@ -894,7 +905,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 			goto out;
- 		}
+ 		cpu_relax();
+-		*stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+-	}
++	} while (--timeout);
  
--complete:
- 		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-@@ -957,7 +967,7 @@ complete:
- 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
- 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
- 			if (ret < 0)
--				goto complete;
-+				goto out;
+ 	if (!timeout) {
+ 		dev_err(dev->dev, "timeout waiting on XUDF bit\n");
+ 		return 0;
+ 	}
  
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
- 			continue;
-@@ -973,7 +983,7 @@ complete:
- 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
- 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
- 			if (ret < 0)
--				goto complete;
-+				goto out;
+-	*err |= OMAP_I2C_STAT_XUDF;
+ 	return 0;
+ }
  
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
- 			continue;
+@@ -922,9 +925,16 @@ complete:
+ 					}
+ 				}
+ 
+-				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
+-				    errata_omap3_i462(dev, &stat, &err))
+-					goto complete;
++				if (dev->errata & I2C_OMAP_ERRATA_I462) {
++					int ret;
++
++					ret = errata_omap3_i462(dev);
++					stat = omap_i2c_read_reg(dev,
++							OMAP_I2C_STAT_REG);
++
++					if (ret < 0)
++						goto complete;
++				}
+ 
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
+ 			}
+@@ -962,9 +972,16 @@ complete:
+ 					}
+ 				}
+ 
+-				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
+-				    errata_omap3_i462(dev, &stat, &err))
+-					goto complete;
++				if (dev->errata & I2C_OMAP_ERRATA_I462) {
++					int ret;
++
++					ret = errata_omap3_i462(dev);
++					stat = omap_i2c_read_reg(dev,
++							OMAP_I2C_STAT_REG);
++
++					if (ret < 0)
++						goto complete;
++				}
+ 
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
+ 			}
 -- 
 1.7.5.4
