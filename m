@@ -1,46 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 02 Jul 2012 19:31:05 -0600
-Subject: [PATCH 4/6] ARM: tegra: Add clk_tegra structure and helper
- functions
-In-Reply-To: <CAJOA=zMt-HWKrgQ-pD-wH0s_Nao5sJA13+ESJSBkHQ_3OBurtg@mail.gmail.com>
-References: <1340879846-12900-1-git-send-email-pgaikwad@nvidia.com>
- <1340879846-12900-5-git-send-email-pgaikwad@nvidia.com>
- <20120628182759.GA28424@gmail.com> <4FED688E.9090408@nvidia.com>
- <CAJOA=zMt-HWKrgQ-pD-wH0s_Nao5sJA13+ESJSBkHQ_3OBurtg@mail.gmail.com>
-Message-ID: <4FF24B59.1060508@wwwdotorg.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 2 Jul 2012 18:33:57 -0700
+Subject: linux-next: adding the common clk tree
+In-Reply-To: <20120703093321.d261f6a118f03d6296af54e9@canb.auug.org.au>
+References: <20120626015551.GW4402@gmail.com>
+ <CACRpkdayZUcA13p8iTRXLb4BestbAQhNP+a1nesYkcDEGFs=WA@mail.gmail.com>
+ <20120703093321.d261f6a118f03d6296af54e9@canb.auug.org.au>
+Message-ID: <CAJOA=zPnOtrJLyryavV0ndqWFvvMcEbjHKKKEpNm80_1cD1_ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2012 06:09 PM, Turquette, Mike wrote:
-> On Fri, Jun 29, 2012 at 1:34 AM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
->> On Thursday 28 June 2012 11:58 PM, Mike Turquette wrote:
->>> We had some discussions in the past on your clock reset and external
->>> line request operations which you've had to put into struct clk_tegra.
->>>
->>> Do you need to expose those ops to code in drivers/*?  I consider that a
->>> reasonable litmus test to start considering if something should be moved
->>> into the generic clk.h api.
+On Mon, Jul 2, 2012 at 4:33 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Linus,
+>
+> On Sat, 30 Jun 2012 21:47:35 +0200 Linus Walleij <linus.walleij@linaro.org> wrote:
 >>
+>> On Tue, Jun 26, 2012 at 3:55 AM, Mike Turquette <mturquette@ti.com> wrote:
 >>
->> Yes, we need these ops in drivers. Peter has sent a patch proposing to move
->> these ops to generic clk.
+>> > Would you please add the clk-next branch of the common clock tree to
+>> > linux-next?
+>> >
+>> > git://git.linaro.org/people/mturquette/linux.git clk-next
 >>
->> In addition, we also need mechanism/ops to change rate and parent from
->> clk_ops implementation. There was some discussion but I do not know the
->> latest status.
->>
-> 
-> Hi Prashant,
-> 
-> OK, that is good to know.  I haven't forgotten about this topic.  I'm
-> still trying to think of the best way to expose less-common operations
-> to drivers...
-> 
-> Based on Stephen's feedback in patch 0 I'll be waiting for another
-> version of this series before taking into clk-next.
+>> So I don't see this being pulled into -next, is it just a slip,
+>> I though the structure of the branch was agreed upon and all?
+>
+> I am waiting for Mike to let me know its all ready to add ...
+>
 
-Oh, does this series depend on stuff in clk-next? I was intending to
-take it through the Tegra tree, since it definitely depends on (in
-complex ways through context if nothing else due to to large
-split/rename patches) a bunch of commits in Tegra's for-3.6/common-clk
-branch.
+Oops.  I thought everything was sorted after our last email.  I've
+gone ahead and updated clk-next based on our discussions, so please do
+pull it in.
+
+Thanks much,
+Mike
+
+> --
+> Cheers,
+> Stephen Rothwell ? ? ? ? ? ? ? ? ? ?sfr at canb.auug.org.au
