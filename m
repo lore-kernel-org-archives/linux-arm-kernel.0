@@ -1,19 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jul 2012 23:46:09 +0100
-Subject: MX28 poweroff issue
-In-Reply-To: <201207040030.36713.marex@denx.de>
-References: <201207040030.36713.marex@denx.de>
-Message-ID: <20120703224609.GC26355@n2100.arm.linux.org.uk>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 03 Jul 2012 18:56:58 -0400
+Subject: [PATCH] mmc: mxs-mmc: enable regulator for mmc slot
+In-Reply-To: <1340699937-8163-1-git-send-email-shawn.guo@linaro.org> (Shawn
+ Guo's message of "Tue, 26 Jun 2012 16:38:57 +0800")
+References: <1340699937-8163-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <87txxo78sl.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 12:30:36AM +0200, Marek Vasut wrote:
-> I recently confirmed this issue when doing "poweroff". The issue was
-> initially reported by Detlev Zundel.
+Hi,
 
-My guess is it's because we don't disable interrupts on halt - because
-the kernel used to allow halt followed by another ctrl-alt-reboot to
-cause the thing to reboot.
+On Tue, Jun 26 2012, Shawn Guo wrote:
+> If bootloader or platform initialization code does not enable the
+> power supply to mmc slot, we need to do it in mmc driver.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/mmc/host/mxs-mmc.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index 34a9026..1a29668 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -707,6 +707,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	struct pinctrl *pinctrl;
+>  	int ret = 0, irq_err, irq_dma;
+>  	dma_cap_mask_t mask;
+> +	struct regulator *reg_vmmc;
+>  
+>  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> @@ -747,6 +748,16 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	host->mmc = mmc;
+>  	host->sdio_irq_en = 0;
+>  
+> +	reg_vmmc = devm_regulator_get(&pdev->dev, "vmmc");
+> +	if (!IS_ERR(reg_vmmc)) {
+> +		ret = regulator_enable(reg_vmmc);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"Failed to enable vmmc regulator: %d\n", ret);
+> +			goto out_mmc_free;
+> +		}
+> +	}
+> +
+>  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>  	if (IS_ERR(pinctrl)) {
+>  		ret = PTR_ERR(pinctrl);
 
-That's long since gone, so we might as well make the CPU spin endlessly
-waiting for someone to pull the power on halt...
+Thanks, pushed to mmc-next for 3.6.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
