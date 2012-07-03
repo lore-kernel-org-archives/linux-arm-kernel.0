@@ -1,29 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Jul 2012 20:23:19 +0000
-Subject: [GIT PULL 1/6] omap non-critical fixes for v3.6 merge window
-In-Reply-To: <pull-1341133277-501333>
-References: <pull-1341133277-501333>
-Message-ID: <201207032023.19799.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  3 Jul 2012 14:26:00 -0600
+Subject: [PATCH] clk: fix used-uninitialized warning in__clk_set_parent
+Message-ID: <1341347160-21170-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 01 July 2012, Tony Lindgren wrote:
-> The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
-> 
->   Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-non-critical-for-v3.6
+From: Stephen Warren <swarren@nvidia.com>
 
+This fixes:
+drivers/clk/clk.c: In function '__clk_set_parent':
+drivers/clk/clk.c:1069:5: warning: 'i' may be used uninitialized in this function
 
-Merged all six pull request. Thanks a lot for all your thorough
-work, it's always great to pull requests like these.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ drivers/clk/clk.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-I ended up putting both tags/omap-devel-pm-for-v3.6 and and 
-tags/omap-devel-driver-for-v3.6 into the next/pm branch as they are
-both mostly power management related in some way.
-
-Everything else went into the obvious place.
-
-	Arnd
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 026d901..42647ca 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1071,13 +1071,15 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+ 	old_parent = clk->parent;
+ 
+ 	/* find index of new parent clock using cached parent ptrs */
+-	if (clk->parents)
++	if (clk->parents) {
+ 		for (i = 0; i < clk->num_parents; i++)
+ 			if (clk->parents[i] == parent)
+ 				break;
+-	else
++	} else {
+ 		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
+ 								GFP_KERNEL);
++		i = clk->num_parents;
++	}
+ 
+ 	/*
+ 	 * find index of new parent clock using string name comparison
+-- 
+1.7.0.4
