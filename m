@@ -1,87 +1,86 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 3 Jul 2012 11:05:50 -0500
-Subject: [PATCH V2] gpio/omap: fix invalid context restore of gpio bank-0
-Message-ID: <1341331550-21312-1-git-send-email-jon-hunter@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 3 Jul 2012 18:15:21 +0200
+Subject: "ADDRCONF(NETDEV_UP): eth0: link is not ready" with IPv6
+In-Reply-To: <4FF313F6.7010600@xdin.com>
+References: <4FED14C2.9020200@xdin.com>
+ <1340983473.3066.6.camel@bwh-desktop.uk.solarflarecom.com>
+ <4FF313F6.7010600@xdin.com>
+Message-ID: <4FF31A99.9010806@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the gpio _runtime_resume/suspend functions are calling the
-get_context_loss_count() platform function if the function is populated for
-a gpio bank. This function is used to determine if the gpio bank logic state
-needs to be restored due to a power transition. This function will be populated
-for all banks, but it should only be called for banks that have the
-"loses_context" variable set. It is pointless to call this if loses_context is
-false as we know the context will never be lost and will not need restoring.
+On 07/03/2012 05:47 PM, Arvid Brodin :
+> (Added MACB "patch" contact Nicolas Ferre to CC list.)
 
-For all OMAP2+ devices gpio bank-0 is in an always-on power domain and so will
-never lose context. We found that the get_context_loss_count() was being called
-for bank-0 during the probe and returning 1 instead of 0 indicating that the
-context had been lost. This was causing the context restore function to be
-called at probe time for this bank and because the context had never been saved,
-was restoring an invalid state. This ultimately resulted in a crash [1].
+Hi,
 
-This issue is a regression that was exposed by commit 1b1287032 (gpio/omap: fix
-missing check in *_runtime_suspend()).
+(adding linux-arm-kernel)
 
-There are multiple bugs here that need to be addressed ...
+> On 2012-06-29 17:24, Ben Hutchings wrote:
+>> On Fri, 2012-06-29 at 02:36 +0000, Arvid Brodin wrote:
+>>> Hi,
+>>>
+>>> After 'ip link set eth0 up' on an avr32 board (network driver macb), the device ends up in
+>>> operational mode "UNKNOWN":
+>>>
+>>> # ip link
+>>> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN qlen 1000
+>>>     link/ether 00:24:74:00:17:9d brd ff:ff:ff:ff:ff:ff
+>>>
+>>> Unplugging and plugging in the network cable gets the device to mode "UP".
+>>>
+>>> This is a problem for me because I'm trying to use this device as a "slave" device (for a
+>>> virtual HSR device*) and I need to be able to decide if the slave device is operational or
+>>> not.
+>>>
+>>> Following Stephen's advice here:
+>>> http://kerneltrap.org/mailarchive/linux-netdev/2008/9/24/3398834 I checked the macb.c code
+>>> and noticed they do not call netif_carrier_off() neither before register_netdev() nor in
+>>> dev_open().
+>
+>> It should be called after register_netdev() and before the driver's
+>> ndo_open implementation returns.
 
-1. Why the always-on power domain returns a context loss count of 1? This needs
-   to be fixed in the power domain code [2]. However, the gpio driver should not
-   assume the loss count is 0 to begin with.
-2. The omap gpio driver should never be calling get_context_loss_count for a
-   gpio bank in a always-on domain. This is pointless and adds unneccessary
-   overhead.
-3. The OMAP gpio driver assumes that the initial power domain context loss count
-   will be 0 at the time the gpio driver is probed. However, it could be
-   possible that this is not the case and an invalid context restore could be
-   performed during the probe. To avoid this only populate the
-   get_context_loss_count() function pointer after the initial call to
-   pm_runtime_get() has occurred. This will ensure that the first
-   pm_runtime_put() initialised the loss count correctly.
+After having read several drivers, it seems that some are calling
+netif_carrier_off() *before* register_netdev() and some *after*... What
+is the proper way?
 
-This patch addresses issues 2 and 3 above.
 
-[1] http://marc.info/?l=linux-omap&m=134065775323775&w=2
-[2] http://marc.info/?l=linux-omap&m=134100413303810&w=2
+> I'm guessing this allows linkwatch to do netif_carrier_on() some time after the dev_open()?
+> 
+> Besides not calling netif_carrier_off() in dev_open(), the Cadence/MACB driver calls
+> netif_carrier_off() in dev_close(). Is this correct?
+> 
+> 
+> How should I handle carrier state for a virtual device? The device should have "carrier"
+> as long as at least one of the underlying physical interfaces is operational (which I
+> guess means operational state UP). Would it be correct to watch NETDEV_CHANGE and DOWN/UP
+> events of the slaves and call netif_carrier_on()/off() on the virtual device depending on
+> the slaves' states? 
+>>
+>>> I added the call before register_netdev(), which fixed the problem. However, if I then
+>>> enable IPv6:
+>>>
+>>> # ip link set eth0 up
+>>> ADDRCONF(NETDEV_UP): eth0: link is not ready
+>>> eth0: link up (100/Full)
+>>> ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+>>
+>> This looks normal.
+> 
+> Good, that narrows it down a bit.
+> 
+>>
+>>> Any idea what is happening / what I'm doing wrong? (This is not just cosmetic; is some
+>>> situations this seems to kill the interface - e.g. ping does not work, down/up does not
+>>> help...) Things work fine without IPv6 configured.
+>>
+>> Perhaps some packets sent automatically by IPv6 are triggering a driver
+>> bug?  Or there is a bug in multicast support, which IPv6 always uses.
 
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Cc: Franky Lin <frankyl@broadcom.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: NeilBrown <neilb@suse.de>
+Sorry, I have no clue on this topic. But I am eager to know if you find
+something. I can queue your patch for netif_carrier_off() at least...
 
-Reported-by: Franky Lin <frankyl@broadcom.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Franky Lin <frankyl@broadcom.com>
-Tested-by: NeilBrown <neilb@suse.de>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- drivers/gpio/gpio-omap.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index c4ed172..f13fc9c 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1081,7 +1081,6 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	bank->is_mpuio = pdata->is_mpuio;
- 	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
- 	bank->loses_context = pdata->loses_context;
--	bank->get_context_loss_count = pdata->get_context_loss_count;
- 	bank->regs = pdata->regs;
- #ifdef CONFIG_OF_GPIO
- 	bank->chip.of_node = of_node_get(node);
-@@ -1135,6 +1134,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	omap_gpio_chip_init(bank);
- 	omap_gpio_show_rev(bank);
- 
-+	if (bank->loses_context)
-+		bank->get_context_loss_count = pdata->get_context_loss_count;
-+
- 	pm_runtime_put(bank->dev);
- 
- 	list_add_tail(&bank->node, &omap_gpio_list);
+Best regards,
 -- 
-1.7.9.5
+Nicolas Ferre
