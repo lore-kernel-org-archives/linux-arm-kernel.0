@@ -1,57 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Jul 2012 13:19:40 +0000
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <20120703130042.GA10007@mail.gnudd.com>
-References: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
- <20120701104401.GA4352@mail.gnudd.com>
- <20120703130042.GA10007@mail.gnudd.com>
-Message-ID: <201207031319.40884.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 3 Jul 2012 14:24:47 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <4FF2EEA1.6080204@linaro.org>
+References: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
+ <20120703123552.GC25995@sirena.org.uk>
+ <4FF2EEA1.6080204@linaro.org>
+Message-ID: <20120703132447.GN29030@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 July 2012, Alessandro Rubini wrote:
-> Peter Anvin:
-> > There is no problem with adding ARM or !X86 dependencies to drivers
-> > now and fixing them later or as required.
-> 
-> Ok. This is my summary of the compilation errors I have when
-> enabling ARM_AMBA undex x86 and enabling everything that appears
-> in "make oldconfig":
-> 
-> 
-> This is a sum up of the errors in all driver that are
-> enabled by telling "CONFIG_ARM_AMBA=y" in the x86 config.
-> 
->    drivers/dma/pl330.c: register names conflict with arch symbols
->      proposed fix: use proper prefix names
-> 
->    drivers/dma/amba-pl08x.c: needs <asm/hardware/pl080.h>
->      proposed fix: move pl080.h to include/linux
+On Tue, Jul 03, 2012 at 02:07:45PM +0100, Lee Jones wrote:
+> On 03/07/12 13:35, Mark Brown wrote:
 
-Note that there is already an include/linux/amba/pl08x.h.
-I would just move the few parts of pl080.h that are actually
-needed with global visibility there, and move the rest
-to drivers/dma/.
+> >Do we really want to create MFD cells like this (which are really Linux
+> >internal things and might vary if another OS or another version of Linux
+> >changes its internal abstractions) from the device tree?
 
->    drivers/gpio/gpio-pl061.c: uses chained_irq_enter/exit
->      proposed fix: depend on CONFIG_ARM (the function only exists in arm)
-> 
->    drivers/mmc/host/mmci.c: uses <asm/sizes.h>
->    drivers/mmc/host/mmci.c: uses readsl/writesl
->      proposed fix: use linux/sizes.h and provide readsl/writesl like others do
+> We're not creating them. We're merely using current infrastructure.
 
-Ack on the linux/sizes.h, that definitely makes sense.
+*Very* recently added infrastructure which caused you to notice this...
 
-I'm not sure I want to spread readsl/writesl beyond the architectures
-that already have it. Maybe instead change the driver to use ioread32_rep,
-which is already available on all architectures and is defined the
-same way as readsl on ARM.
+> Before, when we probed each device from Device Tree we came up
+> against some fairly major limitations of the Device Tree. As a
+> result, Arnd and I agreed that this was the way to go.
 
->    drivers/watchdog/sp805_wdt.c: uses writel_relaxed
->      proposed fix: depend on CONFIG_ARM (this is a spear-only cell by now)
+I'm really unconvinced that instnatiating the MFD cells from device tree
+is in general a good idea.
 
-This one on the other hand makes sense to be defined on all architectures
-IMHO. I don't mind restricting the driver to ARM for now, but having
-a generic writel_relaxed would be nice.
+> See c5395e7ed8f16cc7bb72a783de68659db5aed515 for a short description
+> of the troubles we faced.
 
-	Arnd
+$ git show c5395e7ed8f16cc7bb72a783de68659db5aed515
+fatal: bad object c5395e7ed8f16cc7bb72a783de68659db5aed515
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/8cfced81/attachment.sig>
