@@ -1,156 +1,83 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 4 Jul 2012 00:39:20 +0530
-Subject: [PATCH v5 2/7] ARM: davinci,
- cp_intc: Add OF support for TI interrupt controller
-In-Reply-To: <1338373143-7467-3-git-send-email-hs@denx.de>
-References: <1338373143-7467-1-git-send-email-hs@denx.de>
- <1338373143-7467-3-git-send-email-hs@denx.de>
-Message-ID: <4FF34360.6030501@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 3 Jul 2012 15:44:58 -0300
+Subject: [PATCH 2/2] ASoC: imx-mc13783: Add audmux settings for mx27pdk
+In-Reply-To: <1341341098-9510-1-git-send-email-fabio.estevam@freescale.com>
+References: <1341341098-9510-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1341341098-9510-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+mx27pdk board also has a mc13783 codec.
 
-On 5/30/2012 3:48 PM, Heiko Schocher wrote:
-> Add a function to initialize the Common Platform Interrupt Controller
-> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
-> 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
-> 
-> ---
-> - changes for v4
->   - split patch in 2 patches, one for irq_domain adaption
->     one for DT enhancement, as Nori Sekhar suggested.
->   - add comment from Grant Likely for the DT part:
->     remove if/else clause, not needed.
->     Make use of DT runtime configurable
-> 
-> - changes for v5:
->   add comments from Sergei Shtylyov:
->   - s/intc/cp_intc in commit subject
->   add comments from Grant Likely:
->   - rename compatible" prop to "ti,cp-intc"
-> 
->  .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++++++++++++++++++++
->  arch/arm/mach-davinci/cp_intc.c                    |   24 ++++++++++++++++-
->  2 files changed, 49 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt b/Documentation/devicetree/bindings/arm/davinci/intc.txt
-> new file mode 100644
-> index 0000000..597e8a0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
+Add support for it and do a run-time machine type check to perform the correct
+audiomux settings.
 
-I think this file is better named cp-intc.txt since there is also an
-intc (a different IP) used on DaVinci platforms.
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: <alsa-devel@alsa-project.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ sound/soc/fsl/imx-mc13783.c |   49 +++++++++++++++++++++++++++++--------------
+ 1 files changed, 33 insertions(+), 16 deletions(-)
 
-> @@ -0,0 +1,27 @@
-> +* TI Common Platform Interrupt Controller
-> +
-> +Common Platform Interrupt Controller (cp_intc) is used on
-> +OMAP-L1x SoCs and can support several configurable number
-> +of interrupts.
-> +
-> +Main node required properties:
-> +
-> +- compatible : should be:
-> +	"ti,cp-intc"
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The type shall be a <u32> and the value shall be 1.
-> +
-> +  The cell contains the interrupt number in the range [0-128].
-> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
-> +- reg: physical base address and size of the intc registers map.
-> +
-> +Example:
-> +
-> +	intc: interrupt-controller at 1 {
-> +		compatible = "ti,cp-intc";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		ti,intc-size = <101>;
-> +		reg = <0xfffee000 0x2000>;
-> +	};
-> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-> index 45d5256..d1bef55 100644
-> --- a/arch/arm/mach-davinci/cp_intc.c
-> +++ b/arch/arm/mach-davinci/cp_intc.c
-> @@ -14,6 +14,9 @@
->  #include <linux/irq.h>
->  #include <linux/irqdomain.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
->  
->  #include <mach/common.h>
->  #include <mach/cp_intc.h>
-> @@ -119,7 +122,7 @@ static const struct irq_domain_ops cp_intc_host_ops = {
->  	.xlate = irq_domain_xlate_onetwocell,
->  };
->  
-> -int __init __cp_intc_init(struct device_node *node)
-> +int __init __cp_intc_init(struct device_node *node, struct device_node *parent)
->  {
->  	u32 num_irq		= davinci_soc_info.intc_irq_num;
->  	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
-> @@ -129,6 +132,15 @@ int __init __cp_intc_init(struct device_node *node)
->  
->  	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
-
->  	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
-
-This line needs to be dropped because you are doing an ioremap again
-down below.
-
-> +	if (node) {
-> +		davinci_intc_base = of_iomap(node, 0);
-> +		if (of_property_read_u32(node, "ti,intc-size", &num_irq))
-> +			pr_warn("unable to get intc-size, default to %d\n",
-> +				num_irq);
-> +	} else {
-> +		davinci_intc_base = ioremap(davinci_soc_info.intc_base,
-> +					SZ_8K);
-> +	}
->  	if (WARN_ON(!davinci_intc_base))
->  		return -EINVAL;
->  
-> @@ -206,7 +218,15 @@ int __init __cp_intc_init(struct device_node *node)
->  	return 0;
->  }
->  
-> +static struct of_device_id irq_match[] __initdata = {
-> +	{ .compatible = "ti,cp-intc", .data = __cp_intc_init, },
-> +	{ }
-> +};
-> +
->  void __init cp_intc_init(void)
->  {
-> -	__cp_intc_init(NULL);
-> +	if (!of_find_compatible_node(NULL, NULL, "ti,cp-intc"))
-> +		__cp_intc_init(NULL, NULL);
-> +	else
-> +		of_irq_init(irq_match);
-
-It turns out of_irq_init() does not exist on non-DT builds so this cause
-build breakage when DT is not being used. Looking around, other
-platforms are calling of_irq_init() in the generic DT board file and not
-in the interrupt controller code. See arch/arm/mach-at91/board-dt.c or
-arch/arm/mach-omap2/board-generic.c for examples. We need to adopt a
-similar strategy for DaVinci.
-
-To save time, I implemented these fixes and created a new patch which I
-will send across shortly. Please have a look at that and let me know if
-it works for you. I tested the patch on AM18x EVM.
-
-Thanks,
-Sekhar
+diff --git a/sound/soc/fsl/imx-mc13783.c b/sound/soc/fsl/imx-mc13783.c
+index f59c349..549b31f 100644
+--- a/sound/soc/fsl/imx-mc13783.c
++++ b/sound/soc/fsl/imx-mc13783.c
+@@ -111,22 +111,39 @@ static int __devinit imx_mc13783_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	imx_audmux_v2_configure_port(MX31_AUDMUX_PORT4_SSI_PINS_4,
+-		IMX_AUDMUX_V2_PTCR_SYN,
+-		IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0) |
+-		IMX_AUDMUX_V2_PDCR_MODE(1) |
+-		IMX_AUDMUX_V2_PDCR_INMMASK(0xfc));
+-	imx_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
+-		IMX_AUDMUX_V2_PTCR_SYN |
+-		IMX_AUDMUX_V2_PTCR_TFSDIR |
+-		IMX_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
+-		IMX_AUDMUX_V2_PTCR_TCLKDIR |
+-		IMX_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
+-		IMX_AUDMUX_V2_PTCR_RFSDIR |
+-		IMX_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
+-		IMX_AUDMUX_V2_PTCR_RCLKDIR |
+-		IMX_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4),
+-		IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT4_SSI_PINS_4));
++	if (machine_is_mx31_3ds()) {
++		imx_audmux_v2_configure_port(MX31_AUDMUX_PORT4_SSI_PINS_4,
++			IMX_AUDMUX_V2_PTCR_SYN,
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0) |
++			IMX_AUDMUX_V2_PDCR_MODE(1) |
++			IMX_AUDMUX_V2_PDCR_INMMASK(0xfc));
++		imx_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
++			IMX_AUDMUX_V2_PTCR_SYN |
++			IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR |
++			IMX_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			IMX_AUDMUX_V2_PTCR_RFSDIR |
++			IMX_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			IMX_AUDMUX_V2_PTCR_RCLKDIR |
++			IMX_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4),
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT4_SSI_PINS_4));
++	} else if (machine_is_mx27_3ds()) {
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_TFSDIR |
++			IMX_AUDMUX_V1_PCR_TCLKDIR |
++			IMX_AUDMUX_V1_PCR_RFSDIR |
++			IMX_AUDMUX_V1_PCR_RCLKDIR |
++			IMX_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			IMX_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
++		);
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
++		);
++	}
+ 
+ 	return ret;
+ }
+-- 
+1.7.1
