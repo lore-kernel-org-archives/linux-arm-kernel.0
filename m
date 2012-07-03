@@ -1,34 +1,20 @@
-From: bob.beckett@gmail.com (Robert Beckett)
-Date: Mon, 2 Jul 2012 14:52:52 +0100
-Subject: arm_vmregion_alloc call
-Message-ID: <CAOmFF120-TQZFtLeSUyAaiSOXNLGePu2mLMuOi9Ec47zbAVUYA@mail.gmail.com>
+From: pankaj.embedded@gmail.com (Pankaj Pandey)
+Date: Tue, 3 Jul 2012 14:08:08 +0530
+Subject: Device tree back porting for ARM
+Message-ID: <CAOdCjQt928PoUGA8G0aKktONow9EcHG=JMGDDcNbpBt3TpGd_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Dear All,
 
-I just debugged a problem with a USB driver where it was calling
-dma_alloc_coherent with a GFP_DMA32 flag.
-It turned out that in __dma_alloc_remap, it clears the GFP_DMA and
-GFP_HIGHMEM flags when calling arm_vmregion_alloc so that it does not clash
-with the slab allocator flag requirements, but it does not clear GFP_DMA32.
-The GFP_SLAB_BUG_MASK includes GFP_DMA32, so this looks like a bug to me.
-Should it be clearing GFP_DMA32 as well as GFP_DMA and GFP_HIGHMEM ?
+I working on  back porting of device tree support for ARM from 3.0 kernel
+to  2.6.32 kernel.  Kindly request you to if you can provide
+some idea that which files I need to be added or modified to add a  Device
+Tree support for ARM for 2.6.32  kernel.
+Thanks in Advance !!
 
-I checked in the latest kernel.org code, and the issue is still there.
-
-Is this a bug, or should it just be calling with GFP_DMA instead of
-GFP_DMA32?
-
-For now, I am working around it by using GFP_DMA in the dma_alloc_coherent
-call as we have no GFP_DMA lower limit, so GFP_DMA and GFP_DMA32 are the
-same on my architecture.
-
-Any advice appreciated,
-
-Thanks
-
-Bob
+Thanks and Regards,
+Pankaj Pandey
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120702/a710cc1c/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/d8450c78/attachment-0001.html>
