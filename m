@@ -1,21 +1,21 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Tue, 3 Jul 2012 10:52:17 -0400
-Subject: [PATCH v2 11/12] ARM: Kirkwood: Use DT to configure SATA device.
-In-Reply-To: <1341325365-21393-12-git-send-email-andrew@lunn.ch>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-12-git-send-email-andrew@lunn.ch>
-Message-ID: <CAMW5Ufa2bsYs9VD2g9hJWKpcQNcZt+WXCA1ohYoHeLk9SambSg@mail.gmail.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Tue, 03 Jul 2012 18:00:48 +0300
+Subject: GPMI NAND on MX28 with DT.with
+In-Reply-To: <CAMiH66HMCte-8BAqZiPu0T=U9MzCEfyznND0Hwm7TsctzJe9UQ@mail.gmail.com>
+References: <4FE39F19.9090105@grid-net.com>
+ <CAMiH66HMCte-8BAqZiPu0T=U9MzCEfyznND0Hwm7TsctzJe9UQ@mail.gmail.com>
+Message-ID: <4FF30920.4010504@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2012 at 10:22 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Convert boards using DT, but the old way of configuring SATA to now
-> use properties in there DT file.
+Hi Huang
 
-Andrew, should I be updating my GoFlex patch set to work with these
-new Kirkwood DT abstractions, and if so is there a specific tree you'd
-prefer I work against, or should I wait to see if my existing patch
-set is approved as is and update with a new patch once these updates
-land in an RC?
+On 06/22/2012 05:45 PM, Huang Shijie wrote:
+> Hi,
+>    yes, the gpmi-nand has bugs now.
+> I will try to fix it when I am free.
 
-Josh Coombs
+Any progress with this? Any ideas what could cause the bug?
+
+Regards,
+Lauri Hintsala
