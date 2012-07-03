@@ -1,103 +1,105 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Tue, 03 Jul 2012 12:38:41 +0800
-Subject: [PATCH 2 2/4] net ethernet introduce mac_la_ap helper
-In-Reply-To: <201207021612.57028.arnd@arndb.de>
-References: <20120702063545.26782.98908.stgit@build.warmcat.com>
- <20120702064054.26782.79849.stgit@build.warmcat.com>
- <201207021612.57028.arnd@arndb.de>
-Message-ID: <4FF27751.9050004@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 3 Jul 2012 12:58:13 +0800
+Subject: [PATCH] ARM: dts: mx23: add gpmi nand support
+Message-ID: <1341291493-30707-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/12 00:12, the mail apparently from Arnd Bergmann included:
-> On Monday 02 July 2012, Andy Green wrote:
->> From: Andy Green <andy@warmcat.com>
->>
->> This introduces a small helper in net/ethernet, which registers a
->> network notifier on init, and accepts registrations of expected asynchronously-
+Add DT node for gpmi nand.
+Also add pinctrl for gpmi nand.
 
-> Yes, looks good to me in principle. It needs to get sent to the linux-kernel
-> and netdev mailing lists for review though. A few small comments.
+Enable the gpmi-nand in mx23-evk board.
 
-I wanted to hear that it had actually converged with what was being 
-talked about first.  I just sent out a v3 with the relevant patch also 
-cc-d to those lists but stg mail didn't seem to send it to them.  I'll 
-wait for any further comments here and resend the whole thing including 
-those lists.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/boot/dts/imx23-evk.dts |    6 ++++
+ arch/arm/boot/dts/imx23.dtsi    |   49 ++++++++++++++++++++++++++++++++++----
+ 2 files changed, 49 insertions(+), 6 deletions(-)
 
-> I find the name a bit non-obvious, not sure if we can come up with the
-> perfect one.	
->
-> How about mac-platform?
-
-Done.
-
->>   endif   # if NET
->
-> This one needs to be either a silent option (only selected by the
-> platforms that want it) or the header file has to provide a
-> static-inline fallback that does nothing, so we don't get
-> a build failure on platforms that need it if the option gets
-> disabled.
->
-> I'd prefer making it a silent option because then we don't bloat
-> the kernel if someone accidentally enables it on a platform that
-> does not use it.
-
-Done.  It's already added as a select on the Panda board config.
-
-I also moved it out of the "if NET" clause and took care about the case 
-that CONFIG_NET is off but we still have mac-platform references.
-
->> +static struct mac_la_ap mac_la_ap_list;
->
-> The normal way to do this is to have just a list head that the
-> entries get added to:
->
-> static LIST_HEAD(mac_la_ap_list);
->
-> That also takes care of the initialization.
-
-Thanks for normalizing it, done.
-
->> +DEFINE_MUTEX(mac_la_ap_mutex);
->> +bool mac_la_ap_started;
->
-> These should all be static.
-
-Right, done.
-
-> I think it would be simpler to register the notifier from an
-> initcall and drop the mac_la_ap_started variable.
-
-That was my first approach, to structure it as a real driver.  I had 
-tried a few likely-looking initcall levels but the init of the helper 
-was coming after the init of the network code.
-
-I found this time that core_initcall works, so I used that, dropped the 
-flag.  But isn't it a bit tricky with these to know if the prerequisite 
-you're trying to ensure is already initialized might not actually be at 
-the same initcall level and you're working by accident?
-
->> +int mac_la_ap_register_device_macs(const struct mac_la_ap *macs)
->> +{
->
->> +}
->> +EXPORT_SYMBOL_GPL(mac_la_ap_register_device_macs);
->
->
-> I'm not sure if there is any point in exporting this function, my feeling
-> is that it would only ever be called from built-in code. If we can call it
-> from a module, we should probably also allow this file to be a loadable
-> module as well.
-
-Being a modular API for platform code to call doesn't make sense, I got 
-rid of the export.
-
--Andy
-
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index 9d674ca..e3486f4 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -22,6 +22,12 @@
+ 
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
++			gpmi-nand at 8000c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&gpmi_pins_a &gpmi_pins_fixup>;
++				status = "okay";
++			};
++
+ 			ssp0: ssp at 80010000 {
+ 				compatible = "fsl,imx23-mmc";
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 7662134..a874dbf 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -59,13 +59,15 @@
+ 				status = "disabled";
+ 			};
+ 
+-			bch at 8000a000 {
+-				reg = <0x8000a000 2000>;
+-				status = "disabled";
+-			};
+-
+ 			gpmi-nand at 8000c000 {
+-				reg = <0x8000c000 2000>;
++				compatible = "fsl,imx23-gpmi-nand";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x8000c000 2000>, <0x8000a000 2000>;
++				reg-names = "gpmi-nand", "bch";
++				interrupts = <13>, <56>;
++				interrupt-names = "gpmi-dma", "bch";
++				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -138,6 +140,41 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				gpmi_pins_a: gpmi-nand at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x0000 /* MX23_PAD_GPMI_D00__GPMI_D00 */
++						0x0010 /* MX23_PAD_GPMI_D01__GPMI_D01 */
++						0x0020 /* MX23_PAD_GPMI_D02__GPMI_D02 */
++						0x0030 /* MX23_PAD_GPMI_D03__GPMI_D03 */
++						0x0040 /* MX23_PAD_GPMI_D04__GPMI_D04 */
++						0x0050 /* MX23_PAD_GPMI_D05__GPMI_D05 */
++						0x0060 /* MX23_PAD_GPMI_D06__GPMI_D06 */
++						0x0070 /* MX23_PAD_GPMI_D07__GPMI_D07 */
++						0x0100 /* MX23_PAD_GPMI_CLE__GPMI_CLE */
++						0x0110 /* MX23_PAD_GPMI_ALE__GPMI_ALE */
++						0x0130 /* MX23_PAD_GPMI_RDY0__GPMI_RDY0 */
++						0x0140 /* MX23_PAD_GPMI_RDY1__GPMI_RDY1 */
++						0x0170 /* MX23_PAD_GPMI_WPN__GPMI_WPN */
++						0x0180 /* MX23_PAD_GPMI_WRN__GPMI_WRN */
++						0x0190 /* MX23_PAD_GPMI_RDN__GPMI_RDN */
++						0x21b0 /* MX23_PAD_GPMI_CE1N__GPMI_CE1N */
++						0x21c0 /* MX23_PAD_GPMI_CE0N__GPMI_CE0N	*/
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				gpmi_pins_fixup: gpmi-pins-fixup {
++					fsl,pinmux-ids = <
++						0x0170 /* MX23_PAD_GPMI_WPN__GPMI_WPN */
++						0x0180 /* MX23_PAD_GPMI_WRN__GPMI_WRN */
++						0x0190 /* MX23_PAD_GPMI_RDN__GPMI_RDN */
++					>;
++					fsl,drive-strength = <2>;
++				};
++
+ 				mmc0_4bit_pins_a: mmc0-4bit at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
 -- 
-Andy Green | TI Landing Team Leader
-Linaro.org ? Open source software for ARM SoCs | Follow Linaro
-http://facebook.com/pages/Linaro/155974581091106  - 
-http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
+1.7.0.4
