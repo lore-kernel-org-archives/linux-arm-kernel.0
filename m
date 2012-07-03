@@ -1,77 +1,40 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Jul 2012 20:07:48 +0530
-Subject: [PATCHv4 10/18] i2c: omap: ack IRQ in parts
+Date: Tue, 3 Jul 2012 20:07:56 +0530
+Subject: [PATCHv4 18/18] i2c: omap: remove redundant status read
 In-Reply-To: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
 References: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1341326276-25434-11-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1341326276-25434-19-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+Remove the redundant read of the status register.
 
-According to flow diagrams on OMAP TRMs,
-we should ACK the IRQ as they happen.
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++------------
- 1 files changed, 16 insertions(+), 12 deletions(-)
+v4:Patch addition(fixes a review comment)
+
+ drivers/i2c/busses/i2c-omap.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6c8f135..30db822 100644
+index 8940eb3..b1a32f8 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -869,21 +869,19 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 		}
+@@ -965,7 +965,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 				num_bytes = dev->buf_len;
  
- complete:
--		/*
--		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
--		 * acked after the data operation is complete.
--		 * Ref: TRM SWPU114Q Figure 18-31
--		 */
--		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, stat &
--				~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
--				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
--
--		if (stat & OMAP_I2C_STAT_NACK)
-+		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
-+		}
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
+-			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+ 				goto out;
  
- 		if (stat & OMAP_I2C_STAT_AL) {
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
+@@ -981,7 +980,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 				num_bytes = dev->threshold;
  
- 		/*
-@@ -960,12 +958,18 @@ complete:
- 
- 		if (stat & OMAP_I2C_STAT_ROVR) {
- 			dev_err(dev->dev, "Receive overrun\n");
--			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
-+			err |= OMAP_I2C_STAT_ROVR;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
--			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
-+			err |= OMAP_I2C_STAT_XUDF;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
- 	} while (stat);
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
+-			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+ 				goto out;
  
 -- 
 1.7.5.4
