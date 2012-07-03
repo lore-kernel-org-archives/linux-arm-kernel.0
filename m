@@ -1,59 +1,50 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Tue, 3 Jul 2012 15:29:46 -0500
-Subject: [PATCH] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120703150406.GH22705@S2101-09.ap.freescale.net>
-References: <1341245355-21397-1-git-send-email-shawn.guo@linaro.org>
- <20120702183736.e8e4136d4bf206b55c8653a5@freescale.com>
- <20120703150406.GH22705@S2101-09.ap.freescale.net>
-Message-ID: <20120703152946.c2684e9da3256fedd559f039@freescale.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 3 Jul 2012 14:15:06 -0700
+Subject: [GIT PULL] Integrator common clock
+In-Reply-To: <CACRpkda5xQLr+fhnsWm4ONUCzJxtMMCLkS2ek9ufDPV-u7PsGg@mail.gmail.com>
+References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
+ <20120620212046.GI4402@gmail.com>
+ <CACRpkdaDUvfEV-7zTTyb+NbZ1WnN+iz+9QzDCVESeizCowOCsg@mail.gmail.com>
+ <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
+ <CACRpkda5xQLr+fhnsWm4ONUCzJxtMMCLkS2ek9ufDPV-u7PsGg@mail.gmail.com>
+Message-ID: <CAJOA=zOaXf6QzF9yhcoTTaPYr-9=L2h5r5AvmMxoSbroJJrOFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Jul 2012 23:04:08 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, Jul 3, 2012 at 12:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Jun 22, 2012 at 11:58 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>
+>> I saw that an older version of the patches is on the clk-next branch
+>> in your git, if you're carrying these please take the latest, I created
+>> a branch based off v3.5-rc2 (as I see you're using this) at your
+>> convenience:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+>> for-mike
+>
+> This is still the case, please pull this version of the patches
+> (the last that were posted to the mail list...) or tell me to resend
+> them if that is better.
+>
 
-> On Mon, Jul 02, 2012 at 06:37:36PM -0500, Kim Phillips wrote:
-> > Instead of duplicating the binding documentation entry, can this be
-> > merged in with crypto/fsl-sec4.txt?
-> 
-> Yes. We can do that.  But I would still keep a plain
-> Documentation/devicetree/bindings/rtc/snvs-rtc.txt there with only
-> a pointer to Documentation/devicetree/bindings/crypto/fsl-sec4.txt.
-> Otherwise, I'm afraid that people will hardly know the bindings of
-> snvs-rtc is documented in fsl-sec4.txt.
+Linus,
 
-that's understandable.
+Thanks for the re-ping.  I've dropped the old ones and taken in these patches.
 
-> > Also, don't we need the rtc to
-> > be a 'sub-device' of "fsl,sec-vX.Y-mon", and to have its own
-> > compatible, e.g., "fsl,sec-v4.0-mon-rtc-lp"?
-> > 
-> Sounds sensible.  But how will reg and interrupts properties be
-> documented?  The registers for lp-rtc is not so consecutive and
+I made one trivial change which is to drop "depends on COMMON_CLK"
+from both of the entries in drivers/clk/versatile/Kconfig.  COMMON_CLK
+is implied since we source your Kconfig from within a menu item that
+depends on COMMON_CLK.
 
-LP registers go from 0x34 (LPLR) to 0x8b (LPZMKR7), consecutively.
-HP registers technically would have a split range, but this patch
-doesn't address the HP part.
+Let me know if that is alright with you.
 
-> interrupts are shared by hp and lp.
+One last (maybe stupid) question.  I don't see that ARCH_VERSATILE
+actually uses COMMON_CLK, but uses a legacy platform-specific clk
+framework.  Is that intended?
 
-that's why we return IRQ_NONE, so we can request_irq IRQF_SHARED.
+Thanks,
+Mike
 
-> > > +config RTC_DRV_SNVS
-> > > +	tristate "Freescale SNVS RTC support"
-> > > +	depends on ARCH_MXC
-> > 
-> > should also depend on || FSL_SOC - it was mentioned in the
-> > review of the last version of this patch that this h/w exists on
-> > other, non-ARM based, SoCs.
-> > 
-> I would not do that until the driver is tested on FSL_SOC.
-
-I can test it.
-
-> Also I'm
-> considering to take Stephen's suggestion to drop even ARCH_MXC.
-
-fine with me.
-
-Kim
+> Nice to see the tree in -next!
+> Linus Walleij
