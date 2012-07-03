@@ -1,27 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 3 Jul 2012 15:12:55 +0200
-Subject: [PATCH 0/3] ARM: dts: dove: Basic devicetree support for Marvell
- Dove
-In-Reply-To: <4FF2EDB0.3040707@googlemail.com>
-References: <1341318868-24567-2-git-send-email-sebastian.hesselbarth@googlemail.com>
- <20120703125017.GB17534@lunn.ch> <4FF2EDB0.3040707@googlemail.com>
-Message-ID: <20120703131255.GC17534@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 3 Jul 2012 10:13:32 -0300
+Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
+In-Reply-To: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+Message-ID: <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I am fine with 'marvell' instead of 'mrvl'. But the name change
-> has not been commited to arm-soc, yet? I can create a patch to
-> rename all occurrences of mrvl to marvell if you like.
-> 
+Hi Javier,
 
-Hi Sebastian
+On Tue, Jul 3, 2012 at 8:09 AM, javier Martin
+<javier.martin@vista-silicon.com> wrote:
+> Hi,
+> I've found the following problems in linux-3.5-rc5
+> (6887a4131da3adaab011613776d865f4bcfb5678) in our Visstrim M10 board:
 
-Jason has been working on this. Not sure what the status is.
+Could you please try the two attached patches?
 
-I also have patches for interrupt controllers, GPIO controls, and a
-few of the other device drivers. I will try to post them ASAP for a
-second review round. It would be good if you can test them out on your
-little cube.
+They should fix the dma and mx2-camera issues.
 
-       Thanks
-              Andrew
+I will try to look at the ssi problem, but my mx27pdk board still does
+not have audio supported.
+
+Regards,
+
+Fabio Estevam
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-clkdma.patch
+Type: application/octet-stream
+Size: 2637 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/b546b6ff/attachment-0002.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-clkmx2cam.patch
+Type: application/octet-stream
+Size: 3983 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/b546b6ff/attachment-0003.obj>
