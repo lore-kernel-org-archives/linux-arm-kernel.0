@@ -1,31 +1,24 @@
-From: changbinx.du@intel.com (Du, ChangbinX)
-Date: Tue, 3 Jul 2012 10:23:21 +0000
-Subject: [PATCH] ARM: mm: fix unitialized variable warning
-Message-ID: <0C18FE92A7765D4EB9EE5D38D86A563A0A18BB@SHSMSX101.ccr.corp.intel.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 03 Jul 2012 15:59:39 +0530
+Subject: [PATCH v2] clk: __clk_set_parent: set uninitialized variable
+In-Reply-To: <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
+References: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
+ <4FF15EDF.7030806@ti.com>
+ <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
+Message-ID: <4FF2C993.3060202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mm/alignment.c: In function ?do_alignment?:
-arch/arm/mm/alignment.c:327:15: warning: ?offset.un? may be used uninitialized in this function [-Wuninitialized]
-arch/arm/mm/alignment.c:749:21: note: ?offset.un? was declared here
+On Tuesday 03 July 2012 04:59 AM, Turquette, Mike wrote:
+> Hi Rajendra and Marc,
+>
+> I prefer the code flow in Rajendra's change.  It seems more readable
+> and has a negative diffstat;-)
+>
+> $ git diff --stat
+>   drivers/clk/clk.c |   28 +++++++++++++---------------
+>   1 file changed, 13 insertions(+), 15 deletions(-)
+>
+> Rajendra, can you test and send a proper patch for the same?
 
-Signed-off-by: Du, Changbin <changbin.du@gmail.com>
----
- arch/arm/mm/alignment.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 9107231..387a6cd 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -746,7 +746,7 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
- static int
- do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- {
--	union offset_union offset;
-+	union offset_union uninitialized_var(offset);
- 	unsigned long instr = 0, instrptr;
- 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
- 	unsigned int type;
--- 
-1.7.9.5
+Sure, will do.
