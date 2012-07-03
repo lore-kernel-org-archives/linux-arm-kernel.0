@@ -1,45 +1,27 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Jul 2012 12:00:52 +0200
-Subject: [PATCH RESEND 3/5] can: flexcan: adopt pinctrl support
-In-Reply-To: <20120702015206.GA21003@S2101-09.ap.freescale.net>
-References: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
- <1336352040-28447-4-git-send-email-shawn.guo@linaro.org>
- <4FF0D401.4050101@pengutronix.de>
- <20120702015206.GA21003@S2101-09.ap.freescale.net>
-Message-ID: <4FF2C2D4.7070408@pengutronix.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 03 Jul 2012 13:08:32 +0300
+Subject: [PATCH v11] MTD: LPC32xx MLC NAND driver
+In-Reply-To: <1341075038-29985-1-git-send-email-stigge@antcom.de>
+References: <1341075038-29985-1-git-send-email-stigge@antcom.de>
+Message-ID: <1341310112.2979.50.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2012 03:52 AM, Shawn Guo wrote:
-> On Mon, Jul 02, 2012 at 12:49:37AM +0200, Marc Kleine-Budde wrote:
->>> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->>> +	if (IS_ERR(pinctrl))
->>> +		return PTR_ERR(pinctrl);
->>> +
->>>  	if (pdev->dev.of_node) {
->>>  		const u32 *clock_freq_p;
->>
->> I'm on mx28 and trying to load the flexcan driver via DT, but
->> devm_pinctrl_get_select_default fails with -19.
->>
-> You need to have pinctrl state setup in dts, some like:
+On Sat, 2012-06-30 at 18:50 +0200, Roland Stigge wrote:
+> This patch adds a driver for the MLC NAND controller of the LPC32xx
+> SoC.
 > 
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/174148
-
-Works like charm.
-
-tnx, Marc
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+Pushed to l2-mtd.git, thanks!
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
+Best Regards,
+Artem Bityutskiy
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/003854e2/attachment.sig>
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120703/4cc80646/attachment.sig>
