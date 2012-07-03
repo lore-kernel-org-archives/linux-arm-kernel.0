@@ -1,62 +1,56 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 3 Jul 2012 09:02:40 +0200
-Subject: [PATCH v2 3/4] usb: chipidea: ci13xxx-imx: add "dr_mode"
- property to device tree bindings
-In-Reply-To: <20120703030049.GA3374@b20223-02.ap.freescale.net>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-4-git-send-email-mkl@pengutronix.de>
- <20120629014352.GA28923@b20223-02.ap.freescale.net>
- <4FED5D77.3050009@pengutronix.de>
- <20120629084509.GB28923@b20223-02.ap.freescale.net>
- <4FEDCF15.9040000@wwwdotorg.org>
- <20120630011906.GA2489@richard-laptop>
- <4FF1FEBC.3040107@wwwdotorg.org>
- <CAL411-oeVCsRxxHHWM4VEtbXBTK_Poyxtp0AK7K_4jEg8U1fJA@mail.gmail.com>
- <20120703030049.GA3374@b20223-02.ap.freescale.net>
-Message-ID: <20466.39184.844238.739308@ipc1.ka-ro>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Jul 2012 09:09:27 +0200
+Subject: [PATCH 2/9] arm: mach-mvebu: add header
+In-Reply-To: <alpine.LFD.2.02.1207022313550.31003@xanadu.home>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120702183330.GG1348@lunn.ch> <20120702210838.37c78fda@skate>
+ <20120702191616.GJ1348@lunn.ch>
+ <alpine.LFD.2.02.1207022313550.31003@xanadu.home>
+Message-ID: <20120703070927.GA17004@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Richard Zhao writes:
-> On Tue, Jul 03, 2012 at 10:22:37AM +0800, Peter Chen wrote:
-> > > Hmm. I think it'd be reasonable to use dr_mode like the other bindings,
-> > > and have the default case be decided by the ID pin when dr_mode isn't
-> > > specified. Having different defaults for different bindings seems pretty
-> > > reasonable to me.
-> > 
-> > As far as I know, there is no USB Spec says the ID value should be
-> > used at device or host mode. At USB device and host driver, there
-> > should be NO ID related things, that is to say device or host driver
-> > should not care ID is grounded or floated, as ID may be grounded
-> > at device mode, and high at host mode for different board design.
-> > ID interrupt should only be enabled when dr_mode = otg;
-> I don't quite understand your point. All the discussions are based
-> on otg controllers.
-> > 
-> > Board design and customized usage (user may want to use only device mode
-> > for otg capable port) makes what USB role will be used
-> > at driver, so dr_mode at dts (or pdata->dr_mode at non-dt solution) can make
-> > the decision for driver how USB role will be used.
-> That's the case we need the property. But for fine otg hw design, we
-> don't need the property, right?
+On Mon, Jul 02, 2012 at 11:48:42PM -0400, Nicolas Pitre wrote:
+> On Mon, 2 Jul 2012, Andrew Lunn wrote:
 > 
-> And to decide whether it's otg controller or not, the driver read the
-> capability registers.
+> > It would also be nice if Marvell ASIC engineers didn't randomly move
+> > things around in the address space....
 > 
-A user may wish to restrict even a 'fine otg hw design' to be used in
-pure host or device mode. That's where the dr_mode property jumps in.
+> They didn't.  The _software_ engineers did.
 
+Ah, interesting. I never got that deep into the address mapping, i
+just mechanically refactered it across all Orions without take too
+much time to really understand what its doing.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> Now it seems that all the u-Boot implementations for Orion/Kirkwood out 
+> there have always moved the window containing the serial ports from its 
+> default 0xd0000000 address to 0xf1000000.  Why they did that I have no 
+> idea.  And Linux simply took those remapped physical addresses as 
+> authoritative.
+> 
+> And whether or not Armada 370/XP still have this physical remap ability 
+> I don't know.  And if it does, then why didn't it follow the same 
+> 0xf1000000 tradition as all the other mvebu targets before them I don't 
+> know either.  Maybe this could be considered?
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Thomas, Gregory, could you look at this?
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Are the uboot source open, or are you using a proprietary Marvell
+version?
+
+When Arnd first proposed moving everything into one directory, i had a
+quick look at the memory map. The Orions have more than just the
+serial ports at the same address. If i remember correctly, I2C, SPI,
+PCIE0, USB0, XOR, and ETH0 are all at the same physical
+address. Unfortunately, they have different virtual addresses. So I
+played around unifying the virtual address map.
+
+Doing this will allow some code simplification, header file
+simplification, and sharing of some .dtsi and DT across all Orion
+systems.
+
+Its not something i want to do right now, but having 370/XP the same
+as Orion would be a step towards this.
+
+	Andrew
