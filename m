@@ -1,52 +1,29 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 03 Jul 2012 13:02:11 -0700
-Subject: [PATCH 2 2/4] net ethernet introduce mac_la_ap helper
-In-Reply-To: <1341246931.6578.10.camel@gandalf.stny.rr.com>
-References: <20120702063545.26782.98908.stgit@build.warmcat.com>
- <20120702064054.26782.79849.stgit@build.warmcat.com>
- <201207021612.57028.arnd@arndb.de>
- <1341246931.6578.10.camel@gandalf.stny.rr.com>
-Message-ID: <1341345731.2012.19.camel@joe2Laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Jul 2012 20:23:19 +0000
+Subject: [GIT PULL 1/6] omap non-critical fixes for v3.6 merge window
+In-Reply-To: <pull-1341133277-501333>
+References: <pull-1341133277-501333>
+Message-ID: <201207032023.19799.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-02 at 12:35 -0400, Steven Rostedt wrote:
-> On Mon, 2012-07-02 at 16:12 +0000, Arnd Bergmann wrote:
+On Sunday 01 July 2012, Tony Lindgren wrote:
+> The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
 > 
-> > >  include/net/mac-la-ap.h  |   28 ++++++++
-> > >  net/Kconfig              |   14 ++++
-> > >  net/ethernet/Makefile    |    2 +
-> > >  net/ethernet/mac-la-ap.c |  165 ++++++++++++++++++++++++++++++++++++++++++++++
-> > >  4 files changed, 209 insertions(+)
-> > >  create mode 100644 include/net/mac-la-ap.h
-> > >  create mode 100644 net/ethernet/mac-la-ap.c
-> > > diff --git a/include/net/mac-la-ap.h b/include/net/mac-la-ap.h
-> > > new file mode 100644
-> > > index 0000000..d5189b5
-> > > --- /dev/null
-> > > +++ b/include/net/mac-la-ap.h
-> > > @@ -0,0 +1,28 @@
-> > > +/*
-> > > + * mac-la-ap.h:  Locally Administered MAC address for Async probed devices
-> > > + */
-> > 
-> > I find the name a bit non-obvious, not sure if we can come up with the
-> > perfect one.
-> > 
-> > How about mac-platform?
+>   Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
 > 
-> I really find it unfortunate that 'mac' for ethernet has the same name
-> as the Apple box as well. 'mac' in other contexts can usually
-> differentiate these two, but saying 'mac-platform' just screams of
-> forbidden fruit.
+> are available in the git repository at:
 > 
-> mac-probe.h ?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-non-critical-for-v3.6
 
-Maybe eth_mac_addr.h?
 
-underscore filenames outnumber dash filenames ~2:1
+Merged all six pull request. Thanks a lot for all your thorough
+work, it's always great to pull requests like these.
 
-$ git ls-files "*_*" | while read file ; do basename $file; done | grep "_" | wc -l
-11185
-$ git ls-files "*-*" | while read file ; do basename $file; done | grep "-" | wc -l
-6624
+I ended up putting both tags/omap-devel-pm-for-v3.6 and and 
+tags/omap-devel-driver-for-v3.6 into the next/pm branch as they are
+both mostly power management related in some way.
+
+Everything else went into the obvious place.
+
+	Arnd
