@@ -1,141 +1,102 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 03 Jul 2012 17:50:02 +0200
-Subject: [PATCH v2 12/12] Crypto: CESA: Add support for DT based
- instantiation.
-In-Reply-To: <1341325365-21393-13-git-send-email-andrew@lunn.ch>
+Date: Tue, 03 Jul 2012 17:59:13 +0200
+Subject: [PATCH v2 07/12] I2C: MV64XXX: Add Device Tree support
+In-Reply-To: <1341325365-21393-8-git-send-email-andrew@lunn.ch>
 References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-13-git-send-email-andrew@lunn.ch>
-Message-ID: <5684211.IOzGhLaAtq@flexo>
+ <1341325365-21393-8-git-send-email-andrew@lunn.ch>
+Message-ID: <2232439.93KkEvHiYj@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Andrew,
 
-On Tuesday 03 July 2012 16:22:45 Andrew Lunn wrote:
-> Based on work by Michael Waller and Jason Cooper.
-> 
-> Added support for getting the interrupt number from DT.
+On Tuesday 03 July 2012 16:22:40 Andrew Lunn wrote:
+> Extends the driver to get properties from device tree. Also extend the
+> kirkwood DT support to supply the needed properties.
 > 
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  .../devicetree/bindings/crypto/mv_cesa.txt         |   18 ++++++++++++
->  drivers/crypto/mv_cesa.c                           |   31 
-+++++++++++++++++---
->  2 files changed, 45 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/crypto/mv_cesa.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/mv_cesa.txt 
-b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-> new file mode 100644
-> index 0000000..f191122
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-> @@ -0,0 +1,18 @@
-> +Marvell Cryptographic Engines And Security Accelerator
-> +
-> +Required properties:
-> +- compatible : should be "mrvl,orion-crypto"
+[snip]
+> -	if ((pd->id != 0) || !pdata)
+> +	if ((!pdata && !pd->dev.of_node) || (pdata && (pd->id != 0)))
+>  		return -ENODEV;
 
-You mention "mvrl" here, but the rest of your series uses "marvell", and this 
-is also what you use as a match table later in the driver, this looks like a 
-left-over from your previous submission.
+This is more a reminder than a real remark, but the driver here should not be 
+limiting us to a single platform_device. In fact kirkwood55 (88F6282) has two 
+I2C controllers for instance.
 
-> +- reg : base physical address of the engine and length of memory mapped
-> +        region, followed by base physical address of sram and its memory
-> +               length
-> +- interrupts : interrupt number
-> +
-> +Examples:
-> +
-> +crypto at f1030000 {
-> +       compatible = "mrvl,orion-crypto";
-> +       reg = <0xf1030000 0x10000
-> +              0xf5000000 0x800>;    /* sram */
-> +       interrupts = <22>;
-> +};
-> +
-> diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
-> index 1cc6b3f..964c4c5 100644
-> --- a/drivers/crypto/mv_cesa.c
-> +++ b/drivers/crypto/mv_cesa.c
-> @@ -19,6 +19,9 @@
->  #include <linux/clk.h>
->  #include <crypto/internal/hash.h>
->  #include <crypto/sha.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_irq.h>
 >  
->  #include "mv_cesa.h"
+>  	drv_data = kzalloc(sizeof(struct mv64xxx_i2c_data), GFP_KERNEL);
+> @@ -546,19 +549,35 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+>  	init_waitqueue_head(&drv_data->waitq);
+>  	spin_lock_init(&drv_data->lock);
 >  
-> @@ -1005,7 +1008,11 @@ static int mv_probe(struct platform_device *pdev)
->  		return -EEXIST;
+> -	drv_data->freq_m = pdata->freq_m;
+> -	drv_data->freq_n = pdata->freq_n;
+> -	drv_data->irq = platform_get_irq(pd, 0);
+> +	if (pd->dev.of_node) {
+> +		of_property_read_u32(pd->dev.of_node, "frequency-m",
+> +				     &drv_data->freq_m);
+> +		of_property_read_u32(pd->dev.of_node, "frequency-n",
+> +				     &drv_data->freq_n);
+> +		drv_data->irq = irq_of_parse_and_map(pd->dev.of_node, 0);
+> +	} else {
+> +		drv_data->freq_m = pdata->freq_m;
+> +		drv_data->freq_n = pdata->freq_n;
+> +		drv_data->irq = platform_get_irq(pd, 0);
+> +	}
+> +
+>  	if (drv_data->irq < 0) {
+>  		rc = -ENXIO;
+>  		goto exit_unmap_regs;
+>  	}
+> +
+>  	drv_data->adapter.dev.parent = &pd->dev;
+>  	drv_data->adapter.algo = &mv64xxx_i2c_algo;
+>  	drv_data->adapter.owner = THIS_MODULE;
+>  	drv_data->adapter.class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+> -	drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
+> +	if (pd->dev.of_node)
+> +		drv_data->adapter.timeout = msecs_to_jiffies(
+> +			of_property_read_u32(pd->dev.of_node, "timeout-ms",
+> +					     &drv_data->freq_n));
+> +	else
+> +		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
+>  	drv_data->adapter.nr = pd->id;
+> +	drv_data->adapter.dev.of_node = pd->dev.of_node;
+>  	platform_set_drvdata(pd, drv_data);
+>  	i2c_set_adapdata(&drv_data->adapter, drv_data);
+>  
+> @@ -577,6 +596,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+>  		goto exit_free_irq;
 >  	}
 >  
-> -	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-> +	if (pdev->dev.of_node)
-> +		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> +						   "regs");
-> +	else
-> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-
-If you add a reg-names property, which respects the ordering of the reg 
-property, you don't need this.
-
->  	if (!res)
->  		return -ENXIO;
->  
-> @@ -1021,7 +1028,11 @@ static int mv_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> -	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sram");
-> +	if (pdev->dev.of_node)
-> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	else
-> +		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> +						   "sram");
-
-ditto
-
->  	if (!res) {
->  		ret = -ENXIO;
->  		goto err_unmap_reg;
-> @@ -1034,7 +1045,10 @@ static int mv_probe(struct platform_device *pdev)
->  		goto err_unmap_reg;
->  	}
->  
-> -	irq = platform_get_irq(pdev, 0);
-> +	if (pdev->dev.of_node)
-> +		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> +	else
-> +		irq = platform_get_irq(pdev, 0);
->  	if (irq < 0 || irq == NO_IRQ) {
->  		ret = irq;
->  		goto err_unmap_sram;
-> @@ -1137,12 +1151,21 @@ static int mv_remove(struct platform_device *pdev)
+> +	of_i2c_register_devices(&drv_data->adapter);
+> +
 >  	return 0;
+>  
+>  	exit_free_irq:
+> @@ -602,12 +623,19 @@ mv64xxx_i2c_remove(struct platform_device *dev)
+>  	return rc;
 >  }
 >  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id mv_cesa_of_match_table[] __devinitdata = {
-> +	{ .compatible = "marvell,orion-crypto", },
-> +	{},
+> +static const struct of_device_id mv64xxx_i2c_of_match_table[] __devinitdata 
+= {
+> +	{ .compatible = "marvell,mv64xxx-i2c", },
+> +	{}
 > +};
-> +MODULE_DEVICE_TABLE(of, mv_cesa_of_match_table);
-> +#endif
+> +MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
 > +
->  static struct platform_driver marvell_crypto = {
->  	.probe		= mv_probe,
-> -	.remove		= mv_remove,
-> +	.remove		= __devexit_p(mv_remove),
->  	.driver		= {
+>  static struct platform_driver mv64xxx_i2c_driver = {
+>  	.probe	= mv64xxx_i2c_probe,
+>  	.remove	= __devexit_p(mv64xxx_i2c_remove),
+>  	.driver	= {
 >  		.owner	= THIS_MODULE,
->  		.name	= "mv_crypto",
-> +		.of_match_table = of_match_ptr(mv_cesa_of_match_table),
+>  		.name	= MV64XXX_I2C_CTLR_NAME,
+> +		.of_match_table = of_match_ptr(mv64xxx_i2c_of_match_table),
 >  	},
 >  };
->  MODULE_ALIAS("platform:mv_crypto");
+>  
 > -- 
 > 1.7.10
 > 
