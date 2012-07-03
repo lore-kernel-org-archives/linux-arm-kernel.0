@@ -1,85 +1,171 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Jul 2012 18:15:21 +0200
-Subject: "ADDRCONF(NETDEV_UP): eth0: link is not ready" with IPv6
-In-Reply-To: <4FF313F6.7010600@xdin.com>
-References: <4FED14C2.9020200@xdin.com>
- <1340983473.3066.6.camel@bwh-desktop.uk.solarflarecom.com>
- <4FF313F6.7010600@xdin.com>
-Message-ID: <4FF31A99.9010806@atmel.com>
+Date: Tue, 3 Jul 2012 18:19:53 +0200
+Subject: [PATCH] arm: at91: Add new board
+In-Reply-To: <1341325666-5425-1-git-send-email-jiri.prchal@aksignal.cz>
+References: <1341325666-5425-1-git-send-email-jiri.prchal@aksignal.cz>
+Message-ID: <4FF31BA9.3010905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2012 05:47 PM, Arvid Brodin :
-> (Added MACB "patch" contact Nicolas Ferre to CC list.)
-
-Hi,
-
-(adding linux-arm-kernel)
-
-> On 2012-06-29 17:24, Ben Hutchings wrote:
->> On Fri, 2012-06-29 at 02:36 +0000, Arvid Brodin wrote:
->>> Hi,
->>>
->>> After 'ip link set eth0 up' on an avr32 board (network driver macb), the device ends up in
->>> operational mode "UNKNOWN":
->>>
->>> # ip link
->>> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN qlen 1000
->>>     link/ether 00:24:74:00:17:9d brd ff:ff:ff:ff:ff:ff
->>>
->>> Unplugging and plugging in the network cable gets the device to mode "UP".
->>>
->>> This is a problem for me because I'm trying to use this device as a "slave" device (for a
->>> virtual HSR device*) and I need to be able to decide if the slave device is operational or
->>> not.
->>>
->>> Following Stephen's advice here:
->>> http://kerneltrap.org/mailarchive/linux-netdev/2008/9/24/3398834 I checked the macb.c code
->>> and noticed they do not call netif_carrier_off() neither before register_netdev() nor in
->>> dev_open().
->
->> It should be called after register_netdev() and before the driver's
->> ndo_open implementation returns.
-
-After having read several drivers, it seems that some are calling
-netif_carrier_off() *before* register_netdev() and some *after*... What
-is the proper way?
-
-
-> I'm guessing this allows linkwatch to do netif_carrier_on() some time after the dev_open()?
+On 07/03/2012 04:27 PM, Jiri Prchal :
+> I'd like to add support for our "CDU" board based up on Telit's module GE863 Pro3.
+> It has more uarts, leds, another nand partitioning.
 > 
-> Besides not calling netif_carrier_off() in dev_open(), the Cadence/MACB driver calls
-> netif_carrier_off() in dev_close(). Is this correct?
-> 
-> 
-> How should I handle carrier state for a virtual device? The device should have "carrier"
-> as long as at least one of the underlying physical interfaces is operational (which I
-> guess means operational state UP). Would it be correct to watch NETDEV_CHANGE and DOWN/UP
-> events of the slaves and call netif_carrier_on()/off() on the virtual device depending on
-> the slaves' states? 
->>
->>> I added the call before register_netdev(), which fixed the problem. However, if I then
->>> enable IPv6:
->>>
->>> # ip link set eth0 up
->>> ADDRCONF(NETDEV_UP): eth0: link is not ready
->>> eth0: link up (100/Full)
->>> ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
->>
->> This looks normal.
-> 
-> Good, that narrows it down a bit.
-> 
->>
->>> Any idea what is happening / what I'm doing wrong? (This is not just cosmetic; is some
->>> situations this seems to kill the interface - e.g. ping does not work, down/up does not
->>> help...) Things work fine without IPv6 configured.
->>
->> Perhaps some packets sent automatically by IPv6 are triggering a driver
->> bug?  Or there is a bug in multicast support, which IPv6 always uses.
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
 
-Sorry, I have no clue on this topic. But I am eager to know if you find
-something. I can queue your patch for netif_carrier_off() at least...
+Thanks a lot for taking time to rearrange your board description to
+Device Tree!
+
+> ---
+>  arch/arm/boot/dts/cdu.dtsi |  126 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 126 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/cdu.dtsi
+
+I think that this board name is a little bit too short.
+
+Moreover, if it is a board by itself, I would have expected a *.dts
+file. Otherwise you will not be able to generate a .dtb out of it...
+
+> diff --git a/arch/arm/boot/dts/cdu.dtsi b/arch/arm/boot/dts/cdu.dtsi
+> new file mode 100644
+> index 0000000..0f9ed04
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/cdu.dtsi
+> @@ -0,0 +1,126 @@
+> +/*
+> + * cdu.dtsi - Device Tree file for AKsignal CDU
+> + *
+> + * Copyright (C) 2012 AKsignal Brno,
+> + *               2012 Jiri Prchal <jiri.prchal@aksignal.cz>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +/include/ "at91sam9260.dtsi"
+
+As it is based on Telit board, maybe you can take advantage of their own
+board as a common base? Am I wrong?
+
+
+> +
+> +/ {
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <6000000>;
+> +		};
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs";
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			usart0: serial at fffb0000 {
+> +				status = "okay";
+> +			};
+> +
+> +			usart1: serial at fffb4000 {
+> +				status = "okay";
+> +				linux,rs485-enabled-at-boot-time;
+> +				rs485-rts-delay = <0 0>;
+> +				};
+> +
+> +			usart2: serial at fffb8000 {
+> +				status = "okay";
+> +				linux,rs485-enabled-at-boot-time;
+> +				rs485-rts-delay = <0 0>;
+> +			};
+> +
+> +			usart3: serial at fffd0000 {
+> +				status = "okay";
+> +				linux,rs485-enabled-at-boot-time;
+> +				rs485-rts-delay = <0 0>;
+> +			};
+> +
+> +			macb0: ethernet at fffbc000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			usb1: gadget at fffa4000 {
+> +				atmel,vbus-gpio = <&pioC 15 0>;
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00500000 {
+> +			num-ports = <2>;
+> +			status = "okay";
+> +		};
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "soft";
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			bootstrap at 0 {
+> +				label = "bootstrap";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			uboot at 40000 {
+> +				label = "uboot";
+> +				reg = <0x40000 0x80000>;
+> +			};
+> +			ubootenv at c0000 {
+> +				label = "ubootenv";
+> +				reg = <0xc0000 0x40000>;
+> +			};
+> +			kernel at 100000 {
+> +				label = "kernel";
+> +				reg = <0x100000 0x400000>;
+> +			};
+> +			rootfs at 500000 {
+> +				label = "rootfs";
+> +				reg = <0x500000 0x7b00000>;
+> +			};
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		red {
+> +			gpios = <&pioC 10 0>;
+> +			linux,default-trigger = "none";
+> +		};
+> +
+> +		green {
+> +			gpios = <&pioA 5 1>;
+> +			linux,default-trigger = "none";
+> +			default-state = "on";
+> +		};
+> +
+> +		yellow {
+> +			gpios = <&pioB 20 1>;
+> +			linux,default-trigger = "none";
+> +		};
+> +
+> +		blue {
+> +			gpios = <&pioB 21 1>;
+> +			linux,default-trigger = "none";
+> +		};
+> +	};
+> +};
+
+Thanks for submitting this work, it has to be amended but it seems on
+the good way.
 
 Best regards,
 -- 
