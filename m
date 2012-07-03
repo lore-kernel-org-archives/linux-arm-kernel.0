@@ -1,76 +1,100 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 3 Jul 2012 15:39:34 +0800
-Subject: [PATCH v4] mm: cma: add a simple kernel module as the helper to
- test CMA
-In-Reply-To: <03e601cd58ec$5b8177b0$12846710$%szyprowski@samsung.com>
-References: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
- <03e601cd58ec$5b8177b0$12846710$%szyprowski@samsung.com>
-Message-ID: <CAGsJ_4yjV+HDXdYraJ6CdJrSz1EPGgE6BRvO-_9n+6_UWfxqww@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Jul 2012 15:43:11 +0800
+Subject: [PATCH v3] rtc: stmp3xxx: Add simple binding for the stmp3xxx-rtc
+In-Reply-To: <1340699726-7852-1-git-send-email-shawn.guo@linaro.org>
+References: <1340699726-7852-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120703074309.GC22705@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Alessandro,
 
-2012/7/3 Marek Szyprowski <m.szyprowski@samsung.com>:
-> Hello,
->
-> On Wednesday, March 07, 2012 12:38 PM Barry Song wrote:
->
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> Any write request to /dev/cma_test will let the module to allocate memory from
->> CMA, for example:
->>
->> 1st time
->> $ echo 1024 > /dev/cma_test
->> will require cma_test to request 1MB(1024KB)
->> 2nd time
->> $ echo 2048 > /dev/cma_test
->> will require cma_test to request 2MB(2048KB)
->>
->> Any read request to /dev/cma_test will let the module to free the 1st valid
->> memory from CMA, for example:
->>
->> 1st time
->> $ cat /dev/cma_test
->> will require cma_test to free the 1MB allocated in the first write request
->> 2nd time
->> $ cat /dev/cma_test
->> will require cma_test to free the 2MB allocated in the second write request
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  tools/cma/Makefile   |   13 +++++
->>  tools/cma/cma_test.c |  140 ++++++++++++++++++++++++++++++++++++++++++++++++++
->
-> I'm sorry for such a long delay in processing this patch, but I wanted first to be sure
-> that the core CMA code gets into mainline, then I got busy with other dma-mapping
-> related stuff.
+I queued this one on mxs arch tree.  Please let me know if you have
+problem with that.
 
-now CMA stuff has been in mainline, i think it makes more senses if
-you involve this while you let people merge CMA because it is a CMA
-test component.
+Regards,
+Shawn
 
->
-> IMHO the right place for such code is in drivers/misc instead of tools/cma.
->
-> This patch contains a kernel module source code so it should be put with other kernel
-> modules. tools/ directory is aimed to contain user space code useful for developing and
-> testing Linux kernel.
-
-this one is aiming to test CMA, it should be in tools/ as Michal
-Nazarewicz and i have talked about that.
-it is not a real driver at all.
-
->
-> Make sure that you also add Greg Kroah-Hartman <gregkh@linuxfoundation.org> on CC:,
-> he maintains misc drivers.
->
->> (snipped)
->
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
-
--barry
+On Tue, Jun 26, 2012 at 04:35:26PM +0800, Shawn Guo wrote:
+> From: Marek Vasut <marex@denx.de>
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: rtc-linux at googlegroups.com
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Changes since v2:
+> 
+> * Back out the dts changes from the patch, so that it could be merged
+>   through rtc tree if that's the case.
+> 
+> * The first interrupt has to be rtc alarm interrupt, and that's the
+>   only one that driver tries to get.  Fix binding document for that.
+> 
+>  .../devicetree/bindings/rtc/stmp3xxx-rtc.txt       |   16 ++++++++++++++++
+>  drivers/rtc/rtc-stmp3xxx.c                         |    8 ++++++++
+>  2 files changed, 24 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+> new file mode 100644
+> index 0000000..b800070
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+> @@ -0,0 +1,16 @@
+> +* STMP3xxx/i.MX28 Time Clock controller
+> +
+> +Required properties:
+> +- compatible: should be one of the following.
+> +    * "fsl,stmp3xxx-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: rtc alarm interrupt
+> +
+> +Example:
+> +
+> +rtc at 80056000 {
+> +	compatible = "fsl,imx28-rtc", "fsl,stmp3xxx-rtc";
+> +	reg = <0x80056000 2000>;
+> +	interrupts = <29>;
+> +};
+> diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
+> index 1028786..739ef556 100644
+> --- a/drivers/rtc/rtc-stmp3xxx.c
+> +++ b/drivers/rtc/rtc-stmp3xxx.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/rtc.h>
+>  #include <linux/slab.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <mach/common.h>
+>  
+> @@ -265,6 +266,12 @@ static int stmp3xxx_rtc_resume(struct platform_device *dev)
+>  #define stmp3xxx_rtc_resume	NULL
+>  #endif
+>  
+> +static const struct of_device_id rtc_dt_ids[] = {
+> +	{ .compatible = "fsl,stmp3xxx-rtc", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, rtc_dt_ids);
+> +
+>  static struct platform_driver stmp3xxx_rtcdrv = {
+>  	.probe		= stmp3xxx_rtc_probe,
+>  	.remove		= stmp3xxx_rtc_remove,
+> @@ -273,6 +280,7 @@ static struct platform_driver stmp3xxx_rtcdrv = {
+>  	.driver		= {
+>  		.name	= "stmp3xxx-rtc",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = rtc_dt_ids,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.5.4
+> 
+> 
