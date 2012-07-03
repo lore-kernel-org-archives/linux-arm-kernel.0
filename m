@@ -1,33 +1,61 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Tue, 03 Jul 2012 14:54:12 +0200
-Subject: [PATCH v4] mm: cma: add a simple kernel module as the helper to
- test CMA
-In-Reply-To: <CAGsJ_4yjV+HDXdYraJ6CdJrSz1EPGgE6BRvO-_9n+6_UWfxqww@mail.gmail.com>
-References: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
- <03e601cd58ec$5b8177b0$12846710$%szyprowski@samsung.com>
- <CAGsJ_4yjV+HDXdYraJ6CdJrSz1EPGgE6BRvO-_9n+6_UWfxqww@mail.gmail.com>
-Message-ID: <op.wgvfgmm03l0zgt@mpn-glaptop>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Tue, 3 Jul 2012 15:00:42 +0200
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+References: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+ <4FECB95D.7010200@zytor.com> <cover.1338222460.git.rubini@gnudd.com>
+ <f85fefb10b7a7407b77180be65b18bf0426145b9.1338222461.git.rubini@gnudd.com>
+ <20120701104401.GA4352@mail.gnudd.com>
+Message-ID: <20120703130042.GA10007@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 2012/7/3 Marek Szyprowski <m.szyprowski@samsung.com>:
->> IMHO the right place for such code is in drivers/misc instead of tools/cma.
->>
->> This patch contains a kernel module source code so it should be put with other kernel
->> modules. tools/ directory is aimed to contain user space code useful for developing and
->> testing Linux kernel.
+Peter Anvin:
+> There is no problem with adding ARM or !X86 dependencies to drivers
+> now and fixing them later or as required.
 
-On Tue, 03 Jul 2012 09:39:34 +0200, Barry Song <21cnbao@gmail.com> wrote:
-> this one is aiming to test CMA, it should be in tools/ as Michal
-> Nazarewicz and i have talked about that.
-> it is not a real driver at all.
+Ok. This is my summary of the compilation errors I have when
+enabling ARM_AMBA undex x86 and enabling everything that appears
+in "make oldconfig":
 
-Yeah, I feel like it's better placed in tools/ not to pollute other directories with
-drivers that are of no use to regular users.  I don't have strong feelings about it
-though, so I'm fine either way.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+This is a sum up of the errors in all driver that are
+enabled by telling "CONFIG_ARM_AMBA=y" in the x86 config.
+
+   drivers/dma/pl330.c: register names conflict with arch symbols
+     proposed fix: use proper prefix names
+
+   drivers/dma/amba-pl08x.c: needs <asm/hardware/pl080.h>
+     proposed fix: move pl080.h to include/linux
+
+   drivers/gpio/gpio-pl061.c: uses chained_irq_enter/exit
+     proposed fix: depend on CONFIG_ARM (the function only exists in arm)
+
+   drivers/mmc/host/mmci.c: uses <asm/sizes.h>
+   drivers/mmc/host/mmci.c: uses readsl/writesl
+     proposed fix: use linux/sizes.h and provide readsl/writesl like others do
+
+   drivers/spi/spi-pl022.c: warning for an integer size mismatch
+     proposed fix: none by now
+
+   drivers/watchdog/sp805_wdt.c: uses writel_relaxed
+     proposed fix: depend on CONFIG_ARM (this is a spear-only cell by now)
+
+
+So, if you agree, I would:
+
+    - fix the two dma engines (checking pl080 against russell's pending
+    patches)
+
+    - make pl061 and sp805_wdt.c depends on CONFIG_ARM
+
+    - temporarily do the same for mmci, which I'll make work soon as
+    I have it under my pci bridge
+
+    - ignore the warning on spi-pl022 until I find a fix
+
+    - resubmit my enabling of arm_amba for x86 and my pci-to-amba bridge
+    driver.
+
+thanks
+/alessandro
