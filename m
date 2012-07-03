@@ -1,34 +1,56 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 3 Jul 2012 11:55:56 +0000
-Subject: [GIT PULL 6/6] am33xx changes for v3.6 merge window
-In-Reply-To: <20120703114856.GL1122@atomide.com>
-References: <E1SlGLI-0004Vt-0L@merlin.infradead.org>
- <4FF2D83C.7060409@ti.com> <20120703114856.GL1122@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA6237A@DBDE01.ent.ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  3 Jul 2012 12:59:48 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+Message-ID: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2012 at 17:18:56, Tony Lindgren wrote:
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120703 04:37]:
-> > 
-> > Few patches got missed in this pull request,
-> > 
-> > ARM: OMAP2+: am33xx: Make am33xx as a separate class
-> > ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
-> 
-> OK, at least the first needs to be rebased to apply.
-> 
-> Can you please refresh those against current devel-am33xx
-> branch at commit 6fd8246b1c1167c983b089f9eaafa13ef9ca7adf and
-> repost?
-> 
-> I'll do a separate pull request for those once they are
-> ready.
-> 
+We register the ab8500 as an MFD device from db8500 code during Device Tree
+boot in order to solve some limitations of DT. However, when Device Tree is
+not enabled, we still want to allow platform code to register the ab8500 in
+the normal way. Here we force MFD device registration of the ab8500 only
+when booting with Device Tree enabled.
 
-Thanks Tony, I will resubmit them again today.
-Also, request you to review and merge Cleanup patch-series I had posted
-few days back.
+Solves this issue:
+WARNING: at fs/sysfs/dir.c:526 sysfs_add_one+0x88/0xb0()
+sysfs: cannot create duplicate filename '/bus/platform/devices/ab8500-core.0'
 
-Thanks,
-Vaibhav
+Reported-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 80def6c..4ec0ed1 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2964,6 +2964,9 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+ 		.name = "cpufreq-u8500",
+ 		.of_compatible = "stericsson,cpufreq-u8500",
+ 	},
++};
++
++static struct mfd_cell db8500_of_prcmu_devs[] = {
+ 	{
+ 		.name = "ab8500-core",
+ 		.of_compatible = "stericsson,ab8500",
+@@ -3014,6 +3017,15 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
++	if (np) {
++		err = mfd_add_devices(&pdev->dev, 0, db8500_of_prcmu_devs,
++				ARRAY_SIZE(db8500_of_prcmu_devs), NULL, 0);
++		if (err) {
++			pr_err("prcmu: Failed to add DT subdevices\n");
++			return err;
++		}
++	}
++
+ 	pr_info("DB8500 PRCMU initialized\n");
+ 
+ no_irq_return:
+-- 
+1.7.9.5
