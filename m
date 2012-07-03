@@ -1,51 +1,111 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Jul 2012 20:07:40 +0530
-Subject: [PATCHv4 02/18] i2c: omap: simplify num_bytes handling
+Date: Tue, 3 Jul 2012 20:07:43 +0530
+Subject: [PATCHv4 05/18] i2c: omap: simplify omap_i2c_ack_stat()
 In-Reply-To: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
 References: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1341326276-25434-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1341326276-25434-6-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-trivial patch, no functional changes
+stat & BIT(1) is the same as BIT(1), so let's
+simplify things a bit by removing "stat &" from
+all omap_i2c_ack_stat() calls.
 
-If the fifo is disabled or fifo_size is 0 the num_bytes
-is set to 1. Else it is set to fifo_size or in case of a
-draining interrupt the remaining bytes in the buff stat.
-So the zero check is redundant and can be safely optimised.
+Code snippet (extremely simplified):
+
+if (stat & NACK) {
+        ...
+        omap_i2c_ack_stat(dev, stat & NACK);
+}
+
+if (stat & RDR) {
+        ...
+        omap_i2c_ack_stat(dev, stat & RDR);
+}
+
+and so on. The tricky place is only WRT errata handling, for example:
+
+if (*stat & (NACK | AL)) {
+        omap_i2c_ack_stat(dev, *stat & (XRDY | XDR));
+        ...
+}
+
+but in this case, the errata says we must clear XRDY and XDR if that
+errata triggers, so if they just got enabled or not, it doesn't matter.
+
+Another tricky place is RDR | RRDY (likewise for XDR | XRDY):
+
+if (stat & (RDR | RRDY)) {
+        ...
+        omap_i2c_ack_stat(dev, stat & (RDR | RRDY));
+}
+
+again here there will be no issues because those IRQs never fire
+simultaneously and one will only after after we have handled the
+previous, that's because the same FIFO is used anyway and we won't shift
+data into FIFO until we tell the IP "hey, I'm done with the FIFO, you
+can shift more data"
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
+[Added the explaination from the discurssion to the commit logs]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   19 ++++++++++---------
+ 1 files changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 0946be5..440e41f 100644
+index 31c4e55..1c1ee7a 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -831,8 +831,7 @@ complete:
- 							OMAP_I2C_BUFSTAT_REG)
- 							>> 8) & 0x3F;
+@@ -750,7 +750,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
+ 
+ 	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
+ 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+-			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
+ 			return -ETIMEDOUT;
+ 		}
+@@ -811,10 +811,11 @@ complete:
+ 		 */
+ 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
+ 					OMAP_I2C_STAT_AL)) {
+-			omap_i2c_ack_stat(dev, stat &
+-				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
+-				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
+-				OMAP_I2C_STAT_ARDY));
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
++						OMAP_I2C_STAT_RDR |
++						OMAP_I2C_STAT_XRDY |
++						OMAP_I2C_STAT_XDR |
++						OMAP_I2C_STAT_ARDY));
+ 			omap_i2c_complete_cmd(dev, err);
+ 			return IRQ_HANDLED;
+ 		}
+@@ -861,8 +862,8 @@ complete:
+ 					}
+ 				}
  			}
--			while (num_bytes) {
--				num_bytes--;
-+			while (num_bytes--) {
- 				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
- 				if (dev->buf_len) {
- 					*dev->buf++ = w;
-@@ -874,8 +873,7 @@ complete:
- 							OMAP_I2C_BUFSTAT_REG)
- 							& 0x3F;
+-			omap_i2c_ack_stat(dev,
+-				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
++						OMAP_I2C_STAT_RDR));
+ 			continue;
+ 		}
+ 
+@@ -909,8 +910,8 @@ complete:
+ 
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
  			}
--			while (num_bytes) {
--				num_bytes--;
-+			while (num_bytes--) {
- 				w = 0;
- 				if (dev->buf_len) {
- 					w = *dev->buf++;
+-			omap_i2c_ack_stat(dev,
+-				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
++			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
++						OMAP_I2C_STAT_XDR));
+ 			continue;
+ 		}
+ 
 -- 
 1.7.5.4
