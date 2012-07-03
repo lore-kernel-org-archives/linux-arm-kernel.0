@@ -1,36 +1,53 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Tue, 3 Jul 2012 15:26:41 +0200
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <201207031319.40884.arnd@arndb.de>
-References: <201207031319.40884.arnd@arndb.de>
- <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
- <20120701104401.GA4352@mail.gnudd.com>
- <20120703130042.GA10007@mail.gnudd.com>
-Message-ID: <20120703132641.GA28437@mail.gnudd.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 03 Jul 2012 14:48:29 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <20120703132447.GN29030@opensource.wolfsonmicro.com>
+References: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
+ <20120703123552.GC25995@sirena.org.uk> <4FF2EEA1.6080204@linaro.org>
+ <20120703132447.GN29030@opensource.wolfsonmicro.com>
+Message-ID: <4FF2F82D.9080507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/07/12 14:24, Mark Brown wrote:
+> On Tue, Jul 03, 2012 at 02:07:45PM +0100, Lee Jones wrote:
+>> On 03/07/12 13:35, Mark Brown wrote:
+>
+>>> Do we really want to create MFD cells like this (which are really Linux
+>>> internal things and might vary if another OS or another version of Linux
+>>> changes its internal abstractions) from the device tree?
+>
+>> We're not creating them. We're merely using current infrastructure.
+>
+> *Very* recently added infrastructure which caused you to notice this...
 
-Arnd Bergmann:
+No, I mean the MFD method is current infrastructure.
 
-> Note that there is already an include/linux/amba/pl08x.h.
-> I would just move the few parts of pl080.h that are actually
-> needed with global visibility there, and move the rest
-> to drivers/dma/.
+Using it with DT is new, yes.
 
-Ok.
+>> Before, when we probed each device from Device Tree we came up
+>> against some fairly major limitations of the Device Tree. As a
+>> result, Arnd and I agreed that this was the way to go.
+>
+> I'm really unconvinced that instnatiating the MFD cells from device tree
+> is in general a good idea.
 
->>   proposed fix: use linux/sizes.h and provide readsl/writesl like others do
+Well it just doesn't work the other way.
 
-> Ack on the linux/sizes.h, that definitely makes sense.
+>> See c5395e7ed8f16cc7bb72a783de68659db5aed515 for a short description
+>> of the troubles we faced.
+>
+> $ git show c5395e7ed8f16cc7bb72a783de68659db5aed515
+> fatal: bad object c5395e7ed8f16cc7bb72a783de68659db5aed515
 
-I already have this in place for other drivers that I'm going to use
-with the pci-amba bridge. They have already been picked up by Rusell,
-but they are not in linux-next yet.  So maybe other people have more
-errors than me related to sizes.h, but this for mmci is trivial with
-the other stuff in place.
+Sorry, looks live I've rebased since.
 
-Ok for the rest, I'll submit a patch set following your suggestions
-when the other sizes.h stuff reaches linux-next.
+5f3fc8adeec9bb12742fbfa777fa1947deda21a2
 
-/alessandro
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
