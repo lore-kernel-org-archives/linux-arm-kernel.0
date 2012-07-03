@@ -1,41 +1,156 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 3 Jul 2012 21:04:26 +0200
-Subject: [PATCH] pinctrl/nomadik: add pin group to mco function
-Message-ID: <1341342266-4240-1-git-send-email-linus.walleij@stericsson.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 4 Jul 2012 00:39:20 +0530
+Subject: [PATCH v5 2/7] ARM: davinci,
+ cp_intc: Add OF support for TI interrupt controller
+In-Reply-To: <1338373143-7467-3-git-send-email-hs@denx.de>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-3-git-send-email-hs@denx.de>
+Message-ID: <4FF34360.6030501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+Hi Heiko,
 
-mc0_dat47_a_1 and mc0dat31dir_a_1 groups are missing for mco function
+On 5/30/2012 3:48 PM, Heiko Schocher wrote:
+> Add a function to initialize the Common Platform Interrupt Controller
+> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+> 
+> ---
+> - changes for v4
+>   - split patch in 2 patches, one for irq_domain adaption
+>     one for DT enhancement, as Nori Sekhar suggested.
+>   - add comment from Grant Likely for the DT part:
+>     remove if/else clause, not needed.
+>     Make use of DT runtime configurable
+> 
+> - changes for v5:
+>   add comments from Sergei Shtylyov:
+>   - s/intc/cp_intc in commit subject
+>   add comments from Grant Likely:
+>   - rename compatible" prop to "ti,cp-intc"
+> 
+>  .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++++++++++++++++++++
+>  arch/arm/mach-davinci/cp_intc.c                    |   24 ++++++++++++++++-
+>  2 files changed, 49 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt b/Documentation/devicetree/bindings/arm/davinci/intc.txt
+> new file mode 100644
+> index 0000000..597e8a0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik-db8500.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+I think this file is better named cp-intc.txt since there is also an
+intc (a different IP) used on DaVinci platforms.
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik-db8500.c b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-index 42c4b77..9817493 100644
---- a/drivers/pinctrl/pinctrl-nomadik-db8500.c
-+++ b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-@@ -616,6 +616,8 @@ static const struct nmk_pingroup nmk_db8500_groups[] = {
- 	DB8500_PIN_GROUP(msp0tfstck_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(msp0rfsrck_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(mc0_a_1, NMK_GPIO_ALT_A),
-+	DB8500_PIN_GROUP(mc0_dat47_a_1, NMK_GPIO_ALT_A),
-+	DB8500_PIN_GROUP(mc0dat31dir_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(msp1txrx_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(msp1_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(lcdb_a_1, NMK_GPIO_ALT_A),
-@@ -740,7 +742,7 @@ DB8500_FUNC_GROUPS(ipi2c, "ipi2c_a_1", "ipi2c_a_2");
-  */
- DB8500_FUNC_GROUPS(msp0, "msp0txrx_a_1", "msp0tfstck_a_1", "msp0rfstck_a_1",
- 		   "msp0txrx_b_1", "msp0sck_b_1");
--DB8500_FUNC_GROUPS(mc0, "mc0_a_1");
-+DB8500_FUNC_GROUPS(mc0, "mc0_a_1", "mc0_dat47_a_1", "mc0dat31dir_a_1");
- /* MSP0 can swap RX/TX like MSP0 but has no SCK pin available */
- DB8500_FUNC_GROUPS(msp1, "msp1txrx_a_1", "msp1_a_1", "msp1txrx_b_1");
- DB8500_FUNC_GROUPS(lcdb, "lcdb_a_1");
--- 
-1.7.9.2
+> @@ -0,0 +1,27 @@
+> +* TI Common Platform Interrupt Controller
+> +
+> +Common Platform Interrupt Controller (cp_intc) is used on
+> +OMAP-L1x SoCs and can support several configurable number
+> +of interrupts.
+> +
+> +Main node required properties:
+> +
+> +- compatible : should be:
+> +	"ti,cp-intc"
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The type shall be a <u32> and the value shall be 1.
+> +
+> +  The cell contains the interrupt number in the range [0-128].
+> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
+> +- reg: physical base address and size of the intc registers map.
+> +
+> +Example:
+> +
+> +	intc: interrupt-controller at 1 {
+> +		compatible = "ti,cp-intc";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		ti,intc-size = <101>;
+> +		reg = <0xfffee000 0x2000>;
+> +	};
+> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+> index 45d5256..d1bef55 100644
+> --- a/arch/arm/mach-davinci/cp_intc.c
+> +++ b/arch/arm/mach-davinci/cp_intc.c
+> @@ -14,6 +14,9 @@
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include <mach/common.h>
+>  #include <mach/cp_intc.h>
+> @@ -119,7 +122,7 @@ static const struct irq_domain_ops cp_intc_host_ops = {
+>  	.xlate = irq_domain_xlate_onetwocell,
+>  };
+>  
+> -int __init __cp_intc_init(struct device_node *node)
+> +int __init __cp_intc_init(struct device_node *node, struct device_node *parent)
+>  {
+>  	u32 num_irq		= davinci_soc_info.intc_irq_num;
+>  	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
+> @@ -129,6 +132,15 @@ int __init __cp_intc_init(struct device_node *node)
+>  
+>  	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
+
+>  	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
+
+This line needs to be dropped because you are doing an ioremap again
+down below.
+
+> +	if (node) {
+> +		davinci_intc_base = of_iomap(node, 0);
+> +		if (of_property_read_u32(node, "ti,intc-size", &num_irq))
+> +			pr_warn("unable to get intc-size, default to %d\n",
+> +				num_irq);
+> +	} else {
+> +		davinci_intc_base = ioremap(davinci_soc_info.intc_base,
+> +					SZ_8K);
+> +	}
+>  	if (WARN_ON(!davinci_intc_base))
+>  		return -EINVAL;
+>  
+> @@ -206,7 +218,15 @@ int __init __cp_intc_init(struct device_node *node)
+>  	return 0;
+>  }
+>  
+> +static struct of_device_id irq_match[] __initdata = {
+> +	{ .compatible = "ti,cp-intc", .data = __cp_intc_init, },
+> +	{ }
+> +};
+> +
+>  void __init cp_intc_init(void)
+>  {
+> -	__cp_intc_init(NULL);
+> +	if (!of_find_compatible_node(NULL, NULL, "ti,cp-intc"))
+> +		__cp_intc_init(NULL, NULL);
+> +	else
+> +		of_irq_init(irq_match);
+
+It turns out of_irq_init() does not exist on non-DT builds so this cause
+build breakage when DT is not being used. Looking around, other
+platforms are calling of_irq_init() in the generic DT board file and not
+in the interrupt controller code. See arch/arm/mach-at91/board-dt.c or
+arch/arm/mach-omap2/board-generic.c for examples. We need to adopt a
+similar strategy for DaVinci.
+
+To save time, I implemented these fixes and created a new patch which I
+will send across shortly. Please have a look at that and let me know if
+it works for you. I tested the patch on AM18x EVM.
+
+Thanks,
+Sekhar
