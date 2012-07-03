@@ -1,113 +1,159 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue,  3 Jul 2012 16:22:42 +0200
-Subject: [PATCH v2 09/12] ARM: Kirkwood: DTify the watchdog timer.
+Date: Tue,  3 Jul 2012 16:22:43 +0200
+Subject: [PATCH v2 10/12] ATA: sata_mv: Add device tree support
 In-Reply-To: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
 References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1341325365-21393-10-git-send-email-andrew@lunn.ch>
+Message-ID: <1341325365-21393-11-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree support to the Orion watchdog timer, and enable its
-use in the kirkwood devices using device tree.
+Add support for instantiating this driver from device tree, and add
+the necassary DT information to the kirkwood.dtsi file.
+
+This is based on previous work by Michael Walle and Jason Cooper.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- Documentation/devicetree/bindings/watchdog/marvel.txt |   14 ++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                       |    6 ++++++
- arch/arm/mach-kirkwood/board-dt.c                     |    2 +-
- drivers/watchdog/orion_wdt.c                          |    8 ++++++++
- 4 files changed, 29 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
+ Documentation/devicetree/bindings/ata/marvell.txt |   16 ++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                   |    7 ++++
+ arch/arm/mach-kirkwood/board-dt.c                 |    1 +
+ drivers/ata/sata_mv.c                             |   42 ++++++++++++++-------
+ 4 files changed, 53 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/marvell.txt
 
-diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
+diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
 new file mode 100644
-index 0000000..0b2503a
+index 0000000..b5cdd20
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-@@ -0,0 +1,14 @@
-+* Marvell Orion Watchdog Time
++++ b/Documentation/devicetree/bindings/ata/marvell.txt
+@@ -0,0 +1,16 @@
++* Marvell Orion SATA
 +
 +Required Properties:
-+
-+- Compatibility : "marvell,orion-wdt"
-+- reg		: Address of the timer registers
++- compatibility : "marvell,orion-sata"
++- reg           : Address range of controller
++- interrupts    : Interrupt controller is using
++- nr-ports      : Number of SATA ports in use.
 +
 +Example:
 +
-+	wdt at 20300 {
-+		compatible = "marvell,orion-wdt";
-+		reg = <0x20300 0x28>;
-+		status = "okay";
-+	};
++	sata at 80000 {
++		compatible = "marvell,orion-sata";
++		reg = <0x80000 0x5000>;
++		interrupts = <21>;
++		nr-ports = <2>;
++	}
 diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index c8bc122..be8e127 100644
+index be8e127..ec31b8b 100644
 --- a/arch/arm/boot/dts/kirkwood.dtsi
 +++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -69,6 +69,12 @@
- 			status = "disabled";
+@@ -75,6 +75,13 @@
+ 			status = "okay";
  		};
  
-+		wdt at 20300 {
-+			compatible = "marvell,orion-wdt";
-+			reg = <0x20300 0x28>;
-+			status = "okay";
++		sata at 80000 {
++			compatible = "marvell,orion-sata";
++			reg = <0x80000 0x5000>;
++			interrupts = <21>;
++			status = "disabled";
 +		};
 +
  		nand at 3000000 {
  			#address-cells = <1>;
  			#size-cells = <1>;
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index b7cd6d2..73e75cf 100644
+index 73e75cf..d0ad250 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -30,6 +30,7 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+@@ -31,6 +31,7 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
  	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
  		       NULL),
-+	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
++	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
  	{},
  };
  
-@@ -55,7 +56,6 @@ static void __init kirkwood_dt_init(void)
- 	kirkwood_clk_init();
- 
- 	/* internal devices that every board has */
--	kirkwood_wdt_init();
- 	kirkwood_xor0_init();
- 	kirkwood_xor1_init();
- 	kirkwood_crypto_init();
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 0f57369..1531e02 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -25,6 +25,7 @@
- #include <linux/io.h>
- #include <linux/spinlock.h>
- #include <linux/clk.h>
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 24712ad..8282367 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -65,6 +65,8 @@
+ #include <linux/mbus.h>
+ #include <linux/bitops.h>
+ #include <linux/gfp.h>
 +#include <linux/of.h>
- #include <mach/bridge-regs.h>
++#include <linux/of_irq.h>
+ #include <scsi/scsi_host.h>
+ #include <scsi/scsi_cmnd.h>
+ #include <scsi/scsi_device.h>
+@@ -4026,7 +4028,7 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 	struct ata_host *host;
+ 	struct mv_host_priv *hpriv;
+ 	struct resource *res;
+-	int n_ports = 0;
++	int n_ports = 0, irq = 0;
+ 	int rc;
+ #if defined(CONFIG_HAVE_CLK)
+ 	int port;
+@@ -4050,8 +4052,14 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  
- /*
-@@ -295,6 +296,12 @@ static void orion_wdt_shutdown(struct platform_device *pdev)
- 		orion_wdt_disable();
- }
+ 	/* allocate host */
+-	mv_platform_data = pdev->dev.platform_data;
+-	n_ports = mv_platform_data->n_ports;
++	if (pdev->dev.of_node) {
++		of_property_read_u32(pdev->dev.of_node, "nr-ports", &n_ports);
++		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
++	} else {
++		mv_platform_data = pdev->dev.platform_data;
++		n_ports = mv_platform_data->n_ports;
++		irq = platform_get_irq(pdev, 0);
++	}
  
-+static const struct of_device_id orion_wdt_of_match_table[] __devinitdata = {
-+	{ .compatible = "marvell,orion-wdt", },
+ 	host = ata_host_alloc_pinfo(&pdev->dev, ppi, n_ports);
+ 	hpriv = devm_kzalloc(&pdev->dev, sizeof(*hpriv), GFP_KERNEL);
+@@ -4109,8 +4117,7 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "slots %u ports %d\n",
+ 		 (unsigned)MV_MAX_Q_DEPTH, host->n_ports);
+ 
+-	rc = ata_host_activate(host, platform_get_irq(pdev, 0), mv_interrupt,
+-			       IRQF_SHARED, &mv6_sht);
++	rc = ata_host_activate(host, irq, mv_interrupt, IRQF_SHARED, &mv6_sht);
+ 	if (!rc)
+ 		return 0;
+ 
+@@ -4205,15 +4212,24 @@ static int mv_platform_resume(struct platform_device *pdev)
+ #define mv_platform_resume NULL
+ #endif
+ 
++#ifdef CONFIG_OF
++static struct of_device_id mv_sata_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,orion-sata", },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
++MODULE_DEVICE_TABLE(of, mvsdio_dt_ids);
++#endif
 +
- static struct platform_driver orion_wdt_driver = {
- 	.probe		= orion_wdt_probe,
- 	.remove		= __devexit_p(orion_wdt_remove),
-@@ -302,6 +309,7 @@ static struct platform_driver orion_wdt_driver = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "orion_wdt",
-+		.of_match_table = of_match_ptr(orion_wdt_of_match_table),
- 	},
+ static struct platform_driver mv_platform_driver = {
+-	.probe			= mv_platform_probe,
+-	.remove			= __devexit_p(mv_platform_remove),
+-	.suspend		= mv_platform_suspend,
+-	.resume			= mv_platform_resume,
+-	.driver			= {
+-				   .name = DRV_NAME,
+-				   .owner = THIS_MODULE,
+-				  },
++	.probe		= mv_platform_probe,
++	.remove		= __devexit_p(mv_platform_remove),
++	.suspend	= mv_platform_suspend,
++	.resume		= mv_platform_resume,
++	.driver		= {
++		.name = DRV_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(mv_sata_dt_ids),
++	},
  };
+ 
  
 -- 
 1.7.10
