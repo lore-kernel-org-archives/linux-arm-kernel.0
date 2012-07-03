@@ -1,65 +1,62 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Jul 2012 20:07:49 +0530
-Subject: [PATCHv4 11/18] i2c: omap: switch to platform_get_irq()
-In-Reply-To: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
-References: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1341326276-25434-12-git-send-email-shubhrajyoti@ti.com>
+Date: Tue, 3 Jul 2012 20:07:38 +0530
+Subject: [PATCHv4 00/18] I2C OMAP big cleanup
+Message-ID: <1341326276-25434-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+Changes since v1:
+       - removed tabification on patch 6/17
+       - removed dev_err() which was introduced on patch 09/17
+Changes since v2:
+        - do not set full fifo depth in the RDR interrupt.
+        - some changelog updates.
+        - rebase to the Wolfram's tree.
+Changes since v3:
+        - Remove a redundant read of status register
+        - Read the dev->buf_len variable instead of the register
+        as the information of the remaining bytes is there.
 
-that's a nice helper from drivers core which
-will give us the exact IRQ number, instead
-of a pointer to an IRQ resource.
+Tested on omap4sdp and 3430sdp.
+Functional testing.
+Also did suspend resume.
+(with omap_fixes_a_3.5rc' of git://git.pwsan.com/linux-2.6 into lkml_master
+for 32ktimer fix)
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   12 +++++++-----
- 1 files changed, 7 insertions(+), 5 deletions(-)
+This applies on Wolfram's i2c-embedded/for-next branch
+plus the below series
+http://www.spinics.net/lists/linux-omap/msg72901.html
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 30db822..46d099e 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1012,11 +1012,12 @@ omap_i2c_probe(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev;
- 	struct i2c_adapter	*adap;
--	struct resource		*mem, *irq;
-+	struct resource		*mem;
- 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
- 	struct device_node	*node = pdev->dev.of_node;
- 	const struct of_device_id *match;
- 	irq_handler_t isr;
-+	int irq;
- 	int r;
- 
- 	/* NOTE: driver uses the static register mapping */
-@@ -1025,10 +1026,11 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "no mem resource?\n");
- 		return -ENODEV;
- 	}
--	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	if (!irq) {
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
- 		dev_err(&pdev->dev, "no irq resource?\n");
--		return -ENODEV;
-+		return irq;
- 	}
- 
- 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
-@@ -1062,7 +1064,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	dev->dev = &pdev->dev;
--	dev->irq = irq->start;
-+	dev->irq = irq;
- 
- 	platform_set_drvdata(pdev, dev);
- 	init_completion(&dev->cmd_complete);
+Previous disscurssion 
+http://www.spinics.net/lists/linux-omap/msg72997.html
+
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git for_next/omap/big_cleanup
+
+Felipe Balbi (17):
+  i2c: omap: switch to devm_* API
+  i2c: omap: simplify num_bytes handling
+  i2c: omap: decrease indentation level on data handling
+  i2c: omap: add blank lines
+  i2c: omap: simplify omap_i2c_ack_stat()
+  i2c: omap: split out [XR]DR and [XR]RDY
+  i2c: omap: improve i462 errata handling
+  i2c: omap: re-factor receive/transmit data loop
+  i2c: omap: switch over to do {} while loop
+  i2c: omap: ack IRQ in parts
+  i2c: omap: switch to platform_get_irq()
+  i2c: omap: bus: add a receiver flag
+  i2c: omap: simplify errata check
+  i2c: omap: always return IRQ_HANDLED
+  i2c: omap: simplify IRQ exit path
+  i2c: omap: resize fifos before each message
+  i2c: omap: get rid of the "complete" label
+
+Shubhrajyoti D (1):
+  i2c: omap: remove redundant status read
+
+ drivers/i2c/busses/i2c-omap.c |  392 ++++++++++++++++++++++++-----------------
+ 1 files changed, 228 insertions(+), 164 deletions(-)
+
 -- 
 1.7.5.4
