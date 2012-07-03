@@ -1,46 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 3 Jul 2012 19:09:51 +0200
-Subject: [PATCH v2 08/12] Kirkwood: Add basic device tree support for
- QNAP TS219.
-In-Reply-To: <5219791.0WtDlTNBEQ@flexo>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-9-git-send-email-andrew@lunn.ch>
- <5219791.0WtDlTNBEQ@flexo>
-Message-ID: <20120703170951.GC1519@lunn.ch>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Jul 2012 18:20:40 +0100
+Subject: [PATCH v7] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <4FF329E8.8080702@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2012 at 05:47:57PM +0200, Florian Fainelli wrote:
-> Hi Andrew,
-> 
-> On Tuesday 03 July 2012 16:22:41 Andrew Lunn wrote:
-> > The two different variants of QNAP TS devices, varying by SoC, put the
-> > GPIO keys on different GPIO lines. Hence we need two different DT
-> > board descriptions, which share the same board-ts219.c file.
-> 
-> Why don't you reorder this patch to be after patch 11/12 so that you do not 
-> need to update this file in patch 11/12?
+On 02/07/12 16:39, Thomas Petazzoni wrote:
+> Arnd, Olof,
+>
+> You'll find in this patch set the seventh version of the initial
+> support for a new family of ARMv7-compatible Marvell SoCs.
+>
+> As for the previous releases, both the Armada 370 and the Armada XP
+> SoCs are supported in this directory, and we are able to build a
+> single kernel image that boots on both SoCs. Both SoCs use the PJ4B
+> processor, a Marvell-developed ARM core that implements the ARMv7
+> instruction set. We are currently using Marvell evaluation boards for
+> both of those SoCs, and the support for those boards is added in this
+> patch set.
+>
+> We remained focused on a limited preliminary support which only
+> includes the necessary code for timer and IRQ support, the serial
+> controller is a standard 16550-compatible one. The diffstat looks
+> like:
 
-It just reflects the order i did the work. I can rebase it, but what
-is the advantage? It should be fully bisectable as is.
+I've built and it got to looking for a root-fs.
 
-> 
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> [snip]
-> >  
-> > +config MACH_TS219_DT
-> > +	bool "Device Tree for QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, 
-> TS-219P and TS-219P+ Turbo NAS"
-> 
-> This looks too long, how about just "Device Tree for QNAP TS-11x, TS-21x NAS" 
-> for instance?
+Tested-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Yes, i was not too happy with this. I copied the none DT version as a
-basis, since that is what kernel builds know at the moment. Since i'm
-not alone not liking it, i will change it as you suggested.
+I will have another run through the series tomorrow and do a last
+pass review.
 
-    Thanks
-	Andrew
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
