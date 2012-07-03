@@ -1,75 +1,146 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 3 Jul 2012 12:50:42 +0200
-Subject: [PATCH v2] clk: __clk_set_parent: set uninitialized variable
-In-Reply-To: <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
-References: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
- <4FF15EDF.7030806@ti.com>
- <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
-Message-ID: <20120703105042.GJ22016@pengutronix.de>
+From: eduardo.valentin@ti.com (Valentin, Eduardo)
+Date: Tue, 3 Jul 2012 14:00:24 +0300
+Subject: [PATCH v3 2/7] mfd: omap: control: core system control driver
+In-Reply-To: <CAGF5oy-50evWVX8+U6qe0wwA0UXJUAXxXXbwrEkebSVtT8vxRA@mail.gmail.com>
+References: <4FEB4B46.9020904@dev.rtsoft.ru> <20120628045028.GC2471@besouro>
+ <4FEC25CA.10105@dev.rtsoft.ru>
+ <CAGF5oy9heLnjcHj4H=hMK9NAkrDoOocR-Lbv1Z4cQ4G1C5kSeQ@mail.gmail.com>
+ <4FEC2E1D.5040309@dev.rtsoft.ru> <4FEC3154.9050103@dev.rtsoft.ru>
+ <CAGF5oy85XSfBtV_WFwYyWDHYmBbLGHK_9c9XhTFs1CgnSfyMLA@mail.gmail.com>
+ <CAGF5oy-50evWVX8+U6qe0wwA0UXJUAXxXXbwrEkebSVtT8vxRA@mail.gmail.com>
+Message-ID: <CAGF5oy_gR0VRZFs3g+RQPF27pSnGnMOECtF1J6Tt4arFXdU6XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Mon, Jul 02, 2012 at 04:29:10PM -0700, Turquette, Mike wrote:
-> On Mon, Jul 2, 2012 at 1:42 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> > On Monday 02 July 2012 01:11 PM, Marc Kleine-Budde wrote:
-> >>
-> >> This patch fixes the following warning:
-> >>
-> >> ? ? ?drivers/clk/clk.c: In function '__clk_set_parent':
-> >> ? ? ?drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in
-> >> this function [-Wuninitialized]
-> >>
-> >> which has been introduced with commit:
-> >>
-> >> ? ? ?commit 7975059db572eb47f0fb272a62afeae272a4b209
-> >> ? ? ?Author: Rajendra Nayak<rnayak@ti.com>
-> >> ? ? ?Date: ? Wed Jun 6 14:41:31 2012 +0530
-> >>
-> >> ? ? ? ? ?clk: Allow late cache allocation for clk->parents
-> >>
-> >> This patch applies to linux-3.5-rc5
-> >>
-> >> Cc: Rajendra Nayak<rnayak@ti.com>
-> >> Signed-off-by: Marc Kleine-Budde<mkl@pengutronix.de>
-> >> ---
-> >> Hello,
-> >>
-> >> here an updated version. Changes since v1:
-> >> - Set i to clk->num_parents as Uwe pointed out.
-> >
-> >
-> > I started looking at how to avoid this initing
-> > of i to clk->parents (which is correct for the logic
-> > used below, but somehow seems error prone if someone
-> > happens to change the logic without noticing the init
-> > part)
-> > This is what I came up with, not tested at all, but
-> > worth considering if Mike dislikes the idea of initing
-> > i to clk->parents.
-> >
-> 
-> Hi Rajendra and Marc,
-> 
-> I prefer the code flow in Rajendra's change.  It seems more readable
-> and has a negative diffstat ;-)
-> 
-> $ git diff --stat
->  drivers/clk/clk.c |   28 +++++++++++++---------------
->  1 file changed, 13 insertions(+), 15 deletions(-)
-> 
-> Rajendra, can you test and send a proper patch for the same?  Thanks
-> Marc for sending your two previous patches.  I don't think that I will
-> Cc this one to stable since it falls under the category of
-> "theoretical but not yet observed" bugs.
-Maybe it's not observed yet only because
-7975059db572eb47f0fb272a62afeae272a4b209 isn't deeply tested yet? Don't
-know, just a guess.
+On Thu, Jun 28, 2012 at 1:55 PM, Valentin, Eduardo
+<eduardo.valentin@ti.com> wrote:
+> Hello again,
+>
+> On Thu, Jun 28, 2012 at 1:51 PM, Valentin, Eduardo
+> <eduardo.valentin@ti.com> wrote:
+>> Hello,
+>>
+>> On Thu, Jun 28, 2012 at 1:26 PM, Konstantin Baydarov
+>> <kbaidarov@dev.rtsoft.ru> wrote:
+>>> On 06/28/2012 02:12 PM, Konstantin Baydarov wrote:
+>>>> The interface(design) of omap-control-core.c has already been discussed many times :(
+>>>> Eduardo, in his patch set, suggested following design:
+>>>> - omap-control-core.c ioremaps SCM window and provide functions to read/write SCP register for bandgap and usb.
+>>>>
+>>>> IIRC, this approach didn't satisfy and it was suggested to have private read/write in bandgap and usb.
+>>>>
+>>>> So, my patch set introduces following design:
+>>>> - omap-control-core.c don't provide read/write functions for bandgap and usb.
+>>>> - bandgap and usb use their own private read/write functions
+>>>> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped to the same virtual address. But the problem is that SMP memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach.
+>>> I mean:
+>>>
+>>> - Each omap-control-core.c, bandgap and usb drivers remap SCM window. It's OK because SCM window is statically mapped. So each call of ioremap in omap-control-core.c, bandgap and usb drivers returns the same virtual address. But the problem is that SCM memory window isn't protected. I'm not sure whether it's possible to protect SCM window using this approach(when each driver remaps the same IOMEM).
+>>>
+>>>>
+>>>> Another possible design is:
+>>>> - omap-control-core.c ioremaps and reserves SCM IOMEM window
+>>>> - omap-control-core.c exports omap_control_get_base(virtual base address is returned) to use in bandgap and usb_phy driver.
+>>>> - Bandgap and usb phy uses their own private read/write function.
+>>>> IIUC, this way was suggested by Tony.
+>>
+>> Well I understood slightly different :-)
+>>
+>> I think the point is not really where to put the access functions, but
+>> to have each driver handling a separate part of the the io window. As
+>> I said before, so that they don't access each other io area.
+>>
+>> If you have 1 io window, for the above mentioned constraint, you won't
+>> protect anything. So, in that sense, it doesn't make much difference
+>> if you have access functions in core, or in the children, as they are
+>> all sharing the same io window. Of course, in case we put only 1 io
+>> window, for me it is safer if that window is managed in only one
+>> place, instead of several places.
+>>
+>> The question is then, can we split the io area into smaller windows
+>> for each children? Considering the children registers are not
+>> contiguous :-(. In theory we can put several entries in the 'reg' DT
+>> property, but that becomes a bit messy as it will change depending on
+>> OMAP version. Anyways, if we split the scm io window into several io
+>> smaller areas/chunks, then it makes sense to have access functions in
+>> each children.
+>>
+>>>>
+>>>> I guess It's better to settle the design(interface) of omap-control-core.c, bandgap and usb phy and then submit the next version of patch set.
+>>>
+>>
+>> Agreed. Here. We need to decide how to have this design and stick to it.
+>
+> Once the design is agreed, the series can probably be split into
+> parts, so we can have the scm core and its children worked separately
 
-Best regards
-Uwe
+Just to be clear, what I was proposing is to have each driver taking
+care of its own io window.
+
+For instance, for BG, assuming we have a DT like this:
+
+		ctrl_module_core: ctrl_module_core at 4a002000 {
+			compatible = "ti,omap4-control";
+			ti,hwmods = "ctrl_module_core";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			bandgap: bandgap at 4a002000 {
+				 reg = <0x4a00232C 0x4 0x4a002378 0x18>;
+				 compatible = "ti,omap4460-bandgap";
+				 interrupts = <0 126 4>; /* talert */
+				 ti,tshut-gpio = <86>; /* tshut */
+			 };
+			usb {
+				compatible = "ti,omap4-usb-phy";
+			};
+		};
+
+then, while probing, it can request those by simply:
+
+	i = 0;
+	do {
+		void __iomem *chunk;
+
+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+		if (!res)
+			break;
+		chunk = devm_request_and_ioremap(&pdev->dev, res);
+		if (i == 0)
+			bg_ptr->base = chunk;
+		if (!chunk) {
+			dev_err(&pdev->dev,
+				"failed to request the IO (%d:%pR).\n",
+				i, res);
+			return ERR_PTR(-EADDRNOTAVAIL);
+		}
+		i++;
+	} while (res);
+
+The driver needs to adapt its reg offsets, of course, it is doable and
+with the current design it is just a matter of redefining the register
+offsets.
+
+But for the above to work, the core driver must not request the
+complete IO area.
+
+>
+>>
+>>
+>> --
+>>
+>> Eduardo Valentin
+>
+>
+>
+> --
+>
+> Eduardo Valentin
+
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+Eduardo Valentin
