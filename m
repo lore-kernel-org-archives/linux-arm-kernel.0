@@ -1,40 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 03 Jul 2012 11:11:47 -0700
-Subject: [PATCH] remoteproc: remove the get_by_name/put API
-In-Reply-To: <1341259857-17382-1-git-send-email-ohad@wizery.com>
-References: <1341259857-17382-1-git-send-email-ohad@wizery.com>
-Message-ID: <4FF335E3.5040509@codeaurora.org>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Tue, 3 Jul 2012 15:53:17 -0300
+Subject: [PATCH 2/6] arm: fix compiler warning by properly inlining
+ flat_set_persistent()
+In-Reply-To: <1339229611-2326-2-git-send-email-elezegarcia@gmail.com>
+References: <1339229611-2326-1-git-send-email-elezegarcia@gmail.com>
+ <1339229611-2326-2-git-send-email-elezegarcia@gmail.com>
+Message-ID: <CALF0-+V3LcbXK_0Hi2G_j63qRwPceAuTq_bgwwCGpxicB=EXvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/12 13:10, Ohad Ben-Cohen wrote:
-> Remove rproc_get_by_name() and rproc_put(), and the associated
-> remoteproc infrastructure that supports it (i.e. klist and friends),
-> because:
+Hi,
+
+On Sat, Jun 9, 2012 at 5:13 AM, Ezequiel Garcia <elezegarcia@gmail.com> wrote:
+> This patch removes the following warning:
+> fs/binfmt_flat.c:752: warning: unused variable ?persistent?
+> There is neither change in functionality, nor extra code generated.
 >
-> 1. No one uses them
-> 2. Using them is highly discouraged, and any potential user
->    will be deeply scrutinized and encouraged to move.
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
+> ---
+>  arch/arm/include/asm/flat.h |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
 >
-> If a user, that absolutely can't live with the direct boot/shutdown
-> model, does show up one day, then bringing this functionality back
-> is going to be trivial.
+> diff --git a/arch/arm/include/asm/flat.h b/arch/arm/include/asm/flat.h
+> index 59426a4..6ef6cc5 100644
+> --- a/arch/arm/include/asm/flat.h
+> +++ b/arch/arm/include/asm/flat.h
+> @@ -11,6 +11,11 @@
+>  #define        flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
+>  #define        flat_put_addr_at_rp(rp, val, relval)    put_unaligned(val,rp)
+>  #define        flat_get_relocate_addr(rel)             (rel)
+> -#define        flat_set_persistent(relval, p)          0
+> +
+> +static inline int flat_set_persistent(unsigned long relval,
+> +                                     unsigned long *persistent)
+> +{
+> +       return 0;
+> +}
 >
-> At this point though, keeping this functionality around is way too
-> much of a maintenance burden.
+>  #endif /* __ARM_FLAT_H__ */
+> --
+> 1.7.3.4
 >
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Is there something wrong with this patch preventing it from being applied?
+Or did I send it to wrong list?
 
-> Cc: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
-> Cc: Loic Pallardy <loic.pallardy@stericsson.com>
-> Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
-> Cc: Suman Anna <s-anna@ti.com>
-> Cc: Mark Grosen <mgrosen@ti.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Ezequiel.
