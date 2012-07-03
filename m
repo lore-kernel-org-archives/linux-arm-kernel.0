@@ -1,44 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Jul 2012 11:03:39 +0800
-Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add watchdog support
-In-Reply-To: <1341258627-3469-1-git-send-email-festevam@gmail.com>
-References: <1341258627-3469-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120703030337.GD22106@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 02 Jul 2012 23:48:42 -0400 (EDT)
+Subject: [PATCH 2/9] arm: mach-mvebu: add header
+In-Reply-To: <20120702191616.GJ1348@lunn.ch>
+References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1341243574-3258-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120702183330.GG1348@lunn.ch> <20120702210838.37c78fda@skate>
+ <20120702191616.GJ1348@lunn.ch>
+Message-ID: <alpine.LFD.2.02.1207022313550.31003@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 04:50:26PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Add watchdog support.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index e0ec929..99581a0 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -42,6 +42,9 @@
->  				};
->  			};
->  
-> +			wdog at 020bc000 { /* WDOG1 */
-> +				status = "okay";
-> +			};
+On Mon, 2 Jul 2012, Andrew Lunn wrote:
 
-I'm wondering if it makes more sense to have wdog, rtc, such completely
-soc internal stuff always enabled in <soc>.dtsi.
+> It would also be nice if Marvell ASIC engineers didn't randomly move
+> things around in the address space....
 
->  		};
->  
->  		aips-bus at 02100000 { /* AIPS2 */
-> -- 
-> 1.7.1
-> 
+They didn't.  The _software_ engineers did.
 
--- 
-Regards,
-Shawn
+As you might know, the Orion and Kirkwood SOCs have programmable 
+physical windows for most things, including PCI IO window, PCI mem 
+window, SDRAM window, NAND controller window, bridge peripheral window, 
+etc.  
+
+So you can change your physical address space as you wish.  This was 
+made to accommodate whether you are a PCI host or a PCI client (think 
+wifi cards which are in the later category but still with this window 
+control block).  This is also how the various SDRAM banks are remapped to 
+appear as a contiguous chunk of physical memory regardless of the 
+populated memory size in each bank.
+
+Most of this is being partly set up (or set again) in the various 
+addr-map.c files.
+
+Now it seems that all the u-Boot implementations for Orion/Kirkwood out 
+there have always moved the window containing the serial ports from its 
+default 0xd0000000 address to 0xf1000000.  Why they did that I have no 
+idea.  And Linux simply took those remapped physical addresses as 
+authoritative.
+
+And whether or not Armada 370/XP still have this physical remap ability 
+I don't know.  And if it does, then why didn't it follow the same 
+0xf1000000 tradition as all the other mvebu targets before them I don't 
+know either.  Maybe this could be considered?
+
+
+Nicolas
