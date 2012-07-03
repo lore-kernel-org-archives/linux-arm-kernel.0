@@ -1,43 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jul 2012 04:18:30 -0700
-Subject: [PATCH 1/4] Revert "arm/dts: Add support for TI AM335x EVM board"
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9E911E@DBDE01.ent.ti.com>
-References: <1340358050-29560-1-git-send-email-anilkumar@ti.com>
- <1340358050-29560-2-git-send-email-anilkumar@ti.com>
- <20120702084021.GF1122@atomide.com> <4FF15F7D.1090108@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9E911E@DBDE01.ent.ti.com>
-Message-ID: <20120703111830.GK1122@atomide.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 3 Jul 2012 13:18:48 +0200
+Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
+In-Reply-To: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+Message-ID: <CACKLOr3nnd0-3txJo70nU6SptjHta1bDdUNAkHUAL8VAA=sd2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* AnilKumar, Chimata <anilkumar@ti.com> [120703 03:34]:
-> Hi Tony,
-> 
-> On Mon, Jul 02, 2012 at 14:14:45, Hiremath, Vaibhav wrote:
-> > 
-> > 
-> > On 7/2/2012 2:10 PM, Tony Lindgren wrote:
-> > > * AnilKumar Ch <anilkumar@ti.com> [120622 02:45]:
-> > >> This reverts commit 6c54bbb42678c99685c8e7fd09267e1cb8c2ae40.
-> > > 
-> > > As that has not been merged yet, I'll just drop it and set up
-> > > a new devel-dt branch. Applying the reset into devel-dt.
-> > > 
-> > 
-> > Yeah, that's better.
-> > 
-> > Care to include it into you next pull request.
+The tag 'imx-clk-common-fixes' of repository
+'git://git.pengutronix.de/git/imx/linux-2.6.git' is broken too:
 
-Yes that's the plan.
- 
-> devel-dt branch is created but these patches are not pushed yet.
-> 
-> Let me know do you have any comments on the patches.
+  CC      arch/arm/mach-imx/cpu-imx27.o
+  CC      arch/arm/mach-imx/pm-imx27.o
+  CC      arch/arm/mach-imx/clk-imx27.o
+In file included from arch/arm/mach-imx/clk-imx27.c:11:
+arch/arm/mach-imx/clk.h: In function 'imx_clk_mux':
+arch/arm/mach-imx/clk.h:73: warning: passing argument 3 of
+'clk_register_mux' from incompatible pointer type
+include/linux/clk-provider.h:255: note: expected 'char **' but
+argument is of type 'const char **'
+arch/arm/mach-imx/clk.h: In function 'imx_clk_fixed_factor':
+arch/arm/mach-imx/clk.h:79: error: implicit declaration of function
+'clk_register_fixed_factor'
+arch/arm/mach-imx/clk.h:80: warning: return makes pointer from integer
+without a cast
+arch/arm/mach-imx/clk-imx27.c: In function 'mx27_clocks_init':
+arch/arm/mach-imx/clk-imx27.c:189: error: implicit declaration of
+function 'clk_register_clkdev'
+make[1]: *** [arch/arm/mach-imx/clk-imx27.o] Error 1
+make: *** [arch/arm/mach-imx] Error 2
 
-Oops, sorry yes looks like I only dropped the one you wanted
-to revert but forgot to apply the new ones. Applied now to
-devel-dt and pushed out.
 
-Regards,
 
-Tony
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
