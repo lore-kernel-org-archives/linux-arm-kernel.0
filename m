@@ -1,57 +1,39 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 03 Jul 2012 18:56:58 -0400
-Subject: [PATCH] mmc: mxs-mmc: enable regulator for mmc slot
-In-Reply-To: <1340699937-8163-1-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Tue, 26 Jun 2012 16:38:57 +0800")
-References: <1340699937-8163-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <87txxo78sl.fsf@octavius.laptop.org>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 3 Jul 2012 16:28:10 -0700
+Subject: [GIT PULL] clk: fixes for 3.5-rc6
+Message-ID: <20120703232810.GA28439@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-On Tue, Jun 26 2012, Shawn Guo wrote:
-> If bootloader or platform initialization code does not enable the
-> power supply to mmc slot, we need to do it in mmc driver.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/mmc/host/mxs-mmc.c |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index 34a9026..1a29668 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -707,6 +707,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
->  	struct pinctrl *pinctrl;
->  	int ret = 0, irq_err, irq_dma;
->  	dma_cap_mask_t mask;
-> +	struct regulator *reg_vmmc;
->  
->  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-> @@ -747,6 +748,16 @@ static int mxs_mmc_probe(struct platform_device *pdev)
->  	host->mmc = mmc;
->  	host->sdio_irq_en = 0;
->  
-> +	reg_vmmc = devm_regulator_get(&pdev->dev, "vmmc");
-> +	if (!IS_ERR(reg_vmmc)) {
-> +		ret = regulator_enable(reg_vmmc);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"Failed to enable vmmc regulator: %d\n", ret);
-> +			goto out_mmc_free;
-> +		}
-> +	}
-> +
->  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->  	if (IS_ERR(pinctrl)) {
->  		ret = PTR_ERR(pinctrl);
+I have one trivial fix for the common clk framework towards 3.5-rc6.
+This issue was introduced by the last set of fixes, unfortunately.
 
-Thanks, pushed to mmc-next for 3.6.
+Thanks,
+Mike
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/mturquette/linux.git tags/clk-fixes-for-linus
+
+for you to fetch changes up to 863b13271f1608ab3af6f7a371047d9a66693e38:
+
+  clk: fix parent validation in __clk_set_parent() (2012-07-03 12:05:14 -0700)
+
+----------------------------------------------------------------
+The previous set of common clk fixes for -rc5 left an uninitialized int
+which could lead to bad array indexing when switching clock parents.
+The issue is fixed with a trivial change to the code flow in
+__clk_set_parent.
+
+----------------------------------------------------------------
+Rajendra Nayak (1):
+      clk: fix parent validation in __clk_set_parent()
+
+ drivers/clk/clk.c |   28 +++++++++++++---------------
+ 1 file changed, 13 insertions(+), 15 deletions(-)
