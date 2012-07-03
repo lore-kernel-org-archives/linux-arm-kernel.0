@@ -1,29 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Jul 2012 21:29:44 +0200
-Subject: [GIT PULL] Integrator common clock
-In-Reply-To: <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
-References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
- <20120620212046.GI4402@gmail.com>
- <CACRpkdaDUvfEV-7zTTyb+NbZ1WnN+iz+9QzDCVESeizCowOCsg@mail.gmail.com>
- <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
-Message-ID: <CACRpkda5xQLr+fhnsWm4ONUCzJxtMMCLkS2ek9ufDPV-u7PsGg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jul 2012 20:34:03 +0100
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <201207031319.40884.arnd@arndb.de>
+References: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+ <20120701104401.GA4352@mail.gnudd.com>
+ <20120703130042.GA10007@mail.gnudd.com> <201207031319.40884.arnd@arndb.de>
+Message-ID: <20120703193403.GA26355@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2012 at 11:58 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+On Tue, Jul 03, 2012 at 01:19:40PM +0000, Arnd Bergmann wrote:
+> On Tuesday 03 July 2012, Alessandro Rubini wrote:
+> >    drivers/dma/amba-pl08x.c: needs <asm/hardware/pl080.h>
+> >      proposed fix: move pl080.h to include/linux
+> 
+> Note that there is already an include/linux/amba/pl08x.h.
+> I would just move the few parts of pl080.h that are actually
+> needed with global visibility there, and move the rest
+> to drivers/dma/.
 
-> I saw that an older version of the patches is on the clk-next branch
-> in your git, if you're carrying these please take the latest, I created
-> a branch based off v3.5-rc2 (as I see you're using this) at your
-> convenience:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> for-mike
+NAK.  It's the entire register definitions for the PL08x, which we really
+should not be exporting to common code.
 
-This is still the case, please pull this version of the patches
-(the last that were posted to the mail list...) or tell me to resend
-them if that is better.
+Please wait until _after_ my DMA engine stuff (which is now in linux-next)
+makes its way upstream before touching any of this stuff, otherwise there's
+going to be conflicts.
 
-Nice to see the tree in -next!
-Linus Walleij
+As part of my patch series, this gets rid of a number of uses of it in
+arch/arm, but there's still the .cctl_memcpy initializer which does. I've
+not yet checked whether all implementations use the same value (they
+probably do), and if so then it should be eliminated from platform code
+and moved into the driver.
+
+I've talked about asm/hardware/pl080.h within the last week on this very
+thread... and it's disappointing to have to re-say what I said because
+you've not read my previous postings.
