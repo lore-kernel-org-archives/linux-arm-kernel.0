@@ -1,121 +1,150 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue,  3 Jul 2012 16:22:45 +0200
-Subject: [PATCH v2 12/12] Crypto: CESA: Add support for DT based instantiation.
-In-Reply-To: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1341325365-21393-13-git-send-email-andrew@lunn.ch>
+From: jiri.prchal@aksignal.cz (Jiri Prchal)
+Date: Tue,  3 Jul 2012 16:27:46 +0200
+Subject: [PATCH] arm: at91: Add new board
+Message-ID: <1341325666-5425-1-git-send-email-jiri.prchal@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on work by Michael Waller and Jason Cooper.
+I'd like to add support for our "CDU" board based up on Telit's module GE863 Pro3.
+It has more uarts, leds, another nand partitioning.
 
-Added support for getting the interrupt number from DT.
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
 ---
- .../devicetree/bindings/crypto/mv_cesa.txt         |   18 ++++++++++++
- drivers/crypto/mv_cesa.c                           |   31 +++++++++++++++++---
- 2 files changed, 45 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/crypto/mv_cesa.txt
+ arch/arm/boot/dts/cdu.dtsi |  126 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 126 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/cdu.dtsi
 
-diff --git a/Documentation/devicetree/bindings/crypto/mv_cesa.txt b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
+diff --git a/arch/arm/boot/dts/cdu.dtsi b/arch/arm/boot/dts/cdu.dtsi
 new file mode 100644
-index 0000000..f191122
+index 0000000..0f9ed04
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-@@ -0,0 +1,18 @@
-+Marvell Cryptographic Engines And Security Accelerator
++++ b/arch/arm/boot/dts/cdu.dtsi
+@@ -0,0 +1,126 @@
++/*
++ * cdu.dtsi - Device Tree file for AKsignal CDU
++ *
++ * Copyright (C) 2012 AKsignal Brno,
++ *               2012 Jiri Prchal <jiri.prchal@aksignal.cz>
++ *
++ * Licensed under GPLv2 or later.
++ */
 +
-+Required properties:
-+- compatible : should be "mrvl,orion-crypto"
-+- reg : base physical address of the engine and length of memory mapped
-+        region, followed by base physical address of sram and its memory
-+               length
-+- interrupts : interrupt number
++/include/ "at91sam9260.dtsi"
 +
-+Examples:
++/ {
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+crypto at f1030000 {
-+       compatible = "mrvl,orion-crypto";
-+       reg = <0xf1030000 0x10000
-+              0xf5000000 0x800>;    /* sram */
-+       interrupts = <22>;
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <6000000>;
++		};
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200 ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs";
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			usart0: serial at fffb0000 {
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++				linux,rs485-enabled-at-boot-time;
++				rs485-rts-delay = <0 0>;
++				};
++
++			usart2: serial at fffb8000 {
++				status = "okay";
++				linux,rs485-enabled-at-boot-time;
++				rs485-rts-delay = <0 0>;
++			};
++
++			usart3: serial at fffd0000 {
++				status = "okay";
++				linux,rs485-enabled-at-boot-time;
++				rs485-rts-delay = <0 0>;
++			};
++
++			macb0: ethernet at fffbc000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 15 0>;
++				status = "okay";
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			bootstrap at 0 {
++				label = "bootstrap";
++				reg = <0x0 0x40000>;
++			};
++
++			uboot at 40000 {
++				label = "uboot";
++				reg = <0x40000 0x80000>;
++			};
++			ubootenv at c0000 {
++				label = "ubootenv";
++				reg = <0xc0000 0x40000>;
++			};
++			kernel at 100000 {
++				label = "kernel";
++				reg = <0x100000 0x400000>;
++			};
++			rootfs at 500000 {
++				label = "rootfs";
++				reg = <0x500000 0x7b00000>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		red {
++			gpios = <&pioC 10 0>;
++			linux,default-trigger = "none";
++		};
++
++		green {
++			gpios = <&pioA 5 1>;
++			linux,default-trigger = "none";
++			default-state = "on";
++		};
++
++		yellow {
++			gpios = <&pioB 20 1>;
++			linux,default-trigger = "none";
++		};
++
++		blue {
++			gpios = <&pioB 21 1>;
++			linux,default-trigger = "none";
++		};
++	};
 +};
-+
-diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
-index 1cc6b3f..964c4c5 100644
---- a/drivers/crypto/mv_cesa.c
-+++ b/drivers/crypto/mv_cesa.c
-@@ -19,6 +19,9 @@
- #include <linux/clk.h>
- #include <crypto/internal/hash.h>
- #include <crypto/sha.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_irq.h>
- 
- #include "mv_cesa.h"
- 
-@@ -1005,7 +1008,11 @@ static int mv_probe(struct platform_device *pdev)
- 		return -EEXIST;
- 	}
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-+	if (pdev->dev.of_node)
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "regs");
-+	else
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENXIO;
- 
-@@ -1021,7 +1028,11 @@ static int mv_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sram");
-+	if (pdev->dev.of_node)
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	else
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "sram");
- 	if (!res) {
- 		ret = -ENXIO;
- 		goto err_unmap_reg;
-@@ -1034,7 +1045,10 @@ static int mv_probe(struct platform_device *pdev)
- 		goto err_unmap_reg;
- 	}
- 
--	irq = platform_get_irq(pdev, 0);
-+	if (pdev->dev.of_node)
-+		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-+	else
-+		irq = platform_get_irq(pdev, 0);
- 	if (irq < 0 || irq == NO_IRQ) {
- 		ret = irq;
- 		goto err_unmap_sram;
-@@ -1137,12 +1151,21 @@ static int mv_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id mv_cesa_of_match_table[] __devinitdata = {
-+	{ .compatible = "marvell,orion-crypto", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mv_cesa_of_match_table);
-+#endif
-+
- static struct platform_driver marvell_crypto = {
- 	.probe		= mv_probe,
--	.remove		= mv_remove,
-+	.remove		= __devexit_p(mv_remove),
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "mv_crypto",
-+		.of_match_table = of_match_ptr(mv_cesa_of_match_table),
- 	},
- };
- MODULE_ALIAS("platform:mv_crypto");
 -- 
-1.7.10
+1.7.7
