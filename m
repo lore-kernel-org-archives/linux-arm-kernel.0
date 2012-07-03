@@ -1,65 +1,75 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 3 Jul 2012 14:30:11 +0800
-Subject: [PATCH] ARM: mmp: remove mach/gpio-pxa.h
-In-Reply-To: <1341265214.1911.151.camel@x61.thuisdomein>
-References: <1341265214.1911.151.camel@x61.thuisdomein>
-Message-ID: <CAMPhdO-goJK9JATj_pxbBhDFyN+ZFEHUd6PbRiMeb6RkU1OBmQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 3 Jul 2012 12:00:20 +0530
+Subject: [PATCH RESEND] ARM: OMAP2+: Fix Wake-up power domain power status
+In-Reply-To: <4FF1C9AF.1040802@ti.com>
+References: <1341003892-14424-1-git-send-email-jon-hunter@ti.com>
+ <CAMQu2gxS8+xXUvAqMxcb3sq5dNinEXgtSphJh0TbfAX0uEGvhg@mail.gmail.com>
+ <4FF1C9AF.1040802@ti.com>
+Message-ID: <CAMQu2gw_Avx=9CpBAZiyFJ4ndKcFn5cD8+G+R4=K-AcVdcmv7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2012 at 5:40 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> Commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f ("ARM: pxa: change gpio
-> to platform device") removed all includes of mach/gpio-pxa.h. It kept
-> this unused header in the tree. Using it can't work, as it itself
-> includes the non-existent header plat/gpio-pxa.h. This header can safely
-> be removed.
+On Mon, Jul 2, 2012 at 9:47 PM, Jon Hunter <jon-hunter@ti.com> wrote:
 >
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
-
-> ---
-> Tested only with various git commands on the (history of the) tree.
+> On 06/29/2012 11:27 PM, Shilimkar, Santosh wrote:
+>> + Paul, Rajendra,
+>>
+>> On Sat, Jun 30, 2012 at 2:34 AM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>> Note: Re-sending with updated kernel doc.
+>>>
+>>> The wake-up power domain is an alway-on power domain and so this power domain
+>>> does not have a power state status (PM_PWSTST_xxx) register that indicates the
+>>> current state. However, during the registering of the wake-up power domain the
+>>> state of the domain is queried by calling pwrdm_read_pwrst(). This actually
+>>> tries to read a register that does not exist and returns a value of 0 that
+>>> indicates that the current state is OFF. The OFF state count of the wake-up
+>>> power domain is then set to 1 and the current state to OFF. Both of which are
+>>> incorrect.
+>>>
+>>> To fix this, if a power domain only supports the ON state, do not attempt to
+>>> read the power state status register and simply return ON as the current power
+>>> state.
+>>>
+>>> This is based upon Tony's current linux-omap master branch.
+>>>
+>>> Testing:
+>>> - Boot tested on OMAP4460 panda.
+>>> - Boot tested on OMAP3430 beagle and validated CORE RET still working (using
+>>>  Paul's 32k timer patch [1]).
+>>>
+>>> [1] http://marc.info/?l=linux-omap&m=134000053229888&w=2
+>>>
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>> ---
+>>>  arch/arm/mach-omap2/powerdomain.c |    6 +++++-
+>>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+>>> index eefe179..69b36e1 100644
+>>> --- a/arch/arm/mach-omap2/powerdomain.c
+>>> +++ b/arch/arm/mach-omap2/powerdomain.c
+>>> @@ -526,7 +526,8 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
+>>>  *
+>>>  * Return the powerdomain @pwrdm's current power state.        Returns -EINVAL
+>>>  * if the powerdomain pointer is null or returns the current power state
+>>> - * upon success.
+>>> + * upon success. Note that if the power domain only supports the ON state
+>>> + * then just return ON as the current state.
+>>>  */
+>>>  int pwrdm_read_pwrst(struct powerdomain *pwrdm)
+>>>  {
+>>> @@ -535,6 +536,9 @@ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
+>>>        if (!pwrdm)
+>>>                return -EINVAL;
+>>>
+>>> +       if (pwrdm->pwrsts == PWRSTS_ON)
+>>> +               return PWRDM_POWER_ON;
+>>> +
+>> The patch as such is correct but just wondering whether we should
+>> have some flag rather than above check.
 >
->  arch/arm/mach-mmp/include/mach/gpio-pxa.h |   29 -----------------------------
->  1 files changed, 0 insertions(+), 29 deletions(-)
->  delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
+> I was wondering that too. I opted not to add a flag because there is
+> only one such power domain that needs it.
 >
-> diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
-> deleted file mode 100644
-> index 0e135a5..0000000
-> --- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
-> +++ /dev/null
-> @@ -1,29 +0,0 @@
-> -#ifndef __ASM_MACH_GPIO_PXA_H
-> -#define __ASM_MACH_GPIO_PXA_H
-> -
-> -#include <mach/addr-map.h>
-> -#include <mach/cputype.h>
-> -#include <mach/irqs.h>
-> -
-> -#define GPIO_REGS_VIRT (APB_VIRT_BASE + 0x19000)
-> -
-> -#define BANK_OFF(n)    (((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
-> -#define GPIO_REG(x)    (*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
-> -
-> -#define gpio_to_bank(gpio)     ((gpio) >> 5)
-> -
-> -/* NOTE: these macros are defined here to make optimization of
-> - * gpio_{get,set}_value() to work when 'gpio' is a constant.
-> - * Usage of these macros otherwise is no longer recommended,
-> - * use generic GPIO API whenever possible.
-> - */
-> -#define GPIO_bit(gpio) (1 << ((gpio) & 0x1f))
-> -
-> -#define GPLR(x)                GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x00)
-> -#define GPDR(x)                GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x0c)
-> -#define GPSR(x)                GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x18)
-> -#define GPCR(x)                GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x24)
-> -
-> -#include <plat/gpio-pxa.h>
-> -
-> -#endif /* __ASM_MACH_GPIO_PXA_H */
-> --
-> 1.7.7.6
->
+I agree with you.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
