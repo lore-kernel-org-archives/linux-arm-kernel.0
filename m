@@ -1,56 +1,48 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Tue, 03 Jul 2012 21:09:31 +0900
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <1340991231-17682-3-git-send-email-will.deacon@arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
-Message-ID: <4FF2E0FB.4040008@renesas.com>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
+Date: Tue,  3 Jul 2012 14:32:33 +0200
+Subject: [PATCH 0/3] ARM: dts: dove: Basic devicetree support for Marvell Dove
+In-Reply-To: <1341318756-24524-1-git-send-email-sebastian.hesselbarth@googlemail.com>
+References: <1341318756-24524-1-git-send-email-sebastian.hesselbarth@googlemail.com>
+Message-ID: <1341318756-24524-2-git-send-email-sebastian.hesselbarth@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch series add very basic devicetree support for Marvell Dove.
+It is based on Kirkwood dts and therefore supports uart and rtc by
+dt only.
 
-On 6/30/2012 2:33 AM, Will Deacon wrote:
-> implemented in terms of read_current_timer. This further allows us to
-> skip the loop calibration and have a consistent delay function in the
-> face of core frequency scaling.
-[...]
-> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-> new file mode 100644
-> index 0000000..e1030e1
-> --- /dev/null
-> +++ b/arch/arm/lib/delay.c
-> @@ -0,0 +1,66 @@
-[...]
-> +void __init init_current_timer_delay(unsigned long freq)
-> +{
-> +	pr_info("Switching to timer-based delay loop\n");
-> +	lpj_fine			= freq / HZ;
+The patches have not been tested on neither Dove-DB nor CM-A510 but
+on SolidRun Cubox that is not supported by mainline kernel, yet.
 
-Looking at init/calibrate.c, 'lpj_fine' can save the first loop
-calibration, but does not save the second and subsequent calls to
-calibrate_delay().
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
 
-Magnus first noticed this, and changed to use 'preset_lpj' instead.
-See the commit 173bf69a7a (ARM / mach-shmobile: Use preset_lpj with
-calibrate_delay(), 2012-05-10).
+Sebastian Hesselbarth (3):
+  ARM: dts: dove: Add devicetree descriptors
+  ARM: dts: dove: Add devicetree-based board setup
+  ARM: dts: dove: Integrate devicetree support
 
-If we use 'lpj_fine' for this, we need to skip secondary CPU calibration
-explicitly in another way, something like this:
+ arch/arm/boot/dts/dove-cm-a510.dtsi |   27 ++++++++++
+ arch/arm/boot/dts/dove-dove-db.dtsi |   27 ++++++++++
+ arch/arm/boot/dts/dove.dtsi         |   55 +++++++++++++++++++++
+ arch/arm/mach-dove/Kconfig          |   20 ++++++++
+ arch/arm/mach-dove/Makefile         |    4 ++
+ arch/arm/mach-dove/Makefile.boot    |    3 ++
+ arch/arm/mach-dove/board-cm-a510.c  |   86 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-dove/board-dove-db.c  |   92 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-dove/board-dt.c       |   73 +++++++++++++++++++++++++++
+ arch/arm/mach-dove/common.c         |   17 ++++---
+ arch/arm/mach-dove/common.h         |   25 ++++++++++
+ 12 files changed, 444 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dove-cm-a510.dtsi
+ create mode 100644 arch/arm/boot/dts/dove-dove-db.dtsi
+ create mode 100644 arch/arm/boot/dts/dove.dtsi
+ create mode 100644 arch/arm/mach-dove/board-cm-a510.c
+ create mode 100644 arch/arm/mach-dove/board-dove-db.c
+ create mode 100644 arch/arm/mach-dove/board-dt.c
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/039506.html
-[PATCH 5/5] ARM: smp: Skip secondary cpu calibration to speed-up boot
-
-I've been using Stephen's read_current_timer implemented + lpj_fine +
-Santosh's skip secondary calibration combo for over a year, because I
-wanted to save 'preset_lpj' for the original purpose, FWIW.
-
-
-  Shinya
-
-> +	arm_delay_ops.delay		= __timer_delay;
-> +	arm_delay_ops.const_udelay	= __timer_const_udelay;
-> +	arm_delay_ops.udelay		= __timer_udelay;
-> +}
-> +#endif
+-- 
+1.7.10
