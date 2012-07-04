@@ -1,22 +1,25 @@
-From: csutfirst@gmail.com (csutfirst)
-Date: Wed, 4 Jul 2012 09:25:17 +0800
-Subject: a question about cspi dma on i.mx31
-Message-ID: <CAB5=OOTWqNjbS_sKL13nKizF+w87Uv3ainzUm697TeV7pUKuKQ@mail.gmail.com>
+From: omycle@gmail.com (Li Haifeng)
+Date: Wed, 4 Jul 2012 14:01:25 +0800
+Subject: Fwd: before arm Linux 2.6.38, how to protect the kernel memory from
+ accessing in user space?
+In-Reply-To: <CAFNq8R6cxPgADH=oOxkyenx4ADEPs+dapzj5mDrVftya3yBj3A@mail.gmail.com>
+References: <CAFNq8R6cxPgADH=oOxkyenx4ADEPs+dapzj5mDrVftya3yBj3A@mail.gmail.com>
+Message-ID: <CAFNq8R5qSRh0iEo1en_p8g+z9jgELyOOLPxs7rp-6ZV7OE1Cog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI, All,
-If it's not correct to ask a question by this way, pls execuse me.
+Hi, I am a newbie Linux Kernel learner. I am confused  at memory
+protected between user space and kernel space.  In arm, the hardware
+support the memory protecting by Domain access register.
 
-We are developing a system based on i.mx31, and the software is based on
-linux 2.6.28 released by freescale.
-In our system, the cspi port is configured as a slave port, 32bit mode. As
-the released source code does not
-support CSPI DMA., we re-write a linux driver to make it work. The driver
-do work ,but we get the big-endian
-data.That is ,in the master  data 0x44332211 was sent,but we get 0x11223344
-in our dma callback. I don't know
-whether if the i.mx31 can fix the byte-order.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120704/51f13125/attachment.html>
+But in Linux, it may not take effect in ARM Linux. Because before the
+official kernel 2.6.38, I found that both DOMAIN_USER and
+DOMAIN_KERNEL all set to DOMAIN_MANAGER(0x3). So, before arm Linux
+2.6.38, how to protect the kernel memory from accessing in user space?
+
+By the way, after arm Linux 2.6.38, if CPU_USE_DOMAINS is disabled, is
+the kernel domain also set to Client same as user domain?
+
+
+Regards,
+Haifeng Li
