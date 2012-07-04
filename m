@@ -1,143 +1,55 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 4 Jul 2012 10:49:43 +0200
-Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
-In-Reply-To: <20120704083538.GA30009@pengutronix.de>
-References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
- <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
- <CACKLOr1oeci84Fs7HTRD2Myie8zjKExA15mxM3z7dkq8QfvDmg@mail.gmail.com>
- <CACKLOr3OmhHJM0jNJm0UgO7=-DPrOzYcSYZ-iuT2hVEyQstevw@mail.gmail.com>
- <20120704083538.GA30009@pengutronix.de>
-Message-ID: <CACKLOr3ga16chLBynfj-90r0+UX-_0xeaHHWy7Ri-AyvQdrjkA@mail.gmail.com>
+From: zhouqiao@marvell.com (Qiao Zhou)
+Date: Wed,  4 Jul 2012 16:55:11 +0800
+Subject: [PATCH 0/4 V2] add 88pm80x mfd driver
+Message-ID: <1341392115-9425-1-git-send-email-zhouqiao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2012 10:35, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Jul 04, 2012 at 10:30:40AM +0200, javier Martin wrote:
->> On 4 July 2012 09:48, javier Martin <javier.martin@vista-silicon.com> wrote:
->> > Hi,
->> >
->> > On 3 July 2012 15:13, Fabio Estevam <festevam@gmail.com> wrote:
->> >> Hi Javier,
->> >>
->> >> On Tue, Jul 3, 2012 at 8:09 AM, javier Martin
->> >> <javier.martin@vista-silicon.com> wrote:
->> >>> Hi,
->> >>> I've found the following problems in linux-3.5-rc5
->> >>> (6887a4131da3adaab011613776d865f4bcfb5678) in our Visstrim M10 board:
->> >>
->> >> Could you please try the two attached patches?
->> >>
->> >> They should fix the dma and mx2-camera issues.
->> >>
->> >> I will try to look at the ssi problem, but my mx27pdk board still does
->> >> not have audio supported.
->> >>
->> >> Regards,
->> >>
->> >
->> > thanks for the patches. The first one solves the issue with the audio.
->> > Now I can do an aplay properly too.
->> >
->> > However, second patch for the mx2-camera seems that it's not right
->> > yet. I get a timeout here:
->> >
->> > static int mx27_camera_emma_prp_reset(struct mx2_camera_dev *pcdev)
->> > {
->> >         u32 cntl;
->> >         int count = 0;
->> >
->> >         cntl = readl(pcdev->base_emma + PRP_CNTL);
->> >         writel(PRP_CNTL_SWRST, pcdev->base_emma + PRP_CNTL);
->> >         while (count++ < 100) {
->> >                 if (!(readl(pcdev->base_emma + PRP_CNTL) & PRP_CNTL_SWRST))
->> >                         return 0;
->> >                 barrier();
->> >                 udelay(1);
->> >         }
->> >
->> >         return -ETIMEDOUT;
->> > }
->> >
->> > Keeping this in mind I infer that probably emma clocks have not been
->> > properly enabled.
->> >
->>
->> The problem is that in 'clk-imx27.c' the clocks for the emma are
->> defined as follows:
->>
->>       clk_register_clkdev(clk[emma_ahb_gate], "ahb", "imx-emma");
->>       clk_register_clkdev(clk[emma_ipg_gate], "ipg", "imx-emma");
->>
->> However, in the patch you submitted they are requested as shown:
->>
->>       pcdev->clk_emma_ipg = devm_clk_get(&pdev->dev, "ipg");
->>       if (IS_ERR(pcdev->clk_emma_ipg)) {
->>               err = PTR_ERR(pcdev->clk_emma_ipg);
->>               goto exit_kfree;
->>       }
->>
->>       pcdev->clk_emma_ahb = devm_clk_get(&pdev->dev, "ahb");
->>       if (IS_ERR(pcdev->clk_emma_ahb)) {
->>               err = PTR_ERR(pcdev->clk_emma_ahb);
->>               goto exit_kfree;
->>       }
->>
->> Which means the dev_id used is "mx2-camera.0" instead of "imx-emma".
->> We cannot change the name in 'clk-imx27.c' to "mx2-camera.0" since
->> there is another device "mx2_emmaprp.c" which uses these clocks,
->> unless two different names can be associated with the same clock.
->
-> This can be done just by calling clk_register_clkdev again with the
-> second name and this is also the preferred way of associating the same
-> clock to different devices.
->
-> Sascha
->
+change log [v2->v1]:
+1, split 88pm80x-core.c into 88pm800-core.c and 88pm805.c, per Arnd's
+suggestion. after the re-arch, 88pm80x-i2c handles the 800 & 805 common
+parts, while 800-core.c & 805-core.c handle the specific parts in each
+chip.
+2, add details about the workaround adding a i2c companion between 800 &
+805, and make a separate patch for it, per Arnd's suggestion.
+3, remove callback in pdata. but still keep the pdata currently.
+4, only keep necessary register in 88pm80x.h, including registers for
+regulator/rtc/onkey/power/codec etc, and remove other registers from global
+visibility.
+5, exported r/w API which requires regmap handle. as currently the pm800
+chip has 3 i2c device, only passing a pm80x_chip info can't ensure r/w the
+register in correct i2c device.
 
-So, we would have:
+change log [v1]:
+1, pm800 and pm805 are decoupled and probed separately;
+2, re-used the most of API for pm800 and pm805 per Arnd's comments;
+3, use regmap_irq, instead of previous 88pm80x_irq_data per Mark's comments.
+use regmap_add_irq_chip, and remove previous 88pm80x irq handling.
+4, remove callback function in rtc pdata per Arnd's comments.
+5, updated some coding style issue.
 
-	clk_register_clkdev(clk[csi_ahb_gate], NULL, "mx2-camera.0");
-	...
-        clk_register_clkdev(clk[emma_ahb_gate], "ahb", "mx2-camera.0");
-	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "mx2-camera.0");
-	clk_register_clkdev(clk[emma_ahb_gate], "ahb", "m2m-emmaprp.0");
-	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "m2m-emmaprp.0"));
+Qiao Zhou (4):
+  mfd: support 88pm80x in 80x driver
+  mfd: workaround: add companion chip in 88pm80x
+  rtc: add rtc support to 88PM80X PMIC
+  input: add onkey support to 88PM80X PMIC
 
-And in mx2_camera.c:
-
-	pcdev->clk_csi = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(pcdev->clk_csi)) {
-		dev_err(&pdev->dev, "Could not get csi clock\n");
-		err = PTR_ERR(pcdev->clk_csi);
-		goto exit_kfree;
-	}
-
-        pcdev->clk_emma_ipg = devm_clk_get(&pdev->dev, "ipg");
-        if (IS_ERR(pcdev->clk_emma_ipg)) {
-                err = PTR_ERR(pcdev->clk_emma_ipg);
-                goto exit_kfree;
-        }
-
-        pcdev->clk_emma_ahb = devm_clk_get(&pdev->dev, "ahb");
-        if (IS_ERR(pcdev->clk_emma_ahb)) {
-                err = PTR_ERR(pcdev->clk_emma_ahb);
-                goto exit_kfree;
-        }
-
-In this case, can we guarantee that the framework is able to tell the
-difference between "csi_ahb_gate" and "emma_ahb_gate",
-"emma_ipg_gate"? For instance, for requesting 'clk_csi' we use:
-
-devm_clk_get(&pdev->dev, NULL);
-
-since 'NULL' is handled as a wildcard, how can we make sure that we
-are not requesting 'emma_ahb_gate' or 'emma_ipg_gate' instead?
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+ drivers/input/misc/88pm80x_onkey.c |  190 +++++++++++++
+ drivers/input/misc/Kconfig         |   10 +
+ drivers/input/misc/Makefile        |    1 +
+ drivers/mfd/88pm800-core.c         |  492 +++++++++++++++++++++++++++++++++
+ drivers/mfd/88pm805-core.c         |  273 +++++++++++++++++++
+ drivers/mfd/88pm80x-i2c.c          |  231 ++++++++++++++++
+ drivers/mfd/Kconfig                |   12 +
+ drivers/mfd/Makefile               |    2 +
+ drivers/rtc/Kconfig                |   10 +
+ drivers/rtc/Makefile               |    1 +
+ drivers/rtc/rtc-88pm80x.c          |  366 +++++++++++++++++++++++++
+ include/linux/mfd/88pm80x.h        |  522 ++++++++++++++++++++++++++++++++++++
+ 12 files changed, 2110 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/input/misc/88pm80x_onkey.c
+ create mode 100644 drivers/mfd/88pm800-core.c
+ create mode 100644 drivers/mfd/88pm805-core.c
+ create mode 100644 drivers/mfd/88pm80x-i2c.c
+ create mode 100644 drivers/rtc/rtc-88pm80x.c
+ create mode 100644 include/linux/mfd/88pm80x.h
