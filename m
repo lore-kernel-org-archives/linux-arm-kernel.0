@@ -1,93 +1,99 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 4 Jul 2012 09:16:56 +0000
-Subject: [PATCH-V3 1/3] ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses
- omap-device.o target so add one entry
-In-Reply-To: <20120704072758.GP1122@atomide.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
- <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
- <20120704072758.GP1122@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA632CE@DBDE01.ent.ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 4 Jul 2012 17:20:51 +0800
+Subject: [PATCH v9 00/14] add imx usb driver based on Greg next tree
+In-Reply-To: <02d626b8-b090-408a-b307-17ebe354aa37@email.android.com>
+References: <1340963342-28735-1-git-send-email-richard.zhao@freescale.com>
+ <02d626b8-b090-408a-b307-17ebe354aa37@email.android.com>
+Message-ID: <20120704092050.GC3374@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 12:57:58, Tony Lindgren wrote:
-> Hi
+On Fri, Jun 29, 2012 at 06:52:54PM +0800, Richard Zhao wrote:
+> It is v9. Sorry for mistake.
+Hi Greg,
+
+It looks like no more comments. Could you pick it up?
+
+Thanks
+Richard
+> -- 
+> Sent from my Android phone with K-9 Mail. Please excuse my brevity.
 > 
-> Applying these, but few comments below to make my life easier..
+> Richard Zhao <richard.zhao@freescale.com> wrote:
 > 
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120628 08:04]:
-> > All OMAP2PLUS based devices, builds omap-device.o target;
-> > so just add one entry so that there is no need to patch this file
-> > for any future OMAP2+ devices.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > 
-> > NOTE: No code change from last version.
+> The work is based on ci13xxx rework done by Alexander Shishkin.
 > 
-> Extra comments like this should be within the --- sections so they
-> down't show up when applying the patch. Otherwise I have to manually
-> edit every patch, which sucks.
+> To let Greg pick up, I also added patches Alex queued that I depends on.
+> 
+> This patch series can also be found at:
+> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+> 
+> Status:
+> - this version only support host
+> - usbotg controler works at host role
+> 
+> Changes since last version:
+> - mxs_phy: fix build warnings
+> - ci13xxx_imx: add pm_runtime_disable at exit path
+> 
+> Alexander Shishkin (1):
+> usb: chipidea: remove unneeded NULL check
+> 
+> Felipe Balbi (3):
+> usb: chipidea: drop useless arch-check
+> usb: chipidea: msm: add missing section annotation
+> usb: chipidea: msm: add remove method
+> 
+> Richard Zhao (10):
+> USB: Chipidea: rename struct ci13xxx_udc_driver to struct
+> ci13xxx_platform_data
+> USB: Chipidea: rename struct ci13xxx variables from udc to ci
+> USB: Chipidea: add unified ci13xxx_{add,remove}_device for platform
+> drivers
+> USB: Chipidea: add ci13xxx device id management
+> usb: chipidea: select USB_EHCI_ROOT_HUB_TT in USB_CHIPIDEA_HOST of
+> Kconfig
+> usb: otg: add notify_connect/notify_disconnect callback
+> USB: notify phy when root hub port connect change
+> usb: chipidea: permit driver bindings pass phy pointer
+> usb: otg: add basic mxs phy driver support
+> usb: chipidea: add imx platform driver
+> 
+> .../devicetree/bindings/usb/ci13xxx-imx.txt | 18 +
+> Documentation/devicetree/bindings/usb/mxs-phy.txt | 13 +
+> drivers/usb/chipidea/Kconfig | 1 +
+> drivers/usb/chipidea/Makefile | 9 +-
+> drivers/usb/chipidea/ci.h | 32 +-
+> drivers/usb/chipidea/ci13xxx_imx.c | 198 ++++++
+> drivers/usb/chipidea/ci13xxx_msm.c | 63 +-
+> drivers/usb/chipidea/ci13xxx_pci.c | 52 +-
+> drivers/usb/chipidea/core.c | 70 ++-
+> drivers/usb/chipidea/debug.c | 146 ++---
+> drivers/usb/chipidea/host.c | 3 +-
+> drivers/usb/chipidea/udc.c | 634 ++++++++++----------
+> drivers/usb/core/hub.c | 8 +
+> drivers/usb/otg/Kconfig | 10 +
+> drivers/usb/otg/Makefile | 1 +
+> drivers/usb/otg/mxs-phy.c | 186 ++++++
+> include/linux/usb/chipidea.h | 14 +-
+> include/linux/usb/otg.h | 21 +
+> 18 files changed, 989 insertions(+), 490 deletions(-)
+> create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
+> create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+> create mode 100644 drivers/usb/otg/mxs-phy.c
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at http://vger.kernel.org/majordomo-info.html
 > 
 
-Oops...my bad.
-
-These comments I keep deliberately after signoff so that I can move it
-after --- section while submitting, but somehow missed to do it for this 
-patch-series.
-I will take care of it in the future, sorry for inconvenience.
-
-
-> Then, I'm leaving out the CLEANUP part in $Subject, that alone is not
-> a reason to patch anything. The description should say why the patch
-> is needed, which it does. If you want to specify that this should be
-> grouped in the clean-up branch, then that too could be mentioned within
-> the --- sections.
-> 
-
-Point taken, and will follow now.
-
-> > ---
-> >  arch/arm/plat-omap/Makefile |    4 +---
-> >  1 files changed, 1 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-> > index 6d87532..961bf85 100644
-> > --- a/arch/arm/plat-omap/Makefile
-> > +++ b/arch/arm/plat-omap/Makefile
-> > @@ -10,9 +10,7 @@ obj-n :=
-> >  obj-  :=
-> > 
-> >  # omap_device support (OMAP2+ only at the moment)
-> > -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
-> > -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
-> > -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
-> > +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
-> > 
-> >  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
-> >  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
-> > --
-> > 1.7.0.4
-> > 
-> 
-> This patch did not apply for some reason, I got:
-> 
-> patching file arch/arm/plat-omap/Makefile
-> patch: **** malformed patch at line 73: 1.7.0.4
-> 
-> So please tune up your scripts a bit to the patches can be applied
-> as they are without manual editing ;)
-> 
-
-Hmmmm...
-
-I usually submit the patch against linux-omap/master (to handle cross 
-dependencies), which in some cases fails on other branches you maintain. 
-Probably I will make sure that it allies atleast to relevant branches, for 
-example, in this case it should be applied on linux-omap/cleanup branch as 
-well. 
-
-Thanks,
-Vaibhav
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
