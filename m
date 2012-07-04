@@ -1,41 +1,55 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Wed, 4 Jul 2012 16:36:28 +0200 (CEST)
-Subject: [PATCH 3 of 3] ARM: imx: add rtc support to mx35_3ds
-Message-ID: <656646260.702972.1341412588384.JavaMail.root@advansee.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  4 Jul 2012 15:34:12 +0100
+Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until it's
+ been DT:ed
+Message-ID: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that RTC support has been enabled for i.MX35, add RTC to the mx35_3ds board.
+There are some inconsistencies with the way pinctrl devices are named
+when registered from platform code to the ones registered by Device
+Tree. Platform devices look like 'pinctrl-db8500', whereas the ones
+registered from Device Tree look more like 'pinctrl.2'. This leads to
+failure when carrying out name-based searches for known devices.
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+Until the correct DT bindings have been applied to the pinctrl driver
+it will fail to function correctly. For instance, during a Device
+Tree boot on Snowball no bootlog is visible due to a UART port probe
+failure. Regulators fail in a similar way.
+
+This patch prevents Device Tree from probing the pinctrl driver and
+ensures registration is completed from platform code instead.
+
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../arch/arm/mach-imx/Kconfig                      |    1 +
- .../arch/arm/mach-imx/mach-mx35_3ds.c              |    1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/db8500.dtsi      |    1 +
+ arch/arm/mach-ux500/board-mop500.c |    2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/Kconfig linux-next-HEAD-f9637ba/arch/arm/mach-imx/Kconfig
-index eff4db5..4baf5ab 100644
---- linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/Kconfig
-+++ linux-next-HEAD-f9637ba/arch/arm/mach-imx/Kconfig
-@@ -589,6 +589,7 @@ config MACH_MX35_3DS
- 	select IMX_HAVE_PLATFORM_IPU_CORE
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
- 	select IMX_HAVE_PLATFORM_MXC_NAND
-+	select IMX_HAVE_PLATFORM_MXC_RTC
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	help
- 	  Include support for MX35PDK platform. This includes specific
-diff --git linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/mach-mx35_3ds.c linux-next-HEAD-f9637ba/arch/arm/mach-imx/mach-mx35_3ds.c
-index 11afe00..25db220 100644
---- linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ linux-next-HEAD-f9637ba/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -562,6 +562,7 @@ static void __init mx35_3ds_init(void)
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 4ad5160..0e9ca87 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -172,6 +172,7 @@
  
- 	imx35_add_fec(NULL);
- 	imx35_add_imx2_wdt();
-+	imx35_add_mxc_rtc();
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 		pinctrl {
+ 			compatible = "stericsson,nmk_pinctrl";
++			status = "disabled";
+ 		};
  
- 	imx35_add_imx_uart0(&uart_pdata);
+ 		usb at a03e0000 {
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 461012a..2a5d46f 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -824,6 +824,8 @@ static void __init u8500_init_machine(void)
+ 	/* automatically probe child nodes of db8500 device */
+ 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
+ 
++	dbx500_add_pinctrl(parent, "pinctrl-db8500");
++
+ 	if (of_machine_is_compatible("st-ericsson,mop500")) {
+ 		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
+ 
+-- 
+1.7.9.5
