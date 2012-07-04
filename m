@@ -1,67 +1,113 @@
-From: attila@kinali.ch (Attila Kinali)
-Date: Wed, 4 Jul 2012 09:38:23 +0200
-Subject: MX28 poweroff issue
-In-Reply-To: <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
-References: <201207040030.36713.marex@denx.de>
- <CAOMZO5AEG5g9EYP558UWtX2m-HicAng=h008raN8wA0Yqy-xdA@mail.gmail.com>
- <201207040412.46748.marex@denx.de>
- <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
-Message-ID: <20120704093823.8e74d48bc8d9918a9c80fbcf@kinali.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Jul 2012 07:42:55 +0000
+Subject: [GIT PULL] at91: first batch of cleanup for 3.6
+In-Reply-To: <201207022058.34442.arnd@arndb.de>
+References: <4FF19B6D.3010704@atmel.com> <201207022058.34442.arnd@arndb.de>
+Message-ID: <201207040742.56200.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jul 2012 00:14:12 -0300
-Fabio Estevam <festevam@gmail.com> wrote:
-
-> On Tue, Jul 3, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
+On Monday 02 July 2012, Arnd Bergmann wrote:
+> On Monday 02 July 2012, Nicolas Ferre wrote:
+> > The following changes since commit
+> > 6887a4131da3adaab011613776d865f4bcfb5678:
+> > 
+> >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://github.com/at91linux/linux-at91.git tags/at91-for-next-cleanup
 > 
-> > Dunno, can you try on mx28 please?
-> 
-> I get the same crash as you reported.
-> 
-> On a mx27 (also ARM926EJS) I do not see this problem.
+> Pulled into next/cleanup
 
-I have the same issue on the mx23 (using 3.5-rc5):
+Unfortunately, I got a bunch of new builf errors and warnings:
 
-Requesting system halt
-[  139.330000] System halted.
-[  164.080000] BUG: soft lockup - CPU#0 stuck for 22s! [init:61]
-[  164.080000] Modules linked in:
-[  164.080000] irq event stamp: 24804
-[  164.080000] hardirqs last  enabled at (24803): [<c000ee58>] __irq_svc+0x58/0x60
-[  164.080000] hardirqs last disabled at (24804): [<c000ee34>] __irq_svc+0x34/0x60
-[  164.080000] softirqs last  enabled at (24802): [<c00244e4>] irq_exit+0x8c/0x94
-[  164.080000] softirqs last disabled at (24795): [<c00244e4>] irq_exit+0x8c/0x94
-[  164.080000] 
-[  164.080000] Pid: 61, comm:                 init
-[  164.080000] CPU: 0    Not tainted  (3.5.0-rc5-svn13642 #15)
-[  164.080000] PC is at machine_halt+0x0/0x4
-[  164.080000] LR is at sys_reboot+0x180/0x1dc
-[  164.080000] pc : [<c00101ec>]    lr : [<c0032ed4>]    psr: 60000013
-[  164.080000] sp : c39a9e90  ip : c39f0880  fp : 00000000
-[  164.080000] r10: 00000000  r9 : c39a8000  r8 : c043eddc
-[  164.080000] r7 : 00000008  r6 : 4321fedc  r5 : cdef0123  r4 : c39a8000
-[  164.080000] r3 : 00000000  r2 : 00000000  r1 : c39f0b68  r0 : 00000005
-[  164.080000] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[  164.080000] Control: 0005317f  Table: 43984000  DAC: 00000015
-[  164.080000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c00686a0>] (watchdog_timer_fn+0x130/0x16c)
-[  164.080000] [<c00686a0>] (watchdog_timer_fn+0x130/0x16c) from [<c00400f8>] (__run_hrtimer+0x7c/0x1e4)
-[  164.080000] [<c00400f8>] (__run_hrtimer+0x7c/0x1e4) from [<c00404d4>] (hrtimer_interrupt+0x108/0x2e4)
-[  164.080000] [<c00404d4>] (hrtimer_interrupt+0x108/0x2e4) from [<c0018f4c>] (mxs_timer_interrupt+0x1c/0x28)
-[  164.080000] [<c0018f4c>] (mxs_timer_interrupt+0x1c/0x28) from [<c0068dd8>] (handle_irq_event_percpu+0x5c/0x274)
-[  164.080000] [<c0068dd8>] (handle_irq_event_percpu+0x5c/0x274) from [<c006902c>] (handle_irq_event+0x3c/0x5c)
-[  164.080000] [<c006902c>] (handle_irq_event+0x3c/0x5c) from [<c006b5dc>] (handle_level_irq+0x8c/0x118)
-[  164.080000] [<c006b5dc>] (handle_level_irq+0x8c/0x118) from [<c00689a4>] (generic_handle_irq+0x34/0x40)
-[  164.080000] [<c00689a4>] (generic_handle_irq+0x34/0x40) from [<c00100dc>] (handle_IRQ+0x30/0x84)
-[  164.080000] [<c00100dc>] (handle_IRQ+0x30/0x84) from [<c000ee38>] (__irq_svc+0x38/0x60)
-[  164.080000] [<c000ee38>] (__irq_svc+0x38/0x60) from [<c00101ec>] (machine_halt+0x0/0x4)
-[  164.080000] [<c00101ec>] (machine_halt+0x0/0x4) from [<c0032ed4>] (sys_reboot+0x180/0x1dc)
-[  164.080000] [<c0032ed4>] (sys_reboot+0x180/0x1dc) from [<c000f1e0>] (ret_fast_syscall+0x0/0x38)
+8<----
+ARM: at91: fix new build errors
 
-			Attila Kinali
+MULTI_IRQ_HANDLER and SPARSE_IRQ are now required everywhere because
+mach/irqs.h and mach/entry-macros.S are gone but the symbols are
+only selected for AT91SAM9, not for the NOMMU parts.
 
--- 
-It is upon moral qualities that a society is ultimately founded. All 
-the prosperity and technological sophistication in the world is of no 
-use without that foundation.
-                 -- Miss Matheson, The Diamond Age, Neil Stephenson
+A few files now need to include linux/io.h directly, which used to
+be included through other headers that have changed.
+
+The new at91_aic_irq_priorities variable is only used with CONFIG_OF
+enabled and should not be visible otherwise.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+
+Please check these patches for correctness, and try to be more careful
+to avoid such problems in the future. I found these just building the
+defconfig files, not even invoking my randconfig scripts.
+
+	Arnd
+
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 7d0c40a..c8050b1 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -37,6 +37,8 @@ config SOC_AT91SAM9
+ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select CPU_ARM920T
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_DBGU0
+ 
+@@ -142,6 +144,8 @@ config ARCH_AT91SAM9G45
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+ 	depends on !MMU
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
+ 	select ARCH_USES_GETTIMEOFFSET
+ 
+ endchoice
+diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+index 4c0f5fd..46090e6 100644
+--- a/arch/arm/mach-at91/at91x40.c
++++ b/arch/arm/mach-at91/at91x40.c
+@@ -13,6 +13,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
++#include <linux/io.h>
+ #include <asm/proc-fns.h>
+ #include <asm/system_misc.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+index c5eaaa0..1e02c0e 100644
+--- a/arch/arm/mach-at91/irq.c
++++ b/arch/arm/mach-at91/irq.c
+@@ -49,7 +49,6 @@ static struct irq_domain *at91_aic_domain;
+ static struct device_node *at91_aic_np;
+ static unsigned int n_irqs = NR_AIC_IRQS;
+ static unsigned long at91_aic_caps = 0;
+-static unsigned int *at91_aic_irq_priorities;
+ 
+ /* AIC5 introduces a Source Select Register */
+ #define AT91_AIC_CAP_AIC5	(1 << 0)
+@@ -359,6 +358,8 @@ static void __init __maybe_unused at91_aic5_hw_init(unsigned int spu_vector)
+ }
+ 
+ #if defined(CONFIG_OF)
++static unsigned int *at91_aic_irq_priorities;
++
+ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
+ 							irq_hw_number_t hw)
+ {
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index dc474bc..fca9790 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -27,6 +27,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/ioctl.h>
+ #include <linux/completion.h>
++#include <linux/io.h>
+ 
+ #include <asm/uaccess.h>
+ 
