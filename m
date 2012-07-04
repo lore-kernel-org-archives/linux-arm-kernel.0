@@ -1,42 +1,58 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 4 Jul 2012 22:15:28 +0800
-Subject: [PATCH 1/2] ARM: PRIMA2: add of_dev_auxdata table for I2C, SPI,
- UART and PINCTRL
-In-Reply-To: <201207041310.49861.arnd@arndb.de>
-References: <1341373400-15763-1-git-send-email-Barry.Song@csr.com>
- <201207041143.04942.arnd@arndb.de>
- <CAGsJ_4zU8p8sVweoUWbuggLfetUuD1Ooem=Ku5i1t9p8CX0hgA@mail.gmail.com>
- <201207041310.49861.arnd@arndb.de>
-Message-ID: <CAGsJ_4yAc7M=TVVvLSQ7vAQTo8VmDdgiziK-CUOAiSa1HzfxNA@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 4 Jul 2012 14:17:48 +0000
+Subject: How to handle parameter variation across different boards but
+ same platform
+In-Reply-To: <20120704140118.GA4111@opensource.wolfsonmicro.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
+ <20120704131749.GZ4111@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA35456@DBDE01.ent.ti.com>
+ <20120704140118.GA4111@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA35B10@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/7/4 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 04 July 2012, Barry Song wrote:
->> > If it's about the pinctrl and clock parts, can't you just uses the
->> > generate names like "b0050000.uart" directly?
->>
->> yes. names like "b0050000.uart"  really work, and i have enabled and
->> tested names like that in clock driver.
->> but would people think them ugly?
->
-> No, that's fine.
->
->> and what would the clock driver support two SoCs whose uarts have
->> different map base address?
->
-> If they are different SoCs, then it would be likely be a different clock
-> that is connected to the UART.
->
-> A better solution is to use the new DT clock bindings to replace the
-> clock lookup in the source code. Have a look at
-> git://git.linaro.org/people/mturquette/linux.git to see how others
-> do this in new kernels.
+On Wed, Jul 04, 2012 at 19:31:18, Mark Brown wrote:
+> On Wed, Jul 04, 2012 at 01:43:12PM +0000, Hebbar, Gururaja wrote:
+> > On Wed, Jul 04, 2012 at 18:47:50, Mark Brown wrote:
+> 
+> > > What do you mean by "board"?  If these are plugin modules for your
+> > > platform you need to either identify this at runtime and register a
+> > > different machine driver or select at compile time.
+> 
+> > By board I mean a new development board. 
+> 
+> > New board
+> > sysclk = 24MHz
+> > codec_name = "tlv320aic3x-codec.1-001b"
+> 
+> > Previous Board
+> > sysclk = 12MHz
+> > .codec_name = "tlv320aic3x-codec.2-001b",
+> 
+> > Both boards share the same machine is API (machine_is_am33xx()).
+> 
+> > So, is there any mechanism/api to differentiate these 2 boards inside 
+> > Code?
+> 
+> > Has anyone else faced such situation?
+> 
+> If these are totally different boards they should have different machine
+> IDs set so machine_is_() should identify.  If that isn't there then you
+> need to do something custom to your products to identify the boards
+> further.
 
-ok. thanks. recently i have missed many threads due to some other work issues.
-i'll look into Rob Herring's "clk: add DT clock binding support".
+They are different boards with same SoC (AM33xx). So they both are true for
+machine_is_am33xx().
 
->
->         Arnd
+We have a means to detect the type of board but in arch/arm/mach-omap2/ 
+board file. However, I believe it is not recommended to call boards api
+inside drivers.
 
--barry
+Can you give me more info about the "custom option" you suggested? 
+
+
+> 
+
+
+Regards, 
+Gururaja
