@@ -1,28 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Jul 2012 11:10:21 +0000
-Subject: [GIT PULL] at91: first batch of cleanup for 3.6
-In-Reply-To: <4FF412F5.4030109@atmel.com>
-References: <4FF19B6D.3010704@atmel.com> <201207040742.56200.arnd@arndb.de>
- <4FF412F5.4030109@atmel.com>
-Message-ID: <201207041110.22274.arnd@arndb.de>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 4 Jul 2012 13:15:23 +0200
+Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform.
+In-Reply-To: <20120627162014.1494cdd7@skate>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <1340805007-3313-2-git-send-email-dinguyen@altera.com>
+ <20120627162014.1494cdd7@skate>
+Message-ID: <20120704111523.GA31490@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 July 2012, Nicolas Ferre wrote:
-> Sorry for this Arnd, I should have triggered my building scripts earlier
-> for this request...
-> 
-> Tell me if you can queue your fixing patch or if you prefer that I
-> rework it and send it back a series to you...
+Hi!
 
-Your choice. I'll apply the fix now, but I can replace the series if you
-prefer to send a more bisectible version.
- 
-> Anyway, here is my:
+> > +/*
+> > + * Set up the clock source and clock events devices
+> > + */
+> > +
+> > +void __init socfpga_timer_init(void __iomem *src_timer_base,
+> > +				void __iomem *event_timer_base,
+> > +				unsigned int event_timer_irq)
+> > +{
+> > +	/*
+> > +	 * Initialise to a known state (all timers off)
+> > +	 */
+> > +	writel(0, sp_timer0_va_base + TIMER_CTRL);
+> > +	writel(0, sp_timer1_va_base + TIMER_CTRL);
+> > +	writel(0, osc_timer0_va_base + TIMER_CTRL);
+> > +	writel(0, osc_timer1_va_base + TIMER_CTRL);
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Shouldn't this be done within the timer driver itself?
+
+
+> > +++ b/arch/arm/mach-socfpga/dw_apb_timer.c
 > 
+> The clocksource/clockevents driver now go into drivers/clocksource/,
+> and the corresponding maintainers should be CC'ed (Thomas Gleixner and
+> John Stultz.
 
-Thanks for the quick reply.
+Hmm, fortunately drivers/clocksource already has one such
+driver. Maybe  arch/arm/mach-picoxcell/time.c can be used as a
+template?
 
-	Arnd
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
