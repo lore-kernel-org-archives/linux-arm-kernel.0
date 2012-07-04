@@ -1,67 +1,42 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  5 Jul 2012 00:09:32 +0200
-Subject: [PATCH] clk: allow clocks without parents to change rate
-Message-ID: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 5 Jul 2012 00:34:02 +0200
+Subject: [PATCH 2/2] ARM: PRIMA2: add PINMUX map for primaII UART1 and
+ SPI0/1
+In-Reply-To: <CAGsJ_4xg0_aXaE6GXdVK9DYbh2UUzqow=csmsqRGzFyGh7603w@mail.gmail.com>
+References: <1341373400-15763-1-git-send-email-Barry.Song@csr.com>
+ <1341373400-15763-2-git-send-email-Barry.Song@csr.com>
+ <201207041145.28418.arnd@arndb.de>
+ <CAGsJ_4xg0_aXaE6GXdVK9DYbh2UUzqow=csmsqRGzFyGh7603w@mail.gmail.com>
+Message-ID: <CACRpkdYr6FUynkhXTEEOyZtJzPSngQJDvaCF7NQTQrQDZZCVeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_change_rate() code would dereference clk->parent
-to get clk->parent->rate without first checking that clk->parent
-was valid. This doesn't work if the clock is (A) a root clock
-and (B) can change rate. Such is the case with a VCO clock
-like the ICST which consequently crash like this without
-this patch:
+On Wed, Jul 4, 2012 at 4:25 PM, Barry Song <21cnbao@gmail.com> wrote:
+> 2012/7/4 Arnd Bergmann <arnd@arndb.de>:
+>> On Wednesday 04 July 2012, Barry Song wrote:
 
-Unable to handle kernel NULL pointer dereference at virtual address 0000001c
-pgd = c0004000
-[0000001c] *pgd=00000000
-Internal error: Oops: 5 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0    Not tainted  (3.5.0-rc3-00003-g8156866-dirty #193)
-PC is at clk_change_rate+0x34/0xd8
-LR is at clk_change_rate+0x18/0xd8
+>>>         of_platform_populate(NULL, sirfsoc_of_bus_ids, prima2_auxdata_lookup, NULL);
+>>> +       pinctrl_register_mappings(prima2_padmux_map, ARRAY_SIZE(prima2_padmux_map));
+>>>  }
+>>
+>> I haven't been following pinctrl too closely, but isn't this something
+>> that would normally be represented by putting the lookup table into the
+>> device tree?
+>
+> i'd like to see that. i am not sure whether i have missed anything
+> since i only saw the pinctrl_register_mappings samples.
+> would linus clarify?
 
-Cc: stable at kernel.org
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clk/clk.c |   22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+You can do it either way, but for a DT:ed platform it makes sense to have
+it in device tree.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 687b00d..032d79c 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -854,14 +854,22 @@ static void clk_change_rate(struct clk *clk)
- 
- 	old_rate = clk->rate;
- 
--	if (clk->ops->set_rate)
--		clk->ops->set_rate(clk->hw, clk->new_rate, clk->parent->rate);
-+	if (clk->ops->set_rate) {
-+		if (clk->parent)
-+			clk->ops->set_rate(clk->hw, clk->new_rate,
-+					clk->parent->rate);
-+		else
-+			clk->ops->set_rate(clk->hw, clk->new_rate, 0);
-+	}
- 
--	if (clk->ops->recalc_rate)
--		clk->rate = clk->ops->recalc_rate(clk->hw,
--				clk->parent->rate);
--	else
--		clk->rate = clk->parent->rate;
-+	if (clk->ops->recalc_rate) {
-+		if (clk->parent)
-+			clk->rate = clk->ops->recalc_rate(clk->hw,
-+							clk->parent->rate);
-+		else
-+			clk->rate = clk->ops->recalc_rate(clk->hw, 0);
-+	} else
-+		clk->rate = clk->parent ? clk->parent->rate : 0;
- 
- 	if (clk->notifier_count && old_rate != clk->rate)
- 		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
--- 
-1.7.10.4
+Check drivers/pinctrl/devicetree.c for how that code works, the bindings
+are in
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+There are example usecases in arch/arm/boot/dts/*
+
+This was all implemented by Stephen Warren so he's the reference
+to this codepath.
+
+Yours,
+Linus Walleij
