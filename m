@@ -1,59 +1,22 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 3 Jul 2012 23:22:21 -0700
-Subject: [PATCH] clk: fix used-uninitialized warning in__clk_set_parent
-In-Reply-To: <1341347160-21170-1-git-send-email-swarren@wwwdotorg.org>
-References: <1341347160-21170-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAJOA=zN8KhSc57TgiRpcMnDHEHuDzj0Od1dhK02RP676YDsZ1g@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 04 Jul 2012 12:09:18 +0530
+Subject: [PATCH 02/29] clk: Add CLK_IS_BASIC flag to identify basic clocks
+In-Reply-To: <CAJOA=zMBb+sLT2BejmmkVyd8+Ti4wVh1pXrCm7JLHwZ7g8w3Jg@mail.gmail.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <1339678038-23082-3-git-send-email-rnayak@ti.com> <4FF2E6BF.1060504@ti.com>
+ <CAJOA=zMBb+sLT2BejmmkVyd8+Ti4wVh1pXrCm7JLHwZ7g8w3Jg@mail.gmail.com>
+Message-ID: <4FF3E516.9040008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2012 at 1:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Wednesday 04 July 2012 11:48 AM, Turquette, Mike wrote:
+> Hi Rajendra,
 >
-> This fixes:
-> drivers/clk/clk.c: In function '__clk_set_parent':
-> drivers/clk/clk.c:1069:5: warning: 'i' may be used uninitialized in this function
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> I don't have any outstanding review comments for this patch and I've
+> taken it into clk-next.  Pull the latest and you'll find it there.
 
-Hi Stephen,
+great, thanks Mike.
 
-Thanks for the patch.  Rajendra already sent a fix for this one and
-I've pulled it into clk-fixes and sent it for 3.5-rc6 (and Cc'd
-stable), so I won't be taking in your patch.  You can view Rajendra's
-patch on gitweb:
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=commit;h=863b13271f1608ab3af6f7a371047d9a66693e38
-
-Thanks again for submitting a fix.  Always appreciated.
-
-Mike
-
-> ---
->  drivers/clk/clk.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 026d901..42647ca 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1071,13 +1071,15 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
->         old_parent = clk->parent;
->
->         /* find index of new parent clock using cached parent ptrs */
-> -       if (clk->parents)
-> +       if (clk->parents) {
->                 for (i = 0; i < clk->num_parents; i++)
->                         if (clk->parents[i] == parent)
->                                 break;
-> -       else
-> +       } else {
->                 clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
->                                                                 GFP_KERNEL);
-> +               i = clk->num_parents;
-> +       }
->
->         /*
->          * find index of new parent clock using string name comparison
-> --
-> 1.7.0.4
->
+> Thanks,
+> Mike
