@@ -1,66 +1,46 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 4 Jul 2012 09:48:13 +0200
-Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
-In-Reply-To: <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
-References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
- <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
-Message-ID: <CACKLOr1oeci84Fs7HTRD2Myie8zjKExA15mxM3z7dkq8QfvDmg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 4 Jul 2012 09:51:16 +0200
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20120704075116.GA29310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Olof,
 
-On 3 July 2012 15:13, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Javier,
->
-> On Tue, Jul 3, 2012 at 8:09 AM, javier Martin
-> <javier.martin@vista-silicon.com> wrote:
->> Hi,
->> I've found the following problems in linux-3.5-rc5
->> (6887a4131da3adaab011613776d865f4bcfb5678) in our Visstrim M10 board:
->
-> Could you please try the two attached patches?
->
-> They should fix the dma and mx2-camera issues.
->
-> I will try to look at the ssi problem, but my mx27pdk board still does
-> not have audio supported.
->
-> Regards,
->
+Please pull the following i.MX fixes for -rc
 
-thanks for the patches. The first one solves the issue with the audio.
-Now I can do an aplay properly too.
+Thanks
+ Sascha
 
-However, second patch for the mx2-camera seems that it's not right
-yet. I get a timeout here:
 
-static int mx27_camera_emma_prp_reset(struct mx2_camera_dev *pcdev)
-{
-	u32 cntl;
-	int count = 0;
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
-	cntl = readl(pcdev->base_emma + PRP_CNTL);
-	writel(PRP_CNTL_SWRST, pcdev->base_emma + PRP_CNTL);
-	while (count++ < 100) {
-		if (!(readl(pcdev->base_emma + PRP_CNTL) & PRP_CNTL_SWRST))
-			return 0;
-		barrier();
-		udelay(1);
-	}
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 
-	return -ETIMEDOUT;
-}
+are available in the git repository at:
 
-Keeping this in mind I infer that probably emma clocks have not been
-properly enabled.
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.5-imx-fixes
 
+for you to fetch changes up to c520c921eacdced7e2095ba6cbbb9921906c7b67:
+
+  ARM: imx: assert SCC gate stays enabled (2012-07-04 09:38:29 +0200)
+
+----------------------------------------------------------------
+ARM i.MX fixes for v3.5-rc5
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: imx27_visstrim_m10: Do not include <asm/system.h>
+
+Uwe Kleine-K?nig (1):
+      ARM: imx: assert SCC gate stays enabled
+
+ arch/arm/mach-imx/clk-imx35.c               |    9 ++++++++-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    2 +-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
 
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
