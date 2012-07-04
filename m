@@ -1,68 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 4 Jul 2012 08:55:01 +0200
-Subject: [PATCH] ARM: imx: enable support for mx35 rtc
-In-Reply-To: <1161104963.340229.1340983241008.JavaMail.root@advansee.com>
-References: <1061486785.340218.1340983236720.JavaMail.root@advansee.com>
- <1161104963.340229.1340983241008.JavaMail.root@advansee.com>
-Message-ID: <20120704065501.GF2698@pengutronix.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 4 Jul 2012 14:56:22 +0800
+Subject: [PATCH v4] mm: cma: add a simple kernel module as the helper to
+ test CMA
+In-Reply-To: <000301cd59b1$87094eb0$951bec10$%szyprowski@samsung.com>
+References: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
+ <03e601cd58ec$5b8177b0$12846710$%szyprowski@samsung.com>
+ <CAGsJ_4yjV+HDXdYraJ6CdJrSz1EPGgE6BRvO-_9n+6_UWfxqww@mail.gmail.com>
+ <op.wgvfgmm03l0zgt@mpn-glaptop>
+ <000301cd59b1$87094eb0$951bec10$%szyprowski@samsung.com>
+Message-ID: <CAGsJ_4zGjLgNBHsHF6xmadpsntXBRaOVt58AeOCaawZ-pbQdzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno?t,
+Hi Marek,
 
-On Fri, Jun 29, 2012 at 05:20:41PM +0200, Beno?t Th?baudeau wrote:
-> The i.MX35 has an RTC compatible with the i.MX31's, so enable its support even
-> if it's not very useful because it's not battery backed.
+2012/7/4 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Hello,
+>
+> On Tuesday, July 03, 2012 2:54 PM Michal Nazarewicz wrote:
+>
+>> > 2012/7/3 Marek Szyprowski <m.szyprowski@samsung.com>:
+>> >> IMHO the right place for such code is in drivers/misc instead of tools/cma.
+>> >>
+>> >> This patch contains a kernel module source code so it should be put with other kernel
+>> >> modules. tools/ directory is aimed to contain user space code useful for developing and
+>> >> testing Linux kernel.
+>>
+>> On Tue, 03 Jul 2012 09:39:34 +0200, Barry Song <21cnbao@gmail.com> wrote:
+>> > this one is aiming to test CMA, it should be in tools/ as Michal
+>> > Nazarewicz and i have talked about that.
+>> > it is not a real driver at all.
+>>
+>> Yeah, I feel like it's better placed in tools/ not to pollute other directories with
+>> drivers that are of no use to regular users.  I don't have strong feelings about it
+>> though, so I'm fine either way.
+>
+> Other test devices/drivers are in drivers directory (drivers/usb/misc/usbtest.c for
+> example), I don't see any good reason for polluting tools/ directory with kernel code.
+>
+> IMHO the right person to decide if it makes sense to have such drivers in drivers/mics/
+> or tools/cma/ is Greg KH. Barry, please resend it and ask Greg for the decision.
 
-Given that you do not add board for this rtc and we all want to convert
-to devicetree I would rather drop this patch.
+sure. thanks.
 
-Sascha
+>
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
 
-> 
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
-> ---
->  .../arch/arm/mach-imx/devices-imx35.h              |    4 ++++
->  .../arch/arm/plat-mxc/devices/platform-mxc_rtc.c   |    5 +++++
->  2 files changed, 9 insertions(+)
-> 
-> diff --git linux-next-HEAD-d1d2d3a.orig/arch/arm/mach-imx/devices-imx35.h linux-next-HEAD-d1d2d3a/arch/arm/mach-imx/devices-imx35.h
-> index 7b99ef0..82d6ea0 100644
-> --- linux-next-HEAD-d1d2d3a.orig/arch/arm/mach-imx/devices-imx35.h
-> +++ linux-next-HEAD-d1d2d3a/arch/arm/mach-imx/devices-imx35.h
-> @@ -68,6 +68,10 @@ extern const struct imx_mxc_nand_data imx35_mxc_nand_data;
->  #define imx35_add_mxc_nand(pdata)	\
->  	imx_add_mxc_nand(&imx35_mxc_nand_data, pdata)
->  
-> +extern const struct imx_mxc_rtc_data imx35_mxc_rtc_data;
-> +#define imx35_add_mxc_rtc(pdata)	\
-> +	imx_add_mxc_rtc(&imx35_mxc_rtc_data)
-> +
->  extern const struct imx_mxc_w1_data imx35_mxc_w1_data;
->  #define imx35_add_mxc_w1(pdata)	\
->  	imx_add_mxc_w1(&imx35_mxc_w1_data)
-> diff --git linux-next-HEAD-d1d2d3a.orig/arch/arm/plat-mxc/devices/platform-mxc_rtc.c linux-next-HEAD-d1d2d3a/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-> index 16d0ec4..a5c9ad5 100644
-> --- linux-next-HEAD-d1d2d3a.orig/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-> +++ linux-next-HEAD-d1d2d3a/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-> @@ -20,6 +20,11 @@ const struct imx_mxc_rtc_data imx31_mxc_rtc_data __initconst =
->  	imx_mxc_rtc_data_entry_single(MX31);
->  #endif /* ifdef CONFIG_SOC_IMX31 */
->  
-> +#ifdef CONFIG_SOC_IMX35
-> +const struct imx_mxc_rtc_data imx35_mxc_rtc_data __initconst =
-> +	imx_mxc_rtc_data_entry_single(MX35);
-> +#endif /* ifdef CONFIG_SOC_IMX35 */
-> +
->  struct platform_device *__init imx_add_mxc_rtc(
->  		const struct imx_mxc_rtc_data *data)
->  {
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-barry
