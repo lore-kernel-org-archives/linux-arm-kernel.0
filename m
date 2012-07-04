@@ -1,47 +1,47 @@
-From: yehuday@marvell.com (Yehuda Yitschak)
-Date: Wed, 4 Jul 2012 15:11:01 +0300
-Subject: [PATCH v7] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <2E2747FC8980BB40958FB06A958ED3550144C11C2E54@IL-MB01.marvell.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 4 Jul 2012 06:11:38 -0600 (MDT)
+Subject: [PATCH 0/3] ARM: OMAP2/3: DSS HWMOD fixes
+In-Reply-To: <alpine.DEB.2.00.1206271416420.27496@utopia.booyaka.com>
+References: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.00.1206271416420.27496@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1207040610310.6760@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomi
+
+On Wed, 27 Jun 2012, Paul Walmsley wrote:
+
+> On Thu, 10 May 2012, Tomi Valkeinen wrote:
+> 
+> > These patches fix DSS hwmod data related to sysc flags. I haven't seen any
+> > problem produced by these missing bits, but by looking at the TRM it's clear
+> > that they should be defined.
+> > 
+> > However, applying these will cause additional warnings to show during boot:
+> > 
+> > omap_hwmod: dss_dispc: softreset failed (waited 10000 usec)
+> > omap_hwmod: dss_rfbi: softreset failed (waited 10000 usec)
+> > 
+> > Most likely the softreset fails even now, but as there's no check to verify it,
+> > no warnings are visible.
+> > 
+> > I think the reason for the failing softreset is the same problem as we have on
+> > OMAP4: dss_core hwmod should be enabled before other dss hwmods can be enabled
+> > (and reset).
+> 
+> Thanks, queued for 3.6.
+> 
+> Not sure what to do about the softreset issues at the moment, due to 
+> competing priorities.  But for sure the data should match the hardware.
+
+I've dropped these for 3.6 since they cause a PM regression during a 
+system suspend test:
+
+[   39.721282] Powerdomain (dss_pwrdm) didn't enter target state 1
+
+Probably before we can pull these in, we need to figure out what's going 
+on there.
 
 
-> -----Original Message-----
-> From: Thomas Petazzoni [mailto:thomas.petazzoni at free-electrons.com]
-> Sent: Monday, July 02, 2012 6:39 PM
-> To: Arnd Bergmann; Olof Johansson
-> Cc: Ben Dooks; Jason Cooper; Andrew Lunn; Nicolas Pitre; Lior Amsalem;
-> Maen Suleiman; linux-arm-kernel at lists.infradead.org; Thomas Petazzoni;
-> Gregory Clement; Jon Masters; David Marlin; Tawfik Bayouk; Shadi
-> Ammouri; Eran Ben-Avi; Yehuda Yitschak; Nadav Haklai; Eric Miao
-> Subject: [PATCH v7] arm: Add basic support for new Marvell Armada 370 and
-> Armada XP SoC
-> 
-> Arnd, Olof,
-> 
-> You'll find in this patch set the seventh version of the initial support for a
-> new family of ARMv7-compatible Marvell SoCs.
-> 
-> As for the previous releases, both the Armada 370 and the Armada XP SoCs
-> are supported in this directory, and we are able to build a single kernel
-> image that boots on both SoCs. Both SoCs use the PJ4B processor, a Marvell-
-> developed ARM core that implements the ARMv7 instruction set. We are
-> currently using Marvell evaluation boards for both of those SoCs, and the
-> support for those boards is added in this patch set.
-> 
-Hi, tested by me on Armada XP board. So,
-Tested-By: Yehuda Yitschak <yehuday@marvell.com>
-
-
-[snip]
-> 
-> Best regards,
-> 
-> Thomas Petazzoni
-
-Regards,
-Yehuda Yitschak
+- Paul
