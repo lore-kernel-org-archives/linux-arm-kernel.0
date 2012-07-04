@@ -1,133 +1,26 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 4 Jul 2012 10:01:01 +0200
-Subject: [GIT PULL] at91: first batch of cleanup for 3.6
-In-Reply-To: <201207040742.56200.arnd@arndb.de>
-References: <4FF19B6D.3010704@atmel.com> <201207022058.34442.arnd@arndb.de>
- <201207040742.56200.arnd@arndb.de>
-Message-ID: <4FF3F83D.9060904@atmel.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 4 Jul 2012 16:04:02 +0800
+Subject: [PATCH] ARM: mmp: remove mach/gpio-pxa.h
+In-Reply-To: <CAMPhdO-goJK9JATj_pxbBhDFyN+ZFEHUd6PbRiMeb6RkU1OBmQ@mail.gmail.com>
+References: <1341265214.1911.151.camel@x61.thuisdomein>
+ <CAMPhdO-goJK9JATj_pxbBhDFyN+ZFEHUd6PbRiMeb6RkU1OBmQ@mail.gmail.com>
+Message-ID: <CAN1soZynjS8+0eq7pv=tkTcw4-52yvA-ygEmbKKY0b4LR2nQ0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/04/2012 09:42 AM, Arnd Bergmann a ?crit :
-> On Monday 02 July 2012, Arnd Bergmann wrote:
->> On Monday 02 July 2012, Nicolas Ferre wrote:
->>> The following changes since commit
->>> 6887a4131da3adaab011613776d865f4bcfb5678:
->>>
->>>    Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>    git://github.com/at91linux/linux-at91.git tags/at91-for-next-cleanup
+On Tue, Jul 3, 2012 at 2:30 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Tue, Jul 3, 2012 at 5:40 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+>> Commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f ("ARM: pxa: change gpio
+>> to platform device") removed all includes of mach/gpio-pxa.h. It kept
+>> this unused header in the tree. Using it can't work, as it itself
+>> includes the non-existent header plat/gpio-pxa.h. This header can safely
+>> be removed.
 >>
->> Pulled into next/cleanup
+>> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 >
-> Unfortunately, I got a bunch of new builf errors and warnings:
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
 >
-> 8<----
-> ARM: at91: fix new build errors
->
-> MULTI_IRQ_HANDLER and SPARSE_IRQ are now required everywhere because
-> mach/irqs.h and mach/entry-macros.S are gone but the symbols are
-> only selected for AT91SAM9, not for the NOMMU parts.
->
-> A few files now need to include linux/io.h directly, which used to
-> be included through other headers that have changed.
->
-> The new at91_aic_irq_priorities variable is only used with CONFIG_OF
-> enabled and should not be visible otherwise.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->
-> Please check these patches for correctness, and try to be more careful
-> to avoid such problems in the future. I found these just building the
-> defconfig files, not even invoking my randconfig scripts.
->
-> 	Arnd
->
-
-Hi,
-
-Patches are ok for me. Sorry for this issue, I've tested it on several 
-boards but not these two ones and I didn't notice they don't select 
-AT91SAM9.
+Applied
 
 Regards
-
-Ludovic
-
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 7d0c40a..c8050b1 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -37,6 +37,8 @@ config SOC_AT91SAM9
->   config SOC_AT91RM9200
->   	bool "AT91RM9200"
->   	select CPU_ARM920T
-> +	select MULTI_IRQ_HANDLER
-> +	select SPARSE_IRQ
->   	select GENERIC_CLOCKEVENTS
->   	select HAVE_AT91_DBGU0
->
-> @@ -142,6 +144,8 @@ config ARCH_AT91SAM9G45
->   config ARCH_AT91X40
->   	bool "AT91x40"
->   	depends on !MMU
-> +	select MULTI_IRQ_HANDLER
-> +	select SPARSE_IRQ
->   	select ARCH_USES_GETTIMEOFFSET
->
->   endchoice
-> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-> index 4c0f5fd..46090e6 100644
-> --- a/arch/arm/mach-at91/at91x40.c
-> +++ b/arch/arm/mach-at91/at91x40.c
-> @@ -13,6 +13,7 @@
->   #include <linux/kernel.h>
->   #include <linux/init.h>
->   #include <linux/irq.h>
-> +#include <linux/io.h>
->   #include <asm/proc-fns.h>
->   #include <asm/system_misc.h>
->   #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-> index c5eaaa0..1e02c0e 100644
-> --- a/arch/arm/mach-at91/irq.c
-> +++ b/arch/arm/mach-at91/irq.c
-> @@ -49,7 +49,6 @@ static struct irq_domain *at91_aic_domain;
->   static struct device_node *at91_aic_np;
->   static unsigned int n_irqs = NR_AIC_IRQS;
->   static unsigned long at91_aic_caps = 0;
-> -static unsigned int *at91_aic_irq_priorities;
->
->   /* AIC5 introduces a Source Select Register */
->   #define AT91_AIC_CAP_AIC5	(1 << 0)
-> @@ -359,6 +358,8 @@ static void __init __maybe_unused at91_aic5_hw_init(unsigned int spu_vector)
->   }
->
->   #if defined(CONFIG_OF)
-> +static unsigned int *at91_aic_irq_priorities;
-> +
->   static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
->   							irq_hw_number_t hw)
->   {
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-> index dc474bc..fca9790 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -27,6 +27,7 @@
->   #include <linux/interrupt.h>
->   #include <linux/ioctl.h>
->   #include <linux/completion.h>
-> +#include <linux/io.h>
->
->   #include <asm/uaccess.h>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+Haojian
