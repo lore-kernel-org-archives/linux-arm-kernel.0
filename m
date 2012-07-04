@@ -1,39 +1,106 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 4 Jul 2012 16:06:07 +0800
-Subject: [GIT PULL][for 3.5] pull request of fixes branch from pxa git tree
-Message-ID: <CAN1soZxZAnWU=3c7JV5vr2F71+KrDRN+DN_hEezjS7b_hARsdQ@mail.gmail.com>
+From: shmulik.ladkani@gmail.com (Shmulik Ladkani)
+Date: Wed,  4 Jul 2012 11:06:00 +0300
+Subject: [PATCH 1/5] ubi: introduce ubi->bad_peb_limit
+In-Reply-To: <1341389164-24409-1-git-send-email-shmulik.ladkani@gmail.com>
+References: <1341389164-24409-1-git-send-email-shmulik.ladkani@gmail.com>
+Message-ID: <1341389164-24409-2-git-send-email-shmulik.ladkani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+Introduce 'ubi->bad_peb_limit', which specifies an upper limit of PEBs
+ubi expects to go bad.
+Currently, it is initialized to a fixed percentage of total PEBs in the
+ubi device (configurable via CONFIG_MTD_UBI_BEB_LIMIT).
 
-Please help to pull fixes branch from pxa git tree. Now commit
-c12a3cb9dca9676 is appended.
+The 'bad_peb_limit' is intended to be used for calculating the amount of
+PEBs ubi needs to reserve for bad eraseblock handling.
 
-Regards
-Haojian
+Signed-off-by: Shmulik Ladkani <shmulik.ladkani@gmail.com>
+---
+ arch/arm/configs/sam9_l9260_defconfig |    1 +
+ drivers/mtd/ubi/Kconfig               |   11 +++++++++++
+ drivers/mtd/ubi/build.c               |   13 ++++++++++++-
+ drivers/mtd/ubi/ubi.h                 |    2 ++
+ 4 files changed, 26 insertions(+), 1 deletions(-)
 
-
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git fixes
-
-for you to fetch changes up to c12a3cb9dca96768a5f048bb50f3395216346bda:
-
-  ARM: mmp: remove mach/gpio-pxa.h (2012-07-04 15:58:11 +0800)
-
-----------------------------------------------------------------
-Paul Bolle (1):
-      ARM: mmp: remove mach/gpio-pxa.h
-
-Paul Parsons (1):
-      ARM: pxa: hx4700: Fix basic suspend/resume
-
- arch/arm/mach-mmp/include/mach/gpio-pxa.h |   29 -----------------------------
- arch/arm/mach-pxa/hx4700.c                |   15 ++++++++++++++-
- 2 files changed, 14 insertions(+), 30 deletions(-)
- delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
+diff --git a/arch/arm/configs/sam9_l9260_defconfig b/arch/arm/configs/sam9_l9260_defconfig
+index ecf2531..f6917c9 100644
+--- a/arch/arm/configs/sam9_l9260_defconfig
++++ b/arch/arm/configs/sam9_l9260_defconfig
+@@ -40,6 +40,7 @@ CONFIG_MTD_NAND_ATMEL=y
+ CONFIG_MTD_NAND_PLATFORM=y
+ CONFIG_MTD_UBI=y
+ CONFIG_MTD_UBI_BEB_RESERVE=3
++CONFIG_MTD_UBI_BEB_LIMIT=3
+ CONFIG_MTD_UBI_GLUEBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+diff --git a/drivers/mtd/ubi/Kconfig b/drivers/mtd/ubi/Kconfig
+index 738ee8d..8df256f 100644
+--- a/drivers/mtd/ubi/Kconfig
++++ b/drivers/mtd/ubi/Kconfig
+@@ -42,6 +42,17 @@ config MTD_UBI_BEB_RESERVE
+ 	  eraseblocks (e.g. NOR flash), this value is ignored and nothing is
+ 	  reserved. Leave the default value if unsure.
+ 
++config MTD_UBI_BEB_LIMIT
++	int "Percentage of maximum expected bad eraseblocks"
++	default 2
++	range 0 25
++	help
++	  This option specifies the maximum bad eraseblocks UBI expects on the
++	  ubi device (percents of total number of flash eraseblocks).
++	  If the underlying flash does not admit of bad eraseblocks (e.g. NOR
++	  flash), this value is ignored.
++	  Leave the default value if unsure.
++
+ config MTD_UBI_GLUEBI
+ 	tristate "MTD devices emulation driver (gluebi)"
+ 	help
+diff --git a/drivers/mtd/ubi/build.c b/drivers/mtd/ubi/build.c
+index 2c5ed5c..62cc6ce 100644
+--- a/drivers/mtd/ubi/build.c
++++ b/drivers/mtd/ubi/build.c
+@@ -607,8 +607,19 @@ static int io_init(struct ubi_device *ubi)
+ 	ubi->peb_count  = mtd_div_by_eb(ubi->mtd->size, ubi->mtd);
+ 	ubi->flash_size = ubi->mtd->size;
+ 
+-	if (mtd_can_have_bb(ubi->mtd))
++	if (mtd_can_have_bb(ubi->mtd)) {
+ 		ubi->bad_allowed = 1;
++		if (CONFIG_MTD_UBI_BEB_LIMIT > 0) {
++			int percent = CONFIG_MTD_UBI_BEB_LIMIT;
++			int beb_limit;
++
++			beb_limit = mult_frac(ubi->peb_count, percent, 100);
++			/* round it up */
++			if (mult_frac(beb_limit, 100, percent) < ubi->peb_count)
++				beb_limit++;
++			ubi->bad_peb_limit = beb_limit;
++		}
++	}
+ 
+ 	if (ubi->mtd->type == MTD_NORFLASH) {
+ 		ubi_assert(ubi->mtd->writesize == 1);
+diff --git a/drivers/mtd/ubi/ubi.h b/drivers/mtd/ubi/ubi.h
+index a1a81c9..b5217ef 100644
+--- a/drivers/mtd/ubi/ubi.h
++++ b/drivers/mtd/ubi/ubi.h
+@@ -363,6 +363,7 @@ struct ubi_wl_entry;
+  * @flash_size: underlying MTD device size (in bytes)
+  * @peb_count: count of physical eraseblocks on the MTD device
+  * @peb_size: physical eraseblock size
++ * @bad_peb_limit: top limit of expected bad physical eraseblocks
+  * @bad_peb_count: count of bad physical eraseblocks
+  * @good_peb_count: count of good physical eraseblocks
+  * @corr_peb_count: count of corrupted physical eraseblocks (preserved and not
+@@ -410,6 +411,7 @@ struct ubi_device {
+ 	int avail_pebs;
+ 	int beb_rsvd_pebs;
+ 	int beb_rsvd_level;
++	int bad_peb_limit;
+ 
+ 	int autoresize_vol_id;
+ 	int vtbl_slots;
+-- 
+1.7.9
