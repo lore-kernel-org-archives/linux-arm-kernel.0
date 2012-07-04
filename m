@@ -1,49 +1,41 @@
 From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Wed, 4 Jul 2012 16:36:11 +0200 (CEST)
-Subject: [PATCH 2 of 3] ARM: imx: enable support for mx35 rtc
-Message-ID: <744510504.702918.1341412571534.JavaMail.root@advansee.com>
+Date: Wed, 4 Jul 2012 16:36:28 +0200 (CEST)
+Subject: [PATCH 3 of 3] ARM: imx: add rtc support to mx35_3ds
+Message-ID: <656646260.702972.1341412588384.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX35 has an RTC compatible with the i.MX31's, so enable its support even
-if it's not very useful because it's not battery backed.
+Now that RTC support has been enabled for i.MX35, add RTC to the mx35_3ds board.
 
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: <linux-arm-kernel@lists.infradead.org>
 Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
 ---
- .../arch/arm/mach-imx/devices-imx35.h              |    4 ++++
- .../arch/arm/plat-mxc/devices/platform-mxc_rtc.c   |    5 +++++
- 2 files changed, 9 insertions(+)
+ .../arch/arm/mach-imx/Kconfig                      |    1 +
+ .../arch/arm/mach-imx/mach-mx35_3ds.c              |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/devices-imx35.h linux-next-HEAD-f9637ba/arch/arm/mach-imx/devices-imx35.h
-index e745bc8..c3e9f20 100644
---- linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/devices-imx35.h
-+++ linux-next-HEAD-f9637ba/arch/arm/mach-imx/devices-imx35.h
-@@ -68,6 +68,10 @@ extern const struct imx_mxc_nand_data imx35_mxc_nand_data;
- #define imx35_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand(&imx35_mxc_nand_data, pdata)
+diff --git linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/Kconfig linux-next-HEAD-f9637ba/arch/arm/mach-imx/Kconfig
+index eff4db5..4baf5ab 100644
+--- linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/Kconfig
++++ linux-next-HEAD-f9637ba/arch/arm/mach-imx/Kconfig
+@@ -589,6 +589,7 @@ config MACH_MX35_3DS
+ 	select IMX_HAVE_PLATFORM_IPU_CORE
+ 	select IMX_HAVE_PLATFORM_MXC_EHCI
+ 	select IMX_HAVE_PLATFORM_MXC_NAND
++	select IMX_HAVE_PLATFORM_MXC_RTC
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	help
+ 	  Include support for MX35PDK platform. This includes specific
+diff --git linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/mach-mx35_3ds.c linux-next-HEAD-f9637ba/arch/arm/mach-imx/mach-mx35_3ds.c
+index 11afe00..25db220 100644
+--- linux-next-HEAD-f9637ba.orig/arch/arm/mach-imx/mach-mx35_3ds.c
++++ linux-next-HEAD-f9637ba/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -562,6 +562,7 @@ static void __init mx35_3ds_init(void)
  
-+extern const struct imx_mxc_rtc_data imx35_mxc_rtc_data;
-+#define imx35_add_mxc_rtc()	\
-+	imx_add_mxc_rtc(&imx35_mxc_rtc_data)
-+
- extern const struct imx_mxc_w1_data imx35_mxc_w1_data;
- #define imx35_add_mxc_w1()	\
- 	imx_add_mxc_w1(&imx35_mxc_w1_data)
-diff --git linux-next-HEAD-f9637ba.orig/arch/arm/plat-mxc/devices/platform-mxc_rtc.c linux-next-HEAD-f9637ba/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-index 16d0ec4..a5c9ad5 100644
---- linux-next-HEAD-f9637ba.orig/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-+++ linux-next-HEAD-f9637ba/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-@@ -20,6 +20,11 @@ const struct imx_mxc_rtc_data imx31_mxc_rtc_data __initconst =
- 	imx_mxc_rtc_data_entry_single(MX31);
- #endif /* ifdef CONFIG_SOC_IMX31 */
+ 	imx35_add_fec(NULL);
+ 	imx35_add_imx2_wdt();
++	imx35_add_mxc_rtc();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
  
-+#ifdef CONFIG_SOC_IMX35
-+const struct imx_mxc_rtc_data imx35_mxc_rtc_data __initconst =
-+	imx_mxc_rtc_data_entry_single(MX35);
-+#endif /* ifdef CONFIG_SOC_IMX35 */
-+
- struct platform_device *__init imx_add_mxc_rtc(
- 		const struct imx_mxc_rtc_data *data)
- {
+ 	imx35_add_imx_uart0(&uart_pdata);
