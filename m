@@ -1,48 +1,42 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 4 Jul 2012 13:15:23 +0200
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 4 Jul 2012 13:21:35 +0200
 Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
  SOCFPGA platform.
-In-Reply-To: <20120627162014.1494cdd7@skate>
+In-Reply-To: <20120704111523.GA31490@elf.ucw.cz>
 References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
  <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <20120627162014.1494cdd7@skate>
-Message-ID: <20120704111523.GA31490@elf.ucw.cz>
+ <20120627162014.1494cdd7@skate> <20120704111523.GA31490@elf.ucw.cz>
+Message-ID: <20120704132135.56ddc4ca@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Le Wed, 4 Jul 2012 13:15:23 +0200,
+Pavel Machek <pavel@denx.de> a ?crit :
 
-> > +/*
-> > + * Set up the clock source and clock events devices
-> > + */
-> > +
-> > +void __init socfpga_timer_init(void __iomem *src_timer_base,
-> > +				void __iomem *event_timer_base,
-> > +				unsigned int event_timer_irq)
-> > +{
-> > +	/*
-> > +	 * Initialise to a known state (all timers off)
-> > +	 */
-> > +	writel(0, sp_timer0_va_base + TIMER_CTRL);
-> > +	writel(0, sp_timer1_va_base + TIMER_CTRL);
-> > +	writel(0, osc_timer0_va_base + TIMER_CTRL);
-> > +	writel(0, osc_timer1_va_base + TIMER_CTRL);
+> > The clocksource/clockevents driver now go into drivers/clocksource/,
+> > and the corresponding maintainers should be CC'ed (Thomas Gleixner and
+> > John Stultz.
 > 
-> Shouldn't this be done within the timer driver itself?
+> Hmm, fortunately drivers/clocksource already has one such
+> driver. Maybe  arch/arm/mach-picoxcell/time.c can be used as a
+> template?
 
+I must say I don't know what's the preferred way here. In mach-mvebu,
+the drivers/clocksource/time-armada-370-xp.c does everything, including
+the DT parsing. The part in arch/arm/mach-mvebu/ only defines struct
+sys_timer and points to the initialization function in the
+drivers/clocksource/ driver.
 
-> > +++ b/arch/arm/mach-socfpga/dw_apb_timer.c
-> 
-> The clocksource/clockevents driver now go into drivers/clocksource/,
-> and the corresponding maintainers should be CC'ed (Thomas Gleixner and
-> John Stultz.
+Apparently, in mach-picoxcell, things are organized differently, with
+the DT parsing happening in arch/arm/mach-picoxcell/time.c, and the
+driver providing some lower-level functions to separately register the
+clocksource and the clockevents devices.
 
-Hmm, fortunately drivers/clocksource already has one such
-driver. Maybe  arch/arm/mach-picoxcell/time.c can be used as a
-template?
+I have no idea which one should be preferred over the other.
 
-									Pavel
-
+Thomas
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
