@@ -1,39 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 4 Jul 2012 13:10:24 +0200
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <20120704105653.GA20021@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <20120627162014.1494cdd7@skate> <20120704105653.GA20021@elf.ucw.cz>
-Message-ID: <20120704131024.4bb558a3@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Jul 2012 11:10:21 +0000
+Subject: [GIT PULL] at91: first batch of cleanup for 3.6
+In-Reply-To: <4FF412F5.4030109@atmel.com>
+References: <4FF19B6D.3010704@atmel.com> <201207040742.56200.arnd@arndb.de>
+ <4FF412F5.4030109@atmel.com>
+Message-ID: <201207041110.22274.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Le Wed, 4 Jul 2012 12:56:53 +0200,
-Pavel Machek <pavel@denx.de> a ?crit :
-
-> Hmm, strange. I see picoxcell-pc3x2.dtsi using similar
-> dw-apb-uart. According to 8250_dw.c, it is not completely
-> 16550-compatible, and uses slightly modified driver.
+On Wednesday 04 July 2012, Nicolas Ferre wrote:
+> Sorry for this Arnd, I should have triggered my building scripts earlier
+> for this request...
 > 
-> So it can be driven from dts, but not as ns16850 compatible. This
-> patch does so.
+> Tell me if you can queue your fixing patch or if you prefer that I
+> rework it and send it back a series to you...
 
-I guess your patch misses the .dts bits, but other than that, looks
-much better without this bizarre notifier thing.
+Your choice. I'll apply the fix now, but I can replace the series if you
+prefer to send a more bisectible version.
+ 
+> Anyway, here is my:
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
 
-Do you plan to resend a complete v2 with all your patches nicely
-rebased? It's not that easy to review such a set of small cleanup
-increments :-)
+Thanks for the quick reply.
 
-Regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
