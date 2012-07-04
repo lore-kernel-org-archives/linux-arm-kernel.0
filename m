@@ -1,49 +1,34 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 4 Jul 2012 11:43:20 +0800
-Subject: [PATCH 2/2] ARM: PRIMA2: add PINMUX map for primaII UART1 and SPI0/1
-In-Reply-To: <1341373400-15763-1-git-send-email-Barry.Song@csr.com>
-References: <1341373400-15763-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1341373400-15763-2-git-send-email-Barry.Song@csr.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 4 Jul 2012 05:47:36 +0200
+Subject: MX28 poweroff issue
+In-Reply-To: <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
+References: <201207040030.36713.marex@denx.de>
+ <201207040412.46748.marex@denx.de>
+ <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
+Message-ID: <201207040547.37021.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Dear Fabio Estevam,
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/prima2.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+> On Tue, Jul 3, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
+> > Dunno, can you try on mx28 please?
+> 
+> I get the same crash as you reported.
+> 
+> On a mx27 (also ARM926EJS) I do not see this problem.
 
-diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/prima2.c
-index 82f5c0d..b2bb33d 100644
---- a/arch/arm/mach-prima2/prima2.c
-+++ b/arch/arm/mach-prima2/prima2.c
-@@ -33,6 +33,13 @@ struct of_dev_auxdata prima2_auxdata_lookup[] __initdata = {
- 	{},
- };
- 
-+/* Padmux settings */
-+static struct pinctrl_map prima2_padmux_map[] = {
-+       PIN_MAP_MUX_GROUP_DEFAULT("uart1", "pinctrl0", NULL, "uart1"),
-+       PIN_MAP_MUX_GROUP_DEFAULT("spi0", "pinctrl0", NULL, "spi0"),
-+       PIN_MAP_MUX_GROUP_DEFAULT("spi1", "pinctrl0", NULL, "spi1"),
-+};
-+
- static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
- 	{ .compatible = "simple-bus", },
- 	{},
-@@ -41,6 +48,7 @@ static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
- void __init sirfsoc_mach_init(void)
- {
- 	of_platform_populate(NULL, sirfsoc_of_bus_ids, prima2_auxdata_lookup, NULL);
-+	pinctrl_register_mappings(prima2_padmux_map, ARRAY_SIZE(prima2_padmux_map));
- }
- 
- void __init sirfsoc_init_late(void)
--- 
-1.7.1
+Thanks for verifying this, Fabio. The mx28 generates timer interrupt after it 
+should be sitting in the endless loop, therefore this crash. I think it's 
+because the mx28 (mxs at al) is using the new clock framework (compared to mxc) 
+and the timer isn't deinited by then ...
 
+Disabling interrupts might be just the right solution, though I'm not sure if 
+it's not hiding bugs ...
 
+> Regards,
+> 
+> Fabio Estevam
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Best regards,
+Marek Vasut
