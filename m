@@ -1,55 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Jul 2012 15:34:12 +0100
-Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until it's
- been DT:ed
-Message-ID: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 4 Jul 2012 22:36:54 +0800
+Subject: [GIT PULL] prima2 GPIO support in pinmux
+In-Reply-To: <201207041429.47124.arnd@arndb.de>
+References: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
+ <201207041429.47124.arnd@arndb.de>
+Message-ID: <CAGsJ_4zjKprZn+gDASsKg9pspntagNMOvuQSj1VdK_YgzXn6hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some inconsistencies with the way pinctrl devices are named
-when registered from platform code to the ones registered by Device
-Tree. Platform devices look like 'pinctrl-db8500', whereas the ones
-registered from Device Tree look more like 'pinctrl.2'. This leads to
-failure when carrying out name-based searches for known devices.
+2012/7/4 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 02 July 2012, Barry Song wrote:
+>> Hi Olof, Arnd,
+>>
+>> Please pull the following GPIO support in pinmux for 3.6.
+>
+> I noticed that the driver now requires gpiolib, so we need one
+> of these two patches. I think the first one is safer, but the
+> second one allows you to build without GPIOLIB if you want to
+> disable PINCTRL_SIRF.
 
-Until the correct DT bindings have been applied to the pinctrl driver
-it will fail to function correctly. For instance, during a Device
-Tree boot on Snowball no bootlog is visible due to a UART port probe
-failure. Regulators fail in a similar way.
+yes. missed this. thanks!
+i would have 1 because basically we will always have PINCTRL_SIRF.
 
-This patch prevents Device Tree from probing the pinctrl driver and
-ensures registration is completed from platform code instead.
+>
+>         Arnd
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 8bcda59..adef0da 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -389,7 +389,7 @@ config ARCH_PRIMA2
+>         bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+>         select CPU_V7
+>         select NO_IOPORT
+> -       select ARCH_WANT_OPTIONAL_GPIOLIB
+> +       select ARCH_REQUIRE_GPIOLIB
+>         select GENERIC_CLOCKEVENTS
+>         select CLKDEV_LOOKUP
+>         select GENERIC_IRQ_CHIP
+>
+>
+>
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index 4c05fe8..5b51199 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -104,7 +104,7 @@ config PINCTRL_PXA910
+>
+>  config PINCTRL_SIRF
+>         bool "CSR SiRFprimaII pin controller driver"
+> -       depends on ARCH_PRIMA2
+> +       depends on ARCH_PRIMA2 && GPIOLIB
+>         select PINMUX
+>
+>  config PINCTRL_TEGRA
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/db8500.dtsi      |    1 +
- arch/arm/mach-ux500/board-mop500.c |    2 ++
- 2 files changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 4ad5160..0e9ca87 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -172,6 +172,7 @@
- 
- 		pinctrl {
- 			compatible = "stericsson,nmk_pinctrl";
-+			status = "disabled";
- 		};
- 
- 		usb at a03e0000 {
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 461012a..2a5d46f 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -824,6 +824,8 @@ static void __init u8500_init_machine(void)
- 	/* automatically probe child nodes of db8500 device */
- 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
- 
-+	dbx500_add_pinctrl(parent, "pinctrl-db8500");
-+
- 	if (of_machine_is_compatible("st-ericsson,mop500")) {
- 		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
- 
--- 
-1.7.9.5
+-barry
