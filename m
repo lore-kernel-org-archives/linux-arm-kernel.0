@@ -1,105 +1,158 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  4 Jul 2012 16:01:15 +0100
-Subject: [PATCH 1/2] ARM: vexpress: add debug UARTs to DEBUG_LL kconfig choice
-Message-ID: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  4 Jul 2012 16:01:16 +0100
+Subject: [PATCH 2/2] ARM: vexpress: remove automatic errata workaround
+ selection
+In-Reply-To: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
+References: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1341414076-20895-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Austin <jonathan.austin@arm.com>
+The vexpress Kconfig setup tries to be clever^Whelpful and selects some
+errata workarounds for certain revisions of the Cortex-A9 and PL310,
+which may be required depending on the coretile.
 
-The current vexpress code attempts to autodetect the debug UART based on
-some fragile probing of the memory map. If this fails, we may take an
-abort attempting to access a device that doesn't exist.
+Since the mach-vexpress can support A5, A7 and A15 coretiles, let's
+defer errata workaround selection to the user and instead propose
+recommended workarounds in the defconfig. Note that the use of the
+savedefconfig target removed some unrelated, redundant entries from the
+file.
 
-This patch avoids probing the various possible UART locations on the
-different Versatile Express motherboards and instead adds entries into
-the DEBUG_LL kconfig choice for the two possible memory maps.
-
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug                            |   16 ++++++++++
- arch/arm/mach-vexpress/include/mach/debug-macro.S |   34 ++++++++-------------
- 2 files changed, 29 insertions(+), 21 deletions(-)
+ arch/arm/configs/vexpress_defconfig |   26 ++++++++------------------
+ arch/arm/mach-vexpress/Kconfig      |   13 -------------
+ 2 files changed, 8 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 01a1341..b343f60 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -345,6 +345,22 @@ choice
- 		  For more details about semihosting, please see
- 		  chapter 8 of DUI0203I_rvct_developer_guide.pdf from ARM Ltd.
+diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+index f2de51f..c2c2aed 100644
+--- a/arch/arm/configs/vexpress_defconfig
++++ b/arch/arm/configs/vexpress_defconfig
+@@ -8,11 +8,9 @@ CONFIG_CGROUPS=y
+ CONFIG_CPUSETS=y
+ # CONFIG_UTS_NS is not set
+ # CONFIG_IPC_NS is not set
+-# CONFIG_USER_NS is not set
+ # CONFIG_PID_NS is not set
+ # CONFIG_NET_NS is not set
+ CONFIG_BLK_DEV_INITRD=y
+-# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_MODULES=y
+@@ -24,9 +22,14 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_VEXPRESS_CA9X4=y
+ # CONFIG_SWP_EMULATE is not set
++CONFIG_ARM_ERRATA_720789=y
++CONFIG_ARM_ERRATA_751472=y
++CONFIG_PL310_ERRATA_753970=y
++CONFIG_ARM_ERRATA_754327=y
++CONFIG_ARM_ERRATA_764369=y
++CONFIG_PL310_ERRATA_769419=y
+ CONFIG_SMP=y
+ CONFIG_VMSPLIT_2G=y
+-CONFIG_HOTPLUG_CPU=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+@@ -46,33 +49,26 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
+-CONFIG_MISC_DEVICES=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_SMSC911X=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+ # CONFIG_WLAN is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_AMBAKMI=y
++CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+ CONFIG_FB=y
+@@ -103,7 +99,6 @@ CONFIG_HID_THRUSTMASTER=y
+ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+-# CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_MON=y
+ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_STORAGE=y
+@@ -120,9 +115,7 @@ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+-# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_MAGIC_SYSRQ=y
+@@ -131,10 +124,7 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DETECT_HUNG_TASK=y
+ # CONFIG_SCHED_DEBUG is not set
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_VEXPRESS_CA9X4_UART=y
+ CONFIG_EARLY_PRINTK=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+-# CONFIG_CRYPTO_HW is not set
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index cf8730d..6a165fa7 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,20 +1,8 @@
+ menu "Versatile Express platform type"
+ 	depends on ARCH_VEXPRESS
  
-+	config DEBUG_VEXPRESS_CA9X4_UART
-+		bool "Kernel low-level debugging messages via CA9X4 UART"
-+		depends on ARCH_VEXPRESS_CA9X4
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART0 of the Versatile Express motherboards
-+		  that pre-date the RS1 memory map.
-+
-+	config DEBUG_VEXPRESS_RS1_UART
-+		bool "Kernel low-level debugging messages via RS1 UART"
-+		depends on ARCH_VEXPRESS_DT
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART0 of the Versatile Express motherboards
-+		  with the RS1 memory map.
-+
- endchoice
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-index fa82247..f25a024 100644
---- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-+++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-@@ -10,34 +10,26 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#ifdef CONFIG_DEBUG_VEXPRESS_CA9X4_UART
- #define DEBUG_LL_PHYS_BASE		0x10000000
- #define DEBUG_LL_UART_OFFSET		0x00009000
-+#endif
- 
--#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
--#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
-+#ifdef CONFIG_DEBUG_VEXPRESS_RS1_UART
-+#define DEBUG_LL_PHYS_BASE		0x1c000000
-+#define DEBUG_LL_UART_OFFSET		0x00090000
-+#endif
- 
- #define DEBUG_LL_VIRT_BASE		0xf8000000
- 
--		.macro	addruart,rp,rv,tmp
+-config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+-	bool
+-	select ARM_ERRATA_720789
+-	select ARM_ERRATA_751472
+-	select PL310_ERRATA_753970 if CACHE_PL310
+-	help
+-	  Provides common dependencies for Versatile Express platforms
+-	  based on Cortex-A5 and Cortex-A9 processors. In order to
+-	  build a working kernel, you must also enable relevant core
+-	  tile support or Flattened Device Tree based support options.
 -
--		@ Make an educated guess regarding the memory map:
--		@ - the original A9 core tile, which has MPCore peripherals
--		@   located at 0x1e000000, should use UART at 0x10009000
--		@ - all other (RS1 complaint) tiles use UART mapped
--		@   at 0x1c090000
--		mrc	p15, 4, \tmp, c15, c0, 0
--		cmp	\tmp, #0x1e000000
--
--		@ Original memory map
--		moveq	\rp, #DEBUG_LL_UART_OFFSET
--		orreq	\rv, \rp, #DEBUG_LL_VIRT_BASE
--		orreq	\rp, \rp, #DEBUG_LL_PHYS_BASE
--
--		@ RS1 memory map
--		movne	\rp, #DEBUG_LL_UART_OFFSET_RS1
--		orrne	\rv, \rp, #DEBUG_LL_VIRT_BASE
--		orrne	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
-+#ifndef DEBUG_LL_UART_OFFSET
-+#error "Unknown vexpress UART offset"
-+#endif
+ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
+-	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select HAVE_SMP
+@@ -22,7 +10,6 @@ config ARCH_VEXPRESS_CA9X4
  
-+		.macro	addruart,rp,rv,tmp
-+		mov	\rp, #DEBUG_LL_UART_OFFSET
-+		orr	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orr	\rp, \rp, #DEBUG_LL_PHYS_BASE
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
+ config ARCH_VEXPRESS_DT
+ 	bool "Device Tree support for Versatile Express platforms"
+-	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+ 	select ARM_GIC
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR
 -- 
 1.7.4.1
