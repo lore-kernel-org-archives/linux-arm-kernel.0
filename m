@@ -1,86 +1,93 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 4 Jul 2012 11:14:13 +0200
-Subject: [PATCH] net/macb: manage carrier state with call to
- netif_carrier_{on|off}()
-In-Reply-To: <1341361835.2839.21.camel@bwh-desktop.uk.solarflarecom.com>
-References: <1341361835.2839.21.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <1341393253-6531-1-git-send-email-nicolas.ferre@atmel.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 4 Jul 2012 09:16:56 +0000
+Subject: [PATCH-V3 1/3] ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses
+ omap-device.o target so add one entry
+In-Reply-To: <20120704072758.GP1122@atomide.com>
+References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
+ <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
+ <20120704072758.GP1122@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA632CE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OFF carrier state is setup in probe() open() and suspend() functions.
-The carrier ON state is managed in macb_handle_link_change().
+On Wed, Jul 04, 2012 at 12:57:58, Tony Lindgren wrote:
+> Hi
+> 
+> Applying these, but few comments below to make my life easier..
+> 
+> * Vaibhav Hiremath <hvaibhav@ti.com> [120628 08:04]:
+> > All OMAP2PLUS based devices, builds omap-device.o target;
+> > so just add one entry so that there is no need to patch this file
+> > for any future OMAP2+ devices.
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > 
+> > NOTE: No code change from last version.
+> 
+> Extra comments like this should be within the --- sections so they
+> down't show up when applying the patch. Otherwise I have to manually
+> edit every patch, which sucks.
+> 
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
+Oops...my bad.
 
-This patch follows the discussion about IPv6 and macb interface
-("ADDRCONF(NETDEV_UP): eth0: link is not ready" with IPv6)
-It may not address all aspects of the discussion, so please do comments...
+These comments I keep deliberately after signoff so that I can move it
+after --- section while submitting, but somehow missed to do it for this 
+patch-series.
+I will take care of it in the future, sorry for inconvenience.
 
-I am still wondering if netif_carrier_off() is needed in macb_probe() *after*
-the call to register_netdev() in addition to its inclusion in the open()
-function. As I saw it in sevral drivers, I kept it.
 
-I have tested several suspend/resume loops, and I think that just calling
-netif_carrier_off() in suspend() function is sufficient: am I right?
+> Then, I'm leaving out the CLEANUP part in $Subject, that alone is not
+> a reason to patch anything. The description should say why the patch
+> is needed, which it does. If you want to specify that this should be
+> grouped in the clean-up branch, then that too could be mentioned within
+> the --- sections.
+> 
 
-Thanks for your help,
-Best regards,
+Point taken, and will follow now.
 
- drivers/net/ethernet/cadence/macb.c |   13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+> > ---
+> >  arch/arm/plat-omap/Makefile |    4 +---
+> >  1 files changed, 1 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+> > index 6d87532..961bf85 100644
+> > --- a/arch/arm/plat-omap/Makefile
+> > +++ b/arch/arm/plat-omap/Makefile
+> > @@ -10,9 +10,7 @@ obj-n :=
+> >  obj-  :=
+> > 
+> >  # omap_device support (OMAP2+ only at the moment)
+> > -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
+> > -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
+> > -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
+> > +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
+> > 
+> >  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+> >  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
+> > --
+> > 1.7.0.4
+> > 
+> 
+> This patch did not apply for some reason, I got:
+> 
+> patching file arch/arm/plat-omap/Makefile
+> patch: **** malformed patch at line 73: 1.7.0.4
+> 
+> So please tune up your scripts a bit to the patches can be applied
+> as they are without manual editing ;)
+> 
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 1466bc4..033064b 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -179,13 +179,16 @@ static void macb_handle_link_change(struct net_device *dev)
- 	spin_unlock_irqrestore(&bp->lock, flags);
- 
- 	if (status_change) {
--		if (phydev->link)
-+		if (phydev->link) {
-+			netif_carrier_on(dev);
- 			netdev_info(dev, "link up (%d/%s)\n",
- 				    phydev->speed,
- 				    phydev->duplex == DUPLEX_FULL ?
- 				    "Full" : "Half");
--		else
-+		} else {
-+			netif_carrier_off(dev);
- 			netdev_info(dev, "link down\n");
-+		}
- 	}
- }
- 
-@@ -1033,6 +1036,9 @@ static int macb_open(struct net_device *dev)
- 
- 	netdev_dbg(bp->dev, "open\n");
- 
-+	/* carrier starts down */
-+	netif_carrier_off(dev);
-+
- 	/* if the phy is not yet register, retry later*/
- 	if (!bp->phy_dev)
- 		return -EAGAIN;
-@@ -1406,6 +1412,8 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, dev);
- 
-+	netif_carrier_off(dev);
-+
- 	netdev_info(dev, "Cadence %s at 0x%08lx irq %d (%pM)\n",
- 		    macb_is_gem(bp) ? "GEM" : "MACB", dev->base_addr,
- 		    dev->irq, dev->dev_addr);
-@@ -1469,6 +1477,7 @@ static int macb_suspend(struct platform_device *pdev, pm_message_t state)
- 	struct net_device *netdev = platform_get_drvdata(pdev);
- 	struct macb *bp = netdev_priv(netdev);
- 
-+	netif_carrier_off(netdev);
- 	netif_device_detach(netdev);
- 
- 	clk_disable(bp->hclk);
--- 
-1.7.10
+Hmmmm...
+
+I usually submit the patch against linux-omap/master (to handle cross 
+dependencies), which in some cases fails on other branches you maintain. 
+Probably I will make sure that it allies atleast to relevant branches, for 
+example, in this case it should be applied on linux-omap/cleanup branch as 
+well. 
+
+Thanks,
+Vaibhav
