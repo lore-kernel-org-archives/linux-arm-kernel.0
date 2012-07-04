@@ -1,34 +1,38 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 4 Jul 2012 15:30:53 +0530
-Subject: [PATCH] ARM: architected timers: Mark the clockevent with the
- C3_STOP feature
-In-Reply-To: <4FF41366.4060504@arm.com>
-References: <1341395673-29660-1-git-send-email-santosh.shilimkar@ti.com>
- <4FF41366.4060504@arm.com>
-Message-ID: <CAMQu2gy6ynmCviYpW2qH-_6i614zrtO7P_8CM6O7--V-0FvvKA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 4 Jul 2012 04:07:31 -0600 (MDT)
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FEEC7F2.8070507@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+Message-ID: <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2012 at 3:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On 04/07/12 10:54, Santosh Shilimkar wrote:
-> > ARM arch timers stop in low power state and hence can not wakeup CPUs in
-> > deeper idle states when used as cloc event devices. Marking these clock
-> > event
-> > devices with C3_STOP so that during lowpower states, the tick is managed
-> > by
-> > wakeup capable broadcast timer.
-> >
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-> Hi Santosh,
->
-> I already have queued an identical patch from Lorenzo.
-> Thanks for reminder anyway!
->
-OK. Thanks for the information Mark.
-Looks like I missed that one on the list.
+On Sat, 30 Jun 2012, Daniel Mack wrote:
 
-Regards,
-Santosh
+> Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
+> the components I need.
+
+Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod data 
+for the AM33xx.  There might be some missing integration code to build the 
+devices for the newer IP blocks, though.
+
+> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
+
+Mainline has:
+
+drivers/net/ethernet/ti/davinci_emac.c
+drivers/net/ethernet/ti/davinci_mdio.c
+
+Those might work for you.
+
+
+- Paul
