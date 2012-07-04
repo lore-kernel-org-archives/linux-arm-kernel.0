@@ -1,31 +1,71 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Jul 2012 00:24:54 -0700
-Subject: [RESEND PATCH] ARM: OMAP2+: am33xx: Make am33xx as a separate
- class
-In-Reply-To: <1341320447-18918-2-git-send-email-hvaibhav@ti.com>
-References: <1341320447-18918-1-git-send-email-hvaibhav@ti.com>
- <1341320447-18918-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120704072454.GO1122@atomide.com>
+Date: Wed, 4 Jul 2012 00:27:58 -0700
+Subject: [PATCH-V3 1/3] ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses
+ omap-device.o target so add one entry
+In-Reply-To: <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
+References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
+ <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <20120704072758.GP1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120703 06:12]:
-> Initially, we decided to make am33xx family of device to fall
-> under omap3 class (cpu_is_omap34xx() = true), since it carries
-> Cortex-A8 core. But while adding complete baseport support
-> (like, clock, power and hwmod) support, it is observed that,
-> we are creating more and more problems by treating am33xx device
-> as omap3 family, as nothing matches between them
-> (except cortex-A8 mpu).
+Hi
+
+Applying these, but few comments below to make my life easier..
+
+* Vaibhav Hiremath <hvaibhav@ti.com> [120628 08:04]:
+> All OMAP2PLUS based devices, builds omap-device.o target;
+> so just add one entry so that there is no need to patch this file
+> for any future OMAP2+ devices.
 > 
-> So,  after long discussion we have came to the conclusion that,
-> we should not consider am33xx device as omap3 family, instead
-> create separate class (SOC_AM33XX) under OMAP2PLUS.
-> This means, for am33xx device, cpu_is_omap34xx() will return false,
-> and only cpu_is_am33xx() will be true.
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> 
+> NOTE: No code change from last version.
 
-Thanks applying both.
+Extra comments like this should be within the --- sections so they
+down't show up when applying the patch. Otherwise I have to manually
+edit every patch, which sucks.
 
-Regards,
+Then, I'm leaving out the CLEANUP part in $Subject, that alone is not
+a reason to patch anything. The description should say why the patch
+is needed, which it does. If you want to specify that this should be
+grouped in the clean-up branch, then that too could be mentioned within
+the --- sections.
+
+> ---
+>  arch/arm/plat-omap/Makefile |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+> index 6d87532..961bf85 100644
+> --- a/arch/arm/plat-omap/Makefile
+> +++ b/arch/arm/plat-omap/Makefile
+> @@ -10,9 +10,7 @@ obj-n :=
+>  obj-  :=
+> 
+>  # omap_device support (OMAP2+ only at the moment)
+> -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
+> -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
+> -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
+> +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
+> 
+>  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+>  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
+> --
+> 1.7.0.4
+> 
+
+This patch did not apply for some reason, I got:
+
+patching file arch/arm/plat-omap/Makefile
+patch: **** malformed patch at line 73: 1.7.0.4
+
+So please tune up your scripts a bit to the patches can be applied
+as they are without manual editing ;)
+
+Thanks,
 
 Tony
