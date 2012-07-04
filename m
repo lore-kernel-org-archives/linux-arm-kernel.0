@@ -1,36 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Jul 2012 01:36:17 +0200
-Subject: [GIT PULL] Integrator common clock
-In-Reply-To: <20120704233028.GA31508@n2100.arm.linux.org.uk>
-References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
- <20120620212046.GI4402@gmail.com>
- <CACRpkdaDUvfEV-7zTTyb+NbZ1WnN+iz+9QzDCVESeizCowOCsg@mail.gmail.com>
- <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
- <CACRpkda5xQLr+fhnsWm4ONUCzJxtMMCLkS2ek9ufDPV-u7PsGg@mail.gmail.com>
- <CAJOA=zOaXf6QzF9yhcoTTaPYr-9=L2h5r5AvmMxoSbroJJrOFg@mail.gmail.com>
- <CACRpkdZYZJL6MmQ0tZD=ZWbAX7yUDoH6Xw6CfBLYkVtF2j2gGg@mail.gmail.com>
- <20120704233028.GA31508@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkda3iU_B_qDEsrE4HSoEdsU_Q3+74yMavHKxqBAoR3HmJA@mail.gmail.com>
+Date: Thu, 5 Jul 2012 01:38:33 +0200
+Subject: [PATCH] gpio/mxc: make irqs work for fsl,imx21-gpio devices
+In-Reply-To: <4FF19B4C.3000603@stericsson.com>
+References: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120702093154.GM2698@pengutronix.de>
+ <4FF19B4C.3000603@stericsson.com>
+Message-ID: <CACRpkdbmZYXKSHVRnVh+M8ciE-Zy+PnAqskWoFK69Cc6Ah7X9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 5, 2012 at 1:30 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 05, 2012 at 12:52:06AM +0200, Linus Walleij wrote:
->> I don't have the mach-versatile machine sadly. I think only
->> Catalin and Russell really runs it, except for the QEMU users
->> which are plentiful.
+On Mon, Jul 2, 2012 at 2:59 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> On 07/02/2012 11:31 AM, Sascha Hauer wrote:
+>>
+>> [Added Linus to Cc]
+>>
+>> Has this been applied? Linus, it seems you handle gpio patches now, you
+>> probably missed it because you haven't been on Cc.
 >
-> I'm probably not going to be able to do it this side of going away,
-> especially as the Versatile board looks after the power switch for
-> booting the nightly test builds.
+> No I don't, sorry. I try to help Grant with review but I haven't
+> taken over any trees or merging. If I did I would only have to
+> funnel it to Grant anyway.
 
-No big deal, we take this step by step, and Integrator can very well
-pave the way for the others as a first step.
+Famous last words, I wasn't in sync with my mail log and Grant
+did ask me to do that...
 
-But I'm dying for you to post some pictures and text of you ARM
-system array some day, it sounds like it's a pretty nice stack of
-things you have there :-)
+But now I need to set up a GPIO tree and funnel it to linux-next first.
 
 Yours,
 Linus Walleij
