@@ -1,57 +1,37 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 4 Jul 2012 10:50:20 +0000
-Subject: Current state of AM33xx patches
-In-Reply-To: <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Wed,  4 Jul 2012 13:49:54 +0300
+Subject: [PATCH] clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2
+ and SSP3
+Message-ID: <1341398994-28028-1-git-send-email-lauri.hintsala@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 15:37:31, Paul Walmsley wrote:
-> On Sat, 30 Jun 2012, Daniel Mack wrote:
-> 
-> > Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
-> > the components I need.
-> 
-> Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod data 
-> for the AM33xx.  There might be some missing integration code to build the 
-> devices for the newer IP blocks, though.
-> 
+SSP0 and SSP1 use ref_io0 which has decreased frequency. Expand
+the frequency fix for ref_io1 to get SSP2 and SSP3 to work.
 
-I would also be interested to know more here.
+Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+---
+ drivers/clk/mxs/clk-imx28.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-
-> > Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
-> 
-> Mainline has:
-> 
-> drivers/net/ethernet/ti/davinci_emac.c
-
-Not required for AM335X.
-
-> drivers/net/ethernet/ti/davinci_mdio.c
-> 
-> Those might work for you.
-> 
-
-Few more files,
-
-drivers/net/ethernet/ti/cpsw.c
-drivers/net/ethernet/ti/davinci_cpdma.c
-
-
-Wanted to highlight one point,
-You still have to add platform device code to get it working.
-
-Thanks,
-Vaibhav
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 2826a26..0097c3a 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -112,11 +112,11 @@ static void __init clk_misc_init(void)
+ 
+ 	/*
+ 	 * 480 MHz seems too high to be ssp clock source directly,
+-	 * so set frac0 to get a 288 MHz ref_io0.
++	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
+ 	 */
+ 	val = readl_relaxed(FRAC0);
+-	val &= ~(0x3f << BP_FRAC0_IO0FRAC);
+-	val |= 30 << BP_FRAC0_IO0FRAC;
++	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
++	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
+ 	writel_relaxed(val, FRAC0);
+ }
+ 
+-- 
+1.7.9.5
