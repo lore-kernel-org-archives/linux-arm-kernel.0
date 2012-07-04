@@ -1,71 +1,47 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Wed, 4 Jul 2012 16:54:27 +0300
-Subject: [PATCH v7] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <2E2747FC8980BB40958FB06A958ED3550144C11C2E54@IL-MB01.marvell.com>
-References: <1341243574-3258-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <2E2747FC8980BB40958FB06A958ED3550144C11C2E54@IL-MB01.marvell.com>
-Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56ADBDCE4@IL-MB01.marvell.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 4 Jul 2012 15:01:18 +0100
+Subject: How to handle parameter variation across different boards but
+ same platform
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA35456@DBDE01.ent.ti.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
+ <20120704131749.GZ4111@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA35456@DBDE01.ent.ti.com>
+Message-ID: <20120704140118.GA4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Yehuda Yitschak
-> Sent: Wednesday, July 04, 2012 3:11 PM
-> To: Thomas Petazzoni; Arnd Bergmann; Olof Johansson
-> Cc: Ben Dooks; Jason Cooper; Andrew Lunn; Nicolas Pitre; Lior Amsalem;
-> Maen Suleiman; linux-arm-kernel at lists.infradead.org; Gregory Clement; Jon
-> Masters; David Marlin; Tawfik Bayouk; Shadi Ammouri; Eran Ben-Avi; Nadav
-> Haklai; Eric Miao
-> Subject: RE: [PATCH v7] arm: Add basic support for new Marvell Armada 370
-> and Armada XP SoC
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Thomas Petazzoni [mailto:thomas.petazzoni at free-electrons.com]
-> > Sent: Monday, July 02, 2012 6:39 PM
-> > To: Arnd Bergmann; Olof Johansson
-> > Cc: Ben Dooks; Jason Cooper; Andrew Lunn; Nicolas Pitre; Lior Amsalem;
-> > Maen Suleiman; linux-arm-kernel at lists.infradead.org; Thomas Petazzoni;
-> > Gregory Clement; Jon Masters; David Marlin; Tawfik Bayouk; Shadi
-> > Ammouri; Eran Ben-Avi; Yehuda Yitschak; Nadav Haklai; Eric Miao
-> > Subject: [PATCH v7] arm: Add basic support for new Marvell Armada 370
-> and
-> > Armada XP SoC
-> >
-> > Arnd, Olof,
-> >
-> > You'll find in this patch set the seventh version of the initial support for a
-> > new family of ARMv7-compatible Marvell SoCs.
-> >
-> > As for the previous releases, both the Armada 370 and the Armada XP SoCs
-> > are supported in this directory, and we are able to build a single kernel
-> > image that boots on both SoCs. Both SoCs use the PJ4B processor, a
-> Marvell-
-> > developed ARM core that implements the ARMv7 instruction set. We are
-> > currently using Marvell evaluation boards for both of those SoCs, and the
-> > support for those boards is added in this patch set.
-> >
-> Hi, tested by me on Armada XP board. So,
-> Tested-By: Yehuda Yitschak <yehuday@marvell.com>
-> 
+On Wed, Jul 04, 2012 at 01:43:12PM +0000, Hebbar, Gururaja wrote:
+> On Wed, Jul 04, 2012 at 18:47:50, Mark Brown wrote:
 
+> > What do you mean by "board"?  If these are plugin modules for your
+> > platform you need to either identify this at runtime and register a
+> > different machine driver or select at compile time.
 
-Hi Thomas, Thanks!
-Tested by me on both Armada XP and 370 DB boards.
+> By board I mean a new development board. 
 
-Tested-By: Lior Amsalem <alior@marvell.com>
+> New board
+> sysclk = 24MHz
+> codec_name = "tlv320aic3x-codec.1-001b"
 
-> 
-> [snip]
-> >
-> > Best regards,
-> >
-> > Thomas Petazzoni
-> 
-> Regards,
-> Yehuda Yitschak
+> Previous Board
+> sysclk = 12MHz
+> .codec_name = "tlv320aic3x-codec.2-001b",
 
-Regards,
-Lior Amsalem
+> Both boards share the same machine is API (machine_is_am33xx()).
+
+> So, is there any mechanism/api to differentiate these 2 boards inside 
+> Code?
+
+> Has anyone else faced such situation?
+
+If these are totally different boards they should have different machine
+IDs set so machine_is_() should identify.  If that isn't there then you
+need to do something custom to your products to identify the boards
+further.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120704/6089f919/attachment.sig>
