@@ -1,28 +1,19 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 4 Jul 2012 13:37:50 -0300
-Subject: [PATCH] ARM: mxs_defconfig: Enable RTC driver
-Message-ID: <1341419870-11750-1-git-send-email-fabio.estevam@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 4 Jul 2012 13:39:45 -0300
+Subject: [PATCH] clk: mxs: imx28: decrease the frequency of ref_io1 for
+ SSP2 and SSP3
+In-Reply-To: <201207041823.27336.marex@denx.de>
+References: <1341398994-28028-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20120704133554.GB2595@S2101-09.ap.freescale.net>
+ <201207041823.27336.marex@denx.de>
+Message-ID: <CAOMZO5AK-SN6bv8PeGLFzRz-kObAL67wONyhoLuXeWDwMoJaeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let RTC driver driver be built by default.
+On Wed, Jul 4, 2012 at 1:23 PM, Marek Vasut <marex@denx.de> wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> What problem is that? I've been running the SPI driver against two types of SPI
+> flashes on SSP2 without trouble ...
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 94198c5..1450f64 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -114,6 +114,7 @@ CONFIG_MMC=y
- CONFIG_MMC_MXS=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_DS1307=m
-+CONFIG_RTC_DRV_STMP=y
- CONFIG_DMADEVICES=y
- CONFIG_MXS_DMA=y
- CONFIG_EXT3_FS=y
--- 
-1.7.1
+I guess Shawn is referring to this:
+http://www.spinics.net/lists/arm-kernel/msg180725.html
