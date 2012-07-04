@@ -1,9 +1,9 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  4 Jul 2012 16:56:39 +0200
-Subject: [PATCH v8 2/9] arm: mach-mvebu: add header
+Date: Wed,  4 Jul 2012 16:56:43 +0200
+Subject: [PATCH v8 6/9] arm: mach-mvebu: add defconfig
 In-Reply-To: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341413806-26376-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341413806-26376-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,111 +14,61 @@ Acked-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Yehuda Yitschak <yehuday@marvell.com>
 Tested-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/mach-mvebu/include/mach/debug-macro.S |   24 +++++++++++++
- arch/arm/mach-mvebu/include/mach/timex.h       |   13 +++++++
- arch/arm/mach-mvebu/include/mach/uncompress.h  |   43 ++++++++++++++++++++++++
- 3 files changed, 80 insertions(+)
- create mode 100644 arch/arm/mach-mvebu/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-mvebu/include/mach/timex.h
- create mode 100644 arch/arm/mach-mvebu/include/mach/uncompress.h
+ arch/arm/configs/mvebu_defconfig |   46 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 arch/arm/configs/mvebu_defconfig
 
-diff --git a/arch/arm/mach-mvebu/include/mach/debug-macro.S b/arch/arm/mach-mvebu/include/mach/debug-macro.S
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
 new file mode 100644
-index 0000000..2282576
+index 0000000..2e86b31
 --- /dev/null
-+++ b/arch/arm/mach-mvebu/include/mach/debug-macro.S
-@@ -0,0 +1,24 @@
-+/*
-+ * Early serial output macro for Marvell  SoC
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <mach/armada-370-xp.h>
-+
-+	.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =ARMADA_370_XP_REGS_PHYS_BASE
-+	ldr	\rv, =ARMADA_370_XP_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
-+	.endm
-+
-+#define UART_SHIFT	2
-+#include <asm/hardware/debug-8250.S>
-diff --git a/arch/arm/mach-mvebu/include/mach/timex.h b/arch/arm/mach-mvebu/include/mach/timex.h
-new file mode 100644
-index 0000000..ab324a3
---- /dev/null
-+++ b/arch/arm/mach-mvebu/include/mach/timex.h
-@@ -0,0 +1,13 @@
-+/*
-+ * Marvell Armada SoC time definitions
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#define CLOCK_TICK_RATE		(100 * HZ)
-diff --git a/arch/arm/mach-mvebu/include/mach/uncompress.h b/arch/arm/mach-mvebu/include/mach/uncompress.h
-new file mode 100644
-index 0000000..d6a100c
---- /dev/null
-+++ b/arch/arm/mach-mvebu/include/mach/uncompress.h
-@@ -0,0 +1,43 @@
-+/*
-+ * Marvell Armada SoC kernel uncompression UART routines
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <mach/armada-370-xp.h>
-+
-+#define UART_THR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
-+								+ 0x12000))
-+#define UART_LSR ((volatile unsigned char *)(ARMADA_370_XP_REGS_PHYS_BASE\
-+								+ 0x12014))
-+
-+#define LSR_THRE	0x20
-+
-+static void putc(const char c)
-+{
-+	int i;
-+
-+	for (i = 0; i < 0x1000; i++) {
-+		/* Transmit fifo not full? */
-+		if (*UART_LSR & LSR_THRE)
-+			break;
-+	}
-+
-+	*UART_THR = c;
-+}
-+
-+static void flush(void)
-+{
-+}
-+
-+/*
-+ * nothing to do
-+ */
-+#define arch_decomp_setup()
-+#define arch_decomp_wdog()
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -0,0 +1,46 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_EXPERT=y
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_ARCH_MVEBU=y
++CONFIG_MACH_ARMADA_370_XP=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_USE_OF=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_VFP=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_FS_XATTR is not set
++CONFIG_ISO9660_FS=y
++CONFIG_JOLIET=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_CODEPAGE_850=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_2=y
++CONFIG_NLS_UTF8=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_TIMER_STATS=y
++# CONFIG_DEBUG_BUGVERBOSE is not set
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
 -- 
 1.7.9.5
