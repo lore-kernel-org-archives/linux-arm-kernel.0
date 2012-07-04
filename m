@@ -1,50 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Jul 2012 14:29:46 +0000
-Subject: [GIT PULL] prima2 GPIO support in pinmux
-In-Reply-To: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
-References: <CAGsJ_4xrk0w5aQy+ZSYZwQ3pW5My7dcHnDX57+985VTbdHXCzg@mail.gmail.com>
-Message-ID: <201207041429.47124.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 4 Jul 2012 16:30:05 +0200
+Subject: MX28 poweroff issue
+In-Reply-To: <20120704084506.GE5398@pengutronix.de>
+References: <201207040030.36713.marex@denx.de>
+ <20120704082049.GI16319@n2100.arm.linux.org.uk>
+ <20120704084506.GE5398@pengutronix.de>
+Message-ID: <201207041630.05763.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Barry Song wrote:
-> Hi Olof, Arnd,
+Dear Uwe Kleine-K?nig,
+
+> On Wed, Jul 04, 2012 at 09:20:49AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jul 04, 2012 at 09:07:51AM +0200, Uwe Kleine-K?nig wrote:
+> > > Hi Marek,
+> > > 
+> > > On Wed, Jul 04, 2012 at 05:47:36AM +0200, Marek Vasut wrote:
+> > > > Dear Fabio Estevam,
+> > > > 
+> > > > > On Tue, Jul 3, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
+> > > > > > Dunno, can you try on mx28 please?
+> > > > > 
+> > > > > I get the same crash as you reported.
+> > > > > 
+> > > > > On a mx27 (also ARM926EJS) I do not see this problem.
+> > > > 
+> > > > Thanks for verifying this, Fabio. The mx28 generates timer interrupt
+> > > > after it should be sitting in the endless loop, therefore this
+> > > > crash. I think it's because the mx28 (mxs at al) is using the new
+> > > > clock framework (compared to mxc) and the timer isn't deinited by
+> > > > then ...
+> > > 
+> > > On an i.MX35 with v3.5-rc4 (which is using the new clock framework in
+> > > the meantime, but is an ARM11) I don't see this crash.
+> > 
+> > Are you who aren't seeing it waiting around 30 seconds after "System
+> > halted" ?
 > 
-> Please pull the following GPIO support in pinmux for 3.6.
+> I waited longer and had
+> 
+> 	CONFIG_DETECT_HUNG_TASK=y
+> 	CONFIG_LOCKUP_DETECTOR=y
+> 
+> in my .config.
 
-I noticed that the driver now requires gpiolib, so we need one
-of these two patches. I think the first one is safer, but the
-second one allows you to build without GPIOLIB if you want to
-disable PINCTRL_SIRF.
+Good, so we can trim this down the being mxs specific bug I guess?
 
-	Arnd
+> Best regards
+> Uwe
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8bcda59..adef0da 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -389,7 +389,7 @@ config ARCH_PRIMA2
- 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
- 	select CPU_V7
- 	select NO_IOPORT
--	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select GENERIC_IRQ_CHIP
-
-
-
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 4c05fe8..5b51199 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -104,7 +104,7 @@ config PINCTRL_PXA910
- 
- config PINCTRL_SIRF
- 	bool "CSR SiRFprimaII pin controller driver"
--	depends on ARCH_PRIMA2
-+	depends on ARCH_PRIMA2 && GPIOLIB
- 	select PINMUX
- 
- config PINCTRL_TEGRA
+Best regards,
+Marek Vasut
