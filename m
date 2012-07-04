@@ -1,113 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Jul 2012 07:42:55 +0000
-Subject: [GIT PULL] at91: first batch of cleanup for 3.6
-In-Reply-To: <201207022058.34442.arnd@arndb.de>
-References: <4FF19B6D.3010704@atmel.com> <201207022058.34442.arnd@arndb.de>
-Message-ID: <201207040742.56200.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 4 Jul 2012 09:43:38 +0200
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20120704074338.GN2698@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 July 2012, Arnd Bergmann wrote:
-> On Monday 02 July 2012, Nicolas Ferre wrote:
-> > The following changes since commit
-> > 6887a4131da3adaab011613776d865f4bcfb5678:
-> > 
-> >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://github.com/at91linux/linux-at91.git tags/at91-for-next-cleanup
-> 
-> Pulled into next/cleanup
+Hi Arnd, Olof,
 
-Unfortunately, I got a bunch of new builf errors and warnings:
+Please pull the following i.MX fixes for -rc
 
-8<----
-ARM: at91: fix new build errors
+Thanks
+ Sascha
 
-MULTI_IRQ_HANDLER and SPARSE_IRQ are now required everywhere because
-mach/irqs.h and mach/entry-macros.S are gone but the symbols are
-only selected for AT91SAM9, not for the NOMMU parts.
 
-A few files now need to include linux/io.h directly, which used to
-be included through other headers that have changed.
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
-The new at91_aic_irq_priorities variable is only used with CONFIG_OF
-enabled and should not be visible otherwise.
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+are available in the git repository at:
 
-Please check these patches for correctness, and try to be more careful
-to avoid such problems in the future. I found these just building the
-defconfig files, not even invoking my randconfig scripts.
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.5-imx-fixes
 
-	Arnd
+for you to fetch changes up to c520c921eacdced7e2095ba6cbbb9921906c7b67:
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 7d0c40a..c8050b1 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -37,6 +37,8 @@ config SOC_AT91SAM9
- config SOC_AT91RM9200
- 	bool "AT91RM9200"
- 	select CPU_ARM920T
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_DBGU0
- 
-@@ -142,6 +144,8 @@ config ARCH_AT91SAM9G45
- config ARCH_AT91X40
- 	bool "AT91x40"
- 	depends on !MMU
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
- 	select ARCH_USES_GETTIMEOFFSET
- 
- endchoice
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index 4c0f5fd..46090e6 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-+#include <linux/io.h>
- #include <asm/proc-fns.h>
- #include <asm/system_misc.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index c5eaaa0..1e02c0e 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -49,7 +49,6 @@ static struct irq_domain *at91_aic_domain;
- static struct device_node *at91_aic_np;
- static unsigned int n_irqs = NR_AIC_IRQS;
- static unsigned long at91_aic_caps = 0;
--static unsigned int *at91_aic_irq_priorities;
- 
- /* AIC5 introduces a Source Select Register */
- #define AT91_AIC_CAP_AIC5	(1 << 0)
-@@ -359,6 +358,8 @@ static void __init __maybe_unused at91_aic5_hw_init(unsigned int spu_vector)
- }
- 
- #if defined(CONFIG_OF)
-+static unsigned int *at91_aic_irq_priorities;
-+
- static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
- 							irq_hw_number_t hw)
- {
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index dc474bc..fca9790 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -27,6 +27,7 @@
- #include <linux/interrupt.h>
- #include <linux/ioctl.h>
- #include <linux/completion.h>
-+#include <linux/io.h>
- 
- #include <asm/uaccess.h>
- 
+  ARM: imx: assert SCC gate stays enabled (2012-07-04 09:38:29 +0200)
+
+----------------------------------------------------------------
+ARM i.MX fixes for v3.5-rc5
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: imx27_visstrim_m10: Do not include <asm/system.h>
+
+Uwe Kleine-K?nig (1):
+      ARM: imx: assert SCC gate stays enabled
+
+ arch/arm/mach-imx/clk-imx35.c               |    9 ++++++++-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    2 +-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
