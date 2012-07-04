@@ -1,71 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Jul 2012 00:27:58 -0700
-Subject: [PATCH-V3 1/3] ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses
- omap-device.o target so add one entry
-In-Reply-To: <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
- <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120704072758.GP1122@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 4 Jul 2012 09:37:49 +0200
+Subject: [PATCH 1/2] mfd: Add Freescale's PMIC MC34708 support
+In-Reply-To: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
+References: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120704073749.GD5398@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hello,
 
-Applying these, but few comments below to make my life easier..
-
-* Vaibhav Hiremath <hvaibhav@ti.com> [120628 08:04]:
-> All OMAP2PLUS based devices, builds omap-device.o target;
-> so just add one entry so that there is no need to patch this file
-> for any future OMAP2+ devices.
+On Fri, Apr 20, 2012 at 12:38:40AM +0800, Ying-Chun Liu (PaulLiu) wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+> Freescale MC34708 is a PMIC which supports the following features:
+>  * 6 multi-mode buck regulators
+>  * Boost regulator for USB OTG.
+>  * 8 regulators for thermal budget optimization
+>  * 10-bit ADC
+>  * Real time clock
 > 
-> NOTE: No code change from last version.
+> Signed-off-by: Robin Gong <B38343@freescale.com>
+> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+I want to push that forward. What is the state of these patches on your
+end? Did you start to address the comments? Are there more recent
+patches than the ones in this thread?
 
-Extra comments like this should be within the --- sections so they
-down't show up when applying the patch. Otherwise I have to manually
-edit every patch, which sucks.
+Whatever you might have it would be great if you could share it to help
+preventing duplicate efforts.
 
-Then, I'm leaving out the CLEANUP part in $Subject, that alone is not
-a reason to patch anything. The description should say why the patch
-is needed, which it does. If you want to specify that this should be
-grouped in the clean-up branch, then that too could be mentioned within
-the --- sections.
+Best regards and thanks in advance
+Uwe
 
-> ---
->  arch/arm/plat-omap/Makefile |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-> index 6d87532..961bf85 100644
-> --- a/arch/arm/plat-omap/Makefile
-> +++ b/arch/arm/plat-omap/Makefile
-> @@ -10,9 +10,7 @@ obj-n :=
->  obj-  :=
-> 
->  # omap_device support (OMAP2+ only at the moment)
-> -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
-> -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
-> -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
-> +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
-> 
->  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
->  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
-> --
-> 1.7.0.4
-> 
 
-This patch did not apply for some reason, I got:
-
-patching file arch/arm/plat-omap/Makefile
-patch: **** malformed patch at line 73: 1.7.0.4
-
-So please tune up your scripts a bit to the patches can be applied
-as they are without manual editing ;)
-
-Thanks,
-
-Tony
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
