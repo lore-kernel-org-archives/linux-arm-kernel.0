@@ -1,24 +1,22 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Jul 2012 03:28:38 -0600 (MDT)
-Subject: how to specify dma_mask and coherent_dma_mask in hwmod
-In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9C03C6@DBDE01.ent.ti.com>
-References: <EB1619762EAF8B4E97A227FB77B7E0293E9BDE96@DBDE01.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EAED507@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206280950440.2338@utopia.booyaka.com>
- <B5906170F1614E41A8A28DE3B8D121433EAED713@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206281031510.2338@utopia.booyaka.com>
- <B5906170F1614E41A8A28DE3B8D121433EAEE878@DBDE01.ent.ti.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C03C6@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1207040328260.6760@utopia.booyaka.com>
+Date: Wed, 4 Jul 2012 03:29:45 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Hook-up am33xx support in omap_hwmod
+ framework
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA6334A@DBDE01.ent.ti.com>
+References: <1340898256-22884-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA624A5@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1207040311400.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA6334A@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1207040329120.6760@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Jul 2012, N, Mugunthan V wrote:
+On Wed, 4 Jul 2012, Hiremath, Vaibhav wrote:
 
-> Extending omap_device_build() to accommodate dma masks will endup with lot 
-> of code changes in other modules
+> Yes it does, and was expecting it to go along with Kevin's series.
 
-Why?
+The AM33xx patch isn't a cleanup -- it adds new functionality -- so it 
+doesn't belong as part of a cleanup series.
 
 
 - Paul
