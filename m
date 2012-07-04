@@ -1,48 +1,24 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 4 Jul 2012 13:43:12 +0000
-Subject: How to handle parameter variation across different boards but
- same platform
-In-Reply-To: <20120704131749.GZ4111@opensource.wolfsonmicro.com>
-References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
- <20120704131749.GZ4111@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA35456@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 4 Jul 2012 21:44:29 +0800
+Subject: [PATCH 1/2] mfd: Add Freescale's PMIC MC34708 support
+In-Reply-To: <20120704073749.GD5398@pengutronix.de>
+References: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
+ <20120704073749.GD5398@pengutronix.de>
+Message-ID: <CAAQ0ZWST5DgS+2Er5EsNscxXtThO7H9-HAO=TtM6Me7EHygK7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 18:47:50, Mark Brown wrote:
-> On Wed, Jul 04, 2012 at 12:45:03PM +0000, Hebbar, Gururaja wrote:
-> 
-> You should fix your mailer to word wrap at less than 80 columns.
+On 4 July 2012 15:37, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> I want to push that forward. What is the state of these patches on your
+> end? Did you start to address the comments? Are there more recent
+> patches than the ones in this thread?
+>
+> Whatever you might have it would be great if you could share it to help
+> preventing duplicate efforts.
+>
+As far as I know, Paul hasn't been on that effort any more.
 
-Sorry. Stupid outlook. Will take care of it manually.
+Copied his another email address.
 
-> 
-> > Using machine_is_xxx() is not sufficient because there are 2 other
-> > boards on same Platform/machine but with different values.
-> 
-> > So, how to specify these parameters for the new board?
-> 
-> What do you mean by "board"?  If these are plugin modules for your
-> platform you need to either identify this at runtime and register a
-> different machine driver or select at compile time.
-> 
-
-By board I mean a new development board. 
-
-New board
-sysclk = 24MHz
-codec_name = "tlv320aic3x-codec.1-001b"
-
-Previous Board
-sysclk = 12MHz
-.codec_name = "tlv320aic3x-codec.2-001b",
-
-Both boards share the same machine is API (machine_is_am33xx()).
-
-So, is there any mechanism/api to differentiate these 2 boards inside 
-Code?
-
-Has anyone else faced such situation?
-
-Regards, 
-Gururaja
+Regards,
+Shawn
