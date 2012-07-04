@@ -1,34 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jul 2012 16:19:44 +0100
-Subject: MX28 poweroff issue
-In-Reply-To: <201207041631.30107.marex@denx.de>
-References: <201207040030.36713.marex@denx.de>
- <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
- <20120704093823.8e74d48bc8d9918a9c80fbcf@kinali.ch>
- <201207041631.30107.marex@denx.de>
-Message-ID: <20120704151944.GB18739@n2100.arm.linux.org.uk>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Wed, 4 Jul 2012 20:55:49 +0530
+Subject: [PATCH 2/4] ARM: OMAP2+: Move the stubbed prm and cm functions to
+ prcm.c file and make them __weak.
+In-Reply-To: <alpine.DEB.2.00.1207040431400.6760@utopia.booyaka.com>
+References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
+ <1336669615-16454-3-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.00.1205101140230.32719@utopia.booyaka.com>
+ <CAJ7qFSdiMgM3S5Q+XaFAGrgcL5M5f8CLHyKSRtBKu4AK6ei-BA@mail.gmail.com>
+ <CAJ7qFSfu3yyj8YqETTzx+wipi1Nbf5m5fDLC26Tfojav+Lb56Q@mail.gmail.com>
+ <alpine.DEB.2.00.1207040431400.6760@utopia.booyaka.com>
+Message-ID: <CAJ7qFSc7qNJ91J9sbsYFA5TW=qvyyDXkoL+XuTkHxvFrqBLqkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 04:31:29PM +0200, Marek Vasut wrote:
-> Dear Attila Kinali,
-> 
-> > On Wed, 4 Jul 2012 00:14:12 -0300
-> > 
-> > Fabio Estevam <festevam@gmail.com> wrote:
-> > > On Tue, Jul 3, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
-> > > > Dunno, can you try on mx28 please?
-> > > 
-> > > I get the same crash as you reported.
-> > > 
-> > > On a mx27 (also ARM926EJS) I do not see this problem.
-> > 
-> > I have the same issue on the mx23 (using 3.5-rc5):
-> 
-> Thank you, all of you who tested it on random devices and pointed out stuff :-)
-> 
-> Shawn, do you have any suggestions on how to proceed? Shall we use Russells 
-> approach?
+Hi Paul,
+On Wed, Jul 4, 2012 at 8:49 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi
+>
+> On Thu, 28 Jun 2012, R, Sricharan wrote:
+>
+>>  Ping..
+>
+> Since the prcm.c cleanup series isn't ready yet, I've queued this modified
+> version of your patch.
+>
+> Once the prcm.c cleanup series is ready, hopefully in the 3.7 time frame,
+> we'll be able to get rid of all of these nasty stubs.
+>
+ Thanks a lot. I think this should help to get rid of the OMAP5 dependency.
 
-If it's specific to mx28 and mx23 and nothing else, the cause needs to
-be found.  Maybe we need it tested on other (non-MX) platforms too?
+Thanks,
+ Sricharan
