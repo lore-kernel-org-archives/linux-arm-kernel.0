@@ -1,22 +1,26 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Jul 2012 03:29:45 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Hook-up am33xx support in omap_hwmod
- framework
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA6334A@DBDE01.ent.ti.com>
-References: <1340898256-22884-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA624A5@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1207040311400.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA6334A@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1207040329120.6760@utopia.booyaka.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Wed, 4 Jul 2012 17:34:43 +0800
+Subject: [PATCH 0/5] ARM: tegra: enable wlan for t20 and t30
+Message-ID: <1341394488-13169-1-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jul 2012, Hiremath, Vaibhav wrote:
+Set up clocks, pinmux, gpios and configs to enable wlan for
+following tegra boards:
+Tegra30: Cardhu.
+Tegra20: Seaboard, Ventana.
 
-> Yes it does, and was expecting it to go along with Kevin's series.
+Wei Ni (5):
+  ARM: tegra: set up wlan clocks for tegra dt
+  ARM: dt: t20 seaboard: add pinmux, gpio for wlan
+  ARM: dt: t20 ventana: add pinmux, gpio for wlan
+  ARM: dt: t30 cardhu: add pinmux, gpio for wlan
+  ARM: tegra: enable wireless in defconfig
 
-The AM33xx patch isn't a cleanup -- it adds new functionality -- so it 
-doesn't belong as part of a cleanup series.
-
-
-- Paul
+ arch/arm/boot/dts/tegra20-seaboard.dts |    5 +++++
+ arch/arm/boot/dts/tegra20-ventana.dts  |   20 ++++++++++++++++++--
+ arch/arm/boot/dts/tegra30-cardhu.dts   |   30 ++++++++++++++++++++++++++++++
+ arch/arm/configs/tegra_defconfig       |    6 ++++--
+ arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
+ arch/arm/mach-tegra/board-dt-tegra30.c |    1 +
+ 6 files changed, 59 insertions(+), 4 deletions(-)
