@@ -1,20 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Jul 2012 12:23:52 +0000
-Subject: [GIT PULL] i.MX fixes for -rc
-In-Reply-To: <20120704120500.GB30009@pengutronix.de>
-References: <20120704075116.GA29310@pengutronix.de>
- <201207041149.22941.arnd@arndb.de> <20120704120500.GB30009@pengutronix.de>
-Message-ID: <201207041223.52737.arnd@arndb.de>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 4 Jul 2012 12:45:03 +0000
+Subject: How to handle parameter variation across different boards but same
+ platform
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 July 2012, Sascha Hauer wrote:
-> > Is this something that should have been marked for stable, or was
-> > it just recently introduced? The description suggests the former.
-> 
-> The bug was introduced in the last merge window, so not suitable for
-> stable.
+hi,
 
-Ok, thanks for the confirmation.
+Currently on Davinci platform, codec system clock & snd_soc_card parameter is decided
+using machine_is_xxxx() api.
 
-	Arnd
+	sound/soc/Davinci/davinci-evm.c, inside evm_hw_params() & evm_init(),
+
+We have an upcoming board based on TI AM335x soc which has both codec system clock 
+And the codec name (because of i2c bus difference) different from previous am335x 
+based boards. 
+
+Using machine_is_xxx() is not sufficient because there are 2 other boards on same 
+Platform/machine but with different values.
+
+So, how to specify these parameters for the new board?
+
+Regards
+Gururaja
