@@ -1,67 +1,27 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  4 Jul 2012 16:56:46 +0200
-Subject: [PATCH v8 9/9] ARM: mvebu: MPIC: read number of interrupts from
- control register
-In-Reply-To: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341413806-26376-10-git-send-email-thomas.petazzoni@free-electrons.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 4 Jul 2012 08:53:18 -0600 (MDT)
+Subject: [PATCHv2 02/12] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <87mx3f38lh.fsf@ti.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004555.20034.87035.stgit@dusk> <4FDA15AA.6090704@ti.com>
+ <alpine.DEB.2.00.1206141136080.30212@utopia.booyaka.com>
+ <4FDA45F5.9090300@ti.com>
+ <alpine.DEB.2.00.1206141706420.25628@utopia.booyaka.com>
+ <4FDB387C.7030003@ti.com>
+ <alpine.DEB.2.00.1207040625090.6760@utopia.booyaka.com>
+ <alpine.DEB.2.00.1207040652240.6760@utopia.booyaka.com>
+ <87mx3f38lh.fsf@ti.com>
+Message-ID: <alpine.DEB.2.00.1207040852540.6760@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+On Wed, 4 Jul 2012, Kevin Hilman wrote:
 
-Read the number of MPIC interrupts from the controller and only register
-that many.
+> Tested-by: Kevin Hilman <khilman@ti.com>
+> 
+> I confirm this version is now allowing CORE to hit retention during
+> suspend.
 
-[gregory.clement at free-electrons.com: rename armada symbol name to fit
-with new name: armada_370_xp]
+Thanks, want me to add your S-o-b also?
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Lior Amsalem <alior@marvell.com>
----
- arch/arm/mach-mvebu/irq-armada-370-xp.c |    9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index 645a8d3..5f5f939 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -29,13 +29,12 @@
- #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
- #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
- 
-+#define ARMADA_370_XP_INT_CONTROL		(0x00)
- #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
- #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
- 
- #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
- 
--#define ARMADA_370_XP_NR_IRQS			(115)
--
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-@@ -81,14 +80,18 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
- static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
-+	u32 control;
-+
- 	main_int_base = of_iomap(node, 0);
- 	per_cpu_int_base = of_iomap(node, 1);
- 
- 	BUG_ON(!main_int_base);
- 	BUG_ON(!per_cpu_int_base);
- 
-+	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
-+
- 	armada_370_xp_mpic_domain =
--	    irq_domain_add_linear(node, ARMADA_370_XP_NR_IRQS,
-+	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
- 				  &armada_370_xp_mpic_irq_ops, NULL);
- 
- 	if (!armada_370_xp_mpic_domain)
--- 
-1.7.9.5
+- Paul
