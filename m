@@ -1,38 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 4 Jul 2012 14:05:00 +0200
-Subject: [GIT PULL] i.MX fixes for -rc
-In-Reply-To: <201207041149.22941.arnd@arndb.de>
-References: <20120704075116.GA29310@pengutronix.de>
- <201207041149.22941.arnd@arndb.de>
-Message-ID: <20120704120500.GB30009@pengutronix.de>
+From: attila@kinali.ch (Attila Kinali)
+Date: Wed,  4 Jul 2012 14:10:33 +0200
+Subject: [PATCH] i.mx23: add dts node for mmc1/ssp1 Signed-off-by: Attila
+ Kinali <attila@kinali.ch>
+Message-ID: <1341403833-25437-1-git-send-email-attila@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 11:49:22AM +0000, Arnd Bergmann wrote:
-> On Wednesday 04 July 2012, Sascha Hauer wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Please pull the following i.MX fixes for -rc
-> > 
-> 
-> Thanks, pulled into the fixes branch. I plan to send out fixes tomorrow
-> to Linus.
-> 
-> 
-> > Uwe Kleine-K?nig (1):
-> >       ARM: imx: assert SCC gate stays enabled
-> 
-> Is this something that should have been marked for stable, or was
-> it just recently introduced? The description suggests the former.
+---
+ arch/arm/boot/dts/imx23.dtsi |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-The bug was introduced in the last merge window, so not suitable for
-stable.
-
-Sascha
-
-
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 8c5f999..df0ae8d 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -134,6 +134,21 @@
+ 					fsl,pinmux-ids = <0x2010 0x2060>;
+ 					fsl,pull-up = <0>;
+ 				};
++
++				mmc1_8bit_pins_a: mmc1-8bit at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <0x0002 0x0012 0x0022
++						0x0032 0x0042 0x0052 0x0062
++						0x0072 0x0142 0x0132 0x0182>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++				mmc1_pins_fixup: mmc1-pins-fixup {
++					fsl,pinmux-ids = <0x0132 0x0182>;
++					fsl,pull-up = <0>;
++				};
+ 			};
+ 
+ 			digctl at 8001c000 {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10
