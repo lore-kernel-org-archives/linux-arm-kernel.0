@@ -1,34 +1,23 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Wed, 4 Jul 2012 17:34:45 +0800
-Subject: [PATCH 2/5] ARM: dt: t20 seaboard: add pinmux, gpio for wlan
-In-Reply-To: <1341394488-13169-1-git-send-email-wni@nvidia.com>
-References: <1341394488-13169-1-git-send-email-wni@nvidia.com>
-Message-ID: <1341394488-13169-3-git-send-email-wni@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jul 2012 10:41:40 +0100
+Subject: how to specify dma_mask and coherent_dma_mask in hwmod
+In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9AB214@DBDE01.ent.ti.com>
+References: <EB1619762EAF8B4E97A227FB77B7E0293E9AB214@DBDE01.ent.ti.com>
+Message-ID: <20120704094140.GB16639@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds wlan pinmux and gpio settings to the Tegra20 Seaboard device tree.
+On Thu, Jun 07, 2012 at 04:22:17PM +0000, N, Mugunthan V wrote:
+> While converting platform device registry to Hwmod for CPSW Ethernet
+> driver which is present in AM335X (OMAP2+), I am not finding a way
+> to specify dma_mask and coherent_dma_mask.
+> Is there a way to specify dma_mask and coherent_dma_mask in hwmod?
 
-Signed-off-by: Wei Ni <wni@nvidia.com>
----
- arch/arm/boot/dts/tegra20-seaboard.dts |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+Just remember that we're moving stuff to DMA engine, and that means
+the sDMA device has DMA masks, but none of the peripherals which make
+use of sDMA should have DMA masks set.
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 85e621a..f377a61 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -440,6 +440,11 @@
- 		status = "okay";
- 	};
- 
-+	sdhci at c8000000 {
-+		status = "okay";
-+		power-gpios = <&gpio 86 0>; /* gpio PK6 */
-+	};
-+
- 	sdhci at c8000400 {
- 		status = "okay";
- 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
--- 
-1.7.1
+The reason for this is because the device responsible for accessing
+memory is sDMA, not the peripheral device, and therefore any memory
+properties for DMA should come from the sDMA device, not the peripheral
+device.
