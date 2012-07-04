@@ -1,84 +1,35 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 3 Jul 2012 16:30:01 -0700
-Subject: [PATCH v2] clk: __clk_set_parent: set uninitialized variable
-In-Reply-To: <20120703105042.GJ22016@pengutronix.de>
-References: <1341214902-15667-1-git-send-email-mkl@pengutronix.de>
- <4FF15EDF.7030806@ti.com>
- <CAJOA=zN1FoFQmuht1R06n2xQbZ=g0aqN=5Lo2-v8MQx55qHmeg@mail.gmail.com>
- <20120703105042.GJ22016@pengutronix.de>
-Message-ID: <20120703233001.GB28439@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 4 Jul 2012 02:13:04 +0200
+Subject: MX28 poweroff issue
+In-Reply-To: <20120703224609.GC26355@n2100.arm.linux.org.uk>
+References: <201207040030.36713.marex@denx.de>
+ <20120703224609.GC26355@n2100.arm.linux.org.uk>
+Message-ID: <201207040213.04758.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120703-12:50, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, Jul 02, 2012 at 04:29:10PM -0700, Turquette, Mike wrote:
-> > On Mon, Jul 2, 2012 at 1:42 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> > > On Monday 02 July 2012 01:11 PM, Marc Kleine-Budde wrote:
-> > >>
-> > >> This patch fixes the following warning:
-> > >>
-> > >> ? ? ?drivers/clk/clk.c: In function '__clk_set_parent':
-> > >> ? ? ?drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in
-> > >> this function [-Wuninitialized]
-> > >>
-> > >> which has been introduced with commit:
-> > >>
-> > >> ? ? ?commit 7975059db572eb47f0fb272a62afeae272a4b209
-> > >> ? ? ?Author: Rajendra Nayak<rnayak@ti.com>
-> > >> ? ? ?Date: ? Wed Jun 6 14:41:31 2012 +0530
-> > >>
-> > >> ? ? ? ? ?clk: Allow late cache allocation for clk->parents
-> > >>
-> > >> This patch applies to linux-3.5-rc5
-> > >>
-> > >> Cc: Rajendra Nayak<rnayak@ti.com>
-> > >> Signed-off-by: Marc Kleine-Budde<mkl@pengutronix.de>
-> > >> ---
-> > >> Hello,
-> > >>
-> > >> here an updated version. Changes since v1:
-> > >> - Set i to clk->num_parents as Uwe pointed out.
-> > >
-> > >
-> > > I started looking at how to avoid this initing
-> > > of i to clk->parents (which is correct for the logic
-> > > used below, but somehow seems error prone if someone
-> > > happens to change the logic without noticing the init
-> > > part)
-> > > This is what I came up with, not tested at all, but
-> > > worth considering if Mike dislikes the idea of initing
-> > > i to clk->parents.
-> > >
-> > 
-> > Hi Rajendra and Marc,
-> > 
-> > I prefer the code flow in Rajendra's change.  It seems more readable
-> > and has a negative diffstat ;-)
-> > 
-> > $ git diff --stat
-> >  drivers/clk/clk.c |   28 +++++++++++++---------------
-> >  1 file changed, 13 insertions(+), 15 deletions(-)
-> > 
-> > Rajendra, can you test and send a proper patch for the same?  Thanks
-> > Marc for sending your two previous patches.  I don't think that I will
-> > Cc this one to stable since it falls under the category of
-> > "theoretical but not yet observed" bugs.
-> Maybe it's not observed yet only because
-> 7975059db572eb47f0fb272a62afeae272a4b209 isn't deeply tested yet? Don't
-> know, just a guess.
-> 
+Dear Russell King - ARM Linux,
 
-Fair enough.  I Cc'd stable on that patch and copied you on the fixes
-request to Linus for 3.5-rc6.
-
-Thanks,
-Mike
-
-> Best regards
-> Uwe
+> On Wed, Jul 04, 2012 at 12:30:36AM +0200, Marek Vasut wrote:
+> > I recently confirmed this issue when doing "poweroff". The issue was
+> > initially reported by Detlev Zundel.
 > 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> My guess is it's because we don't disable interrupts on halt - because
+> the kernel used to allow halt followed by another ctrl-alt-reboot to
+> cause the thing to reboot.
+
+This I consider correct.
+
+> That's long since gone, so we might as well make the CPU spin endlessly
+> waiting for someone to pull the power on halt...
+
+The backtrace signals the problem being caused by timer interrupt. Maybe the 
+struct sys_timer shall be extended by .exit callback to shut down the timer?
+
+Well, the other option is to disable interrupts, indeed.
+
+Russell, you're the wiser one, therefore shall I submit a patch-attempt that 
+disables interrupts before the spinning?
+
+Best regards,
+Marek Vasut
