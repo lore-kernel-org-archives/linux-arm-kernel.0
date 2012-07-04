@@ -1,48 +1,48 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 4 Jul 2012 13:40:01 +0000
-Subject: [PATCH] arm/dts: am33xx wdt node
-In-Reply-To: <1341405037-16391-1-git-send-email-afzal@ti.com>
-References: <1341405037-16391-1-git-send-email-afzal@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A2FE9@DBDE01.ent.ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 4 Jul 2012 13:43:12 +0000
+Subject: How to handle parameter variation across different boards but
+ same platform
+In-Reply-To: <20120704131749.GZ4111@opensource.wolfsonmicro.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
+ <20120704131749.GZ4111@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA35456@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Grant and device tree, watchdog lists
+On Wed, Jul 04, 2012 at 18:47:50, Mark Brown wrote:
+> On Wed, Jul 04, 2012 at 12:45:03PM +0000, Hebbar, Gururaja wrote:
+> 
+> You should fix your mailer to word wrap at less than 80 columns.
 
-On Wed, Jul 04, 2012 at 18:00:37, Mohammed, Afzal wrote:
-> Add am33xx wdt node.
+Sorry. Stupid outlook. Will take care of it manually.
+
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
+> > Using machine_is_xxx() is not sufficient because there are 2 other
+> > boards on same Platform/machine but with different values.
 > 
-> Hi,
+> > So, how to specify these parameters for the new board?
 > 
-> This was tested on AM335X EVM. This depends on,
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69424.html
+> What do you mean by "board"?  If these are plugin modules for your
+> platform you need to either identify this at runtime and register a
+> different machine driver or select at compile time.
 > 
-> Regards
-> Afzal
-> 
-> 
->  arch/arm/boot/dts/am33xx.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index f46e353..08b2a5b 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -185,5 +185,10 @@
->  			compatible = "ti,omap3-hsmmc";
->  			ti,hwmods = "mmc3";
->  		};
-> +
-> +		wdt2: wdt at 44e35000 {
-> +			compatible = "ti,omap3-wdt";
-> +			ti,hwmods = "wd_timer2";
-> +		};
->  	};
->  };
-> -- 
-> 1.7.11.1
-> 
-> 
+
+By board I mean a new development board. 
+
+New board
+sysclk = 24MHz
+codec_name = "tlv320aic3x-codec.1-001b"
+
+Previous Board
+sysclk = 12MHz
+.codec_name = "tlv320aic3x-codec.2-001b",
+
+Both boards share the same machine is API (machine_is_am33xx()).
+
+So, is there any mechanism/api to differentiate these 2 boards inside 
+Code?
+
+Has anyone else faced such situation?
+
+Regards, 
+Gururaja
