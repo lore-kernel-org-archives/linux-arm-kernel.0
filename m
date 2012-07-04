@@ -1,23 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jul 2012 10:41:40 +0100
-Subject: how to specify dma_mask and coherent_dma_mask in hwmod
-In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9AB214@DBDE01.ent.ti.com>
-References: <EB1619762EAF8B4E97A227FB77B7E0293E9AB214@DBDE01.ent.ti.com>
-Message-ID: <20120704094140.GB16639@n2100.arm.linux.org.uk>
+Date: Wed, 4 Jul 2012 10:50:53 +0100
+Subject: [PATCH] ARM: reboot: disable nonboot CPUs
+In-Reply-To: <1341388262-3801-1-git-send-email-per.forlin@stericsson.com>
+References: <1341388262-3801-1-git-send-email-per.forlin@stericsson.com>
+Message-ID: <20120704095053.GJ16319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2012 at 04:22:17PM +0000, N, Mugunthan V wrote:
-> While converting platform device registry to Hwmod for CPSW Ethernet
-> driver which is present in AM335X (OMAP2+), I am not finding a way
-> to specify dma_mask and coherent_dma_mask.
-> Is there a way to specify dma_mask and coherent_dma_mask in hwmod?
+On Wed, Jul 04, 2012 at 09:51:02AM +0200, Per Forlin wrote:
+> Disable the nonboot CPUs to safely migrate tasks and interrupts
+> to the boot CPU. This will prevent the nonboot CPUs to
+> interfer or block the boot CPU from being able to reboot
+> the system successfully.
+> 
+> This reboot issue was detected on u8500 when using ab8500 to initaite a
+> system restart. The issue happens because smp_send_stop() stops the CPUs
+> wihouth migrating all resources.
+> If not issuing smp_send_stop() u8500 reboots successfully.
+> 
+> It's optional to support CONFIG_PM_SLEEP_SMP therefore smp_send_stop()
+> can't simply be replaced by disable_nonboot_cpus()
 
-Just remember that we're moving stuff to DMA engine, and that means
-the sDMA device has DMA masks, but none of the peripherals which make
-use of sDMA should have DMA masks set.
+I don't understand what or why you're trying to do this, it seems to be
+unreliable to rely upon conditional sleep support to make system reboot
+to work.
 
-The reason for this is because the device responsible for accessing
-memory is sDMA, not the peripheral device, and therefore any memory
-properties for DMA should come from the sDMA device, not the peripheral
-device.
+Yes, we know at the moment that smp_send_stop() results in the secondary
+CPUs ending up spinning in the kernel, which is then potentially replaced
+buy whatever happens after boot, but short of creating a new per-subarch
+function, I don't see much other alternative.
+
+Doesn't your kernel restart trigger a system hardware reset in any case?
+That's about the only reliable way to do a system restart with SMP.
