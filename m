@@ -1,42 +1,61 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 4 Jul 2012 13:21:35 +0200
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <20120704111523.GA31490@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <20120627162014.1494cdd7@skate> <20120704111523.GA31490@elf.ucw.cz>
-Message-ID: <20120704132135.56ddc4ca@skate>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 04 Jul 2012 13:22:09 +0200
+Subject: Current state of AM33xx patches
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+Message-ID: <4FF42761.2000701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 4 Jul 2012 13:15:23 +0200,
-Pavel Machek <pavel@denx.de> a ?crit :
-
-> > The clocksource/clockevents driver now go into drivers/clocksource/,
-> > and the corresponding maintainers should be CC'ed (Thomas Gleixner and
-> > John Stultz.
+On 04.07.2012 12:50, Hiremath, Vaibhav wrote:
+> On Wed, Jul 04, 2012 at 15:37:31, Paul Walmsley wrote:
+>> On Sat, 30 Jun 2012, Daniel Mack wrote:
+>>
+>>> Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
+>>> the components I need.
+>>
+>> Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod data 
+>> for the AM33xx.  There might be some missing integration code to build the 
+>> devices for the newer IP blocks, though.
+>>
 > 
-> Hmm, fortunately drivers/clocksource already has one such
-> driver. Maybe  arch/arm/mach-picoxcell/time.c can be used as a
-> template?
+> I would also be interested to know more here.
+> 
+> 
+>>> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
+>>
+>> Mainline has:
+>>
+>> drivers/net/ethernet/ti/davinci_emac.c
+> 
+> Not required for AM335X.
+> 
+>> drivers/net/ethernet/ti/davinci_mdio.c
+>>
+>> Those might work for you.
+>>
+> 
+> Few more files,
+> 
+> drivers/net/ethernet/ti/cpsw.c
+> drivers/net/ethernet/ti/davinci_cpdma.c
+> 
+> 
+> Wanted to highlight one point,
+> You still have to add platform device code to get it working.
 
-I must say I don't know what's the preferred way here. In mach-mvebu,
-the drivers/clocksource/time-armada-370-xp.c does everything, including
-the DT parsing. The part in arch/arm/mach-mvebu/ only defines struct
-sys_timer and points to the initialization function in the
-drivers/clocksource/ driver.
+Exactly. And a hwmod binding for DT. Do you have patches for that?
 
-Apparently, in mach-picoxcell, things are organized differently, with
-the DT parsing happening in arch/arm/mach-picoxcell/time.c, and the
-driver providing some lower-level functions to separately register the
-clocksource and the clockevents devices.
 
-I have no idea which one should be preferred over the other.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Daniel
