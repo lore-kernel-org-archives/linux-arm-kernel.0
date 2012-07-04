@@ -1,46 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 4 Jul 2012 09:51:16 +0200
-Subject: [GIT PULL] i.MX fixes for -rc
-Message-ID: <20120704075116.GA29310@pengutronix.de>
+From: per.forlin@stericsson.com (Per Forlin)
+Date: Wed, 4 Jul 2012 09:51:02 +0200
+Subject: [PATCH] ARM: reboot: disable nonboot CPUs
+Message-ID: <1341388262-3801-1-git-send-email-per.forlin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Disable the nonboot CPUs to safely migrate tasks and interrupts
+to the boot CPU. This will prevent the nonboot CPUs to
+interfer or block the boot CPU from being able to reboot
+the system successfully.
 
-Please pull the following i.MX fixes for -rc
+This reboot issue was detected on u8500 when using ab8500 to initaite a
+system restart. The issue happens because smp_send_stop() stops the CPUs
+wihouth migrating all resources.
+If not issuing smp_send_stop() u8500 reboots successfully.
 
-Thanks
- Sascha
+It's optional to support CONFIG_PM_SLEEP_SMP therefore smp_send_stop()
+can't simply be replaced by disable_nonboot_cpus()
 
+Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+---
+ arch/arm/kernel/process.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.5-imx-fixes
-
-for you to fetch changes up to c520c921eacdced7e2095ba6cbbb9921906c7b67:
-
-  ARM: imx: assert SCC gate stays enabled (2012-07-04 09:38:29 +0200)
-
-----------------------------------------------------------------
-ARM i.MX fixes for v3.5-rc5
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: imx27_visstrim_m10: Do not include <asm/system.h>
-
-Uwe Kleine-K?nig (1):
-      ARM: imx: assert SCC gate stays enabled
-
- arch/arm/mach-imx/clk-imx35.c               |    9 ++++++++-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    2 +-
- 2 files changed, 9 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 864580a..aab4f81 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -239,6 +239,7 @@ __setup("reboot=", reboot_setup);
+ 
+ void machine_shutdown(void)
+ {
++	disable_nonboot_cpus();
+ #ifdef CONFIG_SMP
+ 	smp_send_stop();
+ #endif
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10
