@@ -1,76 +1,38 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 04 Jul 2012 13:51:23 +0200
-Subject: [PATCH 1/5] ARM: tegra: set up wlan clocks for tegra dt
-In-Reply-To: <1341401013.9009.931.camel@tegra-chromium-2>
-References: <1341394488-13169-1-git-send-email-wni@nvidia.com>
- <6135516.CD1aogiCta@fb07-iapwap2>
- <1341401013.9009.931.camel@tegra-chromium-2>
-Message-ID: <5111476.afQhu2nTJB@fb07-iapwap2>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 4 Jul 2012 14:05:00 +0200
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <201207041149.22941.arnd@arndb.de>
+References: <20120704075116.GA29310@pengutronix.de>
+ <201207041149.22941.arnd@arndb.de>
+Message-ID: <20120704120500.GB30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 4. Juli 2012, 19:23:33 schrieb Wei Ni:
-> On Wed, 2012-07-04 at 18:43 +0800, Marc Dietrich wrote:
-> > Am Mittwoch, 4. Juli 2012, 17:34:44 schrieb Wei Ni:
-> > > Set up the wlan clock tree for Tegra20 and Tegra30.
-> > > 
-> > > Signed-off-by: Wei Ni <wni@nvidia.com>
-> > > ---
-> > > 
-> > >  arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
-> > >  arch/arm/mach-tegra/board-dt-tegra30.c |    1 +
-> > >  2 files changed, 2 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c
-> > > b/arch/arm/mach-tegra/board-dt-tegra20.c index 70a19a9..fbcc7d9 100644
-> > > --- a/arch/arm/mach-tegra/board-dt-tegra20.c
-> > > +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-> > > @@ -78,6 +78,7 @@ static __initdata struct tegra_clk_init_table
-> > > tegra_dt_clk_init_table[] = { { "pll_a",      "pll_p_out1",   56448000,
-> > > 
-> > >   true },
-> > >   
-> > >  	{ "pll_a_out0", "pll_a",        11289600,       true },
-> > >  	{ "cdev1",      NULL,           0,              true },
-> > > 
-> > > +	{ "blink",      "clk_32k",      32768,          true },
+On Wed, Jul 04, 2012 at 11:49:22AM +0000, Arnd Bergmann wrote:
+> On Wednesday 04 July 2012, Sascha Hauer wrote:
+> > Hi Arnd, Olof,
 > > 
-> > what's the reason to enable this on all boards? Would it make sense to set
-> > this to "false" instead?
-> 
-> This clock is used for the wlan device, it need to be enabled, so that
-> the wlan device can be powered on, and then the mmc driver can enumerate
-> it.
-
-My question was more why you enable it for *all* boards, even those without 
-wlan cards connected to the sdhci. Defining it, but set it to "false", would 
-give the driver the chance to enable it only on request. On the other hand, 
-the impact on additional power consumption may be too low to measure.
-
-Marc
-
+> > Please pull the following i.MX fixes for -rc
 > > 
-> > >  	{ "i2s1",       "pll_a_out0",   11289600,       false},
-> > >  	{ "i2s2",       "pll_a_out0",   11289600,       false},
-> > >  	{ NULL,		NULL,		0,		0},
-> > > 
-> > > diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c
-> > > b/arch/arm/mach-tegra/board-dt-tegra30.c index 53bf60f..2d73c61 100644
-> > > --- a/arch/arm/mach-tegra/board-dt-tegra30.c
-> > > +++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-> > > @@ -61,6 +61,7 @@ static __initdata struct tegra_clk_init_table
-> > > tegra_dt_clk_init_table[] = { { "pll_a_out0",	"pll_a",	11289600,	true },
-> > > 
-> > >  	{ "extern1",	"pll_a_out0",	0,		true },
-> > >  	{ "clk_out_1",	"extern1",	0,		true },
-> > > 
-> > > +	{ "blink",	"clk_32k",	32768,		true },
-> > > 
-> > >  	{ "i2s0",	"pll_a_out0",	11289600,	false},
-> > >  	{ "i2s1",	"pll_a_out0",	11289600,	false},
-> > >  	{ "i2s2",	"pll_a_out0",	11289600,	false},
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks, pulled into the fixes branch. I plan to send out fixes tomorrow
+> to Linus.
+> 
+> 
+> > Uwe Kleine-K?nig (1):
+> >       ARM: imx: assert SCC gate stays enabled
+> 
+> Is this something that should have been marked for stable, or was
+> it just recently introduced? The description suggests the former.
+
+The bug was introduced in the last merge window, so not suitable for
+stable.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
