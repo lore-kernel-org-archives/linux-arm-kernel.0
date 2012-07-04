@@ -1,33 +1,30 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Wed, 4 Jul 2012 20:55:49 +0530
-Subject: [PATCH 2/4] ARM: OMAP2+: Move the stubbed prm and cm functions to
- prcm.c file and make them __weak.
-In-Reply-To: <alpine.DEB.2.00.1207040431400.6760@utopia.booyaka.com>
-References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
- <1336669615-16454-3-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.00.1205101140230.32719@utopia.booyaka.com>
- <CAJ7qFSdiMgM3S5Q+XaFAGrgcL5M5f8CLHyKSRtBKu4AK6ei-BA@mail.gmail.com>
- <CAJ7qFSfu3yyj8YqETTzx+wipi1Nbf5m5fDLC26Tfojav+Lb56Q@mail.gmail.com>
- <alpine.DEB.2.00.1207040431400.6760@utopia.booyaka.com>
-Message-ID: <CAJ7qFSc7qNJ91J9sbsYFA5TW=qvyyDXkoL+XuTkHxvFrqBLqkg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 4 Jul 2012 23:26:06 +0800
+Subject: [PATCH] i.mx23: add dts node for mmc1/ssp1 Signed-off-by: Attila
+ Kinali <attila@kinali.ch>
+In-Reply-To: <20120704170924.76e77f02dc6fcc4579dfc169@kinali.ch>
+References: <1341403833-25437-1-git-send-email-attila@kinali.ch>
+ <20120704135337.GC2595@S2101-09.ap.freescale.net>
+ <20120704170924.76e77f02dc6fcc4579dfc169@kinali.ch>
+Message-ID: <20120704152604.GE2595@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-On Wed, Jul 4, 2012 at 8:49 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
->
-> On Thu, 28 Jun 2012, R, Sricharan wrote:
->
->>  Ping..
->
-> Since the prcm.c cleanup series isn't ready yet, I've queued this modified
-> version of your patch.
->
-> Once the prcm.c cleanup series is ready, hopefully in the 3.7 time frame,
-> we'll be able to get rid of all of these nasty stubs.
->
- Thanks a lot. I think this should help to get rid of the OMAP5 dependency.
+On Wed, Jul 04, 2012 at 05:09:24PM +0200, Attila Kinali wrote:
+> > I do not want to have these pinctrl setup added along.  Please submit
 
-Thanks,
- Sricharan
+Sorry. s/along/alone
+
+> > the changes together with the <board>.dts which uses them.
+> 
+> I copied these from the mmc0 definition above. It could be these are
+> spillovers from the imx23-evk definition. Shall i move teh mmc0_pins_fixup
+> into the imx23-evk.dts file?
+> 
+The changes in the patch look good.  What I meant is we need have the
+user of mmc1_8bit_pins_a and mmc1_pins_fixup added together.  The
+"user" means a <board>.dts which refers to these pins.
+
+-- 
+Regards,
+Shawn
