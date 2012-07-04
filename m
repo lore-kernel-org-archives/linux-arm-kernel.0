@@ -1,39 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jul 2012 23:41:53 -0700
-Subject: [GIT PULL 6/6] am33xx changes for v3.6 merge window
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA6237A@DBDE01.ent.ti.com>
-References: <E1SlGLI-0004Vt-0L@merlin.infradead.org> <4FF2D83C.7060409@ti.com>
- <20120703114856.GL1122@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA6237A@DBDE01.ent.ti.com>
-Message-ID: <20120704064152.GN1122@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 04 Jul 2012 08:52:01 +0200
+Subject: [PATCH v4] mm: cma: add a simple kernel module as the helper to
+ test CMA
+In-Reply-To: <op.wgvfgmm03l0zgt@mpn-glaptop>
+References: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
+ <03e601cd58ec$5b8177b0$12846710$%szyprowski@samsung.com>
+ <CAGsJ_4yjV+HDXdYraJ6CdJrSz1EPGgE6BRvO-_9n+6_UWfxqww@mail.gmail.com>
+ <op.wgvfgmm03l0zgt@mpn-glaptop>
+Message-ID: <000301cd59b1$87094eb0$951bec10$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120703 05:00]:
-> On Tue, Jul 03, 2012 at 17:18:56, Tony Lindgren wrote:
-> > * Vaibhav Hiremath <hvaibhav@ti.com> [120703 04:37]:
-> > > 
-> > > Few patches got missed in this pull request,
-> > > 
-> > > ARM: OMAP2+: am33xx: Make am33xx as a separate class
-> > > ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
-> > 
-> > OK, at least the first needs to be rebased to apply.
-> > 
-> > Can you please refresh those against current devel-am33xx
-> > branch at commit 6fd8246b1c1167c983b089f9eaafa13ef9ca7adf and
-> > repost?
-> > 
-> > I'll do a separate pull request for those once they are
-> > ready.
-> > 
+Hello,
+
+On Tuesday, July 03, 2012 2:54 PM Michal Nazarewicz wrote:
+
+> > 2012/7/3 Marek Szyprowski <m.szyprowski@samsung.com>:
+> >> IMHO the right place for such code is in drivers/misc instead of tools/cma.
+> >>
+> >> This patch contains a kernel module source code so it should be put with other kernel
+> >> modules. tools/ directory is aimed to contain user space code useful for developing and
+> >> testing Linux kernel.
 > 
-> Thanks Tony, I will resubmit them again today.
-> Also, request you to review and merge Cleanup patch-series I had posted
-> few days back.
+> On Tue, 03 Jul 2012 09:39:34 +0200, Barry Song <21cnbao@gmail.com> wrote:
+> > this one is aiming to test CMA, it should be in tools/ as Michal
+> > Nazarewicz and i have talked about that.
+> > it is not a real driver at all.
+> 
+> Yeah, I feel like it's better placed in tools/ not to pollute other directories with
+> drivers that are of no use to regular users.  I don't have strong feelings about it
+> though, so I'm fine either way.
 
-Yes thanks will look.
+Other test devices/drivers are in drivers directory (drivers/usb/misc/usbtest.c for
+example), I don't see any good reason for polluting tools/ directory with kernel code. 
 
-Regards,
+IMHO the right person to decide if it makes sense to have such drivers in drivers/mics/
+or tools/cma/ is Greg KH. Barry, please resend it and ask Greg for the decision.
 
-Tony
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
