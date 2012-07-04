@@ -1,64 +1,135 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 4 Jul 2012 09:02:42 +0200
-Subject: [PATCH] ARM: imx: assert SCC gate stays enabled
-In-Reply-To: <1341221434-15233-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1341221434-15233-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120704070242.GH2698@pengutronix.de>
+From: jiri.prchal@aksignal.cz (Jiri Prchal)
+Date: Wed,  4 Jul 2012 09:04:59 +0200
+Subject: [PATCH] arm: at91: Add new board
+Message-ID: <1341385499-5781-1-git-send-email-jiri.prchal@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 11:30:34AM +0200, Uwe Kleine-K?nig wrote:
-> The SCC clock is needed in internal boot mode and so must keep enabled.
-> This same issue was fixed for the pre-common-clk code in commit
+I'd like to add support for our "CDU" board based up on Telit's module GE863 Pro3.
+It has more uarts, leds, another nand partitioning.
 
-Applied as fix.
+Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+---
+ arch/arm/boot/dts/aks-cdu.dts |  111 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 111 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/aks-cdu.dts
 
-Sascha
-
-> 
-> 	3d6e614 (mx35: Fix boot ROM hang in internal boot mode)
-> 
-> Cc: John Ogness <jogness@linutronix.de>
-> Cc: Hans J. Koch <hjk@hansjkoch.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx35.c |    9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-> index 920a8cc..c6422fb 100644
-> --- a/arch/arm/mach-imx/clk-imx35.c
-> +++ b/arch/arm/mach-imx/clk-imx35.c
-> @@ -201,7 +201,6 @@ int __init mx35_clocks_init()
->  			pr_err("i.MX35 clk %d: register failed with %ld\n",
->  				i, PTR_ERR(clk[i]));
->  
-> -
->  	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
->  	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
->  	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
-> @@ -264,6 +263,14 @@ int __init mx35_clocks_init()
->  	clk_prepare_enable(clk[iim_gate]);
->  	clk_prepare_enable(clk[emi_gate]);
->  
-> +	/*
-> +	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
-> +	 * before conversion to common clk also enabled UART1 (which isn't
-> +	 * handled here and not needed for mmc) and IIM (which is enabled
-> +	 * unconditionally above).
-> +	 */
-> +	clk_prepare_enable(clk[scc_gate]);
-> +
->  	imx_print_silicon_rev("i.MX35", mx35_revision());
->  
->  #ifdef CONFIG_MXC_USE_EPIT
-> -- 
-> 1.7.10
-> 
-> 
-
+diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
+new file mode 100644
+index 0000000..05590cc
+--- /dev/null
++++ b/arch/arm/boot/dts/aks-cdu.dts
+@@ -0,0 +1,111 @@
++/*
++ * aks-cdu.dts - Device Tree file for AK signal CDU
++ *
++ * Copyright (C) 2012 AK signal Brno a.s.
++ *               2012 Jiri Prchal <jiri.prchal@aksignal.cz>
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++/include/ "ge863-pro3.dtsi"
++
++/ {
++	chosen {
++		bootargs = "console=ttyS0,115200 ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs";
++	};
++
++	ahb {
++		apb {
++			usart0: serial at fffb0000 {
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++				linux,rs485-enabled-at-boot-time;
++				rs485-rts-delay = <0 0>;
++				};
++
++			usart2: serial at fffb8000 {
++				status = "okay";
++				linux,rs485-enabled-at-boot-time;
++				rs485-rts-delay = <0 0>;
++			};
++
++			usart3: serial at fffd0000 {
++				status = "okay";
++				linux,rs485-enabled-at-boot-time;
++				rs485-rts-delay = <0 0>;
++			};
++
++			macb0: ethernet at fffbc000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 15 0>;
++				status = "okay";
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			bootstrap at 0 {
++				label = "bootstrap";
++				reg = <0x0 0x40000>;
++			};
++
++			uboot at 40000 {
++				label = "uboot";
++				reg = <0x40000 0x80000>;
++			};
++			ubootenv at c0000 {
++				label = "ubootenv";
++				reg = <0xc0000 0x40000>;
++			};
++			kernel at 100000 {
++				label = "kernel";
++				reg = <0x100000 0x400000>;
++			};
++			rootfs at 500000 {
++				label = "rootfs";
++				reg = <0x500000 0x7b00000>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		red {
++			gpios = <&pioC 10 0>;
++			linux,default-trigger = "none";
++		};
++
++		green {
++			gpios = <&pioA 5 1>;
++			linux,default-trigger = "none";
++			default-state = "on";
++		};
++
++		yellow {
++			gpios = <&pioB 20 1>;
++			linux,default-trigger = "none";
++		};
++
++		blue {
++			gpios = <&pioB 21 1>;
++			linux,default-trigger = "none";
++		};
++	};
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.7
