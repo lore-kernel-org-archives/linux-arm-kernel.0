@@ -1,239 +1,254 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Jul 2012 17:12:55 +0200
-Subject: [PATCH v8 1/9] clocksource: time-armada-370-xp: Marvell Armada
- 370/XP SoC timer driver
-In-Reply-To: <1341413806-26376-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1341413806-26376-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20120704151255.GA30534@lunn.ch>
+From: zhouqiao@marvell.com (Qiao Zhou)
+Date: Wed, 4 Jul 2012 08:14:30 -0700
+Subject: [PATCH 1/4] mfd: support 88pm80x in 80x driver
+In-Reply-To: <201207041137.49020.arnd@arndb.de>
+References: <1341392115-9425-1-git-send-email-zhouqiao@marvell.com>
+ <1341392115-9425-2-git-send-email-zhouqiao@marvell.com>
+ <201207041137.49020.arnd@arndb.de>
+Message-ID: <B2A7C617B3AB7F44B7B44C7D374B431E13A09E8DEE@sc-vexch3.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 04:56:38PM +0200, Thomas Petazzoni wrote:
-> From: Gregory Clement <gregory.clement@free-electrons.com>
-> 
-> Timer 0 is used as free-running clocksource, while timer 1 is used as
-> clock_event_device.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> Tested-by: Yehuda Yitschak <yehuday@marvell.com>
-> Tested-by: Lior Amsalem <alior@marvell.com>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> CC: John Stultz <johnstul@us.ibm.com>
-> ---
->  drivers/clocksource/Kconfig              |    3 +
->  drivers/clocksource/Makefile             |    3 +-
->  drivers/clocksource/time-armada-370-xp.c |  226 ++++++++++++++++++++++++++++++
->  include/linux/time-armada-370-xp.h       |   18 +++
->  4 files changed, 249 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clocksource/time-armada-370-xp.c
->  create mode 100644 include/linux/time-armada-370-xp.h
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 99c6b20..b323631 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -16,6 +16,9 @@ config CLKSRC_MMIO
->  config DW_APB_TIMER
->  	bool
->  
-> +config ARMADA_370_XP_TIMER
-> +	bool
-> +
->  config CLKSRC_DBX500_PRCMU
->  	bool "Clocksource PRCMU Timer"
->  	depends on UX500_SOC_DB8500
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index dd3e661..022015c 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -10,4 +10,5 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
->  obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
->  obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
->  obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
-> -obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
-> \ No newline at end of file
-> +obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
-> +obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
-> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-> new file mode 100644
-> index 0000000..4674f94
-> --- /dev/null
-> +++ b/drivers/clocksource/time-armada-370-xp.c
-> @@ -0,0 +1,226 @@
-> +/*
-> + * Marvell Armada 370/XP SoC timer handling.
-> + *
-> + * Copyright (C) 2012 Marvell
-> + *
-> + * Lior Amsalem <alior@marvell.com>
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * Timer 0 is used as free-running clocksource, while timer 1 is
-> + * used as clock_event_device.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/kernel.h>
-> +#include <linux/timer.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_address.h>
-> +#include <linux/irq.h>
-> +#include <linux/module.h>
-> +#include <asm/sched_clock.h>
-> +
-> +/*
-> + * Timer block registers.
-> + */
-> +#define TIMER_CTRL_OFF		0x0000
-> +#define  TIMER0_EN		 0x0001
-> +#define  TIMER0_RELOAD_EN	 0x0002
-> +#define  TIMER0_25MHZ            0x0800
-> +#define  TIMER0_DIV(div)         ((div) << 19)
-> +#define  TIMER1_EN		 0x0004
-> +#define  TIMER1_RELOAD_EN	 0x0008
-> +#define  TIMER1_25MHZ            0x1000
-> +#define  TIMER1_DIV(div)         ((div) << 22)
-> +#define TIMER_EVENTS_STATUS	0x0004
-> +#define  TIMER0_CLR_MASK         (~0x1)
-> +#define  TIMER1_CLR_MASK         (~0x100)
-> +#define TIMER0_RELOAD_OFF	0x0010
-> +#define TIMER0_VAL_OFF		0x0014
-> +#define TIMER1_RELOAD_OFF	0x0018
-> +#define TIMER1_VAL_OFF		0x001c
-> +
-> +/* Global timers are connected to the coherency fabric clock, and the
-> +   below divider reduces their incrementing frequency. */
-> +#define TIMER_DIVIDER_SHIFT     5
-> +#define TIMER_DIVIDER           (1 << TIMER_DIVIDER_SHIFT)
-> +
-> +/*
-> + * SoC-specific data.
-> + */
-> +static void __iomem *timer_base;
-> +static int timer_irq;
-> +
-> +/*
-> + * Number of timer ticks per jiffy.
-> + */
-> +static u32 ticks_per_jiffy;
-> +
-> +static u32 notrace armada_370_xp_read_sched_clock(void)
-> +{
-> +	return ~readl(timer_base + TIMER0_VAL_OFF);
-> +}
-> +
-> +/*
-> + * Clockevent handling.
-> + */
-> +static int
-> +armada_370_xp_clkevt_next_event(unsigned long delta,
-> +				struct clock_event_device *dev)
-> +{
-> +	u32 u;
-> +
-> +	/*
-> +	 * Clear clockevent timer interrupt.
-> +	 */
-> +	writel(TIMER1_CLR_MASK, timer_base + TIMER_EVENTS_STATUS);
-> +
-> +	/*
-> +	 * Setup new clockevent timer value.
-> +	 */
-> +	writel(delta, timer_base + TIMER1_VAL_OFF);
-> +
-> +	/*
-> +	 * Enable the timer.
-> +	 */
-> +	u = readl(timer_base + TIMER_CTRL_OFF);
-> +	u = ((u & ~TIMER1_RELOAD_EN) | TIMER1_EN |
-> +	     TIMER1_DIV(TIMER_DIVIDER_SHIFT));
-> +	writel(u, timer_base + TIMER_CTRL_OFF);
-> +
-> +	return 0;
-> +}
-> +
-> +static void
-> +armada_370_xp_clkevt_mode(enum clock_event_mode mode,
-> +			  struct clock_event_device *dev)
-> +{
-> +	u32 u;
-> +
-> +	if (mode == CLOCK_EVT_MODE_PERIODIC) {
-> +		/*
-> +		 * Setup timer to fire at 1/HZ intervals.
-> +		 */
-> +		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD_OFF);
-> +		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL_OFF);
-> +
-> +		/*
-> +		 * Enable timer.
-> +		 */
-> +		u = readl(timer_base + TIMER_CTRL_OFF);
-> +
-> +		writel((u | TIMER1_EN | TIMER1_RELOAD_EN |
-> +			TIMER1_DIV(TIMER_DIVIDER_SHIFT)),
-> +		       timer_base + TIMER_CTRL_OFF);
-> +	} else {
-> +		/*
-> +		 * Disable timer.
-> +		 */
-> +		u = readl(timer_base + TIMER_CTRL_OFF);
-> +		writel(u & ~TIMER1_EN, timer_base + TIMER_CTRL_OFF);
-> +
-> +		/*
-> +		 * ACK pending timer interrupt.
-> +		 */
-> +		writel(TIMER1_CLR_MASK, timer_base + TIMER_EVENTS_STATUS);
-> +
-> +	}
-> +}
-> +
-> +static struct clock_event_device armada_370_xp_clkevt = {
-> +	.name		= "armada_370_xp_tick",
-> +	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
-> +	.shift		= 32,
-> +	.rating		= 300,
-> +	.set_next_event	= armada_370_xp_clkevt_next_event,
-> +	.set_mode	= armada_370_xp_clkevt_mode,
-> +};
-> +
-> +static irqreturn_t armada_370_xp_timer_interrupt(int irq, void *dev_id)
-> +{
-> +	/*
-> +	 * ACK timer interrupt and call event handler.
-> +	 */
-> +
-> +	writel(TIMER1_CLR_MASK, timer_base + TIMER_EVENTS_STATUS);
-> +	armada_370_xp_clkevt.event_handler(&armada_370_xp_clkevt);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static struct irqaction armada_370_xp_timer_irq = {
-> +	.name		= "armada_370_xp_tick",
-> +	.flags		= IRQF_DISABLED | IRQF_TIMER,
-> +	.handler	= armada_370_xp_timer_interrupt
-> +};
-> +
-> +void __init armada_370_xp_timer_init(void)
-> +{
-> +	u32 u;
-> +	struct device_node *np;
-> +	unsigned int timer_clk;
-> +	int ret;
-> +	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer")
+>> +	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
+>> +			      ARRAY_SIZE(onkey_devs), &onkey_resources[0],
+>> +			      chip->irq_base);
+>
+>According to what I discussed with Mark in the previous version, I think you
+>need to pass 0 instead of chip->irq_base here, and transform the interrupt
+>numbers using the domain in the client drivers.
+>
+>> +
+>> +const struct i2c_device_id pm80x_id_table[] = {
+>> +	{"88PM800", CHIP_PM800},
+>> +	{"88PM805", CHIP_PM805},
+>> +};
+>> +MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+>
+>Since these are separate modules now, you have to move the device table
+>into the split files as well.
+Is it ok to export it in 88pm80x.h?
+>> +
+>> +/**
+>> + * pm80x_reg_read: Read a single 88PM80x register.
+>> + *
+>> + * @map: regmap to read from.
+>> + * @reg: Register to read.
+>> + */
+>> +int pm80x_reg_read(struct regmap *map, u32 reg)
+>> +{
+>> +	unsigned int val;
+>> +	int ret;
+>> +
+>> +	ret = regmap_read(map, reg, &val);
+>> +
+>> +	if (ret < 0)
+>> +		return ret;
+>> +	else
+>> +		return val;
+>> +}
+>> +EXPORT_SYMBOL_GPL(pm80x_reg_read);
+>
+>In your introductory email you write
+>
+>"Exported r/w API which requires regmap handle. as currently the pm800
+>chip has 3 i2c device, only passing a pm80x_chip info can't ensure r/w the
+>register in correct i2c device."
+>
+>Your first driver version had this, then you removed the functions
+>after I asked you to, and now they are back, so I assume there is something
+>I don't see yet. It looks like the function is just an unnecessary wrapper
+>that is better open-coded in the caller. Can you explain again what the
+>difference is?
+After you suggest to change the r/w API so that caller doesn't care about it's
+via i2c or spi, it makes sense. However due to pm800 has 3 i2c devices, and
+it's hard to export such interface for pm800. Currently to add such interface
+via regmap handle, caller still doesn't care about the actual hw implement,
+also it's clear that all pm80x sub-driver or plat call the unified r/w API.
+>> +/**
+>> + * pm80x_bulk_read: Read multiple 88PM80x registers
+>> + *
+>> + * @map: regmap to read from
+>> + * @reg: First register
+>> + * @buf: Buffer to fill.  The data will be returned big endian.
+>> + * @count: Number of registers
+>> + */
+>> +int pm80x_bulk_read(struct regmap *map, u32 reg, u8 *buf, int count)
+>> +{
+>> +	return regmap_raw_read(map, reg, buf, count);
+>> +}
+>
+>Unused function? Either export this if you want to provide it as
+>the general API, or drop the function.
+It's used by rtc driver.
+>> +int __devinit pm80x_device_init(struct pm80x_chip *chip,
+>> +				struct pm80x_platform_data *pdata)
+>
+>> +void __devexit pm80x_device_exit(struct pm80x_chip *chip)
+>
+>> +SIMPLE_DEV_PM_OPS(pm80x_pm_ops, pm80x_suspend, pm80x_resume);
+>
+>I would think that these need to be exported as well, at least if
+>you want the driver to be modular.
+Would update. Thanks.
+>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>> index e129c82..96dd2d7 100644
+>> --- a/drivers/mfd/Kconfig
+>> +++ b/drivers/mfd/Kconfig
+>> @@ -20,6 +20,18 @@ config MFD_88PM860X
+>>  	  select individual components like voltage regulators, RTC and
+>>  	  battery-charger under the corresponding menus.
+>>  
+>> +config MFD_88PM80X
+>> +	bool "Support Marvell 88PM800/88PM805"
+>> +	depends on I2C=y && GENERIC_HARDIRQS
+>> +	select REGMAP_I2C
+>> +	select REGMAP_IRQ
+>> +	select MFD_CORE
+>> +	help
+>> +	  This supports for Marvell 88PM800/88PM805 Power Management IC.
+>> +	  This includes the I2C driver and the core APIs _only_, you have to
+>> +	  select individual components like voltage regulators, RTC and
+>> +	  battery-charger under the corresponding menus.
+>> +
+>>  config MFD_SM501
+>>  	tristate "Support for Silicon Motion SM501"
+>>  	 ---help---
+>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+>> index 75f6ed6..dc2584e 100644
+>> --- a/drivers/mfd/Makefile
+>> +++ b/drivers/mfd/Makefile
+>> @@ -3,7 +3,9 @@
+>>  #
+>>  
+>>  88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
+>> +88pm80x-objs			:= 88pm800-core.o 88pm805-core.o 88pm80x-i2c.o
+>>  obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
+>> +obj-$(CONFIG_MFD_88PM80X)	+= 88pm80x.o
+>>  obj-$(CONFIG_MFD_SM501)		+= sm501.o
+>>  obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
+>
+>I just noticed that it can currently only be builtin. Is there a strict
+>>requirement for that? If not, better make it a tristate option.
+>
+>If you do that, aside from adding the exports mentioned above, you have
+>to use three separate modules, as in
+>
+>obj-$(CONFIG_MFD_88PM80X)	+= 88pm800-core.o 88pm805-core.o 88pm80x-i2c.o
+>
+>or even
+>
+>obj-$(CONFIG_MFD_88PM800)	+= 88pm800-core.o 88pm800-core.o
+>obj-$(CONFIG_MFD_88PM805)	+= 88pm800-core.o 88pm805-core.o
+>
+>with the respective Kconfig change.
+Would update. Thanks.
+>> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+>> new file mode 100644
+>> index 0000000..115348a
+>> --- /dev/null
+>> +++ b/include/linux/mfd/88pm80x.h
+>> @@ -0,0 +1,521 @@
+>> +#ifndef __LINUX_MFD_88PM80X_H
+>> +#define __LINUX_MFD_88PM80X_H
+>> +
+>> +#define PM80X_VERSION_MASK		(0xFF)	/* 80X chip ID mask */
+>> +
+>> +enum {
+>> +	/* Procida */
+>> +	PM800_CHIP_A0  = 0x60,
+>> +	PM800_CHIP_A1  = 0x61,
+>> +	PM800_CHIP_B0  = 0x62,
+>> +	PM800_CHIP_C0  = 0x63,
+>> +	PM800_CHIP_END = PM800_CHIP_C0,
+>> +
+>> +	/* Make sure to update this to the last stepping */
+>> +	PM8XXX_CHIP_END = PM800_CHIP_END
+>> +};
+>> +
+>> +enum {
+>> +	PM800_ID_INVALID,
+>> +	PM800_ID_VIBRATOR,
+>> +	PM800_ID_SOUND,
+>> +	PM800_ID_MAX,
+>> +};
+>> +
+>> +enum {
+>> +	PM800_ID_BUCK1 = 0,
+>> +	PM800_ID_BUCK2,
+>> +	PM800_ID_BUCK3,
+> +	PM800_ID_BUCK4,
+>> +	PM800_ID_BUCK5,
+>
+>I would still argue that the majority of the constants in this file
+>should get moved into the driver .c file that uses them. Putting them
+>into the header is better done only for interfaces between the
+>driver parts, and for constants that are used by multiple drivers.
+These registers still in this header file are either used by mfd core
+driver, regulator/rtc/onkey/codec, or used in platform initial setting.
+>> +struct pm80x_subchip {
+>> +	struct i2c_client *power_page;	/* chip client for power page */
+>> +	struct i2c_client *gpadc_page;	/* chip client for gpadc page */
+>> +	struct regmap *regmap_power;
+>> +	struct regmap *regmap_gpadc;
+>> +	unsigned short power_page_addr;	/* power page I2C address */
+>> +	unsigned short gpadc_page_addr;	/* gpadc page I2C address */
+>> +};
+>> +
+>> +struct pm80x_chip {
+>> +	struct pm80x_subchip *subchip;
+>> +	struct device *dev;
+>> +	struct i2c_client *client;
+>> +	struct regmap *regmap;
+>> +	struct regmap_irq_chip *regmap_irq_chip;
+>> +	struct regmap_irq_chip_data *irq_data;
+>> +	unsigned char version;
+>> +	int id;
+>> +	int irq;
+>> +	int irq_mode;
+>> +	int irq_base;
+>> +	unsigned int wu_flag;
+>> +};
+>
+>One thing I forgot to ask in the previous review although I had already
+>noticed it then: What is the separation of pm80x_chip and pm80x_subchip
+>used for?
+Pm80x_chip is common for both pm800 and pm805, while pm80x_subchip
+handles the other i2c devices as discussed before, only that these two
+i2c devices are not as much as pm800 and pm805 i2c device, and they are
+only for gpadc & power settings purpose. The subchip can be treated as
+some special feature/function for pm800.
+>> +struct pm80x_rtc_pdata {
+>> +	int		vrtc;
+>> +	int		rtc_wakeup;
+>> +};
+>> +
+>> +struct pm80x_platform_data {
+>> +	struct pm80x_rtc_pdata *rtc;
+>> +	unsigned short pm800_addr;
+>> +	unsigned short pm805_addr;
+>> +	unsigned short power_page_addr;	/* power page I2C address */
+>> +	unsigned short gpadc_page_addr;	/* gpadc page I2C address */
+>> +	int irq_mode;		/* Clear interrupt by read/write(0/1) */
+>> +	int irq_base;		/* IRQ base of chip */
+>> +	int batt_det;		/* enable/disable */
+>> +};
+>
+>You removed the callback here as I asked you to, which I think is a useful
+>cleanup, but you can actually managed to convinced me that it would be ok
+>to have it, so I don't mind if you want to put it back and use auxdata.
+Actually it's convenient for us to put it back currently, and would use
+auxdata instead.
+>
+>On the other hand, I think it probably makes sense to drop the irq_base
+>member in this struct and rely on irq domains to allocate them dynamically
+>as mentioned before.
+Do you mean that both regmap_add_irq_chip and mfd_add_devices api pass -1 as
+the irq_base, so that system can dynamically allocate the irq_base for it?
+Given the proper regmap_irq_chip & device resource, is there anything else
+needed? As I don't want to miss the exact meaning of " transform the
+interrupt numbers using the domain in the client drivers" you mentioned above.
+>	Arnd
+Arnd,  thanks for your review.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Best Regards
+Qiao
