@@ -1,47 +1,47 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 4 Jul 2012 17:54:40 +0800
-Subject: [PATCH] clk: wm831x: fix checkpatch issue for static const char *
- array
-Message-ID: <1341395680-14142-1-git-send-email-Barry.Song@csr.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 04 Jul 2012 10:56:54 +0100
+Subject: [PATCH] ARM: architected timers: Mark the clockevent with the
+ C3_STOP feature
+In-Reply-To: <1341395673-29660-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1341395673-29660-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <4FF41366.4060504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On 04/07/12 10:54, Santosh Shilimkar wrote:
+> ARM arch timers stop in low power state and hence can not wakeup CPUs in
+> deeper idle states when used as cloc event devices. Marking these clock event
+> devices with C3_STOP so that during lowpower states, the tick is managed by
+> wakeup capable broadcast timer.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-static const char * array should probably be static const char * const
+Hi Santosh,
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- drivers/clk/clk-wm831x.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I already have queued an identical patch from Lorenzo.
+Thanks for reminder anyway!
 
-diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-index e7b7765..f601e61 100644
---- a/drivers/clk/clk-wm831x.c
-+++ b/drivers/clk/clk-wm831x.c
-@@ -177,7 +177,7 @@ static int wm831x_fll_set_rate(struct clk_hw *hw, unsigned long rate,
- 			       WM831X_FLL_AUTO_FREQ_MASK, i);
- }
- 
--static const char *wm831x_fll_parents[] = {
-+static const char * const wm831x_fll_parents[] = {
- 	"xtal",
- 	"clkin",
- };
-@@ -298,7 +298,7 @@ static void wm831x_clkout_unprepare(struct clk_hw *hw)
- 	wm831x_reg_lock(wm831x);
- }
- 
--static const char *wm831x_clkout_parents[] = {
-+static const char * const wm831x_clkout_parents[] = {
- 	"xtal",
- 	"fll",
- };
+	M.
+
+> ---
+>  arch/arm/kernel/arch_timer.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> index dd58035..df44c8c 100644
+> --- a/arch/arm/kernel/arch_timer.c
+> +++ b/arch/arm/kernel/arch_timer.c
+> @@ -137,7 +137,7 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+>  	/* Be safe... */
+>  	arch_timer_disable();
+>  
+> -	clk->features = CLOCK_EVT_FEAT_ONESHOT;
+> +	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
+>  	clk->name = "arch_sys_timer";
+>  	clk->rating = 450;
+>  	clk->set_mode = arch_timer_set_mode;
+
+
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Jazz is not dead. It just smells funny...
