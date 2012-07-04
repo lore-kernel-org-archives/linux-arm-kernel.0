@@ -1,52 +1,44 @@
-From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
-Date: Wed, 4 Jul 2012 16:19:26 +0200
-Subject: [PATCH] ARM: reboot: disable nonboot CPUs
-In-Reply-To: <20120704095053.GJ16319@n2100.arm.linux.org.uk>
-References: <1341388262-3801-1-git-send-email-per.forlin@stericsson.com>
- <20120704095053.GJ16319@n2100.arm.linux.org.uk>
-Message-ID: <4FF450EE.4040409@stericsson.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 4 Jul 2012 22:25:22 +0800
+Subject: [PATCH 2/2] ARM: PRIMA2: add PINMUX map for primaII UART1 and
+ SPI0/1
+In-Reply-To: <201207041145.28418.arnd@arndb.de>
+References: <1341373400-15763-1-git-send-email-Barry.Song@csr.com>
+ <1341373400-15763-2-git-send-email-Barry.Song@csr.com>
+ <201207041145.28418.arnd@arndb.de>
+Message-ID: <CAGsJ_4xg0_aXaE6GXdVK9DYbh2UUzqow=csmsqRGzFyGh7603w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2012 11:50 AM, Russell King - ARM Linux wrote:
-> On Wed, Jul 04, 2012 at 09:51:02AM +0200, Per Forlin wrote:
->> Disable the nonboot CPUs to safely migrate tasks and interrupts
->> to the boot CPU. This will prevent the nonboot CPUs to
->> interfer or block the boot CPU from being able to reboot
->> the system successfully.
->>
->> This reboot issue was detected on u8500 when using ab8500 to initaite a
->> system restart. The issue happens because smp_send_stop() stops the CPUs
->> wihouth migrating all resources.
->> If not issuing smp_send_stop() u8500 reboots successfully.
->>
->> It's optional to support CONFIG_PM_SLEEP_SMP therefore smp_send_stop()
->> can't simply be replaced by disable_nonboot_cpus()
-> 
-> I don't understand what or why you're trying to do this, it seems to be
-> unreliable to rely upon conditional sleep support to make system reboot
-> to work.
-> 
-> Yes, we know at the moment that smp_send_stop() results in the secondary
-> CPUs ending up spinning in the kernel, which is then potentially replaced
-> buy whatever happens after boot, but short of creating a new per-subarch
-> function, I don't see much other alternative.
-> 
-> Doesn't your kernel restart trigger a system hardware reset in any case?
-> That's about the only reliable way to do a system restart with SMP.
+2012/7/4 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 04 July 2012, Barry Song wrote:
+>> +/* Padmux settings */
+>> +static struct pinctrl_map prima2_padmux_map[] = {
+>> +       PIN_MAP_MUX_GROUP_DEFAULT("uart1", "pinctrl0", NULL, "uart1"),
+>> +       PIN_MAP_MUX_GROUP_DEFAULT("spi0", "pinctrl0", NULL, "spi0"),
+>> +       PIN_MAP_MUX_GROUP_DEFAULT("spi1", "pinctrl0", NULL, "spi1"),
+>> +};
+>> +
+>>  static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
+>>         { .compatible = "simple-bus", },
+>>         {},
+>> @@ -41,6 +48,7 @@ static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
+>>  void __init sirfsoc_mach_init(void)
+>>  {
+>>         of_platform_populate(NULL, sirfsoc_of_bus_ids, prima2_auxdata_lookup, NULL);
+>> +       pinctrl_register_mappings(prima2_padmux_map, ARRAY_SIZE(prima2_padmux_map));
+>>  }
+>
+> I haven't been following pinctrl too closely, but isn't this something
+> that would normally be represented by putting the lookup table into the
+> device tree?
 
-Thanks for your reply,
+i'd like to see that. i am not sure whether i have missed anything
+since i only saw the pinctrl_register_mappings samples.
+would linus clarify?
 
-The system doesn't reset in the case when calling smp_send_stop().
-This is because the reboot mechanism has a couple of dependencies and some of them lives on CPU1.
-The reboot is performed by an external chip that eventually switches of a regulator that triggers the restart.
-After smp_send_stop() the mailbox communication with the external chip fails, therefore the reboot doesn't happen.
-Right now I don't know in detail why this communication fails.
+>
+>         Arnd
+>
 
-Here are my options
-1. Run disble_nonboot_cpus() to migrate resources from CPU1 to CPU0
-2. Skip calling smp_send_stop(), that works fine on my platform.
-3. Make sure there are no reboot-dependencies on CPU1. Currently I lack the detail understanding of what these dependencies are.
-
-BR
-Per
+-barry
