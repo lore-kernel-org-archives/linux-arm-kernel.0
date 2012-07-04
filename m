@@ -1,26 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Jul 2012 11:49:22 +0000
-Subject: [GIT PULL] i.MX fixes for -rc
-In-Reply-To: <20120704075116.GA29310@pengutronix.de>
-References: <20120704075116.GA29310@pengutronix.de>
-Message-ID: <201207041149.22941.arnd@arndb.de>
+Date: Wed, 4 Jul 2012 11:52:12 +0000
+Subject: [GIT PULL][for 3.5] pull request of fixes branch from pxa git tree
+In-Reply-To: <CAN1soZxZAnWU=3c7JV5vr2F71+KrDRN+DN_hEezjS7b_hARsdQ@mail.gmail.com>
+References: <CAN1soZxZAnWU=3c7JV5vr2F71+KrDRN+DN_hEezjS7b_hARsdQ@mail.gmail.com>
+Message-ID: <201207041152.13226.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 July 2012, Sascha Hauer wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following i.MX fixes for -rc
-> 
+On Wednesday 04 July 2012, Haojian Zhuang wrote:
+> Please help to pull fixes branch from pxa git tree. Now commit
+> c12a3cb9dca9676 is appended.
 
-Thanks, pulled into the fixes branch. I plan to send out fixes tomorrow
-to Linus.
-
-
-> Uwe Kleine-K?nig (1):
->       ARM: imx: assert SCC gate stays enabled
-
-Is this something that should have been marked for stable, or was
-it just recently introduced? The description suggests the former.
+Pulled into the fixes branch, on top of the first patch that was
+already present. Planning to push to Linus tomorrow.
 
 	Arnd
