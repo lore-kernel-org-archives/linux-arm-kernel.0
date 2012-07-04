@@ -1,59 +1,64 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 4 Jul 2012 15:00:40 +0800
-Subject: [PATCH v4] mm: cma: add a simple kernel module as the helper to
- test CMA
-In-Reply-To: <CAGsJ_4zGjLgNBHsHF6xmadpsntXBRaOVt58AeOCaawZ-pbQdzQ@mail.gmail.com>
-References: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
- <03e601cd58ec$5b8177b0$12846710$%szyprowski@samsung.com>
- <CAGsJ_4yjV+HDXdYraJ6CdJrSz1EPGgE6BRvO-_9n+6_UWfxqww@mail.gmail.com>
- <op.wgvfgmm03l0zgt@mpn-glaptop>
- <000301cd59b1$87094eb0$951bec10$%szyprowski@samsung.com>
- <CAGsJ_4zGjLgNBHsHF6xmadpsntXBRaOVt58AeOCaawZ-pbQdzQ@mail.gmail.com>
-Message-ID: <CAGsJ_4w5bL8FU6E59BEBSWGkkU7T8Tr8-KZRV2EUYRR18Vo1TA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 4 Jul 2012 09:02:42 +0200
+Subject: [PATCH] ARM: imx: assert SCC gate stays enabled
+In-Reply-To: <1341221434-15233-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1341221434-15233-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120704070242.GH2698@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/7/4 Barry Song <21cnbao@gmail.com>:
-> Hi Marek,
->
-> 2012/7/4 Marek Szyprowski <m.szyprowski@samsung.com>:
->> Hello,
->>
->> On Tuesday, July 03, 2012 2:54 PM Michal Nazarewicz wrote:
->>
->>> > 2012/7/3 Marek Szyprowski <m.szyprowski@samsung.com>:
->>> >> IMHO the right place for such code is in drivers/misc instead of tools/cma.
->>> >>
->>> >> This patch contains a kernel module source code so it should be put with other kernel
->>> >> modules. tools/ directory is aimed to contain user space code useful for developing and
->>> >> testing Linux kernel.
->>>
->>> On Tue, 03 Jul 2012 09:39:34 +0200, Barry Song <21cnbao@gmail.com> wrote:
->>> > this one is aiming to test CMA, it should be in tools/ as Michal
->>> > Nazarewicz and i have talked about that.
->>> > it is not a real driver at all.
->>>
->>> Yeah, I feel like it's better placed in tools/ not to pollute other directories with
->>> drivers that are of no use to regular users.  I don't have strong feelings about it
->>> though, so I'm fine either way.
->>
->> Other test devices/drivers are in drivers directory (drivers/usb/misc/usbtest.c for
->> example), I don't see any good reason for polluting tools/ directory with kernel code.
->>
->> IMHO the right person to decide if it makes sense to have such drivers in drivers/mics/
->> or tools/cma/ is Greg KH. Barry, please resend it and ask Greg for the decision.
->
-> sure. thanks.
+On Mon, Jul 02, 2012 at 11:30:34AM +0200, Uwe Kleine-K?nig wrote:
+> The SCC clock is needed in internal boot mode and so must keep enabled.
+> This same issue was fixed for the pre-common-clk code in commit
 
-and BTW, if the only issue is the dir it should be placed to let Greg
-decide, would i also have your reviewed-by before sending to Greg KH?
+Applied as fix.
 
->
->>
->> Best regards
->> --
->> Marek Szyprowski
->> Samsung Poland R&D Center
->>
+Sascha
 
--barry
+> 
+> 	3d6e614 (mx35: Fix boot ROM hang in internal boot mode)
+> 
+> Cc: John Ogness <jogness@linutronix.de>
+> Cc: Hans J. Koch <hjk@hansjkoch.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk-imx35.c |    9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+> index 920a8cc..c6422fb 100644
+> --- a/arch/arm/mach-imx/clk-imx35.c
+> +++ b/arch/arm/mach-imx/clk-imx35.c
+> @@ -201,7 +201,6 @@ int __init mx35_clocks_init()
+>  			pr_err("i.MX35 clk %d: register failed with %ld\n",
+>  				i, PTR_ERR(clk[i]));
+>  
+> -
+>  	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
+>  	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
+>  	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
+> @@ -264,6 +263,14 @@ int __init mx35_clocks_init()
+>  	clk_prepare_enable(clk[iim_gate]);
+>  	clk_prepare_enable(clk[emi_gate]);
+>  
+> +	/*
+> +	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
+> +	 * before conversion to common clk also enabled UART1 (which isn't
+> +	 * handled here and not needed for mmc) and IIM (which is enabled
+> +	 * unconditionally above).
+> +	 */
+> +	clk_prepare_enable(clk[scc_gate]);
+> +
+>  	imx_print_silicon_rev("i.MX35", mx35_revision());
+>  
+>  #ifdef CONFIG_MXC_USE_EPIT
+> -- 
+> 1.7.10
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
