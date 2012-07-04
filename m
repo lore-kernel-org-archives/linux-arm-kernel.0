@@ -1,55 +1,29 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 4 Jul 2012 18:45:37 +0530
-Subject: [PATCH] clk: Fix cached parent ptrs allocation
-Message-ID: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 4 Jul 2012 14:17:50 +0100
+Subject: How to handle parameter variation across different boards but
+ same platform
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
+Message-ID: <20120704131749.GZ4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiler optimizes code someway that even if clk->parents
-is not NULL it tries to allocate parents array. Change the
-condition so that compiler does not optimize it in wrong
-way.
+On Wed, Jul 04, 2012 at 12:45:03PM +0000, Hebbar, Gururaja wrote:
 
-Also, initialize i to num_parents to make sure parent
-is searched using parent name if parents is NULL.
+You should fix your mailer to word wrap at less than 80 columns.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
-Mike,
+> Using machine_is_xxx() is not sufficient because there are 2 other
+> boards on same Platform/machine but with different values.
 
-There could be some other way to fix problem. I have not
-debugged it in detail but I think this simple change should do.
+> So, how to specify these parameters for the new board?
 
- drivers/clk/clk.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 026d901..b28f2ae 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1066,18 +1066,18 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
- 	struct clk *old_parent;
- 	unsigned long flags;
- 	int ret = -EINVAL;
--	u8 i;
-+	u8 i = clk->num_parents;
- 
- 	old_parent = clk->parent;
- 
- 	/* find index of new parent clock using cached parent ptrs */
--	if (clk->parents)
-+	if (!clk->parents)
-+		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
-+								GFP_KERNEL);
-+	else
- 		for (i = 0; i < clk->num_parents; i++)
- 			if (clk->parents[i] == parent)
- 				break;
--	else
--		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
--								GFP_KERNEL);
- 
- 	/*
- 	 * find index of new parent clock using string name comparison
--- 
-1.7.4.1
+What do you mean by "board"?  If these are plugin modules for your
+platform you need to either identify this at runtime and register a
+different machine driver or select at compile time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120704/076061df/attachment-0001.sig>
