@@ -1,58 +1,52 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 4 Jul 2012 14:17:48 +0000
-Subject: How to handle parameter variation across different boards but
- same platform
-In-Reply-To: <20120704140118.GA4111@opensource.wolfsonmicro.com>
-References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
- <20120704131749.GZ4111@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EA35456@DBDE01.ent.ti.com>
- <20120704140118.GA4111@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA35B10@DBDE01.ent.ti.com>
+From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
+Date: Wed, 4 Jul 2012 16:19:26 +0200
+Subject: [PATCH] ARM: reboot: disable nonboot CPUs
+In-Reply-To: <20120704095053.GJ16319@n2100.arm.linux.org.uk>
+References: <1341388262-3801-1-git-send-email-per.forlin@stericsson.com>
+ <20120704095053.GJ16319@n2100.arm.linux.org.uk>
+Message-ID: <4FF450EE.4040409@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 19:31:18, Mark Brown wrote:
-> On Wed, Jul 04, 2012 at 01:43:12PM +0000, Hebbar, Gururaja wrote:
-> > On Wed, Jul 04, 2012 at 18:47:50, Mark Brown wrote:
+On 07/04/2012 11:50 AM, Russell King - ARM Linux wrote:
+> On Wed, Jul 04, 2012 at 09:51:02AM +0200, Per Forlin wrote:
+>> Disable the nonboot CPUs to safely migrate tasks and interrupts
+>> to the boot CPU. This will prevent the nonboot CPUs to
+>> interfer or block the boot CPU from being able to reboot
+>> the system successfully.
+>>
+>> This reboot issue was detected on u8500 when using ab8500 to initaite a
+>> system restart. The issue happens because smp_send_stop() stops the CPUs
+>> wihouth migrating all resources.
+>> If not issuing smp_send_stop() u8500 reboots successfully.
+>>
+>> It's optional to support CONFIG_PM_SLEEP_SMP therefore smp_send_stop()
+>> can't simply be replaced by disable_nonboot_cpus()
 > 
-> > > What do you mean by "board"?  If these are plugin modules for your
-> > > platform you need to either identify this at runtime and register a
-> > > different machine driver or select at compile time.
+> I don't understand what or why you're trying to do this, it seems to be
+> unreliable to rely upon conditional sleep support to make system reboot
+> to work.
 > 
-> > By board I mean a new development board. 
+> Yes, we know at the moment that smp_send_stop() results in the secondary
+> CPUs ending up spinning in the kernel, which is then potentially replaced
+> buy whatever happens after boot, but short of creating a new per-subarch
+> function, I don't see much other alternative.
 > 
-> > New board
-> > sysclk = 24MHz
-> > codec_name = "tlv320aic3x-codec.1-001b"
-> 
-> > Previous Board
-> > sysclk = 12MHz
-> > .codec_name = "tlv320aic3x-codec.2-001b",
-> 
-> > Both boards share the same machine is API (machine_is_am33xx()).
-> 
-> > So, is there any mechanism/api to differentiate these 2 boards inside 
-> > Code?
-> 
-> > Has anyone else faced such situation?
-> 
-> If these are totally different boards they should have different machine
-> IDs set so machine_is_() should identify.  If that isn't there then you
-> need to do something custom to your products to identify the boards
-> further.
+> Doesn't your kernel restart trigger a system hardware reset in any case?
+> That's about the only reliable way to do a system restart with SMP.
 
-They are different boards with same SoC (AM33xx). So they both are true for
-machine_is_am33xx().
+Thanks for your reply,
 
-We have a means to detect the type of board but in arch/arm/mach-omap2/ 
-board file. However, I believe it is not recommended to call boards api
-inside drivers.
+The system doesn't reset in the case when calling smp_send_stop().
+This is because the reboot mechanism has a couple of dependencies and some of them lives on CPU1.
+The reboot is performed by an external chip that eventually switches of a regulator that triggers the restart.
+After smp_send_stop() the mailbox communication with the external chip fails, therefore the reboot doesn't happen.
+Right now I don't know in detail why this communication fails.
 
-Can you give me more info about the "custom option" you suggested? 
+Here are my options
+1. Run disble_nonboot_cpus() to migrate resources from CPU1 to CPU0
+2. Skip calling smp_send_stop(), that works fine on my platform.
+3. Make sure there are no reboot-dependencies on CPU1. Currently I lack the detail understanding of what these dependencies are.
 
-
-> 
-
-
-Regards, 
-Gururaja
+BR
+Per
