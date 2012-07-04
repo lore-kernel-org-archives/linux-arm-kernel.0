@@ -1,26 +1,39 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 4 Jul 2012 16:04:02 +0800
-Subject: [PATCH] ARM: mmp: remove mach/gpio-pxa.h
-In-Reply-To: <CAMPhdO-goJK9JATj_pxbBhDFyN+ZFEHUd6PbRiMeb6RkU1OBmQ@mail.gmail.com>
-References: <1341265214.1911.151.camel@x61.thuisdomein>
- <CAMPhdO-goJK9JATj_pxbBhDFyN+ZFEHUd6PbRiMeb6RkU1OBmQ@mail.gmail.com>
-Message-ID: <CAN1soZynjS8+0eq7pv=tkTcw4-52yvA-ygEmbKKY0b4LR2nQ0A@mail.gmail.com>
+Date: Wed, 4 Jul 2012 16:06:07 +0800
+Subject: [GIT PULL][for 3.5] pull request of fixes branch from pxa git tree
+Message-ID: <CAN1soZxZAnWU=3c7JV5vr2F71+KrDRN+DN_hEezjS7b_hARsdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2012 at 2:30 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Tue, Jul 3, 2012 at 5:40 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
->> Commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f ("ARM: pxa: change gpio
->> to platform device") removed all includes of mach/gpio-pxa.h. It kept
->> this unused header in the tree. Using it can't work, as it itself
->> includes the non-existent header plat/gpio-pxa.h. This header can safely
->> be removed.
->>
->> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
->
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
->
-Applied
+Hi Olof & Arnd,
+
+Please help to pull fixes branch from pxa git tree. Now commit
+c12a3cb9dca9676 is appended.
 
 Regards
 Haojian
+
+
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git fixes
+
+for you to fetch changes up to c12a3cb9dca96768a5f048bb50f3395216346bda:
+
+  ARM: mmp: remove mach/gpio-pxa.h (2012-07-04 15:58:11 +0800)
+
+----------------------------------------------------------------
+Paul Bolle (1):
+      ARM: mmp: remove mach/gpio-pxa.h
+
+Paul Parsons (1):
+      ARM: pxa: hx4700: Fix basic suspend/resume
+
+ arch/arm/mach-mmp/include/mach/gpio-pxa.h |   29 -----------------------------
+ arch/arm/mach-pxa/hx4700.c                |   15 ++++++++++++++-
+ 2 files changed, 14 insertions(+), 30 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
