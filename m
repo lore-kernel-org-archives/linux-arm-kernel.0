@@ -1,13 +1,16 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  4 Jul 2012 16:56:44 +0200
-Subject: [PATCH v8 7/9] arm: mach-mvebu: add compilation/configuration change
+Date: Wed,  4 Jul 2012 16:56:40 +0200
+Subject: [PATCH v8 3/9] arm: mach-mvebu: add source files
 In-Reply-To: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1341413806-26376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1341413806-26376-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1341413806-26376-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+[ben.dooks at codethink.co.uk: fixup style error in system-controller]
+[ben.dooks at codethink.co.uk: check result of of_match_node()]
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -15,54 +18,183 @@ Signed-off-by: Lior Amsalem <alior@marvell.com>
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Yehuda Yitschak <yehuday@marvell.com>
 Tested-by: Lior Amsalem <alior@marvell.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/Kconfig  |   14 ++++++++++++++
- arch/arm/Makefile |    1 +
- 2 files changed, 15 insertions(+)
+ arch/arm/mach-mvebu/Kconfig             |    7 +++
+ arch/arm/mach-mvebu/Makefile            |    1 +
+ arch/arm/mach-mvebu/Makefile.boot       |    1 +
+ arch/arm/mach-mvebu/common.h            |   20 ++++++
+ arch/arm/mach-mvebu/system-controller.c |  105 +++++++++++++++++++++++++++++++
+ 5 files changed, 134 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/Kconfig
+ create mode 100644 arch/arm/mach-mvebu/Makefile
+ create mode 100644 arch/arm/mach-mvebu/Makefile.boot
+ create mode 100644 arch/arm/mach-mvebu/common.h
+ create mode 100644 arch/arm/mach-mvebu/system-controller.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8e02882..519b5e0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -533,6 +533,18 @@ config ARCH_IXP4XX
- 	help
- 	  Support for Intel's IXP4XX (XScale) family of processors.
- 
-+config ARCH_MVEBU
-+	bool "Marvell SOCs with Device Tree support"
-+	select GENERIC_CLOCKEVENTS
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
-+	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
-+	select IRQ_DOMAIN
-+	select COMMON_CLK
-+	help
-+	  Support for the Marvell SoC Family with device tree support
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+new file mode 100644
+index 0000000..72d39e5
+--- /dev/null
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -0,0 +1,7 @@
++if ARCH_MVEBU
 +
- config ARCH_DOVE
- 	bool "Marvell Dove"
- 	select CPU_V7
-@@ -987,6 +999,8 @@ endchoice
- # Kconfigs may be included either alphabetically (according to the
- # plat- suffix) or along side the corresponding mach-* source.
- #
-+source "arch/arm/mach-mvebu/Kconfig"
++menu "Marvell SOC with device tree"
 +
- source "arch/arm/mach-at91/Kconfig"
- 
- source "arch/arm/mach-bcmring/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0298b00..f1a1a71 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -157,6 +157,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
- machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
- machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
- machine-$(CONFIG_ARCH_MXS)		:= mxs
-+machine-$(CONFIG_ARCH_MVEBU)		:= mvebu
- machine-$(CONFIG_ARCH_NETX)		:= netx
- machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
- machine-$(CONFIG_ARCH_OMAP1)		:= omap1
++endmenu
++
++endif
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+new file mode 100644
+index 0000000..7366ae7
+--- /dev/null
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -0,0 +1 @@
++obj-y += system-controller.o
+diff --git a/arch/arm/mach-mvebu/Makefile.boot b/arch/arm/mach-mvebu/Makefile.boot
+new file mode 100644
+index 0000000..b327175
+--- /dev/null
++++ b/arch/arm/mach-mvebu/Makefile.boot
+@@ -0,0 +1 @@
++zreladdr-y := 0x00008000
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+new file mode 100644
+index 0000000..f0eaa21
+--- /dev/null
++++ b/arch/arm/mach-mvebu/common.h
+@@ -0,0 +1,20 @@
++/*
++ * Core functions for Marvell System On Chip
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ARCH_MVEBU_COMMON_H
++#define __ARCH_MVEBU_COMMON_H
++
++void mvebu_restart(char mode, const char *cmd);
++
++#endif
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+new file mode 100644
+index 0000000..b8079df
+--- /dev/null
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -0,0 +1,105 @@
++/*
++ * System controller support for Armada 370 and XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada 370 and Armada XP SoCs both have a range of
++ * miscellaneous registers, that do not belong to a particular device,
++ * but rather provide system-level features. This basic
++ * system-controller driver provides a device tree binding for those
++ * registers, and implements utility functions offering various
++ * features related to those registers.
++ *
++ * For now, the feature set is limited to restarting the platform by a
++ * soft-reset, but it might be extended in the future.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++
++static void __iomem *system_controller_base;
++
++struct mvebu_system_controller {
++	u32 rstoutn_mask_offset;
++	u32 system_soft_reset_offset;
++
++	u32 rstoutn_mask_reset_out_en;
++	u32 system_soft_reset;
++};
++static struct mvebu_system_controller *mvebu_sc;
++
++const struct mvebu_system_controller armada_370_xp_system_controller = {
++	.rstoutn_mask_offset = 0x60,
++	.system_soft_reset_offset = 0x64,
++	.rstoutn_mask_reset_out_en = 0x1,
++	.system_soft_reset = 0x1,
++};
++
++const struct mvebu_system_controller orion_system_controller = {
++	.rstoutn_mask_offset = 0x108,
++	.system_soft_reset_offset = 0x10c,
++	.rstoutn_mask_reset_out_en = 0x4,
++	.system_soft_reset = 0x1,
++};
++
++static struct of_device_id of_system_controller_table[] = {
++	{
++		.compatible = "marvell,orion-system-controller",
++		.data = (void *) &orion_system_controller,
++	}, {
++		.compatible = "marvell,armada-370-xp-system-controller",
++		.data = (void *) &armada_370_xp_system_controller,
++	},
++	{ /* end of list */ },
++};
++
++void mvebu_restart(char mode, const char *cmd)
++{
++	if (!system_controller_base) {
++		pr_err("Cannot restart, system-controller not available: check the device tree\n");
++	} else {
++		/*
++		 * Enable soft reset to assert RSTOUTn.
++		 */
++		writel(mvebu_sc->rstoutn_mask_reset_out_en,
++			system_controller_base +
++			mvebu_sc->rstoutn_mask_offset);
++		/*
++		 * Assert soft reset.
++		 */
++		writel(mvebu_sc->system_soft_reset,
++			system_controller_base +
++			mvebu_sc->system_soft_reset_offset);
++	}
++
++	while (1)
++		;
++}
++
++static int __init mvebu_system_controller_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, of_system_controller_table);
++	if (np) {
++		const struct of_device_id *match =
++		    of_match_node(of_system_controller_table, np);
++		BUG_ON(!match);
++		system_controller_base = of_iomap(np, 0);
++		mvebu_sc = (struct mvebu_system_controller *)match->data;
++	}
++
++	return 0;
++}
++
++arch_initcall(mvebu_system_controller_init);
 -- 
 1.7.9.5
