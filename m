@@ -1,37 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 4 Jul 2012 09:07:51 +0200
-Subject: MX28 poweroff issue
-In-Reply-To: <201207040547.37021.marex@denx.de>
-References: <201207040030.36713.marex@denx.de>
- <201207040412.46748.marex@denx.de>
- <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
- <201207040547.37021.marex@denx.de>
-Message-ID: <20120704070751.GB5398@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 4 Jul 2012 09:11:59 +0200
+Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
+In-Reply-To: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+Message-ID: <20120704071159.GJ2698@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Wed, Jul 04, 2012 at 05:47:36AM +0200, Marek Vasut wrote:
-> Dear Fabio Estevam,
+On Tue, Jul 03, 2012 at 01:09:52PM +0200, javier Martin wrote:
+> Hi,
+> I've found the following problems in linux-3.5-rc5
+> (6887a4131da3adaab011613776d865f4bcfb5678) in our Visstrim M10 board:
 > 
-> > On Tue, Jul 3, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
-> > > Dunno, can you try on mx28 please?
-> > 
-> > I get the same crash as you reported.
-> > 
-> > On a mx27 (also ARM926EJS) I do not see this problem.
+> At boot:
 > 
-> Thanks for verifying this, Fabio. The mx28 generates timer interrupt after it 
-> should be sitting in the endless loop, therefore this crash. I think it's 
-> because the mx28 (mxs at al) is using the new clock framework (compared to mxc) 
-> and the timer isn't deinited by then ...
-On an i.MX35 with v3.5-rc4 (which is using the new clock framework in
-the meantime, but is an ARM11) I don't see this crash.
+> Moreover, the following 'clk_get()' fails in mx2_camera.c driver:
+> 
+> 	pcdev->clk_emma = clk_get(NULL, "emma");
+> 	if (IS_ERR(pcdev->clk_emma)) {
+> 		err = PTR_ERR(pcdev->clk_emma);
+> 		goto exit_free_irq;
+> 	}
+> 
+> 
+> I know you guys have been doing some hard deep job with the clocks in
+> the i.MX. I've tried a bisect but it's highly thedious since there are
+> a lot of commits that do not compile:
+> 
 
-Best regards
-Uwe
+[...]
+
+> Do you have any hints of what could have been broken? I'll keep on
+> searching meanwhile.
+
+Mainly these two problems exist:
+
+- missing clk_prepare (or clk_prepare_enable)
+- missing (or mismatching) clk_register_clkdev
+
+Sascha
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
