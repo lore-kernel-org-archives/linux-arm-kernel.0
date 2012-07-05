@@ -1,46 +1,44 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 05 Jul 2012 14:43:08 +0200
-Subject: [PATCH] ARM: davinci: cp_intc: Add OF support for TI interrupt
- controller
-In-Reply-To: <1341342970-27535-1-git-send-email-nsekhar@ti.com>
-References: <1341342970-27535-1-git-send-email-nsekhar@ti.com>
-Message-ID: <4FF58BDC.6060802@denx.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 5 Jul 2012 13:45:49 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <4FF58B68.5000703@linaro.org>
+References: <20120703132447.GN29030@opensource.wolfsonmicro.com>
+ <4FF2F82D.9080507@linaro.org>
+ <20120703142123.GQ29030@opensource.wolfsonmicro.com>
+ <4FF54406.3000307@linaro.org>
+ <20120705094541.GK4111@opensource.wolfsonmicro.com>
+ <4FF57EA9.7060107@linaro.org>
+ <20120705120600.GT4111@opensource.wolfsonmicro.com>
+ <4FF58571.2090807@linaro.org>
+ <20120705122947.GY4111@opensource.wolfsonmicro.com>
+ <4FF58B68.5000703@linaro.org>
+Message-ID: <20120705124549.GD4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sekhar,
+On Thu, Jul 05, 2012 at 01:41:12PM +0100, Lee Jones wrote:
+> On 05/07/12 13:29, Mark Brown wrote:
 
-On 03.07.2012 21:16, Sekhar Nori wrote:
-> From: Heiko Schocher<hs@denx.de>
->
-> Add a function to initialize the Common Platform Interrupt Controller
-> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
->
-> Signed-off-by: Heiko Schocher<hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> Cc: Sekhar Nori<nsekhar@ti.com>
-> Cc: Wolfgang Denk<wd@denx.de>
-> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
-> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
-> ---
->   .../devicetree/bindings/arm/davinci/cp-intc.txt    |   27 ++++++++++++++++++++
->   arch/arm/mach-davinci/cp_intc.c                    |   16 +++++++++---
->   arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
->   3 files changed, 41 insertions(+), 3 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/davinci/cp-intc.txt
+> If DT is _not_ enabled, we do:
 
-Thanks!
+>   From platform code:
+>    - Register the DB8500-PRCMU
+>    - Register the AB8500
 
-Tested on the enbw_cmc board.
+> So you see the registration is separate.
 
-Sent the updated "ARM: davinci: add support for the am1808 based enbw_cmc"
-based on this patch soon.
+Right, so what I'm saying is that what I'd expect unless there's
+something unusual going on is that you wouldn't be doing the separate
+registration of the AB8500 here and would instead be passing the
+platform data for the AB8500 through in the same way you pass the DT
+data through.
 
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+DT and non-DT do have a very similar model for this stuff.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/3cfff40b/attachment.sig>
