@@ -1,32 +1,170 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Jul 2012 08:36:11 +0000
-Subject: [GIT PULL] ARM: OMAP2+: more fixes intended for 3.5-rc
-In-Reply-To: <20120705081520.GT1122@atomide.com>
-References: <alpine.DEB.2.00.1207040806270.6760@utopia.booyaka.com>
- <20120705081520.GT1122@atomide.com>
-Message-ID: <201207050836.12180.arnd@arndb.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 05 Jul 2012 10:33:13 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201207050148.27289.marex@denx.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <4FF40044.90904@metafoo.de> <201207050148.27289.marex@denx.de>
+Message-ID: <4FF55149.2080801@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012, Tony Lindgren wrote:
-> * Paul Walmsley <paul@pwsan.com> [120704 07:13]:
-> > Hi Tony
-> > 
-> > The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-> > 
-> >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.5rc
-> > 
-> > for you to fetch changes up to d7a0b5133f6b1d53d693b9b9873e64e3c8f0db0e:
-> > 
-> >   ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4 (2012-07-04 06:55:29 -0600)
-> > 
-> Thanks pulling into fixes.
+On 07/05/2012 01:48 AM, Marek Vasut wrote:
+> Dear Lars-Peter Clausen,
+> 
+>> On 07/04/2012 04:15 AM, Marek Vasut wrote:
+>>> This driver is very basic. It supports userland trigger, buffer and
+>>> raw access to channels. The support for delay channels is missing
+>>> altogether.
+>>>
+>>> Signed-off-by: Marek Vasut <marex@denx.de>
+>>> Cc: Jonathan Cameron <jic23@kernel.org>
+>>> Cc: Wolfgang Denk <wd@denx.de>
+>>> Cc: Juergen Beisert <jbe@pengutronix.de>
+>>> [...]
+>>
+>> The overall structure looks good, but a few things need to be addressed.
+>> I also think the driver doesn't have to go through staging and could be put
+>> in to the out-of-staging part of iio.
+> 
+> Come and rip me to shreds ;-)
+> 
+> [...]
+> 
+>>> +	wait_queue_head_t	wq_data_avail[LRADC_MAX_MAPPED_CHANS];
+>>> +	bool			wq_done[LRADC_MAX_MAPPED_CHANS];
+>>
+>> This and it's usage looks a bit like an open-coded struct completion.
+> 
+> Indeed, completion is good for this :)
+> 
+>>> +};
+>>> +
+>>> +struct mxs_lradc_data {
+>>> +	struct mxs_lradc	*lradc;
+>>> +};
+>>
+>> Is there any reason not to use the mxs_lradc struct directly has the iio
+>> data?
+> 
+> I explained it below in the patch. I hope we'll eventually support the delay 
+> triggers, which will need 4 separate IIO devices. And this is where this 
+> structure will be augmented by other components.
 
-I'm planning to send a set of fixes upstream to Linus today. Should I
-pull your fixes branch before that?
+Ok I saw the comment, but it wasn't obvious to me that delay channels will
+require multiple IIO devices. Might make sense to state this explicitly.
 
-	Arnd
+> 
+>>> [...]
+>>>
+>>> +
+>>> +/*
+>>> + * Channel management
+>>> + *
+>>> + * This involves crazy mapping between 8 virtual channels the CTRL4
+>>> register + * can harbor and 16 channels total this hardware supports.
+>>> + */
+>>
+>> I suppose this means only a maximum 8 channels can be active at a time.
+>> I've recently posted a patch which makes it easy to implement such a
+>> restriction. http://www.spinics.net/lists/linux-iio/msg05936.html and
+>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
+>> validate callback implementation. In your case you'd check for
+>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
+> 
+> This is good. When do you expect this to hit linux-next possibly? Or at least 
+> linux-iio?
+> 
+
+soon, hopefully.
+
+> [..]
+> 
+>>> +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+>>> +			const struct iio_chan_spec *chan,
+>>> +			int *val, int *val2, long m)
+>>> +{
+>>> +	struct mxs_lradc_data *data = iio_priv(iio_dev);
+>>> +	struct mxs_lradc *lradc = data->lradc;
+>>> +	int ret, slot;
+>>> +
+>>> +	if (m != 0)
+>>
+>> I'd use the symbolic constant here IIO_CHAN_INFO_RAW
+>>
+>>> +		return -EINVAL;
+>>> +
+>>> +	/* Map channel. */
+>>> +	slot = mxs_lradc_map_channel(lradc, chan->channel,
+>>> LRADC_CHAN_FLAG_RAW); +	if (slot < 0)
+>>> +		return slot;
+>>> +
+>>> +	/* Start sampling. */
+>>> +	mxs_lradc_run_slots(lradc, 1 << slot);
+>>> +
+>>> +	/* Wait for completion on the channel, 1 second max. */
+>>> +	lradc->wq_done[slot] = false;
+>>> +	ret = wait_event_interruptible_timeout(lradc->wq_data_avail[slot],
+>>> +					       lradc->wq_done[slot],
+>>> +					       msecs_to_jiffies(1000));
+>>> +	if (!ret) {
+
+Just noticed this, wait_event_interruptible_timeout can return an error
+value, e.g. if it has been interrupted.
+
+>>> +		ret = -ETIMEDOUT;
+>>> +		goto err;
+>>> +	}
+>>> +
+>>
+>> How well will this work if the device is currrently in buffered mode? Maybe
+>> it's better do disablow it by checking iio_buffer_enabled and return -EBUSY
+>> if it returns true;
+> 
+> I believe this should work perfectly OK, why won't it ? I tried to avoid such 
+> artificial limitation.
+> 
+
+I suppose it is fine, but not knowing the hardware, what does
+mxs_lradc_run_slots do exactly?
+
+> [...]
+> 
+>>> +static int mxs_lradc_configure_trigger(struct iio_trigger *trig, bool
+>>> state) +{
+>>> +	struct iio_dev *iio = trig->private_data;
+>>> +	struct mxs_lradc_data *data = iio_priv(iio);
+>>> +	struct mxs_lradc *lradc = data->lradc;
+>>> +	struct iio_buffer *buffer = iio->buffer;
+>>> +	int slot, bit, ret = 0;
+>>> +	uint8_t map = 0;
+>>> +	unsigned long chans = 0;
+>>> +
+>>> +	if (!state)
+>>> +		goto exit;
+>>> +
+>>> +	lradc->buffer = kmalloc(iio->scan_bytes, GFP_KERNEL);
+>>> +	if (!lradc->buffer)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	for_each_set_bit(bit, buffer->scan_mask, LRADC_MAX_TOTAL_CHANS) {
+>>> +		slot = mxs_lradc_map_channel(lradc, bit, LRADC_CHAN_FLAG_BUF);
+>>> +
+>>> +		if (slot < 0) {
+>>> +			ret = -EINVAL;
+>>> +			goto exit;
+>>> +		}
+>>> +		map |= 1 << slot;
+>>> +		chans |= 1 << bit;
+>>> +	}
+>>
+>> I think this should go into the buffer preenable and postdisable callbacks.
+> 
+> How much of it, only the slot mapping or the allocation too ?
+> 
+
+Yeah I guess it is a bit tricky in this case. A good rule of thumb is to ask
+yourself whether the driver will (hypothetically) still work if another
+trigger is used. So the buffer allocation should certainly be handled by the
+buffer code, either the prenable or the update_scan_mode callback. The
+channel mapping part is not so obvious, but I'd put it in the
+preenable/postdisable callbacks as well.
