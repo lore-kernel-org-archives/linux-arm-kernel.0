@@ -1,30 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 04 Jul 2012 19:50:47 -0700
-Subject: [PATCH] remoteproc: adopt the driver core's alloc/add/del/put
- naming
-In-Reply-To: <1341409019-32166-1-git-send-email-ohad@wizery.com>
-References: <1341409019-32166-1-git-send-email-ohad@wizery.com>
-Message-ID: <4FF50107.8030406@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jul 2012 11:06:56 +0800
+Subject: [PATCH] clk: mxs: imx28: decrease the frequency of ref_io1 for
+ SSP2 and SSP3
+In-Reply-To: <1341398994-28028-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1341398994-28028-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20120705030654.GB10610@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/4/2012 6:36 AM, Ohad Ben-Cohen wrote:
-> To make remoteproc's API more intuitive for developers, we adopt
-> the driver core's naming, i.e. alloc -> add -> del -> put. We'll also
-> add register/unregister when their first user shows up.
->
-> Otherwise - there's no functional change here.
->
-> Suggested by Russell King <linux@arm.linux.org.uk>.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
+On Wed, Jul 04, 2012 at 01:49:54PM +0300, Lauri Hintsala wrote:
+> SSP0 and SSP1 use ref_io0 which has decreased frequency. Expand
+> the frequency fix for ref_io1 to get SSP2 and SSP3 to work.
+> 
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Applied, thanks.
 
-> Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
-> Cc: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 > ---
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>  drivers/clk/mxs/clk-imx28.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+> index 2826a26..0097c3a 100644
+> --- a/drivers/clk/mxs/clk-imx28.c
+> +++ b/drivers/clk/mxs/clk-imx28.c
+> @@ -112,11 +112,11 @@ static void __init clk_misc_init(void)
+>  
+>  	/*
+>  	 * 480 MHz seems too high to be ssp clock source directly,
+> -	 * so set frac0 to get a 288 MHz ref_io0.
+> +	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
+>  	 */
+>  	val = readl_relaxed(FRAC0);
+> -	val &= ~(0x3f << BP_FRAC0_IO0FRAC);
+> -	val |= 30 << BP_FRAC0_IO0FRAC;
+> +	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
+> +	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
+>  	writel_relaxed(val, FRAC0);
+>  }
+>  
+> -- 
+> 1.7.9.5
+> 
