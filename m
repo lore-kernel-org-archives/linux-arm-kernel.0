@@ -1,40 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Jul 2012 08:32:16 +0000
-Subject: How to handle parameter variation across different boards but
- same platform
-In-Reply-To: <4FF52948.6090904@ti.com>
-References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
- <20120704142745.GC4111@opensource.wolfsonmicro.com> <4FF52948.6090904@ti.com>
-Message-ID: <201207050832.16750.arnd@arndb.de>
+Date: Thu, 5 Jul 2012 08:36:11 +0000
+Subject: [GIT PULL] ARM: OMAP2+: more fixes intended for 3.5-rc
+In-Reply-To: <20120705081520.GT1122@atomide.com>
+References: <alpine.DEB.2.00.1207040806270.6760@utopia.booyaka.com>
+ <20120705081520.GT1122@atomide.com>
+Message-ID: <201207050836.12180.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012, Vaibhav Hiremath wrote:
-> On 7/4/2012 7:57 PM, Mark Brown wrote:
-> > On Wed, Jul 04, 2012 at 02:17:48PM +0000, Hebbar, Gururaja wrote:
-> >> On Wed, Jul 04, 2012 at 19:31:18, Mark Brown wrote:
+On Thursday 05 July 2012, Tony Lindgren wrote:
+> * Paul Walmsley <paul@pwsan.com> [120704 07:13]:
+> > Hi Tony
 > > 
-> >>> If these are totally different boards they should have different machine
-> >>> IDs set so machine_is_() should identify.  If that isn't there then you
-> >>> need to do something custom to your products to identify the boards
-> >>> further.
+> > The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 > > 
-> >> They are different boards with same SoC (AM33xx). So they both are true for
-> >> machine_is_am33xx().
+> >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 > > 
-> 
-> What if the device only supports Linux boot from DT, where we set
-> machine_desc.nr = ~0 ??
-> 
-> Does machine ID still gets set? May be I am missing something...
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.5rc
+> > 
+> > for you to fetch changes up to d7a0b5133f6b1d53d693b9b9873e64e3c8f0db0e:
+> > 
+> >   ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4 (2012-07-04 06:55:29 -0600)
+> > 
+> Thanks pulling into fixes.
 
-No, it doesn't.
-
-> As part of my debugging, on AM335xEVM platform machine_is_am33xx()
-> returns false, since the value of machine_desc.nr is set to ~0.
-
-Correct. However, when you are booting using the device tree, parameters
-such as the clock frequency of a device should be encoded in the device
-tree itself, so you don't need to know which machine you are on.
+I'm planning to send a set of fixes upstream to Linus today. Should I
+pull your fixes branch before that?
 
 	Arnd
