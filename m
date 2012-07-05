@@ -1,79 +1,27 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Thu, 5 Jul 2012 17:45:05 +0000
-Subject: Current state of AM33xx patches
-In-Reply-To: <4FF42761.2000701@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 5 Jul 2012 23:36:27 +0530
+Subject: [PATCH] i2c i.MX: Fix divider table
+In-Reply-To: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CAM=Q2csv3rEs-xseGd6NHxR3wRSZp82ZqNB1mn-_C4=5=nOc6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Daniel Mack [mailto:zonque at gmail.com]
-> Sent: Wednesday, July 04, 2012 4:52 PM
-> To: Hiremath, Vaibhav
-> Cc: Paul Walmsley; Nori, Sekhar; Jason Kridner; Tony Lindgren; Hilman,
-> Kevin; Hernandez, Carlos; Maupin, Chase; linux-omap at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; Kridner, Jason; N, Mugunthan V
-> Subject: Re: Current state of AM33xx patches
-> 
-> On 04.07.2012 12:50, Hiremath, Vaibhav wrote:
-> > On Wed, Jul 04, 2012 at 15:37:31, Paul Walmsley wrote:
-> >> On Sat, 30 Jun 2012, Daniel Mack wrote:
-> >>
-> >>> Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
-> >>> the components I need.
-> >>
-> >> Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod
-> data
-> >> for the AM33xx.  There might be some missing integration code to build
-> the
-> >> devices for the newer IP blocks, though.
-> >>
-> >
-> > I would also be interested to know more here.
-> >
-> >
-> >>> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
-> >>
-> >> Mainline has:
-> >>
-> >> drivers/net/ethernet/ti/davinci_emac.c
-> >
-> > Not required for AM335X.
-> >
-> >> drivers/net/ethernet/ti/davinci_mdio.c
-> >>
-> >> Those might work for you.
-> >>
-> >
-> > Few more files,
-> >
-> > drivers/net/ethernet/ti/cpsw.c
-> > drivers/net/ethernet/ti/davinci_cpdma.c
-> >
-> >
-> > Wanted to highlight one point,
-> > You still have to add platform device code to get it working.
-> 
-> Exactly. And a hwmod binding for DT. Do you have patches for that?
-> 
-> 
-> Daniel
+On Thu, Jul 5, 2012 at 6:40 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Measurements on i.MX1 and i.MX53 have shown that the divider values
+> in the datasheets are wrong.
+How were the measurements made?
 
-I am working on DT support for cpsw and will be submitting the patch by 
-July 20, 2012
+> the values from first, third and fourth
+> column were all measured to be 8 higher than in the datasheet. It
+> should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
+> the same as the i2c unit is unchanged since the i.MX1.
 
-With regards
-Mugunthan V N
+Also does it vary board to board or is fixed by the ip?
+What I mean is that the external cap etc.
+
+
+
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
