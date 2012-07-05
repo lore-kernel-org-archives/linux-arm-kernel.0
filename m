@@ -1,80 +1,71 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 5 Jul 2012 18:10:59 +0530
-Subject: [PATCH v2 REPOST 4/4] ARM: OMAP2+: dmtimer: cleanup fclk usage
-Message-ID: <1341492059-5544-1-git-send-email-tarun.kanti@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 05 Jul 2012 13:41:12 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <20120705122947.GY4111@opensource.wolfsonmicro.com>
+References: <20120703123552.GC25995@sirena.org.uk>
+ <4FF2EEA1.6080204@linaro.org>
+ <20120703132447.GN29030@opensource.wolfsonmicro.com>
+ <4FF2F82D.9080507@linaro.org>
+ <20120703142123.GQ29030@opensource.wolfsonmicro.com>
+ <4FF54406.3000307@linaro.org>
+ <20120705094541.GK4111@opensource.wolfsonmicro.com>
+ <4FF57EA9.7060107@linaro.org>
+ <20120705120600.GT4111@opensource.wolfsonmicro.com>
+ <4FF58571.2090807@linaro.org>
+ <20120705122947.GY4111@opensource.wolfsonmicro.com>
+Message-ID: <4FF58B68.5000703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With omap_hwmod_get_main_clk() now available, this can be passed to
-clk_get() to extract the fclk and thus avoid construction of fclk name.
-Corrected the timer fck name mis-match between clock44xx_data.c and
-omap_hwmod_44xx_data.c. For other platforms this is already taken care.
+On 05/07/12 13:29, Mark Brown wrote:
+> On Thu, Jul 05, 2012 at 01:15:45PM +0100, Lee Jones wrote:
+>> On 05/07/12 13:06, Mark Brown wrote:
+>
+>>> You seemed to be suggesting that your fix was in some way related to the
+>>> DT changes in the MFD core.  I'm unsure as to the relationship here.
+>
+>> How is it not related? In English the patch would say; "Only
+>> register the AB8500 via the MFD API when we're booting with Device
+>> Tree. This allows AB8500 related devices to be registered in the
+>> normal way, rather than registering them individually using DT and
+>> prevents duplicate registration when we are not executing a Device
+>> Tree enabled boot."
+>
+> This is what you said before and it still doesn't make much sense to me.
+> I'd expect that if anything your first statement would be the opposite
+> of what happens - it seems like your non-DT code is doing something
+> really odd.  If anything I'd expect adding a DT to add duplicate
+> registrations, I'd not expect it to remove registrations.
+>
+> What I'd expect is that if we can figure out that we need to register
+> the AB8500 automatically without any information from DT then we should
+> be able to figure out exactly the same thing in the non-DT case.  I
+> would therefore expect that the change would instead be something which
+> removes the other source of registrations.
 
-Cc: Cousson, Benoit <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Now you're confusing me. :)
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
-Reference:
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-Branch: cleanup-part2
+If DT is _not_ enabled, we do:
 
-Tested on ZOOM3, BLAZE, PANDA.
+   From platform code:
+    - Register the DB8500-PRCMU
+    - Register the AB8500
 
- arch/arm/mach-omap2/clock44xx_data.c |   22 +++++++++++-----------
- arch/arm/mach-omap2/timer.c          |    3 +--
- 2 files changed, 12 insertions(+), 13 deletions(-)
+So you see the registration is separate.
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index ba6f9a0..f9d4f58 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -3299,17 +3299,17 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"smartreflex_core_fck",		&smartreflex_core_fck,	CK_443X),
- 	CLK(NULL,	"smartreflex_iva_fck",		&smartreflex_iva_fck,	CK_443X),
- 	CLK(NULL,	"smartreflex_mpu_fck",		&smartreflex_mpu_fck,	CK_443X),
--	CLK(NULL,	"gpt1_fck",			&timer1_fck,	CK_443X),
--	CLK(NULL,	"gpt10_fck",			&timer10_fck,	CK_443X),
--	CLK(NULL,	"gpt11_fck",			&timer11_fck,	CK_443X),
--	CLK(NULL,	"gpt2_fck",			&timer2_fck,	CK_443X),
--	CLK(NULL,	"gpt3_fck",			&timer3_fck,	CK_443X),
--	CLK(NULL,	"gpt4_fck",			&timer4_fck,	CK_443X),
--	CLK(NULL,	"gpt5_fck",			&timer5_fck,	CK_443X),
--	CLK(NULL,	"gpt6_fck",			&timer6_fck,	CK_443X),
--	CLK(NULL,	"gpt7_fck",			&timer7_fck,	CK_443X),
--	CLK(NULL,	"gpt8_fck",			&timer8_fck,	CK_443X),
--	CLK(NULL,	"gpt9_fck",			&timer9_fck,	CK_443X),
-+	CLK(NULL,	"timer1_fck",			&timer1_fck,	CK_443X),
-+	CLK(NULL,	"timer10_fck",			&timer10_fck,	CK_443X),
-+	CLK(NULL,	"timer11_fck",			&timer11_fck,	CK_443X),
-+	CLK(NULL,	"timer2_fck",			&timer2_fck,	CK_443X),
-+	CLK(NULL,	"timer3_fck",			&timer3_fck,	CK_443X),
-+	CLK(NULL,	"timer4_fck",			&timer4_fck,	CK_443X),
-+	CLK(NULL,	"timer5_fck",			&timer5_fck,	CK_443X),
-+	CLK(NULL,	"timer6_fck",			&timer6_fck,	CK_443X),
-+	CLK(NULL,	"timer7_fck",			&timer7_fck,	CK_443X),
-+	CLK(NULL,	"timer8_fck",			&timer8_fck,	CK_443X),
-+	CLK(NULL,	"timer9_fck",			&timer9_fck,	CK_443X),
- 	CLK(NULL,	"uart1_fck",			&uart1_fck,	CK_443X),
- 	CLK(NULL,	"uart2_fck",			&uart2_fck,	CK_443X),
- 	CLK(NULL,	"uart3_fck",			&uart3_fck,	CK_443X),
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 840929b..4c9ef35 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -173,8 +173,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 		return -ENXIO;
- 
- 	/* After the dmtimer is using hwmod these clocks won't be needed */
--	sprintf(name, "gpt%d_fck", gptimer_id);
--	timer->fclk = clk_get(NULL, name);
-+	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
- 	if (IS_ERR(timer->fclk))
- 		return -ENODEV;
- 
+If DT _is_ enabled, we do:
+
+   From Device Tree:
+    - Register the DB8500-PRCMU (which in turn registers the AB8500)
+
+In this case we the DB8500-PRCMU goes on to register the AB8500 for us, 
+so we need to ensure DT _is_ running before we go on to do that, because 
+if we don't the DB8500-PRCMU will register it and so will platform code.
+
 -- 
-1.7.0.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
