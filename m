@@ -1,64 +1,106 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Jul 2012 14:06:11 +0100
-Subject: [PATCH 8/9] ARM: ux500: Clean-up temporary Device Tree enablement
- helpers
+Date: Thu,  5 Jul 2012 14:06:07 +0100
+Subject: [PATCH 4/9] ARM: ux500: Ensure vendor specific properties have the
+ vendor's identifier
 In-Reply-To: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
 References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1341493572-29735-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we remove some of the extra overhead we introduced to make
-DT:ing the Snowball platform easier. Unfortunately we can't
-remove everything. We are forced to leave cpufreq and DMA behind
-until they have been successfully Device Tree enabled.
+Any non-standard property should contain the vendor's identifier which
+should be perpended onto the property name followed by a comma. This
+aids in name-space collision prevention.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |   10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index c8dd94f..d7a28c0 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -137,10 +137,6 @@ static struct platform_device *platform_devs[] __initdata = {
- 	&db8500_prcmu_device,
- };
- 
--static struct platform_device *of_platform_devs[] __initdata = {
--	&u8500_dma40_device,
--};
--
- static resource_size_t __initdata db8500_gpio_base[] = {
- 	U8500_GPIOBANK0_BASE,
- 	U8500_GPIOBANK1_BASE,
-@@ -232,7 +228,6 @@ struct device * __init u8500_init_devices(void)
- struct device * __init u8500_of_init_devices(void)
- {
- 	struct device *parent;
--	int i;
- 
- 	parent = db8500_soc_device_init();
- 
-@@ -241,8 +236,7 @@ struct device * __init u8500_of_init_devices(void)
- 	platform_device_register_data(parent,
- 		"cpufreq-u8500", -1, NULL, 0);
- 
--	for (i = 0; i < ARRAY_SIZE(of_platform_devs); i++)
--		of_platform_devs[i]->dev.parent = parent;
-+	u8500_dma40_device.dev.parent = parent;
- 
- 	/*
- 	 * Devices to be DT:ed:
-@@ -250,7 +244,7 @@ struct device * __init u8500_of_init_devices(void)
- 	 *   db8500_pmu_device   = done
- 	 *   db8500_prcmu_device = done
- 	 */
--	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
-+	platform_device_register(&u8500_dma40_device);
- 
- 	return parent;
- }
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index d89b88d..7279165 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -60,7 +60,7 @@
+ 			interrupts = <0 119 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <0>;
+@@ -73,7 +73,7 @@
+ 			interrupts = <0 120 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <1>;
+@@ -86,7 +86,7 @@
+ 			interrupts = <0 121 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <2>;
+@@ -99,7 +99,7 @@
+ 			interrupts = <0 122 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <3>;
+@@ -112,7 +112,7 @@
+ 			interrupts = <0 123 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <4>;
+@@ -125,7 +125,7 @@
+ 			interrupts = <0 124 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <5>;
+@@ -138,7 +138,7 @@
+ 			interrupts = <0 125 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <6>;
+@@ -151,7 +151,7 @@
+ 			interrupts = <0 126 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <7>;
+@@ -164,7 +164,7 @@
+ 			interrupts = <0 127 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			supports-sleepmode;
++			st,supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			gpio-bank = <8>;
 -- 
 1.7.9.5
