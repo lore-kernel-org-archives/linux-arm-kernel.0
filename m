@@ -1,29 +1,79 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 5 Jul 2012 22:51:17 +0530
-Subject: [PATCH] clk: Fix cached parent ptrs allocation
-In-Reply-To: <4FF5BBD3.6080704@wwwdotorg.org>
-References: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
- <4FF5BBD3.6080704@wwwdotorg.org>
-Message-ID: <4FF5CD0D.7030902@nvidia.com>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Thu, 5 Jul 2012 17:45:05 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FF42761.2000701@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+ <4FF42761.2000701@gmail.com>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012 09:37 PM, Stephen Warren wrote:
-> On 07/04/2012 07:15 AM, Prashant Gaikwad wrote:
->> Compiler optimizes code someway that even if clk->parents
->> is not NULL it tries to allocate parents array. Change the
->> condition so that compiler does not optimize it in wrong
->> way.
-> If simply inverting the if test and swapping the if/else blocks solves
-> some problem, that sounds like a compiler bug that we need to track down
-> and file/fix.
->
->> Also, initialize i to num_parents to make sure parent
->> is searched using parent name if parents is NULL.
-> Are you sure the change to initialize i wasn't all that was required to
-> solve the problem though? Mike has applied a patch for this that'll be
-> applied to 3.5-rcX and hence trickle into 3.6.
-Just initializing i does not fix problem. The patch Mike has applied 
-does two things
-1. remove warning for uninitialized i
-2. invert the if test
+> -----Original Message-----
+> From: Daniel Mack [mailto:zonque at gmail.com]
+> Sent: Wednesday, July 04, 2012 4:52 PM
+> To: Hiremath, Vaibhav
+> Cc: Paul Walmsley; Nori, Sekhar; Jason Kridner; Tony Lindgren; Hilman,
+> Kevin; Hernandez, Carlos; Maupin, Chase; linux-omap at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; Kridner, Jason; N, Mugunthan V
+> Subject: Re: Current state of AM33xx patches
+> 
+> On 04.07.2012 12:50, Hiremath, Vaibhav wrote:
+> > On Wed, Jul 04, 2012 at 15:37:31, Paul Walmsley wrote:
+> >> On Sat, 30 Jun 2012, Daniel Mack wrote:
+> >>
+> >>> Ok, thanks for the explaining this. For now, I'll add hwmod stubs for
+> >>> the components I need.
+> >>
+> >> Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod
+> data
+> >> for the AM33xx.  There might be some missing integration code to build
+> the
+> >> devices for the newer IP blocks, though.
+> >>
+> >
+> > I would also be interested to know more here.
+> >
+> >
+> >>> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
+> >>
+> >> Mainline has:
+> >>
+> >> drivers/net/ethernet/ti/davinci_emac.c
+> >
+> > Not required for AM335X.
+> >
+> >> drivers/net/ethernet/ti/davinci_mdio.c
+> >>
+> >> Those might work for you.
+> >>
+> >
+> > Few more files,
+> >
+> > drivers/net/ethernet/ti/cpsw.c
+> > drivers/net/ethernet/ti/davinci_cpdma.c
+> >
+> >
+> > Wanted to highlight one point,
+> > You still have to add platform device code to get it working.
+> 
+> Exactly. And a hwmod binding for DT. Do you have patches for that?
+> 
+> 
+> Daniel
+
+I am working on DT support for cpsw and will be submitting the patch by 
+July 20, 2012
+
+With regards
+Mugunthan V N
