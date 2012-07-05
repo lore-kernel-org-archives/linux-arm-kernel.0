@@ -1,89 +1,33 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Thu, 05 Jul 2012 11:09:31 +0530
-Subject: [PATCH 1/1] Watchdog: OMAP3: fix wrong boot status from wdt reboot
-In-Reply-To: <4FF467F8.9070804@windriver.com>
-References: <1341417241-11563-1-git-send-email-zumeng.chen@windriver.com>
- <4FF467F8.9070804@windriver.com>
-Message-ID: <4FF52893.30406@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 5 Jul 2012 07:39:49 +0200
+Subject: [PATCH 6/8] mmc: spi: Add SPI driver for mx233/mx28
+In-Reply-To: <20120705005143.GF2595@S2101-09.ap.freescale.net>
+References: <1340958180-2291-1-git-send-email-marex@denx.de>
+ <1340958180-2291-6-git-send-email-marex@denx.de>
+ <20120705005143.GF2595@S2101-09.ap.freescale.net>
+Message-ID: <201207050739.49912.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-On Wednesday 04 July 2012 09:27 PM, zumeng.chen wrote:
-> To: Shubhrajyoti
-> On 2012?07?04? 23:54, Zumeng Chen wrote:
->> Does the following fix make sense?
-yes , thanks for the patch.
-IIRC Rajendra had a similar one.
-Some comments below.
->>
->> WDIOC_GETBOOTSTATUS always return 0 even if the machine
->> comes from omap-wdt reboot. Because WKUP_MOD is not right
->> for OMAP3,so give the right addr 0xA00 of PRM_RSTST for
->> get_reset_sources, which inputs the signal from omap-wdt
->> reboot, and return 1 when coming from omap-wdt reboot for
->> WDIOC_GETBOOTSTATUS.
->>
->> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
->> ---
->>   arch/arm/mach-omap2/prcm.c  |    4 +++-
->>   drivers/watchdog/omap_wdt.c |    3 +++
->>   drivers/watchdog/omap_wdt.h |    3 +++
->>   3 files changed, 9 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
->> index 480f40a..43f3feb 100644
->> --- a/arch/arm/mach-omap2/prcm.c
->> +++ b/arch/arm/mach-omap2/prcm.c
->> @@ -49,8 +49,10 @@ void __iomem *prcm_mpu_base;
->>   u32 omap_prcm_get_reset_sources(void)
->>   {
->>       /* XXX This presumably needs modification for 34XX */
->> -    if (cpu_is_omap24xx() || cpu_is_omap34xx())
->> +    if (cpu_is_omap24xx())
->>           return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST)& 
->> 0x7f;
->> +    if (cpu_is_omap34xx())
->> +        return omap2_prm_read_mod_reg(0xA00, OMAP2_RM_RSTST)&  0x7f;
->>       if (cpu_is_omap44xx())
->>           return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST)& 
->> 0x7f;
->>
->> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
->> index 8285d65..ea57078 100644
->> --- a/drivers/watchdog/omap_wdt.c
->> +++ b/drivers/watchdog/omap_wdt.c
->> @@ -234,6 +234,9 @@ static long omap_wdt_ioctl(struct file *file,
->> unsigned int cmd,
->>           if (cpu_is_omap24xx())
->>               return put_user(omap_prcm_get_reset_sources(),
->>                       (int __user *)arg);
->> +        if (cpu_is_omap34xx())
->> +            return put_user(omap_prcm_get_reset_sources()&  0x10>>
->> +                OMAP3_PRM_RSTST_BIT, (int __user *)arg);
-Actually instead of returning yes/no.
-The correct  expectation is to return WDIOF_* flags as defined in
-include/linux/watchdog.h.
+Dear Shawn Guo,
 
-(BTW I agree that was something even current code is not
-following).Since you are at it may be that?s
-something you can consider.
+> On Fri, Jun 29, 2012 at 10:22:58AM +0200, Marek Vasut wrote:
+> > +config SPI_MXS
+> > +	tristate "Freescale MXS SPI controller"
+> > +	depends on ARCH_MXS
+> > +	help
+> > +	  SPI driver for Freescale MXS devices.
+> > +
+> 
+> ...
+> 
+> > +	stmp_reset_block(ssp->base);
+> > +
+> 
+> So SPI_MXS may need to select STMP_DEVICE.
 
->>           return put_user(0, (int __user *)arg);
->>       case WDIOC_KEEPALIVE:
->>           pm_runtime_get_sync(wdev->dev);
->> diff --git a/drivers/watchdog/omap_wdt.h b/drivers/watchdog/omap_wdt.h
->> index 09b774c..d8d5daa 100644
->> --- a/drivers/watchdog/omap_wdt.h
->> +++ b/drivers/watchdog/omap_wdt.h
->> @@ -40,6 +40,9 @@
->>   #define OMAP_WATCHDOG_WPS        (0x34)
->>   #define OMAP_WATCHDOG_SPR        (0x48)
->>
->> +/* PRM_RSTST MPU_WD_RST bit */
->> +#define OMAP3_PRM_RSTST_BIT        4
->> +
->>   /* Using the prescaler, the OMAP watchdog could go for many
->>    * months before firing.  These limits work without scaling,
->>    * with the 60 second default assumed by most tools and docs.
->
+Ok, fixed in my tree. But, where's the meteor shower of nitpicks and such stuff? 
+Or is the driver so good you have nothing to pick on? ;-)
+
+Best regards,
+Marek Vasut
