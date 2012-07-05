@@ -1,71 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 05 Jul 2012 13:41:12 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <20120705122947.GY4111@opensource.wolfsonmicro.com>
-References: <20120703123552.GC25995@sirena.org.uk>
- <4FF2EEA1.6080204@linaro.org>
- <20120703132447.GN29030@opensource.wolfsonmicro.com>
- <4FF2F82D.9080507@linaro.org>
- <20120703142123.GQ29030@opensource.wolfsonmicro.com>
- <4FF54406.3000307@linaro.org>
- <20120705094541.GK4111@opensource.wolfsonmicro.com>
- <4FF57EA9.7060107@linaro.org>
- <20120705120600.GT4111@opensource.wolfsonmicro.com>
- <4FF58571.2090807@linaro.org>
- <20120705122947.GY4111@opensource.wolfsonmicro.com>
-Message-ID: <4FF58B68.5000703@linaro.org>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 05 Jul 2012 14:43:08 +0200
+Subject: [PATCH] ARM: davinci: cp_intc: Add OF support for TI interrupt
+ controller
+In-Reply-To: <1341342970-27535-1-git-send-email-nsekhar@ti.com>
+References: <1341342970-27535-1-git-send-email-nsekhar@ti.com>
+Message-ID: <4FF58BDC.6060802@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/12 13:29, Mark Brown wrote:
-> On Thu, Jul 05, 2012 at 01:15:45PM +0100, Lee Jones wrote:
->> On 05/07/12 13:06, Mark Brown wrote:
+Hello Sekhar,
+
+On 03.07.2012 21:16, Sekhar Nori wrote:
+> From: Heiko Schocher<hs@denx.de>
 >
->>> You seemed to be suggesting that your fix was in some way related to the
->>> DT changes in the MFD core.  I'm unsure as to the relationship here.
+> Add a function to initialize the Common Platform Interrupt Controller
+> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
 >
->> How is it not related? In English the patch would say; "Only
->> register the AB8500 via the MFD API when we're booting with Device
->> Tree. This allows AB8500 related devices to be registered in the
->> normal way, rather than registering them individually using DT and
->> prevents duplicate registration when we are not executing a Device
->> Tree enabled boot."
->
-> This is what you said before and it still doesn't make much sense to me.
-> I'd expect that if anything your first statement would be the opposite
-> of what happens - it seems like your non-DT code is doing something
-> really odd.  If anything I'd expect adding a DT to add duplicate
-> registrations, I'd not expect it to remove registrations.
->
-> What I'd expect is that if we can figure out that we need to register
-> the AB8500 automatically without any information from DT then we should
-> be able to figure out exactly the same thing in the non-DT case.  I
-> would therefore expect that the change would instead be something which
-> removes the other source of registrations.
+> Signed-off-by: Heiko Schocher<hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Grant Likely<grant.likely@secretlab.ca>
+> Cc: Sekhar Nori<nsekhar@ti.com>
+> Cc: Wolfgang Denk<wd@denx.de>
+> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
+> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+> ---
+>   .../devicetree/bindings/arm/davinci/cp-intc.txt    |   27 ++++++++++++++++++++
+>   arch/arm/mach-davinci/cp_intc.c                    |   16 +++++++++---
+>   arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
+>   3 files changed, 41 insertions(+), 3 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/davinci/cp-intc.txt
 
-Now you're confusing me. :)
+Thanks!
 
-If DT is _not_ enabled, we do:
+Tested on the enbw_cmc board.
 
-   From platform code:
-    - Register the DB8500-PRCMU
-    - Register the AB8500
+Sent the updated "ARM: davinci: add support for the am1808 based enbw_cmc"
+based on this patch soon.
 
-So you see the registration is separate.
-
-If DT _is_ enabled, we do:
-
-   From Device Tree:
-    - Register the DB8500-PRCMU (which in turn registers the AB8500)
-
-In this case we the DB8500-PRCMU goes on to register the AB8500 for us, 
-so we need to ensure DT _is_ running before we go on to do that, because 
-if we don't the DB8500-PRCMU will register it and so will platform code.
-
+bye,
+Heiko
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
