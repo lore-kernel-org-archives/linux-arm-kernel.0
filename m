@@ -1,94 +1,50 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Thu, 5 Jul 2012 14:00:34 +0800
-Subject: [PATCH 1/1] Watchdog: OMAP3: fix wrong boot status from wdt reboot
-In-Reply-To: <4FF52893.30406@ti.com>
-References: <1341417241-11563-1-git-send-email-zumeng.chen@windriver.com>
- <4FF467F8.9070804@windriver.com> <4FF52893.30406@ti.com>
-Message-ID: <4FF52D82.6030107@windriver.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jul 2012 14:19:42 +0800
+Subject: [PATCH] regulator: core: remove sysfs entry properly in regulator_put
+In-Reply-To: <CAOMZO5BD_FcXVU18PauOFudod5FKd9MP-ZNUDJ4F9iQ6+EAjiA@mail.gmail.com>
+References: <CAOMZO5BD_FcXVU18PauOFudod5FKd9MP-ZNUDJ4F9iQ6+EAjiA@mail.gmail.com>
+Message-ID: <1341469182-5079-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?07?05? 13:39, Shubhrajyoti ??:
-> Hello,
-> On Wednesday 04 July 2012 09:27 PM, zumeng.chen wrote:
->> To: Shubhrajyoti
->> On 2012?07?04? 23:54, Zumeng Chen wrote:
->>> Does the following fix make sense?
-> yes , thanks for the patch.
-> IIRC Rajendra had a similar one.
-> Some comments below.
->>> WDIOC_GETBOOTSTATUS always return 0 even if the machine
->>> comes from omap-wdt reboot. Because WKUP_MOD is not right
->>> for OMAP3,so give the right addr 0xA00 of PRM_RSTST for
->>> get_reset_sources, which inputs the signal from omap-wdt
->>> reboot, and return 1 when coming from omap-wdt reboot for
->>> WDIOC_GETBOOTSTATUS.
->>>
->>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
->>> ---
->>>    arch/arm/mach-omap2/prcm.c  |    4 +++-
->>>    drivers/watchdog/omap_wdt.c |    3 +++
->>>    drivers/watchdog/omap_wdt.h |    3 +++
->>>    3 files changed, 9 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
->>> index 480f40a..43f3feb 100644
->>> --- a/arch/arm/mach-omap2/prcm.c
->>> +++ b/arch/arm/mach-omap2/prcm.c
->>> @@ -49,8 +49,10 @@ void __iomem *prcm_mpu_base;
->>>    u32 omap_prcm_get_reset_sources(void)
->>>    {
->>>        /* XXX This presumably needs modification for 34XX */
->>> -    if (cpu_is_omap24xx() || cpu_is_omap34xx())
->>> +    if (cpu_is_omap24xx())
->>>            return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST)&
->>> 0x7f;
->>> +    if (cpu_is_omap34xx())
->>> +        return omap2_prm_read_mod_reg(0xA00, OMAP2_RM_RSTST)&   0x7f;
->>>        if (cpu_is_omap44xx())
->>>            return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST)&
->>> 0x7f;
->>>
->>> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
->>> index 8285d65..ea57078 100644
->>> --- a/drivers/watchdog/omap_wdt.c
->>> +++ b/drivers/watchdog/omap_wdt.c
->>> @@ -234,6 +234,9 @@ static long omap_wdt_ioctl(struct file *file,
->>> unsigned int cmd,
->>>            if (cpu_is_omap24xx())
->>>                return put_user(omap_prcm_get_reset_sources(),
->>>                        (int __user *)arg);
->>> +        if (cpu_is_omap34xx())
->>> +            return put_user(omap_prcm_get_reset_sources()&   0x10>>
->>> +                OMAP3_PRM_RSTST_BIT, (int __user *)arg);
-> Actually instead of returning yes/no.
-> The correct  expectation is to return WDIOF_* flags as defined in
-> include/linux/watchdog.h.
-Yes, return WDIOF_CARDRESET is more general, thanks.
->
-> (BTW I agree that was something even current code is not
-> following).Since you are at it may be that?s
-> something you can consider.
-Yes, I just find them, I'll try it to get it more following, like 
-get_status.
+With changes introduced by commit 222cc7b (regulator: core: Allow
+multiple requests of a single supply mapping) on create_regulator,
+regulator_put needs a corresponding update on sysfs entry removing.
 
-Regards,
-Zumeng
->
->>>            return put_user(0, (int __user *)arg);
->>>        case WDIOC_KEEPALIVE:
->>>            pm_runtime_get_sync(wdev->dev);
->>> diff --git a/drivers/watchdog/omap_wdt.h b/drivers/watchdog/omap_wdt.h
->>> index 09b774c..d8d5daa 100644
->>> --- a/drivers/watchdog/omap_wdt.h
->>> +++ b/drivers/watchdog/omap_wdt.h
->>> @@ -40,6 +40,9 @@
->>>    #define OMAP_WATCHDOG_WPS        (0x34)
->>>    #define OMAP_WATCHDOG_SPR        (0x48)
->>>
->>> +/* PRM_RSTST MPU_WD_RST bit */
->>> +#define OMAP3_PRM_RSTST_BIT        4
->>> +
->>>    /* Using the prescaler, the OMAP watchdog could go for many
->>>     * months before firing.  These limits work without scaling,
->>>     * with the 60 second default assumed by most tools and docs.
+Also regulator->dev still needs to get assigned in create_regulator,
+otherwise, sysfs_remove_link call in regulator_put will get bypassed.
+
+Reported-by: Fabio Estevam <festevam@gmail.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/regulator/core.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index ef07b62..3998d8f 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -1071,6 +1071,8 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
+ 	list_add(&regulator->list, &rdev->consumer_list);
+ 
+ 	if (dev) {
++		regulator->dev = dev;
++
+ 		/* Add a link to the device sysfs entry */
+ 		size = scnprintf(buf, REG_STR_SIZE, "%s-%s",
+ 				 dev->kobj.name, supply_name);
+@@ -1367,11 +1369,8 @@ void regulator_put(struct regulator *regulator)
+ 	debugfs_remove_recursive(regulator->debugfs);
+ 
+ 	/* remove any sysfs entries */
+-	if (regulator->dev) {
++	if (regulator->dev)
+ 		sysfs_remove_link(&rdev->dev.kobj, regulator->supply_name);
+-		device_remove_file(regulator->dev, &regulator->dev_attr);
+-		kfree(regulator->dev_attr.attr.name);
+-	}
+ 	kfree(regulator->supply_name);
+ 	list_del(&regulator->list);
+ 	kfree(regulator);
+-- 
+1.7.5.4
