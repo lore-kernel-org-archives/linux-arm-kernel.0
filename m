@@ -1,21 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jul 2012 21:10:24 +0100
-Subject: [PATCH] ARM: fix dummy set/modify_domain() to be inline
-In-Reply-To: <1341518923-20760-1-git-send-email-swarren@wwwdotorg.org>
-References: <1341518923-20760-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120705201024.GC31508@n2100.arm.linux.org.uk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 5 Jul 2012 13:19:43 -0700
+Subject: ARM: SoC fixes for 3.5-rc
+In-Reply-To: <201207051240.32157.arnd@arndb.de>
+References: <201207051240.32157.arnd@arndb.de>
+Message-ID: <CA+55aFyAJJVCH_0oBhjQujH+M1qEa-CZdPLSfnizVCPbtUu1EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 02:08:43PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Commit 8026dbe "ARM: fix set_domain() macro" converted some macros to
-> functions, but forgot to make some of the functions inline. This causes:
-> 
-> arch/arm/include/asm/domain.h:81:13: warning: 'set_domain' defined but not used
-> arch/arm/include/asm/domain.h:82:13: warning: 'modify_domain' defined but not used
-> 
-> Make the functions inline to avoid this.
+On Thu, Jul 5, 2012 at 5:40 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>   git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-Already fixed.
+This is not a valid pull address. Please just use
+
+    git://git.kernel.org/
+
+rather than the internal address you use to push to and that isn't
+publicly available.
+
+               Linus
