@@ -1,53 +1,22 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 05 Jul 2012 08:36:38 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <20120703142123.GQ29030@opensource.wolfsonmicro.com>
-References: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
- <20120703123552.GC25995@sirena.org.uk> <4FF2EEA1.6080204@linaro.org>
- <20120703132447.GN29030@opensource.wolfsonmicro.com>
- <4FF2F82D.9080507@linaro.org>
- <20120703142123.GQ29030@opensource.wolfsonmicro.com>
-Message-ID: <4FF54406.3000307@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jul 2012 15:46:25 +0800
+Subject: [PATCH 1/2] ARM: mach-imx: Remove board entries in dt_board_compat
+In-Reply-To: <20120705071318.GO30009@pengutronix.de>
+References: <1339941856-2836-1-git-send-email-festevam@gmail.com>
+ <20120705071318.GO30009@pengutronix.de>
+Message-ID: <20120705074623.GG10610@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/12 15:21, Mark Brown wrote:
-> On Tue, Jul 03, 2012 at 02:48:29PM +0100, Lee Jones wrote:
->> On 03/07/12 14:24, Mark Brown wrote:
->
->>> I'm really unconvinced that instnatiating the MFD cells from device tree
->>> is in general a good idea.
->
->> Well it just doesn't work the other way.
->
-> In what way does it not work?
->
->>>> See c5395e7ed8f16cc7bb72a783de68659db5aed515 for a short description
->>>> of the troubles we faced.
->
->>> $ git show c5395e7ed8f16cc7bb72a783de68659db5aed515
->>> fatal: bad object c5395e7ed8f16cc7bb72a783de68659db5aed515
->
->> Sorry, looks live I've rebased since.
->
->> 5f3fc8adeec9bb12742fbfa777fa1947deda21a2
->
-> This doesn't explain any of the issues, it just says that they exist.
-> My best guess would be that at least some of the issue is due to
-> instantiating the MFD cells from the device tree but it's hard to say
-> clearly.
+On Thu, Jul 05, 2012 at 09:13:18AM +0200, Sascha Hauer wrote:
+> Shawn,
+> 
+> Is this ok with you?
+> 
+No.
 
-I'm guessing Arnd's email answered some of the questions you had. Let me 
-know of you would like me to explain it in any greater detail.
-
-By the way, this patch has nothing to do with registering these devices 
-when DT is enabled. The code already does that. This is a bug fix, to 
-stop multiple registration of the ab8500 when DT is _not_ enabled.
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/172558/focus=172703
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Shawn
