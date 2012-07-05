@@ -1,60 +1,54 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Thu, 5 Jul 2012 09:24:43 +0200
-Subject: [PATCH] ARM: SAMSUNG: Introduce Kconfig variable for Samsung
- custom clk API
-In-Reply-To: <1341418044-24572-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1341418044-24572-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <201207050924.43932.heiko@sntech.de>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu,  5 Jul 2012 10:31:36 +0300
+Subject: [PATCH for 3.5] ARM: apx4devkit: fix FEC enabling PHY clock
+Message-ID: <1341473496-2535-1-git-send-email-lauri.hintsala@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 4. Juli 2012, 18:07:24 schrieb Mark Brown:
-> Make it easier to switch to the common clock API by making the existing
-> clock API implementation depend on a Kconfig symbol which is enabled when
-> the common clock API is disabled. This means that we can have some SoCs
-> using the common clock API and some using the existing API rather than
-> needing a flag day to convert the entire family of devices over.
-nice idea. 
+Ethernet stopped to work after mxs clk framework change.
+
+Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+---
+Shawn,
+
+Any chance to get this patch into 3.5? Ethernet is currently dead on
+apx4devkit. We are going to move device tree in the near future but before
+that we would like to keep our machine in good condition.
+
+Lauri
 
 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+ arch/arm/mach-mxs/mach-apx4devkit.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-
-Heiko
-
-> ---
->  arch/arm/plat-samsung/Kconfig  |    4 ++++
->  arch/arm/plat-samsung/Makefile |    4 ++--
->  2 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index ffc84ac..7aca31c 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -78,6 +78,10 @@ config S5P_HRT
-> 
->  # clock options
-> 
-> +config SAMSUNG_CLOCK
-> +	bool
-> +	default y if !COMMON_CLK
-> +
->  config SAMSUNG_CLKSRC
->  	bool
->  	help
-> diff --git a/arch/arm/plat-samsung/Makefile
-> b/arch/arm/plat-samsung/Makefile index 856f4ee..9e40e8d 100644
-> --- a/arch/arm/plat-samsung/Makefile
-> +++ b/arch/arm/plat-samsung/Makefile
-> @@ -15,8 +15,8 @@ obj-y				+= init.o cpu.o
->  obj-$(CONFIG_ARCH_USES_GETTIMEOFFSET)   += time.o
->  obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
-> 
-> -obj-y				+= clock.o
-> -obj-y				+= pwm-clock.o
-> +obj-$(CONFIG_SAMSUNG_CLOCK)	+= clock.o
-> +obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
-> 
->  obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
->  obj-$(CONFIG_S5P_CLOCK)		+= s5p-clock.o
+diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+index 5e90b9d..f5f0617 100644
+--- a/arch/arm/mach-mxs/mach-apx4devkit.c
++++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+@@ -205,6 +205,16 @@ static int apx4devkit_phy_fixup(struct phy_device *phy)
+ 	return 0;
+ }
+ 
++static void __init apx4devkit_fec_phy_clk_enable(void)
++{
++	struct clk *clk;
++
++	/* Enable fec phy clock */
++	clk = clk_get_sys("enet_out", NULL);
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
++}
++
+ static void __init apx4devkit_init(void)
+ {
+ 	mx28_soc_init();
+@@ -225,6 +235,7 @@ static void __init apx4devkit_init(void)
+ 	phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
+ 			apx4devkit_phy_fixup);
+ 
++	apx4devkit_fec_phy_clk_enable();
+ 	mx28_add_fec(0, &mx28_fec_pdata);
+ 
+ 	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
+-- 
+1.7.9.5
