@@ -1,44 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jul 2012 12:49:39 -0600
-Subject: [PATCH v3 0/6] Port Tegra to generic clk framework
-In-Reply-To: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
-References: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <4FF5E1C3.6070309@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Jul 2012 20:55:27 +0200
+Subject: [PATCH] ARM: imx: Kconfig: Remove IMX_HAVE_PLATFORM_IMX_SSI from
+ MACH_MX25_3DS
+In-Reply-To: <1341332536-2967-1-git-send-email-fabio.estevam@freescale.com>
+References: <1341332536-2967-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120705185527.GX30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2012 03:55 AM, Prashant Gaikwad wrote:
-> This patch set ports Tegra clock code to generic clock framework.
+On Tue, Jul 03, 2012 at 01:22:16PM -0300, Fabio Estevam wrote:
+> commit 5fb86e5d4 (ARM: mx31_3ds: Add sound support) added audio support for
+> mx31pdk, but touched MACH_MX25_3DS Kconfig by mistake.
 
-Unfortunately, this series causes some regressions, so I can't apply it
-now. Given that, it won't make 3.6 since I won't be around to apply it.
+Applied, thanks
 
-I tested both Tegra's for-next, and next-20120705, both plus this
-series, next-20120705 plus the fix for the common clock code
-__clk_set_parent() issue.
+Sascha
 
-The following all appeared to work OK:
+> 
+> Remove IMX_HAVE_PLATFORM_IMX_SSI from MACH_MX25_3DS configuration.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index eff4db5..0da882a 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -158,7 +158,6 @@ config MACH_MX25_3DS
+>  	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	select IMX_HAVE_PLATFORM_IMXDI_RTC
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+> -	select IMX_HAVE_PLATFORM_IMX_SSI
+>  	select IMX_HAVE_PLATFORM_IMX_FB
+>  	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+> -- 
+> 1.7.1
+> 
+> 
+> 
 
-Cardhu DT
-Ventana DT
-Seaboard DT
-Springbank DT
-Harmony DT
-Harmony non-DT
-
-However, the following failed, all(?) in ways that prevented the system
-getting to the login prompt:
-
-Whistler DT
-AC100 DT
-AC100 non-DT
-Trimslice DT
-Trimslice non-DT
-
-(The one slight difference between the 2 branches I tested is that AC100
-and Trimslice booted using DT passed in next-20120705 but failed only in
-Tegra's for-next. Otherwise, all results were identical)
-
-I'll try to investigate what the issues are since I imagine you don't
-have access to these boards. But, I probably won't be able to fix this
-until I return from vacation.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
