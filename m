@@ -1,29 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Jul 2012 10:33:48 +0100
-Subject: [PATCH 1/2] ARM: vexpress: add debug UARTs to DEBUG_LL kconfig
- choice
-In-Reply-To: <1341480232.1173.22.camel@hornet>
-References: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
- <1341480232.1173.22.camel@hornet>
-Message-ID: <20120705093348.GA3399@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 05 Jul 2012 10:36:41 +0100
+Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until
+ it's been DT:ed
+In-Reply-To: <CACRpkdb1rZQWpuUxQoxqg2eYanf4tnm0SmFkQQBwvSuyYV00Gw@mail.gmail.com>
+References: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdb1rZQWpuUxQoxqg2eYanf4tnm0SmFkQQBwvSuyYV00Gw@mail.gmail.com>
+Message-ID: <4FF56029.2060007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+On 05/07/12 09:55, Linus Walleij wrote:
+> On Wed, Jul 4, 2012 at 4:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+>> There are some inconsistencies with the way pinctrl devices are named
+>> when registered from platform code to the ones registered by Device
+>> Tree. Platform devices look like 'pinctrl-db8500', whereas the ones
+>> registered from Device Tree look more like 'pinctrl.2'. This leads to
+>> failure when carrying out name-based searches for known devices.
+>>
+>> Until the correct DT bindings have been applied to the pinctrl driver
+>> it will fail to function correctly. For instance, during a Device
+>> Tree boot on Snowball no bootlog is visible due to a UART port probe
+>> failure. Regulators fail in a similar way.
+>
+> The problem is *NOT* any missing device tree bindings. The place
+> where the problem appear is in the pin control mapping table, which
+> uses the string "pinctrl-db8500"
+>
+> The bindings to pass in the pinctrl mapping from the devcie tree
+> is generic and already exist:
+> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
 
-On Thu, Jul 05, 2012 at 10:23:52AM +0100, Pawel Moll wrote:
-> On Wed, 2012-07-04 at 16:01 +0100, Will Deacon wrote:
-> > This patch avoids probing the various possible UART locations on the
-> > different Versatile Express motherboards and instead adds entries into
-> > the DEBUG_LL kconfig choice for the two possible memory maps.
-> 
-> I wrote similar thing (keeping the autodetection as one of the options)
-> some time ago, but Russell didn't like it (because it wasn't DEBUG_LL
-> choice) and I didn't have time to rework it for 3.5 merge window. Will
-> get this out this time.
+Yes I saw these, but that still doesn't help our situation. A way to 
+link the mapping tables registered with a platform device to the driver 
+started with Device Tree is missing. This can be over-come by several 
+methods:
 
-Ok, thanks. We have similar code in mach/uncompress.h -- how do you feel
-about using the same approach there? I've seen the decompressor explode due
-to the mrc and it's a royal pain to track down.
+a) Create a binding which takes a device name to tag onto a mapping. 
+This can be used in the name based searches currently employed by 
+pinctrl. This is the binding I was talking about in the commit log. In 
+retrospect, I can see that this is not the correct solution.
 
-Will
+b) Continue using Device Tree and force the 'pinctrl-db8500' device name 
+which any string based searches will be expecting with AUXDATA(). We do 
+similar things for clock-names already. However, this must be seen as a 
+hacky work-around and it to be removed after full enablement has been 
+taken place.
+
+c) Prevent the pinctrl driver from being started by Device Tree and 
+allow platform code to register the device until we can populate the 
+device tree with all of the mappings. This is the way you advised me to 
+do it [see below] and it's what this patch tries to achieve.
+
+Linus said:
+> In my eyes the problem is introduced by that commit ["pinctrl-nomadik:
+> Allow Device Tree driver probing"]. So I'll revert it and go for a
+> complete approach for v3.6
+
+Hopefully now you can see where I'm coming from.
+
+> The stuff in the file:
+> arch/arm/mach-ux500/board-mop500-pins.c
+>
+> Need to be moved over to the device tree.
+
+Agreed, but this patch aims to fix an -rc bug. The full Device Tree 
+implementation isn't likely to reach Mainline until at least v3.6, as 
+you already mentioned.
+
+ > There are plenty of
+> examples of how to do this in for example:
+> arch/arm/boot/dts/tegra-seaboard.dts
+
+I don't see this file anywhere?
+
+> So what is needed is that someone augment the device tree
+> with the pinctrl data and disable the registration of the static
+> maps from the above file if the node exists.
+
+Right, future work.
+
+>> This patch prevents Device Tree from probing the pinctrl driver and
+>> ensures registration is completed from platform code instead.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Is the DT machinery really incapable of specifying
+> the device name to anything else than the bus name?
+> Can't you do this with AUX_DATA()? I've seen that done in the
+> past. For example you do:
+>
+> OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+>
+> Can't you just:
+> OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
+>
+> And it will happily assign the "pinctrl-db8500" name to it's instantiated
+> device?
+
+Yes, this will work, see option 'b' above.
+
+I'll submit another patch.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
