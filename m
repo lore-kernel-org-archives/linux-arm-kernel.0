@@ -1,36 +1,30 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 05 Jul 2012 10:38:00 +0100
-Subject: [PATCH 1/2] ARM: vexpress: add debug UARTs to DEBUG_LL kconfig
- choice
-In-Reply-To: <20120705093348.GA3399@mudshark.cambridge.arm.com>
-References: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
- <1341480232.1173.22.camel@hornet>
- <20120705093348.GA3399@mudshark.cambridge.arm.com>
-Message-ID: <1341481080.1173.28.camel@hornet>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 5 Jul 2012 10:38:08 +0100
+Subject: How to handle parameter variation across different boards but
+ same platform
+In-Reply-To: <201207050832.16750.arnd@arndb.de>
+References: <1BAFE6F6C881BF42822005164F1491C33EA3532A@DBDE01.ent.ti.com>
+ <20120704142745.GC4111@opensource.wolfsonmicro.com>
+ <4FF52948.6090904@ti.com> <201207050832.16750.arnd@arndb.de>
+Message-ID: <20120705093808.GJ4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-05 at 10:33 +0100, Will Deacon wrote:
-> Hi Pawel,
-> 
-> On Thu, Jul 05, 2012 at 10:23:52AM +0100, Pawel Moll wrote:
-> > On Wed, 2012-07-04 at 16:01 +0100, Will Deacon wrote:
-> > > This patch avoids probing the various possible UART locations on the
-> > > different Versatile Express motherboards and instead adds entries into
-> > > the DEBUG_LL kconfig choice for the two possible memory maps.
-> > 
-> > I wrote similar thing (keeping the autodetection as one of the options)
-> > some time ago, but Russell didn't like it (because it wasn't DEBUG_LL
-> > choice) and I didn't have time to rework it for 3.5 merge window. Will
-> > get this out this time.
-> 
-> Ok, thanks. We have similar code in mach/uncompress.h -- how do you feel
-> about using the same approach there? I've seen the decompressor explode due
-> to the mrc and it's a royal pain to track down.
+On Thu, Jul 05, 2012 at 08:32:16AM +0000, Arnd Bergmann wrote:
+> On Thursday 05 July 2012, Vaibhav Hiremath wrote:
 
-This was the reason my Kconfig options weren't in DEBUG_LL but in
-ARCH_VEXPRESS - to serve both decompressor and early console. But as it
-was NAKed I'm considering several options, one (the simplest) of them is
-printing nothing in the decompressor unless DEBUG_LL is selected.
+> > Does machine ID still gets set? May be I am missing something...
 
-Pawe?
+> No, it doesn't.
+
+This is a *really* unfortunate decision, BTW - it means that if your
+bootloader has a device tree available it needs to know if the kernel
+it's booting is DT or non-DT which is just generally unhelpful.  Sadly I
+don't hold out much hope of being able to fix it, though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/302e1c8a/attachment.sig>
