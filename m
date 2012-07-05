@@ -1,38 +1,96 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 5 Jul 2012 14:03:07 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <4FF58ED6.40106@linaro.org>
-References: <20120703142123.GQ29030@opensource.wolfsonmicro.com>
- <4FF54406.3000307@linaro.org>
- <20120705094541.GK4111@opensource.wolfsonmicro.com>
- <4FF57EA9.7060107@linaro.org>
- <20120705120600.GT4111@opensource.wolfsonmicro.com>
- <4FF58571.2090807@linaro.org>
- <20120705122947.GY4111@opensource.wolfsonmicro.com>
- <4FF58B68.5000703@linaro.org>
- <20120705124549.GD4111@opensource.wolfsonmicro.com>
- <4FF58ED6.40106@linaro.org>
-Message-ID: <20120705130306.GI4111@opensource.wolfsonmicro.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 5 Jul 2012 13:05:59 +0000
+Subject: [PATCH 1/1] Watchdog: OMAP3: fix wrong boot status from wdt reboot
+In-Reply-To: <1341417241-11563-1-git-send-email-zumeng.chen@windriver.com>
+References: <1341417241-11563-1-git-send-email-zumeng.chen@windriver.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EAF8359@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 01:55:50PM +0100, Lee Jones wrote:
-> On 05/07/12 13:45, Mark Brown wrote:
+Hello,
 
-> >Right, so what I'm saying is that what I'd expect unless there's
-> >something unusual going on is that you wouldn't be doing the separate
-> >registration of the AB8500 here and would instead be passing the
-> >platform data for the AB8500 through in the same way you pass the DT
-> >data through.
+On Wed, Jul 04, 2012 at 21:24:01, Zumeng Chen wrote:
+> Does the following fix make sense?
+> 
+> WDIOC_GETBOOTSTATUS always return 0 even if the machine
+> comes from omap-wdt reboot. Because WKUP_MOD is not right
+> for OMAP3, so give the right addr 0xA00 of PRM_RSTST for
+> get_reset_sources, which inputs the signal from omap-wdt
+> reboot, and return 1 when coming from omap-wdt reboot for
+> WDIOC_GETBOOTSTATUS.
+> 
+> Signed-off-by: Zumeng Chen <zumeng.chen@windriver.com>
+> ---
+>  arch/arm/mach-omap2/prcm.c  |    4 +++-
+>  drivers/watchdog/omap_wdt.c |    3 +++
+>  drivers/watchdog/omap_wdt.h |    3 +++
+>  3 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+> index 480f40a..43f3feb 100644
+> --- a/arch/arm/mach-omap2/prcm.c
+> +++ b/arch/arm/mach-omap2/prcm.c
+> @@ -49,8 +49,10 @@ void __iomem *prcm_mpu_base;
+>  u32 omap_prcm_get_reset_sources(void)
+>  {
+>  	/* XXX This presumably needs modification for 34XX */
+> -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> +	if (cpu_is_omap24xx())
+>  		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST) & 0x7f;
+> +	if (cpu_is_omap34xx())
+> +		return omap2_prm_read_mod_reg(0xA00, OMAP2_RM_RSTST) & 0x7f;
+>  	if (cpu_is_omap44xx())
+>  		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST) & 0x7f;
 
-> Then were would you register it, if not here?
+Instead of adding more cpu_is_* checks maybe you could switch to a
+function pointers based approach here?
 
-Same place as for DT.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/f66959b6/attachment.sig>
+>  
+> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+> index 8285d65..ea57078 100644
+> --- a/drivers/watchdog/omap_wdt.c
+> +++ b/drivers/watchdog/omap_wdt.c
+> @@ -234,6 +234,9 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
+>  		if (cpu_is_omap24xx())
+>  			return put_user(omap_prcm_get_reset_sources(),
+>  					(int __user *)arg);
+> +		if (cpu_is_omap34xx())
+> +			return put_user(omap_prcm_get_reset_sources() & 0x10 >>
+> +				OMAP3_PRM_RSTST_BIT, (int __user *)arg);
+>  		return put_user(0, (int __user *)arg);
+
+Usage of PRCM bit masks in the driver looks wrong. Why not
+introduce an API like omap_prcm_check_reset_reason() which
+returns true or false based on the reset reason being checked?
+
+In case of WDT, the driver can then pass the right flag to
+userspace.
+
+Regards,
+Vaibhav B.
+
+>  	case WDIOC_KEEPALIVE:
+>  		pm_runtime_get_sync(wdev->dev);
+> diff --git a/drivers/watchdog/omap_wdt.h b/drivers/watchdog/omap_wdt.h
+> index 09b774c..d8d5daa 100644
+> --- a/drivers/watchdog/omap_wdt.h
+> +++ b/drivers/watchdog/omap_wdt.h
+> @@ -40,6 +40,9 @@
+>  #define OMAP_WATCHDOG_WPS		(0x34)
+>  #define OMAP_WATCHDOG_SPR		(0x48)
+>  
+> +/* PRM_RSTST MPU_WD_RST bit */
+> +#define OMAP3_PRM_RSTST_BIT		4
+> +
+>  /* Using the prescaler, the OMAP watchdog could go for many
+>   * months before firing.  These limits work without scaling,
+>   * with the 60 second default assumed by most tools and docs.
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
