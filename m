@@ -1,36 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Jul 2012 15:15:43 +0100
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
- implementation to be selected
-In-Reply-To: <4FF59145.2020009@renesas.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
- <4FF59145.2020009@renesas.com>
-Message-ID: <20120705141542.GH3399@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 07:26:38 -0700
+Subject: [PATCH v1 03/14] ARM: OMAP5: id: Add cpu id for ES versions
+In-Reply-To: <1341490136-25901-6-git-send-email-santosh.shilimkar@ti.com>
+References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341490136-25901-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120705142637.GD1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 02:06:13PM +0100, Shinya Kuribayashi wrote:
-> On 6/30/2012 2:33 AM, Will Deacon wrote:
-> > +extern void init_current_timer_delay(unsigned long freq);
-> > +
+Hi,
+
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [120705 05:13]:
+> From: R Sricharan <r.sricharan@ti.com>
 > 
-> This is needed for all users of the new timer-baed delay routine.
-> How about moving this extern declaration to more generic place, in
-> <asm/timex.h>?
+> Adding the OMAP5 ES1.0, 2.0 and OMAP5432 cpu revision
+> detection support.
+> 
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -50,6 +50,11 @@ int omap_type(void)
+>  		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+>  	} else if (cpu_is_omap44xx()) {
+>  		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
+> +	} else if (cpu_is_omap54xx()) {
+> +		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
+> +		val &= OMAP5_DEVICETYPE_MASK;
+> +		val >>= 6;
+> +		goto out;
+>  	} else {
+>  		pr_err("Cannot detect omap type!\n");
+>  		goto out;
+> @@ -100,7 +105,7 @@ static u16 tap_prod_id;
+>  
+>  void omap_get_die_id(struct omap_die_id *odi)
+>  {
+> -	if (cpu_is_omap44xx()) {
+> +	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 
-I mentioned this before in the original posting. Currently, only the
-architected timers are using this interface and I have some reservations
-about using memory-mapped timers instead (although there may be specific
-instances where they're suitable).
+Please update all these patches to use soc_is_omap54xx()
+instead of cpu_is_omap54xx() as that's where we are heading.
 
-In this case, I'd rather see a registration mechanism for the current_timer
-where we take a pointer to read_current_timer and register the delay at the
-same time. That can be added when somebody else decides they want to make
-use of the new delay routines.
+Regards,
 
-> Tested-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
-
-Thanks!
-
-Will
+Tony
