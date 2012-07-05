@@ -1,38 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Jul 2012 15:47:37 +0000
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <20120705135449.GZ17534@lunn.ch>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <201207051347.38887.arnd@arndb.de> <20120705135449.GZ17534@lunn.ch>
-Message-ID: <201207051547.37906.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 05 Jul 2012 16:50:42 +0100
+Subject: [PATCH] of: address: Don't fail a lookup just because a node
+ has no reg property
+In-Reply-To: <201207051538.37687.arnd@arndb.de>
+References: <1341498754-30445-1-git-send-email-lee.jones@linaro.org>
+ <4FF5AB4D.6090500@gmail.com> <4FF5B004.4080100@linaro.org>
+ <201207051538.37687.arnd@arndb.de>
+Message-ID: <4FF5B7D2.8000909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012, Andrew Lunn wrote:
-> > > Orion use generic chip interrupts, both for the main interrupts and
-> > > the GPIO interrupts. This does not yet support irq domain, so i have
-> > > to layer a legacy domain on top. The legacy domain needs to know the
-> > > first IRQ and the number of IRQs. For the primary IRQs that is
-> > > easy. However, GPIO IRQ is not so easy, it depends on how many primary
-> > > IRQs there are. This is not fixed. Orion5x has 32, Dove 64, kirkwood,
-> > > 64, and mv78xx0 has 96. I need to know this number when adding the
-> > > GPIO secondary IRQ legacy domain. By calling orion_gpio_of_init() in
-> > > the orion_add_irq_domain() i have this number to hand. If i used to
-> > > entries in the match table, i would have to put this number into some
-> > > global variable, or somehow ask the IRQ subsystem what the next free
-> > > IRQ number is.
-> > 
-> > But couldn't you store the number of interrupts for the primary controller
-> > in a local variable? I think the of_irq code already guarantees that
-> > the parent is probed first.
-> 
-> Sure i could. But what is the advantage of that?
+On 05/07/12 16:38, Arnd Bergmann wrote:
+> On Thursday 05 July 2012, Lee Jones wrote:
+>>>
+>>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Do you have something dependent on this or want me to apply?
+>>
+>> I have things that require this patch yes. Please apply.
+>
+> I guess Rob's question was whether you want to keep this together
+> with the patch that depends on it rather than him applying just
+> the one patch.
 
-Probably not much. I've reread the of_irq_init code again and it seems that
-the effect would be the same, perhaps appearing a little more similar to what
-the other platforms do.
+No, it's not important.
 
-Please add my Acked-by: to your patch.
+I'll send you the other patch as part of my DT pull-request.
 
-	Arnd
+I'm just waiting on Linus' Ack on a few patches and it'll be ready.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
