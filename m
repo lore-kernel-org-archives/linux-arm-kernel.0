@@ -1,26 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 5 Jul 2012 17:59:40 -0300
-Subject: MX28 poweroff issue
-In-Reply-To: <CAOMZO5DDhhZ4WV9Gweb+rYASE8D-KyX7Q6FCQyKbqcVzfOcBMQ@mail.gmail.com>
-References: <201207040030.36713.marex@denx.de>
- <20120704151944.GB18739@n2100.arm.linux.org.uk>
- <20120705160855.GA20175@S2101-09.ap.freescale.net>
- <201207051823.26243.marex@denx.de>
- <CAOMZO5DDhhZ4WV9Gweb+rYASE8D-KyX7Q6FCQyKbqcVzfOcBMQ@mail.gmail.com>
-Message-ID: <CAOMZO5CAEp8Y7j3+GnhFeoFTEBLaGg5Go=YaGx14zWzSd1W+hQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 5 Jul 2012 23:21:21 +0200
+Subject: [PATCH 3/9] ARM: ux500: Remove AB8500 regulator register
+ initialisation information
+In-Reply-To: <201207051351.03115.arnd@arndb.de>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
+ <201207051351.03115.arnd@arndb.de>
+Message-ID: <4FF60551.6000808@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 5, 2012 at 5:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Marek,
->
-> On Thu, Jul 5, 2012 at 1:23 PM, Marek Vasut <marex@denx.de> wrote:
->
->> Won't mdelay() be better?
+On 07/05/2012 03:51 PM, Arnd Bergmann wrote:
+> On Thursday 05 July 2012, Lee Jones wrote:
+>> There is no need to initialise the AB8500's regulator registers, as
+>> most of this work is already carried out by framework features, so
+>> we can safely remove all traces from platform code.
 >>
->> It removes the warning, but can't some other stray interrupt trigger it again?
->
-> Could you please try the change below? I do not have access to my mx28
-> right now.
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> It makes sense, but this patch is basically a revert of dfa3a824d
+> "mach-ux500: provide ab8500 init vector" from Bengt Jonsson, so
+> it would be nice to get an Ack from him.
 
-Nevermind. It still does not work. I will try again tomorrow.
+Bengt is on leave but I CC some other guys...
+
+Yours,
+Linus Walleij
