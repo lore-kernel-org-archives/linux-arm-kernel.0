@@ -1,29 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Jul 2012 10:42:18 +0100
-Subject: [PATCH 1/2] ARM: vexpress: add debug UARTs to DEBUG_LL kconfig
- choice
-In-Reply-To: <1341481080.1173.28.camel@hornet>
-References: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
- <1341480232.1173.22.camel@hornet>
- <20120705093348.GA3399@mudshark.cambridge.arm.com>
- <1341481080.1173.28.camel@hornet>
-Message-ID: <20120705094218.GB3399@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 5 Jul 2012 10:45:41 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <4FF54406.3000307@linaro.org>
+References: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
+ <20120703123552.GC25995@sirena.org.uk>
+ <4FF2EEA1.6080204@linaro.org>
+ <20120703132447.GN29030@opensource.wolfsonmicro.com>
+ <4FF2F82D.9080507@linaro.org>
+ <20120703142123.GQ29030@opensource.wolfsonmicro.com>
+ <4FF54406.3000307@linaro.org>
+Message-ID: <20120705094541.GK4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 10:38:00AM +0100, Pawel Moll wrote:
-> On Thu, 2012-07-05 at 10:33 +0100, Will Deacon wrote:
-> > 
-> > Ok, thanks. We have similar code in mach/uncompress.h -- how do you feel
-> > about using the same approach there? I've seen the decompressor explode due
-> > to the mrc and it's a royal pain to track down.
-> 
-> This was the reason my Kconfig options weren't in DEBUG_LL but in
-> ARCH_VEXPRESS - to serve both decompressor and early console. But as it
-> was NAKed I'm considering several options, one (the simplest) of them is
-> printing nothing in the decompressor unless DEBUG_LL is selected.
+On Thu, Jul 05, 2012 at 08:36:38AM +0100, Lee Jones wrote:
+> On 03/07/12 15:21, Mark Brown wrote:
 
-Indeed, that's the option I'd favour but I thought I'd check whether you
-were alright with that before updating the patch.
+> >This doesn't explain any of the issues, it just says that they exist.
+> >My best guess would be that at least some of the issue is due to
+> >instantiating the MFD cells from the device tree but it's hard to say
+> >clearly.
 
-Will
+> I'm guessing Arnd's email answered some of the questions you had.
+> Let me know of you would like me to explain it in any greater
+> detail.
+
+No, frankly.  It was just a general "why might we put things in DT"
+answer which (especially given what you say below) isn't related to the
+issue at all.
+
+> By the way, this patch has nothing to do with registering these
+> devices when DT is enabled. The code already does that. This is a
+> bug fix, to stop multiple registration of the ab8500 when DT is
+> _not_ enabled.
+
+Really?  It seems really surprising that adding more DT support to the
+MFD core would have any bearing on something like this...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/1c4ded73/attachment.sig>
