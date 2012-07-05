@@ -1,49 +1,107 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 05 Jul 2012 12:38:51 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <20120705122050.2fbc2fe3@skate> (Thomas Petazzoni's message of
- "Thu, 5 Jul 2012 12:20:50 +0200")
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-2-git-send-email-andrew@lunn.ch>
- <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
- <87sjd6ikkj.fsf@lebrac.rtp-net.org> <20120705122050.2fbc2fe3@skate>
-Message-ID: <87liiyijb8.fsf@lebrac.rtp-net.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 5 Jul 2012 16:15:20 +0530
+Subject: Bad use of highmem with buffer_migrate_page?
+In-Reply-To: <015f01cd5a95$c1525dc0$43f71940$%szyprowski@samsung.com>
+References: <4FAC200D.2080306@codeaurora.org>
+ <02fc01cd2f50$5d77e4c0$1867ae40$%szyprowski@samsung.com>
+ <4FAD89DC.2090307@codeaurora.org>
+ <CAH+eYFBhO9P7V7Nf+yi+vFPveBks7SFKRHfkz3JOQMBKqnkkUQ@mail.gmail.com>
+ <015f01cd5a95$c1525dc0$43f71940$%szyprowski@samsung.com>
+Message-ID: <20120705104520.GA6773@latitude>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
+On Thu, Jul 05, 2012 at 12:05:45PM +0200, Marek Szyprowski wrote:
+> On Thursday, July 05, 2012 11:28 AM Rabin Vincent wrote:
+> > The problem is still present on latest mainline.  The filesystem layer
+> > expects that the pages in the block device's mapping are not in highmem
+> > (the mapping's gfp mask is set in bdget()), but CMA replaces lowmem
+> > pages with highmem pages leading to the crashes.
+> > 
+> > The above fix should work, but perhaps the following is preferable since
+> > it should allow moving highmem pages to other highmem pages?
+> 
+> > diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> > index 4403009..4a4f921 100644
+> > --- a/mm/page_alloc.c
+> > +++ b/mm/page_alloc.c
+> > @@ -5635,7 +5635,12 @@ static struct page *
+> >  __alloc_contig_migrate_alloc(struct page *page, unsigned long private,
+> >  			     int **resultp)
+> >  {
+> > -	return alloc_page(GFP_HIGHUSER_MOVABLE);
+> > +	gfp_t gfp_mask = GFP_USER | __GFP_MOVABLE;
+> > +
+> > +	if (PageHighMem(page))
+> > +		gfp_mask |= __GFP_HIGHMEM;
+> > +
+> > +	return alloc_page(gfp_mask);
+> >  }
+> > 
+> >  /* [start, end) must belong to a single zone. */
+> 
+> 
+> The patch looks fine and does it job well. Could you resend it as a complete 
+> patch with commit message and signed-off-by/reported-by lines? I will handle
+> merging it to mainline then.
 
-> Le Thu, 05 Jul 2012 12:11:40 +0200,
-> Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> a ?crit :
->
->> > You are not the only one working in this area. Arnaud Patard said he
->> > was look at this as well. 
->> 
->> yeah, but tbh I've not made anything yet. If Thomas has already some
->> code for it, we should try to make it "generic" so as to use it on
->> armada xp and orion platforms.
->
-> The MPP registers are identical on Armada XP/370 and 88F6281 (not sure
-> which other SoC datasheet I should be checking). Basically, it's just a
-> range of contiguous registers, with 4 bits per pin to select the
-> function.
+Thanks, here it is:
 
+8<----
+>From 8a94126eb3aa2824866405fb78bb0b8316f8fd00 Mon Sep 17 00:00:00 2001
+From: Rabin Vincent <rabin@rab.in>
+Date: Thu, 5 Jul 2012 15:52:23 +0530
+Subject: [PATCH] mm: cma: don't replace lowmem pages with highmem
 
-iirc, other SoCs are similar. The small exception being dove I
-guess. Dove has a 3rd gpo [the gpios are output only] bank but to be
-used as gpio require that a special bit is set and it's for all gpios of
-this bank. You'll find this bit in the "general mpp configuration
-register" if you look at the datasheet.
+The filesystem layer expects pages in the block device's mapping to not
+be in highmem (the mapping's gfp mask is set in bdget()), but CMA can
+currently replace lowmem pages with highmem pages, leading to crashes in
+filesystem code such as the one below:
 
->
-> So my pinmux driver should simply work as is for Orion as well. The
-> only difference between platforms is the number of MPP pins that are
-> available, but this number also varies between versions of Armada XP
-> and Armada 370, so I already support this in the driver.
->
+  Unable to handle kernel NULL pointer dereference at virtual address 00000400
+  pgd = c0c98000
+  [00000400] *pgd=00c91831, *pte=00000000, *ppte=00000000
+  Internal error: Oops: 817 [#1] PREEMPT SMP ARM
+  CPU: 0    Not tainted  (3.5.0-rc5+ #80)
+  PC is at __memzero+0x24/0x80
+  ...
+  Process fsstress (pid: 323, stack limit = 0xc0cbc2f0)
+  Backtrace:
+  [<c010e3f0>] (ext4_getblk+0x0/0x180) from [<c010e58c>] (ext4_bread+0x1c/0x98)
+  [<c010e570>] (ext4_bread+0x0/0x98) from [<c0117944>] (ext4_mkdir+0x160/0x3bc)
+   r4:c15337f0
+  [<c01177e4>] (ext4_mkdir+0x0/0x3bc) from [<c00c29e0>] (vfs_mkdir+0x8c/0x98)
+  [<c00c2954>] (vfs_mkdir+0x0/0x98) from [<c00c2a60>] (sys_mkdirat+0x74/0xac)
+   r6:00000000 r5:c152eb40 r4:000001ff r3:c14b43f0
+  [<c00c29ec>] (sys_mkdirat+0x0/0xac) from [<c00c2ab8>] (sys_mkdir+0x20/0x24)
+   r6:beccdcf0 r5:00074000 r4:beccdbbc
+  [<c00c2a98>] (sys_mkdir+0x0/0x24) from [<c000e3c0>] (ret_fast_syscall+0x0/0x30)
 
-Are there some output-only gpio on armada xp/370 like on kirkwood/dove ?
+Fix this by replacing only highmem pages with highmem.
 
+Reported-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ mm/page_alloc.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Arnaud
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 4403009..4a4f921 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5635,7 +5635,12 @@ static struct page *
+ __alloc_contig_migrate_alloc(struct page *page, unsigned long private,
+ 			     int **resultp)
+ {
+-	return alloc_page(GFP_HIGHUSER_MOVABLE);
++	gfp_t gfp_mask = GFP_USER | __GFP_MOVABLE;
++
++	if (PageHighMem(page))
++		gfp_mask |= __GFP_HIGHMEM;
++
++	return alloc_page(gfp_mask);
+ }
+ 
+ /* [start, end) must belong to a single zone. */
+-- 
+1.7.9.5
