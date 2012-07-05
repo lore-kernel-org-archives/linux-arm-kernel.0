@@ -1,75 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 5 Jul 2012 17:38:53 +0530
-Subject: [PATCH v1 11/14] ARM: OMAP5: board-generic: Add device tree support.
-In-Reply-To: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341490136-25901-16-git-send-email-santosh.shilimkar@ti.com>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
+Date: Thu, 05 Jul 2012 14:09:59 +0200
+Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
+ Controllers
+In-Reply-To: <20120705114815.GT17534@lunn.ch>
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <1341325365-21393-2-git-send-email-andrew@lunn.ch>
+ <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
+ <87sjd6ikkj.fsf@lebrac.rtp-net.org> <20120705122050.2fbc2fe3@skate>
+ <87liiyijb8.fsf@lebrac.rtp-net.org> <20120705134231.3e1801e5@skate>
+ <20120705114815.GT17534@lunn.ch>
+Message-ID: <4FF58417.8050001@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
+On 07/05/2012 01:48 PM, Andrew Lunn wrote:
+ >> Yes. I am not sure yet how to describe those in the DT, or even if it
+ >> is actually useful to describe them. Wouldn't it be simpler to just
+ >> leave to the user of the GPIO to use a GPIO that's appropriate for its
+ >> usage, i.e not use a GPO when input is needed?
+ >
+ > We assume the hardware designer has got the basic hardware right. Its
+ > not going to work otherwise.
+ >
+ > What we are trying to detect is a DT author making a typo, assigning a
+ > gpio-key to a GPO pin, for example. The current MPP scheme will detect
+ > this sort of error and issue a warning to the kernel logs.
 
-Adding the minimal support for OMAP5 evm board
-with device tree.
+The output-only/non-interrupt gpios could be marked as such in DT.
+The common code should not install irqs if marked by e.g.
+"marvell,gpio-no-irq". The gpio driver already fails to set input
+direction on output-only pins. This could be marked by e.g.
+"marvell,gpio-output-only" in DT.
 
-Reviewed-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- .../devicetree/bindings/arm/omap/omap.txt          |    3 +++
- arch/arm/mach-omap2/board-generic.c                |   19 +++++++++++++++++++
- arch/arm/mach-omap2/omap4-common.c                 |    1 +
- 3 files changed, 23 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index e78e8bc..3d450f6 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -47,3 +47,6 @@ Boards:
- 
- - AM335X EVM : Software Developement Board for AM335x
-   compatible = "ti,am335x-evm", "ti,am33xx", "ti,omap3"
-+
-+- OMAP5 EVM : Evaluation Module
-+  compatible = "ti,omap5-evm", "ti,omap5"
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 716e6b1..6f93a20 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -138,3 +138,22 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.restart	= omap_prcm_restart,
- MACHINE_END
- #endif
-+
-+#ifdef CONFIG_SOC_OMAP5
-+static const char *omap5_boards_compat[] __initdata = {
-+	"ti,omap5",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.map_io		= omap5_map_io,
-+	.init_early	= omap5_init_early,
-+	.init_irq	= omap_gic_of_init,
-+	.handle_irq	= gic_handle_irq,
-+	.init_machine	= omap_generic_init,
-+	.timer		= &omap5_timer,
-+	.dt_compat	= omap5_boards_compat,
-+	.restart	= omap_prcm_restart,
-+MACHINE_END
-+#endif
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index f38d659..c29dee9 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -214,6 +214,7 @@ early_initcall(omap4_sar_ram_init);
- 
- static struct of_device_id irq_match[] __initdata = {
- 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
- 	{ }
- };
- 
--- 
-1.7.9.5
+Sebastian
