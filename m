@@ -1,49 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Jul 2012 20:55:27 +0200
-Subject: [PATCH] ARM: imx: Kconfig: Remove IMX_HAVE_PLATFORM_IMX_SSI from
- MACH_MX25_3DS
-In-Reply-To: <1341332536-2967-1-git-send-email-fabio.estevam@freescale.com>
-References: <1341332536-2967-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120705185527.GX30009@pengutronix.de>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 5 Jul 2012 12:18:30 -0700
+Subject: [PATCH] clk: fix parent validation in __clk_set_parent()
+In-Reply-To: <4FF4E679.10909@nvidia.com>
+References: <1341313938-17861-1-git-send-email-rnayak@ti.com>
+ <4FF4E679.10909@nvidia.com>
+Message-ID: <CAJOA=zMZwOBq7TKoigiGqDHh9kXAxsy-uH5koSOtH+r7p1=SJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2012 at 01:22:16PM -0300, Fabio Estevam wrote:
-> commit 5fb86e5d4 (ARM: mx31_3ds: Add sound support) added audio support for
-> mx31pdk, but touched MACH_MX25_3DS Kconfig by mistake.
+On Wed, Jul 4, 2012 at 5:57 PM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
+> On Tuesday 03 July 2012 04:42 PM, Rajendra Nayak wrote:
+>>
+>> The below commit introduced a bug in __clk_set_parent()
+>> which could cause it to *skip* the parent validation
+>> which makes sure the parent passed to the api is a valid
+>> one.
+>
+>
+> Need this fix for Tegra too.
+>
 
-Applied, thanks
+Hi Prashant,
 
-Sascha
+You'll find it if you pull the latest clk-next.
 
-> 
-> Remove IMX_HAVE_PLATFORM_IMX_SSI from MACH_MX25_3DS configuration.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/Kconfig |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index eff4db5..0da882a 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -158,7 +158,6 @@ config MACH_MX25_3DS
->  	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	select IMX_HAVE_PLATFORM_IMXDI_RTC
->  	select IMX_HAVE_PLATFORM_IMX_I2C
-> -	select IMX_HAVE_PLATFORM_IMX_SSI
->  	select IMX_HAVE_PLATFORM_IMX_FB
->  	select IMX_HAVE_PLATFORM_IMX_KEYPAD
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> -- 
-> 1.7.1
-> 
-> 
-> 
+Regards,
+Mike
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>>      commit 7975059db572eb47f0fb272a62afeae272a4b209
+>>      Author: Rajendra Nayak<rnayak@ti.com>
+>>      Date:   Wed Jun 6 14:41:31 2012 +0530
+>>
+>>          clk: Allow late cache allocation for clk->parents
+>>
+>> This was identified by the following compiler warning..
+>>
+>>      drivers/clk/clk.c: In function '__clk_set_parent':
+>>      drivers/clk/clk.c:1083:5: warning: 'i' may be used uninitialized in
+>> this function [-Wuninitialized]
+>>
+>> .. as reported by Marc Kleine-Budde.
+>>
+>> There were various options discussed on how to fix this, one
+>> being initing 'i' to clk->num_parents, but the below approach
+>> was found to be more appropriate as it also makes the 'parent
+>> validation' code simpler to read.
+>>
+>> Reported-by: Marc Kleine-Budde<mkl@pengutronix.de>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>
+>
