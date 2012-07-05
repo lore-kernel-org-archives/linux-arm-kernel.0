@@ -1,42 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 05 Jul 2012 16:58:09 +0100
-Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until
- it's been DT:ed
-In-Reply-To: <4FF5B8B9.8030200@wwwdotorg.org>
-References: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdb1rZQWpuUxQoxqg2eYanf4tnm0SmFkQQBwvSuyYV00Gw@mail.gmail.com>
- <4FF56029.2060007@linaro.org> <4FF5B8B9.8030200@wwwdotorg.org>
-Message-ID: <4FF5B991.9070807@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Jul 2012 18:01:53 +0200
+Subject: [PATCH] i2c i.MX: Fix divider table
+In-Reply-To: <20120705145236.GA2735@richard-laptop>
+References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+ <20120705145236.GA2735@richard-laptop>
+Message-ID: <20120705160153.GT30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/12 16:54, Stephen Warren wrote:
-> On 07/05/2012 03:36 AM, Lee Jones wrote:
->> On 05/07/12 09:55, Linus Walleij wrote:
-> ...
->>> There are plenty of
->>> examples of how to do this in for example:
->>> arch/arm/boot/dts/tegra-seaboard.dts
->>
->> I don't see this file anywhere?
->
-> It was recently renamed to tegra20-seaboard.dts.
->
-> While Tegra doesn't need any AUXDATA for the pinctrl driver specifically
-> (since we're purely initializing pinctrl from DT now when booting with
-> DT), we do need AUXDATA for other devices mainly for clocks. You can
-> find the AUXDATA setup in:
->
-> arch/arch/mach-tegra/board-dt-tegra*.c
+On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
+> On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
+> > Measurements on i.MX1 and i.MX53 have shown that the divider values
+> > in the datasheets are wrong. the values from first, third and fourth
+> > column were all measured to be 8 higher than in the datasheet. It
+> > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
+> > the same as the i2c unit is unchanged since the i.MX1.
+> We may need to check with IC guys? Or you've done?
 
-That's okay.
+I don't have contact to the IC guys. Could you do this? I'd be
+interested in the results.
 
-We use it quite a lot in arch/arch/mach-ux500/board-mop500.c already 
-(also for things like clocks, dma and call-backs).
+Sascha
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
