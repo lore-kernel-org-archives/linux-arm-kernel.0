@@ -1,39 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jul 2012 07:49:37 -0700
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9A36C6@DBDE01.ent.ti.com>
-References: <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
- <20120702063651.GO4202@atomide.com> <4FF1D980.4040100@ti.com>
- <20120703081746.GJ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A2BAC@DBDE01.ent.ti.com>
- <20120704075158.GQ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
- <20120705105535.GB1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A36C6@DBDE01.ent.ti.com>
-Message-ID: <20120705144936.GF1122@atomide.com>
+From: xiyou.wangcong@gmail.com (Cong Wang)
+Date: Thu, 5 Jul 2012 13:56:43 +0000 (UTC)
+Subject: Bad use of highmem with buffer_migrate_page?
+References: <4FAC200D.2080306@codeaurora.org>
+ <02fc01cd2f50$5d77e4c0$1867ae40$%szyprowski@samsung.com>
+ <4FAD89DC.2090307@codeaurora.org>
+ <CAH+eYFBhO9P7V7Nf+yi+vFPveBks7SFKRHfkz3JOQMBKqnkkUQ@mail.gmail.com>
+ <015f01cd5a95$c1525dc0$43f71940$%szyprowski@samsung.com>
+ <20120705104520.GA6773@latitude>
+Message-ID: <jt46eq$lq0$4@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120705 05:03]:
-> Hi Tony,
-> 
-> On Thu, Jul 05, 2012 at 16:25:35, Tony Lindgren wrote:
-> > * Mohammed, Afzal <afzal@ti.com> [120705 03:29]:
-> 
-> > > Initially I thought you were suggesting that all peripheral drivers
-> > > connected to gpmc should register their retime function (where
-> 
-> > Yes that's what I was suggesting.
-> 
-> To understand you better, peripheral drivers above refers to
-> driver created out of present gpmc platform init code like
-> gpmc-smsc911x.c. You were not referring to
-> drivers/net/ethernet/smsc/smsc911x.c, right ?
+On Thu, 05 Jul 2012 at 10:45 GMT, Rabin Vincent <rabin@rab.in> wrote:
+> 8<----
+> From 8a94126eb3aa2824866405fb78bb0b8316f8fd00 Mon Sep 17 00:00:00 2001
+> From: Rabin Vincent <rabin@rab.in>
+> Date: Thu, 5 Jul 2012 15:52:23 +0530
+> Subject: [PATCH] mm: cma: don't replace lowmem pages with highmem
+>
+> The filesystem layer expects pages in the block device's mapping to not
+> be in highmem (the mapping's gfp mask is set in bdget()), but CMA can
+> currently replace lowmem pages with highmem pages, leading to crashes in
+> filesystem code such as the one below:
+>
+...
+> Fix this by replacing only highmem pages with highmem.
+>
 
-Yes arch/arm/mach-omap2/gpmc-smsc911x.c for now, but eventually
-that too should probably be just a regular driver. Just how it
-will work together with drivers/net/ethernet/smsc/smsc911x.c is
-still a bit open though :)
+Looks good to me too,
 
-Tony
+    Reviewed-by: WANG Cong <xiyou.wangcong@gmail.com>
