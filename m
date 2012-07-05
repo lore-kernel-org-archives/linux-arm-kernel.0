@@ -1,44 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Jul 2012 11:06:56 +0800
-Subject: [PATCH] clk: mxs: imx28: decrease the frequency of ref_io1 for
- SSP2 and SSP3
-In-Reply-To: <1341398994-28028-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1341398994-28028-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <20120705030654.GB10610@S2101-09.ap.freescale.net>
+Date: Thu, 5 Jul 2012 11:07:27 +0800
+Subject: [PATCH v5] ARM: mx23: Add initial support for olinuxino board
+In-Reply-To: <1341418973-3619-1-git-send-email-fabio.estevam@freescale.com>
+References: <1341418973-3619-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120705030726.GC10610@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 01:49:54PM +0300, Lauri Hintsala wrote:
-> SSP0 and SSP1 use ref_io0 which has decreased frequency. Expand
-> the frequency fix for ref_io1 to get SSP2 and SSP3 to work.
+On Wed, Jul 04, 2012 at 01:22:53PM -0300, Fabio Estevam wrote:
+> mx23-olinuxino is a low cost board designed by Olimex.
 > 
-> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> It has the following features:
+> 
+> - Freescale iMX233 ARM926J processor at 454MHz
+> -64 MB RAM
+> -SD-card connector
+> -TV PAL/NTSC video output
+> -2 USB High Speed Hosts
+> -Ethernet 100 Mbit
+> -Stereo Audio Input
+> -Stereo Headphones Audio Output
+> 
+> More information at:
+> http://www.olimex.com/dev/imx233-olinuxino-maxi.html
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks.
 
-> ---
->  drivers/clk/mxs/clk-imx28.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> index 2826a26..0097c3a 100644
-> --- a/drivers/clk/mxs/clk-imx28.c
-> +++ b/drivers/clk/mxs/clk-imx28.c
-> @@ -112,11 +112,11 @@ static void __init clk_misc_init(void)
->  
->  	/*
->  	 * 480 MHz seems too high to be ssp clock source directly,
-> -	 * so set frac0 to get a 288 MHz ref_io0.
-> +	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
->  	 */
->  	val = readl_relaxed(FRAC0);
-> -	val &= ~(0x3f << BP_FRAC0_IO0FRAC);
-> -	val |= 30 << BP_FRAC0_IO0FRAC;
-> +	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
-> +	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
->  	writel_relaxed(val, FRAC0);
->  }
->  
-> -- 
-> 1.7.9.5
-> 
+Regards,
+Shawn
