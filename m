@@ -1,49 +1,46 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 5 Jul 2012 19:59:45 +0530
-Subject: [PATCH v1 03/14] ARM: OMAP5: id: Add cpu id for ES versions
-In-Reply-To: <20120705142637.GD1122@atomide.com>
-References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
- <1341490136-25901-6-git-send-email-santosh.shilimkar@ti.com>
- <20120705142637.GD1122@atomide.com>
-Message-ID: <CAMQu2gwChUq4oj1-8N2S5ymK8aCRoM-EwLE+xE-Ri_gLWq+87w@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  5 Jul 2012 15:32:34 +0100
+Subject: [PATCH] of: address: Don't fail a lookup just because a node has no
+ reg property
+Message-ID: <1341498754-30445-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 5, 2012 at 7:56 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120705 05:13]:
->> From: R Sricharan <r.sricharan@ti.com>
->>
->> Adding the OMAP5 ES1.0, 2.0 and OMAP5432 cpu revision
->> detection support.
->>
->> --- a/arch/arm/mach-omap2/id.c
->> +++ b/arch/arm/mach-omap2/id.c
->> @@ -50,6 +50,11 @@ int omap_type(void)
->>               val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
->>       } else if (cpu_is_omap44xx()) {
->>               val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
->> +     } else if (cpu_is_omap54xx()) {
->> +             val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
->> +             val &= OMAP5_DEVICETYPE_MASK;
->> +             val >>= 6;
->> +             goto out;
->>       } else {
->>               pr_err("Cannot detect omap type!\n");
->>               goto out;
->> @@ -100,7 +105,7 @@ static u16 tap_prod_id;
->>
->>  void omap_get_die_id(struct omap_die_id *odi)
->>  {
->> -     if (cpu_is_omap44xx()) {
->> +     if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
->
-> Please update all these patches to use soc_is_omap54xx()
-> instead of cpu_is_omap54xx() as that's where we are heading.
->
-Damn. We missed to update this. Will fix this and update the
-branch. Thanks for pointing it out.
+Sometimes it doesn't make any sense for a node to have an address.
+In this case device lookup will always be unsuccessful because we
+currently assume every node will have a reg property. This patch
+changes the semantics so that the resource address and the lookup
+address will only be compared if one exists.
 
-Regards
-santosh
+Things like AUXDATA() rely on of_dev_lookup to return the lookup
+entry of a particular device in order to do things like apply
+platform_data to a device. However, this is currently broken for
+nodes which do not have a reg property, meaning that platform_data
+can not be passed in those cases.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/of/platform.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 343ad29..9600480 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -317,10 +317,9 @@ static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *l
+ 	for(; lookup->compatible != NULL; lookup++) {
+ 		if (!of_device_is_compatible(np, lookup->compatible))
+ 			continue;
+-		if (of_address_to_resource(np, 0, &res))
+-			continue;
+-		if (res.start != lookup->phys_addr)
+-			continue;
++		if (!of_address_to_resource(np, 0, &res))
++			if (res.start != lookup->phys_addr)
++				continue;
+ 		pr_debug("%s: devname=%s\n", np->full_name, lookup->name);
+ 		return lookup;
+ 	}
+-- 
+1.7.9.5
