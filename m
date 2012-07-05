@@ -1,47 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jul 2012 02:27:21 -0700
-Subject: [GIT PULL] ARM: OMAP2+: more fixes intended for 3.5-rc
-In-Reply-To: <20120705085229.GV1122@atomide.com>
-References: <alpine.DEB.2.00.1207040806270.6760@utopia.booyaka.com>
- <20120705081520.GT1122@atomide.com>
- <201207050836.12180.arnd@arndb.de>
- <20120705085229.GV1122@atomide.com>
-Message-ID: <20120705092721.GX1122@atomide.com>
+Date: Thu, 5 Jul 2012 02:28:09 -0700
+Subject: [PATCH v2 0/4] ARM: OMAP2+: dmtimer: cleanup related to devm
+ API and clk usage
+In-Reply-To: <CAC83ZvLcyRSc-X2o_05tS7R3S1s190ejDQaBOYHOK1JuknrAxA@mail.gmail.com>
+References: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
+ <CAC83ZvLOoUwthcv0seXeqJcuvxvhP7P500T66RHCCWvrsaPr2A@mail.gmail.com>
+ <CAMQu2gxDbi191EdA0_acaJwhuAddXJ44FzVQJ=5c1Fh0PFDG4w@mail.gmail.com>
+ <CAC83ZvLcyRSc-X2o_05tS7R3S1s190ejDQaBOYHOK1JuknrAxA@mail.gmail.com>
+Message-ID: <20120705092809.GY1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120705 01:57]:
-> * Arnd Bergmann <arnd@arndb.de> [120705 01:41]:
-> > On Thursday 05 July 2012, Tony Lindgren wrote:
-> > > * Paul Walmsley <paul@pwsan.com> [120704 07:13]:
-> > > > Hi Tony
-> > > > 
-> > > > The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-> > > > 
-> > > >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.5rc
-> > > > 
-> > > > for you to fetch changes up to d7a0b5133f6b1d53d693b9b9873e64e3c8f0db0e:
-> > > > 
-> > > >   ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4 (2012-07-04 06:55:29 -0600)
-> > > > 
-> > > Thanks pulling into fixes.
-> > 
-> > I'm planning to send a set of fixes upstream to Linus today. Should I
-> > pull your fixes branch before that?
-> 
-> It seems it should be safe to do, I'll take one more look and send
-> a separate pull request shortly.
+* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120704 21:07]:
+> On Thu, Jun 14, 2012 at 4:28 PM, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
+> >
+> > Just to let you know that this cleanup is essential for Benoit's OMAP4
+> > hwmod cleanup
+> > and OMAP5 minimal support series.
+>
+> This is a gentle reminder in case you have missed somehow!!
+> Let me know if anything else needs to be done.
 
-OK, sent a pull request with Subject: [GIT PULL] omap fixes for v3.5-rc5
- 
-> Regards,
-> 
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Now with the hwmod patch 2/4 pulled into cleanup-part2 from Paul,
+I've also applied patch 1/4 there. Patches 3 and 4 have still some pending
+comments from Kevin it seems?
+
+Also at least patch 3 won't apply, so please check Kevin's comments
+and repost patches 3 and 4 on top of cleanup-part2 at commit 74dd9ec62.
+
+Regards,
+
+Tony
