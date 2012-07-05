@@ -1,45 +1,82 @@
 From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu,  5 Jul 2012 16:12:35 -0700
-Subject: [PATCH 1/6] kernel/debug: Make use of KGDB_REASON_NMI
+Date: Thu,  5 Jul 2012 16:12:36 -0700
+Subject: [PATCH 2/6] kernel/debug: Mask KGDB NMI upon entry
 In-Reply-To: <20120705231034.GA16931@lizard>
 References: <20120705231034.GA16931@lizard>
-Message-ID: <1341529960-18370-1-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <1341529960-18370-2-git-send-email-anton.vorontsov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently kernel never set KGDB_REASON_NMI. We do now, when we enter
-KGDB/KDB from an NMI.
+The new arch callback should manage NMIs that usually cause KGDB to
+enter. That is, not all NMIs should be enabled/disabled, but only
+those that issue kgdb_handle_exception().
 
-This is not to be confused with kgdb_nmicallback(), NMI callback is
-an entry for the slave CPUs during CPUs roundup, but REASON_NMI is the
-entry for the master CPU.
+We must mask it as serial-line interrupt can be used as an NMI, so
+if the original KGDB-entry cause was say a breakpoint, then every
+input to KDB console will cause KGDB to reenter, which we don't want.
 
 Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
 ---
- kernel/debug/kdb/kdb_debugger.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ include/linux/kgdb.h      |    9 +++++++++
+ kernel/debug/debug_core.c |   12 +++++++++++-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/debug/kdb/kdb_debugger.c b/kernel/debug/kdb/kdb_debugger.c
-index 8b68ce7..be7b33b 100644
---- a/kernel/debug/kdb/kdb_debugger.c
-+++ b/kernel/debug/kdb/kdb_debugger.c
-@@ -12,6 +12,7 @@
- #include <linux/kdb.h>
- #include <linux/kdebug.h>
- #include <linux/export.h>
-+#include <linux/hardirq.h>
- #include "kdb_private.h"
- #include "../debug_core.h"
+diff --git a/include/linux/kgdb.h b/include/linux/kgdb.h
+index c4d2fc1..47e739e 100644
+--- a/include/linux/kgdb.h
++++ b/include/linux/kgdb.h
+@@ -221,6 +221,15 @@ extern int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt);
+  */
+ extern void kgdb_arch_late(void);
  
-@@ -52,6 +53,9 @@ int kdb_stub(struct kgdb_state *ks)
- 	if (atomic_read(&kgdb_setting_breakpoint))
- 		reason = KDB_REASON_KEYBOARD;
++/**
++ *	kgdb_arch_enable_nmi - Enable or disable KGDB-entry NMI
++ *	@on: Flag to either enable or disable an NMI
++ *
++ *	This function manages NMIs that usually cause KGDB to enter. That is,
++ *	not all NMIs should be enabled or disabled, but only those that issue
++ *	kgdb_handle_exception().
++ */
++extern void kgdb_arch_enable_nmi(bool on);
  
-+	if (in_nmi())
-+		reason = KDB_REASON_NMI;
+ /**
+  * struct kgdb_arch - Describe architecture specific values.
+diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
+index 0557f24..e285600 100644
+--- a/kernel/debug/debug_core.c
++++ b/kernel/debug/debug_core.c
+@@ -214,6 +214,10 @@ int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
+ 	return 0;
+ }
+ 
++void __weak kgdb_arch_enable_nmi(bool on)
++{
++}
 +
- 	for (i = 0, bp = kdb_breakpoints; i < KDB_MAXBPT; i++, bp++) {
- 		if ((bp->bp_enabled) && (bp->bp_addr == addr)) {
- 			reason = KDB_REASON_BREAK;
+ /*
+  * Some architectures need cache flushes when we set/clear a
+  * breakpoint:
+@@ -672,6 +676,9 @@ kgdb_handle_exception(int evector, int signo, int ecode, struct pt_regs *regs)
+ {
+ 	struct kgdb_state kgdb_var;
+ 	struct kgdb_state *ks = &kgdb_var;
++	int ret;
++
++	kgdb_arch_enable_nmi(0);
+ 
+ 	ks->cpu			= raw_smp_processor_id();
+ 	ks->ex_vector		= evector;
+@@ -685,7 +692,10 @@ kgdb_handle_exception(int evector, int signo, int ecode, struct pt_regs *regs)
+ 	if (kgdb_info[ks->cpu].enter_kgdb != 0)
+ 		return 0;
+ 
+-	return kgdb_cpu_enter(ks, regs, DCPU_WANT_MASTER);
++	ret = kgdb_cpu_enter(ks, regs, DCPU_WANT_MASTER);
++
++	kgdb_arch_enable_nmi(1);
++	return ret;
+ }
+ 
+ int kgdb_nmicallback(int cpu, void *regs)
 -- 
 1.7.10.4
