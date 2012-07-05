@@ -1,32 +1,37 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 5 Jul 2012 16:28:46 +0800
-Subject: [PATCH] regulator: core: remove sysfs entry properly in
- regulator_put
-In-Reply-To: <1341469182-5079-1-git-send-email-shawn.guo@linaro.org>
-References: <CAOMZO5BD_FcXVU18PauOFudod5FKd9MP-ZNUDJ4F9iQ6+EAjiA@mail.gmail.com>
- <1341469182-5079-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120705082845.GF14589@shlinux2.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 01:40:03 -0700
+Subject: [GIT PULL] ARM: OMAP2+: miscellaneous PRCM & hwmod patches for 3.6
+In-Reply-To: <alpine.DEB.2.00.1207040935070.6760@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1207040935070.6760@utopia.booyaka.com>
+Message-ID: <20120705084002.GU1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 02:19:42PM +0800, Shawn Guo wrote:
-> With changes introduced by commit 222cc7b (regulator: core: Allow
-> multiple requests of a single supply mapping) on create_regulator,
-> regulator_put needs a corresponding update on sysfs entry removing.
+* Paul Walmsley <paul@pwsan.com> [120704 08:48]:
+> Hi Tony
 > 
-> Also regulator->dev still needs to get assigned in create_regulator,
-> otherwise, sysfs_remove_link call in regulator_put will get bypassed.
+> The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 > 
-> Reported-by: Fabio Estevam <festevam@gmail.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/regulator/core.c |    7 +++----
->  1 files changed, 3 insertions(+), 4 deletions(-)
+>   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 > 
-Good catch.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-f-for-3.6
+> 
+> for you to fetch changes up to 8cb8de5d87b75f2ecaa1189079764340ea366c0e:
+> 
+>   Merge branches 'hwmod_am335x_support_3.6', 'clkdm_pwrdm_devel_a_3.6' and 'misc_devel_3.6' into omap_devel_f_3.6 (2012-07-04 06:05:51 -0600)
+> 
+> ----------------------------------------------------------------
+> 
+> Miscellaneous OMAP clock, hwmod, clockdomain, and powerdomain patches
+> for 3.6.  Mostly small infrastructure improvements, and preparation
+> for OMAP5 and AM33xx code.
+> 
+> ----------------------------------------------------------------
 
-Tested-by: Dong Aisheng <dong.aisheng@linaro.org>
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+Thanks applying into cleanup-part2 branch.
 
-Regards
-Dong Aisheng
+Regards,
+
+Tony
