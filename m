@@ -1,46 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 05 Jul 2012 13:35:39 -0700
-Subject: [PATCH 1/2] remoteproc: maintain a generic child device for each
- rproc
-In-Reply-To: <CAK=WgbZ+=MGU5juuOP+_vtUe4d_46j=Rd0cqYi7q2i-9T35R5w@mail.gmail.com>
-References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
- <4FC5DBFA.2030300@codeaurora.org>
- <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
- <CAK=WgbbREXV8nkF4vh9iLUp1WQj2ZLYW6VG8Urmw9=roy63meQ@mail.gmail.com>
- <4FF1F145.2050408@codeaurora.org>
- <CAK=WgbZ+=MGU5juuOP+_vtUe4d_46j=Rd0cqYi7q2i-9T35R5w@mail.gmail.com>
-Message-ID: <4FF5FA9B.4070003@codeaurora.org>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 05 Jul 2012 22:35:23 +0200
+Subject: [PATCH 5/5] ARM: tegra: enable wireless in defconfig
+In-Reply-To: <4FF5F20F.2050005@wwwdotorg.org>
+References: <1341394488-13169-1-git-send-email-wni@nvidia.com>
+ <1341394488-13169-6-git-send-email-wni@nvidia.com>
+ <4FF5F20F.2050005@wwwdotorg.org>
+Message-ID: <2114579.sqTp7XiW3H@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/12 12:54, Ohad Ben-Cohen wrote:
-> On Mon, Jul 2, 2012 at 10:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> Great! It looks like device_type doesn't have any list iteration support
->> though. Is that requirement gone?
-> Pretty much, yeah. I'll soon post a separate patch which removes the
-> get_by_name functionality (together with its related klist).
->
->> Will you resend this as part of a series? It will be easier to review then.
-> Not sure. There's a collection of discrete patches that I've been
-> posting, but they really aren't an organic series: as long as the
-> dependencies are met, each and every one of them is applicable even if
-> applied alone.
->
-> So I'd prefer (when possible) to treat patches in a discrete fashion
-> so we can start applying them and unblock others who depend on them
-> (e.g. Fernando's runtime PM work depends on this one).
->
-> But if you prefer me to send this one patch differently to make it
-> easier to review, let me know!
->
+On Thursday 05 July 2012 13:59:11 Stephen Warren wrote:
+> On 07/04/2012 03:34 AM, Wei Ni wrote:
+> > New options enabled:
+> > * WIRELESS: (dependency)
+> > * CFG80211: (dependency)
+> > * WLAN: (dependency)
+> > * BRCMFMAC: wlan driver, enable as module.
+> > 
+> > diff --git a/arch/arm/configs/tegra_defconfig
+> > b/arch/arm/configs/tegra_defconfig
+> > 
+> > +CONFIG_BRCMFMAC=m
+> 
+> Why does this need to be a module? Everything else in tegra_defconfig is
+> built-in, and it'd be nice to be consistent here. Built-in makes
+> net-booting new kernels from U-Boot much easier, since there aren't any
+> modules to copy.
 
-Ok then. Please add
+network drivers (especially wifi) are often modules because they need firmwares. 
+I'm not sure if the kernel can compile them in every case. Our RT2x00 is an 
+example (which also needs a defconfig entry btw) but brcmfmac also needs it as 
+modinfo shows. Beside that, I don't think you want to netboot using wifi and u-
+boot because this needs a huge wireless framework which u-boot doesn't have.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Marc
 
-It would be nice if you got an ack from Greg or Kay on the device_type
-usage too.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> When I built a kernel with this series, I observed the following:
+> 
+> CONFIG_BRCMFMAC=m
+> 
+> * Neither Cardhu nor Ventana auto-load the module. When the module is
+> manually modprobe'd, I still see no wireless device being created.
+> 
+> CONFIG_BRCMFMAC=y
+> 
+> * Cardhu: No wireless device created. I do see some kernel spew such as
+> "mmc1: queuing unknown CIS tuple 0x80" which I believe is the SDIO
+> device being probed, but I don't see any Linux device being created.
+> 
+> * Ventana: There's a 60s hang during boot, I believe related to the BRCM
+> driver, since the hang doesn't occur without the series.
+> 
+> In summary, this series doesn't work at all for me. Can you please
+> explain what you tested and how? Are there any differences between the
+> various Cardhu and Ventana board revisions and/or the 2 different
+> wireless cards possible on Cardhu that'd explain this?
+> 
+> Thanks.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
