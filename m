@@ -1,34 +1,25 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 05 Jul 2012 18:05:08 +0200
-Subject: [alsa-devel] DT support for Davinci ASoC platform
-In-Reply-To: <201207051536.45920.arnd@arndb.de>
-References: <1BAFE6F6C881BF42822005164F1491C33EA35352@DBDE01.ent.ti.com>
- <4FF5733E.6000604@gmail.com> <201207051536.45920.arnd@arndb.de>
-Message-ID: <4FF5BB34.9070002@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Jul 2012 10:07:47 -0600
+Subject: [PATCH] clk: Fix cached parent ptrs allocation
+In-Reply-To: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
+References: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <4FF5BBD3.6080704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.07.2012 17:36, Arnd Bergmann wrote:
-> On Thursday 05 July 2012, Daniel Mack wrote:
->> On 04.07.2012 14:48, Hebbar, Gururaja wrote:
->>> All,
->>>
->>> Are there any plans or work going on for providing Device Tree Support for Davinci
->>> ASoC?
->>>
->>> I am planning to add DT support for TI AM335x (McASP) and I don't want to do duplicate
->>> task.
->>
->> That's good to know. But isn't there a dependency on the EDMA engine? Is
->> that part ported yet?
-> 
-> None of the dma engines are ported yet, because the generic binding for dma
-> engines is still under debate. So far, all DMA channels are described using
-> auxdata on platforms that use DT, with the exception of exynos, but that one
-> will have to change once we have the common code.
+On 07/04/2012 07:15 AM, Prashant Gaikwad wrote:
+> Compiler optimizes code someway that even if clk->parents
+> is not NULL it tries to allocate parents array. Change the
+> condition so that compiler does not optimize it in wrong
+> way.
 
-You're talking about the DT bindings here, right? But the code itself is
-also only present in TI's BSP kernel sources, and not in mainline.
+If simply inverting the if test and swapping the if/else blocks solves
+some problem, that sounds like a compiler bug that we need to track down
+and file/fix.
 
+> Also, initialize i to num_parents to make sure parent
+> is searched using parent name if parents is NULL.
 
-Daniel
+Are you sure the change to initialize i wasn't all that was required to
+solve the problem though? Mike has applied a patch for this that'll be
+applied to 3.5-rcX and hence trickle into 3.6.
