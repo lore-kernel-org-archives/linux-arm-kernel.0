@@ -1,29 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Jul 2012 13:48:15 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <20120705134231.3e1801e5@skate>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-2-git-send-email-andrew@lunn.ch>
- <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
- <87sjd6ikkj.fsf@lebrac.rtp-net.org> <20120705122050.2fbc2fe3@skate>
- <87liiyijb8.fsf@lebrac.rtp-net.org> <20120705134231.3e1801e5@skate>
-Message-ID: <20120705114815.GT17534@lunn.ch>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 5 Jul 2012 11:58:44 +0000
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <20120705105535.GB1122@atomide.com>
+References: <20120627145844.GL3483@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+ <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
+ <20120702063651.GO4202@atomide.com> <4FF1D980.4040100@ti.com>
+ <20120703081746.GJ1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A2BAC@DBDE01.ent.ti.com>
+ <20120704075158.GQ1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
+ <20120705105535.GB1122@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A36C6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas
+Hi Tony,
 
-> Yes. I am not sure yet how to describe those in the DT, or even if it
-> is actually useful to describe them. Wouldn't it be simpler to just
-> leave to the user of the GPIO to use a GPIO that's appropriate for its
-> usage, i.e not use a GPO when input is needed?
+On Thu, Jul 05, 2012 at 16:25:35, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [120705 03:29]:
 
-We assume the hardware designer has got the basic hardware right. Its
-not going to work otherwise.
+> > Initially I thought you were suggesting that all peripheral drivers
+> > connected to gpmc should register their retime function (where
 
-What we are trying to detect is a DT author making a typo, assigning a
-gpio-key to a GPO pin, for example. The current MPP scheme will detect
-this sort of error and issue a warning to the kernel logs.
+> Yes that's what I was suggesting.
 
-	 Andrew
+To understand you better, peripheral drivers above refers to
+driver created out of present gpmc platform init code like
+gpmc-smsc911x.c. You were not referring to
+drivers/net/ethernet/smsc/smsc911x.c, right ?
+
+Regards
+Afzal
