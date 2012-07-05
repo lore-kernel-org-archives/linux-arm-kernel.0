@@ -1,33 +1,94 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 5 Jul 2012 06:40:46 +0530
-Subject: [PATCH] clk: Fix cached parent ptrs allocation
-In-Reply-To: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
-References: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <4FF4E996.7010003@nvidia.com>
+From: andy.green@linaro.org (Andy Green)
+Date: Thu, 05 Jul 2012 10:44:41 +0800
+Subject: [PATCH 4 1/4] OMAP: add cpu id register to MAC address helper
+In-Reply-To: <20120705024259.26317.16000.stgit@build.warmcat.com>
+References: <20120705024259.26317.16000.stgit@build.warmcat.com>
+Message-ID: <20120705024439.26317.84637.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 July 2012 06:45 PM, Prashant Gaikwad wrote:
-> Compiler optimizes code someway that even if clk->parents
-> is not NULL it tries to allocate parents array. Change the
-> condition so that compiler does not optimize it in wrong
-> way.
->
-> Also, initialize i to num_parents to make sure parent
-> is searched using parent name if parents is NULL.
->
-> Signed-off-by: Prashant Gaikwad<pgaikwad@nvidia.com>
-> ---
-> Mike,
->
-> There could be some other way to fix problem. I have not
-> debugged it in detail but I think this simple change should do.
-Mike,
+From: Andy Green <andy@warmcat.com>
 
-Please ignore this patch as Rajendra has already sent patch to fix.
+Introduce a generic helper function that can generate a valid MAC
+address using data from the OMAP unique CPU ID register.
 
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=commitdiff;h=863b13271f1608ab3af6f7a371047d9a66693e38
+For comparison purposes this produces a MAC address of
 
->   drivers/clk/clk.c |   10 +++++-----
->   1 files changed, 5 insertions(+), 5 deletions(-)
->
+  2e:20:3c:ea:46:01
+
+for the ethernet device on my PandaBoard ES.
+
+The MAC address space has space set aside for these kind of "locally
+administered" MAC addresses, analogous to IPv4 10.x.x.x range, and this
+patch marks the generated MAC addresses as such.
+
+The patch leaves two bits allowing elaborating 4 different MACs from the
+generated data.
+
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ arch/arm/mach-omap2/id.c              |   39 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/include/mach/id.h |    1 +
+ 2 files changed, 40 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 37eb95a..3ab5d4d 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -530,3 +530,42 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
+ 	else
+ 		tap_prod_id = 0x0208;
+ }
++
++/*
++ * this uses the unique per-cpu info from the cpu fuses set at factory to
++ * generate a 6-byte MAC address.  Two bits in the generated code are used
++ * to elaborate the generated address into four, so it can be used on multiple
++ * network interfaces.
++ */
++
++void omap_die_id_to_ethernet_mac(u8 *mac, int subtype)
++{
++	struct omap_die_id odi;
++	u32 tap = read_tap_reg(OMAP_TAP_IDCODE);
++
++	omap_get_die_id(&odi);
++
++	mac[0] = odi.id_2;
++	mac[1] = odi.id_2 >> 8;
++	mac[2] = odi.id_1;
++	mac[3] = odi.id_1 >> 8;
++	mac[4] = odi.id_1 >> 16;
++	mac[5] = odi.id_1 >> 24;
++
++	/* XOR other chip-specific data with ID */
++
++	tap ^= odi.id_3;
++
++	mac[0] ^= tap;
++	mac[1] ^= tap >> 8;
++	mac[2] ^= tap >> 16;
++	mac[3] ^= tap >> 24;
++
++	/* allow four MACs from this same basic data */
++
++	mac[1] = (mac[1] & ~0xc0) | ((subtype & 3) << 6);
++
++	/* mark it as not multicast, and outside official 80211 MAC namespace */
++
++	mac[0] = (mac[0] & ~1) | 2;
++}
+diff --git a/arch/arm/mach-omap2/include/mach/id.h b/arch/arm/mach-omap2/include/mach/id.h
+index 02ed3aa..d6c8d63 100644
+--- a/arch/arm/mach-omap2/include/mach/id.h
++++ b/arch/arm/mach-omap2/include/mach/id.h
+@@ -18,5 +18,6 @@ struct omap_die_id {
+ };
+ 
+ void omap_get_die_id(struct omap_die_id *odi);
++void omap_die_id_to_ethernet_mac(u8 *mac, int subtype);
+ 
+ #endif
