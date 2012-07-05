@@ -1,20 +1,170 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Jul 2012 09:11:23 +0200
-Subject: [PATCH] update imx defconfigs
-Message-ID: <1341472285-1061-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  5 Jul 2012 09:11:24 +0200
+Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: update features
+In-Reply-To: <1341472285-1061-1-git-send-email-s.hauer@pengutronix.de>
+References: <1341472285-1061-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1341472285-1061-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-General i.MX defconfig update. Contains the changes from the mailing lists,
-mostly from Fabio, plus some additional things.
+- Add sound support
+- Enable mtd support
+- Enable i.MX NAND support
+- Enable NOR flash support
+- Enable JFFS2/UBI
+- Enable clk debugfs support
+- Disable iommu support which is not present on i.MX
 
-Sascha
-
-----------------------------------------------------------------
-Sascha Hauer (2):
-      ARM: imx_v6_v7_defconfig: update features
-      ARM: imx_v4_v5_defconfig: update features
-
- arch/arm/configs/imx_v4_v5_defconfig |   44 +++++++++++++--------------
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
  arch/arm/configs/imx_v6_v7_defconfig |   54 ++++++++++++++++++----------------
- 2 files changed, 50 insertions(+), 48 deletions(-)
+ 1 file changed, 29 insertions(+), 25 deletions(-)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index b1d3675..f6e6564 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -2,6 +2,8 @@ CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_KERNEL_LZO=y
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=18
+ CONFIG_CGROUPS=y
+ CONFIG_RELAY=y
+@@ -29,15 +31,12 @@ CONFIG_MACH_MX35_3DS=y
+ CONFIG_MACH_VPR200=y
+ CONFIG_MACH_IMX51_DT=y
+ CONFIG_MACH_MX51_3DS=y
+-CONFIG_MACH_EUKREA_CPUIMX51=y
+ CONFIG_MACH_EUKREA_CPUIMX51SD=y
+ CONFIG_MACH_MX51_EFIKAMX=y
+ CONFIG_MACH_MX51_EFIKASB=y
+ CONFIG_MACH_IMX53_DT=y
+ CONFIG_SOC_IMX6Q=y
+ CONFIG_MXC_PWM=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
+ CONFIG_VMSPLIT_2G=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+@@ -64,14 +63,24 @@ CONFIG_IPV6=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++CONFIG_CONNECTOR=y
+ CONFIG_MTD=y
+-CONFIG_MTD_OF_PARTS=y
++CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_JEDECPROBE=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_SST25L=y
+-# CONFIG_STANDALONE is not set
+-CONFIG_CONNECTOR=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_GPMI_NAND=y
++CONFIG_MTD_NAND_MXC=y
++CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=65536
+@@ -130,42 +139,37 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+-CONFIG_MFD_MC13XXX=y
++CONFIG_MFD_MC13XXX_SPI=y
++CONFIG_MFD_MC13XXX_I2C=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_MEDIA_SUPPORT=y
+-CONFIG_VIDEO_V4L2=y
+ CONFIG_VIDEO_DEV=y
+-CONFIG_VIDEO_V4L2_COMMON=y
+-CONFIG_VIDEOBUF_GEN=y
+-CONFIG_VIDEOBUF2_CORE=y
+-CONFIG_VIDEOBUF2_MEMOPS=y
+-CONFIG_VIDEOBUF2_DMA_CONTIG=y
+-CONFIG_VIDEO_CAPTURE_DRIVERS=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+-CONFIG_MX3_VIDEO=y
+ CONFIG_VIDEO_MX3=y
+ CONFIG_FB=y
+-CONFIG_FB_MX3=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+-CONFIG_BACKLIGHT_GENERIC=y
+-CONFIG_DUMMY_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_FONTS=y
+ CONFIG_FONT_8x8=y
+ CONFIG_FONT_8x16=y
+ CONFIG_LOGO=y
+-CONFIG_LOGO_LINUX_MONO=y
+-CONFIG_LOGO_LINUX_VGA16=y
+-CONFIG_LOGO_LINUX_CLUT224=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_IMX_SOC=y
++CONFIG_SND_SOC_PHYCORE_AC97=y
++CONFIG_SND_SOC_EUKREA_TLV320=y
++CONFIG_SND_SOC_IMX_SGTL5000=y
++CONFIG_SND_SOC_IMX_MC13783=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MXC=y
+@@ -181,6 +185,8 @@ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
++CONFIG_COMMON_CLK_DEBUG=y
++# CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+@@ -204,8 +210,9 @@ CONFIG_MSDOS_FS=m
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_CONFIGFS_FS=m
++CONFIG_JFFS2_FS=y
++CONFIG_UBIFS_FS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+@@ -216,14 +223,11 @@ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=m
+ CONFIG_NLS_UTF8=y
+ CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_FS=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ # CONFIG_FTRACE is not set
+ # CONFIG_ARM_UNWIND is not set
+ CONFIG_SECURITYFS=y
+-CONFIG_CRYPTO_DEFLATE=m
+-CONFIG_CRYPTO_LZO=m
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
+ CONFIG_CRC_CCITT=m
+-- 
+1.7.10
