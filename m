@@ -1,50 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Jul 2012 08:52:47 +0200
-Subject: [PATCH v2 07/12] I2C: MV64XXX: Add Device Tree support
-In-Reply-To: <1779200.JgQeyzoLkl@bender>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <2232439.93KkEvHiYj@flexo> <20120703165839.GA1519@lunn.ch>
- <1779200.JgQeyzoLkl@bender>
-Message-ID: <20120705065247.GL17534@lunn.ch>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Jul 2012 09:06:37 +0200
+Subject: [PATCH 2/2] ARM: mxs: defconfig: Enable CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <20120705063749.GF10610@S2101-09.ap.freescale.net>
+References: <1341261351-7924-1-git-send-email-festevam@gmail.com>
+ <1341261351-7924-2-git-send-email-festevam@gmail.com>
+ <20120705005504.GG2595@S2101-09.ap.freescale.net>
+ <20120705062540.GK30009@pengutronix.de>
+ <20120705063749.GF10610@S2101-09.ap.freescale.net>
+Message-ID: <20120705070637.GN30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 09:49:33PM +0200, Florian Fainelli wrote:
-> Hello Andrew,
-> 
-> On Tuesday 03 July 2012 18:58:39 Andrew Lunn wrote:
-> > On Tue, Jul 03, 2012 at 05:59:13PM +0200, Florian Fainelli wrote:
-> > > Hello Andrew,
-> > > 
-> > > On Tuesday 03 July 2012 16:22:40 Andrew Lunn wrote:
-> > > > Extends the driver to get properties from device tree. Also extend the
-> > > > kirkwood DT support to supply the needed properties.
-> > > > 
-> > > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > > ---
-> > > [snip]
-> > > > -	if ((pd->id != 0) || !pdata)
-> > > > +	if ((!pdata && !pd->dev.of_node) || (pdata && (pd->id != 0)))
-> > > >  		return -ENODEV;
-> > > 
-> > > This is more a reminder than a real remark, but the driver here should not 
-> be 
-> > > limiting us to a single platform_device. In fact kirkwood55 (88F6282) has 
-> two 
-> > > I2C controllers for instance.
+On Thu, Jul 05, 2012 at 02:37:51PM +0800, Shawn Guo wrote:
+> On Thu, Jul 05, 2012 at 08:25:40AM +0200, Sascha Hauer wrote:
+> > I also like to have debugfs support enabled in the defconfigs. I don't
+> > know if it's desirable to enable this unconditionally when
+> > CONFIG_DEBUGFS is enabled because I think the clk debugfs support can
+> > have some bad influence on performance.
 > > 
-> > Yes, i don't understand this code. It looks impossible to use it using
-> > platform_data with more than one controller. Any idea why its like
-> > this? I didn't want to change the behavior because i don't understand
-> > why its like this.
-> 
-> No idea, we just stumbled over this with a colleague the other day, and just 
-> removing the check made our second I2C controller work, so I don't see any 
-> reason why there is such a limitation. That said, this is for a subsequent 
-> patch.
+> > I think Fabios patches are fine for nor. If we decide to enable clk
+> > debugfs support later unconditionally than all we have is two unused
+> > lines in the defconfigs.
+> > 
+> Ok, I will queue both patches then.
 
-If you submit a patch, please CC: me and i will ACK it, or test it
-etc, and try to sort out the merge conflicts with the DT patch.
+Could you skip the imx patch? I also have some patches for the defconfig
+from Fabio and I'd like to squash them together since the imx defconfig
+could use a general update.
 
-	Thanks
-		Andrew
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
