@@ -1,29 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Jul 2012 15:36:30 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <20120705133310.GY17534@lunn.ch>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-2-git-send-email-andrew@lunn.ch>
- <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
- <20120705145801.4985770d@skate> <20120705131522.GW17534@lunn.ch>
- <20120705152840.2aea94cf@skate> <20120705133310.GY17534@lunn.ch>
-Message-ID: <20120705153630.5306780a@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jul 2012 15:46:09 +0200
+Subject: [PATCH] gpio/mxc: make irqs work for fsl,imx21-gpio devices
+In-Reply-To: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdYY4sEah7hb9=N7y2CgC45Tp4nc4vrvTYq2Zje5aLuayQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Thu, 5 Jul 2012 15:33:10 +0200,
-Andrew Lunn <andrew@lunn.ch> a ?crit :
+On Wed, Jun 6, 2012 at 11:49 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-> That is what my patch currently does. Feel free to re-use parts of the
-> orion code.
+> The chained handler was set for the platform device with id == 0.
+> When the gpio devices are instantiated by a device tree, all have id ==
+> -1 and so the handler was unset resulting in unusable gpio irqs on
+> i.MX21 and i.MX27 (when using oftree).
+>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Yes, sure! I have applied your patch and read it, I definitely intend
-to re-use many parts of it.
+Applied.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> I'm not sure this is material for stable because it never worked before.
+
+Why take a chance. It goes to stable.
+
+I'll have to explain to Torvalds why this is coming late.
+
+Yours,
+Linus Walleij
