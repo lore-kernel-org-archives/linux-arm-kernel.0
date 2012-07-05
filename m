@@ -1,154 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Jul 2012 12:10:29 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <20120705094824.GO17534@lunn.ch>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-2-git-send-email-andrew@lunn.ch>
- <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
-Message-ID: <20120705121029.782b5346@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jul 2012 12:10:48 +0200
+Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until
+ it's been DT:ed
+In-Reply-To: <4FF56029.2060007@linaro.org>
+References: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdb1rZQWpuUxQoxqg2eYanf4tnm0SmFkQQBwvSuyYV00Gw@mail.gmail.com>
+ <4FF56029.2060007@linaro.org>
+Message-ID: <CACRpkdaEBXprf8-6hXTi=p6pmuYo84io6D1BUzyvMWebro8TvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jul 5, 2012 at 11:36 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Le Thu, 5 Jul 2012 11:48:24 +0200,
-Andrew Lunn <andrew@lunn.ch> a ?crit :
+> A way to link
+> the mapping tables registered with a platform device to the driver started
+> with Device Tree is missing. This can be over-come by several methods:
+>
+> a) Create a binding which takes a device name to tag onto a mapping. This
+> can be used in the name based searches currently employed by pinctrl. This
+> is the binding I was talking about in the commit log. In retrospect, I can
+> see that this is not the correct solution.
 
-> Hi Thomas
-> 
-> You are not the only one working in this area. Arnaud Patard said he
-> was look at this as well. 
+This is what the generic bindings does. The binding already exists.
+It's a matter of augmenting the device tree per se, and making sure
+the static maps are not enabled if you have these nodes.
 
-Ok, I added Arnaud in the Cc list. Arnaud, what is the status of you
-work?
+> b) Continue using Device Tree and force the 'pinctrl-db8500' device name
+> which any string based searches will be expecting with AUXDATA(). We do
+> similar things for clock-names already. However, this must be seen as a
+> hacky work-around and it to be removed after full enablement has been taken
+> place.
+>
+> c) Prevent the pinctrl driver from being started by Device Tree and allow
+> platform code to register the device until we can populate the device tree
+> with all of the mappings. This is the way you advised me to do it [see
+> below] and it's what this patch tries to achieve.
 
-> > So far, the pin muxing part is working (needs some polishing, but the
-> > foundation is here), with device tree bindings. I think the pin muxing
-> > could be used for Orion as well.
-> 
-> Great. This is one of the big things which we are missing when moving
-> a system over the DT. Being able to describe this in DT in a
-> standardized way is very much welcome.
+Yeah.
 
-For the DT binding, I took my inspiration from the MXS and Samsung
-pinctrl drivers, as those platforms also have independent pin muxing
-(while some platforms such as Tegra, have hardware pin groups).
+>> examples of how to do this in for example:
+>> arch/arm/boot/dts/tegra-seaboard.dts
+>
+> I don't see this file anywhere?
 
-The .dtsi side looks like:
+It's in my linux-next from yesterday, but any tegra-* with a "pinmux" node
+will do the illustration I think?
 
-                pinctrl at d0018000 {
-                               compatible = "marvell,mv78230-pinmux";
-                               reg = <0xd0018000 0x38>;
+>> Is the DT machinery really incapable of specifying
+>> the device name to anything else than the bus name?
+>> Can't you do this with AUX_DATA()? I've seen that done in the
+>> past. For example you do:
+>>
+>> OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+>>
+>> Can't you just:
+>> OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
+>>
+>> And it will happily assign the "pinctrl-db8500" name to it's instantiated
+>> device?
+>
+> Yes, this will work, see option 'b' above.
 
+OK! Go for it.
 
-                               uart_2: uart-2 {
-                                            marvell,pins = <42 43>;
-                                            marvell,pins-function = <1>;
-                               };
-
-                               uart_3: uart-3 {
-                                            marvell,pins = <44 45>;
-                                            marvell,pins-function = <2>;
-                               };
-
-                               uart_0_control: uart-0-control {
-                                            marvell,pins = <42 43>;
-                                            marvell,pins-function = <2>;
-                               };
-
-                               uart_1_control: uart-1-control {
-                                            marvell,pins = <46 47>;
-                                            marvell,pins-function = <2>;
-                               };
-
-                               uart_2_control: uart-2-control {
-                                            marvell,pins = <44 45>;
-                                            marvell,pins-function = <1>;
-                               };
-
-                               uart_3_control: uart-3-control {
-                                            marvell,pins = <46 47>;
-                                            marvell,pins-function = <1>;
-                               };
-
-                };
-
-This defines the various pin muxing options, and then when
-instantiating a device, you do:
-
-               test at 12 {
-                       compatible = "marvell,testdrv";
-                       pinctrl-names = "default";
-                       pinctrl-0 = <&uart_0_control>;
-               };
-
-(This is with a dummy test driver that I'm using for testing). Then
-the driver can use the pinctrl API to get the proper muxing for its
-pins.
-
-> > Now, I'm planning to start working on the gpio + gpio interrupts parts
-> > of the driver, and I'm wondering how to interact with your work on the
-> > matter.
-> 
-> I've publicly said, what i have is enough to get it working, but i
-> know its not the end solution. What i have is enough that gpio-key,
-> gpio-led, as described in DT, works. Boards can start using these and
-> as far as i can tell, the binding should not need to change. The GPIO
-> controller binding should also be sufficiently generic that it should
-> also not need changes when we replace the driver with pinctrl.
-> 
-> The biggest problem i had, is the interaction between generic chip
-> interrupts and irqdomain. There has been work to integrate the two,
-> but its stalled. Either the work needs restarting and completing, or
-> you need to throw away the use of generic interrupt so that you can
-> use irqdomain linear. IMHO, throwing away generic interrupt is the
-> wrong way.
-> 
-> The other thing you need to keep in mind is the namespace issues
-> between normal interrupts and GPIO interrupts. The way my patch works
-> is that normal interrupts are setup first, counting how many have been
-> created. Then GPIO interrupts are added, starting off where the normal
-> interrupts ended. Since 370/XP uses different interrupt code, you need
-> to think how to solve this issue.
-
-Ok, thanks for those hints.
-
-> > Should I continue working on a drivers/pinctrl/ driver for mvebu for
-> > Armada 370/XP, and then we see together if it makes sense to extend to
-> > Orion, and if so, what changes are needed?
-> 
-> I know Marvell has contracted you to port to Armada 370/XP, not mvebu,
-> aka all chips which might be able to share this code. This IMHO is
-> wrong. So i personally would put the kirkwood and the Armada 370/XP
-> data sheets next to each other, and from the beginning on write the
-> driver so it supports them all. This assumes the ASIC engineers have
-> not radically changed anything... Please also try to stick to the DT
-> binding i've used.
-
-I've looked at the datasheet for the 88F6281, and the GPIO registers
-look fairly similar with Armada 370/XP, except that:
-
- * On 88F6281, there are two GPIO banks, while on Armada 370/XP it's a
-   continuous range of registers that control the GPIOs. But it can be
-   assimilated as one bank handling more than 32 GPIOs. So shouldn't be
-   a big problem to handle.
-
- * The Armada 370/XP have additional set/clear registers that allow to
-   modify the GPIO states without having to do a read/mask/write
-   sequence, which is nicer on SMP. I guess we can handle that as a
-   variant inside the driver without too much problem.
-
-Marvell has given me a 88F6282 eval board, so I guess they are fine
-with me spending some time ensuring that the new code works properly on
-the previous platforms, especially in this case where the amount of
-work does not seem to be enormous to keep the compatibility.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Linus Walleij
