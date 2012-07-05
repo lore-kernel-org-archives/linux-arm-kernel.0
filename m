@@ -1,71 +1,62 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 5 Jul 2012 09:32:58 +0530
-Subject: [PATCH v2 0/4] ARM: OMAP2+: dmtimer: cleanup related to devm API
- and clk usage
-In-Reply-To: <CAMQu2gxDbi191EdA0_acaJwhuAddXJ44FzVQJ=5c1Fh0PFDG4w@mail.gmail.com>
-References: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
- <CAC83ZvLOoUwthcv0seXeqJcuvxvhP7P500T66RHCCWvrsaPr2A@mail.gmail.com>
- <CAMQu2gxDbi191EdA0_acaJwhuAddXJ44FzVQJ=5c1Fh0PFDG4w@mail.gmail.com>
-Message-ID: <CAC83ZvLcyRSc-X2o_05tS7R3S1s190ejDQaBOYHOK1JuknrAxA@mail.gmail.com>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Thu, 5 Jul 2012 10:50:07 +0530
+Subject: [PATCH v4 0/2] add new cache maintenance api
+Message-ID: <CADysL2ZD0yCpCodeuwDpiaiD=uYuDfv4MDXN=YWa-LfY1-8pjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+>From 393c4effbbec74ff9b969d53ce4d36fde56b71df Mon Sep 17 00:00:00 2001
+From: Ramesh Gupta G <grgupta@ti.com>
+Date: Wed, 4 Jul 2012 16:43:41 +0530
+Subject: [PATCH v4 0/2] add new cache maintenance api
 
-On Thu, Jun 14, 2012 at 4:28 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> Tony,
->
-> On Thu, Jun 14, 2012 at 4:24 PM, DebBarma, Tarun Kanti
-> <tarun.kanti@ti.com> wrote:
->> On Fri, Apr 20, 2012 at 6:09 PM, Tarun Kanti DebBarma
->> <tarun.kanti@ti.com> wrote:
->>> The devm API usage in probe() simplifies error handling operation.
->>> Since iclk is not used in the driver it is removed from wherever
->>> not needed.
->>> Corrected the timer fck name mis-match between clock44xx_data.c and
->>> omap_hwmod_44xx_data.c.
->>> Added omap_hwmod_get_main_clk() API. There is no more need to construct
->>> clock names using sprintf() to be used in clk_get() during initialization.
->>>
->>> Reference:
->>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
->>> Commit: e816b57a337ea3b755de72bec38c10c864f23015 (Linux 3.4-rc3)
->>>
->>> Series is available here for reference:
->>> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev dmtimer_cleanup_for_3.5
->>>
->>> Tested on following platforms:
->>> OMAP5, OMAP4430SDP, OMAP3430SDP, OMAP2430SDP.
->>> Could not test on OMAP2420 due to unavailability of board.
->>>
->>> v2:
->>> - Use devm_request_and_ioremap() instead of request_mem_region() and ioremap()
->>> - Add omap_hwmod_get_main_clk() API
->>> - Reverted changes of clock names from OMAP2 and OMAP3 platforms
->>>
->>> Cc: Cousson, Benoit <b-cousson@ti.com>
->>> Cc: Paul Walmsley <paul@pwsan.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Kevin Hilman <khilman@ti.com>
->>> Cc: Rajendra Nayak <rnayak@ti.com>
->>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>
->>> Tarun Kanti DebBarma (4):
->>>  ARM: OMAP: dmtimer: use devm_ API and do some cleanup in probe()
->>>  ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
->>>  ARM: OMAP2+: dmtimer: cleanup iclk usage
->>>  ARM: OMAP2+: dmtimer: cleanup fclk usage
->> [ping]
->> Only one of the patches in the series (ARM: OMAP2+: dmtimer: cleanup iclk usage)
->> has been taken. I just applied the remaining patches on top of Linux 3.5-rc2 and
->> tested on OMAP3 and OMAP4. Can the remaining patches be taken as well?
->
-> Just to let you know that this cleanup is essential for Benoit's OMAP4
-> hwmod cleanup
-> and OMAP5 minimal support series.
-This is a gentle reminder in case you have missed somehow!!
-Let me know if anything else needs to be done.
-Thanks.
---
-Tarun
+This patch series is the next version to
+- add a new cache maintenance api to support non-coherent iommu drivers.
+- flush both L1 and L2 caches from OMAP iommu whenever the page table
+  memory is updated.
+
+Changes since the previous patch set (v3)
+- Minor cleanup for fixing checkpatch warnings.
+
+The implementation of the new api is based on
+the approach[1] discussed.
+
+[1]http://marc.info/?l=linux-kernel&m=131316512713815&w=2
+
+Signed-off-by: Ramesh Gupta G <grgupta@ti.com>
+
+Ramesh Gupta G (2):
+  ARM: new cache maintenance api for iommu
+  OMAP:IOMMU:flush L1 and L2 caches
+
+ arch/arm/include/asm/cacheflush.h |   26 ++++++++++++++++++++++++++
+ arch/arm/include/asm/glue-cache.h |    1 +
+ arch/arm/mm/cache-fa.S            |   15 +++++++++++++++
+ arch/arm/mm/cache-v3.S            |   14 +++++++++++++-
+ arch/arm/mm/cache-v4.S            |   15 +++++++++++++++
+ arch/arm/mm/cache-v4wb.S          |   21 +++++++++++++++++++++
+ arch/arm/mm/cache-v4wt.S          |   17 +++++++++++++++++
+ arch/arm/mm/cache-v6.S            |   20 ++++++++++++++++++++
+ arch/arm/mm/cache-v7.S            |   21 +++++++++++++++++++++
+ arch/arm/mm/proc-arm1020.S        |   22 ++++++++++++++++++++++
+ arch/arm/mm/proc-arm1020e.S       |   20 ++++++++++++++++++++
+ arch/arm/mm/proc-arm1022.S        |   20 ++++++++++++++++++++
+ arch/arm/mm/proc-arm1026.S        |   20 ++++++++++++++++++++
+ arch/arm/mm/proc-arm920.S         |   17 +++++++++++++++++
+ arch/arm/mm/proc-arm922.S         |   17 +++++++++++++++++
+ arch/arm/mm/proc-arm925.S         |   22 ++++++++++++++++++++++
+ arch/arm/mm/proc-arm926.S         |   22 ++++++++++++++++++++++
+ arch/arm/mm/proc-arm940.S         |   25 +++++++++++++++++++++++++
+ arch/arm/mm/proc-arm946.S         |   24 ++++++++++++++++++++++++
+ arch/arm/mm/proc-feroceon.S       |   30 ++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-macros.S         |    1 +
+ arch/arm/mm/proc-mohawk.S         |   18 ++++++++++++++++++
+ arch/arm/mm/proc-xsc3.S           |   17 +++++++++++++++++
+ arch/arm/mm/proc-xscale.S         |   19 +++++++++++++++++++
+ drivers/iommu/omap-iommu.c        |   26 +++++++++-----------------
+ 25 files changed, 452 insertions(+), 18 deletions(-)
+
+
+-- 
+regards
+Ramesh Gupta G
