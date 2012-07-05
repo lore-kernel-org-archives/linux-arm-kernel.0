@@ -1,88 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Jul 2012 12:40:31 +0000
-Subject: ARM: SoC fixes for 3.5-rc
-Message-ID: <201207051240.32157.arnd@arndb.de>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Thu, 5 Jul 2012 18:10:59 +0530
+Subject: [PATCH v2 REPOST 4/4] ARM: OMAP2+: dmtimer: cleanup fclk usage
+Message-ID: <1341492059-5544-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+With omap_hwmod_get_main_clk() now available, this can be passed to
+clk_get() to extract the fclk and thus avoid construction of fclk name.
+Corrected the timer fck name mis-match between clock44xx_data.c and
+omap_hwmod_44xx_data.c. For other platforms this is already taken care.
 
-I've taken over from Olof again for the next few weeks, here are the
-bug fixes that came in since rc5.
+Cc: Cousson, Benoit <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-	Arnd
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+Reference:
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+Branch: cleanup-part2
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+Tested on ZOOM3, BLAZE, PANDA.
 
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+ arch/arm/mach-omap2/clock44xx_data.c |   22 +++++++++++-----------
+ arch/arm/mach-omap2/timer.c          |    3 +--
+ 2 files changed, 12 insertions(+), 13 deletions(-)
 
-are available in the git repository at:
-
-  git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to e15ebe05cce44c5164dbf8489841c18a887bcfc2:
-
-  Merge tag 'omap-fixes-for-v3.5-rc5' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2012-07-05 12:16:13 +0200)
-
-----------------------------------------------------------------
-
-Small fixes on multiple ARM platforms
-* A build regression from a previous fix on dove and mv78xx0
-* Two fixes for recently (3.5-rc1) changed mmp/pxa code
-* multiple omap2+ bug fixes
-* two trivial fixes for i.MX
-* one v3.5 regression for mxs
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Orion: Fix WDT compile for Dove and MV78xx0
-
-Arnd Bergmann (5):
-      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
-      Merge tag 'v3.5-imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
-      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
-      Merge branch 'mxs/fixes-for-3.5' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge tag 'omap-fixes-for-v3.5-rc5' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Benoit Cousson (1):
-      ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4
-
-Fabio Estevam (1):
-      ARM: imx27_visstrim_m10: Do not include <asm/system.h>
-
-Kevin Hilman (2):
-      ARM: OMAP2: Overo: init I2C before MMC to fix MMC suspend/resume failure
-      ARM: OMAP4: TWL6030: ensure sys_nirq1 is mux'd and wakeup enabled
-
-Lauri Hintsala (1):
-      ARM: apx4devkit: fix FEC enabling PHY clock
-
-Paul Bolle (1):
-      ARM: mmp: remove mach/gpio-pxa.h
-
-Paul Parsons (1):
-      ARM: pxa: hx4700: Fix basic suspend/resume
-
-Paul Walmsley (1):
-      ARM: OMAP4: hwmod data: temporarily comment out data for the usb_host_fs and aess IP blocks
-
-Tony Lindgren (1):
-      Merge tag 'omap-fixes-b-for-3.5rc' of git://git.kernel.org/.../pjw/omap-pending into fixes
-
-Uwe Kleine-K?nig (1):
-      ARM: imx: assert SCC gate stays enabled
-
- arch/arm/mach-dove/include/mach/bridge-regs.h    |    1 +
- arch/arm/mach-dove/include/mach/dove.h           |    1 +
- arch/arm/mach-imx/clk-imx35.c                    |    9 ++++++-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c      |    2 +-
- arch/arm/mach-mmp/include/mach/gpio-pxa.h        |   29 ----------------------
- arch/arm/mach-mv78xx0/include/mach/bridge-regs.h |    1 +
- arch/arm/mach-mv78xx0/include/mach/mv78xx0.h     |    2 ++
- arch/arm/mach-mxs/mach-apx4devkit.c              |   11 ++++++++
- arch/arm/mach-omap2/board-overo.c                |    2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c       |   28 ++++++++++-----------
- arch/arm/mach-omap2/twl-common.c                 |    2 ++
- arch/arm/mach-pxa/hx4700.c                       |   15 ++++++++++-
- 12 files changed, 56 insertions(+), 47 deletions(-)
- delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index ba6f9a0..f9d4f58 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -3299,17 +3299,17 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK(NULL,	"smartreflex_core_fck",		&smartreflex_core_fck,	CK_443X),
+ 	CLK(NULL,	"smartreflex_iva_fck",		&smartreflex_iva_fck,	CK_443X),
+ 	CLK(NULL,	"smartreflex_mpu_fck",		&smartreflex_mpu_fck,	CK_443X),
+-	CLK(NULL,	"gpt1_fck",			&timer1_fck,	CK_443X),
+-	CLK(NULL,	"gpt10_fck",			&timer10_fck,	CK_443X),
+-	CLK(NULL,	"gpt11_fck",			&timer11_fck,	CK_443X),
+-	CLK(NULL,	"gpt2_fck",			&timer2_fck,	CK_443X),
+-	CLK(NULL,	"gpt3_fck",			&timer3_fck,	CK_443X),
+-	CLK(NULL,	"gpt4_fck",			&timer4_fck,	CK_443X),
+-	CLK(NULL,	"gpt5_fck",			&timer5_fck,	CK_443X),
+-	CLK(NULL,	"gpt6_fck",			&timer6_fck,	CK_443X),
+-	CLK(NULL,	"gpt7_fck",			&timer7_fck,	CK_443X),
+-	CLK(NULL,	"gpt8_fck",			&timer8_fck,	CK_443X),
+-	CLK(NULL,	"gpt9_fck",			&timer9_fck,	CK_443X),
++	CLK(NULL,	"timer1_fck",			&timer1_fck,	CK_443X),
++	CLK(NULL,	"timer10_fck",			&timer10_fck,	CK_443X),
++	CLK(NULL,	"timer11_fck",			&timer11_fck,	CK_443X),
++	CLK(NULL,	"timer2_fck",			&timer2_fck,	CK_443X),
++	CLK(NULL,	"timer3_fck",			&timer3_fck,	CK_443X),
++	CLK(NULL,	"timer4_fck",			&timer4_fck,	CK_443X),
++	CLK(NULL,	"timer5_fck",			&timer5_fck,	CK_443X),
++	CLK(NULL,	"timer6_fck",			&timer6_fck,	CK_443X),
++	CLK(NULL,	"timer7_fck",			&timer7_fck,	CK_443X),
++	CLK(NULL,	"timer8_fck",			&timer8_fck,	CK_443X),
++	CLK(NULL,	"timer9_fck",			&timer9_fck,	CK_443X),
+ 	CLK(NULL,	"uart1_fck",			&uart1_fck,	CK_443X),
+ 	CLK(NULL,	"uart2_fck",			&uart2_fck,	CK_443X),
+ 	CLK(NULL,	"uart3_fck",			&uart3_fck,	CK_443X),
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 840929b..4c9ef35 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -173,8 +173,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 		return -ENXIO;
+ 
+ 	/* After the dmtimer is using hwmod these clocks won't be needed */
+-	sprintf(name, "gpt%d_fck", gptimer_id);
+-	timer->fclk = clk_get(NULL, name);
++	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
+ 	if (IS_ERR(timer->fclk))
+ 		return -ENODEV;
+ 
+-- 
+1.7.0.4
