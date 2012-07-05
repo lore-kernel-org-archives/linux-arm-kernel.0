@@ -1,44 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jul 2012 08:27:43 -0700
-Subject: [RESEND PATCH] ARM: OMAP2+: am33xx: Make am33xx as a separate
- class
-In-Reply-To: <20120704081546.GR1122@atomide.com>
-References: <1341320447-18918-1-git-send-email-hvaibhav@ti.com>
- <1341320447-18918-2-git-send-email-hvaibhav@ti.com>
- <20120704072454.GO1122@atomide.com>
- <20120704081546.GR1122@atomide.com>
-Message-ID: <20120705152743.GG1122@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Jul 2012 09:32:08 -0600
+Subject: [PATCH v2 0/6] Port Tegra to generic clk framework
+In-Reply-To: <4FF3D6BD.1000509@nvidia.com>
+References: <1341313761-22118-1-git-send-email-pgaikwad@nvidia.com>
+ <4FF31DFC.8030708@wwwdotorg.org> <4FF3D6BD.1000509@nvidia.com>
+Message-ID: <4FF5B378.6030305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120704 01:20]:
-> * Tony Lindgren <tony@atomide.com> [120704 00:29]:
-> > * Vaibhav Hiremath <hvaibhav@ti.com> [120703 06:12]:
-> > > Initially, we decided to make am33xx family of device to fall
-> > > under omap3 class (cpu_is_omap34xx() = true), since it carries
-> > > Cortex-A8 core. But while adding complete baseport support
-> > > (like, clock, power and hwmod) support, it is observed that,
-> > > we are creating more and more problems by treating am33xx device
-> > > as omap3 family, as nothing matches between them
-> > > (except cortex-A8 mpu).
-> > > 
-> > > So,  after long discussion we have came to the conclusion that,
-> > > we should not consider am33xx device as omap3 family, instead
-> > > create separate class (SOC_AM33XX) under OMAP2PLUS.
-> > > This means, for am33xx device, cpu_is_omap34xx() will return false,
-> > > and only cpu_is_am33xx() will be true.
-> > 
-> > Thanks applying both.
+On 07/03/2012 11:38 PM, Prashant Gaikwad wrote:
+> On Tuesday 03 July 2012 09:59 PM, Stephen Warren wrote:
+>> On 07/03/2012 05:09 AM, Prashant Gaikwad wrote:
+>>> This patch set ports Tegra clock code to generic clock framework.
+>>>
+>>> Depends on
+>>> [PATCH v3 0/9] Add clk_prepare/clk_unprepare series
+>>> [PATCH] ARM: tegra: Remove second instance of uart clk
+>>> [PATCH] dma: tegra: add clk_prepare/clk_unprepare
+>>> [PATCH] ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
+>>>
+>>> Tested on Ventana and Cardhu
+>>>
+>>> v2:
+>>>   - Rebased on Tegra's for-3.6/common-clk
+>> OK, this applies to for-3.6/common-clk without issue now. However, there
+>> are still runtime problems:
+>>
+>> On Tegra20(Ventana), running Tegra's for-next branch with these patches
+>> merged in, if I play audio, the sound is much too low a pitch; the I2S
+>> clock must be being set too low. Also, if I play the same file twice,
+>> once encoded as 48KHz once encoded as 44.1KHz, the pitch is different.
+>>
+>> On Tegra20(Ventana), running next-20120703 plus a few local patches for
+>> regulators plus these common clock patches, then I see the same
+>> segfaults during boot that I mentioned before. It seems something in
+>> linux-next not in Tegra's for-next branch is breaking the common clock
+>> code for us.
 > 
-> I believe all your patches are now applied. I've pushed them out
-> into devel-am33xx-part2 branch. Can you please check and send
-> additional patches as needed?
+> Does these local patches include any changes in clock init table? Is it
+> possible to share the changes?
 
-I ended up moving some patches into cleanup-part2 branch as omap5
-patches also need those. So the new branch for am33xx is called
-devel-am33xx-data at commit 79ab2664. The old devel-am33xx-part2
-branch should be ignored now.
+My local dev branch is usually available at:
+git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
 
-Regards,
+The local patches are mostly regulator support work-in-progress at the
+moment, so nothing to do with clocks, except one minor warning fix.
 
-Tony
+I see you've posted v3; I assume that means you've found/fixed the
+issues - I'll go test.
