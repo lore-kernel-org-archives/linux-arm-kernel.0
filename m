@@ -1,44 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 5 Jul 2012 13:45:49 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <4FF58B68.5000703@linaro.org>
-References: <20120703132447.GN29030@opensource.wolfsonmicro.com>
- <4FF2F82D.9080507@linaro.org>
- <20120703142123.GQ29030@opensource.wolfsonmicro.com>
- <4FF54406.3000307@linaro.org>
- <20120705094541.GK4111@opensource.wolfsonmicro.com>
- <4FF57EA9.7060107@linaro.org>
- <20120705120600.GT4111@opensource.wolfsonmicro.com>
- <4FF58571.2090807@linaro.org>
- <20120705122947.GY4111@opensource.wolfsonmicro.com>
- <4FF58B68.5000703@linaro.org>
-Message-ID: <20120705124549.GD4111@opensource.wolfsonmicro.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 5 Jul 2012 12:46:40 +0000
+Subject: Help required on N900
+In-Reply-To: <CANOLnOM6OaqQ-t8+BiuAPvT_MvfH9NvEUPMOpMPZh2n5uDxpuw@mail.gmail.com>
+References: <C8443D0743D26F4388EA172BF4E2A7A93E9A3446@DBDE01.ent.ti.com>
+ <CANOLnOM6OaqQ-t8+BiuAPvT_MvfH9NvEUPMOpMPZh2n5uDxpuw@mail.gmail.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A37BB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 01:41:12PM +0100, Lee Jones wrote:
-> On 05/07/12 13:29, Mark Brown wrote:
+Hi Grazvydas,
 
-> If DT is _not_ enabled, we do:
+On Thu, Jul 05, 2012 at 17:58:55, Grazvydas Ignotas wrote:
+> On Thu, Jul 5, 2012 at 10:21 AM, Mohammed, Afzal <afzal@ti.com> wrote:
 
->   From platform code:
->    - Register the DB8500-PRCMU
->    - Register the AB8500
+> > Can someone please provide me with a link to N900 board schematics.
+> >
+> > It would be really helpful if information on how to do Numonyx
+> > OneNAND reset on N900 (i.e. like how long reset signal should
+> > be asserted), and gpio pin number connected (if connected) to
+> > OneNAND reset pin can be provided.
+> 
+> I guess this should help:
+> http://maemo.jacekowski.org/docs/
 
-> So you see the registration is separate.
+I did come across this, but could not figure out from it the
+reset pin used, one pin was marked POP_RESET_RP_FT, I assume
+is connected to reset of OneNAND, but could not figure out
+the gpio pin.
 
-Right, so what I'm saying is that what I'd expect unless there's
-something unusual going on is that you wouldn't be doing the separate
-registration of the AB8500 here and would instead be passing the
-platform data for the AB8500 through in the same way you pass the DT
-data through.
+Thanks for your help.
 
-DT and non-DT do have a very similar model for this stuff.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/3cfff40b/attachment.sig>
+Regards
+Afzal
