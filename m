@@ -1,48 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Jul 2012 14:06:05 +0100
-Subject: [PATCH 2/9] pinctrl: pinctrl-nomadik: Append sleepmode property with
- vendor specific prefixes
+Date: Thu,  5 Jul 2012 14:06:11 +0100
+Subject: [PATCH 8/9] ARM: ux500: Clean-up temporary Device Tree enablement
+ helpers
 In-Reply-To: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
 References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1341493572-29735-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any non-standard property should contain the vendor's identifier which
-should be perpended onto the property name followed by a comma. This
-aids in name-space collision prevention. This patch ensures the
-sleepmode property adheres to the rules.
+Here we remove some of the extra overhead we introduced to make
+DT:ing the Snowball platform easier. Unfortunately we can't
+remove everything. We are forced to leave cpufreq and DMA behind
+until they have been successfully Device Tree enabled.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/gpio/gpio-nmk.txt          |    2 +-
- drivers/pinctrl/pinctrl-nomadik.c                  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |   10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-index ee87467..8315ac7 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-@@ -26,6 +26,6 @@ Example:
-                         #gpio-cells = <2>;
-                         gpio-controller;
-                         interrupt-controller;
--                        supports-sleepmode;
-+                        st,supports-sleepmode;
-                         gpio-bank = <1>;
-                 };
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index af0389f..520aa23 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1198,7 +1198,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 		if (!pdata)
- 			return -ENOMEM;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index c8dd94f..d7a28c0 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -137,10 +137,6 @@ static struct platform_device *platform_devs[] __initdata = {
+ 	&db8500_prcmu_device,
+ };
  
--		if (of_get_property(np, "supports-sleepmode", NULL))
-+		if (of_get_property(np, "st,supports-sleepmode", NULL))
- 			pdata->supports_sleepmode = true;
+-static struct platform_device *of_platform_devs[] __initdata = {
+-	&u8500_dma40_device,
+-};
+-
+ static resource_size_t __initdata db8500_gpio_base[] = {
+ 	U8500_GPIOBANK0_BASE,
+ 	U8500_GPIOBANK1_BASE,
+@@ -232,7 +228,6 @@ struct device * __init u8500_init_devices(void)
+ struct device * __init u8500_of_init_devices(void)
+ {
+ 	struct device *parent;
+-	int i;
  
- 		if (of_property_read_u32(np, "gpio-bank", &dev->id)) {
+ 	parent = db8500_soc_device_init();
+ 
+@@ -241,8 +236,7 @@ struct device * __init u8500_of_init_devices(void)
+ 	platform_device_register_data(parent,
+ 		"cpufreq-u8500", -1, NULL, 0);
+ 
+-	for (i = 0; i < ARRAY_SIZE(of_platform_devs); i++)
+-		of_platform_devs[i]->dev.parent = parent;
++	u8500_dma40_device.dev.parent = parent;
+ 
+ 	/*
+ 	 * Devices to be DT:ed:
+@@ -250,7 +244,7 @@ struct device * __init u8500_of_init_devices(void)
+ 	 *   db8500_pmu_device   = done
+ 	 *   db8500_prcmu_device = done
+ 	 */
+-	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
++	platform_device_register(&u8500_dma40_device);
+ 
+ 	return parent;
+ }
 -- 
 1.7.9.5
