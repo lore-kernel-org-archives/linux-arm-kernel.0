@@ -1,37 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 05 Jul 2012 16:50:42 +0100
-Subject: [PATCH] of: address: Don't fail a lookup just because a node
- has no reg property
-In-Reply-To: <201207051538.37687.arnd@arndb.de>
-References: <1341498754-30445-1-git-send-email-lee.jones@linaro.org>
- <4FF5AB4D.6090500@gmail.com> <4FF5B004.4080100@linaro.org>
- <201207051538.37687.arnd@arndb.de>
-Message-ID: <4FF5B7D2.8000909@linaro.org>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
+Date: Thu, 05 Jul 2012 17:51:21 +0200
+Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
+ Controllers
+In-Reply-To: <201207051454.24475.arnd@arndb.de>
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <20120705130819.GV17534@lunn.ch> <4FF5A15A.8070309@googlemail.com>
+ <201207051454.24475.arnd@arndb.de>
+Message-ID: <4FF5B7F9.9020507@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/12 16:38, Arnd Bergmann wrote:
-> On Thursday 05 July 2012, Lee Jones wrote:
->>>
->>> Acked-by: Rob Herring <rob.herring@calxeda.com>
->>>
->>> Do you have something dependent on this or want me to apply?
->>
->> I have things that require this patch yes. Please apply.
+On 07/05/2012 04:54 PM, Arnd Bergmann wrote:
+> This way you have multiple nodes with the same register
+> and different names, which is not how it normally works.
+
+Ok.
+
+>> This would have the advantage that DT describes gpio-to-irq dependencies.
+>> Moreover, nodes that reference gpios can do gpios =<&gpio 71 0>; instead of
+>> gpios =<&gpio3 7 0>;
 >
-> I guess Rob's question was whether you want to keep this together
-> with the patch that depends on it rather than him applying just
-> the one patch.
+> Is that desired?
+>
+> The device tree representation should match what is in the data sheet
+> normally. If they are in a single continuous number range, then we should
+> probably have a single device node with multiple register ranges
+> rather than one device node for each 32-bit register. Looking at
+> arch/arm/plat-orion/gpio.c I think that is not actually the case though
+> and having separate banks is more logical.
 
-No, it's not important.
+Well, looking at the datasheet of Dove GPIOs are numbered [63:0] plus
+GPOs [71:64]. This dt will be a lot shorter and maybe it is describing
+the hardware as it is. (Not sure about the syntax for irqs, though)
 
-I'll send you the other patch as part of my DT pull-request.
+gpio at d0400 {
+	compatible = "marvell,orion-gpio";
+	gpio-controller;
+	reg = <0xd0400 0x20>, /* GPIO[31: 0] */
+	      <0xd0420 0x20>, /* GPIO[63:32] */
+	      <0xe8400 0x0c>; /* GPO [71:64] */
+	ngpio = <72>;
+	interrupts = <12 13 14 15>, <61>;
+};
 
-I'm just waiting on Linus' Ack on a few patches and it'll be ready.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sebastian
