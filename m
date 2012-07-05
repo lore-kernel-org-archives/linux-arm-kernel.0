@@ -1,35 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 5 Jul 2012 15:13:29 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <4FF59F5C.8050002@linaro.org>
-References: <20120703132447.GN29030@opensource.wolfsonmicro.com>
- <4FF58B68.5000703@linaro.org>
- <20120705124549.GD4111@opensource.wolfsonmicro.com>
- <201207051357.07195.arnd@arndb.de> <4FF59F5C.8050002@linaro.org>
-Message-ID: <20120705141329.GN4111@opensource.wolfsonmicro.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 5 Jul 2012 16:24:31 +0200
+Subject: [V3 1/3] regulator: add pre-regulator support for 88pm860x
+In-Reply-To: <1340278283-16423-1-git-send-email-jtzhou@marvell.com>
+References: <20120621101536.GR4037@opensource.wolfsonmicro.com>
+ <1340278283-16423-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20120705142431.GD18200@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 03:06:20PM +0100, Lee Jones wrote:
-> On 05/07/12 14:57, Arnd Bergmann wrote:
+Hi Jett,
 
-> >The non-DT path for this is a huge mess, I'd rather focus on making
-> >it obsolete than trying to fix it. Other than that, I agree that
-> >we should be registering the ab8500 from the prcmu from both the
-> >DT and the non-DT case.
+On Thu, Jun 21, 2012 at 07:31:23PM +0800, Jett.Zhou wrote:
+> Pre-regulator of 88pm8606 is mainly for support charging based on vbus,
+> it needs to be enabled for charging battery, and will be disabled in
+> some exception condition like over-temp.
+> 
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> ---
+>  drivers/mfd/88pm860x-core.c  |   23 ++++++++++++++
+>  drivers/regulator/88pm8607.c |   66 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/88pm860x.h |    1 +
+>  3 files changed, 90 insertions(+), 0 deletions(-)
+Unless Mark already applied this patch, could you please split it into and MFD
+and a regulator (separate) patches ?
 
-> Ah, is that what you were saying Mark?
+Cheers,
+Samuel.
 
-> If so, I apologise. I thought you meant register both from platform
-> code. I'm happy to register the AB8500 from the DB8500 for _both_ DT
-> and !DT.
-
-Yes, that's what I was trying to say - sorry that I wasn't clear!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/33b512ca/attachment-0001.sig>
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
