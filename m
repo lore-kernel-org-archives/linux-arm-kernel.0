@@ -1,43 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Jul 2012 14:06:10 +0100
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+Date: Thu,  5 Jul 2012 14:06:08 +0100
+Subject: [PATCH 5/9] ARM: ux500: Remove temporary snowball_of_platform_devs
+ enablement structure
 In-Reply-To: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
 References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1341493572-29735-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1341493572-29735-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before we can use any domain allocated IRQ, we need to first create a
-map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
-We do this with a helper function provided by the AB8500 IRQ domain
-controller called ab8500_irq_get_virq(). We need to do this for both
-IRQs which the Power-On-Key driver uses; one for button press, the other
-for button depress.
+All Device Tree enablement for Snowball's Platform  devices; LEDs, Keys,
+Ethernet and all associated AB8500 Multi-Functional Devices are now
+complete, so here we remove any trace of adding those devices when Device
+Tree is enabled.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/input/misc/ab8500-ponkey.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-ux500/board-mop500.c |   17 -----------------
+ 1 file changed, 17 deletions(-)
 
-diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-index 5ceb23e..ae4b683 100644
---- a/drivers/input/misc/ab8500-ponkey.c
-+++ b/drivers/input/misc/ab8500-ponkey.c
-@@ -82,6 +82,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 3b76115..c12cd97 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -745,10 +745,6 @@ MACHINE_END
  
- 	input_set_capability(input, EV_KEY, KEY_POWER);
+ #ifdef CONFIG_MACH_UX500_DT
  
-+	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbf);
- 	error = request_any_context_irq(ponkey->irq_dbf, ab8500_ponkey_handler,
- 					0, "ab8500-ponkey-dbf", ponkey);
- 	if (error < 0) {
-@@ -90,6 +91,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
- 		goto err_free_mem;
- 	}
+-static struct platform_device *snowball_of_platform_devs[] __initdata = {
+-	&snowball_key_dev,
+-};
+-
+ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires DMA and call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
+@@ -802,8 +798,6 @@ static void __init u8500_init_machine(void)
  
-+	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbr);
- 	error = request_any_context_irq(ponkey->irq_dbr, ab8500_ponkey_handler,
- 					0, "ab8500-ponkey-dbr", ponkey);
- 	if (error < 0) {
+ 	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
+ 		mop500_platform_devs[i]->dev.parent = parent;
+-	for (i = 0; i < ARRAY_SIZE(snowball_platform_devs); i++)
+-		snowball_platform_devs[i]->dev.parent = parent;
+ 
+ 	/* automatically probe child nodes of db8500 device */
+ 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
+@@ -822,17 +816,6 @@ static void __init u8500_init_machine(void)
+ 
+ 		mop500_uib_init();
+ 
+-	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+-		/*
+-		 * Devices to be DT:ed:
+-		 *   snowball_led_dev   = done
+-		 *   snowball_key_dev   = todo
+-		 *   snowball_sbnet_dev = done
+-		 *   ab8500_device      = done
+-		 */
+-		platform_add_devices(snowball_of_platform_devs,
+-				ARRAY_SIZE(snowball_of_platform_devs));
+-
+ 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+ 		/*
+ 		 * The HREFv60 board removed a GPIO expander and routed
 -- 
 1.7.9.5
