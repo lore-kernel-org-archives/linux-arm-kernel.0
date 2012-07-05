@@ -1,36 +1,60 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 5 Jul 2012 17:38:48 +0530
-Subject: [PATCH v1 06/14] ARM: OMAP5: gpmc: Update gpmc_init()
+Date: Thu, 5 Jul 2012 17:38:39 +0530
+Subject: [PATCH v1 01/14] ARM: OMAP2+: Move stubbed secure_sram_reserve
+ function to a common.c and call it __weak
 In-Reply-To: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341490136-25901-11-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1341490136-25901-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: R Sricharan <r.sricharan@ti.com>
 
-GPMC module is the same as in OMAP4.
-Just update the base address and irq number.
+omap_secure_ram_reserve_memblock is stubbed for OMAP1,2 only builds using a
+ ifdef check. But this results in adding CONFIG_ARCH_OMAPxx checks for
+future socs that use the real function. So move this to common.c file and
+call it __weak.
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/plat-omap/common.c                   |    9 +++++++++
+ arch/arm/plat-omap/include/plat/omap-secure.h |    5 -----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 2286410..fa21b4b 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -727,7 +727,8 @@ static int __init gpmc_init(void)
- 		ck = "gpmc_fck";
- 		l = OMAP34XX_GPMC_BASE;
- 		gpmc_irq = INT_34XX_GPMC_IRQ;
--	} else if (cpu_is_omap44xx()) {
-+	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
-+		/* Base address and irq number are same for OMAP4/5 */
- 		ck = "gpmc_ck";
- 		l = OMAP44XX_GPMC_BASE;
- 		gpmc_irq = OMAP44XX_IRQ_GPMC;
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index 0a9b9a9..89a3723 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -77,3 +77,12 @@ void __init omap_init_consistent_dma_size(void)
+ 	init_consistent_dma_size(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE << 20);
+ #endif
+ }
++
++/*
++ * Stub function for OMAP2 so that common files
++ * continue to build when custom builds are used
++ */
++int __weak omap_secure_ram_reserve_memblock(void)
++{
++	return 0;
++}
+diff --git a/arch/arm/plat-omap/include/plat/omap-secure.h b/arch/arm/plat-omap/include/plat/omap-secure.h
+index 8c7994c..0e4acd2 100644
+--- a/arch/arm/plat-omap/include/plat/omap-secure.h
++++ b/arch/arm/plat-omap/include/plat/omap-secure.h
+@@ -3,12 +3,7 @@
+ 
+ #include <linux/types.h>
+ 
+-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+ extern int omap_secure_ram_reserve_memblock(void);
+-#else
+-static inline void omap_secure_ram_reserve_memblock(void)
+-{ }
+-#endif
+ 
+ #ifdef CONFIG_OMAP4_ERRATA_I688
+ extern int omap_barrier_reserve_memblock(void);
 -- 
 1.7.9.5
