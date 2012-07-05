@@ -1,49 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 05 Jul 2012 13:55:50 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <20120705124549.GD4111@opensource.wolfsonmicro.com>
-References: <20120703132447.GN29030@opensource.wolfsonmicro.com>
- <4FF2F82D.9080507@linaro.org>
- <20120703142123.GQ29030@opensource.wolfsonmicro.com>
- <4FF54406.3000307@linaro.org>
- <20120705094541.GK4111@opensource.wolfsonmicro.com>
- <4FF57EA9.7060107@linaro.org>
- <20120705120600.GT4111@opensource.wolfsonmicro.com>
- <4FF58571.2090807@linaro.org>
- <20120705122947.GY4111@opensource.wolfsonmicro.com>
- <4FF58B68.5000703@linaro.org>
- <20120705124549.GD4111@opensource.wolfsonmicro.com>
-Message-ID: <4FF58ED6.40106@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 5 Jul 2012 13:56:22 +0100
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
+ implementation to be selected
+In-Reply-To: <4FF5849E.6060301@renesas.com>
+References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+ <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+ <4FF2E0FB.4040008@renesas.com>
+ <20120704153624.GI15104@mudshark.cambridge.arm.com>
+ <4FF5849E.6060301@renesas.com>
+Message-ID: <20120705125622.GF3399@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/12 13:45, Mark Brown wrote:
-> On Thu, Jul 05, 2012 at 01:41:12PM +0100, Lee Jones wrote:
->> On 05/07/12 13:29, Mark Brown wrote:
->
->> If DT is _not_ enabled, we do:
->
->>    From platform code:
->>     - Register the DB8500-PRCMU
->>     - Register the AB8500
->
->> So you see the registration is separate.
->
-> Right, so what I'm saying is that what I'd expect unless there's
-> something unusual going on is that you wouldn't be doing the separate
-> registration of the AB8500 here and would instead be passing the
-> platform data for the AB8500 through in the same way you pass the DT
-> data through.
+On Thu, Jul 05, 2012 at 01:12:14PM +0100, Shinya Kuribayashi wrote:
+> Ok, I gave your patch a try (including above), and confirmed that:
+> 
+> * It works fine with non-arch_timer counter.  I'm using SH/R-Mobile
+>   devices, with a memory mapped I/O, 32-bit free-run up-counter
+>   running at 13MHz.
+> 
+> * Secondary CPU calibration gets skipped as expected.
+> 
+> * Your new timer-based delay works as before (loop-based one).  I've
+>   verified 10..1999-microsecond busy-wait with a reasonable accuracy
+>   (and confirmed that 2000+ usec gets rejected as intended).
 
-Then were would you register it, if not here?
+Great, thanks! Can I add your tested-by please?
 
-> DT and non-DT do have a very similar model for this stuff.
+> By the way,
+> 
+> > +       return lpj_fine ?: 0;
+> 
+> Is there any difference with just
+> 
+>         return lpj_fine;
 
+Of course, I'll make that change, cheers.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Stephen -- can I keep your reviewed-by with the additional function please?
+
+Will
