@@ -1,57 +1,39 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 5 Jul 2012 16:44:31 +0800
-Subject: [PATCH v4 RESEND] mm: cma: add a simple kernel module as the
- helper to test CMA
-In-Reply-To: <201207050809.15834.arnd@arndb.de>
-References: <1341469459-29558-1-git-send-email-Barry.Song@csr.com>
- <201207050809.15834.arnd@arndb.de>
-Message-ID: <CAGsJ_4xXZBWYidO1RYMLJzb_iTS21wAv7HQqP-oeVVx8x336bw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 01:52:30 -0700
+Subject: [GIT PULL] ARM: OMAP2+: more fixes intended for 3.5-rc
+In-Reply-To: <201207050836.12180.arnd@arndb.de>
+References: <alpine.DEB.2.00.1207040806270.6760@utopia.booyaka.com>
+ <20120705081520.GT1122@atomide.com>
+ <201207050836.12180.arnd@arndb.de>
+Message-ID: <20120705085229.GV1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+* Arnd Bergmann <arnd@arndb.de> [120705 01:41]:
+> On Thursday 05 July 2012, Tony Lindgren wrote:
+> > * Paul Walmsley <paul@pwsan.com> [120704 07:13]:
+> > > Hi Tony
+> > > 
+> > > The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+> > > 
+> > >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.5rc
+> > > 
+> > > for you to fetch changes up to d7a0b5133f6b1d53d693b9b9873e64e3c8f0db0e:
+> > > 
+> > >   ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4 (2012-07-04 06:55:29 -0600)
+> > > 
+> > Thanks pulling into fixes.
+> 
+> I'm planning to send a set of fixes upstream to Linus today. Should I
+> pull your fixes branch before that?
 
-2012/7/5 Arnd Bergmann <arnd@arndb.de>:
->
-> I think it should be in mm/cma-test.c, along with kmemleak-test.c. It would be nice
-> if you could add some code that just runs at boot time (or when the module is
-> loaded) and allocates and frees memory using CMA.
->
->> +static struct device *cma_dev;
->
-> Do you actually need this device? It's not connected to hardware so
-> it doesn't actually do DMA and we might as well pass a NULL pointer
-> into dma_alloc_*().
->
->> +static const struct file_operations cma_test_fops = {
->> +     .owner =    THIS_MODULE,
->> +     .read  =    cma_test_read,
->> +     .write =    cma_test_write,
->> +};
->> +
->> +static struct miscdevice cma_test_misc = {
->> +     .name = "cma_test",
->> +     .fops = &cma_test_fops,
->> +};
->> +
->> +static int __init cma_test_init(void)
->> +{
->> +     int ret = misc_register(&cma_test_misc);
->
-> A better place for this is really debugfs. The driver is not meant as a stable
-> kernel interface that applications can rely on, it's purely a debugging help.
->
-> Just make this
->
->         ret = debugfs_create_file("cma-test", 0600, NULL, NULL, &cma_test_fops);
->
+It seems it should be safe to do, I'll take one more look and send
+a separate pull request shortly.
 
-we did have some discussions about this at:
-http://www.spinics.net/lists/arm-kernel/msg163548.html
+Regards,
 
-i'd say both are acceptable to me.
-
->         Arnd
->
-
--barry
+Tony
