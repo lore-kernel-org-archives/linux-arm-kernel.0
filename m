@@ -1,46 +1,47 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
-Date: Thu, 05 Jul 2012 17:51:21 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <201207051454.24475.arnd@arndb.de>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <20120705130819.GV17534@lunn.ch> <4FF5A15A.8070309@googlemail.com>
- <201207051454.24475.arnd@arndb.de>
-Message-ID: <4FF5B7F9.9020507@googlemail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 05 Jul 2012 16:51:33 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <201207051541.52261.arnd@arndb.de>
+References: <20120703132447.GN29030@opensource.wolfsonmicro.com>
+ <20120705141329.GN4111@opensource.wolfsonmicro.com>
+ <4FF5A61F.2050400@linaro.org> <201207051541.52261.arnd@arndb.de>
+Message-ID: <4FF5B805.8000205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2012 04:54 PM, Arnd Bergmann wrote:
-> This way you have multiple nodes with the same register
-> and different names, which is not how it normally works.
-
-Ok.
-
->> This would have the advantage that DT describes gpio-to-irq dependencies.
->> Moreover, nodes that reference gpios can do gpios =<&gpio 71 0>; instead of
->> gpios =<&gpio3 7 0>;
+On 05/07/12 16:41, Arnd Bergmann wrote:
+> On Thursday 05 July 2012, Lee Jones wrote:
+>>
+>> On 05/07/12 15:13, Mark Brown wrote:
+>>> On Thu, Jul 05, 2012 at 03:06:20PM +0100, Lee Jones wrote:
+>>>> On 05/07/12 14:57, Arnd Bergmann wrote:
+>>>
+>>>>> The non-DT path for this is a huge mess, I'd rather focus on making
+>>>>> it obsolete than trying to fix it. Other than that, I agree that
+>>>>> we should be registering the ab8500 from the prcmu from both the
+>>>>> DT and the non-DT case.
+>>>
+>>>> Ah, is that what you were saying Mark?
+>>>
+>>>> If so, I apologise. I thought you meant register both from platform
+>>>> code. I'm happy to register the AB8500 from the DB8500 for both DT
+>>>> and !DT.
+>>>
+>>> Yes, that's what I was trying to say - sorry that I wasn't clear!
+>>
+>> Well it seems silly of me just to copy Arnd's work. Do you want to
+>> author and submit the patch to do this Arnd?
 >
-> Is that desired?
->
-> The device tree representation should match what is in the data sheet
-> normally. If they are in a single continuous number range, then we should
-> probably have a single device node with multiple register ranges
-> rather than one device node for each 32-bit register. Looking at
-> arch/arm/plat-orion/gpio.c I think that is not actually the case though
-> and having separate banks is more logical.
+> No, just assume ownership of it. I haven't tried building the
+> patch, so I assume you will have to change it some more. Just
+> list me as Suggested-by:.
 
-Well, looking at the datasheet of Dove GPIOs are numbered [63:0] plus
-GPOs [71:64]. This dt will be a lot shorter and maybe it is describing
-the hardware as it is. (Not sure about the syntax for irqs, though)
+It'll have to wait until tomorrow now, but okay, I'll take it on.
 
-gpio at d0400 {
-	compatible = "marvell,orion-gpio";
-	gpio-controller;
-	reg = <0xd0400 0x20>, /* GPIO[31: 0] */
-	      <0xd0420 0x20>, /* GPIO[63:32] */
-	      <0xe8400 0x0c>; /* GPO [71:64] */
-	ngpio = <72>;
-	interrupts = <12 13 14 15>, <61>;
-};
-
-Sebastian
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
