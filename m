@@ -1,166 +1,82 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Jul 2012 09:11:25 +0200
-Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: update features
-In-Reply-To: <1341472285-1061-1-git-send-email-s.hauer@pengutronix.de>
-References: <1341472285-1061-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1341472285-1061-3-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 5 Jul 2012 09:13:18 +0200
+Subject: [PATCH 1/2] ARM: mach-imx: Remove board entries in dt_board_compat
+In-Reply-To: <1339941856-2836-1-git-send-email-festevam@gmail.com>
+References: <1339941856-2836-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120705071318.GO30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- reenable CONFIG_MFD_MC13XXX_SPI
-- Allow booting from MMC card.
-- Enable mc13783 Codec support
-- Enable sgtl5000 Codec support
-- Enable mc13783 RTC
-- Enable Control Group support for systemd
-- Enable clk debugfs support
+Shawn,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/configs/imx_v4_v5_defconfig |   44 ++++++++++++++++------------------
- 1 file changed, 21 insertions(+), 23 deletions(-)
+Is this ok with you?
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index e05a2f1..ae4ba35 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -2,7 +2,10 @@ CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
- CONFIG_EXPERT=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_SLAB=y
-@@ -36,8 +39,6 @@ CONFIG_MACH_IMX27IPCAM=y
- CONFIG_MACH_IMX27_DT=y
- CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MXC_PWM=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -46,7 +47,6 @@ CONFIG_FPE_NWFPE=y
- CONFIG_FPE_NWFPE_XP=y
- CONFIG_PM_DEBUG=y
- CONFIG_NET=y
--CONFIG_SMSC911X=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
-@@ -70,14 +70,12 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_GEOMETRY=y
- # CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
--CONFIG_MTD_MAP_BANK_WIDTH_4=y
- # CONFIG_MTD_CFI_I2 is not set
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_MXC=y
- CONFIG_MTD_UBI=y
--CONFIG_MISC_DEVICES=y
- CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
- CONFIG_NETDEVICES=y
-@@ -86,6 +84,7 @@ CONFIG_CS89x0_PLATFORM=y
- CONFIG_DM9000=y
- CONFIG_SMC91X=y
- CONFIG_SMC911X=y
-+CONFIG_SMSC911X=y
- CONFIG_SMSC_PHY=y
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
-@@ -113,31 +112,23 @@ CONFIG_HWMON=m
- CONFIG_SENSORS_MC13783_ADC=m
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
--CONFIG_MFD_MC13XXX=y
-+CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
--CONFIG_FB=y
--CONFIG_FB_IMX=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_LCD_L4F00242T03=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_VIDEO_DEV=y
--CONFIG_VIDEO_V4L2_COMMON=y
--CONFIG_VIDEO_MEDIA=y
--CONFIG_VIDEO_V4L2=y
--CONFIG_VIDEOBUF_GEN=y
--CONFIG_VIDEOBUF_DMA_CONTIG=y
--CONFIG_VIDEOBUF2_CORE=y
--CONFIG_VIDEO_CAPTURE_DRIVERS=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
--CONFIG_VIDEO_MX2_HOSTSUPPORT=y
- CONFIG_VIDEO_MX2=y
-+CONFIG_FB=y
-+CONFIG_FB_IMX=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_LCD_L4F00242T03=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FONTS=y
-@@ -152,13 +143,17 @@ CONFIG_SND_IMX_SOC=y
- CONFIG_SND_SOC_MX27VIS_AIC32X4=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
-+CONFIG_SND_SOC_IMX_SGTL5000=y
-+CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB_HID=m
- CONFIG_USB=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
- CONFIG_USB_ULPI=y
- CONFIG_MMC=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_MXC=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -173,22 +168,25 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_IMXDI=y
-+CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
-+CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
- # CONFIG_PROC_PAGE_MONITOR is not set
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_UBIFS_FS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
+Sascha
+
+On Sun, Jun 17, 2012 at 11:04:15AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> There is no need for adding board related entries into dt_board_compat.
+> 
+> Leave only the SoC entry.
+> 
+> This way we do not need to patch a C file when adding dt support for a new board.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/imx51-dt.c   |    1 -
+>  arch/arm/mach-imx/imx53-dt.c   |    4 ----
+>  arch/arm/mach-imx/mach-imx6q.c |    3 ---
+>  3 files changed, 0 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+> index 18e78db..5f10812 100644
+> --- a/arch/arm/mach-imx/imx51-dt.c
+> +++ b/arch/arm/mach-imx/imx51-dt.c
+> @@ -106,7 +106,6 @@ static struct sys_timer imx51_timer = {
+>  };
+>  
+>  static const char *imx51_dt_board_compat[] __initdata = {
+> -	"fsl,imx51-babbage",
+>  	"fsl,imx51",
+>  	NULL
+>  };
+> diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
+> index eb04b62..75535f9 100644
+> --- a/arch/arm/mach-imx/imx53-dt.c
+> +++ b/arch/arm/mach-imx/imx53-dt.c
+> @@ -132,10 +132,6 @@ static struct sys_timer imx53_timer = {
+>  };
+>  
+>  static const char *imx53_dt_board_compat[] __initdata = {
+> -	"fsl,imx53-ard",
+> -	"fsl,imx53-evk",
+> -	"fsl,imx53-qsb",
+> -	"fsl,imx53-smd",
+>  	"fsl,imx53",
+>  	NULL
+>  };
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index b47e98b..1796be4 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -173,9 +173,6 @@ static struct sys_timer imx6q_timer = {
+>  };
+>  
+>  static const char *imx6q_dt_compat[] __initdata = {
+> -	"fsl,imx6q-arm2",
+> -	"fsl,imx6q-sabrelite",
+> -	"fsl,imx6q-sabresd",
+>  	"fsl,imx6q",
+>  	NULL,
+>  };
+> -- 
+> 1.7.1
+> 
+> 
+
 -- 
-1.7.10
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
