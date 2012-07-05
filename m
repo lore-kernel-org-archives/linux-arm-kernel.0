@@ -1,65 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Jul 2012 15:10:26 +0200
-Subject: [PATCH] i2c i.MX: Fix divider table
-Message-ID: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 05 Jul 2012 14:12:09 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <20120705130306.GI4111@opensource.wolfsonmicro.com>
+References: <20120703142123.GQ29030@opensource.wolfsonmicro.com>
+ <4FF54406.3000307@linaro.org>
+ <20120705094541.GK4111@opensource.wolfsonmicro.com>
+ <4FF57EA9.7060107@linaro.org>
+ <20120705120600.GT4111@opensource.wolfsonmicro.com>
+ <4FF58571.2090807@linaro.org>
+ <20120705122947.GY4111@opensource.wolfsonmicro.com>
+ <4FF58B68.5000703@linaro.org>
+ <20120705124549.GD4111@opensource.wolfsonmicro.com>
+ <4FF58ED6.40106@linaro.org>
+ <20120705130306.GI4111@opensource.wolfsonmicro.com>
+Message-ID: <4FF592A9.5050706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Measurements on i.MX1 and i.MX53 have shown that the divider values
-in the datasheets are wrong. the values from first, third and fourth
-column were all measured to be 8 higher than in the datasheet. It
-should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
-the same as the i2c unit is unchanged since the i.MX1.
+On 05/07/12 14:03, Mark Brown wrote:
+> On Thu, Jul 05, 2012 at 01:55:50PM +0100, Lee Jones wrote:
+>> On 05/07/12 13:45, Mark Brown wrote:
+>
+>>> Right, so what I'm saying is that what I'd expect unless there's
+>>> something unusual going on is that you wouldn't be doing the separate
+>>> registration of the AB8500 here and would instead be passing the
+>>> platform data for the AB8500 through in the same way you pass the DT
+>>> data through.
+>
+>> Then were would you register it, if not here?
+>
+> Same place as for DT.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/i2c/busses/i2c-imx.c |   31 ++++++++++++++++++-------------
- 1 file changed, 18 insertions(+), 13 deletions(-)
+That is a possibility, but the idea is to reduce code in the platform 
+area, not add to it. We'd also need a completely separate platform_data 
+structure to the one we use for platform registration, as much of it has 
+now been moved into Device Tree. The regulators are a good example of 
+this, but there's also GPIO information which is no longer relevant etc.
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 8d6b504..aabbe31 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -98,22 +98,27 @@
-  * Document Number: MC9328MXLRM, Rev. 5.1, 06/2007
-  *
-  * Duplicated divider values removed from list
-+ *
-+ * These values (mostly) do not match the ones in the datasheet because
-+ * measurements have shown that the values are wrong. This was tested
-+ * on i.MX1 and i.MX53, so it shoud be safe to assume that the SoCs in
-+ * between behave the same.
-  */
- 
- static u16 __initdata i2c_clk_div[50][2] = {
--	{ 22,	0x20 }, { 24,	0x21 }, { 26,	0x22 }, { 28,	0x23 },
--	{ 30,	0x00 },	{ 32,	0x24 }, { 36,	0x25 }, { 40,	0x26 },
--	{ 42,	0x03 }, { 44,	0x27 },	{ 48,	0x28 }, { 52,	0x05 },
--	{ 56,	0x29 }, { 60,	0x06 }, { 64,	0x2A },	{ 72,	0x2B },
--	{ 80,	0x2C }, { 88,	0x09 }, { 96,	0x2D }, { 104,	0x0A },
--	{ 112,	0x2E }, { 128,	0x2F }, { 144,	0x0C }, { 160,	0x30 },
--	{ 192,	0x31 },	{ 224,	0x32 }, { 240,	0x0F }, { 256,	0x33 },
--	{ 288,	0x10 }, { 320,	0x34 },	{ 384,	0x35 }, { 448,	0x36 },
--	{ 480,	0x13 }, { 512,	0x37 }, { 576,	0x14 },	{ 640,	0x38 },
--	{ 768,	0x39 }, { 896,	0x3A }, { 960,	0x17 }, { 1024,	0x3B },
--	{ 1152,	0x18 }, { 1280,	0x3C }, { 1536,	0x3D }, { 1792,	0x3E },
--	{ 1920,	0x1B },	{ 2048,	0x3F }, { 2304,	0x1C }, { 2560,	0x1D },
--	{ 3072,	0x1E }, { 3840,	0x1F }
-+	{ 30,	0x20 }, { 32,	0x21 }, { 34,	0x22 },	{ 36,	0x23 },
-+	{ 38,	0x00 },	{ 40,	0x24 },	{ 44,	0x25 },	{ 48,	0x26 },
-+	{ 50,	0x03 },	{ 52,	0x27 },	{ 56,	0x28 }, { 60,	0x05 },
-+	{ 64,	0x29 }, { 68,	0x06 }, { 72,	0x2A },	{ 80,	0x2B },
-+	{ 88,	0x2C }, { 96,	0x09 }, { 104,	0x2D }, { 112,	0x0A },
-+	{ 120,	0x2E }, { 136,	0x2F }, { 152,	0x0C },	{ 168,	0x30 },
-+	{ 200,	0x31 }, { 232,	0x32 }, { 248,	0x0F },	{ 264,	0x33 },
-+	{ 288,	0x10 },	{ 328,	0x34 },	{ 392,	0x35 },	{ 456,	0x36 },
-+	{ 480,	0x13 },	{ 520,	0x37 },	{ 576,	0x14 },	{ 648,	0x38 },
-+	{ 776,	0x39 },	{ 904,	0x3A },	{ 960,	0x17 },	{ 1032,	0x3B },
-+	{ 1152,	0x18 },	{ 1288,	0x3C },	{ 1544,	0x3D },	{ 1800,	0x3E },
-+	{ 1920,	0x1B },	{ 2048,	0x3F },	{ 2304,	0x1C },	{ 2560,	0x1D },
-+	{ 3072,	0x1E },	{ 3840,	0x1F }
- };
- 
- struct imx_i2c_struct {
+I do believe that registering the AB8500 from the DB8500 is appropriate 
+though, for the simple reason that the AB8500 is a sub-device to the 
+DB8500. I think this is the correct thing to do. But anyway, as I said 
+before, that ship has sailed. We _already_ do this. All this patch does 
+is prevent the AB8500 from being registered twice when DT is not enabled.
+
 -- 
-1.7.10
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
