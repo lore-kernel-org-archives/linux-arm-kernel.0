@@ -1,31 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Jul 2012 01:50:37 +0200
-Subject: [PATCH] remoteproc: adopt the driver core's alloc/add/del/put
- naming
-In-Reply-To: <1341409019-32166-1-git-send-email-ohad@wizery.com>
-References: <1341409019-32166-1-git-send-email-ohad@wizery.com>
-Message-ID: <CACRpkdYr4VFpSLhcy3vst4=ZzTVPG8OKiZvLb_z4VmKmJGrQeg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jul 2012 08:51:45 +0800
+Subject: [PATCH 6/8] mmc: spi: Add SPI driver for mx233/mx28
+In-Reply-To: <1340958180-2291-6-git-send-email-marex@denx.de>
+References: <1340958180-2291-1-git-send-email-marex@denx.de>
+ <1340958180-2291-6-git-send-email-marex@denx.de>
+Message-ID: <20120705005143.GF2595@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2012 at 3:36 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+On Fri, Jun 29, 2012 at 10:22:58AM +0200, Marek Vasut wrote:
+> +config SPI_MXS
+> +	tristate "Freescale MXS SPI controller"
+> +	depends on ARCH_MXS
+> +	help
+> +	  SPI driver for Freescale MXS devices.
+> +
 
-> To make remoteproc's API more intuitive for developers, we adopt
-> the driver core's naming, i.e. alloc -> add -> del -> put. We'll also
-> add register/unregister when their first user shows up.
->
-> Otherwise - there's no functional change here.
->
-> Suggested by Russell King <linux@arm.linux.org.uk>.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
-> Cc: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+...
 
-I understand this patch and it's a good thing, so:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> +	stmp_reset_block(ssp->base);
+> +
+So SPI_MXS may need to select STMP_DEVICE.
 
-Yours,
-Linus Walleij
+-- 
+Regards,
+Shawn
