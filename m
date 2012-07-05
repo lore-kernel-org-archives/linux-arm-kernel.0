@@ -1,122 +1,37 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Thu, 05 Jul 2012 08:36:53 -1000
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <201207051454.24475.arnd@arndb.de>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <20120705130819.GV17534@lunn.ch> <4FF5A15A.8070309@googlemail.com>
- <201207051454.24475.arnd@arndb.de>
-Message-ID: <4FF5DEC5.9030707@firmworks.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Jul 2012 12:44:01 -0600
+Subject: [PATCH] clk: Fix cached parent ptrs allocation
+In-Reply-To: <4FF5CD0D.7030902@nvidia.com>
+References: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
+ <4FF5BBD3.6080704@wwwdotorg.org> <4FF5CD0D.7030902@nvidia.com>
+Message-ID: <4FF5E071.3090106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/5/2012 4:54 AM, Arnd Bergmann wrote:
-> On Thursday 05 July 2012, Sebastian Hesselbarth wrote:
->> Andrew,
+On 07/05/2012 11:21 AM, Prashant Gaikwad wrote:
+> On Thursday 05 July 2012 09:37 PM, Stephen Warren wrote:
+>> On 07/04/2012 07:15 AM, Prashant Gaikwad wrote:
+>>> Compiler optimizes code someway that even if clk->parents
+>>> is not NULL it tries to allocate parents array. Change the
+>>> condition so that compiler does not optimize it in wrong
+>>> way.
+>> If simply inverting the if test and swapping the if/else blocks solves
+>> some problem, that sounds like a compiler bug that we need to track down
+>> and file/fix.
 >>
->> is it possible to group all gpio banks into one DT description?
->> For mach-dove it could be something like:
->>
->> gpio: gpio-controller {
->>          compatible = "marvell, orion-gpio";
->>          ...
->>
->>          bank0 at d0400 {
->>                  reg = <0xd0400 0x40>;
->>                  ngpio = <8>;
->>                  mask-offset = <0>;
->>                  interrupts = <12>;
->>          };
->>
->>          bank1 at d0400 {
->>                  reg = <0xd0400 0x40>;
->>                  ngpio = <8>;
->>                  mask-offset = <8>;
->>                  interrupts = <13>;
->>          };
+>>> Also, initialize i to num_parents to make sure parent
+>>> is searched using parent name if parents is NULL.
+>> Are you sure the change to initialize i wasn't all that was required to
+>> solve the problem though? Mike has applied a patch for this that'll be
+>> applied to 3.5-rcX and hence trickle into 3.6.
 >
-> This way you have multiple nodes with the same register
-> and different names, which is not how it normally works.
+> Just initializing i does not fix problem. The patch Mike has applied
+> does two things
+> 1. remove warning for uninitialized i
+> 2. invert the if test
 
-The "mask-offset" property is really a "reg" in disguise.
-
-"reg" is considerably more general than just "memory mapped
-register address".  It really means "any numeric identifier
-that makes sense in the context of a parent device".
-
-Therefore, one could say:
-
-gpio: gpio-controller {
-          compatible = "marvell, orion-gpio";
-          reg = <0xd0400 0x40>;
-          #address-cells = <1>;
-          #size-cells = <0>;
-          ...
-
-          bank0 at 0 {
-                  reg = <0x0>;
-                  ngpio = <8>;
-                  mask-offset = <0>;
-                  interrupts = <12>;
-          };
-
-          bank1 at 8 {
-                  reg = <0x8>;
-                  ngpio = <8>;
-                  interrupts = <13>;
-           };
-
->
->>
->> This would have the advantage that DT describes gpio-to-irq dependencies.
->> Moreover, nodes that reference gpios can do gpios = <&gpio 71 0>; instead of
->> gpios = <&gpio3 7 0>;
->
-> Is that desired?
->
-> The device tree representation should match what is in the data sheet
-> normally. If they are in a single continuous number range, then we should
-> probably have a single device node with multiple register ranges
-> rather than one device node for each 32-bit register. Looking at
-> arch/arm/plat-orion/gpio.c I think that is not actually the case though
-> and having separate banks is more logical.
->
-> Something completely different I just noticed in the original patch:
->
->> @@ -90,6 +74,27 @@ static void pmu_irq_handler(unsigned int irq, struct irq_desc *desc)
->>        }
->>   }
->>
->> +static int __initdata gpio0_irqs[4] = {
->> +     IRQ_DOVE_GPIO_0_7,
->> +     IRQ_DOVE_GPIO_8_15,
->> +     IRQ_DOVE_GPIO_16_23,
->> +     IRQ_DOVE_GPIO_24_31,
->> +};
->> +
->> +static int __initdata gpio1_irqs[4] = {
->> +     IRQ_DOVE_HIGH_GPIO,
->> +     0,
->> +     0,
->> +     0,
->> +};
->
-> I think the latter one needs to be
->
-> +static int __initdata gpio1_irqs[4] = {
-> +     IRQ_DOVE_HIGH_GPIO,
-> +     IRQ_DOVE_HIGH_GPIO,
-> +     IRQ_DOVE_HIGH_GPIO,
-> +     IRQ_DOVE_HIGH_GPIO,
-> +};
->
-> so we register all four parts to the same primary IRQ. The
-> same is true for the devicetree representation.
->
-> 	Arnd
->
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
->
+Yes, but Mike's patch is very different to yours. Your patch description
+says that you need to invert the if test to work around the compiler
+optimizer so that it doesn't "optimize it in wrong way", whereas the
+patch Mike applied was for a legitimate bug in the code; those are two
+entirely different things.
