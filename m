@@ -1,36 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Jul 2012 13:05:31 +0100
-Subject: [PATCH] ARM: ux500: Over-ride the DT device naming scheme for pinctrl
-Message-ID: <1341489931-29464-1-git-send-email-lee.jones@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 5 Jul 2012 13:06:00 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <4FF57EA9.7060107@linaro.org>
+References: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
+ <20120703123552.GC25995@sirena.org.uk>
+ <4FF2EEA1.6080204@linaro.org>
+ <20120703132447.GN29030@opensource.wolfsonmicro.com>
+ <4FF2F82D.9080507@linaro.org>
+ <20120703142123.GQ29030@opensource.wolfsonmicro.com>
+ <4FF54406.3000307@linaro.org>
+ <20120705094541.GK4111@opensource.wolfsonmicro.com>
+ <4FF57EA9.7060107@linaro.org>
+Message-ID: <20120705120600.GT4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When pin control mapping tables are written the registered device
-name is supplied for use in name-based searches within the pinctrl
-driver. In the case of the DB8500 the string "pinctrl-db8500" is
-used. However, when we register the driver with Device Tree, its
-naming convention uses something that looks more like "pinctrl.2".
+On Thu, Jul 05, 2012 at 12:46:49PM +0100, Lee Jones wrote:
 
-To work around the device naming inconsistencies between devices
-registered via platform code and the ones registered by Device
-Tree, we use AUXDATA to over-ride the Device Tree naming scheme.
+> Besides, the main role of Device Tree is to eradicate platform code.
+> Whereas the code in the MFD driver used to register the AB8500 devices
+> is not platform code.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |    1 +
- 1 file changed, 1 insertion(+)
+Right, this is a big part of what I'm saying.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index c12cd97..eb9198e 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -769,6 +769,7 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
-+	OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
- 	{},
- };
- 
--- 
-1.7.9.5
+> Does that answer your question better?
+
+Not really, no.  
+
+> >> By the way, this patch has nothing to do with registering these
+> >> devices when DT is enabled. The code already does that. This is a
+> >> bug fix, to stop multiple registration of the ab8500 when DT is
+> >> _not_ enabled.
+
+> > Really?  It seems really surprising that adding more DT support to the
+> > MFD core would have any bearing on something like this...
+
+> I'm not really sure what you mean by this.
+
+You seemed to be suggesting that your fix was in some way related to the
+DT changes in the MFD core.  I'm unsure as to the relationship here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/bef6b759/attachment.sig>
