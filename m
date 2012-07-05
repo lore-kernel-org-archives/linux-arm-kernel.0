@@ -1,38 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Jul 2012 12:25:27 +0200
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 05 Jul 2012 12:38:51 +0200
 Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
  Controllers
-In-Reply-To: <20120705121029.782b5346@skate>
+In-Reply-To: <20120705122050.2fbc2fe3@skate> (Thomas Petazzoni's message of
+ "Thu, 5 Jul 2012 12:20:50 +0200")
 References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
  <1341325365-21393-2-git-send-email-andrew@lunn.ch>
  <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
- <20120705121029.782b5346@skate>
-Message-ID: <20120705102527.GQ17534@lunn.ch>
+ <87sjd6ikkj.fsf@lebrac.rtp-net.org> <20120705122050.2fbc2fe3@skate>
+Message-ID: <87liiyijb8.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I've looked at the datasheet for the 88F6281, and the GPIO registers
-> look fairly similar with Armada 370/XP, except that:
-> 
->  * On 88F6281, there are two GPIO banks, while on Armada 370/XP it's a
->    continuous range of registers that control the GPIOs. But it can be
->    assimilated as one bank handling more than 32 GPIOs. So shouldn't be
->    a big problem to handle.
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
 
-The number of banks varies. Orion5x has one, Dove has three, etc.
+> Le Thu, 05 Jul 2012 12:11:40 +0200,
+> Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> a ?crit :
+>
+>> > You are not the only one working in this area. Arnaud Patard said he
+>> > was look at this as well. 
+>> 
+>> yeah, but tbh I've not made anything yet. If Thomas has already some
+>> code for it, we should try to make it "generic" so as to use it on
+>> armada xp and orion platforms.
+>
+> The MPP registers are identical on Armada XP/370 and 88F6281 (not sure
+> which other SoC datasheet I should be checking). Basically, it's just a
+> range of contiguous registers, with 4 bits per pin to select the
+> function.
 
-> 
->  * The Armada 370/XP have additional set/clear registers that allow to
->    modify the GPIO states without having to do a read/mask/write
->    sequence, which is nicer on SMP. I guess we can handle that as a
->    variant inside the driver without too much problem.
-> 
-> Marvell has given me a 88F6282 eval board, so I guess they are fine
-> with me spending some time ensuring that the new code works properly on
-> the previous platforms, especially in this case where the amount of
-> work does not seem to be enormous to keep the compatibility.
 
-That is good to hear.
+iirc, other SoCs are similar. The small exception being dove I
+guess. Dove has a 3rd gpo [the gpios are output only] bank but to be
+used as gpio require that a special bit is set and it's for all gpios of
+this bank. You'll find this bit in the "general mpp configuration
+register" if you look at the datasheet.
 
-Thanks
-	Andrew
+>
+> So my pinmux driver should simply work as is for Orion as well. The
+> only difference between platforms is the number of MPP pins that are
+> available, but this number also varies between versions of Armada XP
+> and Armada 370, so I already support this in the driver.
+>
+
+Are there some output-only gpio on armada xp/370 like on kirkwood/dove ?
+
+
+Arnaud
