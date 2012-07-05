@@ -1,32 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Jul 2012 13:59:29 +0100
-Subject: [PATCH v2 1/2] ARM: arch timer: implement read_current_timer and
- get_cycles
-In-Reply-To: <4FF58A27.7030309@renesas.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-2-git-send-email-will.deacon@arm.com>
- <4FF58A27.7030309@renesas.com>
-Message-ID: <20120705125929.GG3399@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 5 Jul 2012 14:03:07 +0100
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <4FF58ED6.40106@linaro.org>
+References: <20120703142123.GQ29030@opensource.wolfsonmicro.com>
+ <4FF54406.3000307@linaro.org>
+ <20120705094541.GK4111@opensource.wolfsonmicro.com>
+ <4FF57EA9.7060107@linaro.org>
+ <20120705120600.GT4111@opensource.wolfsonmicro.com>
+ <4FF58571.2090807@linaro.org>
+ <20120705122947.GY4111@opensource.wolfsonmicro.com>
+ <4FF58B68.5000703@linaro.org>
+ <20120705124549.GD4111@opensource.wolfsonmicro.com>
+ <4FF58ED6.40106@linaro.org>
+Message-ID: <20120705130306.GI4111@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 01:35:51PM +0100, Shinya Kuribayashi wrote:
-> On 6/30/2012 2:33 AM, Will Deacon wrote:
-> > +#ifdef ARCH_HAS_READ_CURRENT_TIMER
-> > +#define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
-> > +#else
-> > +#define get_cycles()	(0)
-> > +#endif
-> >  
-> >  #endif
-> 
-> Except <asm/arch_timer.h> inclusion, this change is not arch_timer-
-> dependent, but general parts for ARM, connecting read_current_timer()
-> and get_cycles().  Should be folded into patch 2/2.
+On Thu, Jul 05, 2012 at 01:55:50PM +0100, Lee Jones wrote:
+> On 05/07/12 13:45, Mark Brown wrote:
 
-I'm not so sure. Before this patch, nobody implements read_current_timer for
-ARM as far as I can tell, so with the first user it makes sense to add this
-definition. It's also used on its own outside of the new delay implementation
-as an entropy source.
+> >Right, so what I'm saying is that what I'd expect unless there's
+> >something unusual going on is that you wouldn't be doing the separate
+> >registration of the AB8500 here and would instead be passing the
+> >platform data for the AB8500 through in the same way you pass the DT
+> >data through.
 
-Will
+> Then were would you register it, if not here?
+
+Same place as for DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/f66959b6/attachment.sig>
