@@ -1,26 +1,52 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 05 Jul 2012 10:25:20 +0100
-Subject: [PATCH 2/2] ARM: vexpress: remove automatic errata workaround
- selection
-In-Reply-To: <1341414076-20895-2-git-send-email-will.deacon@arm.com>
-References: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
- <1341414076-20895-2-git-send-email-will.deacon@arm.com>
-Message-ID: <1341480320.1173.25.camel@hornet>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 02:27:10 -0700
+Subject: [GIT PULL] omap fixes for v3.5-rc5
+Message-ID: <20120705092709.GW1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-07-04 at 16:01 +0100, Will Deacon wrote:
-> The vexpress Kconfig setup tries to be clever^Whelpful and selects some
-> errata workarounds for certain revisions of the Cortex-A9 and PL310,
-> which may be required depending on the coretile.
->
-> Since the mach-vexpress can support A5, A7 and A15 coretiles, let's
-> defer errata workaround selection to the user and instead propose
-> recommended workarounds in the defconfig. Note that the use of the
-> savedefconfig target removed some unrelated, redundant entries from the
-> file.
+Hi Arnd & Olof,
 
-I'm fine with that if no one objects. Will add it to the VE updates for
-3.6 merge window.
+Here are few more PM related fixes for the -rc series. If you think
+these are too intrusive at this point, let me know.
 
-Pawe?
+Regards,
+
+Tony
+
+
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.5-rc5
+
+for you to fetch changes up to fa2976a811a764573b2a9c79126d4d66f1f16268:
+
+  Merge tag 'omap-fixes-b-for-3.5rc' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into fixes (2012-07-05 01:12:08 -0700)
+
+----------------------------------------------------------------
+
+PM related fixes for omaps mostly to get suspend/resume
+working again.
+
+----------------------------------------------------------------
+Benoit Cousson (1):
+      ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4
+
+Kevin Hilman (2):
+      ARM: OMAP2: Overo: init I2C before MMC to fix MMC suspend/resume failure
+      ARM: OMAP4: TWL6030: ensure sys_nirq1 is mux'd and wakeup enabled
+
+Paul Walmsley (1):
+      ARM: OMAP4: hwmod data: temporarily comment out data for the usb_host_fs and aess IP blocks
+
+Tony Lindgren (1):
+      Merge tag 'omap-fixes-b-for-3.5rc' of git://git.kernel.org/.../pjw/omap-pending into fixes
+
+ arch/arm/mach-omap2/board-overo.c          |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 28 ++++++++++++++--------------
+ arch/arm/mach-omap2/twl-common.c           |  2 ++
+ 3 files changed, 17 insertions(+), 15 deletions(-)
