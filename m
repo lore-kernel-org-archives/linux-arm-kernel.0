@@ -1,32 +1,65 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Jul 2012 15:54:49 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <201207051347.38887.arnd@arndb.de>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <201207051225.55390.arnd@arndb.de> <20120705130819.GV17534@lunn.ch>
- <201207051347.38887.arnd@arndb.de>
-Message-ID: <20120705135449.GZ17534@lunn.ch>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 5 Jul 2012 16:06:11 +0200
+Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
+ registration
+In-Reply-To: <4FF592A9.5050706@linaro.org>
+References: <20120705094541.GK4111@opensource.wolfsonmicro.com>
+ <4FF57EA9.7060107@linaro.org>
+ <20120705120600.GT4111@opensource.wolfsonmicro.com>
+ <4FF58571.2090807@linaro.org>
+ <20120705122947.GY4111@opensource.wolfsonmicro.com>
+ <4FF58B68.5000703@linaro.org>
+ <20120705124549.GD4111@opensource.wolfsonmicro.com>
+ <4FF58ED6.40106@linaro.org>
+ <20120705130306.GI4111@opensource.wolfsonmicro.com>
+ <4FF592A9.5050706@linaro.org>
+Message-ID: <20120705140611.GB18200@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Orion use generic chip interrupts, both for the main interrupts and
-> > the GPIO interrupts. This does not yet support irq domain, so i have
-> > to layer a legacy domain on top. The legacy domain needs to know the
-> > first IRQ and the number of IRQs. For the primary IRQs that is
-> > easy. However, GPIO IRQ is not so easy, it depends on how many primary
-> > IRQs there are. This is not fixed. Orion5x has 32, Dove 64, kirkwood,
-> > 64, and mv78xx0 has 96. I need to know this number when adding the
-> > GPIO secondary IRQ legacy domain. By calling orion_gpio_of_init() in
-> > the orion_add_irq_domain() i have this number to hand. If i used to
-> > entries in the match table, i would have to put this number into some
-> > global variable, or somehow ask the IRQ subsystem what the next free
-> > IRQ number is.
+Hi Lee,
+
+On Thu, Jul 05, 2012 at 02:12:09PM +0100, Lee Jones wrote:
+> On 05/07/12 14:03, Mark Brown wrote:
+> >On Thu, Jul 05, 2012 at 01:55:50PM +0100, Lee Jones wrote:
+> >>On 05/07/12 13:45, Mark Brown wrote:
+> >
+> >>>Right, so what I'm saying is that what I'd expect unless there's
+> >>>something unusual going on is that you wouldn't be doing the separate
+> >>>registration of the AB8500 here and would instead be passing the
+> >>>platform data for the AB8500 through in the same way you pass the DT
+> >>>data through.
+> >
+> >>Then were would you register it, if not here?
+> >
+> >Same place as for DT.
 > 
-> But couldn't you store the number of interrupts for the primary controller
-> in a local variable? I think the of_irq code already guarantees that
-> the parent is probed first.
+> That is a possibility, but the idea is to reduce code in the
+> platform area, not add to it. We'd also need a completely separate
+> platform_data structure to the one we use for platform registration,
+> as much of it has now been moved into Device Tree. The regulators
+> are a good example of this, but there's also GPIO information which
+> is no longer relevant etc.
+> 
+> I do believe that registering the AB8500 from the DB8500 is
+> appropriate though, for the simple reason that the AB8500 is a
+> sub-device to the DB8500. I think this is the correct thing to do.
+I agree with you here, and I thus see no reasons why we should have a
+different code path for DT and !DT cases.
 
-Sure i could. But what is the advantage of that?
 
-     Andrew
+> But anyway, as I said before, that ship has sailed. We _already_ do
+> this. All this patch does is prevent the AB8500 from being
+> registered twice when DT is not enabled.
+Sure, and it does exactly that. But this does look like a workaround rather
+than an actual fix. And Mark is right about showing the wrong example with
+this kind of patches for other MFD drivers.
+I'd prefer seeig the !DT support removed for now until you can find a proper
+and common solution for both DT and !DT cases.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
