@@ -1,102 +1,57 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
-Date: Thu,  5 Jul 2012 12:14:01 +0200
-Subject: [PATCH v1 2/2] mmc: sdhci-dove: Prepare for common clock framework
-In-Reply-To: <1341483241-18300-1-git-send-email-sebastian.hesselbarth@googlemail.com>
-References: <1341483241-18300-1-git-send-email-sebastian.hesselbarth@googlemail.com>
-Message-ID: <1341483241-18300-2-git-send-email-sebastian.hesselbarth@googlemail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Jul 2012 12:20:50 +0200
+Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
+ Controllers
+In-Reply-To: <87sjd6ikkj.fsf@lebrac.rtp-net.org>
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <1341325365-21393-2-git-send-email-andrew@lunn.ch>
+ <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
+ <87sjd6ikkj.fsf@lebrac.rtp-net.org>
+Message-ID: <20120705122050.2fbc2fe3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As mach-dove is moving towards common clock framework prepare
-the sdhci driver to grab it's clock.
+Le Thu, 05 Jul 2012 12:11:40 +0200,
+Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> a ?crit :
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Anton Vorontsov <cbouatmailru@gmail.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Viresh Kumar <viresh.kumar@st.com>
-Cc: Manuel Lauss <manuel.lauss@googlemail.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/mmc/host/sdhci-dove.c |   48 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 47 insertions(+), 1 deletion(-)
+> > You are not the only one working in this area. Arnaud Patard said he
+> > was look at this as well. 
+> 
+> yeah, but tbh I've not made anything yet. If Thomas has already some
+> code for it, we should try to make it "generic" so as to use it on
+> armada xp and orion platforms.
 
-diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-index 9c85368..a6e53a1 100644
---- a/drivers/mmc/host/sdhci-dove.c
-+++ b/drivers/mmc/host/sdhci-dove.c
-@@ -20,11 +20,17 @@
-  */
- 
- #include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
- #include <linux/module.h>
- #include <linux/mmc/host.h>
- 
- #include "sdhci-pltfm.h"
- 
-+struct sdhci_dove_priv {
-+	struct clk *clk;
-+};
-+
- static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
- {
- 	u16 ret;
-@@ -72,11 +78,51 @@ static struct sdhci_pltfm_data sdhci_dove_pdata = {
- 
- static int __devinit sdhci_dove_probe(struct platform_device *pdev)
- {
--	return sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
-+	struct sdhci_host *host;
-+	struct sdhci_pltfm_host *pltfm_host;
-+	struct sdhci_dove_priv *priv;
-+	int ret;
-+
-+	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
-+	if (ret)
-+		goto sdhci_dove_register_fail;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
-+			    GFP_KERNEL);
-+	if (!priv) {
-+		dev_err(&pdev->dev, "unable to allocate private data");
-+		ret = -ENOMEM;
-+		goto sdhci_dove_allocate_fail;
-+	}
-+
-+	host = platform_get_drvdata(pdev);
-+	pltfm_host = sdhci_priv(host);
-+	pltfm_host->priv = priv;
-+
-+	priv->clk = clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(priv->clk))
-+		clk_prepare_enable(priv->clk);
-+	return 0;
-+
-+sdhci_dove_allocate_fail:
-+	sdhci_pltfm_unregister(pdev);
-+sdhci_dove_register_fail:
-+	return ret;
- }
- 
- static int __devexit sdhci_dove_remove(struct platform_device *pdev)
- {
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_dove_priv *priv = pltfm_host->priv;
-+
-+	if (priv->clk) {
-+		if (!IS_ERR(priv->clk)) {
-+			clk_disable_unprepare(priv->clk);
-+			clk_put(priv->clk);
-+		}
-+		devm_kfree(&pdev->dev, priv->clk);
-+	}
- 	return sdhci_pltfm_unregister(pdev);
- }
- 
+The MPP registers are identical on Armada XP/370 and 88F6281 (not sure
+which other SoC datasheet I should be checking). Basically, it's just a
+range of contiguous registers, with 4 bits per pin to select the
+function.
+
+So my pinmux driver should simply work as is for Orion as well. The
+only difference between platforms is the number of MPP pins that are
+available, but this number also varies between versions of Armada XP
+and Armada 370, so I already support this in the driver.
+
+However, using the pinmux driver will require changes in the device
+drivers, so that they request the pinmux for their devices.
+
+> > I know Marvell has contracted you to port to Armada 370/XP, not mvebu,
+> > aka all chips which might be able to share this code. This IMHO is
+> > wrong. So i personally would put the kirkwood and the Armada 370/XP
+> > data sheets next to each other, and from the beginning on write the
+> > driver so it supports them all. This assumes the ASIC engineers have
+> > not radically changed anything... Please also try to stick to the DT
+> > binding i've used.
+> 
+> agreed. it should be written with all platforms in mind, as long as
+> they're compatible. It can only make things better imho.
+
+Certainly, especially for MPP/GPIO that are definitely very similar.
+
+Best regards,
+
+Thomas
 -- 
-1.7.10
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
