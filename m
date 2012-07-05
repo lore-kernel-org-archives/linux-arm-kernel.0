@@ -1,39 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jul 2012 01:52:30 -0700
-Subject: [GIT PULL] ARM: OMAP2+: more fixes intended for 3.5-rc
-In-Reply-To: <201207050836.12180.arnd@arndb.de>
-References: <alpine.DEB.2.00.1207040806270.6760@utopia.booyaka.com>
- <20120705081520.GT1122@atomide.com>
- <201207050836.12180.arnd@arndb.de>
-Message-ID: <20120705085229.GV1122@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jul 2012 10:55:57 +0200
+Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until
+ it's been DT:ed
+In-Reply-To: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
+References: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdb1rZQWpuUxQoxqg2eYanf4tnm0SmFkQQBwvSuyYV00Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120705 01:41]:
-> On Thursday 05 July 2012, Tony Lindgren wrote:
-> > * Paul Walmsley <paul@pwsan.com> [120704 07:13]:
-> > > Hi Tony
-> > > 
-> > > The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-> > > 
-> > >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.5rc
-> > > 
-> > > for you to fetch changes up to d7a0b5133f6b1d53d693b9b9873e64e3c8f0db0e:
-> > > 
-> > >   ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4 (2012-07-04 06:55:29 -0600)
-> > > 
-> > Thanks pulling into fixes.
-> 
-> I'm planning to send a set of fixes upstream to Linus today. Should I
-> pull your fixes branch before that?
+On Wed, Jul 4, 2012 at 4:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-It seems it should be safe to do, I'll take one more look and send
-a separate pull request shortly.
+> There are some inconsistencies with the way pinctrl devices are named
+> when registered from platform code to the ones registered by Device
+> Tree. Platform devices look like 'pinctrl-db8500', whereas the ones
+> registered from Device Tree look more like 'pinctrl.2'. This leads to
+> failure when carrying out name-based searches for known devices.
+>
+> Until the correct DT bindings have been applied to the pinctrl driver
+> it will fail to function correctly. For instance, during a Device
+> Tree boot on Snowball no bootlog is visible due to a UART port probe
+> failure. Regulators fail in a similar way.
 
-Regards,
+The problem is *NOT* any missing device tree bindings. The place
+where the problem appear is in the pin control mapping table, which
+uses the string "pinctrl-db8500"
 
-Tony
+The bindings to pass in the pinctrl mapping from the devcie tree
+is generic and already exist:
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+
+The stuff in the file:
+arch/arm/mach-ux500/board-mop500-pins.c
+
+Need to be moved over to the device tree. There are plenty of
+examples of how to do this in for example:
+arch/arm/boot/dts/tegra-seaboard.dts
+
+So what is needed is that someone augment the device tree
+with the pinctrl data and disable the registration of the static
+maps from the above file if the node exists.
+
+> This patch prevents Device Tree from probing the pinctrl driver and
+> ensures registration is completed from platform code instead.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Is the DT machinery really incapable of specifying
+the device name to anything else than the bus name?
+Can't you do this with AUX_DATA()? I've seen that done in the
+past. For example you do:
+
+OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+
+Can't you just:
+OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
+
+And it will happily assign the "pinctrl-db8500" name to it's instantiated
+device?
+
+?
+
+Yours,
+Linus Walleij
