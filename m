@@ -1,9 +1,9 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 5 Jul 2012 17:38:54 +0530
-Subject: [PATCH v1 12/14] arm/dts: OMAP5: Add omap5 dts files
+Date: Thu, 5 Jul 2012 17:38:42 +0530
+Subject: [PATCH 3/5] arm/dts: OMAP5: Add omap5 dts files
 In-Reply-To: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341490136-25901-17-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1341490136-25901-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
