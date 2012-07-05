@@ -1,61 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 5 Jul 2012 14:20:21 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <4FF592A9.5050706@linaro.org>
-References: <20120705094541.GK4111@opensource.wolfsonmicro.com>
- <4FF57EA9.7060107@linaro.org>
- <20120705120600.GT4111@opensource.wolfsonmicro.com>
- <4FF58571.2090807@linaro.org>
- <20120705122947.GY4111@opensource.wolfsonmicro.com>
- <4FF58B68.5000703@linaro.org>
- <20120705124549.GD4111@opensource.wolfsonmicro.com>
- <4FF58ED6.40106@linaro.org>
- <20120705130306.GI4111@opensource.wolfsonmicro.com>
- <4FF592A9.5050706@linaro.org>
-Message-ID: <20120705132021.GJ4111@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jul 2012 15:24:50 +0200
+Subject: [PATCH] gpio: samsung: add flags specifier to device-tree binding
+In-Reply-To: <1340684301-16836-1-git-send-email-olof@lixom.net>
+References: <1340684301-16836-1-git-send-email-olof@lixom.net>
+Message-ID: <CACRpkdYTgMi=O76ZmkVxkXCkc4WnY9cu86oDvU_Oq2sZQhkCBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 02:12:09PM +0100, Lee Jones wrote:
-> On 05/07/12 14:03, Mark Brown wrote:
-> >On Thu, Jul 05, 2012 at 01:55:50PM +0100, Lee Jones wrote:
+On Tue, Jun 26, 2012 at 6:18 AM, Olof Johansson <olof@lixom.net> wrote:
 
-> >>Then were would you register it, if not here?
+> This adds a flags field to the gpio specifier for Samsung. I didn't
+> want to add yet another field in the already quite long specifier, so
+> I decided to compress it together with the Pull Up/Down settings instead.
+>
+> This is needed to, for example, have a gpio-keys input that is active low.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-> >Same place as for DT.
+Applied.
 
-> That is a possibility, but the idea is to reduce code in the
-> platform area, not add to it. We'd also need a completely separate
-
-But surely this would, if anything, remove code?  You already have the
-code to do the registration in the MFD so all you're going to be doing
-here is removing the code from 
-
-> platform_data structure to the one we use for platform registration,
-> as much of it has now been moved into Device Tree. The regulators
-> are a good example of this, but there's also GPIO information which
-> is no longer relevant etc.
-
-Hrm, the usual pattern for this stuff is that the DT is parsed into
-platform data so the DT code is isolated to the parser.  It sounds like
-you've got a very different structure here?
-
-> I do believe that registering the AB8500 from the DB8500 is
-> appropriate though, for the simple reason that the AB8500 is a
-> sub-device to the DB8500. I think this is the correct thing to do.
-> But anyway, as I said before, that ship has sailed. We _already_ do
-> this. All this patch does is prevent the AB8500 from being
-> registered twice when DT is not enabled.
-
-Well, it also introduces code into mainline which is likely to be used
-as a template by other people - I'd be especially worried about the next
-ST platform ending up repeating the same mistakes.  If the code is so
-separate perhaps it's better to just remove the non-DT support?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120705/9489904b/attachment.sig>
+Thanks,
+Linus Walleij
