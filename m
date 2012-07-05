@@ -1,51 +1,88 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Thu, 05 Jul 2012 21:35:51 +0900
-Subject: [PATCH v2 1/2] ARM: arch timer: implement read_current_timer and
- get_cycles
-In-Reply-To: <1340991231-17682-2-git-send-email-will.deacon@arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-2-git-send-email-will.deacon@arm.com>
-Message-ID: <4FF58A27.7030309@renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Jul 2012 12:40:31 +0000
+Subject: ARM: SoC fixes for 3.5-rc
+Message-ID: <201207051240.32157.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-On 6/30/2012 2:33 AM, Will Deacon wrote:
->  arch/arm/include/asm/arch_timer.h |    3 +++
->  arch/arm/include/asm/timex.h      |   10 ++++++----
->  arch/arm/kernel/arch_timer.c      |    8 ++++++++
->  3 files changed, 17 insertions(+), 4 deletions(-)
-> 
-[...]
-> diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
-> index 3be8de3..ce11944 100644
-> --- a/arch/arm/include/asm/timex.h
-> +++ b/arch/arm/include/asm/timex.h
-> @@ -12,13 +12,15 @@
->  #ifndef _ASMARM_TIMEX_H
->  #define _ASMARM_TIMEX_H
->  
-> +#include <asm/arch_timer.h>
->  #include <mach/timex.h>
->  
->  typedef unsigned long cycles_t;
->  
-> -static inline cycles_t get_cycles (void)
-> -{
-> -	return 0;
-> -}
-> +#ifdef ARCH_HAS_READ_CURRENT_TIMER
-> +#define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
-> +#else
-> +#define get_cycles()	(0)
-> +#endif
->  
->  #endif
+I've taken over from Olof again for the next few weeks, here are the
+bug fixes that came in since rc5.
 
-Except <asm/arch_timer.h> inclusion, this change is not arch_timer-
-dependent, but general parts for ARM, connecting read_current_timer()
-and get_cycles().  Should be folded into patch 2/2.
+	Arnd
 
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
-  Shinya
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+
+are available in the git repository at:
+
+  git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to e15ebe05cce44c5164dbf8489841c18a887bcfc2:
+
+  Merge tag 'omap-fixes-for-v3.5-rc5' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2012-07-05 12:16:13 +0200)
+
+----------------------------------------------------------------
+
+Small fixes on multiple ARM platforms
+* A build regression from a previous fix on dove and mv78xx0
+* Two fixes for recently (3.5-rc1) changed mmp/pxa code
+* multiple omap2+ bug fixes
+* two trivial fixes for i.MX
+* one v3.5 regression for mxs
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Orion: Fix WDT compile for Dove and MV78xx0
+
+Arnd Bergmann (5):
+      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
+      Merge tag 'v3.5-imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
+      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
+      Merge branch 'mxs/fixes-for-3.5' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'omap-fixes-for-v3.5-rc5' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+Benoit Cousson (1):
+      ARM: OMAP2+: hwmod data: Fix wrong McBSP clock alias on OMAP4
+
+Fabio Estevam (1):
+      ARM: imx27_visstrim_m10: Do not include <asm/system.h>
+
+Kevin Hilman (2):
+      ARM: OMAP2: Overo: init I2C before MMC to fix MMC suspend/resume failure
+      ARM: OMAP4: TWL6030: ensure sys_nirq1 is mux'd and wakeup enabled
+
+Lauri Hintsala (1):
+      ARM: apx4devkit: fix FEC enabling PHY clock
+
+Paul Bolle (1):
+      ARM: mmp: remove mach/gpio-pxa.h
+
+Paul Parsons (1):
+      ARM: pxa: hx4700: Fix basic suspend/resume
+
+Paul Walmsley (1):
+      ARM: OMAP4: hwmod data: temporarily comment out data for the usb_host_fs and aess IP blocks
+
+Tony Lindgren (1):
+      Merge tag 'omap-fixes-b-for-3.5rc' of git://git.kernel.org/.../pjw/omap-pending into fixes
+
+Uwe Kleine-K?nig (1):
+      ARM: imx: assert SCC gate stays enabled
+
+ arch/arm/mach-dove/include/mach/bridge-regs.h    |    1 +
+ arch/arm/mach-dove/include/mach/dove.h           |    1 +
+ arch/arm/mach-imx/clk-imx35.c                    |    9 ++++++-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c      |    2 +-
+ arch/arm/mach-mmp/include/mach/gpio-pxa.h        |   29 ----------------------
+ arch/arm/mach-mv78xx0/include/mach/bridge-regs.h |    1 +
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h     |    2 ++
+ arch/arm/mach-mxs/mach-apx4devkit.c              |   11 ++++++++
+ arch/arm/mach-omap2/board-overo.c                |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c       |   28 ++++++++++-----------
+ arch/arm/mach-omap2/twl-common.c                 |    2 ++
+ arch/arm/mach-pxa/hx4700.c                       |   15 ++++++++++-
+ 12 files changed, 56 insertions(+), 47 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
