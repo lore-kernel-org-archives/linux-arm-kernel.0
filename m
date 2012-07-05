@@ -1,73 +1,23 @@
-From: mina86@mina86.com (=?UTF-8?Q?Micha=C5=82_Nazarewicz?=)
-Date: Thu, 5 Jul 2012 21:21:53 +0200
-Subject: Bad use of highmem with buffer_migrate_page?
-In-Reply-To: <20120705104520.GA6773@latitude>
-References: <4FAC200D.2080306@codeaurora.org>
- <02fc01cd2f50$5d77e4c0$1867ae40$%szyprowski@samsung.com>
- <4FAD89DC.2090307@codeaurora.org>
- <CAH+eYFBhO9P7V7Nf+yi+vFPveBks7SFKRHfkz3JOQMBKqnkkUQ@mail.gmail.com>
- <015f01cd5a95$c1525dc0$43f71940$%szyprowski@samsung.com>
- <20120705104520.GA6773@latitude>
-Message-ID: <CA+pa1O2veiMaNJ5M0qeion5kquCyoa2gW79G2zNqb+nbWLs_Qw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jul 2012 21:44:36 +0200
+Subject: [GIT PULL] Integrator common clock
+In-Reply-To: <CAJOA=zOaXf6QzF9yhcoTTaPYr-9=L2h5r5AvmMxoSbroJJrOFg@mail.gmail.com>
+References: <CACRpkdYj46c1dpBhassGn2DWOpcmHHUQcUGb6VZ-bVL8bc2PJw@mail.gmail.com>
+ <20120620212046.GI4402@gmail.com>
+ <CACRpkdaDUvfEV-7zTTyb+NbZ1WnN+iz+9QzDCVESeizCowOCsg@mail.gmail.com>
+ <CACRpkdZGjMa8dBdc_wrTxHUxHUTwzQM9W55XyU+6VEBnXb8z5g@mail.gmail.com>
+ <CACRpkda5xQLr+fhnsWm4ONUCzJxtMMCLkS2ek9ufDPV-u7PsGg@mail.gmail.com>
+ <CAJOA=zOaXf6QzF9yhcoTTaPYr-9=L2h5r5AvmMxoSbroJJrOFg@mail.gmail.com>
+Message-ID: <CACRpkdaDofUy5eXNEh9utYOT8EerJmFg6hbwTm89yU1uvK5RMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/7/5 Rabin Vincent <rabin@rab.in>:
-> From 8a94126eb3aa2824866405fb78bb0b8316f8fd00 Mon Sep 17 00:00:00 2001
-> From: Rabin Vincent <rabin@rab.in>
-> Date: Thu, 5 Jul 2012 15:52:23 +0530
-> Subject: [PATCH] mm: cma: don't replace lowmem pages with highmem
->
-> The filesystem layer expects pages in the block device's mapping to not
-> be in highmem (the mapping's gfp mask is set in bdget()), but CMA can
-> currently replace lowmem pages with highmem pages, leading to crashes in
-> filesystem code such as the one below:
->
->   Unable to handle kernel NULL pointer dereference at virtual address 00000400
->   pgd = c0c98000
->   [00000400] *pgd=00c91831, *pte=00000000, *ppte=00000000
->   Internal error: Oops: 817 [#1] PREEMPT SMP ARM
->   CPU: 0    Not tainted  (3.5.0-rc5+ #80)
->   PC is at __memzero+0x24/0x80
->   ...
->   Process fsstress (pid: 323, stack limit = 0xc0cbc2f0)
->   Backtrace:
->   [<c010e3f0>] (ext4_getblk+0x0/0x180) from [<c010e58c>] (ext4_bread+0x1c/0x98)
->   [<c010e570>] (ext4_bread+0x0/0x98) from [<c0117944>] (ext4_mkdir+0x160/0x3bc)
->    r4:c15337f0
->   [<c01177e4>] (ext4_mkdir+0x0/0x3bc) from [<c00c29e0>] (vfs_mkdir+0x8c/0x98)
->   [<c00c2954>] (vfs_mkdir+0x0/0x98) from [<c00c2a60>] (sys_mkdirat+0x74/0xac)
->    r6:00000000 r5:c152eb40 r4:000001ff r3:c14b43f0
->   [<c00c29ec>] (sys_mkdirat+0x0/0xac) from [<c00c2ab8>] (sys_mkdir+0x20/0x24)
->    r6:beccdcf0 r5:00074000 r4:beccdbbc
->   [<c00c2a98>] (sys_mkdir+0x0/0x24) from [<c000e3c0>] (ret_fast_syscall+0x0/0x30)
->
-> Fix this by replacing only highmem pages with highmem.
->
-> Reported-by: Laura Abbott <lauraa@codeaurora.org>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+On Tue, Jul 3, 2012 at 11:15 PM, Turquette, Mike <mturquette@ti.com> wrote:
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> Thanks for the re-ping.  I've dropped the old ones and taken in these patches.
 
-> ---
->  mm/page_alloc.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 4403009..4a4f921 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -5635,7 +5635,12 @@ static struct page *
->  __alloc_contig_migrate_alloc(struct page *page, unsigned long private,
->                              int **resultp)
->  {
-> -       return alloc_page(GFP_HIGHUSER_MOVABLE);
-> +       gfp_t gfp_mask = GFP_USER | __GFP_MOVABLE;
-> +
-> +       if (PageHighMem(page))
-> +               gfp_mask |= __GFP_HIGHMEM;
-> +
-> +       return alloc_page(gfp_mask);
->  }
->
->  /* [start, end) must belong to a single zone. */
+I can't see any of them in -next :-(
+
+But now U300 is there though, you get one you loose one ;-)
+
+Linus Walleij
