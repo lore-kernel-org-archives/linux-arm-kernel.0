@@ -1,39 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Jul 2012 15:41:51 +0000
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <4FF5A61F.2050400@linaro.org>
-References: <20120703132447.GN29030@opensource.wolfsonmicro.com>
- <20120705141329.GN4111@opensource.wolfsonmicro.com>
- <4FF5A61F.2050400@linaro.org>
-Message-ID: <201207051541.52261.arnd@arndb.de>
+Date: Thu, 5 Jul 2012 15:47:37 +0000
+Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
+ Controllers
+In-Reply-To: <20120705135449.GZ17534@lunn.ch>
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <201207051347.38887.arnd@arndb.de> <20120705135449.GZ17534@lunn.ch>
+Message-ID: <201207051547.37906.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012, Lee Jones wrote:
+On Thursday 05 July 2012, Andrew Lunn wrote:
+> > > Orion use generic chip interrupts, both for the main interrupts and
+> > > the GPIO interrupts. This does not yet support irq domain, so i have
+> > > to layer a legacy domain on top. The legacy domain needs to know the
+> > > first IRQ and the number of IRQs. For the primary IRQs that is
+> > > easy. However, GPIO IRQ is not so easy, it depends on how many primary
+> > > IRQs there are. This is not fixed. Orion5x has 32, Dove 64, kirkwood,
+> > > 64, and mv78xx0 has 96. I need to know this number when adding the
+> > > GPIO secondary IRQ legacy domain. By calling orion_gpio_of_init() in
+> > > the orion_add_irq_domain() i have this number to hand. If i used to
+> > > entries in the match table, i would have to put this number into some
+> > > global variable, or somehow ask the IRQ subsystem what the next free
+> > > IRQ number is.
+> > 
+> > But couldn't you store the number of interrupts for the primary controller
+> > in a local variable? I think the of_irq code already guarantees that
+> > the parent is probed first.
 > 
-> On 05/07/12 15:13, Mark Brown wrote:
-> > On Thu, Jul 05, 2012 at 03:06:20PM +0100, Lee Jones wrote:
-> >> On 05/07/12 14:57, Arnd Bergmann wrote:
-> >
-> >>> The non-DT path for this is a huge mess, I'd rather focus on making
-> >>> it obsolete than trying to fix it. Other than that, I agree that
-> >>> we should be registering the ab8500 from the prcmu from both the
-> >>> DT and the non-DT case.
-> >
-> >> Ah, is that what you were saying Mark?
-> >
-> >> If so, I apologise. I thought you meant register both from platform
-> >> code. I'm happy to register the AB8500 from the DB8500 for both DT
-> >> and !DT.
-> >
-> > Yes, that's what I was trying to say - sorry that I wasn't clear!
-> 
-> Well it seems silly of me just to copy Arnd's work. Do you want to 
-> author and submit the patch to do this Arnd?
+> Sure i could. But what is the advantage of that?
 
-No, just assume ownership of it. I haven't tried building the
-patch, so I assume you will have to change it some more. Just
-list me as Suggested-by:.
+Probably not much. I've reread the of_irq_init code again and it seems that
+the effect would be the same, perhaps appearing a little more similar to what
+the other platforms do.
+
+Please add my Acked-by: to your patch.
 
 	Arnd
