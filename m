@@ -1,88 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Jul 2012 11:48:24 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <20120705110251.596331e0@skate>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-2-git-send-email-andrew@lunn.ch>
- <20120705110251.596331e0@skate>
-Message-ID: <20120705094824.GO17534@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 02:53:51 -0700
+Subject: [PATCH-V3 1/3] ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses
+ omap-device.o target so add one entry
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA632CE@DBDE01.ent.ti.com>
+References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
+ <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
+ <20120704072758.GP1122@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA632CE@DBDE01.ent.ti.com>
+Message-ID: <20120705095351.GA1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 11:02:51AM +0200, Thomas Petazzoni wrote:
-> Hello Andrew,
-> 
-> Le Tue,  3 Jul 2012 16:22:34 +0200,
-> Andrew Lunn <andrew@lunn.ch> a ??crit :
-> 
-> > Both IRQ and GPIO controllers can now be represented in DT.  The IRQ
-> > controllers are setup first, and then the GPIO controllers. Interrupts
-> > for GPIO lines are placed directly after the main interrupts in the
-> > interrupt space.
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120704 02:21]:
+> On Wed, Jul 04, 2012 at 12:57:58, Tony Lindgren wrote:
+> >
+> > This patch did not apply for some reason, I got:
 > > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > patching file arch/arm/plat-omap/Makefile
+> > patch: **** malformed patch at line 73: 1.7.0.4
+> > 
+> > So please tune up your scripts a bit to the patches can be applied
+> > as they are without manual editing ;)
+> > 
 > 
-> I have started working on a pinctrl driver for mvebu, which would
-> handle pin muxing (MPP) + gpio + gpio interrupts.
+> Hmmmm...
+> 
+> I usually submit the patch against linux-omap/master (to handle cross 
+> dependencies), which in some cases fails on other branches you maintain. 
+> Probably I will make sure that it allies atleast to relevant branches, for 
+> example, in this case it should be applied on linux-omap/cleanup branch as 
+> well. 
 
-Hi Thomas
+The malformed patch error usually means that something messed up
+the patch, like the mail server.. Maybe tabs got replaced with spaces
+or something?
 
-You are not the only one working in this area. Arnaud Patard said he
-was look at this as well. 
-
-> So far, the pin muxing part is working (needs some polishing, but the
-> foundation is here), with device tree bindings. I think the pin muxing
-> could be used for Orion as well.
-
-Great. This is one of the big things which we are missing when moving
-a system over the DT. Being able to describe this in DT in a
-standardized way is very much welcome.
-
-> Now, I'm planning to start working on the gpio + gpio interrupts parts
-> of the driver, and I'm wondering how to interact with your work on the
-> matter.
-
-I've publicly said, what i have is enough to get it working, but i
-know its not the end solution. What i have is enough that gpio-key,
-gpio-led, as described in DT, works. Boards can start using these and
-as far as i can tell, the binding should not need to change. The GPIO
-controller binding should also be sufficiently generic that it should
-also not need changes when we replace the driver with pinctrl.
-
-The biggest problem i had, is the interaction between generic chip
-interrupts and irqdomain. There has been work to integrate the two,
-but its stalled. Either the work needs restarting and completing, or
-you need to throw away the use of generic interrupt so that you can
-use irqdomain linear. IMHO, throwing away generic interrupt is the
-wrong way.
-
-The other thing you need to keep in mind is the namespace issues
-between normal interrupts and GPIO interrupts. The way my patch works
-is that normal interrupts are setup first, counting how many have been
-created. Then GPIO interrupts are added, starting off where the normal
-interrupts ended. Since 370/XP uses different interrupt code, you need
-to think how to solve this issue.
-
-> My understanding is that the new way of doing a pinmux+gpio
-> driver is to implement it in drivers/pinctrl/, which I have started
-> doing.
-
-Great.
- 
-> Should I continue working on a drivers/pinctrl/ driver for mvebu for
-> Armada 370/XP, and then we see together if it makes sense to extend to
-> Orion, and if so, what changes are needed?
-
-I know Marvell has contracted you to port to Armada 370/XP, not mvebu,
-aka all chips which might be able to share this code. This IMHO is
-wrong. So i personally would put the kirkwood and the Armada 370/XP
-data sheets next to each other, and from the beginning on write the
-driver so it supports them all. This assumes the ASIC engineers have
-not radically changed anything... Please also try to stick to the DT
-binding i've used.
-
-If however, you have to focus solely on Armada 370/XP, then the
-community can work on making your code generic at a late date.
-
-	  Andrew
+Tony
