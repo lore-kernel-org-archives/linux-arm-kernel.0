@@ -1,64 +1,40 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 04 Jul 2012 20:12:43 -0700
-Subject: [PATCH 4 2/4] NET ethernet introduce mac_platform helper
-In-Reply-To: <20120705024446.26317.49693.stgit@build.warmcat.com>
-References: <20120705024259.26317.16000.stgit@build.warmcat.com>
- <20120705024446.26317.49693.stgit@build.warmcat.com>
-Message-ID: <1341457963.2058.13.camel@joe2Laptop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jul 2012 11:15:28 +0800
+Subject: [GIT PULL] clk/mxs for 3.6
+In-Reply-To: <20120703020006.GA22106@S2101-09.ap.freescale.net>
+References: <20120703020006.GA22106@S2101-09.ap.freescale.net>
+Message-ID: <20120705031526.GH2595@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-05 at 10:44 +0800, Andy Green wrote:
-> From: Andy Green <andy@warmcat.com>
+On Tue, Jul 03, 2012 at 10:00:09AM +0800, Shawn Guo wrote:
+> The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
 > 
-> This introduces a small helper in net/ethernet, which registers a network
-> notifier at core_initcall time, and accepts registrations mapping expected
-> asynchronously-probed network device paths (like, "usb1/1-1/1-1.1/1-1.1:1.0")
-> and the MAC that is needed to be assigned to the device when it appears.
+>   Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs-for-3.6
+> 
+> Fabio Estevam (1):
+>       clk: mxs: Fix the GPMI clock name
+> 
+> Huang Shijie (1):
+>       clk: mxs: rename the gpmi clock for imx28
+> 
+> Shawn Guo (1):
+>       clk: mxs: add clkdev lookup for pwm
+> 
+>  drivers/clk/mxs/clk-imx23.c |    3 ++-
+>  drivers/clk/mxs/clk-imx28.c |    3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
 
-The mac prefix is poor.  I think eth_mac is better.
+Mike,
 
-[]
+I just added one more patch on the branch.  Please pull it also.
 
-> diff --git a/net/ethernet/mac-platform.c b/net/ethernet/mac-platform.c
-[]
-> +static int mac_platform_netdev_event(struct notifier_block *this,
-> +						unsigned long event, void *ptr)
+Lauri Hintsala (1):
+      clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
 
-alignment to parenthesis please.
-
-[]
-
-> +int mac_platform_register_device_macs(const struct mac_platform *macs)
-> +{
-[]
-> +		next = kmalloc(sizeof(struct mac_platform), GFP_KERNEL);
-> +		if (!next) {
-> +			ret = -ENOMEM;
-> +			goto bail;
-> +		}
-> +
-> +		next->device_path = kmalloc(strlen(macs->device_path) + 1,
-> +								   GFP_KERNEL);
-> +		if (!next->device_path) {
-> +			ret = -ENOMEM;
-> +			goto bail;
-> +		}
-> +
-> +		strcpy(next->device_path, macs->device_path);
-> +		memcpy(next->mac, macs->mac, sizeof macs->mac);
-
-kmemdup and kstrdup()
-
-> +		list_add(&next->list, &mac_platform_list);
-> +
-> +		macs++;
-> +	}
-> +
-> +bail:
-> +	mutex_unlock(&mac_platform_mutex);
-> +
-> +	return ret;
-> +}
-
-leaking memory on failures.
+-- 
+Regards,
+Shawn
