@@ -1,32 +1,36 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Jul 2012 11:07:27 +0800
-Subject: [PATCH v5] ARM: mx23: Add initial support for olinuxino board
-In-Reply-To: <1341418973-3619-1-git-send-email-fabio.estevam@freescale.com>
-References: <1341418973-3619-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120705030726.GC10610@S2101-09.ap.freescale.net>
+Date: Thu, 5 Jul 2012 11:07:50 +0800
+Subject: [PATCH] ARM: mxs_defconfig: Enable RTC driver
+In-Reply-To: <1341419870-11750-1-git-send-email-fabio.estevam@freescale.com>
+References: <1341419870-11750-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120705030748.GD10610@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2012 at 01:22:53PM -0300, Fabio Estevam wrote:
-> mx23-olinuxino is a low cost board designed by Olimex.
-> 
-> It has the following features:
-> 
-> - Freescale iMX233 ARM926J processor at 454MHz
-> -64 MB RAM
-> -SD-card connector
-> -TV PAL/NTSC video output
-> -2 USB High Speed Hosts
-> -Ethernet 100 Mbit
-> -Stereo Audio Input
-> -Stereo Headphones Audio Output
-> 
-> More information at:
-> http://www.olimex.com/dev/imx233-olinuxino-maxi.html
+On Wed, Jul 04, 2012 at 01:37:50PM -0300, Fabio Estevam wrote:
+> Let RTC driver driver be built by default.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks.
 
-Regards,
-Shawn
+> ---
+>  arch/arm/configs/mxs_defconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+> index 94198c5..1450f64 100644
+> --- a/arch/arm/configs/mxs_defconfig
+> +++ b/arch/arm/configs/mxs_defconfig
+> @@ -114,6 +114,7 @@ CONFIG_MMC=y
+>  CONFIG_MMC_MXS=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_DS1307=m
+> +CONFIG_RTC_DRV_STMP=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_MXS_DMA=y
+>  CONFIG_EXT3_FS=y
+> -- 
+> 1.7.1
+> 
+> 
