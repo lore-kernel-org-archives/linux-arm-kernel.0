@@ -1,46 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Jul 2012 20:47:36 +0200
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <CAM=Q2csv3rEs-xseGd6NHxR3wRSZp82ZqNB1mn-_C4=5=nOc6g@mail.gmail.com>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <CAM=Q2csv3rEs-xseGd6NHxR3wRSZp82ZqNB1mn-_C4=5=nOc6g@mail.gmail.com>
-Message-ID: <20120705184736.GW30009@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Jul 2012 12:49:39 -0600
+Subject: [PATCH v3 0/6] Port Tegra to generic clk framework
+In-Reply-To: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
+References: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <4FF5E1C3.6070309@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 11:36:27PM +0530, Shubhrajyoti Datta wrote:
-> On Thu, Jul 5, 2012 at 6:40 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > Measurements on i.MX1 and i.MX53 have shown that the divider values
-> > in the datasheets are wrong.
-> How were the measurements made?
+On 07/05/2012 03:55 AM, Prashant Gaikwad wrote:
+> This patch set ports Tegra clock code to generic clock framework.
 
-With an oscilloscope measuring the period length. This is probably not
-very exact, but the current values are way off. We had 350KHz instead
-of 380KHz (best possible divider) on an i.MX53. Funny enough some
-divider values really match the ones in the datasheet.
+Unfortunately, this series causes some regressions, so I can't apply it
+now. Given that, it won't make 3.6 since I won't be around to apply it.
 
-BTW I'm pretty sure the input frequency to the core is calculated
-correctly as it's the same clock that also drives the timer.
+I tested both Tegra's for-next, and next-20120705, both plus this
+series, next-20120705 plus the fix for the common clock code
+__clk_set_parent() issue.
 
-> 
-> > the values from first, third and fourth
-> > column were all measured to be 8 higher than in the datasheet. It
-> > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
-> > the same as the i2c unit is unchanged since the i.MX1.
-> 
-> Also does it vary board to board or is fixed by the ip?
-> What I mean is that the external cap etc.
+The following all appeared to work OK:
 
-The clock is derived from an internal SoC clock, I don't think this can
-be influenced that much by external components. I did not test different
-boards, but two board with different SoCs.
+Cardhu DT
+Ventana DT
+Seaboard DT
+Springbank DT
+Harmony DT
+Harmony non-DT
 
-Let's see what the IC guys tell us.
+However, the following failed, all(?) in ways that prevented the system
+getting to the login prompt:
 
-Sascha
+Whistler DT
+AC100 DT
+AC100 non-DT
+Trimslice DT
+Trimslice non-DT
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+(The one slight difference between the 2 branches I tested is that AC100
+and Trimslice booted using DT passed in next-20120705 but failed only in
+Tegra's for-next. Otherwise, all results were identical)
+
+I'll try to investigate what the issues are since I imagine you don't
+have access to these boards. But, I probably won't be able to fix this
+until I return from vacation.
