@@ -1,23 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Jul 2012 13:51:02 +0000
-Subject: [PATCH 3/9] ARM: ux500: Remove AB8500 regulator register
- initialisation information
-In-Reply-To: <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <201207051351.03115.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jul 2012 15:51:27 +0200
+Subject: [PATCH] gpio/mxc: use the edge_sel feature if available
+In-Reply-To: <20120627065949.GC1623@pengutronix.de>
+References: <Pine.LNX.4.64.1206221540390.17552@axis700.grange>
+ <1463885754.3196304.1340391846559.JavaMail.root@advansee.com>
+ <20120627065949.GC1623@pengutronix.de>
+Message-ID: <CACRpkdb2Mkvc3-FDhED3foQAm8kymZavSURsgVVNn_=6sBMBFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012, Lee Jones wrote:
-> There is no need to initialise the AB8500's regulator registers, as
-> most of this work is already carried out by framework features, so
-> we can safely remove all traces from platform code.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Jun 27, 2012 at 8:59 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Fri, Jun 22, 2012 at 09:04:06PM +0200, Beno?t Th?baudeau wrote:
 
-It makes sense, but this patch is basically a revert of dfa3a824d
-"mach-ux500: provide ab8500 init vector" from Bengt Jonsson, so
-it would be nice to get an Ack from him.
+>> [PATCH] gpio/mxc: use the edge_sel feature if available
+>>
+>> Some mxc processors have an edge_sel feature, which allows the IRQ to be
+>> triggered by any edge.
+>>
+>> This patch makes use of this feature if available, which skips mxc_flip_edge().
+>>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Linus Walleij <linus.walleij@stericsson.com>
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: <linux-arm-kernel@lists.infradead.org>
+>> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>
+> Grant, Linus, this should probably go through your gpio tree.
 
-	Arnd
+OK applied.
+
+Make sure to check in linux-next that I got it right.
+
+Yours,
+Linus Walleij
