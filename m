@@ -1,242 +1,200 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 5 Jul 2012 17:38:42 +0530
-Subject: [PATCH 3/5] arm/dts: OMAP5: Add omap5 dts files
+Date: Thu, 5 Jul 2012 17:38:52 +0530
+Subject: [PATCH v1 10/14] ARM: omap2+: board-generic: clean up the irq data
+ from board file.
 In-Reply-To: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341490136-25901-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1341490136-25901-15-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: R Sricharan <r.sricharan@ti.com>
 
-Adding the minimum device tree files required for
-OMAP5 to boot.
+Move the irq_match arrays and the irq init functions of OMAP 2,3
+and 4 based boards out of board-generic.c file and also rename the
+irq init function to match the interrupt controller present in
+the SOCs.
 
-Reviewed-by: Benoit Cousson <b-cousson@ti.com>
+This is a preparatory patch to add the OMAP5 evm board's irq init
+support with device tree.
+
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/boot/dts/omap5-evm.dts |   20 +++++
- arch/arm/boot/dts/omap5.dtsi    |  184 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 204 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap5-evm.dts
- create mode 100644 arch/arm/boot/dts/omap5.dtsi
+ arch/arm/mach-omap2/board-generic.c |   23 ++++++-----------------
+ arch/arm/mach-omap2/common.h        |    6 ++++--
+ arch/arm/mach-omap2/irq.c           |   13 ++++++++++++-
+ arch/arm/mach-omap2/omap4-common.c  |   13 +++++++++++++
+ 4 files changed, 35 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-new file mode 100644
-index 0000000..200c39a
---- /dev/null
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap5.dtsi"
-+
-+/ {
-+	model = "TI OMAP5 EVM board";
-+	compatible = "ti,omap5-evm", "ti,omap5";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
-+	};
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 2f2abfb..716e6b1 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -25,23 +25,12 @@
+ #include "common-board-devices.h"
+ 
+ #if !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
+-#define omap_intc_of_init	NULL
++#define intc_of_init	NULL
+ #endif
+ #ifndef CONFIG_ARCH_OMAP4
+ #define gic_of_init		NULL
+ #endif
+ 
+-static struct of_device_id irq_match[] __initdata = {
+-	{ .compatible = "ti,omap2-intc", .data = omap_intc_of_init, },
+-	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+-	{ }
+-};
+-
+-static void __init omap_init_irq(void)
+-{
+-	of_irq_init(irq_match);
+-}
+-
+ static struct of_device_id omap_dt_match_table[] __initdata = {
+ 	{ .compatible = "simple-bus", },
+ 	{ .compatible = "ti,omap-infra", },
+@@ -65,7 +54,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap242x_map_io,
+ 	.init_early	= omap2420_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_intc_of_init,
+ 	.handle_irq	= omap2_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap2_timer,
+@@ -84,7 +73,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap243x_map_io,
+ 	.init_early	= omap2430_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_intc_of_init,
+ 	.handle_irq	= omap2_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap2_timer,
+@@ -103,7 +92,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3430_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_intc_of_init,
+ 	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap3_timer,
+@@ -122,7 +111,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= am33xx_map_io,
+ 	.init_early	= am33xx_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_intc_of_init,
+ 	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap3_am33xx_timer,
+@@ -140,7 +129,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap4_map_io,
+ 	.init_early	= omap4430_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_gic_of_init,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap4430_init_late,
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 367e1fe..7f93cf0 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -234,6 +234,8 @@ void omap3_intc_prepare_idle(void);
+ void omap3_intc_resume_idle(void);
+ void omap2_intc_handle_irq(struct pt_regs *regs);
+ void omap3_intc_handle_irq(struct pt_regs *regs);
++void omap_intc_of_init(void);
++void omap_gic_of_init(void);
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ extern void __iomem *omap4_get_l2cache_base(void);
+@@ -241,10 +243,10 @@ extern void __iomem *omap4_get_l2cache_base(void);
+ 
+ struct device_node;
+ #ifdef CONFIG_OF
+-int __init omap_intc_of_init(struct device_node *node,
++int __init intc_of_init(struct device_node *node,
+ 			     struct device_node *parent);
+ #else
+-int __init omap_intc_of_init(struct device_node *node,
++int __init intc_of_init(struct device_node *node,
+ 			     struct device_node *parent)
+ {
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index d5b34fe..8467beb 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -21,6 +21,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ #include <mach/hardware.h>
+ 
+@@ -258,7 +259,7 @@ asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs
+ 	omap_intc_handle_irq(base_addr, regs);
+ }
+ 
+-int __init omap_intc_of_init(struct device_node *node,
++int __init intc_of_init(struct device_node *node,
+ 			     struct device_node *parent)
+ {
+ 	struct resource res;
+@@ -280,6 +281,16 @@ int __init omap_intc_of_init(struct device_node *node,
+ 	return 0;
+ }
+ 
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "ti,omap2-intc", .data = intc_of_init, },
++	{ }
 +};
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-new file mode 100644
-index 0000000..57e5270
---- /dev/null
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -0,0 +1,184 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ * Based on "omap4.dtsi"
-+ */
 +
-+/*
-+ * Carveout for multimedia usecases
-+ * It should be the last 48MB of the first 512MB memory part
-+ * In theory, it should not even exist. That zone should be reserved
-+ * dynamically during the .reserve callback.
-+ */
-+/memreserve/ 0x9d000000 0x03000000;
++void __init omap_intc_of_init(void)
++{
++	of_irq_init(irq_match);
++}
 +
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "ti,omap5";
-+	interrupt-parent = <&gic>;
-+
-+	aliases {
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
-+		serial5 = &uart6;
-+	};
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a15";
-+		};
-+		cpu at 1 {
-+			compatible = "arm,cortex-a15";
-+		};
-+	};
-+
-+	/*
-+	 * The soc node represents the soc top level view. It is uses for IPs
-+	 * that are not memory mapped in the MPU view or for the MPU itself.
-+	 */
-+	soc {
-+		compatible = "ti,omap-infra";
-+		mpu {
-+			compatible = "ti,omap5-mpu";
-+			ti,hwmods = "mpu";
-+		};
-+	};
-+
-+	/*
-+	 * XXX: Use a flat representation of the OMAP3 interconnect.
-+	 * The real OMAP interconnect network is quite complex.
-+	 * Since that will not bring real advantage to represent that in DT for
-+	 * the moment, just use a fake OCP bus entry to represent the whole bus
-+	 * hierarchy.
-+	 */
-+	ocp {
-+		compatible = "ti,omap4-l3-noc", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
-+
-+		gic: interrupt-controller at 48211000 {
-+			compatible = "arm,cortex-a15-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x48211000 0x1000>,
-+			      <0x48212000 0x1000>;
-+		};
-+
-+		gpio1: gpio at 4ae10000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio1";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio2: gpio at 48055000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio2";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio3: gpio at 48057000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio3";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio4: gpio at 48059000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio4";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio5: gpio at 4805b000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio5";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio6: gpio at 4805d000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio6";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio7: gpio at 48051000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio7";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio8: gpio at 48053000 {
-+			compatible = "ti,omap4-gpio";
-+			ti,hwmods = "gpio8";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		uart1: serial at 4806a000 {
-+			compatible = "ti,omap4-uart";
-+			ti,hwmods = "uart1";
-+			clock-frequency = <48000000>;
-+		};
-+
-+		uart2: serial at 4806c000 {
-+			compatible = "ti,omap4-uart";
-+			ti,hwmods = "uart2";
-+			clock-frequency = <48000000>;
-+		};
-+
-+		uart3: serial at 48020000 {
-+			compatible = "ti,omap4-uart";
-+			ti,hwmods = "uart3";
-+			clock-frequency = <48000000>;
-+		};
-+
-+		uart4: serial at 4806e000 {
-+			compatible = "ti,omap4-uart";
-+			ti,hwmods = "uart4";
-+			clock-frequency = <48000000>;
-+		};
-+
-+		uart5: serial at 48066000 {
-+			compatible = "ti,omap5-uart";
-+			ti,hwmods = "uart5";
-+			clock-frequency = <48000000>;
-+		};
-+
-+		uart6: serial at 48068000 {
-+			compatible = "ti,omap6-uart";
-+			ti,hwmods = "uart6";
-+			clock-frequency = <48000000>;
-+		};
-+	};
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+ static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
+ 
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index a8161e5..f38d659 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -21,6 +21,8 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/map.h>
+ #include <asm/memblock.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ 
+ #include <plat/irqs.h>
+ #include <plat/sram.h>
+@@ -210,6 +212,17 @@ static int __init omap4_sar_ram_init(void)
+ }
+ early_initcall(omap4_sar_ram_init);
+ 
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ }
 +};
++
++void __init omap_gic_of_init(void)
++{
++	omap_wakeupgen_init();
++	of_irq_init(irq_match);
++}
++
+ #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
+ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+ {
 -- 
 1.7.9.5
