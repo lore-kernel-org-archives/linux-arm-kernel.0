@@ -1,40 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jul 2012 09:02:22 -0700
-Subject: [PATCH v1 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <CAMQu2gwD9wXgs0b1OnSmimgXbpG4YU3i2uZs=kGr08kA3AOJZw@mail.gmail.com>
-References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
- <1341490136-25901-7-git-send-email-santosh.shilimkar@ti.com>
- <20120705143333.GE1122@atomide.com>
- <CAMQu2gwD9wXgs0b1OnSmimgXbpG4YU3i2uZs=kGr08kA3AOJZw@mail.gmail.com>
-Message-ID: <20120705160222.GH1122@atomide.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 5 Jul 2012 21:32:58 +0530
+Subject: [PATCH v2 0/6] Port Tegra to generic clk framework
+In-Reply-To: <4FF5B378.6030305@wwwdotorg.org>
+References: <1341313761-22118-1-git-send-email-pgaikwad@nvidia.com>
+ <4FF31DFC.8030708@wwwdotorg.org> <4FF3D6BD.1000509@nvidia.com>
+ <4FF5B378.6030305@wwwdotorg.org>
+Message-ID: <4FF5BAB2.40007@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120705 07:41]:
-> On Thu, Jul 5, 2012 at 8:03 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [120705 05:13]:
-> >> --- a/arch/arm/plat-omap/Makefile
-> >> +++ b/arch/arm/plat-omap/Makefile
-> >> @@ -10,9 +10,7 @@ obj-n :=
-> >>  obj-  :=
-> >>
-> >>  # omap_device support (OMAP2+ only at the moment)
-> >> -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
-> >> -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
-> >> -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
-> >> +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
-> >>
-> >>  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
-> >>  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
-> >
-> > FYI, this we already have as commit b4cb410d in devel-am33xx-part2.
-> > I can merge first few patches in devel-am33xx-part2 branch into
-> > cleanup-part2 so this part can be just left out.
-> >
-> Ok. Once you update the branch this can be easily dropped.
-
-Updated cleanup-part2 at commit ecc46cfd now has it.
-
-Regards,
-
-Tony
+On Thursday 05 July 2012 09:02 PM, Stephen Warren wrote:
+> On 07/03/2012 11:38 PM, Prashant Gaikwad wrote:
+>> On Tuesday 03 July 2012 09:59 PM, Stephen Warren wrote:
+>>> On 07/03/2012 05:09 AM, Prashant Gaikwad wrote:
+>>>> This patch set ports Tegra clock code to generic clock framework.
+>>>>
+>>>> Depends on
+>>>> [PATCH v3 0/9] Add clk_prepare/clk_unprepare series
+>>>> [PATCH] ARM: tegra: Remove second instance of uart clk
+>>>> [PATCH] dma: tegra: add clk_prepare/clk_unprepare
+>>>> [PATCH] ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
+>>>>
+>>>> Tested on Ventana and Cardhu
+>>>>
+>>>> v2:
+>>>>    - Rebased on Tegra's for-3.6/common-clk
+>>> OK, this applies to for-3.6/common-clk without issue now. However, there
+>>> are still runtime problems:
+>>>
+>>> On Tegra20(Ventana), running Tegra's for-next branch with these patches
+>>> merged in, if I play audio, the sound is much too low a pitch; the I2S
+>>> clock must be being set too low. Also, if I play the same file twice,
+>>> once encoded as 48KHz once encoded as 44.1KHz, the pitch is different.
+>>>
+>>> On Tegra20(Ventana), running next-20120703 plus a few local patches for
+>>> regulators plus these common clock patches, then I see the same
+>>> segfaults during boot that I mentioned before. It seems something in
+>>> linux-next not in Tegra's for-next branch is breaking the common clock
+>>> code for us.
+>> Does these local patches include any changes in clock init table? Is it
+>> possible to share the changes?
+> My local dev branch is usually available at:
+> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
+>
+> The local patches are mostly regulator support work-in-progress at the
+> moment, so nothing to do with clocks, except one minor warning fix.
+>
+> I see you've posted v3; I assume that means you've found/fixed the
+> issues - I'll go test.
+I have fixed audio issue in v3. Another issue related to Tegra20 boot 
+depends on the fix posted by Rajendra.
+I have mentioned the dependency on the fix in v3.
