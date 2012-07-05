@@ -1,38 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 05 Jul 2012 08:33:46 +0100
-Subject: [PATCH 1/1] mfd: Fix runtime warning caused by duplicate device
- registration
-In-Reply-To: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
-References: <1341316788-12730-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <4FF5435A.1000909@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jul 2012 15:33:56 +0800
+Subject: [PATCH 2/2] ARM: mxs: defconfig: Enable CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <20120705070637.GN30009@pengutronix.de>
+References: <1341261351-7924-1-git-send-email-festevam@gmail.com>
+ <1341261351-7924-2-git-send-email-festevam@gmail.com>
+ <20120705005504.GG2595@S2101-09.ap.freescale.net>
+ <20120705062540.GK30009@pengutronix.de>
+ <20120705063749.GF10610@S2101-09.ap.freescale.net>
+ <20120705070637.GN30009@pengutronix.de>
+Message-ID: <CAAQ0ZWRogTeXV3GXSN6cr-5+AKfe0pLY6=RKZiApiP+3L6=Eeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sam,
-
-On 03/07/12 12:59, Lee Jones wrote:
-> We register the ab8500 as an MFD device from db8500 code during Device Tree
-> boot in order to solve some limitations of DT. However, when Device Tree is
-> not enabled, we still want to allow platform code to register the ab8500 in
-> the normal way. Here we force MFD device registration of the ab8500 only
-> when booting with Device Tree enabled.
+On 5 July 2012 15:06, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Could you skip the imx patch? I also have some patches for the defconfig
+> from Fabio and I'd like to squash them together since the imx defconfig
+> could use a general update.
 >
-> Solves this issue:
-> WARNING: at fs/sysfs/dir.c:526 sysfs_add_one+0x88/0xb0()
-> sysfs: cannot create duplicate filename '/bus/platform/devices/ab8500-core.0'
->
-> Reported-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Sure.
 
-Are you planning on taking this in any time soon? I'd really like to fix 
-this bug for Linus in -next.
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Shawn
