@@ -1,35 +1,43 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 5 Jul 2012 18:23:26 +0200
-Subject: MX28 poweroff issue
-In-Reply-To: <20120705160855.GA20175@S2101-09.ap.freescale.net>
-References: <201207040030.36713.marex@denx.de>
- <20120704151944.GB18739@n2100.arm.linux.org.uk>
- <20120705160855.GA20175@S2101-09.ap.freescale.net>
-Message-ID: <201207051823.26243.marex@denx.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 05 Jul 2012 18:30:00 +0200
+Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
+ Controllers
+In-Reply-To: <4FF5B7F9.9020507@googlemail.com> (Sebastian Hesselbarth's
+ message of "Thu, 05 Jul 2012 17:51:21 +0200")
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <20120705130819.GV17534@lunn.ch> <4FF5A15A.8070309@googlemail.com>
+ <201207051454.24475.arnd@arndb.de> <4FF5B7F9.9020507@googlemail.com>
+Message-ID: <87hatmi31z.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com> writes:
 
-[...]
+> On 07/05/2012 04:54 PM, Arnd Bergmann wrote:
+>> This way you have multiple nodes with the same register
+>> and different names, which is not how it normally works.
+>
+> Ok.
+>
+>>> This would have the advantage that DT describes gpio-to-irq dependencies.
+>>> Moreover, nodes that reference gpios can do gpios =<&gpio 71 0>; instead of
+>>> gpios =<&gpio3 7 0>;
+>>
+>> Is that desired?
+>>
+>> The device tree representation should match what is in the data sheet
+>> normally. If they are in a single continuous number range, then we should
+>> probably have a single device node with multiple register ranges
+>> rather than one device node for each 32-bit register. Looking at
+>> arch/arm/plat-orion/gpio.c I think that is not actually the case though
+>> and having separate banks is more logical.
+>
+> Well, looking at the datasheet of Dove GPIOs are numbered [63:0] plus
+> GPOs [71:64]. This dt will be a lot shorter and maybe it is describing
+> the hardware as it is. (Not sure about the syntax for irqs, though)
 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 19c95ea..e41edea 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -247,7 +247,8 @@ void machine_shutdown(void)
->  void machine_halt(void)
->  {
->         machine_shutdown();
-> -       while (1);
-> +       while (1)
-> +               msleep(1);
+They're numbered as [63:0] and [71:64] but they're on 3 different banks.
+iirc, there may even be some differences with the way the banks are dealing
+interrupts, so I don't see any reason to not represent the 3 banks in DT.
 
-Won't mdelay() be better?
-
-It removes the warning, but can't some other stray interrupt trigger it again?
-
->  }
-
-Best regards,
-Marek Vasut
+Arnaud
