@@ -1,37 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jul 2012 12:44:01 -0600
-Subject: [PATCH] clk: Fix cached parent ptrs allocation
-In-Reply-To: <4FF5CD0D.7030902@nvidia.com>
-References: <1341407737-1016-1-git-send-email-pgaikwad@nvidia.com>
- <4FF5BBD3.6080704@wwwdotorg.org> <4FF5CD0D.7030902@nvidia.com>
-Message-ID: <4FF5E071.3090106@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Jul 2012 20:47:36 +0200
+Subject: [PATCH] i2c i.MX: Fix divider table
+In-Reply-To: <CAM=Q2csv3rEs-xseGd6NHxR3wRSZp82ZqNB1mn-_C4=5=nOc6g@mail.gmail.com>
+References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+ <CAM=Q2csv3rEs-xseGd6NHxR3wRSZp82ZqNB1mn-_C4=5=nOc6g@mail.gmail.com>
+Message-ID: <20120705184736.GW30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2012 11:21 AM, Prashant Gaikwad wrote:
-> On Thursday 05 July 2012 09:37 PM, Stephen Warren wrote:
->> On 07/04/2012 07:15 AM, Prashant Gaikwad wrote:
->>> Compiler optimizes code someway that even if clk->parents
->>> is not NULL it tries to allocate parents array. Change the
->>> condition so that compiler does not optimize it in wrong
->>> way.
->> If simply inverting the if test and swapping the if/else blocks solves
->> some problem, that sounds like a compiler bug that we need to track down
->> and file/fix.
->>
->>> Also, initialize i to num_parents to make sure parent
->>> is searched using parent name if parents is NULL.
->> Are you sure the change to initialize i wasn't all that was required to
->> solve the problem though? Mike has applied a patch for this that'll be
->> applied to 3.5-rcX and hence trickle into 3.6.
->
-> Just initializing i does not fix problem. The patch Mike has applied
-> does two things
-> 1. remove warning for uninitialized i
-> 2. invert the if test
+On Thu, Jul 05, 2012 at 11:36:27PM +0530, Shubhrajyoti Datta wrote:
+> On Thu, Jul 5, 2012 at 6:40 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Measurements on i.MX1 and i.MX53 have shown that the divider values
+> > in the datasheets are wrong.
+> How were the measurements made?
 
-Yes, but Mike's patch is very different to yours. Your patch description
-says that you need to invert the if test to work around the compiler
-optimizer so that it doesn't "optimize it in wrong way", whereas the
-patch Mike applied was for a legitimate bug in the code; those are two
-entirely different things.
+With an oscilloscope measuring the period length. This is probably not
+very exact, but the current values are way off. We had 350KHz instead
+of 380KHz (best possible divider) on an i.MX53. Funny enough some
+divider values really match the ones in the datasheet.
+
+BTW I'm pretty sure the input frequency to the core is calculated
+correctly as it's the same clock that also drives the timer.
+
+> 
+> > the values from first, third and fourth
+> > column were all measured to be 8 higher than in the datasheet. It
+> > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
+> > the same as the i2c unit is unchanged since the i.MX1.
+> 
+> Also does it vary board to board or is fixed by the ip?
+> What I mean is that the external cap etc.
+
+The clock is derived from an internal SoC clock, I don't think this can
+be influenced that much by external components. I did not test different
+boards, but two board with different SoCs.
+
+Let's see what the IC guys tell us.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
