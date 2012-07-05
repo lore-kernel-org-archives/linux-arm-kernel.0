@@ -1,38 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jul 2012 02:53:51 -0700
-Subject: [PATCH-V3 1/3] ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses
- omap-device.o target so add one entry
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA632CE@DBDE01.ent.ti.com>
-References: <1340895567-22766-1-git-send-email-hvaibhav@ti.com>
- <1340895567-22766-2-git-send-email-hvaibhav@ti.com>
- <20120704072758.GP1122@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA632CE@DBDE01.ent.ti.com>
-Message-ID: <20120705095351.GA1122@atomide.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 5 Jul 2012 15:25:14 +0530
+Subject: [PATCH v3 0/6] Port Tegra to generic clk framework
+Message-ID: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120704 02:21]:
-> On Wed, Jul 04, 2012 at 12:57:58, Tony Lindgren wrote:
-> >
-> > This patch did not apply for some reason, I got:
-> > 
-> > patching file arch/arm/plat-omap/Makefile
-> > patch: **** malformed patch at line 73: 1.7.0.4
-> > 
-> > So please tune up your scripts a bit to the patches can be applied
-> > as they are without manual editing ;)
-> > 
-> 
-> Hmmmm...
-> 
-> I usually submit the patch against linux-omap/master (to handle cross 
-> dependencies), which in some cases fails on other branches you maintain. 
-> Probably I will make sure that it allies atleast to relevant branches, for 
-> example, in this case it should be applied on linux-omap/cleanup branch as 
-> well. 
+This patch set ports Tegra clock code to generic clock framework.
 
-The malformed patch error usually means that something messed up
-the patch, like the mail server.. Maybe tabs got replaced with spaces
-or something?
+Depends on
+[PATCH v3 0/9] Add clk_prepare/clk_unprepare series
+[PATCH] ARM: tegra: Remove second instance of uart clk
+[PATCH] dma: tegra: add clk_prepare/clk_unprepare
+[PATCH] ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
 
-Tony
+Depends on following fix currently in clk-fixes for 3.5-rc6
+http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=commit;h=863b13271f1608ab3af6f7a371047d9a66693e38
+
+Tested on Ventana and Cardhu.
+
+v3:
+ - Fix Tegra20 pll clk round rate.
+ - Fix Tegra30 periph clk ref count check.
+
+v2:
+ - Rebased on Tegra's for-3.6/common-clk.
+
+Prashant Gaikwad (6):
+  ARM: tegra30: Separate out clk ops and clk data
+  ARM: tegra20: Separate out clk ops and clk data
+  ARM: tegra: Rename tegra20 clock file
+  ARM: tegra: Add clk_tegra structure and helper functions
+  ARM: tegra: Port tegra to generic clock framework
+  ARM: tegra: Remove duplicate code
+
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/mach-tegra/Makefile              |    4 +-
+ arch/arm/mach-tegra/clock.c               |  570 +------
+ arch/arm/mach-tegra/clock.h               |   40 +-
+ arch/arm/mach-tegra/common.c              |    1 -
+ arch/arm/mach-tegra/include/mach/clk.h    |    3 +
+ arch/arm/mach-tegra/tegra20_clocks.c      | 1526 +++++++++++++++++
+ arch/arm/mach-tegra/tegra20_clocks.h      |   41 +
+ arch/arm/mach-tegra/tegra20_clocks_data.c | 1113 +++++++++++++
+ arch/arm/mach-tegra/tegra2_clocks.c       | 2484 ----------------------------
+ arch/arm/mach-tegra/tegra30_clocks.c      | 2559 ++++++++++-------------------
+ arch/arm/mach-tegra/tegra30_clocks.h      |   53 +
+ arch/arm/mach-tegra/tegra30_clocks_data.c | 1370 +++++++++++++++
+ 13 files changed, 4991 insertions(+), 4774 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/tegra20_clocks.c
+ create mode 100644 arch/arm/mach-tegra/tegra20_clocks.h
+ create mode 100644 arch/arm/mach-tegra/tegra20_clocks_data.c
+ delete mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
+ create mode 100644 arch/arm/mach-tegra/tegra30_clocks.h
+ create mode 100644 arch/arm/mach-tegra/tegra30_clocks_data.c
+
+-- 
+1.7.4.1
