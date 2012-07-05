@@ -1,30 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Jul 2012 18:01:53 +0200
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120705145236.GA2735@richard-laptop>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
-Message-ID: <20120705160153.GT30009@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 09:02:22 -0700
+Subject: [PATCH v1 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <CAMQu2gwD9wXgs0b1OnSmimgXbpG4YU3i2uZs=kGr08kA3AOJZw@mail.gmail.com>
+References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341490136-25901-7-git-send-email-santosh.shilimkar@ti.com>
+ <20120705143333.GE1122@atomide.com>
+ <CAMQu2gwD9wXgs0b1OnSmimgXbpG4YU3i2uZs=kGr08kA3AOJZw@mail.gmail.com>
+Message-ID: <20120705160222.GH1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
-> On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
-> > Measurements on i.MX1 and i.MX53 have shown that the divider values
-> > in the datasheets are wrong. the values from first, third and fourth
-> > column were all measured to be 8 higher than in the datasheet. It
-> > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
-> > the same as the i2c unit is unchanged since the i.MX1.
-> We may need to check with IC guys? Or you've done?
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120705 07:41]:
+> On Thu, Jul 5, 2012 at 8:03 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [120705 05:13]:
+> >> --- a/arch/arm/plat-omap/Makefile
+> >> +++ b/arch/arm/plat-omap/Makefile
+> >> @@ -10,9 +10,7 @@ obj-n :=
+> >>  obj-  :=
+> >>
+> >>  # omap_device support (OMAP2+ only at the moment)
+> >> -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
+> >> -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
+> >> -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
+> >> +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
+> >>
+> >>  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+> >>  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
+> >
+> > FYI, this we already have as commit b4cb410d in devel-am33xx-part2.
+> > I can merge first few patches in devel-am33xx-part2 branch into
+> > cleanup-part2 so this part can be just left out.
+> >
+> Ok. Once you update the branch this can be easily dropped.
 
-I don't have contact to the IC guys. Could you do this? I'd be
-interested in the results.
+Updated cleanup-part2 at commit ecc46cfd now has it.
 
-Sascha
+Regards,
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
