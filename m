@@ -1,46 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Jul 2012 15:32:34 +0100
-Subject: [PATCH] of: address: Don't fail a lookup just because a node has no
- reg property
-Message-ID: <1341498754-30445-1-git-send-email-lee.jones@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2012 07:33:34 -0700
+Subject: [PATCH v1 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <1341490136-25901-7-git-send-email-santosh.shilimkar@ti.com>
+References: <1341490136-25901-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341490136-25901-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120705143333.GE1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes it doesn't make any sense for a node to have an address.
-In this case device lookup will always be unsuccessful because we
-currently assume every node will have a reg property. This patch
-changes the semantics so that the resource address and the lookup
-address will only be compared if one exists.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [120705 05:13]:
+> --- a/arch/arm/plat-omap/Makefile
+> +++ b/arch/arm/plat-omap/Makefile
+> @@ -10,9 +10,7 @@ obj-n :=
+>  obj-  :=
+>  
+>  # omap_device support (OMAP2+ only at the moment)
+> -obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
+> -obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
+> -obj-$(CONFIG_ARCH_OMAP4) += omap_device.o
+> +obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
+>  
+>  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+>  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
 
-Things like AUXDATA() rely on of_dev_lookup to return the lookup
-entry of a particular device in order to do things like apply
-platform_data to a device. However, this is currently broken for
-nodes which do not have a reg property, meaning that platform_data
-can not be passed in those cases.
+FYI, this we already have as commit b4cb410d in devel-am33xx-part2.
+I can merge first few patches in devel-am33xx-part2 branch into
+cleanup-part2 so this part can be just left out.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/of/platform.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Regards,
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 343ad29..9600480 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -317,10 +317,9 @@ static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *l
- 	for(; lookup->compatible != NULL; lookup++) {
- 		if (!of_device_is_compatible(np, lookup->compatible))
- 			continue;
--		if (of_address_to_resource(np, 0, &res))
--			continue;
--		if (res.start != lookup->phys_addr)
--			continue;
-+		if (!of_address_to_resource(np, 0, &res))
-+			if (res.start != lookup->phys_addr)
-+				continue;
- 		pr_debug("%s: devname=%s\n", np->full_name, lookup->name);
- 		return lookup;
- 	}
--- 
-1.7.9.5
+Tony
