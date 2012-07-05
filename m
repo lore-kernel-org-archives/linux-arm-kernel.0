@@ -1,64 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Jul 2012 10:55:57 +0200
-Subject: [PATCH] ARM: ux500: Register pinctrl from platform code until
- it's been DT:ed
-In-Reply-To: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
-References: <1341412452-3808-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdb1rZQWpuUxQoxqg2eYanf4tnm0SmFkQQBwvSuyYV00Gw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Jul 2012 11:02:51 +0200
+Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
+ Controllers
+In-Reply-To: <1341325365-21393-2-git-send-email-andrew@lunn.ch>
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <1341325365-21393-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20120705110251.596331e0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2012 at 4:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hello Andrew,
 
-> There are some inconsistencies with the way pinctrl devices are named
-> when registered from platform code to the ones registered by Device
-> Tree. Platform devices look like 'pinctrl-db8500', whereas the ones
-> registered from Device Tree look more like 'pinctrl.2'. This leads to
-> failure when carrying out name-based searches for known devices.
->
-> Until the correct DT bindings have been applied to the pinctrl driver
-> it will fail to function correctly. For instance, during a Device
-> Tree boot on Snowball no bootlog is visible due to a UART port probe
-> failure. Regulators fail in a similar way.
+Le Tue,  3 Jul 2012 16:22:34 +0200,
+Andrew Lunn <andrew@lunn.ch> a ?crit :
 
-The problem is *NOT* any missing device tree bindings. The place
-where the problem appear is in the pin control mapping table, which
-uses the string "pinctrl-db8500"
+> Both IRQ and GPIO controllers can now be represented in DT.  The IRQ
+> controllers are setup first, and then the GPIO controllers. Interrupts
+> for GPIO lines are placed directly after the main interrupts in the
+> interrupt space.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-The bindings to pass in the pinctrl mapping from the devcie tree
-is generic and already exist:
-Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+I have started working on a pinctrl driver for mvebu, which would
+handle pin muxing (MPP) + gpio + gpio interrupts.
 
-The stuff in the file:
-arch/arm/mach-ux500/board-mop500-pins.c
+So far, the pin muxing part is working (needs some polishing, but the
+foundation is here), with device tree bindings. I think the pin muxing
+could be used for Orion as well.
 
-Need to be moved over to the device tree. There are plenty of
-examples of how to do this in for example:
-arch/arm/boot/dts/tegra-seaboard.dts
+Now, I'm planning to start working on the gpio + gpio interrupts parts
+of the driver, and I'm wondering how to interact with your work on the
+matter. My understanding is that the new way of doing a pinmux+gpio
+driver is to implement it in drivers/pinctrl/, which I have started
+doing.
 
-So what is needed is that someone augment the device tree
-with the pinctrl data and disable the registration of the static
-maps from the above file if the node exists.
+Should I continue working on a drivers/pinctrl/ driver for mvebu for
+Armada 370/XP, and then we see together if it makes sense to extend to
+Orion, and if so, what changes are needed?
 
-> This patch prevents Device Tree from probing the pinctrl driver and
-> ensures registration is completed from platform code instead.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Thanks,
 
-Is the DT machinery really incapable of specifying
-the device name to anything else than the bus name?
-Can't you do this with AUX_DATA()? I've seen that done in the
-past. For example you do:
-
-OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
-
-Can't you just:
-OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
-
-And it will happily assign the "pinctrl-db8500" name to it's instantiated
-device?
-
-?
-
-Yours,
-Linus Walleij
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
