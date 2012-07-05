@@ -1,50 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Jul 2012 14:19:42 +0800
-Subject: [PATCH] regulator: core: remove sysfs entry properly in regulator_put
-In-Reply-To: <CAOMZO5BD_FcXVU18PauOFudod5FKd9MP-ZNUDJ4F9iQ6+EAjiA@mail.gmail.com>
-References: <CAOMZO5BD_FcXVU18PauOFudod5FKd9MP-ZNUDJ4F9iQ6+EAjiA@mail.gmail.com>
-Message-ID: <1341469182-5079-1-git-send-email-shawn.guo@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 5 Jul 2012 08:21:34 +0200
+Subject: [PATCH] gpio/mxc: make irqs work for fsl,imx21-gpio devices
+In-Reply-To: <CACRpkdbmZYXKSHVRnVh+M8ciE-Zy+PnAqskWoFK69Cc6Ah7X9w@mail.gmail.com>
+References: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120702093154.GM2698@pengutronix.de>
+ <4FF19B4C.3000603@stericsson.com>
+ <CACRpkdbmZYXKSHVRnVh+M8ciE-Zy+PnAqskWoFK69Cc6Ah7X9w@mail.gmail.com>
+Message-ID: <20120705062134.GJ30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With changes introduced by commit 222cc7b (regulator: core: Allow
-multiple requests of a single supply mapping) on create_regulator,
-regulator_put needs a corresponding update on sysfs entry removing.
+On Thu, Jul 05, 2012 at 01:38:33AM +0200, Linus Walleij wrote:
+> On Mon, Jul 2, 2012 at 2:59 PM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+> > On 07/02/2012 11:31 AM, Sascha Hauer wrote:
+> >>
+> >> [Added Linus to Cc]
+> >>
+> >> Has this been applied? Linus, it seems you handle gpio patches now, you
+> >> probably missed it because you haven't been on Cc.
+> >
+> > No I don't, sorry. I try to help Grant with review but I haven't
+> > taken over any trees or merging. If I did I would only have to
+> > funnel it to Grant anyway.
+> 
+> Famous last words, I wasn't in sync with my mail log and Grant
+> did ask me to do that...
 
-Also regulator->dev still needs to get assigned in create_regulator,
-otherwise, sysfs_remove_link call in regulator_put will get bypassed.
+nice ;)
 
-Reported-by: Fabio Estevam <festevam@gmail.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/regulator/core.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+Sascha
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index ef07b62..3998d8f 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1071,6 +1071,8 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
- 	list_add(&regulator->list, &rdev->consumer_list);
- 
- 	if (dev) {
-+		regulator->dev = dev;
-+
- 		/* Add a link to the device sysfs entry */
- 		size = scnprintf(buf, REG_STR_SIZE, "%s-%s",
- 				 dev->kobj.name, supply_name);
-@@ -1367,11 +1369,8 @@ void regulator_put(struct regulator *regulator)
- 	debugfs_remove_recursive(regulator->debugfs);
- 
- 	/* remove any sysfs entries */
--	if (regulator->dev) {
-+	if (regulator->dev)
- 		sysfs_remove_link(&rdev->dev.kobj, regulator->supply_name);
--		device_remove_file(regulator->dev, &regulator->dev_attr);
--		kfree(regulator->dev_attr.attr.name);
--	}
- 	kfree(regulator->supply_name);
- 	list_del(&regulator->list);
- 	kfree(regulator);
 -- 
-1.7.5.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
