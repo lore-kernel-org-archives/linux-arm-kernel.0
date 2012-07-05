@@ -1,57 +1,100 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Jul 2012 12:20:50 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <87sjd6ikkj.fsf@lebrac.rtp-net.org>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <1341325365-21393-2-git-send-email-andrew@lunn.ch>
- <20120705110251.596331e0@skate> <20120705094824.GO17534@lunn.ch>
- <87sjd6ikkj.fsf@lebrac.rtp-net.org>
-Message-ID: <20120705122050.2fbc2fe3@skate>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 5 Jul 2012 10:24:35 +0000
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <20120704075158.GQ1122@atomide.com>
+References: <cover.1340778002.git.afzal@ti.com>
+ <0a4c9edc1328f7789491e2acf5138364e08bf2cb.1340778003.git.afzal@ti.com>
+ <20120627145844.GL3483@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A03A6@DBDE01.ent.ti.com>
+ <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
+ <20120702063651.GO4202@atomide.com> <4FF1D980.4040100@ti.com>
+ <20120703081746.GJ1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A2BAC@DBDE01.ent.ti.com>
+ <20120704075158.GQ1122@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Thu, 05 Jul 2012 12:11:40 +0200,
-Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> a ?crit :
+Hi Tony,
 
-> > You are not the only one working in this area. Arnaud Patard said he
-> > was look at this as well. 
+On Wed, Jul 04, 2012 at 13:21:59, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [120704 00:05]:
+> > On Tue, Jul 03, 2012 at 13:47:47, Tony Lindgren wrote:
+
+> > > Yes how about the gpmc using driver code registers itself with the gpmc code
+> > > and also registers it's retime function with the gpmc? That way the gpmc fck
+> > > stays inside the gpmc code, and the driver specific retime function should
+> > > be able to do the calculation based on driver clocks. The retime function
+> > > needs to have also a pointer to driver private data for it's clocks etc.
+> > 
+> > Sorry, not sure whether I follow you properly, based on what has been
+> > understood, will try to rephrase,
+> > 
+> > All the present gpmc timing calculation done in arch/arm/mach-omap2/gpmc-*
+> > to be moved to gpmc driver. And all the peripheral drivers using gpmc, i.e
+> > like smsc911x, tusb6010 needs to register their retime function with gpmc
+> > driver. And gpmc driver will invoke these registered retime function, when
+> > clock frequency changes.
+> > 
+> > But wouldn't it need changes in the existing drivers like smsc911x that are
+> > used by multiple architectures with gpmc specific registration (put under
+> > a macro ?). We will be having gpmc driver code that contains knowledge
+> > about peripheral timing calculation, seems there is no way out of this.
+> > Peripheral agnostic gpmc code may not happen it seems
 > 
-> yeah, but tbh I've not made anything yet. If Thomas has already some
-> code for it, we should try to make it "generic" so as to use it on
-> armada xp and orion platforms.
+> It depends. For some drivers scaling both gpmc clock and the device clock
+> can happen, like with tusb6010 for example. But the smsc911x does not know
+> about the clocks.. So to additional changes to the driver would be required
+> to if device clocks need scaling. But for now, we should be able to do it
+> at gpmc level with the retime function, or just disable DFS for those clocks
+> if not supported.
 
-The MPP registers are identical on Armada XP/370 and 88F6281 (not sure
-which other SoC datasheet I should be checking). Basically, it's just a
-range of contiguous registers, with 4 bits per pin to select the
-function.
+I have a doubt whether we are talking about the same thing, presently
+our main issue is in eliminating the necessity of peripheral specific
+functions like gpmc_onenand_init, tusb_setup_interface (which calls
+tusb6010_platform_retime), etc., which calculate gpmc timings by
+processing peripheral specific timings over gpmc clock period and
+these processing were required before gpmc driver probe gets invoked
+as gpmc driver needed timings which gpmc can understand to configure
+gpmc.
 
-So my pinmux driver should simply work as is for Orion as well. The
-only difference between platforms is the number of MPP pins that are
-available, but this number also varies between versions of Armada XP
-and Armada 370, so I already support this in the driver.
+During boot time, gpmc driver needs to know timings in terms of gpmc
+parameters to configure gpmc, what I unable to understand from your
+proposal is how gpmc driver knows which retime function to invoke (so
+that gpmc timings can be calculated based on the type of peripheral)
+to calculate gpmc timings. Or do you want a DT field specifying type
+of peripheral connected and so that at probe time the relevant retime
+can be invoked ?
 
-However, using the pinmux driver will require changes in the device
-drivers, so that they request the pinmux for their devices.
+Initially I thought you were suggesting that all peripheral drivers
+connected to gpmc should register their retime function (where
+function will be an exported symbol - part of gpmc code) and
+invoke the respective retime as part of peripheral driver probe,
+hence relieve gpmc driver of doing it, even though retime would be
+present as part of gpmc code. But seems that is not what you were
+suggesting.
 
-> > I know Marvell has contracted you to port to Armada 370/XP, not mvebu,
-> > aka all chips which might be able to share this code. This IMHO is
-> > wrong. So i personally would put the kirkwood and the Armada 370/XP
-> > data sheets next to each other, and from the beginning on write the
-> > driver so it supports them all. This assumes the ASIC engineers have
-> > not radically changed anything... Please also try to stick to the DT
-> > binding i've used.
+By "we should be able to do it at gpmc level", I am unable to
+understand what you are suggesting.
+
+> > In that case gpmc driver probe would have to be relieved of the task of
+> > setting up gpmc timings as we have to wait till peripheral drivers
+> > register their callback, right ?, seems in that case no timing information
+> > needs (or can be) to be passed from DT
 > 
-> agreed. it should be written with all platforms in mind, as long as
-> they're compatible. It can only make things better imho.
+> Well we should pass all the gpmc timing information from DT. And then the
+> driver also still needs to register it's retime function with gpmc.
 
-Certainly, especially for MPP/GPIO that are definitely very similar.
+So timing information that would be passed from DT should be for
+exact gpmc timings like cs_on, cs_off etc., right ?, in that case
+should we manually calculate (like as now done by Kernel in
+gpmc-onenand.c etc) it by having the knowledge of connected
+peripheral & gpmc frequency at boot time and update it in DT ?, as
+we can't apply retime on it as we don't know the connected
+peripheral in gpmc driver. Or do you want another field through DT
+to decide retime that is to be used, then I think passing timing
+from DT would not be needed
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards
+Afzal
