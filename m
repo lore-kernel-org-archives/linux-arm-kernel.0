@@ -1,470 +1,257 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri,  6 Jul 2012 08:09:16 +0200
-Subject: [PATCH 2/2 V2] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <1341554956-17416-1-git-send-email-marex@denx.de>
-References: <1341554956-17416-1-git-send-email-marex@denx.de>
-Message-ID: <1341554956-17416-2-git-send-email-marex@denx.de>
+Date: Fri,  6 Jul 2012 08:17:20 +0200
+Subject: [PATCH 01/10 RESEND] mmc: spi: Move SSP register definitions into
+ separate file
+Message-ID: <1341555449-17507-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
-via DT. The DMA operation is enabled by default.
+Move the definitions into separate file so separate SPI driver can be
+implemented. The SSP controller in MXS can act both as a MMC host and
+as a SPI host.
 
+Based on previous attempt by:
+Fabio Estevam <fabio.estevam@freescale.com>
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Chris Ball <cjb@laptop.org>
 Cc: Detlev Zundel <dzu@denx.de>
 CC: Dong Aisheng <b29396@freescale.com>
-CC: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-Cc: linux-i2c at vger.kernel.org
-CC: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
 CC: Shawn Guo <shawn.guo@linaro.org>
 Cc: Stefano Babic <sbabic@denx.de>
-CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Wolfgang Denk <wd@denx.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
 ---
- Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    5 +
- arch/arm/boot/dts/imx28.dtsi                      |    2 +
- drivers/i2c/busses/i2c-mxs.c                      |  267 +++++++++++++++++++--
- 3 files changed, 252 insertions(+), 22 deletions(-)
+ drivers/mmc/host/mxs-mmc.c  |   87 ++--------------------------------
+ include/linux/spi/mxs-spi.h |  109 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 112 insertions(+), 84 deletions(-)
+ create mode 100644 include/linux/spi/mxs-spi.h
 
-V2: (even though technically V<around 4>, ditto here, slaps himself)
-    Fixed return value from mxs_i2c_dma_setup_xfer(), pointed by Dong.
-    Fixed coding style nitpicks
-    Call mxs_i2c_dma_finish() in failpath only if DMA is active
-
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-index 2ed5332..d337cbc 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-@@ -5,6 +5,10 @@ Required properties:
- - reg: Should contain registers location and length
- - interrupts: Should contain ERROR and DMA interrupts
- - clock-frequency: desired I2C bus clock frequency in Hz.
-+- fsl,i2c-dma-channel: APBX DMA channel for the I2C
-+
-+Optional properties:
-+- fsl,use-pio: Use PIO transfers instead of DMA, useful for debug
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index 93b661d..584f982 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -45,87 +45,10 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/stmp_device.h>
+ #include <linux/mmc/mxs-mmc.h>
++#include <linux/spi/mxs-spi.h>
  
- Examples:
+ #define DRIVER_NAME	"mxs-mmc"
  
-@@ -15,4 +19,5 @@ i2c0: i2c at 80058000 {
- 	reg = <0x80058000 2000>;
- 	interrupts = <111 68>;
- 	clock-frequency = <400000>;
-+	fsl,i2c-dma-channel = <6>;
- };
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 832d30a..e4a4842 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -420,6 +420,7 @@
- 				reg = <0x80058000 2000>;
- 				interrupts = <111 68>;
- 				clock-frequency = <400000>;
-+				fsl,i2c-dma-channel = <6>;
- 				status = "disabled";
- 			};
- 
-@@ -430,6 +431,7 @@
- 				reg = <0x8005a000 2000>;
- 				interrupts = <110 69>;
- 				clock-frequency = <400000>;
-+				fsl,i2c-dma-channel = <7>;
- 				status = "disabled";
- 			};
- 
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 47a7e20..989d4f8 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -7,8 +7,6 @@
-  *
-  * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-  *
-- * TODO: add dma-support if platform-support for it is available
-- *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-  * the Free Software Foundation; either version 2 of the License, or
-@@ -31,6 +29,9 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_i2c.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
-+#include <linux/fsl/mxs-dma.h>
- 
- #define DRIVER_NAME "mxs-i2c"
- 
-@@ -136,6 +137,16 @@ struct mxs_i2c_dev {
- 	u32 cmd_err;
- 	struct i2c_adapter adapter;
- 	const struct mxs_i2c_speed_config *speed;
-+
-+	/* DMA support components */
-+	bool				dma_mode;
-+	int				dma_channel;
-+	struct dma_chan         	*dmach;
-+	struct mxs_dma_data		dma_data;
-+	uint32_t			pio_data[2];
-+	uint32_t			addr_data;
-+	struct scatterlist		sg_io[2];
-+	bool				dma_read;
- };
- 
- static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
-@@ -147,7 +158,11 @@ static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
- 	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
- 
- 	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
--	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
-+	if (i2c->dma_mode)
-+		writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
-+			i2c->regs + MXS_I2C_QUEUECTRL_CLR);
-+	else
-+		writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
- 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
- }
- 
-@@ -238,6 +253,150 @@ static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
- 	return 0;
- }
- 
-+static void mxs_i2c_dma_finish(struct mxs_i2c_dev *i2c)
-+{
-+	if (i2c->dma_read) {
-+		dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
-+		dma_unmap_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
-+	} else {
-+		dma_unmap_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
-+	}
-+}
-+
-+static void mxs_i2c_dma_irq_callback(void *param)
-+{
-+	struct mxs_i2c_dev *i2c = param;
-+
-+	complete(&i2c->cmd_complete);
-+	mxs_i2c_dma_finish(i2c);
-+}
-+
-+static int mxs_i2c_dma_setup_xfer(struct i2c_adapter *adap,
-+			struct i2c_msg *msg, uint32_t flags)
-+{
-+	struct dma_async_tx_descriptor *desc;
-+	struct mxs_i2c_dev *i2c = i2c_get_adapdata(adap);
-+
-+	if (msg->flags & I2C_M_RD) {
-+		i2c->dma_read = 1;
-+		i2c->addr_data = (msg->addr << 1) | I2C_SMBUS_READ;
-+
-+		/*
-+		 * SELECT command.
-+		 */
-+
-+		/* Queue the PIO register write transfer. */
-+		i2c->pio_data[0] = MXS_CMD_I2C_SELECT;
-+		desc = dmaengine_prep_slave_sg(i2c->dmach,
-+					(struct scatterlist *)&i2c->pio_data[0],
-+					1, DMA_TRANS_NONE, 0);
-+		if (!desc) {
-+			dev_err(i2c->dev,
-+				"Failed to get PIO reg. write descriptor.\n");
-+			goto select_init_pio_fail;
-+		}
-+
-+		/* Queue the DMA data transfer. */
-+		sg_init_one(&i2c->sg_io[0], &i2c->addr_data, 1);
-+		dma_map_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
-+		desc = dmaengine_prep_slave_sg(i2c->dmach, &i2c->sg_io[0], 1,
-+					DMA_MEM_TO_DEV,
-+					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+		if (!desc) {
-+			dev_err(i2c->dev,
-+				"Failed to get DMA data write descriptor.\n");
-+			goto select_init_dma_fail;
-+		}
-+
-+		/*
-+		 * READ command.
-+		 */
-+
-+		/* Queue the PIO register write transfer. */
-+		i2c->pio_data[1] = flags | MXS_CMD_I2C_READ |
-+				MXS_I2C_CTRL0_XFER_COUNT(msg->len);
-+		desc = dmaengine_prep_slave_sg(i2c->dmach,
-+					(struct scatterlist *)&i2c->pio_data[1],
-+					1, DMA_TRANS_NONE, DMA_PREP_INTERRUPT);
-+		if (!desc) {
-+			dev_err(i2c->dev,
-+				"Failed to get PIO reg. write descriptor.\n");
-+			goto select_init_dma_fail;
-+		}
-+
-+		/* Queue the DMA data transfer. */
-+		sg_init_one(&i2c->sg_io[1], msg->buf, msg->len);
-+		dma_map_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
-+		desc = dmaengine_prep_slave_sg(i2c->dmach, &i2c->sg_io[1], 1,
-+					DMA_DEV_TO_MEM,
-+					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+		if (!desc) {
-+			dev_err(i2c->dev,
-+				"Failed to get DMA data write descriptor.\n");
-+			goto read_init_dma_fail;
-+		}
-+	} else {
-+		i2c->dma_read = 0;
-+		i2c->addr_data = (msg->addr << 1) | I2C_SMBUS_WRITE;
-+
-+		/*
-+		 * WRITE command.
-+		 */
-+
-+		/* Queue the PIO register write transfer. */
-+		i2c->pio_data[0] = flags | MXS_CMD_I2C_WRITE |
-+				MXS_I2C_CTRL0_XFER_COUNT(msg->len + 1);
-+		desc = dmaengine_prep_slave_sg(i2c->dmach,
-+					(struct scatterlist *)&i2c->pio_data[0],
-+					1, DMA_TRANS_NONE, 0);
-+		if (!desc) {
-+			dev_err(i2c->dev,
-+				"Failed to get PIO reg. write descriptor.\n");
-+			goto write_init_pio_fail;
-+		}
-+
-+		/* Queue the DMA data transfer. */
-+		sg_init_table(i2c->sg_io, 2);
-+		sg_set_buf(&i2c->sg_io[0], &i2c->addr_data, 1);
-+		sg_set_buf(&i2c->sg_io[1], msg->buf, msg->len);
-+		dma_map_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
-+		desc = dmaengine_prep_slave_sg(i2c->dmach, i2c->sg_io, 2,
-+					DMA_MEM_TO_DEV,
-+					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+		if (!desc) {
-+			dev_err(i2c->dev,
-+				"Failed to get DMA data write descriptor.\n");
-+			goto write_init_dma_fail;
-+		}
-+	}
-+
-+	/*
-+	 * The last descriptor must have this callback,
-+	 * to finish the DMA transaction.
-+	 */
-+	desc->callback = mxs_i2c_dma_irq_callback;
-+	desc->callback_param = i2c;
-+
-+	/* Start the transfer. */
-+	dmaengine_submit(desc);
-+	dma_async_issue_pending(i2c->dmach);
-+	return 0;
-+
-+/* Read failpath. */
-+read_init_dma_fail:
-+	dma_unmap_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
-+select_init_dma_fail:
-+	dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
-+select_init_pio_fail:
-+	return -EINVAL;
-+
-+/* Write failpath. */
-+write_init_dma_fail:
-+	dma_unmap_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
-+write_init_pio_fail:
-+	return -EINVAL;
-+}
-+
- /*
-  * Low level master read/write transaction.
-  */
-@@ -248,6 +407,8 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
- 	int ret;
- 	int flags;
- 
-+	flags = stop ? MXS_I2C_CTRL0_POST_SEND_STOP : 0;
-+
- 	dev_dbg(i2c->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
- 		msg->addr, msg->len, msg->flags, stop);
- 
-@@ -257,23 +418,29 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
- 	init_completion(&i2c->cmd_complete);
- 	i2c->cmd_err = 0;
- 
--	flags = stop ? MXS_I2C_CTRL0_POST_SEND_STOP : 0;
+-/* card detect polling timeout */
+-#define MXS_MMC_DETECT_TIMEOUT			(HZ/2)
 -
--	if (msg->flags & I2C_M_RD)
--		mxs_i2c_pioq_setup_read(i2c, msg->addr, msg->len, flags);
--	else
--		mxs_i2c_pioq_setup_write(i2c, msg->addr, msg->buf, msg->len,
--					flags);
-+	if (i2c->dma_mode) {
-+		ret = mxs_i2c_dma_setup_xfer(adap, msg, flags);
-+		if (ret)
-+			return ret;
-+	} else {
-+		if (msg->flags & I2C_M_RD) {
-+			mxs_i2c_pioq_setup_read(i2c, msg->addr,
-+						msg->len, flags);
-+		} else {
-+			mxs_i2c_pioq_setup_write(i2c, msg->addr, msg->buf,
-+						msg->len, flags);
-+		}
- 
--	writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
-+		writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
- 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
-+	}
- 
- 	ret = wait_for_completion_timeout(&i2c->cmd_complete,
- 						msecs_to_jiffies(1000));
- 	if (ret == 0)
- 		goto timeout;
- 
--	if ((!i2c->cmd_err) && (msg->flags & I2C_M_RD)) {
-+	if (!i2c->dma_mode && !i2c->cmd_err && (msg->flags & I2C_M_RD)) {
- 		ret = mxs_i2c_finish_read(i2c, msg->buf, msg->len);
- 		if (ret)
- 			goto timeout;
-@@ -291,6 +458,8 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
- 
- timeout:
- 	dev_dbg(i2c->dev, "Timeout!\n");
-+	if (i2c->dma_mode)
-+		mxs_i2c_dma_finish(i2c);
- 	mxs_i2c_reset(i2c);
- 	return -ETIMEDOUT;
- }
-@@ -332,11 +501,13 @@ static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
- 		/* MXS_I2C_CTRL1_OVERSIZE_XFER_TERM_IRQ is only for slaves */
- 		i2c->cmd_err = -EIO;
- 
--	is_last_cmd = (readl(i2c->regs + MXS_I2C_QUEUESTAT) &
--		MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK) == 0;
-+	if (!i2c->dma_mode) {
-+		is_last_cmd = (readl(i2c->regs + MXS_I2C_QUEUESTAT) &
-+			MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK) == 0;
- 
--	if (is_last_cmd || i2c->cmd_err)
--		complete(&i2c->cmd_complete);
-+		if (is_last_cmd || i2c->cmd_err)
-+			complete(&i2c->cmd_complete);
-+	}
- 
- 	writel(stat, i2c->regs + MXS_I2C_CTRL1_CLR);
- 
-@@ -348,6 +519,21 @@ static const struct i2c_algorithm mxs_i2c_algo = {
- 	.functionality = mxs_i2c_func,
- };
- 
-+static bool mxs_i2c_dma_filter(struct dma_chan *chan, void *param)
-+{
-+	struct mxs_i2c_dev *i2c = param;
-+
-+	if (!mxs_dma_is_apbx(chan))
-+		return false;
-+
-+	if (chan->chan_id != i2c->dma_channel)
-+		return false;
-+
-+	chan->private = &i2c->dma_data;
-+
-+	return true;
-+}
-+
- static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
- {
- 	uint32_t speed;
-@@ -358,6 +544,28 @@ static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
- 	if (!node)
- 		return -EINVAL;
- 
-+	/*
-+	 * The MXS I2C DMA mode is prefered and enabled by default.
-+	 * The PIO mode is still supported, but should be used only
-+	 * for debuging purposes etc.
-+	 */
-+	i2c->dma_mode = 1;
-+	if (of_find_property(node, "fsl,use-pio", NULL)) {
-+		i2c->dma_mode = 0;
-+		dev_info(dev, "Using PIO mode for I2C transfers!\n");
-+	}
-+
-+	/*
-+	 * TODO: This is a temporary solution and should be changed
-+	 * to use generic DMA binding later when the helpers get in.
-+	 */
-+	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
-+				   &i2c->dma_channel);
-+	if (ret) {
-+		dev_warn(dev, "Failed to get DMA channel!\n");
-+		i2c->dma_mode = 0;
-+	}
-+
- 	i2c->speed = &mxs_i2c_95kHz_config;
- 	ret = of_property_read_u32(node, "clock-frequency", &speed);
- 	if (ret)
-@@ -378,7 +586,8 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 	struct pinctrl *pinctrl;
- 	struct resource *res;
- 	resource_size_t res_size;
--	int err, irq;
-+	int err, irq, dmairq;
-+	dma_cap_mask_t mask;
- 
- 	pinctrl = devm_pinctrl_get_select_default(dev);
- 	if (IS_ERR(pinctrl))
-@@ -389,7 +598,10 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res)
-+	irq = platform_get_irq(pdev, 0);
-+	dmairq = platform_get_irq(pdev, 1);
-+
-+	if (!res || irq < 0 || dmairq < 0)
- 		return -ENOENT;
- 
- 	res_size = resource_size(res);
-@@ -400,10 +612,6 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 	if (!i2c->regs)
- 		return -EBUSY;
- 
--	irq = platform_get_irq(pdev, 0);
--	if (irq < 0)
--		return irq;
+-#define ssp_is_old(host)	((host)->devid == IMX23_MMC)
 -
- 	err = devm_request_irq(dev, irq, mxs_i2c_isr, 0, dev_name(dev), i2c);
- 	if (err)
- 		return err;
-@@ -414,6 +622,18 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
+-/* SSP registers */
+-#define HW_SSP_CTRL0				0x000
+-#define  BM_SSP_CTRL0_RUN			(1 << 29)
+-#define  BM_SSP_CTRL0_SDIO_IRQ_CHECK		(1 << 28)
+-#define  BM_SSP_CTRL0_IGNORE_CRC		(1 << 26)
+-#define  BM_SSP_CTRL0_READ			(1 << 25)
+-#define  BM_SSP_CTRL0_DATA_XFER			(1 << 24)
+-#define  BP_SSP_CTRL0_BUS_WIDTH			(22)
+-#define  BM_SSP_CTRL0_BUS_WIDTH			(0x3 << 22)
+-#define  BM_SSP_CTRL0_WAIT_FOR_IRQ		(1 << 21)
+-#define  BM_SSP_CTRL0_LONG_RESP			(1 << 19)
+-#define  BM_SSP_CTRL0_GET_RESP			(1 << 17)
+-#define  BM_SSP_CTRL0_ENABLE			(1 << 16)
+-#define  BP_SSP_CTRL0_XFER_COUNT		(0)
+-#define  BM_SSP_CTRL0_XFER_COUNT		(0xffff)
+-#define HW_SSP_CMD0				0x010
+-#define  BM_SSP_CMD0_DBL_DATA_RATE_EN		(1 << 25)
+-#define  BM_SSP_CMD0_SLOW_CLKING_EN		(1 << 22)
+-#define  BM_SSP_CMD0_CONT_CLKING_EN		(1 << 21)
+-#define  BM_SSP_CMD0_APPEND_8CYC		(1 << 20)
+-#define  BP_SSP_CMD0_BLOCK_SIZE			(16)
+-#define  BM_SSP_CMD0_BLOCK_SIZE			(0xf << 16)
+-#define  BP_SSP_CMD0_BLOCK_COUNT		(8)
+-#define  BM_SSP_CMD0_BLOCK_COUNT		(0xff << 8)
+-#define  BP_SSP_CMD0_CMD			(0)
+-#define  BM_SSP_CMD0_CMD			(0xff)
+-#define HW_SSP_CMD1				0x020
+-#define HW_SSP_XFER_SIZE			0x030
+-#define HW_SSP_BLOCK_SIZE			0x040
+-#define  BP_SSP_BLOCK_SIZE_BLOCK_COUNT		(4)
+-#define  BM_SSP_BLOCK_SIZE_BLOCK_COUNT		(0xffffff << 4)
+-#define  BP_SSP_BLOCK_SIZE_BLOCK_SIZE		(0)
+-#define  BM_SSP_BLOCK_SIZE_BLOCK_SIZE		(0xf)
+-#define HW_SSP_TIMING(h)			(ssp_is_old(h) ? 0x050 : 0x070)
+-#define  BP_SSP_TIMING_TIMEOUT			(16)
+-#define  BM_SSP_TIMING_TIMEOUT			(0xffff << 16)
+-#define  BP_SSP_TIMING_CLOCK_DIVIDE		(8)
+-#define  BM_SSP_TIMING_CLOCK_DIVIDE		(0xff << 8)
+-#define  BP_SSP_TIMING_CLOCK_RATE		(0)
+-#define  BM_SSP_TIMING_CLOCK_RATE		(0xff)
+-#define HW_SSP_CTRL1(h)				(ssp_is_old(h) ? 0x060 : 0x080)
+-#define  BM_SSP_CTRL1_SDIO_IRQ			(1 << 31)
+-#define  BM_SSP_CTRL1_SDIO_IRQ_EN		(1 << 30)
+-#define  BM_SSP_CTRL1_RESP_ERR_IRQ		(1 << 29)
+-#define  BM_SSP_CTRL1_RESP_ERR_IRQ_EN		(1 << 28)
+-#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ		(1 << 27)
+-#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ_EN	(1 << 26)
+-#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ		(1 << 25)
+-#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ_EN	(1 << 24)
+-#define  BM_SSP_CTRL1_DATA_CRC_IRQ		(1 << 23)
+-#define  BM_SSP_CTRL1_DATA_CRC_IRQ_EN		(1 << 22)
+-#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ		(1 << 21)
+-#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ_EN	(1 << 20)
+-#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ		(1 << 17)
+-#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ_EN	(1 << 16)
+-#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ		(1 << 15)
+-#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ_EN	(1 << 14)
+-#define  BM_SSP_CTRL1_DMA_ENABLE		(1 << 13)
+-#define  BM_SSP_CTRL1_POLARITY			(1 << 9)
+-#define  BP_SSP_CTRL1_WORD_LENGTH		(4)
+-#define  BM_SSP_CTRL1_WORD_LENGTH		(0xf << 4)
+-#define  BP_SSP_CTRL1_SSP_MODE			(0)
+-#define  BM_SSP_CTRL1_SSP_MODE			(0xf)
+-#define HW_SSP_SDRESP0(h)			(ssp_is_old(h) ? 0x080 : 0x0a0)
+-#define HW_SSP_SDRESP1(h)			(ssp_is_old(h) ? 0x090 : 0x0b0)
+-#define HW_SSP_SDRESP2(h)			(ssp_is_old(h) ? 0x0a0 : 0x0c0)
+-#define HW_SSP_SDRESP3(h)			(ssp_is_old(h) ? 0x0b0 : 0x0d0)
+-#define HW_SSP_STATUS(h)			(ssp_is_old(h) ? 0x0c0 : 0x100)
+-#define  BM_SSP_STATUS_CARD_DETECT		(1 << 28)
+-#define  BM_SSP_STATUS_SDIO_IRQ			(1 << 17)
+-
+-#define BF_SSP(value, field)	(((value) << BP_SSP_##field) & BM_SSP_##field)
+-
+ #define MXS_MMC_IRQ_BITS	(BM_SSP_CTRL1_SDIO_IRQ		| \
+ 				 BM_SSP_CTRL1_RESP_ERR_IRQ	| \
+ 				 BM_SSP_CTRL1_RESP_TIMEOUT_IRQ	| \
+@@ -135,12 +58,8 @@
+ 				 BM_SSP_CTRL1_RECV_TIMEOUT_IRQ  | \
+ 				 BM_SSP_CTRL1_FIFO_OVERRUN_IRQ)
  
-+	/* Setup the DMA */
-+	if (i2c->dma_mode) {
-+		dma_cap_zero(mask);
-+		dma_cap_set(DMA_SLAVE, mask);
-+		i2c->dma_data.chan_irq = dmairq;
-+		i2c->dmach = dma_request_channel(mask, mxs_i2c_dma_filter, i2c);
-+		if (!i2c->dmach) {
-+			dev_err(dev, "Failed to request dma\n");
-+			return -ENODEV;
-+		}
-+	}
+-#define SSP_PIO_NUM	3
+-
+-enum mxs_mmc_id {
+-	IMX23_MMC,
+-	IMX28_MMC,
+-};
++/* card detect polling timeout */
++#define MXS_MMC_DETECT_TIMEOUT			(HZ/2)
+ 
+ struct mxs_mmc_host {
+ 	struct mmc_host			*mmc;
+diff --git a/include/linux/spi/mxs-spi.h b/include/linux/spi/mxs-spi.h
+new file mode 100644
+index 0000000..b7ccd57
+--- /dev/null
++++ b/include/linux/spi/mxs-spi.h
+@@ -0,0 +1,109 @@
++/*
++ * include/linux/spi/mxs-spi.h
++ *
++ * Freescale i.MX233/i.MX28 SPI controller register definition
++ *
++ * Copyright 2008 Embedded Alley Solutions, Inc.
++ * Copyright 2009-2011 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
 +
- 	platform_set_drvdata(pdev, i2c);
- 
- 	/* Do reset to enforce correct startup after pinmuxing */
-@@ -449,6 +669,9 @@ static int __devexit mxs_i2c_remove(struct platform_device *pdev)
- 	if (ret)
- 		return -EBUSY;
- 
-+	if (i2c->dmach)
-+		dma_release_channel(i2c->dmach);
++#ifndef __LINUX_SPI_MXS_SPI_H__
++#define __LINUX_SPI_MXS_SPI_H__
 +
- 	writel(MXS_I2C_CTRL0_SFTRST, i2c->regs + MXS_I2C_CTRL0_SET);
- 
- 	platform_set_drvdata(pdev, NULL);
++#define ssp_is_old(host)	((host)->devid == IMX23_MMC)
++
++/* SSP registers */
++#define HW_SSP_CTRL0				0x000
++#define  BM_SSP_CTRL0_RUN			(1 << 29)
++#define  BM_SSP_CTRL0_SDIO_IRQ_CHECK		(1 << 28)
++#define  BM_SSP_CTRL0_IGNORE_CRC		(1 << 26)
++#define  BM_SSP_CTRL0_READ			(1 << 25)
++#define  BM_SSP_CTRL0_DATA_XFER			(1 << 24)
++#define  BP_SSP_CTRL0_BUS_WIDTH			22
++#define  BM_SSP_CTRL0_BUS_WIDTH			(0x3 << 22)
++#define  BM_SSP_CTRL0_WAIT_FOR_IRQ		(1 << 21)
++#define  BM_SSP_CTRL0_LONG_RESP			(1 << 19)
++#define  BM_SSP_CTRL0_GET_RESP			(1 << 17)
++#define  BM_SSP_CTRL0_ENABLE			(1 << 16)
++#define  BP_SSP_CTRL0_XFER_COUNT		0
++#define  BM_SSP_CTRL0_XFER_COUNT		0xffff
++#define HW_SSP_CMD0				0x010
++#define  BM_SSP_CMD0_DBL_DATA_RATE_EN		(1 << 25)
++#define  BM_SSP_CMD0_SLOW_CLKING_EN		(1 << 22)
++#define  BM_SSP_CMD0_CONT_CLKING_EN		(1 << 21)
++#define  BM_SSP_CMD0_APPEND_8CYC		(1 << 20)
++#define  BP_SSP_CMD0_BLOCK_SIZE			16
++#define  BM_SSP_CMD0_BLOCK_SIZE			(0xf << 16)
++#define  BP_SSP_CMD0_BLOCK_COUNT		8
++#define  BM_SSP_CMD0_BLOCK_COUNT		(0xff << 8)
++#define  BP_SSP_CMD0_CMD			0
++#define  BM_SSP_CMD0_CMD			0xff
++#define HW_SSP_CMD1				0x020
++#define HW_SSP_XFER_SIZE			0x030
++#define HW_SSP_BLOCK_SIZE			0x040
++#define  BP_SSP_BLOCK_SIZE_BLOCK_COUNT		4
++#define  BM_SSP_BLOCK_SIZE_BLOCK_COUNT		(0xffffff << 4)
++#define  BP_SSP_BLOCK_SIZE_BLOCK_SIZE		0
++#define  BM_SSP_BLOCK_SIZE_BLOCK_SIZE		0xf
++#define HW_SSP_TIMING(h)			(ssp_is_old(h) ? 0x050 : 0x070)
++#define  BP_SSP_TIMING_TIMEOUT			16
++#define  BM_SSP_TIMING_TIMEOUT			(0xffff << 16)
++#define  BP_SSP_TIMING_CLOCK_DIVIDE		8
++#define  BM_SSP_TIMING_CLOCK_DIVIDE		(0xff << 8)
++#define  BP_SSP_TIMING_CLOCK_RATE		0
++#define  BM_SSP_TIMING_CLOCK_RATE		0xff
++#define HW_SSP_CTRL1(h)				(ssp_is_old(h) ? 0x060 : 0x080)
++#define  BM_SSP_CTRL1_SDIO_IRQ			(1 << 31)
++#define  BM_SSP_CTRL1_SDIO_IRQ_EN		(1 << 30)
++#define  BM_SSP_CTRL1_RESP_ERR_IRQ		(1 << 29)
++#define  BM_SSP_CTRL1_RESP_ERR_IRQ_EN		(1 << 28)
++#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ		(1 << 27)
++#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ_EN	(1 << 26)
++#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ		(1 << 25)
++#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ_EN	(1 << 24)
++#define  BM_SSP_CTRL1_DATA_CRC_IRQ		(1 << 23)
++#define  BM_SSP_CTRL1_DATA_CRC_IRQ_EN		(1 << 22)
++#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ		(1 << 21)
++#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ_EN	(1 << 20)
++#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ		(1 << 17)
++#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ_EN	(1 << 16)
++#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ		(1 << 15)
++#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ_EN	(1 << 14)
++#define  BM_SSP_CTRL1_DMA_ENABLE		(1 << 13)
++#define  BM_SSP_CTRL1_POLARITY			(1 << 9)
++#define  BP_SSP_CTRL1_WORD_LENGTH		4
++#define  BM_SSP_CTRL1_WORD_LENGTH		(0xf << 4)
++#define  BP_SSP_CTRL1_SSP_MODE			0
++#define  BM_SSP_CTRL1_SSP_MODE			0xf
++#define HW_SSP_SDRESP0(h)			(ssp_is_old(h) ? 0x080 : 0x0a0)
++#define HW_SSP_SDRESP1(h)			(ssp_is_old(h) ? 0x090 : 0x0b0)
++#define HW_SSP_SDRESP2(h)			(ssp_is_old(h) ? 0x0a0 : 0x0c0)
++#define HW_SSP_SDRESP3(h)			(ssp_is_old(h) ? 0x0b0 : 0x0d0)
++#define HW_SSP_STATUS(h)			(ssp_is_old(h) ? 0x0c0 : 0x100)
++#define  BM_SSP_STATUS_CARD_DETECT		(1 << 28)
++#define  BM_SSP_STATUS_SDIO_IRQ			(1 << 17)
++
++#define BF_SSP(value, field)	(((value) << BP_SSP_##field) & BM_SSP_##field)
++
++#define SSP_PIO_NUM	3
++
++enum mxs_mmc_id {
++	IMX23_MMC,
++	IMX28_MMC,
++};
++
++#endif	/* __LINUX_SPI_MXS_SPI_H__ */
 -- 
 1.7.10
