@@ -1,31 +1,31 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 6 Jul 2012 11:01:11 +0200
-Subject: [V3 2/4] mfd: 88pm860x: add pre-regulator device for 88pm860x
-In-Reply-To: <1341543598-6477-1-git-send-email-jtzhou@marvell.com>
-References: <20120705141541.GO4111@opensource.wolfsonmicro.com>
- <1341543598-6477-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20120706090111.GA5413@sortiz-mobl>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri,  6 Jul 2012 10:49:49 +0200
+Subject: [PATCH 1/2] ARM: OMAP: board-4430sdp: MUX configuration for sys_nirq2
+Message-ID: <1341564590-14024-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jett,
+The sys_nirq2 is used for twl6040, make sure the pin is configured
+correctly.
 
-On Fri, Jul 06, 2012 at 10:59:58AM +0800, Jett.Zhou wrote:
-> Pre-regulator of 88pm8606 is mainly for support charging based on vbus,
-> it needs to be enabled for charging battery, and will be disabled in
-> some exception condition like over-temp.
-> Add the pre-regulator device init data and resource for mfd subdev.
-> 
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-> ---
->  drivers/mfd/88pm860x-core.c  |   23 +++++++++++++++++++++++
->  include/linux/mfd/88pm860x.h |    1 +
->  2 files changed, 24 insertions(+), 0 deletions(-)
-Applied, thanks.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/board-4430sdp.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Cheers,
-Samuel.
-
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index c4e17641..050cc8e 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -827,6 +827,9 @@ static void __init omap_4430sdp_display_init(void)
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
+ 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
++	/* NIRQ2 for twl6040 */
++	OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE1 |
++		  OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.7.8.6
