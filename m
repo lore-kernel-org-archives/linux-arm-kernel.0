@@ -1,22 +1,25 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  6 Jul 2012 12:47:58 -0600
-Subject: [GIT PULL V2 3/7] ARM: tegra: for-3.6/soc branch
+Date: Fri,  6 Jul 2012 12:47:59 -0600
+Subject: [GIT PULL V2 4/7] ARM: tegra: for-3.6/dt branch
 In-Reply-To: <1341600482-11020-1-git-send-email-swarren@wwwdotorg.org>
 References: <1341600482-11020-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1341600482-11020-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1341600482-11020-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains changes to Tegra SoC-specific code in the mach-tegra
-directory; only APBIO/DMA-related patches this time around.
+This branch contains changes to Tegra device tree files, and related Kconfig
+and Makefile changes. Highlights are:
+
+* New support for the Whistler board.
+* Use of the I2C pinctrl-based bus mux on Seaboard/Springbank.
 
 This branch is based on Tegra's for-3.6/cleanup branch from a previous pull
 request.
 
-This branch is not included in any later pull requests.
+This branch is not included in a later pull request.
 
-Note that there will be a merge conflict between for-3.6/{fixes,soc}. The
-expected resolution may be found in branch for-3.6/merged-fixes-soc.
+Note that there will be a merge conflict between for-3.6/{dt,boards}. The
+expected resolution may be found in branch for-3.6/merged-dt-boards.
 
 ----------------------------------------------------------------
 
@@ -26,20 +29,21 @@ The following changes since commit 702b0e4f2f2782962aab7d9a0a40ad68770bb1f6:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/dt
 
-for you to fetch changes up to 5b39fc0bf17028a6b18e57d33f0dcf71f28a8223:
+for you to fetch changes up to 0879c5f72f0a3905d08081e8a2c38e69896b0d5e:
 
-  ARM: tegra: apbio: use dmaengine based dma driver
+  ARM: dt: tegra seaboard: move battery monitor to mux'd I2C bus.
 
 ----------------------------------------------------------------
 
-Laxman Dewangan (2):
-      ARM: tegra: apbio access using dma for tegra20 only
-      ARM: tegra: apbio: use dmaengine based dma driver
+Stephen Warren (3):
+      ARM: dt: tegra: add Whistler device tree file
+      ARM: dt: tegra: seaboard: instantiate pinctrl-based I2C bus mux
+      ARM: dt: tegra seaboard: move battery monitor to mux'd I2C bus.
 
- arch/arm/mach-tegra/Makefile |    3 +-
- arch/arm/mach-tegra/apbio.c  |  194 +++++++++++++++++++++++++++++++++++--
- arch/arm/mach-tegra/apbio.h  |   19 +----
- arch/arm/mach-tegra/common.c |    3 +
- 4 files changed, 193 insertions(+), 26 deletions(-)
+ arch/arm/boot/dts/tegra20-seaboard.dts |   85 ++++++--
+ arch/arm/boot/dts/tegra20-whistler.dts |  301 +++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Makefile.boot      |    1 +
+ 3 files changed, 371 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra20-whistler.dts
