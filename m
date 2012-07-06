@@ -1,50 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jul 2012 01:23:44 -0700
-Subject: [PATCH 1/2] arm/dts: Add AM33XX basic pinctrl support
-In-Reply-To: <1341479616-18630-2-git-send-email-anilkumar@ti.com>
-References: <1341479616-18630-1-git-send-email-anilkumar@ti.com>
- <1341479616-18630-2-git-send-email-anilkumar@ti.com>
-Message-ID: <20120706082343.GN1122@atomide.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 6 Jul 2012 13:57:15 +0530
+Subject: [GIT PULL] ARM: OMAP2+: miscellaneous PRCM & hwmod patches for 3.6
+In-Reply-To: <20120706080943.GL1122@atomide.com>
+References: <alpine.DEB.2.00.1207040935070.6760@utopia.booyaka.com>
+ <20120705084002.GU1122@atomide.com>
+ <CAMQu2gwuXnV7E8-+x9EN0qRF9B2OOgY3KMW-nd0GAqHUwHXkGw@mail.gmail.com>
+ <20120706080943.GL1122@atomide.com>
+Message-ID: <CAMQu2gyA0XF01gi_2Y_7eOY+NFKPidY6dUah3Rh-FnqpC37vfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* AnilKumar Ch <anilkumar@ti.com> [120705 02:18]:
-> Adds basic pinctrl support for AM33XX family of devices. This patch
-> is based on the pinctrl-simple driver submitted by Tony Lindgren's
-> here: http://lwn.net/Articles/496075/
-> 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 59509c4..85def31 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -40,6 +40,18 @@
->  		};
->  	};
->  
-> +	am3358_pinmux: pinmux at 44E10800 {
-> +		compatible = "ti,omap4-padconf";
-> +		reg = <0x44E10800 0x0338>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		#pinctrl-cells = <2>;
-> +		pinctrl-simple,register-width = <32>;
-> +		pinctrl-simple,function-mask = <0x7>;
-> +		pinctrl-simple,function-off = <0xffffffff>;
-> +		pinctrl-simple,pinconf-mask = <0x78>;
-> +	};
-> +
+On Fri, Jul 6, 2012 at 1:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120705 04:26]:
+>>
+>> Looks like the merge has not happened correctly.
+>> I see from the commit log that, you had a merge conflict in omap_hwmod.c
+>> and probably while resolving that the below change got missed.
+>>
+>> Tarun Kanti DebBarma (1):
+>>       ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
+>>
+>> So I tried pulling Paul's branch again on "cleanup-part2" at commit 8cb8de5d87
+>> and it got merged without any conflicts.
+>>
+>> Do you want to re-merge Paul's series in cleanup-part2 or re-apply the above
+>> patch ?
+>
+> Hmm weird, I wonder how I managed to mess up the resolve like that..
+> I'll (re)apply the following fix as the branch has been pushed out already.
+>
+Sounds good to me. Can you update the barcnh please ?
+I don't see that patch yet in cleanup-part2.
 
-You might want to update to the latest version, which is now called
-pinctrl-single instead of pinctrl-simple. Should be easy to update,
-note that we're still waiting on people to comment on the binding,
-so you might want to wait a bit before reposting so we have the
-driver merged.
-
-Regards,
-
-Tony
+Regards
+santosh
