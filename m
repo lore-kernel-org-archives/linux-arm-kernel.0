@@ -1,35 +1,31 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 6 Jul 2012 18:51:32 +0530
-Subject: [PATCH] ARM: OMAP: hwmod: Disable module when hwmod enable fails
-Message-ID: <1341580892-1028-1-git-send-email-rnayak@ti.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Fri, 6 Jul 2012 15:25:21 +0200
+Subject: [PATCH 2/5] crypto: add Atmel AES driver
+In-Reply-To: <20120706121719.GD4450@game.jcrosoft.org>
+References: <1341163187-14946-1-git-send-email-eric@eukrea.com>
+ <1341163187-14946-3-git-send-email-eric@eukrea.com>
+ <20120706121719.GD4450@game.jcrosoft.org>
+Message-ID: <20120706152521.5145f1aa@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Misael Lopez Cruz <misael.lopez@ti.com>
+Hi Jean-Christophe,
 
-Clock and module mode are explictly enable when hwmod is enabled. But if
-the hwmod doesn't get ready on time, clocks are disabled but module is left
-enabled.
+Le Fri, 6 Jul 2012 14:17:19 +0200,
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
+> > +	u8	buf_in[ATMEL_AES_DMA_THRESHOLD] __aligned(sizeof(u32));
+> can you allocate it
+> > +	int	dma_in;
+> > +	struct atmel_aes_dma	dma_lch_in;
+> > +
+> > +	u8	buf_out[ATMEL_AES_DMA_THRESHOLD] __aligned(sizeof(u32));
+> ditto
+> 
+Why is that preferred to allocate dynamicaly these buffers (we are
+talking of 2 x 16 bytes buffers) ?
 
-Signed-off-by: Misael Lopez Cruz <misael.lopez@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> otherwise looks good
+> 
+thanks
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 7731936..26888b6 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1834,6 +1834,7 @@ static int _enable(struct omap_hwmod *oh)
- 			_enable_sysc(oh);
- 		}
- 	} else {
-+		_omap4_disable_module(oh);
- 		_disable_clocks(oh);
- 		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
- 			 oh->name, r);
--- 
-1.7.1
+Eric
