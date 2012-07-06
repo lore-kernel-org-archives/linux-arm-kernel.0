@@ -1,177 +1,129 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:35 -0500
-Subject: [PATCH 10/15] iop13xx: use more regular PCI I/O space handling
+Date: Fri,  6 Jul 2012 13:40:33 -0500
+Subject: [PATCH 08/15] ARM: kirkwood: use fixed PCI i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-11-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-9-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+From: Rob Herring <rob.herring@calxeda.com>
 
-iop13xx confuses I/O port numbers with physical addresses, which breaks
-legacy ISA I/O access behind PCI bridges and makes it unnecessarily hard
-to unify the inb/outb accessors with other platforms. This removes the
-special-casing and just puts all I/O ports into a single 128KB virtually
-mapped I/O port range starting at port zero.
+Move kirkwood PCI to fixed i/o mapping and remove io.h.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-iop13xx/include/mach/io.h      |    6 +++---
- arch/arm/mach-iop13xx/include/mach/iop13xx.h |   12 +++---------
- arch/arm/mach-iop13xx/io.c                   |   27 --------------------------
- arch/arm/mach-iop13xx/pci.c                  |   12 ++++++------
- 4 files changed, 12 insertions(+), 45 deletions(-)
+ arch/arm/Kconfig                               |    1 -
+ arch/arm/mach-kirkwood/common.c                |   17 +++++++----------
+ arch/arm/mach-kirkwood/include/mach/io.h       |   24 ------------------------
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h |    2 --
+ 4 files changed, 7 insertions(+), 37 deletions(-)
+ delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
 
-diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
-index f131885..e197cb8 100644
---- a/arch/arm/mach-iop13xx/include/mach/io.h
-+++ b/arch/arm/mach-iop13xx/include/mach/io.h
-@@ -19,10 +19,10 @@
- #ifndef __ASM_ARM_ARCH_IO_H
- #define __ASM_ARM_ARCH_IO_H
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ed930ad..8a74244 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -547,7 +547,6 @@ config ARCH_KIRKWOOD
+ 	select PCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+-	select NEED_MACH_IO_H
+ 	select PLAT_ORION
+ 	help
+ 	  Support for the following Marvell Kirkwood series SoCs:
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index f261cd2..45d9793 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -22,6 +22,7 @@
+ #include <asm/timex.h>
+ #include <asm/kexec.h>
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ #include <asm/mach/time.h>
+ #include <mach/kirkwood.h>
+ #include <mach/bridge-regs.h>
+@@ -41,16 +42,6 @@
+  ****************************************************************************/
+ static struct map_desc kirkwood_io_desc[] __initdata = {
+ 	{
+-		.virtual	= KIRKWOOD_PCIE_IO_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE_IO_PHYS_BASE),
+-		.length		= KIRKWOOD_PCIE_IO_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= KIRKWOOD_PCIE1_IO_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
+-		.length		= KIRKWOOD_PCIE1_IO_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= KIRKWOOD_REGS_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
+ 		.length		= KIRKWOOD_REGS_SIZE,
+@@ -60,6 +51,12 @@ static struct map_desc kirkwood_io_desc[] __initdata = {
  
--#define IO_SPACE_LIMIT 0xffffffff
-+#include <mach/iop13xx.h>
- 
--#define __io(a) __iop13xx_io(a)
-+#define IO_SPACE_LIMIT (IOP13XX_PCIE_IO_WINDOW_SIZE + IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
- 
--extern void __iomem * __iop13xx_io(unsigned long io_addr);
-+#define __io(a) (IOP13XX_PCIX_LOWER_IO_VA + ((a) & IO_SPACE_LIMIT))
- 
- #endif
-diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-index e190dcd..d3777db 100644
---- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-+++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-@@ -69,17 +69,15 @@ extern unsigned long get_iop_tick_rate(void);
-  * 0x8000.0000 + 928M	0x2.8000.0000   (ioremap)	PCIE outbound memory window
-  *
-  * IO MAP
-- * 0x1000 + 64K	0x0.fffb.1000	0xfec6.1000	PCIX outbound i/o window
-+ * 0x1000 + 64K	0x0.fffb.1000	0xfed6.1000	PCIX outbound i/o window
-  * 0x1000 + 64K	0x0.fffd.1000	0xfed7.1000	PCIE outbound i/o window
-  */
- #define IOP13XX_PCIX_IO_WINDOW_SIZE   0x10000UL
- #define IOP13XX_PCIX_LOWER_IO_PA      0xfffb0000UL
--#define IOP13XX_PCIX_LOWER_IO_VA      0xfec60000UL
-+#define IOP13XX_PCIX_LOWER_IO_VA      0xfed60000UL
- #define IOP13XX_PCIX_LOWER_IO_BA      0x0UL /* OIOTVR */
- #define IOP13XX_PCIX_IO_BUS_OFFSET    0x1000UL
--#define IOP13XX_PCIX_UPPER_IO_PA      (IOP13XX_PCIX_LOWER_IO_PA +\
--				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
--#define IOP13XX_PCIX_UPPER_IO_VA      (IOP13XX_PCIX_LOWER_IO_VA +\
-+#define IOP13XX_PCIX_UPPER_IO_BA      (IOP13XX_PCIX_LOWER_IO_BA +\
- 				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
- #define IOP13XX_PCIX_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
- 					   (IOP13XX_PCIX_LOWER_IO_PA\
-@@ -108,10 +106,6 @@ extern unsigned long get_iop_tick_rate(void);
- #define IOP13XX_PCIE_LOWER_IO_VA      	 0xfed70000UL
- #define IOP13XX_PCIE_LOWER_IO_BA      	 0x0UL  /* OIOTVR */
- #define IOP13XX_PCIE_IO_BUS_OFFSET	 0x1000UL
--#define IOP13XX_PCIE_UPPER_IO_PA      	 (IOP13XX_PCIE_LOWER_IO_PA +\
--					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
--#define IOP13XX_PCIE_UPPER_IO_VA      	 (IOP13XX_PCIE_LOWER_IO_VA +\
--					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
- #define IOP13XX_PCIE_UPPER_IO_BA      	 (IOP13XX_PCIE_LOWER_IO_BA +\
- 					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
- #define IOP13XX_PCIE_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
-diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
-index 3c36419..851dc8f 100644
---- a/arch/arm/mach-iop13xx/io.c
-+++ b/arch/arm/mach-iop13xx/io.c
-@@ -23,25 +23,6 @@
- 
- #include "pci.h"
- 
--void * __iomem __iop13xx_io(unsigned long io_addr)
--{
--	void __iomem * io_virt;
--
--	switch (io_addr) {
--	case IOP13XX_PCIE_LOWER_IO_PA ... IOP13XX_PCIE_UPPER_IO_PA:
--		io_virt = (void *) IOP13XX_PCIE_IO_PHYS_TO_VIRT(io_addr);
--		break;
--	case IOP13XX_PCIX_LOWER_IO_PA ... IOP13XX_PCIX_UPPER_IO_PA:
--		io_virt = (void *) IOP13XX_PCIX_IO_PHYS_TO_VIRT(io_addr);
--		break;
--	default:
--		BUG();
--	}
--
--	return io_virt;
--}
--EXPORT_SYMBOL(__iop13xx_io);
--
- static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
- 	size_t size, unsigned int mtype, void *caller)
+ void __init kirkwood_map_io(void)
  {
-@@ -67,12 +48,6 @@ static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
- 				       (cookie - IOP13XX_PBI_LOWER_MEM_RA),
- 				       size, mtype, __builtin_return_address(0));
- 		break;
--	case IOP13XX_PCIE_LOWER_IO_PA ... IOP13XX_PCIE_UPPER_IO_PA:
--		retval = (void *) IOP13XX_PCIE_IO_PHYS_TO_VIRT(cookie);
--		break;
--	case IOP13XX_PCIX_LOWER_IO_PA ... IOP13XX_PCIX_UPPER_IO_PA:
--		retval = (void *) IOP13XX_PCIX_IO_PHYS_TO_VIRT(cookie);
--		break;
- 	case IOP13XX_PMMR_PHYS_MEM_BASE ... IOP13XX_PMMR_UPPER_MEM_PA:
- 		retval = (void *) IOP13XX_PMMR_PHYS_TO_VIRT(cookie);
- 		break;
-@@ -99,8 +74,6 @@ static void __iop13xx_iounmap(volatile void __iomem *addr)
- 		    goto skip;
++	unsigned long pci_io_pfn[] = {
++		__phys_to_pfn(KIRKWOOD_PCIE_IO_PHYS_BASE),
++		__phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
++	};
++	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn), SZ_1M);
++
+ 	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
+ }
  
- 	switch ((u32) addr) {
--	case IOP13XX_PCIE_LOWER_IO_VA ... IOP13XX_PCIE_UPPER_IO_VA:
--	case IOP13XX_PCIX_LOWER_IO_VA ... IOP13XX_PCIX_UPPER_IO_VA:
- 	case IOP13XX_PMMR_VIRT_MEM_BASE ... IOP13XX_PMMR_UPPER_MEM_VA:
- 		goto skip;
- 	}
-diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
-index 861cb12..1bb905a 100644
---- a/arch/arm/mach-iop13xx/pci.c
-+++ b/arch/arm/mach-iop13xx/pci.c
-@@ -1042,8 +1042,8 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 				  << IOP13XX_ATUX_PCIXSR_FUNC_NUM;
- 		__raw_writel(pcixsr, IOP13XX_ATUX_PCIXSR);
+diff --git a/arch/arm/mach-kirkwood/include/mach/io.h b/arch/arm/mach-kirkwood/include/mach/io.h
+deleted file mode 100644
+index 5d0ab61..0000000
+--- a/arch/arm/mach-kirkwood/include/mach/io.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/include/mach/io.h
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#include "kirkwood.h"
+-
+-#define IO_SPACE_LIMIT		0xffffffff
+-
+-static inline void __iomem *__io(unsigned long addr)
+-{
+-	return (void __iomem *)((addr - KIRKWOOD_PCIE_IO_BUS_BASE)
+-					+ KIRKWOOD_PCIE_IO_VIRT_BASE);
+-}
+-
+-#define __io(a)			__io(a)
+-
+-#endif
+diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+index c5b6851..43e4f9b 100644
+--- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
++++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+@@ -37,12 +37,10 @@
+ #define KIRKWOOD_NAND_MEM_SIZE		SZ_1K
  
--		res[0].start = IOP13XX_PCIX_LOWER_IO_PA + IOP13XX_PCIX_IO_BUS_OFFSET;
--		res[0].end   = IOP13XX_PCIX_UPPER_IO_PA;
-+		res[0].start = IOP13XX_PCIX_LOWER_IO_BA + IOP13XX_PCIX_IO_BUS_OFFSET;
-+		res[0].end   = IOP13XX_PCIX_UPPER_IO_BA;
- 		res[0].name  = "IQ81340 ATUX PCI I/O Space";
- 		res[0].flags = IORESOURCE_IO;
+ #define KIRKWOOD_PCIE1_IO_PHYS_BASE	0xf3000000
+-#define KIRKWOOD_PCIE1_IO_VIRT_BASE	0xfef00000
+ #define KIRKWOOD_PCIE1_IO_BUS_BASE	0x00100000
+ #define KIRKWOOD_PCIE1_IO_SIZE		SZ_1M
  
-@@ -1052,7 +1052,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 		res[1].name  = "IQ81340 ATUX PCI Memory Space";
- 		res[1].flags = IORESOURCE_MEM;
- 		sys->mem_offset = IOP13XX_PCIX_MEM_OFFSET;
--		sys->io_offset = IOP13XX_PCIX_LOWER_IO_PA;
-+		sys->io_offset = IOP13XX_PCIX_LOWER_IO_BA;
- 		break;
- 	case IOP13XX_INIT_ATU_ATUE:
- 		/* Note: the function number field in the PCSR is ro */
-@@ -1063,8 +1063,8 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ #define KIRKWOOD_PCIE_IO_PHYS_BASE	0xf2000000
+-#define KIRKWOOD_PCIE_IO_VIRT_BASE	0xfee00000
+ #define KIRKWOOD_PCIE_IO_BUS_BASE	0x00000000
+ #define KIRKWOOD_PCIE_IO_SIZE		SZ_1M
  
- 		__raw_writel(pcsr, IOP13XX_ATUE_PCSR);
- 
--		res[0].start = IOP13XX_PCIE_LOWER_IO_PA + IOP13XX_PCIE_IO_BUS_OFFSET;
--		res[0].end   = IOP13XX_PCIE_UPPER_IO_PA;
-+		res[0].start = IOP13XX_PCIE_LOWER_IO_BA + IOP13XX_PCIE_IO_BUS_OFFSET;
-+		res[0].end   = IOP13XX_PCIE_UPPER_IO_BA;
- 		res[0].name  = "IQ81340 ATUE PCI I/O Space";
- 		res[0].flags = IORESOURCE_IO;
- 
-@@ -1073,7 +1073,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 		res[1].name  = "IQ81340 ATUE PCI Memory Space";
- 		res[1].flags = IORESOURCE_MEM;
- 		sys->mem_offset = IOP13XX_PCIE_MEM_OFFSET;
--		sys->io_offset = IOP13XX_PCIE_LOWER_IO_PA;
-+		sys->io_offset = IOP13XX_PCIE_LOWER_IO_BA;
- 		sys->map_irq = iop13xx_pcie_map_irq;
- 		break;
- 	default:
 -- 
 1.7.9.5
