@@ -1,113 +1,125 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:31 -0500
-Subject: [PATCH 06/15] ARM: footbridge: use fixed PCI i/o mapping
+Date: Fri,  6 Jul 2012 13:40:26 -0500
+Subject: [PATCH 01/15] ARM: Add fixed PCI i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move footbridge PCI to fixed i/o mapping. io.h is still needed for the
-!MMU case.
+This adds a fixed virtual mapping for PCI i/o addresses. The mapping is
+located at the last 2MB of vmalloc region (0xfee00000-0xff000000).
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/mach-footbridge/common.c                  |   10 ++++------
- .../arm/mach-footbridge/include/mach/debug-macro.S |    3 ++-
- arch/arm/mach-footbridge/include/mach/io.h         |   12 ++----------
- 4 files changed, 9 insertions(+), 18 deletions(-)
+ Documentation/arm/memory.txt    |    3 +++
+ arch/arm/include/asm/io.h       |    5 +++++
+ arch/arm/include/asm/mach/pci.h |   18 ++++++++++++++++++
+ arch/arm/kernel/bios32.c        |   20 ++++++++++++++++++++
+ 4 files changed, 46 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3dfc555..7215ebf 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -431,7 +431,7 @@ config ARCH_FOOTBRIDGE
- 	select FOOTBRIDGE
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_IDE
--	select NEED_MACH_IO_H
-+	select NEED_MACH_IO_H if !MMU
- 	select NEED_MACH_MEMORY_H
- 	help
- 	  Support for systems based on the DC21285 companion chip
-diff --git a/arch/arm/mach-footbridge/common.c b/arch/arm/mach-footbridge/common.c
-index 3e6aaa6..8a739e0 100644
---- a/arch/arm/mach-footbridge/common.c
-+++ b/arch/arm/mach-footbridge/common.c
-@@ -26,6 +26,7 @@
+diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
+index 208a2d4..4bfb9ff 100644
+--- a/Documentation/arm/memory.txt
++++ b/Documentation/arm/memory.txt
+@@ -51,6 +51,9 @@ ffc00000	ffefffff	DMA memory mapping region.  Memory returned
+ ff000000	ffbfffff	Reserved for future expansion of DMA
+ 				mapping region.
  
- #include <asm/mach/irq.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- 
- #include "common.h"
- 
-@@ -175,11 +176,6 @@ static struct map_desc ebsa285_host_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(DC21285_PCI_IACK),
- 		.length		= PCIIACK_SIZE,
- 		.type		= MT_DEVICE,
--	}, {
--		.virtual	= PCIO_BASE,
--		.pfn		= __phys_to_pfn(DC21285_PCI_IO),
--		.length		= PCIO_SIZE,
--		.type		= MT_DEVICE,
- 	},
++fee00000	feffffff	Mapping of PCI I/O space. This is a static
++				mapping within the vmalloc space.
++
+ VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
+ 				Memory returned by vmalloc/ioremap will
+ 				be dynamically placed in this region.
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 815c669..e8bb4d2 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -113,11 +113,16 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ #define __iowmb()		do { } while (0)
  #endif
- };
-@@ -196,8 +192,10 @@ void __init footbridge_map_io(void)
- 	 * Now, work out what we've got to map in addition on this
- 	 * platform.
- 	 */
--	if (footbridge_cfn_mode())
-+	if (footbridge_cfn_mode()) {
-+		pci_map_io_single(DC21285_PCI_IO);
- 		iotable_init(ebsa285_host_io_desc, ARRAY_SIZE(ebsa285_host_io_desc));
-+	}
- }
  
- void footbridge_restart(char mode, const char *cmd)
-diff --git a/arch/arm/mach-footbridge/include/mach/debug-macro.S b/arch/arm/mach-footbridge/include/mach/debug-macro.S
-index e5acde2..c169f0c 100644
---- a/arch/arm/mach-footbridge/include/mach/debug-macro.S
-+++ b/arch/arm/mach-footbridge/include/mach/debug-macro.S
-@@ -17,7 +17,8 @@
- 	/* For NetWinder debugging */
- 		.macro	addruart, rp, rv, tmp
- 		mov	\rp, #0x000003f8
--		orr	\rv, \rp, #0xff000000	@ virtual
-+		orr	\rv, \rp, #0xfe000000	@ virtual
-+		orr	\rv, \rv, #0x00e00000	@ virtual
- 		orr	\rp, \rp, #0x7c000000	@ physical
- 		.endm
- 
-diff --git a/arch/arm/mach-footbridge/include/mach/io.h b/arch/arm/mach-footbridge/include/mach/io.h
-index aba531ee..aba4638 100644
---- a/arch/arm/mach-footbridge/include/mach/io.h
-+++ b/arch/arm/mach-footbridge/include/mach/io.h
-@@ -14,18 +14,10 @@
- #ifndef __ASM_ARM_ARCH_IO_H
- #define __ASM_ARM_ARCH_IO_H
- 
--#ifdef CONFIG_MMU
--#define MMU_IO(a, b)	(a)
--#else
--#define MMU_IO(a, b)	(b)
--#endif
--
--#define PCIO_SIZE       0x00100000
--#define PCIO_BASE       MMU_IO(0xff000000, 0x7c000000)
--
++#define PCI_IO_VIRT_BASE	0xfee00000
++
  /*
-- * Translation of various region addresses to virtual addresses
-+ * Translation of various i/o addresses to host addresses for !CONFIG_MMU
+  * Now, pick up the machine-defined IO definitions
   */
-+#define PCIO_BASE       0x7c000000
- #define __io(a)			((void __iomem *)(PCIO_BASE + (a)))
- 
+ #ifdef CONFIG_NEED_MACH_IO_H
+ #include <mach/io.h>
++#elif defined(CONFIG_PCI)
++#define IO_SPACE_LIMIT	((resource_size_t)0x1fffff)
++#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
+ #else
+ #define __io(a)		__typesafe_io((a) & IO_SPACE_LIMIT)
  #endif
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 26c511f..20a04af 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -55,6 +55,24 @@ struct pci_sys_data {
+ void pci_common_init(struct hw_pci *);
+ 
+ /*
++ * Setup fixed I/O mapping. Must be called from .map_io function.
++ */
++#ifdef CONFIG_PCI
++extern void pci_map_io_pfn(unsigned long pfn[], int nr, int size);
++#else
++static inline void pci_map_io_pfn(unsigned long pfn[], int nr, int size) {}
++#endif
++static inline void __init pci_map_io_single_pfn(unsigned long pfn)
++{
++	pci_map_io_pfn(&pfn, 1, SZ_1M);
++}
++
++static inline void __init pci_map_io_single(unsigned long paddr)
++{
++	pci_map_io_single_pfn(__phys_to_pfn(paddr));
++}
++
++/*
+  * PCI controllers
+  */
+ extern struct pci_ops iop3xx_ops;
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 2555250..0ea0135 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -13,6 +13,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/mach-types.h>
++#include <asm/mach/map.h>
+ #include <asm/mach/pci.h>
+ 
+ static int debug_pci;
+@@ -627,3 +628,22 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+ 
+ 	return 0;
+ }
++
++static struct map_desc pci_io_desc __initdata = {
++	.virtual	= PCI_IO_VIRT_BASE,
++	.type		= MT_DEVICE,
++};
++
++void __init pci_map_io_pfn(unsigned long pfn[], int nr, int size)
++{
++	int i;
++
++	pci_io_desc.length = size;
++
++	for (i = 0; i < nr; i++) {
++		pci_io_desc.pfn = pfn[i];
++		iotable_init(&pci_io_desc, 1);
++
++		pci_io_desc.virtual += size;
++	}
++}
 -- 
 1.7.9.5
