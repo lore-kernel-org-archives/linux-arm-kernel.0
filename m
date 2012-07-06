@@ -1,37 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 6 Jul 2012 08:28:52 +0200
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120706005249.GA26888@b20223-02.ap.freescale.net>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
-Message-ID: <20120706062852.GZ30009@pengutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 6 Jul 2012 08:44:01 +0200
+Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
+In-Reply-To: <CAOMZO5BwraSVyW8SZjoN19gy-eZ2tXXPRT879PdAOu38Yf-z0g@mail.gmail.com>
+References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+ <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
+ <CACKLOr1oeci84Fs7HTRD2Myie8zjKExA15mxM3z7dkq8QfvDmg@mail.gmail.com>
+ <CAOMZO5Bdpe43wSAS-D34LzVA9gAKwGTjsw_1f3iPizVsWJW7kw@mail.gmail.com>
+ <CACKLOr1OYmoWXCU=Q_0O1H5jYcAGXO11ji6d_j7SjyaLZuygAA@mail.gmail.com>
+ <CAOMZO5CLV6TuQUTzYUSvoi6apNUtSLhkbh8Jj3onAnc99TWxWg@mail.gmail.com>
+ <CAOMZO5A0YXcZOB+ov+dD0MVJr0XSr=Ufg5snGDLvZ9=GyK=xMw@mail.gmail.com>
+ <CAOMZO5BwraSVyW8SZjoN19gy-eZ2tXXPRT879PdAOu38Yf-z0g@mail.gmail.com>
+Message-ID: <CACKLOr1EoOL1SQ_QW7P3YtMYgVwt9uE-x728-YrZB8rEh45OMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 08:52:50AM +0800, Richard Zhao wrote:
-> On Thu, Jul 05, 2012 at 06:01:53PM +0200, Sascha Hauer wrote:
-> > On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
-> > > On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
-> > > > Measurements on i.MX1 and i.MX53 have shown that the divider values
-> > > > in the datasheets are wrong. the values from first, third and fourth
-> > > > column were all measured to be 8 higher than in the datasheet. It
-> > > > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
-> > > > the same as the i2c unit is unchanged since the i.MX1.
-> > > We may need to check with IC guys? Or you've done?
-> > 
-> > I don't have contact to the IC guys. Could you do this? I'd be
-> > interested in the results.
-> Sure, but it may be slow, as you know, many people are in summer break.
+The attached patch solves mx2_camera clock problems.
 
-Thanks. It can take longer, the resulting frequencies are all too low,
-so we are on the safe side.
+It can be also found by the following subject in the lists:
 
-Sascha
+media: i.MX27: Fix emma-prp clocks in mx2_camera.c
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: mx2_camera.patch
+Type: application/octet-stream
+Size: 5129 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/400b297d/attachment.obj>
