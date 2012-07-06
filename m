@@ -1,25 +1,40 @@
 From: attila@kinali.ch (Attila Kinali)
-Date: Fri, 6 Jul 2012 13:19:59 +0200
+Date: Fri,  6 Jul 2012 13:22:46 +0200
 Subject: [PATCH] ARM: dma: mxs-dma: Export missing symbols from mxs-dma.c
 In-Reply-To: <20120706111020.GD12558@shlinux2.ap.freescale.net>
-References: <20120706105252.GC12558@shlinux2.ap.freescale.net>
- <1341572992-12319-1-git-send-email-attila@kinali.ch>
- <20120706111020.GD12558@shlinux2.ap.freescale.net>
-Message-ID: <20120706131959.f52784fd92de1fe0e8ac615f@kinali.ch>
+References: <20120706111020.GD12558@shlinux2.ap.freescale.net>
+Message-ID: <1341573766-12459-1-git-send-email-attila@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jul 2012 19:10:21 +0800
-Dong Aisheng <b29396@freescale.com> wrote:
+mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
+which are used at least in mxs-mmc.c. Building mxs-mmc as module
+fails due to those two symbols not being exported.
 
-> Do we need this be EXPORT_SYMBOL_GPL?
+Signed-off-by: Attila Kinali <attila@kinali.ch>
+---
+ drivers/dma/mxs-dma.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Blub.. sorry.. forgot to change them to GPL... gimme a second.
-
-			Attila Kinali
-
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index c96ab15..96d8b80 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -201,6 +201,7 @@ int mxs_dma_is_apbh(struct dma_chan *chan)
+ 
+ 	return dma_is_apbh(mxs_dma);
+ }
++EXPORT_SYMBOL_GPL(mxs_dma_is_apbh);
+ 
+ int mxs_dma_is_apbx(struct dma_chan *chan)
+ {
+@@ -209,6 +210,7 @@ int mxs_dma_is_apbx(struct dma_chan *chan)
+ 
+ 	return !dma_is_apbh(mxs_dma);
+ }
++EXPORT_SYMBOL_GPL(mxs_dma_is_apbx);
+ 
+ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ {
 -- 
-The trouble with you, Shev, is you don't say anything until you've saved
-up a whole truckload of damned heavy brick arguments and then you dump
-them all out and never look at the bleeding body mangled beneath the heap
-		-- Tirin, The Dispossessed, U. Le Guin
+1.7.10
