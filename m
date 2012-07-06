@@ -1,29 +1,18 @@
-From: attila@kinali.ch (Attila Kinali)
-Date: Fri,  6 Jul 2012 11:02:46 +0200
-Subject: [PATCH] ARM: mxs: Export missing symbols from mxs-dma.c
-Message-ID: <1341565366-11441-1-git-send-email-attila@kinali.ch>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 6 Jul 2012 14:33:43 +0530
+Subject: [PATCH 2/2] ARM: OMAP: board-omap4panda: MUX configuration for
+ sys_nirq2
+In-Reply-To: <1341564590-14024-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1341564590-14024-1-git-send-email-peter.ujfalusi@ti.com>
+ <1341564590-14024-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <CAMQu2gzr6jGG3x1E4RQL_D+AJU19-MbsjLVWwjiWGZswfWmvPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
-which are used at least in mxs-mmc.c. Building mxs-mmc as module
-fails due to those two symbols not being exported.
-
-Signed-off-by: Attila Kinali <attila@kinali.ch>
----
- drivers/dma/mxs-dma.c |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index c96ab15..4ea1909 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -779,3 +779,6 @@ static int __init mxs_dma_module_init(void)
- 	return platform_driver_probe(&mxs_dma_driver, mxs_dma_probe);
- }
- subsys_initcall(mxs_dma_module_init);
-+
-+EXPORT_SYMBOL(mxs_dma_is_apbh);
-+EXPORT_SYMBOL(mxs_dma_is_apbx);
--- 
-1.7.10
+On Fri, Jul 6, 2012 at 2:19 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> The sys_nirq2 is used for twl6040, make sure the pin is configured
+> correctly.
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
