@@ -1,107 +1,131 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:25 -0500
-Subject: [PATCH 00/15] PCI io.h cleanups
-Message-ID: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+Date: Fri,  6 Jul 2012 13:40:29 -0500
+Subject: [PATCH 04/15] ARM: integrator: use fixed PCI i/o mapping
+In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-I've finally gotten back to this after several months. This is the 2nd
-part of mach/io.h removals. This series removes io.h on platforms with
-PCI by creating a fixed virtual I/O mapping and a common __io() macro.
+Move integrator PCI to fixed i/o mapping and remove io.h.
 
-As several platforms have 2 1MB I/O windows, I've changed the fixed
-mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
-control the size. This also allows using a single 1MB section mapping
-rather than 4KB pages.
-
-I've only tested versatilepb under qemu, so any testing is appreciated.
-iop3xx and mv78xx0 have some risk of breaking as the PCI bus addresses
-are moved to 0 from matching the cpu host bus addesss.
-
-Rob
-
-Arnd Bergmann (1):
-  iop13xx: use more regular PCI I/O space handling
-
-Rob Herring (14):
-  ARM: Add fixed PCI i/o mapping
-  ARM: versatile: use fixed PCI i/o mapping
-  ARM: tegra: use fixed PCI i/o mapping
-  ARM: integrator: use fixed PCI i/o mapping
-  ARM: shark: use fixed PCI i/o mapping
-  ARM: footbridge: use fixed PCI i/o mapping
-  ARM: dove: use fixed PCI i/o mapping
-  ARM: kirkwood: use fixed PCI i/o mapping
-  ARM: orion5x: use fixed PCI i/o mapping
-  ARM: iop13xx: use fixed PCI i/o mapping
-  ARM: mv78xx0: use fixed pci i/o mapping
-  i2c: iop3xx: clean-up trailing whitespace
-  i2c: iop3xx: use standard gpiolib functions
-  ARM: iop3xx: use fixed PCI i/o mapping
-
- Documentation/arm/memory.txt                       |    3 +
- arch/arm/Kconfig                                   |   13 +--
- arch/arm/include/asm/hardware/iop3xx.h             |   12 +-
- arch/arm/include/asm/io.h                          |    5 +
- arch/arm/include/asm/mach/pci.h                    |   18 +++
- arch/arm/kernel/bios32.c                           |   20 ++++
- arch/arm/mach-dove/common.c                        |   15 +--
- arch/arm/mach-dove/include/mach/dove.h             |    2 -
- arch/arm/mach-dove/include/mach/io.h               |   19 ---
- arch/arm/mach-dove/pcie.c                          |    9 +-
- arch/arm/mach-footbridge/common.c                  |   10 +-
- .../arm/mach-footbridge/include/mach/debug-macro.S |    3 +-
- arch/arm/mach-footbridge/include/mach/io.h         |   12 +-
- arch/arm/mach-integrator/include/mach/io.h         |   33 ------
- arch/arm/mach-integrator/include/mach/platform.h   |    4 +
- arch/arm/mach-integrator/integrator_ap.c           |    9 +-
- arch/arm/mach-iop13xx/include/mach/io.h            |   28 -----
- arch/arm/mach-iop13xx/include/mach/iop13xx.h       |   14 +--
- arch/arm/mach-iop13xx/io.c                         |   27 -----
- arch/arm/mach-iop13xx/pci.c                        |   12 +-
- arch/arm/mach-iop13xx/setup.c                      |   17 ++-
- arch/arm/mach-iop32x/include/mach/io.h             |   19 ---
- arch/arm/mach-iop33x/include/mach/io.h             |   19 ---
- arch/arm/mach-kirkwood/common.c                    |   17 ++-
- arch/arm/mach-kirkwood/include/mach/io.h           |   24 ----
- arch/arm/mach-kirkwood/include/mach/kirkwood.h     |    2 -
- arch/arm/mach-mv78xx0/addr-map.c                   |    1 +
- arch/arm/mach-mv78xx0/common.c                     |   18 ++-
- arch/arm/mach-mv78xx0/include/mach/io.h            |   24 ----
- arch/arm/mach-mv78xx0/include/mach/mv78xx0.h       |   22 ++--
- arch/arm/mach-mv78xx0/pcie.c                       |   28 +----
- arch/arm/mach-orion5x/common.c                     |   16 +--
- arch/arm/mach-orion5x/include/mach/io.h            |   22 ----
- arch/arm/mach-orion5x/include/mach/orion5x.h       |   14 +--
- arch/arm/mach-shark/core.c                         |   14 +--
- arch/arm/mach-shark/include/mach/debug-macro.S     |    7 +-
- arch/arm/mach-shark/include/mach/entry-macro.S     |    3 +-
- arch/arm/mach-shark/include/mach/io.h              |   18 ---
- arch/arm/mach-tegra/include/mach/io.h              |   46 --------
- arch/arm/mach-tegra/include/mach/iomap.h           |    3 +
- arch/arm/mach-tegra/io.c                           |    2 +
- arch/arm/mach-tegra/pcie.c                         |   43 +------
- arch/arm/mach-versatile/core.c                     |    7 +-
- arch/arm/mach-versatile/include/mach/hardware.h    |    1 -
- arch/arm/mach-versatile/include/mach/io.h          |   27 -----
- arch/arm/mach-versatile/pci.c                      |    1 -
- arch/arm/plat-iop/pci.c                            |    4 +-
- arch/arm/plat-iop/setup.c                          |    7 +-
- drivers/i2c/busses/i2c-iop3xx.c                    |  121 ++++++++++----------
- 49 files changed, 219 insertions(+), 596 deletions(-)
- delete mode 100644 arch/arm/mach-dove/include/mach/io.h
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/Kconfig                                 |    1 -
+ arch/arm/mach-integrator/include/mach/io.h       |   33 ----------------------
+ arch/arm/mach-integrator/include/mach/platform.h |    4 +++
+ arch/arm/mach-integrator/integrator_ap.c         |    9 ++----
+ 4 files changed, 7 insertions(+), 40 deletions(-)
  delete mode 100644 arch/arm/mach-integrator/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop32x/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop33x/include/mach/io.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/io.h
- delete mode 100644 arch/arm/mach-orion5x/include/mach/io.h
- delete mode 100644 arch/arm/mach-shark/include/mach/io.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/io.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ac446e3..5d37628 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -261,7 +261,6 @@ config ARCH_INTEGRATOR
+ 	select GENERIC_CLOCKEVENTS
+ 	select PLAT_VERSATILE
+ 	select PLAT_VERSATILE_FPGA_IRQ
+-	select NEED_MACH_IO_H
+ 	select NEED_MACH_MEMORY_H
+ 	select SPARSE_IRQ
+ 	select MULTI_IRQ_HANDLER
+diff --git a/arch/arm/mach-integrator/include/mach/io.h b/arch/arm/mach-integrator/include/mach/io.h
+deleted file mode 100644
+index 8de70de..0000000
+--- a/arch/arm/mach-integrator/include/mach/io.h
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/*
+- *  arch/arm/mach-integrator/include/mach/io.h
+- *
+- *  Copyright (C) 1999 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-/*
+- * WARNING: this has to mirror definitions in platform.h
+- */
+-#define PCI_MEMORY_VADDR        0xe8000000
+-#define PCI_CONFIG_VADDR        0xec000000
+-#define PCI_V3_VADDR            0xed000000
+-#define PCI_IO_VADDR            0xee000000
+-
+-#define __io(a)			((void __iomem *)(PCI_IO_VADDR + (a)))
+-
+-#endif
+diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
+index ec467ba..4c03475 100644
+--- a/arch/arm/mach-integrator/include/mach/platform.h
++++ b/arch/arm/mach-integrator/include/mach/platform.h
+@@ -324,6 +324,10 @@
+  */
+ #define PHYS_PCI_V3_BASE                0x62000000
+ 
++#define PCI_MEMORY_VADDR		0xe8000000
++#define PCI_CONFIG_VADDR		0xec000000
++#define PCI_V3_VADDR			0xed000000
++
+ /* ------------------------------------------------------------------------
+  *  Integrator Interrupt Controllers
+  * ------------------------------------------------------------------------
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index c857501..ceebba9 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -49,6 +49,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ #include <asm/mach/time.h>
+ 
+ #include <plat/fpga-irq.h>
+@@ -72,7 +73,7 @@
+  * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
+  * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
+  * ed000000	62000000	PCI V3 regs		PHYS_PCI_V3_BASE	(max 64k)
+- * ee000000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
++ * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
+  * ef000000			Cache flush
+  * f1000000	10000000	Core module registers
+  * f1100000	11000000	System controller registers
+@@ -146,16 +147,12 @@ static struct map_desc ap_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(PHYS_PCI_V3_BASE),
+ 		.length		= SZ_64K,
+ 		.type		= MT_DEVICE
+-	}, {
+-		.virtual	= PCI_IO_VADDR,
+-		.pfn		= __phys_to_pfn(PHYS_PCI_IO_BASE),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE
+ 	}
+ };
+ 
+ static void __init ap_map_io(void)
+ {
++	pci_map_io_single(PHYS_PCI_IO_BASE);
+ 	iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
+ 	vga_base = PCI_MEMORY_VADDR;
+ }
 -- 
 1.7.9.5
