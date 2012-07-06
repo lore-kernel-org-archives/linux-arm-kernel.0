@@ -1,101 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Jul 2012 10:20:20 +0100
-Subject: [RFC PATCH 2/4] ARM: arch_timers: register a time/cycle counter
-In-Reply-To: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
-References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1341566422-20368-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  6 Jul 2012 10:20:18 +0100
+Subject: [RFC PATCH 0/4] arch_timers patches to enable KVM support
+Message-ID: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some subsystems (KVM for example) need access to a cycle counter.
-In the KVM case, this is used to measure the time delta between
-host and guest in order to accurately generate timer events for
-the guest.
+This series is aimed at offering the minimum level of support that KVM
+needs when it comes to architected timers.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/arch_timer.h |    8 ++++++++
- arch/arm/kernel/arch_timer.c      |   25 +++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
+The first patch shouldn't be controvertial, as it changes the driver
+to use the virtual timer instead of the physical one (access to the
+latest is conditioned by the hypervisor settings, while the former is
+always available). It is actually required if the kernel is run as a
+guest. The next two are basic infrastructure additions.
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index ed2e95d..72c6822 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -1,9 +1,12 @@
- #ifndef __ASMARM_ARCH_TIMER_H
- #define __ASMARM_ARCH_TIMER_H
- 
-+#include <linux/clocksource.h>
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
- int arch_timer_of_register(void);
- int arch_timer_sched_clock_init(void);
-+struct timecounter *arch_timer_get_timecounter(void);
- #else
- static inline int arch_timer_of_register(void)
- {
-@@ -14,6 +17,11 @@ static inline int arch_timer_sched_clock_init(void)
- {
- 	return -ENXIO;
- }
-+
-+static inline struct timecounter *arch_timer_get_timecounter(void)
-+{
-+	return NULL;
-+}
- #endif
- 
- #endif
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 54599e9..2b5da66 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -318,6 +318,15 @@ static cycle_t arch_counter_read(struct clocksource *cs)
- 	return arch_counter_get_cntpct();
- }
- 
-+static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
-+{
-+	/*
-+	 * Always use the physical counter for the clocksource.
-+	 * CNTHCTL.PL1PCTEN must be set to 1.
-+	 */
-+	return arch_counter_get_cntpct();
-+}
-+
- static struct clocksource clocksource_counter = {
- 	.name	= "arch_sys_counter",
- 	.rating	= 400,
-@@ -326,6 +335,18 @@ static struct clocksource clocksource_counter = {
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-+static struct cyclecounter cyclecounter = {
-+	.read	= arch_counter_read_cc,
-+	.mask	= CLOCKSOURCE_MASK(56),
-+};
-+
-+static struct timecounter timecounter;
-+
-+struct timecounter *arch_timer_get_timecounter(void)
-+{
-+	return &timecounter;
-+}
-+
- static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- {
- 	int i;
-@@ -376,6 +397,10 @@ static int __init arch_timer_register(void)
- 	}
- 
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-+	cyclecounter.mult = clocksource_counter.mult;
-+	cyclecounter.shift = clocksource_counter.shift;
-+	timecounter_init(&timecounter, &cyclecounter,
-+			 arch_counter_get_cntpct());
- 
- 	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++) {
- 		irq_handler_t handler = arch_timer_handler;
+The last one is really the cause of the RFC tag. It allows the kernel
+to switch from using the virtual timer to the physical one - KVM needs
+this to allow guests to use the virtual timer, and because it runs in
+PL2, it allows the kernel to use the physical timer. This allows the
+same kernel to be used both as a host or guest kernel.
+
+The ugly part of this patch is that that KVM needs to handle the
+virtual timer interrupt itself, and this patch adds some sort of
+interrupt offloading. Frankly, I hate it, but I'm posting it so people
+can show they have better ideas than I do... ;-)
+
+Patches based on v3.5-rc5.
+
+Marc Zyngier (4):
+  ARM: arch_timers: enable the use of the virtual timer
+  ARM: arch_timers: register a time/cycle counter
+  ARM: arch_timers: give the virtual timer its own interrupt handler
+  ARM: arch_timers: dynamic switch to physical timer and virtual timer
+    offloading
+
+ arch/arm/include/asm/arch_timer.h |   14 ++
+ arch/arm/kernel/arch_timer.c      |  330 ++++++++++++++++++++++++++++++-------
+ 2 files changed, 284 insertions(+), 60 deletions(-)
+
 -- 
 1.7.10.3
