@@ -1,61 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Jul 2012 16:04:09 +0800
-Subject: [PATCH v2] ARM: imx: select USE_OF
-In-Reply-To: <1341560840-30400-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20120706071247.GC30009@pengutronix.de>
- <1341560840-30400-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120706080407.GB22133@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Jul 2012 01:09:43 -0700
+Subject: [GIT PULL] ARM: OMAP2+: miscellaneous PRCM & hwmod patches for 3.6
+In-Reply-To: <CAMQu2gwuXnV7E8-+x9EN0qRF9B2OOgY3KMW-nd0GAqHUwHXkGw@mail.gmail.com>
+References: <alpine.DEB.2.00.1207040935070.6760@utopia.booyaka.com>
+ <20120705084002.GU1122@atomide.com>
+ <CAMQu2gwuXnV7E8-+x9EN0qRF9B2OOgY3KMW-nd0GAqHUwHXkGw@mail.gmail.com>
+Message-ID: <20120706080943.GL1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 09:47:20AM +0200, Uwe Kleine-K?nig wrote:
-> Commit
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120705 04:26]:
+>
+> Looks like the merge has not happened correctly.
+> I see from the commit log that, you had a merge conflict in omap_hwmod.c
+> and probably while resolving that the below change got missed.
 > 
->       544496a (ARM: imx: move irq_domain_add_legacy call into avic driver)
+> Tarun Kanti DebBarma (1):
+>       ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
 > 
-> introduced unconditional calls to irq_find_mapping and
-> irq_domain_add_legacy, but it's still possible to have a .config without
-> CONFIG_IRQ_DOMAIN=y resulting in
+> So I tried pulling Paul's branch again on "cleanup-part2" at commit 8cb8de5d87
+> and it got merged without any conflicts.
 > 
-> 	  CC      arch/arm/plat-mxc/avic.o
-> 	arch/arm/plat-mxc/avic.c: In function 'avic_handle_irq':
-> 	arch/arm/plat-mxc/avic.c:172: error: implicit declaration of function 'irq_find_mapping'
-> 	arch/arm/plat-mxc/avic.c: In function 'mxc_init_irq':
-> 	arch/arm/plat-mxc/avic.c:207: error: implicit declaration of function 'irq_domain_add_legacy'
-> 	arch/arm/plat-mxc/avic.c:208: error: 'irq_domain_simple_ops' undeclared (first use in this function)
-> 	arch/arm/plat-mxc/avic.c:208: error: (Each undeclared identifier is reported only once
-> 	arch/arm/plat-mxc/avic.c:208: error: for each function it appears in.)
-> 	arch/arm/plat-mxc/avic.c:208: warning: assignment makes pointer from integer without a cast
-> 	make[3]: *** [arch/arm/plat-mxc/avic.o] Error 1
-> 	make[2]: *** [arch/arm/plat-mxc/avic.o] Error 2
-> 	make[1]: *** [sub-make] Error 2
-> 	make: *** [all] Error 2
-> 
-> While selecting CONFIG_IRQ_DOMAIN would be enough, USE_OF is the future
-> and implies CONFIG_IRQ_DOMAIN. So select USE_OF for ARCH_MXC and drop
-> other explicit selects that are superflous now.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Do you want to re-merge Paul's series in cleanup-part2 or re-apply the above
+> patch ?
 
-Applied on top of imx/sparse-irq branch.  Thanks, Uwe.
-
-Arnd,
-
-One more fix, sorry.  Can you please pull it?
+Hmm weird, I wonder how I managed to mess up the resolve like that..
+I'll (re)apply the following fix as the branch has been pushed out already.
 
 Regards,
-Shawn
 
-The following changes since commit 6684294d27abb24e61916871c4ecfdaccc14eb03:
+Tony
 
-  ARM: imx: Fix build error due to missing irqs.h include (2012-07-04 11:19:40 +0800)
 
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/sparse-irq
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Fri Jul 6 00:58:43 2012 -0700
 
-Uwe Kleine-K?nig (1):
-      ARM: imx: select USE_OF
+    ARM: OMAP2+: Fix mismerge for omap_hwmod_get_main_clk() API
+    
+    Commit ac5b0ea3d (Merge tag 'omap-devel-f-for-3.6'...) had a merge
+    conflict that somehow got incorrecly resolved in a lossy way for
+    commit bed9d1bb (ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API).
+    Fix the issue by applying the missing pieces.
+    
+    Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
 
- arch/arm/Kconfig          |    1 +
- arch/arm/mach-imx/Kconfig |    4 ----
- 2 files changed, 1 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index ebdf001..ff76ef1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3633,3 +3633,18 @@ void __init omap_hwmod_init(void)
+ 
+ 	inited = true;
+ }
++
++/**
++ * omap_hwmod_get_main_clk - get pointer to main clock name
++ * @oh: struct omap_hwmod *
++ *
++ * Returns the main clock name assocated with @oh upon success,
++ * or NULL if @oh is NULL.
++ */
++const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh)
++{
++	if (!oh)
++		return NULL;
++
++	return oh->main_clk;
++}
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 30f55eb..6132972 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -648,6 +648,8 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
+ 
+ extern void __init omap_hwmod_init(void);
+ 
++const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
++
+ /*
+  * Chip variant-specific hwmod init routines - XXX should be converted
+  * to use initcalls once the initial boot ordering is straightened out
