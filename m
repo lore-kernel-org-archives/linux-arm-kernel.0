@@ -1,22 +1,24 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri,  6 Jul 2012 08:17:24 +0200
-Subject: [PATCH 05/10 RESEND] mmc: spi: Pull out the SSP clock configuration
- function
+Date: Fri,  6 Jul 2012 08:17:25 +0200
+Subject: [PATCH 06/10 V2] spi: Add SPI driver for mx233/mx28
 In-Reply-To: <1341555449-17507-1-git-send-email-marex@denx.de>
 References: <1341555449-17507-1-git-send-email-marex@denx.de>
-Message-ID: <1341555449-17507-5-git-send-email-marex@denx.de>
+Message-ID: <1341555449-17507-6-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pull out the MMC clock configuration function and make it
-into SSP clock configuration function, so it can be used by
-the SPI driver too.
+This is slightly reworked version of the SPI driver.
+Support for DT has been added and it's been converted
+to queued API.
 
+Based on previous attempt by:
+Fabio Estevam <fabio.estevam@freescale.com>
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chris Ball <cjb@laptop.org>
 Cc: Detlev Zundel <dzu@denx.de>
 CC: Dong Aisheng <b29396@freescale.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
 Cc: Rob Herring <rob.herring@calxeda.com>
@@ -24,160 +26,477 @@ CC: Shawn Guo <shawn.guo@linaro.org>
 Cc: Stefano Babic <sbabic@denx.de>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/clk/mxs/Makefile    |    2 +-
- drivers/clk/mxs/clk-ssp.c   |   61 +++++++++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/mxs-mmc.c  |   39 +--------------------------
- include/linux/spi/mxs-spi.h |    2 ++
- 4 files changed, 65 insertions(+), 39 deletions(-)
- create mode 100644 drivers/clk/mxs/clk-ssp.c
+ drivers/spi/Kconfig   |    7 +
+ drivers/spi/Makefile  |    1 +
+ drivers/spi/spi-mxs.c |  427 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 435 insertions(+)
+ create mode 100644 drivers/spi/spi-mxs.c
 
-diff --git a/drivers/clk/mxs/Makefile b/drivers/clk/mxs/Makefile
-index 7bedeec..a6a2223 100644
---- a/drivers/clk/mxs/Makefile
-+++ b/drivers/clk/mxs/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for mxs specific clk
- #
+V2: Fix my patch version management
+    Select STMP_DEVICE (thanks Shawn for pointing this out)
+
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 8c8c680..6a1b06c 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -364,6 +364,13 @@ config SPI_STMP3XXX
+ 	help
+ 	  SPI driver for Freescale STMP37xx/378x SoC SSP interface
  
--obj-y += clk.o clk-pll.o clk-ref.o clk-div.o clk-frac.o
-+obj-y += clk.o clk-pll.o clk-ref.o clk-div.o clk-frac.o clk-ssp.o
- 
- obj-$(CONFIG_SOC_IMX23) += clk-imx23.o
- obj-$(CONFIG_SOC_IMX28) += clk-imx28.o
-diff --git a/drivers/clk/mxs/clk-ssp.c b/drivers/clk/mxs/clk-ssp.c
++config SPI_MXS
++	tristate "Freescale MXS SPI controller"
++	depends on ARCH_MXS
++	select STMP_DEVICE
++	help
++	  SPI driver for Freescale MXS devices.
++
+ config SPI_TEGRA
+ 	tristate "Nvidia Tegra SPI controller"
+ 	depends on ARCH_TEGRA && TEGRA_SYSTEM_DMA
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index b5cbab2..e6a2ee4 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -36,6 +36,7 @@ obj-$(CONFIG_SPI_LM70_LLP)		+= spi-lm70llp.o
+ obj-$(CONFIG_SPI_MPC512x_PSC)		+= spi-mpc512x-psc.o
+ obj-$(CONFIG_SPI_MPC52xx_PSC)		+= spi-mpc52xx-psc.o
+ obj-$(CONFIG_SPI_MPC52xx)		+= spi-mpc52xx.o
++obj-$(CONFIG_SPI_MXS)			+= spi-mxs.o
+ obj-$(CONFIG_SPI_NUC900)		+= spi-nuc900.o
+ obj-$(CONFIG_SPI_OC_TINY)		+= spi-oc-tiny.o
+ obj-$(CONFIG_SPI_OMAP_UWIRE)		+= spi-omap-uwire.o
+diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
 new file mode 100644
-index 0000000..b3c1e16
+index 0000000..3c0b1ac
 --- /dev/null
-+++ b/drivers/clk/mxs/clk-ssp.c
-@@ -0,0 +1,61 @@
++++ b/drivers/spi/spi-mxs.c
+@@ -0,0 +1,427 @@
 +/*
-+ * Copyright 2012 DENX Software Engineering, GmbH
++ * Freescale MXS SPI master driver
 + *
-+ * Pulled from code:
-+ * Portions copyright (C) 2003 Russell King, PXA MMCI Driver
-+ * Portions copyright (C) 2004-2005 Pierre Ossman, W83L51xD SD/MMC driver
++ * Copyright 2012 DENX Software Engineering, GmbH.
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
 + *
-+ * Copyright 2008 Embedded Alley Solutions, Inc.
-+ * Copyright 2009-2011 Freescale Semiconductor, Inc.
++ * Rework and transition to new API by:
++ * Marek Vasut <marex@denx.de>
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * Based on previous attempt by:
++ * Fabio Estevam <fabio.estevam@freescale.com>
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * Based on code from U-Boot bootloader by:
++ * Marek Vasut <marex@denx.de>
++ *
++ * Based on spi-stmp.c, which is:
++ * Author: Dmitry Pervushin <dimka@embeddedalley.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
 + */
 +
 +#include <linux/kernel.h>
 +#include <linux/init.h>
++#include <linux/ioport.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_gpio.h>
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
++#include <linux/highmem.h>
 +#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/completion.h>
++#include <linux/gpio.h>
++#include <linux/regulator/consumer.h>
 +#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/io.h>
++#include <linux/fsl/mxs-dma.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/stmp_device.h>
++#include <linux/spi/spi.h>
 +#include <linux/spi/mxs-spi.h>
 +
-+void mxs_ssp_set_clk_rate(struct mxs_ssp *ssp, unsigned int rate)
++#define DRIVER_NAME		"mxs-spi"
++
++#define SSP_TIMEOUT		1000	/* 1000 ms */
++
++struct mxs_spi {
++	struct mxs_ssp		ssp;
++};
++
++static int mxs_spi_setup_transfer(struct spi_device *dev,
++				struct spi_transfer *t)
 +{
-+	unsigned int ssp_clk, ssp_sck;
-+	u32 clock_divide, clock_rate;
-+	u32 val;
++	struct mxs_spi *spi = spi_master_get_devdata(dev->master);
++	struct mxs_ssp *ssp = &spi->ssp;
++	uint8_t bits_per_word;
++	uint32_t hz = 0;
 +
-+	ssp_clk = clk_get_rate(ssp->clk);
++	bits_per_word = dev->bits_per_word;
++	if (t && t->bits_per_word)
++		bits_per_word = t->bits_per_word;
 +
-+	for (clock_divide = 2; clock_divide <= 254; clock_divide += 2) {
-+		clock_rate = DIV_ROUND_UP(ssp_clk, rate * clock_divide);
-+		clock_rate = (clock_rate > 0) ? clock_rate - 1 : 0;
-+		if (clock_rate <= 255)
-+			break;
++	if (bits_per_word != 8) {
++		dev_err(&dev->dev, "%s, unsupported bits_per_word=%d\n",
++					__func__, bits_per_word);
++		return -EINVAL;
 +	}
 +
-+	if (clock_divide > 254) {
-+		dev_err(ssp->dev,
-+			"%s: cannot set clock to %d\n", __func__, rate);
-+		return;
++	if (dev->max_speed_hz)
++		hz = dev->max_speed_hz;
++	if (t && t->speed_hz)
++		hz = t->speed_hz;
++	if (hz == 0) {
++		dev_err(&dev->dev, "Cannot continue with zero clock\n");
++		return -EINVAL;
 +	}
 +
-+	ssp_sck = ssp_clk / clock_divide / (1 + clock_rate);
++	mxs_ssp_set_clk_rate(ssp, hz);
 +
-+	val = readl(ssp->base + HW_SSP_TIMING(ssp));
-+	val &= ~(BM_SSP_TIMING_CLOCK_DIVIDE | BM_SSP_TIMING_CLOCK_RATE);
-+	val |= BF_SSP(clock_divide, TIMING_CLOCK_DIVIDE);
-+	val |= BF_SSP(clock_rate, TIMING_CLOCK_RATE);
-+	writel(val, ssp->base + HW_SSP_TIMING(ssp));
++	writel(BF_SSP_CTRL1_SSP_MODE(BV_SSP_CTRL1_SSP_MODE__SPI) |
++		     BF_SSP_CTRL1_WORD_LENGTH
++		     (BV_SSP_CTRL1_WORD_LENGTH__EIGHT_BITS) |
++		     ((dev->mode & SPI_CPOL) ? BM_SSP_CTRL1_POLARITY : 0) |
++		     ((dev->mode & SPI_CPHA) ? BM_SSP_CTRL1_PHASE : 0),
++		     ssp->base + HW_SSP_CTRL1(ssp));
 +
-+	ssp->clk_rate = ssp_sck;
++	writel(0x0, ssp->base + HW_SSP_CMD0);
++	writel(0x0, ssp->base + HW_SSP_CMD1);
 +
-+	dev_dbg(ssp->dev,
-+		"%s: clock_divide %d, clock_rate %d, ssp_clk %d, rate_actual %d, rate_requested %d\n",
-+		__func__, clock_divide, clock_rate, ssp_clk, ssp_sck, rate);
++	return 0;
 +}
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 1ea1cba..3b1c99b 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -501,43 +501,6 @@ static void mxs_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 	mxs_mmc_start_cmd(host, mrq->cmd);
- }
- 
--static void mxs_mmc_set_clk_rate(struct mxs_mmc_host *host, unsigned int rate)
--{
--	struct mxs_ssp *ssp = &host->ssp;
--	unsigned int ssp_clk, ssp_sck;
--	u32 clock_divide, clock_rate;
--	u32 val;
--
--	ssp_clk = clk_get_rate(ssp->clk);
--
--	for (clock_divide = 2; clock_divide <= 254; clock_divide += 2) {
--		clock_rate = DIV_ROUND_UP(ssp_clk, rate * clock_divide);
--		clock_rate = (clock_rate > 0) ? clock_rate - 1 : 0;
--		if (clock_rate <= 255)
--			break;
--	}
--
--	if (clock_divide > 254) {
--		dev_err(mmc_dev(host->mmc),
--			"%s: cannot set clock to %d\n", __func__, rate);
--		return;
--	}
--
--	ssp_sck = ssp_clk / clock_divide / (1 + clock_rate);
--
--	val = readl(ssp->base + HW_SSP_TIMING(ssp));
--	val &= ~(BM_SSP_TIMING_CLOCK_DIVIDE | BM_SSP_TIMING_CLOCK_RATE);
--	val |= BF_SSP(clock_divide, TIMING_CLOCK_DIVIDE);
--	val |= BF_SSP(clock_rate, TIMING_CLOCK_RATE);
--	writel(val, ssp->base + HW_SSP_TIMING(ssp));
--
--	ssp->clk_rate = ssp_sck;
--
--	dev_dbg(mmc_dev(host->mmc),
--		"%s: clock_divide %d, clock_rate %d, ssp_clk %d, rate_actual %d, rate_requested %d\n",
--		__func__, clock_divide, clock_rate, ssp_clk, ssp_sck, rate);
--}
--
- static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct mxs_mmc_host *host = mmc_priv(mmc);
-@@ -550,7 +513,7 @@ static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		host->bus_width = 0;
- 
- 	if (ios->clock)
--		mxs_mmc_set_clk_rate(host, ios->clock);
-+		mxs_ssp_set_clk_rate(&host->ssp, ios->clock);
- }
- 
- static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-diff --git a/include/linux/spi/mxs-spi.h b/include/linux/spi/mxs-spi.h
-index 0cb2767..2bc8abb 100644
---- a/include/linux/spi/mxs-spi.h
-+++ b/include/linux/spi/mxs-spi.h
-@@ -136,4 +136,6 @@ struct mxs_ssp {
- 	enum mxs_ssp_id			devid;
- };
- 
-+void mxs_ssp_set_clk_rate(struct mxs_ssp *ssp, unsigned int rate);
 +
- #endif	/* __LINUX_SPI_MXS_SPI_H__ */
++static void mxs_spi_cleanup(struct spi_device *dev)
++{
++	return;
++}
++
++static int mxs_spi_setup(struct spi_device *dev)
++{
++	int err = 0;
++
++	if (!dev->bits_per_word)
++		dev->bits_per_word = 8;
++
++	if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
++		return -EINVAL;
++
++	err = mxs_spi_setup_transfer(dev, NULL);
++	if (err) {
++		dev_err(&dev->dev,
++			"Failed to setup transfer, error = %d\n", err);
++	}
++
++	return err;
++}
++
++static uint32_t mxs_spi_cs_to_reg(unsigned cs)
++{
++	uint32_t select = 0;
++
++	if (cs & 1)
++		select |= BM_SSP_CTRL0_WAIT_FOR_CMD;
++	if (cs & 2)
++		select |= BM_SSP_CTRL0_WAIT_FOR_IRQ;
++
++	return select;
++}
++
++static void mxs_spi_set_cs(struct mxs_spi *spi, unsigned cs)
++{
++	const uint32_t mask =
++		BM_SSP_CTRL0_WAIT_FOR_CMD | BM_SSP_CTRL0_WAIT_FOR_IRQ;
++	uint32_t select;
++	struct mxs_ssp *ssp = &spi->ssp;
++
++	writel(mask, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
++	select = mxs_spi_cs_to_reg(cs);
++	writel(select, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++}
++
++static inline void mxs_spi_enable(struct mxs_spi *spi)
++{
++	struct mxs_ssp *ssp = &spi->ssp;
++
++	writel(BM_SSP_CTRL0_LOCK_CS,
++		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++	writel(BM_SSP_CTRL0_IGNORE_CRC,
++		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
++}
++
++static inline void mxs_spi_disable(struct mxs_spi *spi)
++{
++	struct mxs_ssp *ssp = &spi->ssp;
++
++	writel(BM_SSP_CTRL0_LOCK_CS,
++		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
++	writel(BM_SSP_CTRL0_IGNORE_CRC,
++		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++}
++
++static int mxs_ssp_wait(struct mxs_spi *spi, int offset, int mask, bool set)
++{
++	unsigned long timeout = jiffies + msecs_to_jiffies(SSP_TIMEOUT);
++	struct mxs_ssp *ssp = &spi->ssp;
++	uint32_t reg;
++
++	while (1) {
++		reg = readl_relaxed(ssp->base + offset);
++
++		if (set && ((reg & mask) == mask))
++			break;
++
++		if (!set && ((~reg & mask) == mask))
++			break;
++
++		udelay(1);
++
++		if (time_after(jiffies, timeout))
++			return -ETIMEDOUT;
++	}
++	return 0;
++}
++
++static int mxs_spi_txrx_pio(struct mxs_spi *spi, int cs,
++			    unsigned char *buf, int len,
++			    int *first, int *last, int write)
++{
++	struct mxs_ssp *ssp = &spi->ssp;
++
++	if (*first)
++		mxs_spi_enable(spi);
++
++	mxs_spi_set_cs(spi, cs);
++
++	while (len--) {
++		if (*last && len == 0)
++			mxs_spi_disable(spi);
++
++		if (ssp->devid == IMX23_SSP) {
++			writel(BM_SSP_CTRL0_XFER_COUNT,
++				ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
++			writel(1,
++				ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++		} else {
++			writel(1, ssp->base + HW_SSP_XFER_SIZE);
++		}
++
++		if (write)
++			writel(BM_SSP_CTRL0_READ,
++				ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
++		else
++			writel(BM_SSP_CTRL0_READ,
++				ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++
++		writel(BM_SSP_CTRL0_RUN,
++				ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++
++		if (mxs_ssp_wait(spi, HW_SSP_CTRL0, BM_SSP_CTRL0_RUN, 1))
++			return -ETIMEDOUT;
++
++		if (write)
++			writel(*buf, ssp->base + HW_SSP_DATA);
++
++		writel(BM_SSP_CTRL0_DATA_XFER,
++			     ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++
++		if (!write) {
++			if (mxs_ssp_wait(spi, HW_SSP_STATUS(ssp),
++						BM_SSP_STATUS_FIFO_EMPTY, 0))
++				return -ETIMEDOUT;
++
++			*buf = (readl(ssp->base + HW_SSP_DATA) & 0xff);
++		}
++
++		if (mxs_ssp_wait(spi, HW_SSP_CTRL0, BM_SSP_CTRL0_RUN, 0))
++			return -ETIMEDOUT;
++
++		buf++;
++	}
++
++	if (len <= 0)
++		return 0;
++
++	return -ETIMEDOUT;
++}
++
++static int mxs_spi_transfer_one(struct spi_master *host, struct spi_message *m)
++{
++	struct mxs_spi *spi = spi_master_get_devdata(host);
++	struct mxs_ssp *ssp = &spi->ssp;
++	int first, last;
++	struct spi_transfer *t, *tmp_t;
++	int status = 0;
++	int cs;
++
++	first = last = 0;
++
++	cs = m->spi->chip_select;
++
++	list_for_each_entry_safe(t, tmp_t, &m->transfers, transfer_list) {
++
++		mxs_spi_setup_transfer(m->spi, t);
++
++		if (&t->transfer_list == m->transfers.next)
++			first = 1;
++		if (&t->transfer_list == m->transfers.prev)
++			last = 1;
++		if (t->rx_buf && t->tx_buf) {
++			dev_err(ssp->dev,
++				"Cannot send and receive simultaneously\n");
++			return -EINVAL;
++		}
++
++		if (t->tx_buf)
++			status = mxs_spi_txrx_pio(spi, cs, (void *)t->tx_buf,
++					     t->len, &first, &last, 1);
++		if (t->rx_buf)
++			status = mxs_spi_txrx_pio(spi, cs, t->rx_buf,
++					     t->len, &first, &last, 0);
++
++		m->actual_length += t->len;
++		if (status)
++			break;
++
++		first = last = 0;
++	}
++
++	m->status = 0;
++	spi_finalize_current_message(host);
++
++	return status;
++}
++
++static const struct of_device_id mxs_spi_dt_ids[] = {
++	{ .compatible = "fsl,imx23-spi", .data = (void *) IMX23_SSP, },
++	{ .compatible = "fsl,imx28-spi", .data = (void *) IMX28_SSP, },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mxs_spi_dt_ids);
++
++static int __devinit mxs_spi_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *of_id =
++			of_match_device(mxs_spi_dt_ids, &pdev->dev);
++	struct device_node *np = pdev->dev.of_node;
++	struct spi_master *host;
++	struct mxs_spi *spi;
++	struct mxs_ssp *ssp;
++	struct resource *iores;
++	struct pinctrl *pinctrl;
++	struct clk *clk;
++	void __iomem *base;
++	int devid;
++	int ret = 0;
++
++	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!iores)
++		return -EINVAL;
++
++	base = devm_request_and_ioremap(&pdev->dev, iores);
++	if (!base)
++		return -EADDRNOTAVAIL;
++
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl))
++		return PTR_ERR(pinctrl);
++
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	if (np)
++		devid = (enum mxs_ssp_id) of_id->data;
++	else
++		devid = pdev->id_entry->driver_data;
++
++	host = spi_alloc_master(&pdev->dev, sizeof(*spi));
++	if (!host)
++		return -ENOMEM;
++
++	host->transfer_one_message = mxs_spi_transfer_one;
++	host->setup = mxs_spi_setup;
++	host->cleanup = mxs_spi_cleanup;
++	host->mode_bits = SPI_CPOL | SPI_CPHA;
++	host->num_chipselect = 3;
++	host->dev.of_node = np;
++	host->flags = SPI_MASTER_HALF_DUPLEX;
++
++	spi = spi_master_get_devdata(host);
++	ssp = &spi->ssp;
++	ssp->dev = &pdev->dev;
++	ssp->clk = clk;
++	ssp->base = base;
++	ssp->devid = devid;
++
++	clk_prepare_enable(ssp->clk);
++	ssp->clk_rate = clk_get_rate(ssp->clk) / 1000;
++
++	stmp_reset_block(ssp->base);
++
++	platform_set_drvdata(pdev, host);
++
++	ret = spi_register_master(host);
++	if (ret) {
++		dev_err(&pdev->dev, "Cannot register SPI master, %d\n", ret);
++		goto out_host_free;
++	}
++
++	return 0;
++
++out_host_free:
++	clk_disable_unprepare(ssp->clk);
++	spi_master_put(host);
++	kfree(host);
++	return ret;
++}
++
++static int __devexit mxs_spi_remove(struct platform_device *pdev)
++{
++	struct spi_master *host;
++	struct mxs_spi *spi;
++	struct mxs_ssp *ssp;
++
++	host = platform_get_drvdata(pdev);
++	spi = spi_master_get_devdata(host);
++	ssp = &spi->ssp;
++
++	spi_unregister_master(host);
++
++	platform_set_drvdata(pdev, NULL);
++
++	clk_disable_unprepare(ssp->clk);
++
++	spi_master_put(host);
++	kfree(host);
++
++	return 0;
++}
++
++static struct platform_driver mxs_spi_driver = {
++	.probe	= mxs_spi_probe,
++	.remove	= __devexit_p(mxs_spi_remove),
++	.driver	= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++		.of_match_table = mxs_spi_dt_ids,
++	},
++};
++
++module_platform_driver(mxs_spi_driver);
++
++MODULE_AUTHOR("Dmitry Pervushin <dimka@embeddedalley.com>");
++MODULE_DESCRIPTION("MXS SPI master driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:mxs-spi");
 -- 
 1.7.10
