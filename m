@@ -1,46 +1,47 @@
-From: torbenh@linutronix.de (Torben Hohn)
-Date: Fri,  6 Jul 2012 18:03:34 +0200
-Subject: [PATCH] arm imx31: add a few pinmux settings the tt01 needs
-Message-ID: <1341590614-18408-1-git-send-email-torbenh@linutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 06 Jul 2012 10:15:18 -0600
+Subject: [PATCH v3 0/6] Port Tegra to generic clk framework
+In-Reply-To: <4FF6F7CF.9000405@nvidia.com>
+References: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
+ <4FF5E1C3.6070309@wwwdotorg.org> <4FF6F7CF.9000405@nvidia.com>
+Message-ID: <4FF70F16.50205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are the Pinmux Settings for the PP4 SSI Port multiplexible
-onto the first UART Pins.
+On 07/06/2012 08:35 AM, Prashant Gaikwad wrote:
+> On Friday 06 July 2012 12:19 AM, Stephen Warren wrote:
+>> On 07/05/2012 03:55 AM, Prashant Gaikwad wrote:
+>>> This patch set ports Tegra clock code to generic clock framework.
+> <snip>
+>> (The one slight difference between the 2 branches I tested is that AC100
+>> and Trimslice booted using DT passed in next-20120705 but failed only in
+>> Tegra's for-next. Otherwise, all results were identical)
+>>
+>> I'll try to investigate what the issues are since I imagine you don't
+>> have access to these boards. But, I probably won't be able to fix this
+>> until I return from vacation.
+> 
+> Stephen,
+> 
+> Can you please try removing "late_initcall(clk_disable_unused);" from
+> drivers/clk/clk.c?
+> It will keep unused clocks enabled. If it works then there should not be
+> any regression in this patch series but need to enable some board
+> specific clock.
 
-Signed-off-by: Torben Hohn <torbenh@linutronix.de>
----
- arch/arm/plat-mxc/include/mach/iomux-mx3.h |    5 +++++
- 1 file changed, 5 insertions(+)
+On Whistler using next-20120705, that did help a bit; the board actually
+boots to the login prompt in the usual amount of time rather than
+hanging before even detecting the root filesystem.
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-index 63f22a0..019b0a0 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-@@ -515,12 +515,16 @@ enum iomux_pins {
- #define MX31_PIN_CSPI3_SPI_RDY__CTS3	IOMUX_MODE(MX31_PIN_CSPI3_SPI_RDY, IOMUX_CONFIG_ALT1)
- #define MX31_PIN_CTS1__CTS1		IOMUX_MODE(MX31_PIN_CTS1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_RTS1__RTS1		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_RTS1__SFS		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_TXD1__TXD1		IOMUX_MODE(MX31_PIN_TXD1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_TXD1__SCK		IOMUX_MODE(MX31_PIN_TXD1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_RXD1__RXD1		IOMUX_MODE(MX31_PIN_RXD1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_RXD1__STXDA		IOMUX_MODE(MX31_PIN_RXD1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_DCD_DCE1__DCD_DCE1	IOMUX_MODE(MX31_PIN_DCD_DCE1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_RI_DCE1__RI_DCE1	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_DSR_DCE1__DSR_DCE1	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_DTR_DCE1__DTR_DCE1	IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_DTR_DCE1__SRXDA	IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_CTS2__CTS2		IOMUX_MODE(MX31_PIN_CTS2, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_RTS2__RTS2		IOMUX_MODE(MX31_PIN_RTS2, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_TXD2__TXD2		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_FUNC)
-@@ -724,6 +728,7 @@ enum iomux_pins {
- #define MX31_PIN_KEY_ROW2_KEY_ROW2	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW3_KEY_ROW3	IOMUX_MODE(MX31_PIN_KEY_ROW3, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW4_KEY_ROW4	IOMUX_MODE(MX31_PIN_KEY_ROW4, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_KEY_ROW4_GPIO		IOMUX_MODE(MX31_PIN_KEY_ROW4, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_KEY_ROW5_KEY_ROW5	IOMUX_MODE(MX31_PIN_KEY_ROW5, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW6_KEY_ROW6	IOMUX_MODE(MX31_PIN_KEY_ROW6, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW7_KEY_ROW7	IOMUX_MODE(MX31_PIN_KEY_ROW7, IOMUX_CONFIG_FUNC)
--- 
-1.7.10
+However, there is obviously still some problem with I2C accesses, since
+neither the pca953x nor wm8753 drivers are able to communicate with
+their devices.
+
+Re: the DT-vs-non-DT differences, it's most likely because only parts of
+the clock initialization table are common (in common.c) and parts are in
+board-${boardname}.c (for non-DT) or board-dt-tegra*.c (for DT). I'm
+looking forward to when we can just put all the clock setup in the
+board-specific .dts files:-)
+
+I'll investigate more later (where most later might mostly be in 2 weeks
+after I return from vacation)
