@@ -1,42 +1,22 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 6 Jul 2012 08:52:50 +0800
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120705160153.GT30009@pengutronix.de>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
-Message-ID: <20120706005249.GA26888@b20223-02.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 6 Jul 2012 10:37:19 +0800
+Subject: [PATCH] clk: wm831x: fix checkpatch issue for static const char *
+ array
+In-Reply-To: <20120704101936.GD4111@opensource.wolfsonmicro.com>
+References: <1341395680-14142-1-git-send-email-Barry.Song@csr.com>
+ <20120704101936.GD4111@opensource.wolfsonmicro.com>
+Message-ID: <CAGsJ_4zruQM8GhGGat_nCmoRd1R3Q-fSHV_OJs=yW6dnOQvYTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 06:01:53PM +0200, Sascha Hauer wrote:
-> On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
-> > On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
-> > > Measurements on i.MX1 and i.MX53 have shown that the divider values
-> > > in the datasheets are wrong. the values from first, third and fourth
-> > > column were all measured to be 8 higher than in the datasheet. It
-> > > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
-> > > the same as the i2c unit is unchanged since the i.MX1.
-> > We may need to check with IC guys? Or you've done?
-> 
-> I don't have contact to the IC guys. Could you do this? I'd be
-> interested in the results.
-Sure, but it may be slow, as you know, many people are in summer break.
-
-Thanks
-Richard
-> 
-> Sascha
-> 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+2012/7/4 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Wed, Jul 04, 2012 at 05:54:40PM +0800, Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> static const char * array should probably be static const char * const
+>
+> We need some additional clock API patches to get merged before this is
+> OK, last time I checked the API wasn't const correct enough for it.
+>
+ok. also with this conflict: "warning: initialization discards
+qualifiers from pointer target type"
