@@ -1,46 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 06 Jul 2012 09:52:49 -0600
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add support for set bits for
- general purpose registers
-In-Reply-To: <1341565763-10074-1-git-send-email-b29396@freescale.com>
-References: <1341565763-10074-1-git-send-email-b29396@freescale.com>
-Message-ID: <4FF709D1.40903@wwwdotorg.org>
+From: torbenh@linutronix.de (Torben Hohn)
+Date: Fri,  6 Jul 2012 18:03:34 +0200
+Subject: [PATCH] arm imx31: add a few pinmux settings the tt01 needs
+Message-ID: <1341590614-18408-1-git-send-email-torbenh@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2012 03:09 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> The General Purpose Registers (GPR) is used to select operating modes for
-> general features in the SoC, usually not related to the IOMUX itself,
-> but it does belong to IOMUX controller.
-> We simply provide an convient API for driver to call to set the general purpose
-> register bits if needed.
+These are the Pinmux Settings for the PP4 SSI Port multiplexible
+onto the first UART Pins.
 
-> +static struct imx_pinctrl *imx_pinctrl;
-> +/*
-> + * Set bits for general purpose registers
-> + */
-> +void imx_pinctrl_set_gpr_register(u8 gpr, u8 start_bit, u8 num_bits, u32 value)
-> +{
-> +	u32 reg;
-> +
-> +	/* general purpose register is 32 bits size */
-> +	WARN_ON(!imx_pinctrl || start_bit > 31 || num_bits > 32);
+Signed-off-by: Torben Hohn <torbenh@linutronix.de>
+---
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Hmmm. It's going to be very hard to control the probe() order to ensure
-that this WARN doesn't fire all the time.
-
-I think it would be better to pass in a struct imx_pinctrl* or DT node
-to this function. The DT node for the device that's using this function
-should contain a phandle to the pinctrl device node, which it uses to
-get that handle. Or in a non-DT case, the client driver needs to be
-given the provider driver handle using some other mechanism.
-
-For example, look at how the Tegra30 SMMU uses services from the Tegra30
-AHB; see arch/arm/boot/dts/tegra30.dtsi node "smmu" (client) and node
-"ahb" (provider), drivers/iommu/tegra-smmu.c functions probe() (saves
-smmu->ahb) and smmu_setup_regs() (calls tegra_ahb_enable_smmu() with
-this handle) and drivers/amba/tegra-ahb.c function
-tegra_ahb_enable_smmu() (implements the deferred probe checking to
-correctly order the client/provider driver probing)
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+index 63f22a0..019b0a0 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+@@ -515,12 +515,16 @@ enum iomux_pins {
+ #define MX31_PIN_CSPI3_SPI_RDY__CTS3	IOMUX_MODE(MX31_PIN_CSPI3_SPI_RDY, IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_CTS1__CTS1		IOMUX_MODE(MX31_PIN_CTS1, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_RTS1__RTS1		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_RTS1__SFS		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_ALT2)
+ #define MX31_PIN_TXD1__TXD1		IOMUX_MODE(MX31_PIN_TXD1, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_TXD1__SCK		IOMUX_MODE(MX31_PIN_TXD1, IOMUX_CONFIG_ALT2)
+ #define MX31_PIN_RXD1__RXD1		IOMUX_MODE(MX31_PIN_RXD1, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_RXD1__STXDA		IOMUX_MODE(MX31_PIN_RXD1, IOMUX_CONFIG_ALT2)
+ #define MX31_PIN_DCD_DCE1__DCD_DCE1	IOMUX_MODE(MX31_PIN_DCD_DCE1, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_RI_DCE1__RI_DCE1	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_DSR_DCE1__DSR_DCE1	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_DTR_DCE1__DTR_DCE1	IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_DTR_DCE1__SRXDA	IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_ALT2)
+ #define MX31_PIN_CTS2__CTS2		IOMUX_MODE(MX31_PIN_CTS2, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_RTS2__RTS2		IOMUX_MODE(MX31_PIN_RTS2, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_TXD2__TXD2		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_FUNC)
+@@ -724,6 +728,7 @@ enum iomux_pins {
+ #define MX31_PIN_KEY_ROW2_KEY_ROW2	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_KEY_ROW3_KEY_ROW3	IOMUX_MODE(MX31_PIN_KEY_ROW3, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_KEY_ROW4_KEY_ROW4	IOMUX_MODE(MX31_PIN_KEY_ROW4, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_KEY_ROW4_GPIO		IOMUX_MODE(MX31_PIN_KEY_ROW4, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_KEY_ROW5_KEY_ROW5	IOMUX_MODE(MX31_PIN_KEY_ROW5, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_KEY_ROW6_KEY_ROW6	IOMUX_MODE(MX31_PIN_KEY_ROW6, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_KEY_ROW7_KEY_ROW7	IOMUX_MODE(MX31_PIN_KEY_ROW7, IOMUX_CONFIG_FUNC)
+-- 
+1.7.10
