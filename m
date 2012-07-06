@@ -1,42 +1,40 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 6 Jul 2012 18:17:43 +0530
-Subject: [PATCH v2 00/14] ARM: OMAP5: Add minimal OMAP5 SOC support
-In-Reply-To: <20120706123611.GW1122@atomide.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <20120706123611.GW1122@atomide.com>
-Message-ID: <CAMQu2gxJkQoOUK3sn78e8BZ9fZx4jxS4YOdV_VBrAygSU1fAnA@mail.gmail.com>
+From: attila@kinali.ch (Attila Kinali)
+Date: Fri,  6 Jul 2012 14:53:20 +0200
+Subject: [PATCH] dma: mxs-dma: Export missing symbols from mxs-dma.c
+In-Reply-To: <20120706122141.GE22133@S2101-09.ap.freescale.net>
+References: <20120706122141.GE22133@S2101-09.ap.freescale.net>
+Message-ID: <1341579200-13268-1-git-send-email-attila@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2012 at 6:06 PM, Tony Lindgren <tony@atomide.com> wrote:
->
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120706 02:26]:
-> > Tony,
-> >
-> > Here is the updated series with suggested corrections and generated
-> > against
-> > the latest cleanup-part2 at commit ae6df418. The series adds minimal
-> > OMAP5
-> > support. OMAP5430 has a dual core Cortex-A15 based MPU subsystem with
-> > 2MB
-> > L2 cache. The SOC has many compatible blocks with OMAP4 SOCS and hence
-> > large part of the peripherals are re-used.
->
-> Looking good to me, just one cosmetic comment below:
->
-Great.
+mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
+which are used at least in mxs-mmc.c. Building mxs-mmc as module
+fails due to those two symbols not being exported.
 
-> >   ARM: OMAP: counter-32k: Select the CR register offset using the IP
-> > scheme.
-> >   ARM: OMAP5: l3: Add l3 error handler support for omap5.
-> >   ARM: omap2+: board-generic: clean up the irq data from board file.
-> >   ARM: OMAP5: board-generic: Add device tree support.
-> >   ARM: OMAP5: Add SMP support.
->
-> Can you please remove the trailing period from the patch title lines?
-> That's not typically used..
->
-I agree. Fixed it and update the branch.
+Signed-off-by: Attila Kinali <attila@kinali.ch>
+---
+ drivers/dma/mxs-dma.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Regards,
-Santosh
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index c96ab15..96d8b80 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -201,6 +201,7 @@ int mxs_dma_is_apbh(struct dma_chan *chan)
+ 
+ 	return dma_is_apbh(mxs_dma);
+ }
++EXPORT_SYMBOL_GPL(mxs_dma_is_apbh);
+ 
+ int mxs_dma_is_apbx(struct dma_chan *chan)
+ {
+@@ -209,6 +210,7 @@ int mxs_dma_is_apbx(struct dma_chan *chan)
+ 
+ 	return !dma_is_apbh(mxs_dma);
+ }
++EXPORT_SYMBOL_GPL(mxs_dma_is_apbx);
+ 
+ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ {
+-- 
+1.7.10
