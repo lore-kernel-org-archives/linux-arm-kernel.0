@@ -1,77 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 06 Jul 2012 09:33:35 +0100
-Subject: [PATCH 8/9] ARM: ux500: Clean-up temporary Device Tree enablement
- helpers
-In-Reply-To: <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <4FF6A2DF.5030407@linaro.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 6 Jul 2012 14:04:51 +0530
+Subject: [GIT PULL] ARM: OMAP2+: miscellaneous PRCM & hwmod patches for 3.6
+In-Reply-To: <20120706083023.GP1122@atomide.com>
+References: <alpine.DEB.2.00.1207040935070.6760@utopia.booyaka.com>
+ <20120705084002.GU1122@atomide.com>
+ <CAMQu2gwuXnV7E8-+x9EN0qRF9B2OOgY3KMW-nd0GAqHUwHXkGw@mail.gmail.com>
+ <20120706080943.GL1122@atomide.com>
+ <CAMQu2gyA0XF01gi_2Y_7eOY+NFKPidY6dUah3Rh-FnqpC37vfg@mail.gmail.com>
+ <20120706083023.GP1122@atomide.com>
+Message-ID: <CAMQu2gzRztCfRuQEdSjx0c1RN5b5E67A2NBhE-s0_R07FaRCdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Jul 6, 2012 at 2:00 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120706 01:32]:
+>> On Fri, Jul 6, 2012 at 1:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120705 04:26]:
+>> >>
+>> >> Looks like the merge has not happened correctly.
+>> >> I see from the commit log that, you had a merge conflict in omap_hwmod.c
+>> >> and probably while resolving that the below change got missed.
+>> >>
+>> >> Tarun Kanti DebBarma (1):
+>> >>       ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
+>> >>
+>> >> So I tried pulling Paul's branch again on "cleanup-part2" at commit 8cb8de5d87
+>> >> and it got merged without any conflicts.
+>> >>
+>> >> Do you want to re-merge Paul's series in cleanup-part2 or re-apply the above
+>> >> patch ?
+>> >
+>> > Hmm weird, I wonder how I managed to mess up the resolve like that..
+>> > I'll (re)apply the following fix as the branch has been pushed out already.
+>> >
+>> Sounds good to me. Can you update the barcnh please ?
+>> I don't see that patch yet in cleanup-part2.
+>
+> Pushed out now at commit ae6df418 (ARM: OMAP2+: dmtimer: cleanup fclk usage)
+> also applied. Might take a while for it to get mirrored.
+>
+Great. Thanks !!
 
-Is this a NAK, or did you just miss it?
-
-On 05/07/12 14:06, Lee Jones wrote:
-> Here we remove some of the extra overhead we introduced to make
-> DT:ing the Snowball platform easier. Unfortunately we can't
-> remove everything. We are forced to leave cpufreq and DMA behind
-> until they have been successfully Device Tree enabled.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   arch/arm/mach-ux500/cpu-db8500.c |   10 ++--------
->   1 file changed, 2 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index c8dd94f..d7a28c0 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -137,10 +137,6 @@ static struct platform_device *platform_devs[] __initdata = {
->   	&db8500_prcmu_device,
->   };
->
-> -static struct platform_device *of_platform_devs[] __initdata = {
-> -	&u8500_dma40_device,
-> -};
-> -
->   static resource_size_t __initdata db8500_gpio_base[] = {
->   	U8500_GPIOBANK0_BASE,
->   	U8500_GPIOBANK1_BASE,
-> @@ -232,7 +228,6 @@ struct device * __init u8500_init_devices(void)
->   struct device * __init u8500_of_init_devices(void)
->   {
->   	struct device *parent;
-> -	int i;
->
->   	parent = db8500_soc_device_init();
->
-> @@ -241,8 +236,7 @@ struct device * __init u8500_of_init_devices(void)
->   	platform_device_register_data(parent,
->   		"cpufreq-u8500", -1, NULL, 0);
->
-> -	for (i = 0; i < ARRAY_SIZE(of_platform_devs); i++)
-> -		of_platform_devs[i]->dev.parent = parent;
-> +	u8500_dma40_device.dev.parent = parent;
->
->   	/*
->   	 * Devices to be DT:ed:
-> @@ -250,7 +244,7 @@ struct device * __init u8500_of_init_devices(void)
->   	 *   db8500_pmu_device   = done
->   	 *   db8500_prcmu_device = done
->   	 */
-> -	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
-> +	platform_device_register(&u8500_dma40_device);
->
->   	return parent;
->   }
->
-
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards
+Santosh
