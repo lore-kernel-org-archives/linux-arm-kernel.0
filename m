@@ -1,66 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 6 Jul 2012 09:07:44 +0200
-Subject: [PATCH] ARM: imx: select IRQ_DOMAIN
-In-Reply-To: <20120706070458.GA22129@S2101-09.ap.freescale.net>
-References: <20120614071326.GC31565@S2101-09.ap.freescale.net>
- <1341555995-22532-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120706070458.GA22129@S2101-09.ap.freescale.net>
-Message-ID: <20120706070744.GK5398@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Jul 2012 00:09:00 -0700
+Subject: [PATCH v2 0/4] ARM: OMAP2+: dmtimer: cleanup related to devm
+ API and clk usage
+In-Reply-To: <CAC83ZvKO22JZ59VLdykEjRNDqK_FmGLtC=1y8OEfP88Ef9jBSA@mail.gmail.com>
+References: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
+ <CAC83ZvLOoUwthcv0seXeqJcuvxvhP7P500T66RHCCWvrsaPr2A@mail.gmail.com>
+ <CAMQu2gxDbi191EdA0_acaJwhuAddXJ44FzVQJ=5c1Fh0PFDG4w@mail.gmail.com>
+ <CAC83ZvLcyRSc-X2o_05tS7R3S1s190ejDQaBOYHOK1JuknrAxA@mail.gmail.com>
+ <20120705092809.GY1122@atomide.com>
+ <CAC83ZvKO22JZ59VLdykEjRNDqK_FmGLtC=1y8OEfP88Ef9jBSA@mail.gmail.com>
+Message-ID: <20120706070900.GI1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120705 04:46]:
+>
+> Patch 3: Comment was about adding summary in patch 0/x why we have
+> not removed iclk in OMAP2/3 platform. In other words there was no
+> specific changes needed on patch 3 as such. BTW, patch 3 is already merged.
+...
 
-On Fri, Jul 06, 2012 at 03:05:01PM +0800, Shawn Guo wrote:
-> On Fri, Jul 06, 2012 at 08:26:34AM +0200, Uwe Kleine-K?nig wrote:
-> > Commit
-> > 
-> >       544496a (ARM: imx: move irq_domain_add_legacy call into avic driver)
-> > 
-> > introduced unconditional calls to irq_find_mapping and
-> > irq_domain_add_legacy, but it's still possible to have a .config without
-> > CONFIG_IRQ_DOMAIN=y resulting in
-> > 
-> > 	  CC      arch/arm/plat-mxc/avic.o
-> > 	arch/arm/plat-mxc/avic.c: In function 'avic_handle_irq':
-> > 	arch/arm/plat-mxc/avic.c:172: error: implicit declaration of function 'irq_find_mapping'
-> > 	arch/arm/plat-mxc/avic.c: In function 'mxc_init_irq':
-> > 	arch/arm/plat-mxc/avic.c:207: error: implicit declaration of function 'irq_domain_add_legacy'
-> > 	arch/arm/plat-mxc/avic.c:208: error: 'irq_domain_simple_ops' undeclared (first use in this function)
-> > 	arch/arm/plat-mxc/avic.c:208: error: (Each undeclared identifier is reported only once
-> > 	arch/arm/plat-mxc/avic.c:208: error: for each function it appears in.)
-> > 	arch/arm/plat-mxc/avic.c:208: warning: assignment makes pointer from integer without a cast
-> > 	make[3]: *** [arch/arm/plat-mxc/avic.o] Error 1
-> > 	make[2]: *** [arch/arm/plat-mxc/avic.o] Error 2
-> > 	make[1]: *** [sub-make] Error 2
-> > 	make: *** [all] Error 2
-> > 
-> > Fix that by selecting CONFIG_IRQ_DOMAIN for ARCH_MXC.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  arch/arm/Kconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 84449dd..38b6b90 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -446,6 +446,7 @@ config ARCH_MXC
-> >  	select CLKSRC_MMIO
-> >  	select GENERIC_IRQ_CHIP
-> >  	select MULTI_IRQ_HANDLER
-> > +	select IRQ_DOMAIN
-> 
-> Right, I forgot that we haven't selected USE_OF for ARCH_MXC.  Can we
-> do that instead of selecting IRQ_DOMAIN, since we are on the way to
-> device tree?  Selecting USE_OF will save us a lot of #ifdef CONFIG_OF
-> checks later when we add device tree support into more codes.
-IMHO it's not up to me to decide that. Sascha?
+> I will rebase on top of cleanup-part2 are repost patch 4.
 
-Best regards
-Uwe
+OK thanks!
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
