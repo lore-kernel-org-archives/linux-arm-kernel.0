@@ -1,58 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jul 2012 01:38:23 -0700
-Subject: [PATCH 4/5] ARM: OMAP3EVM: cosmetic fixes for parent clk set
-In-Reply-To: <1340183693-3195-5-git-send-email-zumeng.chen@windriver.com>
+Date: Fri, 6 Jul 2012 01:41:05 -0700
+Subject: [PATCH 3/5] ARM: omap3evm: enable VBUS switch for EHCI tranceiver
+In-Reply-To: <4FE1BC98.7050607@mvista.com>
 References: <1340183693-3195-1-git-send-email-zumeng.chen@windriver.com>
- <1340183693-3195-5-git-send-email-zumeng.chen@windriver.com>
-Message-ID: <20120706083823.GQ1122@atomide.com>
+ <1340183693-3195-4-git-send-email-zumeng.chen@windriver.com>
+ <4FE1BC98.7050607@mvista.com>
+Message-ID: <20120706084105.GR1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Zumeng Chen <zumeng.chen@windriver.com> [120620 02:19]:
-> Since it's no more sense to set parent for dummy clock,
-> so we can just ignore it to mute failed message.
+* Sergei Shtylyov <sshtylyov@mvista.com> [120620 05:10]:
+> On 20-06-2012 13:14, Zumeng Chen wrote:
+> >
+> >This will set TWL4030.GPIO2 as output pin to drive EHCI tranceiver.
+...
 
-This is something Paul should look at.
+> >+	/* Enable VBUS switch by setting TWL4030.GPIO2DIR as output
+> >+	 * for starting USB tranceiver
+> >+	 */
+> >+	if (get_omap3_evm_rev()>= OMAP3EVM_BOARD_GEN_2) {
+> >+		u8 val;
+> 
+>    Empty line after declaration block wouldn't hurt...
+> 
+
+I'll apply these into devel-board branch with the extra line
+added. Not taking the clock related patch 4/5 as that's something
+Paul should queue.
+
+Also note that the board-*.c files are being phased out with
+devicetree support.
 
 Regards,
 
 Tony
- 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
-> ---
->  arch/arm/plat-omap/clock.c  |    4 ++++
->  drivers/mfd/omap-usb-host.c |    2 +-
->  2 files changed, 5 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-> index 62ec5c4..c7e26e4 100644
-> --- a/arch/arm/plat-omap/clock.c
-> +++ b/arch/arm/plat-omap/clock.c
-> @@ -149,6 +149,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->  	if (!arch_clock || !arch_clock->clk_set_parent)
->  		return ret;
->  
-> +	/* If the clock is a dummy clock just return */
-> +	if (clk == &dummy_ck)
-> +		return 0;
-> +
->  	spin_lock_irqsave(&clockfw_lock, flags);
->  	if (clk->usecount == 0) {
->  		ret = arch_clock->clk_set_parent(clk, parent);
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 7e96bb2..c9d27c4 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -699,7 +699,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
->  	}
->  
->  	if (is_ehci_phy_mode(pdata->port_mode[0])) {
-> -		/* for OMAP3 , the clk set paretn fails */
-> +		/* for OMAP3 , the clk set parent fails */
->  		ret = clk_set_parent(omap->utmi_p1_fck,
->  					omap->xclk60mhsp1_ck);
->  		if (ret != 0)
-> -- 
-> 1.7.5.4
-> 
