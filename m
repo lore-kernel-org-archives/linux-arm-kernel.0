@@ -1,32 +1,31 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 6 Jul 2012 13:05:10 +0200
-Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
-In-Reply-To: <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
-References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
-Message-ID: <CACKLOr1ZJ4F7+-U94EQ5AD=1z3-HVU1=uK9yjAv+JgfqjTKo0g@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 6 Jul 2012 12:08:44 +0100
+Subject: [PATCH] clk: wm831x: fix checkpatch issue for static const char
+ * array
+In-Reply-To: <CAGsJ_4zruQM8GhGGat_nCmoRd1R3Q-fSHV_OJs=yW6dnOQvYTw@mail.gmail.com>
+References: <1341395680-14142-1-git-send-email-Barry.Song@csr.com>
+ <20120704101936.GD4111@opensource.wolfsonmicro.com>
+ <CAGsJ_4zruQM8GhGGat_nCmoRd1R3Q-fSHV_OJs=yW6dnOQvYTw@mail.gmail.com>
+Message-ID: <20120706110843.GB4017@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 July 2012 13:00, javier Martin <javier.martin@vista-silicon.com> wrote:
-> Hi,
-> can this patch be applied please?
->
-> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
->
-> Regards.
+On Fri, Jul 06, 2012 at 10:37:19AM +0800, Barry Song wrote:
+> 2012/7/4 Mark Brown <broonie@opensource.wolfsonmicro.com>:
 
-But it should be applied after this one to preserve bisectability:
+> > We need some additional clock API patches to get merged before this is
+> > OK, last time I checked the API wasn't const correct enough for it.
 
-http://patchwork.linuxtv.org/patch/10483/
+> ok. also with this conflict: "warning: initialization discards
+> qualifiers from pointer target type"
 
-So I'd better send a new series to clarify the order.
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Yes, that's the issue I'm referring to - we need the clock API to mark
+the inputs it takes as const before we can have the drivers declare
+thinngs const.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/76d0bdc0/attachment.sig>
