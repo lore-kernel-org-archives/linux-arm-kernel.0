@@ -1,131 +1,113 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:29 -0500
-Subject: [PATCH 04/15] ARM: integrator: use fixed PCI i/o mapping
+Date: Fri,  6 Jul 2012 13:40:31 -0500
+Subject: [PATCH 06/15] ARM: footbridge: use fixed PCI i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-5-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move integrator PCI to fixed i/o mapping and remove io.h.
+Move footbridge PCI to fixed i/o mapping. io.h is still needed for the
+!MMU case.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                                 |    1 -
- arch/arm/mach-integrator/include/mach/io.h       |   33 ----------------------
- arch/arm/mach-integrator/include/mach/platform.h |    4 +++
- arch/arm/mach-integrator/integrator_ap.c         |    9 ++----
- 4 files changed, 7 insertions(+), 40 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/include/mach/io.h
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/mach-footbridge/common.c                  |   10 ++++------
+ .../arm/mach-footbridge/include/mach/debug-macro.S |    3 ++-
+ arch/arm/mach-footbridge/include/mach/io.h         |   12 ++----------
+ 4 files changed, 9 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ac446e3..5d37628 100644
+index 3dfc555..7215ebf 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -261,7 +261,6 @@ config ARCH_INTEGRATOR
+@@ -431,7 +431,7 @@ config ARCH_FOOTBRIDGE
+ 	select FOOTBRIDGE
  	select GENERIC_CLOCKEVENTS
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_FPGA_IRQ
+ 	select HAVE_IDE
 -	select NEED_MACH_IO_H
++	select NEED_MACH_IO_H if !MMU
  	select NEED_MACH_MEMORY_H
- 	select SPARSE_IRQ
- 	select MULTI_IRQ_HANDLER
-diff --git a/arch/arm/mach-integrator/include/mach/io.h b/arch/arm/mach-integrator/include/mach/io.h
-deleted file mode 100644
-index 8de70de..0000000
---- a/arch/arm/mach-integrator/include/mach/io.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- *  arch/arm/mach-integrator/include/mach/io.h
-- *
-- *  Copyright (C) 1999 ARM Limited
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#ifndef __ASM_ARM_ARCH_IO_H
--#define __ASM_ARM_ARCH_IO_H
--
--/*
-- * WARNING: this has to mirror definitions in platform.h
-- */
--#define PCI_MEMORY_VADDR        0xe8000000
--#define PCI_CONFIG_VADDR        0xec000000
--#define PCI_V3_VADDR            0xed000000
--#define PCI_IO_VADDR            0xee000000
--
--#define __io(a)			((void __iomem *)(PCI_IO_VADDR + (a)))
--
--#endif
-diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
-index ec467ba..4c03475 100644
---- a/arch/arm/mach-integrator/include/mach/platform.h
-+++ b/arch/arm/mach-integrator/include/mach/platform.h
-@@ -324,6 +324,10 @@
-  */
- #define PHYS_PCI_V3_BASE                0x62000000
+ 	help
+ 	  Support for systems based on the DC21285 companion chip
+diff --git a/arch/arm/mach-footbridge/common.c b/arch/arm/mach-footbridge/common.c
+index 3e6aaa6..8a739e0 100644
+--- a/arch/arm/mach-footbridge/common.c
++++ b/arch/arm/mach-footbridge/common.c
+@@ -26,6 +26,7 @@
  
-+#define PCI_MEMORY_VADDR		0xe8000000
-+#define PCI_CONFIG_VADDR		0xec000000
-+#define PCI_V3_VADDR			0xed000000
-+
- /* ------------------------------------------------------------------------
-  *  Integrator Interrupt Controllers
-  * ------------------------------------------------------------------------
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index c857501..ceebba9 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -49,6 +49,7 @@
- #include <asm/mach/arch.h>
  #include <asm/mach/irq.h>
  #include <asm/mach/map.h>
 +#include <asm/mach/pci.h>
- #include <asm/mach/time.h>
  
- #include <plat/fpga-irq.h>
-@@ -72,7 +73,7 @@
-  * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
-  * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
-  * ed000000	62000000	PCI V3 regs		PHYS_PCI_V3_BASE	(max 64k)
-- * ee000000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
-+ * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
-  * ef000000			Cache flush
-  * f1000000	10000000	Core module registers
-  * f1100000	11000000	System controller registers
-@@ -146,16 +147,12 @@ static struct map_desc ap_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(PHYS_PCI_V3_BASE),
- 		.length		= SZ_64K,
- 		.type		= MT_DEVICE
+ #include "common.h"
+ 
+@@ -175,11 +176,6 @@ static struct map_desc ebsa285_host_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(DC21285_PCI_IACK),
+ 		.length		= PCIIACK_SIZE,
+ 		.type		= MT_DEVICE,
 -	}, {
--		.virtual	= PCI_IO_VADDR,
--		.pfn		= __phys_to_pfn(PHYS_PCI_IO_BASE),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE
- 	}
+-		.virtual	= PCIO_BASE,
+-		.pfn		= __phys_to_pfn(DC21285_PCI_IO),
+-		.length		= PCIO_SIZE,
+-		.type		= MT_DEVICE,
+ 	},
+ #endif
  };
- 
- static void __init ap_map_io(void)
- {
-+	pci_map_io_single(PHYS_PCI_IO_BASE);
- 	iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
- 	vga_base = PCI_MEMORY_VADDR;
+@@ -196,8 +192,10 @@ void __init footbridge_map_io(void)
+ 	 * Now, work out what we've got to map in addition on this
+ 	 * platform.
+ 	 */
+-	if (footbridge_cfn_mode())
++	if (footbridge_cfn_mode()) {
++		pci_map_io_single(DC21285_PCI_IO);
+ 		iotable_init(ebsa285_host_io_desc, ARRAY_SIZE(ebsa285_host_io_desc));
++	}
  }
+ 
+ void footbridge_restart(char mode, const char *cmd)
+diff --git a/arch/arm/mach-footbridge/include/mach/debug-macro.S b/arch/arm/mach-footbridge/include/mach/debug-macro.S
+index e5acde2..c169f0c 100644
+--- a/arch/arm/mach-footbridge/include/mach/debug-macro.S
++++ b/arch/arm/mach-footbridge/include/mach/debug-macro.S
+@@ -17,7 +17,8 @@
+ 	/* For NetWinder debugging */
+ 		.macro	addruart, rp, rv, tmp
+ 		mov	\rp, #0x000003f8
+-		orr	\rv, \rp, #0xff000000	@ virtual
++		orr	\rv, \rp, #0xfe000000	@ virtual
++		orr	\rv, \rv, #0x00e00000	@ virtual
+ 		orr	\rp, \rp, #0x7c000000	@ physical
+ 		.endm
+ 
+diff --git a/arch/arm/mach-footbridge/include/mach/io.h b/arch/arm/mach-footbridge/include/mach/io.h
+index aba531ee..aba4638 100644
+--- a/arch/arm/mach-footbridge/include/mach/io.h
++++ b/arch/arm/mach-footbridge/include/mach/io.h
+@@ -14,18 +14,10 @@
+ #ifndef __ASM_ARM_ARCH_IO_H
+ #define __ASM_ARM_ARCH_IO_H
+ 
+-#ifdef CONFIG_MMU
+-#define MMU_IO(a, b)	(a)
+-#else
+-#define MMU_IO(a, b)	(b)
+-#endif
+-
+-#define PCIO_SIZE       0x00100000
+-#define PCIO_BASE       MMU_IO(0xff000000, 0x7c000000)
+-
+ /*
+- * Translation of various region addresses to virtual addresses
++ * Translation of various i/o addresses to host addresses for !CONFIG_MMU
+  */
++#define PCIO_BASE       0x7c000000
+ #define __io(a)			((void __iomem *)(PCIO_BASE + (a)))
+ 
+ #endif
 -- 
 1.7.9.5
