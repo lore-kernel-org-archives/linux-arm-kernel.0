@@ -1,129 +1,139 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:33 -0500
-Subject: [PATCH 08/15] ARM: kirkwood: use fixed PCI i/o mapping
+Date: Fri,  6 Jul 2012 13:40:36 -0500
+Subject: [PATCH 11/15] ARM: iop13xx: use fixed PCI i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-9-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-12-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move kirkwood PCI to fixed i/o mapping and remove io.h.
+Move iop13xx PCI to fixed i/o mapping and remove io.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/Kconfig                               |    1 -
- arch/arm/mach-kirkwood/common.c                |   17 +++++++----------
- arch/arm/mach-kirkwood/include/mach/io.h       |   24 ------------------------
- arch/arm/mach-kirkwood/include/mach/kirkwood.h |    2 --
- 4 files changed, 7 insertions(+), 37 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
+ arch/arm/Kconfig                             |    1 -
+ arch/arm/mach-iop13xx/include/mach/io.h      |   28 --------------------------
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h |    6 ++----
+ arch/arm/mach-iop13xx/setup.c                |   17 +++++++---------
+ 4 files changed, 9 insertions(+), 43 deletions(-)
+ delete mode 100644 arch/arm/mach-iop13xx/include/mach/io.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ed930ad..8a74244 100644
+index e542f99..c61e0a4 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -547,7 +547,6 @@ config ARCH_KIRKWOOD
+@@ -486,7 +486,6 @@ config ARCH_IOP13XX
  	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_SUPPORTS_MSI
+ 	select VMSPLIT_1G
 -	select NEED_MACH_IO_H
- 	select PLAT_ORION
+ 	select NEED_MACH_MEMORY_H
+ 	select NEED_RET_TO_USER
  	help
- 	  Support for the following Marvell Kirkwood series SoCs:
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index f261cd2..45d9793 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -22,6 +22,7 @@
- #include <asm/timex.h>
- #include <asm/kexec.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- #include <asm/mach/time.h>
- #include <mach/kirkwood.h>
- #include <mach/bridge-regs.h>
-@@ -41,16 +42,6 @@
-  ****************************************************************************/
- static struct map_desc kirkwood_io_desc[] __initdata = {
- 	{
--		.virtual	= KIRKWOOD_PCIE_IO_VIRT_BASE,
--		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE_IO_PHYS_BASE),
--		.length		= KIRKWOOD_PCIE_IO_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= KIRKWOOD_PCIE1_IO_VIRT_BASE,
--		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
--		.length		= KIRKWOOD_PCIE1_IO_SIZE,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= KIRKWOOD_REGS_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
- 		.length		= KIRKWOOD_REGS_SIZE,
-@@ -60,6 +51,12 @@ static struct map_desc kirkwood_io_desc[] __initdata = {
- 
- void __init kirkwood_map_io(void)
- {
-+	unsigned long pci_io_pfn[] = {
-+		__phys_to_pfn(KIRKWOOD_PCIE_IO_PHYS_BASE),
-+		__phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
-+	};
-+	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn), SZ_1M);
-+
- 	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
- }
- 
-diff --git a/arch/arm/mach-kirkwood/include/mach/io.h b/arch/arm/mach-kirkwood/include/mach/io.h
+diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
 deleted file mode 100644
-index 5d0ab61..0000000
---- a/arch/arm/mach-kirkwood/include/mach/io.h
+index e197cb8..0000000
+--- a/arch/arm/mach-iop13xx/include/mach/io.h
 +++ /dev/null
-@@ -1,24 +0,0 @@
+@@ -1,28 +0,0 @@
 -/*
-- * arch/arm/mach-kirkwood/include/mach/io.h
+- * iop13xx custom ioremap implementation
+- * Copyright (c) 2005-2006, Intel Corporation.
 - *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+- * Place - Suite 330, Boston, MA 02111-1307 USA.
+- *
 - */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
 -
--#ifndef __ASM_ARCH_IO_H
--#define __ASM_ARCH_IO_H
+-#include <mach/iop13xx.h>
 -
--#include "kirkwood.h"
+-#define IO_SPACE_LIMIT (IOP13XX_PCIE_IO_WINDOW_SIZE + IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
 -
--#define IO_SPACE_LIMIT		0xffffffff
--
--static inline void __iomem *__io(unsigned long addr)
--{
--	return (void __iomem *)((addr - KIRKWOOD_PCIE_IO_BUS_BASE)
--					+ KIRKWOOD_PCIE_IO_VIRT_BASE);
--}
--
--#define __io(a)			__io(a)
+-#define __io(a) (IOP13XX_PCIX_LOWER_IO_VA + ((a) & IO_SPACE_LIMIT))
 -
 -#endif
-diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-index c5b6851..43e4f9b 100644
---- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-+++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-@@ -37,12 +37,10 @@
- #define KIRKWOOD_NAND_MEM_SIZE		SZ_1K
+diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+index d3777db..8153ed2 100644
+--- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
++++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+@@ -69,12 +69,11 @@ extern unsigned long get_iop_tick_rate(void);
+  * 0x8000.0000 + 928M	0x2.8000.0000   (ioremap)	PCIE outbound memory window
+  *
+  * IO MAP
+- * 0x1000 + 64K	0x0.fffb.1000	0xfed6.1000	PCIX outbound i/o window
+- * 0x1000 + 64K	0x0.fffd.1000	0xfed7.1000	PCIE outbound i/o window
++ * 0x1000 + 64K	0x0.fffb.1000	0xfef0.1000	PCIX outbound i/o window
++ * 0x1000 + 64K	0x0.fffd.1000	0xfef1.1000	PCIE outbound i/o window
+  */
+ #define IOP13XX_PCIX_IO_WINDOW_SIZE   0x10000UL
+ #define IOP13XX_PCIX_LOWER_IO_PA      0xfffb0000UL
+-#define IOP13XX_PCIX_LOWER_IO_VA      0xfed60000UL
+ #define IOP13XX_PCIX_LOWER_IO_BA      0x0UL /* OIOTVR */
+ #define IOP13XX_PCIX_IO_BUS_OFFSET    0x1000UL
+ #define IOP13XX_PCIX_UPPER_IO_BA      (IOP13XX_PCIX_LOWER_IO_BA +\
+@@ -103,7 +102,6 @@ extern unsigned long get_iop_tick_rate(void);
+ /* PCI-E ranges */
+ #define IOP13XX_PCIE_IO_WINDOW_SIZE   	 0x10000UL
+ #define IOP13XX_PCIE_LOWER_IO_PA      	 0xfffd0000UL
+-#define IOP13XX_PCIE_LOWER_IO_VA      	 0xfed70000UL
+ #define IOP13XX_PCIE_LOWER_IO_BA      	 0x0UL  /* OIOTVR */
+ #define IOP13XX_PCIE_IO_BUS_OFFSET	 0x1000UL
+ #define IOP13XX_PCIE_UPPER_IO_BA      	 (IOP13XX_PCIE_LOWER_IO_BA +\
+diff --git a/arch/arm/mach-iop13xx/setup.c b/arch/arm/mach-iop13xx/setup.c
+index daabb1f..6c1d763 100644
+--- a/arch/arm/mach-iop13xx/setup.c
++++ b/arch/arm/mach-iop13xx/setup.c
+@@ -24,6 +24,7 @@
+ #include <linux/mtd/physmap.h>
+ #endif
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+ #include <asm/hardware/iop_adma.h>
+@@ -40,16 +41,6 @@ static struct map_desc iop13xx_std_desc[] __initdata = {
+ 		.pfn 	 = __phys_to_pfn(IOP13XX_PMMR_PHYS_MEM_BASE),
+ 		.length  = IOP13XX_PMMR_SIZE,
+ 		.type	 = MT_DEVICE,
+-	}, { /* PCIE IO space */
+-		.virtual = IOP13XX_PCIE_LOWER_IO_VA,
+-		.pfn 	 = __phys_to_pfn(IOP13XX_PCIE_LOWER_IO_PA),
+-		.length  = IOP13XX_PCIX_IO_WINDOW_SIZE,
+-		.type	 = MT_DEVICE,
+-	}, { /* PCIX IO space */
+-		.virtual = IOP13XX_PCIX_LOWER_IO_VA,
+-		.pfn 	 = __phys_to_pfn(IOP13XX_PCIX_LOWER_IO_PA),
+-		.length  = IOP13XX_PCIX_IO_WINDOW_SIZE,
+-		.type	 = MT_DEVICE,
+ 	},
+ };
  
- #define KIRKWOOD_PCIE1_IO_PHYS_BASE	0xf3000000
--#define KIRKWOOD_PCIE1_IO_VIRT_BASE	0xfef00000
- #define KIRKWOOD_PCIE1_IO_BUS_BASE	0x00100000
- #define KIRKWOOD_PCIE1_IO_SIZE		SZ_1M
+@@ -363,6 +354,12 @@ static struct platform_device iop13xx_adma_2_channel = {
  
- #define KIRKWOOD_PCIE_IO_PHYS_BASE	0xf2000000
--#define KIRKWOOD_PCIE_IO_VIRT_BASE	0xfee00000
- #define KIRKWOOD_PCIE_IO_BUS_BASE	0x00000000
- #define KIRKWOOD_PCIE_IO_SIZE		SZ_1M
- 
+ void __init iop13xx_map_io(void)
+ {
++	unsigned long pfn[] = {
++		__phys_to_pfn(IOP13XX_PCIX_LOWER_IO_PA),
++		__phys_to_pfn(IOP13XX_PCIE_LOWER_IO_PA),
++	};
++	pci_map_io_pfn(pfn, ARRAY_SIZE(pfn), SZ_1M);
++
+ 	/* Initialize the Static Page Table maps */
+ 	iotable_init(iop13xx_std_desc, ARRAY_SIZE(iop13xx_std_desc));
+ }
 -- 
 1.7.9.5
