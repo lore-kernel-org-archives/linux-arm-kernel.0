@@ -1,83 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jul 2012 01:09:43 -0700
-Subject: [GIT PULL] ARM: OMAP2+: miscellaneous PRCM & hwmod patches for 3.6
-In-Reply-To: <CAMQu2gwuXnV7E8-+x9EN0qRF9B2OOgY3KMW-nd0GAqHUwHXkGw@mail.gmail.com>
-References: <alpine.DEB.2.00.1207040935070.6760@utopia.booyaka.com>
- <20120705084002.GU1122@atomide.com>
- <CAMQu2gwuXnV7E8-+x9EN0qRF9B2OOgY3KMW-nd0GAqHUwHXkGw@mail.gmail.com>
-Message-ID: <20120706080943.GL1122@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Jul 2012 16:16:53 +0800
+Subject: Passing GPIO irq edge/level flags from devicetree to driver, how?
+In-Reply-To: <20120706075434.GE30009@pengutronix.de>
+References: <20120706075434.GE30009@pengutronix.de>
+Message-ID: <20120706081651.GC22133@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120705 04:26]:
->
-> Looks like the merge has not happened correctly.
-> I see from the commit log that, you had a merge conflict in omap_hwmod.c
-> and probably while resolving that the below change got missed.
-> 
-> Tarun Kanti DebBarma (1):
->       ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
-> 
-> So I tried pulling Paul's branch again on "cleanup-part2" at commit 8cb8de5d87
-> and it got merged without any conflicts.
-> 
-> Do you want to re-merge Paul's series in cleanup-part2 or re-apply the above
-> patch ?
+Hi Sascha,
 
-Hmm weird, I wonder how I managed to mess up the resolve like that..
-I'll (re)apply the following fix as the branch has been pushed out already.
+Try to change the value of #interrupt-cells under gpio node from 1 to 2.
+
+I forgot updating imx on this.
 
 Regards,
+Shawn
 
-Tony
-
-
-Author: Tony Lindgren <tony@atomide.com>
-Date:   Fri Jul 6 00:58:43 2012 -0700
-
-    ARM: OMAP2+: Fix mismerge for omap_hwmod_get_main_clk() API
-    
-    Commit ac5b0ea3d (Merge tag 'omap-devel-f-for-3.6'...) had a merge
-    conflict that somehow got incorrecly resolved in a lossy way for
-    commit bed9d1bb (ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API).
-    Fix the issue by applying the missing pieces.
-    
-    Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-    Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index ebdf001..ff76ef1 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -3633,3 +3633,18 @@ void __init omap_hwmod_init(void)
- 
- 	inited = true;
- }
-+
-+/**
-+ * omap_hwmod_get_main_clk - get pointer to main clock name
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Returns the main clock name assocated with @oh upon success,
-+ * or NULL if @oh is NULL.
-+ */
-+const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh)
-+{
-+	if (!oh)
-+		return NULL;
-+
-+	return oh->main_clk;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 30f55eb..6132972 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -648,6 +648,8 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
- 
- extern void __init omap_hwmod_init(void);
- 
-+const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
-+
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
+On Fri, Jul 06, 2012 at 09:54:34AM +0200, Sascha Hauer wrote:
+> Hi All,
+> 
+> Several gpio binding documents like the one for mxs have the following
+> in them:
+> 
+> - #interrupt-cells : Should be 2.  The first cell is the GPIO number.
+>   The second cell bits[3:0] is used to specify trigger type and level flags:
+>       1 = low-to-high edge triggered.
+>       2 = high-to-low edge triggered.
+>       4 = active high level-sensitive.
+>       8 = active low level-sensitive.
+> 
+> Does anybody know where this information is evaluated and how this is
+> passed to the driver?
+> 
+> I am working on i.MX (who would have guessed that) and I am trying to
+> connect a I2C device with an interrupt source connected to the gpio
+> interrupt controller. It works fine, only the irq level/edge flags
+> get lost somewhere.
+> 
+> What I have is:
+> 
+> 	maxtouch at 4b {
+> 		compatible = "mXT224";
+> 		reg = <0x4b>;
+> 		interrupt-parent = <&gpio7>;
+> 		interrupts = <13 2>;
+> 	};
+> 
+> Any idea how the maxtouch driver can use the 'high-to-low edge
+> triggered' information?
+> 
+> BTW. the i.MX GPIO binding document does not claim to support the flags,
+> but I assume it's just missing in the document, but there maybe also
+> something missing in the driver to support this.
+> 
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
