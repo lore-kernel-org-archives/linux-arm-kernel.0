@@ -1,31 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 06 Jul 2012 12:07:47 +0200
-Subject: [PATCH] ARM: OMAP2: twl-common: fix compiler warnings
-In-Reply-To: <1340880592-21700-1-git-send-email-t-kristo@ti.com>
-References: <1340880592-21700-1-git-send-email-t-kristo@ti.com>
-Message-ID: <4FF6B8F3.8010501@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  6 Jul 2012 12:11:51 +0200
+Subject: [PATCH] mmc: atmel-mci: modify CLKDIV displaying in debugfs
+Message-ID: <1341569511-11340-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+Modify clock division displaying in debugfs for matching
+the new CLKDIV,CLKODD user interface arrangement.
+Is using the has_odd_clk_div property to choose the proper format.
 
-On 06/28/2012 12:49 PM, Tero Kristo wrote:
-> OMAP2 does not use the external voltage controller code for TWL, and
-> thus OMAP2 only compilation generates following warnings:
-> 
-> arch/arm/mach-omap2/twl-common.c:51: warning: 'twl_set_voltage' defined but not used
-> arch/arm/mach-omap2/twl-common.c:57: warning: 'twl_get_voltage' defined but not used
-> 
-> This patch moves the code in question behind ARCH specific flags and
-> eliminates these warnings.
-> 
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-I did sent similar patch:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70432.html
-
-Tony applied it to fixes I think already.
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 1fe20cd..9c5daa2 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -396,11 +396,17 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 	clk_disable(host->mck);
+ 	spin_unlock_bh(&host->lock);
+ 
+-	seq_printf(s, "MR:\t0x%08x%s%s CLKDIV=%u\n",
++	seq_printf(s, "MR:\t0x%08x%s%s ",
+ 			buf[ATMCI_MR / 4],
+ 			buf[ATMCI_MR / 4] & ATMCI_MR_RDPROOF ? " RDPROOF" : "",
+-			buf[ATMCI_MR / 4] & ATMCI_MR_WRPROOF ? " WRPROOF" : "",
+-			buf[ATMCI_MR / 4] & 0xff);
++			buf[ATMCI_MR / 4] & ATMCI_MR_WRPROOF ? " WRPROOF" : "");
++	if (host->caps.has_odd_clk_div)
++		seq_printf(s, "{CLKDIV,CLKODD}=%u\n",
++				((buf[ATMCI_MR / 4] & 0xff) << 1)
++				| ((buf[ATMCI_MR / 4] >> 16) & 1));
++	else
++		seq_printf(s, "CLKDIV=%u\n",
++				(buf[ATMCI_MR / 4] & 0xff));
+ 	seq_printf(s, "DTOR:\t0x%08x\n", buf[ATMCI_DTOR / 4]);
+ 	seq_printf(s, "SDCR:\t0x%08x\n", buf[ATMCI_SDCR / 4]);
+ 	seq_printf(s, "ARGR:\t0x%08x\n", buf[ATMCI_ARGR / 4]);
 -- 
-P?ter
+1.7.5.4
