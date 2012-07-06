@@ -1,49 +1,92 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 6 Jul 2012 17:09:23 +0800
-Subject: [PATCH 2/2] pinctrl: pinctrl-imx6q: add missed mux function for
- USBOTG_ID
-In-Reply-To: <1341565763-10074-1-git-send-email-b29396@freescale.com>
-References: <1341565763-10074-1-git-send-email-b29396@freescale.com>
-Message-ID: <1341565763-10074-2-git-send-email-b29396@freescale.com>
+Date: Fri, 6 Jul 2012 17:09:22 +0800
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add support for set bits for
+ general purpose registers
+Message-ID: <1341565763-10074-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-The original pin registers table is derived from u-boot mainline,
-but somehow it was found missing some mux functions for USBOTG_ID.
-We added it at the bottom by following the exist pin function ids,
-then it will not break the exist using of pin function id in dts file.
+The General Purpose Registers (GPR) is used to select operating modes for
+general features in the SoC, usually not related to the IOMUX itself,
+but it does belong to IOMUX controller.
+We simply provide an convient API for driver to call to set the general purpose
+register bits if needed.
 
-Reported-by: Richard Zhao <richard.zhao@freescale.com>
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
- .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         |    2 ++
- drivers/pinctrl/pinctrl-imx6q.c                    |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/pinctrl/pinctrl-imx.c   |   19 +++++++++++++++++++
+ include/linux/fsl/imx-pinctrl.h |   24 ++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 0 deletions(-)
+ create mode 100644 include/linux/fsl/imx-pinctrl.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-index 82b43f9..a4119f6 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-@@ -1626,3 +1626,5 @@ MX6Q_PAD_SD2_DAT3__PCIE_CTRL_MUX_11		1587
- MX6Q_PAD_SD2_DAT3__GPIO_1_12			1588
- MX6Q_PAD_SD2_DAT3__SJC_DONE			1589
- MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3		1590
-+MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID		1591
-+MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID		1592
-diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
-index 7737d4d..e9bf71f 100644
---- a/drivers/pinctrl/pinctrl-imx6q.c
-+++ b/drivers/pinctrl/pinctrl-imx6q.c
-@@ -1950,6 +1950,8 @@ static struct imx_pin_reg imx6q_pin_regs[] = {
- 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 5, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__GPIO_1_12 */
- 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 6, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__SJC_DONE */
- 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 7, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3 */
-+	IMX_PIN_REG(MX6Q_PAD_ENET_RX_ER, 0x04EC, 0x01D8, 0, 0x0000, 0), /* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
-+	IMX_PIN_REG(MX6Q_PAD_GPIO_1, 0x05F4, 0x0224, 3, 0x0000, 0), /* MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID */
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index 44e9726..b83b902 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -54,6 +54,24 @@ struct imx_pinctrl {
+ 	const struct imx_pinctrl_soc_info *info;
  };
  
- /* Pad names for the pinmux subsystem */
++static struct imx_pinctrl *imx_pinctrl;
++/*
++ * Set bits for general purpose registers
++ */
++void imx_pinctrl_set_gpr_register(u8 gpr, u8 start_bit, u8 num_bits, u32 value)
++{
++	u32 reg;
++
++	/* general purpose register is 32 bits size */
++	WARN_ON(!imx_pinctrl || start_bit > 31 || num_bits > 32);
++
++	reg = readl(imx_pinctrl->base + gpr * 4);
++	reg &= ~(((1 << num_bits) - 1) << start_bit);
++	reg |= (value << start_bit);
++	writel(reg, imx_pinctrl->base + gpr * 4);
++}
++EXPORT_SYMBOL_GPL(imx_pinctrl_set_gpr_register);
++
+ static const struct imx_pin_reg *imx_find_pin_reg(
+ 				const struct imx_pinctrl_soc_info *info,
+ 				unsigned pin, bool is_mux, unsigned mux)
+@@ -587,6 +605,7 @@ int __devinit imx_pinctrl_probe(struct platform_device *pdev,
+ 	if (!ipctl->base)
+ 		return -EBUSY;
+ 
++	imx_pinctrl = ipctl;
+ 	imx_pinctrl_desc.name = dev_name(&pdev->dev);
+ 	imx_pinctrl_desc.pins = info->pins;
+ 	imx_pinctrl_desc.npins = info->npins;
+diff --git a/include/linux/fsl/imx-pinctrl.h b/include/linux/fsl/imx-pinctrl.h
+new file mode 100644
+index 0000000..0212948
+--- /dev/null
++++ b/include/linux/fsl/imx-pinctrl.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __FSL_IMX_PINCTRL_H__
++#define __FSL_IMX_PINCTRL_H__
++
++#ifdef CONFIG_PINCTRL_IMX
++extern void imx_pinctrl_set_gpr_register(u8 gpr, u8 start_bit,
++					u8 num_bits, u32 value);
++#else
++static inline void imx_pinctrl_set_gpr_register(u8 gpr, u8 start_bit,
++						u8 num_bits, u32 value)
++{
++	WARN(1, "CONFIG_PINCTRL_IMX is not selected, simply return\n");
++	return;
++}
++#endif
++
++#endif /* !__FSL_IMX_PINCTRL_H__ */
 -- 
 1.7.0.4
