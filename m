@@ -1,59 +1,49 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 6 Jul 2012 13:02:34 +0300
-Subject: [PATCH] ARM: OMAP2: twl-common: fix compiler warnings
-In-Reply-To: <20120706085357.GS1122@atomide.com>
-References: <1340880592-21700-1-git-send-email-t-kristo@ti.com>
- <20120706085357.GS1122@atomide.com>
-Message-ID: <1341568954.2059.214.camel@sokoban>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Fri, 6 Jul 2012 12:04:33 +0200
+Subject: [PATCH] mmc: atmel-mci: fix incorrect setting of host->data to
+ NULL
+In-Reply-To: <1341568713-8869-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1341568713-8869-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4FF6B831.5060005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-06 at 01:53 -0700, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [120628 03:54]:
-> > OMAP2 does not use the external voltage controller code for TWL, and
-> > thus OMAP2 only compilation generates following warnings:
-> 
-> Hmm well omap2420 does not have twl, but 2430 usually has. So do you
-> mean that 2430 does not use the external voltage controller code?
+Le 07/06/2012 11:58 AM, Nicolas Ferre a ?crit :
+> Setting host->data to NULL is incorrect sequence in STATE_SENDING_STOP
+> state of FSM: This early setting leads to the skip of dma_unmap_sg()
+> in atmci_dma_cleanup() which is a bug.
+>
+> Idea taken form dw_mmc by Seungwon Jeon.
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Seungwon Jeon <tgih.jun@samsung.com>
 
-Well, at least currently the external controller code is not used on any
-omap2xxx chip. I guess it might be possible to extend the support for
-omap2 also, but I don't know who can do that (personally I have no
-access to omap2 hw.)
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> 
-> > arch/arm/mach-omap2/twl-common.c:51: warning: 'twl_set_voltage' defined but not used
-> > arch/arm/mach-omap2/twl-common.c:57: warning: 'twl_get_voltage' defined but not used
-> > 
-> > This patch moves the code in question behind ARCH specific flags and
-> > eliminates these warnings.
-> ...
-> 
-> > --- a/arch/arm/mach-omap2/twl-common.c
-> > +++ b/arch/arm/mach-omap2/twl-common.c
-> > @@ -48,6 +48,7 @@ static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
-> >  	},
-> >  };
-> >  
-> > +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> >  static int twl_set_voltage(void *data, int target_uV)
-> >  {
-> >  	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> > @@ -59,6 +60,7 @@ static int twl_get_voltage(void *data)
-> >  	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> >  	return voltdm_get_voltage(voltdm);
-> >  }
-> > +#endif
-> 
-> To avoid patching this piece of code for new SoCs, can we make it
-> ifndef CONFIG_ARCH_OMAP2? Also in the makefile we should not even
-> build twl-common.o for 2420 only builds..
+Thanks
 
-Can't make it ifndef CONFIG_ARCH_OMAP2, as this would break on
-omap2plus_defconfig then... as it defines all ARCH_OMAP2...ARCH_OMAP4.
-
-And... can't drop it from makefile either, as parts of the code from
-twl-common.c are still used with omap2 (omap_pmic_init &
-omap_pmic_late_init). These would need to be moved elsewhere first.
-
--Tero
+> ---
+>   drivers/mmc/host/atmel-mci.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 78e5326..2ce109d 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -1860,7 +1860,6 @@ static void atmci_tasklet_func(unsigned long priv)
+>
+>   			dev_dbg(&host->pdev->dev, "FSM: cmd ready\n");
+>   			host->cmd = NULL;
+> -			host->data = NULL;
+>   			data->bytes_xfered = data->blocks * data->blksz;
+>   			data->error = 0;
+>   			atmci_command_complete(host, mrq->stop);
+> @@ -1874,6 +1873,7 @@ static void atmci_tasklet_func(unsigned long priv)
+>   				atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
+>   				state = STATE_WAITING_NOTBUSY;
+>   			}
+> +			host->data = NULL;
+>   			break;
+>
+>   		case STATE_END_REQUEST:
+>
