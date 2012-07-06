@@ -1,41 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Jul 2012 08:55:49 +0200
-Subject: [PATCH 3/9] ARM: ux500: Remove AB8500 regulator register
- initialisation information
-In-Reply-To: <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
+Date: Fri, 6 Jul 2012 09:03:37 +0200
+Subject: [PATCH 1/9] pinctrl: pinctrl-nomadik: Fix possible memory leak
+In-Reply-To: <1341493572-29735-2-git-send-email-lee.jones@linaro.org>
 References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbRtFX8_++rndCpsH7R1uhwPrkTE_GKgNTM6r1PSuwY0A@mail.gmail.com>
+ <1341493572-29735-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYsLUQqPrYKX3AGuwkhfJO6kk=s2iSSvhwY42HgxS2dfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jul 5, 2012 at 3:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> There is no need to initialise the AB8500's regulator registers, as
-> most of this work is already carried out by framework features, so
-> we can safely remove all traces from platform code.
+> If the Nomadik Pin Control driver is continuously bound and unbound
+> from the same device a number of times the kzalloc() will leak
+> memory. Replacing it with devm_kzalloc() will ensure memory is
+> freed automatically in the event of failure and unbinding.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-NACK, sorry.
+A patch like this but more all-encompassing was already sent out
+by me some days ago:
+http://marc.info/?l=linux-kernel&m=134139303405730&w=2
 
-These registers are used to set up sleep states for the regulators,
-e.g that some regulators will turn off when the system go to sleep.
-
-If you delete this code it's no longer possible to make the system
-powerefficient, power consumption increases so it causes a
-regression.
-
-The proper thing to do is to take the AB8500 datasheet, go in and
-read what these registers actually do, and provide the same
-features through the framework, if just poking the registers
-is deemed non-elegant (I see the point in that).
-
-This is the AB8500 datasheet:
-http://www.stericsson.com/developers/CD00291561_UM1031_AB8500_user_manual-rev5_CTDS_public.pdf
-
-So please refactor this, don't just delete, that's destroying a lot
-of useful stuff.
+Please test that one and see if it solves your problem.
 
 Yours,
 Linus Walleij
