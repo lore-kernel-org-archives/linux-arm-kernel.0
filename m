@@ -1,44 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 06 Jul 2012 08:52:43 +0100
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
-In-Reply-To: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <4FF6994B.9040801@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 6 Jul 2012 09:54:34 +0200
+Subject: Passing GPIO irq edge/level flags from devicetree to driver, how?
+Message-ID: <20120706075434.GE30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry Dmitry, looks like I missed you off of the CC list on this one.
+Hi All,
 
-Here it is again:
+Several gpio binding documents like the one for mxs have the following
+in them:
 
-Before we can use any domain allocated IRQ, we need to first create a
-map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
-We do this with a helper function provided by the AB8500 IRQ domain
-controller called ab8500_irq_get_virq(). We need to do this for both
-IRQs which the Power-On-Key driver uses; one for button press, the other
-for button depress.
+- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
+  The second cell bits[3:0] is used to specify trigger type and level flags:
+      1 = low-to-high edge triggered.
+      2 = high-to-low edge triggered.
+      4 = active high level-sensitive.
+      8 = active low level-sensitive.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/input/misc/ab8500-ponkey.c |    2 ++
- 1 file changed, 2 insertions(+)
+Does anybody know where this information is evaluated and how this is
+passed to the driver?
 
-diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-index 5ceb23e..ae4b683 100644
---- a/drivers/input/misc/ab8500-ponkey.c
-+++ b/drivers/input/misc/ab8500-ponkey.c
-@@ -82,6 +82,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
-  	input_set_capability(input, EV_KEY, KEY_POWER);
- +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbf);
- 	error = request_any_context_irq(ponkey->irq_dbf, ab8500_ponkey_handler,
- 					0, "ab8500-ponkey-dbf", ponkey);
- 	if (error < 0) {
-@@ -90,6 +91,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
- 		goto err_free_mem;
- 	}
- +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbr);
- 	error = request_any_context_irq(ponkey->irq_dbr, ab8500_ponkey_handler,
- 					0, "ab8500-ponkey-dbr", ponkey);
- 	if (error < 0) {
+I am working on i.MX (who would have guessed that) and I am trying to
+connect a I2C device with an interrupt source connected to the gpio
+interrupt controller. It works fine, only the irq level/edge flags
+get lost somewhere.
+
+What I have is:
+
+	maxtouch at 4b {
+		compatible = "mXT224";
+		reg = <0x4b>;
+		interrupt-parent = <&gpio7>;
+		interrupts = <13 2>;
+	};
+
+Any idea how the maxtouch driver can use the 'high-to-low edge
+triggered' information?
+
+BTW. the i.MX GPIO binding document does not claim to support the flags,
+but I assume it's just missing in the document, but there maybe also
+something missing in the driver to support this.
+
+Sascha
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
