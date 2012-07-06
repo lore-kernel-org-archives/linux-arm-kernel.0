@@ -1,31 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 6 Jul 2012 11:07:21 -0700
-Subject: [PATCH v8 06/14] USB: Chipidea: rename struct ci13xxx variables
- from udc to ci
-In-Reply-To: <1340963342-28735-7-git-send-email-richard.zhao@freescale.com>
-References: <1340963342-28735-1-git-send-email-richard.zhao@freescale.com>
- <1340963342-28735-7-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120706180721.GA8983@kroah.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri,  6 Jul 2012 11:20:28 -0700
+Subject: [PATCH] ARM: OMAP2+: omap2plus_defconfig: EHCI driver is not stable,
+ disable it
+Message-ID: <1341598828-31410-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2012 at 05:48:54PM +0800, Richard Zhao wrote:
-> struct ci13xxx represent the controller, which may be device or host,
-> so name its variables as ci.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Reviewed-by: Marek Vasut <marex@denx.de>
+The EHCI driver is not stable enough to be enabled by default.  In v3.5,
+it has at least the following problems:
 
-This patch fails to apply (the 5/14 had some fuzz, but I fixed that by
-hand.)  Odds are it's due to Felipe's other changes now in my tree.
-Care to rediff this, and the rest of the series against the usb-next
-branch and resend them so that I can apply them?
+- warning dump during bootup
+- hang during suspend
+- prevents CORE powerdomain from entering retention during idle (even
+  when no USB devices connected.)
 
-I've applied the first 5 in this series already, so you don't have to
-resend them.
+This demonstrates that this driver has not been thoroughly tested and
+therfore should not be enabled in the default defconfig.
 
-thanks,
+In addition, the problems above cause new PM regressions which need be
+addressed before this driver should be enabled in the default
+defconfig.
 
-greg k-h
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Tony, this applies to your current fixes branch.   Please queue up for v3.5-rc
+so this PM regression is fixed in v3.5.  Thanks.
+
+ arch/arm/configs/omap2plus_defconfig |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 9854ff4..11828e6 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -176,7 +176,6 @@ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+ CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_SUSPEND=y
+ CONFIG_USB_MON=y
+-CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_WDM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_LIBUSUAL=y
+-- 
+1.7.9.2
