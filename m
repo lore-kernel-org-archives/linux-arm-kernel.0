@@ -1,43 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 05 Jul 2012 17:30:41 -0700
-Subject: [GIT PULL] OMAP: PM: one more fix for 3.5-rc
-Message-ID: <877guhenny.fsf@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 5 Jul 2012 19:40:42 -0500
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <20120702220117.GD25234@mudshark.cambridge.arm.com>
+References: <20120608094708.GC19062@mudshark.cambridge.arm.com>
+ <4FD21930.4000800@ti.com> <20120611173930.GD28235@mudshark.cambridge.arm.com>
+ <4FD64083.3020800@ti.com> <20120612092842.GA2991@mudshark.cambridge.arm.com>
+ <4FD7B1DC.30108@ti.com> <20120612213150.GC24380@mudshark.cambridge.arm.com>
+ <4FD7C597.7060501@ti.com> <20120702095539.GD22239@mudshark.cambridge.arm.com>
+ <4FF1D15E.7040301@ti.com> <20120702220117.GD25234@mudshark.cambridge.arm.com>
+Message-ID: <4FF6340A.6020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Will,
 
-Hopefully this is the last one.
+On 07/02/2012 05:01 PM, Will Deacon wrote:
+> On Mon, Jul 02, 2012 at 05:50:38PM +0100, Jon Hunter wrote:
+>> On 07/02/2012 04:55 AM, Will Deacon wrote:
+>>>
+>>> Did you have any luck getting to the bottom of this?
+>>
+>> I am still waiting for feedback from design. They were trying to confirm
+>> my observations. Unfortunately, it is taking some time. I will ping them
+>> again.
+> 
+> Ok, thanks. If pinging doesn't work, bribery can be quite effective with
+> hardware guys :)
 
-This one fixes a problem where the CORE power domain does not hit
-retention during suspend.  This has been known since v3.5 came out, but
-there has been some discussion about the proper fix.  The solution has
-now been agreed upon, so I'd like to see this make it for v3.5-rc.
+Yes looks like I am going to need to get creative :-)
 
-Thanks,
+>>> It would be good to take your PMU suspend/resume patches once we know that
+>>> they will get used.
+>>
+>> Yes that would be good. I could drop the 4460 specific changes for now
+>> and make 4460 work in the same way as 4430 (using CTI) for the time
+>> being and see if we can get these in. However, I recall that was not
+>> working for you, but it was working fine for me.
+> 
+> Indeed, that hack didn't help me and I'd rather not commit it if it only
+> partially fixes the problem. A better bet might just be to go with your
+> original approach and see how many bug reports we receive. That might also
+> help us narrow down the problem, but it's your call.
 
-Kevin
+Ok, I think that that is best.
 
+> In the meantime, I pushed what I think is the latest drop of your series to
+> a new branch on kernel.org:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4-dev
 
+Looks good.
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/fixes/pm-3
-
-for you to fetch changes up to 006c7f18449a06027b0165e938c67b3a029813c9:
-
-  ARM: OMAP2+: hwmod code/clockdomain data: fix 32K sync timer (2012-07-05 17:25:38 -0700)
-
-----------------------------------------------------------------
-Paul Walmsley (1):
-      ARM: OMAP2+: hwmod code/clockdomain data: fix 32K sync timer
-
- arch/arm/mach-omap2/clockdomain.h                |    4 +++
- arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    1 +
- arch/arm/mach-omap2/clockdomains44xx_data.c      |    2 +-
- arch/arm/mach-omap2/omap_hwmod.c                 |   32 ++++++++++++++++------
- 4 files changed, 30 insertions(+), 9 deletions(-)
+Cheers
+Jon
