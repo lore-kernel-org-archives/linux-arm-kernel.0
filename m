@@ -1,351 +1,150 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:38 -0500
-Subject: =?UTF-8?q?=5BPATCH=2013/15=5D=20i2c=3A=20iop3xx=3A=20clean-up=20trailing=20whitespace?=
+Date: Fri,  6 Jul 2012 13:40:34 -0500
+Subject: [PATCH 09/15] ARM: orion5x: use fixed PCI i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-14-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-10-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Remove a bunch of trailing whitespace. No functional changes.
+Move orion5x PCI to fixed i/o mapping and remove io.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: "Jean Delvare (PC drivers, core)" <khali@linux-fr.org>
-Cc: "Ben Dooks (embedded platforms)" <ben-linux@fluff.org>
-Cc: "Wolfram Sang (embedded platforms)" <w.sang@pengutronix.de>
-Cc: linux-i2c at vger.kernel.org
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- drivers/i2c/busses/i2c-iop3xx.c |  112 +++++++++++++++++++--------------------
- 1 file changed, 56 insertions(+), 56 deletions(-)
+ arch/arm/Kconfig                             |    1 -
+ arch/arm/mach-orion5x/common.c               |   16 ++++++----------
+ arch/arm/mach-orion5x/include/mach/io.h      |   22 ----------------------
+ arch/arm/mach-orion5x/include/mach/orion5x.h |   14 ++++++--------
+ 4 files changed, 12 insertions(+), 41 deletions(-)
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/io.h
 
-diff --git a/drivers/i2c/busses/i2c-iop3xx.c b/drivers/i2c/busses/i2c-iop3xx.c
-index 93f147a..567d873 100644
---- a/drivers/i2c/busses/i2c-iop3xx.c
-+++ b/drivers/i2c/busses/i2c-iop3xx.c
-@@ -4,13 +4,13 @@
- /* Copyright (C) 2003 Peter Milne, D-TACQ Solutions Ltd
-  *                    <Peter dot Milne@D hyphen TACQ dot com>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8a74244..e542f99 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -585,7 +585,6 @@ config ARCH_ORION5X
+ 	select PCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+-	select NEED_MACH_IO_H
+ 	select PLAT_ORION
+ 	help
+ 	  Support for the following Marvell Orion 5x series SoCs:
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index 9148b22..82a2502 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -26,6 +26,7 @@
+ #include <asm/timex.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ #include <asm/mach/time.h>
+ #include <mach/bridge-regs.h>
+ #include <mach/hardware.h>
+@@ -47,16 +48,6 @@ static struct map_desc orion5x_io_desc[] __initdata = {
+ 		.length		= ORION5X_REGS_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= ORION5X_PCIE_IO_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
+-		.length		= ORION5X_PCIE_IO_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= ORION5X_PCI_IO_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
+-		.length		= ORION5X_PCI_IO_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= ORION5X_PCIE_WA_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(ORION5X_PCIE_WA_PHYS_BASE),
+ 		.length		= ORION5X_PCIE_WA_SIZE,
+@@ -66,6 +57,11 @@ static struct map_desc orion5x_io_desc[] __initdata = {
+ 
+ void __init orion5x_map_io(void)
+ {
++	unsigned long pci_io_pfn[] = {
++		__phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
++		__phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
++	};
++	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn), SZ_1M);
+ 	iotable_init(orion5x_io_desc, ARRAY_SIZE(orion5x_io_desc));
+ }
+ 
+diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
+deleted file mode 100644
+index 1aa5d0a..0000000
+--- a/arch/arm/mach-orion5x/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * arch/arm/mach-orion5x/include/mach/io.h
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#include <mach/orion5x.h>
+-#include <asm/sizes.h>
+-
+-#define IO_SPACE_LIMIT		SZ_2M
+-static inline void __iomem *__io(unsigned long addr)
+-{
+-	return (void __iomem *)(addr + ORION5X_PCIE_IO_VIRT_BASE);
+-}
+-
+-#define __io(a)			 __io(a)
+-#endif
+diff --git a/arch/arm/mach-orion5x/include/mach/orion5x.h b/arch/arm/mach-orion5x/include/mach/orion5x.h
+index 683e085..e997a42 100644
+--- a/arch/arm/mach-orion5x/include/mach/orion5x.h
++++ b/arch/arm/mach-orion5x/include/mach/orion5x.h
+@@ -31,22 +31,20 @@
+  * fc000000	device bus mappings (cs0/cs1)
   *
-- * With acknowledgements to i2c-algo-ibm_ocp.c by 
-+ * With acknowledgements to i2c-algo-ibm_ocp.c by
-  * Ian DaSilva, MontaVista Software, Inc. idasilva at mvista.com
-  *
-  * And i2c-algo-pcf.c, which was created by Simon G. Vogl and Hans Berglund:
-  *
-  * Copyright (C) 1995-1997 Simon G. Vogl, 1998-2000 Hans Berglund
-- *  
-+ *
-  * And which acknowledged Ky?sti M?lkki <kmalkki@cc.hut.fi>,
-  * Frodo Looijaard <frodol@dds.nl>, Martin Bailey<mbailey@littlefeet-inc.com>
-  *
-@@ -45,8 +45,8 @@
- /* global unit counter */
- static int i2c_id;
+  * virt		phys		size
+- * fdd00000	f1000000	1M	on-chip peripheral registers
+- * fde00000	f2000000	1M	PCIe I/O space
+- * fdf00000	f2100000	1M	PCI I/O space
+- * fe000000	f0000000	16M	PCIe WA space (Orion-1/Orion-NAS only)
++ * fe000000	f1000000	1M	on-chip peripheral registers
++ * fee00000	f2000000	1M	PCIe I/O space
++ * fef00000	f2100000	1M	PCI I/O space
++ * fd000000	f0000000	16M	PCIe WA space (Orion-1/Orion-NAS only)
+  ****************************************************************************/
+ #define ORION5X_REGS_PHYS_BASE		0xf1000000
+-#define ORION5X_REGS_VIRT_BASE		0xfdd00000
++#define ORION5X_REGS_VIRT_BASE		0xfe000000
+ #define ORION5X_REGS_SIZE		SZ_1M
  
--static inline unsigned char 
--iic_cook_addr(struct i2c_msg *msg) 
-+static inline unsigned char
-+iic_cook_addr(struct i2c_msg *msg)
- {
- 	unsigned char addr;
+ #define ORION5X_PCIE_IO_PHYS_BASE	0xf2000000
+-#define ORION5X_PCIE_IO_VIRT_BASE	0xfde00000
+ #define ORION5X_PCIE_IO_BUS_BASE	0x00000000
+ #define ORION5X_PCIE_IO_SIZE		SZ_1M
  
-@@ -55,24 +55,24 @@ iic_cook_addr(struct i2c_msg *msg)
- 	if (msg->flags & I2C_M_RD)
- 		addr |= 1;
+ #define ORION5X_PCI_IO_PHYS_BASE	0xf2100000
+-#define ORION5X_PCI_IO_VIRT_BASE	0xfdf00000
+ #define ORION5X_PCI_IO_BUS_BASE		0x00100000
+ #define ORION5X_PCI_IO_SIZE		SZ_1M
  
--	return addr;   
-+	return addr;
- }
+@@ -55,7 +53,7 @@
  
--static void 
-+static void
- iop3xx_i2c_reset(struct i2c_algo_iop3xx_data *iop3xx_adap)
- {
- 	/* Follows devman 9.3 */
- 	__raw_writel(IOP3XX_ICR_UNIT_RESET, iop3xx_adap->ioaddr + CR_OFFSET);
- 	__raw_writel(IOP3XX_ISR_CLEARBITS, iop3xx_adap->ioaddr + SR_OFFSET);
- 	__raw_writel(0, iop3xx_adap->ioaddr + CR_OFFSET);
--} 
-+}
+ /* Relevant only for Orion-1/Orion-NAS */
+ #define ORION5X_PCIE_WA_PHYS_BASE	0xf0000000
+-#define ORION5X_PCIE_WA_VIRT_BASE	0xfe000000
++#define ORION5X_PCIE_WA_VIRT_BASE	0xfd000000
+ #define ORION5X_PCIE_WA_SIZE		SZ_16M
  
--static void 
-+static void
- iop3xx_i2c_enable(struct i2c_algo_iop3xx_data *iop3xx_adap)
- {
- 	u32 cr = IOP3XX_ICR_GCD | IOP3XX_ICR_SCLEN | IOP3XX_ICR_UE;
- 
--	/* 
-+	/*
- 	 * Every time unit enable is asserted, GPOD needs to be cleared
- 	 * on IOP3XX to avoid data corruption on the bus.
- 	 */
-@@ -86,7 +86,7 @@ iop3xx_i2c_enable(struct i2c_algo_iop3xx_data *iop3xx_adap)
- 	}
- #endif
- 	/* NB SR bits not same position as CR IE bits :-( */
--	iop3xx_adap->SR_enabled = 
-+	iop3xx_adap->SR_enabled =
- 		IOP3XX_ISR_ALD | IOP3XX_ISR_BERRD |
- 		IOP3XX_ISR_RXFULL | IOP3XX_ISR_TXEMPTY;
- 
-@@ -96,23 +96,23 @@ iop3xx_i2c_enable(struct i2c_algo_iop3xx_data *iop3xx_adap)
- 	__raw_writel(cr, iop3xx_adap->ioaddr + CR_OFFSET);
- }
- 
--static void 
-+static void
- iop3xx_i2c_transaction_cleanup(struct i2c_algo_iop3xx_data *iop3xx_adap)
- {
- 	unsigned long cr = __raw_readl(iop3xx_adap->ioaddr + CR_OFFSET);
--	
--	cr &= ~(IOP3XX_ICR_MSTART | IOP3XX_ICR_TBYTE | 
-+
-+	cr &= ~(IOP3XX_ICR_MSTART | IOP3XX_ICR_TBYTE |
- 		IOP3XX_ICR_MSTOP | IOP3XX_ICR_SCLEN);
- 
- 	__raw_writel(cr, iop3xx_adap->ioaddr + CR_OFFSET);
- }
- 
--/* 
-- * NB: the handler has to clear the source of the interrupt! 
-+/*
-+ * NB: the handler has to clear the source of the interrupt!
-  * Then it passes the SR flags of interest to BH via adap data
-  */
--static irqreturn_t 
--iop3xx_i2c_irq_handler(int this_irq, void *dev_id) 
-+static irqreturn_t
-+iop3xx_i2c_irq_handler(int this_irq, void *dev_id)
- {
- 	struct i2c_algo_iop3xx_data *iop3xx_adap = dev_id;
- 	u32 sr = __raw_readl(iop3xx_adap->ioaddr + SR_OFFSET);
-@@ -126,7 +126,7 @@ iop3xx_i2c_irq_handler(int this_irq, void *dev_id)
- }
- 
- /* check all error conditions, clear them , report most important */
--static int 
-+static int
- iop3xx_i2c_error(u32 sr)
- {
- 	int rc = 0;
-@@ -135,12 +135,12 @@ iop3xx_i2c_error(u32 sr)
- 		if ( !rc ) rc = -I2C_ERR_BERR;
- 	}
- 	if ((sr & IOP3XX_ISR_ALD)) {
--		if ( !rc ) rc = -I2C_ERR_ALD;		
-+		if ( !rc ) rc = -I2C_ERR_ALD;
- 	}
--	return rc;	
-+	return rc;
- }
- 
--static inline u32 
-+static inline u32
- iop3xx_i2c_get_srstat(struct i2c_algo_iop3xx_data *iop3xx_adap)
- {
- 	unsigned long flags;
-@@ -161,8 +161,8 @@ iop3xx_i2c_get_srstat(struct i2c_algo_iop3xx_data *iop3xx_adap)
- typedef int (* compare_func)(unsigned test, unsigned mask);
- /* returns 1 on correct comparison */
- 
--static int 
--iop3xx_i2c_wait_event(struct i2c_algo_iop3xx_data *iop3xx_adap, 
-+static int
-+iop3xx_i2c_wait_event(struct i2c_algo_iop3xx_data *iop3xx_adap,
- 			  unsigned flags, unsigned* status,
- 			  compare_func compare)
- {
-@@ -192,47 +192,47 @@ iop3xx_i2c_wait_event(struct i2c_algo_iop3xx_data *iop3xx_adap,
- }
- 
- /*
-- * Concrete compare_funcs 
-+ * Concrete compare_funcs
-  */
--static int 
-+static int
- all_bits_clear(unsigned test, unsigned mask)
- {
- 	return (test & mask) == 0;
- }
- 
--static int 
-+static int
- any_bits_set(unsigned test, unsigned mask)
- {
- 	return (test & mask) != 0;
- }
- 
--static int 
-+static int
- iop3xx_i2c_wait_tx_done(struct i2c_algo_iop3xx_data *iop3xx_adap, int *status)
- {
--	return iop3xx_i2c_wait_event( 
--		iop3xx_adap, 
-+	return iop3xx_i2c_wait_event(
-+		iop3xx_adap,
- 	        IOP3XX_ISR_TXEMPTY | IOP3XX_ISR_ALD | IOP3XX_ISR_BERRD,
- 		status, any_bits_set);
- }
- 
--static int 
-+static int
- iop3xx_i2c_wait_rx_done(struct i2c_algo_iop3xx_data *iop3xx_adap, int *status)
- {
--	return iop3xx_i2c_wait_event( 
--		iop3xx_adap, 
-+	return iop3xx_i2c_wait_event(
-+		iop3xx_adap,
- 		IOP3XX_ISR_RXFULL | IOP3XX_ISR_ALD | IOP3XX_ISR_BERRD,
- 		status,	any_bits_set);
- }
- 
--static int 
-+static int
- iop3xx_i2c_wait_idle(struct i2c_algo_iop3xx_data *iop3xx_adap, int *status)
- {
--	return iop3xx_i2c_wait_event( 
-+	return iop3xx_i2c_wait_event(
- 		iop3xx_adap, IOP3XX_ISR_UNITBUSY, status, all_bits_clear);
- }
- 
--static int 
--iop3xx_i2c_send_target_addr(struct i2c_algo_iop3xx_data *iop3xx_adap, 
-+static int
-+iop3xx_i2c_send_target_addr(struct i2c_algo_iop3xx_data *iop3xx_adap,
- 				struct i2c_msg* msg)
- {
- 	unsigned long cr = __raw_readl(iop3xx_adap->ioaddr + CR_OFFSET);
-@@ -247,7 +247,7 @@ iop3xx_i2c_send_target_addr(struct i2c_algo_iop3xx_data *iop3xx_adap,
- 	}
- 
- 	__raw_writel(iic_cook_addr(msg), iop3xx_adap->ioaddr + DBR_OFFSET);
--	
-+
- 	cr &= ~(IOP3XX_ICR_MSTOP | IOP3XX_ICR_NACK);
- 	cr |= IOP3XX_ICR_MSTART | IOP3XX_ICR_TBYTE;
- 
-@@ -257,8 +257,8 @@ iop3xx_i2c_send_target_addr(struct i2c_algo_iop3xx_data *iop3xx_adap,
- 	return rc;
- }
- 
--static int 
--iop3xx_i2c_write_byte(struct i2c_algo_iop3xx_data *iop3xx_adap, char byte, 
-+static int
-+iop3xx_i2c_write_byte(struct i2c_algo_iop3xx_data *iop3xx_adap, char byte,
- 				int stop)
- {
- 	unsigned long cr = __raw_readl(iop3xx_adap->ioaddr + CR_OFFSET);
-@@ -277,10 +277,10 @@ iop3xx_i2c_write_byte(struct i2c_algo_iop3xx_data *iop3xx_adap, char byte,
- 	rc = iop3xx_i2c_wait_tx_done(iop3xx_adap, &status);
- 
- 	return rc;
--} 
-+}
- 
--static int 
--iop3xx_i2c_read_byte(struct i2c_algo_iop3xx_data *iop3xx_adap, char* byte, 
-+static int
-+iop3xx_i2c_read_byte(struct i2c_algo_iop3xx_data *iop3xx_adap, char* byte,
- 				int stop)
- {
- 	unsigned long cr = __raw_readl(iop3xx_adap->ioaddr + CR_OFFSET);
-@@ -304,19 +304,19 @@ iop3xx_i2c_read_byte(struct i2c_algo_iop3xx_data *iop3xx_adap, char* byte,
- 	return rc;
- }
- 
--static int 
-+static int
- iop3xx_i2c_writebytes(struct i2c_adapter *i2c_adap, const char *buf, int count)
- {
- 	struct i2c_algo_iop3xx_data *iop3xx_adap = i2c_adap->algo_data;
- 	int ii;
- 	int rc = 0;
- 
--	for (ii = 0; rc == 0 && ii != count; ++ii) 
-+	for (ii = 0; rc == 0 && ii != count; ++ii)
- 		rc = iop3xx_i2c_write_byte(iop3xx_adap, buf[ii], ii==count-1);
- 	return rc;
- }
- 
--static int 
-+static int
- iop3xx_i2c_readbytes(struct i2c_adapter *i2c_adap, char *buf, int count)
- {
- 	struct i2c_algo_iop3xx_data *iop3xx_adap = i2c_adap->algo_data;
-@@ -325,7 +325,7 @@ iop3xx_i2c_readbytes(struct i2c_adapter *i2c_adap, char *buf, int count)
- 
- 	for (ii = 0; rc == 0 && ii != count; ++ii)
- 		rc = iop3xx_i2c_read_byte(iop3xx_adap, &buf[ii], ii==count-1);
--	
-+
- 	return rc;
- }
- 
-@@ -336,8 +336,8 @@ iop3xx_i2c_readbytes(struct i2c_adapter *i2c_adap, char *buf, int count)
-  * Each transfer (i.e. a read or a write) is separated by a repeated start
-  * condition.
-  */
--static int 
--iop3xx_i2c_handle_msg(struct i2c_adapter *i2c_adap, struct i2c_msg* pmsg) 
-+static int
-+iop3xx_i2c_handle_msg(struct i2c_adapter *i2c_adap, struct i2c_msg* pmsg)
- {
- 	struct i2c_algo_iop3xx_data *iop3xx_adap = i2c_adap->algo_data;
- 	int rc;
-@@ -357,8 +357,8 @@ iop3xx_i2c_handle_msg(struct i2c_adapter *i2c_adap, struct i2c_msg* pmsg)
- /*
-  * master_xfer() - main read/write entry
-  */
--static int 
--iop3xx_i2c_master_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs, 
-+static int
-+iop3xx_i2c_master_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs,
- 				int num)
- {
- 	struct i2c_algo_iop3xx_data *iop3xx_adap = i2c_adap->algo_data;
-@@ -375,14 +375,14 @@ iop3xx_i2c_master_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs,
- 	}
- 
- 	iop3xx_i2c_transaction_cleanup(iop3xx_adap);
--	
-+
- 	if(ret)
- 		return ret;
- 
--	return im;   
-+	return im;
- }
- 
--static u32 
-+static u32
- iop3xx_i2c_func(struct i2c_adapter *adap)
- {
- 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-@@ -393,11 +393,11 @@ static const struct i2c_algorithm iop3xx_i2c_algo = {
- 	.functionality	= iop3xx_i2c_func,
- };
- 
--static int 
-+static int
- iop3xx_i2c_remove(struct platform_device *pdev)
- {
- 	struct i2c_adapter *padapter = platform_get_drvdata(pdev);
--	struct i2c_algo_iop3xx_data *adapter_data = 
-+	struct i2c_algo_iop3xx_data *adapter_data =
- 		(struct i2c_algo_iop3xx_data *)padapter->algo_data;
- 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	unsigned long cr = __raw_readl(adapter_data->ioaddr + CR_OFFSET);
-@@ -419,7 +419,7 @@ iop3xx_i2c_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int 
-+static int
- iop3xx_i2c_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
+ #define ORION5X_PCIE_MEM_PHYS_BASE	0xe0000000
 -- 
 1.7.9.5
