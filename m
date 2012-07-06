@@ -1,31 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 6 Jul 2012 12:08:44 +0100
-Subject: [PATCH] clk: wm831x: fix checkpatch issue for static const char
- * array
-In-Reply-To: <CAGsJ_4zruQM8GhGGat_nCmoRd1R3Q-fSHV_OJs=yW6dnOQvYTw@mail.gmail.com>
-References: <1341395680-14142-1-git-send-email-Barry.Song@csr.com>
- <20120704101936.GD4111@opensource.wolfsonmicro.com>
- <CAGsJ_4zruQM8GhGGat_nCmoRd1R3Q-fSHV_OJs=yW6dnOQvYTw@mail.gmail.com>
-Message-ID: <20120706110843.GB4017@opensource.wolfsonmicro.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Jul 2012 13:09:08 +0200 (CEST)
+Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
+In-Reply-To: <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
+References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+ <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1207061308300.29809@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 10:37:19AM +0800, Barry Song wrote:
-> 2012/7/4 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+On Fri, 6 Jul 2012, javier Martin wrote:
 
-> > We need some additional clock API patches to get merged before this is
-> > OK, last time I checked the API wasn't const correct enough for it.
+> Hi,
+> can this patch be applied please?
+> 
+> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
 
-> ok. also with this conflict: "warning: initialization discards
-> qualifiers from pointer target type"
+Sorry? This patch has been applied and proven to break more, than it 
+fixed, so, it has been reverted. Am I missing something?
 
-Yes, that's the issue I'm referring to - we need the clock API to mark
-the inputs it takes as const before we can have the drivers declare
-thinngs const.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/76d0bdc0/attachment.sig>
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
