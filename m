@@ -1,78 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 06 Jul 2012 07:40:42 -0500
-Subject: [PATCH 1/1] ARM: add PROC_DEVICETREE support in Kconfig
-In-Reply-To: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
-References: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
-Message-ID: <4FF6DCCA.2080509@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri,  6 Jul 2012 13:43:18 +0100
+Subject: [PATCH 1/1] mfd: ab8500: Clean-up the last two ab8500 related DT
+ match tables
+Message-ID: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2012 05:38 AM, jgq516 at gmail.com wrote:
-> From: Xiao Jiang <jgq516@gmail.com>
-> 
-> Since more and more arm chips support device tree, it'd be better add PROC_DEVICETREE
-> in arch/arm/Kconfig to avoid duplicate code.
+A patch was recently submitted to stop all ab8500 devices from
+being registered through Device Tree. Instead, only the db8500
+will be DT:ed and the rest will continue to be registered via
+the MFD API, as they always were.
 
-I think this should remain user choice. If its going to be selected,
-then you might as well just remove the option altogether. Perhaps just
-make the option default to yes.
+Two patches have recently been applied which enable Device Tree
+probing; one for rtc-ab8500 and the other for ponkey-ab8500.
+These two need to be removed to prevent double-probing these
+devices with Device Tree is enabled.
 
-Rob
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/input/misc/ab8500-ponkey.c |    8 --------
+ drivers/rtc/rtc-ab8500.c           |    6 ------
+ 2 files changed, 14 deletions(-)
 
-> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
-> ---
->  arch/arm/Kconfig                   |    1 +
->  arch/arm/configs/at91_dt_defconfig |    1 -
->  arch/arm/configs/tegra_defconfig   |    1 -
->  arch/arm/plat-omap/Kconfig         |    1 -
->  4 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a91009c..f68896e 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1864,6 +1864,7 @@ config USE_OF
->  	select OF
->  	select OF_EARLY_FLATTREE
->  	select IRQ_DOMAIN
-> +	select PROC_DEVICETREE if PROC_FS
->  	help
->  	  Include support for flattened device tree machine descriptions.
->  
-> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-> index 67bc571..b856cb6 100644
-> --- a/arch/arm/configs/at91_dt_defconfig
-> +++ b/arch/arm/configs/at91_dt_defconfig
-> @@ -64,7 +64,6 @@ CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_ATMEL=y
->  CONFIG_MTD_UBI=y
->  CONFIG_MTD_UBI_GLUEBI=y
-> -CONFIG_PROC_DEVICETREE=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_RAM=y
->  CONFIG_BLK_DEV_RAM_COUNT=4
-> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-> index 1198dd6..43e7b65 100644
-> --- a/arch/arm/configs/tegra_defconfig
-> +++ b/arch/arm/configs/tegra_defconfig
-> @@ -72,7 +72,6 @@ CONFIG_IPV6_TUNNEL=y
->  CONFIG_IPV6_MULTIPLE_TABLES=y
->  # CONFIG_WIRELESS is not set
->  # CONFIG_FIRMWARE_IN_KERNEL is not set
-> -CONFIG_PROC_DEVICETREE=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_AD525X_DPOT=y
->  CONFIG_AD525X_DPOT_I2C=y
-> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> index ad95c7a..4e2cb17 100644
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -27,7 +27,6 @@ config ARCH_OMAP2PLUS
->  	select GENERIC_IRQ_CHIP
->  	select OMAP_DM_TIMER
->  	select USE_OF
-> -	select PROC_DEVICETREE if PROC_FS
->  	help
->  	  "Systems based on OMAP2, OMAP3 or OMAP4"
->  
-> 
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index 84ec691..5ceb23e 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -132,18 +132,10 @@ static int __devexit ab8500_ponkey_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_OF
+-static const struct of_device_id ab8500_ponkey_match[] = {
+-	{ .compatible = "stericsson,ab8500-ponkey", },
+-	{}
+-};
+-#endif
+-
+ static struct platform_driver ab8500_ponkey_driver = {
+ 	.driver		= {
+ 		.name	= "ab8500-poweron-key",
+ 		.owner	= THIS_MODULE,
+-		.of_match_table = of_match_ptr(ab8500_ponkey_match),
+ 	},
+ 	.probe		= ab8500_ponkey_probe,
+ 	.remove		= __devexit_p(ab8500_ponkey_remove),
+diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
+index bf3c2f6..2e5970f 100644
+--- a/drivers/rtc/rtc-ab8500.c
++++ b/drivers/rtc/rtc-ab8500.c
+@@ -462,16 +462,10 @@ static int __devexit ab8500_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ab8500_rtc_match[] = {
+-	{ .compatible = "stericsson,ab8500-rtc", },
+-	{}
+-};
+-
+ static struct platform_driver ab8500_rtc_driver = {
+ 	.driver = {
+ 		.name = "ab8500-rtc",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ab8500_rtc_match,
+ 	},
+ 	.probe	= ab8500_rtc_probe,
+ 	.remove = __devexit_p(ab8500_rtc_remove),
+-- 
+1.7.9.5
