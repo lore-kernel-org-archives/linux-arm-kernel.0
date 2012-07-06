@@ -1,50 +1,51 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 6 Jul 2012 13:31:44 +0200
-Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
-In-Reply-To: <Pine.LNX.4.64.1207061308300.29809@axis700.grange>
-References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
- <Pine.LNX.4.64.1207061308300.29809@axis700.grange>
-Message-ID: <CACKLOr0nwKoO4UL9MKZJmD9WN1uyJhpNzAybd7w7x-GnLtM5cw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri,  6 Jul 2012 13:26:11 +0200
+Subject: [PATCH 2/2] ARM: at91: gpio: implement gpio_free
+In-Reply-To: <1341573971-30145-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1341573971-30145-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1341573971-30145-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+configure a gpio as input when freeing it to reduce power consumption
 
-On 6 July 2012 13:09, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> On Fri, 6 Jul 2012, javier Martin wrote:
->
->> Hi,
->> can this patch be applied please?
->>
->> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
->
-> Sorry? This patch has been applied and proven to break more, than it
-> fixed, so, it has been reverted. Am I missing something?
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/gpio.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Patch v1 was the version that broke pass-through mode (which nobody
-seems to be using/testing). It was applied, then it was reverted as
-you requested in [1].
-
-Then I sent v2 that didn't break pass-through but was invalid too
-because of a merge conflict [2].
-
-Finally, this is v3 which has the pass-through problem and the merge
-problem fixed. It is currently marked as "Under review" and should be
-applied as a fix to 3.5.
-
-It can be applied safely since the patch I stated previously is
-already in 3.5-rc5 [4] (it was applied through the imx tree).
-
-[1] http://patchwork.linuxtv.org/patch/11504/
-[2] http://patchwork.linuxtv.org/patch/11558/
-[3] http://patchwork.linuxtv.org/patch/11559/
-[4] http://patchwork.linuxtv.org/patch/10483/
---
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 994ed02..3833f82 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -45,6 +45,7 @@ struct at91_gpio_chip {
+ #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+ 
+ static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
++static void at91_gpiolib_free(struct gpio_chip *chip, unsigned offset);
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
+@@ -59,6 +60,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 		.chip = {						\
+ 			.label		  = name,			\
+ 			.request	  = at91_gpiolib_request,	\
++			.free		  = at91_gpiolib_free,		\
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
+@@ -863,7 +865,10 @@ void __init at91_gpio_irq_setup(void)
+ }
+ 
+ /* gpiolib support */
+-
++static void at91_gpiolib_free(struct gpio_chip *chip, unsigned offset)
++{
++	at91_gpiolib_direction_input(chip, offset);
++}
+ 
+ static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
+ {
+-- 
+1.7.10
