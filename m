@@ -1,71 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jul 2012 13:43:18 +0100
-Subject: [PATCH 1/1] mfd: ab8500: Clean-up the last two ab8500 related DT
- match tables
-Message-ID: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 6 Jul 2012 18:17:43 +0530
+Subject: [PATCH v2 00/14] ARM: OMAP5: Add minimal OMAP5 SOC support
+In-Reply-To: <20120706123611.GW1122@atomide.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120706123611.GW1122@atomide.com>
+Message-ID: <CAMQu2gxJkQoOUK3sn78e8BZ9fZx4jxS4YOdV_VBrAygSU1fAnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A patch was recently submitted to stop all ab8500 devices from
-being registered through Device Tree. Instead, only the db8500
-will be DT:ed and the rest will continue to be registered via
-the MFD API, as they always were.
+On Fri, Jul 6, 2012 at 6:06 PM, Tony Lindgren <tony@atomide.com> wrote:
+>
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120706 02:26]:
+> > Tony,
+> >
+> > Here is the updated series with suggested corrections and generated
+> > against
+> > the latest cleanup-part2 at commit ae6df418. The series adds minimal
+> > OMAP5
+> > support. OMAP5430 has a dual core Cortex-A15 based MPU subsystem with
+> > 2MB
+> > L2 cache. The SOC has many compatible blocks with OMAP4 SOCS and hence
+> > large part of the peripherals are re-used.
+>
+> Looking good to me, just one cosmetic comment below:
+>
+Great.
 
-Two patches have recently been applied which enable Device Tree
-probing; one for rtc-ab8500 and the other for ponkey-ab8500.
-These two need to be removed to prevent double-probing these
-devices with Device Tree is enabled.
+> >   ARM: OMAP: counter-32k: Select the CR register offset using the IP
+> > scheme.
+> >   ARM: OMAP5: l3: Add l3 error handler support for omap5.
+> >   ARM: omap2+: board-generic: clean up the irq data from board file.
+> >   ARM: OMAP5: board-generic: Add device tree support.
+> >   ARM: OMAP5: Add SMP support.
+>
+> Can you please remove the trailing period from the patch title lines?
+> That's not typically used..
+>
+I agree. Fixed it and update the branch.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/input/misc/ab8500-ponkey.c |    8 --------
- drivers/rtc/rtc-ab8500.c           |    6 ------
- 2 files changed, 14 deletions(-)
-
-diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-index 84ec691..5ceb23e 100644
---- a/drivers/input/misc/ab8500-ponkey.c
-+++ b/drivers/input/misc/ab8500-ponkey.c
-@@ -132,18 +132,10 @@ static int __devexit ab8500_ponkey_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_OF
--static const struct of_device_id ab8500_ponkey_match[] = {
--	{ .compatible = "stericsson,ab8500-ponkey", },
--	{}
--};
--#endif
--
- static struct platform_driver ab8500_ponkey_driver = {
- 	.driver		= {
- 		.name	= "ab8500-poweron-key",
- 		.owner	= THIS_MODULE,
--		.of_match_table = of_match_ptr(ab8500_ponkey_match),
- 	},
- 	.probe		= ab8500_ponkey_probe,
- 	.remove		= __devexit_p(ab8500_ponkey_remove),
-diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
-index bf3c2f6..2e5970f 100644
---- a/drivers/rtc/rtc-ab8500.c
-+++ b/drivers/rtc/rtc-ab8500.c
-@@ -462,16 +462,10 @@ static int __devexit ab8500_rtc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id ab8500_rtc_match[] = {
--	{ .compatible = "stericsson,ab8500-rtc", },
--	{}
--};
--
- static struct platform_driver ab8500_rtc_driver = {
- 	.driver = {
- 		.name = "ab8500-rtc",
- 		.owner = THIS_MODULE,
--		.of_match_table = ab8500_rtc_match,
- 	},
- 	.probe	= ab8500_rtc_probe,
- 	.remove = __devexit_p(ab8500_rtc_remove),
--- 
-1.7.9.5
+Regards,
+Santosh
