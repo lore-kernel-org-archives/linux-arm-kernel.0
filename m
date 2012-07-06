@@ -1,300 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 6 Jul 2012 14:38:05 +0200
-Subject: [PATCH] ARM: dts: imx: update #interrupt-cells for gpio nodes
-In-Reply-To: <1341576493-10936-1-git-send-email-shawn.guo@linaro.org>
-References: <20120706075434.GE30009@pengutronix.de>
- <1341576493-10936-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120706123805.GI30009@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Jul 2012 14:38:53 +0200 (CEST)
+Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
+In-Reply-To: <CACKLOr1RKcwEqt9E90wbf5peB08erb7nOo+KVQ7m87BbsDJhbA@mail.gmail.com>
+References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+ <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
+ <Pine.LNX.4.64.1207061308300.29809@axis700.grange>
+ <CACKLOr0nwKoO4UL9MKZJmD9WN1uyJhpNzAybd7w7x-GnLtM5cw@mail.gmail.com>
+ <Pine.LNX.4.64.1207061338170.29809@axis700.grange>
+ <CACKLOr1RKcwEqt9E90wbf5peB08erb7nOo+KVQ7m87BbsDJhbA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1207061437470.29809@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 08:08:13PM +0800, Shawn Guo wrote:
-> Change the value of #interrupt-cells of gpio nodes from 1 to 2, so that
-> the gpio irq type can be specified in device tree.  Also update binding
-> document to make it clear.
-> 
-> Reported-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Fri, 6 Jul 2012, javier Martin wrote:
 
-Thanks Shawn
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
-> ---
->  .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |    9 +++++++++
->  arch/arm/boot/dts/imx27.dtsi                       |   12 ++++++------
->  arch/arm/boot/dts/imx51.dtsi                       |    8 ++++----
->  arch/arm/boot/dts/imx53.dtsi                       |   14 +++++++-------
->  arch/arm/boot/dts/imx6q.dtsi                       |   14 +++++++-------
->  5 files changed, 33 insertions(+), 24 deletions(-)
+> Hi Guennadi,
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
-> index 5f360e7..4f39297 100644
-> --- a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
-> +++ b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
-> @@ -11,6 +11,13 @@ Required properties:
->    the second cell is used to specify the gpio polarity:
->        0 = active high
->        1 = active low
-> +- interrupt-controller: Marks the device node as an interrupt controller.
-> +- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
-> +  The second cell bits[3:0] is used to specify trigger type and level flags:
-> +      1 = low-to-high edge triggered.
-> +      2 = high-to-low edge triggered.
-> +      4 = active high level-sensitive.
-> +      8 = active low level-sensitive.
->  
->  Example:
->  
-> @@ -20,4 +27,6 @@ gpio0: gpio at 73f84000 {
->  	interrupts = <50 51>;
->  	gpio-controller;
->  	#gpio-cells = <2>;
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
->  };
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 386c769..00bae3a 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -121,7 +121,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio2: gpio at 10015100 {
-> @@ -131,7 +131,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio3: gpio at 10015200 {
-> @@ -141,7 +141,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio4: gpio at 10015300 {
-> @@ -151,7 +151,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio5: gpio at 10015400 {
-> @@ -161,7 +161,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio6: gpio at 10015500 {
-> @@ -171,7 +171,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			cspi3: cspi at 10017000 {
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index bfa65ab..922adef 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -133,7 +133,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio2: gpio at 73f88000 {
-> @@ -143,7 +143,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio3: gpio at 73f8c000 {
-> @@ -153,7 +153,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio4: gpio at 73f90000 {
-> @@ -163,7 +163,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			wdog at 73f98000 { /* WDOG1 */
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index e3e8694..4e735ed 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -135,7 +135,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio2: gpio at 53f88000 {
-> @@ -145,7 +145,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio3: gpio at 53f8c000 {
-> @@ -155,7 +155,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio4: gpio at 53f90000 {
-> @@ -165,7 +165,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			wdog at 53f98000 { /* WDOG1 */
-> @@ -203,7 +203,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio6: gpio at 53fe0000 {
-> @@ -213,7 +213,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio7: gpio at 53fe4000 {
-> @@ -223,7 +223,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			i2c at 53fec000 { /* I2C3 */
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 16a3884..bf88fb7 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -283,7 +283,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio2: gpio at 020a0000 {
-> @@ -293,7 +293,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio3: gpio at 020a4000 {
-> @@ -303,7 +303,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio4: gpio at 020a8000 {
-> @@ -313,7 +313,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio5: gpio at 020ac000 {
-> @@ -323,7 +323,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio6: gpio at 020b0000 {
-> @@ -333,7 +333,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			gpio7: gpio at 020b4000 {
-> @@ -343,7 +343,7 @@
->  				gpio-controller;
->  				#gpio-cells = <2>;
->  				interrupt-controller;
-> -				#interrupt-cells = <1>;
-> +				#interrupt-cells = <2>;
->  			};
->  
->  			kpp at 020b8000 {
-> -- 
-> 1.7.5.4
+> On 6 July 2012 13:39, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > On Fri, 6 Jul 2012, javier Martin wrote:
+> >
+> >> Hi Guennadi,
+> >>
+> >> On 6 July 2012 13:09, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> >> > On Fri, 6 Jul 2012, javier Martin wrote:
+> >> >
+> >> >> Hi,
+> >> >> can this patch be applied please?
+> >> >>
+> >> >> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
+> >> >
+> >> > Sorry? This patch has been applied and proven to break more, than it
+> >> > fixed, so, it has been reverted. Am I missing something?
+> >>
+> >> Patch v1 was the version that broke pass-through mode (which nobody
+> >> seems to be using/testing). It was applied, then it was reverted as
+> >> you requested in [1].
+> >>
+> >> Then I sent v2 that didn't break pass-through but was invalid too
+> >> because of a merge conflict [2].
+> >>
+> >> Finally, this is v3 which has the pass-through problem and the merge
+> >> problem fixed. It is currently marked as "Under review" and should be
+> >> applied as a fix to 3.5.
+> >
+> > Ah, ok, then, don't you think, that expecting your patch to be applied
+> > within 4 minutes of its submission is a bit... overoptimistic? Because
+> > it's 4 minutes after your original patch, that you've sent your
+> > "reminder"...
 > 
+> This patch was sent on '2012-06-01 09:31:45', which is more than a
+> month ago. Look at patchwork:
+> http://patchwork.linuxtv.org/patch/11559/
 > 
-> 
+> I think that a month is a reasonable period to send a reminder and I
+> didn't mean to offend anyone with it.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Hrm, right, sorry. Must have been blind. I've looked at v3 of your patch, 
+I've got one more question to it, expect a reply in a few minutes.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
