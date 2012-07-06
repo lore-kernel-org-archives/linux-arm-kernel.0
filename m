@@ -1,47 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jul 2012 22:01:30 +0100
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <Pine.LNX.4.64.1207061737410.29809@axis700.grange>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206252030.56025.arnd@arndb.de>
- <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
- <201207061528.58291.arnd@arndb.de>
- <Pine.LNX.4.64.1207061737410.29809@axis700.grange>
-Message-ID: <20120706210130.GB31585@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 06 Jul 2012 14:04:30 -0700
+Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
+In-Reply-To: <20120706203005.GF31508@n2100.arm.linux.org.uk>
+References: <1341531958-31721-1-git-send-email-sboyd@codeaurora.org>
+ <20120706002404.GJ2522@linux.vnet.ibm.com> <4FF730CD.7050907@codeaurora.org>
+ <20120706203005.GF31508@n2100.arm.linux.org.uk>
+Message-ID: <4FF752DE.7000104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 05:43:38PM +0200, Guennadi Liakhovetski wrote:
-> Hi Arnd
-> 
-> On Fri, 6 Jul 2012, Arnd Bergmann wrote:
-> > How would the individual driver know the size of the filter_arg?
-> 
-> In exactly the same way as most dmaengine drivers do it today: they don't 
-> touch filter_arg until they're sure this is one of their channels. And 
-> this they typically do by comparing the driver pointer, e.g.:
-> 
-> bool sa11x0_dma_filter_fn(struct dma_chan *chan, void *param)
-> {
-> 	if (chan->device->dev->driver == &sa11x0_dma_driver.driver) {
+On 07/06/12 13:30, Russell King - ARM Linux wrote:
+> On Fri, Jul 06, 2012 at 11:39:09AM -0700, Stephen Boyd wrote:
+>> On 07/05/12 17:24, Paul E. McKenney wrote:
+>>> On Thu, Jul 05, 2012 at 04:45:58PM -0700, Stephen Boyd wrote:
+>>>> @@ -179,7 +184,7 @@ void __ref cpu_die(void)
+>>>>  	mb();
+>>>>
+>>>>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+>>>> -	complete(&cpu_died);
+>>>> +	__this_cpu_write(cpu_state, CPU_DEAD);
+>>> Or you could do something like:
+>>>
+>>> 	RCU_NONIDLE(complete(&cpu_died));
+>>>
+>>> This would tell RCU that it needed to pay attention to this CPU for
+>>> the duration of the "complete()" function call despite the CPU's being
+>>> idle.  And might allow you to dispense with the rest of the patch.
+>> Great! I like that more since we get to keep the completion mechanism
+>> instead of a busy wait.
+>>
+>> Russell, which one would you prefer? Here's the other version
+> I think I prefer the version below.
+>
 
-That's utter rubbish, I'm afraid.
+Ok. I put it in the patch tracker.
 
-Let's say you move that code into sa11x0's alloc_chan_resources() function.
-It will _never_ be called for a channel which isn't owned by the sa11x0
-DMA driver - look at what __dma_request_channel() does:
-
-        list_for_each_entry_safe(device, _d, &dma_device_list, global_node) {
-
-This walks the list of DMA devices.
-
-                chan = private_candidate(mask, device, fn, fn_param);
-
-This walks the channels _on_ _that_ dma device.  Those channels can only
-be owned by the DMA device, which is in turn owned by the driver, which
-in turn is owned by the struct driver that the above filter function
-is checking.
-
-So, all in all, this check inside chan_alloc_resources() tells you
-absolutely _nothing_ about the suitability of dereferencing your
-filter_arg data.  At all.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
