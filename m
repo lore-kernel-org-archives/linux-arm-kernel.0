@@ -1,170 +1,183 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:40 -0500
-Subject: [PATCH 15/15] ARM: iop3xx: use fixed PCI i/o mapping
-In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-16-git-send-email-robherring2@gmail.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Fri,  6 Jul 2012 20:42:38 +0200
+Subject: [RFC][PATCH] ARM: Kirkwood: Fix PHY disable clk problems
+Message-ID: <1341600158-7773-1-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Commit 98d9986 (ARM: Kirkwood: Replace clock gating) and the fix 5fb2ce
+(ARM: Kirkwood: clk_register_gate_fn: add fn assignment) introduced a custom
+variant of clock gating which allows to define a function to be called
+before gating the clock off.
 
-Move iop33x and iop32x PCI to fixed i/o mapping and remove io.h. This
-changes the PCI bus addresses from the cpu address to 0 based. It appears
-that there is translation h/w for this, but its untested.
+This is used to disable the SATA and PCIe PHYs if the respective clocks
+are unused after initialization.
 
-Not sure what to do with io_offset. I think it should always be 0.
-AFAICT, PCI setup is skipped if the ATU is already setup.
+However, of these two drivers, the SATA driver may be compiled as a module.
+The driver re-enables the clocks at module init but the PHYs stay disabled.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Since the custom clock gating disabled the PHYs when gating the clock off,
+it should also re-enable them when enabling the clock gate.  This is done by
+adding a second function that may be used to enable the PHYs.
+
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- arch/arm/Kconfig                       |    2 --
- arch/arm/include/asm/hardware/iop3xx.h |   12 +-----------
- arch/arm/mach-iop32x/include/mach/io.h |   19 -------------------
- arch/arm/mach-iop33x/include/mach/io.h |   19 -------------------
- arch/arm/plat-iop/pci.c                |    4 ++--
- arch/arm/plat-iop/setup.c              |    7 ++-----
- 6 files changed, 5 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/mach-iop32x/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop33x/include/mach/io.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1b7faa5..58bb75e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -495,7 +495,6 @@ config ARCH_IOP32X
- 	bool "IOP32x-based"
- 	depends on MMU
- 	select CPU_XSCALE
--	select NEED_MACH_IO_H
- 	select NEED_RET_TO_USER
- 	select PLAT_IOP
- 	select PCI
-@@ -508,7 +507,6 @@ config ARCH_IOP33X
- 	bool "IOP33x-based"
- 	depends on MMU
- 	select CPU_XSCALE
--	select NEED_MACH_IO_H
- 	select NEED_RET_TO_USER
- 	select PLAT_IOP
- 	select PCI
-diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
-index 2ff2c75..02fe2fb 100644
---- a/arch/arm/include/asm/hardware/iop3xx.h
-+++ b/arch/arm/include/asm/hardware/iop3xx.h
-@@ -217,18 +217,8 @@ extern int iop3xx_get_init_atu(void);
- #define IOP3XX_PCI_LOWER_MEM_PA	0x80000000
- #define IOP3XX_PCI_MEM_WINDOW_SIZE	0x08000000
+Hi,
+
+after the recent fix for clk_register_gate_fn(), it turned out that the
+sata_mv driver does not load anymore as a module.  The discussion how to fix
+this regression ended somehow inconclusive.  As a proposal, this fix (for
+v3.5-rc5) puts the responsibility to re-enable the PHYs onto gate_fn.
+
+- Simon
+
+
+ arch/arm/mach-kirkwood/common.c |   65 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 50 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index f261cd2..ec24902 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -67,6 +67,14 @@ void __init kirkwood_map_io(void)
+  * CLK tree
+  ****************************************************************************/
  
--#define IOP3XX_PCI_IO_WINDOW_SIZE	0x00010000
- #define IOP3XX_PCI_LOWER_IO_PA		0x90000000
--#define IOP3XX_PCI_LOWER_IO_VA		0xfe000000
--#define IOP3XX_PCI_LOWER_IO_BA		0x90000000
--#define IOP3XX_PCI_UPPER_IO_PA		(IOP3XX_PCI_LOWER_IO_PA +\
--					IOP3XX_PCI_IO_WINDOW_SIZE - 1)
--#define IOP3XX_PCI_UPPER_IO_VA		(IOP3XX_PCI_LOWER_IO_VA +\
--					IOP3XX_PCI_IO_WINDOW_SIZE - 1)
--#define IOP3XX_PCI_IO_PHYS_TO_VIRT(addr) (((u32) (addr) -\
--					IOP3XX_PCI_LOWER_IO_PA) +\
--					IOP3XX_PCI_LOWER_IO_VA)
--
-+#define IOP3XX_PCI_LOWER_IO_BA		0x00000000
++static void enable_sata0(void)
++{
++	/* Enable PLL and IVREF */
++	writel(readl(SATA0_PHY_MODE_2) | 0xf, SATA0_PHY_MODE_2);
++	/* Enable PHY */
++	writel(readl(SATA0_IF_CTRL) & ~0x200, SATA0_IF_CTRL);
++}
++
+ static void disable_sata0(void)
+ {
+ 	/* Disable PLL and IVREF */
+@@ -75,6 +83,14 @@ static void disable_sata0(void)
+ 	writel(readl(SATA0_IF_CTRL) | 0x200, SATA0_IF_CTRL);
+ }
  
- #ifndef __ASSEMBLY__
++static void enable_sata1(void)
++{
++	/* Enable PLL and IVREF */
++	writel(readl(SATA1_PHY_MODE_2) | 0xf, SATA1_PHY_MODE_2);
++	/* Enable PHY */
++	writel(readl(SATA1_IF_CTRL) & ~0x200, SATA1_IF_CTRL);
++}
++
+ static void disable_sata1(void)
+ {
+ 	/* Disable PLL and IVREF */
+@@ -107,23 +123,38 @@ static void disable_pcie1(void)
+ 	}
+ }
  
-diff --git a/arch/arm/mach-iop32x/include/mach/io.h b/arch/arm/mach-iop32x/include/mach/io.h
-deleted file mode 100644
-index e2ada26..0000000
---- a/arch/arm/mach-iop32x/include/mach/io.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * arch/arm/mach-iop32x/include/mach/io.h
-- *
-- * Copyright (C) 2001 MontaVista Software, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __IO_H
--#define __IO_H
--
--#include <asm/hardware/iop3xx.h>
--
--#define IO_SPACE_LIMIT		0xffffffff
--#define __io(p)		((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
--
--#endif
-diff --git a/arch/arm/mach-iop33x/include/mach/io.h b/arch/arm/mach-iop33x/include/mach/io.h
-deleted file mode 100644
-index f7c1b65..0000000
---- a/arch/arm/mach-iop33x/include/mach/io.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * arch/arm/mach-iop33x/include/mach/io.h
-- *
-- * Copyright (C) 2001  MontaVista Software, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __IO_H
--#define __IO_H
--
--#include <asm/hardware/iop3xx.h>
--
--#define IO_SPACE_LIMIT		0xffffffff
--#define __io(p)		((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
--
--#endif
-diff --git a/arch/arm/plat-iop/pci.c b/arch/arm/plat-iop/pci.c
-index 8daae9b..a9472bc 100644
---- a/arch/arm/plat-iop/pci.c
-+++ b/arch/arm/plat-iop/pci.c
-@@ -196,8 +196,8 @@ int iop3xx_pci_setup(int nr, struct pci_sys_data *sys)
- 	if (!res)
- 		panic("PCI: unable to alloc resources");
- 
--	res[0].start = IOP3XX_PCI_LOWER_IO_PA;
--	res[0].end   = IOP3XX_PCI_LOWER_IO_PA + IOP3XX_PCI_IO_WINDOW_SIZE - 1;
-+	res[0].start = IOP3XX_PCI_LOWER_IO_BA;
-+	res[0].end   = IOP3XX_PCI_LOWER_IO_BA + SZ_64K - 1;
- 	res[0].name  = "IOP3XX PCI I/O Space";
- 	res[0].flags = IORESOURCE_IO;
- 	request_resource(&ioport_resource, &res[0]);
-diff --git a/arch/arm/plat-iop/setup.c b/arch/arm/plat-iop/setup.c
-index bade586..1ab725b 100644
---- a/arch/arm/plat-iop/setup.c
-+++ b/arch/arm/plat-iop/setup.c
-@@ -13,6 +13,7 @@
- #include <linux/mm.h>
- #include <linux/init.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- #include <asm/hardware/iop3xx.h>
- 
- /*
-@@ -25,15 +26,11 @@ static struct map_desc iop3xx_std_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(IOP3XX_PERIPHERAL_PHYS_BASE),
- 		.length		= IOP3XX_PERIPHERAL_SIZE,
- 		.type		= MT_UNCACHED,
--	 }, {	/* PCI IO space */
--		.virtual	= IOP3XX_PCI_LOWER_IO_VA,
--		.pfn		= __phys_to_pfn(IOP3XX_PCI_LOWER_IO_PA),
--		.length		= IOP3XX_PCI_IO_WINDOW_SIZE,
--		.type		= MT_DEVICE,
- 	 },
+-/* An extended version of the gated clk. This calls fn() before
+- * disabling the clock. We use this to turn off PHYs etc. */
++/* An extended version of the gated clk. This calls fn_en()/fn_dis
++ * before enabling/disabling the clock.  We use this to turn on/off
++ * PHYs etc.  */
+ struct clk_gate_fn {
+ 	struct clk_gate gate;
+-	void (*fn)(void);
++	void (*fn_en)(void);
++	void (*fn_dis)(void);
  };
  
- void __init iop3xx_map_io(void)
+ #define to_clk_gate_fn(_gate) container_of(_gate, struct clk_gate_fn, gate)
+ #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+ 
++static int clk_gate_fn_enable(struct clk_hw *hw)
++{
++	struct clk_gate *gate = to_clk_gate(hw);
++	struct clk_gate_fn *gate_fn = to_clk_gate_fn(gate);
++	int ret;
++
++	ret = clk_gate_ops.enable(hw);
++	if (!ret && gate_fn->fn_en)
++		gate_fn->fn_en();
++
++	return ret;
++}
++
+ static void clk_gate_fn_disable(struct clk_hw *hw)
  {
-+	pci_map_io_single(IOP3XX_PCI_LOWER_IO_PA);
- 	iotable_init(iop3xx_std_desc, ARRAY_SIZE(iop3xx_std_desc));
+ 	struct clk_gate *gate = to_clk_gate(hw);
+ 	struct clk_gate_fn *gate_fn = to_clk_gate_fn(gate);
+ 
+-	if (gate_fn->fn)
+-		gate_fn->fn();
++	if (gate_fn->fn_dis)
++		gate_fn->fn_dis();
+ 
+ 	clk_gate_ops.disable(hw);
  }
+@@ -135,7 +166,7 @@ static struct clk __init *clk_register_gate_fn(struct device *dev,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock,
+-		void (*fn)(void))
++		void (*fn_en)(void), void (*fn_dis)(void))
+ {
+ 	struct clk_gate_fn *gate_fn;
+ 	struct clk *clk;
+@@ -159,11 +190,14 @@ static struct clk __init *clk_register_gate_fn(struct device *dev,
+ 	gate_fn->gate.flags = clk_gate_flags;
+ 	gate_fn->gate.lock = lock;
+ 	gate_fn->gate.hw.init = &init;
+-	gate_fn->fn = fn;
++	gate_fn->fn_en = fn_en;
++	gate_fn->fn_dis = fn_dis;
+ 
+-	/* ops is the gate ops, but with our disable function */
+-	if (clk_gate_fn_ops.disable != clk_gate_fn_disable) {
++	/* ops is the gate ops, but with our enable/disable functions */
++	if (clk_gate_fn_ops.enable != clk_gate_fn_enable ||
++	    clk_gate_fn_ops.disable != clk_gate_fn_disable) {
+ 		clk_gate_fn_ops = clk_gate_ops;
++		clk_gate_fn_ops.enable = clk_gate_fn_enable;
+ 		clk_gate_fn_ops.disable = clk_gate_fn_disable;
+ 	}
+ 
+@@ -187,11 +221,12 @@ static struct clk __init *kirkwood_register_gate(const char *name, u8 bit_idx)
+ 
+ static struct clk __init *kirkwood_register_gate_fn(const char *name,
+ 						    u8 bit_idx,
+-						    void (*fn)(void))
++						    void (*fn_en)(void),
++						    void (*fn_dis)(void))
+ {
+ 	return clk_register_gate_fn(NULL, name, "tclk", 0,
+ 				    (void __iomem *)CLOCK_GATING_CTRL,
+-				    bit_idx, 0, &gating_lock, fn);
++				    bit_idx, 0, &gating_lock, fn_en, fn_dis);
+ }
+ 
+ static struct clk *ge0, *ge1;
+@@ -208,18 +243,18 @@ void __init kirkwood_clk_init(void)
+ 	ge0 = kirkwood_register_gate("ge0",    CGC_BIT_GE0);
+ 	ge1 = kirkwood_register_gate("ge1",    CGC_BIT_GE1);
+ 	sata0 = kirkwood_register_gate_fn("sata0",  CGC_BIT_SATA0,
+-					  disable_sata0);
++					  enable_sata0, disable_sata0);
+ 	sata1 = kirkwood_register_gate_fn("sata1",  CGC_BIT_SATA1,
+-					  disable_sata1);
++					  enable_sata1, disable_sata1);
+ 	usb0 = kirkwood_register_gate("usb0",   CGC_BIT_USB0);
+ 	sdio = kirkwood_register_gate("sdio",   CGC_BIT_SDIO);
+ 	crypto = kirkwood_register_gate("crypto", CGC_BIT_CRYPTO);
+ 	xor0 = kirkwood_register_gate("xor0",   CGC_BIT_XOR0);
+ 	xor1 = kirkwood_register_gate("xor1",   CGC_BIT_XOR1);
+ 	pex0 = kirkwood_register_gate_fn("pex0",   CGC_BIT_PEX0,
+-					 disable_pcie0);
++					 NULL, disable_pcie0);
+ 	pex1 = kirkwood_register_gate_fn("pex1",   CGC_BIT_PEX1,
+-					 disable_pcie1);
++					 NULL, disable_pcie1);
+ 	audio = kirkwood_register_gate("audio",  CGC_BIT_AUDIO);
+ 	kirkwood_register_gate("tdm",    CGC_BIT_TDM);
+ 	kirkwood_register_gate("tsu",    CGC_BIT_TSU);
 -- 
 1.7.9.5
