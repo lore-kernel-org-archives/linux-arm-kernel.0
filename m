@@ -1,63 +1,36 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Fri, 6 Jul 2012 17:56:34 -0500
-Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120706002254.GB20175@S2101-09.ap.freescale.net>
-References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
- <20120705182829.d13d6992406e02e1024552e3@freescale.com>
- <20120706002254.GB20175@S2101-09.ap.freescale.net>
-Message-ID: <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 6 Jul 2012 15:58:33 -0700
+Subject: [PATCH, RFC] i.MX DRM support
+In-Reply-To: <20120702100506.GI24458@pengutronix.de>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+ <20120702100506.GI24458@pengutronix.de>
+Message-ID: <20120706225833.GA22265@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jul 2012 08:22:56 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
-
-> On Thu, Jul 05, 2012 at 06:28:29PM -0500, Kim Phillips wrote:
-> > On Wed, 4 Jul 2012 23:38:14 +0800
-> > Shawn Guo <shawn.guo@linaro.org> wrote:
+On Mon, Jul 02, 2012 at 12:05:06PM +0200, Sascha Hauer wrote:
+> On Thu, Jun 14, 2012 at 03:43:22PM +0200, Sascha Hauer wrote:
+> > Hi All,
 > > 
-> > > +static const struct of_device_id __devinitconst snvs_dt_ids[] = {
-> > > +	{ .compatible = "fsl,sec-v4.0-mon-rtc-lp", },
+> > The following is the state-of-the-art i.MX IPU (Image Processing Unit)
+> > DRM support.
 > > 
-> > the driver should be compatible with "fsl,sec-v4.0-mon", and its
-> > probe function search for "fsl,sec-v4.0-mon-rtc-lp" sub-compatibles
-> > (and possibly "fsl,sec-v4.0-mon-rtc-hp" in the future?).
-> > 
-> So you think snvs is all about rtc (lp and hp), nothing else?  If that
+> > This code is around for quite some time now and has been posted several
+> > times with different APIs, first with plain old framebuffer support, now
+> > DRM, first platform device binding, now devicetree. Unfortunately there's
+> > quite much code needed to get something useful out of the IPU, so these
+> > patches haven't received a lot of attention from people not involved in
+> > i.MX. I think we have now come to a point where this code needs more public
+> > exposure and where it's easier to talk in incremental changes instead of
+> > blobs. Therefore I request this to go to staging for some cycles.
+> 
+> Dave, Greg,
+> 
+> Comments to this one? I addressed the comments I received so far and am
+> about to respin this series. Is it ok to put this to staging? If yes,
+> should I move the whole stuff into drivers/staging/ or should it stay
+> in drivers/gpu/drm with just a Kconfig dependency on STAGING?
 
-no, I'm aware that it's more than a couple of RTCs.
+That's up to the DRM subsystem maintainer to choose.
 
-> is true, it's reasonable to do what you suggested here.  Otherwise, we
-> should have a snvs driver be compatible with "fsl,sec-v4.0-mon", and
-> this driver should be responsible for populate all the sub-devices of
-> snvs, rtc-lp, rtc-hp, and others.  In the latter case, rtc-snvs should
-> just stay as it stands right now.
-
-but it doesn't function as it stands right now, at least on Power.
-The compatible in the device tree's sec_mon node "fsl,sec-v4.0-mon"
-and the driver's "fsl,sec-v4.0-mon-rtc-lp" don't match.  Here are
-the device tree changes I used:
-
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
-index 7990e0d..14c933b 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
-@@ -104,6 +104,14 @@ crypto: crypto at 300000 {
- 
- sec_mon: sec_mon at 314000 {
-        compatible = "fsl,sec-v4.2-mon", "fsl,sec-v4.0-mon";
-+       #address-cells = <1>;
-+       #size-cells = <1>;
-+       ranges = <0 0x314000 0x1000>;
-        reg = <0x314000 0x1000>;
-        interrupts = <93 2 0 0>;
-+
-+       sec_mon_rtc_lp at 34 {
-+               compatible = "fsl,sec-v4.2-mon-rtc-lp", "fsl,sec-v4.0-mon-rtc-lp";
-+               reg = <0x34 0x58>;
-+       };
- };
-
-btw, I don't see any imx6q.dtsi changes.
-
-Kim
+greg k-h
