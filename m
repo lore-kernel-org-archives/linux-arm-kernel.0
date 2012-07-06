@@ -1,118 +1,104 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 6 Jul 2012 23:00:09 +0200
-Subject: [PATCH v2 01/12] ARM: Orion: DT support for IRQ and GPIO
- Controllers
-In-Reply-To: <201207062008.23952.arnd@arndb.de>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <201207051454.24475.arnd@arndb.de> <20120705161600.GA28860@lunn.ch>
- <201207062008.23952.arnd@arndb.de>
-Message-ID: <20120706210009.GC11470@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 06 Jul 2012 15:01:41 -0600
+Subject: [PATCH 03/15] ARM: tegra: use fixed PCI i/o mapping
+In-Reply-To: <4FF74C61.4060903@wwwdotorg.org>
+References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+ <1341600040-30993-4-git-send-email-robherring2@gmail.com>
+ <4FF74028.6090300@wwwdotorg.org> <4FF74689.8070103@gmail.com>
+ <4FF74789.8000804@wwwdotorg.org> <4FF74C61.4060903@wwwdotorg.org>
+Message-ID: <4FF75235.2050104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 08:08:23PM +0000, Arnd Bergmann wrote:
-> On Thursday 05 July 2012, Andrew Lunn wrote:
-> > > I think the latter one needs to be
-> > > 
-> > > +static int __initdata gpio1_irqs[4] = {
-> > > +     IRQ_DOVE_HIGH_GPIO,
-> > > +     IRQ_DOVE_HIGH_GPIO,
-> > > +     IRQ_DOVE_HIGH_GPIO,
-> > > +     IRQ_DOVE_HIGH_GPIO,
-> > > +};
-> > > 
-> > > so we register all four parts to the same primary IRQ. The
-> > > same is true for the devicetree representation.
-> > 
-> > Nope, does not work like that.
-> > 
-> > It does not matter which IRQ of a GPIO chip fires. It looks at the IRQ
-> > cause bits for all lines and fires off the secondary ISR as needed for
-> > the whole chip. So in effect, there is a mapping IRQ->GPIO chip, not
-> > IRQ->1/4 of GPIO chip. With what you suggest above, you would end up
-> > with four chained interrupt handlers, all being handled by the same
-> > interrupt handler for one chio, and the last three in the chain would
-> > never do anything since the first one does all the work.
+(cutting down CCs for Tegra-specific discussion)
+
+On 07/06/2012 02:36 PM, Stephen Warren wrote:
+> On 07/06/2012 02:16 PM, Stephen Warren wrote:
+>> On 07/06/2012 02:11 PM, Rob Herring wrote:
+>>> On 07/06/2012 02:44 PM, Stephen Warren wrote:
+>>>> On 07/06/2012 12:40 PM, Rob Herring wrote:
+>>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>>
+>>>>> Move tegra PCI to fixed i/o mapping and remove io.h.
+>>>>
+>>>> Thierry, since you're the Tegra PCIe expert right now, could you please
+>>>> test and/or comment on this.
+>>>>
+>>>> I did try testing this on next-20120705 on TrimSlice (i.e. the
+>>>> PCIe-based Ethernet controller), but found that PCIe has stopped working
+>>>> there due to "resource collisions". I know this used to work fairly
+>>>> recently, since I tested it when I added the PCIe initialization call to
+>>>> board-dt-tegra20.c. The PCIe messages are:
+>>>
+>>> This is with my change and it works currently without?
+>>
+>> Sorry, no, it's broken even without your change. Hence, I can't test the
+>> impact of your change. Well, I saw the same failure with your patches
+>> too, but that isn't really conclusive testing of your change:-)
 > 
-> Does it really?
+> Aha. The PCIe problem only shows up when booting TrimSlice using DT (in
+> next-20120705 or Tegra's for-next branch).
 > 
-> The handler function I'm looking at is
+> When booting using board files, PCIe works, both without and with your
+> patch, on top of next-20120705.
 > 
-> 
-> static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> {
->         int irqoff;
->         BUG_ON(irq < IRQ_DOVE_GPIO_0_7 || irq > IRQ_DOVE_HIGH_GPIO);
-> 
->         irqoff = irq <= IRQ_DOVE_GPIO_16_23 ? irq - IRQ_DOVE_GPIO_0_7 :
->                 3 + irq - IRQ_DOVE_GPIO_24_31;
-> 
->         orion_gpio_irq_handler(irqoff << 3);
->         if (irq == IRQ_DOVE_HIGH_GPIO) {
->                 orion_gpio_irq_handler(40);
->                 orion_gpio_irq_handler(48);
->                 orion_gpio_irq_handler(56);
->         }
-> }
+> So, your patches are tested on Tegra and still working.
 
-void orion_gpio_irq_handler(int pinoff)
-{
-        struct orion_gpio_chip *ochip;
-        u32 cause, type;
-        int i;
+I haven't root-caused it, but I have found what changed that triggered
+the problem:
 
-        ochip = orion_gpio_chip_find(pinoff);
-        if (ochip == NULL)
-                return;
+When I first wrote the patch to board-dt-tegra20.c that brought DT
+booting up to feature parity with non-DT boot, IIRC, I wrote a
+late_initcall() to run whatever code I added. I'm sure I tested
+TrimSlice PCIe when booting using DT then, since that was the whole
+point of the patch.
 
-        cause = readl(GPIO_DATA_IN(ochip)) & readl(GPIO_LEVEL_MASK(ochip));
-        cause |= readl(GPIO_EDGE_CAUSE(ochip)) & readl(GPIO_EDGE_MASK(ochip));
+Later, I revised the patch to sit on top of Shawn Guo's .init_late
+machine descriptor patch, and ran the code from there instead. However,
+this appears to have broken PCIe on Trimslice; I must have screwed up
+the testing of that change. I don't know why this causes a behavior
+difference though; perhaps some resource acquisition race condition.
 
-        for (i = 0; i < ochip->chip.ngpio; i++) {
-                int irq;
+But just reverting that change doesn't fix the problem; I need to switch
+to a *subsys*_initcall() instead (which is in fact what the Trimslice
+board file uses for PCIe init). In other words:
 
-                irq = ochip->secondary_irq_base + i;
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c
+b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 70a19a9..74aefaf 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -145,19 +145,20 @@ static struct {
+ #endif
+ };
 
-                if (!(cause & (1 << i)))
-                        continue;
+-static void __init tegra_dt_init_late(void)
++static int __init tegra_dt_init_late(void)
+ {
+ 	int i;
 
-                type = irqd_get_trigger_type(irq_get_irq_data(irq));
-                if ((type & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH) {
-                        /* Swap polarity (race with GPIO line) */
-                        u32 polarity;
+-	tegra_init_late();
+-
+ 	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
+ 		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
+ 			board_init_funcs[i].init();
+ 			break;
+ 		}
+ 	}
++
++	return 0;
+ }
++subsys_initcall(tegra_dt_init_late);
 
-                        polarity = readl(GPIO_IN_POL(ochip));
-                        polarity ^= 1 << i;
-                        writel(polarity, GPIO_IN_POL(ochip));
-                }
-                generic_handle_irq(irq);
-        }
-}
-
-orion_gpio_chip_find(pinoff) when called with pinoff 32, 40, 48, or 56
-will return the same gpio chip. The loop:
-
-        for (i = 0; i < ochip->chip.ngpio; i++) {
-
-will iterate over all lines of the controller.
-
-> My reading of this is a manual hardwired implementation of a
-> primary handler that triggers the secondary handler four times
-> when it's called with a specific argument.
-
-Here is your mistake. It not a secondary handler. It is a function
-which might trigger a secondary handler, if the status bit requires
-that the secondary handler should be called..
-
-> If you want to keep that behavior, this handler cannot be
-> generic across all mvebu socs, whereas registering four
-> chained handlers for the same primary interrupt would have
-> the same effect at a very small runtime overhead without the
-> need for any special case.
-
-I would say the current code does redundant stuff.
-
-This code has also been tested on a Dove by Sebastian Hesselbarth and
-he did not notice anything strange happening on his system.
-
-   Andrew
+ static const char *tegra20_dt_board_compat[] = {
+ 	"nvidia,tegra20",
+@@ -171,7 +172,7 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20
+(Flattened Device Tree)")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer		= &tegra_timer,
+ 	.init_machine	= tegra_dt_init,
+-	.init_late	= tegra_dt_init_late,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra20_dt_board_compat,
+ MACHINE_END
