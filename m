@@ -1,144 +1,67 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  6 Jul 2012 14:57:49 +0200
-Subject: [PATCH 1/3] i.MX: coda: Add platform support for coda in i.MX27.
+Date: Fri,  6 Jul 2012 14:57:51 +0200
+Subject: [PATCH 3/3] Visstrim M10: Add support for Coda.
 In-Reply-To: <1341579471-25208-1-git-send-email-javier.martin@vista-silicon.com>
 References: <1341579471-25208-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1341579471-25208-2-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1341579471-25208-4-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX27 SoC include a codadx6 codec that is able to encode
-and decode H.264, H.263 and MPEG4.
+Support the codadx6 that is included in
+the i.MX27 SoC.
 ---
- arch/arm/mach-imx/clk-imx27.c                   |    4 +--
- arch/arm/mach-imx/devices-imx27.h               |    4 +++
- arch/arm/plat-mxc/devices/Kconfig               |    6 +++-
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-imx27-coda.c |   37 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |    8 +++++
- 6 files changed, 57 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/plat-mxc/devices/platform-imx27-coda.c
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 373c8fd..6e9cb02 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -239,8 +239,8 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
- 	clk_register_clkdev(clk[nfc_baud_gate], NULL, "mxc_nand.0");
--	clk_register_clkdev(clk[vpu_baud_gate], "per", "imx-vpu");
--	clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "imx-vpu");
-+	clk_register_clkdev(clk[vpu_baud_gate], "per", "coda-imx27.0");
-+	clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "coda-imx27.0");
- 	clk_register_clkdev(clk[dma_ahb_gate], "ahb", "imx-dma");
- 	clk_register_clkdev(clk[dma_ipg_gate], "ipg", "imx-dma");
- 	clk_register_clkdev(clk[fec_ipg_gate], "ipg", "imx27-fec.0");
-diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-index 28537a5..a2aaa7c 100644
---- a/arch/arm/mach-imx/devices-imx27.h
-+++ b/arch/arm/mach-imx/devices-imx27.h
-@@ -17,6 +17,10 @@ extern const struct imx_fsl_usb2_udc_data imx27_fsl_usb2_udc_data;
- #define imx27_add_fsl_usb2_udc(pdata)	\
- 	imx_add_fsl_usb2_udc(&imx27_fsl_usb2_udc_data, pdata)
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index f76edb9..bee2714 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -232,10 +232,10 @@ static void __init visstrim_camera_init(void)
+ static void __init visstrim_reserve(void)
+ {
+ 	/* reserve 4 MiB for mx2-camera */
+-	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
++	mx2_camera_base = memblock_alloc(2 * MX2_CAMERA_BUF_SIZE,
+ 			MX2_CAMERA_BUF_SIZE);
+-	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+-	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
++	memblock_free(mx2_camera_base, 2 * MX2_CAMERA_BUF_SIZE);
++	memblock_remove(mx2_camera_base, 2 * MX2_CAMERA_BUF_SIZE);
+ }
  
-+extern const struct imx_imx27_coda_data imx27_coda_data;
-+#define imx27_add_coda()	\
-+	imx_add_imx27_coda(&imx27_coda_data)
-+
- extern const struct imx_imx2_wdt_data imx27_imx2_wdt_data;
- #define imx27_add_imx2_wdt(pdata)	\
- 	imx_add_imx2_wdt(&imx27_imx2_wdt_data)
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index cb3e3ee..6b46cee 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -15,7 +15,11 @@ config IMX_HAVE_PLATFORM_GPIO_KEYS
+ /* GPIOs used as events for applications */
+@@ -404,6 +404,23 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+ 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+ };
  
- config IMX_HAVE_PLATFORM_IMX21_HCD
- 	bool
--	
++/* coda */
 +
-+config IMX_HAVE_PLATFORM_IMX27_CODA
-+	bool
-+	default y if SOC_IMX27
-+
- config IMX_HAVE_PLATFORM_IMX2_WDT
- 	bool
- 
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index c11ac84..76f3195 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -4,6 +4,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_FSL_USB2_UDC) += platform-fsl-usb2-udc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
- obj-y += platform-gpio-mxc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX27_CODA) += platform-imx27-coda.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
- obj-y += platform-imx-dma.o
-diff --git a/arch/arm/plat-mxc/devices/platform-imx27-coda.c b/arch/arm/plat-mxc/devices/platform-imx27-coda.c
-new file mode 100644
-index 0000000..8b12aac
---- /dev/null
-+++ b/arch/arm/plat-mxc/devices/platform-imx27-coda.c
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (C) 2012 Vista Silicon
-+ * Javier Martin <javier.martin@vista-silicon.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+
-+#include <mach/hardware.h>
-+#include <mach/devices-common.h>
-+
-+#ifdef CONFIG_SOC_IMX27
-+const struct imx_imx27_coda_data imx27_coda_data __initconst = {
-+	.iobase = MX27_VPU_BASE_ADDR,
-+	.iosize = SZ_512,
-+	.irq = MX27_INT_VPU,
-+};
-+#endif
-+
-+struct platform_device *__init imx_add_imx27_coda(
-+		const struct imx_imx27_coda_data *data)
++static void __init visstrim_coda_init(void)
 +{
-+	struct resource res[] = {
-+		{
-+			.start = data->iobase,
-+			.end = data->iobase + data->iosize - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = data->irq,
-+			.end = data->irq,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	};
-+	return imx_add_platform_device_dmamask("coda-imx27", 0, res, 2, NULL,
-+					0, DMA_BIT_MASK(32));
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 1b2258d..ee38186 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -83,6 +83,14 @@ struct platform_device *__init imx_add_imx21_hcd(
- 		const struct imx_imx21_hcd_data *data,
- 		const struct mx21_usbh_platform_data *pdata);
- 
-+struct imx_imx27_coda_data {
-+	resource_size_t iobase;
-+	resource_size_t iosize;
-+	resource_size_t irq;
-+};
-+struct platform_device *__init imx_add_imx27_coda(
-+		const struct imx_imx27_coda_data *data);
++	struct platform_device *pdev;
++	int dma;
 +
- struct imx_imx2_wdt_data {
- 	int id;
- 	resource_size_t iobase;
++	pdev = imx27_add_coda();
++	dma = dma_declare_coherent_memory(&pdev->dev,
++					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
++					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
++					  MX2_CAMERA_BUF_SIZE,
++					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++	if (!(dma & DMA_MEMORY_MAP))
++		return;
++}
++
+ static void __init visstrim_m10_revision(void)
+ {
+ 	int exp_version = 0;
+@@ -467,6 +484,7 @@ static void __init visstrim_m10_board_init(void)
+ 				      &iclink_tvp5150, sizeof(iclink_tvp5150));
+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
+ 	visstrim_camera_init();
++	visstrim_coda_init();
+ }
+ 
+ static void __init visstrim_m10_timer_init(void)
 -- 
 1.7.9.5
