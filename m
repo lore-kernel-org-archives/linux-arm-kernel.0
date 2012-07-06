@@ -1,30 +1,129 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 6 Jul 2012 17:11:40 +0800
-Subject: [PATCH] pinctrl: pinctrl-imx: only print debug message when
- DEBUG is defined
-In-Reply-To: <1340273435-7530-1-git-send-email-b29396@freescale.com>
-References: <1340273435-7530-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120706091139.GA28264@shlinux2.ap.freescale.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  6 Jul 2012 10:20:22 +0100
+Subject: [RFC PATCH 4/4] ARM: arch_timers: dynamic switch to physical timer
+ and virtual timer offloading
+In-Reply-To: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
+References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1341566422-20368-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2012 at 06:10:35PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Fix regression for commit 3a86a5f8 (pinctrl: pinctrl-imx: free allocated
-> pinctrl_map structure only once and use kernel facilities for IMX_PMX_DUMP)
-> introduced in 3.5-rc3.
-> With above commit, the debug code will alway be excuted.
-> Change to excute it only when DEBUG is defined.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
-> Hopefully it can catch 3.5.
-> ---
->  drivers/pinctrl/pinctrl-imx.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-Ping.
+In an environment supporting virtualization (KVM), the virtual timer
+is reserved to the guests, while we rely on the physical timer for
+the host.
 
-Regards
-Dong Aisheng
+For this, we need to:
+- switch the host CPUs from the virtual timer to the physical one
+- provide an interrupt handler that is called by the virtual
+  timer's interrupt handler.
+
+The new function arch_timer_switch_to_phys() performs this task.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h |    6 +++++
+ arch/arm/kernel/arch_timer.c      |   49 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
+
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 72c6822..7cd1e27 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -2,11 +2,13 @@
+ #define __ASMARM_ARCH_TIMER_H
+ 
+ #include <linux/clocksource.h>
++#include <linux/interrupt.h>
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ int arch_timer_of_register(void);
+ int arch_timer_sched_clock_init(void);
+ struct timecounter *arch_timer_get_timecounter(void);
++void arch_timer_switch_to_phys(irq_handler_t);
+ #else
+ static inline int arch_timer_of_register(void)
+ {
+@@ -22,6 +24,10 @@ static inline struct timecounter *arch_timer_get_timecounter(void)
+ {
+ 	return NULL;
+ }
++
++static inline void arch_timer_switch_to_phys(irq_handler_t handler)
++{
++}
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index 4473f66..1bb632a 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -50,6 +50,8 @@ struct arch_timer_reg_ops {
+ 
+ static struct arch_timer_reg_ops __percpu **arch_timer_reg_ops;
+ 
++static irq_handler_t arch_timer_virt_external_handler;
++
+ /*
+  * Architected system timer support.
+  */
+@@ -204,6 +206,19 @@ static irqreturn_t arch_timer_handler(int irq, void *dev_id)
+ 
+ static irqreturn_t arch_timer_virt_handler(int irq, void *dev_id)
+ {
++	if (arch_timer_virt_external_handler) {
++		unsigned long ctrl;
++
++		ctrl = arch_timer_virt_reg_read(ARCH_TIMER_REG_CTRL);
++		if (ctrl & ARCH_TIMER_CTRL_IT_STAT) {
++			ctrl |= ARCH_TIMER_CTRL_IT_MASK;
++			arch_timer_virt_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++			return arch_timer_virt_external_handler(irq, NULL);
++		}
++
++		return IRQ_NONE;
++	}
++
+ 	return arch_timer_handler(irq, dev_id);
+ }
+ 
+@@ -509,3 +524,37 @@ int __init arch_timer_sched_clock_init(void)
+ 	setup_sched_clock(arch_counter_get_cnt32, 32, arch_timer_rate);
+ 	return 0;
+ }
++
++static void arch_timer_switch_cpu_to_phys(void *dummy)
++{
++	u32 cvall, cvalh, val;
++
++	pr_info("Switching CPU%d to physical timer\n", smp_processor_id());
++
++	asm volatile("mrrc p15, 3, %0, %1, c14	\n" /* Read CNTV_CVAL */
++		     "mcrr p15, 2, %0, %1, c14	\n" /* Write CNTP_CVAL */
++		     : "=r" (cvall), "=r" (cvalh));
++
++	isb();
++	
++	val = arch_timer_virt_reg_read(ARCH_TIMER_REG_CTRL);
++	arch_timer_virt_reg_write(ARCH_TIMER_REG_CTRL,
++				  val & ~ARCH_TIMER_CTRL_ENABLE);
++	arch_timer_phys_reg_write(ARCH_TIMER_REG_CTRL, val);
++	*__this_cpu_ptr(arch_timer_reg_ops) = &arch_timer_phys_ops;
++}
++
++void arch_timer_switch_to_phys(irq_handler_t handler)
++{
++	int cpu;
++
++	if (!arch_timer_use_virtual)
++		return;
++
++	for_each_online_cpu(cpu)
++		smp_call_function_single(cpu, arch_timer_switch_cpu_to_phys,
++					 NULL, 1);
++
++	arch_timer_use_virtual = false;
++	arch_timer_virt_external_handler = handler;
++}
+-- 
+1.7.10.3
