@@ -1,24 +1,78 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 6 Jul 2012 19:17:16 +0800
-Subject: [PATCH] ARM: dma: mxs-dma: Export missing symbols from mxs-dma.c
-In-Reply-To: <1341573766-12459-1-git-send-email-attila@kinali.ch>
-References: <20120706111020.GD12558@shlinux2.ap.freescale.net>
- <1341573766-12459-1-git-send-email-attila@kinali.ch>
-Message-ID: <20120706111715.GA9304@shlinux2.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 6 Jul 2012 13:28:34 +0200
+Subject: [PATCH 1/1] ARM: add PROC_DEVICETREE support in Kconfig
+In-Reply-To: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
+References: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
+Message-ID: <20120706112834.GA4450@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 07:22:46PM +0800, Attila Kinali wrote:
-> mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
-> which are used at least in mxs-mmc.c. Building mxs-mmc as module
-> fails due to those two symbols not being exported.
+On 18:38 Fri 06 Jul     , jgq516 at gmail.com wrote:
+> From: Xiao Jiang <jgq516@gmail.com>
 > 
-> Signed-off-by: Attila Kinali <attila@kinali.ch>
-> ---
->  drivers/dma/mxs-dma.c |    2 ++
->  1 file changed, 2 insertions(+)
+> Since more and more arm chips support device tree, it'd be better add PROC_DEVICETREE
+> in arch/arm/Kconfig to avoid duplicate code.
 > 
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Regards
-Dong Aisheng
+Best Regards,
+J.
+> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+> ---
+>  arch/arm/Kconfig                   |    1 +
+>  arch/arm/configs/at91_dt_defconfig |    1 -
+>  arch/arm/configs/tegra_defconfig   |    1 -
+>  arch/arm/plat-omap/Kconfig         |    1 -
+>  4 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a91009c..f68896e 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1864,6 +1864,7 @@ config USE_OF
+>  	select OF
+>  	select OF_EARLY_FLATTREE
+>  	select IRQ_DOMAIN
+> +	select PROC_DEVICETREE if PROC_FS
+>  	help
+>  	  Include support for flattened device tree machine descriptions.
+>  
+> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+> index 67bc571..b856cb6 100644
+> --- a/arch/arm/configs/at91_dt_defconfig
+> +++ b/arch/arm/configs/at91_dt_defconfig
+> @@ -64,7 +64,6 @@ CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_ATMEL=y
+>  CONFIG_MTD_UBI=y
+>  CONFIG_MTD_UBI_GLUEBI=y
+> -CONFIG_PROC_DEVICETREE=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_BLK_DEV_RAM=y
+>  CONFIG_BLK_DEV_RAM_COUNT=4
+> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+> index 1198dd6..43e7b65 100644
+> --- a/arch/arm/configs/tegra_defconfig
+> +++ b/arch/arm/configs/tegra_defconfig
+> @@ -72,7 +72,6 @@ CONFIG_IPV6_TUNNEL=y
+>  CONFIG_IPV6_MULTIPLE_TABLES=y
+>  # CONFIG_WIRELESS is not set
+>  # CONFIG_FIRMWARE_IN_KERNEL is not set
+> -CONFIG_PROC_DEVICETREE=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_AD525X_DPOT=y
+>  CONFIG_AD525X_DPOT_I2C=y
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index ad95c7a..4e2cb17 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -27,7 +27,6 @@ config ARCH_OMAP2PLUS
+>  	select GENERIC_IRQ_CHIP
+>  	select OMAP_DM_TIMER
+>  	select USE_OF
+> -	select PROC_DEVICETREE if PROC_FS
+>  	help
+>  	  "Systems based on OMAP2, OMAP3 or OMAP4"
+>  
+> -- 
+> 1.7.3
+> 
