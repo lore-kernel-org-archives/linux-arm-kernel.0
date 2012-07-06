@@ -1,31 +1,140 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Jul 2012 08:22:56 +0800
-Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120705182829.d13d6992406e02e1024552e3@freescale.com>
-References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
- <20120705182829.d13d6992406e02e1024552e3@freescale.com>
-Message-ID: <20120706002254.GB20175@S2101-09.ap.freescale.net>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 5 Jul 2012 17:24:04 -0700
+Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
+In-Reply-To: <1341531958-31721-1-git-send-email-sboyd@codeaurora.org>
+References: <1341531958-31721-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120706002404.GJ2522@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 06:28:29PM -0500, Kim Phillips wrote:
-> On Wed, 4 Jul 2012 23:38:14 +0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > +static const struct of_device_id __devinitconst snvs_dt_ids[] = {
-> > +	{ .compatible = "fsl,sec-v4.0-mon-rtc-lp", },
-> 
-> the driver should be compatible with "fsl,sec-v4.0-mon", and its
-> probe function search for "fsl,sec-v4.0-mon-rtc-lp" sub-compatibles
-> (and possibly "fsl,sec-v4.0-mon-rtc-hp" in the future?).
-> 
-So you think snvs is all about rtc (lp and hp), nothing else?  If that
-is true, it's reasonable to do what you suggested here.  Otherwise, we
-should have a snvs driver be compatible with "fsl,sec-v4.0-mon", and
-this driver should be responsible for populate all the sub-devices of
-snvs, rtc-lp, rtc-hp, and others.  In the latter case, rtc-snvs should
-just stay as it stands right now.
+On Thu, Jul 05, 2012 at 04:45:58PM -0700, Stephen Boyd wrote:
+> While running hotplug tests I ran into this RCU splat
 
--- 
-Regards,
-Shawn
+One other possible alternative shown below for completeness.
+
+							Thanx, Paul
+
+> ===============================
+> [ INFO: suspicious RCU usage. ]
+> 3.4.0 #3275 Tainted: G        W
+> -------------------------------
+> include/linux/rcupdate.h:729 rcu_read_lock() used illegally while idle!
+> 
+> other info that might help us debug this:
+> 
+> RCU used illegally from idle CPU!
+> rcu_scheduler_active = 1, debug_locks = 0
+> RCU used illegally from extended quiescent state!
+> 4 locks held by swapper/2/0:
+>  #0:  ((cpu_died).wait.lock){......}, at: [<c00ab128>] complete+0x1c/0x5c
+>  #1:  (&p->pi_lock){-.-.-.}, at: [<c00b275c>] try_to_wake_up+0x2c/0x388
+>  #2:  (&rq->lock){-.-.-.}, at: [<c00b2860>] try_to_wake_up+0x130/0x388
+>  #3:  (rcu_read_lock){.+.+..}, at: [<c00abe5c>] cpuacct_charge+0x28/0x1f4
+> 
+> stack backtrace:
+> [<c001521c>] (unwind_backtrace+0x0/0x12c) from [<c00abec8>] (cpuacct_charge+0x94/0x1f4)
+> [<c00abec8>] (cpuacct_charge+0x94/0x1f4) from [<c00b395c>] (update_curr+0x24c/0x2c8)
+> [<c00b395c>] (update_curr+0x24c/0x2c8) from [<c00b59c4>] (enqueue_task_fair+0x50/0x194)
+> [<c00b59c4>] (enqueue_task_fair+0x50/0x194) from [<c00afea4>] (enqueue_task+0x30/0x34)
+> [<c00afea4>] (enqueue_task+0x30/0x34) from [<c00b0908>] (ttwu_activate+0x14/0x38)
+> [<c00b0908>] (ttwu_activate+0x14/0x38) from [<c00b28a8>] (try_to_wake_up+0x178/0x388)
+> [<c00b28a8>] (try_to_wake_up+0x178/0x388) from [<c00a82a0>] (__wake_up_common+0x34/0x78)
+> [<c00a82a0>] (__wake_up_common+0x34/0x78) from [<c00ab154>] (complete+0x48/0x5c)
+> [<c00ab154>] (complete+0x48/0x5c) from [<c07db7cc>] (cpu_die+0x2c/0x58)
+> [<c07db7cc>] (cpu_die+0x2c/0x58) from [<c000f954>] (cpu_idle+0x64/0xfc)
+> [<c000f954>] (cpu_idle+0x64/0xfc) from [<80208160>] (0x80208160)
+> 
+> When a cpu is marked offline during its idle thread it calls
+> cpu_die() during an RCU idle period. cpu_die() calls complete()
+> to notify the killing process that the cpu has died. complete()
+> calls into the scheduler code which sometimes grabs an RCU read
+> lock in cpuacct_charge().
+> 
+> To avoid this problem, copy what x86 is doing and have a per_cpu
+> variable to track the cpu state and have the killing process poll
+> that variable.
+> 
+> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/kernel/smp.c | 26 ++++++++++++++++----------
+>  1 file changed, 16 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 2c7217d..5430ea4 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -59,6 +59,7 @@ enum ipi_msg_type {
+>  };
+> 
+>  static DECLARE_COMPLETION(cpu_running);
+> +static DEFINE_PER_CPU(int, cpu_state) = { 0 };
+> 
+>  int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
+>  {
+> @@ -143,22 +144,26 @@ int __cpu_disable(void)
+>  	return 0;
+>  }
+> 
+> -static DECLARE_COMPLETION(cpu_died);
+> -
+>  /*
+>   * called on the thread which is asking for a CPU to be shutdown -
+>   * waits until shutdown has completed, or it is timed out.
+>   */
+>  void __cpu_die(unsigned int cpu)
+>  {
+> -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+> -		pr_err("CPU%u: cpu didn't die\n", cpu);
+> -		return;
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < 50; i++) {
+> +		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
+> +			if (platform_cpu_kill(cpu)) {
+> +				pr_notice("CPU%u: shutdown\n", cpu);
+> +				return;
+> +			} else {
+> +				break;
+> +			}
+> +		}
+> +		msleep(100);
+>  	}
+> -	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> -
+> -	if (!platform_cpu_kill(cpu))
+> -		printk("CPU%u: unable to kill\n", cpu);
+> +	pr_err("CPU%u: unable to kill\n", cpu);
+>  }
+> 
+>  /*
+> @@ -179,7 +184,7 @@ void __ref cpu_die(void)
+>  	mb();
+> 
+>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> -	complete(&cpu_died);
+> +	__this_cpu_write(cpu_state, CPU_DEAD);
+
+Or you could do something like:
+
+	RCU_NONIDLE(complete(&cpu_died));
+
+This would tell RCU that it needed to pay attention to this CPU for
+the duration of the "complete()" function call despite the CPU's being
+idle.  And might allow you to dispense with the rest of the patch.
+
+> 
+>  	/*
+>  	 * actual CPU shutdown procedure is at least platform (if not
+> @@ -258,6 +263,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+>  	 * before we continue - which happens after __cpu_up returns.
+>  	 */
+>  	set_cpu_online(cpu, true);
+> +	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
+>  	complete(&cpu_running);
+> 
+>  	/*
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
