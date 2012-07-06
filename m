@@ -1,98 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  6 Jul 2012 10:46:42 -0600
-Subject: [GIT PULL 1/7] ARM: tegra: for-3.6/cleanup branch
-Message-ID: <1341593208-17914-1-git-send-email-swarren@wwwdotorg.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 6 Jul 2012 22:23:54 +0530
+Subject: [PATCH] ARM: davinci: cp_intc: Add OF support for TI interrupt
+ controller
+In-Reply-To: <4FF58BDC.6060802@denx.de>
+References: <1341342970-27535-1-git-send-email-nsekhar@ti.com>
+ <4FF58BDC.6060802@denx.de>
+Message-ID: <4FF71822.2070908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains various minor cleanups, such as binding and .dts renames,
-DT content cleanup, SDHCI support-8bit property usage cleanup, and removal of
-some unnecessary sleep code.
+Hi Grant,
 
-This branch depends only on v3.5-rc2.
+On 7/5/2012 6:13 PM, Heiko Schocher wrote:
+> Hello Sekhar,
+> 
+> On 03.07.2012 21:16, Sekhar Nori wrote:
+>> From: Heiko Schocher<hs@denx.de>
+>>
+>> Add a function to initialize the Common Platform Interrupt Controller
+>> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
+>>
+>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Wolfgang Denk<wd@denx.de>
+>> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
+>> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+>> ---
+>>   .../devicetree/bindings/arm/davinci/cp-intc.txt    |   27
+>> ++++++++++++++++++++
+>>   arch/arm/mach-davinci/cp_intc.c                    |   16 +++++++++---
+>>   arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
+>>   3 files changed, 41 insertions(+), 3 deletions(-)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/arm/davinci/cp-intc.txt
+> 
+> Thanks!
+> 
+> Tested on the enbw_cmc board.
 
-This branch is included in many later pull requests.
+Any further feedback on this? If you are OK, I would like to queue this
+for v3.6 through DaVinci tree.
 
-----------------------------------------------------------------
-
-The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
-
-  Linux 3.5-rc2
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/cleanup
-
-for you to fetch changes up to 702b0e4f2f2782962aab7d9a0a40ad68770bb1f6:
-
-  ARM: dt: tegra: rename board files to match SoC
-
-----------------------------------------------------------------
-
-Prashant Gaikwad (1):
-      ARM: tegra: Remove flow controller programming
-
-Stephen Warren (5):
-      dt: name all Tegra binding docs consistently
-      mmc: tegra: use bus-width property instead of support-8bit
-      ARM: dt: tegra: remove legacy support-8bit property
-      ASoC: tegra: simplify Kconfig dependencies
-      ARM: dt: tegra: rename board files to match SoC
-
-hdoyu at nvidia.com (5):
-      amba: tegra-ahb: Remove empty *_remove()
-      ARM: dt: tegra{20,30}.dtsi: Rename "mc" to "memory-controller"
-      ARM: tegra{20,30}: Rename "mc" to "memory-controller"
-      ARM: dt: tegra20: Rename "emc" to "memory-controller"
-      ARM: tegra20: Rename "emc" to "memory-controller"
-
- .../arm/tegra/{emc.txt => nvidia,tegra20-emc.txt}  |    2 +-
- .../bindings/arm/tegra/nvidia,tegra20-mc.txt       |    2 +-
- .../bindings/arm/tegra/nvidia,tegra30-mc.txt       |    2 +-
- .../{gpio_nvidia.txt => nvidia,tegra20-gpio.txt}   |    0
- .../{tegra-kbc.txt => nvidia,tegra20-kbc.txt}      |    0
- .../{nvidia-sdhci.txt => nvidia,tegra20-sdhci.txt} |    0
- .../nvec/{nvec_nvidia.txt => nvidia,nvec.txt}      |    0
- ...-alc5632.txt => nvidia,tegra-audio-alc5632.txt} |    0
- ...mslice.txt => nvidia,tegra-audio-trimslice.txt} |    0
- ...io-wm8753.txt => nvidia,tegra-audio-wm8753.txt} |    0
- ...io-wm8903.txt => nvidia,tegra-audio-wm8903.txt} |    0
- .../{tegra20-das.txt => nvidia,tegra20-das.txt}    |    0
- .../{tegra20-i2s.txt => nvidia,tegra20-i2s.txt}    |    0
- .../spi/{spi_nvidia.txt => nvidia,tegra20-spi.txt} |    0
- .../usb/{tegra-usb.txt => nvidia,tegra20-ehci.txt} |    0
- .../dts/{tegra-harmony.dts => tegra20-harmony.dts} |    1 -
- .../dts/{tegra-paz00.dts => tegra20-paz00.dts}     |    1 -
- .../{tegra-seaboard.dts => tegra20-seaboard.dts}   |    3 +-
- .../{tegra-trimslice.dts => tegra20-trimslice.dts} |    0
- .../dts/{tegra-ventana.dts => tegra20-ventana.dts} |    1 -
- arch/arm/boot/dts/tegra20.dtsi                     |    4 +-
- .../dts/{tegra-cardhu.dts => tegra30-cardhu.dts}   |    1 -
- arch/arm/boot/dts/tegra30.dtsi                     |    2 +-
- arch/arm/mach-tegra/Kconfig                        |    3 --
- arch/arm/mach-tegra/Makefile.boot                  |   12 +++---
- arch/arm/mach-tegra/cpuidle.c                      |    6 ++--
- arch/arm/mach-tegra/sleep.S                        |   29 ---------------
- drivers/amba/tegra-ahb.c                           |    6 ---
- drivers/mmc/host/sdhci-tegra.c                     |    5 ++-
- sound/soc/tegra/Kconfig                            |   10 +-----
- 30 files changed, 21 insertions(+), 69 deletions(-)
- rename Documentation/devicetree/bindings/arm/tegra/{emc.txt => nvidia,tegra20-emc.txt} (99%)
- rename Documentation/devicetree/bindings/gpio/{gpio_nvidia.txt => nvidia,tegra20-gpio.txt} (100%)
- rename Documentation/devicetree/bindings/input/{tegra-kbc.txt => nvidia,tegra20-kbc.txt} (100%)
- rename Documentation/devicetree/bindings/mmc/{nvidia-sdhci.txt => nvidia,tegra20-sdhci.txt} (100%)
- rename Documentation/devicetree/bindings/nvec/{nvec_nvidia.txt => nvidia,nvec.txt} (100%)
- rename Documentation/devicetree/bindings/sound/{tegra-audio-alc5632.txt => nvidia,tegra-audio-alc5632.txt} (100%)
- rename Documentation/devicetree/bindings/sound/{tegra-audio-trimslice.txt => nvidia,tegra-audio-trimslice.txt} (100%)
- rename Documentation/devicetree/bindings/sound/{tegra-audio-wm8753.txt => nvidia,tegra-audio-wm8753.txt} (100%)
- rename Documentation/devicetree/bindings/sound/{tegra-audio-wm8903.txt => nvidia,tegra-audio-wm8903.txt} (100%)
- rename Documentation/devicetree/bindings/sound/{tegra20-das.txt => nvidia,tegra20-das.txt} (100%)
- rename Documentation/devicetree/bindings/sound/{tegra20-i2s.txt => nvidia,tegra20-i2s.txt} (100%)
- rename Documentation/devicetree/bindings/spi/{spi_nvidia.txt => nvidia,tegra20-spi.txt} (100%)
- rename Documentation/devicetree/bindings/usb/{tegra-usb.txt => nvidia,tegra20-ehci.txt} (100%)
- rename arch/arm/boot/dts/{tegra-harmony.dts => tegra20-harmony.dts} (99%)
- rename arch/arm/boot/dts/{tegra-paz00.dts => tegra20-paz00.dts} (99%)
- rename arch/arm/boot/dts/{tegra-seaboard.dts => tegra20-seaboard.dts} (99%)
- rename arch/arm/boot/dts/{tegra-trimslice.dts => tegra20-trimslice.dts} (100%)
- rename arch/arm/boot/dts/{tegra-ventana.dts => tegra20-ventana.dts} (99%)
- rename arch/arm/boot/dts/{tegra-cardhu.dts => tegra30-cardhu.dts} (99%)
+Thanks,
+Sekhar
