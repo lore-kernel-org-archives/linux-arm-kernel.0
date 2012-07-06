@@ -1,68 +1,74 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jul 2012 18:47:00 +0100
-Subject: [PATCH 3/3] Visstrim M10: Add support for Coda.
-In-Reply-To: <1341579471-25208-4-git-send-email-javier.martin@vista-silicon.com>
+Date: Fri, 6 Jul 2012 18:48:30 +0100
+Subject: [PATCH 2/3] media: coda: Add driver for Coda video codec.
+In-Reply-To: <1341579471-25208-3-git-send-email-javier.martin@vista-silicon.com>
 References: <1341579471-25208-1-git-send-email-javier.martin@vista-silicon.com>
- <1341579471-25208-4-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120706174700.GD31508@n2100.arm.linux.org.uk>
+ <1341579471-25208-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120706174830.GE31508@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 02:57:51PM +0200, Javier Martin wrote:
-> Support the codadx6 that is included in
-> the i.MX27 SoC.
-> ---
->  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   24 +++++++++++++++++++++---
->  1 file changed, 21 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> index f76edb9..bee2714 100644
-> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> @@ -232,10 +232,10 @@ static void __init visstrim_camera_init(void)
->  static void __init visstrim_reserve(void)
->  {
->  	/* reserve 4 MiB for mx2-camera */
-> -	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
-> +	mx2_camera_base = memblock_alloc(2 * MX2_CAMERA_BUF_SIZE,
->  			MX2_CAMERA_BUF_SIZE);
-> -	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
-> -	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
-> +	memblock_free(mx2_camera_base, 2 * MX2_CAMERA_BUF_SIZE);
-> +	memblock_remove(mx2_camera_base, 2 * MX2_CAMERA_BUF_SIZE);
+On Fri, Jul 06, 2012 at 02:57:50PM +0200, Javier Martin wrote:
+> +config VIDEO_CODA
+> +	tristate "Chips&Media Coda multi-standard codec IP"
+> +	depends on VIDEO_DEV && VIDEO_V4L2 && SOC_IMX27
+> +	select VIDEOBUF2_DMA_CONTIG
+> +	select V4L2_MEM2MEM_DEV
+> +	default n
 
-NAK.  If you're going to do this please move it to the right API:
+Please, no more 'default n'... it's the default default anyway.
 
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+> +	---help---
+> +	   Coda is a range of video codec IPs that supports
+> +	   H.264, MPEG-4, and other video formats.
+> +
+>  config VIDEO_SAMSUNG_S5P_G2D
+>  	tristate "Samsung S5P and EXYNOS4 G2D 2d graphics accelerator driver"
+>  	depends on VIDEO_DEV && VIDEO_V4L2 && PLAT_S5P
+> diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
+> index d209de0..a04c307 100644
+> --- a/drivers/media/video/Makefile
+> +++ b/drivers/media/video/Makefile
+> @@ -187,6 +187,7 @@ obj-$(CONFIG_VIDEO_OMAP1)		+= omap1_camera.o
+>  obj-$(CONFIG_VIDEO_ATMEL_ISI)		+= atmel-isi.o
+>  
+>  obj-$(CONFIG_VIDEO_MX2_EMMAPRP)		+= mx2_emmaprp.o
+> +obj-$(CONFIG_VIDEO_CODA) 			+= coda.o
+>  
+>  obj-$(CONFIG_VIDEO_SAMSUNG_S5P_FIMC) 	+= s5p-fimc/
+>  obj-$(CONFIG_VIDEO_SAMSUNG_S5P_JPEG)	+= s5p-jpeg/
+> diff --git a/drivers/media/video/coda.c b/drivers/media/video/coda.c
+> new file mode 100644
+> index 0000000..7b43345
+> --- /dev/null
+> +++ b/drivers/media/video/coda.c
+> @@ -0,0 +1,1916 @@
+> +/*
+> + * Coda multi-standard codec IP
+> + *
+> + * Copyright (C) 2012 Vista Silicon S.L.
+> + *    Javier Martin, <javier.martin@vista-silicon.com>
+> + *    Xavier Duret
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/firmware.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/videodev2.h>
+> +
+> +#include <mach/hardware.h>
 
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index f7b074f..c27058e 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -32,12 +32,12 @@
- #include <linux/delay.h>
- #include <linux/dma-mapping.h>
- #include <linux/leds.h>
--#include <linux/memblock.h>
- #include <media/soc_camera.h>
- #include <sound/tlv320aic32x4.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/memblock.h>
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
- 
-@@ -193,10 +193,8 @@ static void __init visstrim_camera_init(void)
- static void __init visstrim_reserve(void)
- {
- 	/* reserve 4 MiB for mx2-camera */
--	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
-+	mx2_camera_base = memblock_steal(MX2_CAMERA_BUF_SIZE,
- 			MX2_CAMERA_BUF_SIZE);
--	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
--	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
- }
- 
- /* GPIOs used as events for applications */
+What in here needs mach/hardware.h ?  We really should be questioning any
+new driver that needs mach/ headers...
