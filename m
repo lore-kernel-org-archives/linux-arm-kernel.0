@@ -1,46 +1,49 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 06 Jul 2012 11:08:29 +0200
-Subject: arm cortex a9, smp bootup requirement
-Message-ID: <4FF6AB0D.8010105@monstr.eu>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 6 Jul 2012 17:09:23 +0800
+Subject: [PATCH 2/2] pinctrl: pinctrl-imx6q: add missed mux function for
+ USBOTG_ID
+In-Reply-To: <1341565763-10074-1-git-send-email-b29396@freescale.com>
+References: <1341565763-10074-1-git-send-email-b29396@freescale.com>
+Message-ID: <1341565763-10074-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-can someone correct me about smp boot requirement for Linux?
+The original pin registers table is derived from u-boot mainline,
+but somehow it was found missing some mux functions for USBOTG_ID.
+We added it at the bottom by following the exist pin function ids,
+then it will not break the exist using of pin function id in dts file.
 
-We are fixing ARM zynq smp bootup code and would like to be sure
-that out bootup code is correct.
+Reported-by: Richard Zhao <richard.zhao@freescale.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         |    2 ++
+ drivers/pinctrl/pinctrl-imx6q.c                    |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-I have found some requirements from standalone boot up code
-which is invalidate dcache, icache, branch predictor array
-and flush TLB.
-
-I have found in secondary_start_kernel that TLB are flushed
-by local_flush_tlb_all function.
-But haven't found any cache invalidation calling.
-
-I think it is required and we could be added to platform_secondary_init.
-
-Or is it requirement which has to be fulfil by bootloader before
-secondary_startup is called?
-
-We have the option to reset specific cpu in the system and cpu
-starts from 0x0 with cache off and in non-virtual mode
-where we place simple jump trampoline to the secondary_startup
-function. If cache invalidation is required by Linux we can extend this code
-to do it.
-
-Jumping trampoline is:
-0x0: ldr r0, [8]
-0x4: mov pc, r0
-0x8: jump address
-
-Thanks,
-Michal
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+index 82b43f9..a4119f6 100644
+--- a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+@@ -1626,3 +1626,5 @@ MX6Q_PAD_SD2_DAT3__PCIE_CTRL_MUX_11		1587
+ MX6Q_PAD_SD2_DAT3__GPIO_1_12			1588
+ MX6Q_PAD_SD2_DAT3__SJC_DONE			1589
+ MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3		1590
++MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID		1591
++MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID		1592
+diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
+index 7737d4d..e9bf71f 100644
+--- a/drivers/pinctrl/pinctrl-imx6q.c
++++ b/drivers/pinctrl/pinctrl-imx6q.c
+@@ -1950,6 +1950,8 @@ static struct imx_pin_reg imx6q_pin_regs[] = {
+ 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 5, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__GPIO_1_12 */
+ 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 6, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__SJC_DONE */
+ 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 7, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3 */
++	IMX_PIN_REG(MX6Q_PAD_ENET_RX_ER, 0x04EC, 0x01D8, 0, 0x0000, 0), /* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
++	IMX_PIN_REG(MX6Q_PAD_GPIO_1, 0x05F4, 0x0224, 3, 0x0000, 0), /* MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID */
+ };
+ 
+ /* Pad names for the pinmux subsystem */
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+1.7.0.4
