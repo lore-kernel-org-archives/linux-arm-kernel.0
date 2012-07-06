@@ -1,47 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jul 2012 13:32:38 +0100
-Subject: [PATCH] ARM: ux500: Pass PMU platform data due for Perf though AUXDATA
-Message-ID: <1341577958-8521-1-git-send-email-lee.jones@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 6 Jul 2012 13:34:42 +0100
+Subject: [PATCH 3/9] ARM: ux500: Remove AB8500 regulator register
+ initialisation information
+In-Reply-To: <4FF6D183.7040407@linaro.org>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbRtFX8_++rndCpsH7R1uhwPrkTE_GKgNTM6r1PSuwY0A@mail.gmail.com>
+ <4FF6979F.2000904@linaro.org>
+ <20120706112317.GD4017@opensource.wolfsonmicro.com>
+ <4FF6D183.7040407@linaro.org>
+Message-ID: <20120706123441.GF4017@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with Device Tree we need a way to call-back to the
-DB8500 PMU IRQ handler. This is necessary because the two CPU
-IRQ lines are muxed together on the DB8500 chip. The DB8500
-PMU IRQ handler contains logic to pass over to the other core
-in the case of IRQ_NONE. This patch allows the DB8500 PMU IRQ
-handler to be passed to Perf through platform data.
+On Fri, Jul 06, 2012 at 12:52:35PM +0100, Lee Jones wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |    2 ++
- arch/arm/mach-ux500/board-mop500.h |    1 +
- 2 files changed, 3 insertions(+)
+> Then you added your Reviewed-by: until the ux500 stuff goes in.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9c78e40..aa1bdcf 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -727,6 +727,8 @@ MACHINE_END
- #ifdef CONFIG_MACH_UX500_DT
- 
- struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
-+	/* Requires call-back bindings. */
-+	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
- 	/* Requires DMA and call-back bindings. */
- 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
- 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index b5bfc1a..d04a8e6 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -81,6 +81,7 @@ struct device;
- struct i2c_board_info;
- extern struct mmci_platform_data mop500_sdi0_data;
- extern struct mmci_platform_data mop500_sdi4_data;
-+extern struct arm_pmu_platdata db8500_pmu_platdata;
- 
- extern void mop500_sdi_init(struct device *parent);
- extern void snowball_sdi_init(struct device *parent);
--- 
-1.7.9.5
+> However, the ux500 patch has been NACKed, so please don't take the aforementioned patch in either.
+
+No problem, if I punted on it like that I'll have deleted the mail and
+so wouldn't have applied it anyway unless you resent it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/3c448997/attachment.sig>
