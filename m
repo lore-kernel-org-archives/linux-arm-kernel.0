@@ -1,104 +1,282 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jul 2012 05:05:33 -0700
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9A39DF@DBDE01.ent.ti.com>
-References: <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
- <20120702063651.GO4202@atomide.com> <4FF1D980.4040100@ti.com>
- <20120703081746.GJ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A2BAC@DBDE01.ent.ti.com>
- <20120704075158.GQ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
- <20120705105535.GB1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A39DF@DBDE01.ent.ti.com>
-Message-ID: <20120706120533.GU1122@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Jul 2012 20:08:13 +0800
+Subject: [PATCH] ARM: dts: imx: update #interrupt-cells for gpio nodes
+In-Reply-To: <20120706075434.GE30009@pengutronix.de>
+References: <20120706075434.GE30009@pengutronix.de>
+Message-ID: <1341576493-10936-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120705 07:56]:
-> Hi Tony,
-> 
-> On Thu, Jul 05, 2012 at 16:25:35, Tony Lindgren wrote:
-> > * Mohammed, Afzal <afzal@ti.com> [120705 03:29]:
-> 
-> > > I have a doubt whether we are talking about the same thing, presently
-> > > our main issue is in eliminating the necessity of peripheral specific
-> > > functions like gpmc_onenand_init, tusb_setup_interface (which calls
-> > > tusb6010_platform_retime), etc., which calculate gpmc timings by
-> > > processing peripheral specific timings over gpmc clock period and
-> > > these processing were required before gpmc driver probe gets invoked
-> > > as gpmc driver needed timings which gpmc can understand to configure
-> > > gpmc.
-> > 
-> > Right. The issue is that both the gpmc clock and the peripheral clock
-> > may change, and both cause the need to reprogram the gpmc timings.
-> 
-> Presently bigger issue that I am facing w.r.t driver conversion is the
-> requirement of peripheral specific gpmc timing calculation before probe.
-> I believe currently in mainline runtime gpmc clock changes are not
-> handled
+Change the value of #interrupt-cells of gpio nodes from 1 to 2, so that
+the gpio irq type can be specified in device tree.  Also update binding
+document to make it clear.
 
-Hmm I don't follow, why can't the timings be set during the peripheral
-specific driver probe?
+Reported-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |    9 +++++++++
+ arch/arm/boot/dts/imx27.dtsi                       |   12 ++++++------
+ arch/arm/boot/dts/imx51.dtsi                       |    8 ++++----
+ arch/arm/boot/dts/imx53.dtsi                       |   14 +++++++-------
+ arch/arm/boot/dts/imx6q.dtsi                       |   14 +++++++-------
+ 5 files changed, 33 insertions(+), 24 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+index 5f360e7..4f39297 100644
+--- a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
++++ b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+@@ -11,6 +11,13 @@ Required properties:
+   the second cell is used to specify the gpio polarity:
+       0 = active high
+       1 = active low
++- interrupt-controller: Marks the device node as an interrupt controller.
++- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
++  The second cell bits[3:0] is used to specify trigger type and level flags:
++      1 = low-to-high edge triggered.
++      2 = high-to-low edge triggered.
++      4 = active high level-sensitive.
++      8 = active low level-sensitive.
  
-> > > By "we should be able to do it at gpmc level", I am unable to
-> > > understand what you are suggesting.
-> > 
-> > Right, gpmc should be able to handle things alone with the registered
-> > retime function for smsc911x, where the driver does not even know about
-> > the bus. With DT, the platform init code gpmc-smsc911x.c should become
-> > a driver that registers with gpmc and provides the retime function.
-> 
-> So then we would be having two devices & drivers to represent gpmc
-> peripheral like smsc911x, one existing ethernet driver and other one
-> for handling gpmc timings, right ?. And with DT, so we need two nodes
-> to represent a gpmc peripheral ?
-
-Well ideally we'd have some kind of bus glue setup eventually so we'll
-have just one device for smsc911x.. But like I said, that part is a
-bit open still. At least I don't have any clear solution in mind for
-how to do the bus specific wrapper drivers.
+ Example:
  
-> > > So timing information that would be passed from DT should be for
-> > > exact gpmc timings like cs_on, cs_off etc., right ?, in that case
-> > > should we manually calculate (like as now done by Kernel in
-> > > gpmc-onenand.c etc) it by having the knowledge of connected
-> > > peripheral & gpmc frequency at boot time and update it in DT ?, as
-> > > we can't apply retime on it as we don't know the connected
-> > > peripheral in gpmc driver. Or do you want another field through DT
-> > > to decide retime that is to be used, then I think passing timing
-> > > from DT would not be needed
-> > 
-> > The timings values should be passed to gpmc from DT. We need to
-> > be able to pass both cycle and time based values. If no cycle based
-> > value is passed, the time based value should be used. This is because
-> > some peripheral timings can be cycle based, while others can be time
-> > based.
-> 
-> If we can describe gpmc timings purely based on time and cycles field
-> for all the peripherals, can we not remove all the retime functions like
-> timing calculation done in gpmc-onenand.c ?
-
-No that's probably not enough because the time and cycles for a peripheral
-may need to be different if the peripheral clock rate changes.
-  
-> > The peripheral driver can register it's retime function with gpmc and
-> > get a cookie back that allows getting the DT provided timings from gpmc.
-> > And after that the initial timings can be set.
-> 
-> If timings peripheral timings can be fully contained in driver, should
-> we try to pass the same timings translated in terms of gpmc timings
-> through DT ?, and how do we get equivalent gpmc timings to update DT,
-> manually calculate similar to platform init code ?, or I misunderstood
-> you
-> 
-> Sorry to trouble you with more questions, I wanted to understand the way
-> you want to deal with the issue.
-
-Well yes the timings should be passed via devicetree in a gpmc specific
-format. But the peripheral specific retime function still needs to be
-also registered for peripherals that need it.
-
-Regards,
-
-Tony
+@@ -20,4 +27,6 @@ gpio0: gpio at 73f84000 {
+ 	interrupts = <50 51>;
+ 	gpio-controller;
+ 	#gpio-cells = <2>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
+ };
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 386c769..00bae3a 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -121,7 +121,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio2: gpio at 10015100 {
+@@ -131,7 +131,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio3: gpio at 10015200 {
+@@ -141,7 +141,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio4: gpio at 10015300 {
+@@ -151,7 +151,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio5: gpio at 10015400 {
+@@ -161,7 +161,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio6: gpio at 10015500 {
+@@ -171,7 +171,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			cspi3: cspi at 10017000 {
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index bfa65ab..922adef 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -133,7 +133,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio2: gpio at 73f88000 {
+@@ -143,7 +143,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio3: gpio at 73f8c000 {
+@@ -153,7 +153,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio4: gpio at 73f90000 {
+@@ -163,7 +163,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			wdog at 73f98000 { /* WDOG1 */
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index e3e8694..4e735ed 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -135,7 +135,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio2: gpio at 53f88000 {
+@@ -145,7 +145,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio3: gpio at 53f8c000 {
+@@ -155,7 +155,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio4: gpio at 53f90000 {
+@@ -165,7 +165,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			wdog at 53f98000 { /* WDOG1 */
+@@ -203,7 +203,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio6: gpio at 53fe0000 {
+@@ -213,7 +213,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio7: gpio at 53fe4000 {
+@@ -223,7 +223,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			i2c at 53fec000 { /* I2C3 */
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 16a3884..bf88fb7 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -283,7 +283,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio2: gpio at 020a0000 {
+@@ -293,7 +293,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio3: gpio at 020a4000 {
+@@ -303,7 +303,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio4: gpio at 020a8000 {
+@@ -313,7 +313,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio5: gpio at 020ac000 {
+@@ -323,7 +323,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio6: gpio at 020b0000 {
+@@ -333,7 +333,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio7: gpio at 020b4000 {
+@@ -343,7 +343,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupt-cells = <1>;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			kpp at 020b8000 {
+-- 
+1.7.5.4
