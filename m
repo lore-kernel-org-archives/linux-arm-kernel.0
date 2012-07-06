@@ -1,38 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Jul 2012 16:24:32 -0700
-Subject: [PATCH 1/1] ARM: add PROC_DEVICETREE support in Kconfig
-In-Reply-To: <CAERv70uZMEoX4OcECssOrktVzC911tiSLXRH56TjyhQqVgNwBA@mail.gmail.com>
-References: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
- <4FF6DCCA.2080509@gmail.com>
- <CAERv70uZMEoX4OcECssOrktVzC911tiSLXRH56TjyhQqVgNwBA@mail.gmail.com>
-Message-ID: <CAOesGMjmeXVx2MR7GGux9Cztkf-C3cBqpBW1_PW75D_Gk0GHiA@mail.gmail.com>
+From: omycle@gmail.com (Li Haifeng)
+Date: Sat, 7 Jul 2012 07:36:39 +0800
+Subject: Fwd: before arm Linux 2.6.38, how to protect the kernel memory
+ from accessing in user space?
+In-Reply-To: <20120704104402.GL16319@n2100.arm.linux.org.uk>
+References: <CAFNq8R6cxPgADH=oOxkyenx4ADEPs+dapzj5mDrVftya3yBj3A@mail.gmail.com>
+ <CAFNq8R5qSRh0iEo1en_p8g+z9jgELyOOLPxs7rp-6ZV7OE1Cog@mail.gmail.com>
+ <20120704104402.GL16319@n2100.arm.linux.org.uk>
+Message-ID: <CAFNq8R4bmdfVq6kJV96FVfpobPAiiDcKS0Aj4gZz2Xev7Sg0Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2012 at 4:15 PM, Xiao Jiang <jgq516@gmail.com> wrote:
-> 2012/7/6 Rob Herring <robherring2@gmail.com>
+Thank you.
+
+I have got the answer too.
+
+Before 2.6.38, the access permission management is still rely on
+domain and AP field in Page table entry and Domain access control
+register. The start-up code initialize the DOMAIN_USER by
+DOMAIN_MANAGER. But in early_trap_init, the system will modify
+DOMAIN_USER to DOMAIN_CLIENT. And when the domain attribute is
+DOMAIN_CLIENT, the AP field in Page table entry will be effective.
+
+2012/7/4 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Jul 04, 2012 at 02:01:25PM +0800, Li Haifeng wrote:
+>> Hi, I am a newbie Linux Kernel learner. I am confused  at memory
+>> protected between user space and kernel space.  In arm, the hardware
+>> support the memory protecting by Domain access register.
 >>
->> On 07/06/2012 05:38 AM, jgq516 at gmail.com wrote:
->> > From: Xiao Jiang <jgq516@gmail.com>
->> >
->> > Since more and more arm chips support device tree, it'd be better add
->> > PROC_DEVICETREE
->> > in arch/arm/Kconfig to avoid duplicate code.
->>
->> I think this should remain user choice. If its going to be selected,
->> then you might as well just remove the option altogether. Perhaps just
->> make the option default to yes.
->>
-> Hmm, sounds reasonable from your point. So the better choice is to set the
-> option default to Y if the board has dt support just like tegra_defconfig
-> and at91_dt_defconfig,  right? thanks.
+>> But in Linux, it may not take effect in ARM Linux. Because before the
+>> official kernel 2.6.38, I found that both DOMAIN_USER and
+>> DOMAIN_KERNEL all set to DOMAIN_MANAGER(0x3). So, before arm Linux
+>> 2.6.38, how to protect the kernel memory from accessing in user space?
+>
+> That doesn't sound right.
+>
+> When we start booting, then the domain register will be set as that.
+> However, when we exec the first user thread (or indeed any user thread),
+> the user domain will be set to client mode (see the set_fs(USER_DS) in
+> fs/exec.c).
 
-Why bother? If the defconfigs select it then most users basing their
-config from that will be just fine.
-
-PROC_DEVICETREE is 100% optional, it's useful to get runtime access to
-the contents of the device tree but it's not required for the kernel
-to boot.
-
-
--Olof
+More accurately, in early_init_trap, the modify action will be done too ^_^.
