@@ -1,129 +1,101 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Jul 2012 10:20:22 +0100
-Subject: [RFC PATCH 4/4] ARM: arch_timers: dynamic switch to physical timer
- and virtual timer offloading
+Date: Fri,  6 Jul 2012 10:20:20 +0100
+Subject: [RFC PATCH 2/4] ARM: arch_timers: register a time/cycle counter
 In-Reply-To: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
 References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1341566422-20368-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1341566422-20368-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an environment supporting virtualization (KVM), the virtual timer
-is reserved to the guests, while we rely on the physical timer for
-the host.
-
-For this, we need to:
-- switch the host CPUs from the virtual timer to the physical one
-- provide an interrupt handler that is called by the virtual
-  timer's interrupt handler.
-
-The new function arch_timer_switch_to_phys() performs this task.
+Some subsystems (KVM for example) need access to a cycle counter.
+In the KVM case, this is used to measure the time delta between
+host and guest in order to accurately generate timer events for
+the guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h |    6 +++++
- arch/arm/kernel/arch_timer.c      |   49 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+ arch/arm/include/asm/arch_timer.h |    8 ++++++++
+ arch/arm/kernel/arch_timer.c      |   25 +++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
 
 diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 72c6822..7cd1e27 100644
+index ed2e95d..72c6822 100644
 --- a/arch/arm/include/asm/arch_timer.h
 +++ b/arch/arm/include/asm/arch_timer.h
-@@ -2,11 +2,13 @@
+@@ -1,9 +1,12 @@
+ #ifndef __ASMARM_ARCH_TIMER_H
  #define __ASMARM_ARCH_TIMER_H
  
- #include <linux/clocksource.h>
-+#include <linux/interrupt.h>
- 
++#include <linux/clocksource.h>
++
  #ifdef CONFIG_ARM_ARCH_TIMER
  int arch_timer_of_register(void);
  int arch_timer_sched_clock_init(void);
- struct timecounter *arch_timer_get_timecounter(void);
-+void arch_timer_switch_to_phys(irq_handler_t);
++struct timecounter *arch_timer_get_timecounter(void);
  #else
  static inline int arch_timer_of_register(void)
  {
-@@ -22,6 +24,10 @@ static inline struct timecounter *arch_timer_get_timecounter(void)
+@@ -14,6 +17,11 @@ static inline int arch_timer_sched_clock_init(void)
  {
- 	return NULL;
+ 	return -ENXIO;
  }
 +
-+static inline void arch_timer_switch_to_phys(irq_handler_t handler)
++static inline struct timecounter *arch_timer_get_timecounter(void)
 +{
++	return NULL;
 +}
  #endif
  
  #endif
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 4473f66..1bb632a 100644
+index 54599e9..2b5da66 100644
 --- a/arch/arm/kernel/arch_timer.c
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -50,6 +50,8 @@ struct arch_timer_reg_ops {
+@@ -318,6 +318,15 @@ static cycle_t arch_counter_read(struct clocksource *cs)
+ 	return arch_counter_get_cntpct();
+ }
  
- static struct arch_timer_reg_ops __percpu **arch_timer_reg_ops;
- 
-+static irq_handler_t arch_timer_virt_external_handler;
++static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
++{
++	/*
++	 * Always use the physical counter for the clocksource.
++	 * CNTHCTL.PL1PCTEN must be set to 1.
++	 */
++	return arch_counter_get_cntpct();
++}
 +
- /*
-  * Architected system timer support.
-  */
-@@ -204,6 +206,19 @@ static irqreturn_t arch_timer_handler(int irq, void *dev_id)
+ static struct clocksource clocksource_counter = {
+ 	.name	= "arch_sys_counter",
+ 	.rating	= 400,
+@@ -326,6 +335,18 @@ static struct clocksource clocksource_counter = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
  
- static irqreturn_t arch_timer_virt_handler(int irq, void *dev_id)
++static struct cyclecounter cyclecounter = {
++	.read	= arch_counter_read_cc,
++	.mask	= CLOCKSOURCE_MASK(56),
++};
++
++static struct timecounter timecounter;
++
++struct timecounter *arch_timer_get_timecounter(void)
++{
++	return &timecounter;
++}
++
+ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
  {
-+	if (arch_timer_virt_external_handler) {
-+		unsigned long ctrl;
-+
-+		ctrl = arch_timer_virt_reg_read(ARCH_TIMER_REG_CTRL);
-+		if (ctrl & ARCH_TIMER_CTRL_IT_STAT) {
-+			ctrl |= ARCH_TIMER_CTRL_IT_MASK;
-+			arch_timer_virt_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
-+			return arch_timer_virt_external_handler(irq, NULL);
-+		}
-+
-+		return IRQ_NONE;
-+	}
-+
- 	return arch_timer_handler(irq, dev_id);
- }
+ 	int i;
+@@ -376,6 +397,10 @@ static int __init arch_timer_register(void)
+ 	}
  
-@@ -509,3 +524,37 @@ int __init arch_timer_sched_clock_init(void)
- 	setup_sched_clock(arch_counter_get_cnt32, 32, arch_timer_rate);
- 	return 0;
- }
-+
-+static void arch_timer_switch_cpu_to_phys(void *dummy)
-+{
-+	u32 cvall, cvalh, val;
-+
-+	pr_info("Switching CPU%d to physical timer\n", smp_processor_id());
-+
-+	asm volatile("mrrc p15, 3, %0, %1, c14	\n" /* Read CNTV_CVAL */
-+		     "mcrr p15, 2, %0, %1, c14	\n" /* Write CNTP_CVAL */
-+		     : "=r" (cvall), "=r" (cvalh));
-+
-+	isb();
-+	
-+	val = arch_timer_virt_reg_read(ARCH_TIMER_REG_CTRL);
-+	arch_timer_virt_reg_write(ARCH_TIMER_REG_CTRL,
-+				  val & ~ARCH_TIMER_CTRL_ENABLE);
-+	arch_timer_phys_reg_write(ARCH_TIMER_REG_CTRL, val);
-+	*__this_cpu_ptr(arch_timer_reg_ops) = &arch_timer_phys_ops;
-+}
-+
-+void arch_timer_switch_to_phys(irq_handler_t handler)
-+{
-+	int cpu;
-+
-+	if (!arch_timer_use_virtual)
-+		return;
-+
-+	for_each_online_cpu(cpu)
-+		smp_call_function_single(cpu, arch_timer_switch_cpu_to_phys,
-+					 NULL, 1);
-+
-+	arch_timer_use_virtual = false;
-+	arch_timer_virt_external_handler = handler;
-+}
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
++	cyclecounter.mult = clocksource_counter.mult;
++	cyclecounter.shift = clocksource_counter.shift;
++	timecounter_init(&timecounter, &cyclecounter,
++			 arch_counter_get_cntpct());
+ 
+ 	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++) {
+ 		irq_handler_t handler = arch_timer_handler;
 -- 
 1.7.10.3
