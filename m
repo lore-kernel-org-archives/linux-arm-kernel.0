@@ -1,200 +1,132 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 6 Jul 2012 14:51:51 +0530
-Subject: [PATCH v2 10/14] ARM: omap2+: board-generic: clean up the irq data
- from board file.
+Date: Fri, 6 Jul 2012 14:51:50 +0530
+Subject: [PATCH v2 09/14] ARM: OMAP5: Add SMP support.
 In-Reply-To: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341566515-22665-11-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1341566515-22665-10-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
-
-Move the irq_match arrays and the irq init functions of OMAP 2,3
-and 4 based boards out of board-generic.c file and also rename the
-irq init function to match the interrupt controller present in
-the SOCs.
-
-This is a preparatory patch to add the OMAP5 evm board's irq init
-support with device tree.
+Add OMAP5 SMP boot support using OMAP4 SMP code. The relevant code paths
+are runtime checked using cpu id
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/board-generic.c |   23 ++++++-----------------
- arch/arm/mach-omap2/common.h        |    6 ++++--
- arch/arm/mach-omap2/irq.c           |   13 ++++++++++++-
- arch/arm/mach-omap2/omap4-common.c  |   13 +++++++++++++
- 4 files changed, 35 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/common.h       |    1 +
+ arch/arm/mach-omap2/omap-headsmp.S |   21 +++++++++++++++++++++
+ arch/arm/mach-omap2/omap-smp.c     |   35 +++++++++++++++++++++++------------
+ 3 files changed, 45 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 2f2abfb..716e6b1 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -25,23 +25,12 @@
- #include "common-board-devices.h"
- 
- #if !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
--#define omap_intc_of_init	NULL
-+#define intc_of_init	NULL
- #endif
- #ifndef CONFIG_ARCH_OMAP4
- #define gic_of_init		NULL
- #endif
- 
--static struct of_device_id irq_match[] __initdata = {
--	{ .compatible = "ti,omap2-intc", .data = omap_intc_of_init, },
--	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
--	{ }
--};
--
--static void __init omap_init_irq(void)
--{
--	of_irq_init(irq_match);
--}
--
- static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ .compatible = "simple-bus", },
- 	{ .compatible = "ti,omap-infra", },
-@@ -65,7 +54,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
--	.init_irq	= omap_init_irq,
-+	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap2_timer,
-@@ -84,7 +73,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap243x_map_io,
- 	.init_early	= omap2430_init_early,
--	.init_irq	= omap_init_irq,
-+	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap2_timer,
-@@ -103,7 +92,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
--	.init_irq	= omap_init_irq,
-+	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_timer,
-@@ -122,7 +111,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am33xx_init_early,
--	.init_irq	= omap_init_irq,
-+	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_am33xx_timer,
-@@ -140,7 +129,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
--	.init_irq	= omap_init_irq,
-+	.init_irq	= omap_gic_of_init,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap4430_init_late,
 diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 960f984..1f65b18 100644
+index 97e8792..960f984 100644
 --- a/arch/arm/mach-omap2/common.h
 +++ b/arch/arm/mach-omap2/common.h
-@@ -239,6 +239,8 @@ void omap3_intc_prepare_idle(void);
- void omap3_intc_resume_idle(void);
- void omap2_intc_handle_irq(struct pt_regs *regs);
- void omap3_intc_handle_irq(struct pt_regs *regs);
-+void omap_intc_of_init(void);
-+void omap_gic_of_init(void);
+@@ -276,6 +276,7 @@ extern void omap_secondary_startup(void);
+ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
+ extern void omap_auxcoreboot_addr(u32 cpu_addr);
+ extern u32 omap_read_auxcoreboot0(void);
++extern void omap5_secondary_startup(void);
+ #endif
  
- #ifdef CONFIG_CACHE_L2X0
- extern void __iomem *omap4_get_l2cache_base(void);
-@@ -246,10 +248,10 @@ extern void __iomem *omap4_get_l2cache_base(void);
+ #if defined(CONFIG_SMP) && defined(CONFIG_PM)
+diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+index 503ac77..502e313 100644
+--- a/arch/arm/mach-omap2/omap-headsmp.S
++++ b/arch/arm/mach-omap2/omap-headsmp.S
+@@ -19,6 +19,27 @@
+ #include <linux/init.h>
  
- struct device_node;
- #ifdef CONFIG_OF
--int __init omap_intc_of_init(struct device_node *node,
-+int __init intc_of_init(struct device_node *node,
- 			     struct device_node *parent);
- #else
--int __init omap_intc_of_init(struct device_node *node,
-+int __init intc_of_init(struct device_node *node,
- 			     struct device_node *parent)
+ 	__CPUINIT
++
++/* Physical address needed since MMU not enabled yet on secondary core */
++#define AUX_CORE_BOOT0_PA			0x48281800
++
++/*
++ * OMAP5 specific entry point for secondary CPU to jump from ROM
++ * code.  This routine also provides a holding flag into which
++ * secondary core is held until we're ready for it to initialise.
++ * The primary core will update this flag using a hardware
+++ * register AuxCoreBoot0.
++ */
++ENTRY(omap5_secondary_startup)
++wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
++	ldr	r0, [r2]
++	mov	r0, r0, lsr #5
++	mrc	p15, 0, r4, c0, c0, 5
++	and	r4, r4, #0x0f
++	cmp	r0, r4
++	bne	wait
++	b	secondary_startup
++END(omap5_secondary_startup)
+ /*
+  * OMAP4 specific entry point for secondary CPU to jump from ROM
+  * code.  This routine also provides a holding flag into which
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index badfe39..7d118b9 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -33,6 +33,12 @@
+ #include "common.h"
+ #include "clockdomain.h"
+ 
++#define CPU_MASK		0xff0ffff0
++#define CPU_CORTEX_A9		0x410FC090
++#define CPU_CORTEX_A15		0x410FC0F0
++
++#define OMAP5_CORE_COUNT	0x2
++
+ /* SCU base address */
+ static void __iomem *scu_base;
+ 
+@@ -133,7 +139,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ static void __init wakeup_secondary(void)
  {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index d5b34fe..8467beb 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -21,6 +21,7 @@
- #include <linux/irqdomain.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_irq.h>
- 
- #include <mach/hardware.h>
- 
-@@ -258,7 +259,7 @@ asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs
- 	omap_intc_handle_irq(base_addr, regs);
- }
- 
--int __init omap_intc_of_init(struct device_node *node,
-+int __init intc_of_init(struct device_node *node,
- 			     struct device_node *parent)
+ 	void __iomem *base = omap_get_wakeupgen_base();
+-
+ 	/*
+ 	 * Write the address of secondary startup routine into the
+ 	 * AuxCoreBoot1 where ROM code will jump and start executing
+@@ -162,16 +167,21 @@ static void __init wakeup_secondary(void)
+  */
+ void __init smp_init_cpus(void)
  {
- 	struct resource res;
-@@ -280,6 +281,16 @@ int __init omap_intc_of_init(struct device_node *node,
- 	return 0;
+-	unsigned int i, ncores;
+-
+-	/*
+-	 * Currently we can't call ioremap here because
+-	 * SoC detection won't work until after init_early.
+-	 */
+-	scu_base =  OMAP2_L4_IO_ADDRESS(OMAP44XX_SCU_BASE);
+-	BUG_ON(!scu_base);
+-
+-	ncores = scu_get_core_count(scu_base);
++	unsigned int i = 0, ncores = 1, cpu_id;
++
++	/* Use ARM cpuid check here, as SoC detection will not work so early */
++	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
++	if (cpu_id == CPU_CORTEX_A9) {
++		/*
++		 * Currently we can't call ioremap here because
++		 * SoC detection won't work until after init_early.
++		 */
++		scu_base =  OMAP2_L4_IO_ADDRESS(OMAP44XX_SCU_BASE);
++		BUG_ON(!scu_base);
++		ncores = scu_get_core_count(scu_base);
++	} else if (cpu_id == CPU_CORTEX_A15) {
++		ncores = OMAP5_CORE_COUNT;
++	}
+ 
+ 	/* sanity check */
+ 	if (ncores > nr_cpu_ids) {
+@@ -193,6 +203,7 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * Initialise the SCU and wake up the secondary core using
+ 	 * wakeup_secondary().
+ 	 */
+-	scu_enable(scu_base);
++	if (scu_base)
++		scu_enable(scu_base);
+ 	wakeup_secondary();
  }
- 
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "ti,omap2-intc", .data = intc_of_init, },
-+	{ }
-+};
-+
-+void __init omap_intc_of_init(void)
-+{
-+	of_irq_init(irq_match);
-+}
-+
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
- static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
- 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index a8161e5..f38d659 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -21,6 +21,8 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
- #include <asm/memblock.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
- 
- #include <plat/irqs.h>
- #include <plat/sram.h>
-@@ -210,6 +212,17 @@ static int __init omap4_sar_ram_init(void)
- }
- early_initcall(omap4_sar_ram_init);
- 
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ }
-+};
-+
-+void __init omap_gic_of_init(void)
-+{
-+	omap_wakeupgen_init();
-+	of_irq_init(irq_match);
-+}
-+
- #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
- static int omap4_twl6030_hsmmc_late_init(struct device *dev)
- {
 -- 
 1.7.9.5
