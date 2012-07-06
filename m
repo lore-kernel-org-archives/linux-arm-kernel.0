@@ -1,65 +1,22 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri,  6 Jul 2012 11:02:26 +0800
-Subject: [V3 4/4] ARM: MMP: add 88pm860x battery-charger support
-In-Reply-To: <20120705141541.GO4111@opensource.wolfsonmicro.com>
-References: <20120705141541.GO4111@opensource.wolfsonmicro.com>
-Message-ID: <1341543746-6567-1-git-send-email-jtzhou@marvell.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 6 Jul 2012 14:32:44 +0530
+Subject: [PATCH 1/2] ARM: OMAP: board-4430sdp: MUX configuration for
+ sys_nirq2
+In-Reply-To: <1341564590-14024-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1341564590-14024-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <CAMQu2gyZQGGVQQtidGwOCux-0hX=FmPVP+9Sej_VRrQMurd=mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 88pm860x chg_desc platform data for ttc platform.
+On Fri, Jul 6, 2012 at 2:19 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> The sys_nirq2 is used for twl6040, make sure the pin is configured
+> correctly.
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+Should remove the boot-loader pin-muxing dependency.
+Was this the reason, Audio had some issues on OMAP4430
+SDP as reported by Russell ?
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- arch/arm/mach-mmp/ttc_dkb.c |   28 +++++++++++++++++++++++++++-
- 1 files changed, 27 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 7a7de2b..5e70cbf 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -18,6 +18,8 @@
- #include <linux/i2c/pca953x.h>
- #include <linux/gpio.h>
- #include <linux/mfd/88pm860x.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/power/charger-manager.h>
- #include <linux/platform_data/mv_usb.h>
- 
- #include <asm/mach-types.h>
-@@ -138,8 +140,32 @@ static struct pca953x_platform_data max7312_data[] = {
- 	},
- };
- 
-+static char *ttc_psy_chg_stat[] = {"usb", NULL};
-+/*
-+ * Temperature can be handled by battery monitor base on interrupt
-+ * scheme, so dummy it to make sure charger-manager initialize ok.
-+ */
-+static int dummy_temp_out_of_range(int *mC)
-+{
-+	*mC = 2500;
-+	return 0;
-+}
-+
-+struct charger_desc chg_desc_data = {
-+	.polling_mode		= CM_POLL_ALWAYS,
-+	.polling_interval_ms	= 180000,
-+	.battery_present	= CM_FUEL_GAUGE,
-+	.psy_charger_stat	= &ttc_psy_chg_stat[0],
-+	.psy_fuel_gauge		= "battery-monitor",
-+	.temperature_out_of_range	= dummy_temp_out_of_range,
-+};
-+
- static struct pm860x_platform_data ttc_dkb_pm8607_info = {
--	.irq_base       = IRQ_BOARD_START,
-+	.chg_desc	= &chg_desc_data,
-+	.companion_addr	= 0x11,
-+	.irq_mode	= 0,
-+	.irq_base	= IRQ_BOARD_START,
-+	.i2c_port	= GI2C_PORT,
- };
- 
- static struct i2c_board_info ttc_dkb_i2c_info[] = {
--- 
-1.7.0.4
+FWIW:
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
