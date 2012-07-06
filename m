@@ -1,230 +1,238 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:28 -0500
-Subject: [PATCH 03/15] ARM: tegra: use fixed PCI i/o mapping
+Date: Fri,  6 Jul 2012 13:40:37 -0500
+Subject: [PATCH 12/15] ARM: mv78xx0: use fixed pci i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-13-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move tegra PCI to fixed i/o mapping and remove io.h.
+Move mv78xx0 PCI to fixed i/o mapping and remove io.h. This changes the PCI
+bus addresses from the cpu address to 0 based. It appears that there is
+translation h/w for this, but its untested.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Colin Cross <ccross@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/Kconfig                         |    1 -
- arch/arm/mach-tegra/include/mach/io.h    |   46 ------------------------------
- arch/arm/mach-tegra/include/mach/iomap.h |    3 ++
- arch/arm/mach-tegra/io.c                 |    2 ++
- arch/arm/mach-tegra/pcie.c               |   43 ++++------------------------
- 5 files changed, 10 insertions(+), 85 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
+ arch/arm/Kconfig                             |    1 -
+ arch/arm/mach-mv78xx0/addr-map.c             |    1 +
+ arch/arm/mach-mv78xx0/common.c               |   18 ++++++++++++-----
+ arch/arm/mach-mv78xx0/include/mach/io.h      |   24 ----------------------
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h |   22 +++++++++-----------
+ arch/arm/mach-mv78xx0/pcie.c                 |   28 +++++---------------------
+ 6 files changed, 29 insertions(+), 65 deletions(-)
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/io.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8fb7e4a..ac446e3 100644
+index c61e0a4..1b7faa5 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -644,7 +644,6 @@ config ARCH_TEGRA
- 	select HAVE_CLK
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
--	select NEED_MACH_IO_H if PCI
- 	select ARCH_HAS_CPUFREQ
+@@ -571,7 +571,6 @@ config ARCH_MV78XX0
+ 	select PCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+-	select NEED_MACH_IO_H
+ 	select PLAT_ORION
  	help
- 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
-diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
+ 	  Support for the following Marvell MV78xx0 series SoCs:
+diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+index 62b53d7..da9806a 100644
+--- a/arch/arm/mach-mv78xx0/addr-map.c
++++ b/arch/arm/mach-mv78xx0/addr-map.c
+@@ -13,6 +13,7 @@
+ #include <linux/mbus.h>
+ #include <linux/io.h>
+ #include <plat/addr-map.h>
++#include <mach/mv78xx0.h>
+ #include "common.h"
+ 
+ /*
+diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+index b4c53b8..e018d8c 100644
+--- a/arch/arm/mach-mv78xx0/common.c
++++ b/arch/arm/mach-mv78xx0/common.c
+@@ -17,6 +17,7 @@
+ #include <linux/ethtool.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
++#include <asm/mach/pci.h>
+ #include <mach/mv78xx0.h>
+ #include <mach/bridge-regs.h>
+ #include <plat/cache-feroceon-l2.h>
+@@ -135,11 +136,6 @@ static struct map_desc mv78xx0_io_desc[] __initdata = {
+ 		.length		= MV78XX0_CORE_REGS_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= MV78XX0_PCIE_IO_VIRT_BASE(0),
+-		.pfn		= __phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(0)),
+-		.length		= MV78XX0_PCIE_IO_SIZE * 8,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= MV78XX0_REGS_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(MV78XX0_REGS_PHYS_BASE),
+ 		.length		= MV78XX0_REGS_SIZE,
+@@ -150,6 +146,18 @@ static struct map_desc mv78xx0_io_desc[] __initdata = {
+ void __init mv78xx0_map_io(void)
+ {
+ 	unsigned long phys;
++	unsigned long pci_io_pfn[] = {
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(0)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(1)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(2)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(3)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(4)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(5)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(6)),
++		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(7)),
++	};
++
++	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn), SZ_64K);
+ 
+ 	/*
+ 	 * Map the right set of per-core registers depending on
+diff --git a/arch/arm/mach-mv78xx0/include/mach/io.h b/arch/arm/mach-mv78xx0/include/mach/io.h
 deleted file mode 100644
-index fe700f9..0000000
---- a/arch/arm/mach-tegra/include/mach/io.h
+index c7d9d00..0000000
+--- a/arch/arm/mach-mv78xx0/include/mach/io.h
 +++ /dev/null
-@@ -1,46 +0,0 @@
+@@ -1,24 +0,0 @@
 -/*
-- * arch/arm/mach-tegra/include/mach/io.h
+- * arch/arm/mach-mv78xx0/include/mach/io.h
 - *
-- * Copyright (C) 2010 Google, Inc.
-- *
-- * Author:
-- *	Colin Cross <ccross@google.com>
-- *	Erik Gilling <konkers@google.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 - */
 -
--#ifndef __MACH_TEGRA_IO_H
--#define __MACH_TEGRA_IO_H
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
 -
--#define IO_SPACE_LIMIT 0xffff
+-#include "mv78xx0.h"
 -
--#ifndef __ASSEMBLER__
--
--#ifdef CONFIG_TEGRA_PCI
--extern void __iomem *tegra_pcie_io_base;
+-#define IO_SPACE_LIMIT		0xffffffff
 -
 -static inline void __iomem *__io(unsigned long addr)
 -{
--	return tegra_pcie_io_base + (addr & IO_SPACE_LIMIT);
+-	return (void __iomem *)((addr - MV78XX0_PCIE_IO_PHYS_BASE(0))
+-					+ MV78XX0_PCIE_IO_VIRT_BASE(0));
 -}
--#else
--static inline void __iomem *__io(unsigned long addr)
--{
--	return (void __iomem *)addr;
--}
--#endif
 -
--#define __io(a)         __io(a)
+-#define __io(a)			__io(a)
 -
 -#endif
--
--#endif
-diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
-index 7e76da7..fee3a94 100644
---- a/arch/arm/mach-tegra/include/mach/iomap.h
-+++ b/arch/arm/mach-tegra/include/mach/iomap.h
-@@ -303,6 +303,9 @@
- #define IO_APB_VIRT	IOMEM(0xFE300000)
- #define IO_APB_SIZE	SZ_1M
- 
-+#define TEGRA_PCIE_BASE		0x80000000
-+#define TEGRA_PCIE_IO_BASE	(TEGRA_PCIE_BASE + SZ_4M)
-+
- #define IO_TO_VIRT_BETWEEN(p, st, sz)	((p) >= (st) && (p) < ((st) + (sz)))
- #define IO_TO_VIRT_XLATE(p, pst, vst)	(((p) - (pst) + (vst)))
- 
-diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
-index 58b4baf..7a29e10 100644
---- a/arch/arm/mach-tegra/io.c
-+++ b/arch/arm/mach-tegra/io.c
-@@ -26,6 +26,7 @@
- 
- #include <asm/page.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- #include <mach/iomap.h>
- 
- #include "board.h"
-@@ -59,5 +60,6 @@ static struct map_desc tegra_io_desc[] __initdata = {
- 
- void __init tegra_map_common_io(void)
- {
-+	pci_map_io_single(TEGRA_PCIE_IO_BASE);
- 	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
- }
-diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index 0e09137..c989a8e 100644
---- a/arch/arm/mach-tegra/pcie.c
-+++ b/arch/arm/mach-tegra/pcie.c
-@@ -171,8 +171,6 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
-  * 0x90000000 - 0x9fffffff - non-prefetchable memory
-  * 0xa0000000 - 0xbfffffff - prefetchable memory
+diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+index e807c4c..10fc138 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
++++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+@@ -29,15 +29,15 @@
+  *
+  * virt		phys		size
+  * fe400000	f102x000	16K	core-specific peripheral registers
+- * fe700000	f0800000	1M	PCIe #0 I/O space
+- * fe800000	f0900000	1M	PCIe #1 I/O space
+- * fe900000	f0a00000	1M	PCIe #2 I/O space
+- * fea00000	f0b00000	1M	PCIe #3 I/O space
+- * feb00000	f0c00000	1M	PCIe #4 I/O space
+- * fec00000	f0d00000	1M	PCIe #5 I/O space
+- * fed00000	f0e00000	1M	PCIe #6 I/O space
+- * fee00000	f0f00000	1M	PCIe #7 I/O space
+- * fef00000	f1000000	1M	on-chip peripheral registers
++ * fee00000	f0800000	64K	PCIe #0 I/O space
++ * fee10000	f0900000	64K	PCIe #1 I/O space
++ * fee20000	f0a00000	64K	PCIe #2 I/O space
++ * fee30000	f0b00000	64K	PCIe #3 I/O space
++ * fee40000	f0c00000	64K	PCIe #4 I/O space
++ * fee50000	f0d00000	64K	PCIe #5 I/O space
++ * fee60000	f0e00000	64K	PCIe #6 I/O space
++ * fee70000	f0f00000	64K	PCIe #7 I/O space
++ * fd000000	f1000000	1M	on-chip peripheral registers
   */
--#define TEGRA_PCIE_BASE		0x80000000
+ #define MV78XX0_CORE0_REGS_PHYS_BASE	0xf1020000
+ #define MV78XX0_CORE1_REGS_PHYS_BASE	0xf1024000
+@@ -46,11 +46,9 @@
+ #define MV78XX0_CORE_REGS_SIZE		SZ_16K
+ 
+ #define MV78XX0_PCIE_IO_PHYS_BASE(i)	(0xf0800000 + ((i) << 20))
+-#define MV78XX0_PCIE_IO_VIRT_BASE(i)	(0xfe700000 + ((i) << 20))
+-#define MV78XX0_PCIE_IO_SIZE		SZ_1M
+ 
+ #define MV78XX0_REGS_PHYS_BASE		0xf1000000
+-#define MV78XX0_REGS_VIRT_BASE		0xfef00000
++#define MV78XX0_REGS_VIRT_BASE		0xfd000000
+ #define MV78XX0_REGS_SIZE		SZ_1M
+ 
+ #define MV78XX0_PCIE_MEM_PHYS_BASE	0xc0000000
+diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+index 2e56e86..a51a1e4 100644
+--- a/arch/arm/mach-mv78xx0/pcie.c
++++ b/arch/arm/mach-mv78xx0/pcie.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach/pci.h>
+ #include <plat/pcie.h>
+ #include <plat/addr-map.h>
++#include <mach/mv78xx0.h>
+ #include "common.h"
+ 
+ struct pcie_port {
+@@ -30,9 +31,6 @@ struct pcie_port {
+ 
+ static struct pcie_port pcie_port[8];
+ static int num_pcie_ports;
+-static struct resource pcie_io_space;
+-static struct resource pcie_mem_space;
 -
- #define PCIE_REGS_SZ		SZ_16K
- #define PCIE_CFG_OFF		PCIE_REGS_SZ
- #define PCIE_CFG_SZ		SZ_1M
-@@ -180,8 +178,6 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
- #define PCIE_EXT_CFG_SZ		SZ_1M
- #define PCIE_IOMAP_SZ		(PCIE_REGS_SZ + PCIE_CFG_SZ + PCIE_EXT_CFG_SZ)
  
--#define MMIO_BASE		(TEGRA_PCIE_BASE + SZ_4M)
--#define MMIO_SIZE		SZ_64K
- #define MEM_BASE_0		(TEGRA_PCIE_BASE + SZ_256M)
- #define MEM_SIZE_0		SZ_128M
- #define MEM_BASE_1		(MEM_BASE_0 + MEM_SIZE_0)
-@@ -223,17 +219,7 @@ struct tegra_pcie_info {
- 	struct clk		*pll_e;
- };
- 
--static struct tegra_pcie_info tegra_pcie = {
--	.res_mmio = {
--		.name = "PCI IO",
--		.start = MMIO_BASE,
--		.end = MMIO_BASE + MMIO_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--};
--
--void __iomem *tegra_pcie_io_base;
--EXPORT_SYMBOL(tegra_pcie_io_base);
-+static struct tegra_pcie_info tegra_pcie;
- 
- static inline void afi_writel(u32 value, unsigned long offset)
+ void __init mv78xx0_pcie_id(u32 *dev, u32 *rev)
  {
-@@ -403,7 +389,7 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
- 		pp->res[0].end = pp->res[0].start + SZ_32K - 1;
- 	} else {
- 		pp->res[0].start = PCIBIOS_MIN_IO + SZ_32K;
--		pp->res[0].end = IO_SPACE_LIMIT;
-+		pp->res[0].end = SZ_64K - 1;
- 	}
- 	pp->res[0].flags = IORESOURCE_IO;
- 	if (request_resource(&ioport_resource, &pp->res[0]))
-@@ -541,8 +527,8 @@ static void tegra_pcie_setup_translations(void)
+@@ -47,22 +45,6 @@ static void __init mv78xx0_pcie_preinit(void)
+ 	u32 start;
+ 	int win;
  
- 	/* Bar 2: downstream IO bar */
- 	fpci_bar = ((__u32)0xfdfc << 16);
--	size = MMIO_SIZE;
--	axi_address = MMIO_BASE;
-+	size = SZ_64K;
-+	axi_address = TEGRA_PCIE_IO_BASE;
- 	afi_writel(axi_address, AFI_AXI_BAR2_START);
- 	afi_writel(size >> 12, AFI_AXI_BAR2_SZ);
- 	afi_writel(fpci_bar, AFI_FPCI_BAR2);
-@@ -776,7 +762,6 @@ static void tegra_pcie_clocks_put(void)
- 
- static int __init tegra_pcie_get_resources(void)
- {
--	struct resource *res_mmio = &tegra_pcie.res_mmio;
- 	int err;
- 
- 	err = tegra_pcie_clocks_get();
-@@ -798,34 +783,16 @@ static int __init tegra_pcie_get_resources(void)
- 		goto err_map_reg;
- 	}
- 
--	err = request_resource(&iomem_resource, res_mmio);
--	if (err) {
--		pr_err("PCIE: Failed to request resources: %d\n", err);
--		goto err_req_io;
--	}
+-	pcie_io_space.name = "PCIe I/O Space";
+-	pcie_io_space.start = MV78XX0_PCIE_IO_PHYS_BASE(0);
+-	pcie_io_space.end =
+-		MV78XX0_PCIE_IO_PHYS_BASE(0) + MV78XX0_PCIE_IO_SIZE * 8 - 1;
+-	pcie_io_space.flags = IORESOURCE_IO;
+-	if (request_resource(&iomem_resource, &pcie_io_space))
+-		panic("can't allocate PCIe I/O space");
 -
--	tegra_pcie_io_base = ioremap_nocache(res_mmio->start,
--					     resource_size(res_mmio));
--	if (tegra_pcie_io_base == NULL) {
--		pr_err("PCIE: Failed to map IO\n");
--		err = -ENOMEM;
--		goto err_map_io;
--	}
+-	pcie_mem_space.name = "PCIe MEM Space";
+-	pcie_mem_space.start = MV78XX0_PCIE_MEM_PHYS_BASE;
+-	pcie_mem_space.end =
+-		MV78XX0_PCIE_MEM_PHYS_BASE + MV78XX0_PCIE_MEM_SIZE - 1;
+-	pcie_mem_space.flags = IORESOURCE_MEM;
+-	if (request_resource(&iomem_resource, &pcie_mem_space))
+-		panic("can't allocate PCIe MEM space");
 -
- 	err = request_irq(INT_PCIE_INTR, tegra_pcie_isr,
- 			  IRQF_SHARED, "PCIE", &tegra_pcie);
- 	if (err) {
- 		pr_err("PCIE: Failed to register IRQ: %d\n", err);
--		goto err_irq;
-+		goto err_req_io;
+ 	for (i = 0; i < num_pcie_ports; i++) {
+ 		struct pcie_port *pp = pcie_port + i;
+ 
+@@ -70,8 +52,8 @@ static void __init mv78xx0_pcie_preinit(void)
+ 			"PCIe %d.%d I/O", pp->maj, pp->min);
+ 		pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
+ 		pp->res[0].name = pp->io_space_name;
+-		pp->res[0].start = MV78XX0_PCIE_IO_PHYS_BASE(i);
+-		pp->res[0].end = pp->res[0].start + MV78XX0_PCIE_IO_SIZE - 1;
++		pp->res[0].start = i * SZ_64K;
++		pp->res[0].end = pp->res[0].start + SZ_64K - 1;
+ 		pp->res[0].flags = IORESOURCE_IO;
+ 
+ 		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
+@@ -118,10 +100,10 @@ static void __init mv78xx0_pcie_preinit(void)
+ 	for (i = 0; i < num_pcie_ports; i++) {
+ 		struct pcie_port *pp = pcie_port + i;
+ 
+-		if (request_resource(&pcie_io_space, &pp->res[0]))
++		if (request_resource(&ioport_resource, &pp->res[0]))
+ 			panic("can't allocate PCIe I/O sub-space");
+ 
+-		if (request_resource(&pcie_mem_space, &pp->res[1]))
++		if (request_resource(&iomem_resource, &pp->res[1]))
+ 			panic("can't allocate PCIe MEM sub-space");
  	}
- 	set_irq_flags(INT_PCIE_INTR, IRQF_VALID);
  
- 	return 0;
- 
--err_irq:
--	iounmap(tegra_pcie_io_base);
--err_map_io:
--	release_resource(&tegra_pcie.res_mmio);
- err_req_io:
- 	iounmap(tegra_pcie.regs);
- err_map_reg:
 -- 
 1.7.9.5
