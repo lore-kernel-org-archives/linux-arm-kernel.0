@@ -1,236 +1,89 @@
 From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Fri,  6 Jul 2012 14:48:50 +0800
-Subject: [PATCH 4/4] input: add onkey support to 88PM80X PMIC
+Date: Fri,  6 Jul 2012 14:48:48 +0800
+Subject: [PATCH 2/4] mfd: workaround: add companion chip in 88pm80x
 In-Reply-To: <1341557330-24413-1-git-send-email-zhouqiao@marvell.com>
 References: <1341557330-24413-1-git-send-email-zhouqiao@marvell.com>
-Message-ID: <1341557330-24413-5-git-send-email-zhouqiao@marvell.com>
+Message-ID: <1341557330-24413-3-git-send-email-zhouqiao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add onkey support to MARVELL 88PM80X PMIC.
+in hw design, 800 is mainly for pmic control, while 805 for audio.
+but there are 3 registers which controls class D speaker property,
+and they are defined in 800 i2c client domain. so 805 codec driver
+needs to use 800 i2c client to access class D speaker reg for
+audio path management. so add this workaround for the purpose to
+let 805 access 800 i2c in some scenario.
 
 Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
 ---
- drivers/input/misc/88pm80x_onkey.c |  176 ++++++++++++++++++++++++++++++++++++
- drivers/input/misc/Kconfig         |   10 ++
- drivers/input/misc/Makefile        |    1 +
- 3 files changed, 187 insertions(+), 0 deletions(-)
- create mode 100644 drivers/input/misc/88pm80x_onkey.c
+ drivers/mfd/88pm80x-i2c.c   |   28 ++++++++++++++++++++++++++++
+ include/linux/mfd/88pm80x.h |    1 +
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/input/misc/88pm80x_onkey.c b/drivers/input/misc/88pm80x_onkey.c
-new file mode 100644
-index 0000000..807587f
---- /dev/null
-+++ b/drivers/input/misc/88pm80x_onkey.c
-@@ -0,0 +1,176 @@
+diff --git a/drivers/mfd/88pm80x-i2c.c b/drivers/mfd/88pm80x-i2c.c
+index 90aa18a..77b8655 100644
+--- a/drivers/mfd/88pm80x-i2c.c
++++ b/drivers/mfd/88pm80x-i2c.c
+@@ -18,6 +18,12 @@
+ #include <linux/uaccess.h>
+ #include <linux/err.h>
+ 
 +/*
-+ * 88pm80x_onkey.c - Marvell 88PM80x ONKEY driver
-+ *
-+ * Copyright (C) 2012 Marvell International Ltd.
-+ * Haojian Zhuang <haojian.zhuang@marvell.com>
-+ * Qiao Zhou <zhouqiao@marvell.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * workaround: some registers needed by pm805 are defined in pm800, so
++ * need to use this global variable to maintain the relation between
++ * pm800 and pm805. would remove it after HW chip fixes the issue.
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/input.h>
-+#include <linux/mfd/88pm80x.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+#define PM800_LONG_ONKEY_EN		(1 << 0)
-+#define PM800_LONG_KEY_DELAY		(8)	/* 1 .. 16 seconds */
-+#define PM800_LONKEY_PRESS_TIME		((PM800_LONG_KEY_DELAY-1) << 4)
-+#define PM800_LONKEY_PRESS_TIME_MASK	(0xF0)
-+#define PM800_SW_PDOWN			(1 << 5)
-+
-+struct pm80x_onkey_info {
-+	struct input_dev *idev;
-+	struct pm80x_chip *pm80x;
-+	struct regmap *map;
-+	int irq;
-+};
-+
-+/* 88PM80x gives us an interrupt when ONKEY is held */
-+static irqreturn_t pm80x_onkey_handler(int irq, void *data)
-+{
-+	struct pm80x_onkey_info *info = data;
-+	int ret = 0;
-+
-+	regmap_read(info->map, PM800_STATUS_1, &ret);
-+	ret &= PM800_ONKEY_STS1;
-+
-+	input_report_key(info->idev, KEY_POWER, ret);
-+	input_sync(info->idev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+#ifdef CONFIG_PM
-+static int pm80x_onkey_suspend(struct device *dev)
-+{
-+	return pm80x_dev_suspend(dev);
-+}
-+
-+static int pm80x_onkey_resume(struct device *dev)
-+{
-+	return pm80x_dev_resume(dev);
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(pm80x_onkey_pm_ops, pm80x_onkey_suspend,
-+			 pm80x_onkey_resume);
-+
-+static int __devinit pm80x_onkey_probe(struct platform_device *pdev)
-+{
-+
-+	void *chip = dev_get_drvdata(pdev->dev.parent);
-+	struct pm80x_onkey_info *info;
-+	int ret;
-+
-+	info =
-+	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_onkey_info),
-+			 GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	info->pm80x = (struct pm80x_chip *)chip;
-+
-+	info->irq = platform_get_irq(pdev, 0);
-+	if (info->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ resource!\n");
-+		return -EINVAL;
-+	}
-+
-+	info->map = info->pm80x->regmap;
-+	if (!info->map) {
-+		dev_err(&pdev->dev, "no regmap!\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	info->idev = input_allocate_device();
-+	if (!info->idev) {
-+		dev_err(&pdev->dev, "Failed to allocate input dev\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	info->idev->name = "88pm80x_on";
-+	info->idev->phys = "88pm80x_on/input0";
-+	info->idev->id.bustype = BUS_I2C;
-+	info->idev->dev.parent = &pdev->dev;
-+	info->idev->evbit[0] = BIT_MASK(EV_KEY);
-+	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
-+
-+	ret = input_register_device(info->idev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't register input device: %d\n", ret);
-+		goto out_reg;
-+	}
-+
-+	ret = pm80x_request_irq(info->pm80x, info->irq, pm80x_onkey_handler,
-+					    IRQF_ONESHOT, "onkey", info);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to request IRQ: #%d: %d\n",
-+			info->irq, ret);
-+		goto out_irq;
-+	}
-+
-+	platform_set_drvdata(pdev, info);
-+
-+	/* Enable long onkey detection */
-+	regmap_update_bits(info->map, PM800_RTC_MISC4, PM800_LONG_ONKEY_EN,
-+			   PM800_LONG_ONKEY_EN);
-+	/* Set 8-second interval */
-+	regmap_update_bits(info->map, PM800_RTC_MISC3,
-+			   PM800_LONKEY_PRESS_TIME_MASK,
-+			   PM800_LONKEY_PRESS_TIME);
-+
-+	device_init_wakeup(&pdev->dev, 1);
-+	return 0;
-+
-+out_irq:
-+	input_unregister_device(info->idev);
-+out_reg:
-+	input_free_device(info->idev);
-+out:
-+	devm_kfree(&pdev->dev, info);
-+	return ret;
-+}
-+
-+static int __devexit pm80x_onkey_remove(struct platform_device *pdev)
-+{
-+	struct pm80x_onkey_info *info = platform_get_drvdata(pdev);
-+
-+	pm80x_free_irq(info->pm80x, info->irq, info);
-+	input_unregister_device(info->idev);
-+	input_free_device(info->idev);
-+	devm_kfree(&pdev->dev, info);
-+	return 0;
-+}
-+
-+static struct platform_driver pm80x_onkey_driver = {
-+	.driver = {
-+		   .name = "88pm80x-onkey",
-+		   .owner = THIS_MODULE,
-+		   .pm = &pm80x_onkey_pm_ops,
-+		   },
-+	.probe = pm80x_onkey_probe,
-+	.remove = __devexit_p(pm80x_onkey_remove),
-+};
-+
-+module_platform_driver(pm80x_onkey_driver);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Marvell 88PM80x ONKEY driver");
-+MODULE_AUTHOR("Qiao Zhou <zhouqiao@marvell.com>");
-+MODULE_ALIAS("platform:88pm80x-onkey");
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 7faf4a7..7c0f1ec 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -22,6 +22,16 @@ config INPUT_88PM860X_ONKEY
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called 88pm860x_onkey.
++static struct pm80x_chip *g_pm80x_chip;
  
-+config INPUT_88PM80X_ONKEY
-+	tristate "88PM80x ONKEY support"
-+	depends on MFD_88PM800
-+	help
-+	  Support the ONKEY of Marvell 88PM80x PMICs as an input device
-+	  reporting power button status.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called 88pm80x_onkey.
-+
- config INPUT_AB8500_PONKEY
- 	tristate "AB8500 Pon (PowerOn) Key"
- 	depends on AB8500_CORE
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index f55cdf4..83fe6f5 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -5,6 +5,7 @@
- # Each configuration option enables a list of files.
+ const struct regmap_config pm80x_regmap_config = {
+ 	.reg_bits = 8,
+@@ -61,6 +67,19 @@ int __devinit pm80x_init(struct i2c_client *client,
  
- obj-$(CONFIG_INPUT_88PM860X_ONKEY)	+= 88pm860x_onkey.o
-+obj-$(CONFIG_INPUT_88PM80X_ONKEY)	+= 88pm80x_onkey.o
- obj-$(CONFIG_INPUT_AB8500_PONKEY)	+= ab8500-ponkey.o
- obj-$(CONFIG_INPUT_AD714X)		+= ad714x.o
- obj-$(CONFIG_INPUT_AD714X_I2C)		+= ad714x-i2c.o
+ 	device_init_wakeup(&client->dev, 1);
+ 
++	/*
++	 * workaround: set g_pm80x_chip to the first probed chip. if the
++	 * second chip is probed, just point to the companion to each
++	 * other so that pm805 can access those specific register. would
++	 * remove it after HW chip fixes the issue.
++	 */
++	if (!g_pm80x_chip)
++		g_pm80x_chip = chip;
++	else {
++		chip->companion = g_pm80x_chip->client;
++		g_pm80x_chip->companion = chip->client;
++	}
++
+ 	return 0;
+ 
+ err_chip_id:
+@@ -75,6 +94,15 @@ int __devexit pm80x_deinit(struct i2c_client *client)
+ {
+ 	struct pm80x_chip *chip = i2c_get_clientdata(client);
+ 
++	/*
++	 * workaround: clear the dependency between pm800 and pm805.
++	 * would remove it after HW chip fixes the issue.
++	 */
++	if (g_pm80x_chip->companion)
++		g_pm80x_chip->companion = NULL;
++	else
++		g_pm80x_chip = NULL;
++
+ 	regmap_exit(chip->regmap);
+ 	devm_kfree(&client->dev, chip);
+ 
+diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+index 283c903..d8b7dda 100644
+--- a/include/linux/mfd/88pm80x.h
++++ b/include/linux/mfd/88pm80x.h
+@@ -295,6 +295,7 @@ struct pm80x_chip {
+ 	struct pm80x_subchip *subchip;
+ 	struct device *dev;
+ 	struct i2c_client *client;
++	struct i2c_client *companion;
+ 	struct regmap *regmap;
+ 	struct regmap_irq_chip *regmap_irq_chip;
+ 	struct regmap_irq_chip_data *irq_data;
 -- 
 1.7.0.4
