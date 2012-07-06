@@ -1,56 +1,103 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 6 Jul 2012 09:27:06 +0530
-Subject: [PATCH v3 0/6] Port Tegra to generic clk framework
-In-Reply-To: <4FF5E1C3.6070309@wwwdotorg.org>
-References: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
- <4FF5E1C3.6070309@wwwdotorg.org>
-Message-ID: <4FF66212.6080507@nvidia.com>
+From: andy.green@linaro.org (Andy Green)
+Date: Fri, 06 Jul 2012 12:09:48 +0800
+Subject: [PATCH 5 2/2] OMAP4 PANDA register ethernet and wlan for automatic
+ mac allocation
+In-Reply-To: <20120706040938.6669.77083.stgit@build.warmcat.com>
+References: <20120706040938.6669.77083.stgit@build.warmcat.com>
+Message-ID: <20120706040946.6669.1040.stgit@build.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 July 2012 12:19 AM, Stephen Warren wrote:
-> On 07/05/2012 03:55 AM, Prashant Gaikwad wrote:
->> This patch set ports Tegra clock code to generic clock framework.
-> Unfortunately, this series causes some regressions, so I can't apply it
-> now. Given that, it won't make 3.6 since I won't be around to apply it.
+From: Andy Green <andy@warmcat.com>
 
-Ok.
+This provides the board-specific device paths needed to get
+the panda boardfile working with the eth-mac-platform api.
 
-> I tested both Tegra's for-next, and next-20120705, both plus this
-> series, next-20120705 plus the fix for the common clock code
-> __clk_set_parent() issue.
->
-> The following all appeared to work OK:
->
-> Cardhu DT
-> Ventana DT
-> Seaboard DT
-> Springbank DT
-> Harmony DT
-> Harmony non-DT
->
-> However, the following failed, all(?) in ways that prevented the system
-> getting to the login prompt:
->
-> Whistler DT
-> AC100 DT
-> AC100 non-DT
-> Trimslice DT
-> Trimslice non-DT
->
-> (The one slight difference between the 2 branches I tested is that AC100
-> and Trimslice booted using DT passed in next-20120705 but failed only in
-> Tegra's for-next. Otherwise, all results were identical)
->
-> I'll try to investigate what the issues are since I imagine you don't
-> have access to these boards. But, I probably won't be able to fix this
-> until I return from vacation.
+On Pandaboard / ES, neither the onboard Ethernet or onboard WLAN
+module have onboard arrangements for MAC storage, without this
+series yielding randomized MAC per-boot and consequent DHCP problems,
+or in the case of wlan0 a MAC set by a firmware file in the rootfs
+which unless customized yields a MAC of 00:00:00:00:00:00.  No
+official MAC is reserved for either network device even if you do
+take the approach to customize the firmware file.
 
-I am not sure how DT/non-DT should make difference to this series.
-I don't have access to those boards but if you can share the failure log 
-I can try to pinpoint the fix.
+This gets sane, consistent MAC addresses on both devices which
+should stand a good probability of differing between PandaBoards.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Andy Green <andy.green@linaro.org>
+---
+ arch/arm/mach-omap2/Kconfig            |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 83fb31c..61c6a3d 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -358,6 +358,7 @@ config MACH_OMAP4_PANDA
+ 	select OMAP_PACKAGE_CBL
+ 	select OMAP_PACKAGE_CBS
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++	select ETH_MAC_PLATFORM
+ 
+ config MACH_PCM049
+ 	bool "OMAP4 based phyCORE OMAP4"
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 982fb26..75d93cc 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -32,7 +32,10 @@
+ #include <linux/wl12xx.h>
+ #include <linux/platform_data/omap-abe-twl6040.h>
+ 
++#include <net/eth-mac-platform.h>
++
+ #include <mach/hardware.h>
++#include <mach/id.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -486,16 +489,43 @@ static void omap4_panda_init_rev(void)
+ 	}
+ }
+ 
++/*
++ * These device paths represent onboard network devices which have
++ * no MAC address set at boot, and need synthetic ones assigning
++ */
++static __initdata struct eth_mac_platform panda_eth_mac_platform[] = {
++
++	{ /* smsc USB <-> Ethernet bridge */
++		.device_path = "usb1/1-1/1-1.1/1-1.1:1.0",
++	},
++	{ /* wlan0 module */
++		.device_path = "wl12xx",
++	},
++	{ /* terminator */
++	}
++};
++
+ static void __init omap4_panda_init(void)
+ {
+ 	int package = OMAP_PACKAGE_CBS;
+ 	int ret;
++	int n;
+ 
+ 	if (omap_rev() == OMAP4430_REV_ES1_0)
+ 		package = OMAP_PACKAGE_CBL;
+ 	omap4_mux_init(board_mux, NULL, package);
+ 
+ 	omap_panda_wlan_data.irq = gpio_to_irq(GPIO_WIFI_IRQ);
++
++	/*
++	 * provide MAC addresses computed from device ID for network
++	 * devices that have no MAC address otherwise on Panda
++	 */
++	for (n = 0; n < ARRAY_SIZE(panda_eth_mac_platform) - 1; n++)
++		omap_die_id_to_ethernet_mac(panda_eth_mac_platform[n].mac, n);
++	if (eth_mac_platform_register_device_macs(panda_eth_mac_platform))
++		pr_err("Unable to register eth_mac_platform devices\n");
++
+ 	ret = wl12xx_set_platform_data(&omap_panda_wlan_data);
+ 	if (ret)
+ 		pr_err("error setting wl12xx data: %d\n", ret);
