@@ -1,38 +1,78 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 6 Jul 2012 08:44:01 +0200
-Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
-In-Reply-To: <CAOMZO5BwraSVyW8SZjoN19gy-eZ2tXXPRT879PdAOu38Yf-z0g@mail.gmail.com>
-References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
- <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
- <CACKLOr1oeci84Fs7HTRD2Myie8zjKExA15mxM3z7dkq8QfvDmg@mail.gmail.com>
- <CAOMZO5Bdpe43wSAS-D34LzVA9gAKwGTjsw_1f3iPizVsWJW7kw@mail.gmail.com>
- <CACKLOr1OYmoWXCU=Q_0O1H5jYcAGXO11ji6d_j7SjyaLZuygAA@mail.gmail.com>
- <CAOMZO5CLV6TuQUTzYUSvoi6apNUtSLhkbh8Jj3onAnc99TWxWg@mail.gmail.com>
- <CAOMZO5A0YXcZOB+ov+dD0MVJr0XSr=Ufg5snGDLvZ9=GyK=xMw@mail.gmail.com>
- <CAOMZO5BwraSVyW8SZjoN19gy-eZ2tXXPRT879PdAOu38Yf-z0g@mail.gmail.com>
-Message-ID: <CACKLOr1EoOL1SQ_QW7P3YtMYgVwt9uE-x728-YrZB8rEh45OMw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 6 Jul 2012 08:45:38 +0200
+Subject: [GIT PULL] i.MX cleanups for 3.6
+Message-ID: <20120706064538.GB30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The attached patch solves mx2_camera clock problems.
+Hi Olof, Arnd,
 
-It can be also found by the following subject in the lists:
+Please pull the following i.MX cleanups for 3.6
 
-media: i.MX27: Fix emma-prp clocks in mx2_camera.c
+Sascha
 
+The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
 
+  Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-cleanup
+
+for you to fetch changes up to bec31a85f0f83567ed4b77e0cd6399bac2f0f037:
+
+  ARM: imx: remove unused pdata from device macros (2012-07-06 08:25:20 +0200)
+
+----------------------------------------------------------------
+ARM i.MX cleanups for v3.6
+
+----------------------------------------------------------------
+Beno?t Th?baudeau (2):
+      ARM: imx: cleanup otg_mode
+      ARM: imx: remove unused pdata from device macros
+
+Fabio Estevam (1):
+      ARM: imx: Kconfig: Remove IMX_HAVE_PLATFORM_IMX_SSI from MACH_MX25_3DS
+
+Uwe Kleine-K?nig (1):
+      ARM: imx27/dt: make dt_compat entry const
+
+ arch/arm/mach-imx/Kconfig                |    1 -
+ arch/arm/mach-imx/devices-imx21.h        |    4 ++--
+ arch/arm/mach-imx/devices-imx25.h        |    4 ++--
+ arch/arm/mach-imx/devices-imx27.h        |    6 +++---
+ arch/arm/mach-imx/devices-imx31.h        |    6 +++---
+ arch/arm/mach-imx/devices-imx35.h        |    4 ++--
+ arch/arm/mach-imx/devices-imx51.h        |    2 +-
+ arch/arm/mach-imx/devices-imx53.h        |    2 +-
+ arch/arm/mach-imx/imx27-dt.c             |    2 +-
+ arch/arm/mach-imx/mach-cpuimx27.c        |   12 ++++++------
+ arch/arm/mach-imx/mach-cpuimx35.c        |   10 +++++-----
+ arch/arm/mach-imx/mach-cpuimx51sd.c      |   10 +++++-----
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c |   12 ++++++------
+ arch/arm/mach-imx/mach-imx27ipcam.c      |    2 +-
+ arch/arm/mach-imx/mach-mx25_3ds.c        |    4 ++--
+ arch/arm/mach-imx/mach-mx27_3ds.c        |   10 +++++-----
+ arch/arm/mach-imx/mach-mx27ads.c         |    2 +-
+ arch/arm/mach-imx/mach-mx31_3ds.c        |   10 +++++-----
+ arch/arm/mach-imx/mach-mx31moboard.c     |    2 +-
+ arch/arm/mach-imx/mach-mx35_3ds.c        |   10 +++++-----
+ arch/arm/mach-imx/mach-mx51_3ds.c        |    2 +-
+ arch/arm/mach-imx/mach-mx51_babbage.c    |   10 +++++-----
+ arch/arm/mach-imx/mach-mx53_ard.c        |    2 +-
+ arch/arm/mach-imx/mach-mx53_evk.c        |    2 +-
+ arch/arm/mach-imx/mach-mx53_loco.c       |    2 +-
+ arch/arm/mach-imx/mach-mx53_smd.c        |    2 +-
+ arch/arm/mach-imx/mach-pca100.c          |   12 ++++++------
+ arch/arm/mach-imx/mach-pcm037.c          |   12 ++++++------
+ arch/arm/mach-imx/mach-pcm038.c          |    4 ++--
+ arch/arm/mach-imx/mach-pcm043.c          |   10 +++++-----
+ arch/arm/mach-imx/mach-qong.c            |    2 +-
+ arch/arm/mach-imx/mach-vpr200.c          |    2 +-
+ arch/arm/mach-imx/mx31lite-db.c          |    4 ++--
+ 33 files changed, 90 insertions(+), 91 deletions(-)
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: mx2_camera.patch
-Type: application/octet-stream
-Size: 5129 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/400b297d/attachment.obj>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
