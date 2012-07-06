@@ -1,99 +1,107 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 06 Jul 2012 11:39:09 -0700
-Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
-In-Reply-To: <20120706002404.GJ2522@linux.vnet.ibm.com>
-References: <1341531958-31721-1-git-send-email-sboyd@codeaurora.org>
- <20120706002404.GJ2522@linux.vnet.ibm.com>
-Message-ID: <4FF730CD.7050907@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri,  6 Jul 2012 13:40:25 -0500
+Subject: [PATCH 00/15] PCI io.h cleanups
+Message-ID: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/12 17:24, Paul E. McKenney wrote:
-> On Thu, Jul 05, 2012 at 04:45:58PM -0700, Stephen Boyd wrote:
->> @@ -179,7 +184,7 @@ void __ref cpu_die(void)
->>  	mb();
->>
->>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
->> -	complete(&cpu_died);
->> +	__this_cpu_write(cpu_state, CPU_DEAD);
-> Or you could do something like:
->
-> 	RCU_NONIDLE(complete(&cpu_died));
->
-> This would tell RCU that it needed to pay attention to this CPU for
-> the duration of the "complete()" function call despite the CPU's being
-> idle.  And might allow you to dispense with the rest of the patch.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Great! I like that more since we get to keep the completion mechanism
-instead of a busy wait.
+I've finally gotten back to this after several months. This is the 2nd
+part of mach/io.h removals. This series removes io.h on platforms with
+PCI by creating a fixed virtual I/O mapping and a common __io() macro.
 
-Russell, which one would you prefer? Here's the other version
+As several platforms have 2 1MB I/O windows, I've changed the fixed
+mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
+control the size. This also allows using a single 1MB section mapping
+rather than 4KB pages.
 
------>8-----8<-----
-Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
+I've only tested versatilepb under qemu, so any testing is appreciated.
+iop3xx and mv78xx0 have some risk of breaking as the PCI bus addresses
+are moved to 0 from matching the cpu host bus addesss.
 
-While running hotplug tests I ran into this RCU splat
+Rob
 
-===============================
-[ INFO: suspicious RCU usage. ]
-3.4.0 #3275 Tainted: G        W
--------------------------------
-include/linux/rcupdate.h:729 rcu_read_lock() used illegally while idle!
+Arnd Bergmann (1):
+  iop13xx: use more regular PCI I/O space handling
 
-other info that might help us debug this:
+Rob Herring (14):
+  ARM: Add fixed PCI i/o mapping
+  ARM: versatile: use fixed PCI i/o mapping
+  ARM: tegra: use fixed PCI i/o mapping
+  ARM: integrator: use fixed PCI i/o mapping
+  ARM: shark: use fixed PCI i/o mapping
+  ARM: footbridge: use fixed PCI i/o mapping
+  ARM: dove: use fixed PCI i/o mapping
+  ARM: kirkwood: use fixed PCI i/o mapping
+  ARM: orion5x: use fixed PCI i/o mapping
+  ARM: iop13xx: use fixed PCI i/o mapping
+  ARM: mv78xx0: use fixed pci i/o mapping
+  i2c: iop3xx: clean-up trailing whitespace
+  i2c: iop3xx: use standard gpiolib functions
+  ARM: iop3xx: use fixed PCI i/o mapping
 
-RCU used illegally from idle CPU!
-rcu_scheduler_active = 1, debug_locks = 0
-RCU used illegally from extended quiescent state!
-4 locks held by swapper/2/0:
- #0:  ((cpu_died).wait.lock){......}, at: [<c00ab128>] complete+0x1c/0x5c
- #1:  (&p->pi_lock){-.-.-.}, at: [<c00b275c>] try_to_wake_up+0x2c/0x388
- #2:  (&rq->lock){-.-.-.}, at: [<c00b2860>] try_to_wake_up+0x130/0x388
- #3:  (rcu_read_lock){.+.+..}, at: [<c00abe5c>] cpuacct_charge+0x28/0x1f4
-
-stack backtrace:
-[<c001521c>] (unwind_backtrace+0x0/0x12c) from [<c00abec8>] (cpuacct_charge+0x94/0x1f4)
-[<c00abec8>] (cpuacct_charge+0x94/0x1f4) from [<c00b395c>] (update_curr+0x24c/0x2c8)
-[<c00b395c>] (update_curr+0x24c/0x2c8) from [<c00b59c4>] (enqueue_task_fair+0x50/0x194)
-[<c00b59c4>] (enqueue_task_fair+0x50/0x194) from [<c00afea4>] (enqueue_task+0x30/0x34)
-[<c00afea4>] (enqueue_task+0x30/0x34) from [<c00b0908>] (ttwu_activate+0x14/0x38)
-[<c00b0908>] (ttwu_activate+0x14/0x38) from [<c00b28a8>] (try_to_wake_up+0x178/0x388)
-[<c00b28a8>] (try_to_wake_up+0x178/0x388) from [<c00a82a0>] (__wake_up_common+0x34/0x78)
-[<c00a82a0>] (__wake_up_common+0x34/0x78) from [<c00ab154>] (complete+0x48/0x5c)
-[<c00ab154>] (complete+0x48/0x5c) from [<c07db7cc>] (cpu_die+0x2c/0x58)
-[<c07db7cc>] (cpu_die+0x2c/0x58) from [<c000f954>] (cpu_idle+0x64/0xfc)
-[<c000f954>] (cpu_idle+0x64/0xfc) from [<80208160>] (0x80208160)
-
-When a cpu is marked offline during its idle thread it calls
-cpu_die() during an RCU idle period. cpu_die() calls complete()
-to notify the killing process that the cpu has died. complete()
-calls into the scheduler code and eventually grabs an RCU read
-lock in cpuacct_charge().
-
-Mark complete() as RCU_NONIDLE so that RCU pays attention to this
-CPU for the duration of the complete() function even though it's
-in idle.
-
-Suggested-by: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2c7217d..aea74f5 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -179,7 +179,7 @@ void __ref cpu_die(void)
- 	mb();
- 
- 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
--	complete(&cpu_died);
-+	RCU_NONIDLE(complete(&cpu_died));
- 
- 	/*
- 	 * actual CPU shutdown procedure is at least platform (if not
+ Documentation/arm/memory.txt                       |    3 +
+ arch/arm/Kconfig                                   |   13 +--
+ arch/arm/include/asm/hardware/iop3xx.h             |   12 +-
+ arch/arm/include/asm/io.h                          |    5 +
+ arch/arm/include/asm/mach/pci.h                    |   18 +++
+ arch/arm/kernel/bios32.c                           |   20 ++++
+ arch/arm/mach-dove/common.c                        |   15 +--
+ arch/arm/mach-dove/include/mach/dove.h             |    2 -
+ arch/arm/mach-dove/include/mach/io.h               |   19 ---
+ arch/arm/mach-dove/pcie.c                          |    9 +-
+ arch/arm/mach-footbridge/common.c                  |   10 +-
+ .../arm/mach-footbridge/include/mach/debug-macro.S |    3 +-
+ arch/arm/mach-footbridge/include/mach/io.h         |   12 +-
+ arch/arm/mach-integrator/include/mach/io.h         |   33 ------
+ arch/arm/mach-integrator/include/mach/platform.h   |    4 +
+ arch/arm/mach-integrator/integrator_ap.c           |    9 +-
+ arch/arm/mach-iop13xx/include/mach/io.h            |   28 -----
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h       |   14 +--
+ arch/arm/mach-iop13xx/io.c                         |   27 -----
+ arch/arm/mach-iop13xx/pci.c                        |   12 +-
+ arch/arm/mach-iop13xx/setup.c                      |   17 ++-
+ arch/arm/mach-iop32x/include/mach/io.h             |   19 ---
+ arch/arm/mach-iop33x/include/mach/io.h             |   19 ---
+ arch/arm/mach-kirkwood/common.c                    |   17 ++-
+ arch/arm/mach-kirkwood/include/mach/io.h           |   24 ----
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h     |    2 -
+ arch/arm/mach-mv78xx0/addr-map.c                   |    1 +
+ arch/arm/mach-mv78xx0/common.c                     |   18 ++-
+ arch/arm/mach-mv78xx0/include/mach/io.h            |   24 ----
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h       |   22 ++--
+ arch/arm/mach-mv78xx0/pcie.c                       |   28 +----
+ arch/arm/mach-orion5x/common.c                     |   16 +--
+ arch/arm/mach-orion5x/include/mach/io.h            |   22 ----
+ arch/arm/mach-orion5x/include/mach/orion5x.h       |   14 +--
+ arch/arm/mach-shark/core.c                         |   14 +--
+ arch/arm/mach-shark/include/mach/debug-macro.S     |    7 +-
+ arch/arm/mach-shark/include/mach/entry-macro.S     |    3 +-
+ arch/arm/mach-shark/include/mach/io.h              |   18 ---
+ arch/arm/mach-tegra/include/mach/io.h              |   46 --------
+ arch/arm/mach-tegra/include/mach/iomap.h           |    3 +
+ arch/arm/mach-tegra/io.c                           |    2 +
+ arch/arm/mach-tegra/pcie.c                         |   43 +------
+ arch/arm/mach-versatile/core.c                     |    7 +-
+ arch/arm/mach-versatile/include/mach/hardware.h    |    1 -
+ arch/arm/mach-versatile/include/mach/io.h          |   27 -----
+ arch/arm/mach-versatile/pci.c                      |    1 -
+ arch/arm/plat-iop/pci.c                            |    4 +-
+ arch/arm/plat-iop/setup.c                          |    7 +-
+ drivers/i2c/busses/i2c-iop3xx.c                    |  121 ++++++++++----------
+ 49 files changed, 219 insertions(+), 596 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/include/mach/io.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/io.h
+ delete mode 100644 arch/arm/mach-iop13xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-iop32x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-iop33x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/io.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/io.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
+ delete mode 100644 arch/arm/mach-versatile/include/mach/io.h
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.9.5
