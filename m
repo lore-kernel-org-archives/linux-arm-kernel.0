@@ -1,56 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 6 Jul 2012 10:39:57 -0700
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
-In-Reply-To: <4FF6994B.9040801@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <4FF6994B.9040801@linaro.org>
-Message-ID: <20120706173957.GA10202@core.coreip.homeip.net>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 06 Jul 2012 10:41:54 -0700
+Subject: [PATCH] i2c i.MX: Fix divider table
+In-Reply-To: <20120706062852.GZ30009@pengutronix.de>
+References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+ <20120705145236.GA2735@richard-laptop>
+ <20120705160153.GT30009@pengutronix.de>
+ <20120706005249.GA26888@b20223-02.ap.freescale.net>
+ <20120706062852.GZ30009@pengutronix.de>
+Message-ID: <4FF72362.5020704@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On 7/5/2012 11:28 PM, Sascha Hauer wrote:
+> On Fri, Jul 06, 2012 at 08:52:50AM +0800, Richard Zhao wrote:
+>> On Thu, Jul 05, 2012 at 06:01:53PM +0200, Sascha Hauer wrote:
+>>> On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
+>>>> On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
+>>>>> Measurements on i.MX1 and i.MX53 have shown that the divider values
+>>>>> in the datasheets are wrong. the values from first, third and fourth
+>>>>> column were all measured to be 8 higher than in the datasheet. It
+>>>>> should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
+>>>>> the same as the i2c unit is unchanged since the i.MX1.
+>>>> We may need to check with IC guys? Or you've done?
+>>> I don't have contact to the IC guys. Could you do this? I'd be
+>>> interested in the results.
+>> Sure, but it may be slow, as you know, many people are in summer break.
+> Thanks. It can take longer, the resulting frequencies are all too low,
+> so we are on the safe side.
+>
+> Sascha
+>
+You mean safe before the patch is applied, not after. Right?
 
-On Fri, Jul 06, 2012 at 08:52:43AM +0100, Lee Jones wrote:
-> Sorry Dmitry, looks like I missed you off of the CC list on this one.
-> 
-> Here it is again:
-> 
-> Before we can use any domain allocated IRQ, we need to first create a
-> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
-> We do this with a helper function provided by the AB8500 IRQ domain
-> controller called ab8500_irq_get_virq(). We need to do this for both
-> IRQs which the Power-On-Key driver uses; one for button press, the other
-> for button depress.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> drivers/input/misc/ab8500-ponkey.c |    2 ++
-> 1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-> index 5ceb23e..ae4b683 100644
-> --- a/drivers/input/misc/ab8500-ponkey.c
-> +++ b/drivers/input/misc/ab8500-ponkey.c
-> @@ -82,6 +82,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
->  	input_set_capability(input, EV_KEY, KEY_POWER);
-> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbf);
-> 	error = request_any_context_irq(ponkey->irq_dbf, ab8500_ponkey_handler,
-> 					0, "ab8500-ponkey-dbf", ponkey);
-> 	if (error < 0) {
-> @@ -90,6 +91,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
-> 		goto err_free_mem;
-> 	}
-> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbr);
-
-I do not think this is right - you are storing irq_dbr in irq_dbf. Also,
-I think you want to do this earlier, like this:
-
--	ponkey->irq_dbf = irq_dbf;
--	ponkey->irq_dbr = irq_dbr;
-+	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
-+	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
-
-Thanks.
-
--- 
-Dmitry
+Troy
