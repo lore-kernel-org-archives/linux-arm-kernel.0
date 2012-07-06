@@ -1,238 +1,177 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:37 -0500
-Subject: [PATCH 12/15] ARM: mv78xx0: use fixed pci i/o mapping
+Date: Fri,  6 Jul 2012 13:40:35 -0500
+Subject: [PATCH 10/15] iop13xx: use more regular PCI I/O space handling
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-13-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-11-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Arnd Bergmann <arnd@arndb.de>
 
-Move mv78xx0 PCI to fixed i/o mapping and remove io.h. This changes the PCI
-bus addresses from the cpu address to 0 based. It appears that there is
-translation h/w for this, but its untested.
+iop13xx confuses I/O port numbers with physical addresses, which breaks
+legacy ISA I/O access behind PCI bridges and makes it unnecessarily hard
+to unify the inb/outb accessors with other platforms. This removes the
+special-casing and just puts all I/O ports into a single 128KB virtually
+mapped I/O port range starting at port zero.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig                             |    1 -
- arch/arm/mach-mv78xx0/addr-map.c             |    1 +
- arch/arm/mach-mv78xx0/common.c               |   18 ++++++++++++-----
- arch/arm/mach-mv78xx0/include/mach/io.h      |   24 ----------------------
- arch/arm/mach-mv78xx0/include/mach/mv78xx0.h |   22 +++++++++-----------
- arch/arm/mach-mv78xx0/pcie.c                 |   28 +++++---------------------
- 6 files changed, 29 insertions(+), 65 deletions(-)
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/io.h
+ arch/arm/mach-iop13xx/include/mach/io.h      |    6 +++---
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h |   12 +++---------
+ arch/arm/mach-iop13xx/io.c                   |   27 --------------------------
+ arch/arm/mach-iop13xx/pci.c                  |   12 ++++++------
+ 4 files changed, 12 insertions(+), 45 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c61e0a4..1b7faa5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -571,7 +571,6 @@ config ARCH_MV78XX0
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
--	select NEED_MACH_IO_H
- 	select PLAT_ORION
- 	help
- 	  Support for the following Marvell MV78xx0 series SoCs:
-diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
-index 62b53d7..da9806a 100644
---- a/arch/arm/mach-mv78xx0/addr-map.c
-+++ b/arch/arm/mach-mv78xx0/addr-map.c
-@@ -13,6 +13,7 @@
- #include <linux/mbus.h>
- #include <linux/io.h>
- #include <plat/addr-map.h>
-+#include <mach/mv78xx0.h>
- #include "common.h"
+diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
+index f131885..e197cb8 100644
+--- a/arch/arm/mach-iop13xx/include/mach/io.h
++++ b/arch/arm/mach-iop13xx/include/mach/io.h
+@@ -19,10 +19,10 @@
+ #ifndef __ASM_ARM_ARCH_IO_H
+ #define __ASM_ARM_ARCH_IO_H
  
- /*
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index b4c53b8..e018d8c 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -17,6 +17,7 @@
- #include <linux/ethtool.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-+#include <asm/mach/pci.h>
- #include <mach/mv78xx0.h>
- #include <mach/bridge-regs.h>
- #include <plat/cache-feroceon-l2.h>
-@@ -135,11 +136,6 @@ static struct map_desc mv78xx0_io_desc[] __initdata = {
- 		.length		= MV78XX0_CORE_REGS_SIZE,
- 		.type		= MT_DEVICE,
- 	}, {
--		.virtual	= MV78XX0_PCIE_IO_VIRT_BASE(0),
--		.pfn		= __phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(0)),
--		.length		= MV78XX0_PCIE_IO_SIZE * 8,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= MV78XX0_REGS_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(MV78XX0_REGS_PHYS_BASE),
- 		.length		= MV78XX0_REGS_SIZE,
-@@ -150,6 +146,18 @@ static struct map_desc mv78xx0_io_desc[] __initdata = {
- void __init mv78xx0_map_io(void)
- {
- 	unsigned long phys;
-+	unsigned long pci_io_pfn[] = {
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(0)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(1)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(2)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(3)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(4)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(5)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(6)),
-+		__phys_to_pfn(MV78XX0_PCIE_IO_PHYS_BASE(7)),
-+	};
-+
-+	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn), SZ_64K);
+-#define IO_SPACE_LIMIT 0xffffffff
++#include <mach/iop13xx.h>
  
- 	/*
- 	 * Map the right set of per-core registers depending on
-diff --git a/arch/arm/mach-mv78xx0/include/mach/io.h b/arch/arm/mach-mv78xx0/include/mach/io.h
-deleted file mode 100644
-index c7d9d00..0000000
---- a/arch/arm/mach-mv78xx0/include/mach/io.h
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/*
-- * arch/arm/mach-mv78xx0/include/mach/io.h
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __ASM_ARCH_IO_H
--#define __ASM_ARCH_IO_H
--
--#include "mv78xx0.h"
--
--#define IO_SPACE_LIMIT		0xffffffff
--
--static inline void __iomem *__io(unsigned long addr)
--{
--	return (void __iomem *)((addr - MV78XX0_PCIE_IO_PHYS_BASE(0))
--					+ MV78XX0_PCIE_IO_VIRT_BASE(0));
--}
--
--#define __io(a)			__io(a)
--
--#endif
-diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
-index e807c4c..10fc138 100644
---- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
-+++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
-@@ -29,15 +29,15 @@
+-#define __io(a) __iop13xx_io(a)
++#define IO_SPACE_LIMIT (IOP13XX_PCIE_IO_WINDOW_SIZE + IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
+ 
+-extern void __iomem * __iop13xx_io(unsigned long io_addr);
++#define __io(a) (IOP13XX_PCIX_LOWER_IO_VA + ((a) & IO_SPACE_LIMIT))
+ 
+ #endif
+diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+index e190dcd..d3777db 100644
+--- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
++++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+@@ -69,17 +69,15 @@ extern unsigned long get_iop_tick_rate(void);
+  * 0x8000.0000 + 928M	0x2.8000.0000   (ioremap)	PCIE outbound memory window
   *
-  * virt		phys		size
-  * fe400000	f102x000	16K	core-specific peripheral registers
-- * fe700000	f0800000	1M	PCIe #0 I/O space
-- * fe800000	f0900000	1M	PCIe #1 I/O space
-- * fe900000	f0a00000	1M	PCIe #2 I/O space
-- * fea00000	f0b00000	1M	PCIe #3 I/O space
-- * feb00000	f0c00000	1M	PCIe #4 I/O space
-- * fec00000	f0d00000	1M	PCIe #5 I/O space
-- * fed00000	f0e00000	1M	PCIe #6 I/O space
-- * fee00000	f0f00000	1M	PCIe #7 I/O space
-- * fef00000	f1000000	1M	on-chip peripheral registers
-+ * fee00000	f0800000	64K	PCIe #0 I/O space
-+ * fee10000	f0900000	64K	PCIe #1 I/O space
-+ * fee20000	f0a00000	64K	PCIe #2 I/O space
-+ * fee30000	f0b00000	64K	PCIe #3 I/O space
-+ * fee40000	f0c00000	64K	PCIe #4 I/O space
-+ * fee50000	f0d00000	64K	PCIe #5 I/O space
-+ * fee60000	f0e00000	64K	PCIe #6 I/O space
-+ * fee70000	f0f00000	64K	PCIe #7 I/O space
-+ * fd000000	f1000000	1M	on-chip peripheral registers
+  * IO MAP
+- * 0x1000 + 64K	0x0.fffb.1000	0xfec6.1000	PCIX outbound i/o window
++ * 0x1000 + 64K	0x0.fffb.1000	0xfed6.1000	PCIX outbound i/o window
+  * 0x1000 + 64K	0x0.fffd.1000	0xfed7.1000	PCIE outbound i/o window
   */
- #define MV78XX0_CORE0_REGS_PHYS_BASE	0xf1020000
- #define MV78XX0_CORE1_REGS_PHYS_BASE	0xf1024000
-@@ -46,11 +46,9 @@
- #define MV78XX0_CORE_REGS_SIZE		SZ_16K
+ #define IOP13XX_PCIX_IO_WINDOW_SIZE   0x10000UL
+ #define IOP13XX_PCIX_LOWER_IO_PA      0xfffb0000UL
+-#define IOP13XX_PCIX_LOWER_IO_VA      0xfec60000UL
++#define IOP13XX_PCIX_LOWER_IO_VA      0xfed60000UL
+ #define IOP13XX_PCIX_LOWER_IO_BA      0x0UL /* OIOTVR */
+ #define IOP13XX_PCIX_IO_BUS_OFFSET    0x1000UL
+-#define IOP13XX_PCIX_UPPER_IO_PA      (IOP13XX_PCIX_LOWER_IO_PA +\
+-				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
+-#define IOP13XX_PCIX_UPPER_IO_VA      (IOP13XX_PCIX_LOWER_IO_VA +\
++#define IOP13XX_PCIX_UPPER_IO_BA      (IOP13XX_PCIX_LOWER_IO_BA +\
+ 				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
+ #define IOP13XX_PCIX_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
+ 					   (IOP13XX_PCIX_LOWER_IO_PA\
+@@ -108,10 +106,6 @@ extern unsigned long get_iop_tick_rate(void);
+ #define IOP13XX_PCIE_LOWER_IO_VA      	 0xfed70000UL
+ #define IOP13XX_PCIE_LOWER_IO_BA      	 0x0UL  /* OIOTVR */
+ #define IOP13XX_PCIE_IO_BUS_OFFSET	 0x1000UL
+-#define IOP13XX_PCIE_UPPER_IO_PA      	 (IOP13XX_PCIE_LOWER_IO_PA +\
+-					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
+-#define IOP13XX_PCIE_UPPER_IO_VA      	 (IOP13XX_PCIE_LOWER_IO_VA +\
+-					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
+ #define IOP13XX_PCIE_UPPER_IO_BA      	 (IOP13XX_PCIE_LOWER_IO_BA +\
+ 					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
+ #define IOP13XX_PCIE_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
+diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
+index 3c36419..851dc8f 100644
+--- a/arch/arm/mach-iop13xx/io.c
++++ b/arch/arm/mach-iop13xx/io.c
+@@ -23,25 +23,6 @@
  
- #define MV78XX0_PCIE_IO_PHYS_BASE(i)	(0xf0800000 + ((i) << 20))
--#define MV78XX0_PCIE_IO_VIRT_BASE(i)	(0xfe700000 + ((i) << 20))
--#define MV78XX0_PCIE_IO_SIZE		SZ_1M
+ #include "pci.h"
  
- #define MV78XX0_REGS_PHYS_BASE		0xf1000000
--#define MV78XX0_REGS_VIRT_BASE		0xfef00000
-+#define MV78XX0_REGS_VIRT_BASE		0xfd000000
- #define MV78XX0_REGS_SIZE		SZ_1M
- 
- #define MV78XX0_PCIE_MEM_PHYS_BASE	0xc0000000
-diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-index 2e56e86..a51a1e4 100644
---- a/arch/arm/mach-mv78xx0/pcie.c
-+++ b/arch/arm/mach-mv78xx0/pcie.c
-@@ -15,6 +15,7 @@
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
- #include <plat/addr-map.h>
-+#include <mach/mv78xx0.h>
- #include "common.h"
- 
- struct pcie_port {
-@@ -30,9 +31,6 @@ struct pcie_port {
- 
- static struct pcie_port pcie_port[8];
- static int num_pcie_ports;
--static struct resource pcie_io_space;
--static struct resource pcie_mem_space;
+-void * __iomem __iop13xx_io(unsigned long io_addr)
+-{
+-	void __iomem * io_virt;
 -
- 
- void __init mv78xx0_pcie_id(u32 *dev, u32 *rev)
+-	switch (io_addr) {
+-	case IOP13XX_PCIE_LOWER_IO_PA ... IOP13XX_PCIE_UPPER_IO_PA:
+-		io_virt = (void *) IOP13XX_PCIE_IO_PHYS_TO_VIRT(io_addr);
+-		break;
+-	case IOP13XX_PCIX_LOWER_IO_PA ... IOP13XX_PCIX_UPPER_IO_PA:
+-		io_virt = (void *) IOP13XX_PCIX_IO_PHYS_TO_VIRT(io_addr);
+-		break;
+-	default:
+-		BUG();
+-	}
+-
+-	return io_virt;
+-}
+-EXPORT_SYMBOL(__iop13xx_io);
+-
+ static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
+ 	size_t size, unsigned int mtype, void *caller)
  {
-@@ -47,22 +45,6 @@ static void __init mv78xx0_pcie_preinit(void)
- 	u32 start;
- 	int win;
+@@ -67,12 +48,6 @@ static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
+ 				       (cookie - IOP13XX_PBI_LOWER_MEM_RA),
+ 				       size, mtype, __builtin_return_address(0));
+ 		break;
+-	case IOP13XX_PCIE_LOWER_IO_PA ... IOP13XX_PCIE_UPPER_IO_PA:
+-		retval = (void *) IOP13XX_PCIE_IO_PHYS_TO_VIRT(cookie);
+-		break;
+-	case IOP13XX_PCIX_LOWER_IO_PA ... IOP13XX_PCIX_UPPER_IO_PA:
+-		retval = (void *) IOP13XX_PCIX_IO_PHYS_TO_VIRT(cookie);
+-		break;
+ 	case IOP13XX_PMMR_PHYS_MEM_BASE ... IOP13XX_PMMR_UPPER_MEM_PA:
+ 		retval = (void *) IOP13XX_PMMR_PHYS_TO_VIRT(cookie);
+ 		break;
+@@ -99,8 +74,6 @@ static void __iop13xx_iounmap(volatile void __iomem *addr)
+ 		    goto skip;
  
--	pcie_io_space.name = "PCIe I/O Space";
--	pcie_io_space.start = MV78XX0_PCIE_IO_PHYS_BASE(0);
--	pcie_io_space.end =
--		MV78XX0_PCIE_IO_PHYS_BASE(0) + MV78XX0_PCIE_IO_SIZE * 8 - 1;
--	pcie_io_space.flags = IORESOURCE_IO;
--	if (request_resource(&iomem_resource, &pcie_io_space))
--		panic("can't allocate PCIe I/O space");
--
--	pcie_mem_space.name = "PCIe MEM Space";
--	pcie_mem_space.start = MV78XX0_PCIE_MEM_PHYS_BASE;
--	pcie_mem_space.end =
--		MV78XX0_PCIE_MEM_PHYS_BASE + MV78XX0_PCIE_MEM_SIZE - 1;
--	pcie_mem_space.flags = IORESOURCE_MEM;
--	if (request_resource(&iomem_resource, &pcie_mem_space))
--		panic("can't allocate PCIe MEM space");
--
- 	for (i = 0; i < num_pcie_ports; i++) {
- 		struct pcie_port *pp = pcie_port + i;
- 
-@@ -70,8 +52,8 @@ static void __init mv78xx0_pcie_preinit(void)
- 			"PCIe %d.%d I/O", pp->maj, pp->min);
- 		pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
- 		pp->res[0].name = pp->io_space_name;
--		pp->res[0].start = MV78XX0_PCIE_IO_PHYS_BASE(i);
--		pp->res[0].end = pp->res[0].start + MV78XX0_PCIE_IO_SIZE - 1;
-+		pp->res[0].start = i * SZ_64K;
-+		pp->res[0].end = pp->res[0].start + SZ_64K - 1;
- 		pp->res[0].flags = IORESOURCE_IO;
- 
- 		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
-@@ -118,10 +100,10 @@ static void __init mv78xx0_pcie_preinit(void)
- 	for (i = 0; i < num_pcie_ports; i++) {
- 		struct pcie_port *pp = pcie_port + i;
- 
--		if (request_resource(&pcie_io_space, &pp->res[0]))
-+		if (request_resource(&ioport_resource, &pp->res[0]))
- 			panic("can't allocate PCIe I/O sub-space");
- 
--		if (request_resource(&pcie_mem_space, &pp->res[1]))
-+		if (request_resource(&iomem_resource, &pp->res[1]))
- 			panic("can't allocate PCIe MEM sub-space");
+ 	switch ((u32) addr) {
+-	case IOP13XX_PCIE_LOWER_IO_VA ... IOP13XX_PCIE_UPPER_IO_VA:
+-	case IOP13XX_PCIX_LOWER_IO_VA ... IOP13XX_PCIX_UPPER_IO_VA:
+ 	case IOP13XX_PMMR_VIRT_MEM_BASE ... IOP13XX_PMMR_UPPER_MEM_VA:
+ 		goto skip;
  	}
+diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
+index 861cb12..1bb905a 100644
+--- a/arch/arm/mach-iop13xx/pci.c
++++ b/arch/arm/mach-iop13xx/pci.c
+@@ -1042,8 +1042,8 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 				  << IOP13XX_ATUX_PCIXSR_FUNC_NUM;
+ 		__raw_writel(pcixsr, IOP13XX_ATUX_PCIXSR);
  
+-		res[0].start = IOP13XX_PCIX_LOWER_IO_PA + IOP13XX_PCIX_IO_BUS_OFFSET;
+-		res[0].end   = IOP13XX_PCIX_UPPER_IO_PA;
++		res[0].start = IOP13XX_PCIX_LOWER_IO_BA + IOP13XX_PCIX_IO_BUS_OFFSET;
++		res[0].end   = IOP13XX_PCIX_UPPER_IO_BA;
+ 		res[0].name  = "IQ81340 ATUX PCI I/O Space";
+ 		res[0].flags = IORESOURCE_IO;
+ 
+@@ -1052,7 +1052,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 		res[1].name  = "IQ81340 ATUX PCI Memory Space";
+ 		res[1].flags = IORESOURCE_MEM;
+ 		sys->mem_offset = IOP13XX_PCIX_MEM_OFFSET;
+-		sys->io_offset = IOP13XX_PCIX_LOWER_IO_PA;
++		sys->io_offset = IOP13XX_PCIX_LOWER_IO_BA;
+ 		break;
+ 	case IOP13XX_INIT_ATU_ATUE:
+ 		/* Note: the function number field in the PCSR is ro */
+@@ -1063,8 +1063,8 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 
+ 		__raw_writel(pcsr, IOP13XX_ATUE_PCSR);
+ 
+-		res[0].start = IOP13XX_PCIE_LOWER_IO_PA + IOP13XX_PCIE_IO_BUS_OFFSET;
+-		res[0].end   = IOP13XX_PCIE_UPPER_IO_PA;
++		res[0].start = IOP13XX_PCIE_LOWER_IO_BA + IOP13XX_PCIE_IO_BUS_OFFSET;
++		res[0].end   = IOP13XX_PCIE_UPPER_IO_BA;
+ 		res[0].name  = "IQ81340 ATUE PCI I/O Space";
+ 		res[0].flags = IORESOURCE_IO;
+ 
+@@ -1073,7 +1073,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 		res[1].name  = "IQ81340 ATUE PCI Memory Space";
+ 		res[1].flags = IORESOURCE_MEM;
+ 		sys->mem_offset = IOP13XX_PCIE_MEM_OFFSET;
+-		sys->io_offset = IOP13XX_PCIE_LOWER_IO_PA;
++		sys->io_offset = IOP13XX_PCIE_LOWER_IO_BA;
+ 		sys->map_irq = iop13xx_pcie_map_irq;
+ 		break;
+ 	default:
 -- 
 1.7.9.5
