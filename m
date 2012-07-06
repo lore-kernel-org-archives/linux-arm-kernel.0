@@ -1,287 +1,65 @@
-From: andy.green@linaro.org (Andy Green)
-Date: Fri, 06 Jul 2012 12:09:41 +0800
-Subject: [PATCH 5 1/2] NET ethernet introduce eth-mac-platform helper
-Message-ID: <20120706040938.6669.77083.stgit@build.warmcat.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Jul 2012 12:49:47 +0800
+Subject: MX28 poweroff issue
+In-Reply-To: <20120705201002.GB31508@n2100.arm.linux.org.uk>
+References: <201207040030.36713.marex@denx.de>
+ <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
+ <20120704093823.8e74d48bc8d9918a9c80fbcf@kinali.ch>
+ <201207041631.30107.marex@denx.de>
+ <20120704151944.GB18739@n2100.arm.linux.org.uk>
+ <20120705160855.GA20175@S2101-09.ap.freescale.net>
+ <20120705201002.GB31508@n2100.arm.linux.org.uk>
+Message-ID: <20120706044944.GA20503@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Green <andy@warmcat.com>
+On Thu, Jul 05, 2012 at 09:10:02PM +0100, Russell King - ARM Linux wrote:
+> Yes, the general idea is that if the timer is running, and the watchdog
+> is running, and it detects that it's event thread doesn't occasionally
+> run, it will report a lockup.
+> 
+> As other platforms seem to not exhibit the problem when we halt, and
+> endlessly spin with IRQs enabled, the question needs to be asked: what
+> is different with MX23/MX28 and why is it different.
+> 
+Ha, it turns out that the only reason is mxs_defconfig has
+CONFIG_LOCKUP_DETECTOR enabled.
 
-This introduces a small helper in net/ethernet, which registers a network
-notifier at core_initcall time, and accepts registrations mapping expected
-asynchronously-probed network device paths (like, "usb1/1-1/1-1.1/1-1.1:1.0")
-and the MAC that is needed to be assigned to the device when it appears.
+> Yes, we can mask the problem by disabling interrupts - just like x86
+> does - but that doesn't tell us why we have this apparant difference
+> in behaviours.  I think we need to understand that before we start
+> heading down the path of disabling interrupts to get rid of this
+> problem.
+> 
+> So, I think we need some analysis of what's going on here with platforms
+> that do _not_ exhibit the problem.
 
-This allows platform code to enforce valid, consistent MAC addresses on to
-devices that have not been probed at boot-time, but due to being wired on the
-board are always present at the same interface.  It has been tested with USB
-and SDIO probed devices.
+I just reproduced the problem on imx53 with CONFIG_LOCKUP_DETECTOR
+enabled in imx_v6_v7_defconfig.  I think if we enable the config for
+imx_v4_v5_defconfig, we will see the problem on imx27.
 
-Other parts of this series provide an OMAP API that computes a valid
-locally administered MAC address from CPU ID bits that are unique for each
-physical SoC, and register those against devices wired to the board.
+Presumably, other platforms behave same on this.  So would you consider
+the following change is a right fix?
 
-This solves a longstanding problem in at least Panda case that there are no
-reserved MACs for either onboard Ethernet nor onboard WLAN module, and without
-this patch a randomized MAC is assigned to Ethernet and 00:00:00:00:00:00 or
-0xdeadbeef is assigned as the WLAN MAC address.  The series provides sane,
-constant locally-administered MAC addresses that have a high probability of
-differing between boards.
+Regards,
+Shawn
 
-To make use of this safely you also need to make sure that any drivers that
-may compete for the bus ordinal you are using (eg, mUSB and ehci in Panda
-case) are loaded in a deterministic order.
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 19c95ea..693b744 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -247,6 +247,7 @@ void machine_shutdown(void)
+ void machine_halt(void)
+ {
+        machine_shutdown();
++       local_irq_disable();
+        while (1);
+ }
 
-At registration it makes a copy of the incoming data, so the data may be
-__initdata or otherwise transitory.  Registration can be called multiple times
-so registrations from Device Tree and platform may be mixed.
+@@ -268,6 +269,7 @@ void machine_restart(char *cmd)
 
-Since it needs to be called quite early in boot and there is no lifecycle for
-what it does, it could not be modular and is not a driver.
-
-Via suggestions from Arnd Bergmann and Tony Lindgren (and Alan Cox for the
-network notifier concept).
-
-Cc: netdev at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andy Green <andy.green@linaro.org>
----
- include/net/eth-mac-platform.h  |   40 ++++++++++
- net/Kconfig                     |    5 +
- net/ethernet/Makefile           |    3 +
- net/ethernet/eth-mac-platform.c |  150 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 197 insertions(+), 1 deletion(-)
- create mode 100644 include/net/eth-mac-platform.h
- create mode 100644 net/ethernet/eth-mac-platform.c
-
-diff --git a/include/net/eth-mac-platform.h b/include/net/eth-mac-platform.h
-new file mode 100644
-index 0000000..752f1de
---- /dev/null
-+++ b/include/net/eth-mac-platform.h
-@@ -0,0 +1,40 @@
-+/*
-+ * eth-mac-platform.h:  Enforces platform-defined MAC for Async probed devices
-+ */
-+
-+#ifndef __ETH_NET_MAC_PLATFORM_H__
-+#define __ETH_NET_MAC_PLATFORM_H__
-+
-+#include <linux/if_ether.h>
-+
-+/**
-+ * struct eth_mac_platform - associates asynchronously probed device path with
-+ *			     MAC address to be assigned to the device when it
-+ *			     is created
-+ *
-+ * @device_path: device path name of network device
-+ * @mac: MAC address to assign to network device matching device path
-+ * @list: can be left uninitialized when passing from platform
-+ */
-+
-+struct eth_mac_platform {
-+	char *device_path;
-+	u8 mac[ETH_ALEN];
-+	struct list_head list; /* unused in platform data usage */
-+};
-+
-+#ifdef CONFIG_NET
-+/**
-+ * eth_mac_platform_register_device_macs - add an array of device path to
-+ *                                  monitor and MAC to apply when the network
-+ *                                  device at the device path appears
-+ * @macs: array of struct eth_mac_platform terminated by entry with
-+ *	  NULL device_path
-+ */
-+int eth_mac_platform_register_device_macs(const struct eth_mac_platform *macs);
-+#else
-+static inline int eth_mac_platform_register_device_macs(
-+			     const struct eth_mac_platform *macs) { return 0; }
-+#endif /* !CONFIG_NET */
-+
-+#endif /* __ETH_NET_MAC_PLATFORM_H__ */
-diff --git a/net/Kconfig b/net/Kconfig
-index 245831b..dd8ab96 100644
---- a/net/Kconfig
-+++ b/net/Kconfig
-@@ -335,9 +335,12 @@ source "net/caif/Kconfig"
- source "net/ceph/Kconfig"
- source "net/nfc/Kconfig"
- 
--
- endif   # if NET
- 
-+# used by board / dt platform to enforce Ethernet MACs for Async-probed devices
-+config ETH_MAC_PLATFORM
-+	bool
-+
- # Used by archs to tell that they support BPF_JIT
- config HAVE_BPF_JIT
- 	bool
-diff --git a/net/ethernet/Makefile b/net/ethernet/Makefile
-index 7cef1d8..7362f46 100644
---- a/net/ethernet/Makefile
-+++ b/net/ethernet/Makefile
-@@ -5,3 +5,6 @@
- obj-y					+= eth.o
- obj-$(subst m,y,$(CONFIG_IPX))		+= pe2.o
- obj-$(subst m,y,$(CONFIG_ATALK))	+= pe2.o
-+ifneq ($(CONFIG_NET),)
-+obj-$(CONFIG_ETH_MAC_PLATFORM)		+= eth-mac-platform.o
-+endif
-diff --git a/net/ethernet/eth-mac-platform.c b/net/ethernet/eth-mac-platform.c
-new file mode 100644
-index 0000000..9b2ad69
---- /dev/null
-+++ b/net/ethernet/eth-mac-platform.c
-@@ -0,0 +1,150 @@
-+/*
-+ * Helper to allow platform code to enforce association of a locally-
-+ * administered MAC address automatically on asynchronously probed devices,
-+ * such as SDIO and USB based devices.
-+ *
-+ * Because the "device path" is used for matching, this is only useful for
-+ * network assets physcally wired on the board, and also requires any
-+ * different drivers that can compete for bus ordinals (eg mUSB vs ehci) to
-+ * have fixed initialization ordering, eg, by having ehci in monolithic
-+ * kernel
-+ *
-+ * Neither a driver nor a module as needs to be callable from machine file
-+ * before the network devices are registered.
-+ *
-+ * (c) 2012 Andy Green <andy.green@linaro.org>
-+ */
-+
-+#include <linux/netdevice.h>
-+#include <net/eth-mac-platform.h>
-+
-+static LIST_HEAD(eth_mac_platform_list);
-+static DEFINE_MUTEX(eth_mac_platform_mutex);
-+
-+static struct eth_mac_platform *__eth_mac_platform_check(struct device *dev)
-+{
-+	const char *path;
-+	const char *p;
-+	const char *try;
-+	int len;
-+	struct device *devn;
-+	struct eth_mac_platform *tmp;
-+	struct list_head *pos;
-+
-+	list_for_each(pos, &eth_mac_platform_list) {
-+
-+		tmp = list_entry(pos, struct eth_mac_platform, list);
-+
-+		try = tmp->device_path;
-+
-+		p = try + strlen(try);
-+		devn = dev;
-+
-+		while (devn) {
-+
-+			path = dev_name(devn);
-+			len = strlen(path);
-+
-+			if ((p - try) < len) {
-+				devn = NULL;
-+				continue;
-+			}
-+
-+			p -= len;
-+
-+			if (strncmp(path, p, len)) {
-+				devn = NULL;
-+				continue;
-+			}
-+
-+			devn = devn->parent;
-+			if (p == try)
-+				return tmp;
-+
-+			if (devn != NULL && (p - try) < 2)
-+				devn = NULL;
-+
-+			p--;
-+			if (devn != NULL && *p != '/')
-+				devn = NULL;
-+		}
-+	}
-+
-+	return NULL;
-+}
-+
-+static int eth_mac_platform_netdev_event(struct notifier_block *this,
-+					 unsigned long event, void *ptr)
-+{
-+	struct net_device *dev = ptr;
-+	struct sockaddr sa;
-+	struct eth_mac_platform *match;
-+
-+	if (event != NETDEV_REGISTER)
-+		return NOTIFY_DONE;
-+
-+	mutex_lock(&eth_mac_platform_mutex);
-+
-+	match = __eth_mac_platform_check(dev->dev.parent);
-+	if (match == NULL)
-+		goto bail;
-+
-+	sa.sa_family = dev->type;
-+	memcpy(sa.sa_data, match->mac, sizeof match->mac);
-+	dev->netdev_ops->ndo_set_mac_address(dev, &sa);
-+
-+bail:
-+	mutex_unlock(&eth_mac_platform_mutex);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+int eth_mac_platform_register_device_macs(const struct eth_mac_platform *macs)
-+{
-+	struct eth_mac_platform *next;
-+	int ret = 0;
-+
-+	mutex_lock(&eth_mac_platform_mutex);
-+
-+	while (macs->device_path) {
-+
-+		next = kmemdup(macs, sizeof(*macs), GFP_KERNEL);
-+		if (!next) {
-+			ret = -ENOMEM;
-+			goto bail;
-+		}
-+
-+		next->device_path = kstrdup(macs->device_path, GFP_KERNEL);
-+		if (!next->device_path) {
-+			kfree(next);
-+			ret = -ENOMEM;
-+			goto bail;
-+		}
-+
-+		list_add(&next->list, &eth_mac_platform_list);
-+
-+		macs++;
-+	}
-+bail:
-+	mutex_unlock(&eth_mac_platform_mutex);
-+
-+	return ret;
-+}
-+
-+static struct notifier_block eth_mac_platform_netdev_notifier = {
-+	.notifier_call = eth_mac_platform_netdev_event,
-+	.priority = 1,
-+};
-+
-+static int __init eth_mac_platform_init(void)
-+{
-+	int ret;
-+
-+	ret = register_netdevice_notifier(&eth_mac_platform_netdev_notifier);
-+	if (ret)
-+		pr_err("eth_mac_platform_init: Notifier registration failed\n");
-+
-+	return ret;
-+}
-+
-+core_initcall(eth_mac_platform_init);
+        /* Whoops - the platform was unable to reboot. Tell the user! */
+        printk("Reboot failed -- System halted\n");
++       local_irq_disable();
+        while (1);
+ }
