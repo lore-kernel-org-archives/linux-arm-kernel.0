@@ -1,26 +1,45 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 6 Jul 2012 13:09:08 +0200 (CEST)
-Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
-In-Reply-To: <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
-References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1207061308300.29809@axis700.grange>
+From: attila@kinali.ch (Attila Kinali)
+Date: Fri,  6 Jul 2012 13:09:52 +0200
+Subject: [PATCH] ARM: dma: mxs-dma: Export missing symbols from mxs-dma.c
+In-Reply-To: <20120706105252.GC12558@shlinux2.ap.freescale.net>
+References: <20120706105252.GC12558@shlinux2.ap.freescale.net>
+Message-ID: <1341572992-12319-1-git-send-email-attila@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jul 2012, javier Martin wrote:
+mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
+which are used at least in mxs-mmc.c. Building mxs-mmc as module
+fails due to those two symbols not being exported.
 
-> Hi,
-> can this patch be applied please?
-> 
-> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
-
-Sorry? This patch has been applied and proven to break more, than it 
-fixed, so, it has been reverted. Am I missing something?
-
-Thanks
-Guennadi
+Signed-off-by: Attila Kinali <attila@kinali.ch>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ drivers/dma/mxs-dma.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index c96ab15..0437f49 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -201,6 +201,7 @@ int mxs_dma_is_apbh(struct dma_chan *chan)
+ 
+ 	return dma_is_apbh(mxs_dma);
+ }
++EXPORT_SYMBOL(mxs_dma_is_apbh);
+ 
+ int mxs_dma_is_apbx(struct dma_chan *chan)
+ {
+@@ -209,6 +210,7 @@ int mxs_dma_is_apbx(struct dma_chan *chan)
+ 
+ 	return !dma_is_apbh(mxs_dma);
+ }
++EXPORT_SYMBOL(mxs_dma_is_apbx);
+ 
+ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ {
+@@ -779,3 +781,4 @@ static int __init mxs_dma_module_init(void)
+ 	return platform_driver_probe(&mxs_dma_driver, mxs_dma_probe);
+ }
+ subsys_initcall(mxs_dma_module_init);
++
+-- 
+1.7.10
