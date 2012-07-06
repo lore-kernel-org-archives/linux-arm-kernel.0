@@ -1,30 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 6 Jul 2012 13:34:42 +0100
-Subject: [PATCH 3/9] ARM: ux500: Remove AB8500 regulator register
- initialisation information
-In-Reply-To: <4FF6D183.7040407@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <1341493572-29735-4-git-send-email-lee.jones@linaro.org>
- <CACRpkdbRtFX8_++rndCpsH7R1uhwPrkTE_GKgNTM6r1PSuwY0A@mail.gmail.com>
- <4FF6979F.2000904@linaro.org>
- <20120706112317.GD4017@opensource.wolfsonmicro.com>
- <4FF6D183.7040407@linaro.org>
-Message-ID: <20120706123441.GF4017@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Jul 2012 05:36:11 -0700
+Subject: [PATCH v2 00/14] ARM: OMAP5: Add minimal OMAP5 SOC support
+In-Reply-To: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120706123611.GW1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 12:52:35PM +0100, Lee Jones wrote:
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [120706 02:26]:
+> Tony,
+> 
+> Here is the updated series with suggested corrections and generated against
+> the latest cleanup-part2 at commit ae6df418. The series adds minimal OMAP5
+> support. OMAP5430 has a dual core Cortex-A15 based MPU subsystem with 2MB
+> L2 cache. The SOC has many compatible blocks with OMAP4 SOCS and hence
+> large part of the peripherals are re-used.
 
-> Then you added your Reviewed-by: until the ux500 stuff goes in.
+Looking good to me, just one cosmetic comment below:
+ 
+>   ARM: OMAP: counter-32k: Select the CR register offset using the IP scheme.
+>   ARM: OMAP5: l3: Add l3 error handler support for omap5.
+>   ARM: omap2+: board-generic: clean up the irq data from board file.
+>   ARM: OMAP5: board-generic: Add device tree support.
+>   ARM: OMAP5: Add SMP support.
 
-> However, the ux500 patch has been NACKed, so please don't take the aforementioned patch in either.
+Can you please remove the trailing period from the patch title lines?
+That's not typically used..
 
-No problem, if I punted on it like that I'll have deleted the mail and
-so wouldn't have applied it anyway unless you resent it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/3c448997/attachment.sig>
+Thanks,
+
+Tony
