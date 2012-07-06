@@ -1,109 +1,63 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sat, 7 Jul 2012 00:49:05 +0200 (CEST)
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <20120706205731.GA31585@n2100.arm.linux.org.uk>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FE896F9.2020806@ti.com> <1340647463.1562.127.camel@vkoul-udesk3>
- <201206252030.56025.arnd@arndb.de>
- <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
- <20120706205731.GA31585@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.1207070019510.29809@axis700.grange>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Fri, 6 Jul 2012 17:56:34 -0500
+Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
+In-Reply-To: <20120706002254.GB20175@S2101-09.ap.freescale.net>
+References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
+ <20120705182829.d13d6992406e02e1024552e3@freescale.com>
+ <20120706002254.GB20175@S2101-09.ap.freescale.net>
+Message-ID: <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jul 2012, Russell King - ARM Linux wrote:
+On Fri, 6 Jul 2012 08:22:56 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> On Fri, Jul 06, 2012 at 01:36:32PM +0200, Guennadi Liakhovetski wrote:
-> > I like this idea, but why don't we extend it to also cover the non-DT 
-> > case? I.e., why don't we add the above callback (call it "match" or 
-> > "filter" or anything else) to dmaengine operations and inside (the 
-> > extended) dma_request_channel(), instead of calling the filter function, 
-> > passed as a parameter, we loop over all registered DMAC devices and call 
-> > their filter callbacks, until one of them returns true? In fact, it goes 
-> > back to my earlier proposal from 
-> > http://thread.gmane.org/gmane.linux.kernel/1246957
-> > which I, possibly, failed to explain properly. So, the transformation 
-> > chain from today's API would be (all code is approximate):
+> On Thu, Jul 05, 2012 at 06:28:29PM -0500, Kim Phillips wrote:
+> > On Wed, 4 Jul 2012 23:38:14 +0800
+> > Shawn Guo <shawn.guo@linaro.org> wrote:
 > > 
-> > (today)
+> > > +static const struct of_device_id __devinitconst snvs_dt_ids[] = {
+> > > +	{ .compatible = "fsl,sec-v4.0-mon-rtc-lp", },
 > > 
-> > <client driver>
-> > 	dma_request_channel(mask, filter, filter_arg);
+> > the driver should be compatible with "fsl,sec-v4.0-mon", and its
+> > probe function search for "fsl,sec-v4.0-mon-rtc-lp" sub-compatibles
+> > (and possibly "fsl,sec-v4.0-mon-rtc-hp" in the future?).
 > > 
-> > <dmaengine_core>
-> > 	for_each_channel() {
-> > 		ret = (*filter)(chan, filter_arg);
-> > 		if (ret) {
-> > 			ret = chan->device->device_alloc_chan_resources(chan);
-> > 			if (!ret)
-> > 				return chan;
-> > 			else
-> > 				return NULL;
-> > 		}
-> > 	}
-> > 
-> > (can be transformed to)
-> > 
-> > <client driver>
-> > 	dma_request_channel(mask, filter_arg);
-> > 
-> > <dmaengine_core>
-> > 	for_each_channel() {
-> > 		ret = chan->device->filter(chan, filter_arg);
-> > 		if (ret) {
-> > 			<same as above>
-> > 		}
-> > 	}
-> > 
-> > (which further could be simplified to)
-> > 
-> > <client driver>
-> > 	dma_request_channel(mask, filter_arg);
-> > 
-> > <dmaengine_core>
-> > 	for_each_channel() {
-> > 		ret = chan->device->device_alloc_chan_resources(chan, filter_arg);
-> 
-> This looks like you're re-purposing a perfectly good API for something that
-> it wasn't designed to do, namely providing a channel selection mechanism,
-> rather than "allocating channel resources".  The hint is in the bloody
-> name, please take a look sometime!
-> 
-> If you want to call into the DMA engine driver for channel selection,
-> then create an _explicit_ API for it.  Don't bugger around with existing
-> APIs.
+> So you think snvs is all about rtc (lp and hp), nothing else?  If that
 
-Sure, it's better to create a new call-back.
+no, I'm aware that it's more than a couple of RTCs.
 
-> Moreover, the *big* problem that your proposal above creates is this.
-> What _type_ is filter_arg?  If it's void *, then your suggestion is
-> nonsense, even if you associate it with a size argument.  You have no
-> idea what the bytestream that would be passed via that pointer means,
-> even if the size just happens to look like it's what you expect.
+> is true, it's reasonable to do what you suggested here.  Otherwise, we
+> should have a snvs driver be compatible with "fsl,sec-v4.0-mon", and
+> this driver should be responsible for populate all the sub-devices of
+> snvs, rtc-lp, rtc-hp, and others.  In the latter case, rtc-snvs should
+> just stay as it stands right now.
 
-Right, thanks to you and Arnd, who has pointed this out too.
+but it doesn't function as it stands right now, at least on Power.
+The compatible in the device tree's sec_mon node "fsl,sec-v4.0-mon"
+and the driver's "fsl,sec-v4.0-mon-rtc-lp" don't match.  Here are
+the device tree changes I used:
 
-Then it seems to me, that we need to introduce a notion of a mux device. 
-We could of course try to just use some strings instead, arrays of 
-acceptable DMA devices and channels, and most likely we would even be able 
-to find such an approach, that would work for all existing configurations. 
-But it still wouldn't be really fully generic, right? Whereas creating a 
-mux driver we really could cover all possible cases. DMA clients in this 
-case would always be hard wired to only one pin of such a mux, the DMA 
-device on the other side also only has to care about its physical 
-channels. The dmaengine core would then query the mux driver, where it can 
-route specific client request lines?
+diff --git a/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
+index 7990e0d..14c933b 100644
+--- a/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
++++ b/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
+@@ -104,6 +104,14 @@ crypto: crypto at 300000 {
+ 
+ sec_mon: sec_mon at 314000 {
+        compatible = "fsl,sec-v4.2-mon", "fsl,sec-v4.0-mon";
++       #address-cells = <1>;
++       #size-cells = <1>;
++       ranges = <0 0x314000 0x1000>;
+        reg = <0x314000 0x1000>;
+        interrupts = <93 2 0 0>;
++
++       sec_mon_rtc_lp at 34 {
++               compatible = "fsl,sec-v4.2-mon-rtc-lp", "fsl,sec-v4.0-mon-rtc-lp";
++               reg = <0x34 0x58>;
++       };
+ };
 
-A separate mux is needed, because several clients can have their DMA 
-handshake lines routed to several DMAC instances, so, this muxing 
-functionality can neither reside on the client nor on the CMAC.
+btw, I don't see any imx6q.dtsi changes.
 
-Is this a right direction now? Shall I try to prototype such a DMA mux 
-API?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Kim
