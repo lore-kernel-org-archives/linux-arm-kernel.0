@@ -1,61 +1,82 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 6 Jul 2012 14:51:43 +0530
-Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
- offset using the IP scheme.
+Date: Fri, 6 Jul 2012 14:51:54 +0530
+Subject: [PATCH v2 13/14] ARM: OMAP5: Add the build support
 In-Reply-To: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1341566515-22665-14-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: R Sricharan <r.sricharan@ti.com>
 
-OMAP socs has a legacy and a highlander version of the
-32k sync counter IP. The register offsets vary between the
-highlander and the legacy scheme. So use the 'SCHEME'
-bits(30-31) of the revision register to distinguish between
-the two versions and choose the CR register offset accordingly.
+Adding the build support required for OMAP5 soc
+in to omap2+ config.
 
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/plat-omap/counter_32k.c |   16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/configs/omap2plus_defconfig |    1 +
+ arch/arm/mach-omap2/Kconfig          |    8 +++++++-
+ arch/arm/plat-omap/Kconfig           |    4 ++--
+ 3 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index 2132c4f..dbf1e03 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -29,7 +29,10 @@
- #include <plat/clock.h>
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 9854ff4..5c90370 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -236,3 +236,4 @@ CONFIG_CRC_T10DIF=y
+ CONFIG_CRC_ITU_T=y
+ CONFIG_CRC7=y
+ CONFIG_LIBCRC32C=y
++CONFIG_SOC_OMAP5=y
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 6c93477..90d0f85 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -9,7 +9,7 @@ config ARCH_OMAP2PLUS_TYPICAL
+ 	select REGULATOR
+ 	select PM_RUNTIME
+ 	select VFP
+-	select NEON if ARCH_OMAP3 || ARCH_OMAP4
++	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
+ 	select SERIAL_OMAP
+ 	select SERIAL_OMAP_CONSOLE
+ 	select I2C
+@@ -61,6 +61,12 @@ config ARCH_OMAP4
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select ARM_CPU_SUSPEND if PM
  
- /* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
--#define OMAP2_32KSYNCNT_CR_OFF		0x10
-+#define OMAP2_32KSYNCNT_REV_OFF		0x0
-+#define OMAP2_32KSYNCNT_REV_SCHEME	(0x3 << 30)
-+#define OMAP2_32KSYNCNT_CR_OFF_LOW	0x10
-+#define OMAP2_32KSYNCNT_CR_OFF_HIGH	0x30
++config SOC_OMAP5
++	bool "TI OMAP5"
++	select CPU_V7
++	select ARM_GIC
++	select HAVE_SMP
++
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
  
- /*
-  * 32KHz clocksource ... always available, on pretty most chips except
-@@ -84,9 +87,16 @@ int __init omap_init_clocksource_32k(void __iomem *vbase)
- 	int ret;
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index ad95c7a..dcfb506 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -29,7 +29,7 @@ config ARCH_OMAP2PLUS
+ 	select USE_OF
+ 	select PROC_DEVICETREE if PROC_FS
+ 	help
+-	  "Systems based on OMAP2, OMAP3 or OMAP4"
++	  "Systems based on OMAP2, OMAP3, OMAP4 or OMAP5"
  
- 	/*
--	 * 32k sync Counter register offset is@0x10
-+	 * 32k sync Counter IP register offsets vary between the
-+	 * highlander version and the legacy ones.
-+	 * The 'SCHEME' bits(30-31) of the revision register is used
-+	 * to identify the version.
- 	 */
--	sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF;
-+	if (__raw_readl(vbase + OMAP2_32KSYNCNT_REV_OFF) &
-+						OMAP2_32KSYNCNT_REV_SCHEME)
-+		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_HIGH;
-+	else
-+		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_LOW;
+ endchoice
  
- 	/*
- 	 * 120000 rough estimate from the calculations in
+@@ -150,7 +150,7 @@ config OMAP_32K_TIMER
+ 	  This timer saves power compared to the OMAP_MPU_TIMER, and has
+ 	  support for no tick during idle. The 32KHz timer provides less
+ 	  intra-tick resolution than OMAP_MPU_TIMER. The 32KHz timer is
+-	  currently only available for OMAP16XX, 24XX, 34XX and OMAP4.
++	  currently only available for OMAP16XX, 24XX, 34XX and OMAP4/5.
+ 
+ config OMAP3_L2_AUX_SECURE_SAVE_RESTORE
+ 	bool "OMAP3 HS/EMU save and restore for L2 AUX control register"
 -- 
 1.7.9.5
