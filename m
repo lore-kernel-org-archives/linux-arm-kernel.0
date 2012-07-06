@@ -1,96 +1,109 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 6 Jul 2012 17:20:19 -0300
-Subject: [PATCH 1/2] hw_random: mxc-rnga: Adapt clocks to new i.mx clock
- framework
-Message-ID: <1341606020-26449-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jul 2012 21:30:05 +0100
+Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
+In-Reply-To: <4FF730CD.7050907@codeaurora.org>
+References: <1341531958-31721-1-git-send-email-sboyd@codeaurora.org>
+ <20120706002404.GJ2522@linux.vnet.ibm.com> <4FF730CD.7050907@codeaurora.org>
+Message-ID: <20120706203005.GF31508@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt clocks to the new i.mx clock framework and fix the following warning:
-                             
-------------[ cut here ]------------                                            
-WARNING: at drivers/clk/clk.c:511 __clk_enable+0x9c/0xac()                      
-Modules linked in:                                                              
-Backtrace:                                                                      
-[<800124c8>] (dump_backtrace+0x0/0x10c) from [<804172dc>] (dump_stack+0x18/0x1c)
- r7:00000009 r6:000001ff r5:8032cb50 r4:00000000                                
-[<804172c4>] (dump_stack+0x0/0x1c) from [<80021834>] (warn_slowpath_common+0x54)
-[<800217e0>] (warn_slowpath_common+0x0/0x6c) from [<80021870>] (warn_slowpath_n)
- r9:80581cac r8:8700a9c0 r7:805ab070 r6:80000013 r5:806133d4                    
-r4:8700a9c0                                                                     
-[<8002184c>] (warn_slowpath_null+0x0/0x2c) from [<8032cb50>] (__clk_enable+0x9c)
-[<8032cab4>] (__clk_enable+0x0/0xac) from [<8032cb88>] (clk_enable+0x28/0x44)   
- r5:806133d4 r4:8700a9c0                                                        
-[<8032cb60>] (clk_enable+0x0/0x44) from [<80560f14>] (mxc_rnga_probe+0x68/0x164)
- r7:805ab070 r6:8706ec00 r5:80611314 r4:00000000                                
-[<80560eac>] (mxc_rnga_probe+0x0/0x164) from [<8025914c>] (platform_drv_probe+0)
-[<8025912c>] (platform_drv_probe+0x0/0x24) from [<80257c7c>] (driver_probe_devi)
-[<80257bfc>] (driver_probe_device+0x0/0x204) from [<80257e94>] (__driver_attach)
- r9:80581cac r8:0000008e r7:00000000 r6:8706ec3c r5:805ab070                    
-r4:8706ec08                                                                     
-[<80257e00>] (__driver_attach+0x0/0x98) from [<8025642c>] (bus_for_each_dev+0x6)
- r7:00000000 r6:80257e00 r5:87035e98 r4:805ab070                                
-[<802563c4>] (bus_for_each_dev+0x0/0x94) from [<80257adc>] (driver_attach+0x20/)
- r7:00000000 r6:873f2380 r5:805ab338 r4:805ab070                                
-[<80257abc>] (driver_attach+0x0/0x28) from [<80256d50>] (bus_add_driver+0x18c/0)
-[<80256bc4>] (bus_add_driver+0x0/0x268) from [<802584c4>] (driver_register+0x80)
-[<80258444>] (driver_register+0x0/0x134) from [<802594f4>] (platform_driver_reg)
- r7:00000000 r6:805c2e00 r5:00000007 r4:805ab05c                                
-[<802594a8>] (platform_driver_register+0x0/0x60) from [<80259528>] (platform_dr)
-[<80259508>] (platform_driver_probe+0x0/0xa4) from [<80560ea0>] (mod_init+0x18/)
- r7:00000000 r6:805c2e00 r5:00000007 r4:87034000                                
-[<80560e88>] (mod_init+0x0/0x24) from [<800086b4>] (do_one_initcall+0x40/0x194) 
-[<80008674>] (do_one_initcall+0x0/0x194) from [<8053d3f4>] (kernel_init+0xfc/0x)
-[<8053d2f8>] (kernel_init+0x0/0x1cc) from [<80027190>] (do_exit+0x0/0x7ec)      
----[ end trace 4198eed02050f461 ]---                                            
-mxc_rnga mxc_rnga: MXC RNGA Registered
+On Fri, Jul 06, 2012 at 11:39:09AM -0700, Stephen Boyd wrote:
+> On 07/05/12 17:24, Paul E. McKenney wrote:
+> > On Thu, Jul 05, 2012 at 04:45:58PM -0700, Stephen Boyd wrote:
+> >> @@ -179,7 +184,7 @@ void __ref cpu_die(void)
+> >>  	mb();
+> >>
+> >>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> >> -	complete(&cpu_died);
+> >> +	__this_cpu_write(cpu_state, CPU_DEAD);
+> > Or you could do something like:
+> >
+> > 	RCU_NONIDLE(complete(&cpu_died));
+> >
+> > This would tell RCU that it needed to pay attention to this CPU for
+> > the duration of the "complete()" function call despite the CPU's being
+> > idle.  And might allow you to dispense with the rest of the patch.
+> 
+> Great! I like that more since we get to keep the completion mechanism
+> instead of a busy wait.
+> 
+> Russell, which one would you prefer? Here's the other version
 
-Cc: Theodore Ts'o <tytso@mit.edu>
-Cc: Herbert Xu <herbert@gondor.apana.org.au> 
-Cc: <linux-kernel@vger.kernel.org>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/char/hw_random/mxc-rnga.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+I think I prefer the version below.
 
-diff --git a/drivers/char/hw_random/mxc-rnga.c b/drivers/char/hw_random/mxc-rnga.c
-index 85074de..c49c0b8 100644
---- a/drivers/char/hw_random/mxc-rnga.c
-+++ b/drivers/char/hw_random/mxc-rnga.c
-@@ -152,14 +152,14 @@ static int __init mxc_rnga_probe(struct platform_device *pdev)
- 	if (rng_dev)
- 		return -EBUSY;
- 
--	clk = clk_get(&pdev->dev, "rng");
-+	clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
- 		dev_err(&pdev->dev, "Could not get rng_clk!\n");
- 		err = PTR_ERR(clk);
- 		goto out;
- 	}
- 
--	clk_enable(clk);
-+	clk_prepare_enable(clk);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
-@@ -201,7 +201,7 @@ err_ioremap:
- 	release_mem_region(res->start, resource_size(res));
- 
- err_region:
--	clk_disable(clk);
-+	clk_disable_unprepare(clk);
- 	clk_put(clk);
- 
- out:
-@@ -212,7 +212,7 @@ static int __exit mxc_rnga_remove(struct platform_device *pdev)
- {
- 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	void __iomem *rng_base = (void __iomem *)mxc_rnga.priv;
--	struct clk *clk = clk_get(&pdev->dev, "rng");
-+	struct clk *clk = clk_get(&pdev->dev, NULL);
- 
- 	hwrng_unregister(&mxc_rnga);
- 
--- 
-1.7.1
+> 
+> ----->8-----8<-----
+> Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
+> 
+> While running hotplug tests I ran into this RCU splat
+> 
+> ===============================
+> [ INFO: suspicious RCU usage. ]
+> 3.4.0 #3275 Tainted: G        W
+> -------------------------------
+> include/linux/rcupdate.h:729 rcu_read_lock() used illegally while idle!
+> 
+> other info that might help us debug this:
+> 
+> RCU used illegally from idle CPU!
+> rcu_scheduler_active = 1, debug_locks = 0
+> RCU used illegally from extended quiescent state!
+> 4 locks held by swapper/2/0:
+>  #0:  ((cpu_died).wait.lock){......}, at: [<c00ab128>] complete+0x1c/0x5c
+>  #1:  (&p->pi_lock){-.-.-.}, at: [<c00b275c>] try_to_wake_up+0x2c/0x388
+>  #2:  (&rq->lock){-.-.-.}, at: [<c00b2860>] try_to_wake_up+0x130/0x388
+>  #3:  (rcu_read_lock){.+.+..}, at: [<c00abe5c>] cpuacct_charge+0x28/0x1f4
+> 
+> stack backtrace:
+> [<c001521c>] (unwind_backtrace+0x0/0x12c) from [<c00abec8>] (cpuacct_charge+0x94/0x1f4)
+> [<c00abec8>] (cpuacct_charge+0x94/0x1f4) from [<c00b395c>] (update_curr+0x24c/0x2c8)
+> [<c00b395c>] (update_curr+0x24c/0x2c8) from [<c00b59c4>] (enqueue_task_fair+0x50/0x194)
+> [<c00b59c4>] (enqueue_task_fair+0x50/0x194) from [<c00afea4>] (enqueue_task+0x30/0x34)
+> [<c00afea4>] (enqueue_task+0x30/0x34) from [<c00b0908>] (ttwu_activate+0x14/0x38)
+> [<c00b0908>] (ttwu_activate+0x14/0x38) from [<c00b28a8>] (try_to_wake_up+0x178/0x388)
+> [<c00b28a8>] (try_to_wake_up+0x178/0x388) from [<c00a82a0>] (__wake_up_common+0x34/0x78)
+> [<c00a82a0>] (__wake_up_common+0x34/0x78) from [<c00ab154>] (complete+0x48/0x5c)
+> [<c00ab154>] (complete+0x48/0x5c) from [<c07db7cc>] (cpu_die+0x2c/0x58)
+> [<c07db7cc>] (cpu_die+0x2c/0x58) from [<c000f954>] (cpu_idle+0x64/0xfc)
+> [<c000f954>] (cpu_idle+0x64/0xfc) from [<80208160>] (0x80208160)
+> 
+> When a cpu is marked offline during its idle thread it calls
+> cpu_die() during an RCU idle period. cpu_die() calls complete()
+> to notify the killing process that the cpu has died. complete()
+> calls into the scheduler code and eventually grabs an RCU read
+> lock in cpuacct_charge().
+> 
+> Mark complete() as RCU_NONIDLE so that RCU pays attention to this
+> CPU for the duration of the complete() function even though it's
+> in idle.
+> 
+> Suggested-by: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/kernel/smp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 2c7217d..aea74f5 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -179,7 +179,7 @@ void __ref cpu_die(void)
+>  	mb();
+>  
+>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> -	complete(&cpu_died);
+> +	RCU_NONIDLE(complete(&cpu_died));
+>  
+>  	/*
+>  	 * actual CPU shutdown procedure is at least platform (if not
+> 
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
