@@ -1,70 +1,41 @@
-From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Fri, 6 Jul 2012 18:38:47 +0800
-Subject: [PATCH 1/1] ARM: add PROC_DEVICETREE support in Kconfig
-Message-ID: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  6 Jul 2012 11:58:33 +0200
+Subject: [PATCH] mmc: atmel-mci: fix incorrect setting of host->data to NULL
+Message-ID: <1341568713-8869-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiao Jiang <jgq516@gmail.com>
+Setting host->data to NULL is incorrect sequence in STATE_SENDING_STOP
+state of FSM: This early setting leads to the skip of dma_unmap_sg()
+in atmci_dma_cleanup() which is a bug.
 
-Since more and more arm chips support device tree, it'd be better add PROC_DEVICETREE
-in arch/arm/Kconfig to avoid duplicate code.
+Idea taken form dw_mmc by Seungwon Jeon.
 
-Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Seungwon Jeon <tgih.jun@samsung.com>
 ---
- arch/arm/Kconfig                   |    1 +
- arch/arm/configs/at91_dt_defconfig |    1 -
- arch/arm/configs/tegra_defconfig   |    1 -
- arch/arm/plat-omap/Kconfig         |    1 -
- 4 files changed, 1 insertions(+), 3 deletions(-)
+ drivers/mmc/host/atmel-mci.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a91009c..f68896e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1864,6 +1864,7 @@ config USE_OF
- 	select OF
- 	select OF_EARLY_FLATTREE
- 	select IRQ_DOMAIN
-+	select PROC_DEVICETREE if PROC_FS
- 	help
- 	  Include support for flattened device tree machine descriptions.
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 78e5326..2ce109d 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1860,7 +1860,6 @@ static void atmci_tasklet_func(unsigned long priv)
  
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 67bc571..b856cb6 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -64,7 +64,6 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_UBI=y
- CONFIG_MTD_UBI_GLUEBI=y
--CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=4
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 1198dd6..43e7b65 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -72,7 +72,6 @@ CONFIG_IPV6_TUNNEL=y
- CONFIG_IPV6_MULTIPLE_TABLES=y
- # CONFIG_WIRELESS is not set
- # CONFIG_FIRMWARE_IN_KERNEL is not set
--CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index ad95c7a..4e2cb17 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -27,7 +27,6 @@ config ARCH_OMAP2PLUS
- 	select GENERIC_IRQ_CHIP
- 	select OMAP_DM_TIMER
- 	select USE_OF
--	select PROC_DEVICETREE if PROC_FS
- 	help
- 	  "Systems based on OMAP2, OMAP3 or OMAP4"
+ 			dev_dbg(&host->pdev->dev, "FSM: cmd ready\n");
+ 			host->cmd = NULL;
+-			host->data = NULL;
+ 			data->bytes_xfered = data->blocks * data->blksz;
+ 			data->error = 0;
+ 			atmci_command_complete(host, mrq->stop);
+@@ -1874,6 +1873,7 @@ static void atmci_tasklet_func(unsigned long priv)
+ 				atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
+ 				state = STATE_WAITING_NOTBUSY;
+ 			}
++			host->data = NULL;
+ 			break;
  
+ 		case STATE_END_REQUEST:
 -- 
-1.7.3
+1.7.5.4
