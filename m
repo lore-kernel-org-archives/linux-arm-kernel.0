@@ -1,40 +1,23 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 6 Jul 2012 18:52:53 +0800
-Subject: [PATCH] ARM: mxs: Export missing symbols from mxs-dma.c
-In-Reply-To: <1341565366-11441-1-git-send-email-attila@kinali.ch>
-References: <1341565366-11441-1-git-send-email-attila@kinali.ch>
-Message-ID: <20120706105252.GC12558@shlinux2.ap.freescale.net>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 6 Jul 2012 13:00:39 +0200
+Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
+In-Reply-To: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 11:02:46AM +0200, Attila Kinali wrote:
-> mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
-> which are used at least in mxs-mmc.c. Building mxs-mmc as module
-> fails due to those two symbols not being exported.
-> 
-> Signed-off-by: Attila Kinali <attila@kinali.ch>
-> ---
->  drivers/dma/mxs-dma.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index c96ab15..4ea1909 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -779,3 +779,6 @@ static int __init mxs_dma_module_init(void)
->  	return platform_driver_probe(&mxs_dma_driver, mxs_dma_probe);
->  }
->  subsys_initcall(mxs_dma_module_init);
-> +
-> +EXPORT_SYMBOL(mxs_dma_is_apbh);
-> +EXPORT_SYMBOL(mxs_dma_is_apbx);
-If i understand correctly, usually we add EXPORT_SYMBOL right below the function
-exported.
-And can we use EXPORT_SYMBOL_GPL?
-It seems both driver using this are gpl licensed.
+Hi,
+can this patch be applied please?
 
-BTW, maybe you also need change the patch title format a bit:
-dma: mxs-dma: ...
+It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
 
-Regards
-Dong Aisheng
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
