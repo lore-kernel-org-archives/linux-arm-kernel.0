@@ -1,63 +1,149 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 6 Jul 2012 13:46:02 +0200
-Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
-In-Reply-To: <Pine.LNX.4.64.1207061338170.29809@axis700.grange>
-References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
- <Pine.LNX.4.64.1207061308300.29809@axis700.grange>
- <CACKLOr0nwKoO4UL9MKZJmD9WN1uyJhpNzAybd7w7x-GnLtM5cw@mail.gmail.com>
- <Pine.LNX.4.64.1207061338170.29809@axis700.grange>
-Message-ID: <CACKLOr1RKcwEqt9E90wbf5peB08erb7nOo+KVQ7m87BbsDJhbA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 6 Jul 2012 13:51:58 +0200
+Subject: [PATCH] arm: at91: Add new board
+In-Reply-To: <1341385499-5781-1-git-send-email-jiri.prchal@aksignal.cz>
+References: <1341385499-5781-1-git-send-email-jiri.prchal@aksignal.cz>
+Message-ID: <20120706115158.GB4450@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+HI,
 
-On 6 July 2012 13:39, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> On Fri, 6 Jul 2012, javier Martin wrote:
->
->> Hi Guennadi,
->>
->> On 6 July 2012 13:09, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
->> > On Fri, 6 Jul 2012, javier Martin wrote:
->> >
->> >> Hi,
->> >> can this patch be applied please?
->> >>
->> >> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
->> >
->> > Sorry? This patch has been applied and proven to break more, than it
->> > fixed, so, it has been reverted. Am I missing something?
->>
->> Patch v1 was the version that broke pass-through mode (which nobody
->> seems to be using/testing). It was applied, then it was reverted as
->> you requested in [1].
->>
->> Then I sent v2 that didn't break pass-through but was invalid too
->> because of a merge conflict [2].
->>
->> Finally, this is v3 which has the pass-through problem and the merge
->> problem fixed. It is currently marked as "Under review" and should be
->> applied as a fix to 3.5.
->
-> Ah, ok, then, don't you think, that expecting your patch to be applied
-> within 4 minutes of its submission is a bit... overoptimistic? Because
-> it's 4 minutes after your original patch, that you've sent your
-> "reminder"...
+	please put a correct title of the commit
 
-This patch was sent on '2012-06-01 09:31:45', which is more than a
-month ago. Look at patchwork:
-http://patchwork.linuxtv.org/patch/11559/
+On 09:04 Wed 04 Jul     , Jiri Prchal wrote:
+> I'd like to add support for our "CDU" board based up on Telit's module GE863 Pro3.
+> It has more uarts, leds, another nand partitioning.
+> 
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> ---
+>  arch/arm/boot/dts/aks-cdu.dts |  111 +++++++++++++++++++++++++++++++++++++++++
+plewase update thei
 
-I think that a month is a reasonable period to send a reminder and I
-didn't mean to offend anyone with it.
+arch/arm/mach-at91/Makefile.boot
 
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Best Regards,
+J.
+>  1 files changed, 111 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/aks-cdu.dts
+> 
+> diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
+> new file mode 100644
+> index 0000000..05590cc
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/aks-cdu.dts
+> @@ -0,0 +1,111 @@
+> +/*
+> + * aks-cdu.dts - Device Tree file for AK signal CDU
+> + *
+> + * Copyright (C) 2012 AK signal Brno a.s.
+> + *               2012 Jiri Prchal <jiri.prchal@aksignal.cz>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +/include/ "ge863-pro3.dtsi"
+> +
+> +/ {
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs";
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			usart0: serial at fffb0000 {
+> +				status = "okay";
+> +			};
+> +
+> +			usart1: serial at fffb4000 {
+> +				status = "okay";
+> +				linux,rs485-enabled-at-boot-time;
+> +				rs485-rts-delay = <0 0>;
+> +				};
+> +
+> +			usart2: serial at fffb8000 {
+> +				status = "okay";
+> +				linux,rs485-enabled-at-boot-time;
+> +				rs485-rts-delay = <0 0>;
+> +			};
+> +
+> +			usart3: serial at fffd0000 {
+> +				status = "okay";
+> +				linux,rs485-enabled-at-boot-time;
+> +				rs485-rts-delay = <0 0>;
+> +			};
+> +
+> +			macb0: ethernet at fffbc000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			usb1: gadget at fffa4000 {
+> +				atmel,vbus-gpio = <&pioC 15 0>;
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00500000 {
+> +			num-ports = <2>;
+> +			status = "okay";
+> +		};
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "soft";
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			bootstrap at 0 {
+> +				label = "bootstrap";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			uboot at 40000 {
+> +				label = "uboot";
+> +				reg = <0x40000 0x80000>;
+> +			};
+> +			ubootenv at c0000 {
+> +				label = "ubootenv";
+> +				reg = <0xc0000 0x40000>;
+> +			};
+> +			kernel at 100000 {
+> +				label = "kernel";
+> +				reg = <0x100000 0x400000>;
+> +			};
+> +			rootfs at 500000 {
+> +				label = "rootfs";
+> +				reg = <0x500000 0x7b00000>;
+> +			};
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		red {
+> +			gpios = <&pioC 10 0>;
+> +			linux,default-trigger = "none";
+> +		};
+> +
+> +		green {
+> +			gpios = <&pioA 5 1>;
+> +			linux,default-trigger = "none";
+> +			default-state = "on";
+> +		};
+> +
+> +		yellow {
+> +			gpios = <&pioB 20 1>;
+> +			linux,default-trigger = "none";
+> +		};
+> +
+> +		blue {
+> +			gpios = <&pioB 21 1>;
+> +			linux,default-trigger = "none";
+> +		};
+> +	};
+> +};
+> -- 
+> 1.7.7
+> 
