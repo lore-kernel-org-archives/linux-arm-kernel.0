@@ -1,56 +1,90 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri,  6 Jul 2012 13:26:10 +0200
-Subject: [PATCH 1/2] ARM: at91: gpio: implement request
-Message-ID: <1341573971-30145-1-git-send-email-plagnioj@jcrosoft.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Jul 2012 13:36:32 +0200 (CEST)
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201206252030.56025.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FE896F9.2020806@ti.com> <1340647463.1562.127.camel@vkoul-udesk3>
+ <201206252030.56025.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-confire the pin as pio when requested
+On Mon, 25 Jun 2012, Arnd Bergmann wrote:
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[snip]
+
+> The channel data in the device tree is still in a format
+> that is specific to that dmaengine driver and interpreted
+> by it. Using the regular dma_filter_fn prototype is not
+> necessary, but it would be convenient because the dmaengine
+> code already knows how to deal with it. If we don't use this
+> method, how about adding another callback to struct dma_device
+> like
+> 
+> bool (*device_match)(struct dma_chan *chan, struct property *req);
+
+I like this idea, but why don't we extend it to also cover the non-DT 
+case? I.e., why don't we add the above callback (call it "match" or 
+"filter" or anything else) to dmaengine operations and inside (the 
+extended) dma_request_channel(), instead of calling the filter function, 
+passed as a parameter, we loop over all registered DMAC devices and call 
+their filter callbacks, until one of them returns true? In fact, it goes 
+back to my earlier proposal from 
+http://thread.gmane.org/gmane.linux.kernel/1246957
+which I, possibly, failed to explain properly. So, the transformation 
+chain from today's API would be (all code is approximate):
+
+(today)
+
+<client driver>
+	dma_request_channel(mask, filter, filter_arg);
+
+<dmaengine_core>
+	for_each_channel() {
+		ret = (*filter)(chan, filter_arg);
+		if (ret) {
+			ret = chan->device->device_alloc_chan_resources(chan);
+			if (!ret)
+				return chan;
+			else
+				return NULL;
+		}
+	}
+
+(can be transformed to)
+
+<client driver>
+	dma_request_channel(mask, filter_arg);
+
+<dmaengine_core>
+	for_each_channel() {
+		ret = chan->device->filter(chan, filter_arg);
+		if (ret) {
+			<same as above>
+		}
+	}
+
+(which further could be simplified to)
+
+<client driver>
+	dma_request_channel(mask, filter_arg);
+
+<dmaengine_core>
+	for_each_channel() {
+		ret = chan->device->device_alloc_chan_resources(chan, filter_arg);
+		if (!ret)
+			return chan;
+		else if (ret != -ENODEV)
+			return ret;
+		/* -ENODEV - try the next channel */
+	}
+
+Which is quite similar to my above mentioned proposal. Wouldn't this both 
+improve the present API and prepare it for DT?
+
+Thanks
+Guennadi
 ---
- arch/arm/mach-at91/gpio.c |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 325837a..994ed02 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -44,6 +44,7 @@ struct at91_gpio_chip {
- 
- #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
- 
-+static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
- static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
- static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
- static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
-@@ -57,6 +58,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
- 	{								\
- 		.chip = {						\
- 			.label		  = name,			\
-+			.request	  = at91_gpiolib_request,	\
- 			.direction_input  = at91_gpiolib_direction_input, \
- 			.direction_output = at91_gpiolib_direction_output, \
- 			.get		  = at91_gpiolib_get,		\
-@@ -861,6 +863,18 @@ void __init at91_gpio_irq_setup(void)
- }
- 
- /* gpiolib support */
-+
-+
-+static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-+	void __iomem *pio = at91_gpio->regbase;
-+	unsigned mask = 1 << offset;
-+
-+	__raw_writel(mask, pio + PIO_PER);
-+	return 0;
-+}
-+
- static int at91_gpiolib_direction_input(struct gpio_chip *chip,
- 					unsigned offset)
- {
--- 
-1.7.10
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
