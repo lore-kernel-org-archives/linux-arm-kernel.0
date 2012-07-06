@@ -1,42 +1,37 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Sat, 7 Jul 2012 07:36:39 +0800
-Subject: Fwd: before arm Linux 2.6.38, how to protect the kernel memory
- from accessing in user space?
-In-Reply-To: <20120704104402.GL16319@n2100.arm.linux.org.uk>
-References: <CAFNq8R6cxPgADH=oOxkyenx4ADEPs+dapzj5mDrVftya3yBj3A@mail.gmail.com>
- <CAFNq8R5qSRh0iEo1en_p8g+z9jgELyOOLPxs7rp-6ZV7OE1Cog@mail.gmail.com>
- <20120704104402.GL16319@n2100.arm.linux.org.uk>
-Message-ID: <CAFNq8R4bmdfVq6kJV96FVfpobPAiiDcKS0Aj4gZz2Xev7Sg0Lw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 06 Jul 2012 16:38:22 -0700
+Subject: [GIT PULL] gpio/omap: final fixes for v3.5
+Message-ID: <87vci08npt.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you.
+Hi Grant,
 
-I have got the answer too.
+Here's a couple (hopefully) final OMAP GPIO fixes for v3.5-rc.
 
-Before 2.6.38, the access permission management is still rely on
-domain and AP field in Page table entry and Domain access control
-register. The start-up code initialize the DOMAIN_USER by
-DOMAIN_MANAGER. But in early_trap_init, the system will modify
-DOMAIN_USER to DOMAIN_CLIENT. And when the domain attribute is
-DOMAIN_CLIENT, the AP field in Page table entry will be effective.
+Thanks,
 
-2012/7/4 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Jul 04, 2012 at 02:01:25PM +0800, Li Haifeng wrote:
->> Hi, I am a newbie Linux Kernel learner. I am confused  at memory
->> protected between user space and kernel space.  In arm, the hardware
->> support the memory protecting by Domain access register.
->>
->> But in Linux, it may not take effect in ARM Linux. Because before the
->> official kernel 2.6.38, I found that both DOMAIN_USER and
->> DOMAIN_KERNEL all set to DOMAIN_MANAGER(0x3). So, before arm Linux
->> 2.6.38, how to protect the kernel memory from accessing in user space?
->
-> That doesn't sound right.
->
-> When we start booting, then the domain register will be set as that.
-> However, when we exec the first user thread (or indeed any user thread),
-> the user domain will be set to client mode (see the set_fs(USER_DS) in
-> fs/exec.c).
+Kevin
 
-More accurately, in early_init_trap, the modify action will be done too ^_^.
+
+The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
+
+  Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/fixes/gpio-3
+
+for you to fetch changes up to 7b86cef34afceeecf57d4d07f3cfab06f8b60b13:
+
+  gpio/omap: fix invalid context restore of gpio bank-0 (2012-07-03 09:41:39 -0700)
+
+----------------------------------------------------------------
+Grazvydas Ignotas (1):
+      gpio/omap: fix irq loss while in idle with debounce on
+
+Jon Hunter (1):
+      gpio/omap: fix invalid context restore of gpio bank-0
+
+ drivers/gpio/gpio-omap.c |   14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
