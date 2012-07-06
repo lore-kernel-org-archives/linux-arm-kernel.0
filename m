@@ -1,35 +1,68 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 06 Jul 2012 10:41:54 -0700
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120706062852.GZ30009@pengutronix.de>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
- <20120706062852.GZ30009@pengutronix.de>
-Message-ID: <4FF72362.5020704@boundarydevices.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jul 2012 18:47:00 +0100
+Subject: [PATCH 3/3] Visstrim M10: Add support for Coda.
+In-Reply-To: <1341579471-25208-4-git-send-email-javier.martin@vista-silicon.com>
+References: <1341579471-25208-1-git-send-email-javier.martin@vista-silicon.com>
+ <1341579471-25208-4-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120706174700.GD31508@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/5/2012 11:28 PM, Sascha Hauer wrote:
-> On Fri, Jul 06, 2012 at 08:52:50AM +0800, Richard Zhao wrote:
->> On Thu, Jul 05, 2012 at 06:01:53PM +0200, Sascha Hauer wrote:
->>> On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
->>>> On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
->>>>> Measurements on i.MX1 and i.MX53 have shown that the divider values
->>>>> in the datasheets are wrong. the values from first, third and fourth
->>>>> column were all measured to be 8 higher than in the datasheet. It
->>>>> should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
->>>>> the same as the i2c unit is unchanged since the i.MX1.
->>>> We may need to check with IC guys? Or you've done?
->>> I don't have contact to the IC guys. Could you do this? I'd be
->>> interested in the results.
->> Sure, but it may be slow, as you know, many people are in summer break.
-> Thanks. It can take longer, the resulting frequencies are all too low,
-> so we are on the safe side.
->
-> Sascha
->
-You mean safe before the patch is applied, not after. Right?
+On Fri, Jul 06, 2012 at 02:57:51PM +0200, Javier Martin wrote:
+> Support the codadx6 that is included in
+> the i.MX27 SoC.
+> ---
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   24 +++++++++++++++++++++---
+>  1 file changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> index f76edb9..bee2714 100644
+> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -232,10 +232,10 @@ static void __init visstrim_camera_init(void)
+>  static void __init visstrim_reserve(void)
+>  {
+>  	/* reserve 4 MiB for mx2-camera */
+> -	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
+> +	mx2_camera_base = memblock_alloc(2 * MX2_CAMERA_BUF_SIZE,
+>  			MX2_CAMERA_BUF_SIZE);
+> -	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+> -	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+> +	memblock_free(mx2_camera_base, 2 * MX2_CAMERA_BUF_SIZE);
+> +	memblock_remove(mx2_camera_base, 2 * MX2_CAMERA_BUF_SIZE);
 
-Troy
+NAK.  If you're going to do this please move it to the right API:
+
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index f7b074f..c27058e 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -32,12 +32,12 @@
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/leds.h>
+-#include <linux/memblock.h>
+ #include <media/soc_camera.h>
+ #include <sound/tlv320aic32x4.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
++#include <asm/memblock.h>
+ #include <mach/common.h>
+ #include <mach/iomux-mx27.h>
+ 
+@@ -193,10 +193,8 @@ static void __init visstrim_camera_init(void)
+ static void __init visstrim_reserve(void)
+ {
+ 	/* reserve 4 MiB for mx2-camera */
+-	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
++	mx2_camera_base = memblock_steal(MX2_CAMERA_BUF_SIZE,
+ 			MX2_CAMERA_BUF_SIZE);
+-	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+-	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+ }
+ 
+ /* GPIOs used as events for applications */
