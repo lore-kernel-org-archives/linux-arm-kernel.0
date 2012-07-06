@@ -1,125 +1,134 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  6 Jul 2012 13:40:26 -0500
-Subject: [PATCH 01/15] ARM: Add fixed PCI i/o mapping
+Date: Fri,  6 Jul 2012 13:40:30 -0500
+Subject: [PATCH 05/15] ARM: shark: use fixed PCI i/o mapping
 In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1341600040-30993-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1341600040-30993-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This adds a fixed virtual mapping for PCI i/o addresses. The mapping is
-located at the last 2MB of vmalloc region (0xfee00000-0xff000000).
+Convert shark to use the fixed i/o mapping and remove io.h.
+
+This shrinks the mapping from 256MB to 1MB, but nothing is using that much
+space AFAICT.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- Documentation/arm/memory.txt    |    3 +++
- arch/arm/include/asm/io.h       |    5 +++++
- arch/arm/include/asm/mach/pci.h |   18 ++++++++++++++++++
- arch/arm/kernel/bios32.c        |   20 ++++++++++++++++++++
- 4 files changed, 46 insertions(+)
+ arch/arm/Kconfig                               |    1 -
+ arch/arm/mach-shark/core.c                     |   14 ++------------
+ arch/arm/mach-shark/include/mach/debug-macro.S |    7 ++++---
+ arch/arm/mach-shark/include/mach/entry-macro.S |    3 ++-
+ arch/arm/mach-shark/include/mach/io.h          |   18 ------------------
+ 5 files changed, 8 insertions(+), 35 deletions(-)
+ delete mode 100644 arch/arm/mach-shark/include/mach/io.h
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 208a2d4..4bfb9ff 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -51,6 +51,9 @@ ffc00000	ffefffff	DMA memory mapping region.  Memory returned
- ff000000	ffbfffff	Reserved for future expansion of DMA
- 				mapping region.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5d37628..3dfc555 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -869,7 +869,6 @@ config ARCH_SHARK
+ 	select PCI
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select NEED_MACH_MEMORY_H
+-	select NEED_MACH_IO_H
+ 	help
+ 	  Support for the StrongARM based Digital DNARD machine, also known
+ 	  as "Shark" (<http://www.shark-linux.de/shark.html>).
+diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
+index 2704bcd..6a2183a 100644
+--- a/arch/arm/mach-shark/core.c
++++ b/arch/arm/mach-shark/core.c
+@@ -18,11 +18,10 @@
+ #include <asm/system_misc.h>
  
-+fee00000	feffffff	Mapping of PCI I/O space. This is a static
-+				mapping within the vmalloc space.
-+
- VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
- 				Memory returned by vmalloc/ioremap will
- 				be dynamically placed in this region.
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 815c669..e8bb4d2 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -113,11 +113,16 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
- #define __iowmb()		do { } while (0)
- #endif
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
  
-+#define PCI_IO_VIRT_BASE	0xfee00000
-+
- /*
-  * Now, pick up the machine-defined IO definitions
-  */
- #ifdef CONFIG_NEED_MACH_IO_H
- #include <mach/io.h>
-+#elif defined(CONFIG_PCI)
-+#define IO_SPACE_LIMIT	((resource_size_t)0x1fffff)
-+#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
- #else
- #define __io(a)		__typesafe_io((a) & IO_SPACE_LIMIT)
- #endif
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 26c511f..20a04af 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -55,6 +55,24 @@ struct pci_sys_data {
- void pci_common_init(struct hw_pci *);
+-#define IO_BASE                 0xe0000000
+-#define IO_SIZE                 0x08000000
+ #define IO_START                0x40000000
+ #define ROMCARD_SIZE            0x08000000
+ #define ROMCARD_START           0x10000000
+@@ -104,18 +103,9 @@ arch_initcall(shark_init);
  
- /*
-+ * Setup fixed I/O mapping. Must be called from .map_io function.
-+ */
-+#ifdef CONFIG_PCI
-+extern void pci_map_io_pfn(unsigned long pfn[], int nr, int size);
-+#else
-+static inline void pci_map_io_pfn(unsigned long pfn[], int nr, int size) {}
-+#endif
-+static inline void __init pci_map_io_single_pfn(unsigned long pfn)
-+{
-+	pci_map_io_pfn(&pfn, 1, SZ_1M);
-+}
-+
-+static inline void __init pci_map_io_single(unsigned long paddr)
-+{
-+	pci_map_io_single_pfn(__phys_to_pfn(paddr));
-+}
-+
-+/*
-  * PCI controllers
-  */
- extern struct pci_ops iop3xx_ops;
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 2555250..0ea0135 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -13,6 +13,7 @@
- #include <linux/io.h>
+ extern void shark_init_irq(void);
  
- #include <asm/mach-types.h>
-+#include <asm/mach/map.h>
- #include <asm/mach/pci.h>
- 
- static int debug_pci;
-@@ -627,3 +628,22 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 
- 	return 0;
+-static struct map_desc shark_io_desc[] __initdata = {
+-	{
+-		.virtual	= IO_BASE,
+-		.pfn		= __phys_to_pfn(IO_START),
+-		.length		= IO_SIZE,
+-		.type		= MT_DEVICE
+-	}
+-};
+-
+ static void __init shark_map_io(void)
+ {
+-	iotable_init(shark_io_desc, ARRAY_SIZE(shark_io_desc));
++	pci_map_io_single(IO_START);
  }
-+
-+static struct map_desc pci_io_desc __initdata = {
-+	.virtual	= PCI_IO_VIRT_BASE,
-+	.type		= MT_DEVICE,
-+};
-+
-+void __init pci_map_io_pfn(unsigned long pfn[], int nr, int size)
-+{
-+	int i;
-+
-+	pci_io_desc.length = size;
-+
-+	for (i = 0; i < nr; i++) {
-+		pci_io_desc.pfn = pfn[i];
-+		iotable_init(&pci_io_desc, 1);
-+
-+		pci_io_desc.virtual += size;
-+	}
-+}
+ 
+ #define IRQ_TIMER 0
+diff --git a/arch/arm/mach-shark/include/mach/debug-macro.S b/arch/arm/mach-shark/include/mach/debug-macro.S
+index 20eb2bf..d129119 100644
+--- a/arch/arm/mach-shark/include/mach/debug-macro.S
++++ b/arch/arm/mach-shark/include/mach/debug-macro.S
+@@ -12,9 +12,10 @@
+ */
+ 
+ 		.macro	addruart, rp, rv, tmp
+-		mov	\rp, #0xe0000000
+-		orr	\rp, \rp, #0x000003f8
+-		mov	\rv, \rp
++		mov	\rp, #0x3f8
++		orr	\rv, \rp, #0xfe000000
++		orr	\rv, \rv, #0x00e00000
++		orr	\rp, \rp, #0x40000000
+ 		.endm
+ 
+ 		.macro	senduart,rd,rx
+diff --git a/arch/arm/mach-shark/include/mach/entry-macro.S b/arch/arm/mach-shark/include/mach/entry-macro.S
+index 5901b09..c9e49f0 100644
+--- a/arch/arm/mach-shark/include/mach/entry-macro.S
++++ b/arch/arm/mach-shark/include/mach/entry-macro.S
+@@ -8,7 +8,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 		.macro  get_irqnr_preamble, base, tmp
+-		mov	\base, #0xe0000000
++		mov	\base, #0xfe000000
++		orr	\base, \base, #0x00e00000
+ 		.endm
+ 
+ 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+diff --git a/arch/arm/mach-shark/include/mach/io.h b/arch/arm/mach-shark/include/mach/io.h
+deleted file mode 100644
+index 1a45fc0..0000000
+--- a/arch/arm/mach-shark/include/mach/io.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/*
+- * arch/arm/mach-shark/include/mach/io.h
+- *
+- * by Alexander Schulz
+- *
+- * derived from:
+- * arch/arm/mach-ebsa110/include/mach/io.h
+- * Copyright (C) 1997,1998 Russell King
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
+-
+-#endif
 -- 
 1.7.9.5
