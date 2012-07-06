@@ -1,45 +1,77 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  6 Jul 2012 12:47:57 -0600
-Subject: [GIT PULL V2 2/7] ARM: tegra: for-3.6/fixes branch
+Date: Fri,  6 Jul 2012 12:48:01 -0600
+Subject: [GIT PULL V2 6/7] ARM: tegra: for-3.6/common-clk branch
 In-Reply-To: <1341600482-11020-1-git-send-email-swarren@wwwdotorg.org>
 References: <1341600482-11020-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1341600482-11020-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1341600482-11020-7-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains various small bug-fixes to Tegra code.
+This branch contains numerous changes required as a baseline in order to
+convert Tegra to the common clock framework. The intention was to also
+include patches to actually convert Tegra to the common clock framework.
+However, those patches appeared late in the kernel cycle and currently cause
+regressions on some boards, so were dropped for now.
 
-This branch is based on Tegra's for-3.6/cleanup branch from a previous pull
-request.
+This branch depends only on v3.5-rc2.
 
 This branch is not included in a later pull request.
 
-Note that there will be a merge conflict between for-3.6/{fixes,soc}. The
-expected resolution may be found in branch for-3.6/merged-fixes-soc.
-
 ----------------------------------------------------------------
 
-The following changes since commit 702b0e4f2f2782962aab7d9a0a40ad68770bb1f6:
+The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
 
-  ARM: dt: tegra: rename board files to match SoC
+  Linux 3.5-rc2
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/fixes
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/common-clk
 
-for you to fetch changes up to 95ef9958849381931a79ecec53e677e52c406c5a:
+for you to fetch changes up to 094479915618c526a1409dd6704bcb4ff2c5c1c2:
 
-  ARM: tegra: build powergate unconditionally
+  ARM: tegra: Provide clock for only one PWM controller
 
 ----------------------------------------------------------------
 
-Roland Stigge (1):
-      ARM: tegra: Fix dts files w/ status property: "disable" -> "disabled"
+Laxman Dewangan (1):
+      ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
 
-Wolfram Sang (1):
-      ARM: tegra: build powergate unconditionally
+Prashant Gaikwad (10):
+      ARM: tegra: add clk_prepare/clk_unprepare
+      i2c: tegra: Add clk_prepare/clk_unprepare
+      mmc: tegra: add clk_prepare/clk_unprepare
+      USB: ehci-tegra: add clk_prepare/clk_unprepare
+      Input: tegra-kbc - add clk_prepare/clk_unprepare
+      spi/tegra: add clk_prepare/clk_unprepare
+      staging: nvec: add clk_prepare/clk_unprepare
+      ASoC: tegra: add clk_prepare/clk_unprepare
+      crypto: add clk_prepare/clk_unprepare
+      ARM: tegra: Remove second instance of uart clk
 
- arch/arm/boot/dts/tegra20.dtsi |   36 ++++++++++++++++----------------
- arch/arm/boot/dts/tegra30.dtsi |   38 +++++++++++++++++-----------------
- arch/arm/mach-tegra/Makefile   |    2 +-
- 3 files changed, 38 insertions(+), 38 deletions(-)
+Simon Que (1):
+      ARM: tegra: Fix PWM clock programming
+
+Thierry Reding (1):
+      ARM: tegra: Provide clock for only one PWM controller
+
+ arch/arm/mach-tegra/cpu-tegra.c      |    6 +-
+ arch/arm/mach-tegra/dma.c            |    4 +-
+ arch/arm/mach-tegra/pcie.c           |    6 +-
+ arch/arm/mach-tegra/powergate.c      |    4 +-
+ arch/arm/mach-tegra/tegra2_clocks.c  |   58 +++++++++++++++++++---------
+ arch/arm/mach-tegra/tegra30_clocks.c |   28 ++++++--------
+ arch/arm/mach-tegra/timer.c          |    4 +-
+ arch/arm/mach-tegra/usb_phy.c        |   16 ++++----
+ drivers/crypto/tegra-aes.c           |   12 +++---
+ drivers/i2c/busses/i2c-tegra.c       |   10 ++--
+ drivers/input/keyboard/tegra-kbc.c   |    4 +-
+ drivers/mmc/host/sdhci-tegra.c       |    6 +-
+ drivers/spi/spi-tegra.c              |    4 +-
+ drivers/staging/nvec/nvec.c          |    8 ++--
+ drivers/usb/host/ehci-tegra.c        |   20 +++++-----
+ sound/soc/tegra/tegra20_i2s.c        |    4 +-
+ sound/soc/tegra/tegra20_spdif.c      |    4 +-
+ sound/soc/tegra/tegra30_ahub.c       |    8 ++--
+ sound/soc/tegra/tegra30_i2s.c        |    4 +-
+ sound/soc/tegra/tegra_asoc_utils.c   |   12 +++---
+ 20 files changed, 119 insertions(+), 103 deletions(-)
