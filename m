@@ -1,42 +1,82 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 06 Jul 2012 14:36:49 -0600
-Subject: [PATCH 03/15] ARM: tegra: use fixed PCI i/o mapping
-In-Reply-To: <4FF74789.8000804@wwwdotorg.org>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <1341600040-30993-4-git-send-email-robherring2@gmail.com>
- <4FF74028.6090300@wwwdotorg.org> <4FF74689.8070103@gmail.com>
- <4FF74789.8000804@wwwdotorg.org>
-Message-ID: <4FF74C61.4060903@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jul 2012 21:57:31 +0100
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FE896F9.2020806@ti.com> <1340647463.1562.127.camel@vkoul-udesk3>
+ <201206252030.56025.arnd@arndb.de>
+ <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
+Message-ID: <20120706205731.GA31585@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2012 02:16 PM, Stephen Warren wrote:
-> On 07/06/2012 02:11 PM, Rob Herring wrote:
->> On 07/06/2012 02:44 PM, Stephen Warren wrote:
->>> On 07/06/2012 12:40 PM, Rob Herring wrote:
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> Move tegra PCI to fixed i/o mapping and remove io.h.
->>>
->>> Thierry, since you're the Tegra PCIe expert right now, could you please
->>> test and/or comment on this.
->>>
->>> I did try testing this on next-20120705 on TrimSlice (i.e. the
->>> PCIe-based Ethernet controller), but found that PCIe has stopped working
->>> there due to "resource collisions". I know this used to work fairly
->>> recently, since I tested it when I added the PCIe initialization call to
->>> board-dt-tegra20.c. The PCIe messages are:
->>
->> This is with my change and it works currently without?
+On Fri, Jul 06, 2012 at 01:36:32PM +0200, Guennadi Liakhovetski wrote:
+> I like this idea, but why don't we extend it to also cover the non-DT 
+> case? I.e., why don't we add the above callback (call it "match" or 
+> "filter" or anything else) to dmaengine operations and inside (the 
+> extended) dma_request_channel(), instead of calling the filter function, 
+> passed as a parameter, we loop over all registered DMAC devices and call 
+> their filter callbacks, until one of them returns true? In fact, it goes 
+> back to my earlier proposal from 
+> http://thread.gmane.org/gmane.linux.kernel/1246957
+> which I, possibly, failed to explain properly. So, the transformation 
+> chain from today's API would be (all code is approximate):
 > 
-> Sorry, no, it's broken even without your change. Hence, I can't test the
-> impact of your change. Well, I saw the same failure with your patches
-> too, but that isn't really conclusive testing of your change:-)
+> (today)
+> 
+> <client driver>
+> 	dma_request_channel(mask, filter, filter_arg);
+> 
+> <dmaengine_core>
+> 	for_each_channel() {
+> 		ret = (*filter)(chan, filter_arg);
+> 		if (ret) {
+> 			ret = chan->device->device_alloc_chan_resources(chan);
+> 			if (!ret)
+> 				return chan;
+> 			else
+> 				return NULL;
+> 		}
+> 	}
+> 
+> (can be transformed to)
+> 
+> <client driver>
+> 	dma_request_channel(mask, filter_arg);
+> 
+> <dmaengine_core>
+> 	for_each_channel() {
+> 		ret = chan->device->filter(chan, filter_arg);
+> 		if (ret) {
+> 			<same as above>
+> 		}
+> 	}
+> 
+> (which further could be simplified to)
+> 
+> <client driver>
+> 	dma_request_channel(mask, filter_arg);
+> 
+> <dmaengine_core>
+> 	for_each_channel() {
+> 		ret = chan->device->device_alloc_chan_resources(chan, filter_arg);
 
-Aha. The PCIe problem only shows up when booting TrimSlice using DT (in
-next-20120705 or Tegra's for-next branch).
+This looks like you're re-purposing a perfectly good API for something that
+it wasn't designed to do, namely providing a channel selection mechanism,
+rather than "allocating channel resources".  The hint is in the bloody
+name, please take a look sometime!
 
-When booting using board files, PCIe works, both without and with your
-patch, on top of next-20120705.
+If you want to call into the DMA engine driver for channel selection,
+then create an _explicit_ API for it.  Don't bugger around with existing
+APIs.
 
-So, your patches are tested on Tegra and still working.
+Moreover, the *big* problem that your proposal above creates is this.
+What _type_ is filter_arg?  If it's void *, then your suggestion is
+nonsense, even if you associate it with a size argument.  You have no
+idea what the bytestream that would be passed via that pointer means,
+even if the size just happens to look like it's what you expect.
+
+If it's something else, then your mistake above was not defining it, so
+there's no way to evaluate your proposal given that lack of critical
+information.  And if you define it, whatever you come up with _must_
+be suitable for every single DMA engine driver we have today.
