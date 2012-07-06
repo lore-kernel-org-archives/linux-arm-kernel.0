@@ -1,18 +1,27 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 6 Jul 2012 13:00:39 +0200
+Date: Fri, 6 Jul 2012 13:05:10 +0200
 Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
-In-Reply-To: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+In-Reply-To: <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
 References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
+ <CACKLOr0J1JjpCMRf4toJ5uBMDAFZT8VGdFuX6MpUpxpNaAO_SA@mail.gmail.com>
+Message-ID: <CACKLOr1ZJ4F7+-U94EQ5AD=1z3-HVU1=uK9yjAv+JgfqjTKo0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-can this patch be applied please?
+On 6 July 2012 13:00, javier Martin <javier.martin@vista-silicon.com> wrote:
+> Hi,
+> can this patch be applied please?
+>
+> It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
+>
+> Regards.
 
-It solves a BUG for 3.5. Guennadi, Fabio, could you give me an ack for this?
+But it should be applied after this one to preserve bisectability:
 
-Regards.
+http://patchwork.linuxtv.org/patch/10483/
+
+So I'd better send a new series to clarify the order.
+
 -- 
 Javier Martin
 Vista Silicon S.L.
