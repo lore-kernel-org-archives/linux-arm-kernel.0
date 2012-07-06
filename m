@@ -1,33 +1,95 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  6 Jul 2012 19:04:35 -0300
-Subject: [PATCH] ARM: mx27: Reenable silicon version print
-Message-ID: <1341612275-4464-1-git-send-email-festevam@gmail.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 6 Jul 2012 23:40:31 +0100
+Subject: [PATCH 4 2/4] NET ethernet introduce mac_platform helper
+In-Reply-To: <20120705024446.26317.49693.stgit@build.warmcat.com>
+References: <20120705024259.26317.16000.stgit@build.warmcat.com>
+ <20120705024446.26317.49693.stgit@build.warmcat.com>
+Message-ID: <1341614431.2923.13.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, 2012-07-05 at 10:44 +0800, Andy Green wrote:
+[...]
+> To make use of this safely you also need to make sure that any drivers that
+> may compete for the bus ordinal you are using (eg, mUSB and ehci in Panda
+> case) are loaded in a deterministic order.
+[...]
 
-Prior to the new i.mx clock conversion the mx27 silicon version was printed at boot.
+This seems very restrictive... would it be practical to also allow a
+driver name as a path component?
 
-Reenable this feature.
+[...]
+> --- /dev/null
+> +++ b/include/net/mac-platform.h
+> @@ -0,0 +1,39 @@
+> +/*
+> + * mac-platform.h:  Enforces platform-defined MAC for Async probed devices
+> + */
+> +
+> +#ifndef __NET_MAC_PLATFORM_H__
+> +#define __NET_MAC_PLATFORM_H__
+> +
+> +#include <linux/if_ether.h>
+> +
+> +/**
+> + * struct mac_platform - associates asynchronously probed device path with
+> + *			 MAC address to be assigned to the device when it
+> + *			 is created
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clk-imx27.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+A kernel-doc summary is strictly limited to one line.  The longer
+explanation can go in a paragraph under the field descriptions.
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index e8a6016..c9370bf 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -269,6 +269,8 @@ int __init mx27_clocks_init(unsigned long fref)
- 
- 	clk_prepare_enable(clk[emi_ahb_gate]);
- 
-+	imx_print_silicon_rev("i.MX27", mx27_revision());
-+
- 	return 0;
- }
- 
+> + * @device_path: device path name of network device
+> + * @mac: MAC address to assign to network device matching device path
+> + * @list: can be left uninitialized when passing from platform
+> + */
+> +
+> +struct mac_platform {
+> +	char *device_path;
+> +	u8 mac[ETH_ALEN];
+> +	struct list_head list; /* unused in platform data usage */
+> +};
+[...]
+> --- /dev/null
+> +++ b/net/ethernet/mac-platform.c
+[...]
+> +static struct mac_platform *__mac_platform_check(struct device *dev)
+> +{
+> +	const char *path;
+> +	const char *p;
+> +	const char *try;
+> +	int len;
+> +	struct device *devn;
+> +	struct mac_platform *tmp;
+> +	struct list_head *pos;
+> +
+> +	list_for_each(pos, &mac_platform_list) {
+> +
+> +		tmp = list_entry(pos, struct mac_platform, list);
+> +
+> +		try = tmp->device_path;
+> +
+> +		p = try + strlen(try);
+> +		devn = dev;
+> +
+> +		while (devn) {
+> +
+> +			path = dev_name(devn);
+> +			len = strlen(path);
+> +
+> +			if ((p - try) < len) {
+> +				devn = NULL;
+> +				continue;
+> +			}
+> +
+> +			p -= len;
+[...]
+
+There are so many blank lines here, it's hard to see much code at once.
+
+Ben.
+
 -- 
-1.7.1
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
