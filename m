@@ -1,109 +1,152 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jul 2012 21:30:05 +0100
-Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
-In-Reply-To: <4FF730CD.7050907@codeaurora.org>
-References: <1341531958-31721-1-git-send-email-sboyd@codeaurora.org>
- <20120706002404.GJ2522@linux.vnet.ibm.com> <4FF730CD.7050907@codeaurora.org>
-Message-ID: <20120706203005.GF31508@n2100.arm.linux.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 6 Jul 2012 17:30:30 -0300
+Subject: [PATCH] ARM: dts: imx: Always enable the watchdog
+Message-ID: <1341606630-26905-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 11:39:09AM -0700, Stephen Boyd wrote:
-> On 07/05/12 17:24, Paul E. McKenney wrote:
-> > On Thu, Jul 05, 2012 at 04:45:58PM -0700, Stephen Boyd wrote:
-> >> @@ -179,7 +184,7 @@ void __ref cpu_die(void)
-> >>  	mb();
-> >>
-> >>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> >> -	complete(&cpu_died);
-> >> +	__this_cpu_write(cpu_state, CPU_DEAD);
-> > Or you could do something like:
-> >
-> > 	RCU_NONIDLE(complete(&cpu_died));
-> >
-> > This would tell RCU that it needed to pay attention to this CPU for
-> > the duration of the "complete()" function call despite the CPU's being
-> > idle.  And might allow you to dispense with the rest of the patch.
-> 
-> Great! I like that more since we get to keep the completion mechanism
-> instead of a busy wait.
-> 
-> Russell, which one would you prefer? Here's the other version
+Instead of enabling the watchdog in each individual dts file, select in 
+the SoC dtsi file instead.
 
-I think I prefer the version below.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx27.dtsi        |    2 +-
+ arch/arm/boot/dts/imx51-babbage.dts |    4 ----
+ arch/arm/boot/dts/imx51.dtsi        |    2 +-
+ arch/arm/boot/dts/imx53-ard.dts     |    4 ----
+ arch/arm/boot/dts/imx53-evk.dts     |    4 ----
+ arch/arm/boot/dts/imx53-qsb.dts     |    4 ----
+ arch/arm/boot/dts/imx53-smd.dts     |    4 ----
+ arch/arm/boot/dts/imx53.dtsi        |    2 +-
+ arch/arm/boot/dts/imx6q.dtsi        |    2 +-
+ 9 files changed, 4 insertions(+), 24 deletions(-)
 
-> 
-> ----->8-----8<-----
-> Subject: [PATCH] ARM: smp: Fix suspicious RCU originating from cpu_die()
-> 
-> While running hotplug tests I ran into this RCU splat
-> 
-> ===============================
-> [ INFO: suspicious RCU usage. ]
-> 3.4.0 #3275 Tainted: G        W
-> -------------------------------
-> include/linux/rcupdate.h:729 rcu_read_lock() used illegally while idle!
-> 
-> other info that might help us debug this:
-> 
-> RCU used illegally from idle CPU!
-> rcu_scheduler_active = 1, debug_locks = 0
-> RCU used illegally from extended quiescent state!
-> 4 locks held by swapper/2/0:
->  #0:  ((cpu_died).wait.lock){......}, at: [<c00ab128>] complete+0x1c/0x5c
->  #1:  (&p->pi_lock){-.-.-.}, at: [<c00b275c>] try_to_wake_up+0x2c/0x388
->  #2:  (&rq->lock){-.-.-.}, at: [<c00b2860>] try_to_wake_up+0x130/0x388
->  #3:  (rcu_read_lock){.+.+..}, at: [<c00abe5c>] cpuacct_charge+0x28/0x1f4
-> 
-> stack backtrace:
-> [<c001521c>] (unwind_backtrace+0x0/0x12c) from [<c00abec8>] (cpuacct_charge+0x94/0x1f4)
-> [<c00abec8>] (cpuacct_charge+0x94/0x1f4) from [<c00b395c>] (update_curr+0x24c/0x2c8)
-> [<c00b395c>] (update_curr+0x24c/0x2c8) from [<c00b59c4>] (enqueue_task_fair+0x50/0x194)
-> [<c00b59c4>] (enqueue_task_fair+0x50/0x194) from [<c00afea4>] (enqueue_task+0x30/0x34)
-> [<c00afea4>] (enqueue_task+0x30/0x34) from [<c00b0908>] (ttwu_activate+0x14/0x38)
-> [<c00b0908>] (ttwu_activate+0x14/0x38) from [<c00b28a8>] (try_to_wake_up+0x178/0x388)
-> [<c00b28a8>] (try_to_wake_up+0x178/0x388) from [<c00a82a0>] (__wake_up_common+0x34/0x78)
-> [<c00a82a0>] (__wake_up_common+0x34/0x78) from [<c00ab154>] (complete+0x48/0x5c)
-> [<c00ab154>] (complete+0x48/0x5c) from [<c07db7cc>] (cpu_die+0x2c/0x58)
-> [<c07db7cc>] (cpu_die+0x2c/0x58) from [<c000f954>] (cpu_idle+0x64/0xfc)
-> [<c000f954>] (cpu_idle+0x64/0xfc) from [<80208160>] (0x80208160)
-> 
-> When a cpu is marked offline during its idle thread it calls
-> cpu_die() during an RCU idle period. cpu_die() calls complete()
-> to notify the killing process that the cpu has died. complete()
-> calls into the scheduler code and eventually grabs an RCU read
-> lock in cpuacct_charge().
-> 
-> Mark complete() as RCU_NONIDLE so that RCU pays attention to this
-> CPU for the duration of the complete() function even though it's
-> in idle.
-> 
-> Suggested-by: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/kernel/smp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 2c7217d..aea74f5 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -179,7 +179,7 @@ void __ref cpu_die(void)
->  	mb();
->  
->  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> -	complete(&cpu_died);
-> +	RCU_NONIDLE(complete(&cpu_died));
->  
->  	/*
->  	 * actual CPU shutdown procedure is at least platform (if not
-> 
-> -- 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 386c769..cd1a7b9 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -56,7 +56,7 @@
+ 				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
+ 				reg = <0x10002000 0x4000>;
+ 				interrupts = <27>;
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			uart1: serial at 1000a000 {
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index de065b5..f7caa08 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -169,10 +169,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 73f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 73fa8000 {
+ 				compatible = "fsl,imx51-iomuxc-babbage";
+ 				reg = <0x73fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 39eb88e..d33a729 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -170,7 +170,7 @@
+ 				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
+ 				reg = <0x73f98000 0x4000>;
+ 				interrupts = <58>;
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			wdog at 73f9c000 { /* WDOG2 */
+diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+index 5b8eafc..1854145 100644
+--- a/arch/arm/boot/dts/imx53-ard.dts
++++ b/arch/arm/boot/dts/imx53-ard.dts
+@@ -31,10 +31,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-ard";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
+index 9c79803..5d36dde 100644
+--- a/arch/arm/boot/dts/imx53-evk.dts
++++ b/arch/arm/boot/dts/imx53-evk.dts
+@@ -62,10 +62,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-evk";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 2d803a9..3bfa6f1 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -41,10 +41,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-qsb";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 0809102..45848af 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -77,10 +77,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-smd";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 2b5caf9..bec859a 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -172,7 +172,7 @@
+ 				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
+ 				reg = <0x53f98000 0x4000>;
+ 				interrupts = <58>;
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			wdog at 53f9c000 { /* WDOG2 */
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 8c90cba..6017b3d 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -338,7 +338,7 @@
+ 				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
+ 				reg = <0x020bc000 0x4000>;
+ 				interrupts = <0 80 0x04>;
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			wdog at 020c0000 { /* WDOG2 */
+-- 
+1.7.1
