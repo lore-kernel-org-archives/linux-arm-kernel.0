@@ -1,60 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 6 Jul 2012 14:51:42 +0530
-Subject: [PATCH v2 01/14] ARM: OMAP2+: Move stubbed secure_sram_reserve
- function to a common.c and call it __weak
-In-Reply-To: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1341566515-22665-2-git-send-email-santosh.shilimkar@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 06 Jul 2012 11:22:55 +0200
+Subject: [PATCH 1/2] ARM: OMAP: board-4430sdp: MUX configuration for
+ sys_nirq2
+In-Reply-To: <CAMQu2gyZQGGVQQtidGwOCux-0hX=FmPVP+9Sej_VRrQMurd=mw@mail.gmail.com>
+References: <1341564590-14024-1-git-send-email-peter.ujfalusi@ti.com>
+ <CAMQu2gyZQGGVQQtidGwOCux-0hX=FmPVP+9Sej_VRrQMurd=mw@mail.gmail.com>
+Message-ID: <4FF6AE6F.4000808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
+On 07/06/2012 11:02 AM, Shilimkar, Santosh wrote:
+> On Fri, Jul 6, 2012 at 2:19 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+>> The sys_nirq2 is used for twl6040, make sure the pin is configured
+>> correctly.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+> Should remove the boot-loader pin-muxing dependency.
+> Was this the reason, Audio had some issues on OMAP4430
+> SDP as reported by Russell ?
 
-omap_secure_ram_reserve_memblock is stubbed for OMAP1,2 only builds using a
- ifdef check. But this results in adding CONFIG_ARCH_OMAPxx checks for
-future socs that use the real function. So move this to common.c file and
-call it __weak.
+The boot loader never configured the sys_nirq2, I have sent a patch for u-boot
+to do this, but it is said that the kernel should take care of this.
 
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/plat-omap/common.c                   |    9 +++++++++
- arch/arm/plat-omap/include/plat/omap-secure.h |    5 -----
- 2 files changed, 9 insertions(+), 5 deletions(-)
+We did not had jack detection working with upstream u-boot, kernel (I have
+patched u-boot so I have not seen this issue).
+Now if the board is booted without HS connected, upon connecting the HS we
+will recognize it and it should be all fine.
+So yes this was the reason why Russell had issues with audio.
 
-diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index 0a9b9a9..89a3723 100644
---- a/arch/arm/plat-omap/common.c
-+++ b/arch/arm/plat-omap/common.c
-@@ -77,3 +77,12 @@ void __init omap_init_consistent_dma_size(void)
- 	init_consistent_dma_size(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE << 20);
- #endif
- }
-+
-+/*
-+ * Stub function for OMAP2 so that common files
-+ * continue to build when custom builds are used
-+ */
-+int __weak omap_secure_ram_reserve_memblock(void)
-+{
-+	return 0;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap-secure.h b/arch/arm/plat-omap/include/plat/omap-secure.h
-index 8c7994c..0e4acd2 100644
---- a/arch/arm/plat-omap/include/plat/omap-secure.h
-+++ b/arch/arm/plat-omap/include/plat/omap-secure.h
-@@ -3,12 +3,7 @@
- 
- #include <linux/types.h>
- 
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- extern int omap_secure_ram_reserve_memblock(void);
--#else
--static inline void omap_secure_ram_reserve_memblock(void)
--{ }
--#endif
- 
- #ifdef CONFIG_OMAP4_ERRATA_I688
- extern int omap_barrier_reserve_memblock(void);
 -- 
-1.7.9.5
+P?ter
