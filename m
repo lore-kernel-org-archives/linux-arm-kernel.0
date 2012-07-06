@@ -1,413 +1,118 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 Jul 2012 10:20:19 +0100
-Subject: [RFC PATCH 1/4] ARM: arch_timers: enable the use of the virtual timer
-In-Reply-To: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
-References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1341566422-20368-2-git-send-email-marc.zyngier@arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 6 Jul 2012 14:51:48 +0530
+Subject: [PATCH v2 07/14] ARM: OMAP5: l3: Add l3 error handler support for
+ omap5.
+In-Reply-To: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1341566515-22665-8-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, the arch_timer driver only uses the physical timer,
-which can cause problem if PL2 hasn't enabled PL1 access in CNTHCTL,
-which is likely in a virtualized environment. Instead, the virtual
-timer is always available.
+From: R Sricharan <r.sricharan@ti.com>
 
-This patch enables the use of both the virtual timer, unless no
-interrupt is provided in the DT for it, in which case is falls
-back to the physical timer.
+The l3 interconnect ip is same for OMAP4 and OMAP5.
+So reuse the l3 error handler error code for OMAP5
+as well. Also a few targets has been newly added for
+OMAP5. So updating the driver for that here.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/arch_timer.c |  248 ++++++++++++++++++++++++++++++++----------
- 1 file changed, 188 insertions(+), 60 deletions(-)
+ arch/arm/mach-omap2/Makefile      |    1 +
+ arch/arm/mach-omap2/devices.c     |    2 +-
+ arch/arm/mach-omap2/omap_l3_noc.h |   22 ++++++++++++++++++----
+ 3 files changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index dd58035..54599e9 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -27,11 +27,29 @@
- #include <asm/sched_clock.h>
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 085e171..238c5a3 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -197,6 +197,7 @@ obj-$(CONFIG_OMAP3_EMU)			+= emu.o
+ # L3 interconnect
+ obj-$(CONFIG_ARCH_OMAP3)		+= omap_l3_smx.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap_l3_noc.o
++obj-$(CONFIG_SOC_OMAP5)			+= omap_l3_noc.o
  
- static unsigned long arch_timer_rate;
--static int arch_timer_ppi;
--static int arch_timer_ppi2;
-+
-+enum ppi_nr {
-+	PHYS_SECURE_PPI,
-+	PHYS_NONSECURE_PPI,
-+	VIRT_PPI,
-+	HYP_PPI,
-+	MAX_TIMER_PPI
-+};
-+
-+static int arch_timer_ppi[MAX_TIMER_PPI];
- 
- static struct clock_event_device __percpu **arch_timer_evt;
- 
-+static bool arch_timer_use_virtual = true;
-+
-+struct arch_timer_reg_ops {
-+	void	(*reg_write)(int reg, u32 val);
-+	u32	(*reg_read)(int reg);
-+	cycle_t	(*counter_read)(void);
-+};
-+
-+static struct arch_timer_reg_ops __percpu **arch_timer_reg_ops;
-+
- /*
-  * Architected system timer support.
-  */
-@@ -44,7 +62,37 @@ static struct clock_event_device __percpu **arch_timer_evt;
- #define ARCH_TIMER_REG_FREQ		1
- #define ARCH_TIMER_REG_TVAL		2
- 
--static void arch_timer_reg_write(int reg, u32 val)
-+static inline void arch_timer_reg_write(int reg, u32 val)
-+{
-+	(*__this_cpu_ptr(arch_timer_reg_ops))->reg_write(reg, val);
-+}
-+
-+static inline u32 arch_timer_reg_read(int reg)
-+{
-+	return (*__this_cpu_ptr(arch_timer_reg_ops))->reg_read(reg);
-+}
-+
-+static inline cycle_t arch_timer_counter_read(void)
-+{
-+	return (*__this_cpu_ptr(arch_timer_reg_ops))->counter_read();
-+}
-+
-+static u32 arch_timer_common_reg_read(int reg)
-+{
-+	u32 val;
-+
-+	switch (reg) {
-+	case ARCH_TIMER_REG_FREQ:
-+		asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	return val;
-+}
-+
-+static void arch_timer_phys_reg_write(int reg, u32 val)
- {
- 	switch (reg) {
- 	case ARCH_TIMER_REG_CTRL:
-@@ -58,7 +106,7 @@ static void arch_timer_reg_write(int reg, u32 val)
- 	isb();
- }
- 
--static u32 arch_timer_reg_read(int reg)
-+static u32 arch_timer_phys_reg_read(int reg)
- {
- 	u32 val;
- 
-@@ -66,19 +114,78 @@ static u32 arch_timer_reg_read(int reg)
- 	case ARCH_TIMER_REG_CTRL:
- 		asm volatile("mrc p15, 0, %0, c14, c2, 1" : "=r" (val));
- 		break;
--	case ARCH_TIMER_REG_FREQ:
--		asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
--		break;
- 	case ARCH_TIMER_REG_TVAL:
- 		asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
- 		break;
- 	default:
--		BUG();
-+		val = arch_timer_common_reg_read(reg);
-+	}
-+
-+	return val;
-+}
-+
-+static inline cycle_t arch_counter_get_cntpct(void)
-+{
-+	u32 cvall, cvalh;
-+
-+	asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
-+
-+	return ((cycle_t) cvalh << 32) | cvall;
-+}
-+
-+static struct arch_timer_reg_ops arch_timer_phys_ops = {
-+	.reg_write	= arch_timer_phys_reg_write,
-+	.reg_read	= arch_timer_phys_reg_read,
-+	.counter_read	= arch_counter_get_cntpct,
-+};
-+
-+static void arch_timer_virt_reg_write(int reg, u32 val)
-+{
-+	switch (reg) {
-+	case ARCH_TIMER_REG_CTRL:
-+		asm volatile("mcr p15, 0, %0, c14, c3, 1" : : "r" (val));
-+		break;
-+	case ARCH_TIMER_REG_TVAL:
-+		asm volatile("mcr p15, 0, %0, c14, c3, 0" : : "r" (val));
-+		break;
-+	}
-+
-+	isb();
-+}
-+
-+static u32 arch_timer_virt_reg_read(int reg)
-+{
-+	u32 val;
-+
-+	switch (reg) {
-+	case ARCH_TIMER_REG_CTRL:
-+		asm volatile("mrc p15, 0, %0, c14, c3, 1" : "=r" (val));
-+		break;
-+	case ARCH_TIMER_REG_TVAL:
-+		asm volatile("mrc p15, 0, %0, c14, c3, 0" : "=r" (val));
-+		break;
-+	default:
-+		val = arch_timer_common_reg_read(reg);
- 	}
- 
- 	return val;
- }
- 
-+static inline cycle_t arch_counter_get_cntvct(void)
-+{
-+	u32 cvall, cvalh;
-+
-+	asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
-+
-+	return ((cycle_t) cvalh << 32) | cvall;
-+}
-+
-+static struct arch_timer_reg_ops arch_timer_virt_ops = {
-+	.reg_write	= arch_timer_virt_reg_write,
-+	.reg_read	= arch_timer_virt_reg_read,
-+	.counter_read	= arch_counter_get_cntvct,
-+};
-+
- static irqreturn_t arch_timer_handler(int irq, void *dev_id)
- {
- 	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-@@ -134,6 +241,8 @@ static int arch_timer_set_next_event(unsigned long evt,
- 
- static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- {
-+	int i;
-+
- 	/* Be safe... */
- 	arch_timer_disable();
- 
-@@ -142,16 +251,16 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 	clk->rating = 450;
- 	clk->set_mode = arch_timer_set_mode;
- 	clk->set_next_event = arch_timer_set_next_event;
--	clk->irq = arch_timer_ppi;
-+	clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
- 
- 	clockevents_config_and_register(clk, arch_timer_rate,
- 					0xf, 0x7fffffff);
- 
- 	*__this_cpu_ptr(arch_timer_evt) = clk;
- 
--	enable_percpu_irq(clk->irq, 0);
--	if (arch_timer_ppi2)
--		enable_percpu_irq(arch_timer_ppi2, 0);
-+	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
-+		if (arch_timer_ppi[i])
-+			enable_percpu_irq(arch_timer_ppi[i], 0);
- 
- 	return 0;
- }
-@@ -188,38 +297,24 @@ static int arch_timer_available(void)
- 	return 0;
- }
- 
--static inline cycle_t arch_counter_get_cntpct(void)
-+static u32 notrace arch_counter_get_cnt32(void)
- {
--	u32 cvall, cvalh;
--
--	asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
--
--	return ((cycle_t) cvalh << 32) | cvall;
--}
--
--static inline cycle_t arch_counter_get_cntvct(void)
--{
--	u32 cvall, cvalh;
--
--	asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
--
--	return ((cycle_t) cvalh << 32) | cvall;
--}
--
--static u32 notrace arch_counter_get_cntvct32(void)
--{
--	cycle_t cntvct = arch_counter_get_cntvct();
-+	cycle_t cnt = arch_timer_counter_read();
- 
- 	/*
- 	 * The sched_clock infrastructure only knows about counters
- 	 * with@most 32bits. Forget about the upper 24 bits for the
- 	 * time being...
+ obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
+ mailbox_mach-objs			:= mailbox.o
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 7b4b932..be3e059 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -84,7 +84,7 @@ static int __init omap4_l3_init(void)
+ 	 * To avoid code running on other OMAPs in
+ 	 * multi-omap builds
  	 */
--	return (u32)(cntvct & (u32)~0);
-+	return (u32)(cnt & (u32)~0);
- }
+-	if (!(cpu_is_omap44xx()))
++	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+ 		return -ENODEV;
  
- static cycle_t arch_counter_read(struct clocksource *cs)
- {
-+	/*
-+	 * Always use the physical counter for the clocksource.
-+	 * CNTHCTL.PL1PCTEN must be set to 1.
-+	 */
- 	return arch_counter_get_cntpct();
- }
+ 	for (i = 0; i < L3_MODULES; i++) {
+diff --git a/arch/arm/mach-omap2/omap_l3_noc.h b/arch/arm/mach-omap2/omap_l3_noc.h
+index 90b5098..a6ce34d 100644
+--- a/arch/arm/mach-omap2/omap_l3_noc.h
++++ b/arch/arm/mach-omap2/omap_l3_noc.h
+@@ -51,7 +51,9 @@ static u32 l3_targ_inst_clk1[] = {
+ 	0x200, /* DMM2 */
+ 	0x300, /* ABE */
+ 	0x400, /* L4CFG */
+-	0x600  /* CLK2 PWR DISC */
++	0x600,  /* CLK2 PWR DISC */
++	0x0,	/* Host CLK1 */
++	0x900	/* L4 Wakeup */
+ };
  
-@@ -233,11 +328,13 @@ static struct clocksource clocksource_counter = {
+ static u32 l3_targ_inst_clk2[] = {
+@@ -72,11 +74,16 @@ static u32 l3_targ_inst_clk2[] = {
+ 	0xE00, /* missing in TRM corresponds to AES2*/
+ 	0xC00, /* L4 PER3 */
+ 	0xA00, /* L4 PER1*/
+-	0xB00 /* L4 PER2*/
++	0xB00, /* L4 PER2*/
++	0x0, /* HOST CLK2 */
++	0x1800, /* CAL */
++	0x1700 /* LLI */
+ };
  
- static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- {
-+	int i;
-+
- 	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
- 		 clk->irq, smp_processor_id());
--	disable_percpu_irq(clk->irq);
--	if (arch_timer_ppi2)
--		disable_percpu_irq(arch_timer_ppi2);
-+	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
-+		if (arch_timer_ppi[i])
-+			disable_percpu_irq(arch_timer_ppi[i]);
- 	arch_timer_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- }
+ static u32 l3_targ_inst_clk3[] = {
+-	0x0100	/* EMUSS */
++	0x0100	/* EMUSS */,
++	0x0300, /* DEBUGSS_CT_TBR */
++	0x0 /* HOST CLK3 */
+ };
  
-@@ -251,33 +348,48 @@ static struct clock_event_device arch_timer_global_evt;
- static int __init arch_timer_register(void)
- {
- 	int err;
-+	int i;
-+	int cpu;
-+
-+	arch_timer_reg_ops = alloc_percpu(struct arch_timer_reg_ops *);
-+	if (!arch_timer_reg_ops)
-+		return -ENOMEM;
-+
-+	for_each_possible_cpu(cpu) {
-+		struct arch_timer_reg_ops **p;
-+
-+		p = per_cpu_ptr(arch_timer_reg_ops, cpu);
-+		if (arch_timer_use_virtual)
-+			*p = &arch_timer_virt_ops;
-+		else
-+			*p = &arch_timer_phys_ops;
-+	}
+ static struct l3_masters_data {
+@@ -110,13 +117,15 @@ static struct l3_masters_data {
+ 	{ 0xC8, "USBHOSTFS"}
+ };
  
- 	err = arch_timer_available();
- 	if (err)
--		return err;
-+		goto out;
+-static char *l3_targ_inst_name[L3_MODULES][18] = {
++static char *l3_targ_inst_name[L3_MODULES][21] = {
+ 	{
+ 		"DMM1",
+ 		"DMM2",
+ 		"ABE",
+ 		"L4CFG",
+ 		"CLK2 PWR DISC",
++		"HOST CLK1",
++		"L4 WAKEUP"
+ 	},
+ 	{
+ 		"CORTEX M3" ,
+@@ -137,9 +146,14 @@ static char *l3_targ_inst_name[L3_MODULES][18] = {
+ 		"L4 PER3",
+ 		"L4 PER1",
+ 		"L4 PER2",
++		"HOST CLK2",
++		"CAL",
++		"LLI"
+ 	},
+ 	{
+ 		"EMUSS",
++		"DEBUG SOURCE",
++		"HOST CLK3"
+ 	},
+ };
  
- 	arch_timer_evt = alloc_percpu(struct clock_event_device *);
--	if (!arch_timer_evt)
--		return -ENOMEM;
-+	if (!arch_timer_evt) {
-+		err = -ENOMEM;
-+		goto out;
-+	}
- 
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
- 
--	err = request_percpu_irq(arch_timer_ppi, arch_timer_handler,
--				 "arch_timer", arch_timer_evt);
--	if (err) {
--		pr_err("arch_timer: can't register interrupt %d (%d)\n",
--		       arch_timer_ppi, err);
--		goto out_free;
--	}
-+	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++) {
-+		irq_handler_t handler = arch_timer_handler;
- 
--	if (arch_timer_ppi2) {
--		err = request_percpu_irq(arch_timer_ppi2, arch_timer_handler,
-+		if (!arch_timer_ppi[i])
-+			continue;
-+
-+		err = request_percpu_irq(arch_timer_ppi[i], handler,
- 					 "arch_timer", arch_timer_evt);
- 		if (err) {
- 			pr_err("arch_timer: can't register interrupt %d (%d)\n",
--			       arch_timer_ppi2, err);
--			arch_timer_ppi2 = 0;
--			goto out_free_irq;
-+			       arch_timer_ppi[i], err);
-+			arch_timer_ppi[i] = 0;
-+			goto out_free;
- 		}
- 	}
- 
-@@ -299,13 +411,14 @@ static int __init arch_timer_register(void)
- 	return 0;
- 
- out_free_irq:
--	free_percpu_irq(arch_timer_ppi, arch_timer_evt);
--	if (arch_timer_ppi2)
--		free_percpu_irq(arch_timer_ppi2, arch_timer_evt);
-+	for ( ; i > PHYS_SECURE_PPI; i--)
-+		if (arch_timer_ppi[i])
-+			free_percpu_irq(arch_timer_ppi[i], arch_timer_evt);
- 
- out_free:
- 	free_percpu(arch_timer_evt);
--
-+out:
-+	free_percpu(arch_timer_reg_ops);
- 	return err;
- }
- 
-@@ -318,6 +431,7 @@ int __init arch_timer_of_register(void)
- {
- 	struct device_node *np;
- 	u32 freq;
-+	int i;
- 
- 	np = of_find_matching_node(NULL, arch_timer_of_match);
- 	if (!np) {
-@@ -329,10 +443,24 @@ int __init arch_timer_of_register(void)
- 	if (!of_property_read_u32(np, "clock-frequency", &freq))
- 		arch_timer_rate = freq;
- 
--	arch_timer_ppi = irq_of_parse_and_map(np, 0);
--	arch_timer_ppi2 = irq_of_parse_and_map(np, 1);
--	pr_info("arch_timer: found %s irqs %d %d\n",
--		np->name, arch_timer_ppi, arch_timer_ppi2);
-+	pr_info("arch_timer: found %s irqs ", np->name);
-+
-+	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++) {
-+		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
-+		if (!arch_timer_ppi[i]) {
-+			/*
-+			 * No interrupt provided for virtual timer,
-+			 * we'll have to stick to the physical timer.
-+			 */
-+			if (i == VIRT_PPI)
-+				arch_timer_use_virtual = false;
-+			
-+			continue;
-+		}
-+		pr_cont("%d ", arch_timer_ppi[i]);
-+	}
-+
-+	pr_cont("\n");
- 
- 	return arch_timer_register();
- }
-@@ -345,6 +473,6 @@ int __init arch_timer_sched_clock_init(void)
- 	if (err)
- 		return err;
- 
--	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
-+	setup_sched_clock(arch_counter_get_cnt32, 32, arch_timer_rate);
- 	return 0;
- }
 -- 
-1.7.10.3
+1.7.9.5
