@@ -1,65 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Jul 2012 15:31:23 +0800
-Subject: [PATCH] ARM: imx: select USE_OF
-In-Reply-To: <1341559085-16745-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20120706071247.GC30009@pengutronix.de>
- <1341559085-16745-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120706073121.GA22133@S2101-09.ap.freescale.net>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 6 Jul 2012 09:32:21 +0200
+Subject: MX28 poweroff issue
+In-Reply-To: <20120705201002.GB31508@n2100.arm.linux.org.uk>
+References: <201207040030.36713.marex@denx.de>
+ <CAOMZO5Ab-Zibnn-tVfTz5BNJsqJer88jZLVa5Een9DDZ3tdssg@mail.gmail.com>
+ <20120704093823.8e74d48bc8d9918a9c80fbcf@kinali.ch>
+ <201207041631.30107.marex@denx.de>
+ <20120704151944.GB18739@n2100.arm.linux.org.uk>
+ <20120705160855.GA20175@S2101-09.ap.freescale.net>
+ <20120705201002.GB31508@n2100.arm.linux.org.uk>
+Message-ID: <20470.38021.796461.625280@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 09:18:05AM +0200, Uwe Kleine-K?nig wrote:
-> Commit
-> 
->       544496a (ARM: imx: move irq_domain_add_legacy call into avic driver)
-> 
-> introduced unconditional calls to irq_find_mapping and
-> irq_domain_add_legacy, but it's still possible to have a .config without
-> CONFIG_IRQ_DOMAIN=y resulting in
-> 
-> 	  CC      arch/arm/plat-mxc/avic.o
-> 	arch/arm/plat-mxc/avic.c: In function 'avic_handle_irq':
-> 	arch/arm/plat-mxc/avic.c:172: error: implicit declaration of function 'irq_find_mapping'
-> 	arch/arm/plat-mxc/avic.c: In function 'mxc_init_irq':
-> 	arch/arm/plat-mxc/avic.c:207: error: implicit declaration of function 'irq_domain_add_legacy'
-> 	arch/arm/plat-mxc/avic.c:208: error: 'irq_domain_simple_ops' undeclared (first use in this function)
-> 	arch/arm/plat-mxc/avic.c:208: error: (Each undeclared identifier is reported only once
-> 	arch/arm/plat-mxc/avic.c:208: error: for each function it appears in.)
-> 	arch/arm/plat-mxc/avic.c:208: warning: assignment makes pointer from integer without a cast
-> 	make[3]: *** [arch/arm/plat-mxc/avic.o] Error 1
-> 	make[2]: *** [arch/arm/plat-mxc/avic.o] Error 2
-> 	make[1]: *** [sub-make] Error 2
-> 	make: *** [all] Error 2
-> 
-> While selecting CONFIG_IRQ_DOMAIN would be enough, USE_OF is the future
-> and implies CONFIG_IRQ_DOMAIN. So select USE_OF for ARCH_MXC.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 84449dd..97a33c5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -446,6 +446,7 @@ config ARCH_MXC
->  	select CLKSRC_MMIO
->  	select GENERIC_IRQ_CHIP
->  	select MULTI_IRQ_HANDLER
-> +	select USE_OF
+Hi,
 
-Thanks for the quick turn-around, Uwe.
-
-With the change here, these "select USE_OF" in arch/arm/mach-imx/Kconfig
-can be removed altogether, I think.
-
-Regards,
-Shawn
-
->  	help
->  	  Support for Freescale MXC/iMX-based family of processors
->  
-> -- 
-> 1.7.10
+Russell King - ARM Linux writes:
+> On Fri, Jul 06, 2012 at 12:08:58AM +0800, Shawn Guo wrote:
+> > On Wed, Jul 04, 2012 at 04:19:44PM +0100, Russell King - ARM Linux wrote:
+> > > If it's specific to mx28 and mx23 and nothing else, the cause needs to
+> > > be found.  Maybe we need it tested on other (non-MX) platforms too?
+> > 
+> > Though people reported that imx27 does not have the problem, I'm not
+> > so sure about it's a mach-mxs (mx23 and mx28) specific issue.  I have
+> > not figured it out why imx27 does not run into it, but I got some
+> > finding here.
+> > 
+> > Let's look at the dump again.
+> > 
+> > [   59.840000] System halted.
+> > [   84.100000] BUG: soft lockup - CPU#0 stuck for 23s! [halt:584]
+> > ...
+> > [   84.100000] [<c0070cd4>] (watchdog_timer_fn+0x114/0x14c) from [<c004052c>]
+> > (__run_hrtimer+0x7c/0x1ec)
+> > 
+> > It reports the issue eventually in function watchdog_timer_fn
+> > (kernel/watchdog.c):
 > 
+> Yes, the general idea is that if the timer is running, and the watchdog
+> is running, and it detects that it's event thread doesn't occasionally
+> run, it will report a lockup.
+> 
+> As other platforms seem to not exhibit the problem when we halt, and
+> endlessly spin with IRQs enabled, the question needs to be asked: what
+> is different with MX23/MX28 and why is it different.
+> 
+I could reproduce this on an i.MX53 (TX53) platform too. Maybe the
+softlockup watchdog was not enabled on those platforms which didn't
+show this behaviour.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
