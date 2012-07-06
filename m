@@ -1,36 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jul 2012 01:41:05 -0700
-Subject: [PATCH 3/5] ARM: omap3evm: enable VBUS switch for EHCI tranceiver
-In-Reply-To: <4FE1BC98.7050607@mvista.com>
-References: <1340183693-3195-1-git-send-email-zumeng.chen@windriver.com>
- <1340183693-3195-4-git-send-email-zumeng.chen@windriver.com>
- <4FE1BC98.7050607@mvista.com>
-Message-ID: <20120706084105.GR1122@atomide.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 6 Jul 2012 11:01:11 +0200
+Subject: [V3 2/4] mfd: 88pm860x: add pre-regulator device for 88pm860x
+In-Reply-To: <1341543598-6477-1-git-send-email-jtzhou@marvell.com>
+References: <20120705141541.GO4111@opensource.wolfsonmicro.com>
+ <1341543598-6477-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20120706090111.GA5413@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sergei Shtylyov <sshtylyov@mvista.com> [120620 05:10]:
-> On 20-06-2012 13:14, Zumeng Chen wrote:
-> >
-> >This will set TWL4030.GPIO2 as output pin to drive EHCI tranceiver.
-...
+Hi Jett,
 
-> >+	/* Enable VBUS switch by setting TWL4030.GPIO2DIR as output
-> >+	 * for starting USB tranceiver
-> >+	 */
-> >+	if (get_omap3_evm_rev()>= OMAP3EVM_BOARD_GEN_2) {
-> >+		u8 val;
+On Fri, Jul 06, 2012 at 10:59:58AM +0800, Jett.Zhou wrote:
+> Pre-regulator of 88pm8606 is mainly for support charging based on vbus,
+> it needs to be enabled for charging battery, and will be disabled in
+> some exception condition like over-temp.
+> Add the pre-regulator device init data and resource for mfd subdev.
 > 
->    Empty line after declaration block wouldn't hurt...
-> 
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> ---
+>  drivers/mfd/88pm860x-core.c  |   23 +++++++++++++++++++++++
+>  include/linux/mfd/88pm860x.h |    1 +
+>  2 files changed, 24 insertions(+), 0 deletions(-)
+Applied, thanks.
 
-I'll apply these into devel-board branch with the extra line
-added. Not taking the clock related patch 4/5 as that's something
-Paul should queue.
+Cheers,
+Samuel.
 
-Also note that the board-*.c files are being phased out with
-devicetree support.
-
-Regards,
-
-Tony
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
