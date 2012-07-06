@@ -1,74 +1,97 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  6 Jul 2012 12:48:00 -0600
-Subject: [GIT PULL V2 5/7] ARM: tegra: for-3.6/boards branch
-In-Reply-To: <1341600482-11020-1-git-send-email-swarren@wwwdotorg.org>
-References: <1341600482-11020-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1341600482-11020-6-git-send-email-swarren@wwwdotorg.org>
+From: jgq516@gmail.com (Xiao Jiang)
+Date: Sat, 7 Jul 2012 07:15:38 +0800
+Subject: [PATCH 1/1] ARM: add PROC_DEVICETREE support in Kconfig
+In-Reply-To: <4FF6DCCA.2080509@gmail.com>
+References: <1341571127-14461-1-git-send-email-jgq516@gmail.com>
+ <4FF6DCCA.2080509@gmail.com>
+Message-ID: <CAERv70uZMEoX4OcECssOrktVzC911tiSLXRH56TjyhQqVgNwBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains changes to Tegra board files, and related Kconfig and
-Makefile changes. Highlights include:
+2012/7/6 Rob Herring <robherring2@gmail.com>
 
-* Removal of Seaboard/Springbank board files; these boards can now only be
-  used with device tree.
+> On 07/06/2012 05:38 AM, jgq516 at gmail.com wrote:
+> > From: Xiao Jiang <jgq516@gmail.com>
+> >
+> > Since more and more arm chips support device tree, it'd be better add
+> PROC_DEVICETREE
+> > in arch/arm/Kconfig to avoid duplicate code.
+>
+> I think this should remain user choice. If its going to be selected,
+> then you might as well just remove the option altogether. Perhaps just
+> make the option default to yes.
+>
+> Hmm, sounds reasonable from your point. So the better choice is to set the
+option default to Y if the board has dt support just like tegra_defconfig
+and at91_dt_defconfig,  right? thanks.
 
-* Use of small parts of some non-DT board files from the DT board files. This
-  enables all features that the non-DT board files have, when booting from DT.
-  This will allow almost complete removal of all non-DT board files in v3.7.
+Regards,
+Xiao
 
-* Other miscellaneous changes.
-
-This branch is based on Tegra's for-3.6/cleanup branch from a previous pull
-request.
-
-This branch is not included in a later pull request.
-
-Note that there will be a merge conflict between for-3.6/{dt,boards}. The
-expected resolution may be found in branch for-3.6/merged-dt-boards.
-
-----------------------------------------------------------------
-
-The following changes since commit 702b0e4f2f2782962aab7d9a0a40ad68770bb1f6:
-
-  ARM: dt: tegra: rename board files to match SoC
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/boards
-
-for you to fetch changes up to 2553dcc6e603e3833990bd3a29bee98d1dbdf251:
-
-  ARM: tegra: use of_default_bus_match_table
-
-----------------------------------------------------------------
-
-Laxman Dewangan (1):
-      ARM: tegra: add device tree AUXDATA for APBDMA
-
-Stephen Warren (7):
-      ARM: tegra: make .dts compilation depend on Tegra2 support
-      ARM: tegra: remove CONFIG_MACH_TEGRA_DT
-      ARM: tegra: remove Seaboard board files
-      ARM: tegra: trimslice: enable PCIe when booting from device tree
-      ARM: tegra: harmony: init regulators, PCIe when booting from DT
-      ARM: tegra: paz00: enable WiFi rfkill when booting from device tree
-      ARM: tegra: use of_default_bus_match_table
-
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-tegra/Kconfig                 |   36 ---
- arch/arm/mach-tegra/Makefile                |   13 +-
- arch/arm/mach-tegra/Makefile.boot           |   10 +-
- arch/arm/mach-tegra/board-dt-tegra20.c      |   74 +++++-
- arch/arm/mach-tegra/board-dt-tegra30.c      |    8 +-
- arch/arm/mach-tegra/board-harmony-pcie.c    |   15 +-
- arch/arm/mach-tegra/board-harmony-power.c   |   25 ++-
- arch/arm/mach-tegra/board-paz00.c           |    7 +-
- arch/arm/mach-tegra/board-seaboard-pinmux.c |  197 --------------
- arch/arm/mach-tegra/board-seaboard.c        |  306 ----------------------
- arch/arm/mach-tegra/board-seaboard.h        |   47 ----
- arch/arm/mach-tegra/board.h                 |    9 +
- 13 files changed, 127 insertions(+), 621 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/board-seaboard-pinmux.c
- delete mode 100644 arch/arm/mach-tegra/board-seaboard.c
- delete mode 100644 arch/arm/mach-tegra/board-seaboard.h
+Rob
+>
+> > Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+> > ---
+> >  arch/arm/Kconfig                   |    1 +
+> >  arch/arm/configs/at91_dt_defconfig |    1 -
+> >  arch/arm/configs/tegra_defconfig   |    1 -
+> >  arch/arm/plat-omap/Kconfig         |    1 -
+> >  4 files changed, 1 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index a91009c..f68896e 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1864,6 +1864,7 @@ config USE_OF
+> >       select OF
+> >       select OF_EARLY_FLATTREE
+> >       select IRQ_DOMAIN
+> > +     select PROC_DEVICETREE if PROC_FS
+> >       help
+> >         Include support for flattened device tree machine descriptions.
+> >
+> > diff --git a/arch/arm/configs/at91_dt_defconfig
+> b/arch/arm/configs/at91_dt_defconfig
+> > index 67bc571..b856cb6 100644
+> > --- a/arch/arm/configs/at91_dt_defconfig
+> > +++ b/arch/arm/configs/at91_dt_defconfig
+> > @@ -64,7 +64,6 @@ CONFIG_MTD_NAND=y
+> >  CONFIG_MTD_NAND_ATMEL=y
+> >  CONFIG_MTD_UBI=y
+> >  CONFIG_MTD_UBI_GLUEBI=y
+> > -CONFIG_PROC_DEVICETREE=y
+> >  CONFIG_BLK_DEV_LOOP=y
+> >  CONFIG_BLK_DEV_RAM=y
+> >  CONFIG_BLK_DEV_RAM_COUNT=4
+> > diff --git a/arch/arm/configs/tegra_defconfig
+> b/arch/arm/configs/tegra_defconfig
+> > index 1198dd6..43e7b65 100644
+> > --- a/arch/arm/configs/tegra_defconfig
+> > +++ b/arch/arm/configs/tegra_defconfig
+> > @@ -72,7 +72,6 @@ CONFIG_IPV6_TUNNEL=y
+> >  CONFIG_IPV6_MULTIPLE_TABLES=y
+> >  # CONFIG_WIRELESS is not set
+> >  # CONFIG_FIRMWARE_IN_KERNEL is not set
+> > -CONFIG_PROC_DEVICETREE=y
+> >  CONFIG_BLK_DEV_LOOP=y
+> >  CONFIG_AD525X_DPOT=y
+> >  CONFIG_AD525X_DPOT_I2C=y
+> > diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> > index ad95c7a..4e2cb17 100644
+> > --- a/arch/arm/plat-omap/Kconfig
+> > +++ b/arch/arm/plat-omap/Kconfig
+> > @@ -27,7 +27,6 @@ config ARCH_OMAP2PLUS
+> >       select GENERIC_IRQ_CHIP
+> >       select OMAP_DM_TIMER
+> >       select USE_OF
+> > -     select PROC_DEVICETREE if PROC_FS
+> >       help
+> >         "Systems based on OMAP2, OMAP3 or OMAP4"
+> >
+> >
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120707/d56f2dbc/attachment-0001.html>
