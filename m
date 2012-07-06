@@ -1,23 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Jul 2012 15:01:42 +0000
-Subject: [alsa-devel] DT support for Davinci ASoC platform
-In-Reply-To: <4FF5BB34.9070002@gmail.com>
-References: <1BAFE6F6C881BF42822005164F1491C33EA35352@DBDE01.ent.ti.com>
- <201207051536.45920.arnd@arndb.de> <4FF5BB34.9070002@gmail.com>
-Message-ID: <201207061501.42204.arnd@arndb.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Jul 2012 17:11:20 +0200 (CEST)
+Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
+In-Reply-To: <Pine.LNX.4.64.1207061439090.29809@axis700.grange>
+References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+ <Pine.LNX.4.64.1207061439090.29809@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1207061639210.29809@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 July 2012, Daniel Mack wrote:
-> > 
-> > None of the dma engines are ported yet, because the generic binding for dma
-> > engines is still under debate. So far, all DMA channels are described using
-> > auxdata on platforms that use DT, with the exception of exynos, but that one
-> > will have to change once we have the common code.
+hmm... sorry again. It is my fault, that I left this patch without 
+attention for full 5 weeks, but I still don't have a sufficiently good 
+feeling about it. Look here:
+
+On Fri, 6 Jul 2012, Guennadi Liakhovetski wrote:
+
+> Hi Javier
 > 
-> You're talking about the DT bindings here, right? But the code itself is
-> also only present in TI's BSP kernel sources, and not in mainline.
+> Thanks for the patch, and sorry for delay. I was away first 10 days of 
+> June and still haven't come round to cleaning up my todo list since 
+> then...
+> 
+> On Fri, 1 Jun 2012, Javier Martin wrote:
 
-Right, I was misreading the question, sorry for the noise.
+[snip]
 
-	Arnd
+> > @@ -1024,14 +1039,28 @@ static int mx2_camera_set_bus_param(struct soc_camera_device *icd)
+> >  		return ret;
+> >  	}
+> >  
+> > +	xlate = soc_camera_xlate_by_fourcc(icd, pixfmt);
+> > +	if (!xlate) {
+> > +		dev_warn(icd->parent, "Format %x not found\n", pixfmt);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	if (xlate->code == V4L2_MBUS_FMT_YUYV8_2X8) {
+> > +		csicr1 |= CSICR1_PACK_DIR;
+> > +		csicr1 &= ~CSICR1_SWAP16_EN;
+> > +		dev_dbg(icd->parent, "already yuyv format, don't convert\n");
+> > +	} else if (xlate->code == V4L2_MBUS_FMT_UYVY8_2X8) {
+> > +		csicr1 &= ~CSICR1_PACK_DIR;
+> > +		csicr1 |= CSICR1_SWAP16_EN;
+> > +		dev_dbg(icd->parent, "convert uyvy mbus format into yuyv\n");
+> > +	}
+
+This doesn't look right. From V4L2_MBUS_FMT_YUYV8_2X8 you can produce two 
+output formats:
+
+V4L2_PIX_FMT_YUV420 and
+V4L2_PIX_FMT_YUYV
+
+For both of them you set CSICR1_PACK_DIR, which wasn't the default before? 
+Next for V4L2_MBUS_FMT_UYVY8_2X8. From this one you can produce 3 formats:
+
+V4L2_PIX_FMT_YUV420,
+V4L2_PIX_FMT_YUYV and
+V4L2_PIX_FMT_UYVY
+
+For all 3 of them you now set CSICR1_SWAP16_EN. Are you sure all the above 
+is correct?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
