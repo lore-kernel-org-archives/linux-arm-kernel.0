@@ -1,46 +1,37 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  6 Jul 2012 10:46:46 -0600
-Subject: [GIT PULL 5/7] ARM: tegra: for-3.6/dt branch
+Date: Fri,  6 Jul 2012 10:46:48 -0600
+Subject: [GIT PULL 7/7] ARM: tegra: for-3.6/defconfig branch
 In-Reply-To: <1341593208-17914-1-git-send-email-swarren@wwwdotorg.org>
 References: <1341593208-17914-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1341593208-17914-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1341593208-17914-7-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains changes to Tegra device tree files, and related Kconfig
-and Makefile changes. Highlights are:
+This branch contains a single commit which adjusts tegra_defconfig to enable
+new kernel features, driven by new device tree file content and drivers.
 
-* New support for the Whistler board.
-* Use of the I2C pinctrl-based bus mux on Seaboard/Springbank.
-
-The branch is based on Tegra's for-3.6/boards branch from a previous pull
-request.
+This branch depends only on v3.5-rc2.
 
 This branch is NOT included in a later pull request.
 
 ----------------------------------------------------------------
 
-The following changes since commit 2553dcc6e603e3833990bd3a29bee98d1dbdf251:
+The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
 
-  ARM: tegra: use of_default_bus_match_table
+  Linux 3.5-rc2
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.6/defconfig
 
-for you to fetch changes up to d42d7ae61861ef73e1790a98909c89c9c895a9fa:
+for you to fetch changes up to dbebe1589d3a86658f32e74396611452c5f34481:
 
-  ARM: dt: tegra seaboard: move battery monitor to mux'd I2C bus.
+  ARM: tegra: defconfig updates
 
 ----------------------------------------------------------------
 
-Stephen Warren (3):
-      ARM: dt: tegra: add Whistler device tree file
-      ARM: dt: tegra: seaboard: instantiate pinctrl-based I2C bus mux
-      ARM: dt: tegra seaboard: move battery monitor to mux'd I2C bus.
+Stephen Warren (1):
+      ARM: tegra: defconfig updates
 
- arch/arm/boot/dts/tegra20-seaboard.dts |   85 ++++++--
- arch/arm/boot/dts/tegra20-whistler.dts |  301 +++++++++++++++++++++++++++
- arch/arm/mach-tegra/Makefile.boot      |    1 +
- 3 files changed, 371 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra20-whistler.dts
+ arch/arm/configs/tegra_defconfig |   13 ++++++++-----
+ 1 files changed, 8 insertions(+), 5 deletions(-)
