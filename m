@@ -1,53 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  6 Jul 2012 09:18:05 +0200
-Subject: [PATCH] ARM: imx: select USE_OF
-In-Reply-To: <20120706071247.GC30009@pengutronix.de>
-References: <20120706071247.GC30009@pengutronix.de>
-Message-ID: <1341559085-16745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 6 Jul 2012 09:18:10 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <1341493572-29735-8-git-send-email-lee.jones@linaro.org>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <1341493572-29735-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZmb+4ypnDb3Xw-N5svSBfQ-6oWNy3=iXizZwSio+jHAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit
+On Thu, Jul 5, 2012 at 3:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-      544496a (ARM: imx: move irq_domain_add_legacy call into avic driver)
+> Before we can use any domain allocated IRQ, we need to first create a
+> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
+> We do this with a helper function provided by the AB8500 IRQ domain
+> controller called ab8500_irq_get_virq(). We need to do this for both
+> IRQs which the Power-On-Key driver uses; one for button press, the other
+> for button depress.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-introduced unconditional calls to irq_find_mapping and
-irq_domain_add_legacy, but it's still possible to have a .config without
-CONFIG_IRQ_DOMAIN=y resulting in
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-	  CC      arch/arm/plat-mxc/avic.o
-	arch/arm/plat-mxc/avic.c: In function 'avic_handle_irq':
-	arch/arm/plat-mxc/avic.c:172: error: implicit declaration of function 'irq_find_mapping'
-	arch/arm/plat-mxc/avic.c: In function 'mxc_init_irq':
-	arch/arm/plat-mxc/avic.c:207: error: implicit declaration of function 'irq_domain_add_legacy'
-	arch/arm/plat-mxc/avic.c:208: error: 'irq_domain_simple_ops' undeclared (first use in this function)
-	arch/arm/plat-mxc/avic.c:208: error: (Each undeclared identifier is reported only once
-	arch/arm/plat-mxc/avic.c:208: error: for each function it appears in.)
-	arch/arm/plat-mxc/avic.c:208: warning: assignment makes pointer from integer without a cast
-	make[3]: *** [arch/arm/plat-mxc/avic.o] Error 1
-	make[2]: *** [arch/arm/plat-mxc/avic.o] Error 2
-	make[1]: *** [sub-make] Error 2
-	make: *** [all] Error 2
+Lee I think the in-kernel charging drivers in drivers/power/ab8500_* are
+also using the IRQs, have you checked that these also do the right
+thing? (I realize they may be hard to test, but atleast make an effort).
 
-While selecting CONFIG_IRQ_DOMAIN would be enough, USE_OF is the future
-and implies CONFIG_IRQ_DOMAIN. So select USE_OF for ARCH_MXC.
+Please coordinate with Rajanikanth who is working on DT:ing
+these drivers.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 84449dd..97a33c5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -446,6 +446,7 @@ config ARCH_MXC
- 	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
- 	select MULTI_IRQ_HANDLER
-+	select USE_OF
- 	help
- 	  Support for Freescale MXC/iMX-based family of processors
- 
--- 
-1.7.10
+Yours,
+Linus Walleij
