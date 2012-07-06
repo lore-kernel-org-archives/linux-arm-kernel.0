@@ -1,28 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Jul 2012 09:23:17 +0200
-Subject: [PATCH 8/9] ARM: ux500: Clean-up temporary Device Tree enablement
- helpers
-In-Reply-To: <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkda6Ocmp=zoc1f4bA1XjyucZf+it8X+a06cwYJ3-9LECtg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Jul 2012 00:24:13 -0700
+Subject: [PATCH 2/4] arm/dts: Add initial DT support for AM33XX SoC family
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9EF09F@DBDE01.ent.ti.com>
+References: <1340358050-29560-1-git-send-email-anilkumar@ti.com>
+ <1340358050-29560-3-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9EF09F@DBDE01.ent.ti.com>
+Message-ID: <20120706072412.GK1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 5, 2012 at 3:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi,
 
-> Here we remove some of the extra overhead we introduced to make
-> DT:ing the Snowball platform easier. Unfortunately we can't
-> remove everything. We are forced to leave cpufreq and DMA behind
-> until they have been successfully Device Tree enabled.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+* AnilKumar, Chimata <anilkumar@ti.com> [120705 01:21]:
+> 
+> I realized that for mcspi and mmc, the compatible name supposed tobe close to
+> omap4-mcspi. 
+> These changes seems to went from my local branch, so could you please merge 
+> below patch with this
+> 5fc0b42a98556bd9f01cecc6a64fcbd15ec363f0 "arm/dts: Add initial DT
+> support for AM33XX SoC family"
 
-The patch is straight-forward but the commit message is confusing.
+I don't quite follow, do you mean you want to change some compatible names?
+Your patch is just removing entries though?
 
-This just simplifies the code, the last two sentences about leaving
-cpufreq and DMA behind you can put in your weekly report or
-something :-)
+Anyways, please just send a fix with a proper description and Signed-off-by
+on top of the devel-dt branch.
 
-Yours,
-Linus Walleij
+Regards,
+
+Tony 
+ 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 1e7b98f..258b10e 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -166,36 +166,5 @@
+>                         #size-cells = <0>;
+>                         ti,hwmods = "i2c3";
+>                 };
+> -
+> -               mcspi1: spi at 48030000 {
+> -                       compatible = "ti,omap2-mcspi";
+> -                       #address-cells = <1>;
+> -                       #size-cells = <0>;
+> -                       ti,hwmods = "spi0";
+> -                       ti,spi-num-cs = <4>;
+> -               };
+> -
+> -               mcspi2: spi at 481Aa000 {
+> -                       compatible = "ti,omap2-mcspi";
+> -                       #address-cells = <1>;
+> -                       #size-cells = <0>;
+> -                       ti,hwmods = "spi1";
+> -                       ti,spi-num-cs = <2>;
+> -               };
+> -
+> -               mmc1: mmc at 48060000 {
+> -                       compatible = "ti,omap3-hsmmc";
+> -                       ti,hwmods = "mmc1";
+> -               };
+> -
+> -               mmc2: mmc at 481D8000 {
+> -                       compatible = "ti,omap3-hsmmc";
+> -                       ti,hwmods = "mmc2";
+> -               };
+> -
+> -               mmc3: mmc at 47810000 {
+> -                       compatible = "ti,omap3-hsmmc";
+> -                       ti,hwmods = "mmc3";
+> -               };
+>         };
+>  };
+> --
+> 
+> Thanks
+> AnilKumar
