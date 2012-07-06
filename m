@@ -1,54 +1,34 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 6 Jul 2012 20:03:50 +0530
-Subject: [PATCH v2 1/2] ARM: OMAP: board-4430sdp: MUX configuration for
- sys_nirq2
-In-Reply-To: <874nplc6va.fsf@ti.com>
-References: <1341580752-5501-1-git-send-email-peter.ujfalusi@ti.com>
- <1341580752-5501-2-git-send-email-peter.ujfalusi@ti.com>
- <874nplc6va.fsf@ti.com>
-Message-ID: <CAMQu2gx4927Ze9tRUFq9QPubGFWfK9bHqZhVCb7c39O=WeWA3Q@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 6 Jul 2012 20:05:59 +0530
+Subject: [PATCH v3 0/6] Port Tegra to generic clk framework
+In-Reply-To: <4FF5E1C3.6070309@wwwdotorg.org>
+References: <1341482120-3317-1-git-send-email-pgaikwad@nvidia.com>
+ <4FF5E1C3.6070309@wwwdotorg.org>
+Message-ID: <4FF6F7CF.9000405@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2012 at 7:46 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
+On Friday 06 July 2012 12:19 AM, Stephen Warren wrote:
+> On 07/05/2012 03:55 AM, Prashant Gaikwad wrote:
+>> This patch set ports Tegra clock code to generic clock framework.
+<snip>
+> (The one slight difference between the 2 branches I tested is that AC100
+> and Trimslice booted using DT passed in next-20120705 but failed only in
+> Tegra's for-next. Otherwise, all results were identical)
 >
->> The sys_nirq2 is used for twl6040, make sure the pin is configured
->> correctly.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/mach-omap2/board-4430sdp.c |    3 +++
->>  1 files changed, 3 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
->> index c4e17641..72cd206 100644
->> --- a/arch/arm/mach-omap2/board-4430sdp.c
->> +++ b/arch/arm/mach-omap2/board-4430sdp.c
->> @@ -827,6 +827,9 @@ static void __init omap_4430sdp_display_init(void)
->>  #ifdef CONFIG_OMAP_MUX
->>  static struct omap_board_mux board_mux[] __initdata = {
->>       OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
->> +     /* NIRQ2 for twl6040 */
->> +     OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE0 |
->> +               OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE),
->
-> Since this is TWL6030 specific, it should rather be done in TWL code
-> like I did for sys_nirq1:
->
->    http://marc.info/?l=linux-omap&m=134090312118873&w=2
->
-> That would avoid having to do this in both board files.
->
-Though the pin is TWL specific, it need not be same on
-different board with different SOCs. Especially when you need to
-set MUX mode etc. So doing from board file is still better
-since TWL6030/40 can be connected to non OMAP4 devices
-where the muxing can be different.
+> I'll try to investigate what the issues are since I imagine you don't
+> have access to these boards. But, I probably won't be able to fix this
+> until I return from vacation.
 
-With current know boards with TWL6030/40, this is not
-a strong requirement though.
+Stephen,
 
-Regards
-Santosh
+Can you please try removing "late_initcall(clk_disable_unused);" from 
+drivers/clk/clk.c?
+It will keep unused clocks enabled. If it works then there should not be 
+any regression in this patch series but need to enable some board 
+specific clock.
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
