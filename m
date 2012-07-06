@@ -1,35 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 6 Jul 2012 09:32:03 -0300
-Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
-In-Reply-To: <CACKLOr1EoOL1SQ_QW7P3YtMYgVwt9uE-x728-YrZB8rEh45OMw@mail.gmail.com>
-References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
- <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
- <CACKLOr1oeci84Fs7HTRD2Myie8zjKExA15mxM3z7dkq8QfvDmg@mail.gmail.com>
- <CAOMZO5Bdpe43wSAS-D34LzVA9gAKwGTjsw_1f3iPizVsWJW7kw@mail.gmail.com>
- <CACKLOr1OYmoWXCU=Q_0O1H5jYcAGXO11ji6d_j7SjyaLZuygAA@mail.gmail.com>
- <CAOMZO5CLV6TuQUTzYUSvoi6apNUtSLhkbh8Jj3onAnc99TWxWg@mail.gmail.com>
- <CAOMZO5A0YXcZOB+ov+dD0MVJr0XSr=Ufg5snGDLvZ9=GyK=xMw@mail.gmail.com>
- <CAOMZO5BwraSVyW8SZjoN19gy-eZ2tXXPRT879PdAOu38Yf-z0g@mail.gmail.com>
- <CACKLOr1EoOL1SQ_QW7P3YtMYgVwt9uE-x728-YrZB8rEh45OMw@mail.gmail.com>
-Message-ID: <CAOMZO5ASmzk1wYauAfM0JwixnViyudmn+AtqyagJg2J4a56Paw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri,  6 Jul 2012 13:32:38 +0100
+Subject: [PATCH] ARM: ux500: Pass PMU platform data due for Perf though AUXDATA
+Message-ID: <1341577958-8521-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2012 at 3:44 AM, javier Martin
-<javier.martin@vista-silicon.com> wrote:
-> The attached patch solves mx2_camera clock problems.
->
-> It can be also found by the following subject in the lists:
->
-> media: i.MX27: Fix emma-prp clocks in mx2_camera.c
+When booting with Device Tree we need a way to call-back to the
+DB8500 PMU IRQ handler. This is necessary because the two CPU
+IRQ lines are muxed together on the DB8500 chip. The DB8500
+PMU IRQ handler contains logic to pass over to the other core
+in the case of IRQ_NONE. This patch allows the DB8500 PMU IRQ
+handler to be passed to Perf through platform data.
 
-Just tried your patch against today's linux-next and I still get the
-following on a mx27pdk:
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |    2 ++
+ arch/arm/mach-ux500/board-mop500.h |    1 +
+ 2 files changed, 3 insertions(+)
 
-soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-mx2-camera mx2-camera.0: Camera driver attached to camera 0
-ov2640 0-0030: Product ID error fb:fb
-mx2-camera mx2-camera.0: Camera driver detached from camera 0
-mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 665000
-
-Are you able to probe i2c correctly on your board?
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 9c78e40..aa1bdcf 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -727,6 +727,8 @@ MACHINE_END
+ #ifdef CONFIG_MACH_UX500_DT
+ 
+ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
++	/* Requires call-back bindings. */
++	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+ 	/* Requires DMA and call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index b5bfc1a..d04a8e6 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -81,6 +81,7 @@ struct device;
+ struct i2c_board_info;
+ extern struct mmci_platform_data mop500_sdi0_data;
+ extern struct mmci_platform_data mop500_sdi4_data;
++extern struct arm_pmu_platdata db8500_pmu_platdata;
+ 
+ extern void mop500_sdi_init(struct device *parent);
+ extern void snowball_sdi_init(struct device *parent);
+-- 
+1.7.9.5
