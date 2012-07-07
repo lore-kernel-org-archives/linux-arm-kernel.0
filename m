@@ -1,87 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 7 Jul 2012 09:06:25 +0000
-Subject: [PATCH v2 1/2] ARM: sa1100: add missing include of linux/io.h
-In-Reply-To: <201207070848.30706.arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 07 Jul 2012 02:41:42 -0700 (PDT)
+Subject: [PATCH 2/2] irda/pxa:
+In-Reply-To: <201207070855.15431.arnd@arndb.de>
 References: <201207070848.30706.arnd@arndb.de>
-Message-ID: <201207070906.26270.arnd@arndb.de>
+ <201207070855.15431.arnd@arndb.de>
+Message-ID: <20120707.024142.716093879187765160.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After c00184f9ab4 "ARM: sa11x0/pxa: convert OS timer registers to IOMEM",
-multiple defconfig files produce this new warning:
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Sat, 7 Jul 2012 08:55:15 +0000
 
-arch/arm/mach-sa1100/cpu-sa1100.c: In function 'sa1100_update_dram_timings':
-arch/arm/mach-sa1100/cpu-sa1100.c:153:3: error: implicit declaration of function 'IOMEM'
+> After c00184f9ab4 "ARM: sa11x0/pxa: convert OS timer registers to IOMEM",
+> magician_defconfig and a few others fail to build because the OSCR
+> register is accessed by the drivers/net/irda/pxaficp_ir.c but has turned
+> into a pointer that needs to be read using readl.
+> 
+> There are other registers in the same driver that eventually should
+> be converted, and it's unclear whether we would want a better interface
+> to access the OSCR from a device driver.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This patch should be applied to Russell's ARM tree which contains the
+> patch that broke it, Cc to netdev for information and Acks.
 
-Adding linux/io.h to the file using the __REG() macro avoids the warning.
-In the long run, we still need to convert all register accesses to use
-readl/writel rather than directly derefencing the pointer, but this makes
-it compile again.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: actually fix all call sites, rather than just the first one
-
-We might want to put the #include directly into mach/SA-1100.h
-instead, to be on the safe side.
-
-diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
-index 19b2053..e8f4d1e 100644
---- a/arch/arm/mach-sa1100/cpu-sa1100.c
-+++ b/arch/arm/mach-sa1100/cpu-sa1100.c
-@@ -87,6 +87,7 @@
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/cpufreq.h>
-+#include <linux/io.h>
- 
- #include <asm/cputype.h>
- 
-diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
-index b412fc0..7f07f08 100644
---- a/arch/arm/mach-sa1100/jornada720_ssp.c
-+++ b/arch/arm/mach-sa1100/jornada720_ssp.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/sched.h>
-+#include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <mach/jornada720.h>
-diff --git a/arch/arm/mach-sa1100/leds-lart.c b/arch/arm/mach-sa1100/leds-lart.c
-index a51830c..50a5b14 100644
---- a/arch/arm/mach-sa1100/leds-lart.c
-+++ b/arch/arm/mach-sa1100/leds-lart.c
-@@ -10,6 +10,7 @@
-  *  pace of the LED.
-  */
- #include <linux/init.h>
-+#include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <asm/leds.h>
-diff --git a/drivers/input/touchscreen/jornada720_ts.c b/drivers/input/touchscreen/jornada720_ts.c
-index d9be6ea..7f03d1bd 100644
---- a/drivers/input/touchscreen/jornada720_ts.c
-+++ b/drivers/input/touchscreen/jornada720_ts.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/module.h>
- #include <linux/slab.h>
-+#include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <mach/jornada720.h>
-diff --git a/drivers/pcmcia/sa1100_shannon.c b/drivers/pcmcia/sa1100_shannon.c
-index decb347..56ab739 100644
---- a/drivers/pcmcia/sa1100_shannon.c
-+++ b/drivers/pcmcia/sa1100_shannon.c
-@@ -8,6 +8,7 @@
- #include <linux/kernel.h>
- #include <linux/device.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
+Acked-by: David S. Miller <davem@davemloft.net>
