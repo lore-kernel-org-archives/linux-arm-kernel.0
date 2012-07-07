@@ -1,67 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat,  7 Jul 2012 17:47:21 -0300
-Subject: [PATCH 3/3] rtc: rtc-mxc: Convert to module_platform_driver
-In-Reply-To: <1341694041-7839-1-git-send-email-festevam@gmail.com>
-References: <1341694041-7839-1-git-send-email-festevam@gmail.com>
-Message-ID: <1341694041-7839-3-git-send-email-festevam@gmail.com>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
+Date: Sat, 07 Jul 2012 23:08:17 +0200
+Subject: [PATCH 3/3] ARM: dts: dove: Integrate devicetree support
+In-Reply-To: <4FF88F31.7050402@gmail.com>
+References: <1341318868-24567-2-git-send-email-sebastian.hesselbarth@googlemail.com>
+ <1341318868-24567-6-git-send-email-sebastian.hesselbarth@googlemail.com>
+ <4FF88F31.7050402@gmail.com>
+Message-ID: <4FF8A541.6020508@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 07/07/2012 09:34 PM, Rob Herring wrote:
+> On 07/03/2012 07:34 AM, Sebastian Hesselbarth wrote:
+>> This integrates devicetree support for Marvell Dove and currently
+>> suppported boards.
+>>
+> You should remove these board config options. A goal with DT is to
+> remove board related code.
 
-Converting to module_platform_driver can make the code smaller and cleaner.
+Hi Rob,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/rtc/rtc-mxc.c |   20 +++++---------------
- 1 files changed, 5 insertions(+), 15 deletions(-)
+I should have mentioned that this patch series' main goal was not
+to present a full blown DT support for mach-dove but to keep up
+with ongoing DT support for mach-kirkwood by Andrew Lunn. Both
+machs heavily rely on plat-orion and these patches were meant to
+help porting to DT.
 
-diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index 5d8456a..33d6e27 100644
---- a/drivers/rtc/rtc-mxc.c
-+++ b/drivers/rtc/rtc-mxc.c
-@@ -343,7 +343,7 @@ static struct rtc_class_ops mxc_rtc_ops = {
- 	.alarm_irq_enable	= mxc_rtc_alarm_irq_enable,
- };
- 
--static int __init mxc_rtc_probe(struct platform_device *pdev)
-+static int __devinit mxc_rtc_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	struct rtc_device *rtc;
-@@ -434,7 +434,7 @@ exit_free_pdata:
- 	return ret;
- }
- 
--static int __exit mxc_rtc_remove(struct platform_device *pdev)
-+static int __devexit mxc_rtc_remove(struct platform_device *pdev)
- {
- 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
- 
-@@ -482,21 +482,11 @@ static struct platform_driver mxc_rtc_driver = {
- #endif
- 		   .owner	= THIS_MODULE,
- 	},
--	.remove		= __exit_p(mxc_rtc_remove),
-+	.probe = mxc_rtc_probe,
-+	.remove = __devexit_p(mxc_rtc_remove),
- };
- 
--static int __init mxc_rtc_init(void)
--{
--	return platform_driver_probe(&mxc_rtc_driver, mxc_rtc_probe);
--}
--
--static void __exit mxc_rtc_exit(void)
--{
--	platform_driver_unregister(&mxc_rtc_driver);
--}
--
--module_init(mxc_rtc_init);
--module_exit(mxc_rtc_exit);
-+module_platform_driver(mxc_rtc_driver);
- 
- MODULE_AUTHOR("Daniel Mack <daniel@caiaq.de>");
- MODULE_DESCRIPTION("RTC driver for Freescale MXC");
--- 
-1.7.1
+I can keep the patches for now and resend them later when more
+core stuff of plat-orion has been ported to DT.
+
+Sebastian
