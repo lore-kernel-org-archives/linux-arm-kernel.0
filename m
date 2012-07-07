@@ -1,35 +1,46 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Sat, 7 Jul 2012 22:56:43 +0800
-Subject: [PATCH v9 REBASE 4/9] usb: chipidea: select USB_EHCI_ROOT_HUB_TT in
- USB_CHIPIDEA_HOST of Kconfig
+Date: Sat, 7 Jul 2012 22:56:45 +0800
+Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
+ change
 In-Reply-To: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
 References: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1341673008-29808-5-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ci13xxx host needs Root Hub Transaction Translators.
+Phy may need to change settings when port connect change.
 
-Reported-by: Shawn Guo <shawn.guo@freescale.com>
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Acked-by: Marek Vasut <marex@denx.de>
+Tested-by: Subodh Nijsure <snijsure@grid-net.com>
 ---
- drivers/usb/chipidea/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/usb/core/hub.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
-index fd36dc8..8337fb5 100644
---- a/drivers/usb/chipidea/Kconfig
-+++ b/drivers/usb/chipidea/Kconfig
-@@ -20,6 +20,7 @@ config USB_CHIPIDEA_UDC
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 4cc8dc9..2ba9d84 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -20,6 +20,7 @@
+ #include <linux/usb.h>
+ #include <linux/usbdevice_fs.h>
+ #include <linux/usb/hcd.h>
++#include <linux/usb/otg.h>
+ #include <linux/usb/quirks.h>
+ #include <linux/kthread.h>
+ #include <linux/mutex.h>
+@@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
+ 		}
+ 	}
  
- config USB_CHIPIDEA_HOST
- 	bool "ChipIdea host controller"
-+	select USB_EHCI_ROOT_HUB_TT
- 	help
- 	  Say Y here to enable host controller functionality of the
- 	  ChipIdea driver.
++	if (unlikely(hcd->phy && !hdev->parent)) {
++		if (portstatus & USB_PORT_STAT_CONNECTION)
++			usb_phy_notify_connect(hcd->phy, port1);
++		else
++			usb_phy_notify_disconnect(hcd->phy, port1);
++	}
++
+ 	/* Return now if debouncing failed or nothing is connected or
+ 	 * the device was "removed".
+ 	 */
 -- 
 1.7.9.5
