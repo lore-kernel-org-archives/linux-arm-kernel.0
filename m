@@ -1,25 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 7 Jul 2012 08:41:40 +0000
-Subject: [PATCH] ARM: PRIMA2: convert to common clk and finish full clk
- tree
-In-Reply-To: <20120707023201.GC1230@gmail.com>
-References: <1341568806-842-1-git-send-email-Barry.Song@csr.com>
- <CAGsJ_4x=GuY4RPk+SaWisoar1Qb0Y8ox0TqXN2hbsNvOHi_J4Q@mail.gmail.com>
- <20120707023201.GC1230@gmail.com>
-Message-ID: <201207070841.41494.arnd@arndb.de>
+Date: Sat, 7 Jul 2012 08:48:30 +0000
+Subject: [PATCH 1/2] ARM: sa1100: add missing include of linux/io.h
+Message-ID: <201207070848.30706.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 07 July 2012, Mike Turquette wrote:
-> I don't mind dropping your patches from clk-next and taking new ones.
-> Go ahead and send me a new patch which does everything instead of an
-> incremental patch to simply 'git mv' the code.  Feel free to split the
-> patch up if needed.
+After c00184f9ab4 "ARM: sa11x0/pxa: convert OS timer registers to IOMEM",
+pleb_defconfig produces this new warning:
 
-FWIW, I would always recommend doing this in two patches, one that changes
-the code and one that moves the file, in either order. The main difference
-is that for those who cannot use 'git diff -M', reviewing the patch becomes
-much easier when it doesn't look like one file is removed and another
-completely different file is added.
+arch/arm/mach-sa1100/cpu-sa1100.c: In function 'sa1100_update_dram_timings':
+arch/arm/mach-sa1100/cpu-sa1100.c:153:3: error: implicit declaration of function 'IOMEM'
 
-	Arnd
+Adding linux/io.h to the file using the __REG() macro avoids the warning.
+In the long run, we still need to convert the entire file to use
+readl/writel rather than directly derefencing the pointer, but this makes
+it compile again.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
+index 19b2053..e8f4d1e 100644
+--- a/arch/arm/mach-sa1100/cpu-sa1100.c
++++ b/arch/arm/mach-sa1100/cpu-sa1100.c
+@@ -87,6 +87,7 @@
+ #include <linux/types.h>
+ #include <linux/init.h>
+ #include <linux/cpufreq.h>
++#include <linux/io.h>
+ 
+ #include <asm/cputype.h>
+ 
