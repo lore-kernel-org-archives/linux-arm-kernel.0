@@ -1,24 +1,55 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Fri, 06 Jul 2012 14:24:56 -1000
-Subject: Where to put a large bootloader-supplied device tree on ARM ?
-In-Reply-To: <20120706210009.GC11470@lunn.ch>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <201207051454.24475.arnd@arndb.de> <20120705161600.GA28860@lunn.ch>
- <201207062008.23952.arnd@arndb.de> <20120706210009.GC11470@lunn.ch>
-Message-ID: <4FF781D8.3040206@firmworks.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 6 Jul 2012 18:29:45 -0600
+Subject: [GIT PULL] gpio/omap: final fixes for v3.5
+In-Reply-To: <87vci08npt.fsf@ti.com>
+References: <87vci08npt.fsf@ti.com>
+Message-ID: <CACxGe6v+67PEJrOk6K86WjcU055U_QrPU8e21ppKyn9Rfq36tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm passing a flatted device tree from OLPC's bootloader (which
-is a full Open Firmware implementation) to the kernel.  If I
-put the FDT at the "traditional" address 0x100, bad things
-happen when the DT is larger than 16K.  The FDT extends past
-the 0x4000 boundary and gets overwritten by the early page tables
-which are written at that address.
+Hi Kevin,
 
-I have found various places in memory where I can place it
-without it being overwritten, and things work, but that seems
-dodgy and likely to break randomly.
+Linus W. is handling picking up gpio stuff for me while I'm overloaded with
+moving to the UK.
 
-Has there been any discussion about where large-ish FDT images
-should be located?
+Linus, I typically pull from Kevin instead of applying the patches myself.
+
+g.
+ On Jul 6, 2012 5:38 PM, "Kevin Hilman" <khilman@ti.com> wrote:
+
+> Hi Grant,
+>
+> Here's a couple (hopefully) final OMAP GPIO fixes for v3.5-rc.
+>
+> Thanks,
+>
+> Kevin
+>
+>
+> The following changes since commit
+> 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
+>
+>   Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.gitfor_3.5/fixes/gpio-3
+>
+> for you to fetch changes up to 7b86cef34afceeecf57d4d07f3cfab06f8b60b13:
+>
+>   gpio/omap: fix invalid context restore of gpio bank-0 (2012-07-03
+> 09:41:39 -0700)
+>
+> ----------------------------------------------------------------
+> Grazvydas Ignotas (1):
+>       gpio/omap: fix irq loss while in idle with debounce on
+>
+> Jon Hunter (1):
+>       gpio/omap: fix invalid context restore of gpio bank-0
+>
+>  drivers/gpio/gpio-omap.c |   14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120706/8b0ad88f/attachment-0001.html>
