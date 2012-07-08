@@ -1,35 +1,42 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 8 Jul 2012 22:23:32 +0300
-Subject: [GIT PULL] rpmsg fixes for 3.5
-Message-ID: <CAK=WgbbvHobMODDaa+k10uWfbMaH-6SZ6o9f6Vx+aB2TSvfDQw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 8 Jul 2012 21:52:46 +0200
+Subject: [PATCH] Add nand platform on imx27 devicetree
+In-Reply-To: <CAOMZO5BjcnB=CJ=i=V7Ct9oMvgnnbK8AjWvYJZdoVmZu=+_MQQ@mail.gmail.com>
+References: <1341764963-11402-1-git-send-email-tremyfr@yahoo.fr>
+ <CAOMZO5BjcnB=CJ=i=V7Ct9oMvgnnbK8AjWvYJZdoVmZu=+_MQQ@mail.gmail.com>
+Message-ID: <20120708195246.GF4687@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+On Sun, Jul 08, 2012 at 01:57:37PM -0300, Fabio Estevam wrote:
+> On Sun, Jul 8, 2012 at 1:29 PM, Philippe Reynes <tremyfr@yahoo.fr> wrote:
+> > Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
+> > ---
+> >  arch/arm/mach-imx/Kconfig |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > index eff4db5..565422b 100644
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -381,6 +381,7 @@ config MACH_IMX27_DT
+> >         bool "Support i.MX27 platforms from device tree"
+> >         select SOC_IMX27
+> >         select USE_OF
+> > +       select IMX_HAVE_PLATFORM_MXC_NAND
+> 
+> Bu doing this you end up selecting unnecessary code for dt.
+> 
+> I proposed a fix for this already:
+> http://patchwork.ozlabs.org/patch/168645/
+I only know understood your explaination why you don't want this patch
+instead. So ok, I prefer your patch, too.
 
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+Best regards
+Uwe
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
-tags/rpmsg-3.5-fixes
-
-for you to fetch changes up to 15fd943af50dbc5f7f4de33835795c72595f7bf4:
-
-  rpmsg: make sure inflight messages don't invoke just-removed
-callbacks (2012-07-04 11:51:59 +0300)
-
-----------------------------------------------------------------
-Fixing two (somewhat rare) endpoint-related race issues, both of which
-were reported by Fernando Guzman Lugo.
-
-----------------------------------------------------------------
-Ohad Ben-Cohen (2):
-      rpmsg: avoid premature deallocation of endpoints
-      rpmsg: make sure inflight messages don't invoke just-removed callbacks
-
- drivers/rpmsg/virtio_rpmsg_bus.c | 55 ++++++++++++++++++++++++++++++++++++----
- include/linux/rpmsg.h            |  6 +++++
- 2 files changed, 56 insertions(+), 5 deletions(-)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
