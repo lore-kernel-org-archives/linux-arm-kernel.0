@@ -1,141 +1,283 @@
 From: jbe@pengutronix.de (Juergen Beisert)
-Date: Sun,  8 Jul 2012 19:12:18 +0200
-Subject: [PATCH 04/10] MACH/Samsung/Mini2440: add touchscreen support for
- mini2440.
+Date: Sun,  8 Jul 2012 19:12:24 +0200
+Subject: [PATCH 10/10] MACH/Samsung/Mini2440: update the default config
 In-Reply-To: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
 References: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1341767544-17447-5-git-send-email-jbe@pengutronix.de>
+Message-ID: <1341767544-17447-11-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Belisko <marek.belisko@open-nandra.com>
-
-Patch add support for mini2440 touchscreen.
-Some code borrowed from:
-git://repo.or.cz/linux-2.6/mini2440.git
-
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-Acked-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 ---
- arch/arm/mach-s3c24xx/mach-mini2440.c |   36 +++++++++++++++++++++++----------
- 1 file changed, 25 insertions(+), 11 deletions(-)
+ arch/arm/configs/mini2440_defconfig |   90 ++++++++++++++---------------------
+ 1 file changed, 37 insertions(+), 53 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index 45d5bb5..110af98 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -47,6 +47,7 @@
- #include <plat/iic.h>
- #include <plat/mci.h>
- #include <plat/udc.h>
-+#include <plat/ts.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-@@ -552,6 +553,12 @@ static struct platform_device uda1340_codec = {
- 		.id = -1,
- };
- 
-+static struct s3c2410_ts_mach_info mini2440_ts_cfg __initdata = {
-+	.delay = 10000,
-+	.presc = 0xff, /* slow as we can go */
-+	.oversampling_shift = 0,
-+};
-+
- static struct platform_device *mini2440_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_wdt,
-@@ -570,6 +577,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
- 	&uda1340_codec,
- 	&mini2440_audio,
- 	&samsung_asoc_dma,
-+	&s3c_device_adc,
- };
- 
- static void __init mini2440_map_io(void)
-@@ -627,12 +635,12 @@ static void __init mini2440_parse_features(
- 		switch (f) {
- 		case '0'...'9':	/* tft screen */
- 			if (features->done & FEATURE_SCREEN) {
--				printk(KERN_INFO "MINI2440: '%c' ignored, "
-+				pr_info("MINI2440: '%c' ignored, "
- 					"screen type already set\n", f);
- 			} else {
- 				int li = f - '0';
- 				if (li >= ARRAY_SIZE(mini2440_lcd_cfg))
--					printk(KERN_INFO "MINI2440: "
-+					pr_info("MINI2440: "
- 						"'%c' out of range LCD mode\n", f);
- 				else {
- 					features->optional[features->count++] =
-@@ -644,7 +652,7 @@ static void __init mini2440_parse_features(
- 			break;
- 		case 'b':
- 			if (features->done & FEATURE_BACKLIGHT)
--				printk(KERN_INFO "MINI2440: '%c' ignored, "
-+				pr_info("MINI2440: '%c' ignored, "
- 					"backlight already set\n", f);
- 			else {
- 				features->optional[features->count++] =
-@@ -653,12 +661,17 @@ static void __init mini2440_parse_features(
- 			features->done |= FEATURE_BACKLIGHT;
- 			break;
- 		case 't':
--			printk(KERN_INFO "MINI2440: '%c' ignored, "
--				"touchscreen not compiled in\n", f);
-+			if (features->done & FEATURE_TOUCH)
-+				pr_info("MINI2440: '%c' ignored, "
-+					"touchscreen already set\n", f);
-+			else
-+				features->optional[features->count++] =
-+						&s3c_device_ts;
-+			features->done |= FEATURE_TOUCH;
- 			break;
- 		case 'c':
- 			if (features->done & FEATURE_CAMERA)
--				printk(KERN_INFO "MINI2440: '%c' ignored, "
-+				pr_info("MINI2440: '%c' ignored, "
- 					"camera already registered\n", f);
- 			else
- 				features->optional[features->count++] =
-@@ -674,7 +687,7 @@ static void __init mini2440_init(void)
- 	struct mini2440_features_t features = { 0 };
- 	int i;
- 
--	printk(KERN_INFO "MINI2440: Option string mini2440=%s\n",
-+	pr_info("MINI2440: Option string mini2440=%s\n",
- 			mini2440_features_str);
- 
- 	/* Parse the feature string */
-@@ -703,17 +716,17 @@ static void __init mini2440_init(void)
- 		mini2440_fb_info.displays =
- 			&mini2440_lcd_cfg[features.lcd_index];
- 
--		printk(KERN_INFO "MINI2440: LCD");
-+		pr_info("MINI2440: LCD");
- 		for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
- 			if (li == features.lcd_index)
--				printk(" [%d:%dx%d]", li,
-+				pr_info(" [%d:%dx%d]", li,
- 					mini2440_lcd_cfg[li].width,
- 					mini2440_lcd_cfg[li].height);
- 			else
--				printk(" %d:%dx%d", li,
-+				pr_info(" %d:%dx%d", li,
- 					mini2440_lcd_cfg[li].width,
- 					mini2440_lcd_cfg[li].height);
--		printk("\n");
-+		pr_info("\n");
- 		s3c24xx_fb_set_platdata(&mini2440_fb_info);
- 	}
- 
-@@ -721,6 +734,7 @@ static void __init mini2440_init(void)
- 	s3c24xx_mci_set_platdata(&mini2440_mmc_cfg);
- 	s3c_nand_set_platdata(&mini2440_nand_info);
- 	s3c_i2c0_set_platdata(NULL);
-+	s3c24xx_ts_set_platdata(&mini2440_ts_cfg);
- 
- 	i2c_register_board_info(0, mini2440_i2c_devs,
- 				ARRAY_SIZE(mini2440_i2c_devs));
+diff --git a/arch/arm/configs/mini2440_defconfig b/arch/arm/configs/mini2440_defconfig
+index 082175c..b6cab92 100644
+--- a/arch/arm/configs/mini2440_defconfig
++++ b/arch/arm/configs/mini2440_defconfig
+@@ -1,10 +1,9 @@
+ CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_DEFAULT_HOSTNAME="Mini2440"
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+ CONFIG_RELAY=y
+-CONFIG_UTS_NS=y
+-CONFIG_IPC_NS=y
+ CONFIG_BLK_DEV_INITRD=y
+ # CONFIG_COMPAT_BRK is not set
+ CONFIG_MODULES=y
+@@ -14,18 +13,15 @@ CONFIG_MODULE_FORCE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_BLK_DEV_INTEGRITY=y
+ CONFIG_ARCH_S3C24XX=y
++CONFIG_S3C24XX_PWM=y
+ # CONFIG_CPU_S3C2410 is not set
+ CONFIG_CPU_S3C2440=y
+-CONFIG_S3C_ADC=y
+-CONFIG_S3C24XX_PWM=y
+ CONFIG_MACH_MINI2440=y
+ CONFIG_AEABI=y
+-# CONFIG_OABI_COMPAT is not set
+ CONFIG_KEXEC=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_BINFMT_AOUT=m
+ CONFIG_BINFMT_MISC=m
+-CONFIG_PM=y
+ CONFIG_APM_EMULATION=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -58,8 +54,6 @@ CONFIG_VLAN_8021Q=m
+ CONFIG_VLAN_8021Q_GVRP=y
+ CONFIG_NET_PKTGEN=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+@@ -85,8 +79,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
+ CONFIG_CONNECTOR=m
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+@@ -111,7 +103,6 @@ CONFIG_BLK_DEV_NBD=m
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_CDROM_PKTCDVD=m
+-CONFIG_SENSORS_TSL2550=m
+ CONFIG_SCSI=m
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=m
+@@ -119,10 +110,28 @@ CONFIG_CHR_DEV_SG=m
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_TUN=m
+-CONFIG_NET_ETHERNET=y
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CHELSIO is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
+ CONFIG_DM9000=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_PPP=m
++CONFIG_PPP_BSDCOMP=m
++CONFIG_PPP_DEFLATE=m
++CONFIG_PPP_FILTER=y
++CONFIG_PPP_MPPE=m
++CONFIG_PPP_MULTILINK=y
++CONFIG_PPP_ASYNC=m
++CONFIG_PPP_SYNC_TTY=m
+ CONFIG_HOSTAP=m
+ CONFIG_HOSTAP_FIRMWARE=y
+ CONFIG_HOSTAP_FIRMWARE_NVRAM=y
+@@ -130,25 +139,18 @@ CONFIG_LIBERTAS=m
+ CONFIG_LIBERTAS_SDIO=m
+ CONFIG_ZD1211RW=m
+ CONFIG_ZD1211RW_DEBUG=y
+-CONFIG_PPP=m
+-CONFIG_PPP_MULTILINK=y
+-CONFIG_PPP_FILTER=y
+-CONFIG_PPP_ASYNC=m
+-CONFIG_PPP_SYNC_TTY=m
+-CONFIG_PPP_DEFLATE=m
+-CONFIG_PPP_BSDCOMP=m
+-CONFIG_PPP_MPPE=m
+ CONFIG_INPUT_FF_MEMLESS=y
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_INPUT_EVBUG=m
+ # CONFIG_KEYBOARD_ATKBD is not set
+ CONFIG_KEYBOARD_GPIO=y
++# CONFIG_MOUSE_PS2 is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_SERIO_RAW=y
+ CONFIG_VT_HW_CONSOLE_BINDING=y
++CONFIG_LEGACY_PTY_COUNT=128
+ CONFIG_SERIAL_SAMSUNG=y
+ CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+-CONFIG_LEGACY_PTY_COUNT=128
+ CONFIG_IPMI_HANDLER=m
+ CONFIG_IPMI_DEVICE_INTERFACE=m
+ CONFIG_IPMI_SI=m
+@@ -163,7 +165,8 @@ CONFIG_SPI=y
+ CONFIG_SPI_S3C24XX=y
+ CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+-CONFIG_SENSORS_LM75=y
++CONFIG_SENSORS_S3C=y
++CONFIG_SENSORS_S3C_RAW=y
+ CONFIG_THERMAL=m
+ CONFIG_WATCHDOG=y
+ CONFIG_S3C2410_WATCHDOG=y
+@@ -179,8 +182,6 @@ CONFIG_LCD_PLATFORM=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ # CONFIG_BACKLIGHT_GENERIC is not set
+ CONFIG_BACKLIGHT_PWM=y
+-CONFIG_DISPLAY_SUPPORT=y
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+@@ -205,10 +206,9 @@ CONFIG_SND_USB_AUDIO=m
+ CONFIG_SND_USB_CAIAQ=m
+ CONFIG_SND_USB_CAIAQ_INPUT=y
+ CONFIG_SND_SOC=y
+-CONFIG_SND_S3C24XX_SOC=y
++CONFIG_SND_SOC_SAMSUNG=y
++CONFIG_SND_SOC_SAMSUNG_S3C24XX_UDA134X=y
+ CONFIG_HIDRAW=y
+-CONFIG_HID_PID=y
+-CONFIG_USB_HIDDEV=y
+ CONFIG_HID_GYRATION=y
+ CONFIG_HID_NTRIG=y
+ CONFIG_HID_PANTHERLORD=y
+@@ -217,9 +217,9 @@ CONFIG_HID_SAMSUNG=y
+ CONFIG_HID_SONY=y
+ CONFIG_HID_SUNPLUS=y
+ CONFIG_HID_TOPSEED=y
++CONFIG_HID_PID=y
++CONFIG_USB_HIDDEV=y
+ CONFIG_USB=y
+-CONFIG_USB_DEVICEFS=y
+-# CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_ACM=m
+ CONFIG_USB_WDM=m
+@@ -237,7 +237,7 @@ CONFIG_USB_SERIAL_CP210X=m
+ CONFIG_USB_SERIAL_FTDI_SIO=m
+ CONFIG_USB_SERIAL_SPCP8X5=m
+ CONFIG_USB_GADGET=y
+-CONFIG_USB_GADGET_S3C2410=y
++CONFIG_USB_S3C2410=m
+ CONFIG_USB_ZERO=m
+ CONFIG_USB_ETH=m
+ CONFIG_USB_GADGETFS=m
+@@ -249,9 +249,8 @@ CONFIG_SDIO_UART=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SPI=y
+ CONFIG_MMC_S3C=y
+-CONFIG_LEDS_CLASS=y
++CONFIG_MMC_S3C_DMA=y
+ CONFIG_LEDS_S3C24XX=y
+-CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_GPIO=y
+@@ -260,6 +259,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+ CONFIG_RTC_DRV_S3C=y
+ CONFIG_DMADEVICES=y
++# CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=m
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+@@ -267,8 +267,6 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_POSIX_ACL=y
+ CONFIG_EXT3_FS_SECURITY=y
+-CONFIG_INOTIFY=y
+-CONFIG_AUTOFS_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+@@ -280,17 +278,9 @@ CONFIG_CRAMFS=y
+ CONFIG_ROMFS_FS=y
+ CONFIG_ROMFS_BACKED_BY_BOTH=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_BSD_DISKLABEL=y
+-CONFIG_MINIX_SUBPARTITION=y
+-CONFIG_SOLARIS_X86_PARTITION=y
+-CONFIG_UNIXWARE_DISKLABEL=y
+-CONFIG_LDM_PARTITION=y
+-CONFIG_EFI_PARTITION=y
+ CONFIG_NLS_DEFAULT="cp437"
+ CONFIG_NLS_CODEPAGE_437=m
+ CONFIG_NLS_CODEPAGE_737=m
+@@ -337,11 +327,8 @@ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
++# CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_KEYS=y
+-CONFIG_CRYPTO_FIPS=y
+ CONFIG_CRYPTO_NULL=m
+ CONFIG_CRYPTO_CRYPTD=m
+ CONFIG_CRYPTO_AUTHENC=m
+@@ -349,14 +336,12 @@ CONFIG_CRYPTO_TEST=m
+ CONFIG_CRYPTO_CCM=m
+ CONFIG_CRYPTO_GCM=m
+ CONFIG_CRYPTO_CTS=m
+-CONFIG_CRYPTO_ECB=y
+ CONFIG_CRYPTO_LRW=m
+ CONFIG_CRYPTO_PCBC=m
+ CONFIG_CRYPTO_XTS=m
+-CONFIG_CRYPTO_HMAC=y
++CONFIG_CRYPTO_HMAC=m
+ CONFIG_CRYPTO_XCBC=m
+ CONFIG_CRYPTO_MD4=m
+-CONFIG_CRYPTO_MICHAEL_MIC=y
+ CONFIG_CRYPTO_RMD128=m
+ CONFIG_CRYPTO_RMD160=m
+ CONFIG_CRYPTO_RMD256=m
+@@ -365,9 +350,7 @@ CONFIG_CRYPTO_SHA256=m
+ CONFIG_CRYPTO_SHA512=m
+ CONFIG_CRYPTO_TGR192=m
+ CONFIG_CRYPTO_WP512=m
+-CONFIG_CRYPTO_AES=y
+ CONFIG_CRYPTO_ANUBIS=m
+-CONFIG_CRYPTO_ARC4=y
+ CONFIG_CRYPTO_BLOWFISH=m
+ CONFIG_CRYPTO_CAMELLIA=m
+ CONFIG_CRYPTO_CAST5=m
+@@ -382,5 +365,6 @@ CONFIG_CRYPTO_TWOFISH=m
+ CONFIG_CRYPTO_DEFLATE=m
+ CONFIG_CRYPTO_ZLIB=m
+ CONFIG_CRYPTO_LZO=m
++# CONFIG_CRYPTO_HW is not set
+ CONFIG_CRC_T10DIF=y
+ CONFIG_LIBCRC32C=m
 -- 
 1.7.10
