@@ -1,274 +1,93 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 08 Jul 2012 09:17:44 -0500
-Subject: [PATCH 03/15] ARM: tegra: use fixed PCI i/o mapping
-In-Reply-To: <20120708060932.GB5186@avionic-0098.mockup.avionic-design.de>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <1341600040-30993-4-git-send-email-robherring2@gmail.com>
- <20120708060932.GB5186@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4FF99688.1040703@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 8 Jul 2012 19:56:47 +0530
+Subject: [PATCH v5 4/7] ARM: davinci: net: davinci_emac: add OF support
+In-Reply-To: <1338373143-7467-5-git-send-email-hs@denx.de>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-5-git-send-email-hs@denx.de>
+Message-ID: <4FF998A7.50309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2012 01:09 AM, Thierry Reding wrote:
-> On Fri, Jul 06, 2012 at 01:40:28PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Move tegra PCI to fixed i/o mapping and remove io.h.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Colin Cross <ccross@android.com>
->> Cc: Olof Johansson <olof@lixom.net>
->> Acked-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  arch/arm/Kconfig                         |    1 -
->>  arch/arm/mach-tegra/include/mach/io.h    |   46 ------------------------------
->>  arch/arm/mach-tegra/include/mach/iomap.h |    3 ++
->>  arch/arm/mach-tegra/io.c                 |    2 ++
->>  arch/arm/mach-tegra/pcie.c               |   43 ++++------------------------
->>  5 files changed, 10 insertions(+), 85 deletions(-)
->>  delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
+Hi Heiko,
+
+On 5/30/2012 3:49 PM, Heiko Schocher wrote:
+> add of support for the davinci_emac driver.
 > 
-> Hi Rob,
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: netdev at vger.kernel.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Anatoly Sivov <mm05@mail.ru>
 > 
-> generally this looks good. However I've been working on a rewrite of the
-> Tegra PCIe support to make it work as a driver and add DT support. This
-> entails that PCIe support isn't initialized until very late in the
-> process because it makes use of deferred probe if some regulators aren't
-> available. One problem caused by this is that it suddenly requires a lot
-> of code marked as __init to be available after the init phase and I see
-> that you've introduced pci_map_io_single_pfn() that is __init annotated,
-> so it will cause problems when used with my patches.
+> ---
 
-This function can only be called during .map_io anyway, so the __init is
-irrelevant.
+> +#ifdef CONFIG_OF
+> +static struct emac_platform_data
+> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
+> +	struct emac_priv *priv)
+> +{
+> +	struct device_node *np;
+> +	struct emac_platform_data *pdata = NULL;
+> +	const u8 *mac_addr;
+> +	u32 data;
+> +	int ret;
+> +
+> +	pdata = pdev->dev.platform_data;
+> +	if (!pdata) {
+> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +		if (!pdata)
+> +			goto nodata;
+> +	}
+> +
+> +	np = pdev->dev.of_node;
+> +	if (!np)
+> +		goto nodata;
+> +	else
+> +		pdata->version = EMAC_VERSION_2;
+> +
+> +	mac_addr = of_get_mac_address(np);
+> +	if (mac_addr)
+> +		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
 
-> I'm not very familiar with the inner workings of the iotable and the
-> mappings initialized by it, but I wonder if this can be done dynamically
-> at a later stage. The way this is currently done in this patch, the I/O
-> region is statically mapped from a fixed offset within the PCIe address
-> range. Part of the patches to add DT support is to allow this region to
-> be defined by the DT, so that will obviously also create problems.
+I suspect that even in the DT case, many boards will continue to
+read mac address from on-board EEPROMs or from an on-chip eFUSE.
+To take care of such cases, I propose use mac address in DT data
+only if no valid address is passed through platform data. The
+attached patch does this change.
 
-Is the i/o address something you could extract from DT earlier? This can
-be done separately if it doesn't require information from the driver.
+If you are OK with this modification, can you please merge it and
+repost just this patch for review? Please CC David Miller
+(davem at davemloft.net) on your next post as he is the netdev maintainer
+and this patch needs to be merged through him or at least needs his ack.
 
-I'm sure exactly how to do a fixed virtual mapping other than the
-io_table mappings. There was some discussion of use fixmap region
-previously, but doing so will be a bit more complex. I'll look into this
-some.
+With this modification, you can add my:
 
-Rob
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-> If both of those issues can be easily addressed, then this certainly
-> looks very nice.
-> 
-> Thierry
-> 
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 8fb7e4a..ac446e3 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -644,7 +644,6 @@ config ARCH_TEGRA
->>  	select HAVE_CLK
->>  	select HAVE_SMP
->>  	select MIGHT_HAVE_CACHE_L2X0
->> -	select NEED_MACH_IO_H if PCI
->>  	select ARCH_HAS_CPUFREQ
->>  	help
->>  	  This enables support for NVIDIA Tegra based systems (Tegra APX,
->> diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
->> deleted file mode 100644
->> index fe700f9..0000000
->> --- a/arch/arm/mach-tegra/include/mach/io.h
->> +++ /dev/null
->> @@ -1,46 +0,0 @@
->> -/*
->> - * arch/arm/mach-tegra/include/mach/io.h
->> - *
->> - * Copyright (C) 2010 Google, Inc.
->> - *
->> - * Author:
->> - *	Colin Cross <ccross@google.com>
->> - *	Erik Gilling <konkers@google.com>
->> - *
->> - * This software is licensed under the terms of the GNU General Public
->> - * License version 2, as published by the Free Software Foundation, and
->> - * may be copied, distributed, and modified under those terms.
->> - *
->> - * This program is distributed in the hope that it will be useful,
->> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> - * GNU General Public License for more details.
->> - *
->> - */
->> -
->> -#ifndef __MACH_TEGRA_IO_H
->> -#define __MACH_TEGRA_IO_H
->> -
->> -#define IO_SPACE_LIMIT 0xffff
->> -
->> -#ifndef __ASSEMBLER__
->> -
->> -#ifdef CONFIG_TEGRA_PCI
->> -extern void __iomem *tegra_pcie_io_base;
->> -
->> -static inline void __iomem *__io(unsigned long addr)
->> -{
->> -	return tegra_pcie_io_base + (addr & IO_SPACE_LIMIT);
->> -}
->> -#else
->> -static inline void __iomem *__io(unsigned long addr)
->> -{
->> -	return (void __iomem *)addr;
->> -}
->> -#endif
->> -
->> -#define __io(a)         __io(a)
->> -
->> -#endif
->> -
->> -#endif
->> diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
->> index 7e76da7..fee3a94 100644
->> --- a/arch/arm/mach-tegra/include/mach/iomap.h
->> +++ b/arch/arm/mach-tegra/include/mach/iomap.h
->> @@ -303,6 +303,9 @@
->>  #define IO_APB_VIRT	IOMEM(0xFE300000)
->>  #define IO_APB_SIZE	SZ_1M
->>  
->> +#define TEGRA_PCIE_BASE		0x80000000
->> +#define TEGRA_PCIE_IO_BASE	(TEGRA_PCIE_BASE + SZ_4M)
->> +
->>  #define IO_TO_VIRT_BETWEEN(p, st, sz)	((p) >= (st) && (p) < ((st) + (sz)))
->>  #define IO_TO_VIRT_XLATE(p, pst, vst)	(((p) - (pst) + (vst)))
->>  
->> diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
->> index 58b4baf..7a29e10 100644
->> --- a/arch/arm/mach-tegra/io.c
->> +++ b/arch/arm/mach-tegra/io.c
->> @@ -26,6 +26,7 @@
->>  
->>  #include <asm/page.h>
->>  #include <asm/mach/map.h>
->> +#include <asm/mach/pci.h>
->>  #include <mach/iomap.h>
->>  
->>  #include "board.h"
->> @@ -59,5 +60,6 @@ static struct map_desc tegra_io_desc[] __initdata = {
->>  
->>  void __init tegra_map_common_io(void)
->>  {
->> +	pci_map_io_single(TEGRA_PCIE_IO_BASE);
->>  	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
->>  }
->> diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
->> index 0e09137..c989a8e 100644
->> --- a/arch/arm/mach-tegra/pcie.c
->> +++ b/arch/arm/mach-tegra/pcie.c
->> @@ -171,8 +171,6 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
->>   * 0x90000000 - 0x9fffffff - non-prefetchable memory
->>   * 0xa0000000 - 0xbfffffff - prefetchable memory
->>   */
->> -#define TEGRA_PCIE_BASE		0x80000000
->> -
->>  #define PCIE_REGS_SZ		SZ_16K
->>  #define PCIE_CFG_OFF		PCIE_REGS_SZ
->>  #define PCIE_CFG_SZ		SZ_1M
->> @@ -180,8 +178,6 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
->>  #define PCIE_EXT_CFG_SZ		SZ_1M
->>  #define PCIE_IOMAP_SZ		(PCIE_REGS_SZ + PCIE_CFG_SZ + PCIE_EXT_CFG_SZ)
->>  
->> -#define MMIO_BASE		(TEGRA_PCIE_BASE + SZ_4M)
->> -#define MMIO_SIZE		SZ_64K
->>  #define MEM_BASE_0		(TEGRA_PCIE_BASE + SZ_256M)
->>  #define MEM_SIZE_0		SZ_128M
->>  #define MEM_BASE_1		(MEM_BASE_0 + MEM_SIZE_0)
->> @@ -223,17 +219,7 @@ struct tegra_pcie_info {
->>  	struct clk		*pll_e;
->>  };
->>  
->> -static struct tegra_pcie_info tegra_pcie = {
->> -	.res_mmio = {
->> -		.name = "PCI IO",
->> -		.start = MMIO_BASE,
->> -		.end = MMIO_BASE + MMIO_SIZE - 1,
->> -		.flags = IORESOURCE_MEM,
->> -	},
->> -};
->> -
->> -void __iomem *tegra_pcie_io_base;
->> -EXPORT_SYMBOL(tegra_pcie_io_base);
->> +static struct tegra_pcie_info tegra_pcie;
->>  
->>  static inline void afi_writel(u32 value, unsigned long offset)
->>  {
->> @@ -403,7 +389,7 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
->>  		pp->res[0].end = pp->res[0].start + SZ_32K - 1;
->>  	} else {
->>  		pp->res[0].start = PCIBIOS_MIN_IO + SZ_32K;
->> -		pp->res[0].end = IO_SPACE_LIMIT;
->> +		pp->res[0].end = SZ_64K - 1;
->>  	}
->>  	pp->res[0].flags = IORESOURCE_IO;
->>  	if (request_resource(&ioport_resource, &pp->res[0]))
->> @@ -541,8 +527,8 @@ static void tegra_pcie_setup_translations(void)
->>  
->>  	/* Bar 2: downstream IO bar */
->>  	fpci_bar = ((__u32)0xfdfc << 16);
->> -	size = MMIO_SIZE;
->> -	axi_address = MMIO_BASE;
->> +	size = SZ_64K;
->> +	axi_address = TEGRA_PCIE_IO_BASE;
->>  	afi_writel(axi_address, AFI_AXI_BAR2_START);
->>  	afi_writel(size >> 12, AFI_AXI_BAR2_SZ);
->>  	afi_writel(fpci_bar, AFI_FPCI_BAR2);
->> @@ -776,7 +762,6 @@ static void tegra_pcie_clocks_put(void)
->>  
->>  static int __init tegra_pcie_get_resources(void)
->>  {
->> -	struct resource *res_mmio = &tegra_pcie.res_mmio;
->>  	int err;
->>  
->>  	err = tegra_pcie_clocks_get();
->> @@ -798,34 +783,16 @@ static int __init tegra_pcie_get_resources(void)
->>  		goto err_map_reg;
->>  	}
->>  
->> -	err = request_resource(&iomem_resource, res_mmio);
->> -	if (err) {
->> -		pr_err("PCIE: Failed to request resources: %d\n", err);
->> -		goto err_req_io;
->> -	}
->> -
->> -	tegra_pcie_io_base = ioremap_nocache(res_mmio->start,
->> -					     resource_size(res_mmio));
->> -	if (tegra_pcie_io_base == NULL) {
->> -		pr_err("PCIE: Failed to map IO\n");
->> -		err = -ENOMEM;
->> -		goto err_map_io;
->> -	}
->> -
->>  	err = request_irq(INT_PCIE_INTR, tegra_pcie_isr,
->>  			  IRQF_SHARED, "PCIE", &tegra_pcie);
->>  	if (err) {
->>  		pr_err("PCIE: Failed to register IRQ: %d\n", err);
->> -		goto err_irq;
->> +		goto err_req_io;
->>  	}
->>  	set_irq_flags(INT_PCIE_INTR, IRQF_VALID);
->>  
->>  	return 0;
->>  
->> -err_irq:
->> -	iounmap(tegra_pcie_io_base);
->> -err_map_io:
->> -	release_resource(&tegra_pcie.res_mmio);
->>  err_req_io:
->>  	iounmap(tegra_pcie.regs);
->>  err_map_reg:
->> -- 
->> 1.7.9.5
->>
->>
->>
+Thanks,
+Sekhar
+
+---8<----
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index 645618d..6b4b0fe 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -1795,9 +1795,11 @@ static struct emac_platform_data
+ 	else
+ 		pdata->version = EMAC_VERSION_2;
+ 
+-	mac_addr = of_get_mac_address(np);
+-	if (mac_addr)
+-		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
++	if (!is_valid_ether_addr(pdata->mac_addr)) {
++		mac_addr = of_get_mac_address(np);
++		if (mac_addr)
++			memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
++	}
+ 
+ 	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
+ 	if (!ret)
