@@ -1,31 +1,41 @@
 From: jbe@pengutronix.de (Juergen Beisert)
-Date: Sun,  8 Jul 2012 19:12:19 +0200
-Subject: [PATCH 05/10] MACH/Samsung/Mini2440: select touchscreen by default.
+Date: Sun,  8 Jul 2012 19:12:22 +0200
+Subject: [PATCH 08/10] MACH/Samsung/Mini2440: enable button 6 as one of the
+ GPIO keys
 In-Reply-To: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
 References: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1341767544-17447-6-git-send-email-jbe@pengutronix.de>
+Message-ID: <1341767544-17447-9-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Belisko <marek.belisko@open-nandra.com>
+There is no more restriction to omit button 6
 
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-Acked-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 ---
- arch/arm/mach-s3c24xx/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-s3c24xx/mach-mini2440.c |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index e249611..0e65445 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -405,6 +405,7 @@ config MACH_MINI2440
- 	select LEDS_TRIGGER_BACKLIGHT
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
-+	select TOUCHSCREEN_S3C2410
- 	help
- 	  Say Y here to select support for the MINI2440. Is a 10cm x 10cm board
- 	  available via various sources. It can come with a 3.5" or 7" touch LCD.
+diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+index 36149ed..ad1d89e 100644
+--- a/arch/arm/mach-s3c24xx/mach-mini2440.c
++++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+@@ -415,16 +415,12 @@ static struct gpio_keys_button mini2440_buttons[] = {
+ 		.desc		= "Button 5",
+ 		.active_low	= 1,
+ 	},
+-#if 0
+-	/* this pin is also known as TCLK1 and seems to already
+-	 * marked as "in use" somehow in the kernel -- possibly wrongly */
+ 	{
+-		.gpio		= S3C2410_GPG(11),	/* K6 */
++		.gpio		= S3C2410_GPG(11),		/* K6 */
+ 		.code		= KEY_F6,
+ 		.desc		= "Button 6",
+ 		.active_low	= 1,
+ 	},
+-#endif
+ };
+ 
+ static struct gpio_keys_platform_data mini2440_button_data = {
 -- 
 1.7.10
