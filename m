@@ -1,116 +1,185 @@
 From: jbe@pengutronix.de (Juergen Beisert)
-Date: Sun,  8 Jul 2012 19:12:21 +0200
-Subject: [PATCH 07/10] MACH/Samsung/Mini2440: add hwmon capabilities to
- mini2440
+Date: Sun,  8 Jul 2012 19:12:20 +0200
+Subject: [PATCH 06/10] MACH/Samsung/Mini2440: use leds-gpio driver for board
+ leds
 In-Reply-To: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
 References: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1341767544-17447-8-git-send-email-jbe@pengutronix.de>
+Message-ID: <1341767544-17447-7-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the internal 8 ADC channels to the sysfs. They can be reached via:
+From: Marek Belisko <marek.belisko@open-nandra.com>
 
- /sys/devices/platform/s3c24xx-adc/s3c-hwmon
+Intention of this patch is convert existing usage of leds-s3c24xx driver
+to use generic gpio-leds driver. Leds are separated to 2 devices.
+First device handle 4 available leds. Second device is used to drive
+LCD backlight. Backlight can be controlled via parameter b so we need
+separate device which is registered or not depending on parameter.
 
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+Acked-by: Juergen Beisert <jbe@pengutronix.de>
 ---
- arch/arm/mach-s3c24xx/Kconfig         |    1 +
- arch/arm/mach-s3c24xx/mach-mini2440.c |   50 +++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
+ arch/arm/mach-s3c24xx/mach-mini2440.c |  122 +++++++++++++++------------------
+ 1 file changed, 54 insertions(+), 68 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 0e65445..4f42b7e 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -406,6 +406,7 @@ config MACH_MINI2440
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
- 	select TOUCHSCREEN_S3C2410
-+	select S3C_DEV_HWMON
- 	help
- 	  Say Y here to select support for the MINI2440. Is a 10cm x 10cm board
- 	  available via various sources. It can come with a 3.5" or 7" touch LCD.
 diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index fd5fe9d..36149ed 100644
+index 110af98..fd5fe9d 100644
 --- a/arch/arm/mach-s3c24xx/mach-mini2440.c
 +++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -57,6 +57,7 @@
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/hwmon.h>
+@@ -39,7 +39,6 @@
  
- #include <sound/s3c24xx_uda134x.h>
- 
-@@ -548,6 +549,53 @@ static struct s3c2410_ts_mach_info mini2440_ts_cfg __initdata = {
- 	.oversampling_shift = 0,
+ #include <plat/regs-serial.h>
+ #include <mach/regs-gpio.h>
+-#include <mach/leds-gpio.h>
+ #include <mach/regs-mem.h>
+ #include <mach/regs-lcd.h>
+ #include <mach/irqs.h>
+@@ -441,81 +440,71 @@ static struct platform_device mini2440_button_device = {
  };
  
-+static struct s3c_hwmon_chcfg mini2440_adc_chcfg[8] = {
+ /* LEDS */
+-
+-static struct s3c24xx_led_platdata mini2440_led1_pdata = {
+-	.name		= "led1",
+-	.gpio		= S3C2410_GPB(5),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "heartbeat",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led2_pdata = {
+-	.name		= "led2",
+-	.gpio		= S3C2410_GPB(6),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "nand-disk",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led3_pdata = {
+-	.name		= "led3",
+-	.gpio		= S3C2410_GPB(7),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "mmc0",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led4_pdata = {
+-	.name		= "led4",
+-	.gpio		= S3C2410_GPB(8),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led_backlight_pdata = {
+-	.name		= "backlight",
+-	.gpio		= S3C2410_GPG(4),
+-	.def_trigger	= "backlight",
++static struct gpio_led gpio_leds[] = {
 +	{
-+		.name = "AIN0",	/* connected to CON4/5 and W1 */
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "AIN1",	/* connected to CON4/6 */
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "AIN2",	/* connected to CON4/7 */
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "AIN3",	/* connected to CON4/8 */
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "TSYM",
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "TSYP",
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "TSXM",
-+		.mult = 3300,
-+		.div = 1023,
-+	}, {
-+		.name = "TSXP",
-+		.mult = 3300,
-+		.div = 1023,
++		.name			= "led1",
++		.gpio			= S3C2410_GPB(5),
++		.active_low		= 1,
++		.default_trigger	= "heartbeat",
 +	},
-+};
-+
-+static struct s3c_hwmon_pdata mini2440_adc __initdata = {
-+	.in[0] = &mini2440_adc_chcfg[0],
-+	.in[1] = &mini2440_adc_chcfg[1],
-+	.in[2] = &mini2440_adc_chcfg[2],
-+	.in[3] = &mini2440_adc_chcfg[3],
-+	.in[4] = &mini2440_adc_chcfg[4],
-+	.in[5] = &mini2440_adc_chcfg[5],
-+	.in[6] = &mini2440_adc_chcfg[6],
-+	.in[7] = &mini2440_adc_chcfg[7],
-+};
-+
- static struct platform_device *mini2440_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_wdt,
-@@ -564,6 +612,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
- 	&mini2440_audio,
- 	&samsung_asoc_dma,
- 	&s3c_device_adc,
-+	&s3c_device_hwmon,
++	{
++		.name			= "led2",
++		.gpio			= S3C2410_GPB(6),
++		.active_low		= 1,
++		.default_trigger	= "nand-disk",
++		.default_state		= LEDS_GPIO_DEFSTATE_OFF,
++	},
++	{
++		.name			= "led3",
++		.gpio			= S3C2410_GPB(7),
++		.active_low		= 1,
++		.default_trigger	= "mmc0",
++		.default_state		= LEDS_GPIO_DEFSTATE_OFF,
++	},
++	{
++		.name			= "led4",
++		.gpio			= S3C2410_GPB(8),
++		.active_low		= 1,
++		.default_trigger	= "none",
++		.default_state		= LEDS_GPIO_DEFSTATE_OFF,
++	}
  };
  
- static void __init mini2440_map_io(void)
-@@ -721,6 +770,7 @@ static void __init mini2440_init(void)
- 	s3c_nand_set_platdata(&mini2440_nand_info);
- 	s3c_i2c0_set_platdata(NULL);
- 	s3c24xx_ts_set_platdata(&mini2440_ts_cfg);
-+	s3c_hwmon_set_platdata(&mini2440_adc);
+-static struct platform_device mini2440_led1 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 1,
+-	.dev		= {
+-		.platform_data	= &mini2440_led1_pdata,
+-	},
++static struct gpio_led backlight_led[] = {
++	{
++		.name			= "backlight",
++		.gpio			= S3C2410_GPG(4),
++		.active_low		= 0,
++		.default_trigger	= "backlight",
++		.default_state		= LEDS_GPIO_DEFSTATE_ON,
++	}
+ };
  
- 	i2c_register_board_info(0, mini2440_i2c_devs,
- 				ARRAY_SIZE(mini2440_i2c_devs));
+-static struct platform_device mini2440_led2 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 2,
+-	.dev		= {
+-		.platform_data	= &mini2440_led2_pdata,
+-	},
++static struct gpio_led_platform_data gpio_led_info = {
++	.leds		= gpio_leds,
++	.num_leds	= ARRAY_SIZE(gpio_leds),
+ };
+ 
+-static struct platform_device mini2440_led3 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 3,
+-	.dev		= {
+-		.platform_data	= &mini2440_led3_pdata,
+-	},
++static struct gpio_led_platform_data backlight_info = {
++	.leds		= backlight_led,
++	.num_leds	= ARRAY_SIZE(backlight_led),
+ };
+ 
+-static struct platform_device mini2440_led4 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 4,
+-	.dev		= {
+-		.platform_data	= &mini2440_led4_pdata,
+-	},
++static struct platform_device mini2440_leds = {
++	.name	= "leds-gpio",
++	.id	= 0,
++	.dev	= {
++		.platform_data	= &gpio_led_info,
++	}
+ };
+ 
+ static struct platform_device mini2440_led_backlight = {
+-	.name		= "s3c24xx_led",
+-	.id		= 5,
+-	.dev		= {
+-		.platform_data	= &mini2440_led_backlight_pdata,
+-	},
++	.name	= "leds-gpio",
++	.id	= 1,
++	.dev	= {
++		.platform_data	= &backlight_info,
++	}
+ };
+-
+ /* AUDIO */
+ 
+ static struct s3c24xx_uda134x_platform_data mini2440_audio_pins = {
+@@ -566,10 +555,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_rtc,
+ 	&s3c_device_usbgadget,
+ 	&mini2440_device_eth,
+-	&mini2440_led1,
+-	&mini2440_led2,
+-	&mini2440_led3,
+-	&mini2440_led4,
++	&mini2440_leds,
+ 	&mini2440_button_device,
+ 	&s3c_device_nand,
+ 	&s3c_device_sdi,
 -- 
 1.7.10
