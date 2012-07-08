@@ -1,26 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 8 Jul 2012 17:03:12 +0100
-Subject: [PATCH] ARM: remove asm/locks.h
-In-Reply-To: <1341300030.1911.179.camel@x61.thuisdomein>
-References: <1341262188.1911.147.camel@x61.thuisdomein>
- <20120702215203.GA25234@mudshark.cambridge.arm.com>
- <1341300030.1911.179.camel@x61.thuisdomein>
-Message-ID: <20120708160258.GC27030@mudshark.cambridge.arm.com>
+From: tremyfr@yahoo.fr (Philippe Reynes)
+Date: Sun,  8 Jul 2012 18:29:23 +0200
+Subject: [PATCH] Add nand platform on imx27 devicetree
+Message-ID: <1341764963-11402-1-git-send-email-tremyfr@yahoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2012 at 08:20:30AM +0100, Paul Bolle wrote:
-> On Mon, 2012-07-02 at 22:52 +0100, Will Deacon wrote:
-> > Not sure I follow, but since this is all dead code I can't see any tests
-> > failing without it.
-> 
-> The purpose of that disclaimer is to stress that only git commands were
-> used to determine that removing this header is correct and safe. But
-> perhaps saying that I therefore "tested" this patch with git commands is
-> confusing.
+Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
+---
+ arch/arm/mach-imx/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Okey doke. Please can you put this into the patch system?
-
-Cheers,
-
-Will
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index eff4db5..565422b 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -381,6 +381,7 @@ config MACH_IMX27_DT
+ 	bool "Support i.MX27 platforms from device tree"
+ 	select SOC_IMX27
+ 	select USE_OF
++	select IMX_HAVE_PLATFORM_MXC_NAND
+ 	help
+ 	  Include support for Freescale i.MX27 based platforms
+ 	  using the device tree for discovery
+-- 
+1.7.1
