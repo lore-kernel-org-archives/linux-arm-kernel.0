@@ -1,58 +1,58 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sun, 8 Jul 2012 23:10:04 +0800
-Subject: [PATCH v2 1/4] usb: chipidea: pci: make platformdata static
-In-Reply-To: <20120628140603.GA2799@richard-laptop>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-2-git-send-email-mkl@pengutronix.de>
- <20120628140603.GA2799@richard-laptop>
-Message-ID: <CANg6MZh7+eyMa97a73bNTFfd8SGNRMTx=3F1-DYT13R=VR+p1w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 8 Jul 2012 17:00:51 +0100
+Subject: [PATCH 1/2] ARM: vexpress: add debug UARTs to DEBUG_LL kconfig
+ choice
+In-Reply-To: <20120706132554.GE31970@mudshark.cambridge.arm.com>
+References: <1341414076-20895-1-git-send-email-will.deacon@arm.com>
+ <1341480232.1173.22.camel@hornet>
+ <20120705093348.GA3399@mudshark.cambridge.arm.com>
+ <1341481080.1173.28.camel@hornet>
+ <20120705094218.GB3399@mudshark.cambridge.arm.com>
+ <20120706132554.GE31970@mudshark.cambridge.arm.com>
+Message-ID: <20120708160051.GB27030@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 10:06 PM, Richard Zhao <linuxzsc@gmail.com> wrote:
-> On Thu, Jun 28, 2012 at 03:53:46PM +0200, Marc Kleine-Budde wrote:
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->>  drivers/usb/chipidea/ci13xxx_pci.c |    6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
->> index 918e149..9f5c171 100644
->> --- a/drivers/usb/chipidea/ci13xxx_pci.c
->> +++ b/drivers/usb/chipidea/ci13xxx_pci.c
->> @@ -23,17 +23,17 @@
->>  /******************************************************************************
->>   * PCI block
->>   *****************************************************************************/
->> -struct ci13xxx_platform_data pci_platdata = {
->> +static struct ci13xxx_platform_data pci_platdata = {
-> what about adding __devinitdata?
-Marc, what do you think?
+Pawel,
 
-Thanks
-Richard
->
-> Thanks
-> Richard
->>       .name           = UDC_DRIVER_NAME,
->>       .capoffset      = DEF_CAPOFFSET,
->>  };
->>
->> -struct ci13xxx_platform_data langwell_pci_platdata = {
->> +static struct ci13xxx_platform_data langwell_pci_platdata = {
->>       .name           = UDC_DRIVER_NAME,
->>       .capoffset      = 0,
->>  };
->>
->> -struct ci13xxx_platform_data penwell_pci_platdata = {
->> +static struct ci13xxx_platform_data penwell_pci_platdata = {
->>       .name           = UDC_DRIVER_NAME,
->>       .capoffset      = 0,
->>       .power_budget   = 200,
->> --
->> 1.7.10
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Fri, Jul 06, 2012 at 02:25:54PM +0100, Will Deacon wrote:
+> For what it's worth, here's the additional diff:
+
+On the off-chance that you're thinking of picking this up, there's a small
+correction below.
+
+> diff --git a/arch/arm/mach-vexpress/include/mach/uncompress.h b/arch/arm/mach-vexpress/include/mach/uncompress.h
+> index 7dab559..4dbb3ac 100644
+> --- a/arch/arm/mach-vexpress/include/mach/uncompress.h
+> +++ b/arch/arm/mach-vexpress/include/mach/uncompress.h
+> @@ -22,36 +22,19 @@
+>  #define AMBA_UART_CR(base)     (*(volatile unsigned char *)((base) + 0x30))
+>  #define AMBA_UART_FR(base)     (*(volatile unsigned char *)((base) + 0x18))
+>  
+> +#ifdef CONFIG_DEBUG_VEXPRESS_CA9X4_UART
+>  #define UART_BASE      0x10009000
+> -#define UART_BASE_RS1  0x1c090000
+> -
+> -static unsigned long get_uart_base(void)
+> -{
+> -       unsigned long mpcore_periph;
+> -
+> -       /*
+> -        * Make an educated guess regarding the memory map:
+> -        * - the original A9 core tile, which has MPCore peripherals
+> -        *   located at 0x1e000000, should use UART at 0x10009000
+> -        * - all other (RS1 complaint) tiles use UART mapped
+> -        *   at 0x1c090000
+> -        */
+> -       asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (mpcore_periph));
+> -
+> -       if (mpcore_periph == 0x1e000000)
+> -               return UART_BASE;
+> -       else
+> -               return UART_BASE_RS1;
+> -}
+> +#elif CONFIG_DEBUG_VEXPRESS_RS1_UART
+
+This should of course be #elif defined(CONFIG...).
+
+Will
