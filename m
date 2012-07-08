@@ -1,7 +1,7 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 8 Jul 2012 22:22:47 +0300
-Subject: [GIT PULL] hwspinlock fix for 3.5
-Message-ID: <CAK=WgbY2-K991tkQ_09=vCEAnuz3N8K2sXU=R1sOQ_Fm1VC_nw@mail.gmail.com>
+Date: Sun, 8 Jul 2012 22:23:13 +0300
+Subject: [GIT PULL] remoteproc fixes for 3.5
+Message-ID: <CAK=WgbZsCy7ZaMATbyTtZvP6bHCLfroth0z=wFOZhtmMWBFAhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,21 @@ The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git
-tags/hwspinlock-3.5-fixes
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+tags/remoteproc-3.5-fixes
 
-for you to fetch changes up to 476a7eeb60e70ddab138e7cb4bc44ef5ac20782e:
+for you to fetch changes up to e121aefa7d9f10eee5cf26ed47129237a05d940b:
 
-  hwspinlock/core: use global ID to register hwspinlocks on multiple
-devices (2012-07-07 22:35:30 +0300)
-
-----------------------------------------------------------------
-A single hwspinlock core fix for multiple hwspinlock devices scenarios,
-from Shinya Kuribayashi.
+  remoteproc: fix missing CONFIG_FW_LOADER configurations (2012-07-04
+11:01:12 +0300)
 
 ----------------------------------------------------------------
-Shinya Kuribayashi (1):
-      hwspinlock/core: use global ID to register hwspinlocks on multiple devices
+Two build-related remoteproc fixes for 3.5.
 
- drivers/hwspinlock/hwspinlock_core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+----------------------------------------------------------------
+Ohad Ben-Cohen (2):
+      remoteproc/omap: fix randconfig unmet direct dependencies
+      remoteproc: fix missing CONFIG_FW_LOADER configurations
+
+ drivers/remoteproc/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
