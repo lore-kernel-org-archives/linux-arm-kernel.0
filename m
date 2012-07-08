@@ -1,37 +1,43 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 8 Jul 2012 15:26:01 +0800
-Subject: [PATCH] ARM: PRIMA2: convert to common clk and finish full clk
- tree
-In-Reply-To: <201207070841.41494.arnd@arndb.de>
-References: <1341568806-842-1-git-send-email-Barry.Song@csr.com>
- <CAGsJ_4x=GuY4RPk+SaWisoar1Qb0Y8ox0TqXN2hbsNvOHi_J4Q@mail.gmail.com>
- <20120707023201.GC1230@gmail.com> <201207070841.41494.arnd@arndb.de>
-Message-ID: <CAGsJ_4wy67=OSP8qYwf-q77486ttt0YDqPzy1YER=Bj9G4=F3A@mail.gmail.com>
+From: airlied@gmail.com (Dave Airlie)
+Date: Sun, 8 Jul 2012 08:35:55 +0100
+Subject: [PATCH, RFC] i.MX DRM support
+In-Reply-To: <20120706225833.GA22265@kroah.com>
+References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
+ <20120702100506.GI24458@pengutronix.de>
+ <20120706225833.GA22265@kroah.com>
+Message-ID: <CAPM=9ty6xqMg+X7UJMtLShPv5=2kC3PXeBrfLwXT8ReKN+q-9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-2012/7/7 Arnd Bergmann <arnd@arndb.de>:
-> On Saturday 07 July 2012, Mike Turquette wrote:
->> I don't mind dropping your patches from clk-next and taking new ones.
->> Go ahead and send me a new patch which does everything instead of an
->> incremental patch to simply 'git mv' the code.  Feel free to split the
->> patch up if needed.
+On Fri, Jul 6, 2012 at 11:58 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Mon, Jul 02, 2012 at 12:05:06PM +0200, Sascha Hauer wrote:
+>> On Thu, Jun 14, 2012 at 03:43:22PM +0200, Sascha Hauer wrote:
+>> > Hi All,
+>> >
+>> > The following is the state-of-the-art i.MX IPU (Image Processing Unit)
+>> > DRM support.
+>> >
+>> > This code is around for quite some time now and has been posted several
+>> > times with different APIs, first with plain old framebuffer support, now
+>> > DRM, first platform device binding, now devicetree. Unfortunately there's
+>> > quite much code needed to get something useful out of the IPU, so these
+>> > patches haven't received a lot of attention from people not involved in
+>> > i.MX. I think we have now come to a point where this code needs more public
+>> > exposure and where it's easier to talk in incremental changes instead of
+>> > blobs. Therefore I request this to go to staging for some cycles.
+>>
+>> Dave, Greg,
+>>
+>> Comments to this one? I addressed the comments I received so far and am
+>> about to respin this series. Is it ok to put this to staging? If yes,
+>> should I move the whole stuff into drivers/staging/ or should it stay
+>> in drivers/gpu/drm with just a Kconfig dependency on STAGING?
 >
-> FWIW, I would always recommend doing this in two patches, one that changes
-> the code and one that moves the file, in either order. The main difference
-> is that for those who cannot use 'git diff -M', reviewing the patch becomes
-> much easier when it doesn't look like one file is removed and another
-> completely different file is added.
+> That's up to the DRM subsystem maintainer to choose.
 
-i tend towards the latter one. i am thinking those might be two jobs:
-1. change the current drivers to common clk and finish the whole tree
-2. move the updated driver to the right place after 1
+Sorry guys been out of the loop on arm drivers due to other things,
+but probably should go in staging proper for now, until I can at least
+spend time reviewing it.
 
-so they might be two patches, how do you think?
-
->
->         Arnd
-
--barry
+Dave.
