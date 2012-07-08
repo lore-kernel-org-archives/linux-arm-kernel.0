@@ -1,7 +1,7 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 8 Jul 2012 22:23:13 +0300
-Subject: [GIT PULL] remoteproc fixes for 3.5
-Message-ID: <CAK=WgbZsCy7ZaMATbyTtZvP6bHCLfroth0z=wFOZhtmMWBFAhg@mail.gmail.com>
+Date: Sun, 8 Jul 2012 22:23:32 +0300
+Subject: [GIT PULL] rpmsg fixes for 3.5
+Message-ID: <CAK=WgbbvHobMODDaa+k10uWfbMaH-6SZ6o9f6Vx+aB2TSvfDQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,23 @@ The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-tags/remoteproc-3.5-fixes
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
+tags/rpmsg-3.5-fixes
 
-for you to fetch changes up to e121aefa7d9f10eee5cf26ed47129237a05d940b:
+for you to fetch changes up to 15fd943af50dbc5f7f4de33835795c72595f7bf4:
 
-  remoteproc: fix missing CONFIG_FW_LOADER configurations (2012-07-04
-11:01:12 +0300)
+  rpmsg: make sure inflight messages don't invoke just-removed
+callbacks (2012-07-04 11:51:59 +0300)
 
 ----------------------------------------------------------------
-Two build-related remoteproc fixes for 3.5.
+Fixing two (somewhat rare) endpoint-related race issues, both of which
+were reported by Fernando Guzman Lugo.
 
 ----------------------------------------------------------------
 Ohad Ben-Cohen (2):
-      remoteproc/omap: fix randconfig unmet direct dependencies
-      remoteproc: fix missing CONFIG_FW_LOADER configurations
+      rpmsg: avoid premature deallocation of endpoints
+      rpmsg: make sure inflight messages don't invoke just-removed callbacks
 
- drivers/remoteproc/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/rpmsg/virtio_rpmsg_bus.c | 55 ++++++++++++++++++++++++++++++++++++----
+ include/linux/rpmsg.h            |  6 +++++
+ 2 files changed, 56 insertions(+), 5 deletions(-)
