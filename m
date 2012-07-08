@@ -1,53 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 08 Jul 2012 15:33:23 -0500
-Subject: [PATCH 03/15] ARM: tegra: use fixed PCI i/o mapping
-In-Reply-To: <201207081635.30864.arnd@arndb.de>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <20120708060932.GB5186@avionic-0098.mockup.avionic-design.de>
- <4FF99688.1040703@gmail.com> <201207081635.30864.arnd@arndb.de>
-Message-ID: <4FF9EE93.3010200@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 8 Jul 2012 22:57:12 +0100
+Subject: [PATCH] ARM: remove asm/locks.h
+In-Reply-To: <1341773106.22584.9.camel@x61.thuisdomein>
+References: <1341262188.1911.147.camel@x61.thuisdomein>
+ <20120702215203.GA25234@mudshark.cambridge.arm.com>
+ <1341300030.1911.179.camel@x61.thuisdomein>
+ <20120708160258.GC27030@mudshark.cambridge.arm.com>
+ <1341773106.22584.9.camel@x61.thuisdomein>
+Message-ID: <20120708215712.GA6404@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2012 11:35 AM, Arnd Bergmann wrote:
-> On Sunday 08 July 2012, Rob Herring wrote:
->>> I'm not very familiar with the inner workings of the iotable and the
->>> mappings initialized by it, but I wonder if this can be done dynamically
->>> at a later stage. The way this is currently done in this patch, the I/O
->>> region is statically mapped from a fixed offset within the PCIe address
->>> range. Part of the patches to add DT support is to allow this region to
->>> be defined by the DT, so that will obviously also create problems.
->>
->> Is the i/o address something you could extract from DT earlier? This can
->> be done separately if it doesn't require information from the driver.
->>
->> I'm sure exactly how to do a fixed virtual mapping other than the
->> io_table mappings. There was some discussion of use fixmap region
->> previously, but doing so will be a bit more complex. I'll look into this
->> some.
+On Sun, Jul 08, 2012 at 07:45:06PM +0100, Paul Bolle wrote:
+> On Sun, 2012-07-08 at 17:03 +0100, Will Deacon wrote:
+> >  Please can you put this into the patch system?
 > 
-> I think you can call ioremap_page_range() to do this.
+> I'm not sure what the patch system is, but I am certain that I'm not
+> allowed to put this patch into it.
 
-Thanks for the pointer. But this has to be in 2 steps. First reserve the
-virtual space and then map it. For the first part I think something like
-this function will work:
+Don't be so certain -- the patch system is the preferred method for submitting
+patches to arch/arm/ via Russell's tree. Since you're not familiar with it,
+I've sent the patch for you this time:
 
-void __init pci_reserve_io(void)
-{
-	struct vm_struct *vm;
+  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7460/1
 
-	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
+but if you have any additional patches to core ARM code then you can send
+them following mailing list review and looking at the help here:
 
-	vm->addr = (void *)PCI_IO_VIRT_BASE;
-	vm->size = SZ_1M;
-	vm->phys_addr = 0;
-	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-	vm->flags |= VM_ARM_MTYPE(MT_DEVICE);
-	vm->caller = pci_reserve_io;
-	vm_area_add_early(vm++);
-}
+  http://www.arm.linux.org.uk/developer/patches/info.php
 
-There's a big fat warning on vm_area_add_early from Nico to not use
-unless you know what you're doing. I'll pretend I do...
+Note that changes to soc-specific code goes via the arm-soc tree (Arnd and
+Olof) so don't use the patch system for that.
 
-Rob
+Cheers,
+
+Will
