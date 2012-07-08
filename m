@@ -1,283 +1,231 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Sun,  8 Jul 2012 19:12:24 +0200
-Subject: [PATCH 10/10] MACH/Samsung/Mini2440: update the default config
-In-Reply-To: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
-References: <1341767544-17447-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1341767544-17447-11-git-send-email-jbe@pengutronix.de>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
+Date: Sun,  8 Jul 2012 19:15:26 +0200
+Subject: [PATCH 1/1] clk: add DT support for clock gating control
+Message-ID: <1341767726-25630-1-git-send-email-sebastian.hesselbarth@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
----
- arch/arm/configs/mini2440_defconfig |   90 ++++++++++++++---------------------
- 1 file changed, 37 insertions(+), 53 deletions(-)
+This patch adds support for using clock gates (clk-gate) from DT based
+on Rob Herrings DT clk binding support for 3.6.
 
-diff --git a/arch/arm/configs/mini2440_defconfig b/arch/arm/configs/mini2440_defconfig
-index 082175c..b6cab92 100644
---- a/arch/arm/configs/mini2440_defconfig
-+++ b/arch/arm/configs/mini2440_defconfig
-@@ -1,10 +1,9 @@
- CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_DEFAULT_HOSTNAME="Mini2440"
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
- CONFIG_RELAY=y
--CONFIG_UTS_NS=y
--CONFIG_IPC_NS=y
- CONFIG_BLK_DEV_INITRD=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_MODULES=y
-@@ -14,18 +13,15 @@ CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_BLK_DEV_INTEGRITY=y
- CONFIG_ARCH_S3C24XX=y
-+CONFIG_S3C24XX_PWM=y
- # CONFIG_CPU_S3C2410 is not set
- CONFIG_CPU_S3C2440=y
--CONFIG_S3C_ADC=y
--CONFIG_S3C24XX_PWM=y
- CONFIG_MACH_MINI2440=y
- CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
- CONFIG_KEXEC=y
- CONFIG_CPU_IDLE=y
- CONFIG_BINFMT_AOUT=m
- CONFIG_BINFMT_MISC=m
--CONFIG_PM=y
- CONFIG_APM_EMULATION=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -58,8 +54,6 @@ CONFIG_VLAN_8021Q=m
- CONFIG_VLAN_8021Q_GVRP=y
- CONFIG_NET_PKTGEN=m
- CONFIG_BT=m
--CONFIG_BT_L2CAP=m
--CONFIG_BT_SCO=m
- CONFIG_BT_RFCOMM=m
- CONFIG_BT_RFCOMM_TTY=y
- CONFIG_BT_BNEP=m
-@@ -85,8 +79,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- CONFIG_CONNECTOR=m
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-@@ -111,7 +103,6 @@ CONFIG_BLK_DEV_NBD=m
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
- CONFIG_CDROM_PKTCDVD=m
--CONFIG_SENSORS_TSL2550=m
- CONFIG_SCSI=m
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=m
-@@ -119,10 +110,28 @@ CONFIG_CHR_DEV_SG=m
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_TUN=m
--CONFIG_NET_ETHERNET=y
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CHELSIO is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
- CONFIG_DM9000=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_PPP=m
-+CONFIG_PPP_BSDCOMP=m
-+CONFIG_PPP_DEFLATE=m
-+CONFIG_PPP_FILTER=y
-+CONFIG_PPP_MPPE=m
-+CONFIG_PPP_MULTILINK=y
-+CONFIG_PPP_ASYNC=m
-+CONFIG_PPP_SYNC_TTY=m
- CONFIG_HOSTAP=m
- CONFIG_HOSTAP_FIRMWARE=y
- CONFIG_HOSTAP_FIRMWARE_NVRAM=y
-@@ -130,25 +139,18 @@ CONFIG_LIBERTAS=m
- CONFIG_LIBERTAS_SDIO=m
- CONFIG_ZD1211RW=m
- CONFIG_ZD1211RW_DEBUG=y
--CONFIG_PPP=m
--CONFIG_PPP_MULTILINK=y
--CONFIG_PPP_FILTER=y
--CONFIG_PPP_ASYNC=m
--CONFIG_PPP_SYNC_TTY=m
--CONFIG_PPP_DEFLATE=m
--CONFIG_PPP_BSDCOMP=m
--CONFIG_PPP_MPPE=m
- CONFIG_INPUT_FF_MEMLESS=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_EVBUG=m
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_MOUSE_PS2 is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_SERIO_RAW=y
- CONFIG_VT_HW_CONSOLE_BINDING=y
-+CONFIG_LEGACY_PTY_COUNT=128
- CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
--CONFIG_LEGACY_PTY_COUNT=128
- CONFIG_IPMI_HANDLER=m
- CONFIG_IPMI_DEVICE_INTERFACE=m
- CONFIG_IPMI_SI=m
-@@ -163,7 +165,8 @@ CONFIG_SPI=y
- CONFIG_SPI_S3C24XX=y
- CONFIG_SPI_SPIDEV=y
- CONFIG_GPIO_SYSFS=y
--CONFIG_SENSORS_LM75=y
-+CONFIG_SENSORS_S3C=y
-+CONFIG_SENSORS_S3C_RAW=y
- CONFIG_THERMAL=m
- CONFIG_WATCHDOG=y
- CONFIG_S3C2410_WATCHDOG=y
-@@ -179,8 +182,6 @@ CONFIG_LCD_PLATFORM=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
--CONFIG_DISPLAY_SUPPORT=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
-@@ -205,10 +206,9 @@ CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_USB_CAIAQ=m
- CONFIG_SND_USB_CAIAQ_INPUT=y
- CONFIG_SND_SOC=y
--CONFIG_SND_S3C24XX_SOC=y
-+CONFIG_SND_SOC_SAMSUNG=y
-+CONFIG_SND_SOC_SAMSUNG_S3C24XX_UDA134X=y
- CONFIG_HIDRAW=y
--CONFIG_HID_PID=y
--CONFIG_USB_HIDDEV=y
- CONFIG_HID_GYRATION=y
- CONFIG_HID_NTRIG=y
- CONFIG_HID_PANTHERLORD=y
-@@ -217,9 +217,9 @@ CONFIG_HID_SAMSUNG=y
- CONFIG_HID_SONY=y
- CONFIG_HID_SUNPLUS=y
- CONFIG_HID_TOPSEED=y
-+CONFIG_HID_PID=y
-+CONFIG_USB_HIDDEV=y
- CONFIG_USB=y
--CONFIG_USB_DEVICEFS=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_ACM=m
- CONFIG_USB_WDM=m
-@@ -237,7 +237,7 @@ CONFIG_USB_SERIAL_CP210X=m
- CONFIG_USB_SERIAL_FTDI_SIO=m
- CONFIG_USB_SERIAL_SPCP8X5=m
- CONFIG_USB_GADGET=y
--CONFIG_USB_GADGET_S3C2410=y
-+CONFIG_USB_S3C2410=m
- CONFIG_USB_ZERO=m
- CONFIG_USB_ETH=m
- CONFIG_USB_GADGETFS=m
-@@ -249,9 +249,8 @@ CONFIG_SDIO_UART=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SPI=y
- CONFIG_MMC_S3C=y
--CONFIG_LEDS_CLASS=y
-+CONFIG_MMC_S3C_DMA=y
- CONFIG_LEDS_S3C24XX=y
--CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
-@@ -260,6 +259,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
- CONFIG_RTC_DRV_S3C=y
- CONFIG_DMADEVICES=y
-+# CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=m
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
-@@ -267,8 +267,6 @@ CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
- CONFIG_EXT3_FS_SECURITY=y
--CONFIG_INOTIFY=y
--CONFIG_AUTOFS_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
-@@ -280,17 +278,9 @@ CONFIG_CRAMFS=y
- CONFIG_ROMFS_FS=y
- CONFIG_ROMFS_BACKED_BY_BOTH=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_BSD_DISKLABEL=y
--CONFIG_MINIX_SUBPARTITION=y
--CONFIG_SOLARIS_X86_PARTITION=y
--CONFIG_UNIXWARE_DISKLABEL=y
--CONFIG_LDM_PARTITION=y
--CONFIG_EFI_PARTITION=y
- CONFIG_NLS_DEFAULT="cp437"
- CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_737=m
-@@ -337,11 +327,8 @@ CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
-+# CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
--CONFIG_KEYS=y
--CONFIG_CRYPTO_FIPS=y
- CONFIG_CRYPTO_NULL=m
- CONFIG_CRYPTO_CRYPTD=m
- CONFIG_CRYPTO_AUTHENC=m
-@@ -349,14 +336,12 @@ CONFIG_CRYPTO_TEST=m
- CONFIG_CRYPTO_CCM=m
- CONFIG_CRYPTO_GCM=m
- CONFIG_CRYPTO_CTS=m
--CONFIG_CRYPTO_ECB=y
- CONFIG_CRYPTO_LRW=m
- CONFIG_CRYPTO_PCBC=m
- CONFIG_CRYPTO_XTS=m
--CONFIG_CRYPTO_HMAC=y
-+CONFIG_CRYPTO_HMAC=m
- CONFIG_CRYPTO_XCBC=m
- CONFIG_CRYPTO_MD4=m
--CONFIG_CRYPTO_MICHAEL_MIC=y
- CONFIG_CRYPTO_RMD128=m
- CONFIG_CRYPTO_RMD160=m
- CONFIG_CRYPTO_RMD256=m
-@@ -365,9 +350,7 @@ CONFIG_CRYPTO_SHA256=m
- CONFIG_CRYPTO_SHA512=m
- CONFIG_CRYPTO_TGR192=m
- CONFIG_CRYPTO_WP512=m
--CONFIG_CRYPTO_AES=y
- CONFIG_CRYPTO_ANUBIS=m
--CONFIG_CRYPTO_ARC4=y
- CONFIG_CRYPTO_BLOWFISH=m
- CONFIG_CRYPTO_CAMELLIA=m
- CONFIG_CRYPTO_CAST5=m
-@@ -382,5 +365,6 @@ CONFIG_CRYPTO_TWOFISH=m
- CONFIG_CRYPTO_DEFLATE=m
- CONFIG_CRYPTO_ZLIB=m
- CONFIG_CRYPTO_LZO=m
-+# CONFIG_CRYPTO_HW is not set
- CONFIG_CRC_T10DIF=y
- CONFIG_LIBCRC32C=m
+It adds a helper function to clk-gate to allocate all resources required by
+a set of individual clock gates, i.e. register base address and lock. Each
+clock gate is described as a child of the clock-gating-control in DT and
+also created by the helper function.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Rob Landley <rob@landley.net>
+Cc: Mike Turquette <mturquette@ti.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ .../bindings/clock/clock-gating-control.txt        |   80 +++++++++++++++++++
+ drivers/clk/clk-gate.c                             |   84 ++++++++++++++++++++
+ include/linux/clk-provider.h                       |    2 +
+ 3 files changed, 166 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/clock-gating-control.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/clock-gating-control.txt b/Documentation/devicetree/bindings/clock/clock-gating-control.txt
+new file mode 100644
+index 0000000..05f5728
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/clock-gating-control.txt
+@@ -0,0 +1,80 @@
++Binding for simple clock gating control based on clock gate register with one
++bit per clock gate. This is a clock consumer and also a clock provider for a
++set of gated clocks that are described as children of this node. Each clock gate
++is described by a bit number and polarity to control the gate.
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++==Clock gating control==
++
++Required properties:
++- compatible : shall be "clock-gating-control".
++- reg : should contain the register physical address and length for
++        the clock gating control.
++- clocks : shared parent clock for all gated clocks.
++- #clock-cells : from common clock binding; shall be set to 0.
++- #address-cells : number of cells required to describe a clock gate;
++                   should be <2>.
++- #size-cells : should be zero.
++
++Each individual clock gate bit is described as a child of the
++corresponding gating control register with the following properties.
++
++Required child properties:
++- reg : should contain the individual bit and polarity to control
++        the clock gate. A polarity of 0 means that by setting the
++        bit to 1 the clock passes through the clock gate while
++	setting the bit to 0 disables the clock. Any other value
++     	for polarity inverts the meaning of the control bit.
++
++Optional child properties:
++- clocks : overrides the shared parent clock for this clock gate
++           by the clock passed in this property.
++- clock-output-names : from common clock binding; allows to set
++                       a specific name for the gated clock output.
++
++==Example==
++
++	/* fixed root clock */
++	osc: oscillator {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <166666667>;
++	};
++
++	/* sata peripheral clock */
++	sata_clk: ext-oscillator {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <25000000>;
++	};
++
++	/* register-based clock gating control */
++	gating-control at f10d0038 {
++		compatible = "clock-gating-control";
++		reg = <0xf10d0038 0x4>;
++		clocks = <&osc>;
++		#clock-cells = <0>;
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		/* USB0 clock gate on register bit 0 with inverted polarity */
++		cg_usb0: clockgate at 0 {
++			reg = <0 1>; /* register bit 0, inverted polarity */
++		};
++
++		/* PCIe0 clock gate on register bit 1 with normal polarity
++		 * and named output clock */
++		cg_pcie0: clockgate at 1 {
++			reg = <1 0>; /* register bit 1, normal polarity */
++			clock-output-names = "pcie0_clk";
++		};
++
++		/* SATA clock gate with different parent clock */
++		cg_sata: clockgate at 3 {
++			reg = <3 0>; /* register bit 3, normal polarity */
++			clocks = <&sata_clk>;
++		};
++	};
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 578465e..1e88907 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -15,6 +15,9 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <linux/string.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
+ 
+ /**
+  * DOC: basic gatable clock which can gate and ungate it's ouput
+@@ -148,3 +151,84 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 
+ 	return clk;
+ }
++
++#ifdef CONFIG_OF
++/**
++ * of_clock_gating_control_setup() - Setup function for clock gate control
++ *   This is a helper for using clk-gate from OF device tree. It allocates
++ *   a common lock for a base register and creates the individual clk-gates.
++ */
++void __init of_clock_gating_control_setup(struct device_node *np)
++{
++	struct device_node *child;
++	const char *pclk_name;
++	void __iomem *base;
++	spinlock_t *lockp;
++	unsigned int rnum;
++	u64 addr;
++
++	pclk_name = of_clk_get_parent_name(np, 0);
++	if (!pclk_name) {
++		pr_debug("%s: unable to get parent clock for %s\n",
++			__func__, np->full_name);
++		return;
++	}
++
++	lockp = kzalloc(sizeof(spinlock_t), GFP_KERNEL);
++	if (!lockp) {
++		pr_debug("%s: unable to allocate spinlock for %s\n",
++			 __func__, np->full_name);
++		return;
++	}
++
++	spin_lock_init(lockp);
++	base = of_iomap(np, 0);
++	rnum = sizeof(resource_size_t) * 8;
++	addr = of_translate_address(np, of_get_property(np, "reg", NULL));
++
++	pr_debug("create clock gate control %s\n", np->full_name);
++
++	for_each_child_of_node(np, child) {
++		struct clk *cg;
++		const char *cg_name;
++		const char *cg_pclk_name;
++		u32 propval[2];
++		unsigned int rbit;
++
++		if (of_property_read_u32_array(child, "reg", propval, 2)) {
++			pr_debug("%s: wrong #reg on %s\n",
++				 __func__, child->full_name);
++			continue;
++		}
++
++		rbit = propval[0];
++		if (rbit >= rnum) {
++			pr_debug("%s: bit position of %s exceeds resources\n",
++				 __func__, child->full_name);
++			continue;
++		}
++
++		cg_pclk_name = of_clk_get_parent_name(child, 0);
++		if (!pclk_name)
++			cg_pclk_name = pclk_name;
++
++		if (of_property_read_string(child, "clock-output-names",
++					    &cg_name)) {
++			unsigned int nlen = 4 + 16 + strlen(child->name);
++			char *name = kzalloc(nlen+1, GFP_KERNEL);
++			if (!name)
++				continue;
++			snprintf(name, nlen, "%u@%llx.%s", rbit,
++				 (unsigned long long)addr, child->name);
++			cg_name = name;
++		}
++
++		pr_debug("  create clock gate: %s\n", cg_name);
++
++		cg = clk_register_gate(NULL, cg_name, cg_pclk_name, 0,
++				       base, rbit, propval[1], lockp);
++		if (cg)
++			of_clk_add_provider(child, of_clk_src_simple_get, cg);
++	}
++}
++#endif
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index b97f61e..499eac2 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -205,6 +205,8 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock);
+ 
++void of_clock_gating_control_setup(struct device_node *np);
++
+ /**
+  * struct clk_divider - adjustable divider clock
+  *
 -- 
 1.7.10
