@@ -1,81 +1,266 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 8 Jul 2012 07:15:32 +0200
-Subject: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
-In-Reply-To: <1341712907.57646.YahooMailClassic@web124905.mail.ne1.yahoo.com>
-References: <1341712907.57646.YahooMailClassic@web124905.mail.ne1.yahoo.com>
-Message-ID: <201207080715.32999.marex@denx.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sun, 8 Jul 2012 08:09:32 +0200
+Subject: [PATCH 03/15] ARM: tegra: use fixed PCI i/o mapping
+In-Reply-To: <1341600040-30993-4-git-send-email-robherring2@gmail.com>
+References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+ <1341600040-30993-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20120708060932.GB5186@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alain-Serge Nagni,
+On Fri, Jul 06, 2012 at 01:40:28PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Move tegra PCI to fixed i/o mapping and remove io.h.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/Kconfig                         |    1 -
+>  arch/arm/mach-tegra/include/mach/io.h    |   46 ------------------------------
+>  arch/arm/mach-tegra/include/mach/iomap.h |    3 ++
+>  arch/arm/mach-tegra/io.c                 |    2 ++
+>  arch/arm/mach-tegra/pcie.c               |   43 ++++------------------------
+>  5 files changed, 10 insertions(+), 85 deletions(-)
+>  delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
 
-> Hi Marek,
-> 
->  1) Thanks for the advice, I will remember to not top post :-)
+Hi Rob,
 
-You did it again ;-)
+generally this looks good. However I've been working on a rewrite of the
+Tegra PCIe support to make it work as a driver and add DT support. This
+entails that PCIe support isn't initialized until very late in the
+process because it makes use of deferred probe if some regulators aren't
+available. One problem caused by this is that it suddenly requires a lot
+of code marked as __init to be available after the init phase and I see
+that you've introduced pci_map_io_single_pfn() that is __init annotated,
+so it will cause problems when used with my patches.
 
->  2) I spent lot of time testing your new additions to the mxs SPI driver
-> and it works fine. Great job.
+I'm not very familiar with the inner workings of the iotable and the
+mappings initialized by it, but I wonder if this can be done dynamically
+at a later stage. The way this is currently done in this patch, the I/O
+region is statically mapped from a fixed offset within the PCIe address
+range. Part of the patches to add DT support is to allow this region to
+be defined by the DT, so that will obviously also create problems.
 
-On what platform did you test it? And with what SPI peripherals? Can I possibly 
-get your proper Tested-by: line?
+If both of those issues can be easily addressed, then this certainly
+looks very nice.
 
-> Regards,
-> 
-> Alain-Serge
-> 
-> 
-> --- On Thu, 6/28/12, Marek Vasut <marex@denx.de> wrote:
-> 
-> From: Marek Vasut <marex@denx.de>
-> Subject: Re: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: "Alain-Serge Nagni" <alainsergenagni@yahoo.com>, "Fabio Estevam"
-> <festevam@gmail.com>, "Shawn Guo" <shawn.guo@linaro.org> Date: Thursday,
-> June 28, 2012, 6:09 PM
-> 
-> Dear Alain-Serge Nagni,
-> 
-> > Hi Fabio and Marek,
-> >
-> >  So I did rebuild the Kernel and UBoot to support device tree.  I did
-> >
-> > reboot the system and this time I?m not having any kernel panic. Which is
-> > a good signJ. After investigation I notice that the  SSP2 node status is
-> > marked ?disabled? (in the file imx28.dtsi).  So there is no way based on
-> > the patch that was publish to have the imx-spi driver loaded in the
-> > kernel at boot time.
-> > Mareck,
-> >
-> >  I guess that  you have a piece of code that you forgot to publish? If
-> >not
-> >
-> > how can I have your SPI drive to run?
-> >
-> >  Right now I guess that the next step would be to define the SPI node in
-> >
-> > the im28-evk.dts file.  I will open a thread to see if anybody as a
-> > solution for that. What is your take on that?
-> >
-> > 
-> >
-> > Thanks guys,
-> > Alain-Serge         
-> 
-> [...]
-> 
-> Fabio already answered your question. Lemme teach you a few more rules:
-> 1) Do not top post in the email conversation ;-)
-> 2) About DT. You're supposed to include imx28.dtsi in your
-> imx28-yourboard.dts file. Then everything that's already defined in the
-> imx28.dtsi will be present in your imx28-yourboard.dts . But the key thing
-> is, if you define something again, it will override the stuff already
-> defined in the imx28.dtsi file. But you don't have to redefine everything,
-> just redefine what you need changed.
-> 
-> Best regards,
-> Marek Vasut
+Thierry
 
-Best regards,
-Marek Vasut
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 8fb7e4a..ac446e3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -644,7 +644,6 @@ config ARCH_TEGRA
+>  	select HAVE_CLK
+>  	select HAVE_SMP
+>  	select MIGHT_HAVE_CACHE_L2X0
+> -	select NEED_MACH_IO_H if PCI
+>  	select ARCH_HAS_CPUFREQ
+>  	help
+>  	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+> diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
+> deleted file mode 100644
+> index fe700f9..0000000
+> --- a/arch/arm/mach-tegra/include/mach/io.h
+> +++ /dev/null
+> @@ -1,46 +0,0 @@
+> -/*
+> - * arch/arm/mach-tegra/include/mach/io.h
+> - *
+> - * Copyright (C) 2010 Google, Inc.
+> - *
+> - * Author:
+> - *	Colin Cross <ccross@google.com>
+> - *	Erik Gilling <konkers@google.com>
+> - *
+> - * This software is licensed under the terms of the GNU General Public
+> - * License version 2, as published by the Free Software Foundation, and
+> - * may be copied, distributed, and modified under those terms.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - */
+> -
+> -#ifndef __MACH_TEGRA_IO_H
+> -#define __MACH_TEGRA_IO_H
+> -
+> -#define IO_SPACE_LIMIT 0xffff
+> -
+> -#ifndef __ASSEMBLER__
+> -
+> -#ifdef CONFIG_TEGRA_PCI
+> -extern void __iomem *tegra_pcie_io_base;
+> -
+> -static inline void __iomem *__io(unsigned long addr)
+> -{
+> -	return tegra_pcie_io_base + (addr & IO_SPACE_LIMIT);
+> -}
+> -#else
+> -static inline void __iomem *__io(unsigned long addr)
+> -{
+> -	return (void __iomem *)addr;
+> -}
+> -#endif
+> -
+> -#define __io(a)         __io(a)
+> -
+> -#endif
+> -
+> -#endif
+> diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+> index 7e76da7..fee3a94 100644
+> --- a/arch/arm/mach-tegra/include/mach/iomap.h
+> +++ b/arch/arm/mach-tegra/include/mach/iomap.h
+> @@ -303,6 +303,9 @@
+>  #define IO_APB_VIRT	IOMEM(0xFE300000)
+>  #define IO_APB_SIZE	SZ_1M
+>  
+> +#define TEGRA_PCIE_BASE		0x80000000
+> +#define TEGRA_PCIE_IO_BASE	(TEGRA_PCIE_BASE + SZ_4M)
+> +
+>  #define IO_TO_VIRT_BETWEEN(p, st, sz)	((p) >= (st) && (p) < ((st) + (sz)))
+>  #define IO_TO_VIRT_XLATE(p, pst, vst)	(((p) - (pst) + (vst)))
+>  
+> diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
+> index 58b4baf..7a29e10 100644
+> --- a/arch/arm/mach-tegra/io.c
+> +++ b/arch/arm/mach-tegra/io.c
+> @@ -26,6 +26,7 @@
+>  
+>  #include <asm/page.h>
+>  #include <asm/mach/map.h>
+> +#include <asm/mach/pci.h>
+>  #include <mach/iomap.h>
+>  
+>  #include "board.h"
+> @@ -59,5 +60,6 @@ static struct map_desc tegra_io_desc[] __initdata = {
+>  
+>  void __init tegra_map_common_io(void)
+>  {
+> +	pci_map_io_single(TEGRA_PCIE_IO_BASE);
+>  	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
+>  }
+> diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+> index 0e09137..c989a8e 100644
+> --- a/arch/arm/mach-tegra/pcie.c
+> +++ b/arch/arm/mach-tegra/pcie.c
+> @@ -171,8 +171,6 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+>   * 0x90000000 - 0x9fffffff - non-prefetchable memory
+>   * 0xa0000000 - 0xbfffffff - prefetchable memory
+>   */
+> -#define TEGRA_PCIE_BASE		0x80000000
+> -
+>  #define PCIE_REGS_SZ		SZ_16K
+>  #define PCIE_CFG_OFF		PCIE_REGS_SZ
+>  #define PCIE_CFG_SZ		SZ_1M
+> @@ -180,8 +178,6 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+>  #define PCIE_EXT_CFG_SZ		SZ_1M
+>  #define PCIE_IOMAP_SZ		(PCIE_REGS_SZ + PCIE_CFG_SZ + PCIE_EXT_CFG_SZ)
+>  
+> -#define MMIO_BASE		(TEGRA_PCIE_BASE + SZ_4M)
+> -#define MMIO_SIZE		SZ_64K
+>  #define MEM_BASE_0		(TEGRA_PCIE_BASE + SZ_256M)
+>  #define MEM_SIZE_0		SZ_128M
+>  #define MEM_BASE_1		(MEM_BASE_0 + MEM_SIZE_0)
+> @@ -223,17 +219,7 @@ struct tegra_pcie_info {
+>  	struct clk		*pll_e;
+>  };
+>  
+> -static struct tegra_pcie_info tegra_pcie = {
+> -	.res_mmio = {
+> -		.name = "PCI IO",
+> -		.start = MMIO_BASE,
+> -		.end = MMIO_BASE + MMIO_SIZE - 1,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -};
+> -
+> -void __iomem *tegra_pcie_io_base;
+> -EXPORT_SYMBOL(tegra_pcie_io_base);
+> +static struct tegra_pcie_info tegra_pcie;
+>  
+>  static inline void afi_writel(u32 value, unsigned long offset)
+>  {
+> @@ -403,7 +389,7 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
+>  		pp->res[0].end = pp->res[0].start + SZ_32K - 1;
+>  	} else {
+>  		pp->res[0].start = PCIBIOS_MIN_IO + SZ_32K;
+> -		pp->res[0].end = IO_SPACE_LIMIT;
+> +		pp->res[0].end = SZ_64K - 1;
+>  	}
+>  	pp->res[0].flags = IORESOURCE_IO;
+>  	if (request_resource(&ioport_resource, &pp->res[0]))
+> @@ -541,8 +527,8 @@ static void tegra_pcie_setup_translations(void)
+>  
+>  	/* Bar 2: downstream IO bar */
+>  	fpci_bar = ((__u32)0xfdfc << 16);
+> -	size = MMIO_SIZE;
+> -	axi_address = MMIO_BASE;
+> +	size = SZ_64K;
+> +	axi_address = TEGRA_PCIE_IO_BASE;
+>  	afi_writel(axi_address, AFI_AXI_BAR2_START);
+>  	afi_writel(size >> 12, AFI_AXI_BAR2_SZ);
+>  	afi_writel(fpci_bar, AFI_FPCI_BAR2);
+> @@ -776,7 +762,6 @@ static void tegra_pcie_clocks_put(void)
+>  
+>  static int __init tegra_pcie_get_resources(void)
+>  {
+> -	struct resource *res_mmio = &tegra_pcie.res_mmio;
+>  	int err;
+>  
+>  	err = tegra_pcie_clocks_get();
+> @@ -798,34 +783,16 @@ static int __init tegra_pcie_get_resources(void)
+>  		goto err_map_reg;
+>  	}
+>  
+> -	err = request_resource(&iomem_resource, res_mmio);
+> -	if (err) {
+> -		pr_err("PCIE: Failed to request resources: %d\n", err);
+> -		goto err_req_io;
+> -	}
+> -
+> -	tegra_pcie_io_base = ioremap_nocache(res_mmio->start,
+> -					     resource_size(res_mmio));
+> -	if (tegra_pcie_io_base == NULL) {
+> -		pr_err("PCIE: Failed to map IO\n");
+> -		err = -ENOMEM;
+> -		goto err_map_io;
+> -	}
+> -
+>  	err = request_irq(INT_PCIE_INTR, tegra_pcie_isr,
+>  			  IRQF_SHARED, "PCIE", &tegra_pcie);
+>  	if (err) {
+>  		pr_err("PCIE: Failed to register IRQ: %d\n", err);
+> -		goto err_irq;
+> +		goto err_req_io;
+>  	}
+>  	set_irq_flags(INT_PCIE_INTR, IRQF_VALID);
+>  
+>  	return 0;
+>  
+> -err_irq:
+> -	iounmap(tegra_pcie_io_base);
+> -err_map_io:
+> -	release_resource(&tegra_pcie.res_mmio);
+>  err_req_io:
+>  	iounmap(tegra_pcie.regs);
+>  err_map_reg:
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120708/c002e0c8/attachment-0001.sig>
