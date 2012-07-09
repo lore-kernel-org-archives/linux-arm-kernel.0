@@ -1,93 +1,63 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 9 Jul 2012 16:02:48 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the gpio-lw tree
-Message-ID: <20120709160248.c746b4286aa2558160f86571@canb.auug.org.au>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Mon, 9 Jul 2012 14:00:18 +0800
+Subject: [PATCH v2 0/2] Watchdog: OMAP: bootstatus fix for omap3 and
+ changes for the current watchdog framework
+In-Reply-To: <4FFA73DB.1020009@ti.com>
+References: <1341808779-25532-1-git-send-email-zumeng.chen@windriver.com>
+ <4FFA73DB.1020009@ti.com>
+Message-ID: <4FFA7372.4050201@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+? 2012?07?09? 14:02, Vaibhav Hiremath ??:
+>
+> On 7/9/2012 10:09 AM, Zumeng Chen wrote:
+>> Hello,
+>>
+>> The following patches based on the 3.5-rc6 from Wim, which
+>> are based on:
+>>
+>> 1 ) bootstatus fix for omap3,
+>>
+>> 2 ) omap-wdt framework update cater for the current framework
+>>      as Shubhrajyoti comments mentioned.
+>>
+>> Regards,
+>> Zumeng
+>>
+>>    Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
+>>
+>> Zumeng Chen (3):
+>>        Watchdog: Omap: Changes for the new watchdog framework
+>>        Watchdog: Omap: select watchdog core for framework change
+>>        Watchdog: Omap: get the bootstatus for OMAP2Plus
+>>
+> It looks like you have manually created your cover letter, cover-letter
+> says [0/2] but actually you have 3 patches in series.
+>
+>
+> You should use following command to create cover letter,
+>
+> git format-patch --cover-letter<no of patches OR commits for patches>
+OK, I'll re-send it again, so Please ignore this thread from now.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/gpio/gpio-mxc.c between commit fef2bca203e9 ("gpio/mxc: use the
-edge_sel feature if available") from the gpio-lw tree and commit
-1ab7ef158dfb ("gpio/mxc: move irq_domain_add_legacy call into gpio
-driver") from the arm-soc tree.
+Many thanks for your kind reminder
 
-I fixed it up (I think - see below) and can carry the fix as necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Zumeng
 
-diff --cc drivers/gpio/gpio-mxc.c
-index f45bb54,e5db670..0000000
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@@ -184,19 -160,15 +184,19 @@@ static int gpio_set_irq_type(struct irq
-  		edge = GPIO_INT_FALL_EDGE;
-  		break;
-  	case IRQ_TYPE_EDGE_BOTH:
- -		val = gpio_get_value(gpio);
- -		if (val) {
- -			edge = GPIO_INT_LOW_LEV;
- -			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
- +		if (GPIO_EDGE_SEL >= 0) {
- +			edge = GPIO_INT_BOTH_EDGES;
-  		} else {
- -			edge = GPIO_INT_HIGH_LEV;
- -			pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
- +			val = gpio_get_value(gpio);
- +			if (val) {
- +				edge = GPIO_INT_LOW_LEV;
- +				pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
- +			} else {
- +				edge = GPIO_INT_HIGH_LEV;
- +				pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
- +			}
-- 			port->both_edges |= 1 << (gpio & 31);
-++			port->both_edges |= 1 << gpio_idx;
-  		}
- -		port->both_edges |= 1 << gpio_idx;
-  		break;
-  	case IRQ_TYPE_LEVEL_LOW:
-  		edge = GPIO_INT_LOW_LEV;
-@@@ -208,24 -180,11 +208,24 @@@
-  		return -EINVAL;
-  	}
-  
- -	reg += GPIO_ICR1 + ((gpio_idx & 0x10) >> 2); /* ICR1 or ICR2 */
- -	bit = gpio_idx & 0xf;
- -	val = readl(reg) & ~(0x3 << (bit << 1));
- -	writel(val | (edge << (bit << 1)), reg);
- +	if (GPIO_EDGE_SEL >= 0) {
- +		val = readl(port->base + GPIO_EDGE_SEL);
- +		if (edge == GPIO_INT_BOTH_EDGES)
-- 			writel(val | (1 << (gpio & 0x1f)),
-++			writel(val | (1 << gpio_idx),
- +				port->base + GPIO_EDGE_SEL);
- +		else
-- 			writel(val & ~(1 << (gpio & 0x1f)),
-++			writel(val & ~(1 << gpio_idx),
- +				port->base + GPIO_EDGE_SEL);
- +	}
- +
- +	if (edge != GPIO_INT_BOTH_EDGES) {
-- 		reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
-- 		bit = gpio & 0xf;
-++		reg += GPIO_ICR1 + ((gpio_idx & 0x10) >> 2); /* ICR1 or ICR2 */
-++		bit = gpio_idx & 0xf;
- +		val = readl(reg) & ~(0x3 << (bit << 1));
- +		writel(val | (edge << (bit << 1)), reg);
- +	}
- +
-- 	writel(1 << (gpio & 0x1f), port->base + GPIO_ISR);
-+ 	writel(1 << gpio_idx, port->base + GPIO_ISR);
-  
-  	return 0;
-  }
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/490f1697/attachment.sig>
+>
+>
+> Thanks,
+> Vaibhav
+>
+>>   arch/arm/mach-omap2/prcm.c  |    5 +-
+>>   drivers/watchdog/Kconfig    |    1 +
+>>   drivers/watchdog/omap_wdt.c |  338 ++++++++++++++++---------------------------
+>>   drivers/watchdog/omap_wdt.h |    5 +
+>>   4 files changed, 133 insertions(+), 216 deletions(-)
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
