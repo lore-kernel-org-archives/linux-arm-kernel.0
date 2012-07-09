@@ -1,54 +1,42 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Jul 2012 08:51:14 +0200
-Subject: [PATCH 1/3] ARM: clk-imx27: Fix rtc clock id
-In-Reply-To: <1341694041-7839-1-git-send-email-festevam@gmail.com>
-References: <1341694041-7839-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120709065114.GL30009@pengutronix.de>
+Date: Mon, 9 Jul 2012 08:52:47 +0200
+Subject: [PATCH] ARM: mx27: Reenable silicon version print
+In-Reply-To: <1341612275-4464-1-git-send-email-festevam@gmail.com>
+References: <1341612275-4464-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120709065247.GM30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 07, 2012 at 05:47:19PM -0300, Fabio Estevam wrote:
+On Fri, Jul 06, 2012 at 07:04:35PM -0300, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Fix rtc clock id.
+> Prior to the new i.mx clock conversion the mx27 silicon version was printed at boot.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Reenable this feature.
 
-Applied this patch.
+Applied, thanks.
 
 Sascha
 
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/mach-imx/clk-imx27.c |    2 +-
->  arch/arm/mach-imx/clk-imx31.c |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-imx/clk-imx27.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 295cbd7..167a3f1 100644
+> index e8a6016..c9370bf 100644
 > --- a/arch/arm/mach-imx/clk-imx27.c
 > +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -256,7 +256,7 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
->  	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
->  	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
-> -	clk_register_clkdev(clk[rtc_ipg_gate], "rtc", NULL);
-> +	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "mxc_rtc");
->  	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
->  	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
->  	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
-> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-> index c9a06d8..8711090 100644
-> --- a/arch/arm/mach-imx/clk-imx31.c
-> +++ b/arch/arm/mach-imx/clk-imx31.c
-> @@ -123,7 +123,7 @@ int __init mx31_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
->  	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
->  	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
-> -	clk_register_clkdev(clk[rtc_gate], "rtc", NULL);
-> +	clk_register_clkdev(clk[rtc_gate], NULL, "mxc_rtc");
->  	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
->  	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
->  	clk_register_clkdev(clk[nfc], NULL, "mxc_nand.0");
+> @@ -269,6 +269,8 @@ int __init mx27_clocks_init(unsigned long fref)
+>  
+>  	clk_prepare_enable(clk[emi_ahb_gate]);
+>  
+> +	imx_print_silicon_rev("i.MX27", mx27_revision());
+> +
+>  	return 0;
+>  }
+>  
 > -- 
 > 1.7.1
 > 
