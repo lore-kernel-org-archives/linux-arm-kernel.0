@@ -1,39 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 9 Jul 2012 11:48:21 +0200
-Subject: [PATCH V3 0/3] i2c-nomadik changes
-In-Reply-To: <CACRpkdakDBrF+G9wpPn+PQ5tcb2xqeiBoSRMmj_PuB_WhufaaQ@mail.gmail.com>
-References: <cover.1339447570.git.rubini@gnudd.com>
- <CACRpkdakDBrF+G9wpPn+PQ5tcb2xqeiBoSRMmj_PuB_WhufaaQ@mail.gmail.com>
-Message-ID: <20120709094821.GB1296@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Jul 2012 11:50:10 +0200
+Subject: [PATCH 3/7] ARM: mxs: convert m28evk board to device tree
+In-Reply-To: <20120709090239.GH11635@S2101-09.ap.freescale.net>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <201207091046.36886.marex@denx.de>
+ <20120709090239.GH11635@S2101-09.ap.freescale.net>
+Message-ID: <201207091150.10910.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 11:37:15PM +0200, Linus Walleij wrote:
-> On Mon, Jun 11, 2012 at 10:56 PM, Alessandro Rubini <rubini@gnudd.com> wrote:
+Dear Shawn Guo,
+
+> On Mon, Jul 09, 2012 at 10:46:36AM +0200, Marek Vasut wrote:
+> > Well ... the support for that board that's in current mainline is pretty
+> > deprecated. And I wasn't really able to update it due to all the DT hype,
+> > you know the rest of the story more then well etc. etc.
 > 
-> > V3:
-> > ? ? ? ?- fixed according to Linusw feedback (merged the patch he posted)
-> > ? ? ? ?- added Tested-by: Linusw on his permission
+> Let's remove it then :)
+
+Yea.
+
+> > To start the enet_out clock.
 > 
-> I'm happy with this version, Wolfram if it looks OK to you,
-> can you please merge this into the I2C tree?
+> Will take care of it in m28evk_init().
 
-Done now, thanks.
+But almost every board needs that hack ... won't it be easier to make it into 
+default behavior? Or can we not somehow configure this via DT itself?
 
-Is the latest version of Lee's patches for DT sent on 20/06 suitable to
-go on top of that?
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/69dd6f32/attachment.sig>
+Best regards,
+Marek Vasut
