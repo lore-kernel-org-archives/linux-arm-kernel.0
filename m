@@ -1,48 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 Jul 2012 21:06:25 +0200
-Subject: [PATCH] ARM: at91/clock: fix PLLA overclock warning
-Message-ID: <1341860785-27405-1-git-send-email-nicolas.ferre@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Jul 2012 21:40:06 +0200
+Subject: [PATCH V3 0/3] i2c-nomadik changes
+In-Reply-To: <20120709094821.GB1296@pengutronix.de>
+References: <cover.1339447570.git.rubini@gnudd.com>
+ <CACRpkdakDBrF+G9wpPn+PQ5tcb2xqeiBoSRMmj_PuB_WhufaaQ@mail.gmail.com>
+ <20120709094821.GB1296@pengutronix.de>
+Message-ID: <CACRpkda6Bup7myYowaLHnAMd5wkUrehYaJnu7BRnbsOwytZ9sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix PLLA overclock warning in relation with datasheet numbers.
-Add new > 240 MHz and > 210 MHz SoC categories.
+On Mon, Jul 9, 2012 at 11:48 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Mon, Jun 11, 2012 at 11:37:15PM +0200, Linus Walleij wrote:
+>> On Mon, Jun 11, 2012 at 10:56 PM, Alessandro Rubini <rubini@gnudd.com> wrote:
+>>
+>> > V3:
+>> >        - fixed according to Linusw feedback (merged the patch he posted)
+>> >        - added Tested-by: Linusw on his permission
+>>
+>> I'm happy with this version, Wolfram if it looks OK to you,
+>> can you please merge this into the I2C tree?
+>
+> Done now, thanks.
+>
+> Is the latest version of Lee's patches for DT sent on 20/06 suitable to
+> go on top of that?
 
-Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/clock.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+No clue on that, Lee'd have to comment.
 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index de2ec6b..188c829 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -63,6 +63,12 @@ EXPORT_SYMBOL_GPL(at91_pmc_base);
- 
- #define cpu_has_300M_plla()	(cpu_is_at91sam9g10())
- 
-+#define cpu_has_240M_plla()	(cpu_is_at91sam9261() \
-+				|| cpu_is_at91sam9263() \
-+				|| cpu_is_at91sam9rl())
-+
-+#define cpu_has_210M_plla()	(cpu_is_at91sam9260())
-+
- #define cpu_has_pllb()		(!(cpu_is_at91sam9rl() \
- 				|| cpu_is_at91sam9g45() \
- 				|| cpu_is_at91sam9x5() \
-@@ -706,6 +712,12 @@ static int __init at91_pmc_init(unsigned long main_clock)
- 	} else if (cpu_has_800M_plla()) {
- 		if (plla.rate_hz > 800000000)
- 			pll_overclock = true;
-+	} else if (cpu_has_240M_plla()) {
-+		if (plla.rate_hz > 240000000)
-+			pll_overclock = true;
-+	} else if (cpu_has_210M_plla()) {
-+		if (plla.rate_hz > 210000000)
-+			pll_overclock = true;
- 	} else {
- 		if (plla.rate_hz > 209000000)
- 			pll_overclock = true;
--- 
-1.7.10
+Yours,
+Linus Walleij
