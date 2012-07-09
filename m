@@ -1,33 +1,24 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 9 Jul 2012 15:21:23 +0200
-Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
-In-Reply-To: <20120709105533.GA3934@opensource.wolfsonmicro.com>
-References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
- <20120709105551.GK15345@sortiz-mobl>
- <20120709105533.GA3934@opensource.wolfsonmicro.com>
-Message-ID: <20120709132123.GQ15345@sortiz-mobl>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 9 Jul 2012 18:41:08 +0530
+Subject: [PATCH 0/2] OMAP4: DT update for L2 controller and local timers
+Message-ID: <1341839470-5586-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Couple of patches which updates the device tree support for OMAP4.
+- Pl310 L2 cache controller DT support
+- ARM cortex-A9 local timer DT support
 
-On Mon, Jul 09, 2012 at 11:55:33AM +0100, Mark Brown wrote:
-> On Mon, Jul 09, 2012 at 12:55:51PM +0200, Samuel Ortiz wrote:
-> 
-> > I applied the first 2 patches, I'd like to get an ACK from the respective
-> > maintainers for the rtc and the input ones. They can even take it as both
-> > drivers are protected by the MFD symbol.
-> 
-> Alessandro's been mostly offline recently so it might be as well to
-> apply the RTC patch anyway.
-Fair enough, applied now. Neither Alessandro nor the rtc ml wer not cc'ed on this
-thread, but that's another problem.
-Zhou, could you please send at least the rtc patch to Alessandro so that he
-could have a look at it if time permits ?
+Tested on OMAP4430 SDP. 
 
-Cheers,
-Samuel.
+Santosh Shilimkar (2):
+  ARM: OMAP4: Add L2 Cache Controller in Device Tree
+  ARM: OMAP4: Add local timer support for Device Tree
+
+ arch/arm/boot/dts/omap4.dtsi       |   13 +++++++++++++
+ arch/arm/mach-omap2/omap4-common.c |    6 +++++-
+ arch/arm/mach-omap2/timer.c        |   11 ++++++++---
+ 3 files changed, 26 insertions(+), 4 deletions(-)
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.7.9.5
