@@ -1,103 +1,62 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 9 Jul 2012 18:00:46 +0530
-Subject: [PATCH v4 04/12] gpio/omap: remove saved_wakeup field from struct
- gpio_bank
-In-Reply-To: <4FFAC5D6.4090306@ti.com>
-References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
- <1331906760-5259-5-git-send-email-tarun.kanti@ti.com>
- <4FFAA7B3.6020009@ti.com>
- <CAC83ZvLo3X_-EarrMFNM0B196FaMLrP5SNh5OA7aE7wMZ9VJUQ@mail.gmail.com>
- <4FFAC5D6.4090306@ti.com>
-Message-ID: <CAC83ZvL0mjVEE4DDd2gPb7Du5YyEbJ46yMZ4Yg1_oupS8rz7jg@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 9 Jul 2012 14:32:20 +0200
+Subject: [PATCH v4 3/5] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <CAMQu2gydOEVK_fzmzkdrBwBfOq6eZG=0QfLUfFChWJu9unSn2A@mail.gmail.com>
+References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
+ <1341826026-6504-4-git-send-email-vincent.guittot@linaro.org>
+ <CAMQu2gydOEVK_fzmzkdrBwBfOq6eZG=0QfLUfFChWJu9unSn2A@mail.gmail.com>
+Message-ID: <CAKfTPtDPGPNk2h_zB=Rf2N2UABAgaDBbij5QFoZTxUTZJbTeAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 5:21 PM, Roger Quadros <rogerq@ti.com> wrote:
-> Tarun,
->
-> On 07/09/2012 02:16 PM, DebBarma, Tarun Kanti wrote:
->> Hi Roger,
+On 9 July 2012 12:55, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
+> Vincent,
+> On Mon, Jul 9, 2012 at 2:57 PM, Vincent Guittot
+> <vincent.guittot@linaro.org> wrote:
+>> Use cpu compatibility field and clock-frequency field of DT to
+>> estimate the capacity of each core of the system and to update
+>> the cpu_power field accordingly.
+>> This patch enables to put more running tasks on big cores than
+>> on LITTLE ones. But this patch doesn't ensure that long running
+>> tasks will run on big cores and short ones on LITTLE cores.
 >>
->> On Mon, Jul 9, 2012 at 3:13 PM, Roger Quadros <rogerq@ti.com> wrote:
->>> Hi,
->>>
->>> Just bumped across this patch and have a query.
->>>
->>> On 03/16/2012 04:05 PM, Tarun Kanti DebBarma wrote:
->>>> There is no more need to have saved_wakeup because bank->context.wake_en
->>>> already holds that value. So getting rid of read/write operation associated
->>>> with this field.
->>>>
->>>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->>>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Acked-by: Felipe Balbi <balbi@ti.com>
->>>> ---
->>>>  drivers/gpio/gpio-omap.c |   12 +++---------
->>>>  1 files changed, 3 insertions(+), 9 deletions(-)
->>>>
->>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>>> index 3a4f151..3b91ade 100644
->>>> --- a/drivers/gpio/gpio-omap.c
->>>> +++ b/drivers/gpio/gpio-omap.c
->>>> @@ -57,7 +57,6 @@ struct gpio_bank {
->>>>       u16 irq;
->>>>       int irq_base;
->>>>       struct irq_domain *domain;
->>>> -     u32 saved_wakeup;
->>>>       u32 non_wakeup_gpios;
->>>>       u32 enabled_non_wakeup_gpios;
->>>>       struct gpio_regs context;
->>>> @@ -777,7 +776,6 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
->>>>       unsigned long           flags;
->>>>
->>>>       spin_lock_irqsave(&bank->lock, flags);
->>>> -     bank->saved_wakeup = __raw_readl(mask_reg);
->>>>       __raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
->>>
->>> OK, here you are overwriting the mask_reg with the wakeup bitmask
->>> without saving the mask_reg's original content.
->> This is based upon understanding that set_gpio_trigger() is the common
->> function where update of wake_en register takes place. Unless, mask_reg
->> in this case refers to something else, effectively we would be saving the
->> same value to saved_wakeup what is already present in wake_en.
->> I will verify this specific to this function.
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> Reviewed-by: Namhyung Kim <namhyung@kernel.org>
+>> ---
+>>  arch/arm/kernel/topology.c |  153 ++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 153 insertions(+)
 >>
->>>
->>>>       spin_unlock_irqrestore(&bank->lock, flags);
->>>>
->>>> @@ -793,7 +791,7 @@ static int omap_mpuio_resume_noirq(struct device *dev)
->>>>       unsigned long           flags;
->>>>
->>>>       spin_lock_irqsave(&bank->lock, flags);
->>>> -     __raw_writel(bank->saved_wakeup, mask_reg);
->>>> +     __raw_writel(bank->context.wake_en, mask_reg);
->>>
->>> Now you are restoring nothing but the same content that you stored
->>> during suspend. This will cause the non-wakeup gpio interrupts to get
->>> masked between a suspend/resume. So isn't this a bug?
->> That's right, the same value is restored back which was last updated in
->> set_gpio_trigger() that got stored in wake_en register. Let me know if
->> I am missing your points here.
+> Sorry for not giving this comment on previous version but we should also
+> have a way to provide the big.LITTLE information without Device Tree.
+> May be a platform device/data.
+
+Hi Santosh,
+
+I had thought of adding such additional way to set cpu_power of
+big.LITTLE but my conclusion was
+-it's a new platform so it should come with DT
+-DT is already required by other patches linked to big.LITTLE
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html)
+-There is no device that can be easily used to get such information at
+this early boot stage.
+
 >
-> If it is writing the same thing then isn't this write redundant?
-Not, really. During suspend if the register has lost the context
-we need to restore the value from wake_en.
---
-Tarun
+> I know we are moving DT way, but remember apart from core kernel
+> infrastructure, to have a complete product build with DT means all the
+> drivers must be already supporting DT which is not the case with
+> many huge driver sub-systems like USB, display subsystem, Audio etc.
 >
->>
->>>
->>> Proper solution would be to save the mask_reg context into another
->>> register than context.wake_en during suspend.
->> As I said, this would make sense if mask_reg is referring to different
->> register than what is used in set_gpio_trigger(). I will have a look.
+> Having that support would greatly help for the SOC's which have not yet
+> reached to stage where entire SOC is DT compliant and want to use
+> big.LITTLE infrastructure.
+
+Can't you support both type of devices on your platform ? You can move
+your device to DT mode when it is supported ?
+
+Regards,
+Vincent
+
 >
-> OK thanks.
->
->>
->> BTW, did you observe anything unusual during some testing?
->
-> No, I haven't done any tests.
->
-> cheers,
-> -roger
+> Regards
+> Santosh
