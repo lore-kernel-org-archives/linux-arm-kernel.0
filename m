@@ -1,58 +1,33 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 9 Jul 2012 09:26:09 +0800
-Subject: [PATCH] ARM: ttc_dkb: add nand support
-In-Reply-To: <CALZhoSRZKi+PHpj1tBBBFX2rcGb_6yyMowthH0uyA=vRoTNq8w@mail.gmail.com>
-References: <1341793703-18510-1-git-send-email-leiwen@marvell.com>
- <CALZhoSRZKi+PHpj1tBBBFX2rcGb_6yyMowthH0uyA=vRoTNq8w@mail.gmail.com>
-Message-ID: <CAN1soZwo5N2drSwRt8FbFPiSkFYYiar0zyVQxhzbObgmow7bMg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jul 2012 11:03:48 +0800
+Subject: [GIT PULL] imx6 device tree changes for 3.6
+In-Reply-To: <201207061923.59329.arnd@arndb.de>
+References: <20120706054818.GF20503@S2101-09.ap.freescale.net>
+ <201207061923.59329.arnd@arndb.de>
+Message-ID: <20120709030345.GA11097@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 8:47 AM, Lei Wen <adrian.wenl@gmail.com> wrote:
-> Add NAND support for dkb platform.
->
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> ---
->  arch/arm/mach-mmp/ttc_dkb.c |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-> index 7a7de2b..5a6a1ad 100644
-> --- a/arch/arm/mach-mmp/ttc_dkb.c
-> +++ b/arch/arm/mach-mmp/ttc_dkb.c
-> @@ -177,6 +177,13 @@ static struct mv_usb_platform_data ttc_usb_pdata = {
->  #endif
->  #endif
->
-> +#ifdef CONFIG_MTD_NAND_PXA3xx
-> +static struct pxa3xx_nand_platform_data dkb_nand_info = {
-> +       .enable_arbiter = 1,
-> +       .num_cs = 1,
-> +};
-> +#endif
-> +
->  static void __init ttc_dkb_init(void)
->  {
->         mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
-> @@ -184,6 +191,10 @@ static void __init ttc_dkb_init(void)
->         /* on-chip devices */
->         pxa910_add_uart(1);
->
-> +#ifdef CONFIG_MTD_NAND_PXA3xx
-> +       pxa910_add_nand(&dkb_nand_info);
-> +#endif
-> +
->         /* off-chip devices */
->         pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
->         platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
-> --
-> 1.7.5.4
->
+On Fri, Jul 06, 2012 at 07:23:58PM +0000, Arnd Bergmann wrote:
+> On Friday 06 July 2012, Shawn Guo wrote:
+> > The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+> > 
+> >   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/dt-for-3.6
+> 
+> Pulled all five new branches.
+> 
+Thanks, Arnd.
 
-There're two different TTC DKB boards. One is with onenand support,
-and the other is nand support. Now mosts of TTC DKB boards are only
-with nand support. So you can replace onenand code with nand in
-ttc_dkb.c
+> It's very cool that you have been able to add support for the
+> imx23-olinuxino by adding just a dts file.
+> 
+> There was one trivial merge conflict in imx6, see the resolution below.
+> 
+It's all right.
 
-Regards
-Haojian
+-- 
+Regards,
+Shawn
