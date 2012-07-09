@@ -1,26 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Jul 2012 02:14:31 -0700
-Subject: [PATCH] arm/dts: remove MMC/SD and SPI related entries from
- am33xx.dtsi
-In-Reply-To: <1341815049-3947-1-git-send-email-anilkumar@ti.com>
-References: <1341815049-3947-1-git-send-email-anilkumar@ti.com>
-Message-ID: <20120709091431.GE1122@atomide.com>
+From: jiri.prchal@aksignal.cz (Jiri Prchal)
+Date: Mon,  9 Jul 2012 11:16:15 +0200
+Subject: [PATCH 2/2] ARM: at91: clock: fix PLLA overclocked warning
+Message-ID: <1341825375-9143-1-git-send-email-jiri.prchal@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* AnilKumar Ch <anilkumar@ti.com> [120708 23:29]:
-> The MMC/SD and SPI entries in this file are not tested yet. They
-> inadvertently came into the patch because of some work in progress
-> stuff I had in my repo.
-> 
-> These entries should not have been sent out in the first place and
-> I am sorry for the trouble and will be extra careful in future.
-> 
-> Since the offending commit is not sent upstream yet, I hope this can
-> be merged into the commit 5fc0b42a98556bd9f01cecc6a64fcbd15ec363f0
-> (arm/dts: Add initial DT support for AM33XX SoC family) on the devel-dt
-> branch of linux-omap tree.
+This patch fix false warning "PLLA overclocked". Maximum frequency for sam9260 is 210MHz as stated in atmel's datasheet. Originally there was plus 4.5%, so I add this 4.5% to new value too.
 
-Thanks applying into omap devel-dt branch.
+Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+---
+ arch/arm/mach-at91/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Tony
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index de2ec6b..e004308 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -707,7 +707,7 @@ static int __init at91_pmc_init(unsigned long main_clock)
+ 		if (plla.rate_hz > 800000000)
+ 			pll_overclock = true;
+ 	} else {
+-		if (plla.rate_hz > 209000000)
++		if (plla.rate_hz > 219000000)
+ 			pll_overclock = true;
+ 	}
+ 	if (pll_overclock)
+-- 
+1.7.7
