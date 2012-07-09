@@ -1,96 +1,103 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon,  9 Jul 2012 11:27:03 +0200
-Subject: [PATCH v4 2/5] ARM: topology: factorize the update of sibling masks
+Date: Mon,  9 Jul 2012 11:27:05 +0200
+Subject: [PATCH v4 4/5] sched, x86: Remove broken power estimation
 In-Reply-To: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
 References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1341826026-6504-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1341826026-6504-5-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This factorization has also been proposed in another patch that has not been
-merged yet:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html
-So, this patch could be dropped depending of the state of the other one.
+From: Peter Zijlstra <a.p.zijlstra@chello.nl>
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Namhyung Kim <namhyung@kernel.org>
+The x86 sched power implementation has been broken forever and gets in
+the way of other stuff, remove it.
+
+For archaeological interest, fixing this code would require dealing with
+the cross-cpu calling of these functions and more importantly, we need
+to filter idle time out of the a/m-perf stuff because the ratio will go
+down to 0 when idle, giving a 0 capacity which is not what we'd want.
+
+Signed-off-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Link: http://lkml.kernel.org/n/tip-wjjwelpti8f8k7i1pdnzmdr8 at git.kernel.org
 ---
- arch/arm/kernel/topology.c |   48 +++++++++++++++++++++++++-------------------
- 1 file changed, 27 insertions(+), 21 deletions(-)
+ arch/x86/kernel/cpu/Makefile |    2 +-
+ arch/x86/kernel/cpu/sched.c  |   55 ------------------------------------------
+ 2 files changed, 1 insertion(+), 56 deletions(-)
+ delete mode 100644 arch/x86/kernel/cpu/sched.c
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 51f23b3..eb5fc81 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -82,6 +82,32 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
- 	return &cpu_topology[cpu].core_sibling;
- }
+diff --git a/arch/x86/kernel/cpu/Makefile b/arch/x86/kernel/cpu/Makefile
+index 6ab6aa2..c598126 100644
+--- a/arch/x86/kernel/cpu/Makefile
++++ b/arch/x86/kernel/cpu/Makefile
+@@ -14,7 +14,7 @@ CFLAGS_common.o		:= $(nostackp)
  
-+void update_siblings_masks(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
-+	int cpu;
-+
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		cpu_topo = &cpu_topology[cpu];
-+
-+		if (cpuid_topo->socket_id != cpu_topo->socket_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
-+
-+		if (cpuid_topo->core_id != cpu_topo->core_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
-+
- /*
-  * store_cpu_topology is called at boot when only one cpu is running
-  * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
-@@ -91,7 +117,6 @@ void store_cpu_topology(unsigned int cpuid)
- {
- 	struct cputopo_arm *cpuid_topo = &cpu_topology[cpuid];
- 	unsigned int mpidr;
--	unsigned int cpu;
+ obj-y			:= intel_cacheinfo.o scattered.o topology.o
+ obj-y			+= proc.o capflags.o powerflags.o common.o
+-obj-y			+= vmware.o hypervisor.o sched.o mshyperv.o
++obj-y			+= vmware.o hypervisor.o mshyperv.o
+ obj-y			+= rdrand.o
+ obj-y			+= match.o
  
- 	/* If the cpu topology has been already set, just return */
- 	if (cpuid_topo->core_id != -1)
-@@ -133,26 +158,7 @@ void store_cpu_topology(unsigned int cpuid)
- 		cpuid_topo->socket_id = -1;
- 	}
- 
--	/* update core and thread sibling masks */
--	for_each_possible_cpu(cpu) {
--		struct cputopo_arm *cpu_topo = &cpu_topology[cpu];
+diff --git a/arch/x86/kernel/cpu/sched.c b/arch/x86/kernel/cpu/sched.c
+deleted file mode 100644
+index a640ae5..0000000
+--- a/arch/x86/kernel/cpu/sched.c
++++ /dev/null
+@@ -1,55 +0,0 @@
+-#include <linux/sched.h>
+-#include <linux/math64.h>
+-#include <linux/percpu.h>
+-#include <linux/irqflags.h>
 -
--		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
--			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
--			if (cpu != cpuid)
--				cpumask_set_cpu(cpu,
--					&cpuid_topo->core_sibling);
+-#include <asm/cpufeature.h>
+-#include <asm/processor.h>
 -
--			if (cpuid_topo->core_id == cpu_topo->core_id) {
--				cpumask_set_cpu(cpuid,
--					&cpu_topo->thread_sibling);
--				if (cpu != cpuid)
--					cpumask_set_cpu(cpu,
--						&cpuid_topo->thread_sibling);
--			}
--		}
--	}
--	smp_wmb();
-+	update_siblings_masks(cpuid);
- 
- 	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
- 		cpuid, cpu_topology[cpuid].thread_id,
+-#ifdef CONFIG_SMP
+-
+-static DEFINE_PER_CPU(struct aperfmperf, old_perf_sched);
+-
+-static unsigned long scale_aperfmperf(void)
+-{
+-	struct aperfmperf val, *old = &__get_cpu_var(old_perf_sched);
+-	unsigned long ratio, flags;
+-
+-	local_irq_save(flags);
+-	get_aperfmperf(&val);
+-	local_irq_restore(flags);
+-
+-	ratio = calc_aperfmperf_ratio(old, &val);
+-	*old = val;
+-
+-	return ratio;
+-}
+-
+-unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
+-{
+-	/*
+-	 * do aperf/mperf on the cpu level because it includes things
+-	 * like turbo mode, which are relevant to full cores.
+-	 */
+-	if (boot_cpu_has(X86_FEATURE_APERFMPERF))
+-		return scale_aperfmperf();
+-
+-	/*
+-	 * maybe have something cpufreq here
+-	 */
+-
+-	return default_scale_freq_power(sd, cpu);
+-}
+-
+-unsigned long arch_scale_smt_power(struct sched_domain *sd, int cpu)
+-{
+-	/*
+-	 * aperf/mperf already includes the smt gain
+-	 */
+-	if (boot_cpu_has(X86_FEATURE_APERFMPERF))
+-		return SCHED_LOAD_SCALE;
+-
+-	return default_scale_smt_power(sd, cpu);
+-}
+-
+-#endif
 -- 
 1.7.9.5
