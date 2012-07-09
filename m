@@ -1,62 +1,245 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Jul 2012 10:42:45 +0200
-Subject: [PATCH, RFC] i.MX DRM support
-In-Reply-To: <CAPM=9ty6xqMg+X7UJMtLShPv5=2kC3PXeBrfLwXT8ReKN+q-9A@mail.gmail.com>
-References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
- <20120702100506.GI24458@pengutronix.de>
- <20120706225833.GA22265@kroah.com>
- <CAPM=9ty6xqMg+X7UJMtLShPv5=2kC3PXeBrfLwXT8ReKN+q-9A@mail.gmail.com>
-Message-ID: <20120709084245.GX30009@pengutronix.de>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon,  9 Jul 2012 10:44:16 +0200
+Subject: [PATCH v6 4/7] net, ethernet, davinci_emac: add OF support
+Message-ID: <1341823456-32297-1-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 08, 2012 at 08:35:55AM +0100, Dave Airlie wrote:
-> On Fri, Jul 6, 2012 at 11:58 PM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
-> > On Mon, Jul 02, 2012 at 12:05:06PM +0200, Sascha Hauer wrote:
-> >> On Thu, Jun 14, 2012 at 03:43:22PM +0200, Sascha Hauer wrote:
-> >> > Hi All,
-> >> >
-> >> > The following is the state-of-the-art i.MX IPU (Image Processing Unit)
-> >> > DRM support.
-> >> >
-> >> > This code is around for quite some time now and has been posted several
-> >> > times with different APIs, first with plain old framebuffer support, now
-> >> > DRM, first platform device binding, now devicetree. Unfortunately there's
-> >> > quite much code needed to get something useful out of the IPU, so these
-> >> > patches haven't received a lot of attention from people not involved in
-> >> > i.MX. I think we have now come to a point where this code needs more public
-> >> > exposure and where it's easier to talk in incremental changes instead of
-> >> > blobs. Therefore I request this to go to staging for some cycles.
-> >>
-> >> Dave, Greg,
-> >>
-> >> Comments to this one? I addressed the comments I received so far and am
-> >> about to respin this series. Is it ok to put this to staging? If yes,
-> >> should I move the whole stuff into drivers/staging/ or should it stay
-> >> in drivers/gpu/drm with just a Kconfig dependency on STAGING?
-> >
-> > That's up to the DRM subsystem maintainer to choose.
-> 
-> Sorry guys been out of the loop on arm drivers due to other things,
-> but probably should go in staging proper for now, until I can at least
-> spend time reviewing it.
+add of support for the davinci_emac driver.
 
-Right now we have dependencies on:
+Signed-off-by: Heiko Schocher <hs@denx.de>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: netdev at vger.kernel.org
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Wolfgang Denk <wd@denx.de>
+Cc: Anatoly Sivov <mm05@mail.ru>
+Cc: David Miller <davem@davemloft.net>
 
-http://www.mail-archive.com/dri-devel at lists.freedesktop.org/msg24409.html
-http://www.mail-archive.com/dri-devel at lists.freedesktop.org/msg24224.html
+---
+- changes for v2:
+  - add comment from Anatoly Sivov
+    - fix typo in davinci_emac.txt
+  - add comment from Grant Likely:
+    - add prefix "ti,davinci-" to davinci specific property names
+    - remove version property
+    - use compatible name "ti,davinci-dm6460-emac"
+    - use devm_kzalloc()
+    - use of_match_ptr()
+    - document all new properties
+    - remove of_address_to_resource() and do not overwrite
+      resource table
+    - whitespace fixes
+    - remove hw_ram_addr as it is not used in current
+      board code
+- no changes for v3
+- changes for v4:
+  add comments from Nori Sekhar:
+  - move devictree documentation to:
+    Documentation/devicetree/bindings/net/davinci_emac.txt
+  - fix typo in it
+  - rename compatible property to "ti,davinci-dm6467-emac"
+  - remove pinmux-handle
+  - set version directly in pdata->version
+- no changes for v5
+- changes for v6:
+  add comment from Nori, Sekhar:
+  - use mac address in DT data only if no valid address is passed
+    through platform data
+  - added Acked-by from Sekhar Nori
+  - changes Subject line from "ARM: davinci: net:" to
+    "net, ethernet, davinci_emac:"
+  - add David Miller to Cc
 
-We could move these two helpers into staging, but they are needed by
-other drivers from Laurent Pinchart and Lars-Peter Clausen aswell. So
-it would be good to have them available for them aswell. Could you have
-a look on these and consider applying?
+ .../devicetree/bindings/net/davinci_emac.txt       |   41 +++++++++
+ drivers/net/ethernet/ti/davinci_emac.c             |   89 +++++++++++++++++++-
+ 2 files changed, 129 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/davinci_emac.txt
 
-Thanks,
-  Sascha
-
+diff --git a/Documentation/devicetree/bindings/net/davinci_emac.txt b/Documentation/devicetree/bindings/net/davinci_emac.txt
+new file mode 100644
+index 0000000..48b259e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/davinci_emac.txt
+@@ -0,0 +1,41 @@
++* Texas Instruments Davinci EMAC
++
++This file provides information, what the device node
++for the davinci_emac interface contains.
++
++Required properties:
++- compatible: "ti,davinci-dm6467-emac";
++- reg: Offset and length of the register set for the device
++- ti,davinci-ctrl-reg-offset: offset to control register
++- ti,davinci-ctrl-mod-reg-offset: offset to control module register
++- ti,davinci-ctrl-ram-offset: offset to control module ram
++- ti,davinci-ctrl-ram-size: size of control module ram
++- ti,davinci-rmii-en: use RMII
++- ti,davinci-no-bd-ram: has the emac controller BD RAM
++- phy-handle: Contains a phandle to an Ethernet PHY.
++              if not, davinci_emac driver defaults to 100/FULL
++- interrupts: interrupt mapping for the davinci emac interrupts sources:
++              4 sources: <Receive Threshold Interrupt
++			  Receive Interrupt
++			  Transmit Interrupt
++			  Miscellaneous Interrupt>
++
++Optional properties:
++- local-mac-address : 6 bytes, mac address
++
++Example (enbw_cmc board):
++	eth0: emac at 1e20000 {
++		compatible = "ti,davinci-dm6467-emac";
++		reg = <0x220000 0x4000>;
++		ti,davinci-ctrl-reg-offset = <0x3000>;
++		ti,davinci-ctrl-mod-reg-offset = <0x2000>;
++		ti,davinci-ctrl-ram-offset = <0>;
++		ti,davinci-ctrl-ram-size = <0x2000>;
++		local-mac-address = [ 00 00 00 00 00 00 ];
++		interrupts = <33
++				34
++				35
++				36
++				>;
++		interrupt-parent = <&intc>;
++	};
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index 4da93a5..6b4b0fe 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -58,6 +58,12 @@
+ #include <linux/io.h>
+ #include <linux/uaccess.h>
+ #include <linux/davinci_emac.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_net.h>
++
++#include <mach/mux.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/page.h>
+@@ -339,6 +345,9 @@ struct emac_priv {
+ 	u32 rx_addr_type;
+ 	atomic_t cur_tx;
+ 	const char *phy_id;
++#ifdef CONFIG_OF
++	struct device_node *phy_node;
++#endif
+ 	struct phy_device *phydev;
+ 	spinlock_t lock;
+ 	/*platform specific members*/
+@@ -1762,6 +1771,77 @@ static const struct net_device_ops emac_netdev_ops = {
+ #endif
+ };
+ 
++#ifdef CONFIG_OF
++static struct emac_platform_data
++	*davinci_emac_of_get_pdata(struct platform_device *pdev,
++	struct emac_priv *priv)
++{
++	struct device_node *np;
++	struct emac_platform_data *pdata = NULL;
++	const u8 *mac_addr;
++	u32 data;
++	int ret;
++
++	pdata = pdev->dev.platform_data;
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			goto nodata;
++	}
++
++	np = pdev->dev.of_node;
++	if (!np)
++		goto nodata;
++	else
++		pdata->version = EMAC_VERSION_2;
++
++	if (!is_valid_ether_addr(pdata->mac_addr)) {
++		mac_addr = of_get_mac_address(np);
++		if (mac_addr)
++			memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
++	}
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
++	if (!ret)
++		pdata->ctrl_reg_offset = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-mod-reg-offset",
++		&data);
++	if (!ret)
++		pdata->ctrl_mod_reg_offset = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-offset", &data);
++	if (!ret)
++		pdata->ctrl_ram_offset = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-size", &data);
++	if (!ret)
++		pdata->ctrl_ram_size = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-rmii-en", &data);
++	if (!ret)
++		pdata->rmii_en = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-no-bd-ram", &data);
++	if (!ret)
++		pdata->no_bd_ram = data;
++
++	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
++	if (!priv->phy_node)
++		pdata->phy_id = "";
++
++	pdev->dev.platform_data = pdata;
++nodata:
++	return  pdata;
++}
++#else
++static struct emac_platform_data
++	*davinci_emac_of_get_pdata(struct platform_device *pdev,
++	struct emac_priv *priv)
++{
++	return  pdev->dev.platform_data;
++}
++#endif
+ /**
+  * davinci_emac_probe: EMAC device probe
+  * @pdev: The DaVinci EMAC device that we are removing
+@@ -1804,7 +1884,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&priv->lock);
+ 
+-	pdata = pdev->dev.platform_data;
++	pdata = davinci_emac_of_get_pdata(pdev, priv);
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "no platform data\n");
+ 		rc = -ENODEV;
+@@ -2015,6 +2095,12 @@ static const struct dev_pm_ops davinci_emac_pm_ops = {
+ 	.resume		= davinci_emac_resume,
+ };
+ 
++static const struct of_device_id davinci_emac_of_match[] = {
++	{.compatible = "ti,davinci-dm6467-emac", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, davinci_emac_of_match);
++
+ /**
+  * davinci_emac_driver: EMAC platform driver structure
+  */
+@@ -2023,6 +2109,7 @@ static struct platform_driver davinci_emac_driver = {
+ 		.name	 = "davinci_emac",
+ 		.owner	 = THIS_MODULE,
+ 		.pm	 = &davinci_emac_pm_ops,
++		.of_match_table = of_match_ptr(davinci_emac_of_match),
+ 	},
+ 	.probe = davinci_emac_probe,
+ 	.remove = __devexit_p(davinci_emac_remove),
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.7.6
