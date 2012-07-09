@@ -1,25 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 9 Jul 2012 18:53:22 +0200
-Subject: [PATCH 01/10 RESEND] mmc: spi: Move SSP register definitions into
- separate file
-In-Reply-To: <1341555449-17507-1-git-send-email-marex@denx.de>
-References: <1341555449-17507-1-git-send-email-marex@denx.de>
-Message-ID: <201207091853.22494.marex@denx.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 9 Jul 2012 09:57:57 -0700
+Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
+ change
+In-Reply-To: <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
+References: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
+ <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120709165757.GA6024@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
-
-> Move the definitions into separate file so separate SPI driver can be
-> implemented. The SSP controller in MXS can act both as a MMC host and
-> as a SPI host.
+On Sat, Jul 07, 2012 at 10:56:45PM +0800, Richard Zhao wrote:
+> Phy may need to change settings when port connect change.
 > 
-> Based on previous attempt by:
-> Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Tested-by: Subodh Nijsure <snijsure@grid-net.com>
+> ---
+>  drivers/usb/core/hub.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+> index 4cc8dc9..2ba9d84 100644
+> --- a/drivers/usb/core/hub.c
+> +++ b/drivers/usb/core/hub.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/usb.h>
+>  #include <linux/usbdevice_fs.h>
+>  #include <linux/usb/hcd.h>
+> +#include <linux/usb/otg.h>
+>  #include <linux/usb/quirks.h>
+>  #include <linux/kthread.h>
+>  #include <linux/mutex.h>
+> @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
+>  		}
+>  	}
+>  
+> +	if (unlikely(hcd->phy && !hdev->parent)) {
 
-[...]
+Why is this "unlikely"?  And why mark it as such, is this a "fast path"
+that needs the compiler to know this hint to optimize things here?
 
-Bump? Can these be applied now (probably without 10/10 patch)?
+Please don't use likely() or unlikely() except in places it really is
+needed, _and_ you have measured the difference.  Have you done so in
+this place?
 
-Best regards,
-Marek Vasut
+thanks,
+
+greg k-h
