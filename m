@@ -1,33 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Jul 2012 15:50:55 +0000
-Subject: [PATCH 07/15] ARM: dove: use fixed PCI i/o mapping
-In-Reply-To: <1341600040-30993-8-git-send-email-robherring2@gmail.com>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <1341600040-30993-8-git-send-email-robherring2@gmail.com>
-Message-ID: <201207091550.55912.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Jul 2012 17:58:22 +0200
+Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <20120709120523.GG1296@pengutronix.de>
+References: <1341554956-17416-1-git-send-email-marex@denx.de>
+ <201207091307.35860.marex@denx.de> <20120709120523.GG1296@pengutronix.de>
+Message-ID: <201207091758.22788.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 July 2012, Rob Herring wrote:
-> --- a/arch/arm/mach-dove/pcie.c
-> +++ b/arch/arm/mach-dove/pcie.c
-> @@ -60,13 +60,8 @@ static int __init dove_pcie_setup(int nr, struct pci_sys_data *sys)
->                  "PCIe %d I/O", pp->index);
->         pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
->         pp->res[0].name = pp->io_space_name;
-> -       if (pp->index == 0) {
-> -               pp->res[0].start = DOVE_PCIE0_IO_PHYS_BASE;
-> -               pp->res[0].end = pp->res[0].start + DOVE_PCIE0_IO_SIZE - 1;
-> -       } else {
-> -               pp->res[0].start = DOVE_PCIE1_IO_PHYS_BASE;
-> -               pp->res[0].end = pp->res[0].start + DOVE_PCIE1_IO_SIZE - 1;
-> -       }
-> +       pp->res[0].start = nr * SZ_1M;
-> +       pp->res[0].end = pp->res[0].start + SZ_64K - 1;
->         pp->res[0].flags = IORESOURCE_IO;
->         if (request_resource(&ioport_resource, &pp->res[0]))
->                 panic("Request PCIe IO resource failed\n");
+Dear Wolfram Sang,
 
-Why use SZ_64K here when the mapping is actually 1M?
+> > > > diff --git a/arch/arm/boot/dts/imx28.dtsi
+> > > > b/arch/arm/boot/dts/imx28.dtsi index ee3778a..832d30a 100644
+> > > > --- a/arch/arm/boot/dts/imx28.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > 
+> > [...]
+> > 
+> > > > @@ -428,6 +429,7 @@
+> > > > 
+> > > >  				compatible = "fsl,imx28-i2c";
+> > > >  				reg = <0x8005a000 2000>;
+> > > >  				interrupts = <110 69>;
+> > > > 
+> > > > +				clock-frequency = <400000>;
+> > > 
+> > > NACK on that. Not all slaves can do 400KHz, so this is not a sensible
+> > > default.
+> > 
+> > How many of such chips are there and how many of the chips can do 400kHz
+> > ? I believe the majority shouldn't suffer because of minority.
+> 
+> The kernel should work for all users, not only for the majority, so:
+> Better safe than sorry.
+> 
+> Also, defaults should make the system work. Tuning can be done later by
+> somebody who understands what is needed.
+> 
+> And frankly, this attitude which made you add a potential regression is
+> worrisome. I'd suggest to give stability a higher priority.
 
-	Arnd
+I believe you misunderstood my intention. Setting it to 400kHz was done because 
+it's what most people will use, therefore avoiding duplication (most of the 
+board files will override this setting now). All right, your sane defaults here 
+can be applied, I won't argue.
+
+And frankly, you could have left the last jab out. Let's avoid attacking each 
+other, I'm not in the mood for it today.
+
+> Regards,
+> 
+>    Wolfram
+
+Best regards,
+Marek Vasut
