@@ -1,37 +1,24 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 09 Jul 2012 16:24:34 -0400 (EDT)
-Subject: [PATCH 00/15] PCI io.h cleanups
-In-Reply-To: <4FFB25FE.8090806@gmail.com>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <201207091628.37975.arnd@arndb.de> <4FFB25FE.8090806@gmail.com>
-Message-ID: <alpine.LFD.2.02.1207091622390.31100@xanadu.home>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 09 Jul 2012 22:34:37 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <20120709201422.GA12242@core.coreip.homeip.net>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
+Message-ID: <4FFB405D.6070300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jul 2012, Rob Herring wrote:
+> Why do you keep these assignments and then override them with
+> translations? Why don't you do
+>
+> 	ponkey->idev = input;
+> 	ponkey->ab8500 = ab8500;
+> 	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
+> 	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
+>
+> to begin with?
 
-> On 07/09/2012 11:28 AM, Arnd Bergmann wrote:
-> > On Friday 06 July 2012, Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> I've finally gotten back to this after several months. This is the 2nd
-> >> part of mach/io.h removals. This series removes io.h on platforms with
-> >> PCI by creating a fixed virtual I/O mapping and a common __io() macro.
-> >>
-> >> As several platforms have 2 1MB I/O windows, I've changed the fixed
-> >> mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
-> >> control the size. This also allows using a single 1MB section mapping
-> >> rather than 4KB pages.
-> > 
-> > Looks really good, feel free to add my Reviewed-by on patches 2-15, since
-> > I've done a line-by-line walkthrough and could not find anything besides the
-> > trivial comments I gave.
-> 
-> Thanks for the review. It's going to change a bit with using
-> ioremap_page_range. Hope to have new version out soon.
+Ah, I see what you mean now.
 
-Beware the fact that you can't use ioremap_page_range() early on during 
-the boot as it uses the standard page allocator.
-
-
-Nicolas
+Sorry, just glossed over your first email.
