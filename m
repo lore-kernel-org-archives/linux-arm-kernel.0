@@ -1,37 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 8 Jul 2012 22:57:12 +0100
-Subject: [PATCH] ARM: remove asm/locks.h
-In-Reply-To: <1341773106.22584.9.camel@x61.thuisdomein>
-References: <1341262188.1911.147.camel@x61.thuisdomein>
- <20120702215203.GA25234@mudshark.cambridge.arm.com>
- <1341300030.1911.179.camel@x61.thuisdomein>
- <20120708160258.GC27030@mudshark.cambridge.arm.com>
- <1341773106.22584.9.camel@x61.thuisdomein>
-Message-ID: <20120708215712.GA6404@mudshark.cambridge.arm.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Mon, 09 Jul 2012 09:41:27 +0900
+Subject: [PATCH 0/3] hwspinlock: a bug fix, trivial changes
+In-Reply-To: <CAK=WgbYgVoB+B3P6NLpd2t=F9PVA_m7Nbou4k1aq8BGvjJhvNg@mail.gmail.com>
+References: <4FF66FBD.5090601@renesas.com>
+ <CAK=WgbYgVoB+B3P6NLpd2t=F9PVA_m7Nbou4k1aq8BGvjJhvNg@mail.gmail.com>
+Message-ID: <4FFA28B7.9090705@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 08, 2012 at 07:45:06PM +0100, Paul Bolle wrote:
-> On Sun, 2012-07-08 at 17:03 +0100, Will Deacon wrote:
-> >  Please can you put this into the patch system?
+Hi,
+
+On 7/7/2012 7:59 PM, Ohad Ben-Cohen wrote:
+>> Recently I wrote a hwspinlock driver for our devices
 > 
-> I'm not sure what the patch system is, but I am certain that I'm not
-> allowed to put this patch into it.
+> Great! looking forward to see it :)
 
-Don't be so certain -- the patch system is the preferred method for submitting
-patches to arch/arm/ via Russell's tree. Since you're not familiar with it,
-I've sent the patch for you this time:
+Unfortunately I'm not planning to submit that driver at the moment,
+as I'm 120% sure that it won't be utilized by any module in our BSPs
+in the mainline kernel.
 
-  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7460/1
+>> and during
+>> the review and debug process, we found a bug in the core code.
+>> Could you take a look please?
+> 
+> I looked and it's great. Will send to Linus soon.
 
-but if you have any additional patches to core ARM code then you can send
-them following mailing list review and looking at the help here:
+Thanks for fixing up the error path I msised.
 
-  http://www.arm.linux.org.uk/developer/patches/info.php
+>> The first patch is a bug fix.  The latter two patches are what I
+>> think nice-to-have.  If you find useful, just take it, thanks!
+> 
+> I commented on the latter two (generally both look ok sans a small
+> outstanding comment).
 
-Note that changes to soc-specific code goes via the arm-soc tree (Arnd and
-Olof) so don't use the patch system for that.
+Thanks, but I don't mind you dropping the latter two, either.  If I
+have a chance to revisit hwspinlock drivers, I'll go through patches
+again with your comments in mind.
 
-Cheers,
-
-Will
+-- 
+Shinya Kuribayashi
+Renesas Electronics
