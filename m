@@ -1,97 +1,89 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Jul 2012 20:32:23 +0530
-Subject: [GIT PULL] ARM: OMAP5: Add minimal OMAP5 SOC support for 3.6
-Message-ID: <1341846143-11137-1-git-send-email-santosh.shilimkar@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 9 Jul 2012 17:10:36 +0200
+Subject: [PATCH v4 3/5] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <CAMQu2gymVGXdnYCN4sdKgmESfDSXTvpH4uCuByAKZTFS4Lt13A@mail.gmail.com>
+References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
+ <1341826026-6504-4-git-send-email-vincent.guittot@linaro.org>
+ <CAMQu2gydOEVK_fzmzkdrBwBfOq6eZG=0QfLUfFChWJu9unSn2A@mail.gmail.com>
+ <CAKfTPtDPGPNk2h_zB=Rf2N2UABAgaDBbij5QFoZTxUTZJbTeAA@mail.gmail.com>
+ <CAMQu2gwCXwdDmu9SdLozjC5jt7iDTqm39cY1ZZ=-VqaoF5bSvg@mail.gmail.com>
+ <CAKfTPtCicLseyA4DnUwNWf7+jOmab4KLo8Yw=Rz1KPya+fE_-w@mail.gmail.com>
+ <CAMQu2gymVGXdnYCN4sdKgmESfDSXTvpH4uCuByAKZTFS4Lt13A@mail.gmail.com>
+Message-ID: <CAKfTPtCcxg5PNqjXrz9zYwE-DDAUtdbaUuuGpGqGzOFZrk3rnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On 9 July 2012 16:37, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
+> On Mon, Jul 9, 2012 at 8:06 PM, Vincent Guittot
+> <vincent.guittot@linaro.org> wrote:
+>> On 9 July 2012 15:00, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
+>>> On Mon, Jul 9, 2012 at 6:02 PM, Vincent Guittot
+>>> <vincent.guittot@linaro.org> wrote:
+>>>> On 9 July 2012 12:55, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
+>>>>> Vincent,
+>>>>> On Mon, Jul 9, 2012 at 2:57 PM, Vincent Guittot
+>>>>> <vincent.guittot@linaro.org> wrote:
+>>>>>> Use cpu compatibility field and clock-frequency field of DT to
+>>>>>> estimate the capacity of each core of the system and to update
+>>>>>> the cpu_power field accordingly.
+>>>>>> This patch enables to put more running tasks on big cores than
+>>>>>> on LITTLE ones. But this patch doesn't ensure that long running
+>>>>>> tasks will run on big cores and short ones on LITTLE cores.
+>>>>>>
+>>>>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>>>>>> Reviewed-by: Namhyung Kim <namhyung@kernel.org>
+>>>>>> ---
+>>>>>>  arch/arm/kernel/topology.c |  153 ++++++++++++++++++++++++++++++++++++++++++++
+>>>>>>  1 file changed, 153 insertions(+)
+>>>>>>
+>>>>> Sorry for not giving this comment on previous version but we should also
+>>>>> have a way to provide the big.LITTLE information without Device Tree.
+>>>>> May be a platform device/data.
+>>>>
+>>>> Hi Santosh,
+>>>>
+>>>> I had thought of adding such additional way to set cpu_power of
+>>>> big.LITTLE but my conclusion was
+>>>> -it's a new platform so it should come with DT
+>>>> -DT is already required by other patches linked to big.LITTLE
+>>>> (http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html)
+>>>> -There is no device that can be easily used to get such information at
+>>>> this early boot stage.
+>>>>
+>>> I see. Its new processor but it is just 1 one of the IP in an entire SOC.
+>>> As mentioned below I was talking about full SOC support including
+>>> all the driver subsystem with DT.
+>>>
+>>>>>
+>>>>> I know we are moving DT way, but remember apart from core kernel
+>>>>> infrastructure, to have a complete product build with DT means all the
+>>>>> drivers must be already supporting DT which is not the case with
+>>>>> many huge driver sub-systems like USB, display subsystem, Audio etc.
+>>>>>
+>>>>> Having that support would greatly help for the SOC's which have not yet
+>>>>> reached to stage where entire SOC is DT compliant and want to use
+>>>>> big.LITTLE infrastructure.
+>>>>
+>>>> Can't you support both type of devices on your platform ? You can move
+>>>> your device to DT mode when it is supported ?
+>>>>
+>>> That is what eventually people end up doing who don't have
+>>> DT ready for entire SOC. I was trying to ask whether at least some
+>>> method is proposed(need not be merged in mainline) to have
+>>> the big.LITTLE information parsing without DT.
+>>
+>> Ok, IIUC, you need a temporary methods, which doesn't need to be
+>> merged in mainline, to set the cpu_scale field ?
+>>
+> Yep.
 
-Please pull below OMAP5 SOC minimal support. It is generated against the
-cleanup-part2 branch of yours. As you suggested, I have dropped CK_54XX
-flag changes to avoid conflicts.
+You could use set_power_scale in your platform code to set the
+cpu_power of your CPUs until DT is ready for your platform.
 
-The following changes since commit fb584511c4664573097ece7df0de06ad00b713a2:
+Regards,
+Vincent
 
-  ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds (2012-07-09 01:44:11 -0700)
-
-are available in the git repository at:
-
-  git://github.com/SantoshShilimkar/linux.git for_3.6/omap5_minimal_support
-
-for you to fetch changes up to 39f47d9f437fa94622bf51d7b18b42b3336ad9ac:
-
-  ARM: Kconfig update to support additional GPIOs in OMAP5 (2012-07-09 19:14:40 +0530)
-
-----------------------------------------------------------------
-
-R Sricharan (11):
-  ARM: OMAP2+: Move stubbed secure_sram_reserve function to a common.c
-    and call it __weak
-  ARM: OMAP: counter-32k: Select the CR register offset using the IP
-    scheme
-  ARM: OMAP5: id: Add cpu id for ES versions
-  ARM: OMAP5: Add minimal support for OMAP5430 SOC
-  ARM: OMAP5: timer: Add clocksource, clockevent support
-  ARM: OMAP5: gpmc: Update gpmc_init()
-  ARM: OMAP5: l3: Add l3 error handler support for omap5
-  ARM: omap2+: board-generic: clean up the irq data from board file
-  ARM: OMAP5: board-generic: Add device tree support
-  arm/dts: OMAP5: Add omap5 dts files
-  ARM: OMAP5: Add the build support
-
-Santosh Shilimkar (2):
-  ARM: OMAP5: Add the WakeupGen IP updates
-  ARM: OMAP5: Add SMP support
-
-Tarun Kanti DebBarma (1):
-  ARM: Kconfig update to support additional GPIOs in OMAP5
-
- .../devicetree/bindings/arm/omap/omap.txt          |    3 +
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/omap5-evm.dts                    |   20 +++
- arch/arm/boot/dts/omap5.dtsi                       |  184 ++++++++++++++++++++
- arch/arm/configs/omap2plus_defconfig               |    1 +
- arch/arm/mach-omap2/Kconfig                        |    8 +-
- arch/arm/mach-omap2/Makefile                       |   24 ++-
- arch/arm/mach-omap2/board-generic.c                |   42 +++--
- arch/arm/mach-omap2/common.c                       |   24 +++
- arch/arm/mach-omap2/common.h                       |   19 +-
- arch/arm/mach-omap2/control.h                      |    4 +
- arch/arm/mach-omap2/devices.c                      |    2 +-
- arch/arm/mach-omap2/gpmc.c                         |    3 +-
- arch/arm/mach-omap2/id.c                           |   42 ++++-
- arch/arm/mach-omap2/include/mach/debug-macro.S     |    8 +-
- arch/arm/mach-omap2/include/mach/omap-wakeupgen.h  |    7 +
- arch/arm/mach-omap2/io.c                           |   44 +++++
- arch/arm/mach-omap2/iomap.h                        |   27 +++
- arch/arm/mach-omap2/irq.c                          |   13 +-
- arch/arm/mach-omap2/omap-headsmp.S                 |   21 +++
- arch/arm/mach-omap2/omap-hotplug.c                 |   24 ++-
- arch/arm/mach-omap2/omap-smp.c                     |   52 ++++--
- arch/arm/mach-omap2/omap-wakeupgen.c               |  114 +++++++++---
- arch/arm/mach-omap2/omap4-common.c                 |   14 ++
- arch/arm/mach-omap2/omap4-sar-layout.h             |   12 +-
- arch/arm/mach-omap2/omap_hwmod.c                   |    2 +-
- arch/arm/mach-omap2/omap_l3_noc.h                  |   22 ++-
- arch/arm/mach-omap2/prcm-common.h                  |    2 +-
- arch/arm/mach-omap2/prcm.c                         |    2 +-
- arch/arm/mach-omap2/timer.c                        |    5 +
- arch/arm/plat-omap/Kconfig                         |    4 +-
- arch/arm/plat-omap/common.c                        |    9 +
- arch/arm/plat-omap/counter_32k.c                   |   16 +-
- arch/arm/plat-omap/include/plat/cpu.h              |   22 ++-
- arch/arm/plat-omap/include/plat/hardware.h         |    1 +
- arch/arm/plat-omap/include/plat/multi.h            |    9 +
- arch/arm/plat-omap/include/plat/omap-secure.h      |    5 -
- arch/arm/plat-omap/include/plat/omap54xx.h         |   32 ++++
- arch/arm/plat-omap/include/plat/serial.h           |   10 ++
- arch/arm/plat-omap/include/plat/uncompress.h       |    6 +
- arch/arm/plat-omap/sram.c                          |   11 +-
- 41 files changed, 773 insertions(+), 98 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap5-evm.dts
- create mode 100644 arch/arm/boot/dts/omap5.dtsi
- create mode 100644 arch/arm/plat-omap/include/plat/omap54xx.h
-
--- 
-1.7.9.5
+>
+> Regards
+> Santosh
