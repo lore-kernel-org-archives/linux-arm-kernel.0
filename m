@@ -1,70 +1,41 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 9 Jul 2012 18:30:01 +0530
-Subject: [PATCH v4 3/5] ARM: topology: Update cpu_power according to DT
- information
-In-Reply-To: <CAKfTPtDPGPNk2h_zB=Rf2N2UABAgaDBbij5QFoZTxUTZJbTeAA@mail.gmail.com>
-References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
- <1341826026-6504-4-git-send-email-vincent.guittot@linaro.org>
- <CAMQu2gydOEVK_fzmzkdrBwBfOq6eZG=0QfLUfFChWJu9unSn2A@mail.gmail.com>
- <CAKfTPtDPGPNk2h_zB=Rf2N2UABAgaDBbij5QFoZTxUTZJbTeAA@mail.gmail.com>
-Message-ID: <CAMQu2gwCXwdDmu9SdLozjC5jt7iDTqm39cY1ZZ=-VqaoF5bSvg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Jul 2012 05:14:00 -0700
+Subject: [PATCH v2 1/2] ARM: OMAP: board-4430sdp: MUX configuration for
+ sys_nirq2
+In-Reply-To: <4FFAA6AF.2010004@ti.com>
+References: <1341580752-5501-1-git-send-email-peter.ujfalusi@ti.com>
+ <1341580752-5501-2-git-send-email-peter.ujfalusi@ti.com>
+ <874nplc6va.fsf@ti.com>
+ <CAMQu2gx4927Ze9tRUFq9QPubGFWfK9bHqZhVCb7c39O=WeWA3Q@mail.gmail.com>
+ <4FFAA6AF.2010004@ti.com>
+Message-ID: <20120709121400.GF1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 6:02 PM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
-> On 9 July 2012 12:55, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
->> Vincent,
->> On Mon, Jul 9, 2012 at 2:57 PM, Vincent Guittot
->> <vincent.guittot@linaro.org> wrote:
->>> Use cpu compatibility field and clock-frequency field of DT to
->>> estimate the capacity of each core of the system and to update
->>> the cpu_power field accordingly.
->>> This patch enables to put more running tasks on big cores than
->>> on LITTLE ones. But this patch doesn't ensure that long running
->>> tasks will run on big cores and short ones on LITTLE cores.
->>>
->>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>> Reviewed-by: Namhyung Kim <namhyung@kernel.org>
->>> ---
->>>  arch/arm/kernel/topology.c |  153 ++++++++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 153 insertions(+)
->>>
->> Sorry for not giving this comment on previous version but we should also
->> have a way to provide the big.LITTLE information without Device Tree.
->> May be a platform device/data.
->
-> Hi Santosh,
->
-> I had thought of adding such additional way to set cpu_power of
-> big.LITTLE but my conclusion was
-> -it's a new platform so it should come with DT
-> -DT is already required by other patches linked to big.LITTLE
-> (http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html)
-> -There is no device that can be easily used to get such information at
-> this early boot stage.
->
-I see. Its new processor but it is just 1 one of the IP in an entire SOC.
-As mentioned below I was talking about full SOC support including
-all the driver subsystem with DT.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120709 02:43]:
+> On 07/06/2012 04:33 PM, Shilimkar, Santosh wrote:
+> >> Since this is TWL6030 specific, it should rather be done in TWL code
+> >> like I did for sys_nirq1:
+> >>
+> >>    http://marc.info/?l=linux-omap&m=134090312118873&w=2
+> >>
+> >> That would avoid having to do this in both board files.
+> >>
+> > Though the pin is TWL specific, it need not be same on
+> > different board with different SOCs. Especially when you need to
+> > set MUX mode etc. So doing from board file is still better
+> > since TWL6030/40 can be connected to non OMAP4 devices
+> > where the muxing can be different.
+> > 
+> > With current know boards with TWL6030/40, this is not
+> > a strong requirement though.
+> 
+> There can be board which has twl6030 but does not have twl6040.
+> The twl6040 is the recommended audio solution for OMAP4+ systems but it can be
+> replaced by other codec on some boards.
+> This is the reason I have put the mux configuration into the board files for
+> sys_nirq2 (which is in these cases are used to handle the interrupt from twl6040).
 
->>
->> I know we are moving DT way, but remember apart from core kernel
->> infrastructure, to have a complete product build with DT means all the
->> drivers must be already supporting DT which is not the case with
->> many huge driver sub-systems like USB, display subsystem, Audio etc.
->>
->> Having that support would greatly help for the SOC's which have not yet
->> reached to stage where entire SOC is DT compliant and want to use
->> big.LITTLE infrastructure.
->
-> Can't you support both type of devices on your platform ? You can move
-> your device to DT mode when it is supported ?
->
-That is what eventually people end up doing who don't have
-DT ready for entire SOC. I was trying to ask whether at least some
-method is proposed(need not be merged in mainline) to have
-the big.LITTLE information parsing without DT.
+OK I'll apply these into devel-board branch.
 
-Regards
-Santosh
+Tony
