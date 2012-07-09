@@ -1,49 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Jul 2012 08:52:47 +0200
-Subject: [PATCH] ARM: mx27: Reenable silicon version print
-In-Reply-To: <1341612275-4464-1-git-send-email-festevam@gmail.com>
-References: <1341612275-4464-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120709065247.GM30009@pengutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 9 Jul 2012 08:56:55 +0200
+Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
+In-Reply-To: <Pine.LNX.4.64.1207061639210.29809@axis700.grange>
+References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
+ <Pine.LNX.4.64.1207061439090.29809@axis700.grange>
+ <Pine.LNX.4.64.1207061639210.29809@axis700.grange>
+Message-ID: <CACKLOr07SY2KLwCA_e+-5UASsPvGxa5=aUyx-3OtSckWYrDSBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 07:04:35PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Prior to the new i.mx clock conversion the mx27 silicon version was printed at boot.
-> 
-> Reenable this feature.
+On 6 July 2012 17:11, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> hmm... sorry again. It is my fault, that I left this patch without
+> attention for full 5 weeks, but I still don't have a sufficiently good
+> feeling about it. Look here:
+>
+> On Fri, 6 Jul 2012, Guennadi Liakhovetski wrote:
+>
+>> Hi Javier
+>>
+>> Thanks for the patch, and sorry for delay. I was away first 10 days of
+>> June and still haven't come round to cleaning up my todo list since
+>> then...
+>>
+>> On Fri, 1 Jun 2012, Javier Martin wrote:
+>
+> [snip]
+>
+>> > @@ -1024,14 +1039,28 @@ static int mx2_camera_set_bus_param(struct soc_camera_device *icd)
+>> >             return ret;
+>> >     }
+>> >
+>> > +   xlate = soc_camera_xlate_by_fourcc(icd, pixfmt);
+>> > +   if (!xlate) {
+>> > +           dev_warn(icd->parent, "Format %x not found\n", pixfmt);
+>> > +           return -EINVAL;
+>> > +   }
+>> > +
+>> > +   if (xlate->code == V4L2_MBUS_FMT_YUYV8_2X8) {
+>> > +           csicr1 |= CSICR1_PACK_DIR;
+>> > +           csicr1 &= ~CSICR1_SWAP16_EN;
+>> > +           dev_dbg(icd->parent, "already yuyv format, don't convert\n");
+>> > +   } else if (xlate->code == V4L2_MBUS_FMT_UYVY8_2X8) {
+>> > +           csicr1 &= ~CSICR1_PACK_DIR;
+>> > +           csicr1 |= CSICR1_SWAP16_EN;
+>> > +           dev_dbg(icd->parent, "convert uyvy mbus format into yuyv\n");
+>> > +   }
+>
+> This doesn't look right. From V4L2_MBUS_FMT_YUYV8_2X8 you can produce two
+> output formats:
+>
+> V4L2_PIX_FMT_YUV420 and
+> V4L2_PIX_FMT_YUYV
+>
+> For both of them you set CSICR1_PACK_DIR, which wasn't the default before?
+> Next for V4L2_MBUS_FMT_UYVY8_2X8. From this one you can produce 3 formats:
+>
+> V4L2_PIX_FMT_YUV420,
+> V4L2_PIX_FMT_YUYV and
+> V4L2_PIX_FMT_UYVY
+>
+> For all 3 of them you now set CSICR1_SWAP16_EN. Are you sure all the above
+> is correct?
 
-Applied, thanks.
+No, there's just one thing wrong. With this patch, pass-through mode
+for  V4L2_MBUS_FMT_UYVY8_2X8 won't work, since I always convert it to
+YUYV.
 
-Sascha
+Let me send a new version of the patch to address this problem.
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx27.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index e8a6016..c9370bf 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -269,6 +269,8 @@ int __init mx27_clocks_init(unsigned long fref)
->  
->  	clk_prepare_enable(clk[emi_ahb_gate]);
->  
-> +	imx_print_silicon_rev("i.MX27", mx27_revision());
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.7.1
-> 
-> 
-
+Regards.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
