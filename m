@@ -1,26 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Jul 2012 20:37:30 +0000
-Subject: [PATCH 07/15] ARM: dove: use fixed PCI i/o mapping
-In-Reply-To: <4FFB2321.30100@gmail.com>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <201207091550.55912.arnd@arndb.de> <4FFB2321.30100@gmail.com>
-Message-ID: <201207092037.30708.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 09 Jul 2012 22:42:37 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <CACRpkdbB68mXuV3bx-gyJBdJCd2Ja86J8mvvmR3ez3dJ8SzOEg@mail.gmail.com>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
+ <4FFB40A4.5060505@linaro.org>
+ <CACRpkdbB68mXuV3bx-gyJBdJCd2Ja86J8mvvmR3ez3dJ8SzOEg@mail.gmail.com>
+Message-ID: <4FFB423D.1040606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 July 2012, Rob Herring wrote:
-> Why use 1M when 64K is enough based on our prior conversations? The more
-> we standardize the configuration, the more we can make common. I think
-> the majority of the pci setup functions can be consolidated. It's really
-> just data differences for the resource setup. I only used 1M alignment
-> in case there were some alignment requirements in the h/w and it can't
-> handle a starting pci bus address of 0x10000. I think it's just the
-> Marvell parts that do this, so if anyone knowledgeable on those parts
-> can comment it would help.
+On 09/07/12 22:37, Linus Walleij wrote:
+> On Mon, Jul 9, 2012 at 10:35 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+>> From: Lee Jones <lee.jones@linaro.org>
+>> Date: Tue, 26 Jun 2012 10:46:50 +0100
+>> Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+>>
+>> Before we can use any domain allocated IRQ, we need to first create a
+>> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
+>> We do this with a helper function provided by the AB8500 IRQ domain
+>> controller called ab8500_irq_get_virq(). We need to do this for both
+>> IRQs which the Power-On-Key driver uses; one for button press, the other
+>> for button depress.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-IIRC among the plat-orion platforms (dove, kirkwood, mv78xx0, orion), this
-one is the only one where you use 64kb in the resource but 1MB for the
-mapping, while in the other ones they are always the same. I agree that
-the 64kb resource doesn't hurt, we should just be more consistent.
+I've just sent a new one following Dmitry's suggestion.
 
-	Arnd
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
