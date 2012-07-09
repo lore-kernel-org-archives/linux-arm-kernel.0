@@ -1,45 +1,67 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 9 Jul 2012 15:51:34 +0530
-Subject: [GIT PULL] DaVinci SoC updates for v3.6
-Message-ID: <4FFAB0AE.3010508@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 9 Jul 2012 12:25:38 +0200
+Subject: [PATCH 7/9] I2C: MV64XXX: Add Device Tree support
+In-Reply-To: <1339324322-29388-8-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-8-git-send-email-andrew@lunn.ch>
+Message-ID: <20120709102538.GD1296@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Sun, Jun 10, 2012 at 12:31:59PM +0200, Andrew Lunn wrote:
+> Extends the driver to get properties from device tree. Also extend the
+> kirkwood DT support to supply the needed properties.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   35 +++++++++++++++++-
+>  arch/arm/boot/dts/kirkwood.dtsi                    |   13 +++++++
+>  arch/arm/mach-kirkwood/board-dt.c                  |    2 ++
+>  drivers/i2c/busses/i2c-mv64xxx.c                   |   38 +++++++++++++++++---
+>  4 files changed, 82 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+> index b891ee2..89ef899 100644
+> --- a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+> +++ b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+> @@ -1,4 +1,4 @@
+> -* I2C
+> +* Marvell MMP I2C controller
+>  
+>  Required properties :
+>  
+> @@ -32,3 +32,36 @@ Examples:
+>  		interrupts = <58>;
+>  	};
+>  
+> +* Marvell MV64XXX I2C controller
+> +
+> +Required properties :
+> +
+> + - reg         : Offset and length of the register set for the device
+> + - compatible  : should be "marvell,mv64xxx-i2c"
+> + - interrupts  : the interrupt number
+> + - frequency-m : m factor in baud rate calculation
+> +
+> +Recommended properties :
+> +
+> + - frequency-n : n factor in baud rate calculation
+> + - timeout-ms  : How long to wait for a transaction to complete
 
-Can you please pull the following DaVinci SoC updates for v3.6?
+The way we define the bus speed for i2c with DT is using "clock-frequency".
+You should be able to derive the dividers from that? Adding custom
+properties for every driver will hardly be maintainable.
 
 Thanks,
-Sekhar
 
-The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+   Wolfram
 
-  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
-
-are available in the git repository at:
-
-  git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-v3.6-soc
-
-for you to fetch changes up to ce9dcb8784611c50974d1c6b600c71f5c0a29308:
-
-  ARM: davinci: add runtime PM support for clock management (2012-07-01 17:26:26 +0530)
-
-----------------------------------------------------------------
-DaVinci SoC updates for v3.6
-
-Add IRQ domain support for cp_intc and
-runtime PM core support for DaVinci devices.
-
-----------------------------------------------------------------
-Heiko Schocher (1):
-      ARM: davinci: cp_intc: Add irq domain support
-
-Kevin Hilman (1):
-      ARM: davinci: add runtime PM support for clock management
-
- arch/arm/mach-davinci/Kconfig     |    1 +
- arch/arm/mach-davinci/Makefile    |    1 +
- arch/arm/mach-davinci/cp_intc.c   |   63 ++++++++++++++++++++++++++++--------
- arch/arm/mach-davinci/pm_domain.c |   64 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 115 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/mach-davinci/pm_domain.c
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/36034f52/attachment.sig>
