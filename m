@@ -1,30 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Jul 2012 11:46:03 +0000
-Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
-In-Reply-To: <20120709105551.GK15345@sortiz-mobl>
-References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
- <20120709105551.GK15345@sortiz-mobl>
-Message-ID: <201207091146.04093.arnd@arndb.de>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Mon, 9 Jul 2012 17:17:07 +0530
+Subject: [PATCHv11 0/6] I2C cleanups
+In-Reply-To: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
+References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <CAM=Q2ct0PUisYGcaX6EAPWT-SmZAgRV_O8mAOodH-V4Q0O-Vww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 July 2012, Samuel Ortiz wrote:
-> On Mon, Jul 09, 2012 at 02:37:31PM +0800, Qiao Zhou wrote:
-> > change log [v5->v4]:
-> > 1, change the file name, from 88pm800-core.c, 88pm805-core.c, 88pm80x-i2c.c
-> > to 88pm800.c, 88pm805.c, 88pm80x.c, and modified Makefile accordingly.
-> > 2, replace the spinlock used to protect wakeup flag, with using set_bit/
-> > clear_bit, which is suitable adn enough in SMP env.
-> > 3, add the version number in each patch.
-> I applied the first 2 patches, I'd like to get an ACK from the respective
-> maintainers for the rtc and the input ones. They can even take it as both
-> drivers are protected by the MFD symbol.
-> 
+On Thu, Jun 28, 2012 at 8:41 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+> This is a minimal cleanup series.
 
-Please add my
+If there are no further comments can this series be queued?
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-comment to these two patches as well.
-
-	Arnd
+>
+> The patch series does the following
+>
+> - Bus busy recovery mechanism.
+> - Make the i2c use SET_RUNTIME_PM_OPS
+> - Use INIT_COMPLETION instead of init_completion
+> - the reset patch is dropped will try to rework it as per the
+>  review comments recieved.
+>
+>
+> This applies on Wolfram's i2c-embedded/for-next branch.
+>
+> Functional testing on omap4430 , 4460 panda and omap3sdp.
+>
+>
+> The following changes since commit 0f009a914b40be8786fa67b1f4345cacc263b48c:
+>
+>   i2c: tegra: make all resource allocation through devm_* (2012-06-13 16:01:38 +0200)
+>
+> are available in the git repository at:
+>   git://gitorious.org/linus-tree/linus-tree.git for_next/omap/minimal_cleanup
+>
+> Jon Hunter (1):
+>   i2c: omap: Correct I2C revision for OMAP3
+>
+> Shubhrajyoti D (4):
+>   i2c: omap: Optimise the remove code
+>   i2c: omap: Use SET_RUNTIME_PM_OPS
+>   i2c: omap: Do not initialise the completion everytime
+>   i2c: omap: Remove the definition of SYSS_RESETDONE_MASK
+>
+> Vikram Pandita (1):
+>   i2c: omap: Recover from Bus Busy condition
+>
+>  drivers/i2c/busses/i2c-omap.c |   60 ++++++++++++++++++++++++++++------------
+>  1 files changed, 42 insertions(+), 18 deletions(-)
+>
+> --
+> 1.7.5.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
