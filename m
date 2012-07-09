@@ -1,42 +1,47 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Mon, 09 Jul 2012 22:48:37 +0800
-Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
-In-Reply-To: <20120709132123.GQ15345@sortiz-mobl>
-References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
- <20120709105551.GK15345@sortiz-mobl>
- <20120709105533.GA3934@opensource.wolfsonmicro.com>
- <20120709132123.GQ15345@sortiz-mobl>
-Message-ID: <4FFAEF45.7070509@marvell.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 9 Jul 2012 16:52:16 +0200
+Subject: [PATCH 2/2] ARM: at91: clock: fix PLLA overclocked warning
+In-Reply-To: <1341825375-9143-1-git-send-email-jiri.prchal@aksignal.cz>
+References: <1341825375-9143-1-git-send-email-jiri.prchal@aksignal.cz>
+Message-ID: <4FFAF020.1080805@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2012 09:21 PM, Samuel Ortiz wrote:
-> Hi Mark,
->
-> On Mon, Jul 09, 2012 at 11:55:33AM +0100, Mark Brown wrote:
->> On Mon, Jul 09, 2012 at 12:55:51PM +0200, Samuel Ortiz wrote:
->>
->>> I applied the first 2 patches, I'd like to get an ACK from the respective
->>> maintainers for the rtc and the input ones. They can even take it as both
->>> drivers are protected by the MFD symbol.
->>
->> Alessandro's been mostly offline recently so it might be as well to
->> apply the RTC patch anyway.
-> Fair enough, applied now. Neither Alessandro nor the rtc ml wer not cc'ed on this
-> thread, but that's another problem.
-> Zhou, could you please send at least the rtc patch to Alessandro so that he
-> could have a look at it if time permits ?
->
-> Cheers,
-> Samuel.
->
-Samuel, Mark, Arnd,
+Hi Jiri,
 
-deeply appreciate your review, and I'll send the patch to Alessandro and 
-rtc mainline. thanks!
+On 07/09/2012 11:16 AM, Jiri Prchal :
+> This patch fix false warning "PLLA overclocked". Maximum frequency
+> for sam9260 is 210MHz as stated in atmel's datasheet. Originally there was
+> plus 4.5%, so I add this 4.5% to new value too.
 
+Well, I do not see this 4.5% in addition. It is true that Maximum
+frequency had been indicated as higher but current value is 210MHz if
+VDD core is @ 1.8V (for industrial temperature range).
 
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> ---
+>  arch/arm/mach-at91/clock.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> index de2ec6b..e004308 100644
+> --- a/arch/arm/mach-at91/clock.c
+> +++ b/arch/arm/mach-at91/clock.c
+> @@ -707,7 +707,7 @@ static int __init at91_pmc_init(unsigned long main_clock)
+>  		if (plla.rate_hz > 800000000)
+>  			pll_overclock = true;
+>  	} else {
+> -		if (plla.rate_hz > 209000000)
+> +		if (plla.rate_hz > 219000000)
+
+Well, I rework this patch using 210 MHz as stated in datasheet. We shall
+keep this 209 MHz test because at91rm9200 is still using this value.
+Moreover, I add a new category for 240 MHz.
+
+>  			pll_overclock = true;
+>  	}
+>  	if (pll_overclock)
+
+Thanks, best regards,
 -- 
-
-Best Regards
-Qiao
+Nicolas Ferre
