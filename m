@@ -1,35 +1,28 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 9 Jul 2012 16:12:15 +0530
-Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
- offset using the IP scheme.
-In-Reply-To: <4FFA9B6C.7050003@ti.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B6C.7050003@ti.com>
-Message-ID: <CAMQu2gz0UU_RCFSvxo1s_XwDAmTtL4NadsFTg8qL7PtGwPqKtQ@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 9 Jul 2012 12:55:51 +0200
+Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
+In-Reply-To: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
+References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
+Message-ID: <20120709105551.GK15345@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->
->
-> On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
->> From: R Sricharan <r.sricharan@ti.com>
->>
->> OMAP socs has a legacy and a highlander version of the
->> 32k sync counter IP. The register offsets vary between the
->> highlander and the legacy scheme. So use the 'SCHEME'
->> bits(30-31) of the revision register to distinguish between
->
->
-> Just for my understanding, can we get further information on SCHEME
-> bit-fields? What kind of information we have it here.
->
-> I may need this info to pass on to design team here.
->
-Sure. You can refer to the OMAP4 TRM for the bit builds.
-SCHEME bit field tell you difference between a highlander
-and legacy IP as the patch says.
+Hi Zhou,
 
-Regards
-santosh
+On Mon, Jul 09, 2012 at 02:37:31PM +0800, Qiao Zhou wrote:
+> change log [v5->v4]:
+> 1, change the file name, from 88pm800-core.c, 88pm805-core.c, 88pm80x-i2c.c
+> to 88pm800.c, 88pm805.c, 88pm80x.c, and modified Makefile accordingly.
+> 2, replace the spinlock used to protect wakeup flag, with using set_bit/
+> clear_bit, which is suitable adn enough in SMP env.
+> 3, add the version number in each patch.
+I applied the first 2 patches, I'd like to get an ACK from the respective
+maintainers for the rtc and the input ones. They can even take it as both
+drivers are protected by the MFD symbol.
+
+Cheers,
+Samuel. 
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
