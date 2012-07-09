@@ -1,40 +1,40 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 9 Jul 2012 15:14:47 +0200
-Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
-In-Reply-To: <201207091146.04093.arnd@arndb.de>
-References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
- <20120709105551.GK15345@sortiz-mobl>
- <201207091146.04093.arnd@arndb.de>
-Message-ID: <20120709131447.GO15345@sortiz-mobl>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 9 Jul 2012 15:04:53 +0200
+Subject: [PATCH 5/7] ARM: mxs: convert tx28 board to device tree
+In-Reply-To: <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20474.55029.733084.749955@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Shawn,
 
-On Mon, Jul 09, 2012 at 11:46:03AM +0000, Arnd Bergmann wrote:
-> On Monday 09 July 2012, Samuel Ortiz wrote:
-> > On Mon, Jul 09, 2012 at 02:37:31PM +0800, Qiao Zhou wrote:
-> > > change log [v5->v4]:
-> > > 1, change the file name, from 88pm800-core.c, 88pm805-core.c, 88pm80x-i2c.c
-> > > to 88pm800.c, 88pm805.c, 88pm80x.c, and modified Makefile accordingly.
-> > > 2, replace the spinlock used to protect wakeup flag, with using set_bit/
-> > > clear_bit, which is suitable adn enough in SMP env.
-> > > 3, add the version number in each patch.
-> > I applied the first 2 patches, I'd like to get an ACK from the respective
-> > maintainers for the rtc and the input ones. They can even take it as both
-> > drivers are protected by the MFD symbol.
-> > 
+Shawn Guo writes:
+> The function tx28_init is basically a rewriting of tx28_add_fec0.  All
+> those TX28_FEC_* gpio definitions are meant to be used as a temporary
+> solution before we get a generic way to set up board specific gpio
+> pins when booting from device tree.
 > 
-> Please add my
-> 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> comment to these two patches as well.
-Sure. Thanks a lot for your code review.
+This doesn't work at least because the pins that are used for PHY
+strap options need to be reconfigured for their FEC functionality
+after releasing the PHY reset. But even after adding the missing
+reconfiguration the ethernet PHY does not work.
 
-Cheers,
-Samuel.
+Since I currently don't have time to delve deeper into this, you may
+drop the TX28 board support until I get time to do the conversion to
+DT myself.
 
+
+
+Lothar Wa?mann
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
