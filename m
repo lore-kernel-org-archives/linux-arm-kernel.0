@@ -1,59 +1,97 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 9 Jul 2012 17:17:07 +0530
-Subject: [PATCHv11 0/6] I2C cleanups
-In-Reply-To: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
-References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAM=Q2ct0PUisYGcaX6EAPWT-SmZAgRV_O8mAOodH-V4Q0O-Vww@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 9 Jul 2012 14:51:50 +0300
+Subject: [PATCH v4 04/12] gpio/omap: remove saved_wakeup field from struct
+ gpio_bank
+In-Reply-To: <CAC83ZvLo3X_-EarrMFNM0B196FaMLrP5SNh5OA7aE7wMZ9VJUQ@mail.gmail.com>
+References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
+ <1331906760-5259-5-git-send-email-tarun.kanti@ti.com>
+ <4FFAA7B3.6020009@ti.com>
+ <CAC83ZvLo3X_-EarrMFNM0B196FaMLrP5SNh5OA7aE7wMZ9VJUQ@mail.gmail.com>
+Message-ID: <4FFAC5D6.4090306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 8:41 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> This is a minimal cleanup series.
+Tarun,
 
-If there are no further comments can this series be queued?
+On 07/09/2012 02:16 PM, DebBarma, Tarun Kanti wrote:
+> Hi Roger,
+> 
+> On Mon, Jul 9, 2012 at 3:13 PM, Roger Quadros <rogerq@ti.com> wrote:
+>> Hi,
+>>
+>> Just bumped across this patch and have a query.
+>>
+>> On 03/16/2012 04:05 PM, Tarun Kanti DebBarma wrote:
+>>> There is no more need to have saved_wakeup because bank->context.wake_en
+>>> already holds that value. So getting rid of read/write operation associated
+>>> with this field.
+>>>
+>>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Acked-by: Felipe Balbi <balbi@ti.com>
+>>> ---
+>>>  drivers/gpio/gpio-omap.c |   12 +++---------
+>>>  1 files changed, 3 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index 3a4f151..3b91ade 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -57,7 +57,6 @@ struct gpio_bank {
+>>>       u16 irq;
+>>>       int irq_base;
+>>>       struct irq_domain *domain;
+>>> -     u32 saved_wakeup;
+>>>       u32 non_wakeup_gpios;
+>>>       u32 enabled_non_wakeup_gpios;
+>>>       struct gpio_regs context;
+>>> @@ -777,7 +776,6 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+>>>       unsigned long           flags;
+>>>
+>>>       spin_lock_irqsave(&bank->lock, flags);
+>>> -     bank->saved_wakeup = __raw_readl(mask_reg);
+>>>       __raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
+>>
+>> OK, here you are overwriting the mask_reg with the wakeup bitmask
+>> without saving the mask_reg's original content.
+> This is based upon understanding that set_gpio_trigger() is the common
+> function where update of wake_en register takes place. Unless, mask_reg
+> in this case refers to something else, effectively we would be saving the
+> same value to saved_wakeup what is already present in wake_en.
+> I will verify this specific to this function.
+> 
+>>
+>>>       spin_unlock_irqrestore(&bank->lock, flags);
+>>>
+>>> @@ -793,7 +791,7 @@ static int omap_mpuio_resume_noirq(struct device *dev)
+>>>       unsigned long           flags;
+>>>
+>>>       spin_lock_irqsave(&bank->lock, flags);
+>>> -     __raw_writel(bank->saved_wakeup, mask_reg);
+>>> +     __raw_writel(bank->context.wake_en, mask_reg);
+>>
+>> Now you are restoring nothing but the same content that you stored
+>> during suspend. This will cause the non-wakeup gpio interrupts to get
+>> masked between a suspend/resume. So isn't this a bug?
+> That's right, the same value is restored back which was last updated in
+> set_gpio_trigger() that got stored in wake_en register. Let me know if
+> I am missing your points here.
 
+If it is writing the same thing then isn't this write redundant?
 
->
-> The patch series does the following
->
-> - Bus busy recovery mechanism.
-> - Make the i2c use SET_RUNTIME_PM_OPS
-> - Use INIT_COMPLETION instead of init_completion
-> - the reset patch is dropped will try to rework it as per the
->  review comments recieved.
->
->
-> This applies on Wolfram's i2c-embedded/for-next branch.
->
-> Functional testing on omap4430 , 4460 panda and omap3sdp.
->
->
-> The following changes since commit 0f009a914b40be8786fa67b1f4345cacc263b48c:
->
->   i2c: tegra: make all resource allocation through devm_* (2012-06-13 16:01:38 +0200)
->
-> are available in the git repository at:
->   git://gitorious.org/linus-tree/linus-tree.git for_next/omap/minimal_cleanup
->
-> Jon Hunter (1):
->   i2c: omap: Correct I2C revision for OMAP3
->
-> Shubhrajyoti D (4):
->   i2c: omap: Optimise the remove code
->   i2c: omap: Use SET_RUNTIME_PM_OPS
->   i2c: omap: Do not initialise the completion everytime
->   i2c: omap: Remove the definition of SYSS_RESETDONE_MASK
->
-> Vikram Pandita (1):
->   i2c: omap: Recover from Bus Busy condition
->
->  drivers/i2c/busses/i2c-omap.c |   60 ++++++++++++++++++++++++++++------------
->  1 files changed, 42 insertions(+), 18 deletions(-)
->
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+>>
+>> Proper solution would be to save the mask_reg context into another
+>> register than context.wake_en during suspend.
+> As I said, this would make sense if mask_reg is referring to different
+> register than what is used in set_gpio_trigger(). I will have a look.
+
+OK thanks.
+
+> 
+> BTW, did you observe anything unusual during some testing?
+
+No, I haven't done any tests.
+
+cheers,
+-roger
