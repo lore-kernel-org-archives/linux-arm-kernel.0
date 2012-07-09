@@ -1,33 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Jul 2012 23:03:41 +0200
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
-In-Reply-To: <4FFB463F.9040201@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <4FF6994B.9040801@linaro.org>
- <20120706173957.GA10202@core.coreip.homeip.net>
- <4FFB288D.4080606@linaro.org>
- <20120709201422.GA12242@core.coreip.homeip.net>
- <4FFB40A4.5060505@linaro.org>
- <20120709204620.GA12692@core.coreip.homeip.net>
- <4FFB463F.9040201@linaro.org>
-Message-ID: <CACRpkdbjkLvD13_g=TvCUYjqhZ7ySOiEL51h9eT3YVMO4Vnr3A@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 9 Jul 2012 14:18:27 -0700
+Subject: [PATCH 1/3] ARM: clk-imx27: Fix rtc clock id
+In-Reply-To: <1341694041-7839-1-git-send-email-festevam@gmail.com>
+References: <1341694041-7839-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120709141827.14a45a9c.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 10:59 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Sat,  7 Jul 2012 17:47:19 -0300
+Fabio Estevam <festevam@gmail.com> wrote:
 
-> Before we can use any domain allocated IRQ, we need to first create a
-> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
-> We do this with a helper function provided by the AB8500 IRQ domain
-> controller called ab8500_irq_get_virq(). We need to do this for both
-> IRQs which the Power-On-Key driver uses; one for button press, the other
-> for button depress.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Fix rtc clock id.
+> 
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -256,7 +256,7 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
+>  	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
+>  	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
+> -	clk_register_clkdev(clk[rtc_ipg_gate], "rtc", NULL);
+> +	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "mxc_rtc");
+>  	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+>  	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
+>  	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
 
-Now since I was fooled by the last patch, thinking you had tested it before
-submitting (obviously not) - please send a test log of some
-cat /dev/input/event* for this one before I ACK it this time.
 
-Yours,
-Linus Walleij
+When I look at this patch I don't know if it changes the user interface
+(does it rename or move sysfs files or contents?) and I don't know
+whether the patch fixes serious issues, which would indicate that a
+backport into -stable is needed.
+
+So, please read and remember these words: when fixing a bug, always
+provide a complete description of that bug.  Most especially, provide a
+description of the end-user effects of the bug.
