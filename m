@@ -1,78 +1,68 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Mon,  9 Jul 2012 14:13:34 +0800
-Subject: [PATCH 0/4 V4] add 88pm80x mfd driver
-Message-ID: <1341814418-13300-1-git-send-email-zhouqiao@marvell.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Mon, 9 Jul 2012 11:54:09 +0530
+Subject: [PATCH] arm/dts: remove MMC/SD and SPI related entries from
+ am33xx.dtsi
+Message-ID: <1341815049-3947-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-change log [v5->v4]:
-1, change the file name, from 88pm800-core.c, 88pm805-core.c, 88pm80x-i2c.c
-to 88pm800.c, 88pm805.c, 88pm80x.c, and modified Makefile accordingly.
-2, replace the spinlock used to protect wakeup flag, with using set_bit/
-clear_bit, which is suitable adn enough in SMP env.
+The MMC/SD and SPI entries in this file are not tested yet. They
+inadvertently came into the patch because of some work in progress
+stuff I had in my repo.
 
-change log [v4->v3]:
-1, provide unified suspend/resume api for all sub-devices, and add
-protection for 800 & 805 wakeup flag in SMP case.
-2, clean register definition in 88pm80x.h, and thanks Arnd's help.
-3, some minor changes in mfd Kconfig/Makefile.
+These entries should not have been sent out in the first place and
+I am sorry for the trouble and will be extra careful in future.
 
-change log [v3->v2]:
-1, dynamically get the irq_base, for both regmap_add_irq_chip and
-mfd_add_devices. add pm80x_request_irq & pm80x_free_irq for sub-driver
-facility, and modify related irq thread operation. remove irq_base member
-from 80x_chip & platform data.
-2, split 88pm80x.o into 3 separate modules.
-3, remove the 88pm80x r/w API, and directly use open-coded regmap api.
-4, minor change: move pm80x_id_table from 80x-i2c.c to 800/805-core.c,
-exported pm80x_init, pm80x_deinit, and pm80x_bulk_read, add callback in
-pdata.
+Since the offending commit is not sent upstream yet, I hope this can
+be merged into the commit 5fc0b42a98556bd9f01cecc6a64fcbd15ec363f0
+(arm/dts: Add initial DT support for AM33XX SoC family) on the devel-dt
+branch of linux-omap tree.
 
-change log [v2->v1]:
-1, split 88pm80x-core.c into 88pm800-core.c and 88pm805.c, per Arnd's
-suggestion. after the re-arch, 88pm80x-i2c handles the 800 & 805 common
-parts, while 800-core.c & 805-core.c handle the specific parts in each
-chip.
-2, add details about the workaround adding a i2c companion between 800 &
-805, and make a separate patch for it, per Arnd's suggestion.
-3, remove callback in pdata. but still keep the pdata currently.
-4, only keep necessary register in 88pm80x.h, including registers for
-regulator/rtc/onkey/power/codec etc, and remove other registers from global
-visibility.
-5, exported r/w API which requires regmap handle. as currently the pm800
-chip has 3 i2c device, only passing a pm80x_chip info can't ensure r/w the
-register in correct i2c device.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi |   31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
-change log [v1]:
-1, pm800 and pm805 are decoupled and probed separately;
-2, re-used the most of API for pm800 and pm805 per Arnd's comments;
-3, use regmap_irq, instead of previous 88pm80x_irq_data per Mark's comments.
-use regmap_add_irq_chip, and remove previous 88pm80x irq handling.
-4, remove callback function in rtc pdata per Arnd's comments.
-5, updated some coding style issue.
-
-Qiao Zhou (4):
-  mfd: support 88pm80x in 80x driver
-  mfd: workaround: add companion chip in 88pm80x
-  rtc: add rtc support to 88PM80X PMIC
-  input: add onkey support to 88PM80X PMIC
-
- drivers/input/misc/88pm80x_onkey.c |  176 +++++++++++
- drivers/input/misc/Kconfig         |   10 +
- drivers/input/misc/Makefile        |    1 +
- drivers/mfd/88pm800.c              |  593 ++++++++++++++++++++++++++++++++++++
- drivers/mfd/88pm805.c              |  299 ++++++++++++++++++
- drivers/mfd/88pm80x.c              |  144 +++++++++
- drivers/mfd/Kconfig                |   24 ++
- drivers/mfd/Makefile               |    2 +
- drivers/rtc/Kconfig                |   10 +
- drivers/rtc/Makefile               |    1 +
- drivers/rtc/rtc-88pm80x.c          |  371 ++++++++++++++++++++++
- include/linux/mfd/88pm80x.h        |  369 ++++++++++++++++++++++
- 12 files changed, 2000 insertions(+), 0 deletions(-)
- create mode 100644 drivers/input/misc/88pm80x_onkey.c
- create mode 100644 drivers/mfd/88pm800.c
- create mode 100644 drivers/mfd/88pm805.c
- create mode 100644 drivers/mfd/88pm80x.c
- create mode 100644 drivers/rtc/rtc-88pm80x.c
- create mode 100644 include/linux/mfd/88pm80x.h
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index f46e353..59509c4 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -154,36 +154,5 @@
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
+ 		};
+-
+-		mcspi1: spi at 48030000 {
+-			compatible = "ti,omap2-mcspi";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			ti,hwmods = "spi0";
+-			ti,spi-num-cs = <4>;
+-		};
+-
+-		mcspi2: spi at 481Aa000 {
+-			compatible = "ti,omap2-mcspi";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			ti,hwmods = "spi1";
+-			ti,spi-num-cs = <2>;
+-		};
+-
+-		mmc1: mmc at 48060000 {
+-			compatible = "ti,omap3-hsmmc";
+-			ti,hwmods = "mmc1";
+-		};
+-
+-		mmc2: mmc at 481D8000 {
+-			compatible = "ti,omap3-hsmmc";
+-			ti,hwmods = "mmc2";
+-		};
+-
+-		mmc3: mmc at 47810000 {
+-			compatible = "ti,omap3-hsmmc";
+-			ti,hwmods = "mmc3";
+-		};
+ 	};
+ };
+-- 
+1.7.9.5
