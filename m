@@ -1,65 +1,41 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 10 Jul 2012 07:08:21 +0800
-Subject: [PATCH V2] i2c: imx: make bitrate an u32 type
-In-Reply-To: <1341872910-26687-1-git-send-email-wolfram@the-dreams.de>
-References: <1341872910-26687-1-git-send-email-wolfram@the-dreams.de>
-Message-ID: <20120709230819.GA2196@richard-laptop>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 9 Jul 2012 18:21:45 -0500
+Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
+ offset using the IP scheme.
+In-Reply-To: <873950x4ng.fsf@ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
+ <873950x4ng.fsf@ti.com>
+Message-ID: <4FFB6789.2000100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 12:28:30AM +0200, Wolfram Sang wrote:
-> sparse found this assignment of u32 to an int. Fix it:
+Hi Kevin,
+
+On 07/09/2012 11:47 AM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> drivers/i2c/busses/i2c-imx.c:540:56: warning: incorrect type in argument 3 (different signedness)
+>> From: R Sricharan <r.sricharan@ti.com>
+>>
+>> OMAP socs has a legacy and a highlander version of the
+>> 32k sync counter IP. The register offsets vary between the
+>> highlander and the legacy scheme. So use the 'SCHEME'
+>> bits(30-31) of the revision register to distinguish between
+>> the two versions and choose the CR register offset accordingly.
 > 
-> and also fix the type in platform_data. All current users use values
-> which fit into the old and new type, so it is a safe change.
+> Do these scheme bits exist on *all* OMAPs?  including OMAP1?
 > 
-> Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
-> Cc: Richard Zhao <richard.zhao@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
+> This driver is used on OMAP1 as well as OMAP2+.  
 > 
-> Changes since V1: also change type in platform_data. Thanks to Richard.
-> 
->  arch/arm/plat-mxc/include/mach/i2c.h |    2 +-
->  drivers/i2c/busses/i2c-imx.c         |    4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/i2c.h b/arch/arm/plat-mxc/include/mach/i2c.h
-> index 375cdd0..8289d91 100644
-> --- a/arch/arm/plat-mxc/include/mach/i2c.h
-> +++ b/arch/arm/plat-mxc/include/mach/i2c.h
-> @@ -15,7 +15,7 @@
->   *
->   **/
->  struct imxi2c_platform_data {
-> -	int bitrate;
-> +	u32 bitrate;
->  };
->  
->  #endif /* __ASM_ARCH_I2C_H_ */
-> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> index dd2a083..90460dd 100644
-> --- a/drivers/i2c/busses/i2c-imx.c
-> +++ b/drivers/i2c/busses/i2c-imx.c
-> @@ -471,8 +471,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->  	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
->  	struct pinctrl *pinctrl;
->  	void __iomem *base;
-> -	int irq, bitrate;
-> -	int ret;
-> +	int irq, ret;
-> +	u32 bitrate;
->  
->  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The cover letter says this was only build tested on OMAP1 so I suggest
+> this actually be tested on OMAP1 before merging.
+
+I have tested this on an omap5912 osk. I booted and verified that the
+offset is good.
+
+Santosh, add my tested-by for OMAP1 ...
+
+Tested-by: Jon Hunter <jon-hunter@ti.com>
+
+Cheers
+Jon
