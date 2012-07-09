@@ -1,93 +1,38 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 9 Jul 2012 16:09:59 +0530
-Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <4FFA9B61.8030808@ti.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B61.8030808@ti.com>
-Message-ID: <CAMQu2gwGzK4dt0VW19LhQK_tjGgY6C4b628M3dNi5xP_hYFPhg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 9 Jul 2012 16:10:21 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.6
+Message-ID: <4FFAB515.1070708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->
->
->
-> On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
-> > From: R Sricharan <r.sricharan@ti.com>
-> >
-> > OMAP5430 is Texas Instrument's SOC based on ARM Cortex-A15 SMP
-> > architecture. It's a dual core SOC with GIC used for interrupt
-> > handling and with an integrated L2 cache controller.
-> >
-> > OMAP5432 is another variant of OMAP5430, with a
-> > memory controller supporting DDR3 and SATA.
-> >
-> > Patch includes:
-> >  - The machine specific headers and sources updates.
-> >  - Platform header updates.
-> >  - Minimum initialisation support for serial.
-> >  - IO table init
-> >
-> > Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > ---
+Hi Arnd, Olof,
 
-[..]
+Please pull the following DaVinci fix for v3.6
 
-> >
-> > +#if defined(CONFIG_SOC_OMAP5)
-> > +static struct omap_globals omap5_globals = {
-> > +     .class  = OMAP54XX_CLASS,
-> > +     .tap    = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
-> > +     .ctrl   = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
-> > +     .ctrl_pad       = OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE),
-> > +     .prm    = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
-> > +     .cm     = OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
-> > +     .cm2    = OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
-> > +     .prcm_mpu = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE),
->
-> I am not sure whether we had discussed on this before, couldn't find it.
->
-> Why don't we reuse OMAP4 data here and elsewhere??
->
-Because data is not same between OMAP4 and OMAP5.
-Wherever it is same, it is taken care.
+Thanks,
+Sekhar
 
-[..]
+The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
 
-> > diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-> > index 70cf825..766181c 100644
-> > --- a/arch/arm/plat-omap/sram.c
-> > +++ b/arch/arm/plat-omap/sram.c
-> > @@ -6,8 +6,8 @@
-> >   * Copyright (C) 2005 Nokia Corporation
-> >   * Written by Tony Lindgren <tony@atomide.com>
-> >   *
-> > - * Copyright (C) 2009 Texas Instruments
-> > - * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > + * Copyright (C) 2009-2012 Texas Instruments
-> > + * Added OMAP4/5 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >   *
-> >   * This program is free software; you can redistribute it and/or modify
-> >   * it under the terms of the GNU General Public License version 2 as
-> > @@ -44,6 +44,7 @@
-> >  #else
-> >  #define OMAP4_SRAM_PUB_PA    (OMAP4_SRAM_PA + 0x4000)
-> >  #endif
-> > +#define OMAP5_SRAM_PA                0x40300000
-> >
->
-> We have mix of such definitions here, for example,
->
-> "arch/arm/plat-omap/include/plat/sram.h"
-> and now in arch/arm/plat-omap/sram.c here itself.
->
->
-> May be right time to clean it up now.
->
-Thats because of an interconnect BUG which needed it exported
-at plat level in case of OMAP4.
+  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
 
-Regards
-Santosh
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-v3.6-fixes
+
+for you to fetch changes up to bbb33445b9cdd5ac7609723fcfc28dfa77a11039:
+
+  ARM: davinci: da8xx: fix interrupt handling (2012-07-09 16:01:11 +0530)
+
+----------------------------------------------------------------
+DaVinci fixes for v3.6
+
+Fix an interrupt handling issue with cp_intc which
+was causing occasional spurious interrupts with DA850 EVM
+
+----------------------------------------------------------------
+Sekhar Nori (1):
+      ARM: davinci: da8xx: fix interrupt handling
+
+ arch/arm/mach-davinci/include/mach/entry-macro.S |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
