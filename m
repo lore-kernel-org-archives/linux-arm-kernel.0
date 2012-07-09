@@ -1,236 +1,78 @@
 From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Mon,  9 Jul 2012 14:13:38 +0800
-Subject: [PATCH 4/4] input: add onkey support to 88PM80X PMIC
-In-Reply-To: <1341814418-13300-1-git-send-email-zhouqiao@marvell.com>
-References: <1341814418-13300-1-git-send-email-zhouqiao@marvell.com>
-Message-ID: <1341814418-13300-5-git-send-email-zhouqiao@marvell.com>
+Date: Mon,  9 Jul 2012 14:13:34 +0800
+Subject: [PATCH 0/4 V4] add 88pm80x mfd driver
+Message-ID: <1341814418-13300-1-git-send-email-zhouqiao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add onkey support to MARVELL 88PM80X PMIC.
+change log [v5->v4]:
+1, change the file name, from 88pm800-core.c, 88pm805-core.c, 88pm80x-i2c.c
+to 88pm800.c, 88pm805.c, 88pm80x.c, and modified Makefile accordingly.
+2, replace the spinlock used to protect wakeup flag, with using set_bit/
+clear_bit, which is suitable adn enough in SMP env.
 
-Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
----
- drivers/input/misc/88pm80x_onkey.c |  176 ++++++++++++++++++++++++++++++++++++
- drivers/input/misc/Kconfig         |   10 ++
+change log [v4->v3]:
+1, provide unified suspend/resume api for all sub-devices, and add
+protection for 800 & 805 wakeup flag in SMP case.
+2, clean register definition in 88pm80x.h, and thanks Arnd's help.
+3, some minor changes in mfd Kconfig/Makefile.
+
+change log [v3->v2]:
+1, dynamically get the irq_base, for both regmap_add_irq_chip and
+mfd_add_devices. add pm80x_request_irq & pm80x_free_irq for sub-driver
+facility, and modify related irq thread operation. remove irq_base member
+from 80x_chip & platform data.
+2, split 88pm80x.o into 3 separate modules.
+3, remove the 88pm80x r/w API, and directly use open-coded regmap api.
+4, minor change: move pm80x_id_table from 80x-i2c.c to 800/805-core.c,
+exported pm80x_init, pm80x_deinit, and pm80x_bulk_read, add callback in
+pdata.
+
+change log [v2->v1]:
+1, split 88pm80x-core.c into 88pm800-core.c and 88pm805.c, per Arnd's
+suggestion. after the re-arch, 88pm80x-i2c handles the 800 & 805 common
+parts, while 800-core.c & 805-core.c handle the specific parts in each
+chip.
+2, add details about the workaround adding a i2c companion between 800 &
+805, and make a separate patch for it, per Arnd's suggestion.
+3, remove callback in pdata. but still keep the pdata currently.
+4, only keep necessary register in 88pm80x.h, including registers for
+regulator/rtc/onkey/power/codec etc, and remove other registers from global
+visibility.
+5, exported r/w API which requires regmap handle. as currently the pm800
+chip has 3 i2c device, only passing a pm80x_chip info can't ensure r/w the
+register in correct i2c device.
+
+change log [v1]:
+1, pm800 and pm805 are decoupled and probed separately;
+2, re-used the most of API for pm800 and pm805 per Arnd's comments;
+3, use regmap_irq, instead of previous 88pm80x_irq_data per Mark's comments.
+use regmap_add_irq_chip, and remove previous 88pm80x irq handling.
+4, remove callback function in rtc pdata per Arnd's comments.
+5, updated some coding style issue.
+
+Qiao Zhou (4):
+  mfd: support 88pm80x in 80x driver
+  mfd: workaround: add companion chip in 88pm80x
+  rtc: add rtc support to 88PM80X PMIC
+  input: add onkey support to 88PM80X PMIC
+
+ drivers/input/misc/88pm80x_onkey.c |  176 +++++++++++
+ drivers/input/misc/Kconfig         |   10 +
  drivers/input/misc/Makefile        |    1 +
- 3 files changed, 187 insertions(+), 0 deletions(-)
+ drivers/mfd/88pm800.c              |  593 ++++++++++++++++++++++++++++++++++++
+ drivers/mfd/88pm805.c              |  299 ++++++++++++++++++
+ drivers/mfd/88pm80x.c              |  144 +++++++++
+ drivers/mfd/Kconfig                |   24 ++
+ drivers/mfd/Makefile               |    2 +
+ drivers/rtc/Kconfig                |   10 +
+ drivers/rtc/Makefile               |    1 +
+ drivers/rtc/rtc-88pm80x.c          |  371 ++++++++++++++++++++++
+ include/linux/mfd/88pm80x.h        |  369 ++++++++++++++++++++++
+ 12 files changed, 2000 insertions(+), 0 deletions(-)
  create mode 100644 drivers/input/misc/88pm80x_onkey.c
-
-diff --git a/drivers/input/misc/88pm80x_onkey.c b/drivers/input/misc/88pm80x_onkey.c
-new file mode 100644
-index 0000000..807587f
---- /dev/null
-+++ b/drivers/input/misc/88pm80x_onkey.c
-@@ -0,0 +1,176 @@
-+/*
-+ * 88pm80x_onkey.c - Marvell 88PM80x ONKEY driver
-+ *
-+ * Copyright (C) 2012 Marvell International Ltd.
-+ * Haojian Zhuang <haojian.zhuang@marvell.com>
-+ * Qiao Zhou <zhouqiao@marvell.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/input.h>
-+#include <linux/mfd/88pm80x.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+#define PM800_LONG_ONKEY_EN		(1 << 0)
-+#define PM800_LONG_KEY_DELAY		(8)	/* 1 .. 16 seconds */
-+#define PM800_LONKEY_PRESS_TIME		((PM800_LONG_KEY_DELAY-1) << 4)
-+#define PM800_LONKEY_PRESS_TIME_MASK	(0xF0)
-+#define PM800_SW_PDOWN			(1 << 5)
-+
-+struct pm80x_onkey_info {
-+	struct input_dev *idev;
-+	struct pm80x_chip *pm80x;
-+	struct regmap *map;
-+	int irq;
-+};
-+
-+/* 88PM80x gives us an interrupt when ONKEY is held */
-+static irqreturn_t pm80x_onkey_handler(int irq, void *data)
-+{
-+	struct pm80x_onkey_info *info = data;
-+	int ret = 0;
-+
-+	regmap_read(info->map, PM800_STATUS_1, &ret);
-+	ret &= PM800_ONKEY_STS1;
-+
-+	input_report_key(info->idev, KEY_POWER, ret);
-+	input_sync(info->idev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+#ifdef CONFIG_PM
-+static int pm80x_onkey_suspend(struct device *dev)
-+{
-+	return pm80x_dev_suspend(dev);
-+}
-+
-+static int pm80x_onkey_resume(struct device *dev)
-+{
-+	return pm80x_dev_resume(dev);
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(pm80x_onkey_pm_ops, pm80x_onkey_suspend,
-+			 pm80x_onkey_resume);
-+
-+static int __devinit pm80x_onkey_probe(struct platform_device *pdev)
-+{
-+
-+	void *chip = dev_get_drvdata(pdev->dev.parent);
-+	struct pm80x_onkey_info *info;
-+	int ret;
-+
-+	info =
-+	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_onkey_info),
-+			 GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	info->pm80x = (struct pm80x_chip *)chip;
-+
-+	info->irq = platform_get_irq(pdev, 0);
-+	if (info->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ resource!\n");
-+		return -EINVAL;
-+	}
-+
-+	info->map = info->pm80x->regmap;
-+	if (!info->map) {
-+		dev_err(&pdev->dev, "no regmap!\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	info->idev = input_allocate_device();
-+	if (!info->idev) {
-+		dev_err(&pdev->dev, "Failed to allocate input dev\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	info->idev->name = "88pm80x_on";
-+	info->idev->phys = "88pm80x_on/input0";
-+	info->idev->id.bustype = BUS_I2C;
-+	info->idev->dev.parent = &pdev->dev;
-+	info->idev->evbit[0] = BIT_MASK(EV_KEY);
-+	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
-+
-+	ret = input_register_device(info->idev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't register input device: %d\n", ret);
-+		goto out_reg;
-+	}
-+
-+	ret = pm80x_request_irq(info->pm80x, info->irq, pm80x_onkey_handler,
-+					    IRQF_ONESHOT, "onkey", info);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to request IRQ: #%d: %d\n",
-+			info->irq, ret);
-+		goto out_irq;
-+	}
-+
-+	platform_set_drvdata(pdev, info);
-+
-+	/* Enable long onkey detection */
-+	regmap_update_bits(info->map, PM800_RTC_MISC4, PM800_LONG_ONKEY_EN,
-+			   PM800_LONG_ONKEY_EN);
-+	/* Set 8-second interval */
-+	regmap_update_bits(info->map, PM800_RTC_MISC3,
-+			   PM800_LONKEY_PRESS_TIME_MASK,
-+			   PM800_LONKEY_PRESS_TIME);
-+
-+	device_init_wakeup(&pdev->dev, 1);
-+	return 0;
-+
-+out_irq:
-+	input_unregister_device(info->idev);
-+out_reg:
-+	input_free_device(info->idev);
-+out:
-+	devm_kfree(&pdev->dev, info);
-+	return ret;
-+}
-+
-+static int __devexit pm80x_onkey_remove(struct platform_device *pdev)
-+{
-+	struct pm80x_onkey_info *info = platform_get_drvdata(pdev);
-+
-+	pm80x_free_irq(info->pm80x, info->irq, info);
-+	input_unregister_device(info->idev);
-+	input_free_device(info->idev);
-+	devm_kfree(&pdev->dev, info);
-+	return 0;
-+}
-+
-+static struct platform_driver pm80x_onkey_driver = {
-+	.driver = {
-+		   .name = "88pm80x-onkey",
-+		   .owner = THIS_MODULE,
-+		   .pm = &pm80x_onkey_pm_ops,
-+		   },
-+	.probe = pm80x_onkey_probe,
-+	.remove = __devexit_p(pm80x_onkey_remove),
-+};
-+
-+module_platform_driver(pm80x_onkey_driver);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Marvell 88PM80x ONKEY driver");
-+MODULE_AUTHOR("Qiao Zhou <zhouqiao@marvell.com>");
-+MODULE_ALIAS("platform:88pm80x-onkey");
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 7faf4a7..7c0f1ec 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -22,6 +22,16 @@ config INPUT_88PM860X_ONKEY
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called 88pm860x_onkey.
- 
-+config INPUT_88PM80X_ONKEY
-+	tristate "88PM80x ONKEY support"
-+	depends on MFD_88PM800
-+	help
-+	  Support the ONKEY of Marvell 88PM80x PMICs as an input device
-+	  reporting power button status.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called 88pm80x_onkey.
-+
- config INPUT_AB8500_PONKEY
- 	tristate "AB8500 Pon (PowerOn) Key"
- 	depends on AB8500_CORE
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index f55cdf4..83fe6f5 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -5,6 +5,7 @@
- # Each configuration option enables a list of files.
- 
- obj-$(CONFIG_INPUT_88PM860X_ONKEY)	+= 88pm860x_onkey.o
-+obj-$(CONFIG_INPUT_88PM80X_ONKEY)	+= 88pm80x_onkey.o
- obj-$(CONFIG_INPUT_AB8500_PONKEY)	+= ab8500-ponkey.o
- obj-$(CONFIG_INPUT_AD714X)		+= ad714x.o
- obj-$(CONFIG_INPUT_AD714X_I2C)		+= ad714x-i2c.o
--- 
-1.7.0.4
+ create mode 100644 drivers/mfd/88pm800.c
+ create mode 100644 drivers/mfd/88pm805.c
+ create mode 100644 drivers/mfd/88pm80x.c
+ create mode 100644 drivers/rtc/rtc-88pm80x.c
+ create mode 100644 include/linux/mfd/88pm80x.h
