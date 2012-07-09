@@ -1,41 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Jul 2012 05:14:00 -0700
-Subject: [PATCH v2 1/2] ARM: OMAP: board-4430sdp: MUX configuration for
- sys_nirq2
-In-Reply-To: <4FFAA6AF.2010004@ti.com>
-References: <1341580752-5501-1-git-send-email-peter.ujfalusi@ti.com>
- <1341580752-5501-2-git-send-email-peter.ujfalusi@ti.com>
- <874nplc6va.fsf@ti.com>
- <CAMQu2gx4927Ze9tRUFq9QPubGFWfK9bHqZhVCb7c39O=WeWA3Q@mail.gmail.com>
- <4FFAA6AF.2010004@ti.com>
-Message-ID: <20120709121400.GF1122@atomide.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 9 Jul 2012 15:14:47 +0200
+Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
+In-Reply-To: <201207091146.04093.arnd@arndb.de>
+References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
+ <20120709105551.GK15345@sortiz-mobl>
+ <201207091146.04093.arnd@arndb.de>
+Message-ID: <20120709131447.GO15345@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120709 02:43]:
-> On 07/06/2012 04:33 PM, Shilimkar, Santosh wrote:
-> >> Since this is TWL6030 specific, it should rather be done in TWL code
-> >> like I did for sys_nirq1:
-> >>
-> >>    http://marc.info/?l=linux-omap&m=134090312118873&w=2
-> >>
-> >> That would avoid having to do this in both board files.
-> >>
-> > Though the pin is TWL specific, it need not be same on
-> > different board with different SOCs. Especially when you need to
-> > set MUX mode etc. So doing from board file is still better
-> > since TWL6030/40 can be connected to non OMAP4 devices
-> > where the muxing can be different.
+Hi Arnd,
+
+On Mon, Jul 09, 2012 at 11:46:03AM +0000, Arnd Bergmann wrote:
+> On Monday 09 July 2012, Samuel Ortiz wrote:
+> > On Mon, Jul 09, 2012 at 02:37:31PM +0800, Qiao Zhou wrote:
+> > > change log [v5->v4]:
+> > > 1, change the file name, from 88pm800-core.c, 88pm805-core.c, 88pm80x-i2c.c
+> > > to 88pm800.c, 88pm805.c, 88pm80x.c, and modified Makefile accordingly.
+> > > 2, replace the spinlock used to protect wakeup flag, with using set_bit/
+> > > clear_bit, which is suitable adn enough in SMP env.
+> > > 3, add the version number in each patch.
+> > I applied the first 2 patches, I'd like to get an ACK from the respective
+> > maintainers for the rtc and the input ones. They can even take it as both
+> > drivers are protected by the MFD symbol.
 > > 
-> > With current know boards with TWL6030/40, this is not
-> > a strong requirement though.
 > 
-> There can be board which has twl6030 but does not have twl6040.
-> The twl6040 is the recommended audio solution for OMAP4+ systems but it can be
-> replaced by other codec on some boards.
-> This is the reason I have put the mux configuration into the board files for
-> sys_nirq2 (which is in these cases are used to handle the interrupt from twl6040).
+> Please add my
+> 
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> comment to these two patches as well.
+Sure. Thanks a lot for your code review.
 
-OK I'll apply these into devel-board branch.
+Cheers,
+Samuel.
 
-Tony
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
