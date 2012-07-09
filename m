@@ -1,33 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Jul 2012 16:28:37 +0000
-Subject: [PATCH 00/15] PCI io.h cleanups
-In-Reply-To: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201207091628.37975.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 09 Jul 2012 09:36:03 -0700
+Subject: [PATCH] ARM: OMAP2+: omap2plus_defconfig: EHCI driver is not
+ stable, disable it
+In-Reply-To: <20120709084032.GZ1122@atomide.com> (Tony Lindgren's message of
+ "Mon, 9 Jul 2012 01:40:33 -0700")
+References: <1341598828-31410-1-git-send-email-khilman@ti.com>
+ <20120709084032.GZ1122@atomide.com>
+Message-ID: <87obnox570.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 July 2012, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> I've finally gotten back to this after several months. This is the 2nd
-> part of mach/io.h removals. This series removes io.h on platforms with
-> PCI by creating a fixed virtual I/O mapping and a common __io() macro.
-> 
-> As several platforms have 2 1MB I/O windows, I've changed the fixed
-> mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
-> control the size. This also allows using a single 1MB section mapping
-> rather than 4KB pages.
+Tony Lindgren <tony@atomide.com> writes:
 
-Looks really good, feel free to add my Reviewed-by on patches 2-15, since
-I've done a line-by-line walkthrough and could not find anything besides the
-trivial comments I gave.
+> * Kevin Hilman <khilman@ti.com> [120706 11:25]:
+>> The EHCI driver is not stable enough to be enabled by default.  In v3.5,
+>> it has at least the following problems:
+>> 
+>> - warning dump during bootup
+>> - hang during suspend
+>> - prevents CORE powerdomain from entering retention during idle (even
+>>   when no USB devices connected.)
+>> 
+>> This demonstrates that this driver has not been thoroughly tested and
+>> therfore should not be enabled in the default defconfig.
+>> 
+>> In addition, the problems above cause new PM regressions which need be
+>> addressed before this driver should be enabled in the default
+>> defconfig.
+>> 
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> Tony, this applies to your current fixes branch.   Please queue up for v3.5-rc
+>> so this PM regression is fixed in v3.5.  Thanks.
+>
+> OK adding, 
 
-> I've only tested versatilepb under qemu, so any testing is appreciated.
-> iop3xx and mv78xx0 have some risk of breaking as the PCI bus addresses
-> are moved to 0 from matching the cpu host bus addesss.
+Thanks.
 
-Did you try running any devices that actually use I/O space in qemu?
-I think there are plenty of devices that you could use for testing that.
+> although I don't like the idea of having to disable drivers in the
+> defconfig to fix issues :(
 
-	Arnd
+Neither do I, that's why I've been complaining about it since v3.5 came
+out so it would be properly addressed by the driver writers.  It hasn't,
+so this is the last resort.
+
+> The hang during suspend case would
+> be potentially hit by many people.. Should the driver/usb/host/ehci-omap.c
+> be patched to disable suspend or at least warn about it?
+
+Russ Dill has posted fixes already for several of the problems, and
+Keshava has posted a revert, but I don't see them beling addressed for
+v3.5. 
+
+However, those fixes still don't address the CORE retention in idle
+issue which breaks PM for the whole SoC, so IMO this driver is still not
+ready to be enabled by default.
+
+Kevin
