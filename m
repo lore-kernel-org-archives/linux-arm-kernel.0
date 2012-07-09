@@ -1,43 +1,58 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 9 Jul 2012 09:20:38 +0800
-Subject: [PATCH v2 1/4] usb: chipidea: pci: make platformdata static
-In-Reply-To: <20120708174849.GG31508@n2100.arm.linux.org.uk>
-References: <1340891629-13145-1-git-send-email-mkl@pengutronix.de>
- <1340891629-13145-2-git-send-email-mkl@pengutronix.de>
- <20120628140603.GA2799@richard-laptop>
- <CANg6MZh7+eyMa97a73bNTFfd8SGNRMTx=3F1-DYT13R=VR+p1w@mail.gmail.com>
- <20120708174849.GG31508@n2100.arm.linux.org.uk>
-Message-ID: <20120709012037.GB26888@b20223-02.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 9 Jul 2012 09:26:09 +0800
+Subject: [PATCH] ARM: ttc_dkb: add nand support
+In-Reply-To: <CALZhoSRZKi+PHpj1tBBBFX2rcGb_6yyMowthH0uyA=vRoTNq8w@mail.gmail.com>
+References: <1341793703-18510-1-git-send-email-leiwen@marvell.com>
+ <CALZhoSRZKi+PHpj1tBBBFX2rcGb_6yyMowthH0uyA=vRoTNq8w@mail.gmail.com>
+Message-ID: <CAN1soZwo5N2drSwRt8FbFPiSkFYYiar0zyVQxhzbObgmow7bMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 08, 2012 at 06:48:49PM +0100, Russell King - ARM Linux wrote:
-> On Sun, Jul 08, 2012 at 11:10:04PM +0800, Richard Zhao wrote:
-> > On Thu, Jun 28, 2012 at 10:06 PM, Richard Zhao <linuxzsc@gmail.com> wrote:
-> > > On Thu, Jun 28, 2012 at 03:53:46PM +0200, Marc Kleine-Budde wrote:
-> > >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > >> ---
-> > >>  drivers/usb/chipidea/ci13xxx_pci.c |    6 +++---
-> > >>  1 file changed, 3 insertions(+), 3 deletions(-)
-> > >>
-> > >> diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
-> > >> index 918e149..9f5c171 100644
-> > >> --- a/drivers/usb/chipidea/ci13xxx_pci.c
-> > >> +++ b/drivers/usb/chipidea/ci13xxx_pci.c
-> > >> @@ -23,17 +23,17 @@
-> > >>  /******************************************************************************
-> > >>   * PCI block
-> > >>   *****************************************************************************/
-> > >> -struct ci13xxx_platform_data pci_platdata = {
-> > >> +static struct ci13xxx_platform_data pci_platdata = {
-> > > what about adding __devinitdata?
-> > Marc, what do you think?
-> 
-> Not on statically declared platform data.  That's always a mistake.
-> 
-Could you please explain more?
-platdata in this driver is duplicated when call ci13xxx_add_device in
-probe.
+On Mon, Jul 9, 2012 at 8:47 AM, Lei Wen <adrian.wenl@gmail.com> wrote:
+> Add NAND support for dkb platform.
+>
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> ---
+>  arch/arm/mach-mmp/ttc_dkb.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+> index 7a7de2b..5a6a1ad 100644
+> --- a/arch/arm/mach-mmp/ttc_dkb.c
+> +++ b/arch/arm/mach-mmp/ttc_dkb.c
+> @@ -177,6 +177,13 @@ static struct mv_usb_platform_data ttc_usb_pdata = {
+>  #endif
+>  #endif
+>
+> +#ifdef CONFIG_MTD_NAND_PXA3xx
+> +static struct pxa3xx_nand_platform_data dkb_nand_info = {
+> +       .enable_arbiter = 1,
+> +       .num_cs = 1,
+> +};
+> +#endif
+> +
+>  static void __init ttc_dkb_init(void)
+>  {
+>         mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
+> @@ -184,6 +191,10 @@ static void __init ttc_dkb_init(void)
+>         /* on-chip devices */
+>         pxa910_add_uart(1);
+>
+> +#ifdef CONFIG_MTD_NAND_PXA3xx
+> +       pxa910_add_nand(&dkb_nand_info);
+> +#endif
+> +
+>         /* off-chip devices */
+>         pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
+>         platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+> --
+> 1.7.5.4
+>
 
-Thanks
-Richard
+There're two different TTC DKB boards. One is with onenand support,
+and the other is nand support. Now mosts of TTC DKB boards are only
+with nand support. So you can replace onenand code with nand in
+ttc_dkb.c
+
+Regards
+Haojian
