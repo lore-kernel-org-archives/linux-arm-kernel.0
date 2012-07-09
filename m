@@ -1,40 +1,33 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 9 Jul 2012 15:04:53 +0200
-Subject: [PATCH 5/7] ARM: mxs: convert tx28 board to device tree
-In-Reply-To: <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
-References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
- <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20474.55029.733084.749955@ipc1.ka-ro>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 9 Jul 2012 15:21:23 +0200
+Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
+In-Reply-To: <20120709105533.GA3934@opensource.wolfsonmicro.com>
+References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
+ <20120709105551.GK15345@sortiz-mobl>
+ <20120709105533.GA3934@opensource.wolfsonmicro.com>
+Message-ID: <20120709132123.GQ15345@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Mark,
 
-Shawn Guo writes:
-> The function tx28_init is basically a rewriting of tx28_add_fec0.  All
-> those TX28_FEC_* gpio definitions are meant to be used as a temporary
-> solution before we get a generic way to set up board specific gpio
-> pins when booting from device tree.
+On Mon, Jul 09, 2012 at 11:55:33AM +0100, Mark Brown wrote:
+> On Mon, Jul 09, 2012 at 12:55:51PM +0200, Samuel Ortiz wrote:
 > 
-This doesn't work at least because the pins that are used for PHY
-strap options need to be reconfigured for their FEC functionality
-after releasing the PHY reset. But even after adding the missing
-reconfiguration the ethernet PHY does not work.
+> > I applied the first 2 patches, I'd like to get an ACK from the respective
+> > maintainers for the rtc and the input ones. They can even take it as both
+> > drivers are protected by the MFD symbol.
+> 
+> Alessandro's been mostly offline recently so it might be as well to
+> apply the RTC patch anyway.
+Fair enough, applied now. Neither Alessandro nor the rtc ml wer not cc'ed on this
+thread, but that's another problem.
+Zhou, could you please send at least the rtc patch to Alessandro so that he
+could have a look at it if time permits ?
 
-Since I currently don't have time to delve deeper into this, you may
-drop the TX28 board support until I get time to do the conversion to
-DT myself.
+Cheers,
+Samuel.
 
-
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Intel Open Source Technology Centre
+http://oss.intel.com/
