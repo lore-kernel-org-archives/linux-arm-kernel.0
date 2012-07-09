@@ -1,20 +1,223 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Mon, 9 Jul 2012 11:53:00 +0100
-Subject: [PATCH 1/6] ARM: DTS: SPEAr13xx: Fix Interrupt bindings
-In-Reply-To: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
-References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
-Message-ID: <CAOh2x=mwvMefykQBEGF3Ude_KrceYDRjk6POWoxyrhVArzewEw@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 9 Jul 2012 12:53:38 +0200
+Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1341554956-17416-1-git-send-email-marex@denx.de>
+References: <1341554956-17416-1-git-send-email-marex@denx.de>
+Message-ID: <20120709105338.GE1296@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 11:31 AM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
-> From: Vipul Kumar Samar <vipulkumar.samar@st.com>
->
->    - Fix interrupt bindings for uart, ethernet and pmu.
->    - Add interrupt binding for keyboard.
->
-> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+Hi Marek,
 
-Ahh.. Sorry for pushing wrong values in my initial patches.
+thanks for the submission.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Fri, Jul 06, 2012 at 08:09:15AM +0200, Marek Vasut wrote:
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
+
+That limitation should be mentioned in the documentation.
+
+> 
+> The TIMING2 register value is wrong in the documentation for
+> i.MX28! This was found and fixed by:
+>   Shawn Guo <shawn.guo@linaro.org>
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Detlev Zundel <dzu@denx.de>
+> CC: Dong Aisheng <b29396@freescale.com>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> Cc: linux-i2c at vger.kernel.org
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    2 +
+>  arch/arm/boot/dts/imx28.dtsi                      |    2 +
+>  drivers/i2c/busses/i2c-mxs.c                      |   56 +++++++++++++++++++++
+>  3 files changed, 60 insertions(+)
+> 
+> V2: (even though technically V<around 4>, I really need to start doing this
+>      patch management properly, it's quite a mess now)
+
+Yup, it was :) Thanks for resending.
+
+>     Fixed static const struct mxs_i2c_speed_config ... pointed by Dong.
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> index 1bfc02d..2ed5332 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> @@ -4,6 +4,7 @@ Required properties:
+>  - compatible: Should be "fsl,<chip>-i2c"
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain ERROR and DMA interrupts
+> +- clock-frequency: desired I2C bus clock frequency in Hz.
+>  
+>  Examples:
+>  
+> @@ -13,4 +14,5 @@ i2c0: i2c at 80058000 {
+>  	compatible = "fsl,imx28-i2c";
+>  	reg = <0x80058000 2000>;
+>  	interrupts = <111 68>;
+> +	clock-frequency = <400000>;
+>  };
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index ee3778a..832d30a 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -419,6 +419,7 @@
+>  				compatible = "fsl,imx28-i2c";
+>  				reg = <0x80058000 2000>;
+>  				interrupts = <111 68>;
+> +				clock-frequency = <400000>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -428,6 +429,7 @@
+>  				compatible = "fsl,imx28-i2c";
+>  				reg = <0x8005a000 2000>;
+>  				interrupts = <110 69>;
+> +				clock-frequency = <400000>;
+
+NACK on that. Not all slaves can do 400KHz, so this is not a sensible
+default.
+
+>  				status = "disabled";
+>  			};
+>  
+> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+> index 04eb441..47a7e20 100644
+> --- a/drivers/i2c/busses/i2c-mxs.c
+> +++ b/drivers/i2c/busses/i2c-mxs.c
+> @@ -46,6 +46,10 @@
+>  #define MXS_I2C_CTRL0_DIRECTION			0x00010000
+>  #define MXS_I2C_CTRL0_XFER_COUNT(v)		((v) & 0x0000FFFF)
+>  
+> +#define MXS_I2C_TIMING0		(0x10)
+> +#define MXS_I2C_TIMING1		(0x20)
+> +#define MXS_I2C_TIMING2		(0x30)
+> +
+>  #define MXS_I2C_CTRL1		(0x40)
+>  #define MXS_I2C_CTRL1_SET	(0x44)
+>  #define MXS_I2C_CTRL1_CLR	(0x48)
+> @@ -97,6 +101,25 @@
+>  #define MXS_CMD_I2C_READ	(MXS_I2C_CTRL0_SEND_NAK_ON_LAST | \
+>  				 MXS_I2C_CTRL0_MASTER_MODE)
+>  
+> +struct mxs_i2c_speed_config {
+> +	uint32_t	timing0;
+> +	uint32_t	timing1;
+> +	uint32_t	timing2;
+> +};
+> +
+> +/* Timing values for the default 24MHz clock supplied into the i2c block. */
+> +static const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
+
+Hmm, the 100KHz vs 95KHz issue is confusing. My suggestion would be to
+name this mxs_i2c_100kHz_config and write a comment that this is
+technically 95Khz due to limitation of the docs (or whatever). If you
+want to keep the name, then a similar comment should be placed...
+
+
+> +	.timing0	= 0x00780030,
+> +	.timing1	= 0x00800030,
+> +	.timing2	= 0x00300030,
+> +};
+> +
+> +static const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
+> +	.timing0	= 0x000f0007,
+> +	.timing1	= 0x001f000f,
+> +	.timing2	= 0x00300030,
+> +};
+> +
+>  /**
+>   * struct mxs_i2c_dev - per device, private MXS-I2C data
+>   *
+> @@ -112,11 +135,17 @@ struct mxs_i2c_dev {
+>  	struct completion cmd_complete;
+>  	u32 cmd_err;
+>  	struct i2c_adapter adapter;
+> +	const struct mxs_i2c_speed_config *speed;
+>  };
+>  
+>  static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
+>  {
+>  	stmp_reset_block(i2c->regs);
+> +
+> +	writel(i2c->speed->timing0, i2c->regs + MXS_I2C_TIMING0);
+> +	writel(i2c->speed->timing1, i2c->regs + MXS_I2C_TIMING1);
+> +	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
+> +
+>  	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
+>  	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
+>  			i2c->regs + MXS_I2C_QUEUECTRL_SET);
+> @@ -319,6 +348,28 @@ static const struct i2c_algorithm mxs_i2c_algo = {
+>  	.functionality = mxs_i2c_func,
+>  };
+>  
+> +static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
+> +{
+> +	uint32_t speed;
+> +	struct device *dev = i2c->dev;
+> +	struct device_node *node = dev->of_node;
+> +	int ret;
+> +
+> +	if (!node)
+> +		return -EINVAL;
+> +
+> +	i2c->speed = &mxs_i2c_95kHz_config;
+
+...here
+
+> +	ret = of_property_read_u32(node, "clock-frequency", &speed);
+> +	if (ret)
+> +		dev_warn(dev, "No I2C speed selected, using 100kHz\n");
+> +	else if (speed == 400000)
+> +		i2c->speed = &mxs_i2c_400kHz_config;
+> +	else if (speed != 100000)
+> +		dev_warn(dev, "Invalid I2C speed selected, using 100kHz\n");
+
+Minor: s/Invalid/Unsupported/ ?
+
+> +
+> +	return 0;
+> +}
+> +
+>  static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -358,6 +409,11 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+>  		return err;
+>  
+>  	i2c->dev = dev;
+> +
+> +	err = mxs_i2c_get_ofdata(i2c);
+> +	if (err)
+> +		return err;
+> +
+>  	platform_set_drvdata(pdev, i2c);
+>  
+>  	/* Do reset to enforce correct startup after pinmuxing */
+> -- 
+> 1.7.10
+> 
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/a1602a2d/attachment.sig>
