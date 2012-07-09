@@ -1,86 +1,54 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 09 Jul 2012 22:48:40 +0200
-Subject: [PATCH 1/1] mfd: ab8500: Clean-up the last two ab8500 related
- DT match tables
-In-Reply-To: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
-References: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <4FFB43A8.2070307@linaro.org>
+Date: Mon, 09 Jul 2012 22:56:49 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <20120709204620.GA12692@core.coreip.homeip.net>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
+ <4FFB40A4.5060505@linaro.org> <20120709204620.GA12692@core.coreip.homeip.net>
+Message-ID: <4FFB4591.2050601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sam,
+On 09/07/12 22:46, Dmitry Torokhov wrote:
+> On Mon, Jul 09, 2012 at 10:35:48PM +0200, Lee Jones wrote:
+>> From: Lee Jones <lee.jones@linaro.org>
+>> Date: Tue, 26 Jun 2012 10:46:50 +0100
+>> Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+>>
+>> Before we can use any domain allocated IRQ, we need to first create a
+>> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
+>> We do this with a helper function provided by the AB8500 IRQ domain
+>> controller called ab8500_irq_get_virq(). We need to do this for both
+>> IRQs which the Power-On-Key driver uses; one for button press, the other
+>> for button depress.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>   drivers/input/misc/ab8500-ponkey.c |    4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+>> index 5ceb23e..8d24189 100644
+>> --- a/drivers/input/misc/ab8500-ponkey.c
+>> +++ b/drivers/input/misc/ab8500-ponkey.c
+>> @@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
+>>
+>>   	ponkey->idev = input;
+>>   	ponkey->ab8500 = ab8500;
+>> -	ponkey->irq_dbf = irq_dbf;
+>> -	ponkey->irq_dbr = irq_dbr;
+>> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbf);
+>> +	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, ponkey->irq_dbr);
+>                                                        ^^^^^^^^^^^^^^^
+>
+> These are zeroes now. Man, you are killing me...
 
-I've just seen that you have a new for-next branch, but this patch is 
-missing in it.
+I've been traveling all day and my brain is dead.
 
-Just making sure you didn't miss it:
+Hopefully you have a sense of humor. :)
 
-On 06/07/12 14:43, Lee Jones wrote:
-> A patch was recently submitted to stop all ab8500 devices from
-> being registered through Device Tree. Instead, only the db8500
-> will be DT:ed and the rest will continue to be registered via
-> the MFD API, as they always were.
->
-> Two patches have recently been applied which enable Device Tree
-> probing; one for rtc-ab8500 and the other for ponkey-ab8500.
-> These two need to be removed to prevent double-probing these
-> devices with Device Tree is enabled.
->
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/input/misc/ab8500-ponkey.c |    8 --------
->   drivers/rtc/rtc-ab8500.c           |    6 ------
->   2 files changed, 14 deletions(-)
->
-> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-> index 84ec691..5ceb23e 100644
-> --- a/drivers/input/misc/ab8500-ponkey.c
-> +++ b/drivers/input/misc/ab8500-ponkey.c
-> @@ -132,18 +132,10 @@ static int __devexit ab8500_ponkey_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -#ifdef CONFIG_OF
-> -static const struct of_device_id ab8500_ponkey_match[] = {
-> -	{ .compatible = "stericsson,ab8500-ponkey", },
-> -	{}
-> -};
-> -#endif
-> -
->   static struct platform_driver ab8500_ponkey_driver = {
->   	.driver		= {
->   		.name	= "ab8500-poweron-key",
->   		.owner	= THIS_MODULE,
-> -		.of_match_table = of_match_ptr(ab8500_ponkey_match),
->   	},
->   	.probe		= ab8500_ponkey_probe,
->   	.remove		= __devexit_p(ab8500_ponkey_remove),
-> diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
-> index bf3c2f6..2e5970f 100644
-> --- a/drivers/rtc/rtc-ab8500.c
-> +++ b/drivers/rtc/rtc-ab8500.c
-> @@ -462,16 +462,10 @@ static int __devexit ab8500_rtc_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -static const struct of_device_id ab8500_rtc_match[] = {
-> -	{ .compatible = "stericsson,ab8500-rtc", },
-> -	{}
-> -};
-> -
->   static struct platform_driver ab8500_rtc_driver = {
->   	.driver = {
->   		.name = "ab8500-rtc",
->   		.owner = THIS_MODULE,
-> -		.of_match_table = ab8500_rtc_match,
->   	},
->   	.probe	= ab8500_rtc_probe,
->   	.remove = __devexit_p(ab8500_rtc_remove),
->
-
-Kind regards,
-Lee
+Give me two mins.
 
 -- 
 Lee Jones
