@@ -1,89 +1,48 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Mon,  9 Jul 2012 14:13:36 +0800
-Subject: [PATCH 2/4] mfd: workaround: add companion chip in 88pm80x
-In-Reply-To: <1341814418-13300-1-git-send-email-zhouqiao@marvell.com>
-References: <1341814418-13300-1-git-send-email-zhouqiao@marvell.com>
-Message-ID: <1341814418-13300-3-git-send-email-zhouqiao@marvell.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jul 2012 14:14:49 +0800
+Subject: [PATCH 0/7] Convert mxs board files to device tree
+Message-ID: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-in hw design, 800 is mainly for pmic control, while 805 for audio.
-but there are 3 registers which controls class D speaker property,
-and they are defined in 800 i2c client domain. so 805 codec driver
-needs to use 800 i2c client to access class D speaker reg for
-audio path management. so add this workaround for the purpose to
-let 805 access 800 i2c in some scenario.
+With imx23-evk and imx28-evk converted to device tree, it's time to
+start looking at other mxs boards.
 
-Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
----
- drivers/mfd/88pm80x.c       |   28 ++++++++++++++++++++++++++++
- include/linux/mfd/88pm80x.h |    1 +
- 2 files changed, 29 insertions(+), 0 deletions(-)
+Marek, Lauri and Lothar,
 
-diff --git a/drivers/mfd/88pm80x.c b/drivers/mfd/88pm80x.c
-index 90aa18a..77b8655 100644
---- a/drivers/mfd/88pm80x.c
-+++ b/drivers/mfd/88pm80x.c
-@@ -18,6 +18,12 @@
- #include <linux/uaccess.h>
- #include <linux/err.h>
- 
-+/*
-+ * workaround: some registers needed by pm805 are defined in pm800, so
-+ * need to use this global variable to maintain the relation between
-+ * pm800 and pm805. would remove it after HW chip fixes the issue.
-+ */
-+static struct pm80x_chip *g_pm80x_chip;
- 
- const struct regmap_config pm80x_regmap_config = {
- 	.reg_bits = 8,
-@@ -61,6 +67,19 @@ int __devinit pm80x_init(struct i2c_client *client,
- 
- 	device_init_wakeup(&client->dev, 1);
- 
-+	/*
-+	 * workaround: set g_pm80x_chip to the first probed chip. if the
-+	 * second chip is probed, just point to the companion to each
-+	 * other so that pm805 can access those specific register. would
-+	 * remove it after HW chip fixes the issue.
-+	 */
-+	if (!g_pm80x_chip)
-+		g_pm80x_chip = chip;
-+	else {
-+		chip->companion = g_pm80x_chip->client;
-+		g_pm80x_chip->companion = chip->client;
-+	}
-+
- 	return 0;
- 
- err_chip_id:
-@@ -75,6 +94,15 @@ int __devexit pm80x_deinit(struct i2c_client *client)
- {
- 	struct pm80x_chip *chip = i2c_get_clientdata(client);
- 
-+	/*
-+	 * workaround: clear the dependency between pm800 and pm805.
-+	 * would remove it after HW chip fixes the issue.
-+	 */
-+	if (g_pm80x_chip->companion)
-+		g_pm80x_chip->companion = NULL;
-+	else
-+		g_pm80x_chip = NULL;
-+
- 	regmap_exit(chip->regmap);
- 	devm_kfree(&client->dev, chip);
- 
-diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-index 6c126e9..103f06d 100644
---- a/include/linux/mfd/88pm80x.h
-+++ b/include/linux/mfd/88pm80x.h
-@@ -295,6 +295,7 @@ struct pm80x_chip {
- 	struct pm80x_subchip *subchip;
- 	struct device *dev;
- 	struct i2c_client *client;
-+	struct i2c_client *companion;
- 	struct regmap *regmap;
- 	struct regmap_irq_chip *regmap_irq_chip;
- 	struct regmap_irq_chip_data *irq_data;
+Please do me the favor to test the series on your boards to see if it
+provides the same functionality as the board file.  You can just use
+the branch below.
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/dt/others
+
+Thanks,
+Shawn
+
+Marek Vasut (1):
+  ARM: mxs: convert m28evk board to device tree
+
+Shawn Guo (6):
+  ARM: dts: imx28: move extra gpmi-nand pins into board dts
+  ARM: dts: imx28: move lcdif control pins into board dts
+  ARM: mxs: convert apx4devkit board to device tree
+  ARM: mxs: convert tx28 board to device tree
+  ARM: mxs: convert stmp378x_devb board to device tree
+  ARM: mxs: add dtb-y target into Makefile.boot
+
+ arch/arm/boot/dts/apx4devkit.dts    |  143 +++++++++++++++++++++
+ arch/arm/boot/dts/imx28-evk.dts     |   30 ++++-
+ arch/arm/boot/dts/imx28.dtsi        |   96 +++++++++++++-
+ arch/arm/boot/dts/m28evk.dts        |  241 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stmp378x_devb.dts |   78 +++++++++++
+ arch/arm/boot/dts/tx28.dts          |  112 ++++++++++++++++
+ arch/arm/mach-mxs/Makefile.boot     |    9 ++
+ arch/arm/mach-mxs/mach-mxs.c        |  102 +++++++++++++++-
+ 8 files changed, 802 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/boot/dts/apx4devkit.dts
+ create mode 100644 arch/arm/boot/dts/m28evk.dts
+ create mode 100644 arch/arm/boot/dts/stmp378x_devb.dts
+ create mode 100644 arch/arm/boot/dts/tx28.dts
+
 -- 
-1.7.0.4
+1.7.5.4
