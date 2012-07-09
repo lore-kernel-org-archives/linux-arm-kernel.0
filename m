@@ -1,63 +1,73 @@
-From: prathyush.k@samsung.com (Prathyush K)
-Date: Mon, 09 Jul 2012 14:33:43 +0530
-Subject: [PATCH v2] ARM: dma-mapping: modify condition check while freeing
- pages
-Message-ID: <1341824623-7472-1-git-send-email-prathyush.k@samsung.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 9 Jul 2012 14:20:52 +0530
+Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
+ offset using the IP scheme.
+In-Reply-To: <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <4FFA9B6C.7050003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: at mm/vmalloc.c:1471 __iommu_free_buffer+0xcc/0xd0()
-Trying to vfree() nonexistent vm area (ef095000)
-Modules linked in:
-[<c0015a18>] (unwind_backtrace+0x0/0xfc) from [<c0025a94>] (warn_slowpath_common+0x54/0x64)
-[<c0025a94>] (warn_slowpath_common+0x54/0x64) from [<c0025b38>] (warn_slowpath_fmt+0x30/0x40)
-[<c0025b38>] (warn_slowpath_fmt+0x30/0x40) from [<c0016de0>] (__iommu_free_buffer+0xcc/0xd0)
-[<c0016de0>] (__iommu_free_buffer+0xcc/0xd0) from [<c0229a5c>] (exynos_drm_free_buf+0xe4/0x138)
-[<c0229a5c>] (exynos_drm_free_buf+0xe4/0x138) from [<c022b358>] (exynos_drm_gem_destroy+0x80/0xfc)
-[<c022b358>] (exynos_drm_gem_destroy+0x80/0xfc) from [<c0211230>] (drm_gem_object_free+0x28/0x34)
-[<c0211230>] (drm_gem_object_free+0x28/0x34) from [<c0211bd0>] (drm_gem_object_release_handle+0xcc/0xd8)
-[<c0211bd0>] (drm_gem_object_release_handle+0xcc/0xd8) from [<c01abe10>] (idr_for_each+0x74/0xb8)
-[<c01abe10>] (idr_for_each+0x74/0xb8) from [<c02114e4>] (drm_gem_release+0x1c/0x30)
-[<c02114e4>] (drm_gem_release+0x1c/0x30) from [<c0210ae8>] (drm_release+0x608/0x694)
-[<c0210ae8>] (drm_release+0x608/0x694) from [<c00b75a0>] (fput+0xb8/0x228)
-[<c00b75a0>] (fput+0xb8/0x228) from [<c00b40c4>] (filp_close+0x64/0x84)
-[<c00b40c4>] (filp_close+0x64/0x84) from [<c0029d54>] (put_files_struct+0xe8/0x104)
-[<c0029d54>] (put_files_struct+0xe8/0x104) from [<c002b930>] (do_exit+0x608/0x774)
-[<c002b930>] (do_exit+0x608/0x774) from [<c002bae4>] (do_group_exit+0x48/0xb4)
-[<c002bae4>] (do_group_exit+0x48/0xb4) from [<c002bb60>] (sys_exit_group+0x10/0x18)
-[<c002bb60>] (sys_exit_group+0x10/0x18) from [<c000ee80>] (ret_fast_syscall+0x0/0x30)
 
-This patch modifies the condition while freeing to match the condition
-used while allocation. This fixes the above warning which arises when
-array size is equal to PAGE_SIZE where allocation is done using kzalloc
-but free is done using vfree.
 
-Signed-off-by: Prathyush K <prathyush.k@samsung.com>
----
- arch/arm/mm/dma-mapping.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
+> From: R Sricharan <r.sricharan@ti.com>
+> 
+> OMAP socs has a legacy and a highlander version of the
+> 32k sync counter IP. The register offsets vary between the
+> highlander and the legacy scheme. So use the 'SCHEME'
+> bits(30-31) of the revision register to distinguish between
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index dc560dc..0f9358b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1091,7 +1091,7 @@ error:
- 	while (--i)
- 		if (pages[i])
- 			__free_pages(pages[i], 0);
--	if (array_size < PAGE_SIZE)
-+	if (array_size <= PAGE_SIZE)
- 		kfree(pages);
- 	else
- 		vfree(pages);
-@@ -1106,7 +1106,7 @@ static int __iommu_free_buffer(struct device *dev, struct page **pages, size_t s
- 	for (i = 0; i < count; i++)
- 		if (pages[i])
- 			__free_pages(pages[i], 0);
--	if (array_size < PAGE_SIZE)
-+	if (array_size <= PAGE_SIZE)
- 		kfree(pages);
- 	else
- 		vfree(pages);
--- 
-1.7.0.4
+
+Just for my understanding, can we get further information on SCHEME
+bit-fields? What kind of information we have it here.
+
+I may need this info to pass on to design team here.
+
+Thanks,
+Vaibhav
+> the two versions and choose the CR register offset accordingly.
+> 
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/plat-omap/counter_32k.c |   16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+> index 2132c4f..dbf1e03 100644
+> --- a/arch/arm/plat-omap/counter_32k.c
+> +++ b/arch/arm/plat-omap/counter_32k.c
+> @@ -29,7 +29,10 @@
+>  #include <plat/clock.h>
+>  
+>  /* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
+> -#define OMAP2_32KSYNCNT_CR_OFF		0x10
+> +#define OMAP2_32KSYNCNT_REV_OFF		0x0
+> +#define OMAP2_32KSYNCNT_REV_SCHEME	(0x3 << 30)
+> +#define OMAP2_32KSYNCNT_CR_OFF_LOW	0x10
+> +#define OMAP2_32KSYNCNT_CR_OFF_HIGH	0x30
+>  
+>  /*
+>   * 32KHz clocksource ... always available, on pretty most chips except
+> @@ -84,9 +87,16 @@ int __init omap_init_clocksource_32k(void __iomem *vbase)
+>  	int ret;
+>  
+>  	/*
+> -	 * 32k sync Counter register offset is at 0x10
+> +	 * 32k sync Counter IP register offsets vary between the
+> +	 * highlander version and the legacy ones.
+> +	 * The 'SCHEME' bits(30-31) of the revision register is used
+> +	 * to identify the version.
+>  	 */
+> -	sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF;
+> +	if (__raw_readl(vbase + OMAP2_32KSYNCNT_REV_OFF) &
+> +						OMAP2_32KSYNCNT_REV_SCHEME)
+> +		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_HIGH;
+> +	else
+> +		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_LOW;
+>  
+>  	/*
+>  	 * 120000 rough estimate from the calculations in
+> 
