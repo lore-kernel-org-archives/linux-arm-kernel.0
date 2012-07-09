@@ -1,47 +1,49 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 9 Jul 2012 08:47:13 +0800
-Subject: [PATCH] ARM: ttc_dkb: add nand support
-In-Reply-To: <1341793703-18510-1-git-send-email-leiwen@marvell.com>
-References: <1341793703-18510-1-git-send-email-leiwen@marvell.com>
-Message-ID: <CALZhoSRZKi+PHpj1tBBBFX2rcGb_6yyMowthH0uyA=vRoTNq8w@mail.gmail.com>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Mon, 9 Jul 2012 09:16:34 +0800
+Subject: [PATCH] Watchdog: OMAP: Fix the runtime pm code to avoid module
+ getting stuck intransition state.
+In-Reply-To: <20120708092612.GA735@spo001.leaseweb.com>
+References: <1339996996-3257-1-git-send-email-lokeshvutla@ti.com>
+ <4FF93B93.60701@windriver.com> <20120708092612.GA735@spo001.leaseweb.com>
+Message-ID: <4FFA30F2.7010909@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND support for dkb platform.
+? 2012?07?08? 17:26, Wim Van Sebroeck ??:
+> Hi All,
+>
+>> Hello, Lokesh,
+>>
+>> One question: Does "echo 1>  /dev/watchdog" work well?
+>>
+>> Regards,
+>> Zumeng
+> Please note hat "echo 1>  /dev/watchdog" for drivers that have the WDIOF_MAGICCLOSE
+> flag set, reboots the system. This is because it opens the watchdog device ; then
+> writes the characters "1" to it and then closes the watchdog. So the watchdog keeps
+> running (because it didn't see the magic char "V" written to it).
+Yes, this is _absolutely_ right.
+>
+> In this case (omap_wdt) it opens the watchdog device (and starts the watchdog) then
+> it writes a "1" to the watchdog (so basically the watchdog is being pinged) and then
+> closes the watchdog device (which stops the watchdog if NOWAYOUT was not set).
+Wim,
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
----
- arch/arm/mach-mmp/ttc_dkb.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+Agreed for all above, sorry for jumping in:
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 7a7de2b..5a6a1ad 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -177,6 +177,13 @@ static struct mv_usb_platform_data ttc_usb_pdata = {
- #endif
- #endif
+I just have a little question about this patch:
 
-+#ifdef CONFIG_MTD_NAND_PXA3xx
-+static struct pxa3xx_nand_platform_data dkb_nand_info = {
-+       .enable_arbiter = 1,
-+       .num_cs = 1,
-+};
-+#endif
-+
- static void __init ttc_dkb_init(void)
- {
-        mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
-@@ -184,6 +191,10 @@ static void __init ttc_dkb_init(void)
-        /* on-chip devices */
-        pxa910_add_uart(1);
 
-+#ifdef CONFIG_MTD_NAND_PXA3xx
-+       pxa910_add_nand(&dkb_nand_info);
-+#endif
-+
-        /* off-chip devices */
-        pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
-        platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
---
-1.7.5.4
+we have enable pm_runtime_enable(wdev->dev) in probe,
+and do ret = misc_register(&(wdev->omap_wdt_miscdev));
+
+Then this patch wants to remove pm_runtime_get_sync
+in file operation function, is that right?
+
+Regards,
+Zumeng
+
+>
+> Kind regards,
+> Wim.
+>
