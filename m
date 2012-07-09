@@ -1,31 +1,21 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 09 Jul 2012 16:47:32 -0400 (EDT)
-Subject: [PATCH 07/15] ARM: dove: use fixed PCI i/o mapping
-In-Reply-To: <4FFB2321.30100@gmail.com>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <1341600040-30993-8-git-send-email-robherring2@gmail.com>
- <201207091550.55912.arnd@arndb.de> <4FFB2321.30100@gmail.com>
-Message-ID: <alpine.LFD.2.02.1207091641030.31100@xanadu.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Jul 2012 22:47:48 +0200
+Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
+In-Reply-To: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CACRpkda5kfF3o8L4vXRqKsbZC4N_Od9Z2td5zfB_5kJkPmu2Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jul 2012, Rob Herring wrote:
+On Wed, Sep 28, 2011 at 7:50 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
 
-> Why use 1M when 64K is enough based on our prior conversations? The more
-> we standardize the configuration, the more we can make common. I think
-> the majority of the pci setup functions can be consolidated. It's really
-> just data differences for the resource setup. I only used 1M alignment
-> in case there were some alignment requirements in the h/w and it can't
-> handle a starting pci bus address of 0x10000. I think it's just the
-> Marvell parts that do this, so if anyone knowledgeable on those parts
-> can comment it would help.
+> This patch modifies the amba-pl08x driver for s3c64xx.
+> The DMA controller of S3C64XX is a variant of PrimeCell pl080 DMAC.
+> S3C64xx contents extra register to hold the TransferSize.
 
-The only Marvell board I have which can accommodate a PCI card does 
-support 3.3V PCI cards only.  Otherwise this is all PCI Express.  And 
-the only PCI cards with I/O space I've seen are 5V PCI cards.
+Ping on this. Russell's patches have landed in linux-next so you can
+rebase your patches on top of what's in linux-next for a convenient
+testbed.
 
-So I'd say: go for the option with the best consolidation outcome.  No 
-one is using cards with I/O space on those platforms.
-
-
-Nicolas
+Yours,
+Linus Walleij
