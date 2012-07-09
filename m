@@ -1,26 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Jul 2012 22:21:34 +0200
-Subject: [PATCH] ARM: ux500: Pass PMU platform data due for Perf though
- AUXDATA
-In-Reply-To: <1341577958-8521-1-git-send-email-lee.jones@linaro.org>
-References: <1341577958-8521-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdboCpR0wC+KffKPhV3MUG3CSh56WxjqKNPPtTJKp7KY9w@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 09 Jul 2012 16:24:34 -0400 (EDT)
+Subject: [PATCH 00/15] PCI io.h cleanups
+In-Reply-To: <4FFB25FE.8090806@gmail.com>
+References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+ <201207091628.37975.arnd@arndb.de> <4FFB25FE.8090806@gmail.com>
+Message-ID: <alpine.LFD.2.02.1207091622390.31100@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2012 at 2:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, 9 Jul 2012, Rob Herring wrote:
 
-> When booting with Device Tree we need a way to call-back to the
-> DB8500 PMU IRQ handler. This is necessary because the two CPU
-> IRQ lines are muxed together on the DB8500 chip. The DB8500
-> PMU IRQ handler contains logic to pass over to the other core
-> in the case of IRQ_NONE. This patch allows the DB8500 PMU IRQ
-> handler to be passed to Perf through platform data.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On 07/09/2012 11:28 AM, Arnd Bergmann wrote:
+> > On Friday 06 July 2012, Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> I've finally gotten back to this after several months. This is the 2nd
+> >> part of mach/io.h removals. This series removes io.h on platforms with
+> >> PCI by creating a fixed virtual I/O mapping and a common __io() macro.
+> >>
+> >> As several platforms have 2 1MB I/O windows, I've changed the fixed
+> >> mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
+> >> control the size. This also allows using a single 1MB section mapping
+> >> rather than 4KB pages.
+> > 
+> > Looks really good, feel free to add my Reviewed-by on patches 2-15, since
+> > I've done a line-by-line walkthrough and could not find anything besides the
+> > trivial comments I gave.
+> 
+> Thanks for the review. It's going to change a bit with using
+> ioremap_page_range. Hope to have new version out soon.
 
-Makes perfect sense.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Beware the fact that you can't use ioremap_page_range() early on during 
+the boot as it uses the standard page allocator.
 
-Yours,
-Linus Walleij
+
+Nicolas
