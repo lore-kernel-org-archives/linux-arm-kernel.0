@@ -1,72 +1,54 @@
-From: vipulkumar.samar@st.com (vipul kumar samar)
-Date: Mon, 9 Jul 2012 17:34:34 +0530
-Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
- corresponding mask value
-In-Reply-To: <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
-References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
- <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
- <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
-Message-ID: <4FFAC8D2.4080601@st.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 9 Jul 2012 14:05:23 +0200
+Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <201207091307.35860.marex@denx.de>
+References: <1341554956-17416-1-git-send-email-marex@denx.de>
+ <20120709105338.GE1296@pengutronix.de>
+ <201207091307.35860.marex@denx.de>
+Message-ID: <20120709120523.GG1296@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2012 4:34 PM, viresh kumar wrote:
-> On Mon, Jul 9, 2012 at 11:31 AM, Shiraz Hashim<shiraz.hashim@st.com>  wrote:
->> From: Vipul Kumar Samar<vipulkumar.samar@st.com>
->>
->> sys_clk have multiple parents and selection of parent is depends on
->
-> s/ is//
->
->> sys_clk_ctrl register (bit no. 23:25) with possible values,
->>
->>     0XX: pll1_clk
->>     10X: sys_synth_clk
->>     110: pll2_clk
->>     111: pll3_clk
->>
->> Update sys_clk parent array accordingly (ex. 0:3-pll1_clk) and
->> fix mask value to 7.
->>
->> Signed-off-by: Vipul Kumar Samar<vipulkumar.samar@st.com>
->> ---
->>   drivers/clk/spear/spear1340_clock.c |    6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
->> index e69c542..b3b56de 100644
->> --- a/drivers/clk/spear/spear1340_clock.c
->> +++ b/drivers/clk/spear/spear1340_clock.c
->> @@ -25,7 +25,7 @@
->>          #define SPEAR1340_HCLK_SRC_SEL_SHIFT    27
->>          #define SPEAR1340_HCLK_SRC_SEL_MASK     1
->>          #define SPEAR1340_SCLK_SRC_SEL_SHIFT    23
->> -       #define SPEAR1340_SCLK_SRC_SEL_MASK     3
->> +       #define SPEAR1340_SCLK_SRC_SEL_MASK     7
->
-> AFAICR, Mask represents number of bits and not the actual mask.
-> Can you check that again?
 
-Sorry, i'll correct it.
+> > > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> > > index ee3778a..832d30a 100644
+> > > --- a/arch/arm/boot/dts/imx28.dtsi
+> > > +++ b/arch/arm/boot/dts/imx28.dtsi
+> [...]
+> > > @@ -428,6 +429,7 @@
+> > > 
+> > >  				compatible = "fsl,imx28-i2c";
+> > >  				reg = <0x8005a000 2000>;
+> > >  				interrupts = <110 69>;
+> > > 
+> > > +				clock-frequency = <400000>;
+> > 
+> > NACK on that. Not all slaves can do 400KHz, so this is not a sensible
+> > default.
+> 
+> How many of such chips are there and how many of the chips can do 400kHz ? I 
+> believe the majority shouldn't suffer because of minority.
 
->
->>   /* PLL related registers and bit values */
->>   #define SPEAR1340_PLL_CFG                      (VA_MISC_BASE + 0x210)
->> @@ -369,8 +369,8 @@ static struct frac_rate_tbl gen_rtbl[] = {
->>
->>   /* clock parents */
->>   static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
->> -static const char *sys_parents[] = { "none", "pll1_clk", "none", "none",
->> -       "sys_synth_clk", "none", "pll2_clk", "pll3_clk", };
->> +static const char *sys_parents[] = { "pll1_clk", "pll1_clk", "pll1_clk",
->> +       "pll1_clk", "sys_synth_clk", "sys_synth_clk", "pll2_clk", "pll3_clk", };
->
-> Don't know what would be the implication of this?
->
-> @Mike: Can you please tell us what should we do in such cases?
->
+The kernel should work for all users, not only for the majority, so:
+Better safe than sorry.
 
-Is there any other solution for such cases ???
+Also, defaults should make the system work. Tuning can be done later by
+somebody who understands what is needed.
 
-Regards
-Vipul Samar
+And frankly, this attitude which made you add a potential regression is
+worrisome. I'd suggest to give stability a higher priority.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/e81f2bc3/attachment.sig>
