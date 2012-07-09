@@ -1,51 +1,63 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Mon, 9 Jul 2012 09:05:53 +0200
-Subject: [PATCH] mmc: atmel-mci: modify CLKDIV displaying in debugfs
-In-Reply-To: <1341569511-11340-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1341569511-11340-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4FFA82D1.5080904@atmel.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Jul 2012 09:10:54 +0200
+Subject: [PATCH 3/7] ARM: mxs: convert m28evk board to device tree
+In-Reply-To: <1341814496-17487-4-git-send-email-shawn.guo@linaro.org>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <1341814496-17487-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201207090910.55032.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/06/2012 12:11 PM, Nicolas Ferre a ?crit :
-> Modify clock division displaying in debugfs for matching
-> the new CLKDIV,CLKODD user interface arrangement.
-> Is using the has_odd_clk_div property to choose the proper format.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Dear Shawn Guo,
 
-
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-Thanks.
-
+> From: Marek Vasut <marex@denx.de>
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->   drivers/mmc/host/atmel-mci.c |   12 +++++++++---
->   1 files changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 1fe20cd..9c5daa2 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -396,11 +396,17 @@ static int atmci_regs_show(struct seq_file *s, void *v)
->   	clk_disable(host->mck);
->   	spin_unlock_bh(&host->lock);
->
-> -	seq_printf(s, "MR:\t0x%08x%s%s CLKDIV=%u\n",
-> +	seq_printf(s, "MR:\t0x%08x%s%s ",
->   			buf[ATMCI_MR / 4],
->   			buf[ATMCI_MR / 4] & ATMCI_MR_RDPROOF ? " RDPROOF" : "",
-> -			buf[ATMCI_MR / 4] & ATMCI_MR_WRPROOF ? " WRPROOF" : "",
-> -			buf[ATMCI_MR / 4] & 0xff);
-> +			buf[ATMCI_MR / 4] & ATMCI_MR_WRPROOF ? " WRPROOF" : "");
-> +	if (host->caps.has_odd_clk_div)
-> +		seq_printf(s, "{CLKDIV,CLKODD}=%u\n",
-> +				((buf[ATMCI_MR / 4] & 0xff) << 1)
-> +				| ((buf[ATMCI_MR / 4] >> 16) & 1));
-> +	else
-> +		seq_printf(s, "CLKDIV=%u\n",
-> +				(buf[ATMCI_MR / 4] & 0xff));
->   	seq_printf(s, "DTOR:\t0x%08x\n", buf[ATMCI_DTOR / 4]);
->   	seq_printf(s, "SDCR:\t0x%08x\n", buf[ATMCI_SDCR / 4]);
->   	seq_printf(s, "ARGR:\t0x%08x\n", buf[ATMCI_ARGR / 4]);
->
+>  arch/arm/boot/dts/imx28.dtsi |   21 ++++
+>  arch/arm/boot/dts/m28evk.dts |  241
+> ++++++++++++++++++++++++++++++++++++++++++ arch/arm/mach-mxs/mach-mxs.c | 
+>  30 +++++
+>  3 files changed, 292 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/m28evk.dts
+[...]
+
+> +static void __init m28evk_init(void)
+> +{
+> +	update_fec_mac_prop(OUI_DENX);
+
+You need to start the FEC clock here too, otherwise ethernet won't work. Same 
+thing as on mx28evk. And I noticed that on other platforms too, so maybe that 
+should be somehow the other way around -- turn on the ethernet clock by default.
+
+The rest seems OK. I'll update the .dts file once we get the rest of the stuff 
+in (SPI and i2c).
+
+btw. is someone converting the mxs-lcd ?
+
+> +	mxsfb_pdata.mode_list = m28evk_video_modes;
+> +	mxsfb_pdata.mode_count = ARRAY_SIZE(m28evk_video_modes);
+> +	mxsfb_pdata.default_bpp = 16;
+> +	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
+> +}
+> +
+>  static void __init mxs_machine_init(void)
+>  {
+>  	if (of_machine_is_compatible("fsl,imx28-evk"))
+>  		imx28_evk_init();
+>  	else if (of_machine_is_compatible("fsl,imx23-evk"))
+>  		imx23_evk_init();
+> +	else if (of_machine_is_compatible("denx,m28evk"))
+> +		m28evk_init();
+> 
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+>  			     mxs_auxdata_lookup, NULL);
+> @@ -223,6 +252,7 @@ static const char *imx23_dt_compat[] __initdata = {
+> 
+>  static const char *imx28_dt_compat[] __initdata = {
+>  	"crystalfontz,cfa10036",
+> +	"denx,m28evk",
+>  	"fsl,imx28-evk",
+>  	"fsl,imx28",
+>  	NULL,
