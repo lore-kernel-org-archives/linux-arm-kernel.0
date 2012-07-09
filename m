@@ -1,72 +1,25 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 09 Jul 2012 09:47:47 -0700
-Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
- offset using the IP scheme.
-In-Reply-To: <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Fri, 6 Jul 2012 14:51:43 +0530")
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <873950x4ng.fsf@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Jul 2012 18:53:22 +0200
+Subject: [PATCH 01/10 RESEND] mmc: spi: Move SSP register definitions into
+ separate file
+In-Reply-To: <1341555449-17507-1-git-send-email-marex@denx.de>
+References: <1341555449-17507-1-git-send-email-marex@denx.de>
+Message-ID: <201207091853.22494.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Dear Marek Vasut,
 
-> From: R Sricharan <r.sricharan@ti.com>
->
-> OMAP socs has a legacy and a highlander version of the
-> 32k sync counter IP. The register offsets vary between the
-> highlander and the legacy scheme. So use the 'SCHEME'
-> bits(30-31) of the revision register to distinguish between
-> the two versions and choose the CR register offset accordingly.
+> Move the definitions into separate file so separate SPI driver can be
+> implemented. The SSP controller in MXS can act both as a MMC host and
+> as a SPI host.
+> 
+> Based on previous attempt by:
+> Fabio Estevam <fabio.estevam@freescale.com>
 
-Do these scheme bits exist on *all* OMAPs?  including OMAP1?
+[...]
 
-This driver is used on OMAP1 as well as OMAP2+.  
+Bump? Can these be applied now (probably without 10/10 patch)?
 
-The cover letter says this was only build tested on OMAP1 so I suggest
-this actually be tested on OMAP1 before merging.
-
-Kevin
-
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/plat-omap/counter_32k.c |   16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-> index 2132c4f..dbf1e03 100644
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> @@ -29,7 +29,10 @@
->  #include <plat/clock.h>
->  
->  /* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
-> -#define OMAP2_32KSYNCNT_CR_OFF		0x10
-> +#define OMAP2_32KSYNCNT_REV_OFF		0x0
-> +#define OMAP2_32KSYNCNT_REV_SCHEME	(0x3 << 30)
-> +#define OMAP2_32KSYNCNT_CR_OFF_LOW	0x10
-> +#define OMAP2_32KSYNCNT_CR_OFF_HIGH	0x30
->  
->  /*
->   * 32KHz clocksource ... always available, on pretty most chips except
-> @@ -84,9 +87,16 @@ int __init omap_init_clocksource_32k(void __iomem *vbase)
->  	int ret;
->  
->  	/*
-> -	 * 32k sync Counter register offset is at 0x10
-> +	 * 32k sync Counter IP register offsets vary between the
-> +	 * highlander version and the legacy ones.
-> +	 * The 'SCHEME' bits(30-31) of the revision register is used
-> +	 * to identify the version.
->  	 */
-> -	sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF;
-> +	if (__raw_readl(vbase + OMAP2_32KSYNCNT_REV_OFF) &
-> +						OMAP2_32KSYNCNT_REV_SCHEME)
-> +		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_HIGH;
-> +	else
-> +		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_LOW;
->  
->  	/*
->  	 * 120000 rough estimate from the calculations in
+Best regards,
+Marek Vasut
