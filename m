@@ -1,43 +1,48 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 Jul 2012 20:57:33 +0200
-Subject: [GIT PULL] at91: a little dt pull request for 3.6
-Message-ID: <4FFB299D.7030902@atmel.com>
+Date: Mon, 9 Jul 2012 21:06:25 +0200
+Subject: [PATCH] ARM: at91/clock: fix PLLA overclock warning
+Message-ID: <1341860785-27405-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, hi Olof,
+Fix PLLA overclock warning in relation with datasheet numbers.
+Add new > 240 MHz and > 210 MHz SoC categories.
 
-The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
+Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/clock.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-for-next-dt
-
-for you to fetch changes up to 3c68bb48214f87562b6956195178d991403d66d4:
-
-  ARM: at91: Add support for board aks-cdu (2012-07-09 20:45:31 +0200)
-
-----------------------------------------------------------------
-Two new boards described with device tree
-
-----------------------------------------------------------------
-Fabio Porcedda (1):
-      ARM: at91: add support for Telit EVK-PRO3 with Telit GE863-PRO3
-
-Jiri Prchal (1):
-      ARM: at91: Add support for board aks-cdu
-
- arch/arm/boot/dts/aks-cdu.dts     |  113 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/evk-pro3.dts    |   41 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ge863-pro3.dtsi |   52 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Makefile.boot  |    2 ++
- 4 files changed, 208 insertions(+)
- create mode 100644 arch/arm/boot/dts/aks-cdu.dts
- create mode 100644 arch/arm/boot/dts/evk-pro3.dts
- create mode 100644 arch/arm/boot/dts/ge863-pro3.dtsi
-
-Thanks, best regards,
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index de2ec6b..188c829 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -63,6 +63,12 @@ EXPORT_SYMBOL_GPL(at91_pmc_base);
+ 
+ #define cpu_has_300M_plla()	(cpu_is_at91sam9g10())
+ 
++#define cpu_has_240M_plla()	(cpu_is_at91sam9261() \
++				|| cpu_is_at91sam9263() \
++				|| cpu_is_at91sam9rl())
++
++#define cpu_has_210M_plla()	(cpu_is_at91sam9260())
++
+ #define cpu_has_pllb()		(!(cpu_is_at91sam9rl() \
+ 				|| cpu_is_at91sam9g45() \
+ 				|| cpu_is_at91sam9x5() \
+@@ -706,6 +712,12 @@ static int __init at91_pmc_init(unsigned long main_clock)
+ 	} else if (cpu_has_800M_plla()) {
+ 		if (plla.rate_hz > 800000000)
+ 			pll_overclock = true;
++	} else if (cpu_has_240M_plla()) {
++		if (plla.rate_hz > 240000000)
++			pll_overclock = true;
++	} else if (cpu_has_210M_plla()) {
++		if (plla.rate_hz > 210000000)
++			pll_overclock = true;
+ 	} else {
+ 		if (plla.rate_hz > 209000000)
+ 			pll_overclock = true;
 -- 
-Nicolas Ferre
+1.7.10
