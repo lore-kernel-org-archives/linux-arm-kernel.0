@@ -1,26 +1,43 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jul 2012 17:02:41 +0800
-Subject: [PATCH 3/7] ARM: mxs: convert m28evk board to device tree
-In-Reply-To: <201207091046.36886.marex@denx.de>
-References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
- <201207091018.25979.marex@denx.de>
- <20120709084032.GF11635@S2101-09.ap.freescale.net>
- <201207091046.36886.marex@denx.de>
-Message-ID: <20120709090239.GH11635@S2101-09.ap.freescale.net>
+Date: Mon, 9 Jul 2012 17:09:48 +0800
+Subject: [PATCH] ARM: disable interrupt before spinning endlessly
+Message-ID: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2012 at 10:46:36AM +0200, Marek Vasut wrote:
-> Well ... the support for that board that's in current mainline is pretty 
-> deprecated. And I wasn't really able to update it due to all the DT hype, you 
-> know the rest of the story more then well etc. etc.
-> 
-Let's remove it then :)
+The CPU will endlessly spin at the end of machine_halt and
+machine_restart calls.  However, this will lead to a soft lockup
+warning after about 20 seconds, if CONFIG_LOCKUP_DETECTOR is enabled,
+as system timer is still alive.
 
-> To start the enet_out clock.
-> 
-Will take care of it in m28evk_init().
+Disable interrupt before going to spin endlessly, so that the lockup
+warning will never be seen.
 
+Reported-by: Marek Vasut <marex@denx.de>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/kernel/process.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 19c95ea..693b744 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -247,6 +247,7 @@ void machine_shutdown(void)
+ void machine_halt(void)
+ {
+ 	machine_shutdown();
++	local_irq_disable();
+ 	while (1);
+ }
+ 
+@@ -268,6 +269,7 @@ void machine_restart(char *cmd)
+ 
+ 	/* Whoops - the platform was unable to reboot. Tell the user! */
+ 	printk("Reboot failed -- System halted\n");
++	local_irq_disable();
+ 	while (1);
+ }
+ 
 -- 
-Regards,
-Shawn
+1.7.5.4
