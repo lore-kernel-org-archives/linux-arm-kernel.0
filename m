@@ -1,236 +1,97 @@
-From: zhouqiao@marvell.com (Qiao Zhou)
-Date: Mon,  9 Jul 2012 22:57:44 +0800
-Subject: [PATCH 4/4 V5] input: add onkey support to 88PM80X PMIC
-In-Reply-To: <1341845864-13779-1-git-send-email-zhouqiao@marvell.com>
-References: <1341845864-13779-1-git-send-email-zhouqiao@marvell.com>
-Message-ID: <1341845864-13779-5-git-send-email-zhouqiao@marvell.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 9 Jul 2012 20:32:23 +0530
+Subject: [GIT PULL] ARM: OMAP5: Add minimal OMAP5 SOC support for 3.6
+Message-ID: <1341846143-11137-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add onkey support to MARVELL 88PM80X PMIC.
+Tony,
 
-Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
----
- drivers/input/misc/88pm80x_onkey.c |  176 ++++++++++++++++++++++++++++++++++++
- drivers/input/misc/Kconfig         |   10 ++
- drivers/input/misc/Makefile        |    1 +
- 3 files changed, 187 insertions(+), 0 deletions(-)
- create mode 100644 drivers/input/misc/88pm80x_onkey.c
+Please pull below OMAP5 SOC minimal support. It is generated against the
+cleanup-part2 branch of yours. As you suggested, I have dropped CK_54XX
+flag changes to avoid conflicts.
 
-diff --git a/drivers/input/misc/88pm80x_onkey.c b/drivers/input/misc/88pm80x_onkey.c
-new file mode 100644
-index 0000000..807587f
---- /dev/null
-+++ b/drivers/input/misc/88pm80x_onkey.c
-@@ -0,0 +1,176 @@
-+/*
-+ * 88pm80x_onkey.c - Marvell 88PM80x ONKEY driver
-+ *
-+ * Copyright (C) 2012 Marvell International Ltd.
-+ * Haojian Zhuang <haojian.zhuang@marvell.com>
-+ * Qiao Zhou <zhouqiao@marvell.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/input.h>
-+#include <linux/mfd/88pm80x.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+#define PM800_LONG_ONKEY_EN		(1 << 0)
-+#define PM800_LONG_KEY_DELAY		(8)	/* 1 .. 16 seconds */
-+#define PM800_LONKEY_PRESS_TIME		((PM800_LONG_KEY_DELAY-1) << 4)
-+#define PM800_LONKEY_PRESS_TIME_MASK	(0xF0)
-+#define PM800_SW_PDOWN			(1 << 5)
-+
-+struct pm80x_onkey_info {
-+	struct input_dev *idev;
-+	struct pm80x_chip *pm80x;
-+	struct regmap *map;
-+	int irq;
-+};
-+
-+/* 88PM80x gives us an interrupt when ONKEY is held */
-+static irqreturn_t pm80x_onkey_handler(int irq, void *data)
-+{
-+	struct pm80x_onkey_info *info = data;
-+	int ret = 0;
-+
-+	regmap_read(info->map, PM800_STATUS_1, &ret);
-+	ret &= PM800_ONKEY_STS1;
-+
-+	input_report_key(info->idev, KEY_POWER, ret);
-+	input_sync(info->idev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+#ifdef CONFIG_PM
-+static int pm80x_onkey_suspend(struct device *dev)
-+{
-+	return pm80x_dev_suspend(dev);
-+}
-+
-+static int pm80x_onkey_resume(struct device *dev)
-+{
-+	return pm80x_dev_resume(dev);
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(pm80x_onkey_pm_ops, pm80x_onkey_suspend,
-+			 pm80x_onkey_resume);
-+
-+static int __devinit pm80x_onkey_probe(struct platform_device *pdev)
-+{
-+
-+	void *chip = dev_get_drvdata(pdev->dev.parent);
-+	struct pm80x_onkey_info *info;
-+	int ret;
-+
-+	info =
-+	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_onkey_info),
-+			 GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	info->pm80x = (struct pm80x_chip *)chip;
-+
-+	info->irq = platform_get_irq(pdev, 0);
-+	if (info->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ resource!\n");
-+		return -EINVAL;
-+	}
-+
-+	info->map = info->pm80x->regmap;
-+	if (!info->map) {
-+		dev_err(&pdev->dev, "no regmap!\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	info->idev = input_allocate_device();
-+	if (!info->idev) {
-+		dev_err(&pdev->dev, "Failed to allocate input dev\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	info->idev->name = "88pm80x_on";
-+	info->idev->phys = "88pm80x_on/input0";
-+	info->idev->id.bustype = BUS_I2C;
-+	info->idev->dev.parent = &pdev->dev;
-+	info->idev->evbit[0] = BIT_MASK(EV_KEY);
-+	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
-+
-+	ret = input_register_device(info->idev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't register input device: %d\n", ret);
-+		goto out_reg;
-+	}
-+
-+	ret = pm80x_request_irq(info->pm80x, info->irq, pm80x_onkey_handler,
-+					    IRQF_ONESHOT, "onkey", info);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to request IRQ: #%d: %d\n",
-+			info->irq, ret);
-+		goto out_irq;
-+	}
-+
-+	platform_set_drvdata(pdev, info);
-+
-+	/* Enable long onkey detection */
-+	regmap_update_bits(info->map, PM800_RTC_MISC4, PM800_LONG_ONKEY_EN,
-+			   PM800_LONG_ONKEY_EN);
-+	/* Set 8-second interval */
-+	regmap_update_bits(info->map, PM800_RTC_MISC3,
-+			   PM800_LONKEY_PRESS_TIME_MASK,
-+			   PM800_LONKEY_PRESS_TIME);
-+
-+	device_init_wakeup(&pdev->dev, 1);
-+	return 0;
-+
-+out_irq:
-+	input_unregister_device(info->idev);
-+out_reg:
-+	input_free_device(info->idev);
-+out:
-+	devm_kfree(&pdev->dev, info);
-+	return ret;
-+}
-+
-+static int __devexit pm80x_onkey_remove(struct platform_device *pdev)
-+{
-+	struct pm80x_onkey_info *info = platform_get_drvdata(pdev);
-+
-+	pm80x_free_irq(info->pm80x, info->irq, info);
-+	input_unregister_device(info->idev);
-+	input_free_device(info->idev);
-+	devm_kfree(&pdev->dev, info);
-+	return 0;
-+}
-+
-+static struct platform_driver pm80x_onkey_driver = {
-+	.driver = {
-+		   .name = "88pm80x-onkey",
-+		   .owner = THIS_MODULE,
-+		   .pm = &pm80x_onkey_pm_ops,
-+		   },
-+	.probe = pm80x_onkey_probe,
-+	.remove = __devexit_p(pm80x_onkey_remove),
-+};
-+
-+module_platform_driver(pm80x_onkey_driver);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Marvell 88PM80x ONKEY driver");
-+MODULE_AUTHOR("Qiao Zhou <zhouqiao@marvell.com>");
-+MODULE_ALIAS("platform:88pm80x-onkey");
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 7faf4a7..7c0f1ec 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -22,6 +22,16 @@ config INPUT_88PM860X_ONKEY
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called 88pm860x_onkey.
- 
-+config INPUT_88PM80X_ONKEY
-+	tristate "88PM80x ONKEY support"
-+	depends on MFD_88PM800
-+	help
-+	  Support the ONKEY of Marvell 88PM80x PMICs as an input device
-+	  reporting power button status.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called 88pm80x_onkey.
-+
- config INPUT_AB8500_PONKEY
- 	tristate "AB8500 Pon (PowerOn) Key"
- 	depends on AB8500_CORE
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index f55cdf4..83fe6f5 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -5,6 +5,7 @@
- # Each configuration option enables a list of files.
- 
- obj-$(CONFIG_INPUT_88PM860X_ONKEY)	+= 88pm860x_onkey.o
-+obj-$(CONFIG_INPUT_88PM80X_ONKEY)	+= 88pm80x_onkey.o
- obj-$(CONFIG_INPUT_AB8500_PONKEY)	+= ab8500-ponkey.o
- obj-$(CONFIG_INPUT_AD714X)		+= ad714x.o
- obj-$(CONFIG_INPUT_AD714X_I2C)		+= ad714x-i2c.o
+The following changes since commit fb584511c4664573097ece7df0de06ad00b713a2:
+
+  ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds (2012-07-09 01:44:11 -0700)
+
+are available in the git repository at:
+
+  git://github.com/SantoshShilimkar/linux.git for_3.6/omap5_minimal_support
+
+for you to fetch changes up to 39f47d9f437fa94622bf51d7b18b42b3336ad9ac:
+
+  ARM: Kconfig update to support additional GPIOs in OMAP5 (2012-07-09 19:14:40 +0530)
+
+----------------------------------------------------------------
+
+R Sricharan (11):
+  ARM: OMAP2+: Move stubbed secure_sram_reserve function to a common.c
+    and call it __weak
+  ARM: OMAP: counter-32k: Select the CR register offset using the IP
+    scheme
+  ARM: OMAP5: id: Add cpu id for ES versions
+  ARM: OMAP5: Add minimal support for OMAP5430 SOC
+  ARM: OMAP5: timer: Add clocksource, clockevent support
+  ARM: OMAP5: gpmc: Update gpmc_init()
+  ARM: OMAP5: l3: Add l3 error handler support for omap5
+  ARM: omap2+: board-generic: clean up the irq data from board file
+  ARM: OMAP5: board-generic: Add device tree support
+  arm/dts: OMAP5: Add omap5 dts files
+  ARM: OMAP5: Add the build support
+
+Santosh Shilimkar (2):
+  ARM: OMAP5: Add the WakeupGen IP updates
+  ARM: OMAP5: Add SMP support
+
+Tarun Kanti DebBarma (1):
+  ARM: Kconfig update to support additional GPIOs in OMAP5
+
+ .../devicetree/bindings/arm/omap/omap.txt          |    3 +
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/omap5-evm.dts                    |   20 +++
+ arch/arm/boot/dts/omap5.dtsi                       |  184 ++++++++++++++++++++
+ arch/arm/configs/omap2plus_defconfig               |    1 +
+ arch/arm/mach-omap2/Kconfig                        |    8 +-
+ arch/arm/mach-omap2/Makefile                       |   24 ++-
+ arch/arm/mach-omap2/board-generic.c                |   42 +++--
+ arch/arm/mach-omap2/common.c                       |   24 +++
+ arch/arm/mach-omap2/common.h                       |   19 +-
+ arch/arm/mach-omap2/control.h                      |    4 +
+ arch/arm/mach-omap2/devices.c                      |    2 +-
+ arch/arm/mach-omap2/gpmc.c                         |    3 +-
+ arch/arm/mach-omap2/id.c                           |   42 ++++-
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |    8 +-
+ arch/arm/mach-omap2/include/mach/omap-wakeupgen.h  |    7 +
+ arch/arm/mach-omap2/io.c                           |   44 +++++
+ arch/arm/mach-omap2/iomap.h                        |   27 +++
+ arch/arm/mach-omap2/irq.c                          |   13 +-
+ arch/arm/mach-omap2/omap-headsmp.S                 |   21 +++
+ arch/arm/mach-omap2/omap-hotplug.c                 |   24 ++-
+ arch/arm/mach-omap2/omap-smp.c                     |   52 ++++--
+ arch/arm/mach-omap2/omap-wakeupgen.c               |  114 +++++++++---
+ arch/arm/mach-omap2/omap4-common.c                 |   14 ++
+ arch/arm/mach-omap2/omap4-sar-layout.h             |   12 +-
+ arch/arm/mach-omap2/omap_hwmod.c                   |    2 +-
+ arch/arm/mach-omap2/omap_l3_noc.h                  |   22 ++-
+ arch/arm/mach-omap2/prcm-common.h                  |    2 +-
+ arch/arm/mach-omap2/prcm.c                         |    2 +-
+ arch/arm/mach-omap2/timer.c                        |    5 +
+ arch/arm/plat-omap/Kconfig                         |    4 +-
+ arch/arm/plat-omap/common.c                        |    9 +
+ arch/arm/plat-omap/counter_32k.c                   |   16 +-
+ arch/arm/plat-omap/include/plat/cpu.h              |   22 ++-
+ arch/arm/plat-omap/include/plat/hardware.h         |    1 +
+ arch/arm/plat-omap/include/plat/multi.h            |    9 +
+ arch/arm/plat-omap/include/plat/omap-secure.h      |    5 -
+ arch/arm/plat-omap/include/plat/omap54xx.h         |   32 ++++
+ arch/arm/plat-omap/include/plat/serial.h           |   10 ++
+ arch/arm/plat-omap/include/plat/uncompress.h       |    6 +
+ arch/arm/plat-omap/sram.c                          |   11 +-
+ 41 files changed, 773 insertions(+), 98 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap5-evm.dts
+ create mode 100644 arch/arm/boot/dts/omap5.dtsi
+ create mode 100644 arch/arm/plat-omap/include/plat/omap54xx.h
+
 -- 
-1.7.0.4
+1.7.9.5
