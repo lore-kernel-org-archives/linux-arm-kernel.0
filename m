@@ -1,51 +1,71 @@
 From: viresh.kumar@linaro.org (viresh kumar)
-Date: Mon, 9 Jul 2012 11:57:40 +0100
-Subject: [PATCH 3/6] clk: SPEAr13xx: Add localtimer (twd) clock support
-In-Reply-To: <1341829866-26091-3-git-send-email-shiraz.hashim@st.com>
+Date: Mon, 9 Jul 2012 11:58:41 +0100
+Subject: [PATCH 4/6] Clk: SPEAr13xx: Initialize con_id for Ethernet phy
+ clks
+In-Reply-To: <1341829866-26091-4-git-send-email-shiraz.hashim@st.com>
 References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
- <1341829866-26091-3-git-send-email-shiraz.hashim@st.com>
-Message-ID: <CAOh2x=mMeGExE6JaP_Ou614X3btqDsUW3_NFdgQx8a6hPdS+7g@mail.gmail.com>
+ <1341829866-26091-4-git-send-email-shiraz.hashim@st.com>
+Message-ID: <CAOh2x==FWY1=gGQKjmS5JDLQNxta=dt7+gzoa893zL60hm2uXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jul 9, 2012 at 11:31 AM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
 > From: Vipul Kumar Samar <vipulkumar.samar@st.com>
 >
+
+Must have some lines here.
+
 > Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 > ---
->  drivers/clk/spear/spear1310_clock.c |    4 ++++
->  drivers/clk/spear/spear1340_clock.c |    4 ++++
->  2 files changed, 8 insertions(+)
+>  drivers/clk/spear/spear1310_clock.c |   10 +++++-----
+>  drivers/clk/spear/spear1340_clock.c |    2 +-
+>  2 files changed, 6 insertions(+), 6 deletions(-)
 >
 > diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-> index 8f05652..3a246b4 100644
+> index 3a246b4..b6a6325 100644
 > --- a/drivers/clk/spear/spear1310_clock.c
 > +++ b/drivers/clk/spear/spear1310_clock.c
-> @@ -491,6 +491,10 @@ void __init spear1310_clk_init(void)
->                         2);
->         clk_register_clkdev(clk, NULL, "ec800620.wdt");
+> @@ -621,7 +621,7 @@ void __init spear1310_clk_init(void)
+>                         ARRAY_SIZE(gmac_phy_parents), 0,
+>                         SPEAR1310_PERIP_CLK_CFG, SPEAR1310_GMAC_PHY_CLK_SHIFT,
+>                         SPEAR1310_GMAC_PHY_CLK_MASK, 0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "stmmacphy.0");
+> +       clk_register_clkdev(clk, "stmmacphy.0", NULL);
 >
-> +       clk = clk_register_fixed_factor(NULL, "smp_twd_clk", "cpu_clk", 0, 1,
-> +                       2);
-> +       clk_register_clkdev(clk, NULL, "smp_twd");
-> +
->         clk = clk_register_fixed_factor(NULL, "ahb_clk", "pll1_clk", 0, 1,
->                         6);
->         clk_register_clkdev(clk, "ahb_clk", NULL);
+>         /* clcd */
+>         clk = clk_register_mux(NULL, "clcd_synth_mux_clk", clcd_synth_parents,
+> @@ -922,15 +922,15 @@ void __init spear1310_clk_init(void)
+>                         SPEAR1310_RAS_CTRL_REG1,
+>                         SPEAR1310_SMII_RGMII_PHY_CLK_SHIFT,
+>                         SPEAR1310_PHY_CLK_MASK, 0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "stmmacphy.1");
+> -       clk_register_clkdev(clk, NULL, "stmmacphy.2");
+> -       clk_register_clkdev(clk, NULL, "stmmacphy.4");
+> +       clk_register_clkdev(clk, "stmmacphy.1", NULL);
+> +       clk_register_clkdev(clk, "stmmacphy.2", NULL);
+> +       clk_register_clkdev(clk, "stmmacphy.4", NULL);
+>
+>         clk = clk_register_mux(NULL, "rmii_phy_mux_clk", rmii_phy_parents,
+>                         ARRAY_SIZE(rmii_phy_parents), 0,
+>                         SPEAR1310_RAS_CTRL_REG1, SPEAR1310_RMII_PHY_CLK_SHIFT,
+>                         SPEAR1310_PHY_CLK_MASK, 0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "stmmacphy.3");
+> +       clk_register_clkdev(clk, "stmmacphy.3", NULL);
+>
+>         clk = clk_register_mux(NULL, "uart1_mux_clk", uart_parents,
+>                         ARRAY_SIZE(uart_parents), 0, SPEAR1310_RAS_CTRL_REG0,
 > diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-> index d77f54f..a7d5d32 100644
+> index a7d5d32..e69c542 100644
 > --- a/drivers/clk/spear/spear1340_clock.c
 > +++ b/drivers/clk/spear/spear1340_clock.c
-> @@ -537,6 +537,10 @@ void __init spear1340_clk_init(void)
->                         2);
->         clk_register_clkdev(clk, NULL, "ec800620.wdt");
+> @@ -686,7 +686,7 @@ void __init spear1340_clk_init(void)
+>                         ARRAY_SIZE(gmac_phy_parents), 0,
+>                         SPEAR1340_PERIP_CLK_CFG, SPEAR1340_GMAC_PHY_CLK_SHIFT,
+>                         SPEAR1340_GMAC_PHY_CLK_MASK, 0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "stmmacphy.0");
+> +       clk_register_clkdev(clk, "stmmacphy.0", NULL);
 >
-> +       clk = clk_register_fixed_factor(NULL, "smp_twd_clk", "cpu_clk", 0, 1,
-> +                       2);
-> +       clk_register_clkdev(clk, NULL, "smp_twd");
-> +
->         clk = clk_register_mux(NULL, "ahb_clk", ahb_parents,
->                         ARRAY_SIZE(ahb_parents), 0, SPEAR1340_SYS_CLK_CTRL,
->                         SPEAR1340_HCLK_SRC_SEL_SHIFT,
+>         /* clcd */
+>         clk = clk_register_mux(NULL, "clcd_synth_mux_clk", clcd_synth_parents,
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
