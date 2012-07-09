@@ -1,49 +1,93 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Mon, 9 Jul 2012 16:01:03 +0530
-Subject: [PATCH 3/6] clk: SPEAr13xx: Add localtimer (twd) clock support
-In-Reply-To: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
-References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
-Message-ID: <1341829866-26091-3-git-send-email-shiraz.hashim@st.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 9 Jul 2012 16:09:59 +0530
+Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <4FFA9B61.8030808@ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
+ <4FFA9B61.8030808@ti.com>
+Message-ID: <CAMQu2gwGzK4dt0VW19LhQK_tjGgY6C4b628M3dNi5xP_hYFPhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vipul Kumar Samar <vipulkumar.samar@st.com>
+On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+>
+>
+>
+> On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
+> > From: R Sricharan <r.sricharan@ti.com>
+> >
+> > OMAP5430 is Texas Instrument's SOC based on ARM Cortex-A15 SMP
+> > architecture. It's a dual core SOC with GIC used for interrupt
+> > handling and with an integrated L2 cache controller.
+> >
+> > OMAP5432 is another variant of OMAP5430, with a
+> > memory controller supporting DDR3 and SATA.
+> >
+> > Patch includes:
+> >  - The machine specific headers and sources updates.
+> >  - Platform header updates.
+> >  - Minimum initialisation support for serial.
+> >  - IO table init
+> >
+> > Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
 
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
----
- drivers/clk/spear/spear1310_clock.c |    4 ++++
- drivers/clk/spear/spear1340_clock.c |    4 ++++
- 2 files changed, 8 insertions(+)
+[..]
 
-diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index 8f05652..3a246b4 100644
---- a/drivers/clk/spear/spear1310_clock.c
-+++ b/drivers/clk/spear/spear1310_clock.c
-@@ -491,6 +491,10 @@ void __init spear1310_clk_init(void)
- 			2);
- 	clk_register_clkdev(clk, NULL, "ec800620.wdt");
- 
-+	clk = clk_register_fixed_factor(NULL, "smp_twd_clk", "cpu_clk", 0, 1,
-+			2);
-+	clk_register_clkdev(clk, NULL, "smp_twd");
-+
- 	clk = clk_register_fixed_factor(NULL, "ahb_clk", "pll1_clk", 0, 1,
- 			6);
- 	clk_register_clkdev(clk, "ahb_clk", NULL);
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index d77f54f..a7d5d32 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -537,6 +537,10 @@ void __init spear1340_clk_init(void)
- 			2);
- 	clk_register_clkdev(clk, NULL, "ec800620.wdt");
- 
-+	clk = clk_register_fixed_factor(NULL, "smp_twd_clk", "cpu_clk", 0, 1,
-+			2);
-+	clk_register_clkdev(clk, NULL, "smp_twd");
-+
- 	clk = clk_register_mux(NULL, "ahb_clk", ahb_parents,
- 			ARRAY_SIZE(ahb_parents), 0, SPEAR1340_SYS_CLK_CTRL,
- 			SPEAR1340_HCLK_SRC_SEL_SHIFT,
--- 
-1.7.10
+> >
+> > +#if defined(CONFIG_SOC_OMAP5)
+> > +static struct omap_globals omap5_globals = {
+> > +     .class  = OMAP54XX_CLASS,
+> > +     .tap    = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+> > +     .ctrl   = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+> > +     .ctrl_pad       = OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE),
+> > +     .prm    = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
+> > +     .cm     = OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
+> > +     .cm2    = OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
+> > +     .prcm_mpu = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE),
+>
+> I am not sure whether we had discussed on this before, couldn't find it.
+>
+> Why don't we reuse OMAP4 data here and elsewhere??
+>
+Because data is not same between OMAP4 and OMAP5.
+Wherever it is same, it is taken care.
+
+[..]
+
+> > diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> > index 70cf825..766181c 100644
+> > --- a/arch/arm/plat-omap/sram.c
+> > +++ b/arch/arm/plat-omap/sram.c
+> > @@ -6,8 +6,8 @@
+> >   * Copyright (C) 2005 Nokia Corporation
+> >   * Written by Tony Lindgren <tony@atomide.com>
+> >   *
+> > - * Copyright (C) 2009 Texas Instruments
+> > - * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > + * Copyright (C) 2009-2012 Texas Instruments
+> > + * Added OMAP4/5 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> >   * it under the terms of the GNU General Public License version 2 as
+> > @@ -44,6 +44,7 @@
+> >  #else
+> >  #define OMAP4_SRAM_PUB_PA    (OMAP4_SRAM_PA + 0x4000)
+> >  #endif
+> > +#define OMAP5_SRAM_PA                0x40300000
+> >
+>
+> We have mix of such definitions here, for example,
+>
+> "arch/arm/plat-omap/include/plat/sram.h"
+> and now in arch/arm/plat-omap/sram.c here itself.
+>
+>
+> May be right time to clean it up now.
+>
+Thats because of an interconnect BUG which needed it exported
+at plat level in case of OMAP4.
+
+Regards
+Santosh
