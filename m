@@ -1,48 +1,73 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 09 Jul 2012 13:42:06 -0500
-Subject: [PATCH 00/15] PCI io.h cleanups
-In-Reply-To: <201207091628.37975.arnd@arndb.de>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <201207091628.37975.arnd@arndb.de>
-Message-ID: <4FFB25FE.8090806@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 09 Jul 2012 20:50:49 +0200
+Subject: [PATCH 8/9] ARM: ux500: Clean-up temporary Device Tree enablement
+ helpers
+In-Reply-To: <CACRpkdZJAiBvatPGpKZP4mgUb-M-pPY34LVaj7ANkRaX9C4fJQ@mail.gmail.com>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <1341493572-29735-9-git-send-email-lee.jones@linaro.org>
+ <4FF6A2DF.5030407@linaro.org>
+ <CACRpkdZJAiBvatPGpKZP4mgUb-M-pPY34LVaj7ANkRaX9C4fJQ@mail.gmail.com>
+Message-ID: <4FFB2809.3020005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2012 11:28 AM, Arnd Bergmann wrote:
-> On Friday 06 July 2012, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> I've finally gotten back to this after several months. This is the 2nd
->> part of mach/io.h removals. This series removes io.h on platforms with
->> PCI by creating a fixed virtual I/O mapping and a common __io() macro.
->>
->> As several platforms have 2 1MB I/O windows, I've changed the fixed
->> mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
->> control the size. This also allows using a single 1MB section mapping
->> rather than 4KB pages.
-> 
-> Looks really good, feel free to add my Reviewed-by on patches 2-15, since
-> I've done a line-by-line walkthrough and could not find anything besides the
-> trivial comments I gave.
+Better?
 
-Thanks for the review. It's going to change a bit with using
-ioremap_page_range. Hope to have new version out soon.
+>From 9ef8a52c00dedbd63b6eecc086f8bd688d2cb66a Mon Sep 17 00:00:00 2001
+From: Lee Jones <lee.jones@linaro.org>
+Date: Wed, 27 Jun 2012 08:42:08 +0100
+Subject: [PATCH 1/1] ARM: ux500: Clean-up temporary Device Tree enablement
+ helpers
 
->> I've only tested versatilepb under qemu, so any testing is appreciated.
->> iop3xx and mv78xx0 have some risk of breaking as the PCI bus addresses
->> are moved to 0 from matching the cpu host bus addesss.
-> 
-> Did you try running any devices that actually use I/O space in qemu?
-> I think there are plenty of devices that you could use for testing that.
+Here we remove some of the extra overhead we introduced to make
+DT:ing the Snowball platform easier.
 
-I had with sym53c8xx, but it defaulted to memory accesses. Now that I
-enable i/o access mode, it fails due to pcibios_min_io = 0x44000000.
-With that removed it gets into the driver setup but then fails (with or
-without my changes). Might be a qemu model issue. I'll try some other
-devices.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/cpu-db8500.c |   10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-Rob
-
-> 
-> 	Arnd
-> 
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index db3c52d..38b7f9c 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -138,10 +138,6 @@ static struct platform_device *platform_devs[] __initdata = {
+ 	&db8500_prcmu_device,
+ };
+ 
+-static struct platform_device *of_platform_devs[] __initdata = {
+-	&u8500_dma40_device,
+-};
+-
+ static resource_size_t __initdata db8500_gpio_base[] = {
+ 	U8500_GPIOBANK0_BASE,
+ 	U8500_GPIOBANK1_BASE,
+@@ -235,7 +231,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
+ struct device * __init u8500_of_init_devices(void)
+ {
+ 	struct device *parent;
+-	int i;
+ 
+ 	parent = db8500_soc_device_init();
+ 
+@@ -244,8 +239,7 @@ struct device * __init u8500_of_init_devices(void)
+ 	platform_device_register_data(parent,
+ 		"cpufreq-u8500", -1, NULL, 0);
+ 
+-	for (i = 0; i < ARRAY_SIZE(of_platform_devs); i++)
+-		of_platform_devs[i]->dev.parent = parent;
++	u8500_dma40_device.dev.parent = parent;
+ 
+ 	/*
+ 	 * Devices to be DT:ed:
+@@ -253,7 +247,7 @@ struct device * __init u8500_of_init_devices(void)
+ 	 *   db8500_pmu_device   = done
+ 	 *   db8500_prcmu_device = done
+ 	 */
+-	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
++	platform_device_register(&u8500_dma40_device);
+ 
+ 	return parent;
+ }
+-- 
+1.7.9.5
