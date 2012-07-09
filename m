@@ -1,67 +1,72 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 9 Jul 2012 13:52:04 +0200
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <4FF483D2.70000@gmail.com>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <4FF483D2.70000@gmail.com>
-Message-ID: <20120709115204.GC12130@elf.ucw.cz>
+From: vipulkumar.samar@st.com (vipul kumar samar)
+Date: Mon, 9 Jul 2012 17:34:34 +0530
+Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
+ corresponding mask value
+In-Reply-To: <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
+References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+ <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
+ <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
+Message-ID: <4FFAC8D2.4080601@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 7/9/2012 4:34 PM, viresh kumar wrote:
+> On Mon, Jul 9, 2012 at 11:31 AM, Shiraz Hashim<shiraz.hashim@st.com>  wrote:
+>> From: Vipul Kumar Samar<vipulkumar.samar@st.com>
+>>
+>> sys_clk have multiple parents and selection of parent is depends on
+>
+> s/ is//
+>
+>> sys_clk_ctrl register (bit no. 23:25) with possible values,
+>>
+>>     0XX: pll1_clk
+>>     10X: sys_synth_clk
+>>     110: pll2_clk
+>>     111: pll3_clk
+>>
+>> Update sys_clk parent array accordingly (ex. 0:3-pll1_clk) and
+>> fix mask value to 7.
+>>
+>> Signed-off-by: Vipul Kumar Samar<vipulkumar.samar@st.com>
+>> ---
+>>   drivers/clk/spear/spear1340_clock.c |    6 +++---
+>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+>> index e69c542..b3b56de 100644
+>> --- a/drivers/clk/spear/spear1340_clock.c
+>> +++ b/drivers/clk/spear/spear1340_clock.c
+>> @@ -25,7 +25,7 @@
+>>          #define SPEAR1340_HCLK_SRC_SEL_SHIFT    27
+>>          #define SPEAR1340_HCLK_SRC_SEL_MASK     1
+>>          #define SPEAR1340_SCLK_SRC_SEL_SHIFT    23
+>> -       #define SPEAR1340_SCLK_SRC_SEL_MASK     3
+>> +       #define SPEAR1340_SCLK_SRC_SEL_MASK     7
+>
+> AFAICR, Mask represents number of bits and not the actual mask.
+> Can you check that again?
 
+Sorry, i'll correct it.
 
-> > diff --git a/arch/arm/mach-socfpga/include/mach/memory.h b/arch/arm/mach-socfpga/include/mach/memory.h
-> > new file mode 100644
-> > index 0000000..88e0ae9
-> > +#ifndef __ASM_ARCH_MEMORY_H
-> > +#define __ASM_ARCH_MEMORY_H
-> > +
-> > +/*
-> > + * Physical DRAM offset.
-> > + */
-> > +#define PLAT_PHYS_OFFSET	UL(0x00000000)
-> > +
-> > +#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
-> > +
-> > +#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
-> > +#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
-> > +#endif
-> 
-> You shouldn't need memory.h.
+>
+>>   /* PLL related registers and bit values */
+>>   #define SPEAR1340_PLL_CFG                      (VA_MISC_BASE + 0x210)
+>> @@ -369,8 +369,8 @@ static struct frac_rate_tbl gen_rtbl[] = {
+>>
+>>   /* clock parents */
+>>   static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
+>> -static const char *sys_parents[] = { "none", "pll1_clk", "none", "none",
+>> -       "sys_synth_clk", "none", "pll2_clk", "pll3_clk", };
+>> +static const char *sys_parents[] = { "pll1_clk", "pll1_clk", "pll1_clk",
+>> +       "pll1_clk", "sys_synth_clk", "sys_synth_clk", "pll2_clk", "pll3_clk", };
+>
+> Don't know what would be the implication of this?
+>
+> @Mike: Can you please tell us what should we do in such cases?
+>
 
-Yep. Deleting it was easier than expected. Thanks.
-									Pavel
-									
-commit 39edfa179a37d38352b21894fbd9b559e52dcf31
-Author: Pavel <pavel@ucw.cz>
-Date:   Mon Jul 9 13:48:27 2012 +0200
+Is there any other solution for such cases ???
 
-    Remove memory.h/system.h.
-    
-    Signed-off-by: Pavel Machek <pavel@denx.de>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ab3b389..8e69b05 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -261,7 +261,6 @@ config ARCH_SOCFPGA
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_MACH_CLKDEV
- 	select MIGHT_HAVE_CACHE_L2X0
--	select NEED_MACH_MEMORY_H
- 	select SPARSE_IRQ
- 	select USE_OF
- 	help
-diff --git a/arch/arm/mach-socfpga/include/mach/memory.h b/arch/arm/mach-socfpga/include/mach/memory.h
-deleted file mode 100644
-index e69de29..0000000
-diff --git a/arch/arm/mach-socfpga/include/mach/system.h b/arch/arm/mach-socfpga/include/mach/system.h
-deleted file mode 100644
-index e69de29..0000000
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards
+Vipul Samar
