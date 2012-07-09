@@ -1,42 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Jul 2012 09:28:09 +0200
-Subject: [PATCH] [v3] i.MX27: Fix emma-prp clocks in mx2_camera.c
-In-Reply-To: <1341572162-29126-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1341572162-29126-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120709072809.GP30009@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Jul 2012 09:32:54 +0200
+Subject: [PATCH 3/7] ARM: mxs: convert m28evk board to device tree
+In-Reply-To: <20120709072741.GD11635@S2101-09.ap.freescale.net>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <201207090910.55032.marex@denx.de>
+ <20120709072741.GD11635@S2101-09.ap.freescale.net>
+Message-ID: <201207090932.54525.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 12:56:02PM +0200, Javier Martin wrote:
-> This driver wasn't converted to the new clock changes
-> (clk_prepare_enable/clk_disable_unprepare). Also naming
-> of emma-prp related clocks for the i.MX27 was not correct.
-> ---
-> Enable clocks only for i.MX27.
+Dear Shawn Guo,
+
+> On Mon, Jul 09, 2012 at 09:10:54AM +0200, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > From: Marek Vasut <marex@denx.de>
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/imx28.dtsi |   21 ++++
+> > >  arch/arm/boot/dts/m28evk.dts |  241
+> > > 
+> > > ++++++++++++++++++++++++++++++++++++++++++ arch/arm/mach-mxs/mach-mxs.c
+> > > |
+> > > 
+> > >  30 +++++
+> > >  3 files changed, 292 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/boot/dts/m28evk.dts
+> > 
+> > [...]
+> > 
+> > > +static void __init m28evk_init(void)
+> > > +{
+> > > +	update_fec_mac_prop(OUI_DENX);
+> > 
+> > You need to start the FEC clock here too, otherwise ethernet won't work.
+> > Same
 > 
+> Which clock? "enet_out"?  We enabled it for imx28-evk, but
+> I do not know m28evk also needs it, as I haven't seen mach-m28evk.c
+> enabling any fec clock.  Instead, I saw the following in the old clock
+> code.
 
-Indeed,
+Well, this for the old revision of the board.
 
->  
-> -	pcdev->clk_csi = clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(pcdev->clk_csi)) {
-> -		dev_err(&pdev->dev, "Could not get csi clock\n");
-> -		err = PTR_ERR(pcdev->clk_csi);
-> -		goto exit_kfree;
-> +	if (cpu_is_mx27()) {
-> +		pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
-> +		if (IS_ERR(pcdev->clk_csi)) {
-> +			dev_err(&pdev->dev, "Could not get csi clock\n");
-> +			err = PTR_ERR(pcdev->clk_csi);
-> +			goto exit_kfree;
-> +		}
+>         /*
+>          * Extra fec clock setting
+>          * The DENX M28 uses an external clock source
+>          * and the clock output must not be enabled
+>          */
+>         if (!machine_is_m28evk()) {
+>                 reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_ENET);
+>                 reg &= ~BM_CLKCTRL_ENET_SLEEP;
+>                 reg |= BM_CLKCTRL_ENET_CLK_OUT_EN;
+>                 __raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_ENET);
+>         }
+> 
+> Or you meant other fec clock?
 
-but why? Now the i.MX25 won't get a clock anymore.
+I mean these enet_out clock, they need to be enabled.
 
-Sascha
+> > thing as on mx28evk. And I noticed that on other platforms too, so maybe
+> > that should be somehow the other way around -- turn on the ethernet
+> > clock by default.
+> > 
+> > The rest seems OK. I'll update the .dts file once we get the rest of the
+> > stuff in (SPI and i2c).
+> > 
+> > btw. is someone converting the mxs-lcd ?
+> 
+> The lcd should be working right now, with the auxdata used.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sure, but is someone working on the DT variant?
+
+Best regards,
+Marek Vasut
