@@ -1,72 +1,39 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 9 Jul 2012 12:43:15 +0300
-Subject: [PATCH v4 04/12] gpio/omap: remove saved_wakeup field from struct
- gpio_bank
-In-Reply-To: <1331906760-5259-5-git-send-email-tarun.kanti@ti.com>
-References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
- <1331906760-5259-5-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4FFAA7B3.6020009@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 9 Jul 2012 11:48:21 +0200
+Subject: [PATCH V3 0/3] i2c-nomadik changes
+In-Reply-To: <CACRpkdakDBrF+G9wpPn+PQ5tcb2xqeiBoSRMmj_PuB_WhufaaQ@mail.gmail.com>
+References: <cover.1339447570.git.rubini@gnudd.com>
+ <CACRpkdakDBrF+G9wpPn+PQ5tcb2xqeiBoSRMmj_PuB_WhufaaQ@mail.gmail.com>
+Message-ID: <20120709094821.GB1296@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Just bumped across this patch and have a query.
-
-On 03/16/2012 04:05 PM, Tarun Kanti DebBarma wrote:
-> There is no more need to have saved_wakeup because bank->context.wake_en
-> already holds that value. So getting rid of read/write operation associated
-> with this field.
+On Mon, Jun 11, 2012 at 11:37:15PM +0200, Linus Walleij wrote:
+> On Mon, Jun 11, 2012 at 10:56 PM, Alessandro Rubini <rubini@gnudd.com> wrote:
 > 
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/gpio/gpio-omap.c |   12 +++---------
->  1 files changed, 3 insertions(+), 9 deletions(-)
+> > V3:
+> > ? ? ? ?- fixed according to Linusw feedback (merged the patch he posted)
+> > ? ? ? ?- added Tested-by: Linusw on his permission
 > 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 3a4f151..3b91ade 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -57,7 +57,6 @@ struct gpio_bank {
->  	u16 irq;
->  	int irq_base;
->  	struct irq_domain *domain;
-> -	u32 saved_wakeup;
->  	u32 non_wakeup_gpios;
->  	u32 enabled_non_wakeup_gpios;
->  	struct gpio_regs context;
-> @@ -777,7 +776,6 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
->  	unsigned long		flags;
->  
->  	spin_lock_irqsave(&bank->lock, flags);
-> -	bank->saved_wakeup = __raw_readl(mask_reg);
->  	__raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
+> I'm happy with this version, Wolfram if it looks OK to you,
+> can you please merge this into the I2C tree?
 
-OK, here you are overwriting the mask_reg with the wakeup bitmask
-without saving the mask_reg's original content.
+Done now, thanks.
 
->  	spin_unlock_irqrestore(&bank->lock, flags);
->  
-> @@ -793,7 +791,7 @@ static int omap_mpuio_resume_noirq(struct device *dev)
->  	unsigned long		flags;
->  
->  	spin_lock_irqsave(&bank->lock, flags);
-> -	__raw_writel(bank->saved_wakeup, mask_reg);
-> +	__raw_writel(bank->context.wake_en, mask_reg);
+Is the latest version of Lee's patches for DT sent on 20/06 suitable to
+go on top of that?
 
-Now you are restoring nothing but the same content that you stored
-during suspend. This will cause the non-wakeup gpio interrupts to get
-masked between a suspend/resume. So isn't this a bug?
+Regards,
 
-Proper solution would be to save the mask_reg context into another
-register than context.wake_en during suspend.
+   Wolfram
 
->  	spin_unlock_irqrestore(&bank->lock, flags);
->  
->  	return 0;
-
-
-cheers,
--roger
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/69dd6f32/attachment.sig>
