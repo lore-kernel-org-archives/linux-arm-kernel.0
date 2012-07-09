@@ -1,55 +1,88 @@
-From: wolfram@the-dreams.de (Wolfram Sang)
-Date: Tue, 10 Jul 2012 00:28:30 +0200
-Subject: [PATCH V2] i2c: imx: make bitrate an u32 type
-Message-ID: <1341872910-26687-1-git-send-email-wolfram@the-dreams.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 9 Jul 2012 15:57:00 -0700
+Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
+ corresponding mask value
+In-Reply-To: <CAOh2x=k5Tx2Gjrk1uRod-N-6gvYSeEKiZgms8gQfJ61TL8RXCQ@mail.gmail.com>
+References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+ <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
+ <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
+ <4FFAC8D2.4080601@st.com>
+ <CAOh2x=k5Tx2Gjrk1uRod-N-6gvYSeEKiZgms8gQfJ61TL8RXCQ@mail.gmail.com>
+Message-ID: <20120709225700.GB16202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sparse found this assignment of u32 to an int. Fix it:
+On 20120709-13:34, viresh kumar wrote:
+> On Mon, Jul 9, 2012 at 1:04 PM, vipul kumar samar
+> <vipulkumar.samar@st.com> wrote:
+> > On 7/9/2012 4:34 PM, viresh kumar wrote:
+> >>
+> >> On Mon, Jul 9, 2012 at 11:31 AM, Shiraz Hashim<shiraz.hashim@st.com>
+> >> wrote:
+> >>>
+> >>> From: Vipul Kumar Samar<vipulkumar.samar@st.com>
+> >>>
+> >>> sys_clk have multiple parents and selection of parent is depends on
+> >>
+> >>
+> >> s/ is//
+> 
+> I hope you haven't missed this comment :)
+> 
+> >>>   static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
+> >>> -static const char *sys_parents[] = { "none", "pll1_clk", "none", "none",
+> >>> -       "sys_synth_clk", "none", "pll2_clk", "pll3_clk", };
+> >>> +static const char *sys_parents[] = { "pll1_clk", "pll1_clk", "pll1_clk",
+> >>> +       "pll1_clk", "sys_synth_clk", "sys_synth_clk", "pll2_clk",
+> >>> "pll3_clk", };
+> >>
+> >>
+> >> Don't know what would be the implication of this?
+> >>
+> >> @Mike: Can you please tell us what should we do in such cases?
+> >>
+> >
+> > Is there any other solution for such cases ???
+> 
+> That's what i have asked mike for :)
+> Probably you can go through the clock framework code and check how these
+> names are used. Shouldn't be too complex to understand.
+> 
 
-drivers/i2c/busses/i2c-imx.c:540:56: warning: incorrect type in argument 3 (different signedness)
+I assume this change has been tested and wouldn't be posted if modifying
+the parent names broke things.
 
-and also fix the type in platform_data. All current users use values
-which fit into the old and new type, so it is a safe change.
+That said, as long as the parent names are valid strings then the clk
+framework should handle them.  When calling __clk_lookup for parent name
+"none", __clk_lookup will return NULL (of course assuming no one else in
+the system registered a clock named "none", which would be silly).  This
+is handled gracefully by the clk framework by re-parenting your "sys"
+clk from $old_parent to the "orphan" list.
 
-Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
-Cc: Richard Zhao <richard.zhao@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
+At the top level, there are basically two clock trees.  The first tree
+is "real" clock tree which starts as a list of clocks that set the
+CLK_IS_ROOT flag.  The second tree is a tree of "orphans" for clocks
+which are defined but "disconnected" from any real root clock (which
+might be caused by missing data, etc).
 
-Changes since V1: also change type in platform_data. Thanks to Richard.
+In general it is OK to declare parent names which might result in your
+clock being orphaned.  In practice it is more likely that your data
+matches your code: e.g. if you don't support a parent clock in the data
+then you likely never try use that missing parent clock in your code.
 
- arch/arm/plat-mxc/include/mach/i2c.h |    2 +-
- drivers/i2c/busses/i2c-imx.c         |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+The OMAP port does in fact make use of the orphan tree for some clocks,
+so it is tested.  However we haven't had any users of the clock tree
+which made a lot of use of "dynamic" reparenting to and from the orphan
+tree.  I did unit test this back during the 3.4 cycle, but I haven't
+since.  Let me know if you have any problems with it.
 
-diff --git a/arch/arm/plat-mxc/include/mach/i2c.h b/arch/arm/plat-mxc/include/mach/i2c.h
-index 375cdd0..8289d91 100644
---- a/arch/arm/plat-mxc/include/mach/i2c.h
-+++ b/arch/arm/plat-mxc/include/mach/i2c.h
-@@ -15,7 +15,7 @@
-  *
-  **/
- struct imxi2c_platform_data {
--	int bitrate;
-+	u32 bitrate;
- };
- 
- #endif /* __ASM_ARCH_I2C_H_ */
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index dd2a083..90460dd 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -471,8 +471,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
- 	struct pinctrl *pinctrl;
- 	void __iomem *base;
--	int irq, bitrate;
--	int ret;
-+	int irq, ret;
-+	u32 bitrate;
- 
- 	dev_dbg(&pdev->dev, "<%s>\n", __func__);
- 
--- 
-1.7.10.4
+Regards,
+Mike
+
+> --
+> viresh
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
