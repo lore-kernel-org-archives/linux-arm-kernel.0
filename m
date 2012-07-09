@@ -1,43 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jul 2012 17:09:48 +0800
-Subject: [PATCH] ARM: disable interrupt before spinning endlessly
-Message-ID: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Jul 2012 02:14:31 -0700
+Subject: [PATCH] arm/dts: remove MMC/SD and SPI related entries from
+ am33xx.dtsi
+In-Reply-To: <1341815049-3947-1-git-send-email-anilkumar@ti.com>
+References: <1341815049-3947-1-git-send-email-anilkumar@ti.com>
+Message-ID: <20120709091431.GE1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU will endlessly spin at the end of machine_halt and
-machine_restart calls.  However, this will lead to a soft lockup
-warning after about 20 seconds, if CONFIG_LOCKUP_DETECTOR is enabled,
-as system timer is still alive.
+* AnilKumar Ch <anilkumar@ti.com> [120708 23:29]:
+> The MMC/SD and SPI entries in this file are not tested yet. They
+> inadvertently came into the patch because of some work in progress
+> stuff I had in my repo.
+> 
+> These entries should not have been sent out in the first place and
+> I am sorry for the trouble and will be extra careful in future.
+> 
+> Since the offending commit is not sent upstream yet, I hope this can
+> be merged into the commit 5fc0b42a98556bd9f01cecc6a64fcbd15ec363f0
+> (arm/dts: Add initial DT support for AM33XX SoC family) on the devel-dt
+> branch of linux-omap tree.
 
-Disable interrupt before going to spin endlessly, so that the lockup
-warning will never be seen.
+Thanks applying into omap devel-dt branch.
 
-Reported-by: Marek Vasut <marex@denx.de>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/kernel/process.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 19c95ea..693b744 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -247,6 +247,7 @@ void machine_shutdown(void)
- void machine_halt(void)
- {
- 	machine_shutdown();
-+	local_irq_disable();
- 	while (1);
- }
- 
-@@ -268,6 +269,7 @@ void machine_restart(char *cmd)
- 
- 	/* Whoops - the platform was unable to reboot. Tell the user! */
- 	printk("Reboot failed -- System halted\n");
-+	local_irq_disable();
- 	while (1);
- }
- 
--- 
-1.7.5.4
+Tony
