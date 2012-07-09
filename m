@@ -1,41 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 09 Jul 2012 22:08:30 +0200
-Subject: [PATCH V3 0/3] i2c-nomadik changes
-In-Reply-To: <CACRpkda6Bup7myYowaLHnAMd5wkUrehYaJnu7BRnbsOwytZ9sw@mail.gmail.com>
-References: <cover.1339447570.git.rubini@gnudd.com>
- <CACRpkdakDBrF+G9wpPn+PQ5tcb2xqeiBoSRMmj_PuB_WhufaaQ@mail.gmail.com>
- <20120709094821.GB1296@pengutronix.de>
- <CACRpkda6Bup7myYowaLHnAMd5wkUrehYaJnu7BRnbsOwytZ9sw@mail.gmail.com>
-Message-ID: <4FFB3A3E.6020107@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 9 Jul 2012 13:14:22 -0700
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <4FFB288D.4080606@linaro.org>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org>
+ <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org>
+Message-ID: <20120709201422.GA12242@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/12 21:40, Linus Walleij wrote:
-> On Mon, Jul 9, 2012 at 11:48 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
->> On Mon, Jun 11, 2012 at 11:37:15PM +0200, Linus Walleij wrote:
->>> On Mon, Jun 11, 2012 at 10:56 PM, Alessandro Rubini <rubini@gnudd.com> wrote:
->>>
->>>> V3:
->>>>         - fixed according to Linusw feedback (merged the patch he posted)
->>>>         - added Tested-by: Linusw on his permission
->>>
->>> I'm happy with this version, Wolfram if it looks OK to you,
->>> can you please merge this into the I2C tree?
->>
->> Done now, thanks.
->>
->> Is the latest version of Lee's patches for DT sent on 20/06 suitable to
->> go on top of that?
->
-> No clue on that, Lee'd have to comment.
+On Mon, Jul 09, 2012 at 08:53:01PM +0200, Lee Jones wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Tue, 26 Jun 2012 10:46:50 +0100
+> Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+> 
+> Before we can use any domain allocated IRQ, we need to first create a
+> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
+> We do this with a helper function provided by the AB8500 IRQ domain
+> controller called ab8500_irq_get_virq(). We need to do this for both
+> IRQs which the Power-On-Key driver uses; one for button press, the other
+> for button depress.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/input/misc/ab8500-ponkey.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+> index 5ceb23e..08d42d1 100644
+> --- a/drivers/input/misc/ab8500-ponkey.c
+> +++ b/drivers/input/misc/ab8500-ponkey.c
+> @@ -82,6 +82,7 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
+>  
+>  	input_set_capability(input, EV_KEY, KEY_POWER);
+>  
+> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbf);
 
-All my i2c stuff is in -next.
+*sigh*
 
-Feel free to pull it in and base on that.
+Can we please do the assignment earlier? Look, we have a few lines
+above:
+
+	ponkey->idev = input;
+	ponkey->ab8500 = ab8500;
+	ponkey->irq_dbf = irq_dbf;
+	ponkey->irq_dbr = irq_dbr;
+
+Why do you keep these assignments and then override them with
+translations? Why don't you do
+
+	ponkey->idev = input;
+	ponkey->ab8500 = ab8500;
+	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
+	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
+
+to begin with?
+
+Thanks.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Dmitry
