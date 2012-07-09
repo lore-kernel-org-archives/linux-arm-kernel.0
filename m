@@ -1,56 +1,72 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 9 Jul 2012 17:58:22 +0200
-Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <20120709120523.GG1296@pengutronix.de>
-References: <1341554956-17416-1-git-send-email-marex@denx.de>
- <201207091307.35860.marex@denx.de> <20120709120523.GG1296@pengutronix.de>
-Message-ID: <201207091758.22788.marex@denx.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon,  9 Jul 2012 17:16:05 +0100
+Subject: [PATCH] arm: Use phys_addr_t to hold sizes in arm_add_memory and
+ struct membank
+Message-ID: <1341850565-29191-1-git-send-email-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+The memory regions which are passed to arm_add_memory() from
+device tree blobs via early_init_dt_add_memory_arch() can
+have sizes which are larger than will fit in a 32 bit integer,
+so switch to using a phys_addr_t to hold them, to avoid
+silently dropping the top 32 bits of the size.
 
-> > > > diff --git a/arch/arm/boot/dts/imx28.dtsi
-> > > > b/arch/arm/boot/dts/imx28.dtsi index ee3778a..832d30a 100644
-> > > > --- a/arch/arm/boot/dts/imx28.dtsi
-> > > > +++ b/arch/arm/boot/dts/imx28.dtsi
-> > 
-> > [...]
-> > 
-> > > > @@ -428,6 +429,7 @@
-> > > > 
-> > > >  				compatible = "fsl,imx28-i2c";
-> > > >  				reg = <0x8005a000 2000>;
-> > > >  				interrupts = <110 69>;
-> > > > 
-> > > > +				clock-frequency = <400000>;
-> > > 
-> > > NACK on that. Not all slaves can do 400KHz, so this is not a sensible
-> > > default.
-> > 
-> > How many of such chips are there and how many of the chips can do 400kHz
-> > ? I believe the majority shouldn't suffer because of minority.
-> 
-> The kernel should work for all users, not only for the majority, so:
-> Better safe than sorry.
-> 
-> Also, defaults should make the system work. Tuning can be done later by
-> somebody who understands what is needed.
-> 
-> And frankly, this attitude which made you add a potential regression is
-> worrisome. I'd suggest to give stability a higher priority.
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
+---
+(The change from '& PAGE_MASK' is required because PAGE_MASK
+is an unsigned 32 bit constant and would clear the high 32
+bits of size...)
 
-I believe you misunderstood my intention. Setting it to 400kHz was done because 
-it's what most people will use, therefore avoiding duplication (most of the 
-board files will override this setting now). All right, your sane defaults here 
-can be applied, I won't argue.
+Apologies to those on CC who got this mail twice.
 
-And frankly, you could have left the last jab out. Let's avoid attacking each 
-other, I'm not in the mood for it today.
+ arch/arm/include/asm/setup.h |    4 ++--
+ arch/arm/kernel/setup.c      |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-> Regards,
-> 
->    Wolfram
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+index 23ebc0c..24d284a 100644
+--- a/arch/arm/include/asm/setup.h
++++ b/arch/arm/include/asm/setup.h
+@@ -196,7 +196,7 @@ static const struct tagtable __tagtable_##fn __tag = { tag, fn }
+ 
+ struct membank {
+ 	phys_addr_t start;
+-	unsigned long size;
++	phys_addr_t size;
+ 	unsigned int highmem;
+ };
+ 
+@@ -217,7 +217,7 @@ extern struct meminfo meminfo;
+ #define bank_phys_end(bank)	((bank)->start + (bank)->size)
+ #define bank_phys_size(bank)	(bank)->size
+ 
+-extern int arm_add_memory(phys_addr_t start, unsigned long size);
++extern int arm_add_memory(phys_addr_t start, phys_addr_t size);
+ extern void early_print(const char *str, ...);
+ extern void dump_machine_table(void);
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e15d83b..3f62dd1 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -508,7 +508,7 @@ void __init dump_machine_table(void)
+ 		/* can't use cpu_relax() here as it may require MMU setup */;
+ }
+ 
+-int __init arm_add_memory(phys_addr_t start, unsigned long size)
++int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
+ {
+ 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
+ 
+@@ -538,7 +538,7 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
+ 	}
+ #endif
+ 
+-	bank->size = size & PAGE_MASK;
++	bank->size = size & ~(phys_addr_t)(PAGE_SIZE-1);
+ 
+ 	/*
+ 	 * Check whether this memory region has non-zero size or
+-- 
+1.7.9.5
