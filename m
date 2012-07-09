@@ -1,74 +1,44 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 9 Jul 2012 08:56:55 +0200
-Subject: [PATCH v3][for_v3.5] media: mx2_camera: Fix mbus format handling
-In-Reply-To: <Pine.LNX.4.64.1207061639210.29809@axis700.grange>
-References: <1338543105-20322-1-git-send-email-javier.martin@vista-silicon.com>
- <Pine.LNX.4.64.1207061439090.29809@axis700.grange>
- <Pine.LNX.4.64.1207061639210.29809@axis700.grange>
-Message-ID: <CACKLOr07SY2KLwCA_e+-5UASsPvGxa5=aUyx-3OtSckWYrDSBA@mail.gmail.com>
+Date: Mon, 9 Jul 2012 09:00:57 +0200
+Subject: Clock problems in i.MX27 Visstrim M10 (linux-3.5-rc5).
+In-Reply-To: <CAOMZO5ASmzk1wYauAfM0JwixnViyudmn+AtqyagJg2J4a56Paw@mail.gmail.com>
+References: <CACKLOr0z13sMQhb14YpDp7UtwfhVoqRAMOJCA+geapq=Lh7VuQ@mail.gmail.com>
+ <CAOMZO5CeGKJ6kERaCkNE0Cpy2X78CUN_-au5Q+cCtLLjtNXMDg@mail.gmail.com>
+ <CACKLOr1oeci84Fs7HTRD2Myie8zjKExA15mxM3z7dkq8QfvDmg@mail.gmail.com>
+ <CAOMZO5Bdpe43wSAS-D34LzVA9gAKwGTjsw_1f3iPizVsWJW7kw@mail.gmail.com>
+ <CACKLOr1OYmoWXCU=Q_0O1H5jYcAGXO11ji6d_j7SjyaLZuygAA@mail.gmail.com>
+ <CAOMZO5CLV6TuQUTzYUSvoi6apNUtSLhkbh8Jj3onAnc99TWxWg@mail.gmail.com>
+ <CAOMZO5A0YXcZOB+ov+dD0MVJr0XSr=Ufg5snGDLvZ9=GyK=xMw@mail.gmail.com>
+ <CAOMZO5BwraSVyW8SZjoN19gy-eZ2tXXPRT879PdAOu38Yf-z0g@mail.gmail.com>
+ <CACKLOr1EoOL1SQ_QW7P3YtMYgVwt9uE-x728-YrZB8rEh45OMw@mail.gmail.com>
+ <CAOMZO5ASmzk1wYauAfM0JwixnViyudmn+AtqyagJg2J4a56Paw@mail.gmail.com>
+Message-ID: <CACKLOr3Bd3acC2aRz=1RO=hy2VLnx6fjMaXh45yaqh6z0EM6hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 July 2012 17:11, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> hmm... sorry again. It is my fault, that I left this patch without
-> attention for full 5 weeks, but I still don't have a sufficiently good
-> feeling about it. Look here:
->
-> On Fri, 6 Jul 2012, Guennadi Liakhovetski wrote:
->
->> Hi Javier
+On 6 July 2012 14:32, Fabio Estevam <festevam@gmail.com> wrote:
+> On Fri, Jul 6, 2012 at 3:44 AM, javier Martin
+> <javier.martin@vista-silicon.com> wrote:
+>> The attached patch solves mx2_camera clock problems.
 >>
->> Thanks for the patch, and sorry for delay. I was away first 10 days of
->> June and still haven't come round to cleaning up my todo list since
->> then...
+>> It can be also found by the following subject in the lists:
 >>
->> On Fri, 1 Jun 2012, Javier Martin wrote:
+>> media: i.MX27: Fix emma-prp clocks in mx2_camera.c
 >
-> [snip]
+> Just tried your patch against today's linux-next and I still get the
+> following on a mx27pdk:
 >
->> > @@ -1024,14 +1039,28 @@ static int mx2_camera_set_bus_param(struct soc_camera_device *icd)
->> >             return ret;
->> >     }
->> >
->> > +   xlate = soc_camera_xlate_by_fourcc(icd, pixfmt);
->> > +   if (!xlate) {
->> > +           dev_warn(icd->parent, "Format %x not found\n", pixfmt);
->> > +           return -EINVAL;
->> > +   }
->> > +
->> > +   if (xlate->code == V4L2_MBUS_FMT_YUYV8_2X8) {
->> > +           csicr1 |= CSICR1_PACK_DIR;
->> > +           csicr1 &= ~CSICR1_SWAP16_EN;
->> > +           dev_dbg(icd->parent, "already yuyv format, don't convert\n");
->> > +   } else if (xlate->code == V4L2_MBUS_FMT_UYVY8_2X8) {
->> > +           csicr1 &= ~CSICR1_PACK_DIR;
->> > +           csicr1 |= CSICR1_SWAP16_EN;
->> > +           dev_dbg(icd->parent, "convert uyvy mbus format into yuyv\n");
->> > +   }
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx2-camera mx2-camera.0: Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb
+> mx2-camera mx2-camera.0: Camera driver detached from camera 0
+> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 665000
 >
-> This doesn't look right. From V4L2_MBUS_FMT_YUYV8_2X8 you can produce two
-> output formats:
->
-> V4L2_PIX_FMT_YUV420 and
-> V4L2_PIX_FMT_YUYV
->
-> For both of them you set CSICR1_PACK_DIR, which wasn't the default before?
-> Next for V4L2_MBUS_FMT_UYVY8_2X8. From this one you can produce 3 formats:
->
-> V4L2_PIX_FMT_YUV420,
-> V4L2_PIX_FMT_YUYV and
-> V4L2_PIX_FMT_UYVY
->
-> For all 3 of them you now set CSICR1_SWAP16_EN. Are you sure all the above
-> is correct?
+> Are you able to probe i2c correctly on your board?
 
-No, there's just one thing wrong. With this patch, pass-through mode
-for  V4L2_MBUS_FMT_UYVY8_2X8 won't work, since I always convert it to
-YUYV.
+Yes, I am and my patch does not touch any of the I2C settings or clocks.
 
-Let me send a new version of the patch to address this problem.
 
-Regards.
 -- 
 Javier Martin
 Vista Silicon S.L.
