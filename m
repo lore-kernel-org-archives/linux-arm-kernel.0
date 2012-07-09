@@ -1,58 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 09 Jul 2012 22:56:49 +0200
+Date: Mon, 09 Jul 2012 22:59:43 +0200
 Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
 In-Reply-To: <20120709204620.GA12692@core.coreip.homeip.net>
 References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
  <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
  <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
  <4FFB40A4.5060505@linaro.org> <20120709204620.GA12692@core.coreip.homeip.net>
-Message-ID: <4FFB4591.2050601@linaro.org>
+Message-ID: <4FFB463F.9040201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/12 22:46, Dmitry Torokhov wrote:
-> On Mon, Jul 09, 2012 at 10:35:48PM +0200, Lee Jones wrote:
->> From: Lee Jones <lee.jones@linaro.org>
->> Date: Tue, 26 Jun 2012 10:46:50 +0100
->> Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
->>
->> Before we can use any domain allocated IRQ, we need to first create a
->> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
->> We do this with a helper function provided by the AB8500 IRQ domain
->> controller called ab8500_irq_get_virq(). We need to do this for both
->> IRQs which the Power-On-Key driver uses; one for button press, the other
->> for button depress.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>   drivers/input/misc/ab8500-ponkey.c |    4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
->> index 5ceb23e..8d24189 100644
->> --- a/drivers/input/misc/ab8500-ponkey.c
->> +++ b/drivers/input/misc/ab8500-ponkey.c
->> @@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
->>
->>   	ponkey->idev = input;
->>   	ponkey->ab8500 = ab8500;
->> -	ponkey->irq_dbf = irq_dbf;
->> -	ponkey->irq_dbr = irq_dbr;
->> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, ponkey->irq_dbf);
->> +	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, ponkey->irq_dbr);
->                                                        ^^^^^^^^^^^^^^^
->
-> These are zeroes now. Man, you are killing me...
+Sorry for the cock-up(s).
 
-I've been traveling all day and my brain is dead.
+From: Lee Jones <lee.jones@linaro.org>
+Date: Tue, 26 Jun 2012 10:46:50 +0100
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
 
-Hopefully you have a sense of humor. :)
+Before we can use any domain allocated IRQ, we need to first create a
+map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
+We do this with a helper function provided by the AB8500 IRQ domain
+controller called ab8500_irq_get_virq(). We need to do this for both
+IRQs which the Power-On-Key driver uses; one for button press, the other
+for button depress.
 
-Give me two mins.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/input/misc/ab8500-ponkey.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index 5ceb23e..f6764af 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
+ 
+ 	ponkey->idev = input;
+ 	ponkey->ab8500 = ab8500;
+-	ponkey->irq_dbf = irq_dbf;
+-	ponkey->irq_dbr = irq_dbr;
++	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
++	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
+ 
+ 	input->name = "AB8500 POn(PowerOn) Key";
+ 	input->dev.parent = &pdev->dev;
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
