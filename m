@@ -1,72 +1,37 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon,  9 Jul 2012 17:16:05 +0100
-Subject: [PATCH] arm: Use phys_addr_t to hold sizes in arm_add_memory and
- struct membank
-Message-ID: <1341850565-29191-1-git-send-email-peter.maydell@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Jul 2012 16:21:37 +0000
+Subject: [PATCH 01/15] ARM: Add fixed PCI i/o mapping
+In-Reply-To: <1341600040-30993-2-git-send-email-robherring2@gmail.com>
+References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+ <1341600040-30993-2-git-send-email-robherring2@gmail.com>
+Message-ID: <201207091621.38261.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory regions which are passed to arm_add_memory() from
-device tree blobs via early_init_dt_add_memory_arch() can
-have sizes which are larger than will fit in a 32 bit integer,
-so switch to using a phys_addr_t to hold them, to avoid
-silently dropping the top 32 bits of the size.
+On Friday 06 July 2012, Rob Herring wrote:
+>  /*
+> + * Setup fixed I/O mapping. Must be called from .map_io function.
+> + */
+> +#ifdef CONFIG_PCI
+> +extern void pci_map_io_pfn(unsigned long pfn[], int nr, int size);
+> +#else
+> +static inline void pci_map_io_pfn(unsigned long pfn[], int nr, int size) {}
+> +#endif
+> +static inline void __init pci_map_io_single_pfn(unsigned long pfn)
+> +{
+> +       pci_map_io_pfn(&pfn, 1, SZ_1M);
+> +}
+> +
+> +static inline void __init pci_map_io_single(unsigned long paddr)
+> +{
+> +       pci_map_io_single_pfn(__phys_to_pfn(paddr));
+> +}
 
-Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
----
-(The change from '& PAGE_MASK' is required because PAGE_MASK
-is an unsigned 32 bit constant and would clear the high 32
-bits of size...)
+On powerpc, we have a special flag that gets used to register a "primary"
+I/O space, which is the one that holds the port numbers between 0 and 1024
+because that is the only place that an ISA add-on card can be used in.
 
-Apologies to those on CC who got this mail twice.
+I wonder if we want to support that as well, or if we just assume that
+the first one to get registered is the primary bus.
 
- arch/arm/include/asm/setup.h |    4 ++--
- arch/arm/kernel/setup.c      |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 23ebc0c..24d284a 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -196,7 +196,7 @@ static const struct tagtable __tagtable_##fn __tag = { tag, fn }
- 
- struct membank {
- 	phys_addr_t start;
--	unsigned long size;
-+	phys_addr_t size;
- 	unsigned int highmem;
- };
- 
-@@ -217,7 +217,7 @@ extern struct meminfo meminfo;
- #define bank_phys_end(bank)	((bank)->start + (bank)->size)
- #define bank_phys_size(bank)	(bank)->size
- 
--extern int arm_add_memory(phys_addr_t start, unsigned long size);
-+extern int arm_add_memory(phys_addr_t start, phys_addr_t size);
- extern void early_print(const char *str, ...);
- extern void dump_machine_table(void);
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index e15d83b..3f62dd1 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -508,7 +508,7 @@ void __init dump_machine_table(void)
- 		/* can't use cpu_relax() here as it may require MMU setup */;
- }
- 
--int __init arm_add_memory(phys_addr_t start, unsigned long size)
-+int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
- {
- 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
- 
-@@ -538,7 +538,7 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
- 	}
- #endif
- 
--	bank->size = size & PAGE_MASK;
-+	bank->size = size & ~(phys_addr_t)(PAGE_SIZE-1);
- 
- 	/*
- 	 * Check whether this memory region has non-zero size or
--- 
-1.7.9.5
+	Arnd
