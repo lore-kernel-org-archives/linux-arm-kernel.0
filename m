@@ -1,107 +1,55 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 9 Jul 2012 15:15:27 -0700
-Subject: [PATCH] drivers/rtc/rtc-twl.c: fix threaded IRQ to use
- IRQF_ONESHOT
-In-Reply-To: <1341592434-4207-1-git-send-email-khilman@ti.com>
-References: <1341592434-4207-1-git-send-email-khilman@ti.com>
-Message-ID: <20120709151527.58f44c3a.akpm@linux-foundation.org>
+From: wolfram@the-dreams.de (Wolfram Sang)
+Date: Tue, 10 Jul 2012 00:28:30 +0200
+Subject: [PATCH V2] i2c: imx: make bitrate an u32 type
+Message-ID: <1341872910-26687-1-git-send-email-wolfram@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  6 Jul 2012 09:33:54 -0700
-Kevin Hilman <khilman@ti.com> wrote:
+sparse found this assignment of u32 to an int. Fix it:
 
-> Requesting a threaded interrupt without a primary handler and without
-> IRQF_ONESHOT is dangerous, and after commit 1c6c6952 (genirq: Reject
-> bogus threaded irq requests), these requests are rejected.  This
-> causes ->probe() to fail, and the RTC driver not to be availble.
-> 
-> To fix, add IRQF_ONESHOT to the IRQ flags.
-> 
-> Tested on OMAP3730/OveroSTORM and OMAP4430/Panda board using rtcwake
-> to wake from system suspend multiple times.
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Resending to broader audience and including Andrew.  Since, I understand
-> that drivers/rtc is somewhat orphaned, Andrew, can you queue this fix for
-> v3.5.  Thanks.
-> 
->  drivers/rtc/rtc-twl.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-> index 258abea..c5d06fe 100644
-> --- a/drivers/rtc/rtc-twl.c
-> +++ b/drivers/rtc/rtc-twl.c
-> @@ -510,7 +510,7 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
->  	}
->  
->  	ret = request_threaded_irq(irq, NULL, twl_rtc_interrupt,
-> -				   IRQF_TRIGGER_RISING,
-> +				   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
->  				   dev_name(&rtc->dev), rtc);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "IRQ is not free.\n");
+drivers/i2c/busses/i2c-imx.c:540:56: warning: incorrect type in argument 3 (different signedness)
 
-OK, this is the second such patch I've seen and it's time to wonder if
-we should get grumpy at tglx.  afacit 1c6c6952 broke the following
-drivers:
+and also fix the type in platform_data. All current users use values
+which fit into the old and new type, so it is a safe change.
 
+Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
+Cc: Richard Zhao <richard.zhao@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
 
-sound/soc/codecs/wm8994.c
-sound/soc/codecs/max98095.c
-sound/soc/codecs/twl6040.c
-drivers/usb/otg/ab8500-usb.c
-drivers/usb/otg/twl4030-usb.c
-drivers/gpio/gpio-sx150x.c
-drivers/gpio/gpio-ab8500.c
-drivers/mfd/ab8500-gpadc.c
-drivers/mfd/ti-ssp.c
-drivers/mfd/twl4030-madc.c
-drivers/mfd/htc-i2cpld.c
-drivers/mfd/wm831x-auxadc.c
-drivers/mfd/twl6040-core.c
-drivers/mfd/wm8350-core.c
-drivers/extcon/extcon-max8997.c
-drivers/mmc/host/of_mmc_spi.c
-drivers/mmc/core/cd-gpio.c
-drivers/net/can/mcp251x.c
-drivers/nfc/pn544_hci.c
-drivers/nfc/pn544.c
-drivers/power/ab8500_btemp.c
-drivers/power/twl4030_charger.c
-drivers/power/lp8727_charger.c
-drivers/power/smb347-charger.c
-drivers/power/max17042_battery.c
-drivers/power/wm831x_power.c
-drivers/power/ab8500_fg.c
-drivers/power/max8903_charger.c
-drivers/power/ab8500_charger.c
-drivers/regulator/wm831x-isink.c
-drivers/regulator/wm831x-ldo.c
-drivers/regulator/wm831x-dcdc.c
-drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-drivers/staging/iio/adc/adt7310.c
-drivers/staging/iio/adc/adt7410.c
-drivers/staging/iio/adc/ad7816.c
-drivers/staging/iio/cdc/ad7150.c
-drivers/staging/iio/accel/sca3000_core.c
-drivers/staging/cptm1217/clearpad_tm1217.c
-drivers/input/keyboard/tc3589x-keypad.c
-drivers/input/keyboard/twl4030_keypad.c
-drivers/input/misc/twl4030-pwrbutton.c
-drivers/input/misc/twl6040-vibra.c
-drivers/input/misc/wm831x-on.c
-drivers/media/radio/si470x/radio-si470x-i2c.c
-drivers/base/regmap/regmap-irq.c
-drivers/rtc/rtc-wm831x.c
-drivers/rtc/rtc-twl.c
-drivers/rtc/rtc-ab8500.c
-drivers/rtc/rtc-max8998.c
-drivers/rtc/rtc-isl1208.c
-drivers/platform/x86/intel_mid_powerbtn.c
-include/linux/mfd/wm8994/core.h
-include/linux/mfd/wm8350/core.h
+Changes since V1: also change type in platform_data. Thanks to Richard.
 
-what am I missing here?
+ arch/arm/plat-mxc/include/mach/i2c.h |    2 +-
+ drivers/i2c/busses/i2c-imx.c         |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/i2c.h b/arch/arm/plat-mxc/include/mach/i2c.h
+index 375cdd0..8289d91 100644
+--- a/arch/arm/plat-mxc/include/mach/i2c.h
++++ b/arch/arm/plat-mxc/include/mach/i2c.h
+@@ -15,7 +15,7 @@
+  *
+  **/
+ struct imxi2c_platform_data {
+-	int bitrate;
++	u32 bitrate;
+ };
+ 
+ #endif /* __ASM_ARCH_I2C_H_ */
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index dd2a083..90460dd 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -471,8 +471,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+ 	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
+ 	struct pinctrl *pinctrl;
+ 	void __iomem *base;
+-	int irq, bitrate;
+-	int ret;
++	int irq, ret;
++	u32 bitrate;
+ 
+ 	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+ 
+-- 
+1.7.10.4
