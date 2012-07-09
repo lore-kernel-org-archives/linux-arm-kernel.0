@@ -1,62 +1,54 @@
 From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Mon, 9 Jul 2012 16:01:01 +0530
-Subject: [PATCH 1/6] ARM: DTS: SPEAr13xx: Fix Interrupt bindings
-Message-ID: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+Date: Mon, 9 Jul 2012 16:01:05 +0530
+Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
+ corresponding mask value
+In-Reply-To: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+Message-ID: <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vipul Kumar Samar <vipulkumar.samar@st.com>
 
-   - Fix interrupt bindings for uart, ethernet and pmu.
-   - Add interrupt binding for keyboard.
+sys_clk have multiple parents and selection of parent is depends on
+sys_clk_ctrl register (bit no. 23:25) with possible values,
+
+   0XX: pll1_clk
+   10X: sys_synth_clk
+   110: pll2_clk
+   111: pll3_clk
+
+Update sys_clk parent array accordingly (ex. 0:3-pll1_clk) and
+fix mask value to 7.
 
 Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 ---
- arch/arm/boot/dts/spear13xx.dtsi |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/clk/spear/spear1340_clock.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
-index 10dcec7..f7b84ac 100644
---- a/arch/arm/boot/dts/spear13xx.dtsi
-+++ b/arch/arm/boot/dts/spear13xx.dtsi
-@@ -43,8 +43,8 @@
+diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+index e69c542..b3b56de 100644
+--- a/drivers/clk/spear/spear1340_clock.c
++++ b/drivers/clk/spear/spear1340_clock.c
+@@ -25,7 +25,7 @@
+ 	#define SPEAR1340_HCLK_SRC_SEL_SHIFT	27
+ 	#define SPEAR1340_HCLK_SRC_SEL_MASK	1
+ 	#define SPEAR1340_SCLK_SRC_SEL_SHIFT	23
+-	#define SPEAR1340_SCLK_SRC_SEL_MASK	3
++	#define SPEAR1340_SCLK_SRC_SEL_MASK	7
  
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 8 0x04
--			      0 9 0x04>;
-+		interrupts = <0 6 0x04
-+			      0 7 0x04>;
- 	};
+ /* PLL related registers and bit values */
+ #define SPEAR1340_PLL_CFG			(VA_MISC_BASE + 0x210)
+@@ -369,8 +369,8 @@ static struct frac_rate_tbl gen_rtbl[] = {
  
- 	L2: l2-cache {
-@@ -119,8 +119,8 @@
- 		gmac0: eth at e2000000 {
- 			compatible = "st,spear600-gmac";
- 			reg = <0xe2000000 0x8000>;
--			interrupts = <0 23 0x4
--				      0 24 0x4>;
-+			interrupts = <0 33 0x4
-+				      0 34 0x4>;
- 			interrupt-names = "macirq", "eth_wake_irq";
- 			status = "disabled";
- 		};
-@@ -202,6 +202,7 @@
- 			kbd at e0300000 {
- 				compatible = "st,spear300-kbd";
- 				reg = <0xe0300000 0x1000>;
-+				interrupts = <0 52 0x4>;
- 				status = "disabled";
- 			};
- 
-@@ -224,7 +225,7 @@
- 			serial at e0000000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xe0000000 0x1000>;
--				interrupts = <0 36 0x4>;
-+				interrupts = <0 35 0x4>;
- 				status = "disabled";
- 			};
- 
+ /* clock parents */
+ static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
+-static const char *sys_parents[] = { "none", "pll1_clk", "none", "none",
+-	"sys_synth_clk", "none", "pll2_clk", "pll3_clk", };
++static const char *sys_parents[] = { "pll1_clk", "pll1_clk", "pll1_clk",
++	"pll1_clk", "sys_synth_clk", "sys_synth_clk", "pll2_clk", "pll3_clk", };
+ static const char *ahb_parents[] = { "cpu_div3_clk", "amba_synth_clk", };
+ static const char *gpt_parents[] = { "osc_24m_clk", "apb_clk", };
+ static const char *uart0_parents[] = { "pll5_clk", "osc_24m_clk",
 -- 
 1.7.10
