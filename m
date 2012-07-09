@@ -1,17 +1,14 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon,  9 Jul 2012 18:22:53 +0200
-Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
-Message-ID: <1341850974-11977-1-git-send-email-marex@denx.de>
+Date: Mon,  9 Jul 2012 18:22:54 +0200
+Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <1341850974-11977-1-git-send-email-marex@denx.de>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+Message-ID: <1341850974-11977-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch configures the I2C bus timing registers according
-to information passed via DT. Currently, 100kHz and 400kHz
-modes are supported.
-
-The TIMING2 register value is wrong in the documentation for
-i.MX28! This was found and fixed by:
-  Shawn Guo <shawn.guo@linaro.org>
+This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
+via DT. The DMA operation is enabled by default.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Detlev Zundel <dzu@denx.de>
@@ -26,165 +23,448 @@ CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Wolfgang Denk <wd@denx.de>
 Cc: Wolfram Sang <w.sang@pengutronix.de>
 ---
- Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    3 +
+ Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    5 +
  arch/arm/boot/dts/imx28.dtsi                      |    2 +
- drivers/i2c/busses/i2c-mxs.c                      |   66 +++++++++++++++++++++
- 3 files changed, 71 insertions(+)
+ drivers/i2c/busses/i2c-mxs.c                      |  267 +++++++++++++++++++--
+ 3 files changed, 252 insertions(+), 22 deletions(-)
 
-V2: Fixed static const struct mxs_i2c_speed_config
-V3: Use 100kHz by default
-    Document support only for 100kHz and 400kHz
-    Document why the bus is configured to 95kHz instead of 100kHz
-    Replace "Invalid speed ..." message with "Unsupported speed ..." message
+V2: Fixed return value from mxs_i2c_dma_setup_xfer().
+    Fixed coding style nitpicks
+    Call mxs_i2c_dma_finish() in failpath only if DMA is active
+V3: Align with changes in previous patch
 
 diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-index 1bfc02d..30ac3a0 100644
+index 30ac3a0..45b6307 100644
 --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
 +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-@@ -4,6 +4,8 @@ Required properties:
- - compatible: Should be "fsl,<chip>-i2c"
- - reg: Should contain registers location and length
+@@ -6,6 +6,10 @@ Required properties:
  - interrupts: Should contain ERROR and DMA interrupts
-+- clock-frequency: Desired I2C bus clock frequency in Hz.
-+                   Only 100000Hz and 400000Hz modes are supported.
+ - clock-frequency: Desired I2C bus clock frequency in Hz.
+                    Only 100000Hz and 400000Hz modes are supported.
++- fsl,i2c-dma-channel: APBX DMA channel for the I2C
++
++Optional properties:
++- fsl,use-pio: Use PIO transfers instead of DMA, useful for debug
  
  Examples:
  
-@@ -13,4 +15,5 @@ i2c0: i2c at 80058000 {
- 	compatible = "fsl,imx28-i2c";
+@@ -16,4 +20,5 @@ i2c0: i2c at 80058000 {
  	reg = <0x80058000 2000>;
  	interrupts = <111 68>;
-+	clock-frequency = <100000>;
+ 	clock-frequency = <100000>;
++	fsl,i2c-dma-channel = <6>;
  };
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index adb5ffc..e2e9a2b 100644
+index e2e9a2b..99bd037 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -586,6 +586,7 @@
- 				compatible = "fsl,imx28-i2c";
+@@ -587,6 +587,7 @@
  				reg = <0x80058000 2000>;
  				interrupts = <111 68>;
-+				clock-frequency = <100000>;
+ 				clock-frequency = <100000>;
++				fsl,i2c-dma-channel = <6>;
  				status = "disabled";
  			};
  
-@@ -595,6 +596,7 @@
- 				compatible = "fsl,imx28-i2c";
+@@ -597,6 +598,7 @@
  				reg = <0x8005a000 2000>;
  				interrupts = <110 69>;
-+				clock-frequency = <100000>;
+ 				clock-frequency = <100000>;
++				fsl,i2c-dma-channel = <7>;
  				status = "disabled";
  			};
  
 diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 04eb441..877b169 100644
+index 877b169..20290a6 100644
 --- a/drivers/i2c/busses/i2c-mxs.c
 +++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -46,6 +46,10 @@
- #define MXS_I2C_CTRL0_DIRECTION			0x00010000
- #define MXS_I2C_CTRL0_XFER_COUNT(v)		((v) & 0x0000FFFF)
- 
-+#define MXS_I2C_TIMING0		(0x10)
-+#define MXS_I2C_TIMING1		(0x20)
-+#define MXS_I2C_TIMING2		(0x30)
-+
- #define MXS_I2C_CTRL1		(0x40)
- #define MXS_I2C_CTRL1_SET	(0x44)
- #define MXS_I2C_CTRL1_CLR	(0x48)
-@@ -97,6 +101,35 @@
- #define MXS_CMD_I2C_READ	(MXS_I2C_CTRL0_SEND_NAK_ON_LAST | \
- 				 MXS_I2C_CTRL0_MASTER_MODE)
- 
-+struct mxs_i2c_speed_config {
-+	uint32_t	timing0;
-+	uint32_t	timing1;
-+	uint32_t	timing2;
-+};
-+
-+/*
-+ * Timing values for the default 24MHz clock supplied into the i2c block.
-+ *
-+ * The bus can operate at 95kHz or at 400kHz with the following timing
-+ * register configurations. The 100kHz mode isn't present because it's
-+ * values are not stated in the i.MX233/i.MX28 datasheet. The 95kHz mode
-+ * shall be close enough replacement. Therefore when the bus is configured
-+ * for 100kHz operation, 95kHz timing settings are actually loaded.
-+ *
-+ * For details, see i.MX233 [25.4.2 - 25.4.4] and i.MX28 [27.5.2 - 27.5.4].
-+ */
-+static const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
-+	.timing0	= 0x00780030,
-+	.timing1	= 0x00800030,
-+	.timing2	= 0x00300030,
-+};
-+
-+static const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
-+	.timing0	= 0x000f0007,
-+	.timing1	= 0x001f000f,
-+	.timing2	= 0x00300030,
-+};
-+
- /**
-  * struct mxs_i2c_dev - per device, private MXS-I2C data
+@@ -7,8 +7,6 @@
   *
-@@ -112,11 +145,17 @@ struct mxs_i2c_dev {
- 	struct completion cmd_complete;
+  * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+- * TODO: add dma-support if platform-support for it is available
+- *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+@@ -31,6 +29,9 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_i2c.h>
++#include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
++#include <linux/fsl/mxs-dma.h>
+ 
+ #define DRIVER_NAME "mxs-i2c"
+ 
+@@ -146,6 +147,16 @@ struct mxs_i2c_dev {
  	u32 cmd_err;
  	struct i2c_adapter adapter;
-+	const struct mxs_i2c_speed_config *speed;
+ 	const struct mxs_i2c_speed_config *speed;
++
++	/* DMA support components */
++	bool				dma_mode;
++	int				dma_channel;
++	struct dma_chan         	*dmach;
++	struct mxs_dma_data		dma_data;
++	uint32_t			pio_data[2];
++	uint32_t			addr_data;
++	struct scatterlist		sg_io[2];
++	bool				dma_read;
  };
  
  static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
- {
- 	stmp_reset_block(i2c->regs);
-+
-+	writel(i2c->speed->timing0, i2c->regs + MXS_I2C_TIMING0);
-+	writel(i2c->speed->timing1, i2c->regs + MXS_I2C_TIMING1);
-+	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
-+
+@@ -157,7 +168,11 @@ static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
+ 	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
+ 
  	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
- 	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
+-	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
++	if (i2c->dma_mode)
++		writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
++			i2c->regs + MXS_I2C_QUEUECTRL_CLR);
++	else
++		writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
  			i2c->regs + MXS_I2C_QUEUECTRL_SET);
-@@ -319,6 +358,28 @@ static const struct i2c_algorithm mxs_i2c_algo = {
+ }
+ 
+@@ -248,6 +263,150 @@ static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
+ 	return 0;
+ }
+ 
++static void mxs_i2c_dma_finish(struct mxs_i2c_dev *i2c)
++{
++	if (i2c->dma_read) {
++		dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
++		dma_unmap_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
++	} else {
++		dma_unmap_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
++	}
++}
++
++static void mxs_i2c_dma_irq_callback(void *param)
++{
++	struct mxs_i2c_dev *i2c = param;
++
++	complete(&i2c->cmd_complete);
++	mxs_i2c_dma_finish(i2c);
++}
++
++static int mxs_i2c_dma_setup_xfer(struct i2c_adapter *adap,
++			struct i2c_msg *msg, uint32_t flags)
++{
++	struct dma_async_tx_descriptor *desc;
++	struct mxs_i2c_dev *i2c = i2c_get_adapdata(adap);
++
++	if (msg->flags & I2C_M_RD) {
++		i2c->dma_read = 1;
++		i2c->addr_data = (msg->addr << 1) | I2C_SMBUS_READ;
++
++		/*
++		 * SELECT command.
++		 */
++
++		/* Queue the PIO register write transfer. */
++		i2c->pio_data[0] = MXS_CMD_I2C_SELECT;
++		desc = dmaengine_prep_slave_sg(i2c->dmach,
++					(struct scatterlist *)&i2c->pio_data[0],
++					1, DMA_TRANS_NONE, 0);
++		if (!desc) {
++			dev_err(i2c->dev,
++				"Failed to get PIO reg. write descriptor.\n");
++			goto select_init_pio_fail;
++		}
++
++		/* Queue the DMA data transfer. */
++		sg_init_one(&i2c->sg_io[0], &i2c->addr_data, 1);
++		dma_map_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
++		desc = dmaengine_prep_slave_sg(i2c->dmach, &i2c->sg_io[0], 1,
++					DMA_MEM_TO_DEV,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++		if (!desc) {
++			dev_err(i2c->dev,
++				"Failed to get DMA data write descriptor.\n");
++			goto select_init_dma_fail;
++		}
++
++		/*
++		 * READ command.
++		 */
++
++		/* Queue the PIO register write transfer. */
++		i2c->pio_data[1] = flags | MXS_CMD_I2C_READ |
++				MXS_I2C_CTRL0_XFER_COUNT(msg->len);
++		desc = dmaengine_prep_slave_sg(i2c->dmach,
++					(struct scatterlist *)&i2c->pio_data[1],
++					1, DMA_TRANS_NONE, DMA_PREP_INTERRUPT);
++		if (!desc) {
++			dev_err(i2c->dev,
++				"Failed to get PIO reg. write descriptor.\n");
++			goto select_init_dma_fail;
++		}
++
++		/* Queue the DMA data transfer. */
++		sg_init_one(&i2c->sg_io[1], msg->buf, msg->len);
++		dma_map_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
++		desc = dmaengine_prep_slave_sg(i2c->dmach, &i2c->sg_io[1], 1,
++					DMA_DEV_TO_MEM,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++		if (!desc) {
++			dev_err(i2c->dev,
++				"Failed to get DMA data write descriptor.\n");
++			goto read_init_dma_fail;
++		}
++	} else {
++		i2c->dma_read = 0;
++		i2c->addr_data = (msg->addr << 1) | I2C_SMBUS_WRITE;
++
++		/*
++		 * WRITE command.
++		 */
++
++		/* Queue the PIO register write transfer. */
++		i2c->pio_data[0] = flags | MXS_CMD_I2C_WRITE |
++				MXS_I2C_CTRL0_XFER_COUNT(msg->len + 1);
++		desc = dmaengine_prep_slave_sg(i2c->dmach,
++					(struct scatterlist *)&i2c->pio_data[0],
++					1, DMA_TRANS_NONE, 0);
++		if (!desc) {
++			dev_err(i2c->dev,
++				"Failed to get PIO reg. write descriptor.\n");
++			goto write_init_pio_fail;
++		}
++
++		/* Queue the DMA data transfer. */
++		sg_init_table(i2c->sg_io, 2);
++		sg_set_buf(&i2c->sg_io[0], &i2c->addr_data, 1);
++		sg_set_buf(&i2c->sg_io[1], msg->buf, msg->len);
++		dma_map_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
++		desc = dmaengine_prep_slave_sg(i2c->dmach, i2c->sg_io, 2,
++					DMA_MEM_TO_DEV,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++		if (!desc) {
++			dev_err(i2c->dev,
++				"Failed to get DMA data write descriptor.\n");
++			goto write_init_dma_fail;
++		}
++	}
++
++	/*
++	 * The last descriptor must have this callback,
++	 * to finish the DMA transaction.
++	 */
++	desc->callback = mxs_i2c_dma_irq_callback;
++	desc->callback_param = i2c;
++
++	/* Start the transfer. */
++	dmaengine_submit(desc);
++	dma_async_issue_pending(i2c->dmach);
++	return 0;
++
++/* Read failpath. */
++read_init_dma_fail:
++	dma_unmap_sg(i2c->dev, &i2c->sg_io[1], 1, DMA_FROM_DEVICE);
++select_init_dma_fail:
++	dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
++select_init_pio_fail:
++	return -EINVAL;
++
++/* Write failpath. */
++write_init_dma_fail:
++	dma_unmap_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
++write_init_pio_fail:
++	return -EINVAL;
++}
++
+ /*
+  * Low level master read/write transaction.
+  */
+@@ -258,6 +417,8 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
+ 	int ret;
+ 	int flags;
+ 
++	flags = stop ? MXS_I2C_CTRL0_POST_SEND_STOP : 0;
++
+ 	dev_dbg(i2c->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+ 		msg->addr, msg->len, msg->flags, stop);
+ 
+@@ -267,23 +428,29 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
+ 	init_completion(&i2c->cmd_complete);
+ 	i2c->cmd_err = 0;
+ 
+-	flags = stop ? MXS_I2C_CTRL0_POST_SEND_STOP : 0;
+-
+-	if (msg->flags & I2C_M_RD)
+-		mxs_i2c_pioq_setup_read(i2c, msg->addr, msg->len, flags);
+-	else
+-		mxs_i2c_pioq_setup_write(i2c, msg->addr, msg->buf, msg->len,
+-					flags);
++	if (i2c->dma_mode) {
++		ret = mxs_i2c_dma_setup_xfer(adap, msg, flags);
++		if (ret)
++			return ret;
++	} else {
++		if (msg->flags & I2C_M_RD) {
++			mxs_i2c_pioq_setup_read(i2c, msg->addr,
++						msg->len, flags);
++		} else {
++			mxs_i2c_pioq_setup_write(i2c, msg->addr, msg->buf,
++						msg->len, flags);
++		}
+ 
+-	writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
++		writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
+ 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
++	}
+ 
+ 	ret = wait_for_completion_timeout(&i2c->cmd_complete,
+ 						msecs_to_jiffies(1000));
+ 	if (ret == 0)
+ 		goto timeout;
+ 
+-	if ((!i2c->cmd_err) && (msg->flags & I2C_M_RD)) {
++	if (!i2c->dma_mode && !i2c->cmd_err && (msg->flags & I2C_M_RD)) {
+ 		ret = mxs_i2c_finish_read(i2c, msg->buf, msg->len);
+ 		if (ret)
+ 			goto timeout;
+@@ -301,6 +468,8 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
+ 
+ timeout:
+ 	dev_dbg(i2c->dev, "Timeout!\n");
++	if (i2c->dma_mode)
++		mxs_i2c_dma_finish(i2c);
+ 	mxs_i2c_reset(i2c);
+ 	return -ETIMEDOUT;
+ }
+@@ -342,11 +511,13 @@ static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
+ 		/* MXS_I2C_CTRL1_OVERSIZE_XFER_TERM_IRQ is only for slaves */
+ 		i2c->cmd_err = -EIO;
+ 
+-	is_last_cmd = (readl(i2c->regs + MXS_I2C_QUEUESTAT) &
+-		MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK) == 0;
++	if (!i2c->dma_mode) {
++		is_last_cmd = (readl(i2c->regs + MXS_I2C_QUEUESTAT) &
++			MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK) == 0;
+ 
+-	if (is_last_cmd || i2c->cmd_err)
+-		complete(&i2c->cmd_complete);
++		if (is_last_cmd || i2c->cmd_err)
++			complete(&i2c->cmd_complete);
++	}
+ 
+ 	writel(stat, i2c->regs + MXS_I2C_CTRL1_CLR);
+ 
+@@ -358,6 +529,21 @@ static const struct i2c_algorithm mxs_i2c_algo = {
  	.functionality = mxs_i2c_func,
  };
  
-+static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
++static bool mxs_i2c_dma_filter(struct dma_chan *chan, void *param)
 +{
-+	uint32_t speed;
-+	struct device *dev = i2c->dev;
-+	struct device_node *node = dev->of_node;
-+	int ret;
++	struct mxs_i2c_dev *i2c = param;
 +
-+	if (!node)
-+		return -EINVAL;
++	if (!mxs_dma_is_apbx(chan))
++		return false;
 +
-+	i2c->speed = &mxs_i2c_95kHz_config;
-+	ret = of_property_read_u32(node, "clock-frequency", &speed);
-+	if (ret)
-+		dev_warn(dev, "No I2C speed selected, using 100kHz\n");
-+	else if (speed == 400000)
-+		i2c->speed = &mxs_i2c_400kHz_config;
-+	else if (speed != 100000)
-+		dev_warn(dev, "Unsupported I2C speed selected, using 100kHz\n");
++	if (chan->chan_id != i2c->dma_channel)
++		return false;
 +
-+	return 0;
++	chan->private = &i2c->dma_data;
++
++	return true;
 +}
 +
- static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
  {
- 	struct device *dev = &pdev->dev;
-@@ -358,6 +419,11 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ 	uint32_t speed;
+@@ -368,6 +554,28 @@ static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
+ 	if (!node)
+ 		return -EINVAL;
+ 
++	/*
++	 * The MXS I2C DMA mode is prefered and enabled by default.
++	 * The PIO mode is still supported, but should be used only
++	 * for debuging purposes etc.
++	 */
++	i2c->dma_mode = 1;
++	if (of_find_property(node, "fsl,use-pio", NULL)) {
++		i2c->dma_mode = 0;
++		dev_info(dev, "Using PIO mode for I2C transfers!\n");
++	}
++
++	/*
++	 * TODO: This is a temporary solution and should be changed
++	 * to use generic DMA binding later when the helpers get in.
++	 */
++	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
++				   &i2c->dma_channel);
++	if (ret) {
++		dev_warn(dev, "Failed to get DMA channel!\n");
++		i2c->dma_mode = 0;
++	}
++
+ 	i2c->speed = &mxs_i2c_95kHz_config;
+ 	ret = of_property_read_u32(node, "clock-frequency", &speed);
+ 	if (ret)
+@@ -388,7 +596,8 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ 	struct pinctrl *pinctrl;
+ 	struct resource *res;
+ 	resource_size_t res_size;
+-	int err, irq;
++	int err, irq, dmairq;
++	dma_cap_mask_t mask;
+ 
+ 	pinctrl = devm_pinctrl_get_select_default(dev);
+ 	if (IS_ERR(pinctrl))
+@@ -399,7 +608,10 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
++	irq = platform_get_irq(pdev, 0);
++	dmairq = platform_get_irq(pdev, 1);
++
++	if (!res || irq < 0 || dmairq < 0)
+ 		return -ENOENT;
+ 
+ 	res_size = resource_size(res);
+@@ -410,10 +622,6 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ 	if (!i2c->regs)
+ 		return -EBUSY;
+ 
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0)
+-		return irq;
+-
+ 	err = devm_request_irq(dev, irq, mxs_i2c_isr, 0, dev_name(dev), i2c);
+ 	if (err)
+ 		return err;
+@@ -424,6 +632,18 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ 	if (err)
  		return err;
  
- 	i2c->dev = dev;
-+
-+	err = mxs_i2c_get_ofdata(i2c);
-+	if (err)
-+		return err;
++	/* Setup the DMA */
++	if (i2c->dma_mode) {
++		dma_cap_zero(mask);
++		dma_cap_set(DMA_SLAVE, mask);
++		i2c->dma_data.chan_irq = dmairq;
++		i2c->dmach = dma_request_channel(mask, mxs_i2c_dma_filter, i2c);
++		if (!i2c->dmach) {
++			dev_err(dev, "Failed to request dma\n");
++			return -ENODEV;
++		}
++	}
 +
  	platform_set_drvdata(pdev, i2c);
  
  	/* Do reset to enforce correct startup after pinmuxing */
+@@ -459,6 +679,9 @@ static int __devexit mxs_i2c_remove(struct platform_device *pdev)
+ 	if (ret)
+ 		return -EBUSY;
+ 
++	if (i2c->dmach)
++		dma_release_channel(i2c->dmach);
++
+ 	writel(MXS_I2C_CTRL0_SFTRST, i2c->regs + MXS_I2C_CTRL0_SET);
+ 
+ 	platform_set_drvdata(pdev, NULL);
 -- 
 1.7.10.4
