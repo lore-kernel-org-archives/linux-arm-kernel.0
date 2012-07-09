@@ -1,50 +1,66 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Mon, 9 Jul 2012 13:34:03 +0100
-Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
- corresponding mask value
-In-Reply-To: <4FFAC8D2.4080601@st.com>
-References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
- <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
- <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
- <4FFAC8D2.4080601@st.com>
-Message-ID: <CAOh2x=k5Tx2Gjrk1uRod-N-6gvYSeEKiZgms8gQfJ61TL8RXCQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Jul 2012 05:50:25 -0700
+Subject: [PATCH 0/7] arm/dts: Audio support for OMAP4 devices (SDP,
+ PandaBoard)
+In-Reply-To: <4FFACC55.4060106@ti.com>
+References: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
+ <4FFACC55.4060106@ti.com>
+Message-ID: <20120709125025.GG1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 1:04 PM, vipul kumar samar
-<vipulkumar.samar@st.com> wrote:
-> On 7/9/2012 4:34 PM, viresh kumar wrote:
->>
->> On Mon, Jul 9, 2012 at 11:31 AM, Shiraz Hashim<shiraz.hashim@st.com>
->> wrote:
->>>
->>> From: Vipul Kumar Samar<vipulkumar.samar@st.com>
->>>
->>> sys_clk have multiple parents and selection of parent is depends on
->>
->>
->> s/ is//
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120709 05:24]:
+> Hello,
+> 
+> On 06/08/2012 04:01 PM, Peter Ujfalusi wrote:
+> > Hello,
+> > 
+> > The following series enable the audio functionality on OMAP4 based devices using
+> > twl6040 as audio codec.
+> > 
+> > The series adds the needed bindings in the dts for the OMAP IPs, twl6040 MFD
+> > device and for the audio connection on the board.
+> > 
+> > To be able to differentiate between PandaBoard and PandaBoardES (they have a bit
+> > different audio configuration) a new dts file has been created which only
+> > changes the audio properties different between the two boards.
+> > 
+> > Patches for the drivers involved and the documentation related to dts sections
+> > has been either in 3.5 or heading for 3.6.
+> 
+> Probably this series has been overlooked, since I have not received feedback
+> on it.
+> Should I resend the series? Which tree should I use to rebase it?
 
-I hope you haven't missed this comment :)
+Hmm yeah looks good to me. I guess I was waiting for Benoit to apply or ack
+them. I'll apply them into devel-dt branch.
 
->>>   static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
->>> -static const char *sys_parents[] = { "none", "pll1_clk", "none", "none",
->>> -       "sys_synth_clk", "none", "pll2_clk", "pll3_clk", };
->>> +static const char *sys_parents[] = { "pll1_clk", "pll1_clk", "pll1_clk",
->>> +       "pll1_clk", "sys_synth_clk", "sys_synth_clk", "pll2_clk",
->>> "pll3_clk", };
->>
->>
->> Don't know what would be the implication of this?
->>
->> @Mike: Can you please tell us what should we do in such cases?
->>
->
-> Is there any other solution for such cases ???
+Regards,
 
-That's what i have asked mike for :)
-Probably you can go through the clock framework code and check how these
-names are used. Shouldn't be too complex to understand.
-
---
-viresh
+Tony
+ 
+> Thank you,
+> P?ter
+> 
+> > 
+> > Regards,
+> > Peter
+> > ---
+> > Peter Ujfalusi (7):
+> >   arm/dts: omap4: Add entry for OMAP McPDM IP
+> >   arm/dts: omap4: Add entry for OMAP DMIC IP
+> >   arm/dts: omap4-sdp: Add fixed regulator to represent VBAT
+> >   arm/dts: omap4-sdp: Add support for twl6040
+> >   arm/dts: omap4-sdp: Enable audio support via device tree
+> >   arm/dts: omap4-panda: Audio support for PandaBoard 4430
+> >   arm/dts: New dts file for PandaBoardES (4460)
+> > 
+> >  arch/arm/boot/dts/omap4-panda.dts   |   37 +++++++++++++++++++
+> >  arch/arm/boot/dts/omap4-pandaES.dts |   24 ++++++++++++
+> >  arch/arm/boot/dts/omap4-sdp.dts     |   68 +++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/omap4.dtsi        |   18 +++++++++
+> >  4 files changed, 147 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/omap4-pandaES.dts
+> > 
+> 
+> 
