@@ -1,38 +1,72 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 09 Jul 2012 11:38:55 +0200
-Subject: [PATCH v2 1/2] ARM: OMAP: board-4430sdp: MUX configuration for
- sys_nirq2
-In-Reply-To: <CAMQu2gx4927Ze9tRUFq9QPubGFWfK9bHqZhVCb7c39O=WeWA3Q@mail.gmail.com>
-References: <1341580752-5501-1-git-send-email-peter.ujfalusi@ti.com>
- <1341580752-5501-2-git-send-email-peter.ujfalusi@ti.com>
- <874nplc6va.fsf@ti.com>
- <CAMQu2gx4927Ze9tRUFq9QPubGFWfK9bHqZhVCb7c39O=WeWA3Q@mail.gmail.com>
-Message-ID: <4FFAA6AF.2010004@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 9 Jul 2012 12:43:15 +0300
+Subject: [PATCH v4 04/12] gpio/omap: remove saved_wakeup field from struct
+ gpio_bank
+In-Reply-To: <1331906760-5259-5-git-send-email-tarun.kanti@ti.com>
+References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
+ <1331906760-5259-5-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4FFAA7B3.6020009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2012 04:33 PM, Shilimkar, Santosh wrote:
->> Since this is TWL6030 specific, it should rather be done in TWL code
->> like I did for sys_nirq1:
->>
->>    http://marc.info/?l=linux-omap&m=134090312118873&w=2
->>
->> That would avoid having to do this in both board files.
->>
-> Though the pin is TWL specific, it need not be same on
-> different board with different SOCs. Especially when you need to
-> set MUX mode etc. So doing from board file is still better
-> since TWL6030/40 can be connected to non OMAP4 devices
-> where the muxing can be different.
+Hi,
+
+Just bumped across this patch and have a query.
+
+On 03/16/2012 04:05 PM, Tarun Kanti DebBarma wrote:
+> There is no more need to have saved_wakeup because bank->context.wake_en
+> already holds that value. So getting rid of read/write operation associated
+> with this field.
 > 
-> With current know boards with TWL6030/40, this is not
-> a strong requirement though.
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/gpio/gpio-omap.c |   12 +++---------
+>  1 files changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 3a4f151..3b91ade 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -57,7 +57,6 @@ struct gpio_bank {
+>  	u16 irq;
+>  	int irq_base;
+>  	struct irq_domain *domain;
+> -	u32 saved_wakeup;
+>  	u32 non_wakeup_gpios;
+>  	u32 enabled_non_wakeup_gpios;
+>  	struct gpio_regs context;
+> @@ -777,7 +776,6 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+>  	unsigned long		flags;
+>  
+>  	spin_lock_irqsave(&bank->lock, flags);
+> -	bank->saved_wakeup = __raw_readl(mask_reg);
+>  	__raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
 
-There can be board which has twl6030 but does not have twl6040.
-The twl6040 is the recommended audio solution for OMAP4+ systems but it can be
-replaced by other codec on some boards.
-This is the reason I have put the mux configuration into the board files for
-sys_nirq2 (which is in these cases are used to handle the interrupt from twl6040).
+OK, here you are overwriting the mask_reg with the wakeup bitmask
+without saving the mask_reg's original content.
 
--- 
-P?ter
+>  	spin_unlock_irqrestore(&bank->lock, flags);
+>  
+> @@ -793,7 +791,7 @@ static int omap_mpuio_resume_noirq(struct device *dev)
+>  	unsigned long		flags;
+>  
+>  	spin_lock_irqsave(&bank->lock, flags);
+> -	__raw_writel(bank->saved_wakeup, mask_reg);
+> +	__raw_writel(bank->context.wake_en, mask_reg);
+
+Now you are restoring nothing but the same content that you stored
+during suspend. This will cause the non-wakeup gpio interrupts to get
+masked between a suspend/resume. So isn't this a bug?
+
+Proper solution would be to save the mask_reg context into another
+register than context.wake_en during suspend.
+
+>  	spin_unlock_irqrestore(&bank->lock, flags);
+>  
+>  	return 0;
+
+
+cheers,
+-roger
