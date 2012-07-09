@@ -1,41 +1,57 @@
 From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Mon, 9 Jul 2012 12:39:39 +0800
-Subject: [PATCH 3/3] Watchdog: Omap: get the bootstatus for OMAP2Plus
+Date: Mon, 9 Jul 2012 12:46:30 +0800
+Subject: [PATCH v2 0/2] Watchdog: OMAP: bootstatus fix for omap3 and
+ changes for the current watchdog framework
 In-Reply-To: <1341808779-25532-1-git-send-email-zumeng.chen@windriver.com>
 References: <1341808779-25532-1-git-send-email-zumeng.chen@windriver.com>
-Message-ID: <1341808779-25532-4-git-send-email-zumeng.chen@windriver.com>
+Message-ID: <4FFA6226.9010605@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The offset of WKUP_MOD is not right for the PRM_RSTST of OMAP3. So here
-put the right one to match to the actual physical addr 0x48307258, which
-defined in PRCM Registers section.
+The changes have been validated on omap3530evm
 
-And there is a MPU_WD_RST bit in PRM_RSTST(0x48307258) holding the signal
-from omap-wdt reboot, so that we can return WDIOF_CARDRESET if the board
-wakes up from omap-wdt reboot for WDIOC_GETBOOTSTATUS ioctl.
+Normal reboot
+root at ti-omap3:~# dmesg|grep WDT
+omap_wdt: OMAP WDTimer Rev 0x31: Initial timeout 0sec status= 0x0
+root at ti-omap3:~#
 
-Signed-off-by: Zumeng Chen <zumeng.chen@windriver.com>
----
- arch/arm/mach-omap2/prcm.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+root at ti-omap3:~# echo 1 >/dev/watchdog
+Boot from WDT
 
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 480f40a..4dcc706 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -49,8 +49,11 @@ void __iomem *prcm_mpu_base;
- u32 omap_prcm_get_reset_sources(void)
- {
- 	/* XXX This presumably needs modification for 34XX */
--	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+	if (cpu_is_omap24xx())
- 		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST) & 0x7f;
-+	if (cpu_is_omap34xx())
-+		return omap2_prm_read_mod_reg(OMAP3430_GR_MOD, OMAP2_RM_RSTST) &
-+		       0x7f;
- 	if (cpu_is_omap44xx())
- 		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST) & 0x7f;
- 
--- 
-1.7.5.4
+root at ti-omap3:~# dmesg|grep WDT
+omap_wdt: OMAP WDTimer Rev 0x31: Initial timeout 0sec status= 0x1
+root at ti-omap3:~#
+
+Regards,
+zumeng
+? 2012?07?09? 12:39, Zumeng Chen ??:
+> Hello,
+>
+> The following patches based on the 3.5-rc6 from Wim, which
+> are based on:
+>
+> 1 ) bootstatus fix for omap3,
+>
+> 2 ) omap-wdt framework update cater for the current framework
+>     as Shubhrajyoti comments mentioned.
+>
+> Regards,
+> Zumeng
+>
+>   Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
+>
+> Zumeng Chen (3):
+>       Watchdog: Omap: Changes for the new watchdog framework
+>       Watchdog: Omap: select watchdog core for framework change
+>       Watchdog: Omap: get the bootstatus for OMAP2Plus
+>
+>  arch/arm/mach-omap2/prcm.c  |    5 +-
+>  drivers/watchdog/Kconfig    |    1 +
+>  drivers/watchdog/omap_wdt.c |  338 ++++++++++++++++---------------------------
+>  drivers/watchdog/omap_wdt.h |    5 +
+>  4 files changed, 133 insertions(+), 216 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
