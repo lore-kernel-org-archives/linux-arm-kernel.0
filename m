@@ -1,82 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jul 2012 14:51:18 +0800
-Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
-References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
- <20120705182829.d13d6992406e02e1024552e3@freescale.com>
- <20120706002254.GB20175@S2101-09.ap.freescale.net>
- <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
-Message-ID: <20120709065116.GB11635@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Jul 2012 08:51:14 +0200
+Subject: [PATCH 1/3] ARM: clk-imx27: Fix rtc clock id
+In-Reply-To: <1341694041-7839-1-git-send-email-festevam@gmail.com>
+References: <1341694041-7839-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120709065114.GL30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 05:56:34PM -0500, Kim Phillips wrote:
-> but it doesn't function as it stands right now, at least on Power.
-> The compatible in the device tree's sec_mon node "fsl,sec-v4.0-mon"
-> and the driver's "fsl,sec-v4.0-mon-rtc-lp" don't match.  Here are
-> the device tree changes I used:
+On Sat, Jul 07, 2012 at 05:47:19PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> diff --git a/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
-> index 7990e0d..14c933b 100644
-> --- a/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
-> +++ b/arch/powerpc/boot/dts/fsl/qoriq-sec4.2-0.dtsi
-> @@ -104,6 +104,14 @@ crypto: crypto at 300000 {
->  
->  sec_mon: sec_mon at 314000 {
->         compatible = "fsl,sec-v4.2-mon", "fsl,sec-v4.0-mon";
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
-> +       ranges = <0 0x314000 0x1000>;
->         reg = <0x314000 0x1000>;
->         interrupts = <93 2 0 0>;
-> +
-> +       sec_mon_rtc_lp at 34 {
-> +               compatible = "fsl,sec-v4.2-mon-rtc-lp", "fsl,sec-v4.0-mon-rtc-lp";
-> +               reg = <0x34 0x58>;
-> +       };
->  };
+> Fix rtc clock id.
 > 
-Yes, the way that this dts is written as well as the examples in
-Documentation/devicetree/bindings/crypto/fsl-sec4.txt assume there
-is a sec_mon driver.  This driver will match "fsl,sec-v4.0-mon" and
-populate rtc-lp device probed by the rtc-snvs driver created by the
-patch.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-While there is no such sec_mon driver right now.  I did a quick
-tweaking on imx6q.dtsi to have rtc-snvs probed without the need of
-sec_mon driver.
+Applied this patch.
 
-> btw, I don't see any imx6q.dtsi changes.
+Sascha
+
+> ---
+>  arch/arm/mach-imx/clk-imx27.c |    2 +-
+>  arch/arm/mach-imx/clk-imx31.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-See below.
+> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> index 295cbd7..167a3f1 100644
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -256,7 +256,7 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
+>  	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
+>  	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
+> -	clk_register_clkdev(clk[rtc_ipg_gate], "rtc", NULL);
+> +	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "mxc_rtc");
+>  	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+>  	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
+>  	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
+> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+> index c9a06d8..8711090 100644
+> --- a/arch/arm/mach-imx/clk-imx31.c
+> +++ b/arch/arm/mach-imx/clk-imx31.c
+> @@ -123,7 +123,7 @@ int __init mx31_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
+>  	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
+>  	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+> -	clk_register_clkdev(clk[rtc_gate], "rtc", NULL);
+> +	clk_register_clkdev(clk[rtc_gate], NULL, "mxc_rtc");
+>  	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
+>  	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
+>  	clk_register_clkdev(clk[nfc], NULL, "mxc_nand.0");
+> -- 
+> 1.7.1
+> 
+> 
 
-Either way, being a driver of SNVS LP RTC, rtc-snvs should just stand
-as it stands right now.  It should not care about how the device is
-populated, by DT core or by sec_mon driver.
-
-Regards,
-Shawn
-
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 8c90cba..26c42da 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -455,8 +455,16 @@
-                        };
-
-                        snvs at 020cc000 {
--                               reg = <0x020cc000 0x4000>;
--                               interrupts = <0 19 0x04 0 20 0x04>;
-+                               compatible = "fsl,sec-v4.0-mon", "simple-bus";
-+                               #address-cells = <1>;
-+                               #size-cells = <1>;
-+                               ranges = <0 0x020cc000 0x4000>;
-+
-+                               snvs-rtc-lp at 34 {
-+                                       compatible = "fsl,sec-v4.0-mon-rtc-lp";
-+                                       reg = <0x34 0x58>;
-+                                       interrupts = <0 19 0x04 0 20 0x04>;
-+                               };
-                        };
-
-                        epit at 020d0000 { /* EPIT1 */
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
