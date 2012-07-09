@@ -1,220 +1,230 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Mon, 9 Jul 2012 12:30:06 +0100
-Subject: [PATCH 6/6] ARM: SPEAr13xx: Add auxdata for Ethernet controller.
-In-Reply-To: <1341832738-27368-1-git-send-email-shiraz.hashim@st.com>
-References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
- <1341832738-27368-1-git-send-email-shiraz.hashim@st.com>
-Message-ID: <CAOh2x==juL5adaSgmDD+K8Y3SiiMjovS=jgBWiL4Zyzr2=bL_w@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 9 Jul 2012 13:30:21 +0200
+Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform.
+In-Reply-To: <4FF483D2.70000@gmail.com>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <1340805007-3313-2-git-send-email-dinguyen@altera.com>
+ <4FF483D2.70000@gmail.com>
+Message-ID: <20120709113021.GB12130@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2012 at 12:18 PM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
-> From: Vipul Kumar Samar <vipulkumar.samar@st.com>
->
-> Ethernet phy interface on SPEAr platform requires proper clock sources
-> and clock rate to be configured. We use AUXDATA presently to pass
-> callback to the driver to let platform configure the right clocks.
->
-> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-> ---
->  arch/arm/mach-spear13xx/include/mach/generic.h |    2 +
->  arch/arm/mach-spear13xx/include/mach/spear.h   |    3 +
->  arch/arm/mach-spear13xx/spear1340.c            |   32 +++++++++
->  arch/arm/mach-spear13xx/spear13xx.c            |   85 ++++++++++++++++++++++++
->  4 files changed, 122 insertions(+)
->
-> diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-> index dac57fd..8c8fbaa 100644
-> --- a/arch/arm/mach-spear13xx/include/mach/generic.h
-> +++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-> @@ -15,6 +15,7 @@
->  #define __MACH_GENERIC_H
->
->  #include <linux/dmaengine.h>
-> +#include <linux/platform_device.h>
->  #include <asm/mach/time.h>
->
->  /* Add spear13xx structure declarations here */
-> @@ -31,6 +32,7 @@ void __init spear13xx_map_io(void);
->  void __init spear13xx_dt_init_irq(void);
->  void __init spear13xx_l2x0_init(void);
->  bool dw_dma_filter(struct dma_chan *chan, void *slave);
-> +int spear13xx_eth_phy_clk_cfg(struct platform_device *pdev);
+Hi!
 
-don't really need spear13xx_ prefix here. It is obviously for 13xx.
+> > +config ARCH_SOCFPGA
+> > +	bool "Altera SOCFPGA family"
+> > +	select CPU_V7
+> > +	select ARM_GIC
+> > +	select ARM_AMBA
+> > +	select CLKDEV_LOOKUP
+> > +	select MIGHT_HAVE_CACHE_L2X0
+> > +	select HAVE_MACH_CLKDEV
+> > +	select GENERIC_CLOCKEVENTS
+> > +	select ARCH_WANT_OPTIONAL_GPIOLIB
+> > +	select GPIO_PL061 if GPIOLIB
+> > +	select NEED_MACH_MEMORY_H
+> > +	select USE_OF
+> 
+> Alphabetize the selects.
 
->  void spear_restart(char, const char *);
->  void spear13xx_secondary_startup(void);
->
-> diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-> index 65f27de..0ce064b 100644
-> --- a/arch/arm/mach-spear13xx/include/mach/spear.h
-> +++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-> @@ -59,4 +59,7 @@
->  #define SPEAR_DBG_UART_BASE                    UART_BASE
->  #define VA_SPEAR_DBG_UART_BASE                 VA_UART_BASE
->
-> +/* Ethernet base address */
+Umm... Others are not alphabetized, either. Something like this to
+group them logically?
 
-Comment not required.
+> > @@ -1596,6 +1614,7 @@ config HZ
+> >  	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+> >  	default AT91_TIMER_HZ if ARCH_AT91
+> >  	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+> > +	default SOCFPGA_TIMER_HZ if ARCH_SOCFPGA
+> 
+> Is this really needed?
 
-> +#define SPEAR13XX_GETH_BASE                    UL(0xE2000000)
-> +
->  #endif /* __MACH_SPEAR13XX_H */
-> diff --git a/arch/arm/mach-spear13xx/spear1340.c b/arch/arm/mach-spear13xx/spear1340.c
-> index 81e4ed7..ab282ed 100644
-> --- a/arch/arm/mach-spear13xx/spear1340.c
-> +++ b/arch/arm/mach-spear13xx/spear1340.c
-> @@ -18,6 +18,9 @@
->  #include <linux/delay.h>
->  #include <linux/dw_dmac.h>
->  #include <linux/of_platform.h>
-> +#include <linux/phy.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/stmmac.h>
->  #include <asm/hardware/gic.h>
->  #include <asm/mach/arch.h>
->  #include <mach/dma.h>
-> @@ -100,6 +103,34 @@ static struct amba_pl011_data uart1_data = {
->         .dma_rx_param = &uart1_dma_param[1],
->  };
->
-> +/* Ethernet platform data */
-> +static struct stmmac_mdio_bus_data mdio0_private_data = {
-> +       .bus_id = 0,
-> +       .phy_mask = 0,
-> +};
-> +
-> +static struct stmmac_dma_cfg dma0_private_data = {
-> +       .pbl = 16,
-> +       .fixed_burst = 1,
-> +       .burst_len = DMA_AXI_BLEN_ALL,
-> +};
-> +
-> +static struct plat_stmmacenet_data eth_data = {
-> +       .bus_id = 0,
-> +       .phy_addr = -1,
-> +       .interface = PHY_INTERFACE_MODE_RGMII,
-> +       .has_gmac = 1,
-> +       .enh_desc = 1,
-> +       .tx_coe = 1,
-> +       .dma_cfg = &dma0_private_data,
-> +       .rx_coe = STMMAC_RX_COE_TYPE2,
-> +       .bugged_jumbo = 1,
-> +       .pmt = 1,
-> +       .mdio_bus_data = &mdio0_private_data,
-> +       .init = spear13xx_eth_phy_clk_cfg,
-> +       .clk_csr = STMMAC_CSR_150_250M,
-> +};
-> +
->  /* SATA device registration */
->  static int sata_miphy_init(struct device *dev, void __iomem *addr)
->  {
-> @@ -166,6 +197,7 @@ static struct of_dev_auxdata spear1340_auxdata_lookup[] __initdata = {
->         OF_DEV_AUXDATA("snps,spear-ahci", SPEAR1340_SATA_BASE, NULL,
->                         &sata_pdata),
->         OF_DEV_AUXDATA("arm,pl011", SPEAR1340_UART1_BASE, NULL, &uart1_data),
-> +       OF_DEV_AUXDATA("st,spear600-gmac", SPEAR13XX_GETH_BASE, NULL, &eth_data),
->         {}
->  };
->
-> diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-> index cf936b1..285948a 100644
-> --- a/arch/arm/mach-spear13xx/spear13xx.c
-> +++ b/arch/arm/mach-spear13xx/spear13xx.c
-> @@ -18,6 +18,9 @@
->  #include <linux/dw_dmac.h>
->  #include <linux/err.h>
->  #include <linux/of_irq.h>
-> +#include <linux/phy.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/stmmac.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/hardware/gic.h>
->  #include <asm/mach/map.h>
-> @@ -80,6 +83,88 @@ struct dw_dma_platform_data dmac_plat_data = {
->         .chan_priority = CHAN_PRIORITY_DESCENDING,
->  };
->
-> +/* Ethernet clock initialization */
-> +int spear13xx_eth_phy_clk_cfg(struct platform_device *pdev)
-> +{
-> +       int ret;
-> +       struct clk *input_clk, *input_pclk, *phy_pclk, *phy_clk;
-> +       struct plat_stmmacenet_data *pdata = dev_get_platdata(&pdev->dev);
-> +       const char *phy_clk_src_name[] = {
-> +               "phy_input_mclk",
-> +               "phy_synth_gclk",
-> +       };
-> +       const char *input_clk_src_name[] = {
-> +               "pll2_clk",
-> +               "gmii_pad_clk",
-> +               "osc_25m_clk",
-> +       };
-> +       const char *phy_clk_name[] = {
-> +               "stmmacphy.0"
-> +       };
-> +
-> +       if (pdata == NULL)
+Probably not. Removed.
 
-if (!pdata)
+> > +struct clk_ops {
+> > +	long	(*round)(struct clk *, unsigned long);
+> > +	int	(*set)(struct clk *, unsigned long);
+> > +};
+> 
+> Use common clk infrastructure.
 
-> +               return -EINVAL;
-> +
-> +       /* Get the Pll-2 Clock as parent for PHY Input Clock Source */
-> +       input_pclk = clk_get(NULL, input_clk_src_name[0]);
-> +       if (IS_ERR(input_pclk)) {
-> +               ret = PTR_ERR(input_pclk);
-> +               goto fail_get_input_pclk;
-> +       }
-> +
-> +       /*
-> +        * Get the Phy Input clock source as parent for Phy clock. Default
-> +        * selection is gmac_phy_input_clk. This selection would be driving both
-> +        * the synthesizer and phy clock.
-> +        */
-> +       input_clk = clk_get(NULL, phy_clk_src_name[0]);
-> +       if (IS_ERR(input_clk)) {
-> +               ret = PTR_ERR(input_clk);
-> +               goto fail_get_input_clk;
-> +       }
-> +
-> +       /* Fetch the phy clock */
-> +       phy_clk = clk_get(NULL, phy_clk_name[pdata->bus_id]);
-> +       if (IS_ERR(phy_clk)) {
-> +               ret = PTR_ERR(phy_clk);
-> +               goto fail_get_phy_clk;
-> +       }
-> +
-> +       /* Set the pll-2 to 125 MHz */
-> +       clk_set_rate(input_pclk, 125000000);
-> +
-> +       /* Set the Pll-2 as parent for gmac_phy_input_clk */
-> +       clk_set_parent(input_clk, input_pclk);
+Yep, done already.
 
-Above two calls can potentially fail.
+> > +#define IO_SPACE_LIMIT 0xffffffff
+> > +
+> > +#define __io(a)		__typesafe_io(a)
+> > +#define __mem_pci(a)	(a)
+> 
+> You don't need io.h, remove it.
 
-> +
-> +       if (pdata->interface == PHY_INTERFACE_MODE_RMII) {
-> +               /*
-> +                * For the rmii interface select gmac_phy_synth_clk
-> +                * as the parent and set the clock to 50 Mhz
-> +                */
-> +               phy_pclk = clk_get(NULL, phy_clk_src_name[1]);
-> +               clk_set_rate(phy_pclk, 50000000);
-> +       } else {
-> +               /*
-> +                * Set the gmac_phy_input_clk as the parent,
-> +                * and pll-2 is already running as parent of
-> +                * gmac_phy_input_clk at 125 Mhz
-> +                */
-> +               phy_pclk = input_clk;
-> +       }
-> +
-> +       /* Select the parent for phy clock */
-> +       clk_set_parent(phy_clk, phy_pclk);
+Will do, thanks.
 
-same here.
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/include/mach/iomap.h
+> > @@ -0,0 +1,37 @@
+> > +#include <asm/sizes.h>
+> > +
+> > +/* macro to get at IO space when running virtually */
+> > +#ifdef CONFIG_MMU
+> 
+> Do you really support !MMU?
 
---
-viresh
+No. Will remove.
+
+> > +#define SOFTIRQ_SOCFPGA_GPIO_2_28	(IRQ_SOCFPGA_GIC_START + 269)
+> > +#define SOFTIRQ_SOCFPGA_GPIO_2_29	(IRQ_SOCFPGA_GIC_START + 270)
+> > +
+> 
+> All these defines should come from DT.
+
+Yes. Most of them do now, will fix the rest.
+
+> > +#define NR_IRQS			512
+> 
+> As mentioned, use SPARSE_IRQ.
+
+Fixed. As mentioned :-).
+
+> > +#define PLAT_PHYS_OFFSET	UL(0x00000000)
+> > +
+> > +#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
+> > +
+> > +#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
+> > +#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
+> > +#endif
+> 
+> You shouldn't need memory.h.
+
+Ok.
+
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/include/mach/system.h
+> > @@ -0,0 +1,31 @@
+> > +static inline void arch_idle(void)
+> > +{
+> > +	/*
+> > +	 * This should do all the clock switching
+> > +	 * and wait for interrupt tricks
+> > +	 */
+> > +	cpu_do_idle();
+> > +}
+> 
+> This isn't needed any longer and system.h should be removed.
+
+Ok.
+
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/platsmp.c
+...
+> > +/*
+> > + * control for which core is the next to come out of the secondary
+> > + * boot "holding pen"
+> > + */
+> > +int __cpuinitdata pen_release = -1;
+> 
+> None of this pen stuff is needed if you properly reset cores when
+> hot-unplugged. All this is only needed if you only go to wfi when hot
+> unplugged. See highbank platsmp.c for an example without pen code.
+
+Will take a look, thanks!
+
+> > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> > index 101b968..2f9a81e 100644
+> > --- a/arch/arm/mm/Kconfig
+> > +++ b/arch/arm/mm/Kconfig
+> > @@ -381,7 +381,7 @@ config CPU_V6K
+> >  
+> >  # ARMv7
+> >  config CPU_V7
+> > -	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+> > +	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_SOCFPGA
+> 
+> This is not needed.
+
+Already fixed.
+
+Thanks for the review. This is the easy stuff, I'll remove the
+memory.h/system.h next, then address the SMP thing.
+									Pavel
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d203253..ab3b389 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -252,18 +252,18 @@ choice
+ 
+ config ARCH_SOCFPGA
+ 	bool "Altera SOCFPGA family"
+-	select CPU_V7
+-	select ARM_GIC
+ 	select ARM_AMBA
+-	select CLKDEV_LOOKUP
+-	select MIGHT_HAVE_CACHE_L2X0
+-	select HAVE_MACH_CLKDEV
+-	select GENERIC_CLOCKEVENTS
++	select ARM_GIC
++	select CPU_V7
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select GPIO_PL061 if GPIOLIB
++	select CLKDEV_LOOKUP
++	select GENERIC_CLOCKEVENTS
++	select HAVE_MACH_CLKDEV
++	select MIGHT_HAVE_CACHE_L2X0
+ 	select NEED_MACH_MEMORY_H
+-	select USE_OF
+ 	select SPARSE_IRQ
++	select USE_OF
+ 	help
+ 	  This enables support for Altera SOCFPGA Cyclone V platform
+ 
+@@ -1615,7 +1615,6 @@ config HZ
+ 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+ 	default AT91_TIMER_HZ if ARCH_AT91
+ 	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+-	default SOCFPGA_TIMER_HZ if ARCH_SOCFPGA
+ 	default 100
+ 
+ config THUMB2_KERNEL
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 81358e6..7f1b72b 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -6,10 +6,3 @@ config MACH_SOCFPGA_CYCLONE5
+ 	select COMMON_CLK
+ 	help
+ 	  Include support for the Altera(R) Cyclone5 development platform.
+-
+-config SOCFPGA_TIMER_HZ
+-	int "Kernel internal timer frequency "
+-	range 20 1024
+-	default "100"
+-	help
+-	  Kernel internal timer frequency should be a divisor of 77161.
+diff --git a/arch/arm/mach-socfpga/include/mach/iomap.h b/arch/arm/mach-socfpga/include/mach/iomap.h
+index 656482d..d5f8493 100644
+--- a/arch/arm/mach-socfpga/include/mach/iomap.h
++++ b/arch/arm/mach-socfpga/include/mach/iomap.h
+@@ -20,7 +20,6 @@
+ #include <asm/sizes.h>
+ 
+ /* macro to get at IO space when running virtually */
+-#ifdef CONFIG_MMU
+ /*
+  * Statically mapped addresses:
+  *
+@@ -29,9 +28,6 @@
+  * 1fxx xxxx -> fexx xxxx
+  */
+ #define IO_ADDRESS(x)		(((x) & 0x03ffffff) + 0xfb000000)
+-#else
+-#define IO_ADDRESS(x)		(x)
+-#endif
+ #define __io_address(n)		IOMEM(IO_ADDRESS(n))
+ 
+-#endif
+\ No newline at end of file
++#endif
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
