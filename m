@@ -1,42 +1,25 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 9 Jul 2012 16:25:06 +0530
-Subject: [PATCH v4 3/5] ARM: topology: Update cpu_power according to DT
- information
-In-Reply-To: <1341826026-6504-4-git-send-email-vincent.guittot@linaro.org>
-References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
- <1341826026-6504-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <CAMQu2gydOEVK_fzmzkdrBwBfOq6eZG=0QfLUfFChWJu9unSn2A@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 9 Jul 2012 11:55:33 +0100
+Subject: [PATCH 0/4 V5] add 88pm80x mfd driver
+In-Reply-To: <20120709105551.GK15345@sortiz-mobl>
+References: <1341815855-13522-1-git-send-email-zhouqiao@marvell.com>
+ <20120709105551.GK15345@sortiz-mobl>
+Message-ID: <20120709105533.GA3934@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vincent,
-On Mon, Jul 9, 2012 at 2:57 PM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
-> Use cpu compatibility field and clock-frequency field of DT to
-> estimate the capacity of each core of the system and to update
-> the cpu_power field accordingly.
-> This patch enables to put more running tasks on big cores than
-> on LITTLE ones. But this patch doesn't ensure that long running
-> tasks will run on big cores and short ones on LITTLE cores.
->
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> Reviewed-by: Namhyung Kim <namhyung@kernel.org>
-> ---
->  arch/arm/kernel/topology.c |  153 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 153 insertions(+)
->
-Sorry for not giving this comment on previous version but we should also
-have a way to provide the big.LITTLE information without Device Tree.
-May be a platform device/data.
+On Mon, Jul 09, 2012 at 12:55:51PM +0200, Samuel Ortiz wrote:
 
-I know we are moving DT way, but remember apart from core kernel
-infrastructure, to have a complete product build with DT means all the
-drivers must be already supporting DT which is not the case with
-many huge driver sub-systems like USB, display subsystem, Audio etc.
+> I applied the first 2 patches, I'd like to get an ACK from the respective
+> maintainers for the rtc and the input ones. They can even take it as both
+> drivers are protected by the MFD symbol.
 
-Having that support would greatly help for the SOC's which have not yet
-reached to stage where entire SOC is DT compliant and want to use
-big.LITTLE infrastructure.
-
-Regards
-Santosh
+Alessandro's been mostly offline recently so it might be as well to
+apply the RTC patch anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120709/50663325/attachment.sig>
