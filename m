@@ -1,42 +1,47 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Mon, 09 Jul 2012 09:41:27 +0900
-Subject: [PATCH 0/3] hwspinlock: a bug fix, trivial changes
-In-Reply-To: <CAK=WgbYgVoB+B3P6NLpd2t=F9PVA_m7Nbou4k1aq8BGvjJhvNg@mail.gmail.com>
-References: <4FF66FBD.5090601@renesas.com>
- <CAK=WgbYgVoB+B3P6NLpd2t=F9PVA_m7Nbou4k1aq8BGvjJhvNg@mail.gmail.com>
-Message-ID: <4FFA28B7.9090705@renesas.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Mon, 9 Jul 2012 08:47:13 +0800
+Subject: [PATCH] ARM: ttc_dkb: add nand support
+In-Reply-To: <1341793703-18510-1-git-send-email-leiwen@marvell.com>
+References: <1341793703-18510-1-git-send-email-leiwen@marvell.com>
+Message-ID: <CALZhoSRZKi+PHpj1tBBBFX2rcGb_6yyMowthH0uyA=vRoTNq8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add NAND support for dkb platform.
 
-On 7/7/2012 7:59 PM, Ohad Ben-Cohen wrote:
->> Recently I wrote a hwspinlock driver for our devices
-> 
-> Great! looking forward to see it :)
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+---
+ arch/arm/mach-mmp/ttc_dkb.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-Unfortunately I'm not planning to submit that driver at the moment,
-as I'm 120% sure that it won't be utilized by any module in our BSPs
-in the mainline kernel.
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index 7a7de2b..5a6a1ad 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -177,6 +177,13 @@ static struct mv_usb_platform_data ttc_usb_pdata = {
+ #endif
+ #endif
 
->> and during
->> the review and debug process, we found a bug in the core code.
->> Could you take a look please?
-> 
-> I looked and it's great. Will send to Linus soon.
++#ifdef CONFIG_MTD_NAND_PXA3xx
++static struct pxa3xx_nand_platform_data dkb_nand_info = {
++       .enable_arbiter = 1,
++       .num_cs = 1,
++};
++#endif
++
+ static void __init ttc_dkb_init(void)
+ {
+        mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
+@@ -184,6 +191,10 @@ static void __init ttc_dkb_init(void)
+        /* on-chip devices */
+        pxa910_add_uart(1);
 
-Thanks for fixing up the error path I msised.
-
->> The first patch is a bug fix.  The latter two patches are what I
->> think nice-to-have.  If you find useful, just take it, thanks!
-> 
-> I commented on the latter two (generally both look ok sans a small
-> outstanding comment).
-
-Thanks, but I don't mind you dropping the latter two, either.  If I
-have a chance to revisit hwspinlock drivers, I'll go through patches
-again with your comments in mind.
-
--- 
-Shinya Kuribayashi
-Renesas Electronics
++#ifdef CONFIG_MTD_NAND_PXA3xx
++       pxa910_add_nand(&dkb_nand_info);
++#endif
++
+        /* off-chip devices */
+        pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
+        platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+--
+1.7.5.4
