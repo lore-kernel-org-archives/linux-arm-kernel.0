@@ -1,49 +1,68 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 9 Jul 2012 09:37:25 +0200
-Subject: [PATCH] [v3] i.MX27: Fix emma-prp clocks in mx2_camera.c
-In-Reply-To: <20120709072809.GP30009@pengutronix.de>
-References: <1341572162-29126-1-git-send-email-javier.martin@vista-silicon.com>
- <20120709072809.GP30009@pengutronix.de>
-Message-ID: <CACKLOr25yb1Cx4XNriyPceBcqmc5T4jDpJXFpve9JCXpP7iMLg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Jul 2012 09:41:58 +0200
+Subject: [PATCH 1/2] hw_random: mxc-rnga: Adapt clocks to new i.mx clock
+ framework
+In-Reply-To: <1341606020-26449-1-git-send-email-fabio.estevam@freescale.com>
+References: <1341606020-26449-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120709074158.GS30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 July 2012 09:28, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Jul 06, 2012 at 12:56:02PM +0200, Javier Martin wrote:
->> This driver wasn't converted to the new clock changes
->> (clk_prepare_enable/clk_disable_unprepare). Also naming
->> of emma-prp related clocks for the i.MX27 was not correct.
->> ---
->> Enable clocks only for i.MX27.
->>
->
-> Indeed,
->
->>
->> -     pcdev->clk_csi = clk_get(&pdev->dev, NULL);
->> -     if (IS_ERR(pcdev->clk_csi)) {
->> -             dev_err(&pdev->dev, "Could not get csi clock\n");
->> -             err = PTR_ERR(pcdev->clk_csi);
->> -             goto exit_kfree;
->> +     if (cpu_is_mx27()) {
->> +             pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
->> +             if (IS_ERR(pcdev->clk_csi)) {
->> +                     dev_err(&pdev->dev, "Could not get csi clock\n");
->> +                     err = PTR_ERR(pcdev->clk_csi);
->> +                     goto exit_kfree;
->> +             }
->
-> but why? Now the i.MX25 won't get a clock anymore.
+On Fri, Jul 06, 2012 at 05:20:19PM -0300, Fabio Estevam wrote:
+> Cc: Theodore Ts'o <tytso@mit.edu>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au> 
+> Cc: <linux-kernel@vger.kernel.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  drivers/char/hw_random/mxc-rnga.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/char/hw_random/mxc-rnga.c b/drivers/char/hw_random/mxc-rnga.c
+> index 85074de..c49c0b8 100644
+> --- a/drivers/char/hw_random/mxc-rnga.c
+> +++ b/drivers/char/hw_random/mxc-rnga.c
+> @@ -152,14 +152,14 @@ static int __init mxc_rnga_probe(struct platform_device *pdev)
+>  	if (rng_dev)
+>  		return -EBUSY;
+>  
+> -	clk = clk_get(&pdev->dev, "rng");
+> +	clk = clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(clk)) {
+>  		dev_err(&pdev->dev, "Could not get rng_clk!\n");
+>  		err = PTR_ERR(clk);
+>  		goto out;
+>  	}
+>  
+> -	clk_enable(clk);
+> +	clk_prepare_enable(clk);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!res) {
+> @@ -201,7 +201,7 @@ err_ioremap:
+>  	release_mem_region(res->start, resource_size(res));
+>  
+>  err_region:
+> -	clk_disable(clk);
+> +	clk_disable_unprepare(clk);
+>  	clk_put(clk);
+>  
+>  out:
+> @@ -212,7 +212,7 @@ static int __exit mxc_rnga_remove(struct platform_device *pdev)
+>  {
+>  	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	void __iomem *rng_base = (void __iomem *)mxc_rnga.priv;
+> -	struct clk *clk = clk_get(&pdev->dev, "rng");
+> +	struct clk *clk = clk_get(&pdev->dev, NULL);
 
-What are the clocks needed by i.MX25? csi only?
+Uhh, that's a driver bug that should be fixed. Although right now there
+is no reference counting for clocks, the driver should keep the clk
+internally instead of simply calling clk_get whenever it needs access to
+a clk.
 
-By the way, is anybody using this driver with i.MX25?
+Sascha
 
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
