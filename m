@@ -1,233 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 09 Jul 2012 08:25:17 -0500
-Subject: [RFC PATCHv1 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <20120709113021.GB12130@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <1340805007-3313-2-git-send-email-dinguyen@altera.com>
- <4FF483D2.70000@gmail.com> <20120709113021.GB12130@elf.ucw.cz>
-Message-ID: <4FFADBBD.4060906@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 9 Jul 2012 18:55:14 +0530
+Subject: [PATCH 2/2] ARM: OMAP4: Add local timer support for Device Tree
+In-Reply-To: <20120709131549.GI1122@atomide.com>
+References: <1341839470-5586-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341839470-5586-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120709131549.GI1122@atomide.com>
+Message-ID: <CAMQu2gwm8q2MXBS93-Rj+80imdFNBAuqMDB4pG9G2G7x+XzQxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2012 06:30 AM, Pavel Machek wrote:
-> Hi!
-> 
->>> +config ARCH_SOCFPGA
->>> +	bool "Altera SOCFPGA family"
->>> +	select CPU_V7
->>> +	select ARM_GIC
->>> +	select ARM_AMBA
->>> +	select CLKDEV_LOOKUP
->>> +	select MIGHT_HAVE_CACHE_L2X0
->>> +	select HAVE_MACH_CLKDEV
->>> +	select GENERIC_CLOCKEVENTS
->>> +	select ARCH_WANT_OPTIONAL_GPIOLIB
->>> +	select GPIO_PL061 if GPIOLIB
->>> +	select NEED_MACH_MEMORY_H
->>> +	select USE_OF
->>
->> Alphabetize the selects.
-> 
-> Umm... Others are not alphabetized, either. Something like this to
-> group them logically?
-
-Many are not, but check any relatively new platform like highbank, zynq,
-picoxcell.
-
-Rob
-
->>> @@ -1596,6 +1614,7 @@ config HZ
->>>  	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
->>>  	default AT91_TIMER_HZ if ARCH_AT91
->>>  	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
->>> +	default SOCFPGA_TIMER_HZ if ARCH_SOCFPGA
->>
->> Is this really needed?
-> 
-> Probably not. Removed.
-> 
->>> +struct clk_ops {
->>> +	long	(*round)(struct clk *, unsigned long);
->>> +	int	(*set)(struct clk *, unsigned long);
->>> +};
->>
->> Use common clk infrastructure.
-> 
-> Yep, done already.
-> 
->>> +#define IO_SPACE_LIMIT 0xffffffff
->>> +
->>> +#define __io(a)		__typesafe_io(a)
->>> +#define __mem_pci(a)	(a)
->>
->> You don't need io.h, remove it.
-> 
-> Will do, thanks.
-> 
->>> --- /dev/null
->>> +++ b/arch/arm/mach-socfpga/include/mach/iomap.h
->>> @@ -0,0 +1,37 @@
->>> +#include <asm/sizes.h>
->>> +
->>> +/* macro to get at IO space when running virtually */
->>> +#ifdef CONFIG_MMU
->>
->> Do you really support !MMU?
-> 
-> No. Will remove.
-> 
->>> +#define SOFTIRQ_SOCFPGA_GPIO_2_28	(IRQ_SOCFPGA_GIC_START + 269)
->>> +#define SOFTIRQ_SOCFPGA_GPIO_2_29	(IRQ_SOCFPGA_GIC_START + 270)
->>> +
->>
->> All these defines should come from DT.
-> 
-> Yes. Most of them do now, will fix the rest.
-> 
->>> +#define NR_IRQS			512
->>
->> As mentioned, use SPARSE_IRQ.
-> 
-> Fixed. As mentioned :-).
-> 
->>> +#define PLAT_PHYS_OFFSET	UL(0x00000000)
->>> +
->>> +#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
->>> +
->>> +#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
->>> +#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
->>> +#endif
->>
->> You shouldn't need memory.h.
-> 
-> Ok.
-> 
->>> --- /dev/null
->>> +++ b/arch/arm/mach-socfpga/include/mach/system.h
->>> @@ -0,0 +1,31 @@
->>> +static inline void arch_idle(void)
->>> +{
->>> +	/*
->>> +	 * This should do all the clock switching
->>> +	 * and wait for interrupt tricks
->>> +	 */
->>> +	cpu_do_idle();
->>> +}
->>
->> This isn't needed any longer and system.h should be removed.
-> 
-> Ok.
-> 
->>> --- /dev/null
->>> +++ b/arch/arm/mach-socfpga/platsmp.c
+On Mon, Jul 9, 2012 at 6:45 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120709 06:16]:
+>> Add cortex-a9 local timer  support for all OMAP4 based
+>> SOCs using DT.
 > ...
->>> +/*
->>> + * control for which core is the next to come out of the secondary
->>> + * boot "holding pen"
->>> + */
->>> +int __cpuinitdata pen_release = -1;
+>
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -36,6 +36,7 @@
+>>  #include <linux/clocksource.h>
+>>  #include <linux/clockchips.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/of.h>
 >>
->> None of this pen stuff is needed if you properly reset cores when
->> hot-unplugged. All this is only needed if you only go to wfi when hot
->> unplugged. See highbank platsmp.c for an example without pen code.
-> 
-> Will take a look, thanks!
-> 
->>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
->>> index 101b968..2f9a81e 100644
->>> --- a/arch/arm/mm/Kconfig
->>> +++ b/arch/arm/mm/Kconfig
->>> @@ -381,7 +381,7 @@ config CPU_V6K
->>>  
->>>  # ARMv7
->>>  config CPU_V7
->>> -	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
->>> +	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_SOCFPGA
+>>  #include <asm/mach/time.h>
+>>  #include <plat/dmtimer.h>
+>> @@ -384,9 +385,13 @@ static void __init omap4_timer_init(void)
+>>       if (omap_rev() != OMAP4430_REV_ES1_0) {
+>>               int err;
 >>
->> This is not needed.
-> 
-> Already fixed.
-> 
-> Thanks for the review. This is the easy stuff, I'll remove the
-> memory.h/system.h next, then address the SMP thing.
-> 									Pavel
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d203253..ab3b389 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -252,18 +252,18 @@ choice
->  
->  config ARCH_SOCFPGA
->  	bool "Altera SOCFPGA family"
-> -	select CPU_V7
-> -	select ARM_GIC
->  	select ARM_AMBA
-> -	select CLKDEV_LOOKUP
-> -	select MIGHT_HAVE_CACHE_L2X0
-> -	select HAVE_MACH_CLKDEV
-> -	select GENERIC_CLOCKEVENTS
-> +	select ARM_GIC
-> +	select CPU_V7
->  	select ARCH_WANT_OPTIONAL_GPIOLIB
->  	select GPIO_PL061 if GPIOLIB
-> +	select CLKDEV_LOOKUP
-> +	select GENERIC_CLOCKEVENTS
-> +	select HAVE_MACH_CLKDEV
-> +	select MIGHT_HAVE_CACHE_L2X0
->  	select NEED_MACH_MEMORY_H
-> -	select USE_OF
->  	select SPARSE_IRQ
-> +	select USE_OF
->  	help
->  	  This enables support for Altera SOCFPGA Cyclone V platform
->  
-> @@ -1615,7 +1615,6 @@ config HZ
->  	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
->  	default AT91_TIMER_HZ if ARCH_AT91
->  	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
-> -	default SOCFPGA_TIMER_HZ if ARCH_SOCFPGA
->  	default 100
->  
->  config THUMB2_KERNEL
-> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-> index 81358e6..7f1b72b 100644
-> --- a/arch/arm/mach-socfpga/Kconfig
-> +++ b/arch/arm/mach-socfpga/Kconfig
-> @@ -6,10 +6,3 @@ config MACH_SOCFPGA_CYCLONE5
->  	select COMMON_CLK
->  	help
->  	  Include support for the Altera(R) Cyclone5 development platform.
-> -
-> -config SOCFPGA_TIMER_HZ
-> -	int "Kernel internal timer frequency "
-> -	range 20 1024
-> -	default "100"
-> -	help
-> -	  Kernel internal timer frequency should be a divisor of 77161.
-> diff --git a/arch/arm/mach-socfpga/include/mach/iomap.h b/arch/arm/mach-socfpga/include/mach/iomap.h
-> index 656482d..d5f8493 100644
-> --- a/arch/arm/mach-socfpga/include/mach/iomap.h
-> +++ b/arch/arm/mach-socfpga/include/mach/iomap.h
-> @@ -20,7 +20,6 @@
->  #include <asm/sizes.h>
->  
->  /* macro to get at IO space when running virtually */
-> -#ifdef CONFIG_MMU
->  /*
->   * Statically mapped addresses:
->   *
-> @@ -29,9 +28,6 @@
->   * 1fxx xxxx -> fexx xxxx
->   */
->  #define IO_ADDRESS(x)		(((x) & 0x03ffffff) + 0xfb000000)
-> -#else
-> -#define IO_ADDRESS(x)		(x)
-> -#endif
->  #define __io_address(n)		IOMEM(IO_ADDRESS(n))
->  
-> -#endif
-> \ No newline at end of file
-> +#endif
-> 
+>> -             err = twd_local_timer_register(&twd_local_timer);
+>> -             if (err)
+>> -                     pr_err("twd_local_timer_register failed %d\n", err);
+>> +             if (of_have_populated_dt()) {
+>> +                     twd_local_timer_of_register();
+>> +             } else {
+>> +                     err = twd_local_timer_register(&twd_local_timer);
+>> +                     if (err)
+>> +                             pr_err("twd_local_timer_register failed %d\n", err);
+>> +             }
+>>       }
+>>  #endif
+>>  }
+>
+> How about just return after twd_local_timer_of_register() instead?
+> That avoids nesting the code further.
+>
+Yep. Make sense. Will consider that in next version.
+
+Regards
+Santosh
