@@ -1,44 +1,48 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 09 Jul 2012 13:29:53 -0500
-Subject: [PATCH 07/15] ARM: dove: use fixed PCI i/o mapping
-In-Reply-To: <201207091550.55912.arnd@arndb.de>
+Date: Mon, 09 Jul 2012 13:42:06 -0500
+Subject: [PATCH 00/15] PCI io.h cleanups
+In-Reply-To: <201207091628.37975.arnd@arndb.de>
 References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <1341600040-30993-8-git-send-email-robherring2@gmail.com>
- <201207091550.55912.arnd@arndb.de>
-Message-ID: <4FFB2321.30100@gmail.com>
+ <201207091628.37975.arnd@arndb.de>
+Message-ID: <4FFB25FE.8090806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2012 10:50 AM, Arnd Bergmann wrote:
+On 07/09/2012 11:28 AM, Arnd Bergmann wrote:
 > On Friday 06 July 2012, Rob Herring wrote:
->> --- a/arch/arm/mach-dove/pcie.c
->> +++ b/arch/arm/mach-dove/pcie.c
->> @@ -60,13 +60,8 @@ static int __init dove_pcie_setup(int nr, struct pci_sys_data *sys)
->>                  "PCIe %d I/O", pp->index);
->>         pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
->>         pp->res[0].name = pp->io_space_name;
->> -       if (pp->index == 0) {
->> -               pp->res[0].start = DOVE_PCIE0_IO_PHYS_BASE;
->> -               pp->res[0].end = pp->res[0].start + DOVE_PCIE0_IO_SIZE - 1;
->> -       } else {
->> -               pp->res[0].start = DOVE_PCIE1_IO_PHYS_BASE;
->> -               pp->res[0].end = pp->res[0].start + DOVE_PCIE1_IO_SIZE - 1;
->> -       }
->> +       pp->res[0].start = nr * SZ_1M;
->> +       pp->res[0].end = pp->res[0].start + SZ_64K - 1;
->>         pp->res[0].flags = IORESOURCE_IO;
->>         if (request_resource(&ioport_resource, &pp->res[0]))
->>                 panic("Request PCIe IO resource failed\n");
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> I've finally gotten back to this after several months. This is the 2nd
+>> part of mach/io.h removals. This series removes io.h on platforms with
+>> PCI by creating a fixed virtual I/O mapping and a common __io() macro.
+>>
+>> As several platforms have 2 1MB I/O windows, I've changed the fixed
+>> mapping to 2MB (vs. 1MB in the prior posting) and allow platforms to
+>> control the size. This also allows using a single 1MB section mapping
+>> rather than 4KB pages.
 > 
-> Why use SZ_64K here when the mapping is actually 1M?
+> Looks really good, feel free to add my Reviewed-by on patches 2-15, since
+> I've done a line-by-line walkthrough and could not find anything besides the
+> trivial comments I gave.
 
-Why use 1M when 64K is enough based on our prior conversations? The more
-we standardize the configuration, the more we can make common. I think
-the majority of the pci setup functions can be consolidated. It's really
-just data differences for the resource setup. I only used 1M alignment
-in case there were some alignment requirements in the h/w and it can't
-handle a starting pci bus address of 0x10000. I think it's just the
-Marvell parts that do this, so if anyone knowledgeable on those parts
-can comment it would help.
+Thanks for the review. It's going to change a bit with using
+ioremap_page_range. Hope to have new version out soon.
+
+>> I've only tested versatilepb under qemu, so any testing is appreciated.
+>> iop3xx and mv78xx0 have some risk of breaking as the PCI bus addresses
+>> are moved to 0 from matching the cpu host bus addesss.
+> 
+> Did you try running any devices that actually use I/O space in qemu?
+> I think there are plenty of devices that you could use for testing that.
+
+I had with sym53c8xx, but it defaulted to memory accesses. Now that I
+enable i/o access mode, it fails due to pcibios_min_io = 0x44000000.
+With that removed it gets into the driver setup but then fails (with or
+without my changes). Might be a qemu model issue. I'll try some other
+devices.
 
 Rob
+
+> 
+> 	Arnd
+> 
