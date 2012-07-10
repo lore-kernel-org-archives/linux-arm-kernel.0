@@ -1,22 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 13:41:35 +0000
-Subject: Move designware timer OF glue into drivers/clocksource
-In-Reply-To: <20120710121944.GA17661@elf.ucw.cz>
-References: <20120710094249.GF10225@elf.ucw.cz> <20120710112448.GA4806@page>
- <20120710121944.GA17661@elf.ucw.cz>
-Message-ID: <201207101341.36178.arnd@arndb.de>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Tue, 10 Jul 2012 15:42:09 +0200
+Subject: [PATCH v4 0/5] ARM: topology: set the capacity of each cores
+ for big.LITTLE
+In-Reply-To: <CAKfTPtC0BcidJ2ga9c2fdWjrEsfXH48QtSnjv0YOCv7-k3K-Ug@mail.gmail.com>
+References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
+ <1341919622.3462.124.camel@twins>
+ <CAKfTPtC0BcidJ2ga9c2fdWjrEsfXH48QtSnjv0YOCv7-k3K-Ug@mail.gmail.com>
+Message-ID: <1341927729.3462.131.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012, Pavel Machek wrote:
-> Move dw-apb devicetree bindings code to drivers/clocksource, so it can
-> be easily shared between picoxcell and socfpga. 
+On Tue, 2012-07-10 at 14:35 +0200, Vincent Guittot wrote:
 > 
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-
-I agree with the patch, but please make it easier to review, either by
-using the "-M" flag to git format-patch, or by splitting it into one
-patch that holds the changes inside that file and another patch that
-moves it.
-
-	Arnd
+> May be the last one which enable ARCH_POWER should also go into tip ?
+> 
+OK, I can take it.
