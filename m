@@ -1,79 +1,51 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 10 Jul 2012 09:25:01 +0000
-Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
- non-omap1 platforms
-In-Reply-To: <20120710091820.GR1122@atomide.com>
-References: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5096A@DBDE01.ent.ti.com>
- <20120627133950.GJ3483@atomide.com> <20120627161745.GO3483@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA5C2C4@DBDE01.ent.ti.com>
- <20120710084107.GO1122@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA69AA3@DBDE01.ent.ti.com>
- <20120710091820.GR1122@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA69AFE@DBDE01.ent.ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Jul 2012 11:26:32 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201207101120.52892.jbe@pengutronix.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <201207091203.09371.marex@denx.de> <201207101120.52892.jbe@pengutronix.de>
+Message-ID: <201207101126.32778.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 14:48:21, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120710 02:15]:
-> > On Tue, Jul 10, 2012 at 14:11:08, Tony Lindgren wrote:
-> > > * Hiremath, Vaibhav <hvaibhav@ti.com> [120627 13:37]:
-> > > > --- a/arch/arm/plat-omap/include/plat/cpu.h
-> > > > +++ b/arch/arm/plat-omap/include/plat/cpu.h
-> > > > @@ -42,7 +42,14 @@
-> > > >  #define OMAP2_DEVICE_TYPE_GP           3
-> > > >  #define OMAP2_DEVICE_TYPE_BAD          4
-> > > > 
-> > > > +#ifdef CONFIG_ARCH_OMAP2PLUS
-> > > >  int omap_type(void);
-> > > > +#else
-> > > > +inline static int omap_type(void)
-> > > > +{
-> > > > +	/* Always return GP, since it is not being used anyway for omap1 */
-> > > > +	return OMAP2_DEVICE_TYPE_GP;
-> > > > +}
-> > > > +#endif
-> > > > 
-> > > >  /*
-> > > >   * omap_rev bits:
+Dear Juergen Beisert,
+
+> Hi Marek,
+> 
+> > > When I try to compile
+> > > your code I get:
 > > > 
-> > > Just to follow-up on this, looks like we need to postpone this
-> > > for v3.7. While at it, we need to make sure all soc_is_omapxxxx()
-> > > are false by default.
-> > > 
+> > > drivers/staging/iio/adc/mxs-lradc.c:42:40: fatal error:
+> > > linux/iio/triggered_buffer.h: No such file or directory
 > > 
-> > Just FYI, I had submitted V2 of this patch.
+> > You need this patches:
+> >     iio:kfifo_buf Take advantage of the fixed record size used in IIO
+> >     iio: kfifo - add poll support.
 > > 
-> > > What you're suggesting above would also depend on some MULTI_ARCH
-> > > option set if multiple ARM architectures are selected. Above patch
-> > > would only optimize things when ARCH_OMAP2PLUS alone is selected.
-> > > 
-> > 
-> > Isn't this only applicable for ARCH_OMAP2PLUS and OMAP1?? And above patch 
-> > take cares of both, as OMAP1 and 2 will not be build together, since 
-> > compiler flags itself will be different.
+> > And use latest -next.
 > 
-> Right, but we also need to deal with
->  
-> > Can you elaborate on how things will break if multiple ARM architectures are 
-> > selected?
-> >
-> > I am not sure whether I am following you completely.
+> Thanks for the hints. Now it compiles and the driver seems to work.
 > 
-> We have quite a few initcalls that exit early with various soc_is, cpu_is,
-> cpu_class_is tests that would fail for multi zImage kernels. Some of these
-> have been patched away with additional calls in MACHINE_START, but some
-> still remain.
-> 
+> One thing I do not understand: It does not matter what channel I read
+> ('in_voltage*_raw'), only interrupt 16 ('mxs-lradc-channel0') counts up.
+> Intended?
+> Or did I a mistake by adding interrupt numbers "<13 14 15 16 17 18 19 20 21
+> 22 23 24 25>" to the corresponding device tree entry?
 
-Let me check on this inside code but if you have any quick reference, please 
-let me know, I can fix it and submit the patch.
 
-> We probably always need to return false for all soc_is_omapxxxx() unless
-> the SoC detection is initialized in id.c.
-> 
+They're wrong
 
-Ditto...
+lradc at 80050000 {
+        compatible = "fsl,imx28-lradc";
+        reg = <0x80050000 2000>;
+        interrupts = <10 14 15 16 17 18 19
+                        20 21 22 23 24 25>;
+        status = "disabled";
+};
 
-Thanks,
-Vaibhav
+
+> Regards,
+> Juergen
+
+Best regards,
+Marek Vasut
