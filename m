@@ -1,81 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 10 Jul 2012 10:52:30 +0900
-Subject: [GIT PULL] Samsung cleanup-1 for v3.6
-Message-ID: <0c4901cd5e3e$aa970660$ffc51320$%kim@samsung.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 10 Jul 2012 03:57:32 +0200
+Subject: [PATCH 1/1] ARM: OMAP3: igep0020: set GPIO mode for mux mcspi1_cs2 pin
+Message-ID: <1341885452-5372-1-git-send-email-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+According to the IGEPv2 Rev.C data-sheet the LAN9221i pin 14 (IRQ) is
+connected to the OMAP3730 mcspi1_cs2 pin. Since this omap mux pin acts
+as an IRQ line, it has to be configured as an input GPIO.
 
-Please pull samsung cleanup patches for v3.6 and most of them are removing
-useless codes.
+IGEPv2 platform code sets the smsc911x_cfg->gpio_irq to GPIO 176 but
+since the mux pin default mode is MODE7 (safe_mode) the driver fails
+when trying to register the IRQ with the following error message:
 
-If any problems, please kindly let me know.
+[    1.994598] smsc911x: Driver version 2008-10-21
+[    3.704162] irq 272: nobody cared (try booting with the "irqpoll" option)
+[    3.711364] [<c001a114>] (unwind_backtrace+0x0/0xf0) from [<c009a0d4>] (__report_bad_irq+0x20/0xbc)
+[    3.720916] [<c009a0d4>] (__report_bad_irq+0x20/0xbc) from [<c009a41c>] (note_interrupt+0x1d8/0x238)
+[    3.730560] [<c009a41c>] (note_interrupt+0x1d8/0x238) from [<c0098234>] (handle_irq_event_percpu+0xc0/0x260)
+[    3.740936] [<c0098234>] (handle_irq_event_percpu+0xc0/0x260) from [<c0098410>] (handle_irq_event+0x3c/0x5c)
+[    3.751312] [<c0098410>] (handle_irq_event+0x3c/0x5c) from [<c009abe0>] (handle_level_irq+0xac/0x10c)
+[    3.761047] [<c009abe0>] (handle_level_irq+0xac/0x10c) from [<c0097a34>] (generic_handle_irq+0x30/0x48)
+[    3.770935] [<c0097a34>] (generic_handle_irq+0x30/0x48) from [<c02a6b74>] (gpio_irq_handler+0x180/0x1d4)
+[    3.780944] [<c02a6b74>] (gpio_irq_handler+0x180/0x1d4) from [<c0097a34>] (generic_handle_irq+0x30/0x48)
+[    3.790954] [<c0097a34>] (generic_handle_irq+0x30/0x48) from [<c0013e18>] (handle_IRQ+0x4c/0xac)
+[    3.800231] [<c0013e18>] (handle_IRQ+0x4c/0xac) from [<c000858c>] (omap3_intc_handle_irq+0x60/0x74)
+[    3.809783] [<c000858c>] (omap3_intc_handle_irq+0x60/0x74) from [<c04979e4>] (__irq_svc+0x44/0x60)
+[    3.819213] Exception stack(0xee42fde0 to 0xee42fe28)
+[    3.824554] fde0: 00000001 00000001 00000000 00000000 60000013 c06cce14 c06cce14 00000110
+[    3.833190] fe00: 00000000 c06ccdf4 60000013 ee41d000 fb058064 ee42fe28 c0089e08 c04976b4
+[    3.841796] fe20: 20000013 ffffffff
+[    3.845489] [<c04979e4>] (__irq_svc+0x44/0x60) from [<c04976b4>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+[    3.855499] [<c04976b4>] (_raw_spin_unlock_irqrestore+0x34/0x44) from [<c0099744>] (__setup_irq+0x1b8/0x3f0)
+[    3.865875] [<c0099744>] (__setup_irq+0x1b8/0x3f0) from [<c0099a34>] (request_threaded_irq+0xb8/0x140)
+[    3.875701] [<c0099a34>] (request_threaded_irq+0xb8/0x140) from [<c0487950>] (smsc911x_drv_probe+0x75c/0x11a4)
+[    3.886260] [<c0487950>] (smsc911x_drv_probe+0x75c/0x11a4) from [<c02e9bcc>] (platform_drv_probe+0x18/0x1c)
+[    3.906707] [<c02e89b8>] (driver_probe_device+0x90/0x210) from [<c02e8bcc>] (__driver_attach+0x94/0x98)
+[    3.916625] [<c02e8bcc>] (__driver_attach+0x94/0x98) from [<c02e7298>] (bus_for_each_dev+0x50/0x7c)
+[    3.926177] [<c02e7298>] (bus_for_each_dev+0x50/0x7c) from [<c02e81d4>] (bus_add_driver+0x184/0x248)
+[    3.935821] [<c02e81d4>] (bus_add_driver+0x184/0x248) from [<c02e909c>] (driver_register+0x78/0x12c)
+[    3.945465] [<c02e909c>] (driver_register+0x78/0x12c) from [<c0008648>] (do_one_initcall+0x34/0x178)
+[    3.955108] [<c0008648>] (do_one_initcall+0x34/0x178) from [<c066e8f4>] (kernel_init+0xfc/0x1c0)
+[    3.964385] [<c066e8f4>] (kernel_init+0xfc/0x1c0) from [<c00140b0>] (kernel_thread_exit+0x0/0x8)
+[    3.973632] handlers:
+[    3.976043] [<c034e2cc>] smsc911x_irqhandler
+[    3.980560] Disabling IRQ #272
 
-Thanks.
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+---
+ arch/arm/mach-omap2/board-igep0020.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
-
-  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/cleanup-samsung
-
-Bartlomiej Zolnierkiewicz (1):
-      ARM: EXYNOS: Remove leftovers of the Samsung specific power domain
-control
-
-Boojin Kim (1):
-      ARM: EXYNOS: Remove the L2 cache latency setting for EXYNOS5
-
-Jonghwan Choi (1):
-      ARM: SAMSUNG: Remove unused variable 'running' on PWM
-
-Paul Bolle (2):
-      ARM: S3C24XX: remove unused header <mach/bast-pmu.h>
-      ARM: SAMSUNG: remove unused SPI clock headers
-
-Sachin Kamat (4):
-      ARM: S5P64X0: Remove unused variable in dma.c file
-      ARM: S5PC100: Remove unused variable in dma.c file
-      ARM: SAMSUNG: Remove description corresponding to a deleted element
-      ARM: S3C24XX: Remove duplicate header file inclusion
-
- arch/arm/mach-exynos/common.c                   |   25 ------
- arch/arm/mach-exynos/include/mach/spi-clocks.h  |   16 ----
- arch/arm/mach-exynos/mach-nuri.c                |    1 -
- arch/arm/mach-exynos/mach-origen.c              |    1 -
- arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
- arch/arm/mach-exynos/mach-universal_c210.c      |    1 -
- arch/arm/mach-s3c24xx/common.c                  |    1 -
- arch/arm/mach-s3c24xx/include/mach/bast-pmu.h   |   40 ----------
- arch/arm/mach-s3c64xx/include/mach/spi-clocks.h |   18 ----
- arch/arm/mach-s5p64x0/dma.c                     |    2 -
- arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 -----
- arch/arm/mach-s5pc100/dma.c                     |    2 -
- arch/arm/mach-s5pc100/include/mach/spi-clocks.h |   18 ----
- arch/arm/mach-s5pv210/include/mach/spi-clocks.h |   17 ----
- arch/arm/plat-samsung/Kconfig                   |    8 --
- arch/arm/plat-samsung/Makefile                  |    4 -
- arch/arm/plat-samsung/include/plat/devs.h       |    1 -
- arch/arm/plat-samsung/include/plat/fb.h         |    1 -
- arch/arm/plat-samsung/include/plat/pd.h         |   30 -------
- arch/arm/plat-samsung/pd.c                      |   95
------------------------
- arch/arm/plat-samsung/pwm.c                     |    4 -
- 21 files changed, 0 insertions(+), 306 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/spi-clocks.h
- delete mode 100644 arch/arm/mach-s3c24xx/include/mach/bast-pmu.h
- delete mode 100644 arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
- delete mode 100644 arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
- delete mode 100644 arch/arm/mach-s5pc100/include/mach/spi-clocks.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/spi-clocks.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
- delete mode 100644 arch/arm/plat-samsung/pd.c
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 7491529..2821448 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -554,6 +554,8 @@ static const struct usbhs_omap_board_data igep3_usbhs_bdata __initconst = {
+ 
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
++	/* SMSC9221 LAN Controller ETH IRQ (GPIO_176) */
++	OMAP3_MUX(MCSPI1_CS2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #endif
+-- 
+1.7.7.6
