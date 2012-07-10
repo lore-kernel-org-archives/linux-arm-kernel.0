@@ -1,126 +1,37 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 10 Jul 2012 09:32:21 +0200
-Subject: [PATCH] drivers/rtc/rtc-twl.c: fix threaded IRQ to use
- IRQF_ONESHOT
-In-Reply-To: <20120709151527.58f44c3a.akpm@linux-foundation.org>
-References: <1341592434-4207-1-git-send-email-khilman@ti.com>
- <20120709151527.58f44c3a.akpm@linux-foundation.org>
-Message-ID: <4FFBDA85.8070708@metafoo.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jul 2012 07:50:33 +0000
+Subject: [PATCH 07/15] ARM: dove: use fixed PCI i/o mapping
+In-Reply-To: <alpine.LFD.2.02.1207091641030.31100@xanadu.home>
+References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
+ <4FFB2321.30100@gmail.com> <alpine.LFD.2.02.1207091641030.31100@xanadu.home>
+Message-ID: <201207100750.34214.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2012 12:15 AM, Andrew Morton wrote:
-> On Fri,  6 Jul 2012 09:33:54 -0700
-> Kevin Hilman <khilman@ti.com> wrote:
+On Monday 09 July 2012, Nicolas Pitre wrote:
+> On Mon, 9 Jul 2012, Rob Herring wrote:
 > 
->> Requesting a threaded interrupt without a primary handler and without
->> IRQF_ONESHOT is dangerous, and after commit 1c6c6952 (genirq: Reject
->> bogus threaded irq requests), these requests are rejected.  This
->> causes ->probe() to fail, and the RTC driver not to be availble.
->>
->> To fix, add IRQF_ONESHOT to the IRQ flags.
->>
->> Tested on OMAP3730/OveroSTORM and OMAP4430/Panda board using rtcwake
->> to wake from system suspend multiple times.
->>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Resending to broader audience and including Andrew.  Since, I understand
->> that drivers/rtc is somewhat orphaned, Andrew, can you queue this fix for
->> v3.5.  Thanks.
->>
->>  drivers/rtc/rtc-twl.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
->> index 258abea..c5d06fe 100644
->> --- a/drivers/rtc/rtc-twl.c
->> +++ b/drivers/rtc/rtc-twl.c
->> @@ -510,7 +510,7 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
->>  	}
->>  
->>  	ret = request_threaded_irq(irq, NULL, twl_rtc_interrupt,
->> -				   IRQF_TRIGGER_RISING,
->> +				   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
->>  				   dev_name(&rtc->dev), rtc);
->>  	if (ret < 0) {
->>  		dev_err(&pdev->dev, "IRQ is not free.\n");
+> > Why use 1M when 64K is enough based on our prior conversations? The more
+> > we standardize the configuration, the more we can make common. I think
+> > the majority of the pci setup functions can be consolidated. It's really
+> > just data differences for the resource setup. I only used 1M alignment
+> > in case there were some alignment requirements in the h/w and it can't
+> > handle a starting pci bus address of 0x10000. I think it's just the
+> > Marvell parts that do this, so if anyone knowledgeable on those parts
+> > can comment it would help.
 > 
-> OK, this is the second such patch I've seen and it's time to wonder if
-> we should get grumpy at tglx.  afacit 1c6c6952 broke the following
-> drivers:
+> The only Marvell board I have which can accommodate a PCI card does 
+> support 3.3V PCI cards only.  Otherwise this is all PCI Express.  And 
+> the only PCI cards with I/O space I've seen are 5V PCI cards.
 
-If you want to be grumpy, be grumpy at Linus. Thomas actually posted a patch
-which just emits a warning, instead of failing to request the IRQ, but Linus
-didn't want to take it. The whole thread is here
-https://lkml.org/lkml/2012/6/12/151
+All graphics cards and ATA controllers support backwards compatible PIO
+access to the VGA or IDE registers, and they are available for PCI express.
+A lot of PCIe legacy I/O cards (uart, printer, 	GPIO) can also use PIO
+mode to be backwards compatible.
 
-> 
-> 
-> sound/soc/codecs/wm8994.c
-> sound/soc/codecs/max98095.c
-> sound/soc/codecs/twl6040.c
-> drivers/usb/otg/ab8500-usb.c
-> drivers/usb/otg/twl4030-usb.c
-> drivers/gpio/gpio-sx150x.c
-> drivers/gpio/gpio-ab8500.c
-> drivers/mfd/ab8500-gpadc.c
-> drivers/mfd/ti-ssp.c
-> drivers/mfd/twl4030-madc.c
-> drivers/mfd/htc-i2cpld.c
-> drivers/mfd/wm831x-auxadc.c
-> drivers/mfd/twl6040-core.c
-> drivers/mfd/wm8350-core.c
-> drivers/extcon/extcon-max8997.c
-> drivers/mmc/host/of_mmc_spi.c
-> drivers/mmc/core/cd-gpio.c
-> drivers/net/can/mcp251x.c
-> drivers/nfc/pn544_hci.c
-> drivers/nfc/pn544.c
-> drivers/power/ab8500_btemp.c
-> drivers/power/twl4030_charger.c
-> drivers/power/lp8727_charger.c
-> drivers/power/smb347-charger.c
-> drivers/power/max17042_battery.c
-> drivers/power/wm831x_power.c
-> drivers/power/ab8500_fg.c
-> drivers/power/max8903_charger.c
-> drivers/power/ab8500_charger.c
-> drivers/regulator/wm831x-isink.c
-> drivers/regulator/wm831x-ldo.c
-> drivers/regulator/wm831x-dcdc.c
-> drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-> drivers/staging/iio/adc/adt7310.c
-> drivers/staging/iio/adc/adt7410.c
-> drivers/staging/iio/adc/ad7816.c
-> drivers/staging/iio/cdc/ad7150.c
-> drivers/staging/iio/accel/sca3000_core.c
-> drivers/staging/cptm1217/clearpad_tm1217.c
-> drivers/input/keyboard/tc3589x-keypad.c
-> drivers/input/keyboard/twl4030_keypad.c
-> drivers/input/misc/twl4030-pwrbutton.c
-> drivers/input/misc/twl6040-vibra.c
-> drivers/input/misc/wm831x-on.c
-> drivers/media/radio/si470x/radio-si470x-i2c.c
-> drivers/base/regmap/regmap-irq.c
-> drivers/rtc/rtc-wm831x.c
-> drivers/rtc/rtc-twl.c
-> drivers/rtc/rtc-ab8500.c
-> drivers/rtc/rtc-max8998.c
-> drivers/rtc/rtc-isl1208.c
-> drivers/platform/x86/intel_mid_powerbtn.c
-> include/linux/mfd/wm8994/core.h
-> include/linux/mfd/wm8350/core.h
-> 
-> what am I missing here?
-> 
+> So I'd say: go for the option with the best consolidation outcome.  No 
+> one is using cards with I/O space on those platforms.
 
-Most of these drivers are not broken (anymore), the majority drivers which
-were broken by Thomas's patch have already been fixed. As for your list:
-I've already sent out a fix for all of the staging/iio/ drivers a couple of
-days ago. And drivers which use nested interrupts are not affected by this
-problem. In your list these are basically all drivers with wm*, twl* and
-ab8500 in their names. But still leaves a handful of broken driver which
-should be fixed.
+That is probably true.
 
-- Lars
+	Arnd
