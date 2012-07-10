@@ -1,116 +1,68 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 10 Jul 2012 18:11:30 -0500
-Subject: [PATCH 1/1] of: introduce helper to manage boolean
-In-Reply-To: <CAPnjgZ1D0hCZobFENTPN8Vkz04x5bXa9RviJuVcgBt66BL961Q@mail.gmail.com>
-References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
- <20120309014441.8236B3E0903@localhost>
- <20120309100435.GN27213@game.jcrosoft.org>
- <20120309162638.92E813E0880@localhost>
- <20120309163608.GQ27213@game.jcrosoft.org> <4F5E50DA.6080000@freescale.com>
- <20120313031739.GA18320@game.jcrosoft.org>
- <20120313041652.563B63E0536@localhost>
- <CAPnjgZ2dj5pcuGhM2_2nwwnhhcCmKhyi6jVHS7Xf1f682i_j_w@mail.gmail.com>
- <4FFC9D46.6090006@freescale.com>
- <CAPnjgZ1D0hCZobFENTPN8Vkz04x5bXa9RviJuVcgBt66BL961Q@mail.gmail.com>
-Message-ID: <4FFCB6A2.50805@freescale.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 11 Jul 2012 00:15:25 +0100
+Subject: [PATCH v2 1/2] clocksource: dw_apb_timer: Add common DTS glue
+ for  dw_apb_timer
+In-Reply-To: <1341956381-496-1-git-send-email-dinguyen@altera.com>
+References: <1341956381-496-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20120710231525.GA27641@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2012 05:53 PM, Simon Glass wrote:
-> Hi Scott,
-> 
-> On Tue, Jul 10, 2012 at 11:23 PM, Scott Wood <scottwood@freescale.com
-> <mailto:scottwood@freescale.com>> wrote:
-> 
->     Also note that even non-boolean properties can mean something different
->     when absent.  Sometimes this is a default value; sometimes, like with
->     "ranges", it's something that can't be expressed with any value (empty
->     ranges means all translations go straight through; no ranges means no
->     translation is possible).
-> 
-> 
-> That's fine, but I'm not sure I understand why that relates to boolean
-> properties, which currently mean always the same thing (false) when
-> absent. I don't think there is any intent to change that.
+Hi,
 
-The point was this isn't the only scenario where the absence of a
-property means something, and where you might want to delete the property.
+On Tue, Jul 10, 2012 at 04:39:40PM -0500, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Make a common device tree glue for clocksource/dw_apb_timer.
+> Move mach-picoxcell/time.c to be a generic device tree application
+> of the dw_apb_timer.
+> 
+> Signed-off-by: Pavel Machek <pavel@denx.de>
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> ---
+>  Documentation/devicetree/bindings/rtc/dw-apb.txt   |   24 ++++++++++
+>  arch/arm/Kconfig                                   |    1 +
+>  drivers/clocksource/Kconfig                        |    3 ++
+>  drivers/clocksource/Makefile                       |    1 +
+>  .../clocksource/dw_apb_timer_of.c                  |   49 +++++++++++---------
+>  5 files changed, 57 insertions(+), 21 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/dw-apb.txt
+>  rename arch/arm/mach-picoxcell/time.c => drivers/clocksource/dw_apb_timer_of.c (60%)
+> 
+> diff --git a/arch/arm/mach-picoxcell/time.c  
+> b/drivers/clocksource/dw_apb_timer_of.c
+> similarity index 60%
+> rename from arch/arm/mach-picoxcell/time.c
+> rename to drivers/clocksource/dw_apb_timer_of.c
+> index 2ecba67..83bd997 100644
+> --- a/arch/arm/mach-picoxcell/time.c
+> +++ b/drivers/clocksource/dw_apb_timer_of.c
+> @@ -1,11 +1,20 @@
+[...]
+> -static const struct of_device_id picoxcell_rtc_ids[] __initconst = {
+> -	{ .compatible = "picochip,pc3x2-rtc" },
+> +static const struct of_device_id sptimer_ids[] __initconst = {
+> +	{ .compatible = "snps,dw-apb-timer-sp" },
+>  	{ /* Sentinel */ },
 
->     > I think it is useful to
->     > support a boolean with a non-null value which can be 0, meaning
->     true as
->     > Jean-Christophe says.
->     >
->     > My reasons are:
->     >
->     > 1. dtc does not have a way to delete a property and it isn't clear
->     what
->     > syntax could be used there.
-> 
->     Surely some syntax can be created for this.  E.g. /delete-prop/ foo;
-> 
-> 
-> Yes, in fact I saw a patch after sending this email. So for normal
-> values to change the value we do
-> 
->    prop = <23>;
-> 
-> but for booleans we must do EITHER:
-> 
->    bool;
-> 
-> or
-> 
->    /delete-prop/ bool;
-> 
-> depending on whether we want the make it true or false? Ick.
+Please keep picochip,pc3x2-rtc in the compatible list otherwise we won't 
+boot any more.
 
-Doesn't seem that bad to me except in the case you show below where
-you're trying to do it programmatically.
+> -static const struct of_device_id picoxcell_timer_ids[] __initconst = 
+> {
+> -	{ .compatible = "picochip,pc3x2-timer" },
+> +static const struct of_device_id osctimer_ids[] __initconst = {
+> +	{ .compatible = "snps,dw-apb-timer-osc" },
+>  	{},
+>  };
 
-> It seems worse to me, see above. Also if we end up with symbols it will
-*> be impossible to do something like:
-> 
->    bool-property = <WIBBLE_VALUE>;
-> 
-> You will have to do:
-> 
-> if WIBBLE_VALUE == 0
->   /delete-prop/ bool-property;
-> #else
->   bool-property;
-> #endif
-> 
-> or whatever, or maybe I got that around the wrong way.... Not nice IMO.
+The same here.  Also, I'm not sure that the split of these patches is 
+correct - there isn't any bisectability here as you remove the timer in 
+this patch but picoxcell won't build.  I think squashing these 2 patches 
+is fine.
 
-Yeah, that's unpleasant.
+I can't test on hardware right now, but with those changes:
 
-I don't hugely object to a new boolean type for use in new bindings,
-where <0> or absence can both be used to indicate false, as long as it's
-clearly documented.  I'm hesitant to start doing this on existing
-bindings, though, and in any case would like to see support for
-property/node deletion in dtc.
+Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-> (any comments on point 2?)
-
-It's basically the same as the above, right?
-
->     > 3. Discoverability: it is nice to be able to see the possible options,
->     > even if disabled.
-> 
->     This assumes the possible options were known in advance, or that you
->     don't maintain compatibility with old device trees when a new option is
->     added.
-> 
-> 
-> You can still add the option with a zero value - or maybe I
-> misunderstand what you mean.
-
-We normally want to work with existing device trees (which could be
-partially produced by firmware, so changing can be unpleasant), so the
-absence of the property is still going to be a possibility.  Plus
-enumerating every possibility, no matter how rarely used, in every node
-of a certain type seems excessively verbose.  It's not like these are
-user configuration knobs.
-
--Scott
+Jamie
