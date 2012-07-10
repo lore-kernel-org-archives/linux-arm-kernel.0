@@ -1,89 +1,73 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 10 Jul 2012 12:42:46 +0530
-Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
- offset using the IP scheme.
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA695E6@DBDE01.ent.ti.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B6C.7050003@ti.com>
- <CAMQu2gz0UU_RCFSvxo1s_XwDAmTtL4NadsFTg8qL7PtGwPqKtQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA695E6@DBDE01.ent.ti.com>
-Message-ID: <CAMQu2gzubK7r4OEsusXBSGEW5YLWeMkt0tp8X9ERBLjse_5=MA@mail.gmail.com>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Tue, 10 Jul 2012 07:14:22 +0000
+Subject: [PATCH v1 09/11] drivers: usb: musb: Add device tree support
+ for omap musb glue
+In-Reply-To: <1340884267-28908-10-git-send-email-kishon@ti.com>
+References: <1340884267-28908-1-git-send-email-kishon@ti.com>
+ <1340884267-28908-10-git-send-email-kishon@ti.com>
+Message-ID: <47CEF8C4B26E8C44B22B028A650E0EA93EACE24C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 12:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> On Mon, Jul 09, 2012 at 16:12:15, Shilimkar, Santosh wrote:
->> On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->> >
->> >
->> > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
->> >> From: R Sricharan <r.sricharan@ti.com>
->> >>
->> >> OMAP socs has a legacy and a highlander version of the
->> >> 32k sync counter IP. The register offsets vary between the
->> >> highlander and the legacy scheme. So use the 'SCHEME'
->> >> bits(30-31) of the revision register to distinguish between
->> >
->> >
->> > Just for my understanding, can we get further information on SCHEME
->> > bit-fields? What kind of information we have it here.
->> >
->> > I may need this info to pass on to design team here.
->> >
->> Sure. You can refer to the OMAP4 TRM for the bit builds.
->> SCHEME bit field tell you difference between a highlander
->> and legacy IP as the patch says.
->>
->
-> Santosh,
->
-> Can you point to the section of OMAP4 TRM?
->
-> I referred to both Public TRM and internal TRM, but both only did mention
-> "TI internal Data".
->
-Last time I refereed the internal TRM version. Public TRM doesn't
-carry that information
-for some reason.
+Hi,
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |   34
+> ++++++++++++-
+>  drivers/usb/musb/omap2430.c                        |   52
+> ++++++++++++++++++++
+[...]
+> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
+> +		of_property_read_u32(np, "interface_type",
+> +						(u32 *)&data->interface_type);
+> +		of_property_read_u32(np, "num_eps", (u32 *)&config-
+> >num_eps);
+> +		of_property_read_u32(np, "ram_bits", (u32 *)&config-
+> >ram_bits);
+> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
 
-> And as per code, we are not checking any value in 31-30 bit-fields, code
-> just assumes that, non-zero value would be highlander IP.
->
-There are only two types of IP's today and hence it will be either
-0x0 or 0x1. So that check if just fine. The highlander IP may have
-more versions but for known OMAPs and upcoming OMAP, this is
-the only one supported version.
+'mode' has already been read so this should be dropped.
 
-Some more information on the SCHEME bit field.
------------------
-31:30
-SCHEME
-Used to distinguish between old scheme and current.
+Ajay
 
-RO Read Only
-
-0x0 -  LEGACY
-
-0x1 - Highlander 0.8 scheme
---------------------------------
-
-Regards
-Santosh
-
-
-
-
-
-
-
-	
-
-
-	
-
-Read 0x1
-	
-
-HL08
-Highlander 0.8 scheme
+> +		of_property_read_u32(np, "power", (u32 *)&pdata->power);
+> +		config->multipoint = of_property_read_bool(np,
+> "multipoint");
+> +
+> +		pdata->board_data	= data;
+> +		pdata->config		= config;
+> +	}
+> +
+>  	pdata->platform_ops		= &omap2430_ops;
+> 
+>  	platform_set_drvdata(pdev, glue);
+> @@ -597,12 +638,23 @@ static struct dev_pm_ops omap2430_pm_ops = {
+>  #define DEV_PM_OPS	NULL
+>  #endif
+> 
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id omap2430_id_table[] = {
+> +	{ .compatible = "ti,musb-omap2430" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, omap2430_id_table);
+> +#else
+> +#define omap2430_id_table NULL
+> +#endif
+> +
+>  static struct platform_driver omap2430_driver = {
+>  	.probe		= omap2430_probe,
+>  	.remove		= __devexit_p(omap2430_remove),
+>  	.driver		= {
+>  		.name	= "musb-omap2430",
+>  		.pm	= DEV_PM_OPS,
+> +		.of_match_table = omap2430_id_table,
+>  	},
+>  };
+> 
+> --
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
