@@ -1,128 +1,122 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 10 Jul 2012 06:25:49 +0000
-Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <20120709131156.GH1122@atomide.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B61.8030808@ti.com> <20120709131156.GH1122@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA69538@DBDE01.ent.ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 10 Jul 2012 11:57:05 +0530
+Subject: [PATCH v1 10/11] arm/dts: omap: Add usb_otg and glue data
+In-Reply-To: <1340884267-28908-11-git-send-email-kishon@ti.com>
+References: <1340884267-28908-1-git-send-email-kishon@ti.com>
+ <1340884267-28908-11-git-send-email-kishon@ti.com>
+Message-ID: <4FFBCB39.1010809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2012 at 18:41:58, Tony Lindgren wrote:
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120709 01:55]:
-> > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
-> > > --- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> > > +++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> > > @@ -39,6 +39,7 @@ struct omap_clk {
-> > >  #define CK_443X		(1 << 11)
-> > >  #define CK_TI816X	(1 << 12)
-> > >  #define CK_446X		(1 << 13)
-> > > +#define CK_54XX		(1 << 14)
-> > 
-> > This is conflicting with AM33XX, you may want to rebase it again, since
-> > AM33xx clock tree is already pushed and available in
-> > linux-omap/devel-am33xx-part2.
-> 
-> Heh these CK_XXXX defines are now running out of the u16 cpu_mask.
-> 
-> They really should be replaced with SoC specific lists of clocks
-> rather than bloating the cpu_mask and repeating it for every clock
-> that's compiled in for 800+ times.
-> 
-> Below (untested) is what could be done in the short term.
-> 
-> I wonder if we could #define CK_OMAP_DUMMY 0 that's always set
-> for non-shared clocks if they only get set in some *_data.c
-> file in a unique way?
-> 
-> Paul got any better ideas?
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> --- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> +++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> @@ -26,26 +26,29 @@ struct omap_clk {
->  	}
->  
->  /* Platform flags for the clkdev-OMAP integration code */
+On Thursday 28 June 2012 05:21 PM, Kishon Vijay Abraham I wrote:
+> Add usb otg data node in omap4/omap3 device tree file. Also update
+> the node with board specific setting in omapx-<board>.dts file.
+>
+> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+> ---
+>   arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+>   arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+>   arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+>   arch/arm/boot/dts/omap4-panda.dts  |    6 ++++++
+>   arch/arm/boot/dts/omap4-sdp.dts    |    6 ++++++
+>   arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+>   6 files changed, 40 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 5b4506c..f3d7076 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -67,3 +67,9 @@
+>   &mmc3 {
+>   	status = "disable";
+>   };
 > +
-> +#ifdef CONFIG_ARCH_OMAP1
->  #define CK_310		(1 << 0)
->  #define CK_7XX		(1 << 1)	/* 7xx, 850 */
->  #define CK_1510		(1 << 2)
->  #define CK_16XX		(1 << 3)	/* 16xx, 17xx, 5912 */
-> -#define CK_242X		(1 << 4)
-> -#define CK_243X		(1 << 5)	/* 243x, 253x */
-> -#define CK_3430ES1	(1 << 6)	/* 34xxES1 only */
-> -#define CK_3430ES2PLUS	(1 << 7)	/* 34xxES2, ES3, non-Sitara 35xx only */
-> -#define CK_AM35XX	(1 << 9)	/* Sitara AM35xx */
-> -#define CK_36XX		(1 << 10)	/* 36xx/37xx-specific clocks */
-> -#define CK_443X		(1 << 11)
-> -#define CK_TI816X	(1 << 12)
-> -#define CK_446X		(1 << 13)
-> -#define CK_AM33XX	(1 << 14)	/* AM33xx specific clocks */
-> -#define CK_1710		(1 << 15)	/* 1710 extra for rate selection */
-> -
-> +#define CK_1710		(1 << 4)	/* 1710 extra for rate selection */
-> +#endif
->  
-> +#ifdef CONFIG_ARCH_OMAP2PLUS
-> +#define CK_242X		(1 << 0)
-> +#define CK_243X		(1 << 1)	/* 243x, 253x */
-> +#define CK_3430ES1	(1 << 2)	/* 34xxES1 only */
-> +#define CK_3430ES2PLUS	(1 << 3)	/* 34xxES2, ES3, non-Sitara 35xx only */
-> +#define CK_AM35XX	(1 << 4)	/* Sitara AM35xx */
-> +#define CK_36XX		(1 << 5)	/* 36xx/37xx-specific clocks */
-> +#define CK_443X		(1 << 6)
-> +#define CK_TI816X	(1 << 7)
-> +#define CK_446X		(1 << 8)
-> +#define CK_AM33XX	(1 << 9)	/* AM33xx specific clocks */
->  #define CK_34XX		(CK_3430ES1 | CK_3430ES2PLUS)
->  #define CK_3XXX		(CK_34XX | CK_AM35XX | CK_36XX)
-> -
-> +#endif
->  
->  #endif
+> +&usb_otg_hs {
+> +	interface_type =<0>;
+> +	mode =<3>;
+> +	power =<50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+> index 2eee16e..8963b3d 100644
+> --- a/arch/arm/boot/dts/omap3-evm.dts
+> +++ b/arch/arm/boot/dts/omap3-evm.dts
+> @@ -18,3 +18,9 @@
+>   		reg =<0x80000000 0x10000000>; /* 256 MB */
+>   	};
+>   };
+> +
+> +&usb_otg_hs {
+> +	interface_type =<0>;
+> +	mode =<3>;
+> +	power =<50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 99474fa..2f565d6 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -215,5 +215,13 @@
+>   			compatible = "ti,omap3-hsmmc";
+>   			ti,hwmods = "mmc3";
+>   		};
+> +
+> +		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+> +			compatible = "ti,musb-omap2430";
 
-This also will not scale up in the future and will end up again in the same 
-situation.
+this compatible doesn't seem right in omap3.dtsi. Same with
+the below entry in omap4.dtsi.
+See other IP blocks which are reused across OMAP2/3/4 on
+how the compatible for those are handled.
 
-Just a quick thought, may work here,
-
-I looked at the usage of cpu_mask and rates.flag and I believe we can 
-restrict both to given SoC, something like,
-
-OMAP34XX ->
-          ES1
-          ES2PLUS
-          36XX
-          AM35XX
-          ...
-
-OMAP4 ->
-          443X
-          446X
-
-AM33XX ->
-          AM335X
-          TI816X
-          TI814X
-          ...
-
-XYZ...  ->
-          ...
-
-
-The proposal would be,
-
-To make cpu_mask and rate.flags 32 bit wide and divide it in 16-16 bits -
-
-Lower 16 bits => describe SoC it is applicable to
-Upper 16 bit => describes silicon versions or families
-
-Thanks,
-Vaibhav
+> +			ti,hwmods = "usb_otg_hs";
+> +			multipoint =<1>;
+> +			num_eps =<16>;
+> +			ram_bits =<12>;
+> +		};
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index 1efe0c5..0825fa7 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -89,3 +89,9 @@
+>   	ti,non-removable;
+>   	bus-width =<4>;
+>   };
+> +
+> +&usb_otg_hs {
+> +	interface_type =<1>;
+> +	mode =<3>;
+> +	power =<50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index d08c4d1..5244d51 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -158,3 +158,9 @@
+>   	bus-width =<4>;
+>   	ti,non-removable;
+>   };
+> +
+> +&usb_otg_hs {
+> +	interface_type =<1>;
+> +	mode =<3>;
+> +	power =<50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 4d2dcc1..bc7b3c3 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -285,5 +285,13 @@
+>   				<0x4a002300 0x1>;
+>   			};
+>   		};
+> +
+> +		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+> +			compatible = "ti,musb-omap2430";
+> +			ti,hwmods = "usb_otg_hs";
+> +			multipoint =<1>;
+> +			num_eps =<16>;
+> +			ram_bits =<12>;
+> +		};
+>   	};
+>   };
