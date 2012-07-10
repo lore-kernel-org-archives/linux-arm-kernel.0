@@ -1,68 +1,42 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jul 2012 13:36:21 +0800
-Subject: [PATCH v2 1/7] ARM: dts: imx28: move extra gpmi-nand pins into board
- dts
-In-Reply-To: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
-References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1341898587-8462-2-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 10 Jul 2012 13:36:20 +0800
+Subject: [PATCH v2 0/7] Convert mxs board files to device tree
+Message-ID: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only pins GPMI_CE0N and GPMI_READY0 are generally used by other boards.
-Move GPMI_CE1N and GPMI_READY1 into imx28-evk.dts to make gpmi_pins_a
-more general, and can be used by other boards.
+Changes since v1:
+* Drop pwm, backlight and led for m28evk
+* Enable enet_out clock for m28evk as well
+* Drop the rewriting of tx28_add_fec0 for tx28
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx28-evk.dts |   14 +++++++++++++-
- arch/arm/boot/dts/imx28.dtsi    |    2 --
- 2 files changed, 13 insertions(+), 3 deletions(-)
+Regards,
+Shawn
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 0d8739d..0444964 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -24,7 +24,8 @@
- 		apbh at 80000000 {
- 			gpmi-nand at 8000c000 {
- 				pinctrl-names = "default";
--				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
-+				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg
-+					     &gpmi_pins_evk>;
- 				status = "okay";
- 			};
- 
-@@ -64,6 +65,17 @@
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
- 				};
-+
-+				gpmi_pins_evk: gpmi-nand-evk at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x0110 /* MX28_PAD_GPMI_CE1N__GPMI_CE1N */
-+						0x0150 /* MX28_PAD_GPMI_RDY1__GPMI_READY1 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
- 			};
- 
- 			lcdif at 80030000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index adb5ffc..2874adc 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -198,9 +198,7 @@
- 						0x0060 /* MX28_PAD_GPMI_D06__GPMI_D6 */
- 						0x0070 /* MX28_PAD_GPMI_D07__GPMI_D7 */
- 						0x0100 /* MX28_PAD_GPMI_CE0N__GPMI_CE0N */
--						0x0110 /* MX28_PAD_GPMI_CE1N__GPMI_CE1N */
- 						0x0140 /* MX28_PAD_GPMI_RDY0__GPMI_READY0 */
--						0x0150 /* MX28_PAD_GPMI_RDY1__GPMI_READY1 */
- 						0x0180 /* MX28_PAD_GPMI_RDN__GPMI_RDN */
- 						0x0190 /* MX28_PAD_GPMI_WRN__GPMI_WRN */
- 						0x01a0 /* MX28_PAD_GPMI_ALE__GPMI_ALE */
+Marek Vasut (1):
+  ARM: mxs: convert m28evk board to device tree
+
+Shawn Guo (6):
+  ARM: dts: imx28: move extra gpmi-nand pins into board dts
+  ARM: dts: imx28: move lcdif control pins into board dts
+  ARM: mxs: convert apx4devkit board to device tree
+  ARM: mxs: convert tx28 board to device tree
+  ARM: mxs: convert stmp378x_devb board to device tree
+  ARM: mxs: add dtb-y target into Makefile.boot
+
+ arch/arm/boot/dts/apx4devkit.dts    |  143 ++++++++++++++++++++++++
+ arch/arm/boot/dts/imx28-evk.dts     |   30 +++++-
+ arch/arm/boot/dts/imx28.dtsi        |   86 +++++++++++++-
+ arch/arm/boot/dts/m28evk.dts        |  210 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stmp378x_devb.dts |   78 +++++++++++++
+ arch/arm/boot/dts/tx28.dts          |   82 ++++++++++++++
+ arch/arm/mach-mxs/Makefile.boot     |    9 ++
+ arch/arm/mach-mxs/mach-mxs.c        |   67 ++++++++++-
+ 8 files changed, 692 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/boot/dts/apx4devkit.dts
+ create mode 100644 arch/arm/boot/dts/m28evk.dts
+ create mode 100644 arch/arm/boot/dts/stmp378x_devb.dts
+ create mode 100644 arch/arm/boot/dts/tx28.dts
+
 -- 
 1.7.5.4
