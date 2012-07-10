@@ -1,129 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 15:34:12 +0000
-Subject: [GIT PULL 2/5] omap board changes for v3.6 merge window
-In-Reply-To: <0M4ZFU-1RqIwX3VUq-00yonj@mx.kundenserver.de>
-References: <0M4ZFU-1RqIwX3VUq-00yonj@mx.kundenserver.de>
-Message-ID: <201207101534.13166.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Jul 2012 23:37:12 +0800
+Subject: [PATCH v2 5/7] ARM: mxs: convert tx28 board to device tree
+In-Reply-To: <1341898587-8462-6-git-send-email-shawn.guo@linaro.org>
+References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
+ <1341898587-8462-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120710153710.GB11813@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012, Tony Lindgren wrote:
-> The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-> 
->   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-for-v3.6
-> 
-> for you to fetch changes up to b103a2e22a238085f5c50d96345e1a09bb1efd50:
-> 
->   ARM: OMAP3: Fix omap3evm randconfig error introduced by VBUS support (2012-07-09 23:22:24 -0700)
-> 
-> ----------------------------------------------------------------
-> Board and platform data related changes for omaps
-> 
-> ----------------------------------------------------------------
-> Andy Gross (1):
->       omap2+: add drm device
-> 
-> Dmitry Lifshitz (2):
->       ARM: OMAP3: cm-t35: add mt9t001 camera sensor support
->       ARM: OMAP3: cm-t35: add tvp5150 decoder support
-> 
-> Peter Ujfalusi (2):
->       ARM: OMAP: board-4430sdp: MUX configuration for sys_nirq2
->       ARM: OMAP: board-omap4panda: MUX configuration for sys_nirq2
-> 
-> Tony Lindgren (1):
->       ARM: OMAP3: Fix omap3evm randconfig error introduced by VBUS support
-> 
-> Zumeng Chen (4):
->       ARM: OMAP3EVM: Add NAND flash definition
->       ARM: OMAP3EVM: Adding USB internal LDOs board file
->       ARM: omap3evm: enable VBUS switch for EHCI tranceiver
->       ARM: OMAP3530evm: set pendown_state and debounce time for ads7846
+On Tue, Jul 10, 2012 at 01:36:25PM +0800, Shawn Guo wrote:
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index d0bf414..c1e02ae 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -12,8 +12,9 @@
+>  
+>  #include <linux/clk.h>
+>  #include <linux/clkdev.h>
+> +#include <linux/delay.h>
+>  #include <linux/err.h>
+> -#include <linux/init.h>
+> +#include <linux/gpio.h>
+>  #include <linux/init.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/micrel_phy.h>
+> @@ -24,6 +25,7 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+>  #include <mach/common.h>
+> +#include <mach/mxs.h>
+>  
+With tx28_init dropped, these header changes shouldn't be here any more.
 
-> diff --cc arch/arm/mach-omap2/common-board-devices.c
+Regards,
+Shawn
 
-I got a conflict in arch/arm/mach-omap2/common-board-devices.c between
-16aced80f6739 "ARM: OMAP3530evm: set pendown_state and debounce time for
-ads7846" and 97ee9f01d6f26 "ARM: OMAP: fix the ads7846 init code",
-see my resolution below.
-
-Please check if what I have in the for-next branch makese sense to you
-all.
-
-	Arnd
-
-* Unmerged path arch/arm/mach-omap2/common-board-devices.c
-diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-index 1706ebc..1473474 100644
---- a/arch/arm/mach-omap2/common-board-devices.c
-+++ b/arch/arm/mach-omap2/common-board-devices.c
-@@ -35,6 +35,16 @@ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
- 	.turbo_mode	= 0,
-  };
- 
- +/*
- + * ADS7846 driver maybe request a gpio according to the value
- + * of pdata->get_pendown_state, but we have done this. So set
- + * get_pendown_state to avoid twice gpio requesting.
- + */
- +static int omap3_get_pendown_state(void)
- +{
- +	return !gpio_get_value(OMAP3_EVM_TS_GPIO);
- +}
- +
-  static struct ads7846_platform_data ads7846_config = {
- 	.x_max			= 0x0fff,
- 	.y_max			= 0x0fff,
-@@ -45,6 +55,7 @@ static struct ads7846_platform_data ads7846_config = {
- 	.debounce_rep		= 1,
- 	.gpio_pendown		= -EINVAL,
- 	.keep_vref_on		= 1,
- +	.get_pendown_state	= &omap3_get_pendown_state,
-  };
- 
-  static struct spi_board_info ads7846_spi_board_info __initdata = {
-@@ -63,28 +74,30 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
- 	struct spi_board_info *spi_bi = &ads7846_spi_board_info;
- 	int err;
- 
--	if (board_pdata && board_pdata->get_pendown_state) {
--		err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
--		if (err) {
--			pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
--			return;
--		}
--		gpio_export(gpio_pendown, 0);
--
--		if (gpio_debounce)
--			gpio_set_debounce(gpio_pendown, gpio_debounce);
-+	err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
-+	if (err) {
-+		pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
-+		return;
- 	}
- 
-+	if (gpio_debounce)
-+		gpio_set_debounce(gpio_pendown, gpio_debounce);
-+
- 	spi_bi->bus_num	= bus_num;
- 	spi_bi->irq	= gpio_to_irq(gpio_pendown);
- 
- 	if (board_pdata) {
- 		board_pdata->gpio_pendown = gpio_pendown;
- 		spi_bi->platform_data = board_pdata;
-+		if (board_pdata->get_pendown_state)
-+			gpio_export(gpio_pendown, 0);
- 	} else {
- 		ads7846_config.gpio_pendown = gpio_pendown;
- 	}
- 
-+	if (!board_pdata || (board_pdata && !board_pdata->get_pendown_state))
-+		gpio_free(gpio_pendown);
-+
- 	spi_register_board_info(&ads7846_spi_board_info, 1);
- }
- #else
+>  static struct fb_videomode mx23evk_video_modes[] = {
+>  	{
+> @@ -277,6 +279,7 @@ static const char *imx28_dt_compat[] __initdata = {
+>  	"crystalfontz,cfa10036",
+>  	"denx,m28evk",
+>  	"fsl,imx28-evk",
+> +	"karo,tx28",
+>  	"fsl,imx28",
+>  	NULL,
+>  };
+> -- 
+> 1.7.5.4
+> 
+> 
