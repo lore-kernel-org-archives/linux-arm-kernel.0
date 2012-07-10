@@ -1,50 +1,102 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 10 Jul 2012 10:04:57 +0000
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <20120710094538.GT1122@atomide.com>
-References: <20120702063651.GO4202@atomide.com> <4FF1D980.4040100@ti.com>
- <20120703081746.GJ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A2BAC@DBDE01.ent.ti.com>
- <20120704075158.GQ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
- <20120705105535.GB1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A39DF@DBDE01.ent.ti.com>
- <20120706120533.GU1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A622E@DBDE01.ent.ti.com>
- <20120710094538.GT1122@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A64D0@DBDE01.ent.ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Jul 2012 12:08:51 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201207101149.13908.jbe@pengutronix.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <201207101126.32778.marex@denx.de> <201207101149.13908.jbe@pengutronix.de>
+Message-ID: <201207101208.51168.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Dear Juergen Beisert,
 
-On Tue, Jul 10, 2012 at 15:15:38, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120709 23:24]:
-> > On Fri, Jul 06, 2012 at 17:35:33, Tony Lindgren wrote:
-
-> > > format. But the peripheral specific retime function still needs to be
-> > > also registered for peripherals that need it.
-> > 
-> > For the peripherals requiring retime, we cannot (as otherwise whatever
-> > retime does would have to be manually done based on the knowledge of
-> > boot time gpmc clock period to calculate gpmc timings to be fed to DT)
-> > pass gpmc timings via device tree, right ?
+> Hi Marek,
 > 
-> We can still do it when the connected peripheral probe registers with
-> gpmc.
+> Marek Vasut wrote:
+> > > > > When I try to compile
+> > > > > your code I get:
+> > > > > 
+> > > > > drivers/staging/iio/adc/mxs-lradc.c:42:40: fatal error:
+> > > > > linux/iio/triggered_buffer.h: No such file or directory
+> > > > 
+> > > > You need this patches:
+> > > >     iio:kfifo_buf Take advantage of the fixed record size used in IIO
+> > > >     iio: kfifo - add poll support.
+> > > > 
+> > > > And use latest -next.
+> > > 
+> > > Thanks for the hints. Now it compiles and the driver seems to work.
+> > > 
+> > > One thing I do not understand: It does not matter what channel I read
+> > > ('in_voltage*_raw'), only interrupt 16 ('mxs-lradc-channel0') counts
+> > > up. Intended?
+> > > Or did I a mistake by adding interrupt numbers "<13 14 15 16 17 18 19
+> > > 20 21 22 23 24 25>" to the corresponding device tree entry?
+> > 
+> > They're wrong
+> > 
+> > lradc at 80050000 {
+> > 
+> >         compatible = "fsl,imx28-lradc";
+> >         reg = <0x80050000 2000>;
+> >         interrupts = <10 14 15 16 17 18 19
+> >         
+> >                         20 21 22 23 24 25>;
+> >         
+> >         status = "disabled";
+> > 
+> > };
+> 
+> Ups, thanks. But still the same behaviour:
+> 
+> $ cat /proc/interrupts
+> [...]
+>  10:          0         -  mxs-lradc-touchscreen
+>  14:          0         -  mxs-lradc-thresh0
+>  15:          0         -  mxs-lradc-thresh1
+>  16:          0         -  mxs-lradc-channel0
+>  17:          0         -  mxs-lradc-channel1
+>  18:          0         -  mxs-lradc-channel2
+>  19:          0         -  mxs-lradc-channel3
+>  20:          0         -  mxs-lradc-channel4
+>  21:          0         -  mxs-lradc-channel5
+>  22:          0         -  mxs-lradc-channel6
+>  23:          0         -  mxs-lradc-channel7
+>  24:          0         -  mxs-lradc-button0
+>  25:          0         -  mxs-lradc-button1
+> [...]
+> 
+> $ cat in_voltage0_raw
+> 524
+> $ cat in_voltage1_raw
+> 96
+> $ cat in_voltage2_raw
+> 1261
+> 
+> $ cat /proc/interrupts
+> [...]
+>  10:          0         -  mxs-lradc-touchscreen
+>  14:          0         -  mxs-lradc-thresh0
+>  15:          0         -  mxs-lradc-thresh1
+>  16:          3         -  mxs-lradc-channel0
+>  17:          0         -  mxs-lradc-channel1
+>  18:          0         -  mxs-lradc-channel2
+>  19:          0         -  mxs-lradc-channel3
+>  20:          0         -  mxs-lradc-channel4
+>  21:          0         -  mxs-lradc-channel5
+>  22:          0         -  mxs-lradc-channel6
+>  23:          0         -  mxs-lradc-channel7
+>  24:          0         -  mxs-lradc-button0
+>  25:          0         -  mxs-lradc-button1
+> [...]
+> 
+> Intended in this way?
 
-We can, but would it be feasible practically ?, gpmc timings to update in
-DT for a such a peripheral (requiring retime) can be found out only by
-manual calculation similar to the way done in retime function (based on
-peripheral's timings and boot time gpmc clock period), correct ?, Also
-wouldn't this make it necessary to know gpmc clock period at boot time
-for properly updating gpmc timing entry in DT ?
+But wait, you're getting interrupts on channel 0. Doesn't seem quite right. Did 
+you happen to poke into the code and see where the issue might be?
 
-And in this case, we are going to register retime function, so instead of
-relying on DT to provide gpmc timings for such a peripheral, won't it
-be better to make use of retime that is already registered ?
+> Regards,
+> Juergen
 
- 
-Regards
-Afzal
+Best regards,
+Marek Vasut
