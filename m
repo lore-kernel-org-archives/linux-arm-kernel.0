@@ -1,39 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 12:11:07 +0000
-Subject: [GIT PULL] Samsung cleanup-1 for v3.6
-In-Reply-To: <0c4901cd5e3e$aa970660$ffc51320$%kim@samsung.com>
-References: <0c4901cd5e3e$aa970660$ffc51320$%kim@samsung.com>
-Message-ID: <201207101211.07905.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 10 Jul 2012 14:18:45 +0200
+Subject: [PATCH v9] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <201207101203.30984.arnd@arndb.de>
+References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120710111655.071a4ab1@skate> <201207101203.30984.arnd@arndb.de>
+Message-ID: <4FFC1DA5.6050805@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012, Kukjin Kim wrote:
->  arch/arm/mach-exynos/common.c                   |   25 ------
->  arch/arm/mach-exynos/include/mach/spi-clocks.h  |   16 ----
->  arch/arm/mach-exynos/mach-nuri.c                |    1 -
->  arch/arm/mach-exynos/mach-origen.c              |    1 -
->  arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
->  arch/arm/mach-exynos/mach-universal_c210.c      |    1 -
->  arch/arm/mach-s3c24xx/common.c                  |    1 -
->  arch/arm/mach-s3c24xx/include/mach/bast-pmu.h   |   40 ----------
->  arch/arm/mach-s3c64xx/include/mach/spi-clocks.h |   18 ----
->  arch/arm/mach-s5p64x0/dma.c                     |    2 -
->  arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 -----
->  arch/arm/mach-s5pc100/dma.c                     |    2 -
->  arch/arm/mach-s5pc100/include/mach/spi-clocks.h |   18 ----
->  arch/arm/mach-s5pv210/include/mach/spi-clocks.h |   17 ----
->  arch/arm/plat-samsung/Kconfig                   |    8 --
->  arch/arm/plat-samsung/Makefile                  |    4 -
->  arch/arm/plat-samsung/include/plat/devs.h       |    1 -
->  arch/arm/plat-samsung/include/plat/fb.h         |    1 -
->  arch/arm/plat-samsung/include/plat/pd.h         |   30 -------
->  arch/arm/plat-samsung/pd.c                      |   95
-> -----------------------
->  arch/arm/plat-samsung/pwm.c                     |    4 -
->  21 files changed, 0 insertions(+), 306 deletions(-)
+On 07/10/2012 02:03 PM, Arnd Bergmann wrote:
+> On Tuesday 10 July 2012, Thomas Petazzoni wrote:
+>> Le Fri,  6 Jul 2012 17:23:32 +0200,
+>> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
+>>
+>>> You'll find in this patch set the nineth version of the initial
+>>> support for a new family of ARMv7-compatible Marvell SoCs.
+>>
+>> This v9 version has received Acked-by from Andrew Lunn on the
+>> different patches, we have solved the maintainership question of the
+>> new mach-mvebu directory, and so far there hasn't been additional
+>> comments on this v9.
+>>
+>> Is there anything we can do to help in getting this patch set merged?
+> 
+> Usually I'm waiting for git pull requests, which fits the arm-soc
+> workflow best, but it's also ok to ask for patches to be included,
+> especially if you do not have a public git tree.
+> 
+> Should I apply the patches to a new branch in arm-soc or do you
+> send a pull request?
+> 
 
-Great diffstat!
+We have a public git tree available at:
 
-Pulled into next/cleanup, thanks,
+https://github.com/Marvell-Semi/EBU_mainline_public.git
 
-	Arnd
+this last patch set is directly from mvebu_for-next-V9 branch.
+
+Do you need a formal request?
+
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
