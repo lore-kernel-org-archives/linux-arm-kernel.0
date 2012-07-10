@@ -1,36 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Jul 2012 12:54:19 +0100
-Subject: [PATCH] drivers/rtc/rtc-twl.c: fix threaded IRQ to use
- IRQF_ONESHOT
-In-Reply-To: <20120709151527.58f44c3a.akpm@linux-foundation.org>
-References: <1341592434-4207-1-git-send-email-khilman@ti.com>
- <20120709151527.58f44c3a.akpm@linux-foundation.org>
-Message-ID: <20120710115418.GA2280@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jul 2012 12:03:30 +0000
+Subject: [PATCH v9] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <20120710111655.071a4ab1@skate>
+References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120710111655.071a4ab1@skate>
+Message-ID: <201207101203.30984.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2012 at 03:15:27PM -0700, Andrew Morton wrote:
+On Tuesday 10 July 2012, Thomas Petazzoni wrote:
+> Le Fri,  6 Jul 2012 17:23:32 +0200,
+> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
+> 
+> > You'll find in this patch set the nineth version of the initial
+> > support for a new family of ARMv7-compatible Marvell SoCs.
+> 
+> This v9 version has received Acked-by from Andrew Lunn on the
+> different patches, we have solved the maintainership question of the
+> new mach-mvebu directory, and so far there hasn't been additional
+> comments on this v9.
+> 
+> Is there anything we can do to help in getting this patch set merged?
 
-> OK, this is the second such patch I've seen and it's time to wonder if
-> we should get grumpy at tglx.  afacit 1c6c6952 broke the following
-> drivers:
+Usually I'm waiting for git pull requests, which fits the arm-soc
+workflow best, but it's also ok to ask for patches to be included,
+especially if you do not have a public git tree.
 
-> sound/soc/codecs/wm8994.c
-> drivers/mfd/wm831x-auxadc.c
-> drivers/mfd/wm8350-core.c
-> drivers/regulator/wm831x-isink.c
-> drivers/regulator/wm831x-ldo.c
-> drivers/regulator/wm831x-dcdc.c
-> drivers/input/misc/wm831x-on.c
+Should I apply the patches to a new branch in arm-soc or do you
+send a pull request?
 
-> what am I missing here?
-
-At least the above (and possibly a good proportion of the others from
-the looks of things) aren't affected by this change because they are
-nested IRQs for MFDs where we can guarantee that there will never be a
-primary IRQ.  _ONESHOT shouldn't make any odds in these situations.
-
-> drivers/base/regmap/regmap-irq.c
-
-This is using irq_flags passed in by the caller so should be unaffected,
-it's always been the responsibility of the caller to set the flags.
+	Arnd
