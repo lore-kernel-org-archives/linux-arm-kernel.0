@@ -1,7 +1,8 @@
 From: tony@atomide.com (Tony Lindgren)
 Date: Tue, 10 Jul 2012 06:05:55 -0700
-Subject: [GIT PULL 1/5] omap device tree changes for v3.6 merge window
-Message-ID: <pull-1341925556-888624>
+Subject: [GIT PULL 2/5] omap board changes for v3.6 merge window
+In-Reply-To: <pull-1341925556-888624>
+Message-ID: <mailman.29.1341925606.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,71 +12,46 @@ The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-dt-for-v3.6
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-for-v3.6
 
-for you to fetch changes up to f700c4d780f14125f61b70e86d805908efe3fb89:
+for you to fetch changes up to b103a2e22a238085f5c50d96345e1a09bb1efd50:
 
-  arm/dts: New dts file for PandaBoardES (4460) (2012-07-09 05:37:05 -0700)
-
-----------------------------------------------------------------
-Device tree related patches for omaps
+  ARM: OMAP3: Fix omap3evm randconfig error introduced by VBUS support (2012-07-09 23:22:24 -0700)
 
 ----------------------------------------------------------------
-Afzal Mohammed (1):
-      arm/dts: am33xx wdt node
+Board and platform data related changes for omaps
 
-AnilKumar Ch (4):
-      arm/dts: Add initial DT support for AM33XX SoC family
-      arm/dts: Add support for AM335x EVM
-      arm/dts: Add support for AM335x BeagleBone
-      arm/dts: remove MMC/SD and SPI related entries from am33xx.dtsi
+----------------------------------------------------------------
+Andy Gross (1):
+      omap2+: add drm device
 
-Jon Hunter (1):
-      arm/dts: OMAP2: Add support for OMAP2420H4 Board
+Dmitry Lifshitz (2):
+      ARM: OMAP3: cm-t35: add mt9t001 camera sensor support
+      ARM: OMAP3: cm-t35: add tvp5150 decoder support
 
-Peter Ujfalusi (7):
-      arm/dts: omap4: Add entry for OMAP McPDM IP
-      arm/dts: omap4: Add entry for OMAP DMIC IP
-      arm/dts: omap4-sdp: Add fixed regulator to represent VBAT
-      arm/dts: omap4-sdp: Add support for twl6040
-      arm/dts: omap4-sdp: Enable audio support via device tree
-      arm/dts: omap4-panda: Audio support for PandaBoard 4430
-      arm/dts: New dts file for PandaBoardES (4460)
+Peter Ujfalusi (2):
+      ARM: OMAP: board-4430sdp: MUX configuration for sys_nirq2
+      ARM: OMAP: board-omap4panda: MUX configuration for sys_nirq2
 
-Uri Yosef (1):
-      arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule support
+Tony Lindgren (1):
+      ARM: OMAP3: Fix omap3evm randconfig error introduced by VBUS support
 
-Vaibhav Hiremath (2):
-      arm/dts: Add support for TI AM3517/05 EVM board
-      arm/dts: omap3-evm: Add i2c and twl4030 support
+Zumeng Chen (4):
+      ARM: OMAP3EVM: Add NAND flash definition
+      ARM: OMAP3EVM: Adding USB internal LDOs board file
+      ARM: omap3evm: enable VBUS switch for EHCI tranceiver
+      ARM: OMAP3530evm: set pendown_state and debounce time for ads7846
 
-Xiao Jiang (3):
-      arm/dts: add wdt node for omap3 and omap4
-      ARM: OMAP: avoid build wdt platform device if with dt support
-      watchdog: omap_wdt: add device tree support
-
- .../devicetree/bindings/arm/omap/omap.txt          |    3 +
- .../devicetree/bindings/watchdog/omap-wdt.txt      |   14 ++
- arch/arm/boot/dts/am335x-bone.dts                  |   20 +++
- arch/arm/boot/dts/am335x-evm.dts                   |   20 +++
- arch/arm/boot/dts/am33xx.dtsi                      |  158 ++++++++++++++++++++
- arch/arm/boot/dts/am3517-evm.dts                   |   32 ++++
- arch/arm/boot/dts/omap2420-h4.dts                  |   20 +++
- arch/arm/boot/dts/omap3-evm.dts                    |   28 ++++
- arch/arm/boot/dts/omap3.dtsi                       |    5 +
- arch/arm/boot/dts/omap4-panda.dts                  |   37 +++++
- arch/arm/boot/dts/omap4-pandaES.dts                |   24 +++
- arch/arm/boot/dts/omap4-sdp.dts                    |   68 +++++++++
- arch/arm/boot/dts/omap4-var_som.dts                |   96 ++++++++++++
- arch/arm/boot/dts/omap4.dtsi                       |   23 +++
- arch/arm/mach-omap2/devices.c                      |    2 +-
- drivers/watchdog/omap_wdt.c                        |    7 +
- 16 files changed, 556 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/omap-wdt.txt
- create mode 100644 arch/arm/boot/dts/am335x-bone.dts
- create mode 100644 arch/arm/boot/dts/am335x-evm.dts
- create mode 100644 arch/arm/boot/dts/am33xx.dtsi
- create mode 100644 arch/arm/boot/dts/am3517-evm.dts
- create mode 100644 arch/arm/boot/dts/omap2420-h4.dts
- create mode 100644 arch/arm/boot/dts/omap4-pandaES.dts
- create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
+ arch/arm/mach-omap2/Makefile                       |    4 +
+ arch/arm/mach-omap2/board-4430sdp.c                |    3 +
+ arch/arm/mach-omap2/board-cm-t35.c                 |   89 ++++++++++++++++++++
+ arch/arm/mach-omap2/board-omap3evm.c               |   78 ++++++++++++++++-
+ arch/arm/mach-omap2/board-omap4panda.c             |    3 +
+ arch/arm/mach-omap2/common-board-devices.c         |   18 +++-
+ arch/arm/mach-omap2/common-board-devices.h         |    1 +
+ arch/arm/mach-omap2/drm.c                          |   61 ++++++++++++++
+ drivers/staging/omapdrm/omap_drv.h                 |    2 +-
+ .../linux/platform_data/omap_drm.h                 |   19 ++---
+ 10 files changed, 263 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/drm.c
+ rename drivers/staging/omapdrm/omap_priv.h => include/linux/platform_data/omap_drm.h (81%)
