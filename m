@@ -1,58 +1,36 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 10 Jul 2012 20:34:24 +0530
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <20120710135302.GG9409@opensource.wolfsonmicro.com>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
- <4FE882A5.3080504@nvidia.com>
- <20120625222646.GB30406@opensource.wolfsonmicro.com>
- <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
- <20120710134436.GD9409@opensource.wolfsonmicro.com>
- <4FFC31D5.7090600@nvidia.com>
- <20120710135302.GG9409@opensource.wolfsonmicro.com>
-Message-ID: <4FFC4478.7000204@nvidia.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Jul 2012 17:13:31 +0200
+Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <20120710140911.GK20456@pengutronix.de>
+References: <1341554956-17416-1-git-send-email-marex@denx.de>
+ <201207091758.22788.marex@denx.de> <20120710140911.GK20456@pengutronix.de>
+Message-ID: <201207101713.31498.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012 07:23 PM, Mark Brown wrote:
-> * PGP Signed by an unknown key
->
-> On Tue, Jul 10, 2012 at 07:14:53PM +0530, Laxman Dewangan wrote:
->
->> Sorry, I did not get it fully. I had two patches, one for fixed one
->> and other for tps65910. On which patch, you are seeing issue and
->> which part of code?
-> Mainly tps65910.  The fixed voltage regulator does have the same issue
-> but it is somewhat special here.
+Dear Robert Schwebel,
 
-Oops, I follow the same approach for tps65910 what it was with fixed 
-regulator, was thinking that this is good approach.
+> On Mon, Jul 09, 2012 at 05:58:22PM +0200, Marek Vasut wrote:
+> > > The kernel should work for all users, not only for the majority, so:
+> > > Better safe than sorry.
+> > > 
+> > > Also, defaults should make the system work. Tuning can be done later by
+> > > somebody who understands what is needed.
+> > > 
+> > > And frankly, this attitude which made you add a potential regression is
+> > > worrisome. I'd suggest to give stability a higher priority.
+> > 
+> > I believe you misunderstood my intention. Setting it to 400kHz was done
+> > because it's what most people will use, therefore avoiding duplication
+> > (most of the board files will override this setting now). All right,
+> > your sane defaults here can be applied, I won't argue.
+> 
+> I think all I2C chips support 100 kHz, but only selected ones support
+> 400 kHz.
 
-The sample code for tps65910 is as follows. So where do you think that 
-it is wrong and what should be correct approach.
-I need to follow the same for tps6586x also.
+Yes, this is correct. And I never argued about this.
 
+But anyway, V3 patch is out, let's cut this discussion short.
 
-@@ -1023,6 +1051,13 @@ static struct tps65910_board 
-*tps65910_parse_dt_reg_data(
-                  "ti,regulator-ext-sleep-control", &prop);
-          if (!ret)
-              pmic_plat_data->regulator_ext_sleep_control[idx] = prop;
-+
-+
-+        if (info->vin_name) {
-+            snprintf(in_supply, 32, "%s-supply", info->vin_name);
-+            if (of_find_property(np, in_supply, 0))
-+                pmic_plat_data->input_supply[idx] =
-+                                info->vin_name;
-+        }
-      }
-
-      return pmic_plat_data;
-@@ -1126,6 +1161,7 @@ static __devinit int tps65910_probe(struct 
-platform_device *pdev)
-          pmic->info[i] = info;
-
-          pmic->desc[i].name = info->name;
-+        pmic->desc[i].supply_name = pmic_plat_data->input_supply[i];
-          pmic->desc[i].id = i;
+Best regards,
+Marek Vasut
