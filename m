@@ -1,64 +1,128 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 10 Jul 2012 16:39:41 -0500
-Subject: [PATCH v2 2/2] arm: picoxcell: Make use of dw_apb_timer_of
-In-Reply-To: <1341956381-496-1-git-send-email-dinguyen@altera.com>
-References: <1341956381-496-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1341956381-496-2-git-send-email-dinguyen@altera.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 10 Jul 2012 14:48:56 -0700
+Subject: [CFT 03/11] mmc: omap_hsmmc: remove private DMA API implementation
+In-Reply-To: <E1ScaYb-0003tZ-Pb@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Thu, 07 Jun 2012 12:07:13 +0100")
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1ScaYb-0003tZ-Pb@rmk-PC.arm.linux.org.uk>
+Message-ID: <87vchvl22f.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Hi Russell,
 
-Make use of the move dw_apb_timer_of device tree implementation in
-clocksource.
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-Signed-off-by: Pavel Machek <pavel@denx.de>
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Remove the private DMA API implementation from omap_hsmmc, making it
+> use entirely the DMA engine API.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+While testing this, I noticed a minor problem in the case of probe
+failure (e.g. if dmaengine is not built into the kernel.)
+
+The current driver suffers from this same problem but should probably be
+fixed when converting to dmaengine...
+
+[...]
+
+> @@ -2048,36 +1919,28 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+>  		dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
+>  		goto err_irq;
+>  	}
+> -	host->dma_line_tx = res->start;
+> +	tx_req = res->start;
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+>  	if (!res) {
+>  		dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
+>  		goto err_irq;
+>  	}
+> -	host->dma_line_rx = res->start;
+> +	rx_req = res->start;
+>  
+> -	{
+> -		dma_cap_mask_t mask;
+> -		unsigned sig;
+> -		extern bool omap_dma_filter_fn(struct dma_chan *chan, void *param);
+> -
+> -		dma_cap_zero(mask);
+> -		dma_cap_set(DMA_SLAVE, mask);
+> -#if 1
+> -		sig = host->dma_line_rx;
+> -		host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+> -		if (!host->rx_chan) {
+> -			dev_warn(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", sig);
+> -		}
+> -#endif
+> -#if 1
+> -		sig = host->dma_line_tx;
+> -		host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+> -		if (!host->tx_chan) {
+> -			dev_warn(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", sig);
+> -		}
+> -#endif
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(DMA_SLAVE, mask);
+> +
+> +	host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
+> +	if (!host->rx_chan) {
+> +		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+> +		goto err_irq;
+> +	}
+> +
+> +	host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
+> +	if (!host->tx_chan) {
+> +		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+> +		goto err_irq;
+>  	}
+
+If either of these fails, ret is zero so even though this results in a
+failed probe, the return value (ret) is zero meaning the driver still
+gets bound to the device.
+
+The patch below fixes this and applies on your 'for-next' branch.  Or,
+feel free to fold this into the original if you prefer.
+
+Kevin
+
+>From af7537997b46ee3991985fecd4b4a302bdc0df31 Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@ti.com>
+Date: Tue, 10 Jul 2012 14:30:18 -0700
+Subject: [PATCH] mmc: omap_hsmmc: ensure probe returns error if DMA channel
+ request fails
+
+If dma_request_channel() fails (e.g. because DMA engine is not built
+into the kernel), the return value from probe is zero causing the
+driver to be bound to the device even though probe failed.
+
+To fix, ensure that probe returns an error value when a DMA channel
+request fail.
+
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-picoxcell/Makefile |    1 -
- arch/arm/mach-picoxcell/common.c |    3 ++-
- arch/arm/mach-picoxcell/common.h |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index e5ec4a8..8e39f80 100644
---- a/arch/arm/mach-picoxcell/Makefile
-+++ b/arch/arm/mach-picoxcell/Makefile
-@@ -1,2 +1 @@
- obj-y	:= common.o
--obj-y	+= time.o
-diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-index a2e8ae8..8f9a0b4 100644
---- a/arch/arm/mach-picoxcell/common.c
-+++ b/arch/arm/mach-picoxcell/common.c
-@@ -14,6 +14,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/dw_apb_timer.h>
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 2338703..ddcecf8 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1924,12 +1924,14 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+ 	host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
+ 	if (!host->rx_chan) {
+ 		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
++		ret = -ENXIO;
+ 		goto err_irq;
+ 	}
  
- #include <asm/mach/arch.h>
- #include <asm/hardware/vic.h>
-@@ -97,7 +98,7 @@ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= picoxcell_init_irq,
- 	.handle_irq	= vic_handle_irq,
--	.timer		= &picoxcell_timer,
-+	.timer		= &dw_apb_timer,
- 	.init_machine	= picoxcell_init_machine,
- 	.dt_compat	= picoxcell_dt_match,
- 	.restart	= picoxcell_wdt_restart,
-diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
-index 83d55ab..a65cb02 100644
---- a/arch/arm/mach-picoxcell/common.h
-+++ b/arch/arm/mach-picoxcell/common.h
-@@ -12,6 +12,6 @@
+ 	host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
+ 	if (!host->tx_chan) {
+ 		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
++		ret -ENXIO;
+ 		goto err_irq;
+ 	}
  
- #include <asm/mach/time.h>
- 
--extern struct sys_timer picoxcell_timer;
-+extern struct sys_timer dw_apb_timer;
- 
- #endif /* __PICOXCELL_COMMON_H__ */
 -- 
-1.7.9.5
+1.7.9.2
