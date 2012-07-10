@@ -1,56 +1,45 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 10 Jul 2012 08:38:35 +0000
-Subject: [RESEND PATCH] ARM: OMAP2+: am33xx: Make am33xx as a separate
- class
-In-Reply-To: <20120705152743.GG1122@atomide.com>
-References: <1341320447-18918-1-git-send-email-hvaibhav@ti.com>
- <1341320447-18918-2-git-send-email-hvaibhav@ti.com>
- <20120704072454.GO1122@atomide.com> <20120704081546.GR1122@atomide.com>
- <20120705152743.GG1122@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA699EE@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Jul 2012 01:41:08 -0700
+Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
+ non-omap1 platforms
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA5C2C4@DBDE01.ent.ti.com>
+References: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5096A@DBDE01.ent.ti.com>
+ <20120627133950.GJ3483@atomide.com>
+ <20120627161745.GO3483@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA5C2C4@DBDE01.ent.ti.com>
+Message-ID: <20120710084107.GO1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 20:57:43, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [120704 01:20]:
-> > * Tony Lindgren <tony@atomide.com> [120704 00:29]:
-> > > * Vaibhav Hiremath <hvaibhav@ti.com> [120703 06:12]:
-> > > > Initially, we decided to make am33xx family of device to fall
-> > > > under omap3 class (cpu_is_omap34xx() = true), since it carries
-> > > > Cortex-A8 core. But while adding complete baseport support
-> > > > (like, clock, power and hwmod) support, it is observed that,
-> > > > we are creating more and more problems by treating am33xx device
-> > > > as omap3 family, as nothing matches between them
-> > > > (except cortex-A8 mpu).
-> > > > 
-> > > > So,  after long discussion we have came to the conclusion that,
-> > > > we should not consider am33xx device as omap3 family, instead
-> > > > create separate class (SOC_AM33XX) under OMAP2PLUS.
-> > > > This means, for am33xx device, cpu_is_omap34xx() will return false,
-> > > > and only cpu_is_am33xx() will be true.
-> > > 
-> > > Thanks applying both.
-> > 
-> > I believe all your patches are now applied. I've pushed them out
-> > into devel-am33xx-part2 branch. Can you please check and send
-> > additional patches as needed?
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120627 13:37]:
+> --- a/arch/arm/plat-omap/include/plat/cpu.h
+> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+> @@ -42,7 +42,14 @@
+>  #define OMAP2_DEVICE_TYPE_GP           3
+>  #define OMAP2_DEVICE_TYPE_BAD          4
 > 
-> I ended up moving some patches into cleanup-part2 branch as omap5
-> patches also need those. So the new branch for am33xx is called
-> devel-am33xx-data at commit 79ab2664. The old devel-am33xx-part2
-> branch should be ignored now.
+> +#ifdef CONFIG_ARCH_OMAP2PLUS
+>  int omap_type(void);
+> +#else
+> +inline static int omap_type(void)
+> +{
+> +	/* Always return GP, since it is not being used anyway for omap1 */
+> +	return OMAP2_DEVICE_TYPE_GP;
+> +}
+> +#endif
 > 
+>  /*
+>   * omap_rev bits:
 
-Tony,
+Just to follow-up on this, looks like we need to postpone this
+for v3.7. While at it, we need to make sure all soc_is_omapxxxx()
+are false by default.
 
-Can we clean these branches; it is very confusing to track with so many 
-multiple versions?
+What you're suggesting above would also depend on some MULTI_ARCH
+option set if multiple ARM architectures are selected. Above patch
+would only optimize things when ARCH_OMAP2PLUS alone is selected.
 
-Also, One patch still has not merged is,
+Regards,
 
-[PATCH-V2] ARM: OMAP: cpu: Make cpu_class_is_omap2 true for all non-omap1 platforms
-
-Do you have any comments on this? If not, can you merge it?
-
-Thanks,
-Vaibhav
+Tony
