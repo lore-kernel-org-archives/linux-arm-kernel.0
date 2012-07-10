@@ -1,39 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 12:08:35 +0000
-Subject: [GIT PULL] at91: a little dt pull request for 3.6
-In-Reply-To: <4FFB299D.7030902@atmel.com>
-References: <4FFB299D.7030902@atmel.com>
-Message-ID: <201207101208.35778.arnd@arndb.de>
+Date: Tue, 10 Jul 2012 12:11:07 +0000
+Subject: [GIT PULL] Samsung cleanup-1 for v3.6
+In-Reply-To: <0c4901cd5e3e$aa970660$ffc51320$%kim@samsung.com>
+References: <0c4901cd5e3e$aa970660$ffc51320$%kim@samsung.com>
+Message-ID: <201207101211.07905.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 July 2012, Nicolas Ferre wrote:
-> Hi Arnd, hi Olof,
-> 
-> The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
-> 
->   Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-for-next-dt
-> 
-> for you to fetch changes up to 3c68bb48214f87562b6956195178d991403d66d4:
-> 
->   ARM: at91: Add support for board aks-cdu (2012-07-09 20:45:31 +0200)
-> 
-> ----------------------------------------------------------------
-> Two new boards described with device tree
-> 
-> ----------------------------------------------------------------
-> Fabio Porcedda (1):
->       ARM: at91: add support for Telit EVK-PRO3 with Telit GE863-PRO3
-> 
-> Jiri Prchal (1):
->       ARM: at91: Add support for board aks-cdu
+On Tuesday 10 July 2012, Kukjin Kim wrote:
+>  arch/arm/mach-exynos/common.c                   |   25 ------
+>  arch/arm/mach-exynos/include/mach/spi-clocks.h  |   16 ----
+>  arch/arm/mach-exynos/mach-nuri.c                |    1 -
+>  arch/arm/mach-exynos/mach-origen.c              |    1 -
+>  arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+>  arch/arm/mach-exynos/mach-universal_c210.c      |    1 -
+>  arch/arm/mach-s3c24xx/common.c                  |    1 -
+>  arch/arm/mach-s3c24xx/include/mach/bast-pmu.h   |   40 ----------
+>  arch/arm/mach-s3c64xx/include/mach/spi-clocks.h |   18 ----
+>  arch/arm/mach-s5p64x0/dma.c                     |    2 -
+>  arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 -----
+>  arch/arm/mach-s5pc100/dma.c                     |    2 -
+>  arch/arm/mach-s5pc100/include/mach/spi-clocks.h |   18 ----
+>  arch/arm/mach-s5pv210/include/mach/spi-clocks.h |   17 ----
+>  arch/arm/plat-samsung/Kconfig                   |    8 --
+>  arch/arm/plat-samsung/Makefile                  |    4 -
+>  arch/arm/plat-samsung/include/plat/devs.h       |    1 -
+>  arch/arm/plat-samsung/include/plat/fb.h         |    1 -
+>  arch/arm/plat-samsung/include/plat/pd.h         |   30 -------
+>  arch/arm/plat-samsung/pd.c                      |   95
+> -----------------------
+>  arch/arm/plat-samsung/pwm.c                     |    4 -
+>  21 files changed, 0 insertions(+), 306 deletions(-)
 
-Very nice!
+Great diffstat!
 
-Pulled into next/dt.
+Pulled into next/cleanup, thanks,
 
 	Arnd
