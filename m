@@ -1,30 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Jul 2012 14:53:03 +0100
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <4FFC31D5.7090600@nvidia.com>
-References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
- <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
- <4FE882A5.3080504@nvidia.com>
- <20120625222646.GB30406@opensource.wolfsonmicro.com>
- <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
- <20120710134436.GD9409@opensource.wolfsonmicro.com>
- <4FFC31D5.7090600@nvidia.com>
-Message-ID: <20120710135302.GG9409@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jul 2012 14:01:29 +0000
+Subject: [PATCH v9] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <4FFC1DA5.6050805@free-electrons.com>
+References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201207101203.30984.arnd@arndb.de> <4FFC1DA5.6050805@free-electrons.com>
+Message-ID: <201207101401.30607.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 07:14:53PM +0530, Laxman Dewangan wrote:
+On Tuesday 10 July 2012, Gregory CLEMENT wrote:
+> We have a public git tree available at:
+> 
+> https://github.com/Marvell-Semi/EBU_mainline_public.git
+> 
+> this last patch set is directly from mvebu_for-next-V9 branch.
+> 
+> Do you need a formal request?
 
-> Sorry, I did not get it fully. I had two patches, one for fixed one
-> and other for tps65910. On which patch, you are seeing issue and
-> which part of code?
+I've pulled it now, but I would generally prefer if you use
+"git request-pull" to generate the pull request, and use a signed
+tag as the reference so you can include the series description
+in the tag.
 
-Mainly tps65910.  The fixed voltage regulator does have the same issue
-but it is somewhat special here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/c0c51521/attachment.sig>
+I had to rebase the series because the version in your tree was based on
+an outdated for-next branch. You really can't send me stuff based on 
+the for-next branch because that does not have a stable history.
+Please instead make everything based on whatever is the newest -rc
+release at the time you start the series. Also please take a look
+at how other people like Tony Lindgren or Stephen Warren do larger
+sets of pull requests.
+
+	Arnd
