@@ -1,59 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Jul 2012 20:19:26 +0200
-Subject: [PATCH 1/1] mfd: ab8500: Clean-up the last two ab8500 related
- DT match tables
-In-Reply-To: <20120710165518.GG15345@sortiz-mobl>
-References: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
- <20120710091304.GU15345@sortiz-mobl> <4FFC4A23.5000107@linaro.org>
- <20120710165518.GG15345@sortiz-mobl>
-Message-ID: <4FFC722E.2020303@linaro.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 10 Jul 2012 22:54:28 +0400
+Subject: [PATCH 2/3] ARM: i.MX5x clocks: Fix parent for PWM clocks
+In-Reply-To: <20120709082700.GM24458@pengutronix.de>
+References: <20120709082700.GM24458@pengutronix.de>
+Message-ID: <1341946469-25984-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/12 18:55, Samuel Ortiz wrote:
-> Hi Lee,
->
-> On Tue, Jul 10, 2012 at 05:28:35PM +0200, Lee Jones wrote:
->> On 10/07/12 11:13, Samuel Ortiz wrote:
->>> Hi Lee,
->>>
->>> On Fri, Jul 06, 2012 at 01:43:18PM +0100, Lee Jones wrote:
->>>> A patch was recently submitted to stop all ab8500 devices from
->>>> being registered through Device Tree. Instead, only the db8500
->>>> will be DT:ed and the rest will continue to be registered via
->>>> the MFD API, as they always were.
->>>>
->>>> Two patches have recently been applied which enable Device Tree
->>>> probing; one for rtc-ab8500 and the other for ponkey-ab8500.
->>>> These two need to be removed to prevent double-probing these
->>>> devices with Device Tree is enabled.
->>>>
->>>> Cc: Samuel Ortiz <sameo@linux.intel.com>
->>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>> ---
->>>>   drivers/input/misc/ab8500-ponkey.c |    8 --------
->>>>   drivers/rtc/rtc-ab8500.c           |    6 ------
->>>>   2 files changed, 14 deletions(-)
->>> I don't know against which tree you generated those patches, but none of those
->>> 2 of_device_id arrays are in my for-next branch. So I can't apply this patch.
->>
->> I can rebase them on anything of your choosing.
->>
->> What is your for-next branch based on?
-> On Linus' tree. And the of_device_id arrays are not there.
+This patch also changes the names of the clocks to reflect the changes.
 
-Ah, that's why.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-These are patches based on the -next tree.
-
-The code we adapt here isn't in Mainline yet.
-
-I can wait and send them in the back-end of the merge window, or -rc1 
-instead?
-
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index d9cb79f..50e6043 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -57,7 +57,7 @@ enum imx5_clks {
+ 	usboh3_podf, usb_phy_pred, usb_phy_podf, cpu_podf, di_pred, tve_di,
+ 	tve_s, uart1_ipg_gate, uart1_per_gate, uart2_ipg_gate,
+ 	uart2_per_gate, uart3_ipg_gate, uart3_per_gate, i2c1_gate, i2c2_gate,
+-	gpt_ipg_gate, pwm1_ipg_gate, pwm1_hf_gate, pwm2_ipg_gate, pwm2_hf_gate,
++	gpt_ipg_gate, pwm1_ipg_gate, pwm1_per_gate, pwm2_ipg_gate, pwm2_per_gate,
+ 	gpt_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
+ 	esdhc3_ipg_gate, esdhc4_ipg_gate, ssi1_ipg_gate, ssi2_ipg_gate,
+ 	ssi3_ipg_gate, ecspi1_ipg_gate, ecspi1_per_gate, ecspi2_ipg_gate,
+@@ -170,9 +170,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[i2c2_gate] = imx_clk_gate2("i2c2_gate", "per_root", MXC_CCM_CCGR1, 20);
+ 	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 20);
+ 	clk[pwm1_ipg_gate] = imx_clk_gate2("pwm1_ipg_gate", "ipg", MXC_CCM_CCGR2, 10);
+-	clk[pwm1_hf_gate] = imx_clk_gate2("pwm1_hf_gate", "ipg", MXC_CCM_CCGR2, 12);
++	clk[pwm1_per_gate] = imx_clk_gate2("pwm1_per_gate", "per_root", MXC_CCM_CCGR2, 12);
+ 	clk[pwm2_ipg_gate] = imx_clk_gate2("pwm2_ipg_gate", "ipg", MXC_CCM_CCGR2, 14);
+-	clk[pwm2_hf_gate] = imx_clk_gate2("pwm2_hf_gate", "ipg", MXC_CCM_CCGR2, 16);
++	clk[pwm2_per_gate] = imx_clk_gate2("pwm2_per_gate", "per_root", MXC_CCM_CCGR2, 16);
+ 	clk[gpt_gate] = imx_clk_gate2("gpt_gate", "per_root", MXC_CCM_CCGR2, 18);
+ 	clk[fec_gate] = imx_clk_gate2("fec_gate", "ipg", MXC_CCM_CCGR2, 24);
+ 	clk[usboh3_gate] = imx_clk_gate2("usboh3_gate", "ipg", MXC_CCM_CCGR2, 26);
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.3.4
