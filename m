@@ -1,33 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 12:03:30 +0000
-Subject: [PATCH v9] arm: Add basic support for new Marvell Armada 370 and
- Armada XP SoC
-In-Reply-To: <20120710111655.071a4ab1@skate>
-References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120710111655.071a4ab1@skate>
-Message-ID: <201207101203.30984.arnd@arndb.de>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 10 Jul 2012 17:29:06 +0530
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <4FE8EFC4.3090509@wwwdotorg.org>
+References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
+ <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
+ <4FE882A5.3080504@nvidia.com>
+ <20120625222646.GB30406@opensource.wolfsonmicro.com>
+ <4FE8EFC4.3090509@wwwdotorg.org>
+Message-ID: <4FFC190A.2040800@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012, Thomas Petazzoni wrote:
-> Le Fri,  6 Jul 2012 17:23:32 +0200,
-> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
-> 
-> > You'll find in this patch set the nineth version of the initial
-> > support for a new family of ARMv7-compatible Marvell SoCs.
-> 
-> This v9 version has received Acked-by from Andrew Lunn on the
-> different patches, we have solved the maintainership question of the
-> new mach-mvebu directory, and so far there hasn't been additional
-> comments on this v9.
-> 
-> Is there anything we can do to help in getting this patch set merged?
+Hi Mark,
+I require  your input on supporting the vin-supply for tps6586x.
 
-Usually I'm waiting for git pull requests, which fits the arm-soc
-workflow best, but it's also ok to ask for patches to be included,
-especially if you do not have a public git tree.
+On Tuesday 26 June 2012 04:39 AM, Stephen Warren wrote:
+> On 06/25/2012 04:26 PM, Mark Brown wrote:
+>>
+>> More specifically, all the supplies for a device (including those
+>> that happen to be inputs for regulators) should be specified in
+>> exactly the same fashion.  This makes the binding more regular and
+>> means that users can just go through the schematic adding the
+>> mappings without worrying about what what the supply happens to
+>> be.
+> Just making sure I parsed that right. I think what you're saying is
+> that the device itself should represent its input pins, e.g.:
+>
+> tps6586x {
+>      vin-ldo01-supply =<&some_regulator>;
+>      vin-ldo23-supply =<...>;
+>      vin-ldo4-supply =<...>;
+>      vin-ldo678-supply =<...>;
+>      vin-ldo9-supply =<...>;
+> :::::::::::
+> };
 
-Should I apply the patches to a new branch in arm-soc or do you
-send a pull request?
+Looked tps6586x-regulator driver and it has the platform data which is 
+regulator_init_data.
+So for adding the vin-supply similar to what we have in fixed or 
+tps6591x regulator to pass through the desc.supply_name, we are not 
+having option here in platform data which can work for DT and non-DT case.
 
-	Arnd
+So if still want to have the DT and non-DT case similar, we can add one 
+tps6586x_regulator_platform_data as
+
+struct tps6586x_regulator_platform_data
+{
+     const char *input_supply;
+     struct regulator_init_data *reg_init_data;
+}
+
+and then pass this when registering the regulator.
+
+Or,
+second option is to support the input supply name for DT case through 
+desc.supply_name and for non-DT let it be there through regulator_init_data.
+
+Please let me know your opinion.
+
+Thanks,
+Laxman
