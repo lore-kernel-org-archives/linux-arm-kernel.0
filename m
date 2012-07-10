@@ -1,37 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 07:50:33 +0000
-Subject: [PATCH 07/15] ARM: dove: use fixed PCI i/o mapping
-In-Reply-To: <alpine.LFD.2.02.1207091641030.31100@xanadu.home>
-References: <1341600040-30993-1-git-send-email-robherring2@gmail.com>
- <4FFB2321.30100@gmail.com> <alpine.LFD.2.02.1207091641030.31100@xanadu.home>
-Message-ID: <201207100750.34214.arnd@arndb.de>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 10 Jul 2012 13:43:57 +0530
+Subject: [PATCH v1 10/11] arm/dts: omap: Add usb_otg and glue data
+In-Reply-To: <4FFBCB39.1010809@ti.com>
+References: <1340884267-28908-1-git-send-email-kishon@ti.com>
+ <1340884267-28908-11-git-send-email-kishon@ti.com>
+ <4FFBCB39.1010809@ti.com>
+Message-ID: <CAAe_U6LqF9aZLZgHQYhX6VXXB41HUNmZgXfOwe9V9VtWVe+46g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 July 2012, Nicolas Pitre wrote:
-> On Mon, 9 Jul 2012, Rob Herring wrote:
-> 
-> > Why use 1M when 64K is enough based on our prior conversations? The more
-> > we standardize the configuration, the more we can make common. I think
-> > the majority of the pci setup functions can be consolidated. It's really
-> > just data differences for the resource setup. I only used 1M alignment
-> > in case there were some alignment requirements in the h/w and it can't
-> > handle a starting pci bus address of 0x10000. I think it's just the
-> > Marvell parts that do this, so if anyone knowledgeable on those parts
-> > can comment it would help.
-> 
-> The only Marvell board I have which can accommodate a PCI card does 
-> support 3.3V PCI cards only.  Otherwise this is all PCI Express.  And 
-> the only PCI cards with I/O space I've seen are 5V PCI cards.
+Hi,
 
-All graphics cards and ATA controllers support backwards compatible PIO
-access to the VGA or IDE registers, and they are available for PCI express.
-A lot of PCIe legacy I/O cards (uart, printer, 	GPIO) can also use PIO
-mode to be backwards compatible.
+On Tue, Jul 10, 2012 at 11:57 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> On Thursday 28 June 2012 05:21 PM, Kishon Vijay Abraham I wrote:
+>>
+>> Add usb otg data node in omap4/omap3 device tree file. Also update
+>> the node with board specific setting in omapx-<board>.dts file.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+>>   arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+>>   arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+>>   arch/arm/boot/dts/omap4-panda.dts  |    6 ++++++
+>>   arch/arm/boot/dts/omap4-sdp.dts    |    6 ++++++
+>>   arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+>>   6 files changed, 40 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts
+>> b/arch/arm/boot/dts/omap3-beagle.dts
+>> index 5b4506c..f3d7076 100644
+>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>> @@ -67,3 +67,9 @@
+>>   &mmc3 {
+>>         status = "disable";
+>>   };
+>> +
+>> +&usb_otg_hs {
+>> +       interface_type =<0>;
+>> +       mode =<3>;
+>> +       power =<50>;
+>> +};
+>> diff --git a/arch/arm/boot/dts/omap3-evm.dts
+>> b/arch/arm/boot/dts/omap3-evm.dts
+>> index 2eee16e..8963b3d 100644
+>> --- a/arch/arm/boot/dts/omap3-evm.dts
+>> +++ b/arch/arm/boot/dts/omap3-evm.dts
+>> @@ -18,3 +18,9 @@
+>>                 reg =<0x80000000 0x10000000>; /* 256 MB */
+>>         };
+>>   };
+>> +
+>> +&usb_otg_hs {
+>> +       interface_type =<0>;
+>> +       mode =<3>;
+>> +       power =<50>;
+>> +};
+>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>> index 99474fa..2f565d6 100644
+>> --- a/arch/arm/boot/dts/omap3.dtsi
+>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>> @@ -215,5 +215,13 @@
+>>                         compatible = "ti,omap3-hsmmc";
+>>                         ti,hwmods = "mmc3";
+>>                 };
+>> +
+>> +               usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>> +                       compatible = "ti,musb-omap2430";
+>
+>
+> this compatible doesn't seem right in omap3.dtsi. Same with
+> the below entry in omap4.dtsi.
+> See other IP blocks which are reused across OMAP2/3/4 on
+> how the compatible for those are handled.
 
-> So I'd say: go for the option with the best consolidation outcome.  No 
-> one is using cards with I/O space on those platforms.
+Ok. So it should be like *ti,omap4-musb*, *ti,omap3-musb*?
 
-That is probably true.
-
-	Arnd
+Thanks
+Kishon
