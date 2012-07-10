@@ -1,110 +1,67 @@
-From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
-Date: Tue, 10 Jul 2012 09:24:13 +0200
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: set GPIO mode for mux
- mcspi1_cs2 pin
-In-Reply-To: <1341885452-5372-1-git-send-email-javier@dowhile0.org>
-References: <1341885452-5372-1-git-send-email-javier@dowhile0.org>
-Message-ID: <CAFqH_511c6CyAYnbtU0ECZwzRNwJEdTqtcZ63nODCYZU4GC0aA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 10 Jul 2012 09:21:09 +0100
+Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
+ corresponding mask value
+In-Reply-To: <20120709225700.GB16202@gmail.com>
+References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+ <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
+ <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
+ <4FFAC8D2.4080601@st.com>
+ <CAOh2x=k5Tx2Gjrk1uRod-N-6gvYSeEKiZgms8gQfJ61TL8RXCQ@mail.gmail.com>
+ <20120709225700.GB16202@gmail.com>
+Message-ID: <CAKohponeGSG376uj_jEGCEj4m4OgShD7zRGNpF-8BP2rmQUOYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/7/10 Javier Martinez Canillas <javier@dowhile0.org>
+On 9 July 2012 23:57, Mike Turquette <mturquette@ti.com> wrote:
 
-> According to the IGEPv2 Rev.C data-sheet the LAN9221i pin 14 (IRQ) is
-> connected to the OMAP3730 mcspi1_cs2 pin. Since this omap mux pin acts
-> as an IRQ line, it has to be configured as an input GPIO.
+> I assume this change has been tested and wouldn't be posted if modifying
+> the parent names broke things.
 >
-> IGEPv2 platform code sets the smsc911x_cfg->gpio_irq to GPIO 176 but
-> since the mux pin default mode is MODE7 (safe_mode) the driver fails
-> when trying to register the IRQ with the following error message:
+> That said, as long as the parent names are valid strings then the clk
+> framework should handle them.  When calling __clk_lookup for parent name
+> "none", __clk_lookup will return NULL (of course assuming no one else in
+> the system registered a clock named "none", which would be silly).  This
+> is handled gracefully by the clk framework by re-parenting your "sys"
+> clk from $old_parent to the "orphan" list.
 >
-> [    1.994598] smsc911x: Driver version 2008-10-21
-> [    3.704162] irq 272: nobody cared (try booting with the "irqpoll"
-> option)
-> [    3.711364] [<c001a114>] (unwind_backtrace+0x0/0xf0) from [<c009a0d4>]
-> (__report_bad_irq+0x20/0xbc)
-> [    3.720916] [<c009a0d4>] (__report_bad_irq+0x20/0xbc) from [<c009a41c>]
-> (note_interrupt+0x1d8/0x238)
-> [    3.730560] [<c009a41c>] (note_interrupt+0x1d8/0x238) from [<c0098234>]
-> (handle_irq_event_percpu+0xc0/0x260)
-> [    3.740936] [<c0098234>] (handle_irq_event_percpu+0xc0/0x260) from
-> [<c0098410>] (handle_irq_event+0x3c/0x5c)
-> [    3.751312] [<c0098410>] (handle_irq_event+0x3c/0x5c) from [<c009abe0>]
-> (handle_level_irq+0xac/0x10c)
-> [    3.761047] [<c009abe0>] (handle_level_irq+0xac/0x10c) from
-> [<c0097a34>] (generic_handle_irq+0x30/0x48)
-> [    3.770935] [<c0097a34>] (generic_handle_irq+0x30/0x48) from
-> [<c02a6b74>] (gpio_irq_handler+0x180/0x1d4)
-> [    3.780944] [<c02a6b74>] (gpio_irq_handler+0x180/0x1d4) from
-> [<c0097a34>] (generic_handle_irq+0x30/0x48)
-> [    3.790954] [<c0097a34>] (generic_handle_irq+0x30/0x48) from
-> [<c0013e18>] (handle_IRQ+0x4c/0xac)
-> [    3.800231] [<c0013e18>] (handle_IRQ+0x4c/0xac) from [<c000858c>]
-> (omap3_intc_handle_irq+0x60/0x74)
-> [    3.809783] [<c000858c>] (omap3_intc_handle_irq+0x60/0x74) from
-> [<c04979e4>] (__irq_svc+0x44/0x60)
-> [    3.819213] Exception stack(0xee42fde0 to 0xee42fe28)
-> [    3.824554] fde0: 00000001 00000001 00000000 00000000 60000013 c06cce14
-> c06cce14 00000110
-> [    3.833190] fe00: 00000000 c06ccdf4 60000013 ee41d000 fb058064 ee42fe28
-> c0089e08 c04976b4
-> [    3.841796] fe20: 20000013 ffffffff
-> [    3.845489] [<c04979e4>] (__irq_svc+0x44/0x60) from [<c04976b4>]
-> (_raw_spin_unlock_irqrestore+0x34/0x44)
-> [    3.855499] [<c04976b4>] (_raw_spin_unlock_irqrestore+0x34/0x44) from
-> [<c0099744>] (__setup_irq+0x1b8/0x3f0)
-> [    3.865875] [<c0099744>] (__setup_irq+0x1b8/0x3f0) from [<c0099a34>]
-> (request_threaded_irq+0xb8/0x140)
-> [    3.875701] [<c0099a34>] (request_threaded_irq+0xb8/0x140) from
-> [<c0487950>] (smsc911x_drv_probe+0x75c/0x11a4)
-> [    3.886260] [<c0487950>] (smsc911x_drv_probe+0x75c/0x11a4) from
-> [<c02e9bcc>] (platform_drv_probe+0x18/0x1c)
-> [    3.906707] [<c02e89b8>] (driver_probe_device+0x90/0x210) from
-> [<c02e8bcc>] (__driver_attach+0x94/0x98)
-> [    3.916625] [<c02e8bcc>] (__driver_attach+0x94/0x98) from [<c02e7298>]
-> (bus_for_each_dev+0x50/0x7c)
-> [    3.926177] [<c02e7298>] (bus_for_each_dev+0x50/0x7c) from [<c02e81d4>]
-> (bus_add_driver+0x184/0x248)
-> [    3.935821] [<c02e81d4>] (bus_add_driver+0x184/0x248) from [<c02e909c>]
-> (driver_register+0x78/0x12c)
-> [    3.945465] [<c02e909c>] (driver_register+0x78/0x12c) from [<c0008648>]
-> (do_one_initcall+0x34/0x178)
-> [    3.955108] [<c0008648>] (do_one_initcall+0x34/0x178) from [<c066e8f4>]
-> (kernel_init+0xfc/0x1c0)
-> [    3.964385] [<c066e8f4>] (kernel_init+0xfc/0x1c0) from [<c00140b0>]
-> (kernel_thread_exit+0x0/0x8)
-> [    3.973632] handlers:
-> [    3.976043] [<c034e2cc>] smsc911x_irqhandler
-> [    3.980560] Disabling IRQ #272
+> At the top level, there are basically two clock trees.  The first tree
+> is "real" clock tree which starts as a list of clocks that set the
+> CLK_IS_ROOT flag.  The second tree is a tree of "orphans" for clocks
+> which are defined but "disconnected" from any real root clock (which
+> might be caused by missing data, etc).
 >
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
->  arch/arm/mach-omap2/board-igep0020.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+> In general it is OK to declare parent names which might result in your
+> clock being orphaned.  In practice it is more likely that your data
+> matches your code: e.g. if you don't support a parent clock in the data
+> then you likely never try use that missing parent clock in your code.
 >
-> diff --git a/arch/arm/mach-omap2/board-igep0020.c
-> b/arch/arm/mach-omap2/board-igep0020.c
-> index 7491529..2821448 100644
-> --- a/arch/arm/mach-omap2/board-igep0020.c
-> +++ b/arch/arm/mach-omap2/board-igep0020.c
-> @@ -554,6 +554,8 @@ static const struct usbhs_omap_board_data
-> igep3_usbhs_bdata __initconst = {
+> The OMAP port does in fact make use of the orphan tree for some clocks,
+> so it is tested.  However we haven't had any users of the clock tree
+> which made a lot of use of "dynamic" reparenting to and from the orphan
+> tree.  I did unit test this back during the 3.4 cycle, but I haven't
+> since.  Let me know if you have any problems with it.
 >
->  #ifdef CONFIG_OMAP_MUX
->  static struct omap_board_mux board_mux[] __initdata = {
-> +       /* SMSC9221 LAN Controller ETH IRQ (GPIO_176) */
-> +       OMAP3_MUX(MCSPI1_CS2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
->         { .reg_offset = OMAP_MUX_TERMINATOR },
->  };
->  #endif
-> --
-> 1.7.7.6
->
->
-Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 
-Thanks Javier,
+Hi Mike,
+
+For example, clk1 have parents pclk1 and pclk2. Register values
+for pclk1 is 0X and for pclk2 is 1X. i.e. pclk1 is selected for both 00 and
+01.
+And pclk2 is selected for 10 and 11. so, its better to take care of all
+these situations,
+otherwise there can be corner cases like: In linux we decide to use 00 for
+pclk1, 10 for
+pclk2 and other two for "none". But bootloader, enabled the clock with 01
+for pclk1.
+This clock isn't a orphan but it will look like that in our clock tree.
+
+So, is this OK in the current implementation of clk framework to have
+parents like
+"pclk1", "pclk1", "pclk2", "pclk2"?
+
+--
+viresh
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/34ee7ab4/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/01ab87ad/attachment-0001.html>
