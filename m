@@ -1,127 +1,90 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 10 Jul 2012 16:23:18 -0500
-Subject: [PATCH 1/1] of: introduce helper to manage boolean
-In-Reply-To: <CAPnjgZ2dj5pcuGhM2_2nwwnhhcCmKhyi6jVHS7Xf1f682i_j_w@mail.gmail.com>
-References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
- <20120309014441.8236B3E0903@localhost>
- <20120309100435.GN27213@game.jcrosoft.org>
- <20120309162638.92E813E0880@localhost>
- <20120309163608.GQ27213@game.jcrosoft.org> <4F5E50DA.6080000@freescale.com>
- <20120313031739.GA18320@game.jcrosoft.org>
- <20120313041652.563B63E0536@localhost>
- <CAPnjgZ2dj5pcuGhM2_2nwwnhhcCmKhyi6jVHS7Xf1f682i_j_w@mail.gmail.com>
-Message-ID: <4FFC9D46.6090006@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jul 2012 21:36:35 +0000
+Subject: [PATCH v2 04/23] ARM: LPC32xx: Add DMA configuration to platform
+ data
+In-Reply-To: <1339692673-7848-5-git-send-email-stigge@antcom.de>
+References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
+ <1339692673-7848-5-git-send-email-stigge@antcom.de>
+Message-ID: <201207102136.35944.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2012 07:10 AM, Simon Glass wrote:
-> Hi,
-> 
-> On Tue, Mar 13, 2012 at 5:16 AM, Grant Likely <grant.likely@secretlab.ca
-> <mailto:grant.likely@secretlab.ca>> wrote:
-> 
->     On Tue, 13 Mar 2012 04:17:39 +0100, Jean-Christophe PLAGNIOL-VILLARD
->     <plagnioj at jcrosoft.com <mailto:plagnioj@jcrosoft.com>> wrote:
->     > On 14:39 Mon 12 Mar     , Scott Wood wrote:
->     > > On 03/09/2012 10:36 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->     > > >>>> Ugh.  so any value other than 1 returns false?  I think
->     that will surprise
->     > > >>>> most people.
->     > > >>>>
->     > > >>>> I don't like this api or binding.  If it is a bool
->     property, then why isn't
->     > > >>>> simply testing for the property existance sufficient?
->     > > >>> no if you want to disable it
->     > > >>>
->     > > >>> if a bool is define in the dtsi and want to disable it int
->     the dts
->     > > >>>
->     > > >>> if you we can do the the invert
->     > > >>>
->     > > >>> if !0 => true
->     > > >>>
->     > > >>> is-ok;                  => true
->     > > >>> is-ok = <val != 0>;     => true
->     > > >>> is-ok = <0>;            => false
->     > > >>
->     > > >> This is a failure of the dtc tool, not the binding.
->      Accepting this binding
->     > > >> means we have to live with it for a very long time.  It needs
->     to be fixed
->     > > >> in dtc instead so that properties can be deleted instead of
->     only modified.
->     > > > I understand your idea but today if you put and value in the
->     property it's true.
->     > > >
->     > > > So is-ok = <0>; is true also which is illogical as in any
->     language a boolean is
->     > > > true (1) or false (0). When I read the property I will
->     understand false not true
->     > >
->     > > You could say similar things about is-ok = "no" or is-ok = "" or
->     is-ok =
->     > > "I'd rather you didn't"... it's expected that violating the
->     binding may
->     > > produce illogical results.
->     > today is most of the binding people use a number whe the want to
->     be able to
->     > delete it and it's the same in most of the promgramming language
-> 
->     It isn't yet a big pain point, so there isn't time pressure here.
->      Fixing the tool
->     is the better solution, and since the kernel carries a copy of the
->     tool we don't
->     need to worry about adding a feature that isn't available by the dtc
->     packaged by
->     a distribution.
-> 
->     Fixing the tool is the correct thing to do.
-> 
-> 
-> I just wanted to pick up on this thread. Now in the kernel, absence of a
-> property indicates false, and presence indicates true. This is a kernel
-> convention, nothing to do with the dtb format.
+On Thursday 14 June 2012, Roland Stigge wrote:
+> --- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
+> +++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+> @@ -226,7 +226,38 @@ static int __init phy3250_spi_board_regi
+>  }
+>  arch_initcall(phy3250_spi_board_register);
+>  
+> +static struct pl08x_channel_data pl08x_slave_channels[] = {
+> +	{
+> +		.bus_id = "nand-slc",
+> +		.min_signal = 1, /* SLC NAND Flash */
+> +		.max_signal = 1,
+> +		.periph_buses = PL08X_AHB1,
+> +	},
+> +	{
+> +		.bus_id = "nand-mlc",
+> +		.min_signal = 12, /* MLC NAND Flash */
+> +		.max_signal = 12,
+> +		.periph_buses = PL08X_AHB1,
+> +	},
+> +};
+> +
+> +/* NOTE: These will change, according to RMK */
+> +static int pl08x_get_signal(struct pl08x_dma_chan *ch)
+> +{
+> +	return ch->cd->min_signal;
+> +}
+> +
 
-It's an aspect of the device binding, and was used by Open Firmware
-bindings before Linux came up with flat device trees.
+This has changed now, rendering linux-next broken for lpc32xx_defconfig:
 
-Also note that even non-boolean properties can mean something different
-when absent.  Sometimes this is a default value; sometimes, like with
-"ranges", it's something that can't be expressed with any value (empty
-ranges means all translations go straight through; no ranges means no
-translation is possible).
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:190:36: warning: 'struct pl08x_dma_chan' declared inside parameter list [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:190:36: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c: In function 'pl08x_get_signal':
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:192:11: error: dereferencing pointer to incomplete type
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c: At top level:
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:195:37: warning: 'struct pl08x_dma_chan' declared inside parameter list [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:202:2: warning: initialization from incompatible pointer type [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:202:2: warning: (near initialization for 'pl08x_pd.get_signal') [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:203:2: warning: initialization from incompatible pointer type [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:203:2: warning: (near initialization for 'pl08x_pd.put_signal') [enabled by default]
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c: In function 'pl08x_get_signal':
+/home/arnd/linux-arm/arch/arm/mach-lpc32xx/phy3250.c:193:1: warning: control reaches end of non-void function [-Wreturn-type]
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_slc.c: In function 'lpc32xx_dma_filter':
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_slc.c:720:48: error: dereferencing pointer to incomplete type
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_slc.c:720:67: warning: initialization from incompatible pointer type [enabled by default]
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_slc.c:720:67: warning: (near initialization for 'ch') [enabled by default]
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_slc.c:720:145: error: invalid use of undefined type 'struct pl08x_dma_chan'
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_slc.c:723:8: error: dereferencing pointer to incomplete type
+make[4]: *** [drivers/mtd/nand/lpc32xx_slc.o] Error 1
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_mlc.c: In function 'lpc32xx_dma_filter':
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_mlc.c:582:48: error: dereferencing pointer to incomplete type
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_mlc.c:582:67: warning: initialization from incompatible pointer type [enabled by default]
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_mlc.c:582:67: warning: (near initialization for 'ch') [enabled by default]
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_mlc.c:582:145: error: invalid use of undefined type 'struct pl08x_dma_chan'
+/home/arnd/linux-arm/drivers/mtd/nand/lpc32xx_mlc.c:585:8: error: dereferencing pointer to incomplete type
+make[4]: *** [drivers/mtd/nand/lpc32xx_mlc.o] Error 1
 
-> I think it is useful to
-> support a boolean with a non-null value which can be 0, meaning true as
-> Jean-Christophe says.
-> 
-> My reasons are:
-> 
-> 1. dtc does not have a way to delete a property and it isn't clear what
-> syntax could be used there.
+As far as I can tell, each branch touching these files is ok individually,
+but they don't go together.
 
-Surely some syntax can be created for this.  E.g. /delete-prop/ foo;
+There is also this bit of suspicious code in lpc32xx_slc:
 
-> It also seems a little brittle to delete a
-> property in one place and define it in another (ordering? confusion when
-> people can't work out why it has gone?). So not only can dtc not do
-> this, but I'm not sure that it should.
+static bool lpc32xx_dma_filter(struct dma_chan *chan, void *param)
+{
+        struct pl08x_dma_chan *ch =
+                container_of(chan, struct pl08x_dma_chan, chan);
 
-I don't see how it's worse than defining it one place and then
-redefining it elsewhere.
+        /* In LPC32xx's PL080 DMA wiring, the SLC NAND DMA signal is #1 */
+        if (ch->cd->min_signal == 1)
+                return true;
+        return false;
+}
 
-> 3. Discoverability: it is nice to be able to see the possible options,
-> even if disabled. 
+I dont't think that actually valid -- you cannot make any assumption about
+the structure outside of dma_chan here, only about the parameter you pass
+in.
 
-This assumes the possible options were known in advance, or that you
-don't maintain compatibility with old device trees when a new option is
-added.
-
-> In particular, if a boolean value is true, and you
-> later decide with fdtput to turn it off, you effectively remove all
-> trace of it. This could be confusing for those who are looking for
-> available options.
-
-There should still be a "trace of it" in the binding document.
-
--Scott
+	Arnd
