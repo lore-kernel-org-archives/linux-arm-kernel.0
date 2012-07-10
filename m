@@ -1,71 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Jul 2012 10:42:39 +0200
-Subject: [PATCH V2] i2c: imx: make bitrate an u32 type
-In-Reply-To: <1341872910-26687-1-git-send-email-wolfram@the-dreams.de>
-References: <1341872910-26687-1-git-send-email-wolfram@the-dreams.de>
-Message-ID: <20120710084239.GZ30009@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 10 Jul 2012 14:13:17 +0530
+Subject: [PATCH] ARM: davinci: cp_intc: Add OF support for TI interrupt
+ controller
+In-Reply-To: <4FF71822.2070908@ti.com>
+References: <1341342970-27535-1-git-send-email-nsekhar@ti.com>
+ <4FF58BDC.6060802@denx.de> <4FF71822.2070908@ti.com>
+Message-ID: <4FFBEB25.6040501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 12:28:30AM +0200, Wolfram Sang wrote:
-> sparse found this assignment of u32 to an int. Fix it:
-> 
-> drivers/i2c/busses/i2c-imx.c:540:56: warning: incorrect type in argument 3 (different signedness)
-> 
-> and also fix the type in platform_data. All current users use values
-> which fit into the old and new type, so it is a safe change.
-> 
-> Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
-> Cc: Richard Zhao <richard.zhao@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Hi Rob,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+On 7/6/2012 10:23 PM, Sekhar Nori wrote:
+> Hi Grant,
+> 
+> On 7/5/2012 6:13 PM, Heiko Schocher wrote:
+>> Hello Sekhar,
+>>
+>> On 03.07.2012 21:16, Sekhar Nori wrote:
+>>> From: Heiko Schocher<hs@denx.de>
+>>>
+>>> Add a function to initialize the Common Platform Interrupt Controller
+>>> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
+>>>
+>>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>>> Cc: Sekhar Nori<nsekhar@ti.com>
+>>> Cc: Wolfgang Denk<wd@denx.de>
+>>> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
+>>> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+>>> ---
+>>>   .../devicetree/bindings/arm/davinci/cp-intc.txt    |   27
+>>> ++++++++++++++++++++
+>>>   arch/arm/mach-davinci/cp_intc.c                    |   16 +++++++++---
+>>>   arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
+>>>   3 files changed, 41 insertions(+), 3 deletions(-)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/arm/davinci/cp-intc.txt
+>>
+>> Thanks!
+>>
+>> Tested on the enbw_cmc board.
+> 
+> Any further feedback on this? If you are OK, I would like to queue this
+> for v3.6 through DaVinci tree.
 
-Sascha
+Do you have any feedback on this patch? Looks like Grant is going to be
+busy for a while. If you do not have the original patch I can forward it
+to you.
 
-> ---
-> 
-> Changes since V1: also change type in platform_data. Thanks to Richard.
-> 
->  arch/arm/plat-mxc/include/mach/i2c.h |    2 +-
->  drivers/i2c/busses/i2c-imx.c         |    4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/i2c.h b/arch/arm/plat-mxc/include/mach/i2c.h
-> index 375cdd0..8289d91 100644
-> --- a/arch/arm/plat-mxc/include/mach/i2c.h
-> +++ b/arch/arm/plat-mxc/include/mach/i2c.h
-> @@ -15,7 +15,7 @@
->   *
->   **/
->  struct imxi2c_platform_data {
-> -	int bitrate;
-> +	u32 bitrate;
->  };
->  
->  #endif /* __ASM_ARCH_I2C_H_ */
-> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> index dd2a083..90460dd 100644
-> --- a/drivers/i2c/busses/i2c-imx.c
-> +++ b/drivers/i2c/busses/i2c-imx.c
-> @@ -471,8 +471,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->  	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
->  	struct pinctrl *pinctrl;
->  	void __iomem *base;
-> -	int irq, bitrate;
-> -	int ret;
-> +	int irq, ret;
-> +	u32 bitrate;
->  
->  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
