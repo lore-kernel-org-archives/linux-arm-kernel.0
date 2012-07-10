@@ -1,97 +1,68 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jul 2012 13:36:25 +0800
-Subject: [PATCH v2 5/7] ARM: mxs: convert tx28 board to device tree
+Date: Tue, 10 Jul 2012 13:36:23 +0800
+Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
 In-Reply-To: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
 References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1341898587-8462-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1341898587-8462-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FEC support is missing because we need to find a proper way to rewrite
-tx28_add_fec0 for device tree boot.
+From: Marek Vasut <marex@denx.de>
 
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Signed-off-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx28.dtsi |   36 ++++++++++++++++++
- arch/arm/boot/dts/tx28.dts   |   82 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c |    5 ++-
- 3 files changed, 122 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/tx28.dts
+ arch/arm/boot/dts/imx28.dtsi |   11 ++
+ arch/arm/boot/dts/m28evk.dts |  210 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c |   41 ++++++++-
+ 3 files changed, 258 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/m28evk.dts
 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 8595977..e906ec1 100644
+index 02e778b..895a072 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -186,6 +186,19 @@
+@@ -232,6 +232,17 @@
  					fsl,pull-up = <0>;
  				};
  
-+				duart_4pins_a: duart-4pins at 0 {
++				auart0_2pins_a: auart0-2pins at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						0x3022 /* MX28_PAD_AUART0_CTS__DUART_RX */
-+						0x3032 /* MX28_PAD_AUART0_RTS__DUART_TX */
-+						0x3002 /* MX28_PAD_AUART0_RX__DUART_CTS */
-+						0x3012 /* MX28_PAD_AUART0_TX__DUART_RTS */
++						0x3000 /* MX28_PAD_AUART0_RX__AUART0_RX */
++						0x3010 /* MX28_PAD_AUART0_TX__AUART0_TX */
 +					>;
 +					fsl,drive-strength = <0>;
 +					fsl,voltage = <1>;
 +					fsl,pull-up = <0>;
 +				};
 +
- 				gpmi_pins_a: gpmi-nand at 0 {
+ 				auart3_pins_a: auart3 at 0 {
  					reg = <0>;
  					fsl,pinmux-ids = <
-@@ -243,6 +256,19 @@
- 					fsl,pull-up = <0>;
- 				};
- 
-+				auart1_pins_a: auart1 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x3040 /* MX28_PAD_AUART1_RX__AUART1_RX */
-+						0x3050 /* MX28_PAD_AUART1_TX__AUART1_TX */
-+						0x3060 /* MX28_PAD_AUART1_CTS__AUART1_CTS */
-+						0x3070 /* MX28_PAD_AUART1_RTS__AUART1_RTS */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
- 				auart1_2pins_a: auart1-2pins at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
-@@ -407,6 +433,16 @@
- 					fsl,pull-up = <1>;
- 				};
- 
-+				pwm0_pins_a: pwm0 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x3100 /* MX28_PAD_PWM0__PWM_0 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
- 				pwm2_pins_a: pwm2 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
-diff --git a/arch/arm/boot/dts/tx28.dts b/arch/arm/boot/dts/tx28.dts
+diff --git a/arch/arm/boot/dts/m28evk.dts b/arch/arm/boot/dts/m28evk.dts
 new file mode 100644
-index 0000000..f64073b
+index 0000000..f3acdfa
 --- /dev/null
-+++ b/arch/arm/boot/dts/tx28.dts
-@@ -0,0 +1,82 @@
++++ b/arch/arm/boot/dts/m28evk.dts
+@@ -0,0 +1,210 @@
++/*
++ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
 +/dts-v1/;
 +/include/ "imx28.dtsi"
 +
 +/ {
-+	model = "Ka-Ro electronics TX28 module";
-+	compatible = "karo,tx28", "fsl,imx28";
++	model = "DENX M28EVK";
++	compatible = "denx,m28evk", "fsl,imx28";
 +
 +	memory {
 +		reg = <0x40000000 0x08000000>;
@@ -99,44 +70,150 @@ index 0000000..f64073b
 +
 +	apb at 80000000 {
 +		apbh at 80000000 {
++			gpmi-nand at 8000c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
++				status = "okay";
++
++				partition at 0 {
++					label = "bootloader";
++					reg = <0x00000000 0x00300000>;
++					read-only;
++				};
++
++				partition at 1 {
++					label = "environment";
++					reg = <0x00300000 0x00080000>;
++				};
++
++				partition at 2 {
++					label = "redundant-environment";
++					reg = <0x00380000 0x00080000>;
++				};
++
++				partition at 3 {
++					label = "kernel";
++					reg = <0x00400000 0x00400000>;
++				};
++
++				partition at 4 {
++					label = "filesystem";
++					reg = <0x00800000 0x0f800000>;
++				};
++			};
++
 +			ssp0: ssp at 80010000 {
 +				compatible = "fsl,imx28-mmc";
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc0_4bit_pins_a
++				pinctrl-0 = <&mmc0_8bit_pins_a
 +					     &mmc0_cd_cfg
 +					     &mmc0_sck_cfg>;
-+				bus-width = <4>;
++				bus-width = <8>;
++				wp-gpios = <&gpio3 10 1>;
++				status = "okay";
++			};
++
++			pinctrl at 80018000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&hog_pins_a>;
++
++				hog_pins_a: hog-gpios at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x30a3 /* MX28_PAD_AUART2_CTS__GPIO_3_10 */
++						0x30b3 /* MX28_PAD_AUART2_RTS__GPIO_3_11 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				lcdif_pins_m28: lcdif-m28 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x11e0 /* MX28_PAD_LCD_DOTCLK__LCD_DOTCLK */
++						0x11f0 /* MX28_PAD_LCD_ENABLE__LCD_ENABLE */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++			};
++
++			lcdif at 80030000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&lcdif_24bit_pins_a
++					     &lcdif_pins_m28>;
++				status = "okay";
++			};
++
++			can0: can at 80032000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&can0_pins_a>;
++				status = "okay";
++			};
++
++			can1: can at 80034000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&can1_pins_a>;
 +				status = "okay";
 +			};
 +		};
 +
 +		apbx at 80040000 {
++			saif0: saif at 80042000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&saif0_pins_a>;
++				status = "okay";
++			};
++
++			saif1: saif at 80046000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&saif1_pins_a>;
++				fsl,saif-master = <&saif0>;
++				status = "okay";
++			};
++
 +			i2c0: i2c at 80058000 {
 +				pinctrl-names = "default";
 +				pinctrl-0 = <&i2c0_pins_a>;
 +				status = "okay";
 +
-+				ds1339: rtc at 68 {
-+					compatible = "mxim,ds1339";
++				sgtl5000: codec at 0a {
++					compatible = "fsl,sgtl5000";
++					reg = <0x0a>;
++					VDDA-supply = <&reg_3p3v>;
++					VDDIO-supply = <&reg_3p3v>;
++
++				};
++
++				eeprom: eeprom at 51 {
++					compatible = "atmel,24c128";
++					reg = <0x51>;
++					pagesize = <32>;
++				};
++
++				rtc: rtc at 68 {
++					compatible = "stm,mt41t62";
 +					reg = <0x68>;
 +				};
 +			};
 +
-+			pwm: pwm at 80064000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pwm0_pins_a>;
-+				status = "okay";
-+			};
-+
 +			duart: serial at 80074000 {
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&duart_4pins_a>;
++				pinctrl-0 = <&duart_pins_a>;
 +				status = "okay";
 +			};
 +
-+			auart1: serial at 8006c000 {
++			auart0: serial at 8006a000 {
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&auart1_pins_a>;
++				pinctrl-0 = <&auart0_2pins_a>;
++				status = "okay";
++			};
++
++			auart3: serial at 80070000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart3_pins_a>;
 +				status = "okay";
 +			};
 +		};
@@ -147,57 +224,121 @@ index 0000000..f64073b
 +			phy-mode = "rmii";
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&mac0_pins_a>;
++			phy-reset-gpios = <&gpio3 11 0>;
++			status = "okay";
++		};
++
++		mac1: ethernet at 800f4000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac1_pins_a>;
 +			status = "okay";
 +		};
 +	};
 +
-+	leds {
-+		compatible = "gpio-leds";
++	regulators {
++		compatible = "simple-bus";
 +
-+		user {
-+			label = "Heartbeat";
-+			gpios = <&gpio4 10 0>;
-+			linux,default-trigger = "heartbeat";
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
 +		};
 +	};
 +
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
++	sound {
++		compatible = "fsl,imx28-evk-sgtl5000",
++			     "fsl,mxs-audio-sgtl5000";
++		model = "imx28-evk-sgtl5000";
++		saif-controllers = <&saif0 &saif1>;
++		audio-codec = <&sgtl5000>;
 +	};
 +};
 diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index d0bf414..c1e02ae 100644
+index 7bbb961..d3fc8ba 100644
 --- a/arch/arm/mach-mxs/mach-mxs.c
 +++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -12,8 +12,9 @@
+@@ -59,6 +59,23 @@ static struct fb_videomode mx28evk_video_modes[] = {
+ 	},
+ };
  
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
--#include <linux/init.h>
-+#include <linux/gpio.h>
- #include <linux/init.h>
- #include <linux/irqdomain.h>
- #include <linux/micrel_phy.h>
-@@ -24,6 +25,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <mach/common.h>
-+#include <mach/mxs.h>
++static struct fb_videomode m28evk_video_modes[] = {
++	{
++		.name		= "Ampire AM-800480R2TMQW-T01H",
++		.refresh	= 60,
++		.xres		= 800,
++		.yres		= 480,
++		.pixclock	= 30066, /* picosecond (33.26 MHz) */
++		.left_margin	= 0,
++		.right_margin	= 256,
++		.upper_margin	= 0,
++		.lower_margin	= 45,
++		.hsync_len	= 1,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT,
++	},
++};
++
+ static struct mxsfb_platform_data mxsfb_pdata __initdata;
  
- static struct fb_videomode mx23evk_video_modes[] = {
- 	{
-@@ -277,6 +279,7 @@ static const char *imx28_dt_compat[] __initdata = {
+ static struct of_dev_auxdata mxs_auxdata_lookup[] __initdata = {
+@@ -186,15 +203,17 @@ static void __init imx23_evk_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
+ 
+-static void __init imx28_evk_init(void)
++static inline void enable_clk_enet_out(void)
+ {
+-	struct clk *clk;
++	struct clk *clk = clk_get_sys("enet_out", NULL);
+ 
+-	/* Enable fec phy clock */
+-	clk = clk_get_sys("enet_out", NULL);
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
++}
+ 
++static void __init imx28_evk_init(void)
++{
++	enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_FSL);
+ 
+ 	mxsfb_pdata.mode_list = mx28evk_video_modes;
+@@ -203,12 +222,25 @@ static void __init imx28_evk_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
+ 
++static void __init m28evk_init(void)
++{
++	enable_clk_enet_out();
++	update_fec_mac_prop(OUI_DENX);
++
++	mxsfb_pdata.mode_list = m28evk_video_modes;
++	mxsfb_pdata.mode_count = ARRAY_SIZE(m28evk_video_modes);
++	mxsfb_pdata.default_bpp = 16;
++	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
++}
++
+ static void __init mxs_machine_init(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+ 		imx28_evk_init();
+ 	else if (of_machine_is_compatible("fsl,imx23-evk"))
+ 		imx23_evk_init();
++	else if (of_machine_is_compatible("denx,m28evk"))
++		m28evk_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     mxs_auxdata_lookup, NULL);
+@@ -223,6 +255,7 @@ static const char *imx23_dt_compat[] __initdata = {
+ 
+ static const char *imx28_dt_compat[] __initdata = {
  	"crystalfontz,cfa10036",
- 	"denx,m28evk",
++	"denx,m28evk",
  	"fsl,imx28-evk",
-+	"karo,tx28",
  	"fsl,imx28",
  	NULL,
- };
 -- 
 1.7.5.4
