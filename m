@@ -1,23 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Jul 2012 00:08:58 +0800
-Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
-In-Reply-To: <201207101751.12903.marex@denx.de>
-References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
- <201207101737.15379.marex@denx.de>
- <20120710154509.GC11813@S2101-09.ap.freescale.net>
- <201207101751.12903.marex@denx.de>
-Message-ID: <20120710160856.GD11813@S2101-09.ap.freescale.net>
+From: andreasgretler@googlemail.com (Andreas Gretler)
+Date: Tue, 10 Jul 2012 18:09:44 +0200
+Subject: MX28EVK mainline 3.5-Patchs-3.5-rc5 sgtl5000 record not working
+Message-ID: <CAHE2-smsOufHjfyjKARcwHve4cGqWeM8y7ALxcJkaqLiZBNoSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 05:51:12PM +0200, Marek Vasut wrote:
-> But at least it's quite consistent and it's easy to locate your board since you 
-> usually know the cpu type. If you shove in just <boardname>.dts, it'll soon 
-> become horrible mess.
-> 
-Ok, I could send a follow-up patch to rename the files.  But the
-compatible string of the board will stay as the board name.
+Hi,
 
--- 
-Regards,
-Shawn
+i've tested mainline 3.5-Patchs-3.5-rc5 for MX28EVK and it boot up and
+work fine.
+
+But I'm not able to record something. Playback works. I also test it
+against the old 2.6.35.3 Kernel and there record works.
+
+arecord -l show me this:
+
+**** List of CAPTURE Hardware Devices ****
+card 0: mxssgtl5000 [mxs_sgtl5000], device 0: HiFi Playback sgtl5000-0 []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: mxssgtl5000 [mxs_sgtl5000], device 1: HiFi Capture sgtl5000-1 []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+
+
+I try record with arecord -d 2 -D hw:0,1 -f dat test.wav , but it
+crash the Linux. No ErrMsg printed and the board stop working.
+I have no idea what goes wrong. I put some printk message in
+mxs-saif.c and the last message i can see before the board crash is in
+mxs_saif_trigger() is before clk_enable is called.
+
+		/*
+		 * If the saif's master is not himself, we also need to enable
+		 * itself clk for its internal basic logic to work.
+		 */
+		if (saif != master_saif) {
+			clk_enable(saif->clk);
+			__raw_writel(BM_SAIF_CTRL_RUN,
+				saif->base + SAIF_CTRL + MXS_SET_ADDR);
+		}
+
+ In alsamixer i can not toggle the capture source from Mic-In to
+Line-in and also can't change the Headphone from DAC to Line-IN.
+
+I'm not sure this is the right place to ask? I will also post ist to
+alsa-devel at alsa-project.org.
+Can anyone confirm the Problem? Or do/understand I something wrong
+with record and there is no Problem?
+
+Andreas Gretler
