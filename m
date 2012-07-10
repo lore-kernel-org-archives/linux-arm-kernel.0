@@ -1,19 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Jul 2012 15:38:44 +0100
-Subject: [PATCH v4 5/6] spi: s3c64xx: Remove the 'set_level' callback
- from controller data
-In-Reply-To: <1341930459-25223-6-git-send-email-thomas.abraham@linaro.org>
-References: <1341930459-25223-1-git-send-email-thomas.abraham@linaro.org>
- <1341930459-25223-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120710143844.GB11698@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jul 2012 14:50:27 +0000
+Subject: [GIT PULL] DaVinci fixes for v3.6
+In-Reply-To: <4FFAB515.1070708@ti.com>
+References: <4FFAB515.1070708@ti.com>
+Message-ID: <201207101450.28186.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 07:57:38PM +0530, Thomas Abraham wrote:
-> The set_level callback in the controller data, which is used to configure
-> the slave select line, cannot be supported when migrating the driver to
-> device tree based discovery. Since all the platforms currently use gpio
-> as the slave select line, this callback can be removed from the
-> controller data and replaced with call to gpio_set_value in the driver.
+On Monday 09 July 2012, Sekhar Nori wrote:
 
-This is currently buggy, BTW, as the driver never requests the GPIO.
+> The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+> 
+>   Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-v3.6-fixes
+> 
+> for you to fetch changes up to bbb33445b9cdd5ac7609723fcfc28dfa77a11039:
+> 
+>   ARM: davinci: da8xx: fix interrupt handling (2012-07-09 16:01:11 +0530)
+> 
+
+Pulled the fixes, soc and cleanup branches into the respective arm-soc
+branches.
+
+I noticed that you used signed tags, which is good, but your gpg key is
+not actually signed by anyone else. Can you try to get a few signatures
+on it from people that are well connected? 
+
+Within TI, Kevin Hilman, Rob Clark or Sumit Semwal would be such people
+but I'm sure are others who are working with you locally or can do
+a phone verification.
+
+	Arnd
