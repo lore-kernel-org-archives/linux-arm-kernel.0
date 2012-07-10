@@ -1,39 +1,80 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jul 2012 15:24:32 +0800
-Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
-In-Reply-To: <201207100920.03867.marex@denx.de>
-References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
- <1341898587-8462-4-git-send-email-shawn.guo@linaro.org>
- <201207100920.03867.marex@denx.de>
-Message-ID: <CAAQ0ZWQg8qX_hySRSfADKgtR1DB5z8+X+kkAQi_dNOEROqX0Ow@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 10 Jul 2012 07:25:07 +0000
+Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
+ offset using the IP scheme.
+In-Reply-To: <CAMQu2gzubK7r4OEsusXBSGEW5YLWeMkt0tp8X9ERBLjse_5=MA@mail.gmail.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
+ <4FFA9B6C.7050003@ti.com>
+ <CAMQu2gz0UU_RCFSvxo1s_XwDAmTtL4NadsFTg8qL7PtGwPqKtQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA695E6@DBDE01.ent.ti.com>
+ <CAMQu2gzubK7r4OEsusXBSGEW5YLWeMkt0tp8X9ERBLjse_5=MA@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA6974A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2012 15:20, Marek Vasut <marex@denx.de> wrote:
-> Dear Shawn Guo,
->
->> From: Marek Vasut <marex@denx.de>
->>
-> [...]
->
->> +     sound {
->> +             compatible = "fsl,imx28-evk-sgtl5000",
->
-> imx28-evk ? ;-)
->
-Will fix it, as well as apx4devkit.dts.
+On Tue, Jul 10, 2012 at 12:42:46, Shilimkar, Santosh wrote:
+> On Tue, Jul 10, 2012 at 12:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> > On Mon, Jul 09, 2012 at 16:12:15, Shilimkar, Santosh wrote:
+> >> On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+> >> >
+> >> >
+> >> > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
+> >> >> From: R Sricharan <r.sricharan@ti.com>
+> >> >>
+> >> >> OMAP socs has a legacy and a highlander version of the
+> >> >> 32k sync counter IP. The register offsets vary between the
+> >> >> highlander and the legacy scheme. So use the 'SCHEME'
+> >> >> bits(30-31) of the revision register to distinguish between
+> >> >
+> >> >
+> >> > Just for my understanding, can we get further information on SCHEME
+> >> > bit-fields? What kind of information we have it here.
+> >> >
+> >> > I may need this info to pass on to design team here.
+> >> >
+> >> Sure. You can refer to the OMAP4 TRM for the bit builds.
+> >> SCHEME bit field tell you difference between a highlander
+> >> and legacy IP as the patch says.
+> >>
+> >
+> > Santosh,
+> >
+> > Can you point to the section of OMAP4 TRM?
+> >
+> > I referred to both Public TRM and internal TRM, but both only did mention
+> > "TI internal Data".
+> >
+> Last time I refereed the internal TRM version. Public TRM doesn't
+> carry that information
+> for some reason.
+> 
+> > And as per code, we are not checking any value in 31-30 bit-fields, code
+> > just assumes that, non-zero value would be highlander IP.
+> >
+> There are only two types of IP's today and hence it will be either
+> 0x0 or 0x1. So that check if just fine. The highlander IP may have
+> more versions but for known OMAPs and upcoming OMAP, this is
+> the only one supported version.
+> 
+> Some more information on the SCHEME bit field.
+> -----------------
+> 31:30
+> SCHEME
+> Used to distinguish between old scheme and current.
+> 
+> RO Read Only
+> 
+> 0x0 -  LEGACY
+> 
+> 0x1 - Highlander 0.8 scheme
+> --------------------------------
 
->> +                          "fsl,mxs-audio-sgtl5000";
->> +             model = "imx28-evk-sgtl5000";
->> +             saif-controllers = <&saif0 &saif1>;
->> +             audio-codec = <&sgtl5000>;
->> +     };
->> +};
->
-> Otherwise, add my Acked-by: Marek Vasut <marex@denx.de> so if it gets broken
-> now, the blame falls on my head ;-)
->
-I'm much relieved now.
 
-Regards,
-Shawn
+Thanks Santosh,
+
+This is what I was looking for, may be it is worth to put this information 
+in either commit description of in code-comment.
+
+Thanks,
+Vaibhav
