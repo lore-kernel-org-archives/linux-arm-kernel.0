@@ -1,37 +1,33 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 10 Jul 2012 22:09:38 +0530
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <20120710154201.GE10022@opensource.wolfsonmicro.com>
-References: <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
- <4FE882A5.3080504@nvidia.com>
- <20120625222646.GB30406@opensource.wolfsonmicro.com>
- <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
- <20120710134436.GD9409@opensource.wolfsonmicro.com>
- <4FFC31D5.7090600@nvidia.com>
- <20120710135302.GG9409@opensource.wolfsonmicro.com>
- <4FFC4478.7000204@nvidia.com>
- <20120710154201.GE10022@opensource.wolfsonmicro.com>
-Message-ID: <4FFC5ACA.8010003@nvidia.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 10 Jul 2012 22:22:31 +0530
+Subject: [PATCH v4 5/6] spi: s3c64xx: Remove the 'set_level' callback from
+ controller data
+In-Reply-To: <20120710143844.GB11698@sirena.org.uk>
+References: <1341930459-25223-1-git-send-email-thomas.abraham@linaro.org>
+ <1341930459-25223-6-git-send-email-thomas.abraham@linaro.org>
+ <20120710143844.GB11698@sirena.org.uk>
+Message-ID: <CAJuYYwQ4wio0CxPAVaNBoD7=vMgUS0CCZB45aSst-DW2zOTn1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012 09:12 PM, Mark Brown wrote:
-> * PGP Signed by an unknown key
+On 10 July 2012 20:08, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Jul 10, 2012 at 07:57:38PM +0530, Thomas Abraham wrote:
+>> The set_level callback in the controller data, which is used to configure
+>> the slave select line, cannot be supported when migrating the driver to
+>> device tree based discovery. Since all the platforms currently use gpio
+>> as the slave select line, this callback can be removed from the
+>> controller data and replaced with call to gpio_set_value in the driver.
 >
-> On Tue, Jul 10, 2012 at 08:34:24PM +0530, Laxman Dewangan wrote:
->
->> The sample code for tps65910 is as follows. So where do you think
->> that it is wrong and what should be correct approach.
->> I need to follow the same for tps6586x also.
-> Like I said the use of a supply name should be unconditional, you should
-> just set the supply name in the descriptor.
->
-if I set the desc.supply_name unconditional then if the entry of that 
-supply name is not there in the DT entry (on device node) then that 
-regulator will not get registered because the search for 
-supply_regulator will fail during registration.
+> This is currently buggy, BTW, as the driver never requests the GPIO.
 
-I am setting the desc.supply only when there is supply entry in DT or if 
-it is from platform.
+In non-dt case, the platform code supplying the gpio number (slave
+select line) is responsible for requesting the gpio during the
+machine_init call. So the gpio request is not called in the driver for
+that gpio. In dt case, the 6th patch adds dt support and that patch
+includes a gpio request call. Hence, this looks okay to me. Please
+suggest if you still feel that there are changes required.
 
-Do we need to make such supply pin entry as required inplace of optional?
+Thanks for reviewing the patches.
+
+Regards,
+Thomas.
