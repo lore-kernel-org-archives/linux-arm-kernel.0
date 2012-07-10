@@ -1,52 +1,41 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Tue, 10 Jul 2012 13:27:02 +0200
-Subject: [PATCH v4 0/5] ARM: topology: set the capacity of each cores
- for big.LITTLE
-In-Reply-To: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
-References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1341919622.3462.124.camel@twins>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 10 Jul 2012 13:38:58 +0200
+Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
+ change
+In-Reply-To: <20120710112050.GH26888@b20223-02.ap.freescale.net>
+References: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
+ <201207100522.21162.marex@denx.de>
+ <20120710112050.GH26888@b20223-02.ap.freescale.net>
+Message-ID: <201207101338.58340.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-09 at 11:27 +0200, Vincent Guittot wrote:
-> This patchset creates an arch_scale_freq_power function for ARM, which is used 
-> to set the relative capacity of each core of a big.LITTLE system. It also removes
-> the broken power estimation of x86.
+Dear Richard Zhao,
+
+[...]
+
+> > > --- a/drivers/usb/core/hub.c
+> > > +++ b/drivers/usb/core/hub.c
+> > > @@ -1924,6 +1924,11 @@ void usb_disconnect(struct usb_device **pdev)
+> > > 
+> > >  	 */
+> > >  	
+> > >  	device_del(&udev->dev);
+> > > 
+> > > +	if (udev->parent && !udev->parent->parent) {
+> > > +		struct usb_hcd *hcd = bus_to_hcd(udev->bus);
+> > > +		usb_phy_notify_disconnect(hcd->phy, udev->portnum);
+> > > +	}
+> > 
+> > Shouldn't that go before device_del() ?
 > 
-> Modification since v3:
->  - Add comments
->  - Add optimization for SMP system
->  - Ensure that capacity of a CPU will be at most 1
-> 
-> Modification since v2:
->  - set_power_scale function becomes static
->  - Rework loop in update_siblings_masks
->  - Remove useless code in parse_dt_topology
-> 
-> Modification since v1:
->  - Add and update explanation about the use of the table and the range of the value 
->  - Remove the use of NR_CPUS and use nr_cpu_ids instead
->  - Remove broken power estimation of x86
-> 
-> Peter Zijlstra (1):
->   sched, x86: Remove broken power estimation
+> Any difference?
 
-Note that this patch already made its way into tip as commit
-bcae21d6e793a7047d38abc9ac0946c53733c1dd so it might be best to base
-whatever tree this is supposed to fo into on something that includes
-that.
+I was worried some corruption of other members in udev structure might happen, 
+but I'm not so sure anymore after taking deer look.
 
-> Vincent Guittot (4):
->   ARM: topology: Add arch_scale_freq_power function
->   ARM: topology: factorize the update of sibling masks
->   ARM: topology: Update cpu_power according to DT information
->   sched: cpu_power: enable ARCH_POWER
+> Thanks
+> Richard
 
-How would you like to proceed with these patches, I'm fine with them
-going through the ARM tree..
-
-In which case:
-
-Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
-
-Ingo, Russell, any other preferences?
+Best regards,
+Marek Vasut
