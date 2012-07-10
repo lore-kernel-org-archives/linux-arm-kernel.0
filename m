@@ -1,29 +1,32 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Jul 2012 17:52:36 +0100
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <4FFC5ACA.8010003@nvidia.com>
-References: <4FE882A5.3080504@nvidia.com>
- <20120625222646.GB30406@opensource.wolfsonmicro.com>
- <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
- <20120710134436.GD9409@opensource.wolfsonmicro.com>
- <4FFC31D5.7090600@nvidia.com>
- <20120710135302.GG9409@opensource.wolfsonmicro.com>
- <4FFC4478.7000204@nvidia.com>
- <20120710154201.GE10022@opensource.wolfsonmicro.com>
- <4FFC5ACA.8010003@nvidia.com>
-Message-ID: <20120710165236.GI10022@opensource.wolfsonmicro.com>
+Date: Tue, 10 Jul 2012 17:57:17 +0100
+Subject: [PATCH v4 5/6] spi: s3c64xx: Remove the 'set_level' callback
+ from controller data
+In-Reply-To: <CAJuYYwQ4wio0CxPAVaNBoD7=vMgUS0CCZB45aSst-DW2zOTn1w@mail.gmail.com>
+References: <1341930459-25223-1-git-send-email-thomas.abraham@linaro.org>
+ <1341930459-25223-6-git-send-email-thomas.abraham@linaro.org>
+ <20120710143844.GB11698@sirena.org.uk>
+ <CAJuYYwQ4wio0CxPAVaNBoD7=vMgUS0CCZB45aSst-DW2zOTn1w@mail.gmail.com>
+Message-ID: <20120710165716.GJ10022@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 10:09:38PM +0530, Laxman Dewangan wrote:
+On Tue, Jul 10, 2012 at 10:22:31PM +0530, Thomas Abraham wrote:
 
-> Do we need to make such supply pin entry as required inplace of optional?
+> In non-dt case, the platform code supplying the gpio number (slave
+> select line) is responsible for requesting the gpio during the
+> machine_init call. So the gpio request is not called in the driver for
+> that gpio. In dt case, the 6th patch adds dt support and that patch
+> includes a gpio request call. Hence, this looks okay to me. Please
+> suggest if you still feel that there are changes required.
 
-That's the idea.
+That's not really particularly sensible given that the changes remove
+the option to use anything except GPIOs, the GPIO request should be done
+unconditionally in the driver now.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/fc726e9b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/48c3e3ee/attachment.sig>
