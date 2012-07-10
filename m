@@ -1,64 +1,51 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 10 Jul 2012 14:35:25 +0200
-Subject: [PATCH v4 0/5] ARM: topology: set the capacity of each cores for
- big.LITTLE
-In-Reply-To: <1341919622.3462.124.camel@twins>
-References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
- <1341919622.3462.124.camel@twins>
-Message-ID: <CAKfTPtC0BcidJ2ga9c2fdWjrEsfXH48QtSnjv0YOCv7-k3K-Ug@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jul 2012 12:42:41 +0000
+Subject: [GIT PULL] Samsung devel-dma ops for v3.6
+In-Reply-To: <0c5001cd5e41$87daa1b0$978fe510$%kim@samsung.com>
+References: <0c5001cd5e41$87daa1b0$978fe510$%kim@samsung.com>
+Message-ID: <201207101242.41867.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2012 13:27, Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
-> On Mon, 2012-07-09 at 11:27 +0200, Vincent Guittot wrote:
->> This patchset creates an arch_scale_freq_power function for ARM, which is used
->> to set the relative capacity of each core of a big.LITTLE system. It also removes
->> the broken power estimation of x86.
->>
->> Modification since v3:
->>  - Add comments
->>  - Add optimization for SMP system
->>  - Ensure that capacity of a CPU will be at most 1
->>
->> Modification since v2:
->>  - set_power_scale function becomes static
->>  - Rework loop in update_siblings_masks
->>  - Remove useless code in parse_dt_topology
->>
->> Modification since v1:
->>  - Add and update explanation about the use of the table and the range of the value
->>  - Remove the use of NR_CPUS and use nr_cpu_ids instead
->>  - Remove broken power estimation of x86
->>
->> Peter Zijlstra (1):
->>   sched, x86: Remove broken power estimation
->
-> Note that this patch already made its way into tip as commit
-> bcae21d6e793a7047d38abc9ac0946c53733c1dd so it might be best to base
-> whatever tree this is supposed to fo into on something that includes
-> that.
->
+On Tuesday 10 July 2012, Kukjin Kim wrote:
+> Hi Arnd, Olof,
+> 
+> Here is updating DMA common operation for Samsung SoCs.
+> 
+> Since some DMA client driver such as spi needs to change the configuration
+> after dma_request() so this branch adds dma_config() can configure DMA
+> transmit option which is included in dma_request() after that.
+> 
+> Note, according to the changes, needs to update spi and ASoC drivers for
+> Samsung SoCs and only got the ack from Mark Brown not Grant Likely and as I
+> know, he is busy for moving. But I think, the spi change has no problem and
+> it is simple.
+> 
+> If any problems, please kindly let me know.
 
-yes
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git next/devel-dma-ops
 
->> Vincent Guittot (4):
->>   ARM: topology: Add arch_scale_freq_power function
->>   ARM: topology: factorize the update of sibling masks
->>   ARM: topology: Update cpu_power according to DT information
->>   sched: cpu_power: enable ARCH_POWER
->
-> How would you like to proceed with these patches, I'm fine with them
-> going through the ARM tree..
+I've applied this to a new next/dma branch for now, as it sounds that you
+need these changes.
 
-May be the last one which enable ARCH_POWER should also go into tip ?
+However, my feeling is that the s3c-dma-ops support is moving in the wrong
+direction, or at least I do not see where you're heading with it.
 
->
-> In which case:
->
-> Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
->
-> Ingo, Russell, any other preferences?
+>From what I see, there is the 
 
-I'm going to push the patches related to ARM into Russell's patch system
+* arch/arm/plat-s3c24xx/dma.c driver with a proprietary s3c2410_dma_*
+  interface, used by s3cmci and some asoc drivers.
+* arch/arm/mach-s3c64xx/dma.c implementing the same interface and exporting
+  the same symbols.
+* The arch/arm/plat-samsung/dma-ops.c which is a wrapper around the generic
+  dmaengine API, hardcoding the pl330 DMA driver
+* The arch/arm/plat-samsung/include/plat/dma-ops.h interface abstraction
+  that gets used to pick between the two at compile time, and being used by
+  the spi driver and again other asoc drivers
 
-Vincent
+Can you (or someone on the Cc list) explain what the plan is for this?
+Are you moving over the s3c2410_dma*() function to a dmaengine driver
+eventually? Do you expect to see more users of the nonstandard intefaces
+in the samsung code, or are they going away?
+
+	Arnd
