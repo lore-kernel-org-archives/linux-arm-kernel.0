@@ -1,31 +1,53 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jul 2012 13:39:35 +0800
-Subject: [PATCH v2 6/7] ARM: mxs: convert stmp378x_devb board to device tree
+Date: Tue, 10 Jul 2012 13:38:59 +0800
+Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
 In-Reply-To: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
 References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1341898775-8551-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1341898739-8507-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The enc28j60 spi device does not get converted to dts file, because
-there is no mxs spi driver on mainline so far.  The enc28j60 spi
-in mach-stmp378x_devb.c does not work anyway.
+From: Marek Vasut <marex@denx.de>
 
+Signed-off-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/stmp378x_devb.dts |   78 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c        |    1 +
- 2 files changed, 79 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/stmp378x_devb.dts
+ arch/arm/boot/dts/imx28.dtsi |   11 ++
+ arch/arm/boot/dts/m28evk.dts |  210 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c |   41 ++++++++-
+ 3 files changed, 258 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/m28evk.dts
 
-diff --git a/arch/arm/boot/dts/stmp378x_devb.dts b/arch/arm/boot/dts/stmp378x_devb.dts
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 02e778b..895a072 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -232,6 +232,17 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				auart0_2pins_a: auart0-2pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x3000 /* MX28_PAD_AUART0_RX__AUART0_RX */
++						0x3010 /* MX28_PAD_AUART0_TX__AUART0_TX */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 				auart3_pins_a: auart3 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+diff --git a/arch/arm/boot/dts/m28evk.dts b/arch/arm/boot/dts/m28evk.dts
 new file mode 100644
-index 0000000..757a327
+index 0000000..f3acdfa
 --- /dev/null
-+++ b/arch/arm/boot/dts/stmp378x_devb.dts
-@@ -0,0 +1,78 @@
++++ b/arch/arm/boot/dts/m28evk.dts
+@@ -0,0 +1,210 @@
 +/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
 + *
 + * The code contained herein is licensed under the GNU General Public
 + * License. You may obtain a copy of the GNU General Public License
@@ -36,25 +58,58 @@ index 0000000..757a327
 + */
 +
 +/dts-v1/;
-+/include/ "imx23.dtsi"
++/include/ "imx28.dtsi"
 +
 +/ {
-+	model = "Freescale STMP378x Development Board";
-+	compatible = "fsl,stmp378x-devb", "fsl,imx23";
++	model = "DENX M28EVK";
++	compatible = "denx,m28evk", "fsl,imx28";
 +
 +	memory {
-+		reg = <0x40000000 0x04000000>;
++		reg = <0x40000000 0x08000000>;
 +	};
 +
 +	apb at 80000000 {
 +		apbh at 80000000 {
-+			ssp0: ssp at 80010000 {
-+				compatible = "fsl,imx23-mmc";
++			gpmi-nand at 8000c000 {
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_pins_fixup>;
-+				bus-width = <4>;
-+				wp-gpios = <&gpio1 30 0>;
-+				vmmc-supply = <&reg_vddio_sd0>;
++				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
++				status = "okay";
++
++				partition at 0 {
++					label = "bootloader";
++					reg = <0x00000000 0x00300000>;
++					read-only;
++				};
++
++				partition at 1 {
++					label = "environment";
++					reg = <0x00300000 0x00080000>;
++				};
++
++				partition at 2 {
++					label = "redundant-environment";
++					reg = <0x00380000 0x00080000>;
++				};
++
++				partition at 3 {
++					label = "kernel";
++					reg = <0x00400000 0x00400000>;
++				};
++
++				partition at 4 {
++					label = "filesystem";
++					reg = <0x00800000 0x0f800000>;
++				};
++			};
++
++			ssp0: ssp at 80010000 {
++				compatible = "fsl,imx28-mmc";
++				pinctrl-names = "default";
++				pinctrl-0 = <&mmc0_8bit_pins_a
++					     &mmc0_cd_cfg
++					     &mmc0_sck_cfg>;
++				bus-width = <8>;
++				wp-gpios = <&gpio3 10 1>;
 +				status = "okay";
 +			};
 +
@@ -65,54 +120,225 @@ index 0000000..757a327
 +				hog_pins_a: hog-gpios at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						0x11d3 /* MX23_PAD_PWM3__GPIO_1_29 */
-+						0x11e3 /* MX23_PAD_PWM4__GPIO_1_30 */
++						0x30a3 /* MX28_PAD_AUART2_CTS__GPIO_3_10 */
++						0x30b3 /* MX28_PAD_AUART2_RTS__GPIO_3_11 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				lcdif_pins_m28: lcdif-m28 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x11e0 /* MX28_PAD_LCD_DOTCLK__LCD_DOTCLK */
++						0x11f0 /* MX28_PAD_LCD_ENABLE__LCD_ENABLE */
 +					>;
 +					fsl,drive-strength = <0>;
 +					fsl,voltage = <1>;
 +					fsl,pull-up = <0>;
 +				};
 +			};
-+		};
 +
-+		apbx at 80040000 {
-+			auart0: serial at 8006c000 {
++			lcdif at 80030000 {
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&auart0_pins_a>;
++				pinctrl-0 = <&lcdif_24bit_pins_a
++					     &lcdif_pins_m28>;
 +				status = "okay";
 +			};
 +
-+			duart: serial at 80070000 {
++			can0: can at 80032000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&can0_pins_a>;
++				status = "okay";
++			};
++
++			can1: can at 80034000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&can1_pins_a>;
++				status = "okay";
++			};
++		};
++
++		apbx at 80040000 {
++			saif0: saif at 80042000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&saif0_pins_a>;
++				status = "okay";
++			};
++
++			saif1: saif at 80046000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&saif1_pins_a>;
++				fsl,saif-master = <&saif0>;
++				status = "okay";
++			};
++
++			i2c0: i2c at 80058000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins_a>;
++				status = "okay";
++
++				sgtl5000: codec at 0a {
++					compatible = "fsl,sgtl5000";
++					reg = <0x0a>;
++					VDDA-supply = <&reg_3p3v>;
++					VDDIO-supply = <&reg_3p3v>;
++
++				};
++
++				eeprom: eeprom at 51 {
++					compatible = "atmel,24c128";
++					reg = <0x51>;
++					pagesize = <32>;
++				};
++
++				rtc: rtc at 68 {
++					compatible = "stm,mt41t62";
++					reg = <0x68>;
++				};
++			};
++
++			duart: serial at 80074000 {
 +				pinctrl-names = "default";
 +				pinctrl-0 = <&duart_pins_a>;
 +				status = "okay";
 +			};
++
++			auart0: serial at 8006a000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart0_2pins_a>;
++				status = "okay";
++			};
++
++			auart3: serial at 80070000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart3_pins_a>;
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		mac0: ethernet at 800f0000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac0_pins_a>;
++			phy-reset-gpios = <&gpio3 11 0>;
++			status = "okay";
++		};
++
++		mac1: ethernet at 800f4000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac1_pins_a>;
++			status = "okay";
 +		};
 +	};
 +
 +	regulators {
 +		compatible = "simple-bus";
 +
-+		reg_vddio_sd0: vddio-sd0 {
++		reg_3p3v: 3p3v {
 +			compatible = "regulator-fixed";
-+			regulator-name = "vddio-sd0";
++			regulator-name = "3P3V";
 +			regulator-min-microvolt = <3300000>;
 +			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio1 29 0>;
++			regulator-always-on;
 +		};
++	};
++
++	sound {
++		compatible = "fsl,imx28-evk-sgtl5000",
++			     "fsl,mxs-audio-sgtl5000";
++		model = "imx28-evk-sgtl5000";
++		saif-controllers = <&saif0 &saif1>;
++		audio-codec = <&sgtl5000>;
 +	};
 +};
 diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index c1e02ae..b3239e2 100644
+index 7bbb961..d3fc8ba 100644
 --- a/arch/arm/mach-mxs/mach-mxs.c
 +++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -269,6 +269,7 @@ static void __init mxs_machine_init(void)
+@@ -59,6 +59,23 @@ static struct fb_videomode mx28evk_video_modes[] = {
+ 	},
+ };
  
- static const char *imx23_dt_compat[] __initdata = {
- 	"fsl,imx23-evk",
-+	"fsl,stmp378x_devb"
- 	"olimex,imx23-olinuxino",
- 	"fsl,imx23",
++static struct fb_videomode m28evk_video_modes[] = {
++	{
++		.name		= "Ampire AM-800480R2TMQW-T01H",
++		.refresh	= 60,
++		.xres		= 800,
++		.yres		= 480,
++		.pixclock	= 30066, /* picosecond (33.26 MHz) */
++		.left_margin	= 0,
++		.right_margin	= 256,
++		.upper_margin	= 0,
++		.lower_margin	= 45,
++		.hsync_len	= 1,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT,
++	},
++};
++
+ static struct mxsfb_platform_data mxsfb_pdata __initdata;
+ 
+ static struct of_dev_auxdata mxs_auxdata_lookup[] __initdata = {
+@@ -186,15 +203,17 @@ static void __init imx23_evk_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
+ 
+-static void __init imx28_evk_init(void)
++static inline void enable_clk_enet_out(void)
+ {
+-	struct clk *clk;
++	struct clk *clk = clk_get_sys("enet_out", NULL);
+ 
+-	/* Enable fec phy clock */
+-	clk = clk_get_sys("enet_out", NULL);
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
++}
+ 
++static void __init imx28_evk_init(void)
++{
++	enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_FSL);
+ 
+ 	mxsfb_pdata.mode_list = mx28evk_video_modes;
+@@ -203,12 +222,25 @@ static void __init imx28_evk_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
+ 
++static void __init m28evk_init(void)
++{
++	enable_clk_enet_out();
++	update_fec_mac_prop(OUI_DENX);
++
++	mxsfb_pdata.mode_list = m28evk_video_modes;
++	mxsfb_pdata.mode_count = ARRAY_SIZE(m28evk_video_modes);
++	mxsfb_pdata.default_bpp = 16;
++	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
++}
++
+ static void __init mxs_machine_init(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+ 		imx28_evk_init();
+ 	else if (of_machine_is_compatible("fsl,imx23-evk"))
+ 		imx23_evk_init();
++	else if (of_machine_is_compatible("denx,m28evk"))
++		m28evk_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     mxs_auxdata_lookup, NULL);
+@@ -223,6 +255,7 @@ static const char *imx23_dt_compat[] __initdata = {
+ 
+ static const char *imx28_dt_compat[] __initdata = {
+ 	"crystalfontz,cfa10036",
++	"denx,m28evk",
+ 	"fsl,imx28-evk",
+ 	"fsl,imx28",
  	NULL,
 -- 
 1.7.5.4
