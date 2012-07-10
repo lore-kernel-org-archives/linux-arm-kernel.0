@@ -1,68 +1,58 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 10 Jul 2012 11:07:14 -0400 (EDT)
-Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
- change
-In-Reply-To: <20120710031426.GG26888@b20223-02.ap.freescale.net>
-Message-ID: <Pine.LNX.4.44L0.1207101024110.1308-100000@iolanthe.rowland.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 10 Jul 2012 20:34:24 +0530
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <20120710135302.GG9409@opensource.wolfsonmicro.com>
+References: <1340406842-27135-1-git-send-email-swarren@wwwdotorg.org>
+ <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
+ <4FE882A5.3080504@nvidia.com>
+ <20120625222646.GB30406@opensource.wolfsonmicro.com>
+ <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
+ <20120710134436.GD9409@opensource.wolfsonmicro.com>
+ <4FFC31D5.7090600@nvidia.com>
+ <20120710135302.GG9409@opensource.wolfsonmicro.com>
+Message-ID: <4FFC4478.7000204@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jul 2012, Richard Zhao wrote:
+On Tuesday 10 July 2012 07:23 PM, Mark Brown wrote:
+> * PGP Signed by an unknown key
+>
+> On Tue, Jul 10, 2012 at 07:14:53PM +0530, Laxman Dewangan wrote:
+>
+>> Sorry, I did not get it fully. I had two patches, one for fixed one
+>> and other for tps65910. On which patch, you are seeing issue and
+>> which part of code?
+> Mainly tps65910.  The fixed voltage regulator does have the same issue
+> but it is somewhat special here.
 
-> On Sat, Jul 07, 2012 at 10:56:45PM +0800, Richard Zhao wrote:
-> > Phy may need to change settings when port connect change.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
-> > ---
-> >  drivers/usb/core/hub.c |    8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> > index 4cc8dc9..2ba9d84 100644
-> > --- a/drivers/usb/core/hub.c
-> > +++ b/drivers/usb/core/hub.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/usb.h>
-> >  #include <linux/usbdevice_fs.h>
-> >  #include <linux/usb/hcd.h>
-> > +#include <linux/usb/otg.h>
-> >  #include <linux/usb/quirks.h>
-> >  #include <linux/kthread.h>
-> >  #include <linux/mutex.h>
-> > @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
-> >  		}
-> >  	}
-> >  
-> > +	if (unlikely(hcd->phy && !hdev->parent)) {
-> > +		if (portstatus & USB_PORT_STAT_CONNECTION)
-> > +			usb_phy_notify_connect(hcd->phy, port1);
-> > +		else
-> > +			usb_phy_notify_disconnect(hcd->phy, port1);
-> There's another issue. When hcd is removed, notify disconnect is not
-> called. Is it ok, if I remove the above two line and add below patch:
+Oops, I follow the same approach for tps65910 what it was with fixed 
+regulator, was thinking that this is good approach.
 
-You should keep those two lines, since it's possible for a disconnect
-to occur without usb_disconnect() being called.  This happens when a
-device fails to enumerate.
+The sample code for tps65910 is as follows. So where do you think that 
+it is wrong and what should be correct approach.
+I need to follow the same for tps6586x also.
 
-> --- a/drivers/usb/core/hub.c
-> +++ b/drivers/usb/core/hub.c
-> @@ -1924,6 +1924,11 @@ void usb_disconnect(struct usb_device **pdev)
->  	 */
->  	device_del(&udev->dev);
->  
-> +	if (udev->parent && !udev->parent->parent) {
-> +		struct usb_hcd *hcd = bus_to_hcd(udev->bus);
-> +		usb_phy_notify_disconnect(hcd->phy, udev->portnum);
-> +	}
 
-You might not want to add this.  usb_disconnect() can get called in 
-situations where the device remains physically connected (if the 
-firmware changes during a reset, for example).
+@@ -1023,6 +1051,13 @@ static struct tps65910_board 
+*tps65910_parse_dt_reg_data(
+                  "ti,regulator-ext-sleep-control", &prop);
+          if (!ret)
+              pmic_plat_data->regulator_ext_sleep_control[idx] = prop;
++
++
++        if (info->vin_name) {
++            snprintf(in_supply, 32, "%s-supply", info->vin_name);
++            if (of_find_property(np, in_supply, 0))
++                pmic_plat_data->input_supply[idx] =
++                                info->vin_name;
++        }
+      }
 
-If you want to notify the phy when the root hub is removed, there are 
-better places to do it.  One possibility is in hub_quiesce(), another 
-is in usb_remove_hcd().
+      return pmic_plat_data;
+@@ -1126,6 +1161,7 @@ static __devinit int tps65910_probe(struct 
+platform_device *pdev)
+          pmic->info[i] = info;
 
-Alan Stern
+          pmic->desc[i].name = info->name;
++        pmic->desc[i].supply_name = pmic_plat_data->input_supply[i];
+          pmic->desc[i].id = i;
