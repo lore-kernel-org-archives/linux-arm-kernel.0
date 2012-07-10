@@ -1,73 +1,87 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Tue, 10 Jul 2012 13:46:21 +0530
-Subject: [PATCH v1 11/11] arm: omap: phy: remove unused functions from
- omap-phy-internal.c
-In-Reply-To: <4FFBCBC0.5020603@ti.com>
-References: <1340884267-28908-1-git-send-email-kishon@ti.com>
- <1340884267-28908-12-git-send-email-kishon@ti.com>
- <4FFBCBC0.5020603@ti.com>
-Message-ID: <CAAe_U6Ly3J90VMz5dP=p4wDauOf1v_K1JRB0Qp8nBYaQhcx==w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Jul 2012 01:18:52 -0700
+Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA69538@DBDE01.ent.ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
+ <4FFA9B61.8030808@ti.com> <20120709131156.GH1122@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA69538@DBDE01.ent.ti.com>
+Message-ID: <20120710081851.GL1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120709 23:30]:
+> On Mon, Jul 09, 2012 at 18:41:58, Tony Lindgren wrote:
+> > * Vaibhav Hiremath <hvaibhav@ti.com> [120709 01:55]:
+> > > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
+> > > > --- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
+> > > > +++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+> > > > @@ -39,6 +39,7 @@ struct omap_clk {
+> > > >  #define CK_443X		(1 << 11)
+> > > >  #define CK_TI816X	(1 << 12)
+> > > >  #define CK_446X		(1 << 13)
+> > > > +#define CK_54XX		(1 << 14)
+> > > 
+> > > This is conflicting with AM33XX, you may want to rebase it again, since
+> > > AM33xx clock tree is already pushed and available in
+> > > linux-omap/devel-am33xx-part2.
+> > 
+> > Heh these CK_XXXX defines are now running out of the u16 cpu_mask.
+> > 
+> > They really should be replaced with SoC specific lists of clocks
+> > rather than bloating the cpu_mask and repeating it for every clock
+> > that's compiled in for 800+ times.
+> > 
+> > Below (untested) is what could be done in the short term.
+> > 
+> > I wonder if we could #define CK_OMAP_DUMMY 0 that's always set
+> > for non-shared clocks if they only get set in some *_data.c
+> > file in a unique way?
+> > 
+> > Paul got any better ideas?
+...
 
-On Tue, Jul 10, 2012 at 11:59 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> On Thursday 28 June 2012 05:21 PM, Kishon Vijay Abraham I wrote:
->>
->> All the unnessary functions in omap-phy-internal is removed.
->> These functionality are now handled by omap-usb2 phy driver.
->>
->> Cc: Felipe Balbi<balbi@ti.com>
->> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->> Acked-by: Tony Lindgren<tony@atomide.com>
->> ---
->>   arch/arm/mach-omap2/omap_phy_internal.c |  138
->> -------------------------------
->>   arch/arm/mach-omap2/twl-common.c        |    5 -
->>   arch/arm/mach-omap2/usb-musb.c          |    3 -
->>   3 files changed, 0 insertions(+), 146 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_phy_internal.c
->> b/arch/arm/mach-omap2/omap_phy_internal.c
->> index 4c90477..0c610b4 100644
->> --- a/arch/arm/mach-omap2/omap_phy_internal.c
->> +++ b/arch/arm/mach-omap2/omap_phy_internal.c
->> @@ -31,144 +31,6 @@
->>   #include<plat/usb.h>
->>   #include "control.h"
->>
->> -/* OMAP control module register for UTMI PHY */
->> -#define CONTROL_DEV_CONF               0x300
->> -#define PHY_PD                         0x1
->> -
->> -#define USBOTGHS_CONTROL               0x33c
->> -#define        AVALID                          BIT(0)
->> -#define        BVALID                          BIT(1)
->> -#define        VBUSVALID                       BIT(2)
->> -#define        SESSEND                         BIT(3)
->> -#define        IDDIG                           BIT(4)
->> -
->> -static struct clk *phyclk, *clk48m, *clk32k;
->> -static void __iomem *ctrl_base;
->> -static int usbotghs_control;
->> -
->> -int omap4430_phy_init(struct device *dev)
->> -{
->> -       ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
->> -       if (!ctrl_base) {
->> -               pr_err("control module ioremap failed\n");
->> -               return -ENOMEM;
->> -       }
->> -       /* Power down the phy */
->> -       __raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
->
->
-> Just checking, but I hope your new driver handles this too.
-> You might not see any issues with it now, but not doing this could
-> gate OMAP hitting low power in idle.
+> This also will not scale up in the future and will end up again in the same 
+> situation.
 
-I power down the phy during probe in omap-usb2 phy driver.
+Right that's why we want to get rid of it.
+ 
+> Just a quick thought, may work here,
+> 
+> I looked at the usage of cpu_mask and rates.flag and I believe we can 
+> restrict both to given SoC, something like,
+> 
+> OMAP34XX ->
+>           ES1
+>           ES2PLUS
+>           36XX
+>           AM35XX
+>           ...
+> 
+> OMAP4 ->
+>           443X
+>           446X
+> 
+> AM33XX ->
+>           AM335X
+>           TI816X
+>           TI814X
+>           ...
+> 
+> XYZ...  ->
+>           ...
+> 
+> 
+> The proposal would be,
+> 
+> To make cpu_mask and rate.flags 32 bit wide and divide it in 16-16 bits -
+> 
+> Lower 16 bits => describe SoC it is applicable to
+> Upper 16 bit => describes silicon versions or families
 
-Thanks
-Kishon
+No thanks.. We don't want to make it 32 bit and bloat all the compiled in
+clock even further. 
+
+Regards,
+
+Tony
