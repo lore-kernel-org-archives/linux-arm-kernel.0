@@ -1,74 +1,128 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Jul 2012 08:22:34 +0200
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
-In-Reply-To: <20120710061757.GB29257@core.coreip.homeip.net>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
- <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
- <4FFB40A4.5060505@linaro.org> <20120709204620.GA12692@core.coreip.homeip.net>
- <4FFB463F.9040201@linaro.org> <20120710061757.GB29257@core.coreip.homeip.net>
-Message-ID: <4FFBCA2A.6080400@linaro.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 10 Jul 2012 06:25:49 +0000
+Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120709131156.GH1122@atomide.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
+ <4FFA9B61.8030808@ti.com> <20120709131156.GH1122@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA69538@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/12 08:17, Dmitry Torokhov wrote:
-> On Mon, Jul 09, 2012 at 10:59:43PM +0200, Lee Jones wrote:
->> Sorry for the cock-up(s).
->>
->> From: Lee Jones <lee.jones@linaro.org>
->> Date: Tue, 26 Jun 2012 10:46:50 +0100
->> Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
->>
->> Before we can use any domain allocated IRQ, we need to first create a
->> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
->> We do this with a helper function provided by the AB8500 IRQ domain
->> controller called ab8500_irq_get_virq(). We need to do this for both
->> IRQs which the Power-On-Key driver uses; one for button press, the other
->> for button depress.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->
-> I think it would be best if this got merged through whatever tree that
-> was used to introduce ab8500_irq_get_virq(); otherwise it will have to
-> wait till I resync with mainline sometime in the middle of the next
-> release cycle.
->
-> Thanks.
+On Mon, Jul 09, 2012 at 18:41:58, Tony Lindgren wrote:
+> * Vaibhav Hiremath <hvaibhav@ti.com> [120709 01:55]:
+> > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
+> > > --- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
+> > > +++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+> > > @@ -39,6 +39,7 @@ struct omap_clk {
+> > >  #define CK_443X		(1 << 11)
+> > >  #define CK_TI816X	(1 << 12)
+> > >  #define CK_446X		(1 << 13)
+> > > +#define CK_54XX		(1 << 14)
+> > 
+> > This is conflicting with AM33XX, you may want to rebase it again, since
+> > AM33xx clock tree is already pushed and available in
+> > linux-omap/devel-am33xx-part2.
+> 
+> Heh these CK_XXXX defines are now running out of the u16 cpu_mask.
+> 
+> They really should be replaced with SoC specific lists of clocks
+> rather than bloating the cpu_mask and repeating it for every clock
+> that's compiled in for 800+ times.
+> 
+> Below (untested) is what could be done in the short term.
+> 
+> I wonder if we could #define CK_OMAP_DUMMY 0 that's always set
+> for non-shared clocks if they only get set in some *_data.c
+> file in a unique way?
+> 
+> Paul got any better ideas?
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> --- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
+> +++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+> @@ -26,26 +26,29 @@ struct omap_clk {
+>  	}
+>  
+>  /* Platform flags for the clkdev-OMAP integration code */
+> +
+> +#ifdef CONFIG_ARCH_OMAP1
+>  #define CK_310		(1 << 0)
+>  #define CK_7XX		(1 << 1)	/* 7xx, 850 */
+>  #define CK_1510		(1 << 2)
+>  #define CK_16XX		(1 << 3)	/* 16xx, 17xx, 5912 */
+> -#define CK_242X		(1 << 4)
+> -#define CK_243X		(1 << 5)	/* 243x, 253x */
+> -#define CK_3430ES1	(1 << 6)	/* 34xxES1 only */
+> -#define CK_3430ES2PLUS	(1 << 7)	/* 34xxES2, ES3, non-Sitara 35xx only */
+> -#define CK_AM35XX	(1 << 9)	/* Sitara AM35xx */
+> -#define CK_36XX		(1 << 10)	/* 36xx/37xx-specific clocks */
+> -#define CK_443X		(1 << 11)
+> -#define CK_TI816X	(1 << 12)
+> -#define CK_446X		(1 << 13)
+> -#define CK_AM33XX	(1 << 14)	/* AM33xx specific clocks */
+> -#define CK_1710		(1 << 15)	/* 1710 extra for rate selection */
+> -
+> +#define CK_1710		(1 << 4)	/* 1710 extra for rate selection */
+> +#endif
+>  
+> +#ifdef CONFIG_ARCH_OMAP2PLUS
+> +#define CK_242X		(1 << 0)
+> +#define CK_243X		(1 << 1)	/* 243x, 253x */
+> +#define CK_3430ES1	(1 << 2)	/* 34xxES1 only */
+> +#define CK_3430ES2PLUS	(1 << 3)	/* 34xxES2, ES3, non-Sitara 35xx only */
+> +#define CK_AM35XX	(1 << 4)	/* Sitara AM35xx */
+> +#define CK_36XX		(1 << 5)	/* 36xx/37xx-specific clocks */
+> +#define CK_443X		(1 << 6)
+> +#define CK_TI816X	(1 << 7)
+> +#define CK_446X		(1 << 8)
+> +#define CK_AM33XX	(1 << 9)	/* AM33xx specific clocks */
+>  #define CK_34XX		(CK_3430ES1 | CK_3430ES2PLUS)
+>  #define CK_3XXX		(CK_34XX | CK_AM35XX | CK_36XX)
+> -
+> +#endif
+>  
+>  #endif
 
-No problem. I'll send it though ARM-SoC.
+This also will not scale up in the future and will end up again in the same 
+situation.
 
->> ---
->>   drivers/input/misc/ab8500-ponkey.c |    4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
->> index 5ceb23e..f6764af 100644
->> --- a/drivers/input/misc/ab8500-ponkey.c
->> +++ b/drivers/input/misc/ab8500-ponkey.c
->> @@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
->>
->>   	ponkey->idev = input;
->>   	ponkey->ab8500 = ab8500;
->> -	ponkey->irq_dbf = irq_dbf;
->> -	ponkey->irq_dbr = irq_dbr;
->> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
->> +	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
->>
->>   	input->name = "AB8500 POn(PowerOn) Key";
->>   	input->dev.parent = &pdev->dev;
->> --
->> 1.7.9.5
->>
->>
->>
->
+Just a quick thought, may work here,
+
+I looked at the usage of cpu_mask and rates.flag and I believe we can 
+restrict both to given SoC, something like,
+
+OMAP34XX ->
+          ES1
+          ES2PLUS
+          36XX
+          AM35XX
+          ...
+
+OMAP4 ->
+          443X
+          446X
+
+AM33XX ->
+          AM335X
+          TI816X
+          TI814X
+          ...
+
+XYZ...  ->
+          ...
 
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The proposal would be,
+
+To make cpu_mask and rate.flags 32 bit wide and divide it in 16-16 bits -
+
+Lower 16 bits => describe SoC it is applicable to
+Upper 16 bit => describes silicon versions or families
+
+Thanks,
+Vaibhav
