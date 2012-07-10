@@ -1,34 +1,19 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 10 Jul 2012 11:13:04 +0200
-Subject: [PATCH 1/1] mfd: ab8500: Clean-up the last two ab8500 related DT
- match tables
-In-Reply-To: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
-References: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120710091304.GU15345@sortiz-mobl>
+Date: Tue, 10 Jul 2012 11:14:11 +0200
+Subject: [PATCH V6 0/4] add 88pm80x mfd driver
+In-Reply-To: <1341896853-29755-1-git-send-email-zhouqiao@marvell.com>
+References: <1341896853-29755-1-git-send-email-zhouqiao@marvell.com>
+Message-ID: <20120710091411.GV15345@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Zhou,
 
-On Fri, Jul 06, 2012 at 01:43:18PM +0100, Lee Jones wrote:
-> A patch was recently submitted to stop all ab8500 devices from
-> being registered through Device Tree. Instead, only the db8500
-> will be DT:ed and the rest will continue to be registered via
-> the MFD API, as they always were.
-> 
-> Two patches have recently been applied which enable Device Tree
-> probing; one for rtc-ab8500 and the other for ponkey-ab8500.
-> These two need to be removed to prevent double-probing these
-> devices with Device Tree is enabled.
-> 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/input/misc/ab8500-ponkey.c |    8 --------
->  drivers/rtc/rtc-ab8500.c           |    6 ------
->  2 files changed, 14 deletions(-)
-I don't know against which tree you generated those patches, but none of those
-2 of_device_id arrays are in my for-next branch. So I can't apply this patch.
+On Tue, Jul 10, 2012 at 01:07:29PM +0800, Qiao Zhou wrote:
+> change log [v6->v5]:
+> export_symbol_gpl for pm80x_regmap_config to fix build issue for module.
+I did already apply a patch from Axel Lin that fixes that build failure. See
+commit 78a73e59db21b465fe60e795a0b7eadb0451370b from my for-next branch.
 
 Cheers,
 Samuel.
