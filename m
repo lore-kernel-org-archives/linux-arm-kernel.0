@@ -1,47 +1,45 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 10 Jul 2012 22:53:04 +0800
-Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
- change
-In-Reply-To: <Pine.LNX.4.44L0.1207101021580.1308-100000@iolanthe.rowland.org>
-References: <20120710014450.GF26888@b20223-02.ap.freescale.net>
- <Pine.LNX.4.44L0.1207101021580.1308-100000@iolanthe.rowland.org>
-Message-ID: <20120710145302.GA2789@richard-laptop>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Jul 2012 17:02:52 +0200
+Subject: mmc: mxs: DEADLOCK
+In-Reply-To: <4FFC367A.8020100@bluegiga.com>
+References: <4FFC367A.8020100@bluegiga.com>
+Message-ID: <201207101702.52632.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 10:24:07AM -0400, Alan Stern wrote:
-> On Tue, 10 Jul 2012, Richard Zhao wrote:
-> 
-> > > > @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
-> > > >  		}
-> > > >  	}
-> > > >  
-> > > > +	if (unlikely(hcd->phy && !hdev->parent)) {
-> > > 
-> > > Why is this "unlikely"?  And why mark it as such, is this a "fast path"
-> > > that needs the compiler to know this hint to optimize things here?
-> > > 
-> > > Please don't use likely() or unlikely() except in places it really is
-> > > needed, _and_ you have measured the difference.  Have you done so in
-> > > this place?
-> > It's from a comment by Alan Stern.
-> > http://www.spinics.net/lists/linux-usb/msg64987.html
-> 
-> That comment was made in a somewhat different context.  At the time 
-> the code was part of an interrupt handler; now it isn't.
-> 
-> > Actually, for my board, it's not unlikely. But for others which don't
-> > have notify_connect/disconnect, it's unlikely.
-> > 
-> > Because it's not unlikely for all boards, I prefer remove "unlikely".
-> 
-> It's no longer a big deal one way or another.  I don't care about the 
-> "unlikely" because it's on a cold path running in process context.  Go 
-> ahead and remove it.
-Ok. I'll remove it. 
+Dear Lauri Hintsala,
 
-Thanks
-Richard
+[...]
+
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -278,11 +278,11 @@ static irqreturn_t mxs_mmc_irq_handler(int irq,
+> void *dev_id)
+>   	writel(stat & MXS_MMC_IRQ_BITS,
+>   	       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_CLR);
 > 
-> Alan Stern
+> +	spin_unlock(&host->lock);
+> +
+>   	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
+>   		mmc_signal_sdio_irq(host->mmc);
 > 
+> -	spin_unlock(&host->lock);
+> -
+
+Spinlock in irq handler is interesting too ;-)
+
+>   	if (stat & BM_SSP_CTRL1_RESP_TIMEOUT_IRQ)
+>   		cmd->error = -ETIMEDOUT;
+>   	else if (stat & BM_SSP_CTRL1_RESP_ERR_IRQ)
+> 
+> 
+> Is there any reason to keep mmc_signal_sdio_irq inside the spinlock?
+> mmc_signal_sdio_irq calls mxs_mmc_enable_sdio_irq and it tries to
+> acquire lock while it is already acquired.
+> 
+> 
+> Best regards,
+> Lauri Hintsala
+
+Best regards,
+Marek Vasut
