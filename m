@@ -1,33 +1,29 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 10 Jul 2012 22:22:31 +0530
-Subject: [PATCH v4 5/6] spi: s3c64xx: Remove the 'set_level' callback from
- controller data
-In-Reply-To: <20120710143844.GB11698@sirena.org.uk>
-References: <1341930459-25223-1-git-send-email-thomas.abraham@linaro.org>
- <1341930459-25223-6-git-send-email-thomas.abraham@linaro.org>
- <20120710143844.GB11698@sirena.org.uk>
-Message-ID: <CAJuYYwQ4wio0CxPAVaNBoD7=vMgUS0CCZB45aSst-DW2zOTn1w@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 10 Jul 2012 17:52:36 +0100
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <4FFC5ACA.8010003@nvidia.com>
+References: <4FE882A5.3080504@nvidia.com>
+ <20120625222646.GB30406@opensource.wolfsonmicro.com>
+ <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
+ <20120710134436.GD9409@opensource.wolfsonmicro.com>
+ <4FFC31D5.7090600@nvidia.com>
+ <20120710135302.GG9409@opensource.wolfsonmicro.com>
+ <4FFC4478.7000204@nvidia.com>
+ <20120710154201.GE10022@opensource.wolfsonmicro.com>
+ <4FFC5ACA.8010003@nvidia.com>
+Message-ID: <20120710165236.GI10022@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2012 20:08, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jul 10, 2012 at 07:57:38PM +0530, Thomas Abraham wrote:
->> The set_level callback in the controller data, which is used to configure
->> the slave select line, cannot be supported when migrating the driver to
->> device tree based discovery. Since all the platforms currently use gpio
->> as the slave select line, this callback can be removed from the
->> controller data and replaced with call to gpio_set_value in the driver.
->
-> This is currently buggy, BTW, as the driver never requests the GPIO.
+On Tue, Jul 10, 2012 at 10:09:38PM +0530, Laxman Dewangan wrote:
 
-In non-dt case, the platform code supplying the gpio number (slave
-select line) is responsible for requesting the gpio during the
-machine_init call. So the gpio request is not called in the driver for
-that gpio. In dt case, the 6th patch adds dt support and that patch
-includes a gpio request call. Hence, this looks okay to me. Please
-suggest if you still feel that there are changes required.
+> Do we need to make such supply pin entry as required inplace of optional?
 
-Thanks for reviewing the patches.
-
-Regards,
-Thomas.
+That's the idea.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/fc726e9b/attachment.sig>
