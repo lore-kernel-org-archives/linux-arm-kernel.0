@@ -1,60 +1,62 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 10 Jul 2012 16:20:26 +0100
-Subject: [PATCH 4 0/4] Add ability to set defaultless network device MAC
- addresses to deterministic computed locally administered values
-In-Reply-To: <4FFC2712.9020208@warmcat.com>
-References: <20120705024259.26317.16000.stgit@build.warmcat.com>
- <201207101437.54877.florian@openwrt.org>
- <4FFC2712.9020208@warmcat.com>
-Message-ID: <20120710162026.71534607@pyramind.ukuu.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Jul 2012 23:23:53 +0800
+Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
+In-Reply-To: <201207100920.03867.marex@denx.de>
+References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
+ <1341898587-8462-4-git-send-email-shawn.guo@linaro.org>
+ <201207100920.03867.marex@denx.de>
+Message-ID: <20120710152350.GA11813@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Why should Ubuntu, Fedora etc stink up their OSes with Panda-specific 
-> workarounds?  And Panda is not the only device with this issue.
+On Tue, Jul 10, 2012 at 09:20:03AM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
+> 
+> > From: Marek Vasut <marex@denx.de>
+> > 
+> [...]
+> 
+> > +	sound {
+> > +		compatible = "fsl,imx28-evk-sgtl5000",
+> 
+> imx28-evk ? ;-)
+> 
+Fixed as below.
 
-Why should we crap all over the kernel for all these board specific
-problems ? Userspace code is at least pageable and generally less
-security critical.
+Regards,
+Shawn
 
-So your argument from that point of view is bunk. There are tons and tons
-of boards doing tons of horrible hacks. If we mangled the generic code
-for all of them the result would be a complete unmanagable pile of turd.
+---8<---
 
-The use of locally administered MAC addressing is policy. The helper
-belongs in userspace as it's clearly part of what udev is supposed to be
-doing via device notifications, instead of your custom mini kernel-udev
-hack which is what you've basically created.
+diff --git a/arch/arm/boot/dts/apx4devkit.dts b/arch/arm/boot/dts/apx4devkit.dts
+index a670a90..04664bc 100644
+--- a/arch/arm/boot/dts/apx4devkit.dts
++++ b/arch/arm/boot/dts/apx4devkit.dts
+@@ -124,9 +124,9 @@
+        };
 
-We've said no to lots of people (several a year). We've done so for good
-reasons. Most of them had more taste than your hack too (ok except the Pi
-which was even more broken)
+        sound {
+-               compatible = "fsl,imx28-evk-sgtl5000",
++               compatible = "bluegiga,apx4devkit-sgtl5000",
+                             "fsl,mxs-audio-sgtl5000";
+-               model = "imx28-evk-sgtl5000";
++               model = "apx4devkit-sgtl5000";
+                saif-controllers = <&saif0 &saif1>;
+                audio-codec = <&sgtl5000>;
+        };
+diff --git a/arch/arm/boot/dts/m28evk.dts b/arch/arm/boot/dts/m28evk.dts
+index f3acdfa..183a3fd 100644
+--- a/arch/arm/boot/dts/m28evk.dts
++++ b/arch/arm/boot/dts/m28evk.dts
+@@ -201,9 +201,9 @@
+        };
 
-You need a udev rule, one single tiddly udev rule, and perhaps to expose a
-sysfs node somewhere if the required generation data is on the board.
-Hardly stinking up the userspace is it.
-
-That would also then fix any races with userspace trying to set the MAC,
-it would remove the need for the helper. It will avoid encoding
-ultra-crappy assumptions like
-
-"To make use of this safely you also need to make sure that any drivers
-that may compete for the bus ordinal you are using (eg, mUSB and ehci in
-Panda case) are loaded in a deterministic order."
-
-What are you going to do when speeding up booting by parallelising
-more probes breaks this kind of garbage assumption ?
-
-To be honest if Fedora needs to deal with an army of craptastic devices
-whose vendors can't get a MAC address on the board then they probably
-need a single common change to ifup so that if you ifup an interface that
-has no MAC it generates a local one. Thats about 6 lines of userspace
-code in the config scripts. It's also probably a good default end user
-behaviour.
-
-And if you have a real MAC but it's not loaded into the device you can
-just shove it into the platform device.
-
-End of problem.
-
-Alan
+        sound {
+-               compatible = "fsl,imx28-evk-sgtl5000",
++               compatible = "denx,m28evk-sgtl5000",
+                             "fsl,mxs-audio-sgtl5000";
+-               model = "imx28-evk-sgtl5000";
++               model = "m28evk-sgtl5000";
+                saif-controllers = <&saif0 &saif1>;
+                audio-codec = <&sgtl5000>;
+        };
