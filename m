@@ -1,165 +1,210 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 10 Jul 2012 12:14:21 +0530
-Subject: [PATCH v1 05/11] drivers: usb: twl6030: Add dt support for twl6030
- usb
-In-Reply-To: <CAAe_U6LXHvPxHLA1Zhx9Gx8DMM7k4rTpvEAzNzLGrRKOXvBwSA@mail.gmail.com>
-References: <1340884267-28908-1-git-send-email-kishon@ti.com>	<1340884267-28908-6-git-send-email-kishon@ti.com>	<4FFBC478.4060308@ti.com>
- <CAAe_U6LXHvPxHLA1Zhx9Gx8DMM7k4rTpvEAzNzLGrRKOXvBwSA@mail.gmail.com>
-Message-ID: <4FFBCF45.7000304@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 10 Jul 2012 16:41:30 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
+ tree
+Message-ID: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012 11:58 AM, ABRAHAM, KISHON VIJAY wrote:
-> Hi,
->
-> On Tue, Jul 10, 2012 at 11:28 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
->> On Thursday 28 June 2012 05:21 PM, Kishon Vijay Abraham I wrote:
->>>
->>> Add device tree support for twl6030 usb driver.
->>> Update the Documentation with device tree binding information.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->>> ---
->>>    .../devicetree/bindings/usb/twlxxxx-usb.txt        |   18 ++++++++
->>>    drivers/usb/otg/twl6030-usb.c                      |   45
->>> ++++++++++++++------
->>>    2 files changed, 50 insertions(+), 13 deletions(-)
->>>    create mode 100644 Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
->>> b/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
->>> new file mode 100644
->>> index 0000000..f293271
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
->>> @@ -0,0 +1,18 @@
->>> +USB COMPARATOR OF TWL CHIPS
->>> +
->>> +TWL6030 USB COMPARATOR
->>> + - compatible : Should be "ti,twl6030-usb"
->>> + - interrupts : Two interrupt numbers to the cpu should be specified.
->>> First
->>> +   interrupt number is the otg interrupt number that raises ID interrupts
->>> when
->>> +   the controller has to act as host and the second interrupt number is
->>> the
->>> +   usb interrupt number that raises VBUS interrupts when the controller
->>> has to
->>> +   act as device
->>> + - regulator :<supply-name>   can be "vusb" or "ldousb"
->>> + -<supply-name>-supply : phandle to the regulator device tree node
->>> +
->>> +twl6030-usb {
->>> +       compatible = "ti,twl6030-usb";
->>> +       interrupts =<   4 10>;
->>> +       regulator = "vusb";
->>> +       vusb-supply =<&vusb>;
->>
->>
->> This doesn't seem right. Why do you ned a 'regulator' string along
->> with the phandle?
->
-> The original code was something like
-> 	if (twl->features&  TWL6025_SUBCLASS)
-> 		regulator_name = "ldousb";
-> 	else
-> 		regulator_name = "vusb";
->
-> I wasn't sure how to handle this *TWL6025_SUBCLASS* stuff.
->
->>
->>> +};
->>> diff --git a/drivers/usb/otg/twl6030-usb.c b/drivers/usb/otg/twl6030-usb.c
->>> index 6a361d2..20b7abe 100644
->>> --- a/drivers/usb/otg/twl6030-usb.c
->>> +++ b/drivers/usb/otg/twl6030-usb.c
->>> @@ -105,7 +105,7 @@ struct twl6030_usb {
->>>          u8                      asleep;
->>>          bool                    irq_enabled;
->>>          bool                    vbus_enable;
->>> -       unsigned long           features;
->>> +       const char              *regulator;
->>>    };
->>>
->>>    #define       comparator_to_twl(x) container_of((x), struct twl6030_usb,
->>> comparator)
->>> @@ -153,13 +153,6 @@ static int twl6030_start_srp(struct phy_companion
->>> *comparator)
->>>
->>>    static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
->>>    {
->>> -       char *regulator_name;
->>> -
->>> -       if (twl->features&   TWL6025_SUBCLASS)
->>>
->>> -               regulator_name = "ldousb";
->>> -       else
->>> -               regulator_name = "vusb";
->>> -
->>>          /* Set to OTG_REV 1.3 and turn on the ID_WAKEUP_COMP */
->>>          twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x1, TWL6030_BACKUP_REG);
->>>
->>> @@ -169,7 +162,7 @@ static int twl6030_usb_ldo_init(struct twl6030_usb
->>> *twl)
->>>          /* Program MISC2 register and set bit VUSB_IN_VBAT */
->>>          twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x10, TWL6030_MISC2);
->>>
->>> -       twl->usb3v3 = regulator_get(twl->dev, regulator_name);
->>> +       twl->usb3v3 = regulator_get(twl->dev, twl->regulator);
->>>          if (IS_ERR(twl->usb3v3))
->>>                  return -ENODEV;
->>>
->>> @@ -324,9 +317,9 @@ static int __devinit twl6030_usb_probe(struct
->>> platform_device *pdev)
->>>    {
->>>          struct twl6030_usb      *twl;
->>>          int                     status, err;
->>> -       struct twl4030_usb_data *pdata;
->>> -       struct device *dev =&pdev->dev;
->>>
->>> -       pdata = dev->platform_data;
->>> +       struct device_node      *np = pdev->dev.of_node;
->>> +       struct device           *dev =&pdev->dev;
->>>
->>> +       struct twl4030_usb_data *pdata = dev->platform_data;
->>>
->>>          twl = devm_kzalloc(dev, sizeof *twl, GFP_KERNEL);
->>>          if (!twl)
->>> @@ -335,13 +328,28 @@ static int __devinit twl6030_usb_probe(struct
->>> platform_device *pdev)
->>>          twl->dev                =&pdev->dev;
->>>
->>>          twl->irq1               = platform_get_irq(pdev, 0);
->>>          twl->irq2               = platform_get_irq(pdev, 1);
->>> -       twl->features           = pdata->features;
->>>          twl->linkstat           = OMAP_MUSB_UNKNOWN;
->>>
->>>          twl->comparator.set_vbus        = twl6030_set_vbus;
->>>          twl->comparator.start_srp       = twl6030_start_srp;
->>>          omap_usb2_set_comparator(&twl->comparator);
->>>
->>> +       if (np) {
->>> +               err = of_property_read_string(np,
->>> "regulator",&twl->regulator);
->>>
->>> +               if (err<   0) {
->>> +                       dev_err(&pdev->dev, "unable to get regulator\n");
->>> +                       return err;
->>> +               }
->>
->>
->> Isn't there a better way for the driver to know which supply to use instead
->> of DT passing the supply name?
->
-> The problem I see is this same driver is used for twl6030 and twl6025
-> and the regulator used is different for these two chips (And I think
+Hi all,
 
-hmm, so based on what chip is used on a board, shouldn't the board dts
-file just map the right regulator with a supply name?
-This doesn't look like something the driver should be bothered about.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/i2c/busses/i2c-nomadik.c between commit af97bace2cca
+("i2c-nomadik: move header to <linux/platform_data/i2c-nomadik.h>") from
+the i2c-embedded tree and commits 32e42c687e0a ("ARM: ux500: Remove
+unused i2c platform_data initialisation code") and 8214fd238a66 ("i2c:
+Add Device Tree support to the Nomadik I2C driver") from the arm-soc tree.
 
-> twl6025 will also use the same dt file as twl6030 as I don't see a
-> different file for 6025).
->
-> Thanks
-> Kishon
+I fixed it up (I think - see below) and can carry the fix as necessary.
+Please check this and talk to each other ...
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/i2c/busses/i2c-nomadik.c
+index e6b93f3,5471303..0000000
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@@ -24,8 -23,10 +24,9 @@@
+  #include <linux/io.h>
+  #include <linux/regulator/consumer.h>
+  #include <linux/pm_runtime.h>
+ +#include <linux/platform_data/i2c-nomadik.h>
++ #include <linux/of.h>
+  
+ -#include <plat/i2c.h>
+ -
+  #define DRIVER_NAME "nmk-i2c"
+  
+  /* I2C Controller register offsets */
+@@@ -911,23 -896,93 +908,94 @@@ static const struct i2c_algorithm nmk_i
+  	.functionality	= nmk_i2c_functionality
+  };
+  
++ static struct nmk_i2c_controller u8500_i2c = {
++ 	/*
++ 	 * Slave data setup time; 250ns, 100ns, and 10ns, which
++ 	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
++ 	 */
++ 	.slsu           = 0xe,
++ 	.tft            = 1,      /* Tx FIFO threshold */
++ 	.rft            = 8,      /* Rx FIFO threshold */
++ 	.clk_freq       = 400000, /* std. mode operation */
++ 	.timeout        = 200,    /* Slave response timeout(ms) */
++ 	.sm             = I2C_FREQ_MODE_FAST,
++ };
++ 
++ static int __devinit
++ nmk_i2c_of_probe(struct device_node *np, struct nmk_i2c_controller *pdata)
++ {
++ 	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
++ 	if (!pdata->clk_freq) {
++ 		pr_warn("%s: Clock frequency not found\n", np->full_name);
++ 		return -EINVAL;
++ 	}
++ 
++ 	of_property_read_u32(np, "stericsson,slsu", (u32*)&pdata->slsu);
++ 	if (!pdata->slsu) {
++ 		pr_warn("%s: Data line delay not found\n", np->full_name);
++ 		return -EINVAL;
++ 	}
++ 
++ 	of_property_read_u32(np, "stericsson,tft", (u32*)&pdata->tft);
++ 	if (!pdata->tft) {
++ 		pr_warn("%s: Tx FIFO threshold not found\n", np->full_name);
++ 		return -EINVAL;
++ 	}
++ 
++ 	of_property_read_u32(np, "stericsson,rft", (u32*)&pdata->rft);
++ 	if (!pdata->rft) {
++ 		pr_warn("%s: Rx FIFO threshold not found\n", np->full_name);
++ 		return -EINVAL;
++ 	}
++ 
++ 	of_property_read_u32(np, "stericsson,timeout", (u32*)&pdata->timeout);
++ 	if (!pdata->timeout) {
++ 		pr_warn("%s: Timeout not found\n", np->full_name);
++ 		return -EINVAL;
++ 	}
++ 
++ 	/*
++ 	 * This driver only supports fast and standard frequency
++ 	 * modes. If anything else is requested fall-back to standard.
++ 	 */
++ 	if (of_get_property(np, "stericsson,i2c_freq_mode_fast", NULL))
++ 		pdata->sm = I2C_FREQ_MODE_FAST;
++ 	else
++ 		pdata->sm = I2C_FREQ_MODE_STANDARD;
++ 
++ 	return 0;
++ }
++ 
+ -static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ +static atomic_t adapter_id = ATOMIC_INIT(0);
+ +
+ +static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+  {
+  	int ret = 0;
+- 	struct nmk_i2c_controller *pdata =
+- 			adev->dev.platform_data;
+ -	struct resource *res;
+ -	struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
+ -	struct device_node *np = pdev->dev.of_node;
+++	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
+++	struct device_node *np = adev->dev.of_node;
+  	struct nmk_i2c_dev	*dev;
+  	struct i2c_adapter *adap;
+  
+- 	if (!pdata) {
+- 		dev_warn(&adev->dev, "no platform data\n");
+- 		return -ENODEV;
++ 	if (np) {
++ 		if (!pdata) {
+ -			pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+++			pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
++ 			if (!pdata) {
++ 				ret = -ENOMEM;
++ 				goto err_no_mem;
++ 			}
++ 		}
++ 		ret = nmk_i2c_of_probe(np, pdata);
++ 		if (ret)
++ 			kfree(pdata);
+  	}
++ 
++ 	if (!pdata)
++ 		/* No i2c configuration found, using the default. */
++ 		pdata = &u8500_i2c;
++ 
+  	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+  	if (!dev) {
+ -		dev_err(&pdev->dev, "cannot allocate memory\n");
+ +		dev_err(&adev->dev, "cannot allocate memory\n");
+  		ret = -ENOMEM;
+  		goto err_no_mem;
+  	}
+@@@ -969,12 -1037,12 +1037,11 @@@
+  	adap->owner	= THIS_MODULE;
+  	adap->class	= I2C_CLASS_HWMON | I2C_CLASS_SPD;
+  	adap->algo	= &nmk_i2c_algo;
+- 	adap->timeout	= pdata->timeout ? msecs_to_jiffies(pdata->timeout) :
+- 		msecs_to_jiffies(20000);
++ 	adap->timeout	= msecs_to_jiffies(pdata->timeout);
+ +	adap->nr = atomic_read(&adapter_id);
+  	snprintf(adap->name, sizeof(adap->name),
+ -		 "Nomadik I2C%d at %lx", pdev->id, (unsigned long)res->start);
+ -
+ -	/* fetch the controller id */
+ -	adap->nr	= pdev->id;
+ +		 "Nomadik I2C%d at %pR", adap->nr, &adev->res);
+ +	atomic_inc(&adapter_id);
+  
+  	/* fetch the controller configuration from machine */
+  	dev->cfg.clk_freq = pdata->clk_freq;
+@@@ -1040,29 -1110,20 +1107,35 @@@ static int nmk_i2c_remove(struct amba_d
+  	return 0;
+  }
+  
+ +static struct amba_id nmk_i2c_ids[] = {
+ +	{
+ +		.id	= 0x00180024,
+ +		.mask	= 0x00ffffff,
+ +	},
+ +	{
+ +		.id	= 0x00380024,
+ +		.mask	= 0x00ffffff,
+ +	},
+ +	{},
+ +};
+ +
+ +MODULE_DEVICE_TABLE(amba, nmk_i2c_ids);
+ +
++ static const struct of_device_id nmk_gpio_match[] = {
++ 	{ .compatible = "st,nomadik-i2c", },
++ 	{},
++ };
++ 
+ -static struct platform_driver nmk_i2c_driver = {
+ -	.driver = {
+ +static struct amba_driver nmk_i2c_driver = {
+ +	.drv = {
+  		.owner = THIS_MODULE,
+  		.name = DRIVER_NAME,
+  		.pm = &nmk_i2c_pm,
++ 		.of_match_table = nmk_gpio_match,
+  	},
+ +	.id_table = nmk_i2c_ids,
+  	.probe = nmk_i2c_probe,
+ -	.remove = __devexit_p(nmk_i2c_remove),
+ +	.remove = nmk_i2c_remove,
+  };
+  
+  static int __init nmk_i2c_init(void)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/ea0acc82/attachment-0001.sig>
