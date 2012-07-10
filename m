@@ -1,41 +1,143 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 10 Jul 2012 16:50:33 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
-Message-ID: <20120710165033.ab9ffbee81e2aeb03cad8d00@canb.auug.org.au>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 10 Jul 2012 12:22:57 +0530
+Subject: [PATCH v1 07/11] drivers: usb: twl4030: Add device tree support
+ for twl4030 usb
+In-Reply-To: <4FFBC56F.7080007@ti.com>
+References: <1340884267-28908-1-git-send-email-kishon@ti.com>
+ <1340884267-28908-8-git-send-email-kishon@ti.com>
+ <4FFBC56F.7080007@ti.com>
+Message-ID: <CAAe_U6JhMWzsZ_XZzO0gt=g9fufL-urCLEC0nWfa8vk-9x6F_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
 
-On Tue, 10 Jul 2012 16:41:30 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+On Tue, Jul 10, 2012 at 11:32 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> On Thursday 28 June 2012 05:21 PM, Kishon Vijay Abraham I wrote:
+>>
+>> Add device tree support for twl6030 usb driver.
 >
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/i2c/busses/i2c-nomadik.c between commit af97bace2cca
-> ("i2c-nomadik: move header to <linux/platform_data/i2c-nomadik.h>") from
+>
+> twl4030?
+My bad. Will fix it.
+>
+>
+>> Update the Documentation with device tree binding information.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>> ---
+>>   .../devicetree/bindings/usb/twlxxxx-usb.txt        |   19 +++++++++++++
+>>   drivers/usb/otg/twl4030-usb.c                      |   28
+>> +++++++++++++++----
+>>   2 files changed, 41 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+>> b/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+>> index f293271..2d069e4 100644
+>> --- a/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+>> +++ b/Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+>> @@ -16,3 +16,22 @@ twl6030-usb {
+>>         regulator = "vusb";
+>>         vusb-supply =<&vusb>;
+>>   };
+>> +
+>> +TWL4030 USB PHY AND COMPARATOR
+>> + - compatible : Should be "ti,twl4030-usb"
+>> + - interrupts : The interrupt numbers to the cpu should be specified.
+>> First
+>> +   interrupt number is the otg interrupt number that raises ID interrupts
+>> +   and VBUS interrupts. The second interrupt number is optional.
+>> + -<supply-name>-supply : phandle to the regulator device tree node.
+>> +<supply-name>  should be vusb1v5, vusb1v8 and vusb3v1
+>> + - usb_mode : The mode used by the phy to connect to the controller. "1"
+>> +   specifies "ULPI" mode and "2" specifies "CEA2011_3PIN" mode.
+>
+>
+> Are these standard usb phy modes or something specific to the twl4030
+> usb phy?
 
-Also commit 235602146ec9 ("i2c-nomadik: turn the platform driver to an
-amba driver")
+These are standard modes used to connect the phy to the controller. I
+think it's used by other chips other than twl4030 (Something in
+am35xx??).
+>
+>> +
+>> +twl4030-usb {
+>> +       compatible = "ti,twl4030-usb";
+>> +       interrupts =<  10 4>;
+>> +       vusb1v5-supply =<&vusb1v5>;
+>> +       vusb1v8-supply =<&vusb1v8>;
+>> +       vusb3v1-supply =<&vusb3v1>;
+>> +       usb_mode =<1>;
+>> +};
+>> diff --git a/drivers/usb/otg/twl4030-usb.c b/drivers/usb/otg/twl4030-usb.c
+>> index 523cad5..a4e7434 100644
+>> --- a/drivers/usb/otg/twl4030-usb.c
+>> +++ b/drivers/usb/otg/twl4030-usb.c
+>> @@ -585,23 +585,28 @@ static int __devinit twl4030_usb_probe(struct
+>> platform_device *pdev)
+>>         struct twl4030_usb      *twl;
+>>         int                     status, err;
+>>         struct usb_otg          *otg;
+>> -
+>> -       if (!pdata) {
+>> -               dev_dbg(&pdev->dev, "platform_data not available\n");
+>> -               return -EINVAL;
+>> -       }
+>> +       struct device_node      *np = pdev->dev.of_node;
+>>
+>>         twl = devm_kzalloc(&pdev->dev, sizeof *twl, GFP_KERNEL);
+>>         if (!twl)
+>>                 return -ENOMEM;
+>>
+>> +       if (np)
+>> +               of_property_read_u32(np, "usb_mode",
+>> +                               (enum twl4030_usb_mode *)&twl->usb_mode);
+>> +       else if (pdata)
+>> +               twl->usb_mode = pdata->usb_mode;
+>> +       else {
+>> +               dev_err(&pdev->dev, "twl4030 initialized without
+>> pdata\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>>         otg = devm_kzalloc(&pdev->dev, sizeof *otg, GFP_KERNEL);
+>>         if (!otg)
+>>                 return -ENOMEM;
+>>
+>>         twl->dev                =&pdev->dev;
+>>
+>>         twl->irq                = platform_get_irq(pdev, 0);
+>> -       twl->usb_mode           = pdata->usb_mode;
+>>         twl->vbus_supplied      = false;
+>>         twl->asleep             = 1;
+>>         twl->linkstat           = OMAP_MUSB_UNKNOWN;
+>> @@ -690,12 +695,23 @@ static int __exit twl4030_usb_remove(struct
+>> platform_device *pdev)
+>>         return 0;
+>>   }
+>>
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id twl4030_usb_id_table[] = {
+>> +       { .compatible = "ti,twl4030-usb" },
+>> +       {}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, twl4030_usb_id_table);
+>> +#else
+>> +#define twl4030_usb_id_table NULL
+>> +#endif
+>> +
+>>   static struct platform_driver twl4030_usb_driver = {
+>>         .probe          = twl4030_usb_probe,
+>>         .remove         = __exit_p(twl4030_usb_remove),
+>>         .driver         = {
+>>                 .name   = "twl4030_usb",
+>>                 .owner  = THIS_MODULE,
+>> +               .of_match_table = twl4030_usb_id_table,
+>
+>
+> use of_match_ptr().
 
-> the i2c-embedded tree and commits 32e42c687e0a ("ARM: ux500: Remove
-> unused i2c platform_data initialisation code") and 8214fd238a66 ("i2c:
-> Add Device Tree support to the Nomadik I2C driver") from the arm-soc tree.
-> 
-> I fixed it up (I think - see below) and can carry the fix as necessary.
-> Please check this and talk to each other ...
+Ok. Will change it that way.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/463115cb/attachment.sig>
+Thanks
+Kishon
