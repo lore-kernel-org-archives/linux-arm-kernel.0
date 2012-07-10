@@ -1,63 +1,33 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 10 Jul 2012 11:14:27 +0800
-Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
- change
-In-Reply-To: <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
-References: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
- <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120710031426.GG26888@b20223-02.ap.freescale.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 09 Jul 2012 23:18:33 -0400
+Subject: [PATCH] mmc: atmel-mci: fix incorrect setting of host->data to
+ NULL
+In-Reply-To: <4FF6B831.5060005@atmel.com> (ludovic desroches's message of
+ "Fri, 6 Jul 2012 12:04:33 +0200")
+References: <1341568713-8869-1-git-send-email-nicolas.ferre@atmel.com>
+ <4FF6B831.5060005@atmel.com>
+Message-ID: <87sjd0tiba.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 07, 2012 at 10:56:45PM +0800, Richard Zhao wrote:
-> Phy may need to change settings when port connect change.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Tested-by: Subodh Nijsure <snijsure@grid-net.com>
-> ---
->  drivers/usb/core/hub.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> index 4cc8dc9..2ba9d84 100644
-> --- a/drivers/usb/core/hub.c
-> +++ b/drivers/usb/core/hub.c
-> @@ -20,6 +20,7 @@
->  #include <linux/usb.h>
->  #include <linux/usbdevice_fs.h>
->  #include <linux/usb/hcd.h>
-> +#include <linux/usb/otg.h>
->  #include <linux/usb/quirks.h>
->  #include <linux/kthread.h>
->  #include <linux/mutex.h>
-> @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
->  		}
->  	}
->  
-> +	if (unlikely(hcd->phy && !hdev->parent)) {
-> +		if (portstatus & USB_PORT_STAT_CONNECTION)
-> +			usb_phy_notify_connect(hcd->phy, port1);
-> +		else
-> +			usb_phy_notify_disconnect(hcd->phy, port1);
-There's another issue. When hcd is removed, notify disconnect is not
-called. Is it ok, if I remove the above two line and add below patch:
+Hi,
 
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -1924,6 +1924,11 @@ void usb_disconnect(struct usb_device **pdev)
- 	 */
- 	device_del(&udev->dev);
- 
-+	if (udev->parent && !udev->parent->parent) {
-+		struct usb_hcd *hcd = bus_to_hcd(udev->bus);
-+		usb_phy_notify_disconnect(hcd->phy, udev->portnum);
-+	}
-+
- 	/* Free the device number and delete the parent's children[]
- 	 * (or root_hub) pointer.
- 	 */
+On Fri, Jul 06 2012, ludovic.desroches wrote:
+> Le 07/06/2012 11:58 AM, Nicolas Ferre a ?crit :
+>> Setting host->data to NULL is incorrect sequence in STATE_SENDING_STOP
+>> state of FSM: This early setting leads to the skip of dma_unmap_sg()
+>> in atmci_dma_cleanup() which is a bug.
+>>
+>> Idea taken form dw_mmc by Seungwon Jeon.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Seungwon Jeon <tgih.jun@samsung.com>
+>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
+Thanks, pushed to mmc-next for 3.6.
 
-Thanks
-Richard
- 
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
