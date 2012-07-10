@@ -1,61 +1,81 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 10 Jul 2012 09:44:51 +0800
-Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
- change
-In-Reply-To: <20120709165757.GA6024@kroah.com>
-References: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
- <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
- <20120709165757.GA6024@kroah.com>
-Message-ID: <20120710014450.GF26888@b20223-02.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 10 Jul 2012 10:52:30 +0900
+Subject: [GIT PULL] Samsung cleanup-1 for v3.6
+Message-ID: <0c4901cd5e3e$aa970660$ffc51320$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2012 at 09:57:57AM -0700, Greg KH wrote:
-> On Sat, Jul 07, 2012 at 10:56:45PM +0800, Richard Zhao wrote:
-> > Phy may need to change settings when port connect change.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
-> > ---
-> >  drivers/usb/core/hub.c |    8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> > index 4cc8dc9..2ba9d84 100644
-> > --- a/drivers/usb/core/hub.c
-> > +++ b/drivers/usb/core/hub.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/usb.h>
-> >  #include <linux/usbdevice_fs.h>
-> >  #include <linux/usb/hcd.h>
-> > +#include <linux/usb/otg.h>
-> >  #include <linux/usb/quirks.h>
-> >  #include <linux/kthread.h>
-> >  #include <linux/mutex.h>
-> > @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
-> >  		}
-> >  	}
-> >  
-> > +	if (unlikely(hcd->phy && !hdev->parent)) {
-> 
-> Why is this "unlikely"?  And why mark it as such, is this a "fast path"
-> that needs the compiler to know this hint to optimize things here?
-> 
-> Please don't use likely() or unlikely() except in places it really is
-> needed, _and_ you have measured the difference.  Have you done so in
-> this place?
-It's from a comment by Alan Stern.
-http://www.spinics.net/lists/linux-usb/msg64987.html
+Hi Arnd, Olof
 
-Actually, for my board, it's not unlikely. But for others which don't
-have notify_connect/disconnect, it's unlikely.
+Please pull samsung cleanup patches for v3.6 and most of them are removing
+useless codes.
 
-Because it's not unlikely for all boards, I prefer remove "unlikely".
+If any problems, please kindly let me know.
 
-Thanks
-Richard
-> 
-> thanks,
-> 
-> greg k-h
-> 
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+
+  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+next/cleanup-samsung
+
+Bartlomiej Zolnierkiewicz (1):
+      ARM: EXYNOS: Remove leftovers of the Samsung specific power domain
+control
+
+Boojin Kim (1):
+      ARM: EXYNOS: Remove the L2 cache latency setting for EXYNOS5
+
+Jonghwan Choi (1):
+      ARM: SAMSUNG: Remove unused variable 'running' on PWM
+
+Paul Bolle (2):
+      ARM: S3C24XX: remove unused header <mach/bast-pmu.h>
+      ARM: SAMSUNG: remove unused SPI clock headers
+
+Sachin Kamat (4):
+      ARM: S5P64X0: Remove unused variable in dma.c file
+      ARM: S5PC100: Remove unused variable in dma.c file
+      ARM: SAMSUNG: Remove description corresponding to a deleted element
+      ARM: S3C24XX: Remove duplicate header file inclusion
+
+ arch/arm/mach-exynos/common.c                   |   25 ------
+ arch/arm/mach-exynos/include/mach/spi-clocks.h  |   16 ----
+ arch/arm/mach-exynos/mach-nuri.c                |    1 -
+ arch/arm/mach-exynos/mach-origen.c              |    1 -
+ arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+ arch/arm/mach-exynos/mach-universal_c210.c      |    1 -
+ arch/arm/mach-s3c24xx/common.c                  |    1 -
+ arch/arm/mach-s3c24xx/include/mach/bast-pmu.h   |   40 ----------
+ arch/arm/mach-s3c64xx/include/mach/spi-clocks.h |   18 ----
+ arch/arm/mach-s5p64x0/dma.c                     |    2 -
+ arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 -----
+ arch/arm/mach-s5pc100/dma.c                     |    2 -
+ arch/arm/mach-s5pc100/include/mach/spi-clocks.h |   18 ----
+ arch/arm/mach-s5pv210/include/mach/spi-clocks.h |   17 ----
+ arch/arm/plat-samsung/Kconfig                   |    8 --
+ arch/arm/plat-samsung/Makefile                  |    4 -
+ arch/arm/plat-samsung/include/plat/devs.h       |    1 -
+ arch/arm/plat-samsung/include/plat/fb.h         |    1 -
+ arch/arm/plat-samsung/include/plat/pd.h         |   30 -------
+ arch/arm/plat-samsung/pd.c                      |   95
+-----------------------
+ arch/arm/plat-samsung/pwm.c                     |    4 -
+ 21 files changed, 0 insertions(+), 306 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/spi-clocks.h
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/bast-pmu.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/spi-clocks.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/spi-clocks.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/spi-clocks.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
+ delete mode 100644 arch/arm/plat-samsung/pd.c
