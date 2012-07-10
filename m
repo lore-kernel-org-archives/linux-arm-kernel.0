@@ -1,33 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Jul 2012 01:37:27 -0700
-Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA699A3@DBDE01.ent.ti.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B61.8030808@ti.com> <20120709131156.GH1122@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA69538@DBDE01.ent.ti.com>
- <20120710081851.GL1122@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA699A3@DBDE01.ent.ti.com>
-Message-ID: <20120710083726.GN1122@atomide.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 10 Jul 2012 10:38:19 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
+References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
+Message-ID: <20120710083819.GA25197@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120710 01:35]:
-> On Tue, Jul 10, 2012 at 13:48:52, Tony Lindgren wrote:
-> > 
-> > No thanks.. We don't want to make it 32 bit and bloat all the compiled in
-> > clock even further. 
-> > 
+On Tue, Jul 10, 2012 at 04:41:30PM +1000, Stephen Rothwell wrote:
+> Hi all,
 > 
-> In that case, how about just get rid of cpu_mask completely and trust the 
-> data passed by clock-tree for clksel dividers?
-> Let clock-tree data handle this, even if in some cases we end up in 
-> duplicating data for some clocks??
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/i2c/busses/i2c-nomadik.c between commit af97bace2cca
+> ("i2c-nomadik: move header to <linux/platform_data/i2c-nomadik.h>") from
+> the i2c-embedded tree and commits 32e42c687e0a ("ARM: ux500: Remove
+> unused i2c platform_data initialisation code") and 8214fd238a66 ("i2c:
+> Add Device Tree support to the Nomadik I2C driver") from the arm-soc tree.
+> 
+> I fixed it up (I think - see below) and can carry the fix as necessary.
+> Please check this and talk to each other ...
 
-Yes something like that. We already know which clocks need to
-be registered, so whatever we still use CK_XXXX for should be also
-initialized in omapxxxx_clk_init() functions.
+Hmm, I can't recall any discussion that the DT support patch should go
+in via arm-soc. Did I miss something? Right now, I'd think it should go
+in via i2c. I am fine with the other patch going in via arm-soc, but can
+carry it as well.
 
 Regards,
 
-Tony
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/0211c036/attachment.sig>
