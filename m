@@ -1,24 +1,15 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 10 Jul 2012 11:13:00 +0900
-Subject: [GIT PULL] Samsung devel-dma ops for v3.6
-Message-ID: <0c5001cd5e41$87daa1b0$978fe510$%kim@samsung.com>
+Date: Tue, 10 Jul 2012 11:20:49 +0900
+Subject: [GIT PULL] Samsung board-1 for v3.6
+Message-ID: <0c5101cd5e42$9f7415d0$de5c4170$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Arnd, Olof
 
-Here is updating DMA common operation for Samsung SoCs.
+Please pull Samsung boards update for v3.6.
 
-Since some DMA client driver such as spi needs to change the configuration
-after dma_request() so this branch adds dma_config() can configure DMA
-transmit option which is included in dma_request() after that.
-
-Note, according to the changes, needs to update spi and ASoC drivers for
-Samsung SoCs and only got the ack from Mark Brown not Grant Likely and as I
-know, he is busy for moving. But I think, the spi change has no problem and
-it is simple.
-
-If any problems, please kindly let me know.
+If any problems, please let me know.
 
 Thanks.
 
@@ -28,26 +19,39 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
 
-  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+  Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
 
 are available in the git repository at:
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/devel-dma-ops
+next/board-samsung
 
-Boojin Kim (3):
-      ARM: SAMSUNG: Add config() function in DMA common operations
-      spi/s3c64xx: Add the use of DMA config operation
-      ASoC: follow the updated samsung DMA common operations
+Dimitris Papastamos (1):
+      ARM: S3C64XX: Add IRQ mapping for wm0010 on Cragganmore
 
-Sachin Kamat (1):
-      ARM: SAMSUNG: Fix compiler warning in dma-ops.c file
+Mark Brown (4):
+      ARM: S3C64XX: Add module identification for Balblair Cragganmore
+module
+      ARM: S3C64XX: Add WM5102 EVM to Cragganmore modules
+      ARM: S3C64XX: Dynamically allocate the IRQ range for WM8994 on
+Cragganmore
+      ARM: S3C64XX: Dynamically assign interrupts for CPU PMIC on
+Cragganmore
 
- arch/arm/plat-samsung/dma-ops.c              |   76
-++++++++++++++------------
- arch/arm/plat-samsung/include/plat/dma-ops.h |   20 ++++---
- arch/arm/plat-samsung/s3c-dma-ops.c          |   39 ++++++++------
- drivers/spi/spi-s3c64xx.c                    |   33 +++++++-----
- sound/soc/samsung/dma.c                      |   18 ++++---
- 5 files changed, 105 insertions(+), 81 deletions(-)
+Sachin Kamat (4):
+      ARM: EXYNOS: Add HSOTG support to Origen
+      ARM: EXYNOS: Add HSOTG support to SMDKV310
+      ARM: EXYNOS: Update keypad entries for SMDK4X12
+      ARM: S5PV210: Add HSOTG support to SMDKV210
+
+ arch/arm/mach-exynos/Kconfig                  |    2 ++
+ arch/arm/mach-exynos/mach-origen.c            |    6 ++++++
+ arch/arm/mach-exynos/mach-smdk4x12.c          |   10 ++++++----
+ arch/arm/mach-exynos/mach-smdkv310.c          |    6 ++++++
+ arch/arm/mach-s3c64xx/include/mach/crag6410.h |    4 +---
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c  |   10 +++++++++-
+ arch/arm/mach-s3c64xx/mach-crag6410.c         |    1 -
+ arch/arm/mach-s5pv210/Kconfig                 |    2 ++
+ arch/arm/mach-s5pv210/mach-smdkv210.c         |    9 +++++++++
+ 9 files changed, 41 insertions(+), 9 deletions(-)
