@@ -1,133 +1,325 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 10 Jul 2012 06:11:34 +0000
-Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <CAMQu2gxLvG82zGsyEpw6HXp+=3OtB+O8zYSzQ=-ga7NUrcrfog@mail.gmail.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B61.8030808@ti.com>
- <CAMQu2gwGzK4dt0VW19LhQK_tjGgY6C4b628M3dNi5xP_hYFPhg@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA69474@DBDE01.ent.ti.com>
- <CAMQu2gxLvG82zGsyEpw6HXp+=3OtB+O8zYSzQ=-ga7NUrcrfog@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA694DF@DBDE01.ent.ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 9 Jul 2012 23:13:26 -0700
+Subject: [RESEND/PATCHv5 1/2] drivers: input: keypad: Add device tree
+ support
+In-Reply-To: <1339152780-25301-1-git-send-email-sourav.poddar@ti.com>
+References: <1339152780-25301-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120710061326.GA29257@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 11:36:15, Shilimkar, Santosh wrote:
-> On Tue, Jul 10, 2012 at 11:27 AM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > On Mon, Jul 09, 2012 at 16:09:59, Shilimkar, Santosh wrote:
-> >> On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
-> >> >
-> >> >
-> >> >
-> >> > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
-> >> > > From: R Sricharan <r.sricharan@ti.com>
-> >> > >
-> >> > > OMAP5430 is Texas Instrument's SOC based on ARM Cortex-A15 SMP
-> >> > > architecture. It's a dual core SOC with GIC used for interrupt
-> >> > > handling and with an integrated L2 cache controller.
-> >> > >
-> >> > > OMAP5432 is another variant of OMAP5430, with a
-> >> > > memory controller supporting DDR3 and SATA.
-> >> > >
-> >> > > Patch includes:
-> >> > >  - The machine specific headers and sources updates.
-> >> > >  - Platform header updates.
-> >> > >  - Minimum initialisation support for serial.
-> >> > >  - IO table init
-> >> > >
-> >> > > Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> >> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> > > ---
-> >>
-> >> [..]
-> >>
-> >> > >
-> >> > > +#if defined(CONFIG_SOC_OMAP5)
-> >> > > +static struct omap_globals omap5_globals = {
-> >> > > +     .class  = OMAP54XX_CLASS,
-> >> > > +     .tap    = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
-> >> > > +     .ctrl   = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
-> >> > > +     .ctrl_pad       = OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE),
-> >> > > +     .prm    = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
-> >> > > +     .cm     = OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
-> >> > > +     .cm2    = OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
-> >> > > +     .prcm_mpu = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE),
-> >> >
-> >> > I am not sure whether we had discussed on this before, couldn't find it.
-> >> >
-> >> > Why don't we reuse OMAP4 data here and elsewhere??
-> >> >
-> >> Because data is not same between OMAP4 and OMAP5.
-> >> Wherever it is same, it is taken care.
-> >>
-> >
-> > Above most of the base-addresses are same as omap4.
-> >
-> > And what about clocktree and hwmod? Is it going tobe same as omap4?
-> > Or we have separate data generated?
-> >
-> The data generated is different for OMAP5. Hwmod, powerdomain, clockdomain,
-> muxes. This data is out of the tree now since we are waiting for ES2.0
-> data which
-> has some differences w.r.t ES1.0. 
+Hi Sourav,
 
-Ok, this is useful information.
-
-> This was discussed in the beginning
-> as part of this
-> series review on the list.
+On Fri, Jun 08, 2012 at 04:22:59PM +0530, Sourav Poddar wrote:
+> Update the Documentation with omap4 keypad device tree
+> binding information.
+> Add device tree support for omap4 keypad driver.
 > 
+> Tested on omap4430 sdp.
+>
 
-My bad, I missed that discussion, and will refer to archives now.
+Sorry for the delay, I have a few comments:
 
-> >
-> >> [..]
-> >>
-> >> > > diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-> >> > > index 70cf825..766181c 100644
-> >> > > --- a/arch/arm/plat-omap/sram.c
-> >> > > +++ b/arch/arm/plat-omap/sram.c
-> >> > > @@ -6,8 +6,8 @@
-> >> > >   * Copyright (C) 2005 Nokia Corporation
-> >> > >   * Written by Tony Lindgren <tony@atomide.com>
-> >> > >   *
-> >> > > - * Copyright (C) 2009 Texas Instruments
-> >> > > - * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> > > + * Copyright (C) 2009-2012 Texas Instruments
-> >> > > + * Added OMAP4/5 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> > >   *
-> >> > >   * This program is free software; you can redistribute it and/or modify
-> >> > >   * it under the terms of the GNU General Public License version 2 as
-> >> > > @@ -44,6 +44,7 @@
-> >> > >  #else
-> >> > >  #define OMAP4_SRAM_PUB_PA    (OMAP4_SRAM_PA + 0x4000)
-> >> > >  #endif
-> >> > > +#define OMAP5_SRAM_PA                0x40300000
-> >> > >
-> >> >
-> >> > We have mix of such definitions here, for example,
-> >> >
-> >> > "arch/arm/plat-omap/include/plat/sram.h"
-> >> > and now in arch/arm/plat-omap/sram.c here itself.
-> >> >
-> >> >
-> >> > May be right time to clean it up now.
-> >> >
-> >> Thats because of an interconnect BUG which needed it exported
-> >> at plat level in case of OMAP4.
-> >>
-> >
-> > Not only omap4, but we have 2, 3, 4 and AM33xx definitions present there
-> > at plat/sram.h and public PA (SRAM_PUB_PA) address is defined in sram.c file.
-> >
-> I see that now. Infact there is no need for any of those PA's to be defined
-> there except OMAP4 which needs to have that macro available for an errata.
-> 
-> I will clean that up once the series is merged. Don't want to introduce any
-> regression in last moment changes.
-> 
+>  
+>  	/* platform data */
+>  	pdata = pdev->dev.platform_data;
+> -	if (!pdata) {
+> +	if (np) {
+> +		of_property_read_u32(np, "keypad,num-rows", &num_rows);
+> +		of_property_read_u32(np, "keypad,num-columns", &num_cols);
+> +		if (!num_rows || !num_cols) {
+> +			dev_err(&pdev->dev, "number of keypad rows/columns not specified\n");
+> +			return -EINVAL;
+> +		}
+> +	} else if (pdata) {
+> +		num_rows = pdata->rows;
+> +		num_cols = pdata->cols;
+> +	} else {
+>  		dev_err(&pdev->dev, "no platform data defined\n");
+>  		return -EINVAL;
+>  	}
+>  
 
-I am ok. 
+I believe drivers should use platform data if it is supplied and use DT
+data if platform data is omitted. This way one can override firmware
+data if needed.
 
-Thanks,
-Vaibhav
+Does the patch below (if applied on top of your) work for you?
+
+Thanks.
+
+-- 
+Dmitry
+
+Input: omap4-keypad - misc fixes
+
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+
+ drivers/input/keyboard/omap4-keypad.c |  152 ++++++++++++++++-----------------
+ 1 file changed, 74 insertions(+), 78 deletions(-)
+
+
+diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+index d5a2d1a..033168e 100644
+--- a/drivers/input/keyboard/omap4-keypad.c
++++ b/drivers/input/keyboard/omap4-keypad.c
+@@ -76,7 +76,6 @@ enum {
+ 
+ struct omap4_keypad {
+ 	struct input_dev *input;
+-	struct matrix_keymap_data *keymap_data;
+ 
+ 	void __iomem *base;
+ 	unsigned int irq;
+@@ -88,7 +87,7 @@ struct omap4_keypad {
+ 	unsigned int row_shift;
+ 	bool no_autorepeat;
+ 	unsigned char key_state[8];
+-	unsigned short keymap[];
++	unsigned short *keymap;
+ };
+ 
+ static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
+@@ -211,74 +210,52 @@ static void omap4_keypad_close(struct input_dev *input)
+ 	pm_runtime_put_sync(input->dev.parent);
+ }
+ 
+-static struct omap4_keypad *omap_keypad_parse_dt(struct device *dev,
+-				uint32_t rows, uint32_t cols,
+-				struct input_dev *input_dev)
++#ifdef CONFIG_OF
++static int __devinit omap4_keypad_parse_dt(struct device *dev,
++					   struct omap4_keypad *keypad_data)
+ {
+ 	struct device_node *np = dev->of_node;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+ 	int error;
+ 
+-	error = matrix_keypad_build_keymap(NULL, "linux,keymap",
+-				rows, cols, keypad_data->keymap, input_dev);
+-	if (error) {
+-		dev_err(&pdev->dev, "failed to build keymap\n");
+-		input_free_device(input_dev);
++	if (!np) {
++		dev_err(dev, "missing DT data");
++		return -EINVAL;
++	}
++
++	of_property_read_u32(np, "keypad,num-rows", &keypad_data->rows);
++	of_property_read_u32(np, "keypad,num-columns", &keypad_data->cols);
++	if (!keypad_data->rows || !keypad_data->cols) {
++		dev_err(dev, "number of keypad rows/columns not specified\n");
++		return -EINVAL;
+ 	}
+ 
+ 	if (of_get_property(np, "linux,input-no-autorepeat", NULL))
+ 		keypad_data->no_autorepeat = true;
+ 
+-	return keypad_data;
++	return 0;
++}
++#else
++static inline int omap4_keypad_parse_dt(struct device *dev,
++					struct omap4_keypad *keypad_data)
++{
++	return -ENOSYS;
+ }
++#endif
+ 
+ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
+ {
+-	struct device *dev = &pdev->dev;
+-	struct device_node *np = dev->of_node;
+-	const struct omap4_keypad_platform_data *pdata;
++	const struct omap4_keypad_platform_data *pdata =
++				dev_get_platdata(&pdev->dev);
++	const struct matrix_keymap_data *keymap_data =
++				pdata ? pdata->keymap_data : NULL;
+ 	struct omap4_keypad *keypad_data;
+ 	struct input_dev *input_dev;
+ 	struct resource *res;
+-	resource_size_t size;
+-	unsigned int row_shift = 0, max_keys = 0;
+-	uint32_t num_rows = 0, num_cols = 0;
++	unsigned int max_keys;
+ 	int rev;
+ 	int irq;
+ 	int error;
+ 
+-	/* platform data */
+-	pdata = pdev->dev.platform_data;
+-	if (np) {
+-		of_property_read_u32(np, "keypad,num-rows", &num_rows);
+-		of_property_read_u32(np, "keypad,num-columns", &num_cols);
+-		if (!num_rows || !num_cols) {
+-			dev_err(&pdev->dev, "number of keypad rows/columns not specified\n");
+-			return -EINVAL;
+-		}
+-	} else if (pdata) {
+-		num_rows = pdata->rows;
+-		num_cols = pdata->cols;
+-	} else {
+-		dev_err(&pdev->dev, "no platform data defined\n");
+-		return -EINVAL;
+-	}
+-
+-	row_shift = get_count_order(num_cols);
+-	max_keys = num_rows << row_shift;
+-
+-	keypad_data = devm_kzalloc(dev, sizeof(struct omap4_keypad) +
+-			max_keys * sizeof(keypad_data->keymap[0]),
+-				GFP_KERNEL);
+-
+-	if (!keypad_data) {
+-		dev_err(&pdev->dev, "keypad_data memory allocation failed\n");
+-		return -ENOMEM;
+-	}
+-
+-	platform_set_drvdata(pdev, keypad_data);
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "no base address specified\n");
+@@ -291,9 +268,24 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	size = resource_size(res);
++	keypad_data = kzalloc(sizeof(struct omap4_keypad), GFP_KERNEL);
++	if (!keypad_data) {
++		dev_err(&pdev->dev, "keypad_data memory allocation failed\n");
++		return -ENOMEM;
++	}
++
++	keypad_data->irq = irq;
++
++	if (pdata) {
++		keypad_data->rows = pdata->rows;
++		keypad_data->cols = pdata->cols;
++	} else {
++		error = omap4_keypad_parse_dt(&pdev->dev, keypad_data);
++		if (error)
++			return error;
++	}
+ 
+-	res = request_mem_region(res->start, size, pdev->name);
++	res = request_mem_region(res->start, resource_size(res), pdev->name);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "can't request mem region\n");
+ 		error = -EBUSY;
+@@ -307,15 +299,11 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
+ 		goto err_release_mem;
+ 	}
+ 
+-	keypad_data->rows = num_rows;
+-	keypad_data->cols = num_cols;
+-	keypad_data->irq = irq;
+-	keypad_data->row_shift = row_shift;
+ 
+ 	/*
+-	* Enable clocks for the keypad module so that we can read
+-	* revision register.
+-	*/
++	 * Enable clocks for the keypad module so that we can read
++	 * revision register.
++	 */
+ 	pm_runtime_enable(&pdev->dev);
+ 	error = pm_runtime_get_sync(&pdev->dev);
+ 	if (error) {
+@@ -358,29 +346,30 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
+ 	input_dev->open = omap4_keypad_open;
+ 	input_dev->close = omap4_keypad_close;
+ 
+-	if (np) {
+-		keypad_data = omap_keypad_parse_dt(&pdev->dev,
+-				keypad_data->rows, keypad_data->cols,
+-				input_dev);
+-	} else {
+-		keypad_data->keymap_data =
+-			(struct matrix_keymap_data *)pdata->keymap_data;
+-		error = matrix_keypad_build_keymap(keypad_data->keymap_data,
+-				NULL, keypad_data->rows, keypad_data->cols,
+-				keypad_data->keymap, input_dev);
+-		if (error) {
+-			dev_err(&pdev->dev, "failed to build keymap\n");
+-			goto err_free_input;
+-		}
+-	}
+-
++	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+ 	if (!keypad_data->no_autorepeat)
+ 		__set_bit(EV_REP, input_dev->evbit);
+ 
+-	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+-
+ 	input_set_drvdata(input_dev, keypad_data);
+ 
++	keypad_data->row_shift = get_count_order(keypad_data->cols);
++	max_keys = keypad_data->rows << keypad_data->row_shift;
++	keypad_data->keymap = kzalloc(max_keys * sizeof(keypad_data->keymap[0]),
++				      GFP_KERNEL);
++	if (!keypad_data->keymap) {
++		dev_err(&pdev->dev, "Not enough memory for keymap\n");
++		error = -ENOMEM;
++		goto err_free_input;
++	}
++
++	error = matrix_keypad_build_keymap(keymap_data, NULL,
++					   keypad_data->rows, keypad_data->cols,
++					   keypad_data->keymap, input_dev);
++	if (error) {
++		dev_err(&pdev->dev, "failed to build keymap\n");
++		goto err_free_keymap;
++	}
++
+ 	error = request_irq(keypad_data->irq, omap4_keypad_interrupt,
+ 			     IRQF_TRIGGER_RISING,
+ 			     "omap4-keypad", keypad_data);
+@@ -397,11 +386,14 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
+ 		goto err_pm_disable;
+ 	}
+ 
++	platform_set_drvdata(pdev, keypad_data);
+ 	return 0;
+ 
+ err_pm_disable:
+ 	pm_runtime_disable(&pdev->dev);
+ 	free_irq(keypad_data->irq, keypad_data);
++err_free_keymap:
++	kfree(keypad_data->keymap);
+ err_free_input:
+ 	input_free_device(input_dev);
+ err_pm_put_sync:
+@@ -409,7 +401,7 @@ err_pm_put_sync:
+ err_unmap:
+ 	iounmap(keypad_data->base);
+ err_release_mem:
+-	release_mem_region(res->start, size);
++	release_mem_region(res->start, resource_size(res));
+ err_free_keypad:
+ 	kfree(keypad_data);
+ 	return error;
+@@ -431,17 +423,21 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(res->start, resource_size(res));
+ 
++	kfree(keypad_data->keymap);
+ 	kfree(keypad_data);
++
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
+ static const struct of_device_id omap_keypad_dt_match[] = {
+ 	{ .compatible = "ti,omap4-keypad" },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, omap_keypad_dt_match);
++#endif
+ 
+ static struct platform_driver omap4_keypad_driver = {
+ 	.probe		= omap4_keypad_probe,
