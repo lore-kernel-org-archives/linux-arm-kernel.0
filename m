@@ -1,65 +1,50 @@
-From: alainsergenagni@yahoo.com (Alain-Serge Nagni)
-Date: Sat, 7 Jul 2012 19:01:47 -0700 (PDT)
-Subject: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
-In-Reply-To: <201206290009.38518.marex@denx.de>
-Message-ID: <1341712907.57646.YahooMailClassic@web124905.mail.ne1.yahoo.com>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Tue, 10 Jul 2012 08:34:03 +0800
+Subject: [PATCH 3/3] Watchdog: Omap: get the bootstatus for OMAP2Plus
+In-Reply-To: <87ipdwx4zn.fsf@ti.com>
+References: <1341808779-25532-1-git-send-email-zumeng.chen@windriver.com>
+ <1341808779-25532-4-git-send-email-zumeng.chen@windriver.com>
+ <87ipdwx4zn.fsf@ti.com>
+Message-ID: <4FFB787B.8010808@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-?1) Thanks for the advice, I will remember to not top post :-)
-
-
-
-?2) I spent lot of time testing your new additions to the mxs SPI driver and it works fine. Great job.
-
-
+? 2012?07?10? 00:40, Kevin Hilman ??:
+> Zumeng Chen<zumeng.chen@windriver.com>  writes:
+>
+>> The offset of WKUP_MOD is not right for the PRM_RSTST of OMAP3. So here
+>> put the right one to match to the actual physical addr 0x48307258, which
+>> defined in PRCM Registers section.
+>>
+>> And there is a MPU_WD_RST bit in PRM_RSTST(0x48307258) holding the signal
+>> from omap-wdt reboot, so that we can return WDIOF_CARDRESET if the board
+>> wakes up from omap-wdt reboot for WDIOC_GETBOOTSTATUS ioctl.
+>>
+>> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
+>> ---
+>>   arch/arm/mach-omap2/prcm.c |    5 ++++-
+>>   1 files changed, 4 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+>> index 480f40a..4dcc706 100644
+>> --- a/arch/arm/mach-omap2/prcm.c
+>> +++ b/arch/arm/mach-omap2/prcm.c
+>> @@ -49,8 +49,11 @@ void __iomem *prcm_mpu_base;
+>>   u32 omap_prcm_get_reset_sources(void)
+>>   {
+>>   	/* XXX This presumably needs modification for 34XX */
+> While you're fixing this for OMAP3, you can remove this comment as well.
+No problem, I'll update it in V2. Thanks for your kind reminder :-)
 
 Regards,
-
-Alain-Serge
-
-
---- On Thu, 6/28/12, Marek Vasut <marex@denx.de> wrote:
-
-From: Marek Vasut <marex@denx.de>
-Subject: Re: [PATCH 7/7] ARM: mxs: Add SPI driver for mx233/mx28
-To: linux-arm-kernel at lists.infradead.org
-Cc: "Alain-Serge Nagni" <alainsergenagni@yahoo.com>, "Fabio Estevam" <festevam@gmail.com>, "Shawn Guo" <shawn.guo@linaro.org>
-Date: Thursday, June 28, 2012, 6:09 PM
-
-Dear Alain-Serge Nagni,
-
-> Hi Fabio and Marek,
->? So I did rebuild the Kernel and UBoot to support device tree.? I did
-> reboot the system and this time I?m not having any kernel panic. Which is
-> a good signJ. After investigation I notice that the? SSP2 node status is
-> marked ?disabled? (in the file imx28.dtsi).? So there is no way based on
-> the patch that was publish to have the imx-spi driver loaded in the kernel
-> at boot time. 
-> Mareck,
->? I guess that? you have a piece of code that you forgot to publish? If not
-> how can I have your SPI drive to run? 
->? Right now I guess that the next step would be to define the SPI node in
-> the im28-evk.dts file.? I will open a thread to see if anybody as a
-> solution for that. What is your take on that?
->? 
-> Thanks guys,
-> Alain-Serge? ? ? ???
-
-[...]
-
-Fabio already answered your question. Lemme teach you a few more rules:
-1) Do not top post in the email conversation ;-)
-2) About DT. You're supposed to include imx28.dtsi in your imx28-yourboard.dts 
-file. Then everything that's already defined in the imx28.dtsi will be present 
-in your imx28-yourboard.dts . But the key thing is, if you define something 
-again, it will override the stuff already defined in the imx28.dtsi file. But 
-you don't have to redefine everything, just redefine what you need changed.
-
-Best regards,
-Marek Vasut
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120707/f1a8f008/attachment-0001.html>
+Zumeng
+>
+>> -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+>> +	if (cpu_is_omap24xx())
+>>   		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST)&  0x7f;
+>> +	if (cpu_is_omap34xx())
+>> +		return omap2_prm_read_mod_reg(OMAP3430_GR_MOD, OMAP2_RM_RSTST)&
+>> +		       0x7f;
+>>   	if (cpu_is_omap44xx())
+>>   		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST)&  0x7f;
+> Kevin
