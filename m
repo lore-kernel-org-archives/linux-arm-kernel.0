@@ -1,21 +1,89 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Tue, 10 Jul 2012 10:10:15 +0300
-Subject: [PATCH 4/7] ARM: mxs: convert apx4devkit board to device tree
-In-Reply-To: <20120710040154.GB19649@S2101-09.ap.freescale.net>
-References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
- <1341814496-17487-5-git-send-email-shawn.guo@linaro.org>
- <4FFAF5A9.9050007@bluegiga.com>
- <20120710040154.GB19649@S2101-09.ap.freescale.net>
-Message-ID: <4FFBD557.4090806@bluegiga.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 10 Jul 2012 12:42:46 +0530
+Subject: [PATCH v2 02/14] ARM: OMAP: counter-32k: Select the CR register
+ offset using the IP scheme.
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA695E6@DBDE01.ent.ti.com>
+References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
+ <1341566515-22665-3-git-send-email-santosh.shilimkar@ti.com>
+ <4FFA9B6C.7050003@ti.com>
+ <CAMQu2gz0UU_RCFSvxo1s_XwDAmTtL4NadsFTg8qL7PtGwPqKtQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA695E6@DBDE01.ent.ti.com>
+Message-ID: <CAMQu2gzubK7r4OEsusXBSGEW5YLWeMkt0tp8X9ERBLjse_5=MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2012 07:01 AM, Shawn Guo wrote:
->> Apx4devkit boots up and works fine with DT. I would like to add
->> support for NAND, display, SSP2, etc... I'll send patches tomorrow.
+On Tue, Jul 10, 2012 at 12:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> On Mon, Jul 09, 2012 at 16:12:15, Shilimkar, Santosh wrote:
+>> On Mon, Jul 9, 2012 at 2:20 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+>> >
+>> >
+>> > On 7/6/2012 2:51 PM, Santosh Shilimkar wrote:
+>> >> From: R Sricharan <r.sricharan@ti.com>
+>> >>
+>> >> OMAP socs has a legacy and a highlander version of the
+>> >> 32k sync counter IP. The register offsets vary between the
+>> >> highlander and the legacy scheme. So use the 'SCHEME'
+>> >> bits(30-31) of the revision register to distinguish between
+>> >
+>> >
+>> > Just for my understanding, can we get further information on SCHEME
+>> > bit-fields? What kind of information we have it here.
+>> >
+>> > I may need this info to pass on to design team here.
+>> >
+>> Sure. You can refer to the OMAP4 TRM for the bit builds.
+>> SCHEME bit field tell you difference between a highlander
+>> and legacy IP as the patch says.
 >>
-> Thanks, Lauri.  Can I add your Tested-by?
+>
+> Santosh,
+>
+> Can you point to the section of OMAP4 TRM?
+>
+> I referred to both Public TRM and internal TRM, but both only did mention
+> "TI internal Data".
+>
+Last time I refereed the internal TRM version. Public TRM doesn't
+carry that information
+for some reason.
 
-Yes, you can.
+> And as per code, we are not checking any value in 31-30 bit-fields, code
+> just assumes that, non-zero value would be highlander IP.
+>
+There are only two types of IP's today and hence it will be either
+0x0 or 0x1. So that check if just fine. The highlander IP may have
+more versions but for known OMAPs and upcoming OMAP, this is
+the only one supported version.
 
-Lauri
+Some more information on the SCHEME bit field.
+-----------------
+31:30
+SCHEME
+Used to distinguish between old scheme and current.
+
+RO Read Only
+
+0x0 -  LEGACY
+
+0x1 - Highlander 0.8 scheme
+--------------------------------
+
+Regards
+Santosh
+
+
+
+
+
+
+
+	
+
+
+	
+
+Read 0x1
+	
+
+HL08
+Highlander 0.8 scheme
