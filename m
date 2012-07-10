@@ -1,80 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Jul 2012 05:22:20 +0200
-Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
- change
-In-Reply-To: <20120710031426.GG26888@b20223-02.ap.freescale.net>
-References: <1341673008-29808-1-git-send-email-richard.zhao@freescale.com>
- <1341673008-29808-7-git-send-email-richard.zhao@freescale.com>
- <20120710031426.GG26888@b20223-02.ap.freescale.net>
-Message-ID: <201207100522.21162.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Jul 2012 12:01:56 +0800
+Subject: [PATCH 4/7] ARM: mxs: convert apx4devkit board to device tree
+In-Reply-To: <4FFAF5A9.9050007@bluegiga.com>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <1341814496-17487-5-git-send-email-shawn.guo@linaro.org>
+ <4FFAF5A9.9050007@bluegiga.com>
+Message-ID: <20120710040154.GB19649@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Richard Zhao,
+On Mon, Jul 09, 2012 at 06:15:53PM +0300, Lauri Hintsala wrote:
+> On 07/09/2012 09:14 AM, Shawn Guo wrote:
+> >Cc: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> >Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> >---
+> >  arch/arm/boot/dts/apx4devkit.dts |  143 ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/imx28.dtsi     |   33 +++++++++
+> >  arch/arm/mach-mxs/mach-mxs.c     |   23 ++++++
+> >  3 files changed, 199 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/apx4devkit.dts
+> 
+> Apx4devkit boots up and works fine with DT. I would like to add
+> support for NAND, display, SSP2, etc... I'll send patches tomorrow.
+> 
+Thanks, Lauri.  Can I add your Tested-by?
 
-> On Sat, Jul 07, 2012 at 10:56:45PM +0800, Richard Zhao wrote:
-> > Phy may need to change settings when port connect change.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
-> > ---
-> > 
-> >  drivers/usb/core/hub.c |    8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> > index 4cc8dc9..2ba9d84 100644
-> > --- a/drivers/usb/core/hub.c
-> > +++ b/drivers/usb/core/hub.c
-> > @@ -20,6 +20,7 @@
-> > 
-> >  #include <linux/usb.h>
-> >  #include <linux/usbdevice_fs.h>
-> >  #include <linux/usb/hcd.h>
-> > 
-> > +#include <linux/usb/otg.h>
-> > 
-> >  #include <linux/usb/quirks.h>
-> >  #include <linux/kthread.h>
-> >  #include <linux/mutex.h>
-> > 
-> > @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub
-> > *hub, int port1,
-> > 
-> >  		}
-> >  	
-> >  	}
-> > 
-> > +	if (unlikely(hcd->phy && !hdev->parent)) {
-> > +		if (portstatus & USB_PORT_STAT_CONNECTION)
-> > +			usb_phy_notify_connect(hcd->phy, port1);
-> > +		else
-> > +			usb_phy_notify_disconnect(hcd->phy, port1);
-> 
-> There's another issue. When hcd is removed, notify disconnect is not
-> called. Is it ok, if I remove the above two line and add below patch:
-> 
-> --- a/drivers/usb/core/hub.c
-> +++ b/drivers/usb/core/hub.c
-> @@ -1924,6 +1924,11 @@ void usb_disconnect(struct usb_device **pdev)
->  	 */
->  	device_del(&udev->dev);
-> 
-> +	if (udev->parent && !udev->parent->parent) {
-> +		struct usb_hcd *hcd = bus_to_hcd(udev->bus);
-> +		usb_phy_notify_disconnect(hcd->phy, udev->portnum);
-> +	}
-
-Shouldn't that go before device_del() ?
-
-> +
->  	/* Free the device number and delete the parent's children[]
->  	 * (or root_hub) pointer.
->  	 */
-> 
-> 
-> Thanks
-> Richard
-
-Best regards,
-Marek Vasut
+-- 
+Regards,
+Shawn
