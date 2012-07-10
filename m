@@ -1,200 +1,94 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 10 Jul 2012 19:57:37 +0530
-Subject: [PATCH v4 4/6] ARM: Samsung: Modify s3c64xx_spi{0|1|2}_set_platdata
- function
+Date: Tue, 10 Jul 2012 19:57:38 +0530
+Subject: [PATCH v4 5/6] spi: s3c64xx: Remove the 'set_level' callback from
+ controller data
 In-Reply-To: <1341930459-25223-1-git-send-email-thomas.abraham@linaro.org>
 References: <1341930459-25223-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1341930459-25223-5-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1341930459-25223-6-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the spi controller hardware configuration moved into the driver data, there
-are no more default hardware configuration data that is passed through platform
-data. Accordingly, the s3c64xx_spi{0|1|2}_set_platdata functions are adapted to
-these changes.
+The set_level callback in the controller data, which is used to configure
+the slave select line, cannot be supported when migrating the driver to
+device tree based discovery. Since all the platforms currently use gpio
+as the slave select line, this callback can be removed from the
+controller data and replaced with call to gpio_set_value in the driver.
 
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410.c            |    2 +-
- arch/arm/plat-samsung/devs.c                     |   60 ++++++++-------------
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |   14 +++---
- 3 files changed, 31 insertions(+), 45 deletions(-)
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 --
+ drivers/spi/spi-s3c64xx.c                        |   11 ++++++-----
+ 2 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 161c3b6..3627444 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -798,7 +798,7 @@ static void __init crag6410_machine_init(void)
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
- 	samsung_keypad_set_platdata(&crag6410_keypad_data);
--	s3c64xx_spi0_set_platdata(&s3c64xx_spi0_pdata, 0, 1);
-+	s3c64xx_spi0_set_platdata(NULL, 0, 1);
- 
- 	platform_add_devices(crag6410_devices, ARRAY_SIZE(crag6410_devices));
- 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 1d214cb..86d0758 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -1512,7 +1512,7 @@ static struct resource s3c64xx_spi0_resource[] = {
- };
- 
- struct platform_device s3c64xx_device_spi0 = {
--	.name		= "s3c64xx-spi",
-+	.name		= "s3c6410-spi",
- 	.id		= 0,
- 	.num_resources	= ARRAY_SIZE(s3c64xx_spi0_resource),
- 	.resource	= s3c64xx_spi0_resource,
-@@ -1522,13 +1522,10 @@ struct platform_device s3c64xx_device_spi0 = {
- 	},
- };
- 
--void __init s3c64xx_spi0_set_platdata(struct s3c64xx_spi_info *pd,
--				      int src_clk_nr, int num_cs)
-+void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-+						int num_cs)
- {
--	if (!pd) {
--		pr_err("%s:Need to pass platform data\n", __func__);
--		return;
--	}
-+	struct s3c64xx_spi_info pd;
- 
- 	/* Reject invalid configuration */
- 	if (!num_cs || src_clk_nr < 0) {
-@@ -1536,12 +1533,11 @@ void __init s3c64xx_spi0_set_platdata(struct s3c64xx_spi_info *pd,
- 		return;
- 	}
- 
--	pd->num_cs = num_cs;
--	pd->src_clk_nr = src_clk_nr;
--	if (!pd->cfg_gpio)
--		pd->cfg_gpio = s3c64xx_spi0_cfg_gpio;
-+	pd.num_cs = num_cs;
-+	pd.src_clk_nr = src_clk_nr;
-+	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
- 
--	s3c_set_platdata(pd, sizeof(*pd), &s3c64xx_device_spi0);
-+	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi0);
- }
- #endif /* CONFIG_S3C64XX_DEV_SPI0 */
- 
-@@ -1554,7 +1550,7 @@ static struct resource s3c64xx_spi1_resource[] = {
- };
- 
- struct platform_device s3c64xx_device_spi1 = {
--	.name		= "s3c64xx-spi",
-+	.name		= "s3c6410-spi",
- 	.id		= 1,
- 	.num_resources	= ARRAY_SIZE(s3c64xx_spi1_resource),
- 	.resource	= s3c64xx_spi1_resource,
-@@ -1564,26 +1560,20 @@ struct platform_device s3c64xx_device_spi1 = {
- 	},
- };
- 
--void __init s3c64xx_spi1_set_platdata(struct s3c64xx_spi_info *pd,
--				      int src_clk_nr, int num_cs)
-+void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-+						int num_cs)
- {
--	if (!pd) {
--		pr_err("%s:Need to pass platform data\n", __func__);
--		return;
--	}
--
- 	/* Reject invalid configuration */
- 	if (!num_cs || src_clk_nr < 0) {
- 		pr_err("%s: Invalid SPI configuration\n", __func__);
- 		return;
- 	}
- 
--	pd->num_cs = num_cs;
--	pd->src_clk_nr = src_clk_nr;
--	if (!pd->cfg_gpio)
--		pd->cfg_gpio = s3c64xx_spi1_cfg_gpio;
-+	pd.num_cs = num_cs;
-+	pd.src_clk_nr = src_clk_nr;
-+	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi1_cfg_gpio;
- 
--	s3c_set_platdata(pd, sizeof(*pd), &s3c64xx_device_spi1);
-+	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi1);
- }
- #endif /* CONFIG_S3C64XX_DEV_SPI1 */
- 
-@@ -1596,7 +1586,7 @@ static struct resource s3c64xx_spi2_resource[] = {
- };
- 
- struct platform_device s3c64xx_device_spi2 = {
--	.name		= "s3c64xx-spi",
-+	.name		= "s3c6410-spi",
- 	.id		= 2,
- 	.num_resources	= ARRAY_SIZE(s3c64xx_spi2_resource),
- 	.resource	= s3c64xx_spi2_resource,
-@@ -1606,13 +1596,10 @@ struct platform_device s3c64xx_device_spi2 = {
- 	},
- };
- 
--void __init s3c64xx_spi2_set_platdata(struct s3c64xx_spi_info *pd,
--				      int src_clk_nr, int num_cs)
-+void __init s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-+						int num_cs)
- {
--	if (!pd) {
--		pr_err("%s:Need to pass platform data\n", __func__);
--		return;
--	}
-+	struct s3c64xx_spi_info pd;
- 
- 	/* Reject invalid configuration */
- 	if (!num_cs || src_clk_nr < 0) {
-@@ -1620,11 +1607,10 @@ void __init s3c64xx_spi2_set_platdata(struct s3c64xx_spi_info *pd,
- 		return;
- 	}
- 
--	pd->num_cs = num_cs;
--	pd->src_clk_nr = src_clk_nr;
--	if (!pd->cfg_gpio)
--		pd->cfg_gpio = s3c64xx_spi2_cfg_gpio;
-+	pd.num_cs = num_cs;
-+	pd.src_clk_nr = src_clk_nr;
-+	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi2_cfg_gpio;
- 
--	s3c_set_platdata(pd, sizeof(*pd), &s3c64xx_device_spi2);
-+	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi2);
- }
- #endif /* CONFIG_S3C64XX_DEV_SPI2 */
 diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-index 89dbaee..c818a7c 100644
+index c818a7c..ceba18d 100644
 --- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
 +++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-@@ -45,19 +45,19 @@ struct s3c64xx_spi_info {
- /**
-  * s3c64xx_spi_set_platdata - SPI Controller configure callback by the board
-  *				initialization code.
-- * @pd: SPI platform data to set.
-+ * @cfg_gpio: Pointer to gpio setup function.
-  * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
-  * @num_cs: Number of elements in the 'cs' array.
+@@ -18,7 +18,6 @@ struct platform_device;
+  * @fb_delay: Slave specific feedback delay.
+  *            Refer to FB_CLK_SEL register definition in SPI chapter.
+  * @line: Custom 'identity' of the CS line.
+- * @set_level: CS line control.
   *
-  * Call this from machine init code for each SPI Controller that
-  * has some chips attached to it.
-  */
--extern void s3c64xx_spi0_set_platdata(struct s3c64xx_spi_info *pd,
--				      int src_clk_nr, int num_cs);
--extern void s3c64xx_spi1_set_platdata(struct s3c64xx_spi_info *pd,
--				      int src_clk_nr, int num_cs);
--extern void s3c64xx_spi2_set_platdata(struct s3c64xx_spi_info *pd,
--				      int src_clk_nr, int num_cs);
-+extern void s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-+						int num_cs);
-+extern void s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-+						int num_cs);
-+extern void s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-+						int num_cs);
+  * This is per SPI-Slave Chipselect information.
+  * Allocate and initialize one in machine init code and make the
+@@ -27,7 +26,6 @@ struct platform_device;
+ struct s3c64xx_spi_csinfo {
+ 	u8 fb_delay;
+ 	unsigned line;
+-	void (*set_level)(unsigned line_id, int lvl);
+ };
  
- /* defined by architecture to configure gpio */
- extern int s3c64xx_spi0_cfg_gpio(void);
+ /**
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 0a9e43e..068600d 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -27,6 +27,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/spi/spi.h>
++#include <linux/gpio.h>
+ 
+ #include <mach/dma.h>
+ #include <plat/s3c64xx-spi.h>
+@@ -411,14 +412,14 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+ 			/* Deselect the last toggled device */
+ 			cs = sdd->tgl_spi->controller_data;
+-			cs->set_level(cs->line,
+-					spi->mode & SPI_CS_HIGH ? 0 : 1);
++			gpio_set_value(cs->line,
++				spi->mode & SPI_CS_HIGH ? 0 : 1);
+ 		}
+ 		sdd->tgl_spi = NULL;
+ 	}
+ 
+ 	cs = spi->controller_data;
+-	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
++	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+ }
+ 
+ static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
+@@ -504,7 +505,7 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 	if (sdd->tgl_spi == spi)
+ 		sdd->tgl_spi = NULL;
+ 
+-	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
++	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+ }
+ 
+ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+@@ -833,7 +834,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 	unsigned long flags;
+ 	int err = 0;
+ 
+-	if (cs == NULL || cs->set_level == NULL) {
++	if (cs == NULL) {
+ 		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
+ 		return -ENODEV;
+ 	}
 -- 
 1.6.6.rc2
