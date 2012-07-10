@@ -1,65 +1,28 @@
 From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Tue, 10 Jul 2012 10:08:10 +0300
-Subject: [PATCH 4/6] ARM: apx4devkit: add SSP2 support
-In-Reply-To: <1341904092-13777-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1341904092-13777-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <1341904092-13777-5-git-send-email-lauri.hintsala@bluegiga.com>
+Date: Tue, 10 Jul 2012 10:08:06 +0300
+Subject: [PATCH 0/6] Improve apx4devkit DT support
+Message-ID: <1341904092-13777-1-git-send-email-lauri.hintsala@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
----
- arch/arm/boot/dts/apx4devkit.dts |   31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Add NAND, display and SSP2 support for apx4devkit.
 
-diff --git a/arch/arm/boot/dts/apx4devkit.dts b/arch/arm/boot/dts/apx4devkit.dts
-index f6d1a57..9cf5ae6 100644
---- a/arch/arm/boot/dts/apx4devkit.dts
-+++ b/arch/arm/boot/dts/apx4devkit.dts
-@@ -25,6 +25,14 @@
- 				status = "okay";
- 			};
- 
-+			ssp2: ssp at 80014000 {
-+				compatible = "fsl,imx28-mmc";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc2_4bit_pins_apx4 &mmc2_sck_cfg_apx4>;
-+				bus-width = <4>;
-+				status = "okay";
-+			};
-+
- 			pinctrl at 80018000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&hog_pins_a>;
-@@ -52,6 +60,29 @@
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
- 				};
-+
-+				mmc2_4bit_pins_apx4: mmc2-4bit-apx4 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2041 /* MX28_PAD_SSP0_DATA4__SSP2_D0 */
-+						0x2051 /* MX28_PAD_SSP0_DATA5__SSP2_D3 */
-+						0x2061 /* MX28_PAD_SSP0_DATA6__SSP2_CMD */
-+						0x2071 /* MX28_PAD_SSP0_DATA7__SSP2_SCK */
-+						0x2141 /* MX28_PAD_SSP2_SS1__SSP2_D1 */
-+						0x2151 /* MX28_PAD_SSP2_SS2__SSP2_D2 */
-+					>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				mmc2_sck_cfg_apx4: mmc2-sck-cfg-apx4 {
-+					fsl,pinmux-ids = <
-+						0x2071 /* MX28_PAD_SSP0_DATA7__SSP2_SCK */
-+					>;
-+					fsl,drive-strength = <2>;
-+					fsl,pull-up = <0>;
-+				};
- 			};
- 
- 			lcdif at 80030000 {
+Patches are based on Shawn's mxs/dt/others-v2 branch.
+
+Lauri
+
+---
+Lauri Hintsala (6):
+  ARM: apx4devkit: add NAND support
+  ARM: apx4devkit: add display support
+  ARM: apx4devkit: fix the bus-width of SSP0 to 4 bits
+  ARM: apx4devkit: add SSP2 support
+  ARM: apx4devkit: remove AUART3
+  ARM: apx4devkit: add pin muxing for GPIOs
+
+ arch/arm/boot/dts/apx4devkit.dts |   75 +++++++++++++++++++++++++++++++++-----
+ arch/arm/mach-mxs/mach-mxs.c     |   24 ++++++++++++
+ 2 files changed, 89 insertions(+), 10 deletions(-)
+
 -- 
 1.7.9.5
