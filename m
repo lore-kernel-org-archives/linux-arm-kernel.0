@@ -1,71 +1,32 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 10 Jul 2012 14:37:51 +0200
+From: andy@warmcat.com (=?UTF-8?B?IkFuZHkgR3JlZW4gKOael+WuieW7uCki?=)
+Date: Tue, 10 Jul 2012 20:58:58 +0800
 Subject: [PATCH 4 0/4] Add ability to set defaultless network device MAC
  addresses to deterministic computed locally administered values
-In-Reply-To: <20120705024259.26317.16000.stgit@build.warmcat.com>
+In-Reply-To: <201207101437.54877.florian@openwrt.org>
 References: <20120705024259.26317.16000.stgit@build.warmcat.com>
-Message-ID: <201207101437.54877.florian@openwrt.org>
+ <201207101437.54877.florian@openwrt.org>
+Message-ID: <4FFC2712.9020208@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/07/12 20:37, the mail apparently from Florian Fainelli included:
 
-Le jeudi 05 juillet 2012 04:44:33, Andy Green a ?crit :
-> The following series adds some code to generate legal, locally administered
-> MAC addresses from OMAP4 CPU Die ID fuse data, and then adds a helper at
-> net/ethernet taking care of accepting device path / MAC mapping
-> registrations and running a notifier to enforce the requested MAC when the
-> matching network device turns up.
+Hi -
 
-This looks like something you can solve by user-space entirely. Expose the 
-OMAP4 CPU Die ID using a sysfs attribute, and let user-space manage the MAC 
-address pool.
+> Le jeudi 05 juillet 2012 04:44:33, Andy Green a ?crit :
+>> The following series adds some code to generate legal, locally administered
+>> MAC addresses from OMAP4 CPU Die ID fuse data, and then adds a helper at
+>> net/ethernet taking care of accepting device path / MAC mapping
+>> registrations and running a notifier to enforce the requested MAC when the
+>> matching network device turns up.
+>
+> This looks like something you can solve by user-space entirely. Expose the
 
-If you tell me you want to use this for nfsroot booting, what prevents you 
-from using an initramfs, assign a valid MAC to your interface and switch over 
-your nfsroot once the interface setup is done?
+That might seem so from a openwrt perspective, where you custom cook the 
+whole userland thing per-device, but it ain't so from a generic rootfs 
+perspective.
 
-> 
-> On PandaBoard / ES, two devices have no board-level MAC either assigned by
-> the manufacturer or stored on the board, the last patch in the series adds
-> these device paths and gets them set when the network device is registered.
-> 
-> Lastly for convenient testing, there's a little patch on
-> omap2plus_defconfig that will get Ethernet and WLAN up on Pandaboard.
-> 
-> The patches are against today's linux-omap.
-> 
-> Thanks to Tony Lindgren and Arnd Bergmann for comments leading to the
-> helper in net/ethernet.
-> 
-> ---
-> 
-> Andy Green (4):
->       OMAP: add cpu id register to MAC address helper
->       NET ethernet introduce mac_platform helper
->       OMAP4 PANDA register ethernet and wlan for automatic mac allocation
->       config test config extending omap2plus with wl12xx etc
-> 
-> 
->  arch/arm/configs/omap2plus_defconfig   |   35 +++----
->  arch/arm/mach-omap2/Kconfig            |    1
->  arch/arm/mach-omap2/board-omap4panda.c |   30 ++++++
->  arch/arm/mach-omap2/id.c               |   39 ++++++++
->  arch/arm/mach-omap2/include/mach/id.h  |    1
->  include/net/mac-platform.h             |   39 ++++++++
->  net/Kconfig                            |    5 +
->  net/ethernet/Makefile                  |    3 +
->  net/ethernet/mac-platform.c            |  151
-> ++++++++++++++++++++++++++++++++ 9 files changed, 282 insertions(+), 22
-> deletions(-)
->  create mode 100644 include/net/mac-platform.h
->  create mode 100644 net/ethernet/mac-platform.c
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Why should Ubuntu, Fedora etc stink up their OSes with Panda-specific 
+workarounds?  And Panda is not the only device with this issue.
 
--- 
-Florian
+-Andy
