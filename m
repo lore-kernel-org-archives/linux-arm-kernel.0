@@ -1,41 +1,137 @@
 From: pavel@denx.de (Pavel Machek)
-Date: Tue, 10 Jul 2012 13:13:25 +0200
-Subject: Move designware timer OF glue into drivers/clocksource
-In-Reply-To: <alpine.LFD.2.02.1207101304160.32033@ionos>
-References: <20120710094249.GF10225@elf.ucw.cz>
- <alpine.LFD.2.02.1207101304160.32033@ionos>
-Message-ID: <20120710111324.GA8701@elf.ucw.cz>
+Date: Tue, 10 Jul 2012 13:15:15 +0200
+Subject: [RFC PATCHv1 2/2] ARM: socfpga: Add board support for Altera's
+ SOCFPGA Cyclone 5 HW
+In-Reply-To: <20120627162548.01adc769@skate>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <1340805007-3313-3-git-send-email-dinguyen@altera.com>
+ <20120627162548.01adc769@skate>
+Message-ID: <20120710111515.GB8701@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-On Tue 2012-07-10 13:07:36, Thomas Gleixner wrote:
-> On Tue, 10 Jul 2012, Pavel Machek wrote:
-> >  		timer0: timer at ffc08000 {
-> > -				compatible = "socfpga,sp-timer";
-> > +				compatible = "snps,dw-apb-timer-sp";
+> Le Wed, 27 Jun 2012 08:50:07 -0500,
+> <dinguyen@altera.com> a ?crit :
 > 
-> apb timer. That rings a bell. Does that have anything to do with
+> > +CONFIG_CMDLINE="console=ttyS0,57600 mem=256M at 0x0"
 > 
-> arch/x86/kernel/apb_timer.c ? That's from one of the intel mobile
-> chips and might be the very same IP block.
+> Why do you need to specify the memory map here, since it's already
+> passed in the device tree?
 
-As far as I can tell, drivers/clocksource/dw_apb_timer.c is already
-used on Intel MID platform... What I'm moving is device tree glue,
-that is unsuitable for x86 plaforms with classical BIOS. (And AFAICT,
-intel MID also uses something different).
+Fixed.
 
-> > -obj-y					:= common.o time.o
-> > +obj-y					:= common.o ../../../drivers/clocksource/dw_apb_timer_of.o
+> > +const static struct of_device_id irq_match[] = {
+> > +	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+> > +	{}
+> > +};
+> > +
+> > +static struct map_desc cyclone5_io_desc[] __initdata = {
+> > +	{
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_SPTIMER0_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_SPTIMER0_BASE),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_SPTIMER1_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_SPTIMER1_BASE),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_OSC1TIMER0_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_OSC1TIMER0_BASE),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_OSC1TIMER1_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_OSC1TIMER1_BASE),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_MPUSCU_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_MPUSCU_BASE),
+> > +		.length		= SZ_8K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_SYSMGR_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_SYSMGR_BASE),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_MPUL2_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_MPUL2_BASE),
+> > +		.length		= SZ_8K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= IO_ADDRESS(SOCFPGA_CLKMGR_BASE),
+> > +		.pfn		= __phys_to_pfn(SOCFPGA_CLKMGR_BASE),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	},
+> > +};
 > 
-> Urgh! Why can't we just compile it from drivers/clocksource/Makefile
-> ?
+> Most of those static mappings should instead be turned into dynamic
+> mappings created with ioremap(), at least for the timers.
 
-It will cost me a new config option, but I can do that, yes.
+Now this one is interesting. I just removed these mappings, and it
+still works. I guess that's good.
 
-Thanks,
-									Pavel
+								Pavel
+
+commit 5f2d9e152e170a328689e5ab0c3f42851b99a4ec
+Author: Pavel <pavel@ucw.cz>
+Date:   Tue Jul 10 13:08:54 2012 +0200
+
+    cyclone5_map_io seems to be unneccessary. Remove it.
+    
+    Signed-off-by: Pavel Machek <pavel@denx.de>
+
+diff --git a/arch/arm/mach-socfpga/socfpga_cyclone5.c b/arch/arm/mach-socfpga/socfpga_cyclone5.c
+index 459f5a6..0bc0b8b 100644
+--- a/arch/arm/mach-socfpga/socfpga_cyclone5.c
++++ b/arch/arm/mach-socfpga/socfpga_cyclone5.c
+@@ -50,30 +50,6 @@ const static struct of_device_id irq_match[] = {
+ 	{}
+ };
+ 
+-static struct map_desc cyclone5_io_desc[] __initdata = {
+-	{
+-		.virtual	= IO_ADDRESS(SOCFPGA_MPUSCU_BASE),
+-		.pfn		= __phys_to_pfn(SOCFPGA_MPUSCU_BASE),
+-		.length		= SZ_8K,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= IO_ADDRESS(SOCFPGA_SYSMGR_BASE),
+-		.pfn		= __phys_to_pfn(SOCFPGA_SYSMGR_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= IO_ADDRESS(SOCFPGA_CLKMGR_BASE),
+-		.pfn		= __phys_to_pfn(SOCFPGA_CLKMGR_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+-static void __init cyclone5_map_io(void)
+-{
+-	iotable_init(cyclone5_io_desc, ARRAY_SIZE(cyclone5_io_desc));
+-}
+-
+ static void __init gic_init_irq(void)
+ {
+ 	of_irq_init(irq_match);
+@@ -100,7 +76,6 @@ static const char *altera_dt_match[] = {
+ };
+ 
+ DT_MACHINE_START(SOCFPGA_CYCLONE5, "Altera SOCFPGA Cyclone V")
+-	.map_io		= cyclone5_map_io,
+ 	.init_early	= socfpga_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.handle_irq     = gic_handle_irq,
+
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
