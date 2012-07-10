@@ -1,44 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Jul 2012 17:37:15 +0200
-Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
-In-Reply-To: <20120710152350.GA11813@S2101-09.ap.freescale.net>
-References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
- <201207100920.03867.marex@denx.de>
- <20120710152350.GA11813@S2101-09.ap.freescale.net>
-Message-ID: <201207101737.15379.marex@denx.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 10 Jul 2012 16:42:01 +0100
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <4FFC4478.7000204@nvidia.com>
+References: <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
+ <4FE882A5.3080504@nvidia.com>
+ <20120625222646.GB30406@opensource.wolfsonmicro.com>
+ <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
+ <20120710134436.GD9409@opensource.wolfsonmicro.com>
+ <4FFC31D5.7090600@nvidia.com>
+ <20120710135302.GG9409@opensource.wolfsonmicro.com>
+ <4FFC4478.7000204@nvidia.com>
+Message-ID: <20120710154201.GE10022@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On Tue, Jul 10, 2012 at 08:34:24PM +0530, Laxman Dewangan wrote:
 
-> On Tue, Jul 10, 2012 at 09:20:03AM +0200, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > From: Marek Vasut <marex@denx.de>
-> > 
-> > [...]
-> > 
-> > > +	sound {
-> > > +		compatible = "fsl,imx28-evk-sgtl5000",
-> > 
-> > imx28-evk ? ;-)
+> The sample code for tps65910 is as follows. So where do you think
+> that it is wrong and what should be correct approach.
+> I need to follow the same for tps6586x also.
 
-Good on my end.
-
-> Fixed as below.
-> 
-> Regards,
-> Shawn
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/m28evk.dts b/arch/arm/boot/dts/m28evk.dts
-
-Just a suggestion -- why not name all the imx28-based boards' DTS files "imx28-
-<board>.dts" ? In this case imx28-m28evk.dts , it'd make it obvious where this 
-board fits.
-
-[...]
-
-Best regards,
-Marek Vasut
+Like I said the use of a supply name should be unconditional, you should
+just set the supply name in the descriptor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120710/75a398e8/attachment-0001.sig>
