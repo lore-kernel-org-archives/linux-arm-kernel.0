@@ -1,80 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 14:12:01 +0000
-Subject: [PATCH] mfd: Implement devicetree support for AB8500 Btemp
-In-Reply-To: <1341926639-9956-1-git-send-email-rajanikanth.hv@stericsson.com>
-References: <1341926639-9956-1-git-send-email-rajanikanth.hv@stericsson.com>
-Message-ID: <201207101412.01561.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 10 Jul 2012 16:12:35 +0200
+Subject: [PATCH v9] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <201207101401.30607.arnd@arndb.de>
+References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201207101203.30984.arnd@arndb.de> <4FFC1DA5.6050805@free-electrons.com>
+ <201207101401.30607.arnd@arndb.de>
+Message-ID: <4FFC3853.6060003@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012, Rajanikanth H.V wrote:
+On 07/10/2012 04:01 PM, Arnd Bergmann wrote:
+> On Tuesday 10 July 2012, Gregory CLEMENT wrote:
+>> We have a public git tree available at:
+>>
+>> https://github.com/Marvell-Semi/EBU_mainline_public.git
+>>
+>> this last patch set is directly from mvebu_for-next-V9 branch.
+>>
+>> Do you need a formal request?
+> 
+> I've pulled it now, but I would generally prefer if you use
+> "git request-pull" to generate the pull request, and use a signed
+> tag as the reference so you can include the series description
+> in the tag.
 
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt
-> @@ -0,0 +1,54 @@
-> +AB8500 Battery Termperature Monitor Driver
-> +
-> +AB8500 is a mixed signal multimedia and power management
-> +device comprising: power and energy management module,
-> +WalliCharger and USB charger interface, audio, general
-> +purpose ADC TVOut, clock management and SIM card Interface.
-> +
-> +Battery temperature monitoring support is part of 'energy
-> +management module', the other components of this module
-> +are: 'main and USB Combo charger' and fuel guage.
-> +
-> +The properties below describes the node for battery
-> +temperature monitor driver.
-> +
-> +Required Properties:
-> +- compatible = "stericsson,ab8500-btemp"
-> +
-> +interrupts:
-> +	Four battery temperature ranges are be defined
-> +	which results in interrupt events as:
-> +	- Btemp
-> +	- BtempLow
-> +	- BtempMedium
-> +	- BtempHigh
-> +
+Thanks a lot. I've just created a signed tag and was about to send it.
+But as you have already done all the work it is useless now.
 
-These names do not match the five interrupts in the example or in the
-code. When you provide an "interrupt-names" property you have to define
-the exact strings that are permissible for them in the binding.
+> 
+> I had to rebase the series because the version in your tree was based on
+> an outdated for-next branch. You really can't send me stuff based on 
+> the for-next branch because that does not have a stable history.
+> Please instead make everything based on whatever is the newest -rc
+> release at the time you start the series. Also please take a look
+> at how other people like Tony Lindgren or Stephen Warren do larger
+> sets of pull requests.
 
-> +Supplied-to:
-> +	This shall be power supply class dependency where in the runtime battery
-> +	properties will be shared across fuel guage and charging algorithm driver.
+Ok thanks for the pointers. For the next pull we will join a pull request
+on a signed tag and the patch set.
 
-I probably don't understand enough of this, but shouldn't the other devices
-that are supplied by this have a reference to this node rather than doing
-it this way around? Why use strings here instead of phandles?
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-You are also not listing some of the properties that are in the device
-tree here, like the "interrupts" property itself.
 
-> diff --git a/arch/arm/mach-ux500/board-mop500-bm.c b/arch/arm/mach-ux500/board-mop500-bm.c
-> new file mode 100644
-> index 0000000..3349ceb
-> --- /dev/null
-> +++ b/arch/arm/mach-ux500/board-mop500-bm.c
-
-Didn't we conclude that this file has no board-specific information in it?
-Either explain why it's still here, or move it into the driver itself.
-
-> +/*
-> + * Note that the batres_vs_temp table must be strictly sorted by falling
-> + * temperature values to work.
-> + */
-> +#ifdef CONFIG_AB8500_9100_LI_ION_BATTERY
-> +#define BATRES	180
-> +#else
-> +#define BATRES	300
-> +#endif
-
-I think I mentioned before that you need to get rid of the
-CONFIG_AB8500_9100_LI_ION_BATTERY symbol. If you have exclusive
-compile-time options, it is impossible to build a kernel that
-runs on all system, so this has to be a run-time option.
-
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
