@@ -1,51 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jul 2012 23:37:12 +0800
-Subject: [PATCH v2 5/7] ARM: mxs: convert tx28 board to device tree
-In-Reply-To: <1341898587-8462-6-git-send-email-shawn.guo@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Jul 2012 17:37:15 +0200
+Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
+In-Reply-To: <20120710152350.GA11813@S2101-09.ap.freescale.net>
 References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
- <1341898587-8462-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120710153710.GB11813@S2101-09.ap.freescale.net>
+ <201207100920.03867.marex@denx.de>
+ <20120710152350.GA11813@S2101-09.ap.freescale.net>
+Message-ID: <201207101737.15379.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 01:36:25PM +0800, Shawn Guo wrote:
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index d0bf414..c1e02ae 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -12,8 +12,9 @@
->  
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
-> +#include <linux/delay.h>
->  #include <linux/err.h>
-> -#include <linux/init.h>
-> +#include <linux/gpio.h>
->  #include <linux/init.h>
->  #include <linux/irqdomain.h>
->  #include <linux/micrel_phy.h>
-> @@ -24,6 +25,7 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach/time.h>
->  #include <mach/common.h>
-> +#include <mach/mxs.h>
->  
-With tx28_init dropped, these header changes shouldn't be here any more.
+Dear Shawn Guo,
 
-Regards,
-Shawn
+> On Tue, Jul 10, 2012 at 09:20:03AM +0200, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > From: Marek Vasut <marex@denx.de>
+> > 
+> > [...]
+> > 
+> > > +	sound {
+> > > +		compatible = "fsl,imx28-evk-sgtl5000",
+> > 
+> > imx28-evk ? ;-)
 
->  static struct fb_videomode mx23evk_video_modes[] = {
->  	{
-> @@ -277,6 +279,7 @@ static const char *imx28_dt_compat[] __initdata = {
->  	"crystalfontz,cfa10036",
->  	"denx,m28evk",
->  	"fsl,imx28-evk",
-> +	"karo,tx28",
->  	"fsl,imx28",
->  	NULL,
->  };
-> -- 
-> 1.7.5.4
+Good on my end.
+
+> Fixed as below.
 > 
-> 
+> Regards,
+> Shawn
+
+[...]
+
+> diff --git a/arch/arm/boot/dts/m28evk.dts b/arch/arm/boot/dts/m28evk.dts
+
+Just a suggestion -- why not name all the imx28-based boards' DTS files "imx28-
+<board>.dts" ? In this case imx28-m28evk.dts , it'd make it obvious where this 
+board fits.
+
+[...]
+
+Best regards,
+Marek Vasut
