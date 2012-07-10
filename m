@@ -1,46 +1,84 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Jul 2012 10:32:03 +0200
-Subject: [PATCH v2 3/7] ARM: mxs: convert m28evk board to device tree
-In-Reply-To: <CAAQ0ZWQg8qX_hySRSfADKgtR1DB5z8+X+kkAQi_dNOEROqX0Ow@mail.gmail.com>
-References: <1341898587-8462-1-git-send-email-shawn.guo@linaro.org>
- <201207100920.03867.marex@denx.de>
- <CAAQ0ZWQg8qX_hySRSfADKgtR1DB5z8+X+kkAQi_dNOEROqX0Ow@mail.gmail.com>
-Message-ID: <201207101032.03982.marex@denx.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 10 Jul 2012 14:02:41 +0530
+Subject: [PATCH v1 10/11] arm/dts: omap: Add usb_otg and glue data
+In-Reply-To: <CAAe_U6LqF9aZLZgHQYhX6VXXB41HUNmZgXfOwe9V9VtWVe+46g@mail.gmail.com>
+References: <1340884267-28908-1-git-send-email-kishon@ti.com>	<1340884267-28908-11-git-send-email-kishon@ti.com>	<4FFBCB39.1010809@ti.com>
+ <CAAe_U6LqF9aZLZgHQYhX6VXXB41HUNmZgXfOwe9V9VtWVe+46g@mail.gmail.com>
+Message-ID: <4FFBE8A9.6050608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On Tuesday 10 July 2012 01:43 PM, ABRAHAM, KISHON VIJAY wrote:
+> Hi,
+>
+> On Tue, Jul 10, 2012 at 11:57 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
+>> On Thursday 28 June 2012 05:21 PM, Kishon Vijay Abraham I wrote:
+>>>
+>>> Add usb otg data node in omap4/omap3 device tree file. Also update
+>>> the node with board specific setting in omapx-<board>.dts file.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>>> ---
+>>>    arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+>>>    arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+>>>    arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+>>>    arch/arm/boot/dts/omap4-panda.dts  |    6 ++++++
+>>>    arch/arm/boot/dts/omap4-sdp.dts    |    6 ++++++
+>>>    arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+>>>    6 files changed, 40 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts
+>>> b/arch/arm/boot/dts/omap3-beagle.dts
+>>> index 5b4506c..f3d7076 100644
+>>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>>> @@ -67,3 +67,9 @@
+>>>    &mmc3 {
+>>>          status = "disable";
+>>>    };
+>>> +
+>>> +&usb_otg_hs {
+>>> +       interface_type =<0>;
+>>> +       mode =<3>;
+>>> +       power =<50>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/omap3-evm.dts
+>>> b/arch/arm/boot/dts/omap3-evm.dts
+>>> index 2eee16e..8963b3d 100644
+>>> --- a/arch/arm/boot/dts/omap3-evm.dts
+>>> +++ b/arch/arm/boot/dts/omap3-evm.dts
+>>> @@ -18,3 +18,9 @@
+>>>                  reg =<0x80000000 0x10000000>; /* 256 MB */
+>>>          };
+>>>    };
+>>> +
+>>> +&usb_otg_hs {
+>>> +       interface_type =<0>;
+>>> +       mode =<3>;
+>>> +       power =<50>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>>> index 99474fa..2f565d6 100644
+>>> --- a/arch/arm/boot/dts/omap3.dtsi
+>>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>>> @@ -215,5 +215,13 @@
+>>>                          compatible = "ti,omap3-hsmmc";
+>>>                          ti,hwmods = "mmc3";
+>>>                  };
+>>> +
+>>> +               usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>>> +                       compatible = "ti,musb-omap2430";
+>>
+>>
+>> this compatible doesn't seem right in omap3.dtsi. Same with
+>> the below entry in omap4.dtsi.
+>> See other IP blocks which are reused across OMAP2/3/4 on
+>> how the compatible for those are handled.
+>
+> Ok. So it should be like *ti,omap4-musb*, *ti,omap3-musb*?
 
-> On 10 July 2012 15:20, Marek Vasut <marex@denx.de> wrote:
-> > Dear Shawn Guo,
-> > 
-> >> From: Marek Vasut <marex@denx.de>
-> > 
-> > [...]
-> > 
-> >> +     sound {
-> >> +             compatible = "fsl,imx28-evk-sgtl5000",
-> > 
-> > imx28-evk ? ;-)
-> 
-> Will fix it, as well as apx4devkit.dts.
-> 
-> >> +                          "fsl,mxs-audio-sgtl5000";
-> >> +             model = "imx28-evk-sgtl5000";
-> >> +             saif-controllers = <&saif0 &saif1>;
-> >> +             audio-codec = <&sgtl5000>;
-> >> +     };
-> >> +};
-> > 
-> > Otherwise, add my Acked-by: Marek Vasut <marex@denx.de> so if it gets
-> > broken now, the blame falls on my head ;-)
-> 
-> I'm much relieved now.
+Yes, that would be more appropriate.
 
-Heh ;-)
-
-> Regards,
-> Shawn
-
-Best regards,
-Marek Vasut
+>
+> Thanks
+> Kishon
