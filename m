@@ -1,29 +1,36 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Jul 2012 12:44:31 +0100
-Subject: [PATCH] ARM: S3C64XX: Don't specify an irq_base for WM1192-EV1 board
-Message-ID: <1341920671-8348-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Tue, 10 Jul 2012 12:54:19 +0100
+Subject: [PATCH] drivers/rtc/rtc-twl.c: fix threaded IRQ to use
+ IRQF_ONESHOT
+In-Reply-To: <20120709151527.58f44c3a.akpm@linux-foundation.org>
+References: <1341592434-4207-1-git-send-email-khilman@ti.com>
+ <20120709151527.58f44c3a.akpm@linux-foundation.org>
+Message-ID: <20120710115418.GA2280@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-None of the GPIO IRQs are connected so there is no reason to specify a
-base.
+On Mon, Jul 09, 2012 at 03:15:27PM -0700, Andrew Morton wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 -
- 1 file changed, 1 deletion(-)
+> OK, this is the second such patch I've seen and it's time to wonder if
+> we should get grumpy at tglx.  afacit 1c6c6952 broke the following
+> drivers:
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index df3103d..0fe4f15 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -566,7 +566,6 @@ static struct wm831x_status_pdata wm1192_led8_pdata = {
- 
- static struct wm831x_pdata smdk6410_wm1192_pdata = {
- 	.pre_init = wm1192_pre_init,
--	.irq_base = IRQ_BOARD_START,
- 
- 	.backlight = &wm1192_backlight_pdata,
- 	.dcdc = {
--- 
-1.7.10
+> sound/soc/codecs/wm8994.c
+> drivers/mfd/wm831x-auxadc.c
+> drivers/mfd/wm8350-core.c
+> drivers/regulator/wm831x-isink.c
+> drivers/regulator/wm831x-ldo.c
+> drivers/regulator/wm831x-dcdc.c
+> drivers/input/misc/wm831x-on.c
+
+> what am I missing here?
+
+At least the above (and possibly a good proportion of the others from
+the looks of things) aren't affected by this change because they are
+nested IRQs for MFDs where we can guarantee that there will never be a
+primary IRQ.  _ONESHOT shouldn't make any odds in these situations.
+
+> drivers/base/regmap/regmap-irq.c
+
+This is using irq_flags passed in by the caller so should be unaffected,
+it's always been the responsibility of the caller to set the flags.
