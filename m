@@ -1,65 +1,74 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 10 Jul 2012 06:20:04 +0000
-Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
- migration
-In-Reply-To: <20120706120533.GU1122@atomide.com>
-References: <20120628123207.GG19842@atomide.com> <4FEC89B9.3090404@ti.com>
- <20120702063651.GO4202@atomide.com> <4FF1D980.4040100@ti.com>
- <20120703081746.GJ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A2BAC@DBDE01.ent.ti.com>
- <20120704075158.GQ1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
- <20120705105535.GB1122@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9A39DF@DBDE01.ent.ti.com>
- <20120706120533.GU1122@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A622E@DBDE01.ent.ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Jul 2012 08:22:34 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <20120710061757.GB29257@core.coreip.homeip.net>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
+ <4FFB40A4.5060505@linaro.org> <20120709204620.GA12692@core.coreip.homeip.net>
+ <4FFB463F.9040201@linaro.org> <20120710061757.GB29257@core.coreip.homeip.net>
+Message-ID: <4FFBCA2A.6080400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 10/07/12 08:17, Dmitry Torokhov wrote:
+> On Mon, Jul 09, 2012 at 10:59:43PM +0200, Lee Jones wrote:
+>> Sorry for the cock-up(s).
+>>
+>> From: Lee Jones <lee.jones@linaro.org>
+>> Date: Tue, 26 Jun 2012 10:46:50 +0100
+>> Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+>>
+>> Before we can use any domain allocated IRQ, we need to first create a
+>> map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
+>> We do this with a helper function provided by the AB8500 IRQ domain
+>> controller called ab8500_irq_get_virq(). We need to do this for both
+>> IRQs which the Power-On-Key driver uses; one for button press, the other
+>> for button depress.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> I think it would be best if this got merged through whatever tree that
+> was used to introduce ab8500_irq_get_virq(); otherwise it will have to
+> wait till I resync with mainline sometime in the middle of the next
+> release cycle.
+>
+> Thanks.
 
-Could not respond you earlier as was sick
+No problem. I'll send it though ARM-SoC.
 
-On Fri, Jul 06, 2012 at 17:35:33, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120705 07:56]:
-> > On Thu, Jul 05, 2012 at 16:25:35, Tony Lindgren wrote:
+>> ---
+>>   drivers/input/misc/ab8500-ponkey.c |    4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+>> index 5ceb23e..f6764af 100644
+>> --- a/drivers/input/misc/ab8500-ponkey.c
+>> +++ b/drivers/input/misc/ab8500-ponkey.c
+>> @@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
+>>
+>>   	ponkey->idev = input;
+>>   	ponkey->ab8500 = ab8500;
+>> -	ponkey->irq_dbf = irq_dbf;
+>> -	ponkey->irq_dbr = irq_dbr;
+>> +	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
+>> +	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
+>>
+>>   	input->name = "AB8500 POn(PowerOn) Key";
+>>   	input->dev.parent = &pdev->dev;
+>> --
+>> 1.7.9.5
+>>
+>>
+>>
+>
 
-> > Presently bigger issue that I am facing w.r.t driver conversion is the
-> > requirement of peripheral specific gpmc timing calculation before probe.
-> > I believe currently in mainline runtime gpmc clock changes are not
-> > handled
-> 
-> Hmm I don't follow, why can't the timings be set during the peripheral
-> specific driver probe?
 
-My viewpoint while making the above comment was with gpmc driver
-series that was posted, in that it was required to do peripheral specific
-timings calculation before probe. With your suggested peripheral specific
-driver for the purpose of handling retime, it is not a problem, a
-solution on how to integrate it has to be found though.
-
-> > > The peripheral driver can register it's retime function with gpmc and
-> > > get a cookie back that allows getting the DT provided timings from gpmc.
-> > > And after that the initial timings can be set.
-> > 
-> > If timings peripheral timings can be fully contained in driver, should
-> > we try to pass the same timings translated in terms of gpmc timings
-> > through DT ?, and how do we get equivalent gpmc timings to update DT,
-> > manually calculate similar to platform init code ?, or I misunderstood
-> > you
-
-> Well yes the timings should be passed via devicetree in a gpmc specific
-
-I assume with the above, you were referring to peripherals that does not
-have retime function.
-
-> format. But the peripheral specific retime function still needs to be
-> also registered for peripherals that need it.
-
-For the peripherals requiring retime, we cannot (as otherwise whatever
-retime does would have to be manually done based on the knowledge of
-boot time gpmc clock period to calculate gpmc timings to be fed to DT)
-pass gpmc timings via device tree, right ?
-
-Regards
-Afzal
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
