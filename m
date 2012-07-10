@@ -1,48 +1,37 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 10 Jul 2012 18:55:18 +0200
-Subject: [PATCH 1/1] mfd: ab8500: Clean-up the last two ab8500 related DT
- match tables
-In-Reply-To: <4FFC4A23.5000107@linaro.org>
-References: <1341578598-9307-1-git-send-email-lee.jones@linaro.org>
- <20120710091304.GU15345@sortiz-mobl> <4FFC4A23.5000107@linaro.org>
-Message-ID: <20120710165518.GG15345@sortiz-mobl>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 10 Jul 2012 22:09:38 +0530
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <20120710154201.GE10022@opensource.wolfsonmicro.com>
+References: <4FE80413.6070001@nvidia.com> <4FE87FE3.1080608@wwwdotorg.org>
+ <4FE882A5.3080504@nvidia.com>
+ <20120625222646.GB30406@opensource.wolfsonmicro.com>
+ <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
+ <20120710134436.GD9409@opensource.wolfsonmicro.com>
+ <4FFC31D5.7090600@nvidia.com>
+ <20120710135302.GG9409@opensource.wolfsonmicro.com>
+ <4FFC4478.7000204@nvidia.com>
+ <20120710154201.GE10022@opensource.wolfsonmicro.com>
+Message-ID: <4FFC5ACA.8010003@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Tuesday 10 July 2012 09:12 PM, Mark Brown wrote:
+> * PGP Signed by an unknown key
+>
+> On Tue, Jul 10, 2012 at 08:34:24PM +0530, Laxman Dewangan wrote:
+>
+>> The sample code for tps65910 is as follows. So where do you think
+>> that it is wrong and what should be correct approach.
+>> I need to follow the same for tps6586x also.
+> Like I said the use of a supply name should be unconditional, you should
+> just set the supply name in the descriptor.
+>
+if I set the desc.supply_name unconditional then if the entry of that 
+supply name is not there in the DT entry (on device node) then that 
+regulator will not get registered because the search for 
+supply_regulator will fail during registration.
 
-On Tue, Jul 10, 2012 at 05:28:35PM +0200, Lee Jones wrote:
-> On 10/07/12 11:13, Samuel Ortiz wrote:
-> >Hi Lee,
-> >
-> >On Fri, Jul 06, 2012 at 01:43:18PM +0100, Lee Jones wrote:
-> >>A patch was recently submitted to stop all ab8500 devices from
-> >>being registered through Device Tree. Instead, only the db8500
-> >>will be DT:ed and the rest will continue to be registered via
-> >>the MFD API, as they always were.
-> >>
-> >>Two patches have recently been applied which enable Device Tree
-> >>probing; one for rtc-ab8500 and the other for ponkey-ab8500.
-> >>These two need to be removed to prevent double-probing these
-> >>devices with Device Tree is enabled.
-> >>
-> >>Cc: Samuel Ortiz <sameo@linux.intel.com>
-> >>Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>---
-> >>  drivers/input/misc/ab8500-ponkey.c |    8 --------
-> >>  drivers/rtc/rtc-ab8500.c           |    6 ------
-> >>  2 files changed, 14 deletions(-)
-> >I don't know against which tree you generated those patches, but none of those
-> >2 of_device_id arrays are in my for-next branch. So I can't apply this patch.
-> 
-> I can rebase them on anything of your choosing.
-> 
-> What is your for-next branch based on?
-On Linus' tree. And the of_device_id arrays are not there.
+I am setting the desc.supply only when there is supply entry in DT or if 
+it is from platform.
 
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Do we need to make such supply pin entry as required inplace of optional?
