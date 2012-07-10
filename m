@@ -1,26 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2012 12:47:04 +0000
-Subject: [GIT PULL] Samsung board-1 for v3.6
-In-Reply-To: <0c5101cd5e42$9f7415d0$de5c4170$%kim@samsung.com>
-References: <0c5101cd5e42$9f7415d0$de5c4170$%kim@samsung.com>
-Message-ID: <201207101247.05530.arnd@arndb.de>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 10 Jul 2012 14:37:51 +0200
+Subject: [PATCH 4 0/4] Add ability to set defaultless network device MAC
+ addresses to deterministic computed locally administered values
+In-Reply-To: <20120705024259.26317.16000.stgit@build.warmcat.com>
+References: <20120705024259.26317.16000.stgit@build.warmcat.com>
+Message-ID: <201207101437.54877.florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012, Kukjin Kim wrote:
+Hi,
 
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+Le jeudi 05 juillet 2012 04:44:33, Andy Green a ?crit :
+> The following series adds some code to generate legal, locally administered
+> MAC addresses from OMAP4 CPU Die ID fuse data, and then adds a helper at
+> net/ethernet taking care of accepting device path / MAC mapping
+> registrations and running a notifier to enforce the requested MAC when the
+> matching network device turns up.
+
+This looks like something you can solve by user-space entirely. Expose the 
+OMAP4 CPU Die ID using a sysfs attribute, and let user-space manage the MAC 
+address pool.
+
+If you tell me you want to use this for nfsroot booting, what prevents you 
+from using an initramfs, assign a valid MAC to your interface and switch over 
+your nfsroot once the interface setup is done?
+
 > 
-> The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
+> On PandaBoard / ES, two devices have no board-level MAC either assigned by
+> the manufacturer or stored on the board, the last patch in the series adds
+> these device paths and gets them set when the network device is registered.
 > 
->   Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
+> Lastly for convenient testing, there's a little patch on
+> omap2plus_defconfig that will get Ethernet and WLAN up on Pandaboard.
 > 
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/board-samsung
+> The patches are against today's linux-omap.
+> 
+> Thanks to Tony Lindgren and Arnd Bergmann for comments leading to the
+> helper in net/ethernet.
+> 
+> ---
+> 
+> Andy Green (4):
+>       OMAP: add cpu id register to MAC address helper
+>       NET ethernet introduce mac_platform helper
+>       OMAP4 PANDA register ethernet and wlan for automatic mac allocation
+>       config test config extending omap2plus with wl12xx etc
+> 
+> 
+>  arch/arm/configs/omap2plus_defconfig   |   35 +++----
+>  arch/arm/mach-omap2/Kconfig            |    1
+>  arch/arm/mach-omap2/board-omap4panda.c |   30 ++++++
+>  arch/arm/mach-omap2/id.c               |   39 ++++++++
+>  arch/arm/mach-omap2/include/mach/id.h  |    1
+>  include/net/mac-platform.h             |   39 ++++++++
+>  net/Kconfig                            |    5 +
+>  net/ethernet/Makefile                  |    3 +
+>  net/ethernet/mac-platform.c            |  151
+> ++++++++++++++++++++++++++++++++ 9 files changed, 282 insertions(+), 22
+> deletions(-)
+>  create mode 100644 include/net/mac-platform.h
+>  create mode 100644 net/ethernet/mac-platform.c
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-
-Pulled, thanks!
-
-	ARnd
+-- 
+Florian
