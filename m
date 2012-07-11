@@ -1,72 +1,152 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jul 2012 08:44:06 +0200
-Subject: [PATCH 3/3] ARM: i.MX5x clocks: Fix GPT clocks
-In-Reply-To: <1341946469-25984-3-git-send-email-shc_work@mail.ru>
-References: <20120709082700.GM24458@pengutronix.de>
- <1341946469-25984-3-git-send-email-shc_work@mail.ru>
-Message-ID: <20120711064406.GF30009@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Jul 2012 23:47:25 -0700
+Subject: [PATCH v5 3/3] ARM: OMAP2+: onenand: prepare for gpmc driver
+ migration
+In-Reply-To: <4FFC6330.1040409@ti.com>
+References: <C8443D0743D26F4388EA172BF4E2A7A93E9A35E1@DBDE01.ent.ti.com>
+ <20120705105535.GB1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A39DF@DBDE01.ent.ti.com>
+ <20120706120533.GU1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A622E@DBDE01.ent.ti.com>
+ <20120710094538.GT1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A64D0@DBDE01.ent.ti.com>
+ <20120710131734.GV1122@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A669D@DBDE01.ent.ti.com>
+ <4FFC6330.1040409@ti.com>
+Message-ID: <20120711064724.GA1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 10:54:29PM +0400, Alexander Shiyan wrote:
-> This patch fix incorrect defined bits for GPT clocks according to
-> datasheet.
-
-Fix is a strong word. As I can see it these are only cosmetic changes
-without any functional change, right?
-
-Sascha
-
+* Jon Hunter <jon-hunter@ti.com> [120710 10:20]:
+> Hi Afzal,
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
+> On 07/10/2012 08:47 AM, Mohammed, Afzal wrote:
+> > Hi Tony,
+> > 
+> > On Tue, Jul 10, 2012 at 18:47:34, Tony Lindgren wrote:
+> >> * Mohammed, Afzal <afzal@ti.com> [120710 03:09]:
+> >>> On Tue, Jul 10, 2012 at 15:15:38, Tony Lindgren wrote:
+> >>>> * Mohammed, Afzal <afzal@ti.com> [120709 23:24]:
+> > 
+> >>>>> For the peripherals requiring retime, we cannot (as otherwise whatever
+> >>>>> retime does would have to be manually done based on the knowledge of
+> >>>>> boot time gpmc clock period to calculate gpmc timings to be fed to DT)
+> >>>>> pass gpmc timings via device tree, right ?
+> >>>>
+> >>>> We can still do it when the connected peripheral probe registers with
+> >>>> gpmc.
+> > 
+> > Were you actually referring to updating kernel view of device tree nodes, and
+> > not the device tree file (not sure whether it is really possible) ?
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 50e6043..628e940 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -58,7 +58,7 @@ enum imx5_clks {
->  	tve_s, uart1_ipg_gate, uart1_per_gate, uart2_ipg_gate,
->  	uart2_per_gate, uart3_ipg_gate, uart3_per_gate, i2c1_gate, i2c2_gate,
->  	gpt_ipg_gate, pwm1_ipg_gate, pwm1_per_gate, pwm2_ipg_gate, pwm2_per_gate,
-> -	gpt_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
-> +	gpt_per_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
->  	esdhc3_ipg_gate, esdhc4_ipg_gate, ssi1_ipg_gate, ssi2_ipg_gate,
->  	ssi3_ipg_gate, ecspi1_ipg_gate, ecspi1_per_gate, ecspi2_ipg_gate,
->  	ecspi2_per_gate, cspi_ipg_gate, sdma_gate, emi_slow_gate, ipu_s,
-> @@ -168,12 +168,12 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk[uart3_per_gate] = imx_clk_gate2("uart3_per_gate", "uart_root", MXC_CCM_CCGR1, 16);
->  	clk[i2c1_gate] = imx_clk_gate2("i2c1_gate", "per_root", MXC_CCM_CCGR1, 18);
->  	clk[i2c2_gate] = imx_clk_gate2("i2c2_gate", "per_root", MXC_CCM_CCGR1, 20);
-> -	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 20);
->  	clk[pwm1_ipg_gate] = imx_clk_gate2("pwm1_ipg_gate", "ipg", MXC_CCM_CCGR2, 10);
->  	clk[pwm1_per_gate] = imx_clk_gate2("pwm1_per_gate", "per_root", MXC_CCM_CCGR2, 12);
->  	clk[pwm2_ipg_gate] = imx_clk_gate2("pwm2_ipg_gate", "ipg", MXC_CCM_CCGR2, 14);
->  	clk[pwm2_per_gate] = imx_clk_gate2("pwm2_per_gate", "per_root", MXC_CCM_CCGR2, 16);
-> -	clk[gpt_gate] = imx_clk_gate2("gpt_gate", "per_root", MXC_CCM_CCGR2, 18);
-> +	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 18);
-> +	clk[gpt_per_gate] = imx_clk_gate2("gpt_per_gate", "per_root", MXC_CCM_CCGR2, 20);
->  	clk[fec_gate] = imx_clk_gate2("fec_gate", "ipg", MXC_CCM_CCGR2, 24);
->  	clk[usboh3_gate] = imx_clk_gate2("usboh3_gate", "ipg", MXC_CCM_CCGR2, 26);
->  	clk[usboh3_per_gate] = imx_clk_gate2("usboh3_per_gate", "usboh3_podf", MXC_CCM_CCGR2, 28);
-> @@ -237,7 +237,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  			pr_err("i.MX5 clk %d: register failed with %ld\n",
->  				i, PTR_ERR(clk[i]));
->  	
-> -	clk_register_clkdev(clk[gpt_gate], "per", "imx-gpt.0");
-> +	clk_register_clkdev(clk[gpt_per_gate], "per", "imx-gpt.0");
->  	clk_register_clkdev(clk[gpt_ipg_gate], "ipg", "imx-gpt.0");
->  	clk_register_clkdev(clk[uart1_per_gate], "per", "imx21-uart.0");
->  	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
-> -- 
-> 1.7.3.4
-> 
-> 
+> I believe that Tony is suggesting performing the retime at probe time.
+> In the case of OneNand you would simply call the
+> onenand_set_async_mode/sync_mode from within the probe as a retime
+> function.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yes there's no need to do it earlier.
+ 
+> >>> We can, but would it be feasible practically ?, gpmc timings to update in
+> >>> DT for a such a peripheral (requiring retime) can be found out only by
+> >>> manual calculation similar to the way done in retime function (based on
+> >>> peripheral's timings and boot time gpmc clock period), correct ?, Also
+> >>> wouldn't this make it necessary to know gpmc clock period at boot time
+> >>> for properly updating gpmc timing entry in DT ?
+> >>
+> >> The gpmc clock period can be returned to the connected peripheral when
+> >> it's registering. Well basically we can call the retime function upon
+> >> registering and pass the gpmc clock period.
+> > 
+> > Won't this lead to the necessity of particular driver load order problem ?,
+> > As per the above, to return gpmc clock period to the connected peripheral,
+> > we need to ensure that gpmc driver is probed before peripheral driver.
+> 
+> I think it is more like when probing the gpmc, the retime function for
+> the connected peripheral is called passing the gpmc clock freq.
+
+Right, there's no need to do any of that at gpmc probe time. And the
+module dependencies take care of the load ordrer as gpmc_cs_request()
+is exported.
+ 
+> > And in that case how can gpmc driver rely on DT as gpmc timings for the
+> > peripheral requiring retime would not yet be available as peripheral
+> > driver is not yet probed, seems like a circular dependency.
+> 
+> The DT node should simply have the information required by the retime
+> function or gpmc timings themselves if available. In the case of OneNAND
+> async mode you have a bunch of constants such as ...
+> 
+> const int t_cer  = 15;
+> const int t_avdp = 12;
+> const int t_cez  = 20; /* max of t_cez, t_oez */
+> const int t_ds   = 30;
+> const int t_wpl  = 40;
+> const int t_wph  = 30
+> 
+> These can be stored in the DT and then translated to gpmc timings at
+> runtime. DT should only store static timing or clock information known
+> at compile time.
+
+Yup. And the format of the timing data in DT should be standardized so
+the only differences for each connected peripheral is the retime function.
+ 
+> >>> And in this case, we are going to register retime function, so instead of
+> >>> relying on DT to provide gpmc timings for such a peripheral, won't it
+> >>> be better to make use of retime that is already registered ?
+> >>
+> >> No we need to pass the timings from device tree as they may be different
+> >> for similar boards. For example, different level shifters used on
+> >> similar boards may affect the timings, although the retime function
+> >> can be the same.
+> > 
+> > Unless I am missing something, could not see this scenario taken care
+> > in the existing retime functions, did see one comment for smc91x, but
+> > seems in that case Kernel doesn't do any timing configuration and
+> > leave timings as configured by bootloader
+> 
+> I think that we just need to adapt the current functions that our
+> calculating the timings so that ...
+> 
+> 1. We can call from them within the gpmc probe to setup the timings
+> versus having the peripherals program the gpmc priory to probe.
+> 2. Any static timing information needed by the retime function is part
+> of the platform data passed to the gpmc probe and therefore can also be
+> read from DT.
+
+Yup, and also:
+
+3. Disable frequency scaling for L3 if no retime function is specified
+
+In that case we may have a generic default function that just sets the
+boot time values and disables the L3 scaling.
+ 
+> From a high-level I think that the goal should be ...
+> 
+> gpmc_probe
+> 	--> request CS
+> 	--> calls retime function to calculate gpmc timing (optional)
+> 	--> configures CS
+> 	--> registers peripheral device
+
+Yes with few additions.. Connected peripheral probe requests CS from
+gpmc with the optional retime function pointer passed as a parameter.
+After gpmc code has determined the CS is available, it calls the optional
+retime function before returning back to the connected peripheral probe.
+
+So how about the following with a bit more details:
+
+gpmc_probe
+	--> just sets up gpmc resources then idles itself
+
+connected peripheral probe
+	--> calls gpmc_cs_request() with gpmc timings from DT and an
+	    optional retime function as a parameter
+	--> gpmc_cs_request() allocates the CS
+	--> gpmc_cs_request() calls the optional retime function and
+	    if not specified, just sets the DT timings and disables
+	    L3 DFS
+	--> gpmc_cs_request() returns to connected peripheral probe
+
+Regards,
+
+Tony
