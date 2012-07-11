@@ -1,183 +1,72 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jul 2012 08:34:03 +0200
-Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: update features
-In-Reply-To: <1341988443-5534-1-git-send-email-s.hauer@pengutronix.de>
-References: <1341988443-5534-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1341988443-5534-3-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 11 Jul 2012 08:44:06 +0200
+Subject: [PATCH 3/3] ARM: i.MX5x clocks: Fix GPT clocks
+In-Reply-To: <1341946469-25984-3-git-send-email-shc_work@mail.ru>
+References: <20120709082700.GM24458@pengutronix.de>
+ <1341946469-25984-3-git-send-email-shc_work@mail.ru>
+Message-ID: <20120711064406.GF30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- reenable CONFIG_MFD_MC13XXX_SPI
-- Allow booting from MMC card.
-- Enable mc13783 Codec support
-- Enable sgtl5000 Codec support
-- Enable mc13783 RTC
-- Enable Control Group support for systemd
-- Enable clk debugfs support
-- Enable i.MX keypad driver
-- Enable MC13783 touchscreen
-- Enable i.MX PATA driver
+On Tue, Jul 10, 2012 at 10:54:29PM +0400, Alexander Shiyan wrote:
+> This patch fix incorrect defined bits for GPT clocks according to
+> datasheet.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/configs/imx_v4_v5_defconfig |   51 +++++++++++++++++-----------------
- 1 file changed, 25 insertions(+), 26 deletions(-)
+Fix is a strong word. As I can see it these are only cosmetic changes
+without any functional change, right?
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index e05a2f1..78ed575 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -2,7 +2,10 @@ CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
- CONFIG_EXPERT=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_SLAB=y
-@@ -36,8 +39,6 @@ CONFIG_MACH_IMX27IPCAM=y
- CONFIG_MACH_IMX27_DT=y
- CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MXC_PWM=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -46,7 +47,6 @@ CONFIG_FPE_NWFPE=y
- CONFIG_FPE_NWFPE_XP=y
- CONFIG_PM_DEBUG=y
- CONFIG_NET=y
--CONFIG_SMSC911X=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
-@@ -70,31 +70,31 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_GEOMETRY=y
- # CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
--CONFIG_MTD_MAP_BANK_WIDTH_4=y
- # CONFIG_MTD_CFI_I2 is not set
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_MXC=y
- CONFIG_MTD_UBI=y
--CONFIG_MISC_DEVICES=y
- CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
-+CONFIG_ATA=y
-+CONFIG_PATA_IMX=y
- CONFIG_NETDEVICES=y
- CONFIG_CS89x0=y
- CONFIG_CS89x0_PLATFORM=y
- CONFIG_DM9000=y
- CONFIG_SMC91X=y
- CONFIG_SMC911X=y
-+CONFIG_SMSC911X=y
- CONFIG_SMSC_PHY=y
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
--# CONFIG_INPUT_KEYBOARD is not set
-+CONFIG_KEYBOARD_IMX=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=m
--CONFIG_TOUCHSCREEN_MC13783=m
--# CONFIG_SERIO is not set
-+CONFIG_TOUCHSCREEN_MC13783=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_IMX=y
-@@ -113,31 +113,23 @@ CONFIG_HWMON=m
- CONFIG_SENSORS_MC13783_ADC=m
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
--CONFIG_MFD_MC13XXX=y
-+CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
--CONFIG_FB=y
--CONFIG_FB_IMX=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_LCD_L4F00242T03=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_VIDEO_DEV=y
--CONFIG_VIDEO_V4L2_COMMON=y
--CONFIG_VIDEO_MEDIA=y
--CONFIG_VIDEO_V4L2=y
--CONFIG_VIDEOBUF_GEN=y
--CONFIG_VIDEOBUF_DMA_CONTIG=y
--CONFIG_VIDEOBUF2_CORE=y
--CONFIG_VIDEO_CAPTURE_DRIVERS=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
--CONFIG_VIDEO_MX2_HOSTSUPPORT=y
- CONFIG_VIDEO_MX2=y
-+CONFIG_FB=y
-+CONFIG_FB_IMX=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_LCD_L4F00242T03=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FONTS=y
-@@ -152,13 +144,17 @@ CONFIG_SND_IMX_SOC=y
- CONFIG_SND_SOC_MX27VIS_AIC32X4=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
-+CONFIG_SND_SOC_IMX_SGTL5000=y
-+CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB_HID=m
- CONFIG_USB=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
- CONFIG_USB_ULPI=y
- CONFIG_MMC=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_MXC=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -173,22 +169,25 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_IMXDI=y
-+CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
-+CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
- # CONFIG_PROC_PAGE_MONITOR is not set
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_UBIFS_FS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
+Sascha
+
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index 50e6043..628e940 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -58,7 +58,7 @@ enum imx5_clks {
+>  	tve_s, uart1_ipg_gate, uart1_per_gate, uart2_ipg_gate,
+>  	uart2_per_gate, uart3_ipg_gate, uart3_per_gate, i2c1_gate, i2c2_gate,
+>  	gpt_ipg_gate, pwm1_ipg_gate, pwm1_per_gate, pwm2_ipg_gate, pwm2_per_gate,
+> -	gpt_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
+> +	gpt_per_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
+>  	esdhc3_ipg_gate, esdhc4_ipg_gate, ssi1_ipg_gate, ssi2_ipg_gate,
+>  	ssi3_ipg_gate, ecspi1_ipg_gate, ecspi1_per_gate, ecspi2_ipg_gate,
+>  	ecspi2_per_gate, cspi_ipg_gate, sdma_gate, emi_slow_gate, ipu_s,
+> @@ -168,12 +168,12 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk[uart3_per_gate] = imx_clk_gate2("uart3_per_gate", "uart_root", MXC_CCM_CCGR1, 16);
+>  	clk[i2c1_gate] = imx_clk_gate2("i2c1_gate", "per_root", MXC_CCM_CCGR1, 18);
+>  	clk[i2c2_gate] = imx_clk_gate2("i2c2_gate", "per_root", MXC_CCM_CCGR1, 20);
+> -	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 20);
+>  	clk[pwm1_ipg_gate] = imx_clk_gate2("pwm1_ipg_gate", "ipg", MXC_CCM_CCGR2, 10);
+>  	clk[pwm1_per_gate] = imx_clk_gate2("pwm1_per_gate", "per_root", MXC_CCM_CCGR2, 12);
+>  	clk[pwm2_ipg_gate] = imx_clk_gate2("pwm2_ipg_gate", "ipg", MXC_CCM_CCGR2, 14);
+>  	clk[pwm2_per_gate] = imx_clk_gate2("pwm2_per_gate", "per_root", MXC_CCM_CCGR2, 16);
+> -	clk[gpt_gate] = imx_clk_gate2("gpt_gate", "per_root", MXC_CCM_CCGR2, 18);
+> +	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 18);
+> +	clk[gpt_per_gate] = imx_clk_gate2("gpt_per_gate", "per_root", MXC_CCM_CCGR2, 20);
+>  	clk[fec_gate] = imx_clk_gate2("fec_gate", "ipg", MXC_CCM_CCGR2, 24);
+>  	clk[usboh3_gate] = imx_clk_gate2("usboh3_gate", "ipg", MXC_CCM_CCGR2, 26);
+>  	clk[usboh3_per_gate] = imx_clk_gate2("usboh3_per_gate", "usboh3_podf", MXC_CCM_CCGR2, 28);
+> @@ -237,7 +237,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  			pr_err("i.MX5 clk %d: register failed with %ld\n",
+>  				i, PTR_ERR(clk[i]));
+>  	
+> -	clk_register_clkdev(clk[gpt_gate], "per", "imx-gpt.0");
+> +	clk_register_clkdev(clk[gpt_per_gate], "per", "imx-gpt.0");
+>  	clk_register_clkdev(clk[gpt_ipg_gate], "ipg", "imx-gpt.0");
+>  	clk_register_clkdev(clk[uart1_per_gate], "per", "imx21-uart.0");
+>  	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
+> -- 
+> 1.7.3.4
+> 
+> 
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
