@@ -1,35 +1,85 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jul 2012 19:33:38 +0800
-Subject: [PATCH v6 0/7] imx28/imx6q: add usb support 
-Message-ID: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+Date: Wed, 11 Jul 2012 19:33:41 +0800
+Subject: [PATCH v6 3/7] ARM: imx6q: disable usb charger detector
+In-Reply-To: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is platform part to add imx28/imx6q driver support.
-The dirver part has been mostly merged to usb-next.
+The external charger detector needs to be disabled,
+or the signal at DP will be poor
 
-The last pinctrl patch also needs imx6q pinctrl driver fix that Aisheng
-is working on. Of course it can pass build, and only effect usb gadget
-function.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6q.c |   41 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Richard Zhao (7):
-  ARM: imx6q: correct device name of usbphy and usb controller clock
-    export
-  ARM: imx6q: add usbphy clocks
-  ARM: imx6q: disable usb charger detector
-  ARM: dts: imx6q-sabrelite: add usb devices
-  ARM: mxs: clk_register_clkdev mx28 usb clocks
-  ARM: dts: imx28-evk: add usb devices
-  ARM: dts: imx6q-sabrelite: add usbotg pinctrl support
-
- arch/arm/boot/dts/imx28-evk.dts       |   36 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx28.dtsi          |   12 ++++++++--
- arch/arm/boot/dts/imx6q-sabrelite.dts |   30 +++++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi          |   42 +++++++++++++++++++++++++++++++--
- arch/arm/mach-imx/clk-imx6q.c         |   11 ++++++++-
- arch/arm/mach-imx/mach-imx6q.c        |   41 ++++++++++++++++++++++++++++++++
- drivers/clk/mxs/clk-imx28.c           |    4 ++++
- 7 files changed, 171 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 1c18d3c..63fe5d6 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -25,6 +25,7 @@
+ #include <linux/pinctrl/machine.h>
+ #include <linux/phy.h>
+ #include <linux/micrel_phy.h>
++#include <linux/mfd/anatop.h>
+ #include <asm/cpuidle.h>
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -117,6 +118,45 @@ static void __init imx6q_sabrelite_init(void)
+ 	imx6q_sabrelite_cko1_setup();
+ }
+ 
++static void __init imx6q_usb_init(void)
++{
++	struct device_node *np;
++	struct platform_device *pdev = NULL;
++	struct anatop *adata = NULL;
++
++	np = of_find_node_by_path("/soc/aips-bus at 02000000/anatop at 020c8000");
++	if (np)
++		pdev = of_find_device_by_node(np);
++	if (pdev)
++		adata = platform_get_drvdata(pdev);
++	if (!adata) {
++		if (np)
++			of_node_put(np);
++		return;
++	}
++
++#define HW_ANADIG_USB1_CHRG_DETECT		0x000001b0
++#define HW_ANADIG_USB2_CHRG_DETECT		0x00000210
++
++#define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x00100000
++#define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x00080000
++
++	/*
++	 * The external charger detector needs to be disabled,
++	 * or the signal at DP will be poor
++	 */
++	anatop_write_reg(adata, HW_ANADIG_USB1_CHRG_DETECT,
++			BM_ANADIG_USB_CHRG_DETECT_EN_B
++			| BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B,
++			~0);
++	anatop_write_reg(adata, HW_ANADIG_USB2_CHRG_DETECT,
++			BM_ANADIG_USB_CHRG_DETECT_EN_B |
++			BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B,
++			~0);
++
++	of_node_put(np);
++}
++
+ static void __init imx6q_init_machine(void)
+ {
+ 	/*
+@@ -131,6 +171,7 @@ static void __init imx6q_init_machine(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 
+ 	imx6q_pm_init();
++	imx6q_usb_init();
+ }
+ 
+ static struct cpuidle_driver imx6q_cpuidle_driver = {
 -- 
 1.7.9.5
