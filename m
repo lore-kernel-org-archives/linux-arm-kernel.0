@@ -1,89 +1,134 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Tue, 10 Jul 2012 19:02:21 -0500
-Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120710023226.GA19649@S2101-09.ap.freescale.net>
-References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
- <20120705182829.d13d6992406e02e1024552e3@freescale.com>
- <20120706002254.GB20175@S2101-09.ap.freescale.net>
- <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
- <20120709065116.GB11635@S2101-09.ap.freescale.net>
- <20120709194514.e6a854441fa69a54fadc296d@freescale.com>
- <20120710023226.GA19649@S2101-09.ap.freescale.net>
-Message-ID: <20120710190221.0f26b6f158257b00c40e6a4e@freescale.com>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Wed, 11 Jul 2012 08:52:19 +0800
+Subject: [GIT PULL 2/5] omap board changes for v3.6 merge window
+In-Reply-To: <201207101534.13166.arnd@arndb.de>
+References: <0M4ZFU-1RqIwX3VUq-00yonj@mx.kundenserver.de>
+ <201207101534.13166.arnd@arndb.de>
+Message-ID: <4FFCCE43.2070709@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jul 2012 10:32:29 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
+? 2012?07?10? 23:34, Arnd Bergmann ??:
+> On Tuesday 10 July 2012, Tony Lindgren wrote:
+>> The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+>>
+>>    Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-for-v3.6
+>>
+>> for you to fetch changes up to b103a2e22a238085f5c50d96345e1a09bb1efd50:
+>>
+>>    ARM: OMAP3: Fix omap3evm randconfig error introduced by VBUS support (2012-07-09 23:22:24 -0700)
+>>
+>> ----------------------------------------------------------------
+>> Board and platform data related changes for omaps
+>>
+>> ----------------------------------------------------------------
+>> Andy Gross (1):
+>>        omap2+: add drm device
+>>
+>> Dmitry Lifshitz (2):
+>>        ARM: OMAP3: cm-t35: add mt9t001 camera sensor support
+>>        ARM: OMAP3: cm-t35: add tvp5150 decoder support
+>>
+>> Peter Ujfalusi (2):
+>>        ARM: OMAP: board-4430sdp: MUX configuration for sys_nirq2
+>>        ARM: OMAP: board-omap4panda: MUX configuration for sys_nirq2
+>>
+>> Tony Lindgren (1):
+>>        ARM: OMAP3: Fix omap3evm randconfig error introduced by VBUS support
+>>
+>> Zumeng Chen (4):
+>>        ARM: OMAP3EVM: Add NAND flash definition
+>>        ARM: OMAP3EVM: Adding USB internal LDOs board file
+>>        ARM: omap3evm: enable VBUS switch for EHCI tranceiver
+>>        ARM: OMAP3530evm: set pendown_state and debounce time for ads7846
+>> diff --cc arch/arm/mach-omap2/common-board-devices.c
+> I got a conflict in arch/arm/mach-omap2/common-board-devices.c between
+> 16aced80f6739 "ARM: OMAP3530evm: set pendown_state and debounce time for
+> ads7846" and 97ee9f01d6f26 "ARM: OMAP: fix the ads7846 init code",
+> see my resolution below.
+>
+> Please check if what I have in the for-next branch makese sense to you
+> all.
+No problem,  many thanks Arnd for your information.
+I'll check it, test it, and send you feedback.
 
-> On Mon, Jul 09, 2012 at 07:45:14PM -0500, Kim Phillips wrote:
-> > I'm not sure if this is appropriate vs. having common arch code
-> > publish SNVS devices; see e.g., the other fsl,* devices in
-> > arch/powerpc/platforms/85xx/common.c:mpc85xx_common_ids[].
-> > 
-> This is completely beyond the scope of the patch, which merely adds
-> a driver for snvs-lp-rtc device.  But the driver does not know how
-> the device is created, and it does not need to know.
-> 
-> > Either way, I'd like to get support without having to manually tweak
-> > the device tree, i.e., the patch doesn't work as-is.
-> > 
-> As I already said, the patch only adds a driver for snvs-lp-rtc.  It
-> should not care about how snvs-lp-rtc device is created on particular
-> platform.  The patch does work as-is for imx6q, which is the target
-> of the patch so far.
-
-how, without the "simple-bus" addition to the sec_mon compatibles
-list in the imx6 device tree (which isn't present in this patch)?
-
-> > btw, testing on a p4080r2 produces a soft lockup:
-> > 
-> > root at p4080ds:~# modprobe rtc-snvs
-> > snvs_rtc ffe314034.sec_mon_rtc_lp: rtc core: registered ffe314034.sec_mon_r as rtc1
-> > root at p4080ds:~# hwclock -w -f /dev/rtc1 
-> > BUG: soft lockup - CPU#0 stuck for 23s! [kworker/0:0:4]
-> > Modules linked in: rtc_snvs nfsd exportfs
-> > irq event stamp: 54
-> > hardirqs last  enabled at (53): [<c04f90dc>] _raw_spin_unlock_irq+0x30/0x58
-> > hardirqs last disabled at (54): [<c04f8808>] _raw_spin_lock_irq+0x24/0x70
-> > softirqs last  enabled at (0): [<c001eff8>] copy_process+0x2f4/0xde4
-> > softirqs last disabled at (0): [<  (null)>]   (null)
-> > NIP: f10b80b4 LR: f10b8074 CTR: 00000003
-> > REGS: ee071d70 TRAP: 0901   Not tainted  (3.5.0-rc5-00099-gd8715a7-dirty)
-> > MSR: 00029002 <CE,EE,ME>  CR: 42042022  XER: 00000000
-> > TASK = ee06f470[4] 'kworker/0:0' THREAD: ee070000 CPU: 0
-> > GPR00: 00000000 ee071e20 ee06f470 c04f9058 00000001 f10b8074 00000000 00000002 
-> > GPR08: 00000001 f10bc054 00000000 00000000 c04f901c 
-> > NIP [f10b80b4] snvs_rtc_alarm_irq_enable+0xb4/0xf8 [rtc_snvs]
-> > LR [f10b8074] snvs_rtc_alarm_irq_enable+0x74/0xf8 [rtc_snvs]
-> > Call Trace:
-> > [ee071e20] [f10b8074] snvs_rtc_alarm_irq_enable+0x74/0xf8 [rtc_snvs] (unreliable)
-> > [ee071e40] [c038c118] rtc_timer_do_work+0x184/0x20c
-> > [ee071f10] [c003fc4c] process_one_work+0x1d4/0x48c
-> > [ee071f50] [c0040d4c] worker_thread+0x184/0x358
-> > [ee071f90] [c0046458] kthread+0x84/0x88
-> > [ee071ff0] [c000d434] kernel_thread+0x4c/0x68
-> > Instruction dump:
-> > 7c0004ac 7d404c2c 0c0a0000 4c00012c 7c0004ac 7c004c2c 0c000000 4c00012c 
-> > 7f8a0000 409effdc 7c0004ac 7c004c2c <0c000000> 4c00012c 7c0004ac 7d604c2c 
-> > 
-> > I debugged it to the innermost loop of rtc_write_sync_lp(), where
-> > count2 and count3 are always equal.  Should there be a timeout in
-> > that loop?  Do you know if this is because the machine isn't
-> > in trusted mode?  Any other hints appreciated.
-> > 
-> This is probably because readl/writel does not work on powerpc.
-> I experienced the same thing when working on fsl_ssi driver.
-> 
-> My patch only targets imx6q right now.
-
-interesting.  When I add
-
-+#define readl in_be32
-+#define writel(val, addr)             out_be32(addr, val)
-
-to the top of the driver, the soft-lockup moves to
-rtc_read_lp_counter().  I'm trying to verify if I have the right h/w
-revision.
-
-Kim
+Regards,
+Zumeng
+>
+> 	Arnd
+>
+> * Unmerged path arch/arm/mach-omap2/common-board-devices.c
+> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
+> index 1706ebc..1473474 100644
+> --- a/arch/arm/mach-omap2/common-board-devices.c
+> +++ b/arch/arm/mach-omap2/common-board-devices.c
+> @@ -35,6 +35,16 @@ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
+>   	.turbo_mode	= 0,
+>    };
+>
+>   +/*
+>   + * ADS7846 driver maybe request a gpio according to the value
+>   + * of pdata->get_pendown_state, but we have done this. So set
+>   + * get_pendown_state to avoid twice gpio requesting.
+>   + */
+>   +static int omap3_get_pendown_state(void)
+>   +{
+>   +	return !gpio_get_value(OMAP3_EVM_TS_GPIO);
+>   +}
+>   +
+>    static struct ads7846_platform_data ads7846_config = {
+>   	.x_max			= 0x0fff,
+>   	.y_max			= 0x0fff,
+> @@ -45,6 +55,7 @@ static struct ads7846_platform_data ads7846_config = {
+>   	.debounce_rep		= 1,
+>   	.gpio_pendown		= -EINVAL,
+>   	.keep_vref_on		= 1,
+>   +	.get_pendown_state	=&omap3_get_pendown_state,
+>    };
+>
+>    static struct spi_board_info ads7846_spi_board_info __initdata = {
+> @@ -63,28 +74,30 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+>   	struct spi_board_info *spi_bi =&ads7846_spi_board_info;
+>   	int err;
+>
+> -	if (board_pdata&&  board_pdata->get_pendown_state) {
+> -		err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
+> -		if (err) {
+> -			pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
+> -			return;
+> -		}
+> -		gpio_export(gpio_pendown, 0);
+> -
+> -		if (gpio_debounce)
+> -			gpio_set_debounce(gpio_pendown, gpio_debounce);
+> +	err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
+> +	if (err) {
+> +		pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
+> +		return;
+>   	}
+>
+> +	if (gpio_debounce)
+> +		gpio_set_debounce(gpio_pendown, gpio_debounce);
+> +
+>   	spi_bi->bus_num	= bus_num;
+>   	spi_bi->irq	= gpio_to_irq(gpio_pendown);
+>
+>   	if (board_pdata) {
+>   		board_pdata->gpio_pendown = gpio_pendown;
+>   		spi_bi->platform_data = board_pdata;
+> +		if (board_pdata->get_pendown_state)
+> +			gpio_export(gpio_pendown, 0);
+>   	} else {
+>   		ads7846_config.gpio_pendown = gpio_pendown;
+>   	}
+>
+> +	if (!board_pdata || (board_pdata&&  !board_pdata->get_pendown_state))
+> +		gpio_free(gpio_pendown);
+> +
+>   	spi_register_board_info(&ads7846_spi_board_info, 1);
+>   }
+>   #else
