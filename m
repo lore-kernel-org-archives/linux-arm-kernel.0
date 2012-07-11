@@ -1,61 +1,61 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jul 2012 14:01:21 +0800
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120706062852.GZ30009@pengutronix.de>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
- <20120706062852.GZ30009@pengutronix.de>
-Message-ID: <20120711060121.GB30055@b20223-02.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Jul 2012 23:04:39 -0700
+Subject: [GIT PULL 5/5] minimal omap5 support for v3.6 merge window
+In-Reply-To: <201207101553.01188.arnd@arndb.de>
+References: <pull-1341925556-888624> <E1SoaE5-0001gM-89@merlin.infradead.org>
+ <20120710134235.GY1122@atomide.com>
+ <201207101553.01188.arnd@arndb.de>
+Message-ID: <20120711060439.GZ1122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2012 at 08:28:52AM +0200, Sascha Hauer wrote:
-> On Fri, Jul 06, 2012 at 08:52:50AM +0800, Richard Zhao wrote:
-> > On Thu, Jul 05, 2012 at 06:01:53PM +0200, Sascha Hauer wrote:
-> > > On Thu, Jul 05, 2012 at 10:52:39PM +0800, Richard Zhao wrote:
-> > > > On Thu, Jul 05, 2012 at 03:10:26PM +0200, Sascha Hauer wrote:
-> > > > > Measurements on i.MX1 and i.MX53 have shown that the divider values
-> > > > > in the datasheets are wrong. the values from first, third and fourth
-> > > > > column were all measured to be 8 higher than in the datasheet. It
-> > > > > should be safe to assume that the SoCs between i.MX1 and i.MX53 behave
-> > > > > the same as the i2c unit is unchanged since the i.MX1.
-> > > > We may need to check with IC guys? Or you've done?
+* Arnd Bergmann <arnd@arndb.de> [120710 08:57]:
+> On Tuesday 10 July 2012, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [120710 06:21]:
+> > > The following changes since commit fb584511c4664573097ece7df0de06ad00b713a2:
 > > > 
-> > > I don't have contact to the IC guys. Could you do this? I'd be
-> > > interested in the results.
-> > Sure, but it may be slow, as you know, many people are in summer break.
+> > >   ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds (2012-07-09 01:44:11 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap devel-omap5
+> > 
+> > FYI, I got some merge conflicts with the am33xx and PM/smartreflex
+> > changes, here's how I resolved them.
+> > 
 > 
-> Thanks. It can take longer, the resulting frequencies are all too low,
-> so we are on the safe side.
-Sascha,
+> Pulled all five branches now.
 
-IC guys confirmed that the spec is right:
+OK thanks.
+ 
+> I put the am33xx clk data into the next/clk branch, as that seemed convenient.
+> The omap5 branch is in the next/newsoc branch, together with the new Marvell
+> ArmadaXP port.
 
-This an adaptive feature of our I2C module may apply to all IMX chips.
-No mistake in the table of RMs.
+OK
+ 
+> I'm not extremely happy with the multi-level dependencies, but it's still
+> manageable at the moment, especially since I have a relatively large number
+> of next/* branches.
 
-The divider is designed to guarantee SCL high level and low level last
-time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
-the transition time is longer than 1 internal pre-divided clock cycle.
-The pre-divided clock is divided from I2C module clock, used for
-generating SCL. So you will see SCL clock cycle is some way longer than
-calculated value using IFDR.
+Yes me neither, that causes a lot of extra work keeping thing working.
 
-Transition time will different from rising or falling edge, different
-pull-up resistors, and different SCL loading.
+The clean-up we did caused quite a bit of these dependencies, but
+was necessary for adding am33xx and omap5 in somewhat clean way to avoid
+patching all over the place to add more soc_is_omapxxxx() calls. So this
+amount of dependencies should be rare.
 
-This feature make sure transition time won?t eat both level time of SCL.
+All the clean-up should really have been in the first clean-up branch, but
+was not quite ready yet at that point. That would have simplified things
+a lot.
+ 
+> If others submit pull requests that create additional dependencies I might
+> have to reject them if that gets too complex.
 
-Thanks
-Richard
-> 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
+Yes sorry about that, I too was considering leaving some of these branches
+for v3.7 to let the dependencies clear out.. Anyways thanks again for the
+extra effort on your part too.
+
+Regards,
+
+Tony
