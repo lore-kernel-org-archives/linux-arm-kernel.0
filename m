@@ -1,172 +1,141 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 11 Jul 2012 14:36:31 +0100
-Subject: [PATCH 9/9] ARM: vexpress: Config option for early printk console
+Date: Wed, 11 Jul 2012 14:36:24 +0100
+Subject: [PATCH 2/9] ARM: vexpress: Check master site in daughterboard's
+ sysctl operations
 In-Reply-To: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
 References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1342013791-19516-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <1342013791-19516-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versatile Express platform can be used in different configuartion,
-the console UART used by early printk may be located at different
-addresses in the address space.
+With recent enough motherboard firmware, core tile can be fitted
+in either of the two daughterboard sites. The non-DT tile code for
+V2P-CA9 did not check that when configuring DVI output nor setting
+CLCD pixel clock.
 
-This patch makes it possible to select base address of a PL011 UART
-to be used as a console output in the kernel configuration. The
-default behaviour is still the heuristic detecting memory map
-on Cortex-A core tiles.
-
-The zImage decompressor will use the same configuration values
-or print out nothing if DEBUG_LL is not enabled.
+Fixed now, providing "get master site" API in motherboard's code.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/Kconfig.debug                            |   26 ++++++++++++
- arch/arm/mach-vexpress/include/mach/debug-macro.S |   44 +++++++++++++++++++++
- arch/arm/mach-vexpress/include/mach/uncompress.h  |   14 +++++++
- 3 files changed, 84 insertions(+)
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |   15 ++++++++++++---
+ arch/arm/mach-vexpress/include/mach/motherboard.h |    9 ++++++---
+ arch/arm/mach-vexpress/v2m.c                      |   18 +++++++++++++-----
+ 3 files changed, 31 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 01a1341..12eee87 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -310,6 +310,32 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index c65cc3b..ab15a55 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -66,8 +66,15 @@ static void __init ct_ca9x4_init_irq(void)
  
-+	config DEBUG_VEXPRESS_UART0_DETECT
-+		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
-+		depends on ARCH_VEXPRESS
-+		help
-+		  This option enables simple heuristic which tries to determine
-+		  motherboard's memory map variant (original or RS1) and then
-+		  choose relevant UART0 base address.
-+
-+		  Note that this will only work with standard A-class core tiles,
-+		  and may fail with non-standard SMM or custom software model.
-+
-+	config DEBUG_VEXPRESS_UART0_CA9
-+		bool "Use PL011 UART0 at 0x10009000 (V2P-CA9 core tile)"
-+		depends on ARCH_VEXPRESS
-+		help
-+		  This option selects UART0 at 0x10009000. Except for custom models,
-+		  this applies only to V2P-CA9 tile.
-+
-+	config DEBUG_VEXPRESS_UART0_RS1
-+		bool "Use PL011 UART0 at 0x1c090000 (RS1 complaint tiles)"
-+		depends on ARCH_VEXPRESS
-+		help
-+		  This option selects UART0 at 0x1c090000. This applies to most
-+		  of the tiles using RS1 memory map, including all new A-class
-+		  core tiles, FPGA-based SMMs and software models.
-+
- 	config DEBUG_LL_UART_NONE
- 		bool "No low-level debugging UART"
- 		help
-diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-index fa82247..1980239 100644
---- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-+++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-@@ -18,6 +18,8 @@
- 
- #define DEBUG_LL_VIRT_BASE		0xf8000000
- 
-+#if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
-+
- 		.macro	addruart,rp,rv,tmp
- 
- 		@ Make an educated guess regarding the memory map:
-@@ -41,3 +43,45 @@
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-+
-+#elif defined(CONFIG_DEBUG_VEXPRESS_UART0_CA9)
-+
-+		.macro	addruart,rp,rv,tmp
-+		mov	\rp, #DEBUG_LL_UART_OFFSET
-+		orr	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orr	\rp, \rp, #DEBUG_LL_PHYS_BASE
-+		.endm
-+
-+#include <asm/hardware/debug-pl01x.S>
-+
-+#elif defined(CONFIG_DEBUG_VEXPRESS_UART0_RS1)
-+
-+		.macro	addruart,rp,rv,tmp
-+		mov	\rp, #DEBUG_LL_UART_OFFSET_RS1
-+		orr	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orr	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
-+		.endm
-+
-+#include <asm/hardware/debug-pl01x.S>
-+
-+#else /* CONFIG_DEBUG_LL_UART_NONE */
-+
-+		.macro	addruart, rp, rv, tmp
-+		/*
-+		 * Have to provide reasonable dummy values,
-+		 * otherwise code in head.S crashes badly...
-+		 */
-+		mov	\rp, #0
-+		mov	\rv, #0
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+		.endm
-+
-+#endif
-diff --git a/arch/arm/mach-vexpress/include/mach/uncompress.h b/arch/arm/mach-vexpress/include/mach/uncompress.h
-index 7dab559..1e472eb 100644
---- a/arch/arm/mach-vexpress/include/mach/uncompress.h
-+++ b/arch/arm/mach-vexpress/include/mach/uncompress.h
-@@ -27,6 +27,7 @@
- 
- static unsigned long get_uart_base(void)
+ static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
  {
-+#if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
- 	unsigned long mpcore_periph;
- 
- 	/*
-@@ -42,6 +43,13 @@ static unsigned long get_uart_base(void)
- 		return UART_BASE;
- 	else
- 		return UART_BASE_RS1;
-+#elif defined(CONFIG_DEBUG_VEXPRESS_UART0_CA9)
-+	return UART_BASE;
-+#elif defined(CONFIG_DEBUG_VEXPRESS_UART0_RS1)
-+	return UART_BASE_RS1;
-+#else
-+	return 0;
-+#endif
+-	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
+-	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE_DB1, 2);
++	u32 site = v2m_get_master_site();
++
++	/*
++	 * Old firmware was using the "site" component of the command
++	 * to control the DVI muxer (while it should be always 0 ie. MB).
++	 * Newer firmware uses the data register. Keep both for compatibility.
++	 */
++	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE(site), site);
++	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE(SYS_CFG_SITE_MB), 2);
  }
  
+ static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
+@@ -112,7 +119,9 @@ static long ct_round(struct clk *clk, unsigned long rate)
+ 
+ static int ct_set(struct clk *clk, unsigned long rate)
+ {
+-	return v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE_DB1 | 1, rate);
++	u32 site = v2m_get_master_site();
++
++	return v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE(site) | 1, rate);
+ }
+ 
+ static const struct clk_ops osc1_clk_ops = {
+diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
+index 31a9289..f004ec9 100644
+--- a/arch/arm/mach-vexpress/include/mach/motherboard.h
++++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
+@@ -104,9 +104,10 @@
+ #define SYS_CFG_REBOOT		(9 << 20)
+ #define SYS_CFG_DVIMODE		(11 << 20)
+ #define SYS_CFG_POWER		(12 << 20)
+-#define SYS_CFG_SITE_MB		(0 << 16)
+-#define SYS_CFG_SITE_DB1	(1 << 16)
+-#define SYS_CFG_SITE_DB2	(2 << 16)
++#define SYS_CFG_SITE(n)		((n) << 16)
++#define SYS_CFG_SITE_MB		0
++#define SYS_CFG_SITE_DB1	1
++#define SYS_CFG_SITE_DB2	2
+ #define SYS_CFG_STACK(n)	((n) << 12)
+ 
+ #define SYS_CFG_ERR		(1 << 1)
+@@ -122,6 +123,8 @@ void v2m_flags_set(u32 data);
+ #define SYS_MISC_MASTERSITE	(1 << 14)
+ #define SYS_PROCIDx_HBI_MASK	0xfff
+ 
++int v2m_get_master_site(void);
++
  /*
-@@ -51,6 +59,9 @@ static inline void putc(int c)
- {
- 	unsigned long base = get_uart_base();
- 
-+	if (!base)
-+		return;
-+
- 	while (AMBA_UART_FR(base) & (1 << 5))
- 		barrier();
- 
-@@ -61,6 +72,9 @@ static inline void flush(void)
- {
- 	unsigned long base = get_uart_base();
- 
-+	if (!base)
-+		return;
-+
- 	while (AMBA_UART_FR(base) & (1 << 3))
- 		barrier();
+  * Core tile IDs
+  */
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index fde26ad..bb18592 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -147,6 +147,13 @@ void __init v2m_flags_set(u32 data)
+ 	writel(data, v2m_sysreg_base + V2M_SYS_FLAGSSET);
  }
+ 
++int v2m_get_master_site(void)
++{
++	u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
++
++	return misc & SYS_MISC_MASTERSITE ? SYS_CFG_SITE_DB2 : SYS_CFG_SITE_DB1;
++}
++
+ 
+ static struct resource v2m_pcie_i2c_resource = {
+ 	.start	= V2M_SERIAL_BUS_PCI,
+@@ -326,7 +333,8 @@ static long v2m_osc_round(struct clk *clk, unsigned long rate)
+ 
+ static int v2m_osc1_set(struct clk *clk, unsigned long rate)
+ {
+-	return v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE_MB | 1, rate);
++	return v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE(SYS_CFG_SITE_MB) | 1,
++			rate);
+ }
+ 
+ static const struct clk_ops osc1_clk_ops = {
+@@ -404,13 +412,13 @@ static void __init v2m_init_early(void)
+ 
+ static void v2m_power_off(void)
+ {
+-	if (v2m_cfg_write(SYS_CFG_SHUTDOWN | SYS_CFG_SITE_MB, 0))
++	if (v2m_cfg_write(SYS_CFG_SHUTDOWN | SYS_CFG_SITE(SYS_CFG_SITE_MB), 0))
+ 		printk(KERN_EMERG "Unable to shutdown\n");
+ }
+ 
+ static void v2m_restart(char str, const char *cmd)
+ {
+-	if (v2m_cfg_write(SYS_CFG_REBOOT | SYS_CFG_SITE_MB, 0))
++	if (v2m_cfg_write(SYS_CFG_REBOOT | SYS_CFG_SITE(SYS_CFG_SITE_MB), 0))
+ 		printk(KERN_EMERG "Unable to reboot\n");
+ }
+ 
+@@ -605,8 +613,8 @@ void __init v2m_dt_init_early(void)
+ 
+ 	/* Confirm board type against DT property, if available */
+ 	if (of_property_read_u32(allnodes, "arm,hbi", &dt_hbi) == 0) {
+-		u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
+-		u32 id = readl(v2m_sysreg_base + (misc & SYS_MISC_MASTERSITE ?
++		int site = v2m_get_master_site();
++		u32 id = readl(v2m_sysreg_base + (site == SYS_CFG_SITE_DB2 ?
+ 				V2M_SYS_PROCID1 : V2M_SYS_PROCID0));
+ 		u32 hbi = id & SYS_PROCIDx_HBI_MASK;
+ 
 -- 
 1.7.9.5
