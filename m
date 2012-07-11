@@ -1,45 +1,63 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 11 Jul 2012 22:37:30 +0530
-Subject: [GIT PULL] DaVinci fixes for v3.6
-In-Reply-To: <201207101450.28186.arnd@arndb.de>
-References: <4FFAB515.1070708@ti.com> <201207101450.28186.arnd@arndb.de>
-Message-ID: <4FFDB2D2.3000003@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 11 Jul 2012 12:37:46 -0500
+Subject: [PATCH v3] clocksource: dw_apb_timer: Add common DTS glue for
+ dw_apb_timer
+In-Reply-To: <20120711162058.GA28067@elf.ucw.cz>
+References: <1342023144-13945-1-git-send-email-dinguyen@altera.com>
+ <20120711162058.GA28067@elf.ucw.cz>
+Message-ID: <4FFDB9EA.3000902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 7/10/2012 8:20 PM, Arnd Bergmann wrote:
-> On Monday 09 July 2012, Sekhar Nori wrote:
+On 07/11/2012 11:20 AM, Pavel Machek wrote:
+> Hi!
 > 
->> The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+>> Make a common device tree glue for clocksource/dw_apb_timer.
+>> Move mach-picoxcell/time.c to be a generic device tree application
+>> of the dw_apb_timer.
 >>
->>   Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+>> Configure mach-picoxcell to use the dw_apb_timer_of device tree
+>> implementation in drivers/clocksource.
 >>
->> are available in the git repository at:
->>
->>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-v3.6-fixes
->>
->> for you to fetch changes up to bbb33445b9cdd5ac7609723fcfc28dfa77a11039:
->>
->>   ARM: davinci: da8xx: fix interrupt handling (2012-07-09 16:01:11 +0530)
->>
+>> Signed-off-by: Pavel Machek <pavel@denx.de>
+>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>> Acked-by: Jamie Iles <jamie@jamieiles.com>
 > 
-> Pulled the fixes, soc and cleanup branches into the respective arm-soc
-> branches.
-
-Thanks!
-
+> Ok, this is getting complex.
 > 
-> I noticed that you used signed tags, which is good, but your gpg key is
-> not actually signed by anyone else. Can you try to get a few signatures
-> on it from people that are well connected? 
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+>> @@ -0,0 +1,24 @@
+>> +* Designware APB timer
+>> +
+>> +Required properties:
+>> +- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +  region.
+>> +- interrupts: IRQ line for the timer.
+>> +- clock-frequency: The frequency in HZ of the timer.
 > 
-> Within TI, Kevin Hilman, Rob Clark or Sumit Semwal would be such people
-> but I'm sure are others who are working with you locally or can do
-> a phone verification.
+> I know device-tree maintainers requested -freq -> -frequency,
+>> --- a/arch/arm/mach-picoxcell/time.c
+>> +++ b/drivers/clocksource/dw_apb_timer_of.c
+> 
+> But then this will need updating to accept "-frequency",
+> 
+>> -static const struct of_device_id picoxcell_timer_ids[] __initconst = {
+>> +static const struct of_device_id osctimer_ids[] __initconst = {
+>>  	{ .compatible = "picochip,pc3x2-timer" },
+>> +	{ .compatible = "snps,dw-apb-timer-osc" },
+>>  	{},
+>>  };
+> 
+> and dts will need to be updated, anyway, so we could update
+> "picochip,pc3x2-timer" -> "snps,dw-apb-timer-osc" as well, right?
+> 
+> Alternatively, we could just keep using "-freq"....
+> 
+> Or am I overlooking something?
 
-Yes, I will get my key signed soon. Sumit is locally located.
+If picoxcell is already using "-freq", then yes, you'll have to keep it
+for compatibility. You have to assume that a dtb cannot be changed.
 
-Thanks,
-Sekhar
+Rob
