@@ -1,48 +1,47 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jul 2012 19:33:40 +0800
-Subject: [PATCH v6 2/7] ARM: imx6q: add usbphy clocks
+Date: Wed, 11 Jul 2012 19:33:45 +0800
+Subject: [PATCH v6 7/7] ARM: dts: imx6q-sabrelite: add usbotg pinctrl support
 In-Reply-To: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
 References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1342006425-21008-3-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1342006425-21008-8-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    2 ++
+ arch/arm/boot/dts/imx6q.dtsi          |    6 ++++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 3f5b9d6..ea89520 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -152,7 +152,7 @@ enum mx6q_clks {
- 	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
- 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
- 	pll4_audio, pll5_video, pll6_mlb, pll7_usb_host, pll8_enet, ssi1_ipg,
--	ssi2_ipg, ssi3_ipg, rom,
-+	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2,
- 	clk_max
- };
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 5bba0d1..de3cd2e 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -57,6 +57,8 @@
+ 		aips-bus at 02100000 { /* AIPS2 */
+ 			usb at 02184000 { /* USB OTG */
+ 				vbus-supply = <&reg_usb_otg_vbus>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usbotg_1>;
+ 				status = "okay";
+ 			};
  
-@@ -198,6 +198,9 @@ int __init mx6q_clocks_init(void)
- 	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x2000,   0x3);
- 	clk[pll8_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll8_enet",	"osc", base + 0xe0, 0x182000, 0x3);
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 5e4f100..64a24a0 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -552,6 +552,12 @@
+ 					};
+ 				};
  
-+	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
-+	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
++				usbotg {
++					pinctrl_usbotg_1: usbotggrp-1 {
++						fsl,pins = <1591 0x17059>;	/* MX6Q_PAD_GPIO_1__USBOTG_ID */
++					};
++				};
 +
- 	/*                                name              parent_name        reg       idx */
- 	clk[pll2_pfd0_352m] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base + 0x100, 0);
- 	clk[pll2_pfd1_594m] = imx_clk_pfd("pll2_pfd1_594m", "pll2_bus",     base + 0x100, 1);
-@@ -402,6 +405,8 @@ int __init mx6q_clocks_init(void)
- 	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
- 	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
- 	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
-+	clk_register_clkdev(clk[usbphy1], NULL, "20c9000.usbphy");
-+	clk_register_clkdev(clk[usbphy2], NULL, "20ca000.usbphy");
- 	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
- 	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
- 	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+ 				usdhc3 {
+ 					pinctrl_usdhc3_1: usdhc3grp-1 {
+ 						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
 -- 
 1.7.9.5
