@@ -1,42 +1,51 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 11 Jul 2012 16:49:56 +0300
-Subject: Device tree binding for DVFS table
-In-Reply-To: <20748722.319671342012092123.JavaMail.weblogic@epml17>
-References: <20748722.319671342012092123.JavaMail.weblogic@epml17>
-Message-ID: <20120711134956.GB9437@tbergstrom-lnx.Nvidia.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Wed, 11 Jul 2012 22:02:04 +0800
+Subject: [PATCH v6 3/7] ARM: imx6q: disable usb charger detector
+In-Reply-To: <CAP9ODKpGiW43E4Cq8MDb-83G7B3Y57AVGz9oaBVzmW83SykUYg@mail.gmail.com>
+References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+ <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
+ <CAP9ODKpGiW43E4Cq8MDb-83G7B3Y57AVGz9oaBVzmW83SykUYg@mail.gmail.com>
+Message-ID: <20120711140201.GA2774@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 03:08:14PM +0200, ??? wrote:
-> > Hi,
-> >
-> > I am working on DT binding for Tegra DVFS.
-> >
-> > For Tegra, DVFS node mainly consists of frequency and voltage pairs. 
-> > Frequency in the pair may change for different process. E.g. for process 
-> > 1 CPU clock frequency could be 900MHz at 1V while for process 2 it could 
-> > be 1GHz at 1V.
-> > Tegra uses vendor specific ids to identify the correct frequency table.
+On Wed, Jul 11, 2012 at 10:28:07AM -0300, Otavio Salvador wrote:
+> On Wed, Jul 11, 2012 at 8:33 AM, Richard Zhao
+> <richard.zhao@freescale.com> wrote:
+> > The external charger detector needs to be disabled,
+> > or the signal at DP will be poor
 > 
-> Hello,
+> Something as this needs to be applied, no?
 > 
-> It seems that in the example, the values in "voltage-array" and
-> "frequencies" are switched.
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index eff4db5..93695e0 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -832,6 +832,9 @@ config SOC_IMX6Q
+>         select HAVE_SMP
+>         select PINCTRL
+>         select PINCTRL_IMX6Q
+> +       select MFD_ANATOP
+This is needed.
+> +       select REGULATOR
+> +       select REGULATOR_ANATOP
+but why these two?
+
+Thanks
+Richard
+>         select USE_OF
 > 
-> Anyway, what about SoCs that reads information from IEM (or any other module)
->  to measure gate delays or some other value to set the appriorate voltage values
->  for every possible frequency? I remember some of Exynos SoCs have been doing
->  it; dynamically measure the characteristics at boot-up time and apply voltages
->  accordingly; they couldn't identify it based on the chip-id or simply by reading
->  a single register.
+>         help
 > 
-
-
-But in that case you would have a nominal voltage for each OPP which gets
-adjusted at boottime or runtime depending on the exact silicon characteristics?
-I would say the DT binding should then specify 1 table with the nominal values
-and leave the dynamics to the driver.
-
-Cheers,
-
-Peter.
+> I sent this patch some time ago but I don't recall to get an ack/nack
+> for it. I can resend it.
+> 
+> -- 
+> Otavio Salvador                             O.S. Systems
+> E-mail: otavio at ossystems.com.br  http://www.ossystems.com.br
+> Mobile: +55 53 9981-7854              http://projetos.ossystems.com.br
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
