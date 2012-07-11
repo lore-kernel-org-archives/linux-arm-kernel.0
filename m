@@ -1,36 +1,26 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Wed, 11 Jul 2012 17:43:12 +0530
-Subject: [PATCH v4 0/2] add new cache maintenance api
-In-Reply-To: <CADysL2ZD0yCpCodeuwDpiaiD=uYuDfv4MDXN=YWa-LfY1-8pjA@mail.gmail.com>
-References: <CADysL2ZD0yCpCodeuwDpiaiD=uYuDfv4MDXN=YWa-LfY1-8pjA@mail.gmail.com>
-Message-ID: <CADysL2YuOuCQEDpy0TdWJHaSmiotg-utnPSnhmxCetH0XBVRPg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 11 Jul 2012 17:51:13 +0530
+Subject: [PATCH v5 5/6] spi: s3c64xx: Remove the 'set_level' callback from
+ controller data
+In-Reply-To: <20120711114716.GF3938@opensource.wolfsonmicro.com>
+References: <CAJuYYwSi-1nBM40SWt359W0Lr2n_yVX5tvWfOS77bmLQRt_9fw@mail.gmail.com>
+ <1342005359-748-1-git-send-email-thomas.abraham@linaro.org>
+ <20120711114716.GF3938@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwR8o76aLr_2J4jqF93hhz_4L3MJikJUtTpG5jWfPKDk+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Thu, Jul 5, 2012 at 10:50 AM, Gupta, Ramesh <grgupta@ti.com> wrote:
-> From 393c4effbbec74ff9b969d53ce4d36fde56b71df Mon Sep 17 00:00:00 2001
-> From: Ramesh Gupta G <grgupta@ti.com>
-> Date: Wed, 4 Jul 2012 16:43:41 +0530
-> Subject: [PATCH v4 0/2] add new cache maintenance api
+On 11 July 2012 17:17, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Jul 11, 2012 at 04:45:59PM +0530, Thomas Abraham wrote:
+>> The set_level callback in the controller data, which is used to configure
+>> the slave select line, cannot be supported when migrating the driver to
+>> device tree based discovery. Since all the platforms currently use gpio
+>> as the slave select line, this callback can be removed from the
+>> controller data and replaced with call to gpio_set_value in the driver.
 >
-> This patch series is the next version to
-> - add a new cache maintenance api to support non-coherent iommu drivers.
-> - flush both L1 and L2 caches from OMAP iommu whenever the page table
->   memory is updated.
->
-> Changes since the previous patch set (v3)
-> - Minor cleanup for fixing checkpatch warnings.
->
-> The implementation of the new api is based on
-> the approach[1] discussed.
->
-> [1]http://marc.info/?l=linux-kernel&m=131316512713815&w=2
+> I don't seem to have patches 1-4?
 
-
-Did you get a chance to review this patch series? Please let me know
-if I miss anything.
-
-thank you and regards
-Ramesh Gupta G
+Based on your comments to add the gpio request, only two patches 5/6
+and 6/6 in this series have changed since. I have cc'ed you in the
+other 4 patches as well. If you do not have those patches, please let
+me know, I will repost the whole series again. Thanks.
