@@ -1,42 +1,36 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Wed, 11 Jul 2012 12:54:11 -0300
-Subject: [PATCH v6 3/7] ARM: imx6q: disable usb charger detector
-In-Reply-To: <20120711140201.GA2774@richard-laptop>
-References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
- <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
- <CAP9ODKpGiW43E4Cq8MDb-83G7B3Y57AVGz9oaBVzmW83SykUYg@mail.gmail.com>
- <20120711140201.GA2774@richard-laptop>
-Message-ID: <CAP9ODKpuV38dBbH=Z1QBCL2P0YEQkjOAH9-NuEQa0PSrak_=Cg@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 11 Jul 2012 17:03:58 +0100
+Subject: [PATCH v2 1/2] clocksource: dw_apb_timer: Add common DTS glue
+ for  dw_apb_timer
+In-Reply-To: <1342020026.4790.1.camel@dinguyen-VirtualBox>
+References: <1341956381-496-1-git-send-email-dinguyen@altera.com>
+ <20120710231525.GA27641@page>
+ <1342020026.4790.1.camel@dinguyen-VirtualBox>
+Message-ID: <20120711160358.GA8444@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 11:02 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
-> On Wed, Jul 11, 2012 at 10:28:07AM -0300, Otavio Salvador wrote:
->> On Wed, Jul 11, 2012 at 8:33 AM, Richard Zhao
->> <richard.zhao@freescale.com> wrote:
->> > The external charger detector needs to be disabled,
->> > or the signal at DP will be poor
->>
->> Something as this needs to be applied, no?
->>
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> index eff4db5..93695e0 100644
->> --- a/arch/arm/mach-imx/Kconfig
->> +++ b/arch/arm/mach-imx/Kconfig
->> @@ -832,6 +832,9 @@ config SOC_IMX6Q
->>         select HAVE_SMP
->>         select PINCTRL
->>         select PINCTRL_IMX6Q
->> +       select MFD_ANATOP
-> This is needed.
->> +       select REGULATOR
->> +       select REGULATOR_ANATOP
-> but why these two?
+On Wed, Jul 11, 2012 at 10:20:26AM -0500, Dinh Nguyen wrote:
+> On Wed, 2012-07-11 at 00:15 +0100, Jamie Iles wrote:
+> > On Tue, Jul 10, 2012 at 04:39:40PM -0500, dinguyen at altera.com wrote:
+> > > --- a/arch/arm/mach-picoxcell/time.c
+> > > +++ b/drivers/clocksource/dw_apb_timer_of.c
+> > > @@ -1,11 +1,20 @@
+> > [...]
+> > > -static const struct of_device_id picoxcell_rtc_ids[] __initconst = {
+> > > -	{ .compatible = "picochip,pc3x2-rtc" },
+> > > +static const struct of_device_id sptimer_ids[] __initconst = {
+> > > +	{ .compatible = "snps,dw-apb-timer-sp" },
+> > >  	{ /* Sentinel */ },
+> > 
+> > Please keep picochip,pc3x2-rtc in the compatible list otherwise we won't 
+> > boot any more.
+> 
+> Should I add another .compatible entry here, or make the change in
+> picoxcell-pc3x2 and picoxcell-pc3x3 dtsi files?
 
-I did it some time ago and ended up adding it ... don't recall why but
-MFD only does fix the build failure ... I sent a patch with that.
+I think that adding another compatible entry is the right thing to do 
+here - it avoids churn of the dtsi files and means that the compiled 
+device-tree blobs on deployed devices won't need updating.
 
--- 
-Otavio Salvador                             O.S. Systems
-E-mail: otavio at ossystems.com.br  http://www.ossystems.com.br
-Mobile: +55 53 9981-7854              http://projetos.ossystems.com.br
+Jamie
