@@ -1,51 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Jul 2012 16:18:46 +0100
-Subject: [PATCH 1/9] ARM: vexpress: remove automatic errata workaround
- selection
-In-Reply-To: <4FFD956D.7020901@gmail.com>
-References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
- <1342013791-19516-2-git-send-email-pawel.moll@arm.com>
- <4FFD956D.7020901@gmail.com>
-Message-ID: <20120711151846.GE13498@mudshark.cambridge.arm.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 11 Jul 2012 10:20:26 -0500
+Subject: [PATCH v2 1/2] clocksource: dw_apb_timer: Add common DTS glue
+ for  dw_apb_timer
+In-Reply-To: <20120710231525.GA27641@page>
+References: <1341956381-496-1-git-send-email-dinguyen@altera.com>
+ <20120710231525.GA27641@page>
+Message-ID: <1342020026.4790.1.camel@dinguyen-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 04:02:05PM +0100, Rob Herring wrote:
-> On 07/11/2012 08:36 AM, Pawel Moll wrote:
-> > From: Will Deacon <will.deacon@arm.com>
-> > 
-> > The vexpress Kconfig setup tries to be clever^Whelpful and selects some
-> > errata workarounds for certain revisions of the Cortex-A9 and PL310,
-> > which may be required depending on the coretile.
-> > 
-> > Since the mach-vexpress can support A5, A7 and A15 coretiles, let's
-> > defer errata workaround selection to the user and instead propose
-> > recommended workarounds in the defconfig. Note that the use of the
-> > savedefconfig target removed some unrelated, redundant entries from the
-> > file.
+On Wed, 2012-07-11 at 00:15 +0100, Jamie Iles wrote:
+> Hi,
 > 
-> Most workarounds are runtime conditioned or don't have significant
-> impact, so why not leave them enabled? For a single kernel image, we're
-> going to have to basically turn on every errata work-around. Perhaps we
-> should only have config options if they are not runtime enabled and have
-> significant performance impact. I think having the settings in the
-> defconfig is error prone, not mention if threats from Linus to remove
-> all defconfigs actually happened it would be lost. In general, I don't
-> think end users have enough information to determine what needs to be
-> turned on. You need the errata list as well which is not public. Some of
-> the errata help text says "rXpY and all later revisions" which changes
-> when a new core revision comes out.
+> On Tue, Jul 10, 2012 at 04:39:40PM -0500, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Make a common device tree glue for clocksource/dw_apb_timer.
+> > Move mach-picoxcell/time.c to be a generic device tree application
+> > of the dw_apb_timer.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > ---
+> >  Documentation/devicetree/bindings/rtc/dw-apb.txt   |   24 ++++++++++
+> >  arch/arm/Kconfig                                   |    1 +
+> >  drivers/clocksource/Kconfig                        |    3 ++
+> >  drivers/clocksource/Makefile                       |    1 +
+> >  .../clocksource/dw_apb_timer_of.c                  |   49 +++++++++++---------
+> >  5 files changed, 57 insertions(+), 21 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/rtc/dw-apb.txt
+> >  rename arch/arm/mach-picoxcell/time.c => drivers/clocksource/dw_apb_timer_of.c (60%)
+> > 
+> > diff --git a/arch/arm/mach-picoxcell/time.c  
+> > b/drivers/clocksource/dw_apb_timer_of.c
+> > similarity index 60%
+> > rename from arch/arm/mach-picoxcell/time.c
+> > rename to drivers/clocksource/dw_apb_timer_of.c
+> > index 2ecba67..83bd997 100644
+> > --- a/arch/arm/mach-picoxcell/time.c
+> > +++ b/drivers/clocksource/dw_apb_timer_of.c
+> > @@ -1,11 +1,20 @@
+> [...]
+> > -static const struct of_device_id picoxcell_rtc_ids[] __initconst = {
+> > -	{ .compatible = "picochip,pc3x2-rtc" },
+> > +static const struct of_device_id sptimer_ids[] __initconst = {
+> > +	{ .compatible = "snps,dw-apb-timer-sp" },
+> >  	{ /* Sentinel */ },
+> 
+> Please keep picochip,pc3x2-rtc in the compatible list otherwise we won't 
+> boot any more.
 
-The problem I have with the current scheme for vexpress is that you can't
-disable the workarounds when you know they are not needed. The Kconfig
-*forces* them to be enabled -- that's certainly not right. Of the
-workarounds in question, ARM_ERRATA_720789 is not runtime enabled and I
-would like to deselect if when running on my A5, A7 or A15 cores. The
-description clearly states it's an A9 erratum, so I don't think users will
-have any difficulty knowing that they don't need it for other cores
-(although I agree that it should be enabled for single zimage).
+Should I add another .compatible entry here, or make the change in
+picoxcell-pc3x2 and picoxcell-pc3x3 dtsi files?
 
-The defconfig changes were just a courtesy to reflect the change in the
-Kconfig, I'm happy for them to be dropped.
+> 
+> > -static const struct of_device_id picoxcell_timer_ids[] __initconst = 
+> > {
+> > -	{ .compatible = "picochip,pc3x2-timer" },
+> > +static const struct of_device_id osctimer_ids[] __initconst = {
+> > +	{ .compatible = "snps,dw-apb-timer-osc" },
+> >  	{},
+> >  };
+> 
+> The same here.  Also, I'm not sure that the split of these patches is 
+> correct - there isn't any bisectability here as you remove the timer in 
+> this patch but picoxcell won't build.  I think squashing these 2 patches 
+> is fine.
 
-Will
+Will do...thanks for the review.
+
+Dinh
+> 
+> I can't test on hardware right now, but with those changes:
+> 
+> Acked-by: Jamie Iles <jamie@jamieiles.com>
+> 
+> Jamie
+> 
