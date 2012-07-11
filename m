@@ -1,40 +1,39 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 11 Jul 2012 15:23:47 +0100
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 11 Jul 2012 15:23:11 +0100
 Subject: [PATCH 9/9] ARM: vexpress: Config option for early printk console
-In-Reply-To: <1342016181.30755.2.camel@hornet>
+In-Reply-To: <1342013791-19516-10-git-send-email-pawel.moll@arm.com>
 References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
  <1342013791-19516-10-git-send-email-pawel.moll@arm.com>
- <20120711140912.GC13498@mudshark.cambridge.arm.com>
- <1342016181.30755.2.camel@hornet>
-Message-ID: <1342016627.30755.5.camel@hornet>
+Message-ID: <4FFD8C4F.40502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-07-11 at 15:16 +0100, Pawel Moll wrote:
-> On Wed, 2012-07-11 at 15:09 +0100, Will Deacon wrote:
-> > > +#else /* CONFIG_DEBUG_LL_UART_NONE */
-> > > +
-> > > +		.macro	addruart, rp, rv, tmp
-> > > +		/*
-> > > +		 * Have to provide reasonable dummy values,
-> > > +		 * otherwise code in head.S crashes badly...
-> > > +		 */
-> > > +		mov	\rp, #0
-> > > +		mov	\rv, #0
-> > > +		.endm
-> > 
-> > Eek, this means we take out an I/O section mapping at zero, doesn't it?
-> > Is that really a good idea? It scares me because (a) it's below PAGE_OFFSET
-> > and (b) we don't know consistently what's at physical address 0.
-> > 
-> > Perhaps we could change head.S to avoid the mapping if addruart returns a
-> > NULL virtual address?
-> 
-> Sure (care to prepare a patch? ;-), but this will have to go through
-> Russell not arm-soc, so it won't be a part of this update. And I'll
-> remove the comment...
+Hi Pawel,
 
-... and use DEBUG_LL_VIRT_BASE as the \rv for now, before the change in
-head.S happen. Physical 0 on VE is always flash, so it's not a problem.
+On 11/07/12 14:36, Pawel Moll wrote:
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 01a1341..12eee87 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -310,6 +310,32 @@ choice
+>  		  The uncompressor code port configuration is now handled
+>  		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+>  
+> +	config DEBUG_VEXPRESS_UART0_DETECT
+> +		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+> +		depends on ARCH_VEXPRESS
+> +		help
+> +		  This option enables simple heuristic which tries to determine
+> +		  motherboard's memory map variant (original or RS1) and then
+> +		  choose relevant UART0 base address.
+> +
+> +		  Note that this will only work with standard A-class core tiles,
+> +		  and may fail with non-standard SMM or custom software model.
+> +
 
-Pawel
+Is it possible to make this depend on something like CPU_CP15_MMU,
+instead of ARCH_VEXPRESS? Seems like a reasonable way to ensure that
+this isn't used on some of the core tiles that don't have the required
+cp15 registers to read the Configuration Base Address Register.
+
+Jonny
