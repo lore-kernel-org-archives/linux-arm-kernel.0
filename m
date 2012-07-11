@@ -1,35 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jul 2012 20:06:28 +0000
-Subject: [Ksummit-2012-discuss] ARM mini-summit
-In-Reply-To: <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
-References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
- <20120711140536.GC16523@phenom.dumpdata.com>
- <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
-Message-ID: <201207112006.28632.arnd@arndb.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 11 Jul 2012 13:11:36 -0700
+Subject: [PATCH 5/6] Clk: SPEAr1340: fix sys clock parent source and
+ corresponding mask value
+In-Reply-To: <CAKohponeGSG376uj_jEGCEj4m4OgShD7zRGNpF-8BP2rmQUOYQ@mail.gmail.com>
+References: <1341829866-26091-1-git-send-email-shiraz.hashim@st.com>
+ <1341829866-26091-5-git-send-email-shiraz.hashim@st.com>
+ <CAOh2x=n9dOaxW7hibg3M5XYTtbMkyrvUMt0ORKzWLULxUNtXEg@mail.gmail.com>
+ <4FFAC8D2.4080601@st.com>
+ <CAOh2x=k5Tx2Gjrk1uRod-N-6gvYSeEKiZgms8gQfJ61TL8RXCQ@mail.gmail.com>
+ <20120709225700.GB16202@gmail.com>
+ <CAKohponeGSG376uj_jEGCEj4m4OgShD7zRGNpF-8BP2rmQUOYQ@mail.gmail.com>
+Message-ID: <20120711201136.GD2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 July 2012, Konrad Rzeszutek Wilk wrote:
-> >> > contacts, with Grant and Olof joining in as time permits.
-> >>
-> >> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> >
-> > I would be interested in attending it as well. I believe Stefano has a strong
-> > interest as well (since he and Ian Campbell are leading the Xen ARM work).
+On 20120710-09:21, Viresh Kumar wrote:
+> On 9 July 2012 23:57, Mike Turquette <mturquette@ti.com> wrote:
 > 
-> And Stefano is out on vacation right now so I will serve as his phantom voice
-> and say: "Yes, I am interested as well."
+> > I assume this change has been tested and wouldn't be posted if modifying
+> > the parent names broke things.
+> >
+> > That said, as long as the parent names are valid strings then the clk
+> > framework should handle them.  When calling __clk_lookup for parent name
+> > "none", __clk_lookup will return NULL (of course assuming no one else in
+> > the system registered a clock named "none", which would be silly).  This
+> > is handled gracefully by the clk framework by re-parenting your "sys"
+> > clk from $old_parent to the "orphan" list.
+> >
+> > At the top level, there are basically two clock trees.  The first tree
+> > is "real" clock tree which starts as a list of clocks that set the
+> > CLK_IS_ROOT flag.  The second tree is a tree of "orphans" for clocks
+> > which are defined but "disconnected" from any real root clock (which
+> > might be caused by missing data, etc).
+> >
+> > In general it is OK to declare parent names which might result in your
+> > clock being orphaned.  In practice it is more likely that your data
+> > matches your code: e.g. if you don't support a parent clock in the data
+> > then you likely never try use that missing parent clock in your code.
+> >
+> > The OMAP port does in fact make use of the orphan tree for some clocks,
+> > so it is tested.  However we haven't had any users of the clock tree
+> > which made a lot of use of "dynamic" reparenting to and from the orphan
+> > tree.  I did unit test this back during the 3.4 cycle, but I haven't
+> > since.  Let me know if you have any problems with it.
+> >
+> 
+> Hi Mike,
+> 
+> For example, clk1 have parents pclk1 and pclk2. Register values
+> for pclk1 is 0X and for pclk2 is 1X. i.e. pclk1 is selected for both 00 and
+> 01.
+> And pclk2 is selected for 10 and 11. so, its better to take care of all
+> these situations,
+> otherwise there can be corner cases like: In linux we decide to use 00 for
+> pclk1, 10 for
+> pclk2 and other two for "none". But bootloader, enabled the clock with 01
+> for pclk1.
+> This clock isn't a orphan but it will look like that in our clock tree.
+> 
+> So, is this OK in the current implementation of clk framework to have
+> parents like
+> "pclk1", "pclk1", "pclk2", "pclk2"?
+> 
 
-Ok. So are you mostly interested in discussion ARM virtualization or other topics
-as well? Last time we had organized this explicitly as the "ARM subarch maintainer
-summit" and we might again limit the participants to the subarch maintainers and
-a few more people if we're running out of space, but then again if a lot of them
-are interested in discussion virtualization, we should probably have you both and 
-the ARM KVM people included as well.
+Hello Viresh,
 
-We haven't even started discussing an agenda, but I'll note down your names as
-candidates and Xen and/or KVM as proposed topics. I'll follow up with a more
-formal call for topics once I have a positive confirmation from James and the
-linux-foundation that we can go ahead with the ARM mini-summit.
+I believe it will be OK, but that situation definitely needs testing.
+There will not be duplicate clocks in the tree (which is good), but the
+parent selection logic for clk1 will be a bit silly.  All in all
+duplicating parent string names is a hack.
 
-	Arnd
+If this case is very common then a better way to handle it would be a
+clk_mux-specific flag which handles this case gracefully.  Mark all of
+your mux data with this flag for the affected clocks and then don't
+worry about it anymore.
+
+Regards,
+Mike
+
+> --
+> viresh
