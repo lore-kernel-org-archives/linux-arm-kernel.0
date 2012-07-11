@@ -1,45 +1,64 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Jul 2012 10:57:55 +0800
-Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120710190221.0f26b6f158257b00c40e6a4e@freescale.com>
-References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
- <20120705182829.d13d6992406e02e1024552e3@freescale.com>
- <20120706002254.GB20175@S2101-09.ap.freescale.net>
- <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
- <20120709065116.GB11635@S2101-09.ap.freescale.net>
- <20120709194514.e6a854441fa69a54fadc296d@freescale.com>
- <20120710023226.GA19649@S2101-09.ap.freescale.net>
- <20120710190221.0f26b6f158257b00c40e6a4e@freescale.com>
-Message-ID: <20120711025753.GA14060@S2101-09.ap.freescale.net>
+Date: Wed, 11 Jul 2012 11:14:48 +0800
+Subject: MX28EVK mainline 3.5-Patchs-3.5-rc5 sgtl5000 record not working
+In-Reply-To: <CAHE2-smsOufHjfyjKARcwHve4cGqWeM8y7ALxcJkaqLiZBNoSw@mail.gmail.com>
+References: <CAHE2-smsOufHjfyjKARcwHve4cGqWeM8y7ALxcJkaqLiZBNoSw@mail.gmail.com>
+Message-ID: <20120711031446.GB14060@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 07:02:21PM -0500, Kim Phillips wrote:
-> how, without the "simple-bus" addition to the sec_mon compatibles
-> list in the imx6 device tree (which isn't present in this patch)?
-> 
-This patch does not present anything about sec_mon node.  It's all
-about sec_mon_rtc_lp node.  The driver itself does not know if the
-rtc_lp node is a subnode of sec_mon node at all.
+Copy driver maintainer Dong here.
 
-Can you please tell me what exact change you expect me to make on
-drivers/rtc/rtc-snvs.c?  The patch merely adds a lp-rtc driver and
-should not include any platform specific changes (dts, etc.)  The
-driver and dts changes are two orthogonal parts, and should go via
-RTC tree and ARCH tree separately.
-
-> interesting.  When I add
-> 
-> +#define readl in_be32
-> +#define writel(val, addr)             out_be32(addr, val)
-> 
-> to the top of the driver, the soft-lockup moves to
-> rtc_read_lp_counter().  I'm trying to verify if I have the right h/w
-> revision.
-> 
-You can submit an incremental patch later to make the driver work for
-powerpc.
-
--- 
 Regards,
 Shawn
+
+On Tue, Jul 10, 2012 at 06:09:44PM +0200, Andreas Gretler wrote:
+> Hi,
+> 
+> i've tested mainline 3.5-Patchs-3.5-rc5 for MX28EVK and it boot up and
+> work fine.
+> 
+> But I'm not able to record something. Playback works. I also test it
+> against the old 2.6.35.3 Kernel and there record works.
+> 
+> arecord -l show me this:
+> 
+> **** List of CAPTURE Hardware Devices ****
+> card 0: mxssgtl5000 [mxs_sgtl5000], device 0: HiFi Playback sgtl5000-0 []
+>   Subdevices: 1/1
+>   Subdevice #0: subdevice #0
+> card 0: mxssgtl5000 [mxs_sgtl5000], device 1: HiFi Capture sgtl5000-1 []
+>   Subdevices: 1/1
+>   Subdevice #0: subdevice #0
+> 
+> 
+> I try record with arecord -d 2 -D hw:0,1 -f dat test.wav , but it
+> crash the Linux. No ErrMsg printed and the board stop working.
+> I have no idea what goes wrong. I put some printk message in
+> mxs-saif.c and the last message i can see before the board crash is in
+> mxs_saif_trigger() is before clk_enable is called.
+> 
+> 		/*
+> 		 * If the saif's master is not himself, we also need to enable
+> 		 * itself clk for its internal basic logic to work.
+> 		 */
+> 		if (saif != master_saif) {
+> 			clk_enable(saif->clk);
+> 			__raw_writel(BM_SAIF_CTRL_RUN,
+> 				saif->base + SAIF_CTRL + MXS_SET_ADDR);
+> 		}
+> 
+>  In alsamixer i can not toggle the capture source from Mic-In to
+> Line-in and also can't change the Headphone from DAC to Line-IN.
+> 
+> I'm not sure this is the right place to ask? I will also post ist to
+> alsa-devel at alsa-project.org.
+> Can anyone confirm the Problem? Or do/understand I something wrong
+> with record and there is no Problem?
+> 
+> Andreas Gretler
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
