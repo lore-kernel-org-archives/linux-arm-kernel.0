@@ -1,52 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Jul 2012 16:53:03 +0100
-Subject: [PATCH 1/9] ARM: vexpress: remove automatic errata workaround
- selection
-In-Reply-To: <4FFD9F7F.7020103@gmail.com>
-References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
- <1342013791-19516-2-git-send-email-pawel.moll@arm.com>
- <4FFD956D.7020901@gmail.com>
- <20120711151846.GE13498@mudshark.cambridge.arm.com>
- <4FFD9F7F.7020103@gmail.com>
-Message-ID: <20120711155303.GF13498@mudshark.cambridge.arm.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Wed, 11 Jul 2012 12:54:11 -0300
+Subject: [PATCH v6 3/7] ARM: imx6q: disable usb charger detector
+In-Reply-To: <20120711140201.GA2774@richard-laptop>
+References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+ <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
+ <CAP9ODKpGiW43E4Cq8MDb-83G7B3Y57AVGz9oaBVzmW83SykUYg@mail.gmail.com>
+ <20120711140201.GA2774@richard-laptop>
+Message-ID: <CAP9ODKpuV38dBbH=Z1QBCL2P0YEQkjOAH9-NuEQa0PSrak_=Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 04:45:03PM +0100, Rob Herring wrote:
-> On 07/11/2012 10:18 AM, Will Deacon wrote:
-> > The problem I have with the current scheme for vexpress is that you can't
-> > disable the workarounds when you know they are not needed. The Kconfig
-> > *forces* them to be enabled -- that's certainly not right. Of the
-> > workarounds in question, ARM_ERRATA_720789 is not runtime enabled and I
-> > would like to deselect if when running on my A5, A7 or A15 cores. The
-> > description clearly states it's an A9 erratum, so I don't think users will
-> > have any difficulty knowing that they don't need it for other cores
-> > (although I agree that it should be enabled for single zimage).
-> > 
-> > The defconfig changes were just a courtesy to reflect the change in the
-> > Kconfig, I'm happy for them to be dropped.
-> 
-> It's not a courtesy. It's the only place it remains documented other
-> than git history.
+On Wed, Jul 11, 2012 at 11:02 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
+> On Wed, Jul 11, 2012 at 10:28:07AM -0300, Otavio Salvador wrote:
+>> On Wed, Jul 11, 2012 at 8:33 AM, Richard Zhao
+>> <richard.zhao@freescale.com> wrote:
+>> > The external charger detector needs to be disabled,
+>> > or the signal at DP will be poor
+>>
+>> Something as this needs to be applied, no?
+>>
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index eff4db5..93695e0 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>> @@ -832,6 +832,9 @@ config SOC_IMX6Q
+>>         select HAVE_SMP
+>>         select PINCTRL
+>>         select PINCTRL_IMX6Q
+>> +       select MFD_ANATOP
+> This is needed.
+>> +       select REGULATOR
+>> +       select REGULATOR_ANATOP
+> but why these two?
 
-Sorry, I also meant to say that we could select them for the CA9X4 platform,
-so the information wouldn't be lost.
+I did it some time ago and ended up adding it ... don't recall why but
+MFD only does fix the build failure ... I sent a patch with that.
 
-> What if you just make the existing config option user selectable?
-
-I think that's harder than it sounds. How would you do this without adding
-vexpress-specific dependencies to the erratum config option itself? I
-suppose you could make them default y for multi-platform kernels (I can't
-remember if Arnd's single zImage changes had a config option for that).
-
-> That doesn't solve the problem with this errata. Obviously on my newer
-> A9, I wouldn't want this errata enabled either (assuming there is
-> measurable impact). So we should come up with a better solution for
-> single kernel image.
-
-Agreed, and I think that's a discussion we should have with a wider
-audience. For some of the simpler workarounds we could probably use code
-patching like we do for the SMP/UP stuff and like (I think) powerpc does
-too.
-
-Will
+-- 
+Otavio Salvador                             O.S. Systems
+E-mail: otavio at ossystems.com.br  http://www.ossystems.com.br
+Mobile: +55 53 9981-7854              http://projetos.ossystems.com.br
