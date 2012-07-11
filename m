@@ -1,49 +1,80 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 11 Jul 2012 16:37:02 -0700
-Subject: [GIT PULL] clk/mxs for 3.6
-In-Reply-To: <20120705031526.GH2595@S2101-09.ap.freescale.net>
-References: <20120703020006.GA22106@S2101-09.ap.freescale.net>
- <20120705031526.GH2595@S2101-09.ap.freescale.net>
-Message-ID: <CAJOA=zPHG=KEcuMM_7guxCT5dAnhAs0+ZNDHD4WJZ7LC0tQR5Q@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 11 Jul 2012 16:42:29 -0700
+Subject: [PATCH] clk: allow clocks without parents to change rate
+In-Reply-To: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
+References: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20120711234229.GF2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2012 at 8:15 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Jul 03, 2012 at 10:00:09AM +0800, Shawn Guo wrote:
->> The following changes since commit cfaf025112d3856637ff34a767ef785ef5cf2ca9:
->>
->>   Linux 3.5-rc2 (2012-06-08 18:40:09 -0700)
->>
->> are available in the git repository at:
->>   git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs-for-3.6
->>
->> Fabio Estevam (1):
->>       clk: mxs: Fix the GPMI clock name
->>
->> Huang Shijie (1):
->>       clk: mxs: rename the gpmi clock for imx28
->>
->> Shawn Guo (1):
->>       clk: mxs: add clkdev lookup for pwm
->>
->>  drivers/clk/mxs/clk-imx23.c |    3 ++-
->>  drivers/clk/mxs/clk-imx28.c |    3 ++-
->>  2 files changed, 4 insertions(+), 2 deletions(-)
->
-> Mike,
->
-> I just added one more patch on the branch.  Please pull it also.
->
-> Lauri Hintsala (1):
->       clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
+On 20120705-00:09, Linus Walleij wrote:
+> The clk_change_rate() code would dereference clk->parent
+> to get clk->parent->rate without first checking that clk->parent
+> was valid. This doesn't work if the clock is (A) a root clock
+> and (B) can change rate. Such is the case with a VCO clock
+> like the ICST which consequently crash like this without
+> this patch:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 0000001c
+> pgd = c0004000
+> [0000001c] *pgd=00000000
+> Internal error: Oops: 5 [#1] PREEMPT ARM
+> Modules linked in:
+> CPU: 0    Not tainted  (3.5.0-rc3-00003-g8156866-dirty #193)
+> PC is at clk_change_rate+0x34/0xd8
+> LR is at clk_change_rate+0x18/0xd8
+> 
+> Cc: stable at kernel.org
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Done.
+Hi Linus,
+
+This has been fixed in Pawell's patch, "clk: Check parent for NULL in
+clk_change_rate".
 
 Thanks,
 Mike
 
->
-> --
-> Regards,
-> Shawn
->
+> ---
+>  drivers/clk/clk.c |   22 +++++++++++++++-------
+>  1 file changed, 15 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 687b00d..032d79c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -854,14 +854,22 @@ static void clk_change_rate(struct clk *clk)
+>  
+>  	old_rate = clk->rate;
+>  
+> -	if (clk->ops->set_rate)
+> -		clk->ops->set_rate(clk->hw, clk->new_rate, clk->parent->rate);
+> +	if (clk->ops->set_rate) {
+> +		if (clk->parent)
+> +			clk->ops->set_rate(clk->hw, clk->new_rate,
+> +					clk->parent->rate);
+> +		else
+> +			clk->ops->set_rate(clk->hw, clk->new_rate, 0);
+> +	}
+>  
+> -	if (clk->ops->recalc_rate)
+> -		clk->rate = clk->ops->recalc_rate(clk->hw,
+> -				clk->parent->rate);
+> -	else
+> -		clk->rate = clk->parent->rate;
+> +	if (clk->ops->recalc_rate) {
+> +		if (clk->parent)
+> +			clk->rate = clk->ops->recalc_rate(clk->hw,
+> +							clk->parent->rate);
+> +		else
+> +			clk->rate = clk->ops->recalc_rate(clk->hw, 0);
+> +	} else
+> +		clk->rate = clk->parent ? clk->parent->rate : 0;
+>  
+>  	if (clk->notifier_count && old_rate != clk->rate)
+>  		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+> -- 
+> 1.7.10.4
+> 
