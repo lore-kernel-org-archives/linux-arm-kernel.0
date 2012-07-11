@@ -1,65 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jul 2012 14:35:32 +0200
-Subject: [Ksummit-2012-discuss] ARM mini-summit
-In-Reply-To: <20120711115755.GF22437@arm.com>
-References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
- <201207111128.29924.arnd@arndb.de> <20120711115755.GF22437@arm.com>
-Message-ID: <de55bfacdc06182dd4f3a36722fcc9fe@localhost>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 11 Jul 2012 14:40:47 +0200
+Subject: [PATCH v2 04/23] ARM: LPC32xx: Add DMA configuration to platform
+ data
+In-Reply-To: <201207111233.24780.arnd@arndb.de>
+References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
+ <201207102136.35944.arnd@arndb.de> <4FFD393F.1070104@antcom.de>
+ <201207111233.24780.arnd@arndb.de>
+Message-ID: <4FFD744F.8060204@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jul 2012 12:57:55 +0100, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Jul 11, 2012 at 12:28:29PM +0100, Arnd Bergmann wrote:
->> On Wednesday 11 July 2012, James Bottomley wrote:
->> > Hi All,
->> > 
->> > We have set aside the second day of the kernel summit (Tuesday 28
->> > August) as mini-summit day.  So far we have only the PCI mini summit
-on
->> > this day, so if you can think of other topics, please send them to
-the
->> > kernel summit discuss list:
->> > 
->> > ksummit-2012-discuss at lists.linux-foundation.org
->> > 
->> > Looking at the available rooms, we think we can run about four or
-five
->> > mini summits.
->> > 
->> > As an added incentive, mini summit organisers get to pick who they
->> > invite and all the people they pick will get an automatic invitation
-to
->> > the third day of the kernel summit (but not the core first day) and
-the
->> > evening events.
->> 
->> There is a lot of interest in having another ARM mini-summit, as we had
->> last
->> year. Previously, Grant Likely organized this with Olof and me, but
->> right now
->> Grant is in an extended offline period and Olof is currently on
-vacation
->> as well. Will Deacon already contacted me and he is interested in
-helping
->> out with organizing the mini-summit, so the two of us could be the
->> primary
->> contacts, with Grant and Olof joining in as time permits.
->> 
->> I'm planning to send out an initial email to potential participants
-today
->> or tomorrow to get an idea of who would be joining.
+On 07/11/2012 02:33 PM, Arnd Bergmann wrote:
+> On Wednesday 11 July 2012, Roland Stigge wrote:
+>> Thanks for the note! Looks like the interface consolidated to replace
+>> ch->cd->min_signal with sth. like cd->min_signal directly.
+>>
+>> Accessing the signal id/number is/was quite convenient because as you
+>> can see in the 3 above cases that now get compile errors with the pl08x
+>> changes, the LPC32xx chip hard-wires those numbers, and the respective
+>> code is LPC32xx specific anyway.
+>>
+>> So can we make an exception here to compare static dma channel numbers?
+>> Or is there any other interface to access the static dma channel numbers
+>> that I'm currently not aware of?
+>>
+>> Depending on what we agree upon, I can then provide fixes to the
+>> lpc32xx-next branch.
 > 
-> I'm definitely interested in attending this.
+> I'm not familiar with this code, but I think the solution for now
+> (while we don't have a DT binding) is to do the same thing that
+> spear3xx does: pass a pointer to the global pl08x_filter_id
+> function and an identifier for the channel in the platform data
+> for that device.
 
-Same here. The previous incarnation of the mini-summit was very
-successful, and I would be very interested in attending another one.
+OK, thanks!
 
-It's not like we're having any shortage of things to discuss these days...
-;-)
+Is a patch on top of the already provided lpc32xx-next branches the
+preferred form for a fix? On top of which branch do you need it?
 
-Thanks,
+Thanks in advance,
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Roland
