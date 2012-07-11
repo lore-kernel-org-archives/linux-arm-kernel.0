@@ -1,39 +1,28 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Wed, 11 Jul 2012 10:28:07 -0300
-Subject: [PATCH v6 3/7] ARM: imx6q: disable usb charger detector
-In-Reply-To: <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
-References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
- <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
-Message-ID: <CAP9ODKpGiW43E4Cq8MDb-83G7B3Y57AVGz9oaBVzmW83SykUYg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 11 Jul 2012 14:31:42 +0100
+Subject: [PATCH v5 5/6] spi: s3c64xx: Remove the 'set_level' callback
+ from controller data
+In-Reply-To: <CAJuYYwR8o76aLr_2J4jqF93hhz_4L3MJikJUtTpG5jWfPKDk+w@mail.gmail.com>
+References: <CAJuYYwSi-1nBM40SWt359W0Lr2n_yVX5tvWfOS77bmLQRt_9fw@mail.gmail.com>
+ <1342005359-748-1-git-send-email-thomas.abraham@linaro.org>
+ <20120711114716.GF3938@opensource.wolfsonmicro.com>
+ <CAJuYYwR8o76aLr_2J4jqF93hhz_4L3MJikJUtTpG5jWfPKDk+w@mail.gmail.com>
+Message-ID: <20120711133142.GH3938@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 8:33 AM, Richard Zhao
-<richard.zhao@freescale.com> wrote:
-> The external charger detector needs to be disabled,
-> or the signal at DP will be poor
+On Wed, Jul 11, 2012 at 05:51:13PM +0530, Thomas Abraham wrote:
 
-Something as this needs to be applied, no?
+> Based on your comments to add the gpio request, only two patches 5/6
+> and 6/6 in this series have changed since. I have cc'ed you in the
+> other 4 patches as well. If you do not have those patches, please let
+> me know, I will repost the whole series again. Thanks.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index eff4db5..93695e0 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -832,6 +832,9 @@ config SOC_IMX6Q
-        select HAVE_SMP
-        select PINCTRL
-        select PINCTRL_IMX6Q
-+       select MFD_ANATOP
-+       select REGULATOR
-+       select REGULATOR_ANATOP
-        select USE_OF
-
-        help
-
-I sent this patch some time ago but I don't recall to get an ack/nack
-for it. I can resend it.
-
--- 
-Otavio Salvador                             O.S. Systems
-E-mail: otavio at ossystems.com.br  http://www.ossystems.com.br
-Mobile: +55 53 9981-7854              http://projetos.ossystems.com.br
+Please resend the full series.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120711/acf40c11/attachment-0001.sig>
