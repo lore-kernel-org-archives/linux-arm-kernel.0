@@ -1,105 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Jul 2012 09:03:41 -0500
-Subject: Device tree binding for DVFS table
-In-Reply-To: <4FFD77FE.8050206@nvidia.com>
-References: <4FFD77FE.8050206@nvidia.com>
-Message-ID: <4FFD87BD.2030206@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Jul 2012 15:09:12 +0100
+Subject: [PATCH 9/9] ARM: vexpress: Config option for early printk console
+In-Reply-To: <1342013791-19516-10-git-send-email-pawel.moll@arm.com>
+References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
+ <1342013791-19516-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <20120711140912.GC13498@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2012 07:56 AM, Prashant Gaikwad wrote:
-> Hi,
-> 
-> I am working on DT binding for Tegra DVFS.
-> 
-> For Tegra, DVFS node mainly consists of frequency and voltage pairs.
-> Frequency in the pair may change for different process. E.g. for process
-> 1 CPU clock frequency could be 900MHz at 1V while for process 2 it could
-> be 1GHz at 1V.
-> Tegra uses vendor specific ids to identify the correct frequency table.
-> 
-> Following is the proposed binding for voltage and frequency tables used
-> in DVFS. Looking for comments/suggestions to make it generic.
-> 
-> =======DVFS table node===================
-> This node defines the voltage configuration for the DVFS which includes
-> the regulator and voltage array.
-> 
-> Required properties:
-> 
-> reg_id : <regulator phandle>;
-> voltage-table : <voltage array, values in mV>;
-> 
-> #address-cells and #size-cells : To identify correct frequency table
-> using process id (or some other vendor specific way).
-> 
-> ========Frequency table node===============
-> 
-> This node defines frequency configuration for the device DVFS.
-> 
-> Required properties:
-> 
-> In device node need a reference to the DVFS table node.
-> 
-> dvfs : the phandle for the DVFS table node
-> 
-> frequency-table at n
->        reg = <n>; dependent on address-cells and size-cells in DVFS
-> table node.
->        frequencies = <frequency array, values in MHz>;
+Hi Pawel,
 
-You are storing u32 values, why limit the resolution to MHz.
+On Wed, Jul 11, 2012 at 02:36:31PM +0100, Pawel Moll wrote:
+> +#else /* CONFIG_DEBUG_LL_UART_NONE */
+> +
+> +		.macro	addruart, rp, rv, tmp
+> +		/*
+> +		 * Have to provide reasonable dummy values,
+> +		 * otherwise code in head.S crashes badly...
+> +		 */
+> +		mov	\rp, #0
+> +		mov	\rv, #0
+> +		.endm
 
-Put the unit in the property names.
+Eek, this means we take out an I/O section mapping at zero, doesn't it?
+Is that really a good idea? It scares me because (a) it's below PAGE_OFFSET
+and (b) we don't know consistently what's at physical address 0.
 
-> }
-> 
-> Example:
-> -------------------------------------------------------------------------
-> 
-> cpu-dvfs-table : dvfs-table {
+Perhaps we could change head.S to avoid the mapping if addruart returns a
+NULL virtual address?
 
-This should be located with the node that the frequencies correspond to.
-
->               compatible = "nvidia,tegra30-dvfs-table";
->               reg_id = <&sm0>;
->               #address-cells = <1>;
->               #size-cells = <0>;
->               voltage-array = <750 775 800 825 850 875 900 925 950 975
-> 1000 1025 1050 1100 1125>;
-
-The SOC is really characterized at all these voltages?
-
-> };
-> 
-> device {
->              dvfs = <&cpu-dvfs-table>;
->              frequency-table at 102 {
->                       reg = <0x102>;
->                       frequencies = <314 314 314 456 456 456 608 608 608
-> 760 817 817 912 1000>;
-
-I don't see the point of repeating frequencies.
-
->              };
->              frequency-table at 002 {
->                       reg = <0x002>;
->                       frequencies = <598 598 750 750 893 893 1000>;
->              };
-
-How do you determine the voltage for a frequency on table 2?
-
-I'd expect a single property with freq/volt pairs or 2 properties for
-freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
-
-Rob
-
-> };
-> 
-> Thanks & Regards,
-> Prashant G
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will
