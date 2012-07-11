@@ -1,42 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jul 2012 20:56:02 +0200
-Subject: [GIT PULL] i.MX defconfig updates
-Message-ID: <20120711185602.GP30009@pengutronix.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 11 Jul 2012 12:11:23 -0700
+Subject: [PATCH] i2c i.MX: Fix divider table
+In-Reply-To: <20120711183838.GM30009@pengutronix.de>
+References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+ <20120705145236.GA2735@richard-laptop>
+ <20120705160153.GT30009@pengutronix.de>
+ <20120706005249.GA26888@b20223-02.ap.freescale.net>
+ <20120706062852.GZ30009@pengutronix.de>
+ <20120711060121.GB30055@b20223-02.ap.freescale.net>
+ <20120711183838.GM30009@pengutronix.de>
+Message-ID: <4FFDCFDB.7020402@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 7/11/2012 11:38 AM, Sascha Hauer wrote:
+> Hi Richard,
+>
+> On Wed, Jul 11, 2012 at 02:01:21PM +0800, Richard Zhao wrote:
+>> IC guys confirmed that the spec is right:
+>>
+>> This an adaptive feature of our I2C module may apply to all IMX chips.
+>> No mistake in the table of RMs.
+>>
+>> The divider is designed to guarantee SCL high level and low level last
+>> time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
+>> the transition time is longer than 1 internal pre-divided clock cycle.
+>> The pre-divided clock is divided from I2C module clock, used for
+>> generating SCL. So you will see SCL clock cycle is some way longer than
+>> calculated value using IFDR.
+>>
+>> Transition time will different from rising or falling edge, different
+>> pull-up resistors, and different SCL loading.
+>>
+>> This feature make sure transition time won?t eat both level time of SCL.
+> Thanks for clarification. Does this mean that this feature is used to
+> synchronize between the bus clock and and bitclock?
+>
+> I'll send a documentation patch for this next week to make this clear.
+>
+> Sascha
+>
+How does this explain why column 2 matched your measurements, but 1, 3, 
+and 4 didn't.
+And you tested on 2 different boards.
+Something doesn't smell right.
 
-Please pull the following i.MX defconfig updates for v3.6.
-
-Sascha
-
-
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
-
-for you to fetch changes up to 34ae0dadb4e99e8177f9785e069e9cca636ef8c1:
-
-  ARM: imx_v4_v5_defconfig: update features (2012-07-11 08:31:53 +0200)
-
-----------------------------------------------------------------
-ARM i.MX defconfig updates for v3.6
-
-----------------------------------------------------------------
-Sascha Hauer (2):
-      ARM: imx_v6_v7_defconfig: update features
-      ARM: imx_v4_v5_defconfig: update features
-
- arch/arm/configs/imx_v4_v5_defconfig |   51 ++++++++++++++--------------
- arch/arm/configs/imx_v6_v7_defconfig |   61 ++++++++++++++++++++--------------
- 2 files changed, 61 insertions(+), 51 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Just my 2cents
+Troy
