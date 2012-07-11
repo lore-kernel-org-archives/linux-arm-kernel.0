@@ -1,130 +1,120 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jul 2012 19:33:42 +0800
-Subject: [PATCH v6 4/7] ARM: dts: imx6q-sabrelite: add usb devices
+Date: Wed, 11 Jul 2012 19:33:44 +0800
+Subject: [PATCH v6 6/7] ARM: dts: imx28-evk: add usb devices
 In-Reply-To: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
 References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1342006425-21008-5-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1342006425-21008-7-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add usbphy devices
-- add usb host controller and otg devices
-- add on-board hub reset gpio pinctrl
-- add usb h1 vbus regulator
+- add usb phy devices
+- add usb controller devices
+- add usb vbus regulators
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Tested-by: Subodh Nijsure <snijsure@grid-net.com>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts |   28 +++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi          |   36 +++++++++++++++++++++++++++++++--
- 2 files changed, 62 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx28-evk.dts |   36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx28.dtsi    |   12 ++++++++++--
+ 2 files changed, 46 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index e0ec929..5bba0d1 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -41,10 +41,29 @@
- 					status = "okay";
- 				};
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 0d8739d..c27771d 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -137,10 +137,28 @@
+ 				pinctrl-0 = <&auart3_pins_a>;
+ 				status = "okay";
  			};
-+			iomuxc at 020e0000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_gpio_hog>;
- 
-+				gpios {
-+					pinctrl_gpio_hog: gpiohog {
-+						fsl,pins = <1044 0x80000000	/* MX6Q_PAD_GPIO_17__GPIO_7_12 */
-+							   144  0x80000000>;	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
-+					};
-+				};
++
++			usbphy0: usbphy at 8007c000 {
++				status = "okay";
++			};
++
++			usbphy1: usbphy at 8007e000 {
++				status = "okay";
 +			};
  		};
+ 	};
  
- 		aips-bus at 02100000 { /* AIPS2 */
-+			usb at 02184000 { /* USB OTG */
-+				vbus-supply = <&reg_usb_otg_vbus>;
-+				status = "okay";
-+			};
+ 	ahb at 80080000 {
++		usb0: usb at 80080000 {
++			vbus-supply = <&reg_usb0_vbus>;
++			status = "okay";
++		};
 +
-+			usb at 02184200 { /* USB1 */
-+				status = "okay";
-+			};
++		usb1: usb at 80090000 {
++			vbus-supply = <&reg_usb1_vbus>;
++			status = "okay";
++		};
 +
- 			ethernet at 02188000 {
- 				phy-mode = "rgmii";
- 				phy-reset-gpios = <&gpio3 23 0>;
-@@ -111,6 +130,15 @@
+ 		mac0: ethernet at 800f0000 {
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+@@ -185,6 +203,24 @@
  			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
+ 			gpio = <&gpio2 15 0>;
  		};
 +
-+		reg_usb_otg_vbus: usb_otg_vbus {
++		reg_usb0_vbus: usb0_vbus {
 +			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
++			regulator-name = "usb0_vbus";
 +			regulator-min-microvolt = <5000000>;
 +			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 22 0>;
++			gpio = <&gpio3 9 0>;
++			enable-active-high;
++		};
++
++		reg_usb1_vbus: usb1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 8 0>;
 +			enable-active-high;
 +		};
  	};
  
  	sound {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 16a3884..5e4f100 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -461,12 +461,14 @@
- 				};
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index adb5ffc..cc25a0f 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -654,11 +654,13 @@
  			};
  
--			usbphy at 020c9000 { /* USBPHY1 */
-+			usbphy1: usbphy at 020c9000 {
-+				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
+ 			usbphy0: usbphy at 8007c000 {
++				compatible = "fsl,imx28-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x8007c000 0x2000>;
+ 				status = "disabled";
  			};
  
--			usbphy at 020ca000 { /* USBPHY2 */
-+			usbphy2: usbphy at 020ca000 {
-+				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
+ 			usbphy1: usbphy at 8007e000 {
++				compatible = "fsl,imx28-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x8007e000 0x2000>;
+ 				status = "disabled";
  			};
-@@ -614,6 +616,36 @@
- 				reg = <0x0217c000 0x4000>;
- 			};
+@@ -672,13 +674,19 @@
+ 		reg = <0x80080000 0x80000>;
+ 		ranges;
  
-+			usb at 02184000 { /* USB OTG */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184000 0x200>;
-+				interrupts = <0 43 0x04>;
-+				fsl,usbphy = <&usbphy1>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184200 { /* USB1 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184200 0x200>;
-+				interrupts = <0 40 0x04>;
-+				fsl,usbphy = <&usbphy2>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184400 { /* USB2 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184400 0x200>;
-+				interrupts = <0 41 0x04>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184600 { /* USB3 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184600 0x200>;
-+				interrupts = <0 42 0x04>;
-+				status = "disabled";
-+			};
-+
- 			ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
+-		usbctrl0: usbctrl at 80080000 {
++		usb0: usb at 80080000 {
++			compatible = "fsl,imx28-usb", "fsl,imx27-usb";
+ 			reg = <0x80080000 0x10000>;
++			interrupts = <93>;
++			fsl,usbphy = <&usbphy0>;
+ 			status = "disabled";
+ 		};
+ 
+-		usbctrl1: usbctrl at 80090000 {
++		usb1: usb at 80090000 {
++			compatible = "fsl,imx28-usb", "fsl,imx27-usb";
+ 			reg = <0x80090000 0x10000>;
++			interrupts = <92>;
++			fsl,usbphy = <&usbphy1>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.7.9.5
