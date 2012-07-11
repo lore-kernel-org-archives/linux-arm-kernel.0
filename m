@@ -1,33 +1,35 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 11 Jul 2012 13:04:02 -0700
-Subject: Device tree binding for DVFS table
-In-Reply-To: <20120711144449.GA23654@sirena.org.uk>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <20120711144449.GA23654@sirena.org.uk>
-Message-ID: <20120711200402.GC2772@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jul 2012 20:06:28 +0000
+Subject: [Ksummit-2012-discuss] ARM mini-summit
+In-Reply-To: <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
+References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
+ <20120711140536.GC16523@phenom.dumpdata.com>
+ <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
+Message-ID: <201207112006.28632.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120711-15:44, Mark Brown wrote:
-> On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
+On Wednesday 11 July 2012, Konrad Rzeszutek Wilk wrote:
+> >> > contacts, with Grant and Olof joining in as time permits.
+> >>
+> >> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> >
+> > I would be interested in attending it as well. I believe Stefano has a strong
+> > interest as well (since he and Ian Campbell are leading the Xen ARM work).
 > 
-> > I'd expect a single property with freq/volt pairs or 2 properties for
-> > freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
-> 
-> I strongly agree - the current proposal is very hard to read due to the
-> separation between the voltage and frequency values.  Some devices do
-> also need to scale multiple rails together, especially when this gets
-> used for I/O devices.
-> 
-> I'd also expect to see a range of voltages for each frequency rather
-> than a specific voltage; usually things are at least characterised with
-> a specified tolerance.
+> And Stefano is out on vacation right now so I will serve as his phantom voice
+> and say: "Yes, I am interested as well."
 
-Not only should we support multiple voltage rails but also multiple
-clocks.  For some devices a DVFS transition is composed of scaling
-multiple clock rates together.  So some sort of clock identifier
-(phandle?) is needed as well.  (forgive my ignorance on the phandle
-part, as I am a DT noob)
+Ok. So are you mostly interested in discussion ARM virtualization or other topics
+as well? Last time we had organized this explicitly as the "ARM subarch maintainer
+summit" and we might again limit the participants to the subarch maintainers and
+a few more people if we're running out of space, but then again if a lot of them
+are interested in discussion virtualization, we should probably have you both and 
+the ARM KVM people included as well.
 
-Regards,
-Mike
+We haven't even started discussing an agenda, but I'll note down your names as
+candidates and Xen and/or KVM as proposed topics. I'll follow up with a more
+formal call for topics once I have a positive confirmation from James and the
+linux-foundation that we can go ahead with the ARM mini-summit.
+
+	Arnd
