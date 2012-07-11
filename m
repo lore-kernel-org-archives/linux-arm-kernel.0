@@ -1,63 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Jul 2012 12:37:46 -0500
-Subject: [PATCH v3] clocksource: dw_apb_timer: Add common DTS glue for
- dw_apb_timer
-In-Reply-To: <20120711162058.GA28067@elf.ucw.cz>
-References: <1342023144-13945-1-git-send-email-dinguyen@altera.com>
- <20120711162058.GA28067@elf.ucw.cz>
-Message-ID: <4FFDB9EA.3000902@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 11 Jul 2012 18:49:08 +0100
+Subject: [PATCH v5 0/6] spi: s3c64xx: add support for device tree
+In-Reply-To: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20120711174908.GP3938@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2012 11:20 AM, Pavel Machek wrote:
-> Hi!
-> 
->> Make a common device tree glue for clocksource/dw_apb_timer.
->> Move mach-picoxcell/time.c to be a generic device tree application
->> of the dw_apb_timer.
->>
->> Configure mach-picoxcell to use the dw_apb_timer_of device tree
->> implementation in drivers/clocksource.
->>
->> Signed-off-by: Pavel Machek <pavel@denx.de>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> Acked-by: Jamie Iles <jamie@jamieiles.com>
-> 
-> Ok, this is getting complex.
-> 
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
->> @@ -0,0 +1,24 @@
->> +* Designware APB timer
->> +
->> +Required properties:
->> +- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +- interrupts: IRQ line for the timer.
->> +- clock-frequency: The frequency in HZ of the timer.
-> 
-> I know device-tree maintainers requested -freq -> -frequency,
->> --- a/arch/arm/mach-picoxcell/time.c
->> +++ b/drivers/clocksource/dw_apb_timer_of.c
-> 
-> But then this will need updating to accept "-frequency",
-> 
->> -static const struct of_device_id picoxcell_timer_ids[] __initconst = {
->> +static const struct of_device_id osctimer_ids[] __initconst = {
->>  	{ .compatible = "picochip,pc3x2-timer" },
->> +	{ .compatible = "snps,dw-apb-timer-osc" },
->>  	{},
->>  };
-> 
-> and dts will need to be updated, anyway, so we could update
-> "picochip,pc3x2-timer" -> "snps,dw-apb-timer-osc" as well, right?
-> 
-> Alternatively, we could just keep using "-freq"....
-> 
-> Or am I overlooking something?
+On Wed, Jul 11, 2012 at 09:10:59PM +0530, Thomas Abraham wrote:
+> Changes since v4:
+> - Includes the missing gpio request for slave select line gpio as suggested
+>   by Mark Brown.
 
-If picoxcell is already using "-freq", then yes, you'll have to keep it
-for compatibility. You have to assume that a dtb cannot be changed.
+These looked OK (and have had quite a bit of review already so we're
+probably at the stage where incremental fixes are better anyway) so I
+tried to apply them but git am was really unhappy.  I tried applying on
 
-Rob
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git spi-next
+
+and -next.  Can you check what's going on here please?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120711/d1dc1806/attachment.sig>
