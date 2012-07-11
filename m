@@ -1,42 +1,37 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jul 2012 20:38:38 +0200
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120711060121.GB30055@b20223-02.ap.freescale.net>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
- <20120706062852.GZ30009@pengutronix.de>
- <20120711060121.GB30055@b20223-02.ap.freescale.net>
-Message-ID: <20120711183838.GM30009@pengutronix.de>
+Date: Wed, 11 Jul 2012 20:46:55 +0200
+Subject: [PATCH 3/3] ARM: i.MX5x clocks: Fix GPT clocks
+In-Reply-To: <1341990699.130808521@f65.mail.ru>
+References: <20120709082700.GM24458@pengutronix.de>
+ <1341946469-25984-3-git-send-email-shc_work@mail.ru>
+ <20120711064406.GF30009@pengutronix.de>
+ <1341990699.130808521@f65.mail.ru>
+Message-ID: <20120711184655.GN30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Wed, Jul 11, 2012 at 11:11:39AM +0400, Alexander Shiyan wrote:
+> Hello.
+> 
+> 
+> Wed, 11 Jul 2012 08:44:06 +0200 ?? Sascha Hauer <s.hauer@pengutronix.de>:
+> On Tue, Jul 10, 2012 at 10:54:29PM +0400, Alexander Shiyan wrote:
+> > This patch fix incorrect defined bits for GPT clocks according to
+> > datasheet.
+> 
+> Fix is a strong word. As I can see it these are only cosmetic changes
+> without any functional change, right?
 
-On Wed, Jul 11, 2012 at 02:01:21PM +0800, Richard Zhao wrote:
-> 
-> IC guys confirmed that the spec is right:
-> 
-> This an adaptive feature of our I2C module may apply to all IMX chips.
-> No mistake in the table of RMs.
-> 
-> The divider is designed to guarantee SCL high level and low level last
-> time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
-> the transition time is longer than 1 internal pre-divided clock cycle.
-> The pre-divided clock is divided from I2C module clock, used for
-> generating SCL. So you will see SCL clock cycle is some way longer than
-> calculated value using IFDR.
-> 
-> Transition time will different from rising or falling edge, different
-> pull-up resistors, and different SCL loading.
-> 
-> This feature make sure transition time won?t eat both level time of SCL.
+> No. GPT bits for "per_root" and "ipg" was be swapped. IMX51RM says:
+> CCGR2 Register Mappingi
+> ...
+> 9 gpt_ipg_clk
+> 10 gpt_highfreq
 
-Thanks for clarification. Does this mean that this feature is used to
-synchronize between the bus clock and and bitclock?
-
-I'll send a documentation patch for this next week to make this clear.
+Ah, ok. So it seems clk_get_rate will return the correct clock, but the
+clk_enable() is mixed for both clocks. In this case I think this can
+wait for the merge window since the current code will enable both clocks
+anyway.
 
 Sascha
 
