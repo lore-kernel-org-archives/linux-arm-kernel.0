@@ -1,80 +1,45 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jul 2012 10:53:16 +0800
-Subject: [PATCH v9 REBASE 6/9] USB: notify phy when root hub port connect
- change
-In-Reply-To: <Pine.LNX.4.44L0.1207101024110.1308-100000@iolanthe.rowland.org>
-References: <20120710031426.GG26888@b20223-02.ap.freescale.net>
- <Pine.LNX.4.44L0.1207101024110.1308-100000@iolanthe.rowland.org>
-Message-ID: <20120711025315.GA30055@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Jul 2012 10:57:55 +0800
+Subject: [PATCH v2] rtc: snvs: add Freescale rtc-snvs driver
+In-Reply-To: <20120710190221.0f26b6f158257b00c40e6a4e@freescale.com>
+References: <1341416294-3194-1-git-send-email-shawn.guo@linaro.org>
+ <20120705182829.d13d6992406e02e1024552e3@freescale.com>
+ <20120706002254.GB20175@S2101-09.ap.freescale.net>
+ <20120706175634.a98fb53a9a1fdf40bd4febb3@freescale.com>
+ <20120709065116.GB11635@S2101-09.ap.freescale.net>
+ <20120709194514.e6a854441fa69a54fadc296d@freescale.com>
+ <20120710023226.GA19649@S2101-09.ap.freescale.net>
+ <20120710190221.0f26b6f158257b00c40e6a4e@freescale.com>
+Message-ID: <20120711025753.GA14060@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 11:07:14AM -0400, Alan Stern wrote:
-> On Tue, 10 Jul 2012, Richard Zhao wrote:
+On Tue, Jul 10, 2012 at 07:02:21PM -0500, Kim Phillips wrote:
+> how, without the "simple-bus" addition to the sec_mon compatibles
+> list in the imx6 device tree (which isn't present in this patch)?
 > 
-> > On Sat, Jul 07, 2012 at 10:56:45PM +0800, Richard Zhao wrote:
-> > > Phy may need to change settings when port connect change.
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > > Tested-by: Subodh Nijsure <snijsure@grid-net.com>
-> > > ---
-> > >  drivers/usb/core/hub.c |    8 ++++++++
-> > >  1 file changed, 8 insertions(+)
-> > > 
-> > > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> > > index 4cc8dc9..2ba9d84 100644
-> > > --- a/drivers/usb/core/hub.c
-> > > +++ b/drivers/usb/core/hub.c
-> > > @@ -20,6 +20,7 @@
-> > >  #include <linux/usb.h>
-> > >  #include <linux/usbdevice_fs.h>
-> > >  #include <linux/usb/hcd.h>
-> > > +#include <linux/usb/otg.h>
-> > >  #include <linux/usb/quirks.h>
-> > >  #include <linux/kthread.h>
-> > >  #include <linux/mutex.h>
-> > > @@ -4037,6 +4038,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
-> > >  		}
-> > >  	}
-> > >  
-> > > +	if (unlikely(hcd->phy && !hdev->parent)) {
-> > > +		if (portstatus & USB_PORT_STAT_CONNECTION)
-> > > +			usb_phy_notify_connect(hcd->phy, port1);
-> > > +		else
-> > > +			usb_phy_notify_disconnect(hcd->phy, port1);
-> > There's another issue. When hcd is removed, notify disconnect is not
-> > called. Is it ok, if I remove the above two line and add below patch:
-> 
-> You should keep those two lines, since it's possible for a disconnect
-> to occur without usb_disconnect() being called.  This happens when a
-> device fails to enumerate.
-> 
-> > --- a/drivers/usb/core/hub.c
-> > +++ b/drivers/usb/core/hub.c
-> > @@ -1924,6 +1924,11 @@ void usb_disconnect(struct usb_device **pdev)
-> >  	 */
-> >  	device_del(&udev->dev);
-> >  
-> > +	if (udev->parent && !udev->parent->parent) {
-> > +		struct usb_hcd *hcd = bus_to_hcd(udev->bus);
-> > +		usb_phy_notify_disconnect(hcd->phy, udev->portnum);
-> > +	}
-> 
-> You might not want to add this.  usb_disconnect() can get called in 
-> situations where the device remains physically connected (if the 
-> firmware changes during a reset, for example).
-> 
-> If you want to notify the phy when the root hub is removed, there are 
-> better places to do it.  One possibility is in hub_quiesce(), another 
-> is in usb_remove_hcd().
-Thanks. I'll need more testing, and won't add it in this patch.
+This patch does not present anything about sec_mon node.  It's all
+about sec_mon_rtc_lp node.  The driver itself does not know if the
+rtc_lp node is a subnode of sec_mon node at all.
 
-Richard
+Can you please tell me what exact change you expect me to make on
+drivers/rtc/rtc-snvs.c?  The patch merely adds a lp-rtc driver and
+should not include any platform specific changes (dts, etc.)  The
+driver and dts changes are two orthogonal parts, and should go via
+RTC tree and ARCH tree separately.
+
+> interesting.  When I add
 > 
-> Alan Stern
+> +#define readl in_be32
+> +#define writel(val, addr)             out_be32(addr, val)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> to the top of the driver, the soft-lockup moves to
+> rtc_read_lp_counter().  I'm trying to verify if I have the right h/w
+> revision.
 > 
+You can submit an incremental patch later to make the driver work for
+powerpc.
+
+-- 
+Regards,
+Shawn
