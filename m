@@ -1,43 +1,23 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 11 Jul 2012 15:24:53 +0100
-Subject: [PATCH 9/9] ARM: vexpress: Config option for early printk console
-In-Reply-To: <4FFD8C4F.40502@arm.com>
-References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
- <1342013791-19516-10-git-send-email-pawel.moll@arm.com>
- <4FFD8C4F.40502@arm.com>
-Message-ID: <1342016693.30755.6.camel@hornet>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 11 Jul 2012 15:44:50 +0100
+Subject: Device tree binding for DVFS table
+In-Reply-To: <4FFD87BD.2030206@gmail.com>
+References: <4FFD77FE.8050206@nvidia.com>
+ <4FFD87BD.2030206@gmail.com>
+Message-ID: <20120711144449.GA23654@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-07-11 at 15:23 +0100, Jonathan Austin wrote:
-> Hi Pawel,
-> 
-> On 11/07/12 14:36, Pawel Moll wrote:
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index 01a1341..12eee87 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -310,6 +310,32 @@ choice
-> >  		  The uncompressor code port configuration is now handled
-> >  		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-> >  
-> > +	config DEBUG_VEXPRESS_UART0_DETECT
-> > +		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
-> > +		depends on ARCH_VEXPRESS
-> > +		help
-> > +		  This option enables simple heuristic which tries to determine
-> > +		  motherboard's memory map variant (original or RS1) and then
-> > +		  choose relevant UART0 base address.
-> > +
-> > +		  Note that this will only work with standard A-class core tiles,
-> > +		  and may fail with non-standard SMM or custom software model.
-> > +
-> 
-> Is it possible to make this depend on something like CPU_CP15_MMU,
-> instead of ARCH_VEXPRESS? Seems like a reasonable way to ensure that
-> this isn't used on some of the core tiles that don't have the required
-> cp15 registers to read the Configuration Base Address Register.
+On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
 
-Yes, sure, I forgot about this! Sorry, will post v2 in a second.
+> I'd expect a single property with freq/volt pairs or 2 properties for
+> freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
 
-Pawel
+I strongly agree - the current proposal is very hard to read due to the
+separation between the voltage and frequency values.  Some devices do
+also need to scale multiple rails together, especially when this gets
+used for I/O devices.
+
+I'd also expect to see a range of voltages for each frequency rather
+than a specific voltage; usually things are at least characterised with
+a specified tolerance.
