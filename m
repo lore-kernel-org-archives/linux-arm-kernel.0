@@ -1,9 +1,9 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 11 Jul 2012 16:49:00 +0300
+Date: Wed, 11 Jul 2012 16:49:56 +0300
 Subject: Device tree binding for DVFS table
 In-Reply-To: <20748722.319671342012092123.JavaMail.weblogic@epml17>
 References: <20748722.319671342012092123.JavaMail.weblogic@epml17>
-Message-ID: <20120711134900.GA9437@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20120711134956.GB9437@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,6 +29,8 @@ On Wed, Jul 11, 2012 at 03:08:14PM +0200, ??? wrote:
 >  it; dynamically measure the characteristics at boot-up time and apply voltages
 >  accordingly; they couldn't identify it based on the chip-id or simply by reading
 >  a single register.
+> 
+
 
 But in that case you would have a nominal voltage for each OPP which gets
 adjusted at boottime or runtime depending on the exact silicon characteristics?
