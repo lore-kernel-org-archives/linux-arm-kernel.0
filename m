@@ -1,125 +1,33 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 11 Jul 2012 16:10:12 +0800
-Subject: [PATCH v2 RESEND 0/3] Watchdog: OMAP: bootstatus fix for omap3
- and changes for the current watchdog framework
-In-Reply-To: <4FFBACE4.80901@windriver.com>
-References: <1341819328-3514-1-git-send-email-zumeng.chen@windriver.com>
- <4FFBACE4.80901@windriver.com>
-Message-ID: <4FFD34E4.7060505@windriver.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jul 2012 08:18:03 +0000
+Subject: [GIT PULL] Samsung devel-dma ops for v3.6
+In-Reply-To: <0e1301cd5f34$008fe1e0$01afa5a0$%kim@samsung.com>
+References: <0c5001cd5e41$87daa1b0$978fe510$%kim@samsung.com>
+ <201207101242.41867.arnd@arndb.de>
+ <0e1301cd5f34$008fe1e0$01afa5a0$%kim@samsung.com>
+Message-ID: <201207110818.04091.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The same case works well on am335xevm but with a new patch in
-mach-omap2/prcm.c
+On Wednesday 11 July 2012, Kukjin Kim wrote:
+> Yeah, let me explain the status for Samsung SoCs' DMA. There are 3 different
+> DMA IPs, samsung specific s3c24xx dma, pl080 and pl330. As you know, pl330
+> already moved in drivers/dma for using common DMA engine and Alim is
+> re-working on pl080
+> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg10954.html
+> ) and let me check its progress. But s3c24xx dma is not ready yet. When
+> pl330 was moving, my colleague, Boojin Kim posted to use common DMA APIs for
+> Samsung drivers which are using DMA such as spi and ASoC. But it was
+> including too many ifdef for checking which DMA is used and it can occur
+> breakage for multiplatform
+> (http://www.spinics.net/lists/arm-kernel/msg131137.html). So we implemented
+> to use some dma_ops after discussing with Grant Likely
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/058171.html
+> ).
+> 
+> Anyway, we will try to use common DMA APIs for all Samsung SoCs. But need
+> more time ;)
 
-I'll send it later.
+Ok, sounds good. Thanks for the background information!
 
-root at ti-omap3:~# uname -a
-Linux ti-omap3 3.4.3-00635-g82d1d26-dirty #32 Wed Jul 11 16:02:12 CST
-2012 armv7l GNU/Linux
-root at ti-omap3:~# dmesg|grep WDT
-[ 1.921173] omap_wdt: OMAP WDTimer Rev 0x01: Initial timeout 0sec
-status= 0x1
-root at ti-omap3:~# ./a.out -i 20; for i in `seq 1 20`; do echo $i ; sleep
-1;done
-Set watchdog interval to 20
-Current watchdog interval is 20
-Last boot is caused by : Watchdog
-Use:
-<w> to kick through writing over device file
-<i> to kick through IOCTL
-<x> to exit the program
-x
-
-1
-2
-[snip]
-U-Boot SPL 2011.09 (Feb 09 2012 - 15:38:59)
-Texas Instruments Revision detection unimplemented
-
-
-U-Boot 2011.09 (Feb 09 2012 - 15:11:31)
-
-I2C: ready
-DRAM: 256 MiB
-WARNING: Caches not enabled
-Found a daughter card connected
-NAND: HW ECC Hamming Code selected
-256 MiB
-MMC: OMAP SD/MMC: 0
-Net: cpsw
-Hit any key to stop autoboot: 0
-U-Boot#
-
-Regards,
-Zumeng
-
-? 2012?07?10? 12:17, Zumeng Chen ??:
-> ? 2012?07?09? 15:35, Zumeng Chen ??:
->> Hello,
->>
->> The following patches based on the 3.5-rc6 from Wim, which
->> focus on:
->>
->> 1 ) bootstatus fix for omap3,
->>
->> 2 ) omap-wdt framework update cater for the current framework
->>     as Shubhrajyoti comments mentioned.
-> I compiled a test case from the following website,
-> http://www.lpclinux.com/Blogs/Testing_LPC313x_Linux_Watchdog_Driver
->
-> It works well.
->
-> root at ti-omap3:/tmp# ./a.out -h
-> Usage: ./a.out [options]
-> -h --help Display this usage information.
-> -d --dev <device_file> Use <device_file> as watchdog device file.
-> The default device file is '/dev/watchdog'
-> -i --interval <interval> Change the watchdog interval time
-> root at ti-omap3:/tmp# ./a.out -i 40;
-> Set watchdog interval to 40
-> Current watchdog interval is 40
-> Last boot is caused by : Watchdog
-> Use:
-> <w> to kick through writing over device file
-> <i> to kick through IOCTL
-> <x> to exit the program
-> x
-> Goodbye !
-> watchdog: Omap Watchdog: nowayout prevents watchdog to be stopped!
-> watchdog: Omap Watchdog: watchdog did not stop!
-> root at ti-omap3:/tmp# for i in `seq 1 30`; do echo $i; sleep 1;done
-> 1
-> 2
->
-> [snip]
->
-> I built NOWAYOUT in driver, so it doesn't stop, still going until the
-> following
-> information:
->
-> Texas Instruments X-Loader 1.42
-> Starting OS Bootloader...
-> No OOB scheme defined for oobsize 0
-> OneNAND: 0 kB
-> 256 MiB
->
-> Regards,
-> Zumeng
->> Regards,
->>
->> Zumeng Chen (3):
->>   Watchdog: Omap: Changes for the new watchdog framework
->>   Watchdog: Omap: select watchdog core for framework change
->>   Watchdog: Omap: get the bootstatus for OMAP2Plus
->>
->>  arch/arm/mach-omap2/prcm.c  |    5 +-
->>  drivers/watchdog/Kconfig    |    1 +
->>  drivers/watchdog/omap_wdt.c |  342 ++++++++++++++++---------------------------
->>  drivers/watchdog/omap_wdt.h |    5 +
->>  4 files changed, 133 insertions(+), 220 deletions(-)
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	Arnd
