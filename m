@@ -1,37 +1,36 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 11 Jul 2012 21:10:59 +0530
-Subject: [PATCH v5 0/6] spi: s3c64xx: add support for device tree
-Message-ID: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+Date: Wed, 11 Jul 2012 21:11:00 +0530
+Subject: [PATCH v5 1/6] spi: s3c64xx: remove unused S3C64XX_SPI_ST_TRLCNTZ
+ macro
+In-Reply-To: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1342021265-11212-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v4:
-- Includes the missing gpio request for slave select line gpio as suggested
-  by Mark Brown.
+The macro S3C64XX_SPI_ST_TRLCNTZ is not used and hence it is removed.
 
-Changes since v3:
-- Fixed the build breakage after applying 3rd patch in this series (which
-  had dependency on the 6th patch). This was reported by Doug Anderson.
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ drivers/spi/spi-s3c64xx.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-Changes since v2:
-- Removed renaming of platform device name at runtime
-- Includes other minor fixes suggested by Olof, Grant, Kukjin and Abhilash.
-- Rebased to Linux 3.5-rc1
-
-Changes since v1:
-- Incorporated changes suggested by Mark Brown
- - Merged 2nd, 3rd and 5th patch into one single patch.
- - Listed the order of gpios in the device tree support documentation.
- - Switched to generic property names for chip select gpio line and
-   number of slave select lines.
-- Moved the platform enablement patches for Exynos4 and Exynos5 into a
- different patch series.
-- Included Ack from Jaswinder Singh <jaswinder.singh@linaro.org>.
-
-This patch series adds device tree based discovery support for Samsung's
-s3c64xx compatible spi controller. This is mainly tested for Exynos4210
-and Exynos5250 with onboard spi nor flash device.
-
-The patch series (6 patches) that add board/platform specific support has
-no changes since the v2 version. This series is available at:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100812.html
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 3c36cfa..6e60eec 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -113,10 +113,6 @@
+ 
+ #define S3C64XX_SPI_FBCLK_MSK		(3<<0)
+ 
+-#define S3C64XX_SPI_ST_TRLCNTZ(v, i) ((((v) >> (i)->rx_lvl_offset) & \
+-					(((i)->fifo_lvl_mask + 1))) \
+-					? 1 : 0)
+-
+ #define S3C64XX_SPI_ST_TX_DONE(v, i) (((v) & (1 << (i)->tx_st_done)) ? 1 : 0)
+ #define TX_FIFO_LVL(v, i) (((v) >> 6) & (i)->fifo_lvl_mask)
+ #define RX_FIFO_LVL(v, i) (((v) >> (i)->rx_lvl_offset) & (i)->fifo_lvl_mask)
+-- 
+1.6.6.rc2
