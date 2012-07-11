@@ -1,72 +1,125 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 11 Jul 2012 00:52:35 -0700
-Subject: [PATCH v9] input: keyboard: Add keys driver for the LPC32xx SoC
-In-Reply-To: <4FFD2FF0.8030000@antcom.de>
-References: <1341948910-6530-1-git-send-email-stigge@antcom.de>
- <20120710205507.GA377@core.coreip.homeip.net>
- <4FFD2FF0.8030000@antcom.de>
-Message-ID: <20120711075235.GA27353@core.coreip.homeip.net>
+From: zumeng.chen@windriver.com (Zumeng Chen)
+Date: Wed, 11 Jul 2012 16:10:12 +0800
+Subject: [PATCH v2 RESEND 0/3] Watchdog: OMAP: bootstatus fix for omap3
+ and changes for the current watchdog framework
+In-Reply-To: <4FFBACE4.80901@windriver.com>
+References: <1341819328-3514-1-git-send-email-zumeng.chen@windriver.com>
+ <4FFBACE4.80901@windriver.com>
+Message-ID: <4FFD34E4.7060505@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 09:49:04AM +0200, Roland Stigge wrote:
-> On 07/10/2012 10:55 PM, Dmitry Torokhov wrote:
-> > Hi Roland,
-> > 
-> > On Tue, Jul 10, 2012 at 09:35:10PM +0200, Roland Stigge wrote:
-> >> This patch adds a driver for the key scan interface of the LPC32xx SoC
-> >>
-> > 
-> > Could of more things that I had in my patch but forgot to specifically
-> > call out:
-> > 
-> >> +
-> >> +	/* Configure the key scanner */
-> >> +	clk_prepare_enable(kscandat->clk);
-> > 
-> > This may fail so we should handle errors.
-> > 
-> >> +	writel(kscandat->deb_clks, LPC32XX_KS_DEB(kscandat->kscan_base));
-> >> +	writel(kscandat->scan_delay, LPC32XX_KS_SCAN_CTL(kscandat->kscan_base));
-> >> +	writel(LPC32XX_KSCAN_FTST_USE32K_CLK,
-> >> +	       LPC32XX_KS_FAST_TST(kscandat->kscan_base));
-> >> +	writel(kscandat->matrix_sz,
-> >> +	       LPC32XX_KS_MATRIX_DIM(kscandat->kscan_base));
-> >> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-> >> +	clk_disable_unprepare(kscandat->clk);
-> >> +
-> >> +	error = request_irq(irq, lpc32xx_kscan_irq, 0, pdev->name, kscandat);
-> > 
-> > ...
-> > 
-> >> +
-> >> +	free_irq(platform_get_irq(pdev, 0), pdev);
-> > 
-> > You are requesting IRQ with kscandat as an argument but freeing it with
-> > 'pdev' which will fail.
-> > 
-> >> +
-> >> +	if (kscandat->input->users) {
-> >> +		/* Enable clock and clear IRQ */
-> >> +		clk_prepare_enable(kscandat->clk);
-> > 
-> > Need to handle errors here as well.
-> > 
-> > Since I am partial to my rearrangement (basically I started preferring
-> > err_<action> style of error labels as they more explanatory than out2 or
-> > fail3 style of labels), could you try this version of my patch (on top
-> > of your v9 one). Third time is a charm maybe? :)
-> 
-> Yes, works fine!
-> 
-> Thanks!
-> 
-> Acked-by: Roland Stigge <stigge@antcom.de>
+The same case works well on am335xevm but with a new patch in
+mach-omap2/prcm.c
 
-Excellent, I'll fold it up into your original v9 patch and queue for
-3.6.
+I'll send it later.
 
-Thank you for your patience.
+root at ti-omap3:~# uname -a
+Linux ti-omap3 3.4.3-00635-g82d1d26-dirty #32 Wed Jul 11 16:02:12 CST
+2012 armv7l GNU/Linux
+root at ti-omap3:~# dmesg|grep WDT
+[ 1.921173] omap_wdt: OMAP WDTimer Rev 0x01: Initial timeout 0sec
+status= 0x1
+root at ti-omap3:~# ./a.out -i 20; for i in `seq 1 20`; do echo $i ; sleep
+1;done
+Set watchdog interval to 20
+Current watchdog interval is 20
+Last boot is caused by : Watchdog
+Use:
+<w> to kick through writing over device file
+<i> to kick through IOCTL
+<x> to exit the program
+x
 
--- 
-Dmitry
+1
+2
+[snip]
+U-Boot SPL 2011.09 (Feb 09 2012 - 15:38:59)
+Texas Instruments Revision detection unimplemented
+
+
+U-Boot 2011.09 (Feb 09 2012 - 15:11:31)
+
+I2C: ready
+DRAM: 256 MiB
+WARNING: Caches not enabled
+Found a daughter card connected
+NAND: HW ECC Hamming Code selected
+256 MiB
+MMC: OMAP SD/MMC: 0
+Net: cpsw
+Hit any key to stop autoboot: 0
+U-Boot#
+
+Regards,
+Zumeng
+
+? 2012?07?10? 12:17, Zumeng Chen ??:
+> ? 2012?07?09? 15:35, Zumeng Chen ??:
+>> Hello,
+>>
+>> The following patches based on the 3.5-rc6 from Wim, which
+>> focus on:
+>>
+>> 1 ) bootstatus fix for omap3,
+>>
+>> 2 ) omap-wdt framework update cater for the current framework
+>>     as Shubhrajyoti comments mentioned.
+> I compiled a test case from the following website,
+> http://www.lpclinux.com/Blogs/Testing_LPC313x_Linux_Watchdog_Driver
+>
+> It works well.
+>
+> root at ti-omap3:/tmp# ./a.out -h
+> Usage: ./a.out [options]
+> -h --help Display this usage information.
+> -d --dev <device_file> Use <device_file> as watchdog device file.
+> The default device file is '/dev/watchdog'
+> -i --interval <interval> Change the watchdog interval time
+> root at ti-omap3:/tmp# ./a.out -i 40;
+> Set watchdog interval to 40
+> Current watchdog interval is 40
+> Last boot is caused by : Watchdog
+> Use:
+> <w> to kick through writing over device file
+> <i> to kick through IOCTL
+> <x> to exit the program
+> x
+> Goodbye !
+> watchdog: Omap Watchdog: nowayout prevents watchdog to be stopped!
+> watchdog: Omap Watchdog: watchdog did not stop!
+> root at ti-omap3:/tmp# for i in `seq 1 30`; do echo $i; sleep 1;done
+> 1
+> 2
+>
+> [snip]
+>
+> I built NOWAYOUT in driver, so it doesn't stop, still going until the
+> following
+> information:
+>
+> Texas Instruments X-Loader 1.42
+> Starting OS Bootloader...
+> No OOB scheme defined for oobsize 0
+> OneNAND: 0 kB
+> 256 MiB
+>
+> Regards,
+> Zumeng
+>> Regards,
+>>
+>> Zumeng Chen (3):
+>>   Watchdog: Omap: Changes for the new watchdog framework
+>>   Watchdog: Omap: select watchdog core for framework change
+>>   Watchdog: Omap: get the bootstatus for OMAP2Plus
+>>
+>>  arch/arm/mach-omap2/prcm.c  |    5 +-
+>>  drivers/watchdog/Kconfig    |    1 +
+>>  drivers/watchdog/omap_wdt.c |  342 ++++++++++++++++---------------------------
+>>  drivers/watchdog/omap_wdt.h |    5 +
+>>  4 files changed, 133 insertions(+), 220 deletions(-)
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
