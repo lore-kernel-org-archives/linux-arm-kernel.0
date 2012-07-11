@@ -1,53 +1,62 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 11 Jul 2012 18:23:41 +0200
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 11 Jul 2012 09:32:20 -0700
 Subject: [PATCH v2 1/2] clocksource: dw_apb_timer: Add common DTS glue
  for  dw_apb_timer
-In-Reply-To: <20120711160358.GA8444@page>
+In-Reply-To: <20120711162341.GB28067@elf.ucw.cz>
 References: <1341956381-496-1-git-send-email-dinguyen@altera.com>
- <20120710231525.GA27641@page>
- <1342020026.4790.1.camel@dinguyen-VirtualBox>
- <20120711160358.GA8444@page>
-Message-ID: <20120711162341.GB28067@elf.ucw.cz>
+ <20120710231525.GA27641@page> <1342020026.4790.1.camel@dinguyen-VirtualBox>
+ <20120711160358.GA8444@page> <20120711162341.GB28067@elf.ucw.cz>
+Message-ID: <71B37E0559AC6849A68C5BA94C509FB458329AE8FD@SJ-ITMSG02.altera.priv.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2012-07-11 17:03:58, Jamie Iles wrote:
-> On Wed, Jul 11, 2012 at 10:20:26AM -0500, Dinh Nguyen wrote:
-> > On Wed, 2012-07-11 at 00:15 +0100, Jamie Iles wrote:
-> > > On Tue, Jul 10, 2012 at 04:39:40PM -0500, dinguyen at altera.com wrote:
-> > > > --- a/arch/arm/mach-picoxcell/time.c
-> > > > +++ b/drivers/clocksource/dw_apb_timer_of.c
-> > > > @@ -1,11 +1,20 @@
-> > > [...]
-> > > > -static const struct of_device_id picoxcell_rtc_ids[] __initconst = {
-> > > > -	{ .compatible = "picochip,pc3x2-rtc" },
-> > > > +static const struct of_device_id sptimer_ids[] __initconst = {
-> > > > +	{ .compatible = "snps,dw-apb-timer-sp" },
-> > > >  	{ /* Sentinel */ },
-> > > 
-> > > Please keep picochip,pc3x2-rtc in the compatible list otherwise we won't 
-> > > boot any more.
-> > 
-> > Should I add another .compatible entry here, or make the change in
-> > picoxcell-pc3x2 and picoxcell-pc3x3 dtsi files?
-> 
-> I think that adding another compatible entry is the right thing to do 
-> here - it avoids churn of the dtsi files and means that the compiled 
-> device-tree blobs on deployed devices won't need updating.
+On Wed, 2012-07-11 at 18:23 +0200, Pavel Machek wrote:
+> On Wed 2012-07-11 17:03:58, Jamie Iles wrote:
+> > On Wed, Jul 11, 2012 at 10:20:26AM -0500, Dinh Nguyen wrote:
+> > > On Wed, 2012-07-11 at 00:15 +0100, Jamie Iles wrote:
+> > > > On Tue, Jul 10, 2012 at 04:39:40PM -0500, dinguyen at altera.com wrote:
+> > > > > --- a/arch/arm/mach-picoxcell/time.c
+> > > > > +++ b/drivers/clocksource/dw_apb_timer_of.c
+> > > > > @@ -1,11 +1,20 @@
+> > > > [...]
+> > > > > -static const struct of_device_id picoxcell_rtc_ids[] __initconst = {
+> > > > > -     { .compatible = "picochip,pc3x2-rtc" },
+> > > > > +static const struct of_device_id sptimer_ids[] __initconst = {
+> > > > > +     { .compatible = "snps,dw-apb-timer-sp" },
+> > > > >       { /* Sentinel */ },
+> > > >
+> > > > Please keep picochip,pc3x2-rtc in the compatible list otherwise we won't
+> > > > boot any more.
+> > >
+> > > Should I add another .compatible entry here, or make the change in
+> > > picoxcell-pc3x2 and picoxcell-pc3x3 dtsi files?
+> >
+> > I think that adding another compatible entry is the right thing to do
+> > here - it avoids churn of the dtsi files and means that the compiled
+> > device-tree blobs on deployed devices won't need updating.
+>
+> Rob requested making "-freq" -> "-frequency" change, which will make
+> it incompatible.
+>
 
-Rob requested making "-freq" -> "-frequency" change, which will make
-it incompatible. 
+I think everyone uses -frequency. Just realized that I need up send out
+a v4.
+Because this is wrong:
+if (of_property_read_u32(np, "clock-freq", rate))
 
-Shall we:
+Dinh
 
-a) drop all the compatibility
+> Shall we:
+>
+> a) drop all the compatibility
+>
+> b) make it parse both "-freq" and "-freqency" and both sets of ids
+>
+> ?
+>
+> Thanks,
+>                                                                       Pavel
 
-b) make it parse both "-freq" and "-freqency" and both sets of ids
 
-?
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Confidentiality Notice.
+This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution,  or copying  of this message, or any attachments, is strictly prohibited.  If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments.  Thank you.
