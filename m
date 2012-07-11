@@ -1,247 +1,132 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 11 Jul 2012 21:11:02 +0530
-Subject: [PATCH v5 3/6] ARM: Samsung: Remove pdev pointer parameter from spi
- gpio setup functions
+Date: Wed, 11 Jul 2012 21:11:04 +0530
+Subject: [PATCH v5 5/6] spi: s3c64xx: Remove the 'set_level' callback from
+ controller data
 In-Reply-To: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
 References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1342021265-11212-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1342021265-11212-6-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform data pointer that is passed to the spi gpio setup functions
-is not used. Hence, this parameter is removed from all the spi gpio setup
-functions.
+The set_level callback in the controller data, which is used to configure
+the slave select line, cannot be supported when migrating the driver to
+device tree based discovery. Since all the platforms currently use gpio
+as the slave select line, this callback can be removed from the
+controller data and replaced with call to gpio_set_value in the driver.
 
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/mach-exynos/setup-spi.c                 |    8 +++-----
- arch/arm/mach-s3c24xx/setup-spi.c                |    2 +-
- arch/arm/mach-s3c64xx/setup-spi.c                |    6 ++----
- arch/arm/mach-s5p64x0/setup-spi.c                |    5 ++---
- arch/arm/mach-s5pc100/setup-spi.c                |    8 +++-----
- arch/arm/mach-s5pv210/setup-spi.c                |    6 ++----
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    8 ++++----
- drivers/spi/spi-s3c64xx.c                        |    5 ++---
- 8 files changed, 19 insertions(+), 29 deletions(-)
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 -
+ drivers/spi/spi-s3c64xx.c                        |   31 ++++++++++++++++++---
+ 2 files changed, 26 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/setup-spi.c b/arch/arm/mach-exynos/setup-spi.c
-index a71ec4d..4999829 100644
---- a/arch/arm/mach-exynos/setup-spi.c
-+++ b/arch/arm/mach-exynos/setup-spi.c
-@@ -9,12 +9,10 @@
-  */
- 
- #include <linux/gpio.h>
--#include <linux/platform_device.h>
--
- #include <plat/gpio-cfg.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
--int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi0_cfg_gpio(void)
- {
- 	s3c_gpio_cfgpin(EXYNOS4_GPB(0), S3C_GPIO_SFN(2));
- 	s3c_gpio_setpull(EXYNOS4_GPB(0), S3C_GPIO_PULL_UP);
-@@ -25,7 +23,7 @@ int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI1
--int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi1_cfg_gpio(void)
- {
- 	s3c_gpio_cfgpin(EXYNOS4_GPB(4), S3C_GPIO_SFN(2));
- 	s3c_gpio_setpull(EXYNOS4_GPB(4), S3C_GPIO_PULL_UP);
-@@ -36,7 +34,7 @@ int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI2
--int s3c64xx_spi2_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi2_cfg_gpio(void)
- {
- 	s3c_gpio_cfgpin(EXYNOS4_GPC1(1), S3C_GPIO_SFN(5));
- 	s3c_gpio_setpull(EXYNOS4_GPC1(1), S3C_GPIO_PULL_UP);
-diff --git a/arch/arm/mach-s3c24xx/setup-spi.c b/arch/arm/mach-s3c24xx/setup-spi.c
-index 42abe15..3d47e02 100644
---- a/arch/arm/mach-s3c24xx/setup-spi.c
-+++ b/arch/arm/mach-s3c24xx/setup-spi.c
-@@ -18,7 +18,7 @@
- #include <mach/regs-gpio.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
--int s3c64xx_spi0_cfg_gpio(struct platform_device *pdev)
-+int s3c64xx_spi0_cfg_gpio(void)
- {
- 	/* enable hsspi bit in misccr */
- 	s3c2410_modify_misccr(S3C2416_MISCCR_HSSPI_EN2, 1);
-diff --git a/arch/arm/mach-s3c64xx/setup-spi.c b/arch/arm/mach-s3c64xx/setup-spi.c
-index ff999d9..4dc5345 100644
---- a/arch/arm/mach-s3c64xx/setup-spi.c
-+++ b/arch/arm/mach-s3c64xx/setup-spi.c
-@@ -9,12 +9,10 @@
-  */
- 
- #include <linux/gpio.h>
--#include <linux/platform_device.h>
--
- #include <plat/gpio-cfg.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
--int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi0_cfg_gpio(void)
- {
- 	s3c_gpio_cfgall_range(S3C64XX_GPC(0), 3,
- 				S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-@@ -23,7 +21,7 @@ int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI1
--int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi1_cfg_gpio(void)
- {
- 	s3c_gpio_cfgall_range(S3C64XX_GPC(4), 3,
- 				S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-diff --git a/arch/arm/mach-s5p64x0/setup-spi.c b/arch/arm/mach-s5p64x0/setup-spi.c
-index 1cf84b5..7664356 100644
---- a/arch/arm/mach-s5p64x0/setup-spi.c
-+++ b/arch/arm/mach-s5p64x0/setup-spi.c
-@@ -9,11 +9,10 @@
-  */
- 
- #include <linux/gpio.h>
--#include <linux/platform_device.h>
- #include <plat/gpio-cfg.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
--int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi0_cfg_gpio(void)
- {
- 	if (soc_is_s5p6450())
- 		s3c_gpio_cfgall_range(S5P6450_GPC(0), 3,
-@@ -26,7 +25,7 @@ int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI1
--int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi1_cfg_gpio(void)
- {
- 	if (soc_is_s5p6450())
- 		s3c_gpio_cfgall_range(S5P6450_GPC(4), 3,
-diff --git a/arch/arm/mach-s5pc100/setup-spi.c b/arch/arm/mach-s5pc100/setup-spi.c
-index 4b42718..1835679 100644
---- a/arch/arm/mach-s5pc100/setup-spi.c
-+++ b/arch/arm/mach-s5pc100/setup-spi.c
-@@ -9,12 +9,10 @@
-  */
- 
- #include <linux/gpio.h>
--#include <linux/platform_device.h>
--
- #include <plat/gpio-cfg.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
--int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi0_cfg_gpio(void)
- {
- 	s3c_gpio_cfgall_range(S5PC100_GPB(0), 3,
- 				S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-@@ -23,7 +21,7 @@ int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI1
--int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi1_cfg_gpio(void)
- {
- 	s3c_gpio_cfgall_range(S5PC100_GPB(4), 3,
- 				S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-@@ -32,7 +30,7 @@ int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI2
--int s3c64xx_spi2_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi2_cfg_gpio(void)
- {
- 	s3c_gpio_cfgpin(S5PC100_GPG3(0), S3C_GPIO_SFN(3));
- 	s3c_gpio_setpull(S5PC100_GPG3(0), S3C_GPIO_PULL_UP);
-diff --git a/arch/arm/mach-s5pv210/setup-spi.c b/arch/arm/mach-s5pv210/setup-spi.c
-index 2cd66a6..81aecc1 100644
---- a/arch/arm/mach-s5pv210/setup-spi.c
-+++ b/arch/arm/mach-s5pv210/setup-spi.c
-@@ -9,12 +9,10 @@
-  */
- 
- #include <linux/gpio.h>
--#include <linux/platform_device.h>
--
- #include <plat/gpio-cfg.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
--int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi0_cfg_gpio(void)
- {
- 	s3c_gpio_cfgpin(S5PV210_GPB(0), S3C_GPIO_SFN(2));
- 	s3c_gpio_setpull(S5PV210_GPB(0), S3C_GPIO_PULL_UP);
-@@ -25,7 +23,7 @@ int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
- #endif
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI1
--int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
-+int s3c64xx_spi1_cfg_gpio(void)
- {
- 	s3c_gpio_cfgpin(S5PV210_GPB(4), S3C_GPIO_SFN(2));
- 	s3c_gpio_setpull(S5PV210_GPB(4), S3C_GPIO_PULL_UP);
 diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-index 4e9b9c3..89dbaee 100644
+index c818a7c..ceba18d 100644
 --- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
 +++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-@@ -39,7 +39,7 @@ struct s3c64xx_spi_csinfo {
- struct s3c64xx_spi_info {
- 	int src_clk_nr;
- 	int num_cs;
--	int (*cfg_gpio)(struct platform_device *pdev);
-+	int (*cfg_gpio)(void);
+@@ -18,7 +18,6 @@ struct platform_device;
+  * @fb_delay: Slave specific feedback delay.
+  *            Refer to FB_CLK_SEL register definition in SPI chapter.
+  * @line: Custom 'identity' of the CS line.
+- * @set_level: CS line control.
+  *
+  * This is per SPI-Slave Chipselect information.
+  * Allocate and initialize one in machine init code and make the
+@@ -27,7 +26,6 @@ struct platform_device;
+ struct s3c64xx_spi_csinfo {
+ 	u8 fb_delay;
+ 	unsigned line;
+-	void (*set_level)(unsigned line_id, int lvl);
  };
  
  /**
-@@ -60,9 +60,9 @@ extern void s3c64xx_spi2_set_platdata(struct s3c64xx_spi_info *pd,
- 				      int src_clk_nr, int num_cs);
- 
- /* defined by architecture to configure gpio */
--extern int s3c64xx_spi0_cfg_gpio(struct platform_device *dev);
--extern int s3c64xx_spi1_cfg_gpio(struct platform_device *dev);
--extern int s3c64xx_spi2_cfg_gpio(struct platform_device *dev);
-+extern int s3c64xx_spi0_cfg_gpio(void);
-+extern int s3c64xx_spi1_cfg_gpio(void);
-+extern int s3c64xx_spi2_cfg_gpio(void);
- 
- extern struct s3c64xx_spi_info s3c64xx_spi0_pdata;
- extern struct s3c64xx_spi_info s3c64xx_spi1_pdata;
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 8698618..0a9e43e 100644
+index 0a9e43e..e4182ea 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -1071,7 +1071,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 		goto err1;
+@@ -27,6 +27,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/spi/spi.h>
++#include <linux/gpio.h>
+ 
+ #include <mach/dma.h>
+ #include <plat/s3c64xx-spi.h>
+@@ -411,14 +412,14 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+ 			/* Deselect the last toggled device */
+ 			cs = sdd->tgl_spi->controller_data;
+-			cs->set_level(cs->line,
+-					spi->mode & SPI_CS_HIGH ? 0 : 1);
++			gpio_set_value(cs->line,
++				spi->mode & SPI_CS_HIGH ? 0 : 1);
+ 		}
+ 		sdd->tgl_spi = NULL;
  	}
  
--	if (sci->cfg_gpio == NULL || sci->cfg_gpio(pdev)) {
-+	if (sci->cfg_gpio == NULL || sci->cfg_gpio()) {
- 		dev_err(&pdev->dev, "Unable to config gpio\n");
- 		ret = -EBUSY;
- 		goto err2;
-@@ -1214,12 +1214,11 @@ static int s3c64xx_spi_suspend(struct device *dev)
+ 	cs = spi->controller_data;
+-	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
++	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+ }
  
- static int s3c64xx_spi_resume(struct device *dev)
+ static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
+@@ -504,7 +505,7 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 	if (sdd->tgl_spi == spi)
+ 		sdd->tgl_spi = NULL;
+ 
+-	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
++	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+ }
+ 
+ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+@@ -833,11 +834,21 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 	unsigned long flags;
+ 	int err = 0;
+ 
+-	if (cs == NULL || cs->set_level == NULL) {
++	if (cs == NULL) {
+ 		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
+ 		return -ENODEV;
+ 	}
+ 
++	if (!spi_get_ctldata(spi)) {
++		err = gpio_request(cs->line, dev_name(&spi->dev));
++		if (err) {
++			dev_err(&spi->dev, "request for slave select gpio "
++					"line [%d] failed\n", cs->line);
++			return -EBUSY;
++		}
++		spi_set_ctldata(spi, cs);
++	}
++
+ 	sdd = spi_master_get_devdata(spi->master);
+ 	sci = sdd->cntrlr_info;
+ 
+@@ -908,6 +919,15 @@ setup_exit:
+ 	return err;
+ }
+ 
++static void s3c64xx_spi_cleanup(struct spi_device *spi)
++{
++	struct s3c64xx_spi_csinfo *cs = spi_get_ctldata(spi);
++
++	if (cs)
++		gpio_free(cs->line);
++	spi_set_ctldata(spi, NULL);
++}
++
+ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
  {
--	struct platform_device *pdev = to_platform_device(dev);
- 	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
- 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
- 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+ 	struct s3c64xx_spi_driver_data *sdd = data;
+@@ -1049,6 +1069,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
  
--	sci->cfg_gpio(pdev);
-+	sci->cfg_gpio();
- 
- 	/* Enable the clock */
- 	clk_enable(sdd->src_clk);
+ 	master->bus_num = sdd->port_id;
+ 	master->setup = s3c64xx_spi_setup;
++	master->cleanup = s3c64xx_spi_cleanup;
+ 	master->prepare_transfer_hardware = s3c64xx_spi_prepare_transfer;
+ 	master->transfer_one_message = s3c64xx_spi_transfer_one_message;
+ 	master->unprepare_transfer_hardware = s3c64xx_spi_unprepare_transfer;
 -- 
 1.6.6.rc2
