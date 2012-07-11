@@ -1,43 +1,75 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 11 Jul 2012 14:40:47 +0200
-Subject: [PATCH v2 04/23] ARM: LPC32xx: Add DMA configuration to platform
- data
-In-Reply-To: <201207111233.24780.arnd@arndb.de>
-References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
- <201207102136.35944.arnd@arndb.de> <4FFD393F.1070104@antcom.de>
- <201207111233.24780.arnd@arndb.de>
-Message-ID: <4FFD744F.8060204@antcom.de>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Wed, 11 Jul 2012 18:26:30 +0530
+Subject: Device tree binding for DVFS table
+Message-ID: <4FFD77FE.8050206@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2012 02:33 PM, Arnd Bergmann wrote:
-> On Wednesday 11 July 2012, Roland Stigge wrote:
->> Thanks for the note! Looks like the interface consolidated to replace
->> ch->cd->min_signal with sth. like cd->min_signal directly.
->>
->> Accessing the signal id/number is/was quite convenient because as you
->> can see in the 3 above cases that now get compile errors with the pl08x
->> changes, the LPC32xx chip hard-wires those numbers, and the respective
->> code is LPC32xx specific anyway.
->>
->> So can we make an exception here to compare static dma channel numbers?
->> Or is there any other interface to access the static dma channel numbers
->> that I'm currently not aware of?
->>
->> Depending on what we agree upon, I can then provide fixes to the
->> lpc32xx-next branch.
-> 
-> I'm not familiar with this code, but I think the solution for now
-> (while we don't have a DT binding) is to do the same thing that
-> spear3xx does: pass a pointer to the global pl08x_filter_id
-> function and an identifier for the channel in the platform data
-> for that device.
+Hi,
 
-OK, thanks!
+I am working on DT binding for Tegra DVFS.
 
-Is a patch on top of the already provided lpc32xx-next branches the
-preferred form for a fix? On top of which branch do you need it?
+For Tegra, DVFS node mainly consists of frequency and voltage pairs. 
+Frequency in the pair may change for different process. E.g. for process 
+1 CPU clock frequency could be 900MHz at 1V while for process 2 it could 
+be 1GHz at 1V.
+Tegra uses vendor specific ids to identify the correct frequency table.
 
-Thanks in advance,
+Following is the proposed binding for voltage and frequency tables used 
+in DVFS. Looking for comments/suggestions to make it generic.
 
-Roland
+=======DVFS table node===================
+This node defines the voltage configuration for the DVFS which includes 
+the regulator and voltage array.
+
+Required properties:
+
+reg_id : <regulator phandle>;
+voltage-table : <voltage array, values in mV>;
+
+#address-cells and #size-cells : To identify correct frequency table 
+using process id (or some other vendor specific way).
+
+========Frequency table node===============
+
+This node defines frequency configuration for the device DVFS.
+
+Required properties:
+
+In device node need a reference to the DVFS table node.
+
+dvfs : the phandle for the DVFS table node
+
+frequency-table at n
+        reg = <n>; dependent on address-cells and size-cells in DVFS 
+table node.
+        frequencies = <frequency array, values in MHz>;
+}
+
+Example:
+-------------------------------------------------------------------------
+
+cpu-dvfs-table : dvfs-table {
+               compatible = "nvidia,tegra30-dvfs-table";
+               reg_id = <&sm0>;
+               #address-cells = <1>;
+               #size-cells = <0>;
+               voltage-array = <750 775 800 825 850 875 900 925 950 975 
+1000 1025 1050 1100 1125>;
+};
+
+device {
+              dvfs = <&cpu-dvfs-table>;
+              frequency-table at 102 {
+                       reg = <0x102>;
+                       frequencies = <314 314 314 456 456 456 608 608 
+608 760 817 817 912 1000>;
+              };
+              frequency-table at 002 {
+                       reg = <0x002>;
+                       frequencies = <598 598 750 750 893 893 1000>;
+              };
+};
+
+Thanks & Regards,
+Prashant G
