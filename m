@@ -1,32 +1,35 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jul 2012 19:33:39 +0800
-Subject: [PATCH v6 1/7] ARM: imx6q: correct device name of usbphy and usb
- controller clock export
-In-Reply-To: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
-References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1342006425-21008-2-git-send-email-richard.zhao@freescale.com>
+Date: Wed, 11 Jul 2012 19:33:38 +0800
+Subject: [PATCH v6 0/7] imx28/imx6q: add usb support 
+Message-ID: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c |    4 ++++
- 1 file changed, 4 insertions(+)
+This is platform part to add imx28/imx6q driver support.
+The dirver part has been mostly merged to usb-next.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index cabbbb7..3f5b9d6 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -398,6 +398,10 @@ int __init mx6q_clocks_init(void)
- 	clk_register_clkdev(clk[gpmi_bch], "gpmi_bch", "112000.gpmi-nand");
- 	clk_register_clkdev(clk[gpmi_apb], "gpmi_apb", "112000.gpmi-nand");
- 	clk_register_clkdev(clk[gpmi_io], "gpmi_io", "112000.gpmi-nand");
-+	clk_register_clkdev(clk[usboh3], NULL, "2184000.usb");
-+	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
-+	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
-+	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
- 	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
- 	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
- 	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+The last pinctrl patch also needs imx6q pinctrl driver fix that Aisheng
+is working on. Of course it can pass build, and only effect usb gadget
+function.
+
+Richard Zhao (7):
+  ARM: imx6q: correct device name of usbphy and usb controller clock
+    export
+  ARM: imx6q: add usbphy clocks
+  ARM: imx6q: disable usb charger detector
+  ARM: dts: imx6q-sabrelite: add usb devices
+  ARM: mxs: clk_register_clkdev mx28 usb clocks
+  ARM: dts: imx28-evk: add usb devices
+  ARM: dts: imx6q-sabrelite: add usbotg pinctrl support
+
+ arch/arm/boot/dts/imx28-evk.dts       |   36 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx28.dtsi          |   12 ++++++++--
+ arch/arm/boot/dts/imx6q-sabrelite.dts |   30 +++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi          |   42 +++++++++++++++++++++++++++++++--
+ arch/arm/mach-imx/clk-imx6q.c         |   11 ++++++++-
+ arch/arm/mach-imx/mach-imx6q.c        |   41 ++++++++++++++++++++++++++++++++
+ drivers/clk/mxs/clk-imx28.c           |    4 ++++
+ 7 files changed, 171 insertions(+), 5 deletions(-)
+
 -- 
 1.7.9.5
