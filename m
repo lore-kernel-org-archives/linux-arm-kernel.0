@@ -1,46 +1,105 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 11 Jul 2012 12:17:52 +0200
-Subject: [PATCH 1/2] media: Add mem2mem deinterlacing driver.
-In-Reply-To: <CACKLOr1xgjuGp-jshCaCBZwG4pbWsBSt9Cq9jUdd3PGjpHiXEQ@mail.gmail.com>
-References: <1341996904-22893-1-git-send-email-javier.martin@vista-silicon.com>
- <201207111145.51858.hverkuil@xs4all.nl>
- <CACKLOr1xgjuGp-jshCaCBZwG4pbWsBSt9Cq9jUdd3PGjpHiXEQ@mail.gmail.com>
-Message-ID: <201207111217.52973.hverkuil@xs4all.nl>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 11 Jul 2012 19:21:55 +0900
+Subject: [PATCH 4/7] ARM: EXYNOS: Adding DRM platform device
+In-Reply-To: <1341999741-15578-5-git-send-email-l.krishna@samsung.com>
+References: <1341999741-15578-1-git-send-email-l.krishna@samsung.com>
+ <1341999741-15578-5-git-send-email-l.krishna@samsung.com>
+Message-ID: <001d01cd5f4e$ff51c850$fdf558f0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 11 July 2012 12:02:48 javier Martin wrote:
-> Hi Hans,
-> thank you for your comments.
+
+
+> -----Original Message-----
+> From: Leela Krishna Amudala [mailto:l.krishna at samsung.com]
+> Sent: Wednesday, July 11, 2012 6:42 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: grant.likely at secretlab.ca; olofj at google.com; thomas.ab at samsung.com; kgene.kim at samsung.com;
+> joshi at samsung.com; jg1.han at samsung.com
+> Subject: [PATCH 4/7] ARM: EXYNOS: Adding DRM platform device
 > 
-> On 11 July 2012 11:45, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> > Hi Javier!
-> >
-> > Thanks for the patch.
-> >
-> > On Wed 11 July 2012 10:55:03 Javier Martin wrote:
-> >> Some video decoders such as tvp5150 provide separate
-> >> video fields (V4L2_FIELD_SEQ_TB). This driver uses
-> >> dmaengine to convert this format to V4L2_FIELD_INTERLACED_TB
-> >> (weaving) or V4L2_FIELD_NONE (line doubling)
-> >
-> > Which field is used for the line doubling? Top or bottom? Or is each field
-> > doubled, thus doubling the framerate?
+> Add DRM platform device to machine file for exynos5.
 > 
-> No, just top field is used.
-> I don't know if it's worth defining a new field format for doubling fields.
-
-Probably not, but just make sure it is clearly documented.
-
-> > I also recommend adding SEQ_BT/INTERLACED_BT support: NTSC transmits the bottom
-> > field first, so it is useful to have support for that.
+> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> ---
+>  arch/arm/mach-exynos/mach-exynos5-dt.c |   27 +++++++++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
 > 
-> Adding that is quite easy but I cannot test it.
-> Maybe someone could add it later?
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index 652a537..a91c928 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -17,6 +17,7 @@
+> 
+>  #include <asm/mach/arch.h>
+>  #include <asm/hardware/gic.h>
+> +#include <asm/io.h>
+>  #include <mach/map.h>
+> 
+>  #include <plat/cpu.h>
+> @@ -29,6 +30,22 @@
+>  #include <video/platform_lcd.h>
+> 
+> 
+> +static void exynos_fimd_gpio_setup_24bpp(void)
+> +{
+> +	unsigned int reg = 0;
+> +	/*
+> +	 * Set DISP1BLK_CFG register for Display path selection
+> +	 * FIMD of DISP1_BLK Bypass selection : DISP1BLK_CFG[15]
+> +	 * ---------------------
+> +	 * 0 | MIE/MDNIE
+> +	 * 1 | FIMD : selected
+> +	 */
+> +	reg = __raw_readl(S3C_VA_SYS + 0x0214);
+> +	reg &= ~(1 << 15);      /* To save other reset values */
+> +	reg |= (1 << 15);
+> +	__raw_writel(reg, S3C_VA_SYS + 0x0214);
+> +}
+> +
+>  static int smdk5250_bl_notify(struct device *unused, int brightness)
+>  {
+>  	/* manage lcd_bl_en signal */
+> @@ -51,6 +68,14 @@ static struct platform_pwm_backlight_data smdk5250_bl_data = {
+>  	.notify		= smdk5250_bl_notify,
+>  };
+> 
+> +static struct platform_device exynos_drm_device = {
+> +	.name		= "exynos-drm",
+> +	.dev = {
+> +		.dma_mask = &exynos_drm_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask = 0xffffffffUL,
+> +	}
+> +};
+> +
 
-It shouldn't be too hard to test: make the top field red and the bottom field blue
-and check if the resulting image is correct.
 
-Regards,
+If your patches use ./drivers/video/s3c-fb.c, please use the term 'FB'.
+In this case, this 'exynos_drm_device' is not unnecessary.
 
-	Hans
+Um... Have you tested this patchset with board such as SMDK5250?
+Does it work properly?
+
+
+>  static void lcd_set_power(struct plat_lcd_data *pd,
+>  			unsigned int power)
+>  {
+> @@ -134,6 +159,7 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+> 
+>  static struct platform_device *smdk5250_devices[] __initdata = {
+>  	&smdk5250_lcd, /* for platform_lcd device */
+> +	&exynos_drm_device,
+>  };
+> 
+>  static void __init exynos5250_dt_map_io(void)
+> @@ -147,6 +173,7 @@ static void __init exynos5250_dt_machine_init(void)
+>  	samsung_bl_set(&smdk5250_bl_gpio_info, &smdk5250_bl_data);
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+>  				exynos5250_auxdata_lookup, NULL);
+> +	exynos_fimd_gpio_setup_24bpp();
+>  	platform_add_devices(smdk5250_devices, ARRAY_SIZE(smdk5250_devices));
+>  }
+> 
+> --
+> 1.7.0.4
