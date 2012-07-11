@@ -1,21 +1,38 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 11 Jul 2012 11:18:20 +0200
-Subject: [PATCH v2 2/3] media: coda: Add driver for Coda video codec.
-In-Reply-To: <1341825437-23420-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1341825437-23420-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CACKLOr3sxiSDeV0=Hk07xMYd1XtZZA65tCcBjxOY=GeEH+spaw@mail.gmail.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 11 Jul 2012 15:12:14 +0530
+Subject: [PATCH 0/7] Add device tree based discovery support for drm-fimd
+Message-ID: <1341999741-15578-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe, Sascha,
-could you ack this patch please?
+From: Leela Krishna <l.krishna@samsung.com>
 
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+The patches are created against "for-next" branch of Kukjin Kim's tree at:
+ git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+
+This patch set adds Backlight, LCD support and device tree based discovery 
+support for drm-fimd
+
+Leela Krishna (3):
+  ARM: EXYNOS5: add device tree based discovery support for FIMD
+  ARM: EXYNOS5: Add the bus clock for FIMD
+  ARM: EXYNOS5: Set parent clock to fimd
+
+Leela Krishna Amudala (4):
+  ARM: SAMSUNG: add additional registers and SFR definitions for
+    writeback
+  ARM: EXYNOS5: add machine specific support for backlight
+  ARM: EXYNOS5: add machine specific support for LCD
+  ARM: EXYNOS: Adding DRM platform device
+
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |   16 +++
+ arch/arm/boot/dts/exynos5250.dtsi               |    7 ++
+ arch/arm/mach-exynos/Kconfig                    |    1 +
+ arch/arm/mach-exynos/clock-exynos5.c            |   30 ++++--
+ arch/arm/mach-exynos/include/mach/map.h         |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c          |  125 +++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/clock.h      |    2 +
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   10 ++
+ arch/arm/plat-samsung/include/plat/regs-fb.h    |   51 +++++++++
+ drivers/video/Kconfig                           |    6 +
+ 10 files changed, 239 insertions(+), 10 deletions(-)
