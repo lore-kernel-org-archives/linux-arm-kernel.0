@@ -1,52 +1,183 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 11 Jul 2012 15:34:07 +0900
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <4FE1FB15.3090305@codeaurora.org>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
- <4FD62DBB.8070407@codeaurora.org>
- <20120611192519.GF18267@n2100.arm.linux.org.uk>
- <4FE1FB15.3090305@codeaurora.org>
-Message-ID: <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Jul 2012 08:34:03 +0200
+Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: update features
+In-Reply-To: <1341988443-5534-1-git-send-email-s.hauer@pengutronix.de>
+References: <1341988443-5534-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1341988443-5534-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd wrote:
-> 
-> On 06/11/12 12:25, Russell King - ARM Linux wrote:
-> > On Mon, Jun 11, 2012 at 10:41:15AM -0700, Stephen Boyd wrote:
-> >> On 06/11/12 10:18, Nicolas Pitre wrote:
-> >>> It certainly works for all the targets I'm looking at right now.  In
-> >>> those cases the boot protocol couldn't care less about the IPI number
-> as
-> >>> the point is only to kick the target CPU out of WFI.
-> >>>
-> >>> And that message certainly has to go as it may be triggered multiple
-> >>> times per second in some use cases here.
-> >>>
-> >>>
-> >> Last time this came up I thought we covered most of the platforms?
-> >>
-> >> OMAP, Realview, Versatile Express, and MSM are covered by this thread
-> >>
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-
-> January/039275.html
-> > Ok, in that case I've just committed three patches to make those
-> platforms
-> > use SGI0 instead of SGI1.
-> 
-> Great. Kukjin Kim, can exynos use SGI0? It looks like exynos is the only
-> one left to move to SGI0.
-> 
-Yeah, EXYNOS can use SGI0 instead of SGI1 :)
+- reenable CONFIG_MFD_MC13XXX_SPI
+- Allow booting from MMC card.
+- Enable mc13783 Codec support
+- Enable sgtl5000 Codec support
+- Enable mc13783 RTC
+- Enable Control Group support for systemd
+- Enable clk debugfs support
+- Enable i.MX keypad driver
+- Enable MC13783 touchscreen
+- Enable i.MX PATA driver
 
-Thanks.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |   51 +++++++++++++++++-----------------
+ 1 file changed, 25 insertions(+), 26 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index e05a2f1..78ed575 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -2,7 +2,10 @@ CONFIG_EXPERIMENTAL=y
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CGROUPS=y
+ CONFIG_EXPERT=y
+ # CONFIG_COMPAT_BRK is not set
+ CONFIG_SLAB=y
+@@ -36,8 +39,6 @@ CONFIG_MACH_IMX27IPCAM=y
+ CONFIG_MACH_IMX27_DT=y
+ CONFIG_MXC_IRQ_PRIOR=y
+ CONFIG_MXC_PWM=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -46,7 +47,6 @@ CONFIG_FPE_NWFPE=y
+ CONFIG_FPE_NWFPE_XP=y
+ CONFIG_PM_DEBUG=y
+ CONFIG_NET=y
+-CONFIG_SMSC911X=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+ CONFIG_INET=y
+@@ -70,31 +70,31 @@ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+ CONFIG_MTD_CFI_GEOMETRY=y
+ # CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
+-CONFIG_MTD_MAP_BANK_WIDTH_4=y
+ # CONFIG_MTD_CFI_I2 is not set
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_MXC=y
+ CONFIG_MTD_UBI=y
+-CONFIG_MISC_DEVICES=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_EEPROM_AT25=y
++CONFIG_ATA=y
++CONFIG_PATA_IMX=y
+ CONFIG_NETDEVICES=y
+ CONFIG_CS89x0=y
+ CONFIG_CS89x0_PLATFORM=y
+ CONFIG_DM9000=y
+ CONFIG_SMC91X=y
+ CONFIG_SMC911X=y
++CONFIG_SMSC911X=y
+ CONFIG_SMSC_PHY=y
+ # CONFIG_INPUT_MOUSEDEV is not set
+ CONFIG_INPUT_EVDEV=y
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_KEYBOARD_IMX=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ADS7846=m
+-CONFIG_TOUCHSCREEN_MC13783=m
+-# CONFIG_SERIO is not set
++CONFIG_TOUCHSCREEN_MC13783=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_8250=m
+ CONFIG_SERIAL_IMX=y
+@@ -113,31 +113,23 @@ CONFIG_HWMON=m
+ CONFIG_SENSORS_MC13783_ADC=m
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+-CONFIG_MFD_MC13XXX=y
++CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+-CONFIG_FB=y
+-CONFIG_FB_IMX=y
+-CONFIG_BACKLIGHT_LCD_SUPPORT=y
+-CONFIG_LCD_CLASS_DEVICE=y
+-CONFIG_BACKLIGHT_CLASS_DEVICE=y
+-CONFIG_LCD_L4F00242T03=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+-CONFIG_VIDEO_V4L2_COMMON=y
+-CONFIG_VIDEO_MEDIA=y
+-CONFIG_VIDEO_V4L2=y
+-CONFIG_VIDEOBUF_GEN=y
+-CONFIG_VIDEOBUF_DMA_CONTIG=y
+-CONFIG_VIDEOBUF2_CORE=y
+-CONFIG_VIDEO_CAPTURE_DRIVERS=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+-CONFIG_VIDEO_MX2_HOSTSUPPORT=y
+ CONFIG_VIDEO_MX2=y
++CONFIG_FB=y
++CONFIG_FB_IMX=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_CLASS_DEVICE=y
++CONFIG_LCD_L4F00242T03=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FONTS=y
+@@ -152,13 +144,17 @@ CONFIG_SND_IMX_SOC=y
+ CONFIG_SND_SOC_MX27VIS_AIC32X4=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
++CONFIG_SND_SOC_IMX_SGTL5000=y
++CONFIG_SND_SOC_IMX_MC13783=y
+ CONFIG_USB_HID=m
+ CONFIG_USB=y
+-# CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MXC=y
+ CONFIG_USB_ULPI=y
+ CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_MXC=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+@@ -173,22 +169,25 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_IMXDI=y
++CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_IMX_DMA=y
++CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_PROC_PAGE_MONITOR is not set
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_UBIFS_FS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=m
+ CONFIG_NLS_CODEPAGE_850=m
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=m
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+-- 
+1.7.10.4
