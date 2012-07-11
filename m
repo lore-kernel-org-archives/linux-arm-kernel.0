@@ -1,26 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 11 Jul 2012 12:47:17 +0100
-Subject: [PATCH v5 5/6] spi: s3c64xx: Remove the 'set_level' callback
- from controller data
-In-Reply-To: <1342005359-748-1-git-send-email-thomas.abraham@linaro.org>
-References: <CAJuYYwSi-1nBM40SWt359W0Lr2n_yVX5tvWfOS77bmLQRt_9fw@mail.gmail.com>
- <1342005359-748-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120711114716.GF3938@opensource.wolfsonmicro.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Jul 2012 12:57:55 +0100
+Subject: [Ksummit-2012-discuss] ARM mini-summit
+In-Reply-To: <201207111128.29924.arnd@arndb.de>
+References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
+ <201207111128.29924.arnd@arndb.de>
+Message-ID: <20120711115755.GF22437@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 04:45:59PM +0530, Thomas Abraham wrote:
-> The set_level callback in the controller data, which is used to configure
-> the slave select line, cannot be supported when migrating the driver to
-> device tree based discovery. Since all the platforms currently use gpio
-> as the slave select line, this callback can be removed from the
-> controller data and replaced with call to gpio_set_value in the driver.
+On Wed, Jul 11, 2012 at 12:28:29PM +0100, Arnd Bergmann wrote:
+> On Wednesday 11 July 2012, James Bottomley wrote:
+> > Hi All,
+> > 
+> > We have set aside the second day of the kernel summit (Tuesday 28
+> > August) as mini-summit day.  So far we have only the PCI mini summit on
+> > this day, so if you can think of other topics, please send them to the
+> > kernel summit discuss list:
+> > 
+> > ksummit-2012-discuss at lists.linux-foundation.org
+> > 
+> > Looking at the available rooms, we think we can run about four or five
+> > mini summits.
+> > 
+> > As an added incentive, mini summit organisers get to pick who they
+> > invite and all the people they pick will get an automatic invitation to
+> > the third day of the kernel summit (but not the core first day) and the
+> > evening events.
+> 
+> There is a lot of interest in having another ARM mini-summit, as we had last
+> year. Previously, Grant Likely organized this with Olof and me, but right now
+> Grant is in an extended offline period and Olof is currently on vacation
+> as well. Will Deacon already contacted me and he is interested in helping
+> out with organizing the mini-summit, so the two of us could be the primary
+> contacts, with Grant and Olof joining in as time permits.
+> 
+> I'm planning to send out an initial email to potential participants today
+> or tomorrow to get an idea of who would be joining.
 
-I don't seem to have patches 1-4?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120711/418f6cca/attachment.sig>
+I'm definitely interested in attending this.
+
+-- 
+Catalin
