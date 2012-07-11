@@ -1,49 +1,21 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 11 Jul 2012 12:11:23 -0700
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120711183838.GM30009@pengutronix.de>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
- <20120706062852.GZ30009@pengutronix.de>
- <20120711060121.GB30055@b20223-02.ap.freescale.net>
- <20120711183838.GM30009@pengutronix.de>
-Message-ID: <4FFDCFDB.7020402@boundarydevices.com>
+From: konrad@darnok.org (Konrad Rzeszutek Wilk)
+Date: Wed, 11 Jul 2012 15:27:53 -0400
+Subject: [Ksummit-2012-discuss] ARM mini-summit
+In-Reply-To: <20120711140536.GC16523@phenom.dumpdata.com>
+References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
+ <201207111128.29924.arnd@arndb.de>
+ <CACxGe6vOXaJaTdob8MZ7NGw8v-QQ0wnycnYK6JTK+YT5vA2EfQ@mail.gmail.com>
+ <20120711140536.GC16523@phenom.dumpdata.com>
+Message-ID: <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/11/2012 11:38 AM, Sascha Hauer wrote:
-> Hi Richard,
->
-> On Wed, Jul 11, 2012 at 02:01:21PM +0800, Richard Zhao wrote:
->> IC guys confirmed that the spec is right:
+>> > contacts, with Grant and Olof joining in as time permits.
 >>
->> This an adaptive feature of our I2C module may apply to all IMX chips.
->> No mistake in the table of RMs.
->>
->> The divider is designed to guarantee SCL high level and low level last
->> time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
->> the transition time is longer than 1 internal pre-divided clock cycle.
->> The pre-divided clock is divided from I2C module clock, used for
->> generating SCL. So you will see SCL clock cycle is some way longer than
->> calculated value using IFDR.
->>
->> Transition time will different from rising or falling edge, different
->> pull-up resistors, and different SCL loading.
->>
->> This feature make sure transition time won?t eat both level time of SCL.
-> Thanks for clarification. Does this mean that this feature is used to
-> synchronize between the bus clock and and bitclock?
+>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 >
-> I'll send a documentation patch for this next week to make this clear.
->
-> Sascha
->
-How does this explain why column 2 matched your measurements, but 1, 3, 
-and 4 didn't.
-And you tested on 2 different boards.
-Something doesn't smell right.
+> I would be interested in attending it as well. I believe Stefano has a strong
+> interest as well (since he and Ian Campbell are leading the Xen ARM work).
 
-Just my 2cents
-Troy
+And Stefano is out on vacation right now so I will serve as his phantom voice
+and say: "Yes, I am interested as well."
