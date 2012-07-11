@@ -1,85 +1,33 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 11 Jul 2012 11:08:58 +0200
-Subject: [RFC] kernel, logbuf: add support for external log buffer
-In-Reply-To: <1339395188-10166-1-git-send-email-hs@denx.de>
-References: <1339395188-10166-1-git-send-email-hs@denx.de>
-Message-ID: <4FFD42AA.8090301@denx.de>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Wed, 11 Jul 2012 14:43:13 +0530
+Subject: [PATCH 0/2] gpio/omap: few code realignment and update of missing code
+Message-ID: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This is in reponse to comments provided to [gpio/omap: add clk_prepare
+and clk_unprepare] and is available here for reference:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105762.html
 
-On 11.06.2012 08:13, Heiko Schocher wrote:
-> This merges support for the previously DENX-only kernel
-> feature of specifying an alternative, "external" buffer
-> for kernel printk messages and their associated metadata.
-> This patch is based on DENX-only kernel commit:
->
-> commit 212f61c7fd3b952a81d1459dd32a86a32ddfd4ce
-> Author: Igor Lisitsin<igor@emcraft.com>
-> Date:   Wed Apr 18 14:55:19 2007 +0400
->
-> Add support for external log buffer.
->
-> Add support for external log buffer, for example passed by U-Boot,
-> which may already contain messages (from the boot loader and/or POST).
->
-> Signed-off-by: Igor Lisitsin<igor@emcraft.com>
->
-> see:
-> http://git.denx.de/?p=linux-denx.git;a=commit;h=212f61c7fd3b952a81d1459dd32a86a32ddfd4ce
->
-> When this option is enabled, an architecture- or machine-specific log
-> buffer is used for all printk messages. This allows entities such as
-> boot loaders (e.g. U-Boot) to place printk-compatible messages into
-> this buffer and for the kernel to coalesce them with its normal
-> messages. This patch support this feature for arch/arm based
-> boards.
->
-> Signed-off-by: Heiko Schocher<hs@denx.de>
-> Cc: Wolfgang Denk<wd@denx.de>
-> Cc: Igor Lisitsin<igor@emcraft.com>
-> Cc: Grant Erickson<gerickson@nuovations.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: Tim Bird<tim.bird@am.sony.com>
-> Cc: CE Linux Developers List<celinux-dev@lists.celinuxforum.org>
-> Cc: Kay Sievers<kay@vrfy.org>
->
-> ---
-> restage prior discussion from lkml:
->
-> https://lkml.org/lkml/2009/1/21/250
->
-> Discussion stopped, and I want to reanimate it, also there is a
-> Project Proposal on the "CE Linux Developers List" for such a feature,
-> see here:
->
-> http://www.mail-archive.com/celinux-dev at lists.celinuxforum.org/msg00103.html
->
-> Maybe it is now the time to discuss this again?
->
-> Is it worth to try to get this old code in current kernel, or
-> should we investigate Kay Sievers proposal for a structured logging
-> system, which will alter the format of the messages as they are
-> stored in the log buffer, and discuss for this a "logbuffer support"?
->
-> See this discussion here:
->
-> http://thread.gmane.org/gmane.linux.kernel/1277619
->
->   arch/arm/mm/init.c      |   25 ++++++++++
->   include/linux/logbuff.h |   51 ++++++++++++++++++++
->   init/Kconfig            |   12 +++++
->   init/main.c             |    5 ++
->   kernel/printk.c         |  117 +++++++++++++++++++++++++++++++++++++++++++++--
->   5 files changed, 206 insertions(+), 4 deletions(-)
->   create mode 100644 include/linux/logbuff.h
+Patch-1 moves the debounce clock handle initialization from gpio_debounce()
+to omap_gpio_mod_init(). Since this is a one time initialization it makes
+sense to keep it here. Though proposal was to keep in omap_gpio_chip_init()
+I found more appropriate to keep in omap_gpio_mod_init() because it is more
+related to bank specific initialization.
 
-ping? I got no respond to this RFC ... no chance to get this to
-mainline?
+Patch-2 adds *.remove* callback which is missing in current implementation.
+Along with other cleanup operations this function is used for releasing the
+clock handle and of course calling clk_unprepare().
 
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Reference:
+git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+Commit: bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a (Linux 3.5-rc6)
+
+Tested on: OMAP3630/ZOOM3, BLAZE
+
+Tarun Kanti DebBarma (2):
+  gpio/omap: move bank->dbck initialization to omap_gpio_mod_init()
+  gpio/omap: add *remove* callback in platform_driver
+
+ drivers/gpio/gpio-omap.c |   40 ++++++++++++++++++++++++++++++++++------
+ 1 files changed, 34 insertions(+), 6 deletions(-)
