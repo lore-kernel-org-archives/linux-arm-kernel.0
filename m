@@ -1,40 +1,46 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 11 Jul 2012 15:32:01 +0530
-Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
-In-Reply-To: <20120710170112.GK10022@opensource.wolfsonmicro.com>
-References: <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
- <20120710134436.GD9409@opensource.wolfsonmicro.com>
- <4FFC31D5.7090600@nvidia.com>
- <20120710135302.GG9409@opensource.wolfsonmicro.com>
- <4FFC4478.7000204@nvidia.com>
- <20120710154201.GE10022@opensource.wolfsonmicro.com>
- <4FFC5ACA.8010003@nvidia.com>
- <20120710165236.GI10022@opensource.wolfsonmicro.com>
- <4FFC5E1C.7000500@nvidia.com>
- <20120710170112.GK10022@opensource.wolfsonmicro.com>
-Message-ID: <4FFD4F19.8070404@nvidia.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 11 Jul 2012 12:02:48 +0200
+Subject: [PATCH 1/2] media: Add mem2mem deinterlacing driver.
+In-Reply-To: <201207111145.51858.hverkuil@xs4all.nl>
+References: <1341996904-22893-1-git-send-email-javier.martin@vista-silicon.com>
+ <1341996904-22893-2-git-send-email-javier.martin@vista-silicon.com>
+ <201207111145.51858.hverkuil@xs4all.nl>
+Message-ID: <CACKLOr1xgjuGp-jshCaCBZwG4pbWsBSt9Cq9jUdd3PGjpHiXEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 July 2012 10:31 PM, Mark Brown wrote:
-> * PGP Signed by an unknown key
+Hi Hans,
+thank you for your comments.
+
+On 11 July 2012 11:45, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> Hi Javier!
 >
-> On Tue, Jul 10, 2012 at 10:23:48PM +0530, Laxman Dewangan wrote:
+> Thanks for the patch.
 >
->> Then I will have 2 question:
->> 1. If that pin is connected to battery then what should be entry?
->>     vcc1-supply =<>>>;
->> Do we need to register battery supply as fixed (non-gpio based) and
->> then refer here for phandle?
-> Use a fixed voltage regulator to represent the battery.
+> On Wed 11 July 2012 10:55:03 Javier Martin wrote:
+>> Some video decoders such as tvp5150 provide separate
+>> video fields (V4L2_FIELD_SEQ_TB). This driver uses
+>> dmaengine to convert this format to V4L2_FIELD_INTERLACED_TB
+>> (weaving) or V4L2_FIELD_NONE (line doubling)
 >
->> 2. what about non-dt case? The regulator registration will also fail
->> here because of there is no regulator saying vcc1 in this case. Do
->> we need to register the vcc1 regualtor as fixed, battery supplied
->> regulator in board files so that the ldo's registration will
->> success?
-> Same thing, use a fixed voltage regulator.
+> Which field is used for the line doubling? Top or bottom? Or is each field
+> doubled, thus doubling the framerate?
+
+No, just top field is used.
+I don't know if it's worth defining a new field format for doubling fields.
+
+> I also recommend adding SEQ_BT/INTERLACED_BT support: NTSC transmits the bottom
+> field first, so it is useful to have support for that.
+
+Adding that is quite easy but I cannot test it.
+Maybe someone could add it later?
 
 
-Understood completely and it is so simple to support vin-supply. Will 
-implement the same. Thanks for clearing doubts.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
