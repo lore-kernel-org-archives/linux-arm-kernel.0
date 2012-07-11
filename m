@@ -1,33 +1,60 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 11 Jul 2012 23:10:43 +0200 (CEST)
-Subject: [PATCH v5] clocksource: dw_apb_timer: Add common DTS glue for
- dw_apb_timer
-In-Reply-To: <1342037596-17710-1-git-send-email-dinguyen@altera.com>
-References: <1342037596-17710-1-git-send-email-dinguyen@altera.com>
-Message-ID: <alpine.LFD.2.02.1207112307061.32033@ionos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Jul 2012 23:16:09 +0200
+Subject: [Ksummit-2012-discuss] ARM mini-summit
+In-Reply-To: <201207112006.28632.arnd@arndb.de>
+References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
+ <20120711140536.GC16523@phenom.dumpdata.com>
+ <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
+ <201207112006.28632.arnd@arndb.de>
+Message-ID: <061ef00be9b475973e5df22fcd096308@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jul 2012, dinguyen at altera.com wrote:
-
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, 11 Jul 2012 20:06:28 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 11 July 2012, Konrad Rzeszutek Wilk wrote:
+>> >> > contacts, with Grant and Olof joining in as time permits.
+>> >>
+>> >> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>> >
+>> > I would be interested in attending it as well. I believe Stefano has
+a
+>> > strong
+>> > interest as well (since he and Ian Campbell are leading the Xen ARM
+>> > work).
+>> 
+>> And Stefano is out on vacation right now so I will serve as his phantom
+>> voice
+>> and say: "Yes, I am interested as well."
 > 
-> Make a common device tree glue for clocksource/dw_apb_timer.
-> Move mach-picoxcell/time.c to be a generic device tree application
-> of the dw_apb_timer.
+> Ok. So are you mostly interested in discussion ARM virtualization or
+other
+> topics
+> as well? Last time we had organized this explicitly as the "ARM subarch
+> maintainer
+> summit" and we might again limit the participants to the subarch
+> maintainers and
+> a few more people if we're running out of space, but then again if a lot
+> of them
+> are interested in discussion virtualization, we should probably have you
+> both and 
+> the ARM KVM people included as well.
 > 
-> Configure mach-picoxcell to use the dw_apb_timer_of device tree
-> implementation in drivers/clocksource.
-> 
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Acked-by: Jamie Iles <jamie@jamieiles.com>
+> We haven't even started discussing an agenda, but I'll note down your
+> names as
+> candidates and Xen and/or KVM as proposed topics. I'll follow up with a
+> more
+> formal call for topics once I have a positive confirmation from James
+and
+> the
+> linux-foundation that we can go ahead with the ARM mini-summit.
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Putting on my KVM/ARM hacker hat this time: I'd be very glad to contribute
+to the discussion. There is a number of ARM-specific topics that would be
+interesting to discuss regarding KVM/ARM (mainlining the damn thing, common
+hypercalls?, HYP mode booting), and probably a couple of other things.
 
-Please take it through the proper ARM/SoC tree so work depending on
-that does not get blocked.
+Cheers,
 
-Thanks,
-
-	tglx
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
