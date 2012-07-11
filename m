@@ -1,28 +1,77 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 11 Jul 2012 11:25:37 +0800
-Subject: [PATCH 0/5] AT91SAM9G46/M11: add crypto drivers
-In-Reply-To: <1341163187-14946-1-git-send-email-eric@eukrea.com>
-References: <1341163187-14946-1-git-send-email-eric@eukrea.com>
-Message-ID: <20120711032537.GF5263@gondor.apana.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Jul 2012 12:14:33 +0800
+Subject: [PATCH 4/6] ARM: apx4devkit: add SSP2 support
+In-Reply-To: <1341904092-13777-5-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1341904092-13777-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <1341904092-13777-5-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20120711041431.GC14060@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 01, 2012 at 07:19:42PM +0200, Eric B?nard wrote:
-> This patch serie adds the support for the crypto engine available in
-> the Atmel SAM9G46 http://www.atmel.com/devices/SAM9G46.aspx and SAM9M11
-> http://www.atmel.com/devices/SAM9M11.aspx
+On Tue, Jul 10, 2012 at 10:08:10AM +0300, Lauri Hintsala wrote:
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> ---
+>  arch/arm/boot/dts/apx4devkit.dts |   31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
 > 
-> For each driver the choice between PDC/DMA or PIO was optimized to
-> maximize the performances (benchmarks will soon be available on
-> the linux4sam wiki http://www.at91.com/).
-> 
-> These drivers were tested on both devices : the last patch adds a few
-> missing tests to tcrypt.
-> 
-> This work was sponsored by Atmel.
+> diff --git a/arch/arm/boot/dts/apx4devkit.dts b/arch/arm/boot/dts/apx4devkit.dts
+> index f6d1a57..9cf5ae6 100644
+> --- a/arch/arm/boot/dts/apx4devkit.dts
+> +++ b/arch/arm/boot/dts/apx4devkit.dts
+> @@ -25,6 +25,14 @@
+>  				status = "okay";
+>  			};
+>  
+> +			ssp2: ssp at 80014000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&mmc2_4bit_pins_apx4 &mmc2_sck_cfg_apx4>;
+> +				bus-width = <4>;
+> +				status = "okay";
+> +			};
+> +
+>  			pinctrl at 80018000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&hog_pins_a>;
+> @@ -52,6 +60,29 @@
+>  					fsl,voltage = <1>;
+>  					fsl,pull-up = <0>;
+>  				};
+> +
+> +				mmc2_4bit_pins_apx4: mmc2-4bit-apx4 at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x2041 /* MX28_PAD_SSP0_DATA4__SSP2_D0 */
+> +						0x2051 /* MX28_PAD_SSP0_DATA5__SSP2_D3 */
+> +						0x2061 /* MX28_PAD_SSP0_DATA6__SSP2_CMD */
+> +						0x2071 /* MX28_PAD_SSP0_DATA7__SSP2_SCK */
+> +						0x2141 /* MX28_PAD_SSP2_SS1__SSP2_D1 */
+> +						0x2151 /* MX28_PAD_SSP2_SS2__SSP2_D2 */
+> +					>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
 
-All applied.  Thanks!
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Ideally, this should be defined in imx28.dtsi, since what pins can be
+muxed on what functions is determined by soc design.  But I'm fine
+with it for now, and we can move it later when there are other boards
+using the same mux options emerging.
+
+Regards,
+Shawn
+
+> +
+> +				mmc2_sck_cfg_apx4: mmc2-sck-cfg-apx4 {
+> +					fsl,pinmux-ids = <
+> +						0x2071 /* MX28_PAD_SSP0_DATA7__SSP2_SCK */
+> +					>;
+> +					fsl,drive-strength = <2>;
+> +					fsl,pull-up = <0>;
+> +				};
+>  			};
+>  
+>  			lcdif at 80030000 {
+> -- 
+> 1.7.9.5
+> 
