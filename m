@@ -1,55 +1,40 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 11 Jul 2012 19:05:49 +0900
-Subject: [PATCH 0/7] Add device tree based discovery support for drm-fimd
-In-Reply-To: <1341997869-27527-1-git-send-email-l.krishna@samsung.com>
-References: <1341997869-27527-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <001401cd5f4c$bf564e30$3e02ea90$%han@samsung.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 11 Jul 2012 15:32:01 +0530
+Subject: [PATCH 1/3] ARM: dt: tegra: seaboard: add regulators
+In-Reply-To: <20120710170112.GK10022@opensource.wolfsonmicro.com>
+References: <4FE8EFC4.3090509@wwwdotorg.org> <4FFC190A.2040800@nvidia.com>
+ <20120710134436.GD9409@opensource.wolfsonmicro.com>
+ <4FFC31D5.7090600@nvidia.com>
+ <20120710135302.GG9409@opensource.wolfsonmicro.com>
+ <4FFC4478.7000204@nvidia.com>
+ <20120710154201.GE10022@opensource.wolfsonmicro.com>
+ <4FFC5ACA.8010003@nvidia.com>
+ <20120710165236.GI10022@opensource.wolfsonmicro.com>
+ <4FFC5E1C.7000500@nvidia.com>
+ <20120710170112.GK10022@opensource.wolfsonmicro.com>
+Message-ID: <4FFD4F19.8070404@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On July 11, 2012 6:11 PM, Leela Krishna Amudala <l.krishna@samsung.com> wrote:
+On Tuesday 10 July 2012 10:31 PM, Mark Brown wrote:
+> * PGP Signed by an unknown key
+>
+> On Tue, Jul 10, 2012 at 10:23:48PM +0530, Laxman Dewangan wrote:
+>
+>> Then I will have 2 question:
+>> 1. If that pin is connected to battery then what should be entry?
+>>     vcc1-supply =<>>>;
+>> Do we need to register battery supply as fixed (non-gpio based) and
+>> then refer here for phandle?
+> Use a fixed voltage regulator to represent the battery.
+>
+>> 2. what about non-dt case? The regulator registration will also fail
+>> here because of there is no regulator saying vcc1 in this case. Do
+>> we need to register the vcc1 regualtor as fixed, battery supplied
+>> regulator in board files so that the ldo's registration will
+>> success?
+> Same thing, use a fixed voltage regulator.
 
-> 
-> From: Leela Krishna <l.krishna@samsung.com>
-> 
-> The patches are created against "for-next" branch of Kukjin Kim's tree at:
->  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> 
-> This patch set adds Backlight, LCD support and device tree based discovery
-> support for drm-fimd
 
-Your patchset seems FB-FIMD, not DRM-FIMD.
-
-FIMD IP can be used by FB or DRM framework.
-Please, use the term clearly.
-
-If your patches use ./drivers/video/s3c-fb.c, please use the term 'FB'.
-If your patches use ./drivers/gpu/drm/exynos/*, please use the term 'DRM'.
-
-Best regards,
-Jingoo Han
-
-> 
-> Leela Krishna (3):
->   ARM: EXYNOS5: add device tree based discovery support for FIMD
->   ARM: EXYNOS5: Add the bus clock for FIMD
->   ARM: EXYNOS5: Set parent clock to fimd
-> 
-> Leela Krishna Amudala (4):
->   ARM: SAMSUNG: add additional registers and SFR definitions for
->     writeback
->   ARM: EXYNOS5: add machine specific support for backlight
->   ARM: EXYNOS5: add machine specific support for LCD
->   ARM: EXYNOS: Adding DRM platform device
-> 
->  arch/arm/boot/dts/exynos5250-smdk5250.dts       |   16 +++
->  arch/arm/boot/dts/exynos5250.dtsi               |    7 ++
->  arch/arm/mach-exynos/Kconfig                    |    1 +
->  arch/arm/mach-exynos/clock-exynos5.c            |   30 ++++--
->  arch/arm/mach-exynos/include/mach/map.h         |    1 +
->  arch/arm/mach-exynos/mach-exynos5-dt.c          |  125 +++++++++++++++++++++++
->  arch/arm/plat-samsung/include/plat/clock.h      |    2 +
->  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   10 ++
->  arch/arm/plat-samsung/include/plat/regs-fb.h    |   51 +++++++++
->  drivers/video/Kconfig                           |    6 +
->  10 files changed, 239 insertions(+), 10 deletions(-)
+Understood completely and it is so simple to support vin-supply. Will 
+implement the same. Thanks for clearing doubts.
