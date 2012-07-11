@@ -1,38 +1,66 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Wed, 11 Jul 2012 14:41:02 +0530
-Subject: [PATCH 0/7] Add device tree based discovery support for drm-fimd
-Message-ID: <1341997869-27527-1-git-send-email-l.krishna@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 11 Jul 2012 16:52:45 +0800
+Subject: MX28EVK mainline 3.5-Patchs-3.5-rc5 sgtl5000 record not working
+In-Reply-To: <20120711031446.GB14060@S2101-09.ap.freescale.net>
+References: <CAHE2-smsOufHjfyjKARcwHve4cGqWeM8y7ALxcJkaqLiZBNoSw@mail.gmail.com>
+ <20120711031446.GB14060@S2101-09.ap.freescale.net>
+Message-ID: <20120711085244.GA22640@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leela Krishna <l.krishna@samsung.com>
+On Wed, Jul 11, 2012 at 11:14:48AM +0800, Shawn Guo wrote:
+> Copy driver maintainer Dong here.
+> 
+> Regards,
+> Shawn
+> 
+> On Tue, Jul 10, 2012 at 06:09:44PM +0200, Andreas Gretler wrote:
+> > Hi,
+> > 
+> > i've tested mainline 3.5-Patchs-3.5-rc5 for MX28EVK and it boot up and
+> > work fine.
+> > 
+> > But I'm not able to record something. Playback works. I also test it
+> > against the old 2.6.35.3 Kernel and there record works.
+> > 
+> > arecord -l show me this:
+> > 
+> > **** List of CAPTURE Hardware Devices ****
+> > card 0: mxssgtl5000 [mxs_sgtl5000], device 0: HiFi Playback sgtl5000-0 []
+> >   Subdevices: 1/1
+> >   Subdevice #0: subdevice #0
+> > card 0: mxssgtl5000 [mxs_sgtl5000], device 1: HiFi Capture sgtl5000-1 []
+> >   Subdevices: 1/1
+> >   Subdevice #0: subdevice #0
+> > 
+> > 
+> > I try record with arecord -d 2 -D hw:0,1 -f dat test.wav , but it
+> > crash the Linux. No ErrMsg printed and the board stop working.
+> > I have no idea what goes wrong. I put some printk message in
+> > mxs-saif.c and the last message i can see before the board crash is in
+> > mxs_saif_trigger() is before clk_enable is called.
+> > 
+> > 		/*
+> > 		 * If the saif's master is not himself, we also need to enable
+> > 		 * itself clk for its internal basic logic to work.
+> > 		 */
+> > 		if (saif != master_saif) {
+> > 			clk_enable(saif->clk);
+> > 			__raw_writel(BM_SAIF_CTRL_RUN,
+> > 				saif->base + SAIF_CTRL + MXS_SET_ADDR);
+> > 		}
+> > 
+> >  In alsamixer i can not toggle the capture source from Mic-In to
+> > Line-in and also can't change the Headphone from DAC to Line-IN.
+> > 
+> > I'm not sure this is the right place to ask? I will also post ist to
+> > alsa-devel at alsa-project.org.
+> > Can anyone confirm the Problem? Or do/understand I something wrong
+> > with record and there is no Problem?
+> > 
+I can see the same problem at my side.
+Usually it's caused by clock issue.
+I will try to fix it tomorrow when have time.
 
-The patches are created against "for-next" branch of Kukjin Kim's tree at:
- git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-
-This patch set adds Backlight, LCD support and device tree based discovery 
-support for drm-fimd
-
-Leela Krishna (3):
-  ARM: EXYNOS5: add device tree based discovery support for FIMD
-  ARM: EXYNOS5: Add the bus clock for FIMD
-  ARM: EXYNOS5: Set parent clock to fimd
-
-Leela Krishna Amudala (4):
-  ARM: SAMSUNG: add additional registers and SFR definitions for
-    writeback
-  ARM: EXYNOS5: add machine specific support for backlight
-  ARM: EXYNOS5: add machine specific support for LCD
-  ARM: EXYNOS: Adding DRM platform device
-
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |   16 +++
- arch/arm/boot/dts/exynos5250.dtsi               |    7 ++
- arch/arm/mach-exynos/Kconfig                    |    1 +
- arch/arm/mach-exynos/clock-exynos5.c            |   30 ++++--
- arch/arm/mach-exynos/include/mach/map.h         |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c          |  125 +++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/clock.h      |    2 +
- arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   10 ++
- arch/arm/plat-samsung/include/plat/regs-fb.h    |   51 +++++++++
- drivers/video/Kconfig                           |    6 +
- 10 files changed, 239 insertions(+), 10 deletions(-)
+Regards
+Dong Aisheng
