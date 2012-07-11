@@ -1,33 +1,58 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 11 Jul 2012 14:43:13 +0530
-Subject: [PATCH 0/2] gpio/omap: few code realignment and update of missing code
-Message-ID: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
+Date: Wed, 11 Jul 2012 14:43:14 +0530
+Subject: [PATCH 1/2] gpio/omap: move bank->dbck initialization to
+ omap_gpio_mod_init()
+In-Reply-To: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
+References: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1341997995-14020-2-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is in reponse to comments provided to [gpio/omap: add clk_prepare
-and clk_unprepare] and is available here for reference:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105762.html
+Since the bank->dbck initialization in a one time operation there
+is no need to keep this within gpio_debounce(). Therefore, moving
+clk_get(bank->dbck) to omap_gpio_mod_init(). Since the value of
+bank->dbck would be NULL at the beginning, this check has been
+removed.
 
-Patch-1 moves the debounce clock handle initialization from gpio_debounce()
-to omap_gpio_mod_init(). Since this is a one time initialization it makes
-sense to keep it here. Though proposal was to keep in omap_gpio_chip_init()
-I found more appropriate to keep in omap_gpio_mod_init() because it is more
-related to bank specific initialization.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Cousson, Benoit <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+ drivers/gpio/gpio-omap.c |   10 ++++------
+ 1 files changed, 4 insertions(+), 6 deletions(-)
 
-Patch-2 adds *.remove* callback which is missing in current implementation.
-Along with other cleanup operations this function is used for releasing the
-clock handle and of course calling clk_unprepare().
-
-Reference:
-git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
-Commit: bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a (Linux 3.5-rc6)
-
-Tested on: OMAP3630/ZOOM3, BLAZE
-
-Tarun Kanti DebBarma (2):
-  gpio/omap: move bank->dbck initialization to omap_gpio_mod_init()
-  gpio/omap: add *remove* callback in platform_driver
-
- drivers/gpio/gpio-omap.c |   40 ++++++++++++++++++++++++++++++++++------
- 1 files changed, 34 insertions(+), 6 deletions(-)
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index c4ed172..afecdcc 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -889,12 +889,6 @@ static int gpio_debounce(struct gpio_chip *chip, unsigned offset,
+ 
+ 	bank = container_of(chip, struct gpio_bank, chip);
+ 
+-	if (!bank->dbck) {
+-		bank->dbck = clk_get(bank->dev, "dbclk");
+-		if (IS_ERR(bank->dbck))
+-			dev_err(bank->dev, "Could not get gpio dbck\n");
+-	}
+-
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	_set_gpio_debounce(bank, offset, debounce);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+@@ -966,6 +960,10 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
+ 	 /* Initialize interface clk ungated, module enabled */
+ 	if (bank->regs->ctrl)
+ 		__raw_writel(0, base + bank->regs->ctrl);
++
++	bank->dbck = clk_get(bank->dev, "dbclk");
++	if (IS_ERR(bank->dbck))
++		dev_err(bank->dev, "Could not get gpio dbck\n");
+ }
+ 
+ static __devinit void
+-- 
+1.7.0.4
