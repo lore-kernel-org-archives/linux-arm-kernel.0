@@ -1,30 +1,40 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 11 Jul 2012 15:39:09 +0200
-Subject: [PATCH v2 04/23] ARM: LPC32xx: Add DMA configuration to platform
- data
-In-Reply-To: <201207111325.03195.arnd@arndb.de>
-References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
- <201207111233.24780.arnd@arndb.de> <4FFD744F.8060204@antcom.de>
- <201207111325.03195.arnd@arndb.de>
-Message-ID: <4FFD81FD.4080103@antcom.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 11 Jul 2012 16:49:00 +0300
+Subject: Device tree binding for DVFS table
+In-Reply-To: <20748722.319671342012092123.JavaMail.weblogic@epml17>
+References: <20748722.319671342012092123.JavaMail.weblogic@epml17>
+Message-ID: <20120711134900.GA9437@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2012 03:25 PM, Arnd Bergmann wrote:
-> On Wednesday 11 July 2012, Roland Stigge wrote:
->> OK, thanks!
->>
->> Is a patch on top of the already provided lpc32xx-next branches the
->> preferred form for a fix? On top of which branch do you need it?
->>
+On Wed, Jul 11, 2012 at 03:08:14PM +0200, ??? wrote:
+> > Hi,
+> >
+> > I am working on DT binding for Tegra DVFS.
+> >
+> > For Tegra, DVFS node mainly consists of frequency and voltage pairs. 
+> > Frequency in the pair may change for different process. E.g. for process 
+> > 1 CPU clock frequency could be 900MHz at 1V while for process 2 it could 
+> > be 1GHz at 1V.
+> > Tegra uses vendor specific ids to identify the correct frequency table.
 > 
-> Yes, I think in this case, changing it on top of that branch is best.
+> Hello,
+> 
+> It seems that in the example, the values in "voltage-array" and
+> "frequencies" are switched.
+> 
+> Anyway, what about SoCs that reads information from IEM (or any other module)
+>  to measure gate delays or some other value to set the appriorate voltage values
+>  for every possible frequency? I remember some of Exynos SoCs have been doing
+>  it; dynamically measure the characteristics at boot-up time and apply voltages
+>  accordingly; they couldn't identify it based on the chip-id or simply by reading
+>  a single register.
 
-Good, thanks!
+But in that case you would have a nominal voltage for each OPP which gets
+adjusted at boottime or runtime depending on the exact silicon characteristics?
+I would say the DT binding should then specify 1 table with the nominal values
+and leave the dynamics to the driver.
 
-> I'm not sure how that works for the nand drivers though, since they
-> are in another tree.
+Cheers,
 
-Will address this separately with the mtd/nand tree.
-
-Roland
+Peter.
