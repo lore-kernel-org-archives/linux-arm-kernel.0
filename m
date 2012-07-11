@@ -1,62 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jul 2012 21:44:53 +0200
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <4FFDCFDB.7020402@boundarydevices.com>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
- <20120706062852.GZ30009@pengutronix.de>
- <20120711060121.GB30055@b20223-02.ap.freescale.net>
- <20120711183838.GM30009@pengutronix.de>
- <4FFDCFDB.7020402@boundarydevices.com>
-Message-ID: <20120711194453.GS30009@pengutronix.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 11 Jul 2012 13:04:02 -0700
+Subject: Device tree binding for DVFS table
+In-Reply-To: <20120711144449.GA23654@sirena.org.uk>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+ <20120711144449.GA23654@sirena.org.uk>
+Message-ID: <20120711200402.GC2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 12:11:23PM -0700, Troy Kisky wrote:
-> On 7/11/2012 11:38 AM, Sascha Hauer wrote:
-> >Hi Richard,
-> >
-> >On Wed, Jul 11, 2012 at 02:01:21PM +0800, Richard Zhao wrote:
-> >>IC guys confirmed that the spec is right:
-> >>
-> >>This an adaptive feature of our I2C module may apply to all IMX chips.
-> >>No mistake in the table of RMs.
-> >>
-> >>The divider is designed to guarantee SCL high level and low level last
-> >>time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
-> >>the transition time is longer than 1 internal pre-divided clock cycle.
-> >>The pre-divided clock is divided from I2C module clock, used for
-> >>generating SCL. So you will see SCL clock cycle is some way longer than
-> >>calculated value using IFDR.
-> >>
-> >>Transition time will different from rising or falling edge, different
-> >>pull-up resistors, and different SCL loading.
-> >>
-> >>This feature make sure transition time won?t eat both level time of SCL.
-> >Thanks for clarification. Does this mean that this feature is used to
-> >synchronize between the bus clock and and bitclock?
-> >
-> >I'll send a documentation patch for this next week to make this clear.
-> >
-> >Sascha
-> >
-> How does this explain why column 2 matched your measurements, but 1,
-> 3, and 4 didn't.
-> And you tested on 2 different boards.
-> Something doesn't smell right.
+On 20120711-15:44, Mark Brown wrote:
+> On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
+> 
+> > I'd expect a single property with freq/volt pairs or 2 properties for
+> > freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
+> 
+> I strongly agree - the current proposal is very hard to read due to the
+> separation between the voltage and frequency values.  Some devices do
+> also need to scale multiple rails together, especially when this gets
+> used for I/O devices.
+> 
+> I'd also expect to see a range of voltages for each frequency rather
+> than a specific voltage; usually things are at least characterised with
+> a specified tolerance.
 
-This reminds me that one divider value on i.MX53 crashed the whole I2C
-module (it was unusable until reset). The same value worked on i.MX1.
-Some divider values produced a terrible jitter on the clock output. So
-it really seems that there is something more going on than just a simple
-divider.
+Not only should we support multiple voltage rails but also multiple
+clocks.  For some devices a DVFS transition is composed of scaling
+multiple clock rates together.  So some sort of clock identifier
+(phandle?) is needed as well.  (forgive my ignorance on the phandle
+part, as I am a DT noob)
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Mike
