@@ -1,52 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 11 Jul 2012 13:15:02 +0100
-Subject: ARM mini-summit
-In-Reply-To: <201207111128.29924.arnd@arndb.de>
-References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
- <201207111128.29924.arnd@arndb.de>
-Message-ID: <CACxGe6vOXaJaTdob8MZ7NGw8v-QQ0wnycnYK6JTK+YT5vA2EfQ@mail.gmail.com>
+From: myungjoo.ham@samsung.com (=?euc-kr?B?x9S47cHW?=)
+Date: Wed, 11 Jul 2012 13:08:15 +0000 (GMT)
+Subject: Device tree binding for DVFS table
+Message-ID: <20748722.319671342012092123.JavaMail.weblogic@epml17>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 11, 2012 12:28 PM, "Arnd Bergmann" <arnd@arndb.de> wrote:
+> Hi,
 >
-> On Wednesday 11 July 2012, James Bottomley wrote:
-> > Hi All,
-> >
-> > We have set aside the second day of the kernel summit (Tuesday 28
-> > August) as mini-summit day.  So far we have only the PCI mini summit on
-> > this day, so if you can think of other topics, please send them to the
-> > kernel summit discuss list:
-> >
-> > ksummit-2012-discuss at lists.linux-foundation.org
-> >
-> > Looking at the available rooms, we think we can run about four or five
-> > mini summits.
-> >
-> > As an added incentive, mini summit organisers get to pick who they
-> > invite and all the people they pick will get an automatic invitation to
-> > the third day of the kernel summit (but not the core first day) and the
-> > evening events.
+> I am working on DT binding for Tegra DVFS.
 >
-> There is a lot of interest in having another ARM mini-summit, as we had
-last
-> year. Previously, Grant Likely organized this with Olof and me, but right
-now
-> Grant is in an extended offline period and Olof is currently on vacation
-> as well. Will Deacon already contacted me and he is interested in helping
-> out with organizing the mini-summit, so the two of us could be the primary
-> contacts, with Grant and Olof joining in as time permits.
+> For Tegra, DVFS node mainly consists of frequency and voltage pairs. 
+> Frequency in the pair may change for different process. E.g. for process 
+> 1 CPU clock frequency could be 900MHz at 1V while for process 2 it could 
+> be 1GHz at 1V.
+> Tegra uses vendor specific ids to identify the correct frequency table.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Hello,
 
->
-> I'm planning to send out an initial email to potential participants today
-> or tomorrow to get an idea of who would be joining. Do you have an upper
-> limit to the number of people that you expect a mini-summit? I think we
-> could easily get 30 or more people that want to come, but we can also
-> restrict it to a smaller size.
->
->         Arnd
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120711/7b83760e/attachment-0001.html>
+It seems that in the example, the values in "voltage-array" and
+"frequencies" are switched.
+
+Anyway, what about SoCs that reads information from IEM (or any other module)
+ to measure gate delays or some other value to set the appriorate voltage values
+ for every possible frequency? I remember some of Exynos SoCs have been doing
+ it; dynamically measure the characteristics at boot-up time and apply voltages
+ accordingly; they couldn't identify it based on the chip-id or simply by reading
+ a single register.
+
+
+Cheers!
+MyungJoo.
+
+> 
+> Following is the proposed binding for voltage and frequency tables used 
+> in DVFS. Looking for comments/suggestions to make it generic.
