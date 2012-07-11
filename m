@@ -1,87 +1,83 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 11 Jul 2012 16:08:41 +0900
-Subject: [GIT PULL] Samsung devel-dma ops for v3.6
-In-Reply-To: <201207101242.41867.arnd@arndb.de>
-References: <0c5001cd5e41$87daa1b0$978fe510$%kim@samsung.com>
- <201207101242.41867.arnd@arndb.de>
-Message-ID: <0e1301cd5f34$008fe1e0$01afa5a0$%kim@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Jul 2012 09:18:36 +0200
+Subject: [PATCH] ARM: mxs: rename dts files with soc name being the prefix
+In-Reply-To: <1341981977-18207-1-git-send-email-shawn.guo@linaro.org>
+References: <1341981977-18207-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FFD28CC.5040909@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Tuesday 10 July 2012, Kukjin Kim wrote:
-> > Hi Arnd, Olof,
-> >
-> > Here is updating DMA common operation for Samsung SoCs.
-> >
-> > Since some DMA client driver such as spi needs to change the
-> configuration
-> > after dma_request() so this branch adds dma_config() can configure DMA
-> > transmit option which is included in dma_request() after that.
-> >
-> > Note, according to the changes, needs to update spi and ASoC drivers for
-> > Samsung SoCs and only got the ack from Mark Brown not Grant Likely and
-> as I
-> > know, he is busy for moving. But I think, the spi change has no problem
-> and
-> > it is simple.
-> >
-> > If any problems, please kindly let me know.
-> 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/devel-dma-ops
-> 
-> I've applied this to a new next/dma branch for now, as it sounds that you
-> need these changes.
-> 
-Arnd, thanks.
+Hi,
 
-> However, my feeling is that the s3c-dma-ops support is moving in the wrong
-> direction, or at least I do not see where you're heading with it.
+Le 11/07/2012 06:46, Shawn Guo a ?crit :
+> Rename mxs dts files with soc name being the prefix, so that the board
+> dts file can be located easily by soc name, and we also gain the
+> consistency of naming.
 > 
-> From what I see, there is the
-> 
-> * arch/arm/plat-s3c24xx/dma.c driver with a proprietary s3c2410_dma_*
->   interface, used by s3cmci and some asoc drivers.
-> * arch/arm/mach-s3c64xx/dma.c implementing the same interface and
-> exporting
->   the same symbols.
-> * The arch/arm/plat-samsung/dma-ops.c which is a wrapper around the
-> generic
->   dmaengine API, hardcoding the pl330 DMA driver
-> * The arch/arm/plat-samsung/include/plat/dma-ops.h interface abstraction
->   that gets used to pick between the two at compile time, and being used
-> by
->   the spi driver and again other asoc drivers
-> 
-> Can you (or someone on the Cc list) explain what the plan is for this?
-> Are you moving over the s3c2410_dma*() function to a dmaengine driver
-> eventually? Do you expect to see more users of the nonstandard intefaces
-> in the samsung code, or are they going away?
-> 
-Yeah, let me explain the status for Samsung SoCs' DMA. There are 3 different
-DMA IPs, samsung specific s3c24xx dma, pl080 and pl330. As you know, pl330
-already moved in drivers/dma for using common DMA engine and Alim is
-re-working on pl080
-(http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg10954.html
-) and let me check its progress. But s3c24xx dma is not ready yet. When
-pl330 was moving, my colleague, Boojin Kim posted to use common DMA APIs for
-Samsung drivers which are using DMA such as spi and ASoC. But it was
-including too many ifdef for checking which DMA is used and it can occur
-breakage for multiplatform
-(http://www.spinics.net/lists/arm-kernel/msg131137.html). So we implemented
-to use some dma_ops after discussing with Grant Likely
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/058171.html
-).
+> Suggested-by: Marek Vasut <marex@denx.de>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../boot/dts/{cfa10036.dts => imx23-cfa10036.dts}  |    0
 
-Anyway, we will try to use common DMA APIs for all Samsung SoCs. But need
-more time ;)
+It's an imx28 board
 
-Thanks.
+>  .../{stmp378x_devb.dts => imx23-stmp378x_devb.dts} |    0
+>  .../dts/{apx4devkit.dts => imx28-apx4devkit.dts}   |    0
+>  arch/arm/boot/dts/{m28evk.dts => imx28-m28evk.dts} |    0
+>  arch/arm/boot/dts/{tx28.dts => imx28-tx28.dts}     |    0
+>  arch/arm/mach-mxs/Makefile.boot                    |   10 +++++-----
+>  6 files changed, 5 insertions(+), 5 deletions(-)
+>  rename arch/arm/boot/dts/{cfa10036.dts => imx23-cfa10036.dts} (100%)
+>  rename arch/arm/boot/dts/{stmp378x_devb.dts => imx23-stmp378x_devb.dts} (100%)
+>  rename arch/arm/boot/dts/{apx4devkit.dts => imx28-apx4devkit.dts} (100%)
+>  rename arch/arm/boot/dts/{m28evk.dts => imx28-m28evk.dts} (100%)
+>  rename arch/arm/boot/dts/{tx28.dts => imx28-tx28.dts} (100%)
+> 
+> diff --git a/arch/arm/boot/dts/cfa10036.dts b/arch/arm/boot/dts/imx23-cfa10036.dts
+> similarity index 100%
+> rename from arch/arm/boot/dts/cfa10036.dts
+> rename to arch/arm/boot/dts/imx23-cfa10036.dts
+> diff --git a/arch/arm/boot/dts/stmp378x_devb.dts b/arch/arm/boot/dts/imx23-stmp378x_devb.dts
+> similarity index 100%
+> rename from arch/arm/boot/dts/stmp378x_devb.dts
+> rename to arch/arm/boot/dts/imx23-stmp378x_devb.dts
+> diff --git a/arch/arm/boot/dts/apx4devkit.dts b/arch/arm/boot/dts/imx28-apx4devkit.dts
+> similarity index 100%
+> rename from arch/arm/boot/dts/apx4devkit.dts
+> rename to arch/arm/boot/dts/imx28-apx4devkit.dts
+> diff --git a/arch/arm/boot/dts/m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+> similarity index 100%
+> rename from arch/arm/boot/dts/m28evk.dts
+> rename to arch/arm/boot/dts/imx28-m28evk.dts
+> diff --git a/arch/arm/boot/dts/tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> similarity index 100%
+> rename from arch/arm/boot/dts/tx28.dts
+> rename to arch/arm/boot/dts/imx28-tx28.dts
+> diff --git a/arch/arm/mach-mxs/Makefile.boot b/arch/arm/mach-mxs/Makefile.boot
+> index 58733cc..33181c0 100644
+> --- a/arch/arm/mach-mxs/Makefile.boot
+> +++ b/arch/arm/mach-mxs/Makefile.boot
+> @@ -1,10 +1,10 @@
+>  zreladdr-y += 0x40008000
+>  
+> -dtb-y += apx4devkit.dtb \
+> -	 cfa10036.dtb \
+> +dtb-y += imx23-cfa10036.dtb \
+>  	 imx23-evk.dtb \
+>  	 imx23-olinuxino.dtb \
+> +	 imx23-stmp378x_devb.dtb \
+> +	 imx28-apx4devkit.dtb \
+>  	 imx28-evk.dtb \
+> -	 m28evk.dtb \
+> -	 stmp378x_devb.dtb \
+> -	 tx28.dtb \
+> +	 imx28-m28evk.dtb \
+> +	 imx28-tx28.dtb \
+> 
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
