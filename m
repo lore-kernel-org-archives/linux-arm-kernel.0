@@ -1,46 +1,54 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 11 Jul 2012 12:02:48 +0200
-Subject: [PATCH 1/2] media: Add mem2mem deinterlacing driver.
-In-Reply-To: <201207111145.51858.hverkuil@xs4all.nl>
-References: <1341996904-22893-1-git-send-email-javier.martin@vista-silicon.com>
- <1341996904-22893-2-git-send-email-javier.martin@vista-silicon.com>
- <201207111145.51858.hverkuil@xs4all.nl>
-Message-ID: <CACKLOr1xgjuGp-jshCaCBZwG4pbWsBSt9Cq9jUdd3PGjpHiXEQ@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 11 Jul 2012 19:11:11 +0900
+Subject: [PATCH 0/7] Add device tree based discovery support for drm-fimd
+In-Reply-To: <1341999741-15578-1-git-send-email-l.krishna@samsung.com>
+References: <1341999741-15578-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <001b01cd5f4d$7f7c5e70$7e751b50$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-thank you for your comments.
+On July 11, 2012 6:11 PM, Leela Krishna Amudala <l.krishna@samsung.com> wrote:
+> 
+> From: Leela Krishna <l.krishna@samsung.com>
+> 
+> The patches are created against "for-next" branch of Kukjin Kim's tree at:
+>  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> 
+> This patch set adds Backlight, LCD support and device tree based discovery
+> support for drm-fimd
 
-On 11 July 2012 11:45, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> Hi Javier!
->
-> Thanks for the patch.
->
-> On Wed 11 July 2012 10:55:03 Javier Martin wrote:
->> Some video decoders such as tvp5150 provide separate
->> video fields (V4L2_FIELD_SEQ_TB). This driver uses
->> dmaengine to convert this format to V4L2_FIELD_INTERLACED_TB
->> (weaving) or V4L2_FIELD_NONE (line doubling)
->
-> Which field is used for the line doubling? Top or bottom? Or is each field
-> doubled, thus doubling the framerate?
+Your patchset seems FB-FIMD, not DRM-FIMD.
 
-No, just top field is used.
-I don't know if it's worth defining a new field format for doubling fields.
+FIMD IP can be used by FB or DRM framework.
+Please, use the term clearly.
 
-> I also recommend adding SEQ_BT/INTERLACED_BT support: NTSC transmits the bottom
-> field first, so it is useful to have support for that.
+If your patches use ./drivers/video/s3c-fb.c, please use the term 'FB'.
+If your patches use ./drivers/gpu/drm/exynos/*, please use the term 'DRM'.
 
-Adding that is quite easy but I cannot test it.
-Maybe someone could add it later?
+Best regards,
+Jingoo Han
 
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+> 
+> Leela Krishna (3):
+>   ARM: EXYNOS5: add device tree based discovery support for FIMD
+>   ARM: EXYNOS5: Add the bus clock for FIMD
+>   ARM: EXYNOS5: Set parent clock to fimd
+> 
+> Leela Krishna Amudala (4):
+>   ARM: SAMSUNG: add additional registers and SFR definitions for
+>     writeback
+>   ARM: EXYNOS5: add machine specific support for backlight
+>   ARM: EXYNOS5: add machine specific support for LCD
+>   ARM: EXYNOS: Adding DRM platform device
+> 
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |   16 +++
+>  arch/arm/boot/dts/exynos5250.dtsi               |    7 ++
+>  arch/arm/mach-exynos/Kconfig                    |    1 +
+>  arch/arm/mach-exynos/clock-exynos5.c            |   30 ++++--
+>  arch/arm/mach-exynos/include/mach/map.h         |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c          |  125 +++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/clock.h      |    2 +
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   10 ++
+>  arch/arm/plat-samsung/include/plat/regs-fb.h    |   51 +++++++++
+>  drivers/video/Kconfig                           |    6 +
+>  10 files changed, 239 insertions(+), 10 deletions(-)
