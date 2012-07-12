@@ -1,54 +1,16 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 12 Jul 2012 14:22:57 +0200
-Subject: [PATCH 2/2] mtd: lpc32xx_mlc: Adjust to pl08x DMA interface changes
-In-Reply-To: <1342095778-13403-1-git-send-email-stigge@antcom.de>
-References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
-Message-ID: <1342095778-13403-3-git-send-email-stigge@antcom.de>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Thu, 12 Jul 2012 13:31:26 +0100
+Subject: [PATCH] ARM: samsung: adc: fix race in s3c_adc_start
+In-Reply-To: <1342059131-31251-1-git-send-email-toddpoynor@google.com>
+References: <1342059131-31251-1-git-send-email-toddpoynor@google.com>
+Message-ID: <20120712123125.GJ18513@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adjusts the LPC32xx MLC NAND driver to the new pl08x DMA interface,
-fixing the compile error resulting from changed pl08x structures.
-
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-
----
-
-Applies to today's linux-next (integrated lpc32xx-next and dma branches which collide)
-
- drivers/mtd/nand/lpc32xx_mlc.c |   13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
-
-diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
-index 260b2c2..1cf3593 100644
---- a/drivers/mtd/nand/lpc32xx_mlc.c
-+++ b/drivers/mtd/nand/lpc32xx_mlc.c
-@@ -576,17 +576,6 @@ static void lpc32xx_ecc_enable(struct mtd_info *mtd, int mode)
- 	/* Always enabled! */
- }
- 
--static bool lpc32xx_dma_filter(struct dma_chan *chan, void *param)
--{
--	struct pl08x_dma_chan *ch =
--		container_of(chan, struct pl08x_dma_chan, chan);
--
--	/* In LPC32xx's PL080 DMA wiring, the MLC NAND DMA signal is #12 */
--	if (ch->cd->min_signal == 12)
--		return true;
--	return false;
--}
--
- static int lpc32xx_dma_setup(struct lpc32xx_nand_host *host)
- {
- 	struct mtd_info *mtd = &host->mtd;
-@@ -594,7 +583,7 @@ static int lpc32xx_dma_setup(struct lpc32xx_nand_host *host)
- 
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
--	host->dma_chan = dma_request_channel(mask, lpc32xx_dma_filter, NULL);
-+	host->dma_chan = dma_request_channel(mask, pl08x_filter_id, "nand-mlc");
- 	if (!host->dma_chan) {
- 		dev_err(mtd->dev.parent, "Failed to request DMA channel\n");
- 		return -EBUSY;
--- 
-1.7.10.4
+On Wed, Jul 11, 2012 at 07:12:11PM -0700, Todd Poynor wrote:
+> Checking for adc->ts_pend already claimed should be done with the
+> lock held.
+> 
+> Change-Id: Ic9f15e26bd19934ab8c2885ce5df265933ac304a
+> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+Acked-by: Ben Dooks <ben-linux@fluff.org>
