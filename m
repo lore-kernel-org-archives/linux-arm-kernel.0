@@ -1,133 +1,80 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 12 Jul 2012 14:21:41 +0800
-Subject: [PATCH v8] ARM: dts: imx6q-sabrelite: add usb devices
-In-Reply-To: <1342059927-25661-5-git-send-email-richard.zhao@freescale.com>
-References: <1342059927-25661-5-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1342074101-31493-1-git-send-email-richard.zhao@freescale.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 11 Jul 2012 20:52:43 -1000
+Subject: Where to put a large bootloader-supplied device tree on ARM ?
+In-Reply-To: <alpine.LFD.2.02.1207090015270.31100@xanadu.home>
+References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
+ <201207051454.24475.arnd@arndb.de> <20120705161600.GA28860@lunn.ch>
+ <201207062008.23952.arnd@arndb.de> <20120706210009.GC11470@lunn.ch>
+ <4FF781D8.3040206@firmworks.com>
+ <2966DB01BC317A4DA23684BA0F653415013701@xmb-aln-x08.cisco.com>
+ <4FF7980E.7050705@firmworks.com>
+ <alpine.LFD.2.02.1207090015270.31100@xanadu.home>
+Message-ID: <4FFE743B.6080504@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add usbphy devices
-- add usb host controller and otg devices
-- add usb h1 vbus regulator
+On 7/8/2012 6:30 PM, Nicolas Pitre wrote:
+> On Fri, 6 Jul 2012, Mitch Bradley wrote:
+> 
+>> On 7/6/2012 3:23 PM, David VomLehn (dvomlehn) wrote:
+>>> The kernel *must* go where it is linked, but the FDT contains only relative
+>>> references and is thus free to go anywhere. The same is true of ramdisks,
+>>> which
+>>> are usually placed after the kernel.
+> 
+> The kernel must go where it is linked *only* if you are using the 
+> 'Image' output.  When using 'zImage' you can put the kernel anywhere in 
+> memory, or in the first 128MB of RAM if CONFIG_AUTO_ZRELADDR is used.
+> 
+>> Right, but the kernel image is compressed, so after decompression it expands
+>> into the area just after it.  Also, the .bss segment is in that vicinity.
+> 
+> To be exact, the compressed kernel moves itself out of the region where 
+> the decompressed kernel will end up before doing the decompression, but 
+> only if necessary.  So it is a good idea to load zImage away from the 
+> decompressed kernel area to avoid this extra move and save some fraction 
+> of a second on boot time.
+> 
+>> There's some code in arch/arm/boot/compressed/head.S to relocate
+>> device tree blobs, but it requires CONFIG_ARM_APPENDED_DTB which
+>> is not recommended - arch/arm/Kconfig recommends using the
+>> documented boot protocol istead .
+> 
+> This is in case a DTB is appended to zImage.  When the DTB is detected, 
+> the moving of zImage out of the decompressed area must take care of 
+> moving the DTB as well.
+> 
+>> Documentation/arm/Booting says
+>> to put the dtb "in a region of memory where the kernel decompressor
+>> will not overwrite it", further recommending the first 16KiB.
+>>
+>> As noted, the first 16KiB loses if the dtb is too large.  And
+>> "where the kernel decompressor will not overwrite it" says what
+>> won't work, not what will.  It appears that the decompressor works
+>> out its addresses dynamically, so there's no hard prescription even
+>> for what to avoid.
+> 
+> A good rule of thumb is to take the size of the decompressed kernel and 
+> multiply this by 3.  Rounding up is also fine.  So for example if your 
+> arch/arm/boot/Image is 5MB, then putting anciliary data such as a 
+> ramdisk or a large DTB from 16MB into RAM or above should be fine.
+> 
+>> For now, I'm putting the initrd at the end of memory and the dtb
+>> below that.  That seems to work, but I'm unsure whether or not
+>> I'm just "getting lucky".
+> 
+> That's also perfectly fine.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
-changes since last version:
- - add gpio pinctrl
 
- arch/arm/boot/dts/imx6q-sabrelite.dts |   30 +++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi          |   36 +++++++++++++++++++++++++++++++--
- 2 files changed, 64 insertions(+), 2 deletions(-)
+Alas, that worked for machines with 512 MiB of main memory, but failed
+on 1 GiB machines.  My guess is that, when the initrd and dtb are near
+the top of a 1 GiB memory, the virtual address gets too near the top of
+the kernel's 1 GiB of virtual space (which starts at 0xc0000000),
+perhaps colliding with the VMALLOC space.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index e0ec929..46fdfd1 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -42,9 +42,30 @@
- 				};
- 			};
- 
-+			iomuxc at 020e0000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_gpio_hog>;
-+
-+				gpios {
-+					pinctrl_gpio_hog: gpiohog {
-+						fsl,pins = <
-+							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
-+							   >;
-+					};
-+				};
-+			};
- 		};
- 
- 		aips-bus at 02100000 { /* AIPS2 */
-+			usb at 02184000 { /* USB OTG */
-+				vbus-supply = <&reg_usb_otg_vbus>;
-+				status = "okay";
-+			};
-+
-+			usb at 02184200 { /* USB1 */
-+				status = "okay";
-+			};
-+
- 			ethernet at 02188000 {
- 				phy-mode = "rgmii";
- 				phy-reset-gpios = <&gpio3 23 0>;
-@@ -111,6 +132,15 @@
- 			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
-+
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 22 0>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	sound {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 16a3884..5e4f100 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -461,12 +461,14 @@
- 				};
- 			};
- 
--			usbphy at 020c9000 { /* USBPHY1 */
-+			usbphy1: usbphy at 020c9000 {
-+				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 			};
- 
--			usbphy at 020ca000 { /* USBPHY2 */
-+			usbphy2: usbphy at 020ca000 {
-+				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 			};
-@@ -614,6 +616,36 @@
- 				reg = <0x0217c000 0x4000>;
- 			};
- 
-+			usb at 02184000 { /* USB OTG */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184000 0x200>;
-+				interrupts = <0 43 0x04>;
-+				fsl,usbphy = <&usbphy1>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184200 { /* USB1 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184200 0x200>;
-+				interrupts = <0 40 0x04>;
-+				fsl,usbphy = <&usbphy2>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184400 { /* USB2 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184400 0x200>;
-+				interrupts = <0 41 0x04>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184600 { /* USB3 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184600 0x200>;
-+				interrupts = <0 42 0x04>;
-+				status = "disabled";
-+			};
-+
- 			ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
--- 
-1.7.9.5
+Putting them just below the 128 MiB boundary seems to work.
+
+> 
+> 
+> Nicolas
+> 
