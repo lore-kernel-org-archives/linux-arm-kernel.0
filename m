@@ -1,35 +1,32 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 12 Jul 2012 10:25:21 +0800
-Subject: [PATCH v7 0/6] imx28/imx6q: add usb support
-Message-ID: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
+Date: Thu, 12 Jul 2012 10:25:26 +0800
+Subject: [PATCH v7 5/6] clk: mxs: clk_register_clkdev mx28 usb clocks
+In-Reply-To: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
+References: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1342059927-25661-6-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is platform part to add imx28/imx6q driver support.
-The dirver part has been mostly merged to usb-next.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Tested-by: Subodh Nijsure <snijsure@grid-net.com>
+---
+ drivers/clk/mxs/clk-imx28.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Changes since last version:
- - correct subject
- - use of_find_compatible_node
- - remove hub reset
- - add mx28 evk gpio pinctrl 
-
-Richard Zhao (6):
-  ARM: imx6q: add usb controller clock lookups
-  ARM: imx6q: add usbphy clocks
-  ARM: imx6q: disable usb charger detector
-  ARM: dts: imx6q-sabrelite: add usb devices
-  clk: mxs: clk_register_clkdev mx28 usb clocks
-  ARM: dts: imx28-evk: add usb devices
-
- arch/arm/boot/dts/imx28-evk.dts       |   38 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx28.dtsi          |   12 ++++++++--
- arch/arm/boot/dts/imx6q-sabrelite.dts |   19 ++++++++++++++-
- arch/arm/boot/dts/imx6q.dtsi          |   36 +++++++++++++++++++++++++++--
- arch/arm/mach-imx/clk-imx6q.c         |   11 ++++++++-
- arch/arm/mach-imx/mach-imx6q.c        |   41 +++++++++++++++++++++++++++++++++
- drivers/clk/mxs/clk-imx28.c           |    4 ++++
- 7 files changed, 155 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 7fad6c8..a3bb644 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -328,6 +328,10 @@ int __init mx28_clocks_init(void)
+ 	clk_register_clkdevs(clks[fec], fec_lookups, ARRAY_SIZE(fec_lookups));
+ 	clk_register_clkdevs(clks[can0], can0_lookups, ARRAY_SIZE(can0_lookups));
+ 	clk_register_clkdevs(clks[can1], can1_lookups, ARRAY_SIZE(can1_lookups));
++	clk_register_clkdev(clks[usb0_pwr], NULL, "8007c000.usbphy");
++	clk_register_clkdev(clks[usb1_pwr], NULL, "8007e000.usbphy");
++	clk_register_clkdev(clks[usb0], NULL, "80080000.usb");
++	clk_register_clkdev(clks[usb1], NULL, "80090000.usb");
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
 -- 
 1.7.9.5
