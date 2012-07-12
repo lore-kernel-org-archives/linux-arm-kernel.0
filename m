@@ -1,77 +1,67 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jul 2012 18:12:41 +0900
-Subject: [PATCH] ARM: SAMSUNG: Introduce Kconfig variable for Samsung
- custom clk API
-In-Reply-To: <201207050924.43932.heiko@sntech.de>
-References: <1341418044-24572-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201207050924.43932.heiko@sntech.de>
-Message-ID: <0fb101cd600e$7d42c970$77c85c50$%kim@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 12 Jul 2012 14:43:27 +0530
+Subject: [PATCHv3 5/9] ARM: OMAP3: set autoidle flags for a few clocks
+In-Reply-To: <1338470942-20185-6-git-send-email-t-kristo@ti.com>
+References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
+ <1338470942-20185-6-git-send-email-t-kristo@ti.com>
+Message-ID: <4FFE9537.9080708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Am Mittwoch, 4. Juli 2012, 18:07:24 schrieb Mark Brown:
-> > Make it easier to switch to the common clock API by making the existing
-> > clock API implementation depend on a Kconfig symbol which is enabled
-> when
-> > the common clock API is disabled. This means that we can have some SoCs
-> > using the common clock API and some using the existing API rather than
-> > needing a flag day to convert the entire family of devices over.
-> nice idea.
-> 
-Yes, I think so.
+Hi Tero,
 
-> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> 
-Applied.
+On Thursday 31 May 2012 06:58 PM, Tero Kristo wrote:
+> dpll3, dpll4 and sdrc_ick are controlled automatically by hardware.
 
-And, I think, need to sort out the SAMSUNG_CLKSRC next time :)
+sdrc_ick does not seem to have a software control to enable/disable
+this automatic control in hardware, so what you are doing in the
+patch below seems fine.
+However for dpll3 and dpll4, there is indeed a software control which
+is enabled/disabled through omap3_dpll_allow_idle/omap3_dpll_deny_idle
+functions respectively. So shouldn't the 'autoidle' flag for them be
+handled similar to what you do in omap2_clkt_iclk_allow_idle/
+omap2_clkt_iclk_deny_idle functions in your PATCH 2/9, instead of
+setting them to 'true' statically?
 
-Thanks.
+regards,
+Rajendra
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> 
-> > ---
-> >  arch/arm/plat-samsung/Kconfig  |    4 ++++
-> >  arch/arm/plat-samsung/Makefile |    4 ++--
-> >  2 files changed, 6 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-
-> samsung/Kconfig
-> > index ffc84ac..7aca31c 100644
-> > --- a/arch/arm/plat-samsung/Kconfig
-> > +++ b/arch/arm/plat-samsung/Kconfig
-> > @@ -78,6 +78,10 @@ config S5P_HRT
-> >
-> >  # clock options
-> >
-> > +config SAMSUNG_CLOCK
-> > +	bool
-> > +	default y if !COMMON_CLK
-> > +
-> >  config SAMSUNG_CLKSRC
-> >  	bool
-> >  	help
-> > diff --git a/arch/arm/plat-samsung/Makefile
-> > b/arch/arm/plat-samsung/Makefile index 856f4ee..9e40e8d 100644
-> > --- a/arch/arm/plat-samsung/Makefile
-> > +++ b/arch/arm/plat-samsung/Makefile
-> > @@ -15,8 +15,8 @@ obj-y				+= init.o cpu.o
-> >  obj-$(CONFIG_ARCH_USES_GETTIMEOFFSET)   += time.o
-> >  obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
-> >
-> > -obj-y				+= clock.o
-> > -obj-y				+= pwm-clock.o
-> > +obj-$(CONFIG_SAMSUNG_CLOCK)	+= clock.o
-> > +obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
-> >
-> >  obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
-> >  obj-$(CONFIG_S5P_CLOCK)		+= s5p-clock.o
+> Thus, reflect this with the autoidle flags, the clocks will no longer
+> show as active in usecount dumps and will allow the voltdm->sleep /
+> wakeup calls to work properly.
+>
+> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> Cc: Paul Walmsley<paul@pwsan.com>
+> Cc: Kevin Hilman<khilman@ti.com>
+> ---
+>   arch/arm/mach-omap2/clock3xxx_data.c |    3 +++
+>   1 files changed, 3 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+> index 4e1a3b0..ca0de28 100644
+> --- a/arch/arm/mach-omap2/clock3xxx_data.c
+> +++ b/arch/arm/mach-omap2/clock3xxx_data.c
+> @@ -434,6 +434,7 @@ static struct clk dpll3_ck = {
+>   	.round_rate	=&omap2_dpll_round_rate,
+>   	.clkdm_name	= "dpll3_clkdm",
+>   	.recalc		=&omap3_dpll_recalc,
+> +	.autoidle	= true,
+>   };
+>
+>   /*
+> @@ -617,6 +618,7 @@ static struct clk dpll4_ck = {
+>   	.set_rate	=&omap3_dpll4_set_rate,
+>   	.clkdm_name	= "dpll4_clkdm",
+>   	.recalc		=&omap3_dpll_recalc,
+> +	.autoidle	= true,
+>   };
+>
+>   /*
+> @@ -1751,6 +1753,7 @@ static struct clk sdrc_ick = {
+>   	.flags		= ENABLE_ON_INIT,
+>   	.clkdm_name	= "core_l3_clkdm",
+>   	.recalc		=&followparent_recalc,
+> +	.autoidle	= true,
+>   };
+>
+>   static struct clk gpmc_fck = {
