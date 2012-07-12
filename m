@@ -1,27 +1,61 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 12 Jul 2012 19:13:37 +0530
-Subject: [PATCH v5 0/6] spi: s3c64xx: add support for device tree
-In-Reply-To: <20120712130234.GE3957@opensource.wolfsonmicro.com>
-References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
- <20120711174908.GP3938@opensource.wolfsonmicro.com>
- <CAJuYYwQA_x112xqOnQmwZjzoXoR-DAvT8YdB90Wm=78CH72uOg@mail.gmail.com>
- <0fae01cd600e$442ed160$cc8c7420$%kim@samsung.com>
- <20120712130234.GE3957@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwS59yoRnyFOR4_M5ymAS5uh0fN5zS=x2CS5Ax-795awBA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 12 Jul 2012 14:58:06 +0100
+Subject: [Ksummit-2012-discuss] ARM mini-summit
+In-Reply-To: <061ef00be9b475973e5df22fcd096308@localhost>
+References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
+ <20120711140536.GC16523@phenom.dumpdata.com>
+ <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
+ <201207112006.28632.arnd@arndb.de>
+ <061ef00be9b475973e5df22fcd096308@localhost>
+Message-ID: <alpine.DEB.2.02.1207121432260.23783@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 July 2012 18:32, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Jul 12, 2012 at 06:11:05PM +0900, Kukjin Kim wrote:
->
->> And Mark, this touches various samsung stuff in arch/arm/ so if you're ok,
->> I'd like to pick this up in samsung tree. We don't want to see conflicts...
->
-> Well, simple conflicts aren't that big a deal...  However, Thomas
-> mentioned that in order to test this he merged the SPI tree into your
-> tree so perhaps there is also a dependency on the SPI tree?  If that was
-> just for good practice testing then I agree that the best thing is to
-> merge via your tree, otherwise we might need to think harder.
+On Wed, 11 Jul 2012, Marc Zyngier wrote:
+> On Wed, 11 Jul 2012 20:06:28 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 11 July 2012, Konrad Rzeszutek Wilk wrote:
+> >> >> > contacts, with Grant and Olof joining in as time permits.
+> >> >>
+> >> >> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> >> >
+> >> > I would be interested in attending it as well. I believe Stefano has
+> a
+> >> > strong
+> >> > interest as well (since he and Ian Campbell are leading the Xen ARM
+> >> > work).
+> >> 
+> >> And Stefano is out on vacation right now so I will serve as his phantom
+> >> voice
+> >> and say: "Yes, I am interested as well."
+> > 
+> > Ok. So are you mostly interested in discussion ARM virtualization or
+> other
+> > topics
+> > as well? Last time we had organized this explicitly as the "ARM subarch
+> > maintainer
+> > summit" and we might again limit the participants to the subarch
+> > maintainers and
+> > a few more people if we're running out of space, but then again if a lot
+> > of them
+> > are interested in discussion virtualization, we should probably have you
+> > both and 
+> > the ARM KVM people included as well.
+> > 
+> > We haven't even started discussing an agenda, but I'll note down your
+> > names as
+> > candidates and Xen and/or KVM as proposed topics. I'll follow up with a
+> > more
+> > formal call for topics once I have a positive confirmation from James
+> and
+> > the
+> > linux-foundation that we can go ahead with the ARM mini-summit.
+> 
+> Putting on my KVM/ARM hacker hat this time: I'd be very glad to contribute
+> to the discussion. There is a number of ARM-specific topics that would be
+> interesting to discuss regarding KVM/ARM (mainlining the damn thing, common
+> hypercalls?, HYP mode booting), and probably a couple of other things.
 
-There were no dependency on Grant's spi/next branch. It was merged
-just to ensure that nothing is broken.
+
+That's right: the hypercall calling convention, notifications from the
+hypervisor via GIC, the boot process and device tree for virtual
+hardware are all interesting topics to discuss.
