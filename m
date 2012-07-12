@@ -1,44 +1,21 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 12 Jul 2012 17:10:01 +0300
-Subject: Device tree binding for DVFS table
-In-Reply-To: <20120711200402.GC2772@gmail.com>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <20120711144449.GA23654@sirena.org.uk>
- <20120711200402.GC2772@gmail.com>
-Message-ID: <20120712141001.GE9437@tbergstrom-lnx.Nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Jul 2012 15:14:07 +0100
+Subject: [PATCH v2] ARM: vexpress: remove automatic errata workaround
+ selection
+In-Reply-To: <1342088236-12797-1-git-send-email-pawel.moll@arm.com>
+References: <1342013791-19516-2-git-send-email-pawel.moll@arm.com>
+ <1342088236-12797-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20120712141407.GL2816@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 10:04:02PM +0200, Mike Turquette wrote:
-> On 20120711-15:44, Mark Brown wrote:
-> > On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
-> > 
-> > > I'd expect a single property with freq/volt pairs or 2 properties for
-> > > freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
-> > 
-> > I strongly agree - the current proposal is very hard to read due to the
-> > separation between the voltage and frequency values.  Some devices do
-> > also need to scale multiple rails together, especially when this gets
-> > used for I/O devices.
-> > 
-> > I'd also expect to see a range of voltages for each frequency rather
-> > than a specific voltage; usually things are at least characterised with
-> > a specified tolerance.
+On Thu, Jul 12, 2012 at 11:17:16AM +0100, Pawel Moll wrote:
+> Hi Both,
 > 
-> Not only should we support multiple voltage rails but also multiple
-> clocks.  For some devices a DVFS transition is composed of scaling
-> multiple clock rates together.  So some sort of clock identifier
-> (phandle?) is needed as well.  (forgive my ignorance on the phandle
-> part, as I am a DT noob)
+> Here it is. I've kept Will's Signed-off-by for now, but it seems to me
+> Rob should be signing this off. If you don't mind that I'll put Rob's
+> name in the final version for arm-soc folk.
 
-I would say this constraint should be expressed in a seperate DT node. In
-short I think we have 3 things to model:
+Fine by me, I just want to flush my TLB by ASID again :)
 
-+ frequency/voltage relationships
-+ power rail constraints (eg voltage difference limit between 2 rails)
-+ clock constraints (eg. clock x frequency must be a fixed ratio of clock y
-  frequency)
-
-Cheers,
-
-Peter.
+Will
