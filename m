@@ -1,60 +1,49 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 12 Jul 2012 15:47:56 +0800
-Subject: [GIT PULL] mxs device tree changes for 3.6 (part 2)
-Message-ID: <20120712074755.GL6971@S2101-09.ap.freescale.net>
+Date: Thu, 12 Jul 2012 15:54:06 +0800
+Subject: [GIT PULL] imx device tree changes for 3.6 (part 2)
+Message-ID: <20120712075405.GM6971@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Here is the second (last) batch of mxs mxs device tree changes for 3.6.
+Here is the second (last) batch of imx device tree changes for 3.6.
 Please pull.
 
 Regards,
 Shawn
 
-The following changes since commit 6ca44acfc31ad485b18e2fca0428479b7d4f141d:
+The following changes since commit 77ac32ad2b03baa7638aadda1650200287ca6f5d:
 
-  ARM: dts: imx28-evk: add flexan devices (2012-07-06 13:26:05 +0800)
+  ARM: imx6q: add clocks for gpmi-nand (2012-07-03 11:39:57 +0800)
 
 are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/dt-for-3.6
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/dt-for-3.6
 
-Lauri Hintsala (6):
-      ARM: apx4devkit: add NAND support
-      ARM: apx4devkit: add display support
-      ARM: apx4devkit: fix the bus-width of SSP0 to 4 bits
-      ARM: apx4devkit: add SSP2 support
-      ARM: apx4devkit: remove AUART3
-      ARM: apx4devkit: add pin muxing for GPIOs
+Hui Wang (1):
+      ARM: dts: imx6q-sabrelite: add ecspi1 pinctrl support
 
-Marek Vasut (1):
-      ARM: mxs: convert m28evk board to device tree
+Otavio Salvador (1):
+      ARM: imx6q: ensure ANATOP controller is available
 
-Richard Zhao (1):
-      ARM: dts: imx28-evk: add usb devices
+Richard Zhao (4):
+      ARM: imx6q: add usb controller clock lookups
+      ARM: imx6q: add usbphy clocks
+      ARM: imx6q: disable usb charger detector
+      ARM: dts: imx6q-sabrelite: add usb devices
 
-Shawn Guo (7):
-      ARM: dts: imx28: move extra gpmi-nand pins into board dts
-      ARM: dts: imx28: move lcdif control pins into board dts
-      ARM: mxs: convert apx4devkit board to device tree
-      ARM: mxs: convert tx28 board to device tree
-      ARM: mxs: convert stmp378x_devb board to device tree
-      ARM: mxs: add dtb-y target into Makefile.boot
-      ARM: mxs: rename dts files with soc name being the prefix
+Shawn Guo (2):
+      bindings: update imx and mxs #gpio-cells
+      ARM: dts: imx: update #interrupt-cells for gpio nodes
 
- arch/arm/boot/dts/imx23-stmp378x_devb.dts          |   78 ++++++++
- arch/arm/boot/dts/imx28-apx4devkit.dts             |  198 ++++++++++++++++++
- .../boot/dts/{cfa10036.dts => imx28-cfa10036.dts}  |    0
- arch/arm/boot/dts/imx28-evk.dts                    |   68 ++++++-
- arch/arm/boot/dts/imx28-m28evk.dts                 |  210 ++++++++++++++++++++
- arch/arm/boot/dts/imx28-tx28.dts                   |   97 +++++++++
- arch/arm/boot/dts/imx28.dtsi                       |   98 +++++++++-
- arch/arm/mach-mxs/Makefile.boot                    |    9 +
- arch/arm/mach-mxs/mach-mxs.c                       |   87 ++++++++-
- 9 files changed, 831 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx23-stmp378x_devb.dts
- create mode 100644 arch/arm/boot/dts/imx28-apx4devkit.dts
- rename arch/arm/boot/dts/{cfa10036.dts => imx28-cfa10036.dts} (100%)
- create mode 100644 arch/arm/boot/dts/imx28-m28evk.dts
- create mode 100644 arch/arm/boot/dts/imx28-tx28.dts
+ .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |   14 ++++-
+ .../devicetree/bindings/gpio/gpio-mxs.txt          |    5 +-
+ arch/arm/boot/dts/imx27.dtsi                       |   12 ++--
+ arch/arm/boot/dts/imx51.dtsi                       |    8 ++--
+ arch/arm/boot/dts/imx53.dtsi                       |   14 +++---
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |   33 +++++++++++
+ arch/arm/boot/dts/imx6q.dtsi                       |   58 +++++++++++++++++---
+ arch/arm/mach-imx/Kconfig                          |    1 +
+ arch/arm/mach-imx/clk-imx6q.c                      |   11 ++++-
+ arch/arm/mach-imx/mach-imx6q.c                     |   41 ++++++++++++++
+ 10 files changed, 166 insertions(+), 31 deletions(-)
