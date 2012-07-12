@@ -1,41 +1,71 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarth)
-Date: Thu, 12 Jul 2012 09:26:48 +0200
-Subject: [RESEND PATCH v1 1/2] mmc: sdhci-dove: Add SDHCI_QUIRK_NO_HISPD_BIT
-Message-ID: <4FFE7C38.9020800@googlemail.com>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Thu, 12 Jul 2012 07:28:10 +0000
+Subject: mxc-nand fix for 3.5 (Was: Re: [PATCH v2] mtd mxc_nand: use
+ 32bit copy functions)
+In-Reply-To: <20120712065722.GA592@pengutronix.de>
+References: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
+ <1340970369.3070.166.camel@sauron.fi.intel.com>
+ <20120712065722.GA592@pengutronix.de>
+Message-ID: <1342078088.30654.14.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bump. There has been no discussion on this patch nor on patch 2/2. Is there
-anybody out there willing to test and confirm these patches?
---
-The sdio controller on dove doesn't have a bit to indicate
-high-speed. With the quirk set it fixes accessing high-speed
-sdcards.
+On Thu, 2012-07-12 at 08:57 +0200, Uwe Kleine-K?nig wrote:
+> The mxc_nand driver is completely useless with
+> 
+>         5775ba3 (mtd: mxc_nand: fix several sparse warnings about incorrect address space)
+> 
+> but without this patch. So it would be great if we could have it in 3.5.
+> Or alternatively revert 5775ba3. This fix currently it sits as
+> 
+>         096bcc2 (mtd: mxc_nand: use 32bit copy functions)
+> 
+> in next/master. 
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Anton Vorontsov <cbouatmailru@gmail.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Manuel Lauss <manuel.lauss@googlemail.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
-  drivers/mmc/host/sdhci-dove.c |    3 ++-
-  1 file changed, 2 insertions(+), 1 deletion(-)
+The subject of that commit didn't jump out at me when I was perusing the
+patch queue for 3.5-worthy stuff.
 
-diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-index 177f697..9c85368 100644
---- a/drivers/mmc/host/sdhci-dove.c
-+++ b/drivers/mmc/host/sdhci-dove.c
-@@ -66,7 +66,8 @@ static struct sdhci_pltfm_data sdhci_dove_pdata = {
-  	.quirks	= SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER |
-  		  SDHCI_QUIRK_NO_BUSY_IRQ |
-  		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
--		  SDHCI_QUIRK_FORCE_DMA,
-+		  SDHCI_QUIRK_FORCE_DMA |
-+		  SDHCI_QUIRK_NO_HISPD_BIT,
-  };
-   static int __devinit sdhci_dove_probe(struct platform_device *pdev)
+Artem reminded me about it just after I sent my previous pull request to
+Linus last week. I wanted to let it sit in linux-next for a little
+while, but now...
+
+Linus, please pull from
+   git://git.infradead.org/linux-mtd.git for-linus-20120712
+
+Late MTD fixes for 3.5:
+ - fix 'sparse warning fix' regression which totally breaks MXC NAND
+ - fix GPMI NAND regression when used with UBI
+ - update/correct sysfs documentation for new 'bitflip_threshold' field
+ - fix nandsim build failure
+
+----
+Herton Ronaldo Krzesinski (1):
+      mtd: nandsim: don't open code a do_div helper
+
+Mike Dunn (1):
+      mtd: ABI documentation: clarification of bitflip_threshold
+
+Sascha Hauer (2):
+      mtd: mxc_nand: use 32bit copy functions
+      mtd: gpmi-nand: fix read page when reading to vmalloced area
+
+ Documentation/ABI/testing/sysfs-class-mtd |   17 ++++++-------
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c    |   10 ++++----
+ drivers/mtd/nand/mxc_nand.c               |   37 ++++++++++++++++++++++-------
+ drivers/mtd/nand/nandsim.c                |   12 +++-------
+ 4 files changed, 46 insertions(+), 30 deletions(-)
+
 -- 
-1.7.10
+                   Sent with MeeGo's ActiveSync support.
+
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120712/7d3ca2c4/attachment-0001.bin>
