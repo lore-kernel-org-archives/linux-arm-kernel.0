@@ -1,20 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jul 2012 13:03:00 +0200
-Subject: [PATCH 2/2] gpio/omap: add *remove* callback in platform_driver
-In-Reply-To: <87394xhocn.fsf@ti.com>
-References: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
- <1341997995-14020-3-git-send-email-tarun.kanti@ti.com>
- <87394xhocn.fsf@ti.com>
-Message-ID: <CACRpkdZMG_ZHW_eGGrdrJh1SuO_=hOObijzmxG1ob6RoNf_dwg@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 12 Jul 2012 19:04:43 +0800
+Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits
+ for general purpose registers
+In-Reply-To: <4FFE9D7E.1080302@gmail.com>
+References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+ <4FFE9D7E.1080302@gmail.com>
+Message-ID: <20120712110442.GE22640@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2012 at 1:25 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Thu, Jul 12, 2012 at 05:48:46PM +0800, Hui Wang wrote:
+...
+> > +
+> > +int imx_pinctrl_gpr_read(u8 gpr)
+> > +{
+> > +	if (!imx_pinctrl)
+> > +		return -EPROBE_DEFER;
+> > +
+> > +	return readl(imx_pinctrl->base + gpr);
+> >   
+> Suppose the MSB of the register content is 1, how does the caller 
+> distinguish if the function return an error or return a register content?
+> 
+Good catch, it's indeed an issue.
+We need find a way to fix it, probably i would add a parameter for
+read API to return a u32 value.
 
-> There is quite a bit of other things to do in remove to properly cleanup
-> what is done in probe.
+Thanks
 
-OK I'm dropping this patch for now...
-
-Yours,
-Linus Walleij
+Regards
+Dong Aisheng
