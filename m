@@ -1,46 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Jul 2012 09:40:03 -0700
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <4FFE9A69.3060301@renesas.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
- <4FFE7DB2.4040702@renesas.com>
- <20120712084432.GA2816@mudshark.cambridge.arm.com>
- <4FFE9A69.3060301@renesas.com>
-Message-ID: <4FFEFDE3.5000403@codeaurora.org>
+From: mturquette@ti.com (Mike Turquette)
+Date: Thu, 12 Jul 2012 09:51:45 -0700
+Subject: [GIT PULL] clk/mxs for 3.6 (part 2)
+In-Reply-To: <20120712074238.GK6971@S2101-09.ap.freescale.net>
+References: <20120712074238.GK6971@S2101-09.ap.freescale.net>
+Message-ID: <20120712165145.GI2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/12 02:35, Shinya Kuribayashi wrote:
-> On 7/12/2012 5:44 PM, Will Deacon wrote:
->>> On 6/30/2012 2:33 AM, Will Deacon wrote:
->>>> +void __init init_current_timer_delay(unsigned long freq)
->>>> +{
->>>> +	pr_info("Switching to timer-based delay loop\n");
->>>> +	lpj_fine			= freq / HZ;
->>>> +	arm_delay_ops.delay		= __timer_delay;
->>>> +	arm_delay_ops.const_udelay	= __timer_const_udelay;
->>>> +	arm_delay_ops.udelay		= __timer_udelay;
->>>> +}
->>> Once this function is processed, the udelay() behavior changes
->>> _immediately_ from loop-based delay to timer-based one, without waiting
->>> for 'loops_per_jiffy' itself being corrected in calibrate_delay().
->>>
->>> As a result, actual udelay()s may be toooo long than expected, in
->>> particular udelay()s used between init_current_timer_delay() and
->>> calibrate_delay().  It's unlikely be short, as the frequency of a
->>> counter for read_current_timer is typically slower than CPU frequency.
->> Surely using udelay before calibrate_delay_loop has been called is a
->> fundamental error?
-> Got it.  I'm just not confident about disallowing early use of udelay().
->
->
+On 20120712-15:42, Shawn Guo wrote:
+> Hi Mike,
+> 
+> Here is one more clk/mxs patch (last one, I believe) for 3.6.
+> Please pull.
+> 
 
-I don't think it's an error. Instead you get a very large delay, similar
-to what would happen if you called udelay() before calibrate_delay()
-anyway (see the comment in init/main.c above loops_per_jiffy).
+It's in clk-next now.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Mike
+
+> Regards,
+> Shawn
+> 
+> The following changes since commit 64e2bc41304726a5ca8a4d37754db69b88841ebf:
+> 
+>   clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3 (2012-07-05 09:36:44 +0800)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs-for-3.6
+> 
+> Richard Zhao (1):
+>       clk: mxs: clk_register_clkdev mx28 usb clocks
+> 
+>  drivers/clk/mxs/clk-imx28.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> 
