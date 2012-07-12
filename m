@@ -1,38 +1,53 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 12 Jul 2012 09:51:45 -0700
-Subject: [GIT PULL] clk/mxs for 3.6 (part 2)
-In-Reply-To: <20120712074238.GK6971@S2101-09.ap.freescale.net>
-References: <20120712074238.GK6971@S2101-09.ap.freescale.net>
-Message-ID: <20120712165145.GI2772@gmail.com>
+Date: Thu, 12 Jul 2012 09:54:18 -0700
+Subject: [PATCH] clk: allow clocks without parents to change rate
+In-Reply-To: <CACRpkdZOgquPF1FXo7LBeFOYhheqx+_ENTn6w4qcKGBqeHnvFQ@mail.gmail.com>
+References: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
+ <20120711234229.GF2772@gmail.com>
+ <CACRpkdZOgquPF1FXo7LBeFOYhheqx+_ENTn6w4qcKGBqeHnvFQ@mail.gmail.com>
+Message-ID: <20120712165418.GJ2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120712-15:42, Shawn Guo wrote:
-> Hi Mike,
+On 20120712-12:50, Linus Walleij wrote:
+> On Thu, Jul 12, 2012 at 1:42 AM, Mike Turquette <mturquette@ti.com> wrote:
 > 
-> Here is one more clk/mxs patch (last one, I believe) for 3.6.
-> Please pull.
+> > This has been fixed in Pawell's patch, "clk: Check parent for NULL in
+> > clk_change_rate".
+> 
+> Yes, that'll probably work.
+> 
+> A small nitpick though:
+> 
+> I have slightly different semantics, Pawel's patch assigns zero if
+> parent is NULL, then use that as fallback, whereas I check for the
+> parent being NULL all the way. I was worried that the old sematics
+> could change like this:
+> 
+> So here it takes that:
+> 
+> +       if (clk->parent)
+> +               best_parent_rate = clk->parent->rate;
+> +
+> 
+> And I was cautious that if this changes the parent rate:
+> 
+> +               clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
+> 
+> Then this passes the old parent rate to the recalc function:
+> 
+> +               clk->rate = clk->ops->recalc_rate(clk->hw, best_parent_rate);
+> 
+> It has no side-effects on my system but I worried about
+> others, so I just left the behaviour to re-read the rate from the parent
+> every time if possible.
 > 
 
-It's in clk-next now.
+Thanks for looking into it.  I think for now let's keep what we have and
+we'll patch it up if bugs are reported.
 
-Regards,
+Thanks again,
 Mike
 
-> Regards,
-> Shawn
-> 
-> The following changes since commit 64e2bc41304726a5ca8a4d37754db69b88841ebf:
-> 
->   clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3 (2012-07-05 09:36:44 +0800)
-> 
-> are available in the git repository at:
->   git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs-for-3.6
-> 
-> Richard Zhao (1):
->       clk: mxs: clk_register_clkdev mx28 usb clocks
-> 
->  drivers/clk/mxs/clk-imx28.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> 
+> Yours,
+> Linus Walleij
