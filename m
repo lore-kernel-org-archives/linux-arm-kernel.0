@@ -1,117 +1,41 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 11 Jul 2012 17:46:44 -0700
-Subject: [GIT PULL] DT clk binding support for 3.6
-In-Reply-To: <4FF86BD9.3050805@gmail.com>
-References: <4FF86BD9.3050805@gmail.com>
-Message-ID: <20120712004644.GH2772@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Jul 2012 09:03:34 +0800
+Subject: [PATCH v6 1/7] ARM: imx6q: correct device name of usbphy and usb
+ controller clock export
+In-Reply-To: <1342006425-21008-2-git-send-email-richard.zhao@freescale.com>
+References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+ <1342006425-21008-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120712010332.GA6971@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120707-12:03, Rob Herring wrote:
-> Mike,
-> 
-> Please pull DT clk binding and highbank clk support for 3.6. The only
-> real change from 3.5 pull request is returning error values rather than
-> NULL to align with the rest of the clk framework. There's been a little
-> discussion but otherwise has been quiet.
-> 
-
-Hi Rob,
-
-I agree that these patches have seen enough time on the list.  I did
-find one problem in testing: the high bank clock registration function
-writes to clk_hb->hw.init which is marked const.  I fixed it up in the
-below patch.  That fix is now squashed into into the final patch in your
-series on the clk-next branch.  Let me know if you have any objections.
+It seems that the patch subject does not match the content.
 
 Regards,
-Mike
+Shawn
 
-diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
-index 2f61065..52fecad 100644
---- a/drivers/clk/clk-highbank.c
-+++ b/drivers/clk/clk-highbank.c
-@@ -277,7 +277,7 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
- 	struct hb_clk *hb_clk;
- 	const char *clk_name = node->name;
- 	const char *parent_name;
--	struct clk_init_data init_data;
-+	struct clk_init_data init;
- 	int rc;
- 
- 	rc = of_property_read_u32(node, "reg", &reg);
-@@ -292,13 +292,14 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
- 
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
--	hb_clk->hw.init = &init_data;
--	hb_clk->hw.init->name = clk_name;
--	hb_clk->hw.init->num_parents = 1;
-+	init.name = clk_name;
-+	init.ops = ops;
-+	init.flags = 0;
- 	parent_name = of_clk_get_parent_name(node, 0);
--	hb_clk->hw.init->parent_names = &parent_name;
--	hb_clk->hw.init->ops = ops;
--	hb_clk->hw.init->flags = 0;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	hb_clk->hw.init = &init;
- 
- 	clk = clk_register(NULL, &hb_clk->hw);
- 	if (WARN_ON(IS_ERR(clk))) {
-
-
-> Rob
+On Wed, Jul 11, 2012 at 07:33:39PM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c |    4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index cabbbb7..3f5b9d6 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -398,6 +398,10 @@ int __init mx6q_clocks_init(void)
+>  	clk_register_clkdev(clk[gpmi_bch], "gpmi_bch", "112000.gpmi-nand");
+>  	clk_register_clkdev(clk[gpmi_apb], "gpmi_apb", "112000.gpmi-nand");
+>  	clk_register_clkdev(clk[gpmi_io], "gpmi_io", "112000.gpmi-nand");
+> +	clk_register_clkdev(clk[usboh3], NULL, "2184000.usb");
+> +	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
+> +	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
+> +	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
+>  	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+>  	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+>  	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+> -- 
+> 1.7.9.5
 > 
->   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 > 
-> are available in the git repository at:
-> 
->   git://sources.calxeda.com/kernel/linux.git clk-for-3.6
-> 
-> for you to fetch changes up to 39a8e38a03823c3acaec02c6d7c551e268cb2139:
-> 
->   clk: add highbank clock support (2012-07-01 17:04:45 -0500)
-> 
-> ----------------------------------------------------------------
-> Grant Likely (2):
->       clk: add DT clock binding support
->       clk: add DT fixed-clock binding support
-> 
-> Rob Herring (2):
->       dt: add clock binding doc to primecell bindings
->       clk: add highbank clock support
-> 
->  .../devicetree/bindings/arm/primecell.txt          |    6 +
->  .../devicetree/bindings/clock/calxeda.txt          |   17 +
->  .../devicetree/bindings/clock/clock-bindings.txt   |  117 +++++++
->  .../devicetree/bindings/clock/fixed-clock.txt      |   21 ++
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/boot/dts/highbank.dts                     |   91 +++++-
->  arch/arm/mach-highbank/Makefile                    |    2 +-
->  arch/arm/mach-highbank/clock.c                     |   62 ----
->  arch/arm/mach-highbank/highbank.c                  |    7 +
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/clk-fixed-rate.c                       |   23 ++
->  drivers/clk/clk-highbank.c                         |  345
-> ++++++++++++++++++++
->  drivers/clk/clk.c                                  |  140 ++++++++
->  drivers/clk/clkdev.c                               |   77 +++++
->  include/linux/clk-provider.h                       |   16 +
->  include/linux/clk.h                                |   19 ++
->  16 files changed, 881 insertions(+), 64 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/calxeda.txt
->  create mode 100644
-> Documentation/devicetree/bindings/clock/clock-bindings.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
->  delete mode 100644 arch/arm/mach-highbank/clock.c
->  create mode 100644 drivers/clk/clk-highbank.c
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
