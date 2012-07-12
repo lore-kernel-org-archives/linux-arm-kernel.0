@@ -1,31 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Jul 2012 07:41:11 +0900
-Subject: [PATCH] ARM: samsung: adc: fix race in s3c_adc_start
-In-Reply-To: <20120712123125.GJ18513@trinity.fluff.org>
-References: <1342059131-31251-1-git-send-email-toddpoynor@google.com>
- <20120712123125.GJ18513@trinity.fluff.org>
-Message-ID: <4FFF5287.8000608@samsung.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Fri, 13 Jul 2012 09:02:56 +1000
+Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
+In-Reply-To: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <11987916.rOoNGcb1ly@dev1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/12 21:31, Ben Dooks wrote:
-> On Wed, Jul 11, 2012 at 07:12:11PM -0700, Todd Poynor wrote:
->> Checking for adc->ts_pend already claimed should be done with the
->> lock held.
->>
->> Change-Id: Ic9f15e26bd19934ab8c2885ce5df265933ac304a
->> Signed-off-by: Todd Poynor<toddpoynor@google.com>
-> Acked-by: Ben Dooks<ben-linux@fluff.org>
+Hi Uwe,
 
-Ben, thanks for your ack, will apply.
+> This series was tested on a Phytec pcm038 (mc13783 on spi) using
+> traditional boot (i.e. not dt) and on a i.MX53 based machine (mc34708 on
+> i2c) using dt boot.
+> 
+> Philippe's patches are already in next, they are just included here for
+> those who want to test the patches. The 'mfd/mc13xxx: drop modifying
+> driver's id_table in probe' was already sent out yesterday and is
+> included here because the last patch depends on it.
+> 
 
-BTW, Todd, do you want to keep the 'Change-Id' in mainline?
-If you don't mind, I'd like to remove it...
+For all patches (that don't already have it):
+Acked-by: Marc Reilly <marc@cpdesign.com.au>
 
-Thanks.
+If for some reason you do a V2:
+- In patch 6 moves line "#define MC13XXX_NUMREGS 0x3f" around, is this 
+necessary?
+- Patch 4 should come last, ie after "add support for mc34708"
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers,
+Marc
