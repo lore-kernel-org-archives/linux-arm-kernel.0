@@ -1,65 +1,63 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 12 Jul 2012 18:35:13 +0300
-Subject: [PATCHv3 8/9] ARM: OMAP3: prevent per_clkdm from attempting
- manual domain transitions
-In-Reply-To: <4FFE9BB9.7000209@ti.com>
-References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
- <1338470942-20185-9-git-send-email-t-kristo@ti.com>
- <4FFE9BB9.7000209@ti.com>
-Message-ID: <1342107313.4672.40.camel@sokoban>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 12 Jul 2012 16:39:35 +0100
+Subject: [GIT PULL] Veratile Express updates for v3.6
+Message-ID: <1342107575.25865.13.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-12 at 15:11 +0530, Rajendra Nayak wrote:
-> On Thursday 31 May 2012 06:59 PM, Tero Kristo wrote:
-> > Previously, PER clock domain was always enabled, as the usecounts
-> > for this domain incorrectly always showed positive value. On HW
-> > level though, the domain enters idle as it is set in HW supervised
-> > mode. Now, when the usecounts reflect real values, PER domain will
-> > attempt to enter software supervised idle, which is not supported by the
-> > hardware/kernel that well, and causes multiple problems. First of all,
-> > coming back from idle, PER domain remains idle as the wakedeps have
-> > been disabled for the domain, and this causes a crash with the GPIO
-> > code, as the resume code attempts to access domain which is not active.
-> > Just enabling the interface clocks for the GPIO does not help, as they
-> > are autoidled and don't bring the domain out of idle. Secondly, there
-> > are multiple erratas for omap3, which say that the wakedeps should be
-> > enabled for the PER domain, see e.g. errata i582 for omap3630.
-> 
-> If PER software supervised idle is so *buggy* then shouldn't the flags
-> just reflect that PER *does not* support software supervised idle?
-> Using a flag which reflects that the clkdm supports both hardware
-> and software supervised idle ('CLKDM_CAN_HWSUP_SWSUP') and then using
-> another one to actually skip putting it in software supervised sounds
-> a little round about, no?
-> Does updating the flag to 'CLKDM_CAN_HWSUP' also fix all the issues
-> for you? without adding the additional 'CLKDM_SKIP_MANUAL_TRANS' flag.
+Hi Arnd, Ofof,
 
-Simple CAN_HWSUP doesn't work, as the whole problem is with HWSUP mode
-and manual enabling / disabling of autodeps by kernel. I can rename the
-flag to something like CLKDM_NO_AUTODEP_DISABLE and move the checking of
-flag from the generic clockdomain code to omap3 clockdomain part though.
+Could you, please, pull the updated for Versatile Express based on
+v3.5-rc6? You may want to drop the "Make plat-versatile clock optional"
+during the merge, if it conflicts with Intergrator's common clock change
+(shouldn't be a problem, though).
 
--Tero
+The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
 
-> 
-> >
-> > Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> > ---
-> >   arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
-> >   1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> > index 6038adb..0dae4c8 100644
-> > --- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> > +++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> > @@ -282,7 +282,7 @@ static struct clockdomain usbhost_clkdm = {
-> >   static struct clockdomain per_clkdm = {
-> >   	.name		= "per_clkdm",
-> >   	.pwrdm		= { .name = "per_pwrdm" },
-> > -	.flags		= CLKDM_CAN_HWSUP_SWSUP,
-> > +	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_SKIP_MANUAL_TRANS,
-> >   	.dep_bit	= OMAP3430_EN_PER_SHIFT,
-> >   	.wkdep_srcs	= per_wkdeps,
-> >   	.sleepdep_srcs	= per_sleepdeps,
-> 
+  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/pawelmoll/linux.git vexpress-v3.5-rc6
+
+for you to fetch changes up to 5d4b9fa0cac57e73857e2dd6d116ef98ef1109b5:
+
+  ARM: vexpress: Config option for early printk console (2012-07-12 16:16:58 +0100)
+
+Thanks!
+
+Pawel
+
+----------------------------------------------------------------
+Pawel Moll (8):
+      ARM: vexpress: Check master site in daughterboard's sysctl operations
+      ARM: versatile: Make plat-versatile clock optional
+      ARM: vexpress: Initial common clock support
+      ARM: vexpress: Add missing SP804 interrupt in motherboard's DTS files
+      ARM: vexpress: Add fixed regulator for SMSC
+      ARM: vexpress: Convert V2P-CA15 Device Tree to 64 bit addresses
+      ARM: vexpress: Add Device Tree for V2P-CA15_CA7 core tile
+      ARM: vexpress: Config option for early printk console
+
+Will Deacon (1):
+      ARM: vexpress: remove automatic errata workaround selection
+
+ arch/arm/Kconfig                                  |    6 +-
+ arch/arm/Kconfig.debug                            |   26 ++
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |   11 +
+ arch/arm/boot/dts/vexpress-v2m.dtsi               |   11 +
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts       |   36 +--
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts        |  188 +++++++++++++
+ arch/arm/mach-vexpress/Kconfig                    |    5 +-
+ arch/arm/mach-vexpress/Makefile.boot              |    3 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |   64 ++---
+ arch/arm/mach-vexpress/include/mach/clkdev.h      |   15 --
+ arch/arm/mach-vexpress/include/mach/debug-macro.S |   41 +++
+ arch/arm/mach-vexpress/include/mach/motherboard.h |   28 +-
+ arch/arm/mach-vexpress/include/mach/uncompress.h  |   14 +
+ arch/arm/mach-vexpress/v2m.c                      |  292 ++++++++++-----------
+ arch/arm/plat-versatile/Kconfig                   |    3 +
+ arch/arm/plat-versatile/Makefile                  |    2 +-
+ 16 files changed, 504 insertions(+), 241 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+ delete mode 100644 arch/arm/mach-vexpress/include/mach/clkdev.h
