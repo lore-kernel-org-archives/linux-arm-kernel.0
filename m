@@ -1,58 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jul 2012 18:10:17 +0900
-Subject: [PATCH] ARM: Exynos: Add device tree node for Exynos4 interrupt
- combiner controller
-In-Reply-To: <1342068948-20755-1-git-send-email-thomas.abraham@linaro.org>
-References: <1342068948-20755-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <0fab01cd600e$27d56ec0$77804c40$%kim@samsung.com>
+Date: Thu, 12 Jul 2012 18:11:00 +0900
+Subject: [PATCH 0/2] Exynos4: power domain fixes for v3.5-rc
+In-Reply-To: <1339750473-32699-1-git-send-email-m.szyprowski@samsung.com>
+References: <1339750473-32699-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <0fad01cd600e$41940240$c4bc06c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+Marek Szyprowski wrote:
 > 
-> Add node for Exynos4 interrupt combiner controller.
+> Hello,
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+> This is a resend of my power domain fixes for Samsung Exynos platform.
+> They fix issues introduced by switching to gen_pd based driver in commit
+> 91cfbd4ee0 ('ARM: EXYNOS: Hook up power domains to generic power domain
+> infrastructure') and restore runtime pm functionality for multimedia
+> drivers (s5p-fimc, s5p-mfc, s5p-tv, exynos-drm). Tested on Universal
+> C210 and NURI boards, but the issues were also reported for Origen
+> boards and others. If possible, please consider these patches as fixes
+> (runtime pm is broken without them) and merge to v3.5-rc line.
 > 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
-> b/arch/arm/boot/dts/exynos4210.dtsi
-> index a1dd2ee..0e4f659 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -33,6 +33,17 @@
->  		reg = <0x10490000 0x1000>, <0x10480000 0x100>;
->  	};
+> Best regards
+> Marek Szyprowski
+> Samsung Poland R&D Center
 > 
-> +	combiner:interrupt-controller at 10440000 {
-> +		compatible = "samsung,exynos4210-combiner";
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-
-How about changing above ordering like interrupt gic controller?
-
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-
-And, don't we need combiner-nr?
-+		samsung,combiner-nr = <16>;
-
-> +		reg = <0x10440000 0x1000>;
-> +		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> +			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> +			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> +			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
-> +	};
-> +
->  	watchdog at 10060000 {
->  		compatible = "samsung,s3c2410-wdt";
->  		reg = <0x10060000 0x100>;
+> 
+> Patch summary:
+> 
+> Marek Szyprowski (2):
+>   ARM: Exynos4: read initial state of power domain from hw registers
+>   ARM: Exynos4: pm_domains: register devices in 'need_restore' state
+> 
+>  arch/arm/mach-exynos/pm_domains.c |   13 +++++++++----
+>  1 files changed, 9 insertions(+), 4 deletions(-)
+> 
 > --
-> 1.6.6.rc2
+> 1.7.1.569.g6f426
 
-Others, looks good to me.
+OK, applied this series in my -fixes.
 
 Thanks.
 
