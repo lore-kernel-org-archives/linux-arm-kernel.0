@@ -1,31 +1,39 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 12 Jul 2012 14:17:27 +0530
-Subject: [PATCH v5 0/6] spi: s3c64xx: add support for device tree
-In-Reply-To: <CAJuYYwQA_x112xqOnQmwZjzoXoR-DAvT8YdB90Wm=78CH72uOg@mail.gmail.com>
-References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
- <20120711174908.GP3938@opensource.wolfsonmicro.com>
- <CAJuYYwQA_x112xqOnQmwZjzoXoR-DAvT8YdB90Wm=78CH72uOg@mail.gmail.com>
-Message-ID: <CAJuYYwRfP76iuBb-Lo-PtrUxKW1odmTjhenz+5LY+=OfCXJmfw@mail.gmail.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Thu, 12 Jul 2012 11:03:29 +0200
+Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
+ MX2_CAMERA_PACK_DIR_MSB flags.
+Message-ID: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2012 23:30, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> On 11 July 2012 23:19, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
->> On Wed, Jul 11, 2012 at 09:10:59PM +0530, Thomas Abraham wrote:
->>> Changes since v4:
->>> - Includes the missing gpio request for slave select line gpio as suggested
->>>   by Mark Brown.
->>
->> These looked OK (and have had quite a bit of review already so we're
->> probably at the stage where incremental fixes are better anyway) so I
->> tried to apply them but git am was really unhappy.  I tried applying on
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git spi-next
->>
->> and -next.  Can you check what's going on here please?
->
-> These patches were based on Samsung maintainer's for-next branch with
-> Grant's spi/next branch merged. I will check with your spi-next
-> branch. Thanks.
+These flags are not used any longer and can be safely removed
+since the following patch:
+http://www.spinics.net/lists/linux-media/msg50165.html
 
-The 6th patch in this series has a dependency on Samsung maintainers
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ arch/arm/plat-mxc/include/mach/mx2_cam.h |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/mx2_cam.h b/arch/arm/plat-mxc/include/mach/mx2_cam.h
+index 3c080a3..7ded6f1 100644
+--- a/arch/arm/plat-mxc/include/mach/mx2_cam.h
++++ b/arch/arm/plat-mxc/include/mach/mx2_cam.h
+@@ -23,7 +23,6 @@
+ #ifndef __MACH_MX2_CAM_H_
+ #define __MACH_MX2_CAM_H_
+ 
+-#define MX2_CAMERA_SWAP16		(1 << 0)
+ #define MX2_CAMERA_EXT_VSYNC		(1 << 1)
+ #define MX2_CAMERA_CCIR			(1 << 2)
+ #define MX2_CAMERA_CCIR_INTERLACE	(1 << 3)
+@@ -31,7 +30,6 @@
+ #define MX2_CAMERA_GATED_CLOCK		(1 << 5)
+ #define MX2_CAMERA_INV_DATA		(1 << 6)
+ #define MX2_CAMERA_PCLK_SAMPLE_RISING	(1 << 7)
+-#define MX2_CAMERA_PACK_DIR_MSB		(1 << 8)
+ 
+ /**
+  * struct mx2_camera_platform_data - optional platform data for mx2_camera
+-- 
+1.7.9.5
