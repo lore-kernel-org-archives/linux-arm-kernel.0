@@ -1,57 +1,117 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 12 Jul 2012 08:45:22 +0800
-Subject: [PATCH] i2c i.MX: Fix divider table
-In-Reply-To: <20120711183838.GM30009@pengutronix.de>
-References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
- <20120705145236.GA2735@richard-laptop>
- <20120705160153.GT30009@pengutronix.de>
- <20120706005249.GA26888@b20223-02.ap.freescale.net>
- <20120706062852.GZ30009@pengutronix.de>
- <20120711060121.GB30055@b20223-02.ap.freescale.net>
- <20120711183838.GM30009@pengutronix.de>
-Message-ID: <20120712004522.GA21635@b20223-02.ap.freescale.net>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 11 Jul 2012 17:46:44 -0700
+Subject: [GIT PULL] DT clk binding support for 3.6
+In-Reply-To: <4FF86BD9.3050805@gmail.com>
+References: <4FF86BD9.3050805@gmail.com>
+Message-ID: <20120712004644.GH2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 08:38:38PM +0200, Sascha Hauer wrote:
-> Hi Richard,
+On 20120707-12:03, Rob Herring wrote:
+> Mike,
 > 
-> On Wed, Jul 11, 2012 at 02:01:21PM +0800, Richard Zhao wrote:
-> > 
-> > IC guys confirmed that the spec is right:
-> > 
-> > This an adaptive feature of our I2C module may apply to all IMX chips.
-> > No mistake in the table of RMs.
-> > 
-> > The divider is designed to guarantee SCL high level and low level last
-> > time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
-> > the transition time is longer than 1 internal pre-divided clock cycle.
-> > The pre-divided clock is divided from I2C module clock, used for
-> > generating SCL. So you will see SCL clock cycle is some way longer than
-> > calculated value using IFDR.
-> > 
-> > Transition time will different from rising or falling edge, different
-> > pull-up resistors, and different SCL loading.
-> > 
-> > This feature make sure transition time won?t eat both level time of SCL.
+> Please pull DT clk binding and highbank clk support for 3.6. The only
+> real change from 3.5 pull request is returning error values rather than
+> NULL to align with the rest of the clk framework. There's been a little
+> discussion but otherwise has been quiet.
 > 
-> Thanks for clarification. Does this mean that this feature is used to
-> synchronize between the bus clock and and bitclock?
-Per my understanding,
-Not exactly. Divided clock is only used for count time of SCL level
-hold. This means, even if the i2c bus loading is high (long level
-setup time), the i2c may still work.
 
-Thanks
-Richard
+Hi Rob,
+
+I agree that these patches have seen enough time on the list.  I did
+find one problem in testing: the high bank clock registration function
+writes to clk_hb->hw.init which is marked const.  I fixed it up in the
+below patch.  That fix is now squashed into into the final patch in your
+series on the clk-next branch.  Let me know if you have any objections.
+
+Regards,
+Mike
+
+diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+index 2f61065..52fecad 100644
+--- a/drivers/clk/clk-highbank.c
++++ b/drivers/clk/clk-highbank.c
+@@ -277,7 +277,7 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
+ 	struct hb_clk *hb_clk;
+ 	const char *clk_name = node->name;
+ 	const char *parent_name;
+-	struct clk_init_data init_data;
++	struct clk_init_data init;
+ 	int rc;
+ 
+ 	rc = of_property_read_u32(node, "reg", &reg);
+@@ -292,13 +292,14 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
+ 
+ 	of_property_read_string(node, "clock-output-names", &clk_name);
+ 
+-	hb_clk->hw.init = &init_data;
+-	hb_clk->hw.init->name = clk_name;
+-	hb_clk->hw.init->num_parents = 1;
++	init.name = clk_name;
++	init.ops = ops;
++	init.flags = 0;
+ 	parent_name = of_clk_get_parent_name(node, 0);
+-	hb_clk->hw.init->parent_names = &parent_name;
+-	hb_clk->hw.init->ops = ops;
+-	hb_clk->hw.init->flags = 0;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	hb_clk->hw.init = &init;
+ 
+ 	clk = clk_register(NULL, &hb_clk->hw);
+ 	if (WARN_ON(IS_ERR(clk))) {
+
+
+> Rob
 > 
-> I'll send a documentation patch for this next week to make this clear.
+> The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 > 
-> Sascha
+>   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 > 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> are available in the git repository at:
 > 
+>   git://sources.calxeda.com/kernel/linux.git clk-for-3.6
+> 
+> for you to fetch changes up to 39a8e38a03823c3acaec02c6d7c551e268cb2139:
+> 
+>   clk: add highbank clock support (2012-07-01 17:04:45 -0500)
+> 
+> ----------------------------------------------------------------
+> Grant Likely (2):
+>       clk: add DT clock binding support
+>       clk: add DT fixed-clock binding support
+> 
+> Rob Herring (2):
+>       dt: add clock binding doc to primecell bindings
+>       clk: add highbank clock support
+> 
+>  .../devicetree/bindings/arm/primecell.txt          |    6 +
+>  .../devicetree/bindings/clock/calxeda.txt          |   17 +
+>  .../devicetree/bindings/clock/clock-bindings.txt   |  117 +++++++
+>  .../devicetree/bindings/clock/fixed-clock.txt      |   21 ++
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/boot/dts/highbank.dts                     |   91 +++++-
+>  arch/arm/mach-highbank/Makefile                    |    2 +-
+>  arch/arm/mach-highbank/clock.c                     |   62 ----
+>  arch/arm/mach-highbank/highbank.c                  |    7 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-fixed-rate.c                       |   23 ++
+>  drivers/clk/clk-highbank.c                         |  345
+> ++++++++++++++++++++
+>  drivers/clk/clk.c                                  |  140 ++++++++
+>  drivers/clk/clkdev.c                               |   77 +++++
+>  include/linux/clk-provider.h                       |   16 +
+>  include/linux/clk.h                                |   19 ++
+>  16 files changed, 881 insertions(+), 64 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/calxeda.txt
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
+>  delete mode 100644 arch/arm/mach-highbank/clock.c
+>  create mode 100644 drivers/clk/clk-highbank.c
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
