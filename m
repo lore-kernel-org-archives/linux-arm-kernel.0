@@ -1,43 +1,57 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 11 Jul 2012 17:11:34 -0700
-Subject: [PATCH 3/9] ARM: versatile: Make plat-versatile clock optional
-In-Reply-To: <CACRpkdYiW8C298K3uPzfJrq09vs-r90brMT_imgz54KtP4Xqsw@mail.gmail.com>
-References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
- <1342013791-19516-4-git-send-email-pawel.moll@arm.com>
- <CACRpkdYiW8C298K3uPzfJrq09vs-r90brMT_imgz54KtP4Xqsw@mail.gmail.com>
-Message-ID: <20120712001134.GG2772@gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 12 Jul 2012 08:45:22 +0800
+Subject: [PATCH] i2c i.MX: Fix divider table
+In-Reply-To: <20120711183838.GM30009@pengutronix.de>
+References: <1341493826-13861-1-git-send-email-s.hauer@pengutronix.de>
+ <20120705145236.GA2735@richard-laptop>
+ <20120705160153.GT30009@pengutronix.de>
+ <20120706005249.GA26888@b20223-02.ap.freescale.net>
+ <20120706062852.GZ30009@pengutronix.de>
+ <20120711060121.GB30055@b20223-02.ap.freescale.net>
+ <20120711183838.GM30009@pengutronix.de>
+Message-ID: <20120712004522.GA21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120711-18:43, Linus Walleij wrote:
-> On Wed, Jul 11, 2012 at 3:36 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+On Wed, Jul 11, 2012 at 08:38:38PM +0200, Sascha Hauer wrote:
+> Hi Richard,
 > 
-> > ... in preparation for common clock coming for Integrator
-> > and Versatile Express.
-> >
-> > Based on Linus Walleij's "ARM: integrator: convert to common
-> > clock" patch.
-> >
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> On Wed, Jul 11, 2012 at 02:01:21PM +0800, Richard Zhao wrote:
+> > 
+> > IC guys confirmed that the spec is right:
+> > 
+> > This an adaptive feature of our I2C module may apply to all IMX chips.
+> > No mistake in the table of RMs.
+> > 
+> > The divider is designed to guarantee SCL high level and low level last
+> > time. Divider will hold when SCL transition from 1 to 0 or 0 to 1, if
+> > the transition time is longer than 1 internal pre-divided clock cycle.
+> > The pre-divided clock is divided from I2C module clock, used for
+> > generating SCL. So you will see SCL clock cycle is some way longer than
+> > calculated value using IFDR.
+> > 
+> > Transition time will different from rising or falling edge, different
+> > pull-up resistors, and different SCL loading.
+> > 
+> > This feature make sure transition time won?t eat both level time of SCL.
 > 
-> I think Mike is already queueing my patch, so if you're changing
-> anything you should build on top of that and submit it to the
-> clk tree.
+> Thanks for clarification. Does this mean that this feature is used to
+> synchronize between the bus clock and and bitclock?
+Per my understanding,
+Not exactly. Divided clock is only used for count time of SCL level
+hold. This means, even if the i2c bus loading is high (long level
+setup time), the i2c may still work.
+
+Thanks
+Richard
 > 
-> Mike, is the Integrator patches making it into your for-next branch?
+> I'll send a documentation patch for this next week to make this clear.
 > 
-
-They are there locally and will be pushed in the next hour.
-
-> The merge window is closing in you know...
+> Sascha
 > 
-
-Oh I'm well aware.  I ended up rebasing clk-3.6 (sigh) so that it would
-be on top v3.5-rc6 and pull in the clk-fixes stuff that way.  But this
-way I'm getting all of my ducks in a row for the 3.6 merge window.
-
-Regards,
-Mike
-
-> Yours,
-> Linus Walleij
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
