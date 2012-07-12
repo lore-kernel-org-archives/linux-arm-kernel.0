@@ -1,28 +1,76 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 12 Jul 2012 16:23:20 +0100
-Subject: Device tree binding for DVFS table
-In-Reply-To: <4FFE4FE6.20109@nvidia.com>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <20120711144449.GA23654@sirena.org.uk> <4FFE4FE6.20109@nvidia.com>
-Message-ID: <20120712152320.GA7256@opensource.wolfsonmicro.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 12 Jul 2012 18:32:27 +0300
+Subject: [PATCHv3 5/9] ARM: OMAP3: set autoidle flags for a few clocks
+In-Reply-To: <4FFE9537.9080708@ti.com>
+References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
+ <1338470942-20185-6-git-send-email-t-kristo@ti.com>
+ <4FFE9537.9080708@ti.com>
+Message-ID: <1342107147.4672.37.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2012 at 09:47:42AM +0530, Prashant Gaikwad wrote:
-> On Wednesday 11 July 2012 08:14 PM, Mark Brown wrote:
+On Thu, 2012-07-12 at 14:43 +0530, Rajendra Nayak wrote:
+> Hi Tero,
+> 
+> On Thursday 31 May 2012 06:58 PM, Tero Kristo wrote:
+> > dpll3, dpll4 and sdrc_ick are controlled automatically by hardware.
+> 
+> sdrc_ick does not seem to have a software control to enable/disable
+> this automatic control in hardware, so what you are doing in the
+> patch below seems fine.
+> However for dpll3 and dpll4, there is indeed a software control which
+> is enabled/disabled through omap3_dpll_allow_idle/omap3_dpll_deny_idle
+> functions respectively. So shouldn't the 'autoidle' flag for them be
+> handled similar to what you do in omap2_clkt_iclk_allow_idle/
+> omap2_clkt_iclk_deny_idle functions in your PATCH 2/9, instead of
+> setting them to 'true' statically?
 
-> >I'd also expect to see a range of voltages for each frequency rather
-> >than a specific voltage; usually things are at least characterised with
-> >a specified tolerance.
+Yea, this is a good idea, and seems to work also. I'll add this change
+to the next rev.
 
-> But then how will you determine the operating voltage for a frequency?
+-Tero
 
-By passing the range into the regulator API - the regulator API always
-takes a voltage range anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120712/cf8d306e/attachment.sig>
+> 
+> regards,
+> Rajendra
+> 
+> > Thus, reflect this with the autoidle flags, the clocks will no longer
+> > show as active in usecount dumps and will allow the voltdm->sleep /
+> > wakeup calls to work properly.
+> >
+> > Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> > Cc: Paul Walmsley<paul@pwsan.com>
+> > Cc: Kevin Hilman<khilman@ti.com>
+> > ---
+> >   arch/arm/mach-omap2/clock3xxx_data.c |    3 +++
+> >   1 files changed, 3 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+> > index 4e1a3b0..ca0de28 100644
+> > --- a/arch/arm/mach-omap2/clock3xxx_data.c
+> > +++ b/arch/arm/mach-omap2/clock3xxx_data.c
+> > @@ -434,6 +434,7 @@ static struct clk dpll3_ck = {
+> >   	.round_rate	=&omap2_dpll_round_rate,
+> >   	.clkdm_name	= "dpll3_clkdm",
+> >   	.recalc		=&omap3_dpll_recalc,
+> > +	.autoidle	= true,
+> >   };
+> >
+> >   /*
+> > @@ -617,6 +618,7 @@ static struct clk dpll4_ck = {
+> >   	.set_rate	=&omap3_dpll4_set_rate,
+> >   	.clkdm_name	= "dpll4_clkdm",
+> >   	.recalc		=&omap3_dpll_recalc,
+> > +	.autoidle	= true,
+> >   };
+> >
+> >   /*
+> > @@ -1751,6 +1753,7 @@ static struct clk sdrc_ick = {
+> >   	.flags		= ENABLE_ON_INIT,
+> >   	.clkdm_name	= "core_l3_clkdm",
+> >   	.recalc		=&followparent_recalc,
+> > +	.autoidle	= true,
+> >   };
+> >
+> >   static struct clk gpmc_fck = {
+> 
