@@ -1,125 +1,74 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Jul 2012 11:57:53 +0200
-Subject: [PATCH 7/7] mfd/mc13xxx: add support for mc34708
+Date: Thu, 12 Jul 2012 11:57:51 +0200
+Subject: [PATCH 5/7] mfd/mc13xxx: drop modifying driver's id_table in probe
 In-Reply-To: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1342087073-3892-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1342087073-3892-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This was introduced in commit
+
+	876989d (mfd: Add device tree probe support for mc13xxx)
+
+for spi and later while introducing support for i2c copied to the i2c
+driver.
+
+Modifying driver details is very strange, for example probing an
+mc13892 device (instantiated via dt) removes the driver's ability to
+handle (traditionally probed) mc13783 devices in this case.
+I'm not aware of any problems that make this hack necessary and if
+there were some, they have to be fixed in the spi/i2c core, not in
+a driver.
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mfd/mc13xxx-core.c |   21 +++++++++++++++++++++
- drivers/mfd/mc13xxx-i2c.c  |    6 ++++++
- drivers/mfd/mc13xxx-spi.c  |    4 ++++
- drivers/mfd/mc13xxx.h      |    3 ++-
- 4 files changed, 33 insertions(+), 1 deletion(-)
+ drivers/mfd/mc13xxx-i2c.c |    6 ------
+ drivers/mfd/mc13xxx-spi.c |    6 ------
+ 2 files changed, 12 deletions(-)
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index 7874711..4ce3e1f 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -119,6 +119,11 @@
- #define MC13XXX_REVISION_FAB		(0x03 << 11)
- #define MC13XXX_REVISION_ICIDCODE	(0x3f << 13)
- 
-+#define MC34708_REVISION_REVMETAL	(0x07 <<  0)
-+#define MC34708_REVISION_REVFULL	(0x07 <<  3)
-+#define MC34708_REVISION_FIN		(0x07 <<  6)
-+#define MC34708_REVISION_FAB		(0x07 <<  9)
-+
- #define MC13XXX_ADC1		44
- #define MC13XXX_ADC1_ADEN		(1 << 0)
- #define MC13XXX_ADC1_RAND		(1 << 1)
-@@ -424,6 +429,16 @@ static void mc13xxx_print_revision(struct mc13xxx *mc13xxx, u32 revision)
- 			maskval(revision, MC13XXX_REVISION_ICIDCODE));
- }
- 
-+static void mc34708_print_revision(struct mc13xxx *mc13xxx, u32 revision)
-+{
-+	dev_info(mc13xxx->dev, "%s: rev %d.%d, fin: %d, fab: %d\n",
-+			mc13xxx->variant->name,
-+			maskval(revision, MC34708_REVISION_REVFULL),
-+			maskval(revision, MC34708_REVISION_REVMETAL),
-+			maskval(revision, MC34708_REVISION_FIN),
-+			maskval(revision, MC34708_REVISION_FAB));
-+}
-+
- /* These are only exported for mc13xxx-i2c and mc13xxx-spi */
- struct mc13xxx_variant mc13xxx_variant_mc13783 = {
- 	.name = "mc13783",
-@@ -437,6 +452,12 @@ struct mc13xxx_variant mc13xxx_variant_mc13892 = {
- };
- EXPORT_SYMBOL_GPL(mc13xxx_variant_mc13892);
- 
-+struct mc13xxx_variant mc13xxx_variant_mc34708 = {
-+	.name = "mc34708",
-+	.print_revision = mc34708_print_revision,
-+};
-+EXPORT_SYMBOL_GPL(mc13xxx_variant_mc34708);
-+
- static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
- {
- 	return mc13xxx->variant->name;
 diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-index 6c1598c..907abff 100644
+index d22501d..e00e885 100644
 --- a/drivers/mfd/mc13xxx-i2c.c
 +++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -26,6 +26,9 @@ static const struct i2c_device_id mc13xxx_i2c_device_id[] = {
- 		.name = "mc13892",
- 		.driver_data = (kernel_ulong_t)&mc13xxx_variant_mc13892,
- 	}, {
-+		.name = "mc34708",
-+		.driver_data = (kernel_ulong_t)&mc13xxx_variant_mc34708,
-+	}, {
- 		/* sentinel */
- 	}
- };
-@@ -36,6 +39,9 @@ static const struct of_device_id mc13xxx_dt_ids[] = {
- 		.compatible = "fsl,mc13892",
- 		.data = &mc13xxx_variant_mc13892,
- 	}, {
-+		.compatible = "fsl,mc34708",
-+		.data = &mc13xxx_variant_mc34708,
-+	}, {
- 		/* sentinel */
- 	}
- };
+@@ -53,16 +53,10 @@ static struct regmap_config mc13xxx_regmap_i2c_config = {
+ static int mc13xxx_i2c_probe(struct i2c_client *client,
+ 		const struct i2c_device_id *id)
+ {
+-	const struct of_device_id *of_id;
+-	struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
+ 	struct mc13xxx *mc13xxx;
+ 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
+ 	int ret;
+ 
+-	of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
+-	if (of_id)
+-		idrv->id_table = (const struct i2c_device_id*) of_id->data;
+-
+ 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
+ 	if (!mc13xxx)
+ 		return -ENOMEM;
 diff --git a/drivers/mfd/mc13xxx-spi.c b/drivers/mfd/mc13xxx-spi.c
-index 75a00c4..08a3bd9 100644
+index 03df422..b99e728 100644
 --- a/drivers/mfd/mc13xxx-spi.c
 +++ b/drivers/mfd/mc13xxx-spi.c
-@@ -33,6 +33,9 @@ static const struct spi_device_id mc13xxx_device_id[] = {
- 		.name = "mc13892",
- 		.driver_data = (kernel_ulong_t)&mc13xxx_variant_mc13892,
- 	}, {
-+		.name = "mc34708",
-+		.driver_data = (kernel_ulong_t)&mc13xxx_variant_mc34708,
-+	}, {
- 		/* sentinel */
- 	}
- };
-@@ -41,6 +44,7 @@ MODULE_DEVICE_TABLE(spi, mc13xxx_device_id);
- static const struct of_device_id mc13xxx_dt_ids[] = {
- 	{ .compatible = "fsl,mc13783", .data = &mc13xxx_variant_mc13783, },
- 	{ .compatible = "fsl,mc13892", .data = &mc13xxx_variant_mc13892, },
-+	{ .compatible = "fsl,mc34708", .data = &mc13xxx_variant_mc34708, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
-diff --git a/drivers/mfd/mc13xxx.h b/drivers/mfd/mc13xxx.h
-index 78bf4c3..460ec5c 100644
---- a/drivers/mfd/mc13xxx.h
-+++ b/drivers/mfd/mc13xxx.h
-@@ -24,7 +24,8 @@ struct mc13xxx_variant {
+@@ -119,16 +119,10 @@ static struct regmap_bus regmap_mc13xxx_bus = {
  
- extern struct mc13xxx_variant
- 		mc13xxx_variant_mc13783,
--		mc13xxx_variant_mc13892;
-+		mc13xxx_variant_mc13892,
-+		mc13xxx_variant_mc34708;
+ static int mc13xxx_spi_probe(struct spi_device *spi)
+ {
+-	const struct of_device_id *of_id;
+-	struct spi_driver *sdrv = to_spi_driver(spi->dev.driver);
+ 	struct mc13xxx *mc13xxx;
+ 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
+ 	int ret;
  
- struct mc13xxx {
- 	struct regmap *regmap;
+-	of_id = of_match_device(mc13xxx_dt_ids, &spi->dev);
+-	if (of_id)
+-		sdrv->id_table = &mc13xxx_device_id[(enum mc13xxx_id) of_id->data];
+-
+ 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
+ 	if (!mc13xxx)
+ 		return -ENOMEM;
 -- 
 1.7.10.4
