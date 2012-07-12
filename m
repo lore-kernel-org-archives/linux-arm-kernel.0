@@ -1,63 +1,50 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 12 Jul 2012 16:39:35 +0100
-Subject: [GIT PULL] Veratile Express updates for v3.6
-Message-ID: <1342107575.25865.13.camel@hornet>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Thu, 12 Jul 2012 19:39:28 +0400
+Subject: [PATCH v2 1/4] ARM: i.MX5x clocks: Add EPIT support This patch adds
+ support for Enhanced Periodic Interrupt Timer (EPIT) to clock subsystem.
+Message-ID: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Ofof,
 
-Could you, please, pull the updated for Versatile Express based on
-v3.5-rc6? You may want to drop the "Make plat-versatile clock optional"
-during the merge, if it conflicts with Intergrator's common clock change
-(shouldn't be a problem, though).
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
-
-  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-v3.5-rc6
-
-for you to fetch changes up to 5d4b9fa0cac57e73857e2dd6d116ef98ef1109b5:
-
-  ARM: vexpress: Config option for early printk console (2012-07-12 16:16:58 +0100)
-
-Thanks!
-
-Pawel
-
-----------------------------------------------------------------
-Pawel Moll (8):
-      ARM: vexpress: Check master site in daughterboard's sysctl operations
-      ARM: versatile: Make plat-versatile clock optional
-      ARM: vexpress: Initial common clock support
-      ARM: vexpress: Add missing SP804 interrupt in motherboard's DTS files
-      ARM: vexpress: Add fixed regulator for SMSC
-      ARM: vexpress: Convert V2P-CA15 Device Tree to 64 bit addresses
-      ARM: vexpress: Add Device Tree for V2P-CA15_CA7 core tile
-      ARM: vexpress: Config option for early printk console
-
-Will Deacon (1):
-      ARM: vexpress: remove automatic errata workaround selection
-
- arch/arm/Kconfig                                  |    6 +-
- arch/arm/Kconfig.debug                            |   26 ++
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |   11 +
- arch/arm/boot/dts/vexpress-v2m.dtsi               |   11 +
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts       |   36 +--
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts        |  188 +++++++++++++
- arch/arm/mach-vexpress/Kconfig                    |    5 +-
- arch/arm/mach-vexpress/Makefile.boot              |    3 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                 |   64 ++---
- arch/arm/mach-vexpress/include/mach/clkdev.h      |   15 --
- arch/arm/mach-vexpress/include/mach/debug-macro.S |   41 +++
- arch/arm/mach-vexpress/include/mach/motherboard.h |   28 +-
- arch/arm/mach-vexpress/include/mach/uncompress.h  |   14 +
- arch/arm/mach-vexpress/v2m.c                      |  292 ++++++++++-----------
- arch/arm/plat-versatile/Kconfig                   |    3 +
- arch/arm/plat-versatile/Makefile                  |    2 +-
- 16 files changed, 504 insertions(+), 241 deletions(-)
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
- delete mode 100644 arch/arm/mach-vexpress/include/mach/clkdev.h
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index a2200c7..d4653d9 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -81,6 +81,7 @@ enum imx5_clks {
+ 	ssi1_root_podf, ssi2_root_pred, ssi2_root_podf, ssi_ext1_pred,
+ 	ssi_ext1_podf, ssi_ext2_pred, ssi_ext2_podf, ssi1_root_gate,
+ 	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
++	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
+ 	clk_max
+ };
+ 
+@@ -226,6 +227,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[ssi3_root_gate] = imx_clk_gate2("ssi3_root_gate", "ssi3_root_sel", MXC_CCM_CCGR3, 26);
+ 	clk[ssi_ext1_gate] = imx_clk_gate2("ssi_ext1_gate", "ssi_ext1_com_sel", MXC_CCM_CCGR3, 28);
+ 	clk[ssi_ext2_gate] = imx_clk_gate2("ssi_ext2_gate", "ssi_ext2_com_sel", MXC_CCM_CCGR3, 30);
++	clk[epit1_ipg_gate] = imx_clk_gate2("epit1_ipg_gate", "ipg", MXC_CCM_CCGR2, 2);
++	clk[epit1_hf_gate] = imx_clk_gate2("epit1_hf_gate", "per_root", MXC_CCM_CCGR2, 4);
++	clk[epit2_ipg_gate] = imx_clk_gate2("epit2_ipg_gate", "ipg", MXC_CCM_CCGR2, 6);
++	clk[epit2_hf_gate] = imx_clk_gate2("epit2_hf_gate", "per_root", MXC_CCM_CCGR2, 8);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+ 		if (IS_ERR(clk[i]))
+@@ -279,6 +284,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk_register_clkdev(clk[dummy], NULL, "imx-keypad");
+ 	clk_register_clkdev(clk[tve_gate], NULL, "imx-tve.0");
+ 	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx-tve.0");
++	clk_register_clkdev(clk[epit1_ipg_gate], "ipg", "imx-epit.0");
++	clk_register_clkdev(clk[epit1_hf_gate], "per", "imx-epit.0");
++	clk_register_clkdev(clk[epit2_ipg_gate], "ipg", "imx-epit.1");
++	clk_register_clkdev(clk[epit2_hf_gate], "per", "imx-epit.1");
+ 
+ 	/* Set SDHC parents to be PLL2 */
+ 	clk_set_parent(clk[esdhc_a_sel], clk[pll2_sw]);
+-- 
+1.7.3.4
