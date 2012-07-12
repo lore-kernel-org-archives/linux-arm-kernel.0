@@ -1,21 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jul 2012 16:00:12 +0000
-Subject: [GIT PULL] imx device tree changes for 3.6 (part 2)
-In-Reply-To: <20120712075405.GM6971@S2101-09.ap.freescale.net>
-References: <20120712075405.GM6971@S2101-09.ap.freescale.net>
-Message-ID: <201207121600.12512.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 12 Jul 2012 18:05:46 +0200
+Subject: IRQ and FIQ disabling during sleep states.
+In-Reply-To: <20120711123020.GW2416@tbergstrom-lnx.Nvidia.com>
+References: <20120711123020.GW2416@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FFEF5DA.8000505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 July 2012, Shawn Guo wrote:
-> Hi Arnd, Olof,
+On 07/11/2012 02:30 PM, Peter De Schrijver wrote:
+> Hi,
 > 
-> Here is the second (last) batch of imx device tree changes for 3.6.
-> Please pull.
+> I noticed several platforms exhibit different behaviour wrt disabling IRQ or
+> FIQ when entering a CPU idle state. Tegra for example disables both FIQ and
+> IRQ when entering CPU clockstop, but OMAP seems to only disable FIQs? Also
+> the generic cpuidle_wrap_enter() function, enables IRQs after return from
+> the idle state, but doesn't disable them.
 > 
+> Some questions:
+> 
+> 1) I assume we need to disable IRQ/FIQ to not confuse the cpuidle code due to
+>    late interrupts?
+> 2) What prevents us from unifying this?
 
-Pulled both imx and mxs branches.
 
-Thanks,
+AFAIR, Rob Lee discussed about this point already. Maybe he has a
+pointer to the discussion.
 
-	Arnd
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
