@@ -1,39 +1,45 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 12 Jul 2012 14:35:21 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Adjust to pl08x DMA interface changes
-Message-ID: <4FFEC489.5030307@antcom.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 12 Jul 2012 18:24:22 +0530
+Subject: [PATCH v3 0/6] mmc: dw_mmc: add support for device tree based
+ instantiation
+Message-ID: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+This patch series adds device tree support for Synopsis Designware Mobile
+Storage Host Controller.
 
-this is the pull request including the fix for the compile error caused by
-lpc32xx-next and dma branches collisions in linux-next.
+The first patch converts the copy of controller device instance into a
+reference. This is need to allow device resource management api to correctly
+manage the resources allocated by the driver. The second patch fixes the
+incorrect abort of the probe in case a slot initialization fails. This is
+fixed by allowing as many slots to be initialized successfully and failing
+only if there are no slots that were initialized.
 
-I submitted the respective changes in the MTD drivers separately as patches
-to the mtd subsystem.
+The third patch adds clock lookup in the driver and this is optional. Platforms
+that do not need any clock gating and control for the dw_mmc controllers will
+not be affected with this change. The fourth patch adds a quirk to notify the
+controller about the absence of the write protect line.
 
-Thanks,
+The fifth patch adds device tree based discovery support for the dw_mmc driver.
+The sixth patch add Samsung Exynos5250 specific extentions to the driver.
 
-Roland
+This patchset is based on Samsung kernel tree's for-next branch with the
+mmc tree's mmc-next branch merged.
 
+Thomas Abraham (6):
+  mmc: dw_mmc: convert copy of struct device in struct dw_mci to a reference
+  mmc: dw_mmc: allow probe to succeed even if one slot is initialized
+  mmc: dw_mmc: lookup for optional biu and ciu clocks
+  mmc: dw_mmc: add quirk to indicate missing write protect line
+  mmc: dw_mmc: add device tree support
+  mmc: dw_mmc: add samsung exynos5250 specific extentions
 
-
-The following changes since commit dcdd1339a3cda33f216628142eea78f3d41b47fe:
-
-  ARM: LPC32xx: Remove unused gpios (2012-07-01 21:06:45 +0200)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/core-fixes
-
-for you to fetch changes up to 8ba85f8bffdfbac98dac8630406f7d020103db70:
-
-  ARM: LPC32xx: Adjust to pl08x DMA interface changes (2012-07-12 14:25:37 +0200)
-
-----------------------------------------------------------------
-Roland Stigge (1):
-      ARM: LPC32xx: Adjust to pl08x DMA interface changes
-
- arch/arm/mach-lpc32xx/phy3250.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/mmc/synposis-dw-mshc.txt   |  144 ++++++++
+ drivers/mmc/host/dw_mmc-pci.c                      |    2 +-
+ drivers/mmc/host/dw_mmc-pltfm.c                    |   41 +++-
+ drivers/mmc/host/dw_mmc.c                          |  364 +++++++++++++++++---
+ drivers/mmc/host/dw_mmc.h                          |   23 ++
+ include/linux/mmc/dw_mmc.h                         |   17 +-
+ 6 files changed, 538 insertions(+), 53 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
