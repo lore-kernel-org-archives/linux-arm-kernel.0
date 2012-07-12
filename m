@@ -1,229 +1,319 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 12 Jul 2012 15:12:31 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
-Message-ID: <20120712131231.GH2194@pengutronix.de>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 12 Jul 2012 15:28:09 +0200
+Subject: [ACKed PATCH] clocksource: dw_apb_timer: Add common DTS glue for
+ dw_apb_timer
+In-Reply-To: <alpine.LFD.2.02.1207112307061.32033@ionos>
+References: <1342037596-17710-1-git-send-email-dinguyen@altera.com>
+ <alpine.LFD.2.02.1207112307061.32033@ionos>
+Message-ID: <20120712132809.GD11798@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed 2012-07-11 23:10:43, Thomas Gleixner wrote:
+> On Wed, 11 Jul 2012, dinguyen at altera.com wrote:
+> 
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Make a common device tree glue for clocksource/dw_apb_timer.
+> > Move mach-picoxcell/time.c to be a generic device tree application
+> > of the dw_apb_timer.
+> > 
+> > Configure mach-picoxcell to use the dw_apb_timer_of device tree
+> > implementation in drivers/clocksource.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Acked-by: Jamie Iles <jamie@jamieiles.com>
+> 
+> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> 
+> Please take it through the proper ARM/SoC tree so work depending on
+> that does not get blocked.
 
-> I fixed it up (I think - see below) and can carry the fix as necessary.
-> Please check this and talk to each other ...
-
-I also noticed the bindings today [1]. They came in via a seperate
-patch (suboptimal) which has no ack by a devicetree maintainer which I'd
-really like to see here, because the bindings look suspicious to me.
-They look like they mostly export register settings which is usually
-questionable since we might want to abstract bindings so they can be
-useful for a number of drivers.
-
-Arnd, since you committed the patches, can you please comment? I'd
-prefer to drop this DT conversion for now, otherwise we might have to
-support this possibly rushed bindings forever? LinusW, what do you
-think?
+Arnd, can you apply this? Or should we create public git tree to pull
+from?
 
 Thanks,
+								Pavel
 
-   Wolfram
+---
 
-[1] http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=87a174f3d7cea1b9c7596911c39616768f441629
+Make a common device tree glue for clocksource/dw_apb_timer.
+Move mach-picoxcell/time.c to be a generic device tree application
+of the dw_apb_timer.
 
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/i2c/busses/i2c-nomadik.c
-> index e6b93f3,5471303..0000000
-> --- a/drivers/i2c/busses/i2c-nomadik.c
-> +++ b/drivers/i2c/busses/i2c-nomadik.c
-> @@@ -24,8 -23,10 +24,9 @@@
->   #include <linux/io.h>
->   #include <linux/regulator/consumer.h>
->   #include <linux/pm_runtime.h>
->  +#include <linux/platform_data/i2c-nomadik.h>
-> + #include <linux/of.h>
->   
->  -#include <plat/i2c.h>
->  -
->   #define DRIVER_NAME "nmk-i2c"
->   
->   /* I2C Controller register offsets */
-> @@@ -911,23 -896,93 +908,94 @@@ static const struct i2c_algorithm nmk_i
->   	.functionality	= nmk_i2c_functionality
->   };
->   
-> + static struct nmk_i2c_controller u8500_i2c = {
-> + 	/*
-> + 	 * Slave data setup time; 250ns, 100ns, and 10ns, which
-> + 	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
-> + 	 */
-> + 	.slsu           = 0xe,
-> + 	.tft            = 1,      /* Tx FIFO threshold */
-> + 	.rft            = 8,      /* Rx FIFO threshold */
-> + 	.clk_freq       = 400000, /* std. mode operation */
-> + 	.timeout        = 200,    /* Slave response timeout(ms) */
-> + 	.sm             = I2C_FREQ_MODE_FAST,
-> + };
-> + 
-> + static int __devinit
-> + nmk_i2c_of_probe(struct device_node *np, struct nmk_i2c_controller *pdata)
-> + {
-> + 	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
-> + 	if (!pdata->clk_freq) {
-> + 		pr_warn("%s: Clock frequency not found\n", np->full_name);
-> + 		return -EINVAL;
-> + 	}
-> + 
-> + 	of_property_read_u32(np, "stericsson,slsu", (u32*)&pdata->slsu);
-> + 	if (!pdata->slsu) {
-> + 		pr_warn("%s: Data line delay not found\n", np->full_name);
-> + 		return -EINVAL;
-> + 	}
-> + 
-> + 	of_property_read_u32(np, "stericsson,tft", (u32*)&pdata->tft);
-> + 	if (!pdata->tft) {
-> + 		pr_warn("%s: Tx FIFO threshold not found\n", np->full_name);
-> + 		return -EINVAL;
-> + 	}
-> + 
-> + 	of_property_read_u32(np, "stericsson,rft", (u32*)&pdata->rft);
-> + 	if (!pdata->rft) {
-> + 		pr_warn("%s: Rx FIFO threshold not found\n", np->full_name);
-> + 		return -EINVAL;
-> + 	}
-> + 
-> + 	of_property_read_u32(np, "stericsson,timeout", (u32*)&pdata->timeout);
-> + 	if (!pdata->timeout) {
-> + 		pr_warn("%s: Timeout not found\n", np->full_name);
-> + 		return -EINVAL;
-> + 	}
-> + 
-> + 	/*
-> + 	 * This driver only supports fast and standard frequency
-> + 	 * modes. If anything else is requested fall-back to standard.
-> + 	 */
-> + 	if (of_get_property(np, "stericsson,i2c_freq_mode_fast", NULL))
-> + 		pdata->sm = I2C_FREQ_MODE_FAST;
-> + 	else
-> + 		pdata->sm = I2C_FREQ_MODE_STANDARD;
-> + 
-> + 	return 0;
-> + }
-> + 
->  -static int __devinit nmk_i2c_probe(struct platform_device *pdev)
->  +static atomic_t adapter_id = ATOMIC_INIT(0);
->  +
->  +static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
->   {
->   	int ret = 0;
-> - 	struct nmk_i2c_controller *pdata =
-> - 			adev->dev.platform_data;
->  -	struct resource *res;
->  -	struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
->  -	struct device_node *np = pdev->dev.of_node;
-> ++	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
-> ++	struct device_node *np = adev->dev.of_node;
->   	struct nmk_i2c_dev	*dev;
->   	struct i2c_adapter *adap;
->   
-> - 	if (!pdata) {
-> - 		dev_warn(&adev->dev, "no platform data\n");
-> - 		return -ENODEV;
-> + 	if (np) {
-> + 		if (!pdata) {
->  -			pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> ++			pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
-> + 			if (!pdata) {
-> + 				ret = -ENOMEM;
-> + 				goto err_no_mem;
-> + 			}
-> + 		}
-> + 		ret = nmk_i2c_of_probe(np, pdata);
-> + 		if (ret)
-> + 			kfree(pdata);
->   	}
-> + 
-> + 	if (!pdata)
-> + 		/* No i2c configuration found, using the default. */
-> + 		pdata = &u8500_i2c;
-> + 
->   	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
->   	if (!dev) {
->  -		dev_err(&pdev->dev, "cannot allocate memory\n");
->  +		dev_err(&adev->dev, "cannot allocate memory\n");
->   		ret = -ENOMEM;
->   		goto err_no_mem;
->   	}
-> @@@ -969,12 -1037,12 +1037,11 @@@
->   	adap->owner	= THIS_MODULE;
->   	adap->class	= I2C_CLASS_HWMON | I2C_CLASS_SPD;
->   	adap->algo	= &nmk_i2c_algo;
-> - 	adap->timeout	= pdata->timeout ? msecs_to_jiffies(pdata->timeout) :
-> - 		msecs_to_jiffies(20000);
-> + 	adap->timeout	= msecs_to_jiffies(pdata->timeout);
->  +	adap->nr = atomic_read(&adapter_id);
->   	snprintf(adap->name, sizeof(adap->name),
->  -		 "Nomadik I2C%d at %lx", pdev->id, (unsigned long)res->start);
->  -
->  -	/* fetch the controller id */
->  -	adap->nr	= pdev->id;
->  +		 "Nomadik I2C%d at %pR", adap->nr, &adev->res);
->  +	atomic_inc(&adapter_id);
->   
->   	/* fetch the controller configuration from machine */
->   	dev->cfg.clk_freq = pdata->clk_freq;
-> @@@ -1040,29 -1110,20 +1107,35 @@@ static int nmk_i2c_remove(struct amba_d
->   	return 0;
->   }
->   
->  +static struct amba_id nmk_i2c_ids[] = {
->  +	{
->  +		.id	= 0x00180024,
->  +		.mask	= 0x00ffffff,
->  +	},
->  +	{
->  +		.id	= 0x00380024,
->  +		.mask	= 0x00ffffff,
->  +	},
->  +	{},
->  +};
->  +
->  +MODULE_DEVICE_TABLE(amba, nmk_i2c_ids);
->  +
-> + static const struct of_device_id nmk_gpio_match[] = {
-> + 	{ .compatible = "st,nomadik-i2c", },
-> + 	{},
-> + };
-> + 
->  -static struct platform_driver nmk_i2c_driver = {
->  -	.driver = {
->  +static struct amba_driver nmk_i2c_driver = {
->  +	.drv = {
->   		.owner = THIS_MODULE,
->   		.name = DRIVER_NAME,
->   		.pm = &nmk_i2c_pm,
-> + 		.of_match_table = nmk_gpio_match,
->   	},
->  +	.id_table = nmk_i2c_ids,
->   	.probe = nmk_i2c_probe,
->  -	.remove = __devexit_p(nmk_i2c_remove),
->  +	.remove = nmk_i2c_remove,
->   };
->   
->   static int __init nmk_i2c_init(void)
+Configure mach-picoxcell to use the dw_apb_timer_of device tree
+implementation in drivers/clocksource.
+
+Signed-off-by: Pavel Machek <pavel@denx.de>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ Documentation/devicetree/bindings/rtc/dw-apb.txt   |   25 ++++++++++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-picoxcell/Makefile                   |    1 -
+ arch/arm/mach-picoxcell/common.c                   |    3 +-
+ arch/arm/mach-picoxcell/common.h                   |    2 +-
+ drivers/clocksource/Kconfig                        |    3 ++
+ drivers/clocksource/Makefile                       |    1 +
+ .../clocksource/dw_apb_timer_of.c                  |   52 ++++++++++++--------
+ 8 files changed, 64 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/dw-apb.txt
+ rename arch/arm/mach-picoxcell/time.c => drivers/clocksource/dw_apb_timer_of.c (57%)
+
+diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+new file mode 100644
+index 0000000..93e2b0f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+@@ -0,0 +1,25 @@
++* Designware APB timer
++
++Required properties:
++- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: IRQ line for the timer.
++- clock-frequency: The frequency in HZ of the timer.
++- clock-freq: For backwards compatibility with picoxcell
++
++Example:
++
++		timer1: timer at ffc09000 {
++				compatible = "snps,dw-apb-timer-sp";
++				interrupts = <0 168 4>;
++				clock-frequency = <200000000>;
++				reg = <0xffc09000 0x1000>;
++			};
++
++		timer2: timer at ffd00000 {
++				compatible = "snps,dw-apb-timer-osc";
++				interrupts = <0 169 4>;
++				clock-frequency = <200000000>;
++				reg = <0xffd00000 0x1000>;
++			};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a91009c..57eb6ef 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -658,6 +658,7 @@ config ARCH_PICOXCELL
+ 	select ARM_VIC
+ 	select CPU_V6K
+ 	select DW_APB_TIMER
++	select DW_APB_TIMER_OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_TCM
+diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
+index e5ec4a8..8e39f80 100644
+--- a/arch/arm/mach-picoxcell/Makefile
++++ b/arch/arm/mach-picoxcell/Makefile
+@@ -1,2 +1 @@
+ obj-y	:= common.o
+-obj-y	+= time.o
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index a2e8ae8..8f9a0b4 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -14,6 +14,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/dw_apb_timer.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/vic.h>
+@@ -97,7 +98,7 @@ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= picoxcell_init_irq,
+ 	.handle_irq	= vic_handle_irq,
+-	.timer		= &picoxcell_timer,
++	.timer		= &dw_apb_timer,
+ 	.init_machine	= picoxcell_init_machine,
+ 	.dt_compat	= picoxcell_dt_match,
+ 	.restart	= picoxcell_wdt_restart,
+diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
+index 83d55ab..a65cb02 100644
+--- a/arch/arm/mach-picoxcell/common.h
++++ b/arch/arm/mach-picoxcell/common.h
+@@ -12,6 +12,6 @@
+ 
+ #include <asm/mach/time.h>
+ 
+-extern struct sys_timer picoxcell_timer;
++extern struct sys_timer dw_apb_timer;
+ 
+ #endif /* __PICOXCELL_COMMON_H__ */
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 99c6b20..e62bc7e 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -16,6 +16,9 @@ config CLKSRC_MMIO
+ config DW_APB_TIMER
+ 	bool
+ 
++config DW_APB_TIMER_OF
++	bool
++
+ config CLKSRC_DBX500_PRCMU
+ 	bool "Clocksource PRCMU Timer"
+ 	depends on UX500_SOC_DB8500
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index dd3e661..2cdaf7d 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -10,4 +10,5 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
+ obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+ obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
++obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+\ No newline at end of file
+diff --git a/arch/arm/mach-picoxcell/time.c b/drivers/clocksource/dw_apb_timer_of.c
+similarity index 57%
+rename from arch/arm/mach-picoxcell/time.c
+rename to drivers/clocksource/dw_apb_timer_of.c
+index 2ecba67..f7dba5b 100644
+--- a/arch/arm/mach-picoxcell/time.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -1,11 +1,20 @@
+ /*
++ * Copyright (C) 2012 Altera Corporation
+  * Copyright (c) 2011 Picochip Ltd., Jamie Iles
+  *
++ * Modified from mach-picoxcell/time.c
++ *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  *
+- * All enquiries to support at picochip.com
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ #include <linux/dw_apb_timer.h>
+ #include <linux/of.h>
+@@ -15,8 +24,6 @@
+ #include <asm/mach/time.h>
+ #include <asm/sched_clock.h>
+ 
+-#include "common.h"
+-
+ static void timer_get_base_and_rate(struct device_node *np,
+ 				    void __iomem **base, u32 *rate)
+ {
+@@ -25,11 +32,12 @@ static void timer_get_base_and_rate(struct device_node *np,
+ 	if (!*base)
+ 		panic("Unable to map regs for %s", np->name);
+ 
+-	if (of_property_read_u32(np, "clock-freq", rate))
+-		panic("No clock-freq property for %s", np->name);
++	if (of_property_read_u32(np, "clock-freq", rate) &&
++		of_property_read_u32(np, "clock-frequency", rate))
++		panic("No clock-frequency property for %s", np->name);
+ }
+ 
+-static void picoxcell_add_clockevent(struct device_node *event_timer)
++static void add_clockevent(struct device_node *event_timer)
+ {
+ 	void __iomem *iobase;
+ 	struct dw_apb_clock_event_device *ced;
+@@ -49,7 +57,7 @@ static void picoxcell_add_clockevent(struct device_node *event_timer)
+ 	dw_apb_clockevent_register(ced);
+ }
+ 
+-static void picoxcell_add_clocksource(struct device_node *source_timer)
++static void add_clocksource(struct device_node *source_timer)
+ {
+ 	void __iomem *iobase;
+ 	struct dw_apb_clocksource *cs;
+@@ -67,55 +75,57 @@ static void picoxcell_add_clocksource(struct device_node *source_timer)
+ 
+ static void __iomem *sched_io_base;
+ 
+-static u32 picoxcell_read_sched_clock(void)
++static u32 read_sched_clock(void)
+ {
+ 	return __raw_readl(sched_io_base);
+ }
+ 
+-static const struct of_device_id picoxcell_rtc_ids[] __initconst = {
++static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-rtc" },
++	{ .compatible = "snps,dw-apb-timer-sp" },
+ 	{ /* Sentinel */ },
+ };
+ 
+-static void picoxcell_init_sched_clock(void)
++static void init_sched_clock(void)
+ {
+ 	struct device_node *sched_timer;
+ 	u32 rate;
+ 
+-	sched_timer = of_find_matching_node(NULL, picoxcell_rtc_ids);
++	sched_timer = of_find_matching_node(NULL, sptimer_ids);
+ 	if (!sched_timer)
+ 		panic("No RTC for sched clock to use");
+ 
+ 	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
+ 	of_node_put(sched_timer);
+ 
+-	setup_sched_clock(picoxcell_read_sched_clock, 32, rate);
++	setup_sched_clock(read_sched_clock, 32, rate);
+ }
+ 
+-static const struct of_device_id picoxcell_timer_ids[] __initconst = {
++static const struct of_device_id osctimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-timer" },
++	{ .compatible = "snps,dw-apb-timer-osc" },
+ 	{},
+ };
+ 
+-static void __init picoxcell_timer_init(void)
++static void __init timer_init(void)
+ {
+ 	struct device_node *event_timer, *source_timer;
+ 
+-	event_timer = of_find_matching_node(NULL, picoxcell_timer_ids);
++	event_timer = of_find_matching_node(NULL, osctimer_ids);
+ 	if (!event_timer)
+ 		panic("No timer for clockevent");
+-	picoxcell_add_clockevent(event_timer);
++	add_clockevent(event_timer);
+ 
+-	source_timer = of_find_matching_node(event_timer, picoxcell_timer_ids);
++	source_timer = of_find_matching_node(event_timer, osctimer_ids);
+ 	if (!source_timer)
+ 		panic("No timer for clocksource");
+-	picoxcell_add_clocksource(source_timer);
++	add_clocksource(source_timer);
+ 
+ 	of_node_put(source_timer);
+ 
+-	picoxcell_init_sched_clock();
++	init_sched_clock();
+ }
+ 
+-struct sys_timer picoxcell_timer = {
+-	.init = picoxcell_timer_init,
++struct sys_timer dw_apb_timer = {
++	.init = timer_init,
+ };
+-- 
+1.7.9.5
+
+
+
+
 
 
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120712/b23ede08/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
