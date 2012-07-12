@@ -1,74 +1,47 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Jul 2012 11:57:51 +0200
-Subject: [PATCH 5/7] mfd/mc13xxx: drop modifying driver's id_table in probe
+Date: Thu, 12 Jul 2012 11:57:47 +0200
+Subject: [PATCH 1/7] MFD: Fix mc13xxx SPI regmap
 In-Reply-To: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1342087073-3892-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1342087073-3892-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was introduced in commit
+From: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 
-	876989d (mfd: Add device tree probe support for mc13xxx)
+This fix the SPI regmap configuration, the wrong write flag was used.
+Also, bits_per_word should not be set as the regmap spi implementation
+uses a 8bits transfert granularity.
 
-for spi and later while introducing support for i2c copied to the i2c
-driver.
-
-Modifying driver details is very strange, for example probing an
-mc13892 device (instantiated via dt) removes the driver's ability to
-handle (traditionally probed) mc13783 devices in this case.
-I'm not aware of any problems that make this hack necessary and if
-there were some, they have to be fixed in the spi/i2c core, not in
-a driver.
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Acked-by: Marc Reilly <marc@cpdesign.com.au>
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
+Origin: next-20120712, commit:e4ecf6ea84d68aea5a9785e89f52672e1e126998
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mfd/mc13xxx-i2c.c |    6 ------
- drivers/mfd/mc13xxx-spi.c |    6 ------
- 2 files changed, 12 deletions(-)
+ drivers/mfd/mc13xxx-spi.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-index d22501d..e00e885 100644
---- a/drivers/mfd/mc13xxx-i2c.c
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -53,16 +53,10 @@ static struct regmap_config mc13xxx_regmap_i2c_config = {
- static int mc13xxx_i2c_probe(struct i2c_client *client,
- 		const struct i2c_device_id *id)
- {
--	const struct of_device_id *of_id;
--	struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
- 	struct mc13xxx *mc13xxx;
- 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
- 	int ret;
- 
--	of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
--	if (of_id)
--		idrv->id_table = (const struct i2c_device_id*) of_id->data;
--
- 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
- 	if (!mc13xxx)
- 		return -ENOMEM;
 diff --git a/drivers/mfd/mc13xxx-spi.c b/drivers/mfd/mc13xxx-spi.c
-index 03df422..b99e728 100644
+index 3fcdab3..5d1969f 100644
 --- a/drivers/mfd/mc13xxx-spi.c
 +++ b/drivers/mfd/mc13xxx-spi.c
-@@ -119,16 +119,10 @@ static struct regmap_bus regmap_mc13xxx_bus = {
+@@ -49,6 +49,7 @@ static struct regmap_config mc13xxx_regmap_spi_config = {
+ 	.reg_bits = 7,
+ 	.pad_bits = 1,
+ 	.val_bits = 24,
++	.write_flag_mask = 0x80,
  
- static int mc13xxx_spi_probe(struct spi_device *spi)
- {
--	const struct of_device_id *of_id;
--	struct spi_driver *sdrv = to_spi_driver(spi->dev.driver);
- 	struct mc13xxx *mc13xxx;
- 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
- 	int ret;
+ 	.max_register = MC13XXX_NUMREGS,
  
--	of_id = of_match_device(mc13xxx_dt_ids, &spi->dev);
--	if (of_id)
--		sdrv->id_table = &mc13xxx_device_id[(enum mc13xxx_id) of_id->data];
--
- 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
- 	if (!mc13xxx)
- 		return -ENOMEM;
+@@ -73,7 +74,6 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
+ 
+ 	dev_set_drvdata(&spi->dev, mc13xxx);
+ 	spi->mode = SPI_MODE_0 | SPI_CS_HIGH;
+-	spi->bits_per_word = 32;
+ 
+ 	mc13xxx->dev = &spi->dev;
+ 	mutex_init(&mc13xxx->lock);
 -- 
 1.7.10.4
