@@ -1,255 +1,188 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 12 Jul 2012 07:14:02 -0500
-Subject: [RESEND PATCH 1/1] clk: add DT support for clock gating control
-In-Reply-To: <4FFE7979.4060000@googlemail.com>
-References: <4FFE7979.4060000@googlemail.com>
-Message-ID: <4FFEBF8A.1020700@gmail.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Thu, 12 Jul 2012 20:16:38 +0800
+Subject: [PATCH v3 1/2] pinctrl: pinctrl-imx: add support for set bits
+ for general purpose registers
+In-Reply-To: <1342093124-24658-1-git-send-email-b29396@freescale.com>
+References: <1342093124-24658-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120712121636.GA2123@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2012 02:15 AM, Sebastian Hesselbarth wrote:
-> As Rob's clock binding support patch is now up on clk-next, I'd like to
-> draw attention on this patch again.
-> -- 
-> This patch adds support for using clock gates (clk-gate) from DT based
-> on Rob Herrings DT clk binding support for 3.6.
+On Thu, Jul 12, 2012 at 07:38:43PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> It adds a helper function to clk-gate to allocate all resources required by
-> a set of individual clock gates, i.e. register base address and lock. Each
-> clock gate is described as a child of the clock-gating-control in DT and
-> also created by the helper function.
+> The General Purpose Registers (GPR) is used to select operating modes for
+> general features in the SoC, usually not related to the IOMUX itself,
+> but it does belong to IOMUX controller.
+> We simply provide an convient API for driver to call to write/read the general
+> purpose register bits if needed.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Mike Turquette <mturquette@ti.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 > ---
->  .../bindings/clock/clock-gating-control.txt        |   80
-> +++++++++++++++++++
->  drivers/clk/clk-gate.c                             |   84
-> ++++++++++++++++++++
->  include/linux/clk-provider.h                       |    2 +
->  3 files changed, 166 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/clock-gating-control.txt
+> ChangeLog v2->v3:
+> * add spinlock to protect write
+> * add a parameter for read API to distinguish with return error
+> ChangeLog v1->v2:
+> * add gpr read api
+> * change api name a bit to *_write and *_read
+> * add -EPROBE_DEFER support
+> * define macros for gpr registers for imx6q
+> * change driver loadding priority to postcore_init at satisfy clients driver
+>   to use imx_pinctrl_gpr_{read | write} APIs at best
+> ---
+>  drivers/pinctrl/pinctrl-imx.c   |   36 ++++
+>  drivers/pinctrl/pinctrl-imx51.c |    2 +-
+>  drivers/pinctrl/pinctrl-imx53.c |    2 +-
+>  drivers/pinctrl/pinctrl-imx6q.c |    2 +-
+>  include/linux/fsl/imx-pinctrl.h |  340 +++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 379 insertions(+), 3 deletions(-)
+>  create mode 100644 include/linux/fsl/imx-pinctrl.h
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/clock/clock-gating-control.txt
-> b/Documentation/devicetree/bindings/clock/clock-gating-control.txt
-> new file mode 100644
-> index 0000000..05f5728
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/clock-gating-control.txt
-> @@ -0,0 +1,80 @@
-> +Binding for simple clock gating control based on clock gate register
-> with one
-> +bit per clock gate. This is a clock consumer and also a clock provider
-> for a
-> +set of gated clocks that are described as children of this node. Each
-> clock gate
-> +is described by a bit number and polarity to control the gate.
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +==Clock gating control==
-> +
-> +Required properties:
-> +- compatible : shall be "clock-gating-control".
-> +- reg : should contain the register physical address and length for
-> +        the clock gating control.
-> +- clocks : shared parent clock for all gated clocks.
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- #address-cells : number of cells required to describe a clock gate;
-> +                   should be <2>.
-> +- #size-cells : should be zero.
-> +
-> +Each individual clock gate bit is described as a child of the
-> +corresponding gating control register with the following properties.
-> +
-> +Required child properties:
-> +- reg : should contain the individual bit and polarity to control
-> +        the clock gate. A polarity of 0 means that by setting the
-> +        bit to 1 the clock passes through the clock gate while
-> +    setting the bit to 0 disables the clock. Any other value
-> +         for polarity inverts the meaning of the control bit.
-
-This is a bit of overloading reg to specify the polarity.
-
-> +
-> +Optional child properties:
-> +- clocks : overrides the shared parent clock for this clock gate
-> +           by the clock passed in this property.
-> +- clock-output-names : from common clock binding; allows to set
-> +                       a specific name for the gated clock output.
-> +
-> +==Example==
-> +
-> +    /* fixed root clock */
-> +    osc: oscillator {
-> +        compatible = "fixed-clock";
-> +        #clock-cells = <0>;
-> +        clock-frequency = <166666667>;
-> +    };
-> +
-> +    /* sata peripheral clock */
-> +    sata_clk: ext-oscillator {
-> +        compatible = "fixed-clock";
-> +        #clock-cells = <0>;
-> +        clock-frequency = <25000000>;
-> +    };
-> +
-> +    /* register-based clock gating control */
-> +    gating-control at f10d0038 {
-> +        compatible = "clock-gating-control";
-> +        reg = <0xf10d0038 0x4>;
-> +        clocks = <&osc>;
-> +        #clock-cells = <0>;
-> +        #address-cells = <2>;
-> +        #size-cells = <0>;
-> +
-> +        /* USB0 clock gate on register bit 0 with inverted polarity */
-> +        cg_usb0: clockgate at 0 {
-> +            reg = <0 1>; /* register bit 0, inverted polarity */
-> +        };
-> +
-> +        /* PCIe0 clock gate on register bit 1 with normal polarity
-> +         * and named output clock */
-> +        cg_pcie0: clockgate at 1 {
-> +            reg = <1 0>; /* register bit 1, normal polarity */
-> +            clock-output-names = "pcie0_clk";
-> +        };
-> +
-> +        /* SATA clock gate with different parent clock */
-> +        cg_sata: clockgate at 3 {
-> +            reg = <3 0>; /* register bit 3, normal polarity */
-> +            clocks = <&sata_clk>;
-> +        };
-
-I'm not sure I like the node per bit. What about a bit mask for valid
-bits and polarities. Then add a clock cell to specify the bit or index.
-
-i.MX has 2-bit enable fields for its leaf clocks, so how and if you
-would support that is something to think about.
-
-Rob
-
-> +    };
-> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-> index 578465e..1e88907 100644
-> --- a/drivers/clk/clk-gate.c
-> +++ b/drivers/clk/clk-gate.c
-> @@ -15,6 +15,9 @@
->  #include <linux/io.h>
->  #include <linux/err.h>
->  #include <linux/string.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
->   /**
->   * DOC: basic gatable clock which can gate and ungate it's ouput
-> @@ -148,3 +151,84 @@ struct clk *clk_register_gate(struct device *dev,
-> const char *name,
->       return clk;
->  }
-> +
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_clock_gating_control_setup() - Setup function for clock gate control
-> + *   This is a helper for using clk-gate from OF device tree. It allocates
-> + *   a common lock for a base register and creates the individual
-> clk-gates.
+> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+> index 44e9726..4568f5a 100644
+> --- a/drivers/pinctrl/pinctrl-imx.c
+> +++ b/drivers/pinctrl/pinctrl-imx.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/pinctrl/pinctrl.h>
+>  #include <linux/pinctrl/pinmux.h>
+>  #include <linux/slab.h>
+> +#include <linux/spinlock.h>
+>  
+>  #include "core.h"
+>  #include "pinctrl-imx.h"
+> @@ -52,8 +53,41 @@ struct imx_pinctrl {
+>  	struct pinctrl_dev *pctl;
+>  	void __iomem *base;
+>  	const struct imx_pinctrl_soc_info *info;
+> +	spinlock_t gprlock;
+>  };
+>  
+> +static struct imx_pinctrl *imx_pinctrl;
+> +/*
+> + * Set bits for general purpose registers
 > + */
-> +void __init of_clock_gating_control_setup(struct device_node *np)
+> +int imx_pinctrl_gpr_write(u8 gpr, u32 mask, u32 val)
 > +{
-> +    struct device_node *child;
-> +    const char *pclk_name;
-> +    void __iomem *base;
-> +    spinlock_t *lockp;
-> +    unsigned int rnum;
-> +    u64 addr;
+> +	u32 reg;
 > +
-> +    pclk_name = of_clk_get_parent_name(np, 0);
-> +    if (!pclk_name) {
-> +        pr_debug("%s: unable to get parent clock for %s\n",
-> +            __func__, np->full_name);
-> +        return;
-> +    }
+> +	if (!imx_pinctrl)
+> +		return -EPROBE_DEFER;
 > +
-> +    lockp = kzalloc(sizeof(spinlock_t), GFP_KERNEL);
-> +    if (!lockp) {
-> +        pr_debug("%s: unable to allocate spinlock for %s\n",
-> +             __func__, np->full_name);
-> +        return;
-> +    }
+> +	spin_lock(&imx_pinctrl->gprlock);
+spin_lock_irqsave? We don't know whether people call it in isr.
+
+> +	reg = readl(imx_pinctrl->base + gpr);
+> +	reg &= ~mask;
+> +	writel(reg | (val & mask), imx_pinctrl->base + gpr);
+> +	spin_unlock(&imx_pinctrl->gprlock);
 > +
-> +    spin_lock_init(lockp);
-> +    base = of_iomap(np, 0);
-> +    rnum = sizeof(resource_size_t) * 8;
-> +    addr = of_translate_address(np, of_get_property(np, "reg", NULL));
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(imx_pinctrl_gpr_write);
 > +
-> +    pr_debug("create clock gate control %s\n", np->full_name);
+> +int imx_pinctrl_gpr_read(u8 gpr, u32 *val)
+> +{
+> +	if (!imx_pinctrl)
+> +		return -EPROBE_DEFER;
 > +
-> +    for_each_child_of_node(np, child) {
-> +        struct clk *cg;
-> +        const char *cg_name;
-> +        const char *cg_pclk_name;
-> +        u32 propval[2];
-> +        unsigned int rbit;
+> +	*val = readl(imx_pinctrl->base + gpr);
 > +
-> +        if (of_property_read_u32_array(child, "reg", propval, 2)) {
-> +            pr_debug("%s: wrong #reg on %s\n",
-> +                 __func__, child->full_name);
-> +            continue;
-> +        }
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(imx_pinctrl_gpr_read);
 > +
-> +        rbit = propval[0];
-> +        if (rbit >= rnum) {
-> +            pr_debug("%s: bit position of %s exceeds resources\n",
-> +                 __func__, child->full_name);
-> +            continue;
-> +        }
+>  static const struct imx_pin_reg *imx_find_pin_reg(
+>  				const struct imx_pinctrl_soc_info *info,
+>  				unsigned pin, bool is_mux, unsigned mux)
+> @@ -587,6 +621,8 @@ int __devinit imx_pinctrl_probe(struct platform_device *pdev,
+>  	if (!ipctl->base)
+>  		return -EBUSY;
+>  
+> +	spin_lock_init(&ipctl->gprlock);
+> +	imx_pinctrl = ipctl;
+>  	imx_pinctrl_desc.name = dev_name(&pdev->dev);
+>  	imx_pinctrl_desc.pins = info->pins;
+>  	imx_pinctrl_desc.npins = info->npins;
+> diff --git a/drivers/pinctrl/pinctrl-imx51.c b/drivers/pinctrl/pinctrl-imx51.c
+> index 689b3c8..aa37634 100644
+> --- a/drivers/pinctrl/pinctrl-imx51.c
+> +++ b/drivers/pinctrl/pinctrl-imx51.c
+> @@ -1310,7 +1310,7 @@ static int __init imx51_pinctrl_init(void)
+>  {
+>  	return platform_driver_register(&imx51_pinctrl_driver);
+>  }
+> -arch_initcall(imx51_pinctrl_init);
+> +postcore_initcall(imx51_pinctrl_init);
+>  
+>  static void __exit imx51_pinctrl_exit(void)
+>  {
+> diff --git a/drivers/pinctrl/pinctrl-imx53.c b/drivers/pinctrl/pinctrl-imx53.c
+> index 1f49e16..cff42a1 100644
+> --- a/drivers/pinctrl/pinctrl-imx53.c
+> +++ b/drivers/pinctrl/pinctrl-imx53.c
+> @@ -1637,7 +1637,7 @@ static int __init imx53_pinctrl_init(void)
+>  {
+>  	return platform_driver_register(&imx53_pinctrl_driver);
+>  }
+> -arch_initcall(imx53_pinctrl_init);
+> +postcore_initcall(imx53_pinctrl_init);
+>  
+>  static void __exit imx53_pinctrl_exit(void)
+>  {
+> diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
+> index 7737d4d..6974238 100644
+> --- a/drivers/pinctrl/pinctrl-imx6q.c
+> +++ b/drivers/pinctrl/pinctrl-imx6q.c
+> @@ -2319,7 +2319,7 @@ static int __init imx6q_pinctrl_init(void)
+>  {
+>  	return platform_driver_register(&imx6q_pinctrl_driver);
+>  }
+> -arch_initcall(imx6q_pinctrl_init);
+> +postcore_initcall(imx6q_pinctrl_init);
+>  
+>  static void __exit imx6q_pinctrl_exit(void)
+>  {
+> diff --git a/include/linux/fsl/imx-pinctrl.h b/include/linux/fsl/imx-pinctrl.h
+> new file mode 100644
+> index 0000000..37ee3a7
+> --- /dev/null
+> +++ b/include/linux/fsl/imx-pinctrl.h
+> @@ -0,0 +1,340 @@
+> +/*
+> + * Copyright (C) 2012 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +        cg_pclk_name = of_clk_get_parent_name(child, 0);
-> +        if (!pclk_name)
-> +            cg_pclk_name = pclk_name;
+> +#ifndef __FSL_IMX_PINCTRL_H__
+> +#define __FSL_IMX_PINCTRL_H__
 > +
-> +        if (of_property_read_string(child, "clock-output-names",
-> +                        &cg_name)) {
-> +            unsigned int nlen = 4 + 16 + strlen(child->name);
-> +            char *name = kzalloc(nlen+1, GFP_KERNEL);
-> +            if (!name)
-> +                continue;
-> +            snprintf(name, nlen, "%u@%llx.%s", rbit,
-> +                 (unsigned long long)addr, child->name);
-> +            cg_name = name;
-> +        }
+> +#include <linux/bitops.h>
 > +
-> +        pr_debug("  create clock gate: %s\n", cg_name);
+> +#define IMX_PINCTRL_GPR_ERR \
+> +	"CONFIG_PINCTRL_IMX is not selected, simply return\n"
 > +
-> +        cg = clk_register_gate(NULL, cg_name, cg_pclk_name, 0,
-> +                       base, rbit, propval[1], lockp);
-> +        if (cg)
-> +            of_clk_add_provider(child, of_clk_src_simple_get, cg);
-> +    }
+> +#ifdef CONFIG_PINCTRL_IMX
+> +extern int imx_pinctrl_gpr_write(u8 gpr, u32 mask, u32 val);
+> +extern int imx_pinctrl_gpr_read(u8 gpr, u32 val);
+					   u32 *
+
+> +#else
+> +static inline int imx_pinctrl_gpr_write(u8 gpr, u32 mask, u32 val)
+> +{
+> +	WARN(1, IMX_PINCTRL_GPR_ERR);
+> +	return -ENODEV;
+> +}
+> +
+> +static inline int imx_pinctrl_gpr_read(u8 gpr, u32 val)
+						  u32 *
+> +{
+> +	WARN(1, IMX_PINCTRL_GPR_ERR);
+> +	return -ENODEV;
 > +}
 > +#endif
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index b97f61e..499eac2 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -205,6 +205,8 @@ struct clk *clk_register_gate(struct device *dev,
-> const char *name,
->          void __iomem *reg, u8 bit_idx,
->          u8 clk_gate_flags, spinlock_t *lock);
->  +void of_clock_gating_control_setup(struct device_node *np);
-> +
->  /**
->   * struct clk_divider - adjustable divider clock
->   *
+
+Thanks
+Richard
