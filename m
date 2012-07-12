@@ -1,55 +1,46 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 12 Jul 2012 19:39:30 +0400
-Subject: [PATCH v2 3/4] ARM: i.MX5x clocks: Fix GPT clocks This patch fix
- incorrect defined bits for GPT clocks according to datasheet.
+Date: Thu, 12 Jul 2012 19:39:31 +0400
+Subject: [PATCH v2 4/4] ARM: i.MX5x CSPI: Fixed clock name for CSPI
 In-Reply-To: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
 References: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1342107571-15454-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1342107571-15454-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch also includes fix CSPI ID for i.MX53. ID should be 2,
+because IDs 0 and 1 are occupied by eCSPI.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/clk-imx51-imx53.c          |    2 +-
+ arch/arm/plat-mxc/devices/platform-spi_imx.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 3481e18..3d7564c 100644
+index 3d7564c..b0cf835 100644
 --- a/arch/arm/mach-imx/clk-imx51-imx53.c
 +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -58,7 +58,7 @@ enum imx5_clks {
- 	tve_s, uart1_ipg_gate, uart1_per_gate, uart2_ipg_gate,
- 	uart2_per_gate, uart3_ipg_gate, uart3_per_gate, i2c1_gate, i2c2_gate,
- 	gpt_ipg_gate, pwm1_ipg_gate, pwm1_hf_gate, pwm2_ipg_gate, pwm2_hf_gate,
--	gpt_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
-+	gpt_hf_gate, fec_gate, usboh3_per_gate, esdhc1_ipg_gate, esdhc2_ipg_gate,
- 	esdhc3_ipg_gate, esdhc4_ipg_gate, ssi1_ipg_gate, ssi2_ipg_gate,
- 	ssi3_ipg_gate, ecspi1_ipg_gate, ecspi1_per_gate, ecspi2_ipg_gate,
- 	ecspi2_per_gate, cspi_ipg_gate, sdma_gate, emi_slow_gate, ipu_s,
-@@ -168,12 +168,12 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk[uart3_per_gate] = imx_clk_gate2("uart3_per_gate", "uart_root", MXC_CCM_CCGR1, 16);
- 	clk[i2c1_gate] = imx_clk_gate2("i2c1_gate", "per_root", MXC_CCM_CCGR1, 18);
- 	clk[i2c2_gate] = imx_clk_gate2("i2c2_gate", "per_root", MXC_CCM_CCGR1, 20);
--	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 20);
- 	clk[pwm1_ipg_gate] = imx_clk_gate2("pwm1_ipg_gate", "ipg", MXC_CCM_CCGR2, 10);
- 	clk[pwm1_hf_gate] = imx_clk_gate2("pwm1_hf_gate", "per_root", MXC_CCM_CCGR2, 12);
- 	clk[pwm2_ipg_gate] = imx_clk_gate2("pwm2_ipg_gate", "ipg", MXC_CCM_CCGR2, 14);
- 	clk[pwm2_hf_gate] = imx_clk_gate2("pwm2_hf_gate", "per_root", MXC_CCM_CCGR2, 16);
--	clk[gpt_gate] = imx_clk_gate2("gpt_gate", "per_root", MXC_CCM_CCGR2, 18);
-+	clk[gpt_ipg_gate] = imx_clk_gate2("gpt_ipg_gate", "ipg", MXC_CCM_CCGR2, 18);
-+	clk[gpt_hf_gate] = imx_clk_gate2("gpt_hf_gate", "per_root", MXC_CCM_CCGR2, 20);
- 	clk[fec_gate] = imx_clk_gate2("fec_gate", "ipg", MXC_CCM_CCGR2, 24);
- 	clk[usboh3_gate] = imx_clk_gate2("usboh3_gate", "ipg", MXC_CCM_CCGR2, 26);
- 	clk[usboh3_per_gate] = imx_clk_gate2("usboh3_per_gate", "usboh3_podf", MXC_CCM_CCGR2, 28);
-@@ -237,7 +237,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 			pr_err("i.MX5 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
- 	
--	clk_register_clkdev(clk[gpt_gate], "per", "imx-gpt.0");
-+	clk_register_clkdev(clk[gpt_hf_gate], "per", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_gate], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[uart1_per_gate], "per", "imx21-uart.0");
- 	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
+@@ -253,7 +253,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk_register_clkdev(clk[ecspi1_ipg_gate], "ipg", "imx51-ecspi.0");
+ 	clk_register_clkdev(clk[ecspi2_per_gate], "per", "imx51-ecspi.1");
+ 	clk_register_clkdev(clk[ecspi2_ipg_gate], "ipg", "imx51-ecspi.1");
+-	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx51-cspi.0");
++	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx35-cspi.2");
+ 	clk_register_clkdev(clk[pwm1_ipg_gate], "pwm", "mxc_pwm.0");
+ 	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
+ 	clk_register_clkdev(clk[i2c1_gate], NULL, "imx-i2c.0");
+diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/plat-mxc/devices/platform-spi_imx.c
+index 9bfae8b..9c50c14 100644
+--- a/arch/arm/plat-mxc/devices/platform-spi_imx.c
++++ b/arch/arm/plat-mxc/devices/platform-spi_imx.c
+@@ -95,7 +95,7 @@ const struct imx_spi_imx_data imx51_ecspi_data[] __initconst = {
+ #ifdef CONFIG_SOC_IMX53
+ /* i.mx53 has the i.mx35 type cspi */
+ const struct imx_spi_imx_data imx53_cspi_data __initconst =
+-	imx_spi_imx_data_entry_single(MX53, CSPI, "imx35-cspi", 0, , SZ_4K);
++	imx_spi_imx_data_entry_single(MX53, CSPI, "imx35-cspi", 2, , SZ_4K);
+ 
+ /* i.mx53 has the i.mx51 type ecspi */
+ const struct imx_spi_imx_data imx53_ecspi_data[] __initconst = {
 -- 
 1.7.3.4
