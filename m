@@ -1,41 +1,60 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jul 2012 18:10:04 +0900
-Subject: [PATCH] ARM: S3C64XX: Don't specify an irq_base for WM1192-EV1
- board
-In-Reply-To: <1341920671-8348-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1341920671-8348-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <0fa901cd600e$1fbf93f0$5f3ebbd0$%kim@samsung.com>
+Date: Thu, 12 Jul 2012 18:10:17 +0900
+Subject: [PATCH] ARM: Exynos: Add device tree node for Exynos4 interrupt
+ combiner controller
+In-Reply-To: <1342068948-20755-1-git-send-email-thomas.abraham@linaro.org>
+References: <1342068948-20755-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <0fab01cd600e$27d56ec0$77804c40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Thomas Abraham wrote:
 > 
-> None of the GPIO IRQs are connected so there is no reason to specify a
-> base.
+> Add node for Exynos4 interrupt combiner controller.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 > ---
->  arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 -
->  1 file changed, 1 deletion(-)
+>  arch/arm/boot/dts/exynos4210.dtsi |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-
-> s3c64xx/mach-smdk6410.c
-> index df3103d..0fe4f15 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> @@ -566,7 +566,6 @@ static struct wm831x_status_pdata wm1192_led8_pdata =
-> {
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> b/arch/arm/boot/dts/exynos4210.dtsi
+> index a1dd2ee..0e4f659 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -33,6 +33,17 @@
+>  		reg = <0x10490000 0x1000>, <0x10480000 0x100>;
+>  	};
 > 
->  static struct wm831x_pdata smdk6410_wm1192_pdata = {
->  	.pre_init = wm1192_pre_init,
-> -	.irq_base = IRQ_BOARD_START,
-> 
->  	.backlight = &wm1192_backlight_pdata,
->  	.dcdc = {
-> --
-> 1.7.10
+> +	combiner:interrupt-controller at 10440000 {
+> +		compatible = "samsung,exynos4210-combiner";
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
 
-Applied, thanks.
+How about changing above ordering like interrupt gic controller?
+
++		#interrupt-cells = <2>;
++		interrupt-controller;
+
+And, don't we need combiner-nr?
++		samsung,combiner-nr = <16>;
+
+> +		reg = <0x10440000 0x1000>;
+> +		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+> +			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+> +			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> +			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
+> +	};
+> +
+>  	watchdog at 10060000 {
+>  		compatible = "samsung,s3c2410-wdt";
+>  		reg = <0x10060000 0x100>;
+> --
+> 1.6.6.rc2
+
+Others, looks good to me.
+
+Thanks.
 
 Best regards,
 Kgene.
