@@ -1,115 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Jul 2012 11:57:48 +0200
-Subject: [PATCH 2/7] MFD: mc13xxx workaround SPI hardware bug on i.Mx
-In-Reply-To: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1342087073-3892-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 12 Jul 2012 11:17:16 +0100
+Subject: [PATCH v2] ARM: vexpress: remove automatic errata workaround selection
+In-Reply-To: <1342013791-19516-2-git-send-email-pawel.moll@arm.com>
+References: <1342013791-19516-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1342088236-12797-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+From: Will Deacon <will.deacon@arm.com>
 
-The MC13xxx PMIC is mainly used on i.Mx SoC. On thoses SoC the SPI
-hardware will deassert CS line as soon as the SPI FIFO is empty.
-The MC13xxx hardware is very sensitive to CS line change as it
-corrupts the transfert if CS is deasserted in the middle of a register
-read or write.
-It is not possible to use the CS line as a GPIO on some SoC, so we
-need to workaround this by implementing a single SPI transfer to
-access the PMIC.
+The vexpress Kconfig setup tries to be clever^Whelpful and selects some
+errata workarounds for certain revisions of the Cortex-A9 and PL310,
+which may be required depending on the core tile.
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Acked-by: Marc Reilly <marc@cpdesign.com.au>
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
-Origin: next-20120712, commit:e4ecf6ea84d68aea5a9785e89f52672e1e126998
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Since the mach-vexpress can support A5, A7 and A15 coretiles, let's
+make errata workaround selection optional.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/mfd/mc13xxx-spi.c |   65 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 64 insertions(+), 1 deletion(-)
+ arch/arm/mach-vexpress/Kconfig |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/mc13xxx-spi.c b/drivers/mfd/mc13xxx-spi.c
-index 5d1969f..03df422 100644
---- a/drivers/mfd/mc13xxx-spi.c
-+++ b/drivers/mfd/mc13xxx-spi.c
-@@ -54,6 +54,67 @@ static struct regmap_config mc13xxx_regmap_spi_config = {
- 	.max_register = MC13XXX_NUMREGS,
+Hi Both,
+
+Here it is. I've kept Will's Signed-off-by for now, but it seems to me
+Rob should be signing this off. If you don't mind that I'll put Rob's
+name in the final version for arm-soc folk.
+
+Cheers!
+
+Pawel
+
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index cf8730d..fc3730f 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -2,7 +2,8 @@ menu "Versatile Express platform type"
+ 	depends on ARCH_VEXPRESS
  
- 	.cache_type = REGCACHE_NONE,
-+	.use_single_rw = 1,
-+};
-+
-+static int mc13xxx_spi_read(void *context, const void *reg, size_t reg_size,
-+				void *val, size_t val_size)
-+{
-+	unsigned char w[4] = { *((unsigned char *) reg), 0, 0, 0};
-+	unsigned char r[4];
-+	unsigned char *p = val;
-+	struct device *dev = context;
-+	struct spi_device *spi = to_spi_device(dev);
-+	struct spi_transfer t = {
-+		.tx_buf = w,
-+		.rx_buf = r,
-+		.len = 4,
-+	};
-+
-+	struct spi_message m;
-+	int ret;
-+
-+	if (val_size != 3 || reg_size != 1)
-+		return -ENOTSUPP;
-+
-+	spi_message_init(&m);
-+	spi_message_add_tail(&t, &m);
-+	ret = spi_sync(spi, &m);
-+
-+	memcpy(p, &r[1], 3);
-+
-+	return ret;
-+}
-+
-+static int mc13xxx_spi_write(void *context, const void *data, size_t count)
-+{
-+	struct device *dev = context;
-+	struct spi_device *spi = to_spi_device(dev);
-+
-+	if (count != 4)
-+		return -ENOTSUPP;
-+
-+	return spi_write(spi, data, count);
-+}
-+
-+/*
-+ * We cannot use regmap-spi generic bus implementation here.
-+ * The MC13783 chip will get corrupted if CS signal is deasserted
-+ * and on i.Mx31 SoC (the target SoC for MC13783 PMIC) the SPI controller
-+ * has the following errata (DSPhl22960):
-+ * "The CSPI negates SS when the FIFO becomes empty with
-+ * SSCTL= 0. Software cannot guarantee that the FIFO will not
-+ * drain because of higher priority interrupts and the
-+ * non-realtime characteristics of the operating system. As a
-+ * result, the SS will negate before all of the data has been
-+ * transferred to/from the peripheral."
-+ * We workaround this by accessing the SPI controller with a
-+ * single transfert.
-+ */
-+
-+static struct regmap_bus regmap_mc13xxx_bus = {
-+	.write = mc13xxx_spi_write,
-+	.read = mc13xxx_spi_read,
- };
+ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+-	bool
++	bool "Enable A5 and A9 only errata work-arounds"
++	default y
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_751472
+ 	select PL310_ERRATA_753970 if CACHE_PL310
+@@ -14,7 +15,6 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
  
- static int mc13xxx_spi_probe(struct spi_device *spi)
-@@ -78,7 +139,9 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
- 	mc13xxx->dev = &spi->dev;
- 	mutex_init(&mc13xxx->lock);
+ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
+-	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select HAVE_SMP
+@@ -22,7 +22,6 @@ config ARCH_VEXPRESS_CA9X4
  
--	mc13xxx->regmap = regmap_init_spi(spi, &mc13xxx_regmap_spi_config);
-+	mc13xxx->regmap = regmap_init(&spi->dev, &regmap_mc13xxx_bus, &spi->dev,
-+					&mc13xxx_regmap_spi_config);
-+
- 	if (IS_ERR(mc13xxx->regmap)) {
- 		ret = PTR_ERR(mc13xxx->regmap);
- 		dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
+ config ARCH_VEXPRESS_DT
+ 	bool "Device Tree support for Versatile Express platforms"
+-	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+ 	select ARM_GIC
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR
 -- 
-1.7.10.4
+1.7.9.5
