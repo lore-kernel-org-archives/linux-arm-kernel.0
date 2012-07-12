@@ -1,27 +1,45 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 12 Jul 2012 09:47:42 +0530
+Date: Thu, 12 Jul 2012 09:52:40 +0530
 Subject: Device tree binding for DVFS table
-In-Reply-To: <20120711144449.GA23654@sirena.org.uk>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <20120711144449.GA23654@sirena.org.uk>
-Message-ID: <4FFE4FE6.20109@nvidia.com>
+In-Reply-To: <20120711134956.GB9437@tbergstrom-lnx.Nvidia.com>
+References: <20748722.319671342012092123.JavaMail.weblogic@epml17>
+ <20120711134956.GB9437@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FFE5110.8020803@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 July 2012 08:14 PM, Mark Brown wrote:
-> On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
+On Wednesday 11 July 2012 07:19 PM, Peter De Schrijver wrote:
+> On Wed, Jul 11, 2012 at 03:08:14PM +0200, ??? wrote:
+>>> Hi,
+>>>
+>>> I am working on DT binding for Tegra DVFS.
+>>>
+>>> For Tegra, DVFS node mainly consists of frequency and voltage pairs.
+>>> Frequency in the pair may change for different process. E.g. for process
+>>> 1 CPU clock frequency could be 900MHz at 1V while for process 2 it could
+>>> be 1GHz at 1V.
+>>> Tegra uses vendor specific ids to identify the correct frequency table.
+>> Hello,
+>>
+>> It seems that in the example, the values in "voltage-array" and
+>> "frequencies" are switched.
+>>
+>> Anyway, what about SoCs that reads information from IEM (or any other module)
+>>   to measure gate delays or some other value to set the appriorate voltage values
+>>   for every possible frequency? I remember some of Exynos SoCs have been doing
+>>   it; dynamically measure the characteristics at boot-up time and apply voltages
+>>   accordingly; they couldn't identify it based on the chip-id or simply by reading
+>>   a single register.
+>>
 >
->> I'd expect a single property with freq/volt pairs or 2 properties for
->> freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
-> I strongly agree - the current proposal is very hard to read due to the
-> separation between the voltage and frequency values.  Some devices do
-> also need to scale multiple rails together, especially when this gets
-> used for I/O devices.
+> But in that case you would have a nominal voltage for each OPP which gets
+> adjusted at boottime or runtime depending on the exact silicon characteristics?
+> I would say the DT binding should then specify 1 table with the nominal values
+> and leave the dynamics to the driver.
 
-Multiple rails for single clock or would it be multiple clocks?
+It makes sense or is it different than this?
 
-> I'd also expect to see a range of voltages for each frequency rather
-> than a specific voltage; usually things are at least characterised with
-> a specified tolerance.
-
-But then how will you determine the operating voltage for a frequency?
+> Cheers,
+>
+> Peter.
+>
