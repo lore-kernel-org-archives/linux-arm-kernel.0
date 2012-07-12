@@ -1,44 +1,44 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 12 Jul 2012 12:33:06 +0200
-Subject: [PATCH v5] clocksource: dw_apb_timer: Add common DTS glue for
- dw_apb_timer
-In-Reply-To: <1342041579.19608.6.camel@dinguyen-VirtualBox>
-References: <1342037596-17710-1-git-send-email-dinguyen@altera.com>
- <20120711210837.GA32489@elf.ucw.cz>
- <1342041579.19608.6.camel@dinguyen-VirtualBox>
-Message-ID: <20120712103305.GA11798@elf.ucw.cz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Jul 2012 12:50:46 +0200
+Subject: [PATCH] clk: allow clocks without parents to change rate
+In-Reply-To: <20120711234229.GF2772@gmail.com>
+References: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
+ <20120711234229.GF2772@gmail.com>
+Message-ID: <CACRpkdZOgquPF1FXo7LBeFOYhheqx+_ENTn6w4qcKGBqeHnvFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Jul 12, 2012 at 1:42 AM, Mike Turquette <mturquette@ti.com> wrote:
 
-> > > Make a common device tree glue for clocksource/dw_apb_timer.
-> > > Move mach-picoxcell/time.c to be a generic device tree application
-> > > of the dw_apb_timer.
-> > > 
-> > > Configure mach-picoxcell to use the dw_apb_timer_of device tree
-> > > implementation in drivers/clocksource.
-> > 
-> > > @@ -25,11 +32,12 @@ static void timer_get_base_and_rate(struct device_node *np,
-> > >  	if (!*base)
-> > >  		panic("Unable to map regs for %s", np->name);
-> > >  
-> > > -	if (of_property_read_u32(np, "clock-freq", rate))
-> > > -		panic("No clock-freq property for %s", np->name);
-> > > +	if (of_property_read_u32(np, "clock-freq", rate) &&
-> > > +		of_property_read_u32(np, "clock-frequency", rate))
-> > > +		panic("No clock-frequency property for %s", np->name);
-> > >  }
-> > >  
-> > 
-> > But this should be ||, not &&, I guess.
-> 
-> Actually the way the code was written, it should be &&. Since
-> of_property_read_u32 returns 0 for success, doing an OR will fail if 1
-> of the conditions is true. We only want to fail if both conditions fail.
+> This has been fixed in Pawell's patch, "clk: Check parent for NULL in
+> clk_change_rate".
 
-Oops, sorry, I was blind.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yes, that'll probably work.
+
+A small nitpick though:
+
+I have slightly different semantics, Pawel's patch assigns zero if
+parent is NULL, then use that as fallback, whereas I check for the
+parent being NULL all the way. I was worried that the old sematics
+could change like this:
+
+So here it takes that:
+
++       if (clk->parent)
++               best_parent_rate = clk->parent->rate;
++
+
+And I was cautious that if this changes the parent rate:
+
++               clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
+
+Then this passes the old parent rate to the recalc function:
+
++               clk->rate = clk->ops->recalc_rate(clk->hw, best_parent_rate);
+
+It has no side-effects on my system but I worried about
+others, so I just left the behaviour to re-read the rate from the parent
+every time if possible.
+
+Yours,
+Linus Walleij
