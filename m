@@ -1,13 +1,31 @@
-From: kangshan0910@gmail.com (shan kang)
-Date: Thu, 12 Jul 2012 10:14:35 +0800
-Subject: ARM: why smp_mb() is not needed in the "__mutex_fastpath_lock" and
- "__mutex_fastpath_unlock" functions
-Message-ID: <CAK2TD5ygowdy9t1TpfxAPbpvNQfMnMB-3Zp8TKMsTYtBZdGW=Q@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 12 Jul 2012 10:25:22 +0800
+Subject: [PATCH v7 1/6] ARM: imx6q: add usb controller clock lookups
+In-Reply-To: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
+References: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1342059927-25661-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-   I wonder why smp_mb() is not needed in the "__mutex_fastpath_lock"
-and "__mutex_fastpath_unlock" functions which are located in the
-"arch/arm/include/asm/mutex.h"?
-   I think "dmb" instruction is necessary there.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index cabbbb7..3f5b9d6 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -398,6 +398,10 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[gpmi_bch], "gpmi_bch", "112000.gpmi-nand");
+ 	clk_register_clkdev(clk[gpmi_apb], "gpmi_apb", "112000.gpmi-nand");
+ 	clk_register_clkdev(clk[gpmi_io], "gpmi_io", "112000.gpmi-nand");
++	clk_register_clkdev(clk[usboh3], NULL, "2184000.usb");
++	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
++	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
++	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
+ 	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+ 	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+ 	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+-- 
+1.7.9.5
