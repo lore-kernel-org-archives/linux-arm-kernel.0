@@ -1,39 +1,54 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Thu, 12 Jul 2012 18:35:37 +0900
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <20120712084432.GA2816@mudshark.cambridge.arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
- <4FFE7DB2.4040702@renesas.com>
- <20120712084432.GA2816@mudshark.cambridge.arm.com>
-Message-ID: <4FFE9A69.3060301@renesas.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 12 Jul 2012 15:11:13 +0530
+Subject: [PATCHv3 8/9] ARM: OMAP3: prevent per_clkdm from attempting manual
+ domain transitions
+In-Reply-To: <1338470942-20185-9-git-send-email-t-kristo@ti.com>
+References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
+ <1338470942-20185-9-git-send-email-t-kristo@ti.com>
+Message-ID: <4FFE9BB9.7000209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/12/2012 5:44 PM, Will Deacon wrote:
->> On 6/30/2012 2:33 AM, Will Deacon wrote:
->>> +void __init init_current_timer_delay(unsigned long freq)
->>> +{
->>> +	pr_info("Switching to timer-based delay loop\n");
->>> +	lpj_fine			= freq / HZ;
->>> +	arm_delay_ops.delay		= __timer_delay;
->>> +	arm_delay_ops.const_udelay	= __timer_const_udelay;
->>> +	arm_delay_ops.udelay		= __timer_udelay;
->>> +}
->>
->> Once this function is processed, the udelay() behavior changes
->> _immediately_ from loop-based delay to timer-based one, without waiting
->> for 'loops_per_jiffy' itself being corrected in calibrate_delay().
->>
->> As a result, actual udelay()s may be toooo long than expected, in
->> particular udelay()s used between init_current_timer_delay() and
->> calibrate_delay().  It's unlikely be short, as the frequency of a
->> counter for read_current_timer is typically slower than CPU frequency.
-> 
-> Surely using udelay before calibrate_delay_loop has been called is a
-> fundamental error?
+On Thursday 31 May 2012 06:59 PM, Tero Kristo wrote:
+> Previously, PER clock domain was always enabled, as the usecounts
+> for this domain incorrectly always showed positive value. On HW
+> level though, the domain enters idle as it is set in HW supervised
+> mode. Now, when the usecounts reflect real values, PER domain will
+> attempt to enter software supervised idle, which is not supported by the
+> hardware/kernel that well, and causes multiple problems. First of all,
+> coming back from idle, PER domain remains idle as the wakedeps have
+> been disabled for the domain, and this causes a crash with the GPIO
+> code, as the resume code attempts to access domain which is not active.
+> Just enabling the interface clocks for the GPIO does not help, as they
+> are autoidled and don't bring the domain out of idle. Secondly, there
+> are multiple erratas for omap3, which say that the wakedeps should be
+> enabled for the PER domain, see e.g. errata i582 for omap3630.
 
-Got it.  I'm just not confident about disallowing early use of udelay().
+If PER software supervised idle is so *buggy* then shouldn't the flags
+just reflect that PER *does not* support software supervised idle?
+Using a flag which reflects that the clkdm supports both hardware
+and software supervised idle ('CLKDM_CAN_HWSUP_SWSUP') and then using
+another one to actually skip putting it in software supervised sounds
+a little round about, no?
+Does updating the flag to 'CLKDM_CAN_HWSUP' also fix all the issues
+for you? without adding the additional 'CLKDM_SKIP_MANUAL_TRANS' flag.
 
-  Shinya
+>
+> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> ---
+>   arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+> index 6038adb..0dae4c8 100644
+> --- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
+> +++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+> @@ -282,7 +282,7 @@ static struct clockdomain usbhost_clkdm = {
+>   static struct clockdomain per_clkdm = {
+>   	.name		= "per_clkdm",
+>   	.pwrdm		= { .name = "per_pwrdm" },
+> -	.flags		= CLKDM_CAN_HWSUP_SWSUP,
+> +	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_SKIP_MANUAL_TRANS,
+>   	.dep_bit	= OMAP3430_EN_PER_SHIFT,
+>   	.wkdep_srcs	= per_wkdeps,
+>   	.sleepdep_srcs	= per_sleepdeps,
