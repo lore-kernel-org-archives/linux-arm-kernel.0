@@ -1,46 +1,43 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 12 Jul 2012 19:39:31 +0400
-Subject: [PATCH v2 4/4] ARM: i.MX5x CSPI: Fixed clock name for CSPI
-In-Reply-To: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
-References: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1342107571-15454-4-git-send-email-shc_work@mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jul 2012 15:39:42 +0000
+Subject: [ACKed PATCH] clocksource: dw_apb_timer: Add common DTS glue for
+ dw_apb_timer
+In-Reply-To: <20120712132809.GD11798@elf.ucw.cz>
+References: <1342037596-17710-1-git-send-email-dinguyen@altera.com>
+ <alpine.LFD.2.02.1207112307061.32033@ionos>
+ <20120712132809.GD11798@elf.ucw.cz>
+Message-ID: <201207121539.42608.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch also includes fix CSPI ID for i.MX53. ID should be 2,
-because IDs 0 and 1 are occupied by eCSPI.
+On Thursday 12 July 2012, Pavel Machek wrote:
+> On Wed 2012-07-11 23:10:43, Thomas Gleixner wrote:
+> > On Wed, 11 Jul 2012, dinguyen at altera.com wrote:
+> > 
+> > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > 
+> > > Make a common device tree glue for clocksource/dw_apb_timer.
+> > > Move mach-picoxcell/time.c to be a generic device tree application
+> > > of the dw_apb_timer.
+> > > 
+> > > Configure mach-picoxcell to use the dw_apb_timer_of device tree
+> > > implementation in drivers/clocksource.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > > Acked-by: Jamie Iles <jamie@jamieiles.com>
+> > 
+> > Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> > 
+> > Please take it through the proper ARM/SoC tree so work depending on
+> > that does not get blocked.
+> 
+> Arnd, can you apply this? Or should we create public git tree to pull
+> from?
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/clk-imx51-imx53.c          |    2 +-
- arch/arm/plat-mxc/devices/platform-spi_imx.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 3d7564c..b0cf835 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -253,7 +253,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[ecspi1_ipg_gate], "ipg", "imx51-ecspi.0");
- 	clk_register_clkdev(clk[ecspi2_per_gate], "per", "imx51-ecspi.1");
- 	clk_register_clkdev(clk[ecspi2_ipg_gate], "ipg", "imx51-ecspi.1");
--	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx51-cspi.0");
-+	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx35-cspi.2");
- 	clk_register_clkdev(clk[pwm1_ipg_gate], "pwm", "mxc_pwm.0");
- 	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
- 	clk_register_clkdev(clk[i2c1_gate], NULL, "imx-i2c.0");
-diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/plat-mxc/devices/platform-spi_imx.c
-index 9bfae8b..9c50c14 100644
---- a/arch/arm/plat-mxc/devices/platform-spi_imx.c
-+++ b/arch/arm/plat-mxc/devices/platform-spi_imx.c
-@@ -95,7 +95,7 @@ const struct imx_spi_imx_data imx51_ecspi_data[] __initconst = {
- #ifdef CONFIG_SOC_IMX53
- /* i.mx53 has the i.mx35 type cspi */
- const struct imx_spi_imx_data imx53_cspi_data __initconst =
--	imx_spi_imx_data_entry_single(MX53, CSPI, "imx35-cspi", 0, , SZ_4K);
-+	imx_spi_imx_data_entry_single(MX53, CSPI, "imx35-cspi", 2, , SZ_4K);
- 
- /* i.mx53 has the i.mx51 type ecspi */
- const struct imx_spi_imx_data imx53_ecspi_data[] __initconst = {
--- 
-1.7.3.4
+Applied to next/timer branch,
+
+Thanks!
+
+	ARnd
