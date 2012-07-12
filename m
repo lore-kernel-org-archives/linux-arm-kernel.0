@@ -1,62 +1,133 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 Jul 2012 07:30:36 +0200
-Subject: [PATCH 1/1] MTD: atmel nand: fix gpio missing request
-Message-ID: <1342071036-15905-1-git-send-email-plagnioj@jcrosoft.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 12 Jul 2012 14:21:41 +0800
+Subject: [PATCH v8] ARM: dts: imx6q-sabrelite: add usb devices
+In-Reply-To: <1342059927-25661-5-git-send-email-richard.zhao@freescale.com>
+References: <1342059927-25661-5-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1342074101-31493-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-without this the gpio will not be muxed as a gpio by the current custom pinmux
-or later by the pinctrl
+- add usbphy devices
+- add usb host controller and otg devices
+- add usb h1 vbus regulator
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- drivers/mtd/nand/atmel_nand.c |   25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+changes since last version:
+ - add gpio pinctrl
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 97ac671..fce649a 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -583,8 +583,24 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	nand_chip->IO_ADDR_W = host->io_base;
- 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+ arch/arm/boot/dts/imx6q-sabrelite.dts |   30 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi          |   36 +++++++++++++++++++++++++++++++--
+ 2 files changed, 64 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index e0ec929..46fdfd1 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -42,9 +42,30 @@
+ 				};
+ 			};
  
--	if (gpio_is_valid(host->board.rdy_pin))
-+	if (gpio_is_valid(host->board.rdy_pin)) {
-+		res = gpio_request(host->board.rdy_pin, "nand_rdy");
-+		if (res) {
-+			dev_err(&pdev->dev,
-+				"can't request rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
- 		nand_chip->dev_ready = atmel_nand_device_ready;
-+	}
++			iomuxc at 020e0000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_gpio_hog>;
 +
-+	if (gpio_is_valid(host->board.enable_pin)) {
-+		res = gpio_request(host->board.enable_pin, "nand_enable");
-+		if (res) {
-+			dev_err(&pdev->dev,
-+				"can't request enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+	}
++				gpios {
++					pinctrl_gpio_hog: gpiohog {
++						fsl,pins = <
++							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
++							   >;
++					};
++				};
++			};
+ 		};
  
- 	nand_chip->ecc.mode = host->board.ecc_mode;
- 
-@@ -622,6 +638,13 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	atmel_nand_enable(host);
- 
- 	if (gpio_is_valid(host->board.det_pin)) {
-+		res = gpio_request(host->board.det_pin, "nand_det");
-+		if (res) {
-+			dev_err(&pdev->dev,
-+				"can't request det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
+ 		aips-bus at 02100000 { /* AIPS2 */
++			usb at 02184000 { /* USB OTG */
++				vbus-supply = <&reg_usb_otg_vbus>;
++				status = "okay";
++			};
 +
- 		if (gpio_get_value(host->board.det_pin)) {
- 			printk(KERN_INFO "No SmartMedia card inserted.\n");
- 			res = -ENXIO;
++			usb at 02184200 { /* USB1 */
++				status = "okay";
++			};
++
+ 			ethernet at 02188000 {
+ 				phy-mode = "rgmii";
+ 				phy-reset-gpios = <&gpio3 23 0>;
+@@ -111,6 +132,15 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		reg_usb_otg_vbus: usb_otg_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 0>;
++			enable-active-high;
++		};
+ 	};
+ 
+ 	sound {
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 16a3884..5e4f100 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -461,12 +461,14 @@
+ 				};
+ 			};
+ 
+-			usbphy at 020c9000 { /* USBPHY1 */
++			usbphy1: usbphy at 020c9000 {
++				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 			};
+ 
+-			usbphy at 020ca000 { /* USBPHY2 */
++			usbphy2: usbphy at 020ca000 {
++				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 			};
+@@ -614,6 +616,36 @@
+ 				reg = <0x0217c000 0x4000>;
+ 			};
+ 
++			usb at 02184000 { /* USB OTG */
++				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				reg = <0x02184000 0x200>;
++				interrupts = <0 43 0x04>;
++				fsl,usbphy = <&usbphy1>;
++				status = "disabled";
++			};
++
++			usb at 02184200 { /* USB1 */
++				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				reg = <0x02184200 0x200>;
++				interrupts = <0 40 0x04>;
++				fsl,usbphy = <&usbphy2>;
++				status = "disabled";
++			};
++
++			usb at 02184400 { /* USB2 */
++				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				reg = <0x02184400 0x200>;
++				interrupts = <0 41 0x04>;
++				status = "disabled";
++			};
++
++			usb at 02184600 { /* USB3 */
++				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				reg = <0x02184600 0x200>;
++				interrupts = <0 42 0x04>;
++				status = "disabled";
++			};
++
+ 			ethernet at 02188000 {
+ 				compatible = "fsl,imx6q-fec";
+ 				reg = <0x02188000 0x4000>;
 -- 
-1.7.10
+1.7.9.5
