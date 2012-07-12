@@ -1,71 +1,56 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Thu, 12 Jul 2012 07:28:10 +0000
-Subject: mxc-nand fix for 3.5 (Was: Re: [PATCH v2] mtd mxc_nand: use
- 32bit copy functions)
-In-Reply-To: <20120712065722.GA592@pengutronix.de>
-References: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
- <1340970369.3070.166.camel@sauron.fi.intel.com>
- <20120712065722.GA592@pengutronix.de>
-Message-ID: <1342078088.30654.14.camel@shinybook.infradead.org>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Thu, 12 Jul 2012 16:33:06 +0900
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
+ to be selected
+In-Reply-To: <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+ <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+Message-ID: <4FFE7DB2.4040702@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-12 at 08:57 +0200, Uwe Kleine-K?nig wrote:
-> The mxc_nand driver is completely useless with
-> 
->         5775ba3 (mtd: mxc_nand: fix several sparse warnings about incorrect address space)
-> 
-> but without this patch. So it would be great if we could have it in 3.5.
-> Or alternatively revert 5775ba3. This fix currently it sits as
-> 
->         096bcc2 (mtd: mxc_nand: use 32bit copy functions)
-> 
-> in next/master. 
+Hi Will, Stephen,
 
-The subject of that commit didn't jump out at me when I was perusing the
-patch queue for 3.5-worthy stuff.
+On 6/30/2012 2:33 AM, Will Deacon wrote:
+> +void __init init_current_timer_delay(unsigned long freq)
+> +{
+> +	pr_info("Switching to timer-based delay loop\n");
+> +	lpj_fine			= freq / HZ;
+> +	arm_delay_ops.delay		= __timer_delay;
+> +	arm_delay_ops.const_udelay	= __timer_const_udelay;
+> +	arm_delay_ops.udelay		= __timer_udelay;
+> +}
 
-Artem reminded me about it just after I sent my previous pull request to
-Linus last week. I wanted to let it sit in linux-next for a little
-while, but now...
+Once this function is processed, the udelay() behavior changes
+_immediately_ from loop-based delay to timer-based one, without waiting
+for 'loops_per_jiffy' itself being corrected in calibrate_delay().
 
-Linus, please pull from
-   git://git.infradead.org/linux-mtd.git for-linus-20120712
+As a result, actual udelay()s may be toooo long than expected, in
+particular udelay()s used between init_current_timer_delay() and
+calibrate_delay().  It's unlikely be short, as the frequency of a
+counter for read_current_timer is typically slower than CPU frequency.
 
-Late MTD fixes for 3.5:
- - fix 'sparse warning fix' regression which totally breaks MXC NAND
- - fix GPMI NAND regression when used with UBI
- - update/correct sysfs documentation for new 'bitflip_threshold' field
- - fix nandsim build failure
+I'm not sure udelay()s used in this period are legitimate, but if it's
+there we'll in trouble somehow.  This is not so great.
 
-----
-Herton Ronaldo Krzesinski (1):
-      mtd: nandsim: don't open code a do_div helper
+If this assumption is correct, it might be better to adjust / correct
+loops_per_jiffy itself along with lpj_fine, prior to calibrate_delay().
 
-Mike Dunn (1):
-      mtd: ABI documentation: clarification of bitflip_threshold
-
-Sascha Hauer (2):
-      mtd: mxc_nand: use 32bit copy functions
-      mtd: gpmi-nand: fix read page when reading to vmalloced area
-
- Documentation/ABI/testing/sysfs-class-mtd |   17 ++++++-------
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c    |   10 ++++----
- drivers/mtd/nand/mxc_nand.c               |   37 ++++++++++++++++++++++-------
- drivers/mtd/nand/nandsim.c                |   12 +++-------
- 4 files changed, 46 insertions(+), 30 deletions(-)
-
--- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index cb881c3..9065d30 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -57,7 +57,7 @@ static void __timer_udelay(unsigned long usecs)
+ 
+ void __init init_current_timer_delay(unsigned long freq)
+ {
+-	lpj_fine			= (freq + HZ/2) / HZ;
++	loops_per_jiffy = lpj_fine	= (freq + HZ/2) / HZ;
+ 	arm_delay_ops.delay		= __timer_delay;
+ 	arm_delay_ops.const_udelay	= __timer_const_udelay;
+ 	arm_delay_ops.udelay		= __timer_udelay;
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120712/7d3ca2c4/attachment-0001.bin>
+What do you think?  Am I missing something?
+
+  Shinya
