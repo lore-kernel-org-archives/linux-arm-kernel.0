@@ -1,49 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 12 Jul 2012 15:54:06 +0800
-Subject: [GIT PULL] imx device tree changes for 3.6 (part 2)
-Message-ID: <20120712075405.GM6971@S2101-09.ap.freescale.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 12 Jul 2012 11:19:15 +0300
+Subject: Device tree binding for DVFS table
+In-Reply-To: <20120711144449.GA23654@sirena.org.uk>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+ <20120711144449.GA23654@sirena.org.uk>
+Message-ID: <20120712081915.GD9437@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Wed, Jul 11, 2012 at 04:44:50PM +0200, Mark Brown wrote:
+> On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
+> 
+> > I'd expect a single property with freq/volt pairs or 2 properties for
+> > freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
+> 
+> I strongly agree - the current proposal is very hard to read due to the
+> separation between the voltage and frequency values.  Some devices do
+> also need to scale multiple rails together, especially when this gets
+> used for I/O devices.
+> 
 
-Here is the second (last) batch of imx device tree changes for 3.6.
-Please pull.
+I don't think dependencies between rails should be modelled in the same DT
+nodes. We have those too in Tegra30, but as this is SoC internal, I am not
+sure if it needs to be modelled in DT at all, or if we can leave it in SoC
+specific code. While our current dependency is of the form 'voltage difference
+between rail x and rail y must be smaller then z mV', I have been told these
+dependencies might become more complicated in the future. Hence they might
+need to be expressed in code anyway.
+Anyway, I think voltage dependencies between rails is a related but seperate
+topic from DVFS.
 
-Regards,
-Shawn
+Cheers,
 
-The following changes since commit 77ac32ad2b03baa7638aadda1650200287ca6f5d:
-
-  ARM: imx6q: add clocks for gpmi-nand (2012-07-03 11:39:57 +0800)
-
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/dt-for-3.6
-
-Hui Wang (1):
-      ARM: dts: imx6q-sabrelite: add ecspi1 pinctrl support
-
-Otavio Salvador (1):
-      ARM: imx6q: ensure ANATOP controller is available
-
-Richard Zhao (4):
-      ARM: imx6q: add usb controller clock lookups
-      ARM: imx6q: add usbphy clocks
-      ARM: imx6q: disable usb charger detector
-      ARM: dts: imx6q-sabrelite: add usb devices
-
-Shawn Guo (2):
-      bindings: update imx and mxs #gpio-cells
-      ARM: dts: imx: update #interrupt-cells for gpio nodes
-
- .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |   14 ++++-
- .../devicetree/bindings/gpio/gpio-mxs.txt          |    5 +-
- arch/arm/boot/dts/imx27.dtsi                       |   12 ++--
- arch/arm/boot/dts/imx51.dtsi                       |    8 ++--
- arch/arm/boot/dts/imx53.dtsi                       |   14 +++---
- arch/arm/boot/dts/imx6q-sabrelite.dts              |   33 +++++++++++
- arch/arm/boot/dts/imx6q.dtsi                       |   58 +++++++++++++++++---
- arch/arm/mach-imx/Kconfig                          |    1 +
- arch/arm/mach-imx/clk-imx6q.c                      |   11 ++++-
- arch/arm/mach-imx/mach-imx6q.c                     |   41 ++++++++++++++
- 10 files changed, 166 insertions(+), 31 deletions(-)
+Peter.
