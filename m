@@ -1,35 +1,112 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 12 Jul 2012 11:19:15 +0300
-Subject: Device tree binding for DVFS table
-In-Reply-To: <20120711144449.GA23654@sirena.org.uk>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <20120711144449.GA23654@sirena.org.uk>
-Message-ID: <20120712081915.GD9437@tbergstrom-lnx.Nvidia.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 12 Jul 2012 10:31:08 +0200
+Subject: [PATCH 1/1 v2] MTD: atmel nand: fix gpio missing request
+In-Reply-To: <1342071036-15905-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1342071036-15905-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1342081868-5995-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 04:44:50PM +0200, Mark Brown wrote:
-> On Wed, Jul 11, 2012 at 09:03:41AM -0500, Rob Herring wrote:
-> 
-> > I'd expect a single property with freq/volt pairs or 2 properties for
-> > freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
-> 
-> I strongly agree - the current proposal is very hard to read due to the
-> separation between the voltage and frequency values.  Some devices do
-> also need to scale multiple rails together, especially when this gets
-> used for I/O devices.
-> 
+without this the gpio will not be muxed as a gpio by the current custom pinmux
+or later by the pinctrl
 
-I don't think dependencies between rails should be modelled in the same DT
-nodes. We have those too in Tegra30, but as this is SoC internal, I am not
-sure if it needs to be modelled in DT at all, or if we can leave it in SoC
-specific code. While our current dependency is of the form 'voltage difference
-between rail x and rail y must be smaller then z mV', I have been told these
-dependencies might become more complicated in the future. Hence they might
-need to be expressed in code anyway.
-Anyway, I think voltage dependencies between rails is a related but seperate
-topic from DVFS.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+V2:
 
-Cheers,
+	set the direction too
 
-Peter.
+	today this is invisible as you mostly boot from nand and the
+	bootloader configured them but if you load the kernel via nor you need
+	to do it
+
+Best Regards,
+J.
+ drivers/mtd/nand/atmel_nand.c |   56 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 97ac671..eef9f80 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -583,8 +583,39 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	nand_chip->IO_ADDR_W = host->io_base;
+ 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+ 
+-	if (gpio_is_valid(host->board.rdy_pin))
++	if (gpio_is_valid(host->board.rdy_pin)) {
++		res = gpio_request(host->board.rdy_pin, "nand_rdy");
++		if (res < 0) {
++			dev_err(&pdev->dev,
++				"can't request rdy gpio %d\n", host->board.rdy_pin);
++			goto err_ecc_ioremap;
++		}
++
++		res = gpio_direction_input(host->board.rdy_pin);
++		if (res < 0) {
++			dev_err(&pdev->dev,
++				"can't request input direction rdy gpio %d\n", host->board.rdy_pin);
++			goto err_ecc_ioremap;
++		}
++
+ 		nand_chip->dev_ready = atmel_nand_device_ready;
++	}
++
++	if (gpio_is_valid(host->board.enable_pin)) {
++		res = gpio_request(host->board.enable_pin, "nand_enable");
++		if (res < 0) {
++			dev_err(&pdev->dev,
++				"can't request enable gpio %d\n", host->board.enable_pin);
++			goto err_ecc_ioremap;
++		}
++
++		res = gpio_direction_output(host->board.enable_pin, 1);
++		if (res < 0) {
++			dev_err(&pdev->dev,
++				"can't request output direction enable gpio %d\n", host->board.enable_pin);
++			goto err_ecc_ioremap;
++		}
++	}
+ 
+ 	nand_chip->ecc.mode = host->board.ecc_mode;
+ 
+@@ -622,6 +653,20 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	atmel_nand_enable(host);
+ 
+ 	if (gpio_is_valid(host->board.det_pin)) {
++		res = gpio_request(host->board.det_pin, "nand_det");
++		if (res < 0) {
++			dev_err(&pdev->dev,
++				"can't request det gpio %d\n", host->board.det_pin);
++			goto err_no_card;
++		}
++
++		res = gpio_direction_input(host->board.det_pin);
++		if (res < 0) {
++			dev_err(&pdev->dev,
++				"can't request input direction det gpio %d\n", host->board.det_pin);
++			goto err_no_card;
++		}
++
+ 		if (gpio_get_value(host->board.det_pin)) {
+ 			printk(KERN_INFO "No SmartMedia card inserted.\n");
+ 			res = -ENXIO;
+@@ -738,6 +783,15 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+ 
+ 	atmel_nand_disable(host);
+ 
++	if (gpio_is_valid(host->board.det_pin))
++		gpio_free(host->board.det_pin);
++
++	if (gpio_is_valid(host->board.enable_pin))
++		gpio_free(host->board.enable_pin);
++
++	if (gpio_is_valid(host->board.rdy_pin))
++		gpio_free(host->board.rdy_pin);
++
+ 	if (host->ecc)
+ 		iounmap(host->ecc);
+ 
+-- 
+1.7.10
