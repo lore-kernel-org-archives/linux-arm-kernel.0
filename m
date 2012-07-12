@@ -1,56 +1,27 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Thu, 12 Jul 2012 16:33:06 +0900
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <1340991231-17682-3-git-send-email-will.deacon@arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
-Message-ID: <4FFE7DB2.4040702@renesas.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Jul 2012 15:42:40 +0800
+Subject: [GIT PULL] clk/mxs for 3.6 (part 2)
+Message-ID: <20120712074238.GK6971@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Stephen,
+Hi Mike,
 
-On 6/30/2012 2:33 AM, Will Deacon wrote:
-> +void __init init_current_timer_delay(unsigned long freq)
-> +{
-> +	pr_info("Switching to timer-based delay loop\n");
-> +	lpj_fine			= freq / HZ;
-> +	arm_delay_ops.delay		= __timer_delay;
-> +	arm_delay_ops.const_udelay	= __timer_const_udelay;
-> +	arm_delay_ops.udelay		= __timer_udelay;
-> +}
+Here is one more clk/mxs patch (last one, I believe) for 3.6.
+Please pull.
 
-Once this function is processed, the udelay() behavior changes
-_immediately_ from loop-based delay to timer-based one, without waiting
-for 'loops_per_jiffy' itself being corrected in calibrate_delay().
+Regards,
+Shawn
 
-As a result, actual udelay()s may be toooo long than expected, in
-particular udelay()s used between init_current_timer_delay() and
-calibrate_delay().  It's unlikely be short, as the frequency of a
-counter for read_current_timer is typically slower than CPU frequency.
+The following changes since commit 64e2bc41304726a5ca8a4d37754db69b88841ebf:
 
-I'm not sure udelay()s used in this period are legitimate, but if it's
-there we'll in trouble somehow.  This is not so great.
+  clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3 (2012-07-05 09:36:44 +0800)
 
-If this assumption is correct, it might be better to adjust / correct
-loops_per_jiffy itself along with lpj_fine, prior to calibrate_delay().
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs-for-3.6
 
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index cb881c3..9065d30 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -57,7 +57,7 @@ static void __timer_udelay(unsigned long usecs)
- 
- void __init init_current_timer_delay(unsigned long freq)
- {
--	lpj_fine			= (freq + HZ/2) / HZ;
-+	loops_per_jiffy = lpj_fine	= (freq + HZ/2) / HZ;
- 	arm_delay_ops.delay		= __timer_delay;
- 	arm_delay_ops.const_udelay	= __timer_const_udelay;
- 	arm_delay_ops.udelay		= __timer_udelay;
+Richard Zhao (1):
+      clk: mxs: clk_register_clkdev mx28 usb clocks
 
-
-What do you think?  Am I missing something?
-
-  Shinya
+ drivers/clk/mxs/clk-imx28.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
