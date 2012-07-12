@@ -1,138 +1,18 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 12 Jul 2012 18:28:47 +0530
-Subject: [PATCH v2 3/3] ARM: dts: Add nodes for dw_mmc controllers for Samsung
- Exynos5250 platforms
-In-Reply-To: <1342097927-25334-1-git-send-email-thomas.abraham@linaro.org>
-References: <1342097927-25334-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1342097927-25334-4-git-send-email-thomas.abraham@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jul 2012 12:46:43 +0000
+Subject: [GIT PULL] ARM: LPC32xx: Adjust to pl08x DMA interface changes
+In-Reply-To: <4FFEC489.5030307@antcom.de>
+References: <4FFEC489.5030307@antcom.de>
+Message-ID: <201207121246.44389.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the four instances of dw_mmc controllers in Exynos5250
-and enable instance 0 and 2 for the smdk5250 board.
+On Thursday 12 July 2012, Roland Stigge wrote:
+> this is the pull request including the fix for the compile error caused by
+> lpc32xx-next and dma branches collisions in linux-next.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   58 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   32 ++++++++++++++++
- 2 files changed, 90 insertions(+), 0 deletions(-)
+Pulled into next/soc branch along with the other patches.
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 49945cc..8e54e41 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -16,6 +16,13 @@
- 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
- 	compatible = "samsung,smdk5250", "samsung,exynos5250";
- 
-+	aliases {
-+		mshc0 = &mshc_0;
-+		mshc1 = &mshc_1;
-+		mshc2 = &mshc_2;
-+		mshc3 = &mshc_3;
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 	};
-@@ -71,4 +78,55 @@
- 	i2c at 12CD0000 {
- 		status = "disabled";
- 	};
-+
-+	mshc_0: dwmmc0 at 12200000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		card-detection-broken;
-+		no-write-protect;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-sdr-timing = <2 3 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+			cd-gpios = <&gpc0 2 2 3 3>;
-+			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
-+				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
-+				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
-+				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
-+				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
-+		};
-+	};
-+
-+	mshc_1: dwmmc1 at 12210000 {
-+		status = "disabled";
-+	};
-+
-+	mshc_2: dwmmc2 at 12220000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		no-write-protect;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-sdr-timing = <2 3 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			cd-gpios = <&gpc3 2 2 3 3>;
-+			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
-+				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
-+				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
-+				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
-+				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
-+		};
-+	};
-+
-+	mshc_3: dwmmc3 at 12230000 {
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 4272b29..b6ae657 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -146,6 +146,38 @@
- 		#size-cells = <0>;
- 	};
- 
-+	dwmmc0 at 12200000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12200000 0x1000>;
-+		interrupts = <0 75 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc1 at 12210000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12210000 0x1000>;
-+		interrupts = <0 76 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc2 at 12220000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12220000 0x1000>;
-+		interrupts = <0 77 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc3 at 12230000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12230000 0x1000>;
-+		interrupts = <0 78 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.6.6.rc2
+Thanks,
+
+	Arnd
