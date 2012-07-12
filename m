@@ -1,43 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jul 2012 18:11:00 +0900
-Subject: [PATCH 0/2] Exynos4: power domain fixes for v3.5-rc
-In-Reply-To: <1339750473-32699-1-git-send-email-m.szyprowski@samsung.com>
-References: <1339750473-32699-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <0fad01cd600e$41940240$c4bc06c0$%kim@samsung.com>
+Date: Thu, 12 Jul 2012 18:11:05 +0900
+Subject: [PATCH v5 0/6] spi: s3c64xx: add support for device tree
+In-Reply-To: <CAJuYYwQA_x112xqOnQmwZjzoXoR-DAvT8YdB90Wm=78CH72uOg@mail.gmail.com>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+ <20120711174908.GP3938@opensource.wolfsonmicro.com>
+ <CAJuYYwQA_x112xqOnQmwZjzoXoR-DAvT8YdB90Wm=78CH72uOg@mail.gmail.com>
+Message-ID: <0fae01cd600e$442ed160$cc8c7420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+Thomas Abraham wrote:
 > 
-> Hello,
+> On 11 July 2012 23:19, Mark Brown <broonie@opensource.wolfsonmicro.com>
+> wrote:
+> > On Wed, Jul 11, 2012 at 09:10:59PM +0530, Thomas Abraham wrote:
+> >> Changes since v4:
+> >> - Includes the missing gpio request for slave select line gpio as
+> suggested
+> >>   by Mark Brown.
+> >
+> > These looked OK (and have had quite a bit of review already so we're
+> > probably at the stage where incremental fixes are better anyway) so I
+> > tried to apply them but git am was really unhappy.  I tried applying on
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git spi-
+> next
+> >
+> > and -next.  Can you check what's going on here please?
 > 
-> This is a resend of my power domain fixes for Samsung Exynos platform.
-> They fix issues introduced by switching to gen_pd based driver in commit
-> 91cfbd4ee0 ('ARM: EXYNOS: Hook up power domains to generic power domain
-> infrastructure') and restore runtime pm functionality for multimedia
-> drivers (s5p-fimc, s5p-mfc, s5p-tv, exynos-drm). Tested on Universal
-> C210 and NURI boards, but the issues were also reported for Origen
-> boards and others. If possible, please consider these patches as fixes
-> (runtime pm is broken without them) and merge to v3.5-rc line.
-> 
-> Best regards
-> Marek Szyprowski
-> Samsung Poland R&D Center
-> 
-> 
-> Patch summary:
-> 
-> Marek Szyprowski (2):
->   ARM: Exynos4: read initial state of power domain from hw registers
->   ARM: Exynos4: pm_domains: register devices in 'need_restore' state
-> 
->  arch/arm/mach-exynos/pm_domains.c |   13 +++++++++----
->  1 files changed, 9 insertions(+), 4 deletions(-)
-> 
-> --
-> 1.7.1.569.g6f426
+Firstly, this patches look ok to me.
 
-OK, applied this series in my -fixes.
+And Mark, this touches various samsung stuff in arch/arm/ so if you're ok,
+I'd like to pick this up in samsung tree. We don't want to see conflicts...
+
+> These patches were based on Samsung maintainer's for-next branch with
+> Grant's spi/next branch merged. I will check with your spi-next
+> branch. Thanks.
 
 Thanks.
 
