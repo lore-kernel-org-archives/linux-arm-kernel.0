@@ -1,58 +1,139 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 12 Jul 2012 11:26:25 +0800
-Subject: [RFC PATCH 2/2] irq: add irq_desc_initialize to remove some
- duplicated lines
-In-Reply-To: <alpine.LFD.2.02.1207120017590.32033@ionos>
-References: <1340182831-10477-1-git-send-email-b29396@freescale.com>
- <1340182831-10477-2-git-send-email-b29396@freescale.com>
- <alpine.LFD.2.02.1207120017590.32033@ionos>
-Message-ID: <20120712032624.GC22640@shlinux2.ap.freescale.net>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 12 Jul 2012 09:38:48 +0530
+Subject: Device tree binding for DVFS table
+In-Reply-To: <4FFD87BD.2030206@gmail.com>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+Message-ID: <4FFE4DD0.7020407@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wednesday 11 July 2012 07:33 PM, Rob Herring wrote:
+> On 07/11/2012 07:56 AM, Prashant Gaikwad wrote:
+>> Hi,
+>>
+>> I am working on DT binding for Tegra DVFS.
+>>
+>> For Tegra, DVFS node mainly consists of frequency and voltage pairs.
+>> Frequency in the pair may change for different process. E.g. for process
+>> 1 CPU clock frequency could be 900MHz at 1V while for process 2 it could
+>> be 1GHz at 1V.
+>> Tegra uses vendor specific ids to identify the correct frequency table.
+>>
+>> Following is the proposed binding for voltage and frequency tables used
+>> in DVFS. Looking for comments/suggestions to make it generic.
+>>
+>> =======DVFS table node===================
+>> This node defines the voltage configuration for the DVFS which includes
+>> the regulator and voltage array.
+>>
+>> Required properties:
+>>
+>> reg_id :<regulator phandle>;
+>> voltage-table :<voltage array, values in mV>;
+>>
+>> #address-cells and #size-cells : To identify correct frequency table
+>> using process id (or some other vendor specific way).
+>>
+>> ========Frequency table node===============
+>>
+>> This node defines frequency configuration for the device DVFS.
+>>
+>> Required properties:
+>>
+>> In device node need a reference to the DVFS table node.
+>>
+>> dvfs : the phandle for the DVFS table node
+>>
+>> frequency-table at n
+>>         reg =<n>; dependent on address-cells and size-cells in DVFS
+>> table node.
+>>         frequencies =<frequency array, values in MHz>;
+> You are storing u32 values, why limit the resolution to MHz.
+>
+> Put the unit in the property names.
+>
 
-Thanks for the review firstly.
+Unit can be changed, will do it.
 
-On Thu, Jul 12, 2012 at 06:19:18AM +0800, Thomas Gleixner wrote:
-> On Wed, 20 Jun 2012, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > There're two copies of irq_desc initialization code, reform them into
-> > an irq_desc_initialize function to call.
-> > 
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> >  kernel/irq/irqdesc.c |   51 +++++++++++++++++++++++++++----------------------
-> >  1 files changed, 28 insertions(+), 23 deletions(-)
-> 
-> We add more code by removing redundant copies?
-> 
-I also had this strange question.
-I looked the code a bit more, i guess the main problem is that the redundant copies
-is not too big, so we can not see great savings.
+>> }
+>>
+>> Example:
+>> -------------------------------------------------------------------------
+>>
+>> cpu-dvfs-table : dvfs-table {
+> This should be located with the node that the frequencies correspond to.
+>
 
-Compare to the init code of irq_desc in original alloc_desc function,
-the new irq_desc_initialize function saves 4 lines.
-However, the new function also add 4 lines for defining extra function name,
-parameter and etc.
-And alloc_desc still needs to call irq_desc_initialize and checking return value
-which needs extra 6 lines.
-The main saving is another copy of irq_desc initialization in early_irq_init,
-but this copy does not check any return values which cause we did not save too much,
-only about 4 lines.
-Plus extra blan lines added, so totally it does not save more than new added.
+With CAR node?
 
-However, i was thinking it could make code looks a bit better.
-So i sent out this RFC patch.
-Do you think if it's reasonable?
+>>                compatible = "nvidia,tegra30-dvfs-table";
+>>                reg_id =<&sm0>;
+>>                #address-cells =<1>;
+>>                #size-cells =<0>;
+>>                voltage-array =<750 775 800 825 850 875 900 925 950 975
+>> 1000 1025 1050 1100 1125>;
+> The SOC is really characterized at all these voltages?
 
-BTW, there's an issue in my patch, should change like:
-        if (alloc_masks(desc, GFP_KERNEL, node)) {
--               kfree(desc->kstat_irqs);
-+               free_percpu(desc->kstat_irqs);
-                return -ENOMEM;
-        }
+Not really, but different processes of single SoC are characterized for 
+different voltages and this array covers all those voltages.
 
-Regards
-Dong Aisheng
+>> };
+>>
+>> device {
+>>               dvfs =<&cpu-dvfs-table>;
+>>               frequency-table at 102 {
+>>                        reg =<0x102>;
+>>                        frequencies =<314 314 314 456 456 456 608 608 608
+>> 760 817 817 912 1000>;
+> I don't see the point of repeating frequencies.
+>>               };
+>>               frequency-table at 002 {
+>>                        reg =<0x002>;
+>>                        frequencies =<598 598 750 750 893 893 1000>;
+>>               };
+> How do you determine the voltage for a frequency on table 2?
+>
+> I'd expect a single property with freq/volt pairs or 2 properties for
+> freq and voltage where there is a 1:1 relationship (freq N uses voltage N).
+
+
+How this will work:
+
+voltage-array =<750 775 800 825 850 875 900  925 950 975 1000 1025 1050 1100 1125>
+frequencies-1 =<314 314 314 456 456 456 608  608 608 760 817  817  912  1000>;
+frequencies-2 =<598 598 750 750 893 893 1000>;
+
+
+Freq and voltage has 1:1 relationship but as single voltage table is 
+used for different processes we have more entries in voltage table than 
+freq table.
+Frequency table 1 is mapped till 1100mV while frequency table 2 is 
+mapped till 900mV only, it maintains 1:1 relationship.
+
+About repeating frequencies, operating voltage for a frequency would be 
+the highest one mapped in the table.
+For example, in frequency table 2 operating voltage for 750MHz would be 
+825mV while for 893MHz it would be 875mV. Unmapped entries could be 
+replaced with 0 to make reading better.
+
+Advantage it provides is single voltage table used for multiple 
+frequency tables, as can be observed from above tables, operating 
+voltage for 314MHz in freq table 1 is 800mV while there is no frequency 
+in table 2 at that voltage.
+
+I know this makes reading difficult but it provides flexibility,
+
+I hope it explains the implementation.
+
+> Rob
+>
+>> };
+>>
+>> Thanks&  Regards,
+>> Prashant G
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
