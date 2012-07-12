@@ -1,66 +1,36 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Jul 2012 07:08:06 +0900
-Subject: [Ksummit-2012-discuss] ARM mini-summit
-In-Reply-To: <de55bfacdc06182dd4f3a36722fcc9fe@localhost>
-References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
- <201207111128.29924.arnd@arndb.de> <20120711115755.GF22437@arm.com>
- <de55bfacdc06182dd4f3a36722fcc9fe@localhost>
-Message-ID: <4FFF4AC6.10404@samsung.com>
+Date: Fri, 13 Jul 2012 07:35:51 +0900
+Subject: [PATCH v5 0/6] spi: s3c64xx: add support for device tree
+In-Reply-To: <20120712161657.GC7256@opensource.wolfsonmicro.com>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+ <20120711174908.GP3938@opensource.wolfsonmicro.com>
+ <CAJuYYwQA_x112xqOnQmwZjzoXoR-DAvT8YdB90Wm=78CH72uOg@mail.gmail.com>
+ <0fae01cd600e$442ed160$cc8c7420$%kim@samsung.com>
+ <20120712130234.GE3957@opensource.wolfsonmicro.com>
+ <CAJuYYwS59yoRnyFOR4_M5ymAS5uh0fN5zS=x2CS5Ax-795awBA@mail.gmail.com>
+ <20120712161657.GC7256@opensource.wolfsonmicro.com>
+Message-ID: <4FFF5147.3070707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/12 21:35, Marc Zyngier wrote:
-> On Wed, 11 Jul 2012 12:57:55 +0100, Catalin Marinas
-> <catalin.marinas@arm.com>  wrote:
->> On Wed, Jul 11, 2012 at 12:28:29PM +0100, Arnd Bergmann wrote:
->>> On Wednesday 11 July 2012, James Bottomley wrote:
->>>> Hi All,
->>>>
->>>> We have set aside the second day of the kernel summit (Tuesday 28
->>>> August) as mini-summit day.  So far we have only the PCI mini summit
-> on
->>>> this day, so if you can think of other topics, please send them to
-> the
->>>> kernel summit discuss list:
->>>>
->>>> ksummit-2012-discuss at lists.linux-foundation.org
->>>>
->>>> Looking at the available rooms, we think we can run about four or
-> five
->>>> mini summits.
->>>>
->>>> As an added incentive, mini summit organisers get to pick who they
->>>> invite and all the people they pick will get an automatic invitation
-> to
->>>> the third day of the kernel summit (but not the core first day) and
-> the
->>>> evening events.
->>>
->>> There is a lot of interest in having another ARM mini-summit, as we had
->>> last
->>> year. Previously, Grant Likely organized this with Olof and me, but
->>> right now
->>> Grant is in an extended offline period and Olof is currently on
-> vacation
->>> as well. Will Deacon already contacted me and he is interested in
-> helping
->>> out with organizing the mini-summit, so the two of us could be the
->>> primary
->>> contacts, with Grant and Olof joining in as time permits.
->>>
->>> I'm planning to send out an initial email to potential participants
-> today
->>> or tomorrow to get an idea of who would be joining.
->>
->> I'm definitely interested in attending this.
+On 07/13/12 01:16, Mark Brown wrote:
+> On Thu, Jul 12, 2012 at 07:13:37PM +0530, Thomas Abraham wrote:
+>> On 12 July 2012 18:32, Mark Brown<broonie@opensource.wolfsonmicro.com>  wrote:
 >
-> Same here. The previous incarnation of the mini-summit was very
-> successful, and I would be very interested in attending another one.
+>>> Well, simple conflicts aren't that big a deal...  However, Thomas
+>>> mentioned that in order to test this he merged the SPI tree into your
+>>> tree so perhaps there is also a dependency on the SPI tree?  If that was
+>>> just for good practice testing then I agree that the best thing is to
+>>> merge via your tree, otherwise we might need to think harder.
 >
-> It's not like we're having any shortage of things to discuss these days...
-> ;-)
+>> There were no dependency on Grant's spi/next branch. It was merged
+>> just to ensure that nothing is broken.
 >
-+1 same here, I'm interested in ARM mini-summit :)
+> OK, great - then the Samsung tree it is.
+
+Thanks, will apply.
+
+Mark, if you want to add your ack or review on them, let me know.
 
 Thanks.
 
