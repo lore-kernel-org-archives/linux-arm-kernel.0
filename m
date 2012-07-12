@@ -1,112 +1,87 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 Jul 2012 10:31:08 +0200
-Subject: [PATCH 1/1 v2] MTD: atmel nand: fix gpio missing request
-In-Reply-To: <1342071036-15905-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1342071036-15905-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1342081868-5995-1-git-send-email-plagnioj@jcrosoft.com>
+From: keshava_mgowda@ti.com (Munegowda, Keshava)
+Date: Thu, 12 Jul 2012 14:03:40 +0530
+Subject: [PATCH] ARM: OMAP2+: omap2plus_defconfig: EHCI driver is not
+ stable, disable it
+In-Reply-To: <1341598828-31410-1-git-send-email-khilman@ti.com>
+References: <1341598828-31410-1-git-send-email-khilman@ti.com>
+Message-ID: <CAP05o4JVWPQjx4srob7jhBTepa8URX4tpOmLyNTpWdaw3pTQ3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-without this the gpio will not be muxed as a gpio by the current custom pinmux
-or later by the pinctrl
+On Fri, Jul 6, 2012 at 11:50 PM, Kevin Hilman <khilman@ti.com> wrote:
+> The EHCI driver is not stable enough to be enabled by default.  In v3.5,
+> it has at least the following problems:
+>
+> - warning dump during bootup
+> - hang during suspend
+> - prevents CORE powerdomain from entering retention during idle (even
+>   when no USB devices connected.)
+>
+> This demonstrates that this driver has not been thoroughly tested and
+> therfore should not be enabled in the default defconfig.
+>
+> In addition, the problems above cause new PM regressions which need be
+> addressed before this driver should be enabled in the default
+> defconfig.
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Tony, this applies to your current fixes branch.   Please queue up for v3.5-rc
+> so this PM regression is fixed in v3.5.  Thanks.
+>
+>  arch/arm/configs/omap2plus_defconfig |    1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 9854ff4..11828e6 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -176,7 +176,6 @@ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+>  CONFIG_USB_DEVICEFS=y
+>  CONFIG_USB_SUSPEND=y
+>  CONFIG_USB_MON=y
+> -CONFIG_USB_EHCI_HCD=y
+>  CONFIG_USB_WDM=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_LIBUSUAL=y
+> --
+> 1.7.9.2
+>
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-V2:
 
-	set the direction too
+hi Kevin
+   This patch is good. But , in  my earlier patch I was disabling the
+dependent configuration of ehci too.
 
-	today this is invisible as you mostly boot from nand and the
-	bootloader configured them but if you load the kernel via nor you need
-	to do it
+- CONFIG_USB=y
+                - removes the usb host  ( EHCI is the only host),
+hence keeping it enabled with ehci does not make sense for
+                        omap2 defconfig
 
-Best Regards,
-J.
- drivers/mtd/nand/atmel_nand.c |   56 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 55 insertions(+), 1 deletion(-)
+-CONFIG_USB_DEBUG=y
+                   - Enables the debug messages for usb host
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 97ac671..eef9f80 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -583,8 +583,39 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	nand_chip->IO_ADDR_W = host->io_base;
- 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
- 
--	if (gpio_is_valid(host->board.rdy_pin))
-+	if (gpio_is_valid(host->board.rdy_pin)) {
-+		res = gpio_request(host->board.rdy_pin, "nand_rdy");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
-+		res = gpio_direction_input(host->board.rdy_pin);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request input direction rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
- 		nand_chip->dev_ready = atmel_nand_device_ready;
-+	}
-+
-+	if (gpio_is_valid(host->board.enable_pin)) {
-+		res = gpio_request(host->board.enable_pin, "nand_enable");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
-+		res = gpio_direction_output(host->board.enable_pin, 1);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request output direction enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+	}
- 
- 	nand_chip->ecc.mode = host->board.ecc_mode;
- 
-@@ -622,6 +653,20 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	atmel_nand_enable(host);
- 
- 	if (gpio_is_valid(host->board.det_pin)) {
-+		res = gpio_request(host->board.det_pin, "nand_det");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
-+
-+		res = gpio_direction_input(host->board.det_pin);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request input direction det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
-+
- 		if (gpio_get_value(host->board.det_pin)) {
- 			printk(KERN_INFO "No SmartMedia card inserted.\n");
- 			res = -ENXIO;
-@@ -738,6 +783,15 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
- 
- 	atmel_nand_disable(host);
- 
-+	if (gpio_is_valid(host->board.det_pin))
-+		gpio_free(host->board.det_pin);
-+
-+	if (gpio_is_valid(host->board.enable_pin))
-+		gpio_free(host->board.enable_pin);
-+
-+	if (gpio_is_valid(host->board.rdy_pin))
-+		gpio_free(host->board.rdy_pin);
-+
- 	if (host->ecc)
- 		iounmap(host->ecc);
- 
--- 
-1.7.10
+-CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+-CONFIG_USB_DEVICEFS=y
+                    Announces the new devices attached to ehci; if usb
+host it self is not there, then we dont need it.
+
+-CONFIG_USB_SUSPEND=y
+                   - suspend resume of usb host; not required if ehci
+itself is not existing
+
+-CONFIG_USB_MON=y
+                   - usb monitor
+
+-CONFIG_USB_WDM=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_USB_LIBUSUAL=y
+-CONFIG_USB_TEST=y
+              - usb storage and test ; again dependent on ehci only in
+omap2plusdefconfig.
+
+for omap build, if you disabling ehci , its good have not include
+these modules; yet including these modules does not harm anything.
+
+regards
+keshava
