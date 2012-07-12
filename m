@@ -1,46 +1,58 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 11 Jul 2012 15:07:38 +0100
-Subject: [RFC PATCH 1/2] irq_domain: correct a minor wrong comment for
- linear revmap
-In-Reply-To: <1340182831-10477-1-git-send-email-b29396@freescale.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 12 Jul 2012 11:26:25 +0800
+Subject: [RFC PATCH 2/2] irq: add irq_desc_initialize to remove some
+ duplicated lines
+In-Reply-To: <alpine.LFD.2.02.1207120017590.32033@ionos>
 References: <1340182831-10477-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120711140738.ABA533E0E16@localhost>
+ <1340182831-10477-2-git-send-email-b29396@freescale.com>
+ <alpine.LFD.2.02.1207120017590.32033@ionos>
+Message-ID: <20120712032624.GC22640@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jun 2012 17:00:30 +0800, Dong Aisheng <b29396@freescale.com> wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> The revmap type should be linear for irq_domain_add_linear function.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Hi Thomas,
 
-Applied, thanks.
+Thanks for the review firstly.
 
-g.
+On Thu, Jul 12, 2012 at 06:19:18AM +0800, Thomas Gleixner wrote:
+> On Wed, 20 Jun 2012, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > There're two copies of irq_desc initialization code, reform them into
+> > an irq_desc_initialize function to call.
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > ---
+> >  kernel/irq/irqdesc.c |   51 +++++++++++++++++++++++++++----------------------
+> >  1 files changed, 28 insertions(+), 23 deletions(-)
+> 
+> We add more code by removing redundant copies?
+> 
+I also had this strange question.
+I looked the code a bit more, i guess the main problem is that the redundant copies
+is not too big, so we can not see great savings.
 
-> ---
->  kernel/irq/irqdomain.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 3e4ea85..cb83554 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -219,7 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
->  EXPORT_SYMBOL_GPL(irq_domain_add_legacy);
->  
->  /**
-> - * irq_domain_add_linear() - Allocate and register a legacy revmap irq_domain.
-> + * irq_domain_add_linear() - Allocate and register a linear revmap irq_domain.
->   * @of_node: pointer to interrupt controller's device tree node.
->   * @size: Number of interrupts in the domain.
->   * @ops: map/unmap domain callbacks
-> -- 
-> 1.7.0.4
-> 
-> 
+Compare to the init code of irq_desc in original alloc_desc function,
+the new irq_desc_initialize function saves 4 lines.
+However, the new function also add 4 lines for defining extra function name,
+parameter and etc.
+And alloc_desc still needs to call irq_desc_initialize and checking return value
+which needs extra 6 lines.
+The main saving is another copy of irq_desc initialization in early_irq_init,
+but this copy does not check any return values which cause we did not save too much,
+only about 4 lines.
+Plus extra blan lines added, so totally it does not save more than new added.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+However, i was thinking it could make code looks a bit better.
+So i sent out this RFC patch.
+Do you think if it's reasonable?
+
+BTW, there's an issue in my patch, should change like:
+        if (alloc_masks(desc, GFP_KERNEL, node)) {
+-               kfree(desc->kstat_irqs);
++               free_percpu(desc->kstat_irqs);
+                return -ENOMEM;
+        }
+
+Regards
+Dong Aisheng
