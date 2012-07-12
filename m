@@ -1,54 +1,73 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 12 Jul 2012 15:11:13 +0530
-Subject: [PATCHv3 8/9] ARM: OMAP3: prevent per_clkdm from attempting manual
- domain transitions
-In-Reply-To: <1338470942-20185-9-git-send-email-t-kristo@ti.com>
-References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
- <1338470942-20185-9-git-send-email-t-kristo@ti.com>
-Message-ID: <4FFE9BB9.7000209@ti.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Thu, 12 Jul 2012 17:48:46 +0800
+Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits
+ for general purpose registers
+In-Reply-To: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+Message-ID: <4FFE9D7E.1080302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 May 2012 06:59 PM, Tero Kristo wrote:
-> Previously, PER clock domain was always enabled, as the usecounts
-> for this domain incorrectly always showed positive value. On HW
-> level though, the domain enters idle as it is set in HW supervised
-> mode. Now, when the usecounts reflect real values, PER domain will
-> attempt to enter software supervised idle, which is not supported by the
-> hardware/kernel that well, and causes multiple problems. First of all,
-> coming back from idle, PER domain remains idle as the wakedeps have
-> been disabled for the domain, and this causes a crash with the GPIO
-> code, as the resume code attempts to access domain which is not active.
-> Just enabling the interface clocks for the GPIO does not help, as they
-> are autoidled and don't bring the domain out of idle. Secondly, there
-> are multiple erratas for omap3, which say that the wakedeps should be
-> enabled for the PER domain, see e.g. errata i582 for omap3630.
-
-If PER software supervised idle is so *buggy* then shouldn't the flags
-just reflect that PER *does not* support software supervised idle?
-Using a flag which reflects that the clkdm supports both hardware
-and software supervised idle ('CLKDM_CAN_HWSUP_SWSUP') and then using
-another one to actually skip putting it in software supervised sounds
-a little round about, no?
-Does updating the flag to 'CLKDM_CAN_HWSUP' also fix all the issues
-for you? without adding the additional 'CLKDM_SKIP_MANUAL_TRANS' flag.
-
+Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 >
-> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> The General Purpose Registers (GPR) is used to select operating modes for
+> general features in the SoC, usually not related to the IOMUX itself,
+> but it does belong to IOMUX controller.
+> We simply provide an convient API for driver to call to write/read the general
+> purpose register bits if needed.
+>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 > ---
->   arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
+> ChangeLog v1->v2:
+> * add gpr read api
+> * change api name a bit to *_write and *_read
+> * add -EPROBE_DEFER support
+> * define macros for gpr registers for imx6q
+> * change driver loadding priority to postcore_init at satisfy clients driver
+>   to use imx_pinctrl_gpr_{read | write} APIs at best
+> ---
+>  drivers/pinctrl/pinctrl-imx.c   |   29 ++++
+>  drivers/pinctrl/pinctrl-imx51.c |    2 +-
+>  drivers/pinctrl/pinctrl-imx53.c |    2 +-
+>  drivers/pinctrl/pinctrl-imx6q.c |    2 +-
+>  include/linux/fsl/imx-pinctrl.h |  340 +++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 372 insertions(+), 3 deletions(-)
+>  create mode 100644 include/linux/fsl/imx-pinctrl.h
 >
-> diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> index 6038adb..0dae4c8 100644
-> --- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> @@ -282,7 +282,7 @@ static struct clockdomain usbhost_clkdm = {
->   static struct clockdomain per_clkdm = {
->   	.name		= "per_clkdm",
->   	.pwrdm		= { .name = "per_pwrdm" },
-> -	.flags		= CLKDM_CAN_HWSUP_SWSUP,
-> +	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_SKIP_MANUAL_TRANS,
->   	.dep_bit	= OMAP3430_EN_PER_SHIFT,
->   	.wkdep_srcs	= per_wkdeps,
->   	.sleepdep_srcs	= per_sleepdeps,
+> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+> index 44e9726..1725e07 100644
+> --- a/drivers/pinctrl/pinctrl-imx.c
+> +++ b/drivers/pinctrl/pinctrl-imx.c
+> @@ -54,6 +54,34 @@ struct imx_pinctrl {
+>  	const struct imx_pinctrl_soc_info *info;
+>  };
+>  
+> +static struct imx_pinctrl *imx_pinctrl;
+> +/*
+> + * Set bits for general purpose registers
+> + */
+> +int imx_pinctrl_gpr_write(u8 gpr, u32 mask, u32 value)
+> +{
+> +	u32 reg;
+> +
+> +	if (!imx_pinctrl)
+> +		return -EPROBE_DEFER;
+> +
+> +	reg = readl(imx_pinctrl->base + gpr);
+> +	reg &= ~mask;
+> +	writel(reg | value, imx_pinctrl->base + gpr);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(imx_pinctrl_gpr_write);
+> +
+> +int imx_pinctrl_gpr_read(u8 gpr)
+> +{
+> +	if (!imx_pinctrl)
+> +		return -EPROBE_DEFER;
+> +
+> +	return readl(imx_pinctrl->base + gpr);
+>   
+Suppose the MSB of the register content is 1, how does the caller 
+distinguish if the function return an error or return a register content?
