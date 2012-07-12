@@ -1,51 +1,72 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 12 Jul 2012 17:08:00 +0800
-Subject: [PATCH v2 2/2] pinctrl: pinctrl-imx6q: add missed mux function for
- USBOTG_ID
-In-Reply-To: <1342084080-3145-1-git-send-email-b29396@freescale.com>
-References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
-Message-ID: <1342084080-3145-2-git-send-email-b29396@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 12 Jul 2012 18:19:53 +0900
+Subject: [PATCH 00/10] ARM: S3C24XX gpio cleanups and fixes
+In-Reply-To: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1341058142-30438-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <0fb401cd600f$7ef9f9e0$7cededa0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+Sylwester Nawrocki wrote:
+> 
+> This changset attempts to remove the users of an obsolete GPIO API in
+> Samsung S3C24XX platform and instead use the gpiolib API. It should
+> allow to drop some s3c24xx SoC specific headers as a next step and
+> simplify drivers/gpio/gpio-samsung.c driver a little. With the
+> introduction of the pinctrl GPIO driver we're going to have three
+> distinct GPIO APIs. Let's avoid this and drop the s3c24xx_gpio_*
+> functions, which have been scheduled for removal since about v2.6.35.
+> 
+> Additionally this changeset includes two minor fixes, for AC97 clock
+> and CAMIF interrupts.
+> 
+> 
+> Sylwester Nawrocki (10):
+>   ARM: S3C24XX: Free the backlight gpio requested in Mini2440 board code
+>   ARM: S3C24XX: Convert SMDK board file to the gpiolib API
+>   ARM: S3C24XX: Convert QT2410 board file to the gpiolib API
+>   ARM: S3C24XX: Convert the PM code to gpiolib API
+>   ARM: S3C24XX: Convert the touchscreen setup code to common GPIO API
+>   ARM: S3C24XX: Remove unused GPA, GPE, GPH bank GPIO aliases
+>   ARM: S3C24XX: Remove unused GPIO definitions for port J
+>   ARM: S3C24XX: Remove unused GPIO definitions for Openmoko GTA02 board
+>   ARM: S3C24XX: Correct AC97 clock control bit for S3C2440
+>   ARM: S3C24XX: Correct CAMIF interrupt definitions
+> 
+>  arch/arm/mach-s3c24xx/clock-s3c2440.c           |    2 +-
+>  arch/arm/mach-s3c24xx/common-smdk.c             |   20 ++++---
+>  arch/arm/mach-s3c24xx/include/mach/gpio-nrs.h   |   21 -------
+>  arch/arm/mach-s3c24xx/include/mach/gta02.h      |   69
+--------------------
+> --
+>  arch/arm/mach-s3c24xx/include/mach/regs-gpio.h  |   17 +++++-
+>  arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h |   70
+-------------------
+> ----
+>  arch/arm/mach-s3c24xx/mach-gta02.c              |    1 -
+>  arch/arm/mach-s3c24xx/mach-mini2440.c           |    4 +-
+>  arch/arm/mach-s3c24xx/mach-qt2410.c             |    6 +-
+>  arch/arm/mach-s3c24xx/mach-rx1950.c             |    1 -
+>  arch/arm/mach-s3c24xx/pm-s3c2410.c              |   12 +++-
+>  arch/arm/mach-s3c24xx/pm-s3c2412.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c2412.c                 |    1 -
+>  arch/arm/mach-s3c24xx/s3c244x.c                 |    1 -
+>  arch/arm/mach-s3c24xx/setup-ts.c                |    6 +--
+>  arch/arm/plat-samsung/devs.c                    |    3 +-
+>  16 files changed, 43 insertions(+), 192 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-gpioj.h
+> 
+> --
+> 1.7.4.1
 
-The original pin registers table is derived from u-boot mainline,
-but somehow it was found missing some mux functions for USBOTG_ID.
-We added it at the bottom by following the exist pin function ids,
-then it will not break the exist using of pin function id in dts file.
+Basically, looks ok to me :)
 
-Reported-by: Richard Zhao <richard.zhao@freescale.com>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
-ChangeLog v1->v2: No changes
----
- .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         |    2 ++
- drivers/pinctrl/pinctrl-imx6q.c                    |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+I need to check in detail then will apply this series with some guys' ack.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-index 82b43f9..a4119f6 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-@@ -1626,3 +1626,5 @@ MX6Q_PAD_SD2_DAT3__PCIE_CTRL_MUX_11		1587
- MX6Q_PAD_SD2_DAT3__GPIO_1_12			1588
- MX6Q_PAD_SD2_DAT3__SJC_DONE			1589
- MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3		1590
-+MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID		1591
-+MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID		1592
-diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
-index 6974238..4d9bc07 100644
---- a/drivers/pinctrl/pinctrl-imx6q.c
-+++ b/drivers/pinctrl/pinctrl-imx6q.c
-@@ -1950,6 +1950,8 @@ static struct imx_pin_reg imx6q_pin_regs[] = {
- 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 5, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__GPIO_1_12 */
- 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 6, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__SJC_DONE */
- 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 7, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3 */
-+	IMX_PIN_REG(MX6Q_PAD_ENET_RX_ER, 0x04EC, 0x01D8, 0, 0x0000, 0), /* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
-+	IMX_PIN_REG(MX6Q_PAD_GPIO_1, 0x05F4, 0x0224, 3, 0x0000, 0), /* MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID */
- };
- 
- /* Pad names for the pinmux subsystem */
--- 
-1.7.0.4
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
