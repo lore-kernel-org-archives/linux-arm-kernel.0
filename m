@@ -1,73 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 12 Jul 2012 09:39:12 -0500
-Subject: [PATCH v2] ARM: vexpress: remove automatic errata workaround
- selection
-In-Reply-To: <1342088236-12797-1-git-send-email-pawel.moll@arm.com>
-References: <1342013791-19516-2-git-send-email-pawel.moll@arm.com>
- <1342088236-12797-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <4FFEE190.9000502@gmail.com>
+From: attila@kinali.ch (Attila Kinali)
+Date: Thu, 12 Jul 2012 17:13:50 +0200
+Subject: mmc: mxs: DEADLOCK
+In-Reply-To: <20120712143950.GA16343@S2101-09.ap.freescale.net>
+References: <4FFC367A.8020100@bluegiga.com>
+ <20120711060607.GE14060@S2101-09.ap.freescale.net>
+ <20120712160008.03731746cdc5cf4bb0548256@kinali.ch>
+ <20120712143950.GA16343@S2101-09.ap.freescale.net>
+Message-ID: <20120712171350.011ee50f582c10f962ba1e48@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2012 05:17 AM, Pawel Moll wrote:
-> From: Will Deacon <will.deacon@arm.com>
-> 
-> The vexpress Kconfig setup tries to be clever^Whelpful and selects some
-> errata workarounds for certain revisions of the Cortex-A9 and PL310,
-> which may be required depending on the core tile.
-> 
-> Since the mach-vexpress can support A5, A7 and A15 coretiles, let's
-> make errata workaround selection optional.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  arch/arm/mach-vexpress/Kconfig |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> Hi Both,
-> 
-> Here it is. I've kept Will's Signed-off-by for now, but it seems to me
-> Rob should be signing this off. If you don't mind that I'll put Rob's
-> name in the final version for arm-soc folk.
+On Thu, 12 Jul 2012 22:39:53 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Well, Will wrote the commit message so both should be.
+> > 
+> > I ran into the same problem today, but the proposed fix doesn't seem
+> > to work for me:
+> > 
+> It's a different problem from what Lauri reported and fixed.  
 
-Rob
+Ok... 
 
-> 
-> Cheers!
-> 
-> Pawel
-> 
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index cf8730d..fc3730f 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -2,7 +2,8 @@ menu "Versatile Express platform type"
->  	depends on ARCH_VEXPRESS
->  
->  config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
-> -	bool
-> +	bool "Enable A5 and A9 only errata work-arounds"
-> +	default y
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_751472
->  	select PL310_ERRATA_753970 if CACHE_PL310
-> @@ -14,7 +15,6 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
->  
->  config ARCH_VEXPRESS_CA9X4
->  	bool "Versatile Express Cortex-A9x4 tile"
-> -	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
->  	select ARM_GIC
->  	select CPU_V7
->  	select HAVE_SMP
-> @@ -22,7 +22,6 @@ config ARCH_VEXPRESS_CA9X4
->  
->  config ARCH_VEXPRESS_DT
->  	bool "Device Tree support for Versatile Express platforms"
-> -	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
->  	select ARM_GIC
->  	select ARM_PATCH_PHYS_VIRT
->  	select AUTO_ZRELADDR
-> 
+> I haven't
+> played SDIO card that much, so I'm not completely clear about the SDIO
+> calling sequence, but is it reasonable that mxs_mmc_enable_sdio_irq is
+> being called recursively?
+
+I don't know. I dont know the code at all and not how the sdio system
+works. But a quick check shows, that mxs_mmc_enable_sdio_irq does not
+call any other function (besides readel, writel) and hence cannot call itself.
+
+For me it rather looks like that there seem to be two consequtive
+irqs that get passed to sdio_irq_thread which then calls 
+mxs_mmc_enable_sdio_irq.
+
+But with my limited knowledge i cannot check this theory.
+Can anyone give me some hints how i could verify this?
+
+			Attila Kinali
+
+-- 
+The trouble with you, Shev, is you don't say anything until you've saved
+up a whole truckload of damned heavy brick arguments and then you dump
+them all out and never look at the bleeding body mangled beneath the heap
+		-- Tirin, The Dispossessed, U. Le Guin
