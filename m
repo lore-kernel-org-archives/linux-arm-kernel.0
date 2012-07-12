@@ -1,80 +1,43 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 11 Jul 2012 16:42:29 -0700
-Subject: [PATCH] clk: allow clocks without parents to change rate
-In-Reply-To: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
-References: <1341439772-649-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120711234229.GF2772@gmail.com>
+Date: Wed, 11 Jul 2012 17:11:34 -0700
+Subject: [PATCH 3/9] ARM: versatile: Make plat-versatile clock optional
+In-Reply-To: <CACRpkdYiW8C298K3uPzfJrq09vs-r90brMT_imgz54KtP4Xqsw@mail.gmail.com>
+References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
+ <1342013791-19516-4-git-send-email-pawel.moll@arm.com>
+ <CACRpkdYiW8C298K3uPzfJrq09vs-r90brMT_imgz54KtP4Xqsw@mail.gmail.com>
+Message-ID: <20120712001134.GG2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120705-00:09, Linus Walleij wrote:
-> The clk_change_rate() code would dereference clk->parent
-> to get clk->parent->rate without first checking that clk->parent
-> was valid. This doesn't work if the clock is (A) a root clock
-> and (B) can change rate. Such is the case with a VCO clock
-> like the ICST which consequently crash like this without
-> this patch:
+On 20120711-18:43, Linus Walleij wrote:
+> On Wed, Jul 11, 2012 at 3:36 PM, Pawel Moll <pawel.moll@arm.com> wrote:
 > 
-> Unable to handle kernel NULL pointer dereference at virtual address 0000001c
-> pgd = c0004000
-> [0000001c] *pgd=00000000
-> Internal error: Oops: 5 [#1] PREEMPT ARM
-> Modules linked in:
-> CPU: 0    Not tainted  (3.5.0-rc3-00003-g8156866-dirty #193)
-> PC is at clk_change_rate+0x34/0xd8
-> LR is at clk_change_rate+0x18/0xd8
+> > ... in preparation for common clock coming for Integrator
+> > and Versatile Express.
+> >
+> > Based on Linus Walleij's "ARM: integrator: convert to common
+> > clock" patch.
+> >
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > 
-> Cc: stable at kernel.org
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> I think Mike is already queueing my patch, so if you're changing
+> anything you should build on top of that and submit it to the
+> clk tree.
+> 
+> Mike, is the Integrator patches making it into your for-next branch?
+> 
 
-Hi Linus,
+They are there locally and will be pushed in the next hour.
 
-This has been fixed in Pawell's patch, "clk: Check parent for NULL in
-clk_change_rate".
+> The merge window is closing in you know...
+> 
 
-Thanks,
+Oh I'm well aware.  I ended up rebasing clk-3.6 (sigh) so that it would
+be on top v3.5-rc6 and pull in the clk-fixes stuff that way.  But this
+way I'm getting all of my ducks in a row for the 3.6 merge window.
+
+Regards,
 Mike
 
-> ---
->  drivers/clk/clk.c |   22 +++++++++++++++-------
->  1 file changed, 15 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 687b00d..032d79c 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -854,14 +854,22 @@ static void clk_change_rate(struct clk *clk)
->  
->  	old_rate = clk->rate;
->  
-> -	if (clk->ops->set_rate)
-> -		clk->ops->set_rate(clk->hw, clk->new_rate, clk->parent->rate);
-> +	if (clk->ops->set_rate) {
-> +		if (clk->parent)
-> +			clk->ops->set_rate(clk->hw, clk->new_rate,
-> +					clk->parent->rate);
-> +		else
-> +			clk->ops->set_rate(clk->hw, clk->new_rate, 0);
-> +	}
->  
-> -	if (clk->ops->recalc_rate)
-> -		clk->rate = clk->ops->recalc_rate(clk->hw,
-> -				clk->parent->rate);
-> -	else
-> -		clk->rate = clk->parent->rate;
-> +	if (clk->ops->recalc_rate) {
-> +		if (clk->parent)
-> +			clk->rate = clk->ops->recalc_rate(clk->hw,
-> +							clk->parent->rate);
-> +		else
-> +			clk->rate = clk->ops->recalc_rate(clk->hw, 0);
-> +	} else
-> +		clk->rate = clk->parent ? clk->parent->rate : 0;
->  
->  	if (clk->notifier_count && old_rate != clk->rate)
->  		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
-> -- 
-> 1.7.10.4
-> 
+> Yours,
+> Linus Walleij
