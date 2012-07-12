@@ -1,119 +1,25 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 12 Jul 2012 10:25:25 +0800
-Subject: [PATCH v7 4/6] ARM: dts: imx6q-sabrelite: add usb devices
-In-Reply-To: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
-References: <1342059927-25661-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1342059927-25661-5-git-send-email-richard.zhao@freescale.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Wed, 11 Jul 2012 23:47:13 -0300
+Subject: [PATCH v6 3/7] ARM: imx6q: disable usb charger detector
+In-Reply-To: <20120712020646.GG6971@S2101-09.ap.freescale.net>
+References: <1342006425-21008-1-git-send-email-richard.zhao@freescale.com>
+ <1342006425-21008-4-git-send-email-richard.zhao@freescale.com>
+ <20120712020646.GG6971@S2101-09.ap.freescale.net>
+Message-ID: <CAP9ODKoBwxqk6yLsw=nZ272nrHCX9u3xkwWUEaNANrV-Zp5FOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add usbphy devices
-- add usb host controller and otg devices
-- add usb h1 vbus regulator
+On Wed, Jul 11, 2012 at 11:06 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+...
+>> +     np = of_find_node_by_path("/soc/aips-bus at 02000000/anatop at 020c8000");
+>
+> I would suggest use of_find_compatible_node to save the open-coding of
+> such path.
+...
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |   19 ++++++++++++++++-
- arch/arm/boot/dts/imx6q.dtsi          |   36 +++++++++++++++++++++++++++++++--
- 2 files changed, 52 insertions(+), 3 deletions(-)
+Nice catch!
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index e0ec929..e72b6b3 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -41,10 +41,18 @@
- 					status = "okay";
- 				};
- 			};
--
- 		};
- 
- 		aips-bus at 02100000 { /* AIPS2 */
-+			usb at 02184000 { /* USB OTG */
-+				vbus-supply = <&reg_usb_otg_vbus>;
-+				status = "okay";
-+			};
-+
-+			usb at 02184200 { /* USB1 */
-+				status = "okay";
-+			};
-+
- 			ethernet at 02188000 {
- 				phy-mode = "rgmii";
- 				phy-reset-gpios = <&gpio3 23 0>;
-@@ -111,6 +119,15 @@
- 			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
-+
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 22 0>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	sound {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 16a3884..5e4f100 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -461,12 +461,14 @@
- 				};
- 			};
- 
--			usbphy at 020c9000 { /* USBPHY1 */
-+			usbphy1: usbphy at 020c9000 {
-+				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 			};
- 
--			usbphy at 020ca000 { /* USBPHY2 */
-+			usbphy2: usbphy at 020ca000 {
-+				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 			};
-@@ -614,6 +616,36 @@
- 				reg = <0x0217c000 0x4000>;
- 			};
- 
-+			usb at 02184000 { /* USB OTG */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184000 0x200>;
-+				interrupts = <0 43 0x04>;
-+				fsl,usbphy = <&usbphy1>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184200 { /* USB1 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184200 0x200>;
-+				interrupts = <0 40 0x04>;
-+				fsl,usbphy = <&usbphy2>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184400 { /* USB2 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184400 0x200>;
-+				interrupts = <0 41 0x04>;
-+				status = "disabled";
-+			};
-+
-+			usb at 02184600 { /* USB3 */
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x02184600 0x200>;
-+				interrupts = <0 42 0x04>;
-+				status = "disabled";
-+			};
-+
- 			ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
 -- 
-1.7.9.5
+Otavio Salvador                             O.S. Systems
+E-mail: otavio at ossystems.com.br  http://www.ossystems.com.br
+Mobile: +55 53 9981-7854              http://projetos.ossystems.com.br
