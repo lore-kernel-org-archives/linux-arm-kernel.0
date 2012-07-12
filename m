@@ -1,61 +1,113 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 12 Jul 2012 14:58:06 +0100
-Subject: [Ksummit-2012-discuss] ARM mini-summit
-In-Reply-To: <061ef00be9b475973e5df22fcd096308@localhost>
-References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
- <20120711140536.GC16523@phenom.dumpdata.com>
- <CAPbh3rsnNNFNWEf651M-mO2UFOK8pFYTMV2x7RPhjHOAyf9OJw@mail.gmail.com>
- <201207112006.28632.arnd@arndb.de>
- <061ef00be9b475973e5df22fcd096308@localhost>
-Message-ID: <alpine.DEB.2.02.1207121432260.23783@kaball.uk.xensource.com>
+From: attila@kinali.ch (Attila Kinali)
+Date: Thu, 12 Jul 2012 16:00:08 +0200
+Subject: mmc: mxs: DEADLOCK
+In-Reply-To: <20120711060607.GE14060@S2101-09.ap.freescale.net>
+References: <4FFC367A.8020100@bluegiga.com>
+ <20120711060607.GE14060@S2101-09.ap.freescale.net>
+Message-ID: <20120712160008.03731746cdc5cf4bb0548256@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jul 2012, Marc Zyngier wrote:
-> On Wed, 11 Jul 2012 20:06:28 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 11 July 2012, Konrad Rzeszutek Wilk wrote:
-> >> >> > contacts, with Grant and Olof joining in as time permits.
-> >> >>
-> >> >> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> >> >
-> >> > I would be interested in attending it as well. I believe Stefano has
-> a
-> >> > strong
-> >> > interest as well (since he and Ian Campbell are leading the Xen ARM
-> >> > work).
-> >> 
-> >> And Stefano is out on vacation right now so I will serve as his phantom
-> >> voice
-> >> and say: "Yes, I am interested as well."
+On Wed, 11 Jul 2012 14:06:09 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
+
+
+> > I found a way to fix this issue:
 > > 
-> > Ok. So are you mostly interested in discussion ARM virtualization or
-> other
-> > topics
-> > as well? Last time we had organized this explicitly as the "ARM subarch
-> > maintainer
-> > summit" and we might again limit the participants to the subarch
-> > maintainers and
-> > a few more people if we're running out of space, but then again if a lot
-> > of them
-> > are interested in discussion virtualization, we should probably have you
-> > both and 
-> > the ARM KVM people included as well.
+> > --- a/drivers/mmc/host/mxs-mmc.c
+> > +++ b/drivers/mmc/host/mxs-mmc.c
+> > @@ -278,11 +278,11 @@ static irqreturn_t mxs_mmc_irq_handler(int
+> > irq, void *dev_id)
+> >  	writel(stat & MXS_MMC_IRQ_BITS,
+> >  	       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_CLR);
 > > 
-> > We haven't even started discussing an agenda, but I'll note down your
-> > names as
-> > candidates and Xen and/or KVM as proposed topics. I'll follow up with a
-> > more
-> > formal call for topics once I have a positive confirmation from James
-> and
-> > the
-> > linux-foundation that we can go ahead with the ARM mini-summit.
+> > +	spin_unlock(&host->lock);
+> > +
+> >  	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
+> >  		mmc_signal_sdio_irq(host->mmc);
+> > 
+> > -	spin_unlock(&host->lock);
+> > -
+> >  	if (stat & BM_SSP_CTRL1_RESP_TIMEOUT_IRQ)
+> >  		cmd->error = -ETIMEDOUT;
+> >  	else if (stat & BM_SSP_CTRL1_RESP_ERR_IRQ)
+> > 
+> > 
+> > Is there any reason to keep mmc_signal_sdio_irq inside the spinlock?
+> > mmc_signal_sdio_irq calls mxs_mmc_enable_sdio_irq and it tries to
+> > acquire lock while it is already acquired.
+> > 
+> The fix looks right to me.  You can have my ack when you send a patch
+> for it.
 > 
-> Putting on my KVM/ARM hacker hat this time: I'd be very glad to contribute
-> to the discussion. There is a number of ARM-specific topics that would be
-> interesting to discuss regarding KVM/ARM (mainlining the damn thing, common
-> hypercalls?, HYP mode booting), and probably a couple of other things.
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
+I ran into the same problem today, but the proposed fix doesn't seem
+to work for me:
 
-That's right: the hypercall calling convention, notifications from the
-hypervisor via GIC, the boot process and device tree for virtual
-hardware are all interesting topics to discuss.
+---schnipp---
+# modprobe libertas_sdio
+[   59.200000] lib80211: common routines for IEEE802.11 drivers
+[   59.240000] cfg80211: Calling CRDA to update world regulatory domain
+[   59.320000] libertas_sdio: Libertas SDIO driver
+[   59.330000] libertas_sdio: Copyright Pierre Ossman
+# modprobe mxs-mmc
+[   64.210000] mxs-mmc 80010000.ssp: initialized
+[   64.260000] mxs-mmc 80034000.ssp: initialized
+[   64.270000] mmc0: new SDIO card at address 0001
+# [   65.440000] libertas_sdio mmc0:0001:1: (unregistered net_device): 00:13:04:80:00:3f, fw 9.70.3p24, cap 0x00000303
+[   65.470000] 
+[   65.470000] =============================================
+[   65.470000] [ INFO: possible recursive locking detected ]
+[   65.470000] 3.5.0-rc5 #2 Not tainted
+[   65.470000] ---------------------------------------------
+[   65.470000] ksdioirqd/mmc0/73 is trying to acquire lock:
+[   65.470000]  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
+[   65.470000] 
+[   65.470000] but task is already holding lock:
+[   65.470000]  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
+[   65.470000] 
+[   65.470000] other info that might help us debug this:
+[   65.470000]  Possible unsafe locking scenario:
+[   65.470000] 
+[   65.470000]        CPU0
+[   65.470000]        ----
+[   65.470000]   lock(&(&host->lock)->rlock#2);
+[   65.470000]   lock(&(&host->lock)->rlock#2);
+[   65.470000] 
+[   65.470000]  *** DEADLOCK ***
+[   65.470000] 
+[   65.470000]  May be due to missing lock nesting notation
+[   65.470000] 
+[   65.470000] 1 lock held by ksdioirqd/mmc0/73:
+[   65.470000]  #0:  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
+[   65.470000] 
+[   65.470000] stack backtrace:
+[   65.470000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c005ccb8>] (__lock_acquire+0x14f8/0x1b98)
+[   65.470000] [<c005ccb8>] (__lock_acquire+0x14f8/0x1b98) from [<c005d3f8>] (lock_acquire+0xa0/0x108)
+[   65.470000] [<c005d3f8>] (lock_acquire+0xa0/0x108) from [<c02f671c>] (_raw_spin_lock_irqsave+0x48/0x5c)
+[   65.470000] [<c02f671c>] (_raw_spin_lock_irqsave+0x48/0x5c) from [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc])
+[   65.470000] [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]) from [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc])
+[   65.470000] [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc]) from [<c0219b38>] (sdio_irq_thread+0x1bc/0x274)
+[   65.470000] [<c0219b38>] (sdio_irq_thread+0x1bc/0x274) from [<c003c324>] (kthread+0x8c/0x98)
+[   65.470000] [<c003c324>] (kthread+0x8c/0x98) from [<c00101ac>] (kernel_thread_exit+0x0/0x8)
+[   65.470000] BUG: spinlock lockup suspected on CPU#0, ksdioirqd/mmc0/73
+[   65.470000]  lock: 0xc3358724, .magic: dead4ead, .owner: ksdioirqd/mmc0/73, .owner_cpu: 0
+[   65.470000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c01b46b0>] (do_raw_spin_lock+0x100/0x144)
+[   65.470000] [<c01b46b0>] (do_raw_spin_lock+0x100/0x144) from [<c02f6724>] (_raw_spin_lock_irqsave+0x50/0x5c)
+[   65.470000] [<c02f6724>] (_raw_spin_lock_irqsave+0x50/0x5c) from [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc])
+[   65.470000] [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]) from [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc])
+[   65.470000] [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc]) from [<c0219b38>] (sdio_irq_thread+0x1bc/0x274)
+[   65.470000] [<c0219b38>] (sdio_irq_thread+0x1bc/0x274) from [<c003c324>] (kthread+0x8c/0x98)
+[   65.470000] [<c003c324>] (kthread+0x8c/0x98) from [<c00101ac>] (kernel_thread_exit+0x0/0x8)
+---schnapp---
+
+Any hints how to work around or fix this, would be appreciated
+
+			Attila Kinali
+
+-- 
+It is upon moral qualities that a society is ultimately founded. All 
+the prosperity and technological sophistication in the world is of no 
+use without that foundation.
+                 -- Miss Matheson, The Diamond Age, Neil Stephenson
