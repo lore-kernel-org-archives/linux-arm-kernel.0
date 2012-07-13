@@ -1,45 +1,60 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 13 Jul 2012 18:18:34 +0530
-Subject: [PATCH] ARM: OMAP4: sleep: Save the complete used register stack frame
-Message-ID: <1342183715-13734-1-git-send-email-santosh.shilimkar@ti.com>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Fri, 13 Jul 2012 09:51:29 -0300
+Subject: [PATCH 2/2] mtd: lpc32xx_mlc: Adjust to pl08x DMA interface
+ changes
+In-Reply-To: <1342095778-13403-3-git-send-email-stigge@antcom.de>
+References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
+ <1342095778-13403-3-git-send-email-stigge@antcom.de>
+Message-ID: <CAAAP30GxeXHfeZZchYzSjBQXfkS+o+sabAU5iy8uBxiSoO87hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 sleep entry code even though itself don't use many CPU registers
-makes call to the v7_flush_dcache_all() which uses them. Since
-v7_flush_dcache_all() doesn't make use of stack, the caller must take
-care of the stack frame. Otherwise it will lead to corrupted stack frame.
+On Thu, Jul 12, 2012 at 9:22 AM, Roland Stigge <stigge@antcom.de> wrote:
+> This patch adjusts the LPC32xx MLC NAND driver to the new pl08x DMA interface,
+> fixing the compile error resulting from changed pl08x structures.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Fix it by saving used registers.
+Acked-By: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/sleep44xx.S |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-index 9f6b83d..b5823e9 100644
---- a/arch/arm/mach-omap2/sleep44xx.S
-+++ b/arch/arm/mach-omap2/sleep44xx.S
-@@ -58,7 +58,7 @@ ppa_por_params:
-  * CPU failed to transition to targeted OFF/DORMANT state.
-  */
- ENTRY(omap4_finish_suspend)
--	stmfd	sp!, {lr}
-+	stmfd	sp!, {r4-r12, lr}
- 	cmp	r0, #0x0
- 	beq	do_WFI				@ No lowpower state, jump to WFI
- 
-@@ -226,7 +226,7 @@ scu_gp_clear:
- skip_scu_gp_clear:
- 	isb
- 	dsb
--	ldmfd	sp!, {pc}
-+	ldmfd	sp!, {r4-r12, pc}
- ENDPROC(omap4_finish_suspend)
- 
- /*
--- 
-1.7.9.5
+> ---
+>
+> Applies to today's linux-next (integrated lpc32xx-next and dma branches which collide)
+>
+>  drivers/mtd/nand/lpc32xx_mlc.c |   13 +------------
+>  1 file changed, 1 insertion(+), 12 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+> index 260b2c2..1cf3593 100644
+> --- a/drivers/mtd/nand/lpc32xx_mlc.c
+> +++ b/drivers/mtd/nand/lpc32xx_mlc.c
+> @@ -576,17 +576,6 @@ static void lpc32xx_ecc_enable(struct mtd_info *mtd, int mode)
+>         /* Always enabled! */
+>  }
+>
+> -static bool lpc32xx_dma_filter(struct dma_chan *chan, void *param)
+> -{
+> -       struct pl08x_dma_chan *ch =
+> -               container_of(chan, struct pl08x_dma_chan, chan);
+> -
+> -       /* In LPC32xx's PL080 DMA wiring, the MLC NAND DMA signal is #12 */
+> -       if (ch->cd->min_signal == 12)
+> -               return true;
+> -       return false;
+> -}
+> -
+>  static int lpc32xx_dma_setup(struct lpc32xx_nand_host *host)
+>  {
+>         struct mtd_info *mtd = &host->mtd;
+> @@ -594,7 +583,7 @@ static int lpc32xx_dma_setup(struct lpc32xx_nand_host *host)
+>
+>         dma_cap_zero(mask);
+>         dma_cap_set(DMA_SLAVE, mask);
+> -       host->dma_chan = dma_request_channel(mask, lpc32xx_dma_filter, NULL);
+> +       host->dma_chan = dma_request_channel(mask, pl08x_filter_id, "nand-mlc");
+>         if (!host->dma_chan) {
+>                 dev_err(mtd->dev.parent, "Failed to request DMA channel\n");
+>                 return -EBUSY;
+> --
+> 1.7.10.4
+>
