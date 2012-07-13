@@ -1,60 +1,38 @@
-From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarh)
-Date: Fri, 13 Jul 2012 11:42:20 +0200
-Subject: [RESEND PATCH 1/1] clk: add DT support for clock gating control
-In-Reply-To: <4FFF93DC.30103@gmail.com>
-References: <4FFE7979.4060000@googlemail.com> <4FFEBF8A.1020700@gmail.com>
- <4FFECC4E.4070001@googlemail.com> <4FFF93DC.30103@gmail.com>
-Message-ID: <4FFFED7C.9050406@googlemail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 13 Jul 2012 15:05:00 +0530
+Subject: [PATCH 0/2] PWM driver support for EHRPWM & ECAP
+Message-ID: <1342172102-30363-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 05:19 AM, Rob Herring wrote:
-> What's implemented in Linux should not define the binding. The binding
-> should describe the hardware.
-> [...]
-> True, but not your problem to implement. A binding doesn't necessarily
-> mean there is a full Linux implementation. We just don't want to create
-> something only to find others need something completely different.
+This patch series adds support for PWM driver support for EHRPWM
+and ECAP modules which has been present on AM335x SOC. AM335X SOC has 3
+instances of ECAP & EHRPWM.
 
-Ok, what about a DT describing the following for a simple register-based
-clock gating controller and the corresponding gated-clock independent of
-the controller. I am sure there are a bunch of SoCs out there that
-control their clock gates by writing some bits to a register. If that
-DT description matches your expectations, I ll prepare patches with
-documentation and implementation for common clock framework.
+EHRPWM device can be used to generate PWM waveforms. It has 2 channels of PWM
+output and each can be configured for different duty cycle and polarity.
 
-Sebastian
+ECAP device can be used as either Capture or APWM mode. In APWM mode, ECAP
+can generate PWM waveform.
 
---
-  /* Simple clock gating controller based on bitmasks and register */
-cgc: clock-gating-control at f1000000 {
-   compatible = "clock-gating-control-register";
-   reg = <0xf1000000 0x4>;
+Patch #1 adds Generic PWM driver support for simple APWM functionality of ECAP
+ECAP hardware.
 
-   /* Clock gating control with one bit at bit position 0
-      enable with (1<<0), disable with (0<<0) */
-   cgctrl_usb0: cgc_usb0 {
-     clock-gating-control,shift = <0>;
-     clock-gating-control,mask = <1>;
-     clock-gating-control,enable = <1>;
-     clock-gating-control,disable = <0>;
-   };
+Patch #2 adds  PWM driver support for EHRPWM device.
 
-   /* Clock gating control with two bits at bit position 1-2
-      enable with (2<<1), disable with (0<<1) */
-   cgctrl_sata: cgc_sata {
-     clock-gating-control,shift = <1>;
-     clock-gating-control,mask = <3>;
-     clock-gating-control,enable = <2>;
-     clock-gating-control,disable = <0>;
-   };
-};
+This patch series is based on new PWM framework maintained at [1].
 
-/* Generic clock gate description that can be used with
-    any clock gating controller */
-cg_usb0: clockgate at 0 {
-   compatible = "gated-clock";
-   #clock-cells = <0>;
-   clocks = <&osc>;
-   clock-gate-control = <&cgctrl_usb0>;
-};
+1. https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+2. http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104483.html
+
+Philip, Avinash (2):
+  PWM: ECAP: PWM driver support for ECAP APWM.
+  PWM: EHRPWM: PWM driver support for EHRPWM.
+
+ drivers/pwm/Kconfig      |   22 ++
+ drivers/pwm/Makefile     |    2 +
+ drivers/pwm/pwm-ecap.c   |  255 +++++++++++++++++++++++++
+ drivers/pwm/pwm-ehrpwm.c |  476 ++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 755 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/pwm/pwm-ecap.c
+ create mode 100644 drivers/pwm/pwm-ehrpwm.c
