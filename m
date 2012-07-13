@@ -1,106 +1,71 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 13 Jul 2012 15:00:25 -0600 (MDT)
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <500028B3.1040309@ti.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com>
-Message-ID: <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 13 Jul 2012 23:52:36 +0200 (CEST)
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1342161907.1726.26.camel@vkoul-udesk3>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201206262027.47817.arnd@arndb.de> <1340804708.1562.253.camel@vkoul-udesk3>
+ <201206271520.49276.arnd@arndb.de> <1342161907.1726.26.camel@vkoul-udesk3>
+Message-ID: <Pine.LNX.4.64.1207132335110.5711@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon
+Hi Vinod
 
-On Fri, 13 Jul 2012, Jon Hunter wrote:
+On Fri, 13 Jul 2012, Vinod Koul wrote:
 
-> On 07/12/2012 04:17 PM, Paul Walmsley wrote:
-> > On Thu, 7 Jun 2012, Jon Hunter wrote:
-> > 
-> > Hmm, it would be nice if we could keep the CLKDM_CAN_* flags matching the 
-> > hardware capabilities.  Looking at the 4430 TRM Rev X Table 3-744 
-> > "CM_EMU_CLKSTCTRL", the CLKTRCTRL field isn't documented as supporting the 
-> > SW_SLEEP mode (which CLKDM_CAN_FORCE_SLEEP will set).
+> On Wed, 2012-06-27 at 15:20 +0000, Arnd Bergmann wrote:
+
+[snip]
+
+> > Do you mean there must be a global table, or are you ok with putting
+> > the information about a channel into the device that uses the channel,
+> > as we do for most other subsystems (IRQ, GPIO, pinctrl, ...).
+> > If not, what is the problem with that approach?
 > 
-> Right, however, this was part of the recommendation from Benoit. In
-> patch #7 of this series we actually made the following modification ...
-
-[ ... ]
-
-> So now, by setting CLKDM_CAN_FORCE_SLEEP we are actually enabling
-> HW_AUTO and not SW_SLEEP (for OMAP4). This was the purpose of patch #7
-> was to remove the SW_SLEEP for OMAP4 as it is equivalent to HW_AUTO when
-> using it to disable the module. 
-
-OK, that's right.
-
-> Unfortunately, although this works it does make the flags a bit less 
-> clearer. The upside is the solution is simpler.
-
-Yeah, the problem is the clockdomain CLKDM_CAN_* flags are just intended 
-to represent the available bits from the register bitfield, rather than a 
-higher-level concept.  Among other things, it allows the maintainers and 
-users of this code to verify it by comparing it to the TRM.  Changing the 
-CLKDM_CAN_* flags in the kernel is not actually that simple since it 
-involves overriding the hardware data for the EMU clockdomain for every 
-applicable chip.  In other words, it just moves the complexity 
-elsewhere.
-
-> I am not sure if it is really a matter of the clock domain missing the
-> idle reporting, but more of a problem that the EMU power domain power
-> state is programmed in HW to OFF and cannot be changed by software. (see
-> POWER_STATE field of PM_EMU_PWRSTCTRL register description in the TRM).
+> Today, we simple ask, "give me dma channel with DMA_SLAVE capability".
 > 
-> This means that when the EMU clock domain does idle, the EMU power
-> domain can transition to OFF and hence we loss the EMU logic context. So
-> we need to keep the EMU CLKDM on to keep the EMU PWRDM on, but it is
-> really the lack of control we have over the PWRDM that is the problem. I
-> would not say this is a HW bug but more of a design choice probably to
-> keep the design simpler at the expense of power.
+> If we change it to "give me dma channel which suits my need" and have
+> additional information in dmaengine to handle this request effectively.
+> 
+> What that would mean is
+> a) DMA channel either knows which channel to provide, Or
+> b) Additional arguments provided to dmaengine API to help it find out
+> which channel to provide.
+> 
+> It would be good to have client ask for a specific channel. But in order
+> to build generic clients, we face a problem that clients may not know
+> how they mapped to dmac by SoC designer. Or the mux maybe entirely
+> flexible on which channel.
+> 
+> If we add this as DT property (which I assume should be platform
+> specific), then client will know which channel to request.
+> It can have two levels, dmac and channel. In case mux is flexible enough
+> then client gets a channel and program the mux for this mapping.
+> 
+> I think this is the most simplistic solution I have for this, thoughts?
 
-I really wonder how much more difficult it would have been to add the 
-ON state to the EMU powerdomain next-power-state control bitfields...
+How about this my idea:
 
-> I believe that this problem would happen to all power domains if they
-> were programmed for the OFF power state when the clock domain idled. For
-> other power domains we avoid this by programming them to the ON state
-> when we are using them.
+http://thread.gmane.org/gmane.linux.ports.arm.omap/75828/focus=15501
 
-Hmm.  In the case of most other clockdomains, we have some way to indicate 
-to the PRCM whether the IP block/clock is in use or not: functional clock 
-control bits or modulemode control bits or CLKACTIVITY bits or (in the 
-worst case) SIDLEMODE bits.  We don't really have any of these control 
-mechanisms for most of the EMU clockdomain IP blocks/clocks.
+A small correction to it would be, that it shouldn't (necessarily) be a 
+separate driver, because in some cases the mux resides on the DMAC, they 
+share registers, so, it shouldn't really be a separate device and a 
+separate driver, don't think it's worth an MFD set up or anything similar. 
+So, I am trying ATM to implement something along the lines of
 
->From a theoretical perspective, assigning the problem solely to the 
-powerdomain next-power-state bits might also ignore the impact on 
-clockdomain dependencies.  These take effect based on the clockdomain 
-activity state, rather than powerdomain next-power-states.  Although, for 
-the specific case of the EMU clockdomains on OMAP3/4, it looks like this 
-is not a practical problem according to the TRM.
+struct dma_chan *dma_request_slave_channel(struct device *dev,
+		enum dma_transfer_direction direction, const char *name);
 
-> Thanks for the detailed suggestion! Adding a flag to prevent programming
-> the HW_AUTO while the CLKDM is active could definitely work (although I
-> may change the name/description of the flag a little).
+The connection between clients and the mux is always static, so, the 
+dmaengine core can always just pass to the mux a client-side "pad" 
+specifier (dev + direction + (optionally) name). The mux call-back will 
+then see, where it can connect that pad and return a suitable channel 
+descriptor - possibly with the help of the DMAC driver proper.
 
-Sure, let me know what you think of the above reasoning.
-
-> Another proposal I also thought of is re-working the flags to describe
-> the HW mode to be used when turning on the CLKDM, when the CLKDM is
-> active and when the CLKDM is shut down. So instead of saying what modes
-> the CLKDM supports, specify what modes should be used for pre-ON (i.e.
-> turn ON), ON and OFF. Right now software is trying to decide for us by
-> what is available (which is ideal) but makes working around such nuances
-> a little more painful.
-
-With the hardware data, it would be good to keep it something that can be 
-generated with as little human intervention as possible, except in the 
-case of bug workarounds or departures from standard practice.  The idea is 
-to reduce the amount of human interaction needed to generate data to 
-support new chips, when everything works as it should.  It also allows us 
-software forks to explicitly mark unusual quirks or bugs that we'd like 
-the hardware people to change for future revisions :-)
-
-
-- Paul
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
