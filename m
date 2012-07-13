@@ -1,67 +1,64 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Fri, 13 Jul 2012 05:14:21 -0500
-Subject: [PATCH v2] ARM: OMAP4: twl-common: Support for additional devices
- on i2c1 bus
-In-Reply-To: <1342168682-15888-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1342168682-15888-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAOMWX4e81gKYa_j8DHE_dn06+JfLwfEPuyj5kYVmDUBdG0n-1A@mail.gmail.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Fri, 13 Jul 2012 11:17:19 +0100
+Subject: [PATCH V2 7/7] net: stmmac: Overwrite platform data if passed
+ from auxdata
+In-Reply-To: <d72fd8775e055a0788226f1a9c1fbe3e333f6bae.1342171151.git.vipulkumar.samar@st.com>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <d72fd8775e055a0788226f1a9c1fbe3e333f6bae.1342171151.git.vipulkumar.samar@st.com>
+Message-ID: <CAOh2x=nn_Z6KkzW0cCtBDJnsNhAKLfEbkC0pJNK+OY9X0-XYjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 3:38 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
-> Manufacturers can opt to use different codec than twl6040 and also can add
-> audio related IC to the bus (external amplifier for example on SDP4430).
+On Fri, Jul 13, 2012 at 10:23 AM, Vipul Kumar Samar
+<vipulkumar.samar@st.com> wrote:
+> Platform data can be passed through either device tree or
+> auxdata_lookup. Device tree still donot have any means to provide
+> facility for passing platform callbacks to the driver.
 >
-> Make it possible to add differnet set of additional devices to i2c1 bus on
-> OMAP4 boards.
+> If any platform data is available through auxdata_lookup then overwrite
+> the platform data passed through device tree.
 >
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+
+This one is part of wrong patchset, remove it from this one, when you send a
+pull request to Arnd/Olof.
+
+Send it to net dev list separately. Keep giuseppe and stefan Roese in CC.
+
 > ---
+>  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
 >
-> Changes since v1:
-> Generated against l-o/master
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> index 680d2b8..4651579 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> @@ -114,10 +114,11 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
+>                         pr_err("%s: main dt probe failed", __func__);
+>                         goto out_unmap;
+>                 }
+> -       } else {
+> -               plat_dat = pdev->dev.platform_data;
+>         }
 >
-> Regards,
-> Peter
->
->  arch/arm/mach-omap2/board-4430sdp.c    |   12 +++++++++-
->  arch/arm/mach-omap2/board-omap4panda.c |   12 +++++++++-
->  arch/arm/mach-omap2/twl-common.c       |   35 +++++++++----------------------
->  arch/arm/mach-omap2/twl-common.h       |    3 +-
->  4 files changed, 32 insertions(+), 30 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index ad8a7d9..26466f2 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -547,6 +547,14 @@ static struct twl6040_platform_data twl6040_data = {
->         .irq_base       = TWL6040_CODEC_IRQ_BASE,
->  };
->
-> +static struct i2c_board_info __initdata sdp4430_i2c_1_boardinfo[] = {
-> +       {
-> +               I2C_BOARD_INFO("twl6040", 0x4b),
-> +               .irq = OMAP44XX_IRQ_SYS_2N,
-> +               .platform_data = &twl6040_data,
-> +       },
-> +};
+> +       if (pdev->dev.platform_data)
+> +               plat_dat = pdev->dev.platform_data;
 > +
->  static struct twl4030_platform_data sdp4430_twldata = {
->         /* Regulators */
->         .vusim          = &sdp4430_vusim,
-> @@ -580,8 +588,8 @@ static int __init omap4_i2c_init(void)
->                         TWL_COMMON_REGULATOR_CLK32KG |
->                         TWL_COMMON_REGULATOR_V1V8 |
->                         TWL_COMMON_REGULATOR_V2V1);
-> -       omap4_pmic_init("twl6030", &sdp4430_twldata,
-> -                       &twl6040_data, OMAP44XX_IRQ_SYS_2N);
-> +       omap4_pmic_init("twl6030", &sdp4430_twldata, sdp4430_i2c_1_boardinfo,
-> +                       ARRAY_SIZE(sdp4430_i2c_1_boardinfo));
 
-We still need a way to switch to I2C highspeed mode
-omap4_pmic_init still does register in 400KHz mode, while setting a bit in 6040
-should let us talk 3.3MHz on the bus.
+Even this looks wrong. You can't simply override plat_dat like this.
+Better to add properties to stmmac driver, that you can pass via DT.
 
-Regards,
-Nishanth Menon
+That's what Stefan also mentioned in his original patch:
+
+static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
+					    struct plat_stmmacenet_data *plat,
+					    const char **mac)
+{
+	/*
+	 * Currently only the properties needed on SPEAr600
+	 * are provided. All other properties should be added
+	 * once needed on other platforms.
+	 */
+
+--
+viresh
