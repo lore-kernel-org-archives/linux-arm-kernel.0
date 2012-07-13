@@ -1,44 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 Jul 2012 16:09:19 -0400 (EDT)
-Subject: Loading handle_arch_irq with a PC relative load
-In-Reply-To: <50007C33.4000105@xenomai.org>
-References: <50007197.8030403@xenomai.org>
- <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
- <50007C33.4000105@xenomai.org>
-Message-ID: <alpine.LFD.2.02.1207131604470.14068@xanadu.home>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 13 Jul 2012 15:10:31 -0500
+Subject: [PATCH] ARM: OMAP2+: Fix dmtimer set source clock failure
+Message-ID: <1342210231-2070-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
+Calling the dmtimer function omap_dm_timer_set_source() fails if following a
+call to pm_runtime_put() to disable the timer. For example the following
+sequence would fail to set the parent clock ...
 
-> On 07/13/2012 09:40 PM, Nicolas Pitre wrote:
-> > On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
-> > 
-> >>
-> >> I do not know if it is really useful, but it seems it would be possible 
-> >> to reduce the number of memory accesses to just one in the irq_handler 
-> >> macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
-> >> PC relative load, with something like the following patch:
-> > 
-> > To be strict with ccode sections, you can't do this.  The 
-> > handle_arch_irq symbol identifies a variable and with your patch you're 
-> > moving it from the .data section to the .text section.  The .text 
-> > section is meant to be read only, and this is even more true when using 
-> > a XIP kernel where .text is in ROM, or if we could make the access 
-> > protection of the kernel ro.
-> 
-> I understand that but, XIP kernel aside, the handle_arch_irq variable is
-> set only once very early during the boot process, so, almost read-only.
-> Is not Linux using self-modifying code in some cases anyway (booting an
-> SMP kernel on an UP processor for instance).
+	omap_dm_timer_stop(gptimer);
+	omap_dm_timer_set_source(gptimer, OMAP_TIMER_SRC_32_KHZ);
 
-There are limits to which such tricks should be applied.  In the SMP on 
-UP case this is a matter of making the kernel boot at all which is a 
-rather strong reason.
+The following error message would be seen ...
 
-Do you have performance numbers like interrupt latency that show this 
-patch being worth it?  Without concrete justifications I don't think we 
-should go down that path.
+omap_dm_timer_set_source: failed to set timer_32k_ck as parent
 
+The problem is that, by design, pm_runtime_put() simply decrements the usage
+count and returns before the timer has actually been disabled. Therefore,
+setting the parent clock failed because the timer was still active when the
+trying to set the parent clock. Setting a parent clock will fail if the clock
+you are setting the parent of has a non-zero usage count. To ensure that this
+does not fail use pm_runtime_put_sync() when disabling the timer.
 
-Nicolas
+Note that this will not be seen on OMAP1 devices, because these devices do
+not use the clock framework for dmtimers.
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 626ad8c..7b6689a 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -258,7 +258,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
+ 
+ void omap_dm_timer_disable(struct omap_dm_timer *timer)
+ {
+-	pm_runtime_put(&timer->pdev->dev);
++	pm_runtime_put_sync(&timer->pdev->dev);
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
+ 
+-- 
+1.7.9.5
