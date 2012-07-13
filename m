@@ -1,44 +1,49 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Jul 2012 17:19:45 +0300
-Subject: [PATCHv4 8/8] ARM: OMAP3: do not delete per_clkdm autodeps during idle
-In-Reply-To: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1342189185-5306-9-git-send-email-t-kristo@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jul 2012 14:22:25 +0000
+Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
+ controller.
+In-Reply-To: <CAOh2x==ob+N26pJdc1DC8DfOomus1robkj=8DeyVE_ve_L-bAA@mail.gmail.com>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <214127499f10b0099e6f3542e1e879fdd8c1bdcf.1342171151.git.vipulkumar.samar@st.com>
+ <CAOh2x==ob+N26pJdc1DC8DfOomus1robkj=8DeyVE_ve_L-bAA@mail.gmail.com>
+Message-ID: <201207131422.26274.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, PER clock domain was always enabled, as the usecounts
-for this domain incorrectly always showed positive value. On HW
-level though, the domain enters idle as it is set in HW supervised
-mode. Now, when the usecounts reflect real values, PER domain
-will be put to HWSUP sleep mode, which means its autodeps are deleted.
-Removing wakedeps for PER domain will cause multiple problems.
-First of all, coming back from idle, PER domain remains idle as the
-wakedeps have been disabled for the domain, and this causes a crash
-with the GPIO code, as the resume code attempts to access domain
-which is not active. Just enabling the interface clocks for the GPIO
-does not help, as they are autoidled and don't bring the domain out
-of idle. Secondly, there are multiple erratas for omap3, which say
-that the wakedeps should be enabled for the PER domain, see e.g.
-errata i582 for omap3630.
+On Friday 13 July 2012, viresh kumar wrote:
+> Adding Stefan and Peppe.
+> 
+> I understand why you can't send all platform data from DT.
+> Let me elaborate the problem statement
+> 
+> stmmac is used by platforms with and without DT.
+> - Without DT will pass platform data directly, without any issues.
+> - With DT have to pass all data, some of that via DT and other without
+> DT, like routines
+>   (atleast for now)
+> 
+> For now what I suggest is, update DT support for whatever we can..
+> i.e. support Maximum
+> properties there. As finally we will support everything via DT, no
+> platform data.
+> 
+> Whatever is left, that can't be passed via DT, like routine, pass it
+> from platform data
+> and merge both these versions of platform data in driver, keeping DT
+> ones in priority.
+> 
+> i.e. Whatever is defined in DT properties must come from there and
+> left outs from
+> platform data.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Absolutely agreed.
 
-diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-index 6038adb..5658440 100644
---- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-@@ -282,7 +282,7 @@ static struct clockdomain usbhost_clkdm = {
- static struct clockdomain per_clkdm = {
- 	.name		= "per_clkdm",
- 	.pwrdm		= { .name = "per_pwrdm" },
--	.flags		= CLKDM_CAN_HWSUP_SWSUP,
-+	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_NO_AUTODEP_DISABLE,
- 	.dep_bit	= OMAP3430_EN_PER_SHIFT,
- 	.wkdep_srcs	= per_wkdeps,
- 	.sleepdep_srcs	= per_sleepdeps,
--- 
-1.7.4.1
+The one part I think you both have wrong is the idea that the
+spear13xx_eth_phy_clk_cfg function is needed.
+
+I believe the correct answer for this is to introduce a driver for
+the phy in drivers/net/phy/, and have the phy be described correctly
+in the device tree and referenced found using the of_phy_find_device()
+function.
+
+	Arnd
