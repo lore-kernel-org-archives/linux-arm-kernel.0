@@ -1,121 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 13 Jul 2012 10:48:54 +0200
-Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
-In-Reply-To: <11987916.rOoNGcb1ly@dev1>
-References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <11987916.rOoNGcb1ly@dev1>
-Message-ID: <20120713084854.GD592@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jul 2012 09:57:47 +0100
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
+ implementation to be selected
+In-Reply-To: <4FFF8509.2050302@renesas.com>
+References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+ <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+ <4FFE7DB2.4040702@renesas.com>
+ <20120712084432.GA2816@mudshark.cambridge.arm.com>
+ <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
+ <4FFF8509.2050302@renesas.com>
+Message-ID: <20120713085746.GA18079@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-[I added git at vger.k.o to Cc: please strip the recipents accordingly if
-you reply.]
-
-On Fri, Jul 13, 2012 at 09:02:56AM +1000, Marc Reilly wrote:
-> Hi Uwe,
-> 
-> > This series was tested on a Phytec pcm038 (mc13783 on spi) using
-> > traditional boot (i.e. not dt) and on a i.MX53 based machine (mc34708 on
-> > i2c) using dt boot.
+On Fri, Jul 13, 2012 at 03:16:41AM +0100, Shinya Kuribayashi wrote:
+> On 7/13/2012 1:40 AM, Stephen Boyd wrote:
+> >>>> As a result, actual udelay()s may be toooo long than expected, in
+> >>>> particular udelay()s used between init_current_timer_delay() and
+> >>>> calibrate_delay().  It's unlikely be short, as the frequency of a
+> >>>> counter for read_current_timer is typically slower than CPU frequency.
+> >>> Surely using udelay before calibrate_delay_loop has been called is a
+> >>> fundamental error?
+> >> Got it.  I'm just not confident about disallowing early use of udelay().
+> >>
 > > 
-> > Philippe's patches are already in next, they are just included here for
-> > those who want to test the patches. The 'mfd/mc13xxx: drop modifying
-> > driver's id_table in probe' was already sent out yesterday and is
-> > included here because the last patch depends on it.
-> > 
-> 
-> For all patches (that don't already have it):
-> Acked-by: Marc Reilly <marc@cpdesign.com.au>
-Thanks.
+> > I don't think it's an error. Instead you get a very large delay, similar
+> > to what would happen if you called udelay() before calibrate_delay()
+> > anyway (see the comment in init/main.c above loops_per_jiffy).
 
-> If for some reason you do a V2:
-> - In patch 6 moves line "#define MC13XXX_NUMREGS 0x3f" around, is this 
-> necessary?
-It doesn't move it around, that's only how it looks. I removed enum
-mc13xxx_id (above MC13XXX_NUMREGS) and added struct mc13xxx_variant
-(below MC13XXX_NUMREGS). Git choosed to use the closing brace of enum
-mc13xxx_id and struct mc13xxx_variant respectively as context (together
-with the following empty line).
-(For the new readers, here is how git represented the relevant part:
+Interesting, I didn't notice it was initialised to 4k, so yes I suppose you
+could make use of some sort of delay. I don't think it's necessarily `very
+large' though -- anything ticking at over ~400KHz with HZ=100 would give you
+a smaller delay.
 
- #include <linux/regmap.h>
- #include <linux/mfd/mc13xxx.h>
+> Thanks, so I'd set up loops_per_jiffy early, along with lpj_fine in
+> init_current_timer_delay().
 
--enum mc13xxx_id {
--	MC13XXX_ID_MC13783,
--	MC13XXX_ID_MC13892,
--	MC13XXX_ID_INVALID,
-+#define MC13XXX_NUMREGS 0x3f
-+
-+struct mc13xxx;
-+
-+struct mc13xxx_variant {
-+	const char *name;
-+	void (*print_revision)(struct mc13xxx *mc13xxx, u32 revision);
- };
+That should work, providing you can get a sensible initial estimate for
+loops_per_jiffy.
 
--#define MC13XXX_NUMREGS 0x3f
-+extern struct mc13xxx_variant
-+		mc13xxx_variant_mc13783,
-+		mc13xxx_variant_mc13892;
-
- struct mc13xxx {
- 	struct regmap *regmap;
-...
-)
-
-The following would be an equivalent and (for humans) easier to review
-patch:
-
- #include <linux/regmap.h>
- #include <linux/mfd/mc13xxx.h>
-
--enum mc13xxx_id {
--	MC13XXX_ID_MC13783,
--	MC13XXX_ID_MC13892,
--	MC13XXX_ID_INVALID,
--};
--
- #define MC13XXX_NUMREGS 0x3f
-
-+struct mc13xxx;
-+
-+struct mc13xxx_variant {
-+	const char *name;
-+	void (*print_revision)(struct mc13xxx *mc13xxx, u32 revision);
-+};
-+
-+extern struct mc13xxx_variant
-+		mc13xxx_variant_mc13783,
-+		mc13xxx_variant_mc13892;
-+
- struct mc13xxx {
- 	struct regmap *regmap;
-...
-
-But as this touches 17 lines compared to only 15 using the way git
-choosed to represent patch 6, git used the smaller representation. (I'm
-not sure this is the correct reason, but at least it sounds sensible.)
-Usually this metric is sane, but here it's not. I don't know if you can
-do anything about it? E.g. take the number of +, - and context blocks
-into account. Then it would be 5 for the patch above vs. 7 for the
-way git did it.
-Or weight a context line containing
-
-	#define MC13XXX_NUMREGS 0x3f
-
-more than two lines one of which is empty and the other only contains a
-}?
-
-> - Patch 4 should come last, ie after "add support for mc34708"
-Yeah, but it doesn't break bisectibility, and as the rtc patches go in via a
-different tree (in fact akpm already took them) it doesn't matter much.
-
-Best regards and thanks for your feedback
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Will
