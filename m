@@ -1,48 +1,25 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 10:10:39 -0500
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-In-Reply-To: <20120713151451.b2ef97045ef2273ea15973c9@canb.auug.org.au>
-References: <20120713151451.b2ef97045ef2273ea15973c9@canb.auug.org.au>
-Message-ID: <50003A6F.5090008@gmail.com>
+From: viresh.kumar2@arm.com (viresh kumar)
+Date: Fri, 13 Jul 2012 16:12:46 +0100
+Subject: [PATCH 2/3] ARM: dts: SPEAr320: Fix compatible string
+In-Reply-To: <68769db82768b57876573b9391ee3119fe6ca19e.1342181727.git.vipulkumar.samar@st.com>
+References: <cover.1342181727.git.vipulkumar.samar@st.com>
+ <68769db82768b57876573b9391ee3119fe6ca19e.1342181727.git.vipulkumar.samar@st.com>
+Message-ID: <50003AEE.6060302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13/07/12 13:21, Vipul Kumar Samar wrote:
+>       model = "ST SPEAr300 Evaluation Board";
+
+Fix this too. :)
+
+> -     compatible = "st,spear300-evb", "st,spear300";
+> +     compatible = "st,spear320-evb", "st,spear320";
 
 
-On 07/13/2012 12:14 AM, Stephen Rothwell wrote:
-> Hi Mike,
-> 
-> Today's linux-next merge of the clk tree got a conflict in
-> drivers/clk/Makefile between commit 4a31bd28e86a ("ARM: nomadik: convert
-> to generic clock") from the arm-soc tree and commit 8d4d9f52081c ("clk:
-> add highbank clock support") from the clk tree.
-> 
-> Just context changes.  I fixed it up (see below) and can carry the fix as
-> necessary.
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/clk/Makefile
-> index 26b6b92,02ffdf6..0000000
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@@ -3,6 -3,11 +3,12 @@@ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.
->   obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
->   				   clk-mux.o clk-divider.o clk-fixed-factor.o
->   # SoCs specific
->  +obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
-> + obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
->   obj-$(CONFIG_ARCH_MXS)		+= mxs/
->   obj-$(CONFIG_PLAT_SPEAR)	+= spear/
-> + obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
-> + obj-$(CONFIG_ARCH_INTEGRATOR)	+= versatile/
+--
+Viresh
 
-These should be sorted.
 
-Rob
 
-> + 
-> + # Chip specific
-> + obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
