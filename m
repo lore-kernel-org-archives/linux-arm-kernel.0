@@ -1,41 +1,35 @@
-From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Fri, 13 Jul 2012 14:53:47 +0530
-Subject: [PATCH V2 0/7] ARM: SPEAr13xx: Minor fixes and updation
-Message-ID: <cover.1342171151.git.vipulkumar.samar@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jul 2012 10:42:32 +0100
+Subject: ARM: why smp_mb() is not needed in the "__mutex_fastpath_lock"
+ and "__mutex_fastpath_unlock" functions
+In-Reply-To: <CAK2TD5z2DticZAQ-Pxzo7YT9tx=YWZkwcn-YZJ3aQa4AFoE_Cw@mail.gmail.com>
+References: <CAK2TD5ygowdy9t1TpfxAPbpvNQfMnMB-3Zp8TKMsTYtBZdGW=Q@mail.gmail.com>
+ <CAFNq8R6dNb0BrDVZScJ8s=P3B-OMgtr8tUdy8XqQcCAeUWuH+A@mail.gmail.com>
+ <CAK2TD5z2DticZAQ-Pxzo7YT9tx=YWZkwcn-YZJ3aQa4AFoE_Cw@mail.gmail.com>
+Message-ID: <20120713094232.GD18079@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
--v2:
--Fix check retrun value from clk_set_rate and clk_set_parent.
--Fix sys_clk mask value.
--Additional patch for overwrite platform data passed from auxdata_lookup
+On Fri, Jul 13, 2012 at 10:10:52AM +0100, shan kang wrote:
+> For example, in the following scenario, Process2  may get the wrong value;
+> Process1:
+> mutex_lock(&lock);
+> write data; (store operation)
+> mutex_unlock(&lock);
+> 
+> Process2:
+> mutex_lock(&lock);
+> read data; (load operation)
+> mutex_unlock(&lock);
 
--v1:
--Fix interrupt bindings for ethernet, i2c,.
--Fix clk enable register for uart1 and i2c1.
--Fix register con_id for ethernet.
--Update sys_clk parent.
--Pass ethernet platform data from auxdata lookup.
--Add local timer clock.
+Yes, it looks like we can screw things up in the uncontended case (where
+nobody blocks on the mutex). We could add an smp_mb after the lock operation
+and another one before the unlock, but I'm tempted just to use
+asm-generic/mutex-dec.h instead. The latter approach will subtly change the
+current behaviour, so I'll post a patch when I'm happy with it.
 
-Vipul Kumar Samar (7):
-  ARM: SPEAr13xx: Fix Interrupt bindings
-  clk: SPEAr1340: Fix clk enable register for uart1 and i2c1.
-  clk: SPEAr13xx: Add localtimer (twd) clock support
-  Clk : SPEAr13xx: Register con_id for Ethernet phy clks
-  Clk: SPEAr1340: Update sys clock parent array
-  ARM: SPEAr13xx: Add auxdata for Ethernet controller.
-  net: stmmac: Overwrite platform data if passed from auxdata
+Curious: did you find this by inspection or did you observe it going wrong?
 
- arch/arm/boot/dts/spear13xx.dtsi                   |   11 +-
- arch/arm/mach-spear13xx/include/mach/generic.h     |    2 +
- arch/arm/mach-spear13xx/include/mach/spear.h       |    1 +
- arch/arm/mach-spear13xx/spear1340.c                |   32 ++++++
- arch/arm/mach-spear13xx/spear13xx.c                |  104 ++++++++++++++++++++
- drivers/clk/spear/spear1310_clock.c                |   14 ++-
- drivers/clk/spear/spear1340_clock.c                |   14 ++-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    5 +-
- 8 files changed, 166 insertions(+), 17 deletions(-)
+Cheers,
 
--- 
-1.7.2.2
+Will
