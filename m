@@ -1,109 +1,66 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 13 Jul 2012 15:41:59 +0200
-Subject: [PATCH v4 0/8] ARM: OMAP2+: PM: introduce the power domains
- functional states
-In-Reply-To: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
-References: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
-Message-ID: <CAORVsuXZpN97_as+gF6dyoyaU8os4rr=YNgiNMJXfAedQkkwyw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 13 Jul 2012 22:42:52 +0900
+Subject: [PATCH v5 6/6] spi: s3c64xx: add device tree support
+In-Reply-To: <CAJuYYwRiR8M5m9rDE6dzMawuSLO03f7mydoks+zU2ByTmbtMrA@mail.gmail.com>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+ <1342021265-11212-7-git-send-email-thomas.abraham@linaro.org>
+ <4FFF51EE.4080609@samsung.com>
+ <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
+ <117c01cd60ea$90f76ac0$b2e64040$%kim@samsung.com>
+ <CAJuYYwRiR8M5m9rDE6dzMawuSLO03f7mydoks+zU2ByTmbtMrA@mail.gmail.com>
+Message-ID: <118901cd60fd$66c26260$34472720$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Thomas Abraham wrote:
+> 
+> On 13 July 2012 16:58, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Thomas Abraham wrote:
+> >>
+> >> On 13 July 2012 04:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> >> > Thomas, the DMACH_DT_PROP is available only on pl330 now. So seems
+> occur
+> >> > following build error with s3c6400_defconfig.
+> >> >
+> >> > drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_get_dmares':
+> >> > drivers/spi/spi-s3c64xx.c:1098: error: 'DMACH_DT_PROP' undeclared
+> (first
+> >> use
+> >> > in this function)
+> >> > drivers/spi/spi-s3c64xx.c:1098: error: (Each undeclared identifier is
+> >> > reported only once
+> >> > drivers/spi/spi-s3c64xx.c:1098: error: for each function it appears
+> in.)
+> >> > make[3]: *** [drivers/spi/spi-s3c64xx.o] Error 1
+> >> > make[2]: *** [drivers/spi] Error 2
+> >> >
+> >>
+> >> Dear Mr. Kim,
+> >>
+> >> Thanks for considering these patches to be merged via your tree. For
+> >> the build break you mentioned above, there was a patch submitted some
+> >> time back to handle this. The link to that patch is:
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
+> >> June/102627.html.
+> >> Could you please apply this patch also to your tree.
+> >>
+> > Sure, it looks good to me, will apply that then this series will be
+> rebased
+> > on top of that.
+> 
+> There are six more patches that enable spi device tree support for
+> Exynos4 and Exynos5 platforms. Could you consider to apply those
+> patches as well. The link to those patches is:
+> http://www.mail-archive.com/linux-samsung-
+> soc at vger.kernel.org/msg10851.html.
+> 
+Yeah, I remember, but I think some patches is needed to re-work as per
+comments...?
 
-On Thu, Jun 14, 2012 at 4:53 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> Here is a re-spin after some comments after an internal review and some testing on
-> OMAP4 with device OFF support.
->
-> Implement the functional states for the power domains:
-> - unify the API to use the functional states,
-> - protect the power domain state change by a mutex in
->   omap_set_pwrdm_state,
-> - introduce the functional states for power domains power states and
->   logic power states, and the conversion functions between the
->   functional and internal states,
-> - program the logic power state of power domains from the functional
->   states, in omap_set_pwrdm_state
-> - convert the OMAP2/3/4 PM code to use the updated API,
-> - provide the power domains statistics by functional states,
-> - provide ftrace tracepoints with the functional state.
->
-> Based on mainline kernel 3.5.0-rc2.
->
-> Tested on OMAP3 Beagleboard, with suspend and cpuidle in RET and
-> OFF modes.
+Thanks.
 
-Here is the latest version for anyone willing to look at it, or even
-better review and test it.
-
-The latest code can be fetched from https://gitorious.org/jpihet/linux.
-Please note that the tree also contains branches for the per-device PM
-QoS, OMAP4 device OFF and the misc fixes needed to allow OMAP4 to
-enter the low power modes.
-
-Based on 3.5.0-rc6; tested with OMAP3&4 suspend/resume and OMAP3
-cpuidle, using CSWR and OFF modes.
-
-Here are the changes since the last version:
-- changed the locking to a spinlock. Thanks to Ambresh K for reporting
-the issue,
-- extended the locking to the next power state read
-(pwrdm_read_next_func_pwrst) and write (omap_set_pwrdm_state).
-
-Regards,
-Jean
-
->
->
-> History:
->  v4:
->  - reworked the code after internal review and testing with OMAP3&4 device
->    OFF,
->  - fixed the tracepoints generation code,
->  - introduce a function that returns power domains achievable functional
->    states, in order to return a valid state for power domains that only
->    support some of the power states. Although it has been tested OK the
->    code is in RFC state.
->
->  v3:
->  - fix a bug in OMAP3 cpuidle which prevented the IO wake-ups in PER
->
->  v2:
->  - add the logic power states,
->  - provide the power domains statistics by functional states
->
->  v1:
->  - initial implementation, in RFC state
->
->
-> Jean Pihet (8):
->   ARM: OMAP2+: PM: protect the power domain state change by a mutex
->   ARM: OMAP2+: PM: introduce power domains functional states
->   ARM: OMAP2+: PM: use the functional power states API
->   ARM: OMAP2+: PM: introduce power domains logic and memory functional
->     states
->   ARM: OMAP2+: PM: introduce power domains achievable functional states
->   ARM: OMAP2+: PM: use the functional power states API for logic and
->     memory
->   ARM: OMAP2+: PM: use power domain functional state in stats counters
->   ARM: OMAP2+: PM debug: trace the functional power domains states
->
->  arch/arm/mach-omap2/cpuidle34xx.c          |   61 +++---
->  arch/arm/mach-omap2/cpuidle44xx.c          |   28 +--
->  arch/arm/mach-omap2/omap-hotplug.c         |    2 +-
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c  |   39 ++--
->  arch/arm/mach-omap2/pm-debug.c             |   15 +-
->  arch/arm/mach-omap2/pm.c                   |   62 -----
->  arch/arm/mach-omap2/pm.h                   |    1 -
->  arch/arm/mach-omap2/pm24xx.c               |   15 +-
->  arch/arm/mach-omap2/pm34xx.c               |   78 +++---
->  arch/arm/mach-omap2/pm44xx.c               |   18 +-
->  arch/arm/mach-omap2/powerdomain-common.c   |  100 ++++++++
->  arch/arm/mach-omap2/powerdomain.c          |  367 ++++++++++++++++++++++++++--
->  arch/arm/mach-omap2/powerdomain.h          |  101 ++++++--
->  arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |    7 +
->  arch/arm/mach-omap2/powerdomain44xx.c      |    3 +
->  15 files changed, 653 insertions(+), 244 deletions(-)
->
-> --
-> 1.7.7.6
->
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
