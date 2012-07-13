@@ -1,46 +1,32 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Fri, 13 Jul 2012 09:06:58 +0100
-Subject: [PATCH 1/4] clk:spear1340:Fix: Rename clk ids within predefined
- limit
-In-Reply-To: <b43c4e64ed61d4c18f5c3326539f7f03e9604ef1.1342160220.git.vipulkumar.samar@st.com>
-References: <cover.1342160220.git.vipulkumar.samar@st.com>
- <b43c4e64ed61d4c18f5c3326539f7f03e9604ef1.1342160220.git.vipulkumar.samar@st.com>
-Message-ID: <CAOh2x==4rQhAvZmmqiyi0jhF0Zz=v8OmuCBaFGFehOEt2kyd1w@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 13 Jul 2012 10:07:41 +0200
+Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1341850974-11977-1-git-send-email-marex@denx.de>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+Message-ID: <20120713080741.GE32184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 7:23 AM, Vipul Kumar Samar
-<vipulkumar.samar@st.com> wrote:
-> The max limit of con_id is 16 and dev_id is 20. As of now for spear1340, many
-> clk ids are exceeding this predefined limit.
->
-> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+On Mon, Jul 09, 2012 at 06:22:53PM +0200, Marek Vasut wrote:
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
+> 
+> The TIMING2 register value is wrong in the documentation for
+> i.MX28! This was found and fixed by:
+>   Shawn Guo <shawn.guo@linaro.org>
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
 
-> @@ -509,23 +507,23 @@ void __init spear1340_clk_init(void)
+Applied to next, thanks.
 
-> -       clk_register_clkdev(clk1, "uart0_synth_gate_clk", NULL);
-
-> -       clk_register_clkdev(clk1, "sdhci_synth_gate_clk", NULL);
-
-> -       clk_register_clkdev(clk, "gmac_phy_input_mux_clk", NULL);
-> -       clk_register_clkdev(clk1, "gmac_phy_synth_gate_clk", NULL);
-
-These are the only places in this entire patch, where i found con_id
-crossing the limit.
-Then why so many changes? Aligning all to similar naming?
-
-
->         clk_register_clkdev(clk, NULL, "e0000000.serial");
-
-@Russell & Mike: Above line uses maximum length of dev_id, i.e. 16.
-And because with DT we have so long device names now, out of which
-8 - address
-1 - '.'
-1 - '\0'
-
-10 are already gone and so only 6 are left for device name. Should we
-consider updating
-dev_id array size??
-
---
-viresh
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120713/87880d65/attachment.sig>
