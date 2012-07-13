@@ -1,63 +1,49 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 09:07:41 -0500
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <20120713140021.GS18079@mudshark.cambridge.arm.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com> <20120713140021.GS18079@mudshark.cambridge.arm.com>
-Message-ID: <50002BAD.3010600@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jul 2012 14:14:36 +0000
+Subject: [PATCH] ARM: mutex: use generic atomic_dec-based implementation
+ for ARMv6+
+In-Reply-To: <1342177463-21238-1-git-send-email-will.deacon@arm.com>
+References: <1342177463-21238-1-git-send-email-will.deacon@arm.com>
+Message-ID: <201207131414.37078.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 07/13/2012 09:00 AM, Will Deacon wrote:
-> Jon,
+On Friday 13 July 2012, Will Deacon wrote:
+> The open-coded mutex implementation for ARMv6+ cores suffers from a
+> couple of problems:
 > 
-> [cutting out realms of context!]
-
-Thanks! My inbox thanks you too ;-)
-
-> On Fri, Jul 13, 2012 at 02:54:59PM +0100, Jon Hunter wrote:
->> Another proposal I also thought of is re-working the flags to describe
->> the HW mode to be used when turning on the CLKDM, when the CLKDM is
->> active and when the CLKDM is shut down. So instead of saying what modes
->> the CLKDM supports, specify what modes should be used for pre-ON (i.e.
->> turn ON), ON and OFF. Right now software is trying to decide for us by
->> what is available (which is ideal) but makes working around such nuances
->> a little more painful.
->>
->> By the way, I did do some testing on OMAP3, but I don't recall now
->> whether I was having such problems with OMAP3. I need to go back and
->> test perf again on OMAP3 to see if such a flag is needed.
+>         1. (major) There aren't any barriers in sight, so in the
+>            uncontended case we don't actually protect any accesses
+>            performed in during the critical section.
 > 
-> If you do test on OMAP3, please kill the OMAP3_EMU option as I think this
-> has the effect of keeping the EMU power domain up via the etm code (look at
-> etb_probe).
+>         2. (minor) If the strex indicates failure to complete the store,
+>            we assume that the lock is contended and run away down the
+>            failure (slow) path. This assumption isn't correct and the
+>            core may fail the strex for reasons other than contention.
 > 
-> Will
+> This patch solves both of these problems by using the generic atomic_dec
+> based implementation for mutexes on ARMv6+. This also has the benefit of
+> removing a fair amount of inline assembly code.
 > 
-> ---8<---
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a91009c..d02054c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1139,8 +1139,7 @@ config XSCALE_PMU
->         default y
->  
->  config CPU_HAS_PMU
-> -       depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
-> -                  (!ARCH_OMAP3 || OMAP3_EMU)
-> +       depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU)
->         default y
->         bool
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Reported-by: Shan Kang <kangshan0910@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Ah-ha! May be this is why is worked without issue. I will look at that
-and check the power states. I must admit that my testing was quick to
-ensure no breakages but no thorough to check what was going on with power.
+Nice!
 
-Cheers
-Jon
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+One question though: can you explain why the xchg implementation is better
+on pre-v6, while the dec implementation is better on v6+? It would probably
+be helpful to put that in the comment at
+
+ /* On pre-ARMv6 hardware the swp based implementation is the most efficient. */
+ # include <asm-generic/mutex-xchg.h>
+ #else
+ /* ARMv6+ can implement efficient atomic decrement using exclusive accessors. */
+ # include <asm-generic/mutex-dec.h>
+
+Intuitively, I'd guess that both implementations are equally efficient
+on ARMv6 because they use the same ldrex/strex loop.
+
+	Arnd
