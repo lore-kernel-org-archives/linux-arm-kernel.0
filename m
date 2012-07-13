@@ -1,7 +1,7 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 17:19:30 -0500
-Subject: [RFC 0/4] ARM: OMAP3+: Add device-tree support for timers
-Message-ID: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
+Date: Fri, 13 Jul 2012 17:26:49 -0500
+Subject: [RFC RESEND 0/4] ARM: OMAP3+: Add device-tree support for timers
+Message-ID: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
