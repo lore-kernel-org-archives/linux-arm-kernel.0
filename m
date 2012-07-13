@@ -1,74 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 Jul 2012 15:40:38 -0400 (EDT)
-Subject: Loading handle_arch_irq with a PC relative load
-In-Reply-To: <50007197.8030403@xenomai.org>
-References: <50007197.8030403@xenomai.org>
-Message-ID: <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jul 2012 14:48:52 -0500
+Subject: [PATCH 00/11] make struct of_device_id.data const
+In-Reply-To: <20120713174935.GN592@pengutronix.de>
+References: <1342182734-321-1-git-send-email-y> <5000175E.4070702@gmail.com>
+ <20120713134638.GH592@pengutronix.de> <201207131624.27266.arnd@arndb.de>
+ <20120713174935.GN592@pengutronix.de>
+Message-ID: <50007BA4.90804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
+On 07/13/2012 12:49 PM, Uwe Kleine-K?nig wrote:
 
-> 
-> I do not know if it is really useful, but it seems it would be possible 
-> to reduce the number of memory accesses to just one in the irq_handler 
-> macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
-> PC relative load, with something like the following patch:
+[snip]
 
-To be strict with ccode sections, you can't do this.  The 
-handle_arch_irq symbol identifies a variable and with your patch you're 
-moving it from the .data section to the .text section.  The .text 
-section is meant to be read only, and this is even more true when using 
-a XIP kernel where .text is in ROM, or if we could make the access 
-protection of the kernel ro.
+> I guess this results in a warning until after patch 10 is applied? (A
+> few more down below.)
+> 
+> In the meantime I expanded my defconfig build script to handle powerpc,
+> too. I'll check these. I think I'll have to let the build run over
+> night...
 
+I'm not certain but just an allyesconfig build on powerpc should be
+sufficient rather than building defconfigs. We still dream about doing
+that on ARM.
 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 0d1851c..48ee46a 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -37,10 +37,9 @@
->   */
->  	.macro	irq_handler
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
-> -	ldr	r1, =handle_arch_irq
->  	mov	r0, sp
->  	adr	lr, BSYM(9997f)
-> -	ldr	pc, [r1]
-> +	ldr	pc, handle_arch_irq
->  #else
->  	arch_irq_handler_default
->  #endif
-> @@ -325,6 +324,12 @@ ENDPROC(__pabt_svc)
->  #endif
->  .LCfp:
->  	.word	fp_enter
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	.globl	handle_arch_irq
-> +handle_arch_irq:
-> +	.space	4
-> +#endif
-> +
->  
->  /*
->   * User mode handlers
-> @@ -1151,9 +1156,3 @@ cr_alignment:
->  	.space	4
->  cr_no_alignment:
->  	.space	4
-> -
-> -#ifdef CONFIG_MULTI_IRQ_HANDLER
-> -	.globl	handle_arch_irq
-> -handle_arch_irq:
-> -	.space	4
-> -#endif
-> 
-> 
-> -- 
->                                                                 Gilles.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Rob
