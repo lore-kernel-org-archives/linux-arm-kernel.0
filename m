@@ -1,36 +1,41 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Fri, 13 Jul 2012 11:16:41 +0900
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <4FFEFDE3.5000403@codeaurora.org>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
- <4FFE7DB2.4040702@renesas.com>
- <20120712084432.GA2816@mudshark.cambridge.arm.com>
- <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
-Message-ID: <4FFF8509.2050302@renesas.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 12 Jul 2012 19:33:14 -0700
+Subject: ARM mini-summit
+In-Reply-To: <201207111128.29924.arnd@arndb.de>
+References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
+ <201207111128.29924.arnd@arndb.de>
+Message-ID: <CAOesGMiLQYuK9Pszir7mSEKgE3AWdbr+P7YJ5FH3Kkig=bMTgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2012 1:40 AM, Stephen Boyd wrote:
->>>> As a result, actual udelay()s may be toooo long than expected, in
->>>> particular udelay()s used between init_current_timer_delay() and
->>>> calibrate_delay().  It's unlikely be short, as the frequency of a
->>>> counter for read_current_timer is typically slower than CPU frequency.
->>> Surely using udelay before calibrate_delay_loop has been called is a
->>> fundamental error?
->> Got it.  I'm just not confident about disallowing early use of udelay().
+On Wed, Jul 11, 2012 at 4:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 11 July 2012, James Bottomley wrote:
+>> Hi All,
 >>
-> 
-> I don't think it's an error. Instead you get a very large delay, similar
-> to what would happen if you called udelay() before calibrate_delay()
-> anyway (see the comment in init/main.c above loops_per_jiffy).
+>> We have set aside the second day of the kernel summit (Tuesday 28
+>> August) as mini-summit day.  So far we have only the PCI mini summit on
+>> this day, so if you can think of other topics, please send them to the
+>> kernel summit discuss list:
+>>
+>> ksummit-2012-discuss at lists.linux-foundation.org
+>>
+>> Looking at the available rooms, we think we can run about four or five
+>> mini summits.
+>>
+>> As an added incentive, mini summit organisers get to pick who they
+>> invite and all the people they pick will get an automatic invitation to
+>> the third day of the kernel summit (but not the core first day) and the
+>> evening events.
+>
+> There is a lot of interest in having another ARM mini-summit, as we had last
+> year. Previously, Grant Likely organized this with Olof and me, but right now
+> Grant is in an extended offline period and Olof is currently on vacation
+> as well. Will Deacon already contacted me and he is interested in helping
+> out with organizing the mini-summit, so the two of us could be the primary
+> contacts, with Grant and Olof joining in as time permits.
 
-Thanks, so I'd set up loops_per_jiffy early, along with lpj_fine in
-init_current_timer_delay().
+ACK. I'll be back home next week and should have more time to spend on
+it from there on out.
 
-As a matter of fact, I do have early use of udelay()s in my tree :-)
-Will give it a try for some time.
--- 
-Shinya Kuribayashi
-Renesas Electronics
+
+-Olof
