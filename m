@@ -1,35 +1,24 @@
-From: y@pengutronix.de (y at pengutronix.de)
-Date: Fri, 13 Jul 2012 14:32:13 +0200
-Subject: [PATCH 10/11] of: add const to struct of_device_id.data
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Jul 2012 14:39:08 +0200
+Subject: [PATCH 00/11] make struct of_device_id.data const
 In-Reply-To: <1342182734-321-1-git-send-email-y>
 References: <1342182734-321-1-git-send-email-y>
-Message-ID: <1342182734-321-12-git-send-email-y>
+Message-ID: <20120713123908.GF592@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hello,
 
-Drivers should never need to modify the data of a device id. So it can
-be const which in turn allows more consts in the driver.
+On Fri, Jul 13, 2012 at 02:32:02PM +0200, y at pengutronix.de wrote:
+This is utter non-sense, it was me who sent these mails (and pressed 'y'
+when git send-email asked if "Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de>" is the right sender). Please make sure
+to correct this when replying to the patches.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
----
- include/linux/mod_devicetable.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Sorry for the inconvenience.
 
-diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-index 5db9382..98fb3fe 100644
---- a/include/linux/mod_devicetable.h
-+++ b/include/linux/mod_devicetable.h
-@@ -224,7 +224,7 @@ struct of_device_id
- 	char	type[32];
- 	char	compatible[128];
- #ifdef __KERNEL__
--	void	*data;
-+	const void *data;
- #else
- 	kernel_ulong_t data;
- #endif
+Best regards
+Uwe
 -- 
-1.7.10.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
