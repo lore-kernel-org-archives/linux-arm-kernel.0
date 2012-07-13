@@ -1,35 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jul 2012 10:42:32 +0100
-Subject: ARM: why smp_mb() is not needed in the "__mutex_fastpath_lock"
- and "__mutex_fastpath_unlock" functions
-In-Reply-To: <CAK2TD5z2DticZAQ-Pxzo7YT9tx=YWZkwcn-YZJ3aQa4AFoE_Cw@mail.gmail.com>
-References: <CAK2TD5ygowdy9t1TpfxAPbpvNQfMnMB-3Zp8TKMsTYtBZdGW=Q@mail.gmail.com>
- <CAFNq8R6dNb0BrDVZScJ8s=P3B-OMgtr8tUdy8XqQcCAeUWuH+A@mail.gmail.com>
- <CAK2TD5z2DticZAQ-Pxzo7YT9tx=YWZkwcn-YZJ3aQa4AFoE_Cw@mail.gmail.com>
-Message-ID: <20120713094232.GD18079@mudshark.cambridge.arm.com>
+From: sebastian.hesselbarth@googlemail.com (Sebastian Hesselbarh)
+Date: Fri, 13 Jul 2012 11:42:20 +0200
+Subject: [RESEND PATCH 1/1] clk: add DT support for clock gating control
+In-Reply-To: <4FFF93DC.30103@gmail.com>
+References: <4FFE7979.4060000@googlemail.com> <4FFEBF8A.1020700@gmail.com>
+ <4FFECC4E.4070001@googlemail.com> <4FFF93DC.30103@gmail.com>
+Message-ID: <4FFFED7C.9050406@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 10:10:52AM +0100, shan kang wrote:
-> For example, in the following scenario, Process2  may get the wrong value;
-> Process1:
-> mutex_lock(&lock);
-> write data; (store operation)
-> mutex_unlock(&lock);
-> 
-> Process2:
-> mutex_lock(&lock);
-> read data; (load operation)
-> mutex_unlock(&lock);
+On 07/13/2012 05:19 AM, Rob Herring wrote:
+> What's implemented in Linux should not define the binding. The binding
+> should describe the hardware.
+> [...]
+> True, but not your problem to implement. A binding doesn't necessarily
+> mean there is a full Linux implementation. We just don't want to create
+> something only to find others need something completely different.
 
-Yes, it looks like we can screw things up in the uncontended case (where
-nobody blocks on the mutex). We could add an smp_mb after the lock operation
-and another one before the unlock, but I'm tempted just to use
-asm-generic/mutex-dec.h instead. The latter approach will subtly change the
-current behaviour, so I'll post a patch when I'm happy with it.
+Ok, what about a DT describing the following for a simple register-based
+clock gating controller and the corresponding gated-clock independent of
+the controller. I am sure there are a bunch of SoCs out there that
+control their clock gates by writing some bits to a register. If that
+DT description matches your expectations, I ll prepare patches with
+documentation and implementation for common clock framework.
 
-Curious: did you find this by inspection or did you observe it going wrong?
+Sebastian
 
-Cheers,
+--
+  /* Simple clock gating controller based on bitmasks and register */
+cgc: clock-gating-control at f1000000 {
+   compatible = "clock-gating-control-register";
+   reg = <0xf1000000 0x4>;
 
-Will
+   /* Clock gating control with one bit at bit position 0
+      enable with (1<<0), disable with (0<<0) */
+   cgctrl_usb0: cgc_usb0 {
+     clock-gating-control,shift = <0>;
+     clock-gating-control,mask = <1>;
+     clock-gating-control,enable = <1>;
+     clock-gating-control,disable = <0>;
+   };
+
+   /* Clock gating control with two bits at bit position 1-2
+      enable with (2<<1), disable with (0<<1) */
+   cgctrl_sata: cgc_sata {
+     clock-gating-control,shift = <1>;
+     clock-gating-control,mask = <3>;
+     clock-gating-control,enable = <2>;
+     clock-gating-control,disable = <0>;
+   };
+};
+
+/* Generic clock gate description that can be used with
+    any clock gating controller */
+cg_usb0: clockgate at 0 {
+   compatible = "gated-clock";
+   #clock-cells = <0>;
+   clocks = <&osc>;
+   clock-gate-control = <&cgctrl_usb0>;
+};
