@@ -1,54 +1,55 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 13 Jul 2012 11:02:35 +0530
-Subject: [PATCH] ARM: Exynos: Add device tree node for Exynos4 interrupt
- combiner controller
-In-Reply-To: <0fab01cd600e$27d56ec0$77804c40$%kim@samsung.com>
-References: <1342068948-20755-1-git-send-email-thomas.abraham@linaro.org>
- <0fab01cd600e$27d56ec0$77804c40$%kim@samsung.com>
-Message-ID: <CAJuYYwTJeS9NgBRZgyDgbNh1u0DpHX2+EZ1TtrcCYUg+5EJf_g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Jul 2012 14:13:55 +0800
+Subject: [PATCH] ARM: mxs: fix compile error caused by prom_update_property
+ change
+Message-ID: <1342160035-24170-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 July 2012 14:40, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Thomas Abraham wrote:
->>
->> Add node for Exynos4 interrupt combiner controller.
->>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->>  arch/arm/boot/dts/exynos4210.dtsi |   11 +++++++++++
->>  1 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
->> b/arch/arm/boot/dts/exynos4210.dtsi
->> index a1dd2ee..0e4f659 100644
->> --- a/arch/arm/boot/dts/exynos4210.dtsi
->> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->> @@ -33,6 +33,17 @@
->>               reg = <0x10490000 0x1000>, <0x10480000 0x100>;
->>       };
->>
->> +     combiner:interrupt-controller at 10440000 {
->> +             compatible = "samsung,exynos4210-combiner";
->> +             interrupt-controller;
->> +             #interrupt-cells = <2>;
->
-> How about changing above ordering like interrupt gic controller?
+The commit 475d009 (of: Improve prom_update_property() function)
+changed prom_update_property interface, and causes the compile
+error below.
 
-Ok.
+  CC      arch/arm/mach-mxs/mach-mxs.o
+arch/arm/mach-mxs/mach-mxs.c: In function ?update_fec_mac_prop?:
+arch/arm/mach-mxs/mach-mxs.c:216:4: error: too many arguments to function ?prom_update_property?
+include/linux/of.h:263:12: note: declared here
 
->
-> +               #interrupt-cells = <2>;
-> +               interrupt-controller;
->
-> And, don't we need combiner-nr?
-> +               samsung,combiner-nr = <16>;
+Update the caller update_fec_mac_prop to fix the error.
 
-'samsung,combiner-nr' is an optional property. If it is not specfied,
-the default value is set as 16. So it is not required for Exynos4
-combiner node.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+The error is seen on next-20120712 where commit 475d009 (of: Improve
+prom_update_property() function) emerges.
 
-I will resubmit this patch with your suggested change.
+ arch/arm/mach-mxs/mach-mxs.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
 
-Thanks,
-Thomas.
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 648bdd0..8dabfe8 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -162,7 +162,7 @@ enum mac_oui {
+ static void __init update_fec_mac_prop(enum mac_oui oui)
+ {
+ 	struct device_node *np, *from = NULL;
+-	struct property *oldmac, *newmac;
++	struct property *newmac;
+ 	const u32 *ocotp = mxs_get_ocotp();
+ 	u8 *macaddr;
+ 	u32 val;
+@@ -208,11 +208,7 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 		macaddr[4] = (val >> 8) & 0xff;
+ 		macaddr[5] = (val >> 0) & 0xff;
+ 
+-		oldmac = of_find_property(np, newmac->name, NULL);
+-		if (oldmac)
+-			prom_update_property(np, newmac, oldmac);
+-		else
+-			prom_add_property(np, newmac);
++		prom_update_property(np, newmac);
+ 	}
+ }
+ 
+-- 
+1.7.4.1
