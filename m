@@ -1,64 +1,93 @@
-From: albert.u.boot@aribaud.net (Albert ARIBAUD)
-Date: Fri, 13 Jul 2012 08:45:26 +0200
-Subject: [U-Boot] Where to put a large bootloader-supplied device tree
- on ARM ?
-In-Reply-To: <4FFF79B6.6040508@gmail.com>
-References: <1341325365-21393-1-git-send-email-andrew@lunn.ch>
- <201207051454.24475.arnd@arndb.de> <20120705161600.GA28860@lunn.ch>
- <201207062008.23952.arnd@arndb.de> <20120706210009.GC11470@lunn.ch>
- <4FF781D8.3040206@firmworks.com>
- <2966DB01BC317A4DA23684BA0F653415013701@xmb-aln-x08.cisco.com>
- <4FF7980E.7050705@firmworks.com>
- <alpine.LFD.2.02.1207090015270.31100@xanadu.home>
- <4FFE743B.6080504@firmworks.com> <4FFF34C9.8030000@gmail.com>
- <20120712233801.0411daa7@lilith>
- <20120712214743.2160B202A3F@gemini.denx.de>
- <4FFF79B6.6040508@gmail.com>
-Message-ID: <20120713084526.5f680de3@lilith>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 13 Jul 2012 12:15:07 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201206271520.49276.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201206262027.47817.arnd@arndb.de> <1340804708.1562.253.camel@vkoul-udesk3>
+ <201206271520.49276.arnd@arndb.de>
+Message-ID: <1342161907.1726.26.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, 2012-06-27 at 15:20 +0000, Arnd Bergmann wrote:
+Back from vacation... so restart the pending discussion
 
-On Thu, 12 Jul 2012 20:28:22 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On 07/12/2012 04:47 PM, Wolfgang Denk wrote:
-> > Dear Albert ARIBAUD,
-> > 
-> > In message <20120712233801.0411daa7@lilith> you wrote:
-> >>
-> >> If I'm not mistaken, yes U-Boot loads itself as high as it can, and I don't
-> >> know about the FDT, but no, U-Boot does not "like" to load initrd "just
-> >> below that": it loads initrd where the boot commands tell it to, and the
-> >> boot commands are written by board developers. Nothing in U-Boot forces
-> >> initrd to be loaded as high as possible.
 > 
-> u-boot loads the initrd where you tell it, then bootm relocates it for
-> some reason.
-> >>
-> >> That leaves the question of the FDT, though -- I'm not familiar enough
-> >> with it (yet) to tell if it is always located just under U-Boot or if
-> >> its placement is controllable by board commands.
-> > 
-> > You can always just set the "fdt_high" and "initrd_high" evironment
-> > variables to restrict the positioning of initrd and FDT in RAM; see
-> > the README for details.
+> Sorry, I believe I was just using the wrong terminology, and what I named
+> the slave here would just be the client.
 > 
-> Yes, I'm aware of all this, but this is not the default behavior and the
-> default behavior will not work in this case. It also has another bug
-> related to the relocation that I fixed:
+> This may have contributed to a lot of confusion before, so let's make
+> sure I use the right terms now:
 > 
-> http://www.mail-archive.com/u-boot at lists.denx.de/msg86475.html
+> a) slave == dmac == dmaengine driver
+> b) client == device driver, e.g. mmc
+> c) common code == dmaengine layer
 > 
-> Rob
+> Is this correct?
+Yup, that is what i use.
 
-As for the default behavior, this becomes a board config issue, not a
-U-Boot issue.
+> 
+> > > > > I think encoding a description for a dma request in a single number is
+> > > > > the last thing we want to do here. We've tried that with IRQ and GPIO
+> > > > > numbers and it got us into a huge mess that will need a long time to
+> > > > > get out of.
+> > > > No i wasn't thinking of a number. The mapping shouldn't be a global
+> > > > number at all, though that is a very easy but not very scalable
+> > > > solution.
+> > > > We need to take care of 1:1 mapping of client and channels as well as
+> > > > many:1  cases as well. A single global number cannot represent that
+> > > > properly.
+> > > > 
+> > > > My idea is platform gives this information to dmaengine. Clients and
+> > > > dmaengine driver do not worry about it. That also paves way for arch
+> > > > independent clients and drivers.
+> > > 
+> > > IMO the platform should have no part in this. I absolutely want to
+> > > get rid of any platform-specific hardcoded tables in the kernel for
+> > > stuff that can easily be run-time detected from the device tree.
+> > > There are cases where hard-coding in the kernel is easier, but I don't
+> > > think this is one of them.
+> >
+> > Again, you got me wrong. We don't want any hardcoded table is kernel.
+> > The information in table should come from whatever way that platform can
+> > give me. For your case it should be DT.
+> 
+> Ok, good.
+> 
+> > We can have the map of which client can use which channel as DT binding
+> > of dmaengine core. So dmaengine can easily arbitrate about channel
+> > requests. Again this mapping information is not some even linux
+> > independent.
+> 
+> Why can't it be OS independent?
+I meant OS independent, didn't come out well :(
+> 
+> Do you mean there must be a global table, or are you ok with putting
+> the information about a channel into the device that uses the channel,
+> as we do for most other subsystems (IRQ, GPIO, pinctrl, ...).
+> If not, what is the problem with that approach?
 
-Regarding the patch, as a bugfix it will go in u-boot-arm/master
-for 2012.07.
+Today, we simple ask, "give me dma channel with DMA_SLAVE capability".
 
-With all this, do we have the overall issue covered?
+If we change it to "give me dma channel which suits my need" and have
+additional information in dmaengine to handle this request effectively.
 
-Amicalement,
+What that would mean is
+a) DMA channel either knows which channel to provide, Or
+b) Additional arguments provided to dmaengine API to help it find out
+which channel to provide.
+
+It would be good to have client ask for a specific channel. But in order
+to build generic clients, we face a problem that clients may not know
+how they mapped to dmac by SoC designer. Or the mux maybe entirely
+flexible on which channel.
+
+If we add this as DT property (which I assume should be platform
+specific), then client will know which channel to request.
+It can have two levels, dmac and channel. In case mux is flexible enough
+then client gets a channel and program the mux for this mapping.
+
+I think this is the most simplistic solution I have for this, thoughts?
+
 -- 
-Albert.
+~Vinod
