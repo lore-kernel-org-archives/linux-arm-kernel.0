@@ -1,42 +1,31 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 13 Jul 2012 12:21:12 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FE896F9.2020806@ti.com> <1340647463.1562.127.camel@vkoul-udesk3>
- <201206252030.56025.arnd@arndb.de>
- <Pine.LNX.4.64.1207061315470.29809@axis700.grange>
-Message-ID: <1342162272.1726.29.camel@vkoul-udesk3>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Jul 2012 15:14:18 +0800
+Subject: [PATCH 5/7] ARM: mxs: convert tx28 board to device tree
+In-Reply-To: <20474.55029.733084.749955@ipc1.ka-ro>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
+ <20474.55029.733084.749955@ipc1.ka-ro>
+Message-ID: <20120713071415.GA10602@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-06 at 13:36 +0200, Guennadi Liakhovetski wrote:
-> On Mon, 25 Jun 2012, Arnd Bergmann wrote:
-> 
-> [snip]
-> 
-> > The channel data in the device tree is still in a format
-> > that is specific to that dmaengine driver and interpreted
-> > by it. Using the regular dma_filter_fn prototype is not
-> > necessary, but it would be convenient because the dmaengine
-> > code already knows how to deal with it. If we don't use this
-> > method, how about adding another callback to struct dma_device
-> > like
-> > 
-> > bool (*device_match)(struct dma_chan *chan, struct property *req);
-> 
-> I like this idea, but why don't we extend it to also cover the non-DT 
-> case? I.e., why don't we add the above callback (call it "match" or 
-> "filter" or anything else) to dmaengine operations and inside (the 
-> extended) dma_request_channel(), instead of calling the filter function, 
-> passed as a parameter, we loop over all registered DMAC devices and call 
-> their filter callbacks, 
-And I have told you many times, that dmacs should not know anything
-about clients. They should be totally agnostic to it.
+Hi Lothar,
 
-Clients need to request a specific channel, and that is where changes
-should come for. Not having dmac provide one.
+On Mon, Jul 09, 2012 at 03:04:53PM +0200, Lothar Wa?mann wrote:
+> This doesn't work at least because the pins that are used for PHY
+> strap options need to be reconfigured for their FEC functionality
+> after releasing the PHY reset. But even after adding the missing
+> reconfiguration the ethernet PHY does not work.
+> 
+Can you please test the branch below to see if ethernet PHY works?
 
+  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/dt/tx28
+
+I hope I have addressed the issue with pin configuration there.
+But I'm not sure if "enet_out" clock needs to be enabled on tx28.
+I have enabled it in the code above.  You need to remove
+enable_clk_enet_out call from tx28_init, if it's not needed.
 
 -- 
-~Vinod
+Regards,
+Shawn
