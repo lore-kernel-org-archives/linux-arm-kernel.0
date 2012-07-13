@@ -1,67 +1,63 @@
 From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Fri, 13 Jul 2012 14:53:51 +0530
-Subject: [PATCH V2 4/7] Clk : SPEAr13xx: Register con_id for Ethernet phy clks
+Date: Fri, 13 Jul 2012 14:53:48 +0530
+Subject: [PATCH V2 1/7] ARM: SPEAr13xx: Fix Interrupt bindings
 In-Reply-To: <cover.1342171151.git.vipulkumar.samar@st.com>
 References: <cover.1342171151.git.vipulkumar.samar@st.com>
-Message-ID: <1edacddddd5d29111c611c779f0756cf779a240c.1342171151.git.vipulkumar.samar@st.com>
+Message-ID: <6f2947a4b7c2eb5e5d29f34e494b181be79cf1ef.1342171151.git.vipulkumar.samar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On kernel-3.5 stmmac Ethernet phy is not register as a separate device. So this
-patch is to register con_id for phy clk.
+-Correct interrupt bindings for uart, ethernet and pmu.
+-Added interrupt binding for keyboard.
 
 Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 Acked-by: Viiresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clk/spear/spear1310_clock.c |   10 +++++-----
- drivers/clk/spear/spear1340_clock.c |    2 +-
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/spear13xx.dtsi |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index 3d83ffc..a711662 100644
---- a/drivers/clk/spear/spear1310_clock.c
-+++ b/drivers/clk/spear/spear1310_clock.c
-@@ -619,7 +619,7 @@ void __init spear1310_clk_init(void)
- 			ARRAY_SIZE(gmac_phy_parents), 0,
- 			SPEAR1310_PERIP_CLK_CFG, SPEAR1310_GMAC_PHY_CLK_SHIFT,
- 			SPEAR1310_GMAC_PHY_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, NULL, "stmmacphy.0");
-+	clk_register_clkdev(clk, "stmmacphy.0", NULL);
+diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+index 10dcec7..f7b84ac 100644
+--- a/arch/arm/boot/dts/spear13xx.dtsi
++++ b/arch/arm/boot/dts/spear13xx.dtsi
+@@ -43,8 +43,8 @@
  
- 	/* clcd */
- 	clk = clk_register_mux(NULL, "clcd_syn_mclk", clcd_synth_parents,
-@@ -920,15 +920,15 @@ void __init spear1310_clk_init(void)
- 			SPEAR1310_RAS_CTRL_REG1,
- 			SPEAR1310_SMII_RGMII_PHY_CLK_SHIFT,
- 			SPEAR1310_PHY_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, NULL, "stmmacphy.1");
--	clk_register_clkdev(clk, NULL, "stmmacphy.2");
--	clk_register_clkdev(clk, NULL, "stmmacphy.4");
-+	clk_register_clkdev(clk, "stmmacphy.1", NULL);
-+	clk_register_clkdev(clk, "stmmacphy.2", NULL);
-+	clk_register_clkdev(clk, "stmmacphy.4", NULL);
+ 	pmu {
+ 		compatible = "arm,cortex-a9-pmu";
+-		interrupts = <0 8 0x04
+-			      0 9 0x04>;
++		interrupts = <0 6 0x04
++			      0 7 0x04>;
+ 	};
  
- 	clk = clk_register_mux(NULL, "rmii_phy_mclk", rmii_phy_parents,
- 			ARRAY_SIZE(rmii_phy_parents), 0,
- 			SPEAR1310_RAS_CTRL_REG1, SPEAR1310_RMII_PHY_CLK_SHIFT,
- 			SPEAR1310_PHY_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, NULL, "stmmacphy.3");
-+	clk_register_clkdev(clk, "stmmacphy.3", NULL);
+ 	L2: l2-cache {
+@@ -119,8 +119,8 @@
+ 		gmac0: eth at e2000000 {
+ 			compatible = "st,spear600-gmac";
+ 			reg = <0xe2000000 0x8000>;
+-			interrupts = <0 23 0x4
+-				      0 24 0x4>;
++			interrupts = <0 33 0x4
++				      0 34 0x4>;
+ 			interrupt-names = "macirq", "eth_wake_irq";
+ 			status = "disabled";
+ 		};
+@@ -202,6 +202,7 @@
+ 			kbd at e0300000 {
+ 				compatible = "st,spear300-kbd";
+ 				reg = <0xe0300000 0x1000>;
++				interrupts = <0 52 0x4>;
+ 				status = "disabled";
+ 			};
  
- 	clk = clk_register_mux(NULL, "uart1_mclk", uart_parents,
- 			ARRAY_SIZE(uart_parents), 0, SPEAR1310_RAS_CTRL_REG0,
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index 7815cbd..2cd5520 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -683,7 +683,7 @@ void __init spear1340_clk_init(void)
- 			ARRAY_SIZE(gmac_phy_parents), 0,
- 			SPEAR1340_PERIP_CLK_CFG, SPEAR1340_GMAC_PHY_CLK_SHIFT,
- 			SPEAR1340_GMAC_PHY_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, NULL, "stmmacphy.0");
-+	clk_register_clkdev(clk, "stmmacphy.0", NULL);
+@@ -224,7 +225,7 @@
+ 			serial at e0000000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0xe0000000 0x1000>;
+-				interrupts = <0 36 0x4>;
++				interrupts = <0 35 0x4>;
+ 				status = "disabled";
+ 			};
  
- 	/* clcd */
- 	clk = clk_register_mux(NULL, "clcd_syn_mclk", clcd_synth_parents,
 -- 
 1.7.2.2
