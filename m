@@ -1,30 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 13 Jul 2012 19:32:34 +0200
-Subject: [PATCH] ARM: disable interrupt before spinning endlessly
-In-Reply-To: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
-References: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201207131932.34530.marex@denx.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 13 Jul 2012 13:35:17 -0400 (EDT)
+Subject: [PATCH v2] ARM: mutex: use generic xchg-based implementation for
+ ARMv6+
+In-Reply-To: <1342199767-15108-1-git-send-email-will.deacon@arm.com>
+References: <1342199767-15108-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1207131334080.14068@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On Fri, 13 Jul 2012, Will Deacon wrote:
 
-> The CPU will endlessly spin at the end of machine_halt and
-> machine_restart calls.  However, this will lead to a soft lockup
-> warning after about 20 seconds, if CONFIG_LOCKUP_DETECTOR is enabled,
-> as system timer is still alive.
+> The open-coded mutex implementation for ARMv6+ cores suffers from a
+> severe lack of barriers, so in the uncontended case we don't actually
+> protect any accesses performed during the critical section.
 > 
-> Disable interrupt before going to spin endlessly, so that the lockup
-> warning will never be seen.
+> Furthermore, the code is largely a duplication of the ARMv6+ atomic_dec
+> code but optimised to remove a branch instruction, as the mutex fastpath
+> was previously inlined. Now that this is executed out-of-line, we can
+> reuse the atomic access code for the locking (in fact, we use the xchg
+> code as this produces shorter critical sections).
 > 
-> Reported-by: Marek Vasut <marex@denx.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> This patch uses the generic xchg based implementation for mutexes on
+> ARMv6+, which introduces barriers to the lock/unlock operations and also
+> has the benefit of removing a fair amount of inline assembly code.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Reported-by: Shan Kang <kangshan0910@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/kernel/process.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> Ok, so here's v2 following the feedback from Arnd and Nico. We now use
+> the xchg-based version for all versions of the architecture and I've
+> updated the commit message to reflect both that and also to remove the
+> bit about avoiding the slowpath on frivolous CPUs!
 
-I just got back from a conference, I'd gladly test. But my mx28 doesn't boot at 
-all with latest -next. Any idea why?
+Looks great.  You probably should tag it for stable as well.
 
-Best regards,
-Marek Vasut
+
+Nicolas
