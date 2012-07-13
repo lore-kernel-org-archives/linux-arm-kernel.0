@@ -1,7 +1,7 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 15:10:31 -0500
+Date: Fri, 13 Jul 2012 15:12:03 -0500
 Subject: [PATCH] ARM: OMAP2+: Fix dmtimer set source clock failure
-Message-ID: <1342210231-2070-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1342210323-2129-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
