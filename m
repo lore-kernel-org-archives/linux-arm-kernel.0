@@ -1,42 +1,41 @@
 From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Fri, 13 Jul 2012 14:53:49 +0530
-Subject: [PATCH V2 2/7] clk: SPEAr1340: Fix clk enable register for uart1 and
- i2c1.
-In-Reply-To: <cover.1342171151.git.vipulkumar.samar@st.com>
-References: <cover.1342171151.git.vipulkumar.samar@st.com>
-Message-ID: <331cbb10bd162ca25d60f6c9951c00785d6b9ce7.1342171151.git.vipulkumar.samar@st.com>
+Date: Fri, 13 Jul 2012 14:53:47 +0530
+Subject: [PATCH V2 0/7] ARM: SPEAr13xx: Minor fixes and updation
+Message-ID: <cover.1342171151.git.vipulkumar.samar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to fix typing mistake of clk enable register of i2c1 and uart1.
+-v2:
+-Fix check retrun value from clk_set_rate and clk_set_parent.
+-Fix sys_clk mask value.
+-Additional patch for overwrite platform data passed from auxdata_lookup
 
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-Acked-by: Viiresh Kumar <viresh.kumar@linaro.org>
----
- drivers/clk/spear/spear1340_clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+-v1:
+-Fix interrupt bindings for ethernet, i2c,.
+-Fix clk enable register for uart1 and i2c1.
+-Fix register con_id for ethernet.
+-Update sys_clk parent.
+-Pass ethernet platform data from auxdata lookup.
+-Add local timer clock.
 
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index 0f2324b..4484698 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -617,7 +617,7 @@ void __init spear1340_clk_init(void)
- 	clk_register_clkdev(clk, "uart1_mclk", NULL);
- 
- 	clk = clk_register_gate(NULL, "uart1_clk", "uart1_mclk", 0,
--			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_UART1_CLK_ENB, 0,
-+			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_UART1_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "b4100000.serial");
- 
-@@ -741,7 +741,7 @@ void __init spear1340_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "e0280000.i2c");
- 
- 	clk = clk_register_gate(NULL, "i2c1_clk", "ahb_clk", 0,
--			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_I2C1_CLK_ENB, 0,
-+			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_I2C1_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "b4000000.i2c");
- 
+Vipul Kumar Samar (7):
+  ARM: SPEAr13xx: Fix Interrupt bindings
+  clk: SPEAr1340: Fix clk enable register for uart1 and i2c1.
+  clk: SPEAr13xx: Add localtimer (twd) clock support
+  Clk : SPEAr13xx: Register con_id for Ethernet phy clks
+  Clk: SPEAr1340: Update sys clock parent array
+  ARM: SPEAr13xx: Add auxdata for Ethernet controller.
+  net: stmmac: Overwrite platform data if passed from auxdata
+
+ arch/arm/boot/dts/spear13xx.dtsi                   |   11 +-
+ arch/arm/mach-spear13xx/include/mach/generic.h     |    2 +
+ arch/arm/mach-spear13xx/include/mach/spear.h       |    1 +
+ arch/arm/mach-spear13xx/spear1340.c                |   32 ++++++
+ arch/arm/mach-spear13xx/spear13xx.c                |  104 ++++++++++++++++++++
+ drivers/clk/spear/spear1310_clock.c                |   14 ++-
+ drivers/clk/spear/spear1340_clock.c                |   14 ++-
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    5 +-
+ 8 files changed, 166 insertions(+), 17 deletions(-)
+
 -- 
 1.7.2.2
