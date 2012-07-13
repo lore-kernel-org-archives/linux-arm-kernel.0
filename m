@@ -1,42 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jul 2012 09:57:47 +0100
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
- implementation to be selected
-In-Reply-To: <4FFF8509.2050302@renesas.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
- <4FFE7DB2.4040702@renesas.com>
- <20120712084432.GA2816@mudshark.cambridge.arm.com>
- <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
- <4FFF8509.2050302@renesas.com>
-Message-ID: <20120713085746.GA18079@mudshark.cambridge.arm.com>
+From: kangshan0910@gmail.com (shan kang)
+Date: Fri, 13 Jul 2012 17:10:52 +0800
+Subject: ARM: why smp_mb() is not needed in the "__mutex_fastpath_lock"
+ and "__mutex_fastpath_unlock" functions
+In-Reply-To: <CAFNq8R6dNb0BrDVZScJ8s=P3B-OMgtr8tUdy8XqQcCAeUWuH+A@mail.gmail.com>
+References: <CAK2TD5ygowdy9t1TpfxAPbpvNQfMnMB-3Zp8TKMsTYtBZdGW=Q@mail.gmail.com>
+ <CAFNq8R6dNb0BrDVZScJ8s=P3B-OMgtr8tUdy8XqQcCAeUWuH+A@mail.gmail.com>
+Message-ID: <CAK2TD5z2DticZAQ-Pxzo7YT9tx=YWZkwcn-YZJ3aQa4AFoE_Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 03:16:41AM +0100, Shinya Kuribayashi wrote:
-> On 7/13/2012 1:40 AM, Stephen Boyd wrote:
-> >>>> As a result, actual udelay()s may be toooo long than expected, in
-> >>>> particular udelay()s used between init_current_timer_delay() and
-> >>>> calibrate_delay().  It's unlikely be short, as the frequency of a
-> >>>> counter for read_current_timer is typically slower than CPU frequency.
-> >>> Surely using udelay before calibrate_delay_loop has been called is a
-> >>> fundamental error?
-> >> Got it.  I'm just not confident about disallowing early use of udelay().
-> >>
-> > 
-> > I don't think it's an error. Instead you get a very large delay, similar
-> > to what would happen if you called udelay() before calibrate_delay()
-> > anyway (see the comment in init/main.c above loops_per_jiffy).
+For example, in the following scenario, Process2  may get the wrong value;
+Process1:
+mutex_lock(&lock);
+write data; (store operation)
+mutex_unlock(&lock);
 
-Interesting, I didn't notice it was initialised to 4k, so yes I suppose you
-could make use of some sort of delay. I don't think it's necessarily `very
-large' though -- anything ticking at over ~400KHz with HZ=100 would give you
-a smaller delay.
+Process2:
+mutex_lock(&lock);
+read data; (load operation)
+mutex_unlock(&lock);
 
-> Thanks, so I'd set up loops_per_jiffy early, along with lpj_fine in
-> init_current_timer_delay().
+Suppose Process1 gets the lock first, write data and unlock. If the
+store operation completes very slowly, the load operation of the
+Process2 will fail to get the new value.
+Since there are no dmb instructions in the mutex_lock and
+mutex_unlock, which doesn't make sure that after Process2 gets the
+lock, the result of the Process1's store operation will be seen by the
+Process2.
 
-That should work, providing you can get a sensible initial estimate for
-loops_per_jiffy.
 
-Will
+
+2012/7/13 Li Haifeng <omycle@gmail.com>:
+> Hi Shan,
+>
+> 2012/7/12 shan kang <kangshan0910@gmail.com>:
+>> Hello,
+>>    I wonder why smp_mb() is not needed in the "__mutex_fastpath_lock"
+>> and "__mutex_fastpath_unlock" functions which are located in the
+>> "arch/arm/include/asm/mutex.h"?
+>>    I think "dmb" instruction is necessary there.
+>
+> Why necessary? Could you explain more detailed?
+>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
