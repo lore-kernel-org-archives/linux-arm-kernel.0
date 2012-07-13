@@ -1,32 +1,29 @@
 From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Fri, 13 Jul 2012 17:51:04 +0530
-Subject: [PATCH 1/3] ARM: SPEAr3xx: Rename gpt timer clk parent name
+Date: Fri, 13 Jul 2012 17:51:05 +0530
+Subject: [PATCH 2/3] ARM: dts: SPEAr320: Fix compatible string
 In-Reply-To: <cover.1342181727.git.vipulkumar.samar@st.com>
 References: <cover.1342181727.git.vipulkumar.samar@st.com>
-Message-ID: <0275d6ccd52ace2ce8ac87f159df89ae746e82a5.1342181727.git.vipulkumar.samar@st.com>
+Message-ID: <68769db82768b57876573b9391ee3119fe6ca19e.1342181727.git.vipulkumar.samar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pll3_48m_clk clock is renamed like pll3_clk so make corresponding changes for
-gpt parent clock name.
-
 Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 ---
- arch/arm/mach-spear3xx/spear3xx.c |    2 +-
+ arch/arm/boot/dts/spear320-evb.dts |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 0f41bd1..66db5f1 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -87,7 +87,7 @@ void __init spear3xx_map_io(void)
+diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+index c13fd1f..4d55b67 100644
+--- a/arch/arm/boot/dts/spear320-evb.dts
++++ b/arch/arm/boot/dts/spear320-evb.dts
+@@ -16,7 +16,7 @@
  
- static void __init spear3xx_timer_init(void)
- {
--	char pclk_name[] = "pll3_48m_clk";
-+	char pclk_name[] = "pll3_clk";
- 	struct clk *gpt_clk, *pclk;
+ / {
+ 	model = "ST SPEAr300 Evaluation Board";
+-	compatible = "st,spear300-evb", "st,spear300";
++	compatible = "st,spear320-evb", "st,spear320";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
  
- 	spear3xx_clk_init();
 -- 
 1.7.2.2
