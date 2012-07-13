@@ -1,58 +1,26 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Jul 2012 17:19:44 +0300
-Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for preventing
- autodep delete
-In-Reply-To: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1342189185-5306-8-git-send-email-t-kristo@ti.com>
+Date: Fri, 13 Jul 2012 17:19:37 +0300
+Subject: [PATCHv4 0/8] ARM: OMAP: pm: usecounting changes
+Message-ID: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clockdomains bug out if their autodeps are deleted before idle.
-This happens namely with OMAP3 PER domain, it will bug out if it
-doesn't have wakedeps enabled when it enters off-mode. This patch
-adds support for new flag 'CLKDM_NO_AUTODEP_DISABLE' which does this.
+Hi,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/clockdomain.c |    3 +++
- arch/arm/mach-omap2/clockdomain.h |    4 ++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+Changes compared to previous version:
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 7f5423e..56cef58 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -201,6 +201,9 @@ void _clkdm_del_autodeps(struct clockdomain *clkdm)
- 	if (!autodeps || clkdm->flags & CLKDM_NO_AUTODEPS)
- 		return;
- 
-+	if (clkdm->flags & CLKDM_NO_AUTODEP_DISABLE)
-+		return;
-+
- 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
- 		if (IS_ERR(autodep->clkdm.ptr))
- 			continue;
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 373399a..1fc5314 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -31,12 +31,16 @@
-  *
-  * CLKDM_NO_AUTODEPS: Prevent "autodeps" from being added/removed from this
-  *     clockdomain.  (Currently, this applies to OMAP3 clockdomains only.)
-+ * CLKDM_NO_AUTODEP_DISABLE: Prevent clockdomain code from deleting autodeps.
-+ *     Needed for PER domain on omap3, as it will bug out with off-mode if
-+ *     wakedeps are removed.
-  */
- #define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
- #define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
- #define CLKDM_CAN_ENABLE_AUTO			(1 << 2)
- #define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
- #define CLKDM_NO_AUTODEPS			(1 << 4)
-+#define CLKDM_NO_AUTODEP_DISABLE		(1 << 5)
- 
- #define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
- #define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
--- 
-1.7.4.1
+- added kerneldoc comments to new API functions
+- added autoidle flagging support for omap3 dplls
+- modified the clkdm code tweak required to fix omap3 per domain problems
+ * moved implementation to _clkdm_del_autodeps
+ * renamed the CLKDM_SKIP_MANUAL_TRANS to CLKDM_NO_AUTODEP_DISABLE
+ * modified comments accordingly
+- ported for 3.5-rc6
+
+- tested with omap3 beagle board, both ret / off + suspend / cpuidle
+
+- functional branch available at:
+  git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+  branch: mainline-3.5-rc6-pwrdm-changes-v4
+
+-Tero
