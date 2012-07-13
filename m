@@ -1,36 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 13 Jul 2012 13:36:59 -0600
-Subject: [PATCH 00/11] make struct of_device_id.data const
-In-Reply-To: <5000175E.4070702@gmail.com>
-References: <5000175E.4070702@gmail.com>
-Message-ID: <CACxGe6tXvz+rt2yrHHaD=j94-=JQEh06sHW0FWGiHb2=9GS2pA@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 13 Jul 2012 15:40:38 -0400 (EDT)
+Subject: Loading handle_arch_irq with a PC relative load
+In-Reply-To: <50007197.8030403@xenomai.org>
+References: <50007197.8030403@xenomai.org>
+Message-ID: <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 6:41 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 07/13/2012 07:32 AM, y at pengutronix.de wrote:
->> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>
->> Hello,
->>
->> this series' goal is to make struct of_device_id.data const.
->> Conceptually a driver must not modify the data contained there so making
->> it const is the right thing.
->>
->> This change might introduce warnings because drivers don't use const to
->> access the data pointed to by of_device_id.data. In most cases the fix
->> is to add some consts.
->>
->> This series (apart from adding this const in patch 10) fixes all drivers
->> covered by all arm defconfigs (based on v3.5-rc6).
->>
->
-> What about other arches?
+On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
 
-This whole series is of questionable value to me.  While I agree that
-.data should be const, I don't think changing it has is measurably
-better than what we have now.  Particularly when the series isn't
-complete for all users.  And "building all defconfigs" is not the
-right way to look for affected users.
+> 
+> I do not know if it is really useful, but it seems it would be possible 
+> to reduce the number of memory accesses to just one in the irq_handler 
+> macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
+> PC relative load, with something like the following patch:
 
-g.
+To be strict with ccode sections, you can't do this.  The 
+handle_arch_irq symbol identifies a variable and with your patch you're 
+moving it from the .data section to the .text section.  The .text 
+section is meant to be read only, and this is even more true when using 
+a XIP kernel where .text is in ROM, or if we could make the access 
+protection of the kernel ro.
+
+
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 0d1851c..48ee46a 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -37,10 +37,9 @@
+>   */
+>  	.macro	irq_handler
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+> -	ldr	r1, =handle_arch_irq
+>  	mov	r0, sp
+>  	adr	lr, BSYM(9997f)
+> -	ldr	pc, [r1]
+> +	ldr	pc, handle_arch_irq
+>  #else
+>  	arch_irq_handler_default
+>  #endif
+> @@ -325,6 +324,12 @@ ENDPROC(__pabt_svc)
+>  #endif
+>  .LCfp:
+>  	.word	fp_enter
+> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+> +	.globl	handle_arch_irq
+> +handle_arch_irq:
+> +	.space	4
+> +#endif
+> +
+>  
+>  /*
+>   * User mode handlers
+> @@ -1151,9 +1156,3 @@ cr_alignment:
+>  	.space	4
+>  cr_no_alignment:
+>  	.space	4
+> -
+> -#ifdef CONFIG_MULTI_IRQ_HANDLER
+> -	.globl	handle_arch_irq
+> -handle_arch_irq:
+> -	.space	4
+> -#endif
+> 
+> 
+> -- 
+>                                                                 Gilles.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
