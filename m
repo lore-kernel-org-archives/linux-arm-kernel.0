@@ -1,96 +1,310 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 13 Jul 2012 19:37:38 +0300
-Subject: [RFC 5/6] ARM: OMAP3: hwmod data: add sad2d hwmod
-In-Reply-To: <1342197459-7920-1-git-send-email-t-kristo@ti.com>
-References: <1342197459-7920-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1342197459-7920-6-git-send-email-t-kristo@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 13 Jul 2012 17:07:18 -0500
+Subject: [RFC 1/4] arm/dts: OMAP: Add genernal purpose timer nodes
+In-Reply-To: <1342217241-28491-1-git-send-email-jon-hunter@ti.com>
+References: <1342217241-28491-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1342217241-28491-2-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SAD2D stands for the die to die interface, and is used for communicating
-with the optional stacked modem. This hwmod is added in preparation for
-the d2d_idle move from pm34xx.c to hwmod data.
+Add the 12 GP timers nodes present in OMAP3.
+Add the 11 GP timers nodes present in OMAP4.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Add documentation for timer properties specific to OMAP.
+
+For each timer an alias is being added. The purpose for doing this is because
+the OMAP dmtimer driver uses an ID to distinguish between the different timer
+instances. For example, a timer can be requested by its ID. By adding an alias
+for each timer we can then use the function of_alias_get_id() to extract the
+ID for each timer from the alias name. The same method is used for the TTY
+serial devices. If it is preferred that such an alias is not added and there
+is a better way to pass an ID from device-tree let me know.
+
+Cc: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/cm-regbits-34xx.h      |    2 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   37 ++++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/arm/omap/timer.txt         |   34 +++++++
+ arch/arm/boot/dts/omap3.dtsi                       |  104 ++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi                       |   93 +++++++++++++++++
+ 3 files changed, 231 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/timer.txt
 
-diff --git a/arch/arm/mach-omap2/cm-regbits-34xx.h b/arch/arm/mach-omap2/cm-regbits-34xx.h
-index 90d150c8..03b0806 100644
---- a/arch/arm/mach-omap2/cm-regbits-34xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-34xx.h
-@@ -218,6 +218,8 @@
- #define OMAP3430_ST_MAILBOXES_MASK			(1 << 7)
- #define OMAP3430_ST_OMAPCTRL_SHIFT			6
- #define OMAP3430_ST_OMAPCTRL_MASK			(1 << 6)
-+#define OMAP3430_ST_SAD2D_SHIFT				3
-+#define OMAP3430_ST_SAD2D_MASK				(1 << 3)
- #define OMAP3430_ST_SDMA_SHIFT				2
- #define OMAP3430_ST_SDMA_MASK				(1 << 2)
- #define OMAP3430_ST_SDRC_SHIFT				1
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 1ef6c90..dd1335e 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -2017,6 +2017,33 @@ static struct omap_hwmod omap3xxx_hdq1w_hwmod = {
- 	.class		= &omap2_hdq1w_class,
- };
+diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+new file mode 100644
+index 0000000..dcbb451
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+@@ -0,0 +1,34 @@
++OMAP Timer controller bindings
++
++Required properties:
++- compatible:
++  - "ti,omap3-timer" for OMAP3+ controllers
++- reg: Contains timer register address range (base address and length)
++- interrupts: Contains the interrupt information for the timer. The format is
++  being dependent on which interrupt controller the OMAP device uses.
++
++OMAP specific properties:
++- ti,hwmods: Name of the hwmod associated to the timer:
++  "timer<X>", <X> being the 1-based instance number from the HW spec
++- ti,timer-alwon: Indicates the timer is in an alway-on power domain.
++- ti,timer-pwm: Indicates the timer supports can generate PWM output.
++- ti,timer-secure: Indicates the timer is reserved on a secure OMAP device and
++  therefore cannot be used by the kernel.
++
++Note: Each timer should have an alias correctly numbered in "aliases" node. The
++      alias is used to identify the timer instance in the driver.
++
++Example:
++
++aliases {
++	timer12 = &timer12;
++};
++
++timer12: timer at 48304000 {
++	compatible = "ti,omap3-timer";
++	reg = <0x48304000 0xfff>;
++	interrupts = <95>;
++	ti,hwmods = "timer12"
++	ti,timer-alwon;
++	ti,timer-secure;
++};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 8109471..f309f2a 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -12,12 +12,25 @@
  
-+/* SAD2D */
-+static struct omap_hwmod_rst_info omap3xxx_sad2d_resets[] = {
-+	{ .name = "rst_modem_pwron_sw", .rst_shift = 0 },
-+	{ .name = "rst_modem_sw", .rst_shift = 1 },
-+};
-+
-+static struct omap_hwmod_class omap3xxx_sad2d_class = {
-+	.name			= "sad2d",
-+};
-+
-+static struct omap_hwmod omap3xxx_sad2d_hwmod = {
-+	.name		= "sad2d",
-+	.rst_lines	= omap3xxx_sad2d_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(omap3xxx_sad2d_resets),
-+	.main_clk	= "sad2d_ick",
-+	.prcm		= {
-+		.omap2 = {
-+			.module_offs = CORE_MOD,
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP3430_EN_SAD2D_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP3430_ST_SAD2D_SHIFT,
-+		},
-+	},
-+	.class		= &omap3xxx_sad2d_class,
-+};
-+
- /*
-  * '32K sync counter' class
-  * 32-bit ordinary counter, clocked by the falling edge of the 32 khz clock
-@@ -2120,6 +2147,15 @@ static struct omap_hwmod_ocp_if am35xx_usbhsotg__l3 = {
- 	.clk		= "core_l3_ick",
- 	.user		= OCP_USER_MPU,
- };
-+
-+/* l3_core -> sad2d interface */
-+static struct omap_hwmod_ocp_if omap3xxx_sad2d__l3 = {
-+	.master		= &omap3xxx_sad2d_hwmod,
-+	.slave		= &omap3xxx_l3_main_hwmod,
-+	.clk		= "core_l3_ick",
-+	.user		= OCP_USER_MPU,
-+};
-+
- /* L4_CORE -> L4_WKUP interface */
- static struct omap_hwmod_ocp_if omap3xxx_l4_core__l4_wkup = {
- 	.master	= &omap3xxx_l4_core_hwmod,
-@@ -3203,6 +3239,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
- 	&omap34xx_l4_core__mcspi3,
- 	&omap34xx_l4_core__mcspi4,
- 	&omap3xxx_l4_wkup__counter_32k,
-+	&omap3xxx_sad2d__l3,
- 	NULL,
- };
+ / {
+ 	compatible = "ti,omap3430", "ti,omap3";
++	interrupt-parent = <&intc>;
  
+ 	aliases {
+ 		serial0 = &uart1;
+ 		serial1 = &uart2;
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
++		timer1 = &timer1;
++		timer2 = &timer2;
++		timer3 = &timer3;
++		timer4 = &timer4;
++		timer5 = &timer5;
++		timer6 = &timer6;
++		timer7 = &timer7;
++		timer8 = &timer8;
++		timer9 = &timer9;
++		timer10 = &timer10;
++		timer11 = &timer11;
++		timer12 = &timer12;
+ 	};
+ 
+ 	cpus {
+@@ -220,5 +233,96 @@
+ 			compatible = "ti,omap3-wdt";
+ 			ti,hwmods = "wd_timer2";
+ 		};
++
++		timer1: timer at 48318000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48318000 0xfff>;
++			interrupts = <37>;
++			ti,hwmods = "timer1";
++			ti,timer-alwon;
++		};
++
++		timer2: timer at 49032000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x49032000 0xfff>;
++			interrupts = <38>;
++			ti,hwmods = "timer2";
++		};
++
++		timer3: timer at 49034000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x49034000 0xfff>;
++			interrupts = <39>;
++			ti,hwmods = "timer3";
++		};
++
++		timer4: timer at 49036000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x49036000 0xfff>;
++			interrupts = <40>;
++			ti,hwmods = "timer4";
++		};
++
++		timer5: timer at 49038000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x49038000 0xfff>;
++			interrupts = <41>;
++			ti,hwmods = "timer5";
++		};
++
++		timer6: timer at 4903a000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4903a000 0xfff>;
++			interrupts = <42>;
++			ti,hwmods = "timer6";
++		};
++
++		timer7: timer at 4903c000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4903c000 0xfff>;
++			interrupts = <43>;
++			ti,hwmods = "timer7";
++		};
++
++		timer8: timer at 4903e000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4903e000 0xfff>;
++			interrupts = <44>;
++			ti,hwmods = "timer8";
++			ti,timer-pwm;
++		};
++
++		timer9: timer at 49040000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x49040000 0xfff>;
++			interrupts = <45>;
++			ti,hwmods = "timer9";
++			ti,timer-pwm;
++		};
++
++		timer10: timer at 48086000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48086000 0xfff>;
++			interrupts = <46>;
++			ti,hwmods = "timer10";
++			ti,timer-pwm;
++		};
++
++		timer11: timer at 48088000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48088000 0xfff>;
++			interrupts = <47>;
++			ti,hwmods = "timer11";
++			ti,timer-pwm;
++		};
++
++		timer12: timer at 48304000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48304000 0xfff>;
++			interrupts = <95>;
++			ti,hwmods = "timer12";
++			ti,timer-alwon;
++			ti,timer-secure;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 04cbbcb..39716c5 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -25,6 +25,17 @@
+ 		serial1 = &uart2;
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
++		timer1 = &timer1;
++		timer2 = &timer2;
++		timer3 = &timer3;
++		timer4 = &timer4;
++		timer5 = &timer5;
++		timer6 = &timer6;
++		timer7 = &timer7;
++		timer8 = &timer8;
++		timer9 = &timer9;
++		timer10 = &timer10;
++		timer11 = &timer11;
+ 	};
+ 
+ 	cpus {
+@@ -295,5 +306,87 @@
+ 			interrupt-parent = <&gic>;
+ 			ti,hwmods = "dmic";
+ 		};
++
++		timer1: timer at 4a318000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4a318000 0x7f>;
++			interrupts = <0 37 0x4>;
++			ti,hwmods = "timer1";
++			ti,timer-alwon;
++		};
++
++		timer2: timer at 48032000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48032000 0x7f>;
++			interrupts = <0 38 0x4>;
++			ti,hwmods = "timer2";
++		};
++
++		timer3: timer at 48034000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48034000 0x7f>;
++			interrupts = <0 39 0x4>;
++			ti,hwmods = "timer3";
++		};
++
++		timer4: timer at 48036000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48036000 0x7f>;
++			interrupts = <0 40 0x4>;
++			ti,hwmods = "timer4";
++		};
++
++		timer5: timer at 49038000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x49038000 0x7f>;
++			interrupts = <0 41 0x4>;
++			ti,hwmods = "timer5";
++		};
++
++		timer6: timer at 4903a000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4903a000 0x7f>;
++			interrupts = <0 42 0x4>;
++			ti,hwmods = "timer6";
++		};
++
++		timer7: timer at 4903c000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4903c000 0x7f>;
++			interrupts = <0 43 0x4>;
++			ti,hwmods = "timer7";
++		};
++
++		timer8: timer at 4903e000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4903e000 0x7f>;
++			interrupts = <0 44 0x4>;
++			ti,hwmods = "timer8";
++			ti,timer-pwm;
++		};
++
++		timer9: timer at 4803e000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x4803e000 0x7f>;
++			interrupts = <0 45 0x4>;
++			ti,hwmods = "timer9";
++			ti,timer-pwm;
++		};
++
++		timer10: timer at 48086000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48086000 0x7f>;
++			interrupts = <0 46 0x4>;
++			ti,hwmods = "timer10";
++			ti,timer-pwm;
++		};
++
++		timer11: timer at 48088000 {
++			compatible = "ti,omap3-timer";
++			reg = <0x48088000 0x7f>;
++			interrupts = <0 47 0x4>;
++			ti,hwmods = "timer11";
++			ti,timer-pwm;
++		};
+ 	};
+ };
 -- 
-1.7.4.1
+1.7.9.5
