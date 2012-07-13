@@ -1,142 +1,64 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 17:26:53 -0500
-Subject: [RFC RESEND 4/4] ARM: OMAP: Add DT support for timer driver
+Date: Fri, 13 Jul 2012 17:26:52 -0500
+Subject: [RFC RESEND 3/4] ARM: OMAP4: Add timer clock aliases for device-tree
 In-Reply-To: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
 References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1342218413-30116-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <1342218413-30116-4-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to add device-tree support to the timer driver the following changes
-were made ...
+For OMAP4, the dmtimers are located in the Wake-up, ABE and Peripheral (PER)
+power domains. Hence, when the dmtimer is configured to use the "timer_sys_ck"
+as its functional clock the actual clock used is different depending on whether
+the clock is in the Wake-up, ABE or PER domain. So when we look-up the dmtimer's
+"timer_sys_ck" we need to specify the timer device name as well as clock alias
+to find the right clock.
 
-1. If DT blob is present, then let HWMOD create the timer devices dynamically.
-2. When device-tree is present the "id" field in the platform_device structure
-   (pdev->id) is initialised to -1 and the timer instance is looked-up using the
-   device tree alias mechanism. Therefore, avoid using "pdev-id" in the driver
-   and use "timer->id" which will be initialised correctly regardless of whether
-   device tree is present.
-3. When device-tree is present the platform_data structure will be NULL and so
-   check for this.
-4. The OMAP timer device tree binding optional parameters ...
-	a. ti,timer-alwon  --> Timer is in an always-on power domain
-	b. ti,timer-pwn    --> Timer can generate a PWM output
-   Search for the above parameters and set the appropriate timer attribute
-   flags.
+Currently, the device names for the timers have the format "omap_timer.X" where
+X is the timer instance number. When using to device tree, the format of the
+device name created by device-tree is different and has the format
+"<reg-address>.<device-name>" (this is assuming that the device-tree "reg"
+property is specified). This causes the look-up for the OMAP4 "timer_sys_ck" to
+fail. To fix this add new timer clock alias for using device-tree.
+
+Please note that adding a 2nd set of clock aliases for the same clocks to only
+temporary until device-tree migration is complete. Then we can remove the legacy
+aliases. Hence, I have marked the legacy aliases with a "TODO" to remove them.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/timer.c  |    4 ++++
- arch/arm/plat-omap/dmtimer.c |   32 ++++++++++++++++++++++++++------
- 2 files changed, 30 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/clock44xx_data.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index e3b9931..ad5b29a 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -473,6 +473,10 @@ static int __init omap2_dm_timer_init(void)
- {
- 	int ret;
- 
-+	/* If dtb is there, the devices will be created dynamically */
-+	if (of_have_populated_dt())
-+		return -ENODEV;
-+
- 	ret = omap_hwmod_for_each_by_class("timer", omap_timer_init, NULL);
- 	if (unlikely(ret)) {
- 		pr_err("%s: device registration failed.\n", __func__);
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 626ad8c..5a51b67 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -40,6 +40,8 @@
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <plat/dmtimer.h>
- #include <plat/omap-pm.h>
-@@ -123,7 +125,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
- static void omap_dm_timer_reset(struct omap_dm_timer *timer)
- {
- 	omap_dm_timer_enable(timer);
--	if (timer->pdev->id != 1) {
-+	if (timer->id != 1) {
- 		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
- 		omap_dm_timer_wait_for_reset(timer);
- 	}
-@@ -214,7 +216,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
- 
- 	spin_lock_irqsave(&dm_timer_lock, flags);
- 	list_for_each_entry(t, &omap_timer_list, node) {
--		if (t->pdev->id == id && !t->reserved) {
-+		if (t->id == id && !t->reserved) {
- 			timer = t;
- 			timer->reserved = 1;
- 			break;
-@@ -414,7 +416,7 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
- 	 * use the clock framework to set the parent clock. To be removed
- 	 * once OMAP1 migrated to using clock framework for dmtimers
- 	 */
--	if (pdata->set_timer_src)
-+	if (pdata && pdata->set_timer_src)
- 		return pdata->set_timer_src(timer->pdev, source);
- 
- 	fclk = clk_get(&timer->pdev->dev, "fck");
-@@ -695,7 +697,7 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
- 
--	if (!pdata) {
-+	if (!pdata && !dev->of_node) {
- 		dev_err(dev, "%s: no platform data.\n", __func__);
- 		return -ENODEV;
- 	}
-@@ -724,11 +726,21 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	timer->id = pdev->id;
-+	if (dev->of_node) {
-+		timer->id = of_alias_get_id(dev->of_node, "timer");
-+
-+		if (of_find_property(dev->of_node, "ti,timer-alwon", NULL))
-+			timer->capability |= OMAP_TIMER_ALWON;
-+		if (of_find_property(dev->of_node, "ti,timer-pwm", NULL))
-+			timer->capability |= OMAP_TIMER_HAS_PWM;
-+	} else {
-+		timer->id = pdev->id;
-+		timer->capability = pdata->timer_capability;
-+	}
-+
- 	timer->irq = irq->start;
- 	timer->reserved = omap_dm_timer_reserved_systimer(timer->id);
- 	timer->pdev = pdev;
--	timer->capability = pdata->timer_capability;
- 
- 	/* Skip pm_runtime_enable for OMAP1 */
- 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
-@@ -778,11 +790,19 @@ static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
- 	return ret;
- }
- 
-+static const struct of_device_id omap_timer_match[] = {
-+	{ .compatible = "ti,omap3-timer", },
-+	{ .compatible = "ti,omap2-timer", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap_timer_match);
-+
- static struct platform_driver omap_dm_timer_driver = {
- 	.probe  = omap_dm_timer_probe,
- 	.remove = __devexit_p(omap_dm_timer_remove),
- 	.driver = {
- 		.name   = "omap_timer",
-+		.of_match_table = of_match_ptr(omap_timer_match),
- 	},
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index d7f55e4..7dfeaf0 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -3314,6 +3314,7 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK("usbhs_omap",	"usbtll_fck",		&dummy_ck,	CK_443X),
+ 	CLK("omap_wdt",	"ick",				&dummy_ck,	CK_443X),
+ 	CLK(NULL,	"timer_32k_ck",	&sys_32k_ck,	CK_443X),
++	/* TODO: Remove "omap_timer.X" aliases once DT migration is complete */
+ 	CLK("omap_timer.1",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+ 	CLK("omap_timer.2",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+ 	CLK("omap_timer.3",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+@@ -3325,6 +3326,17 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK("omap_timer.6",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK("omap_timer.7",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK("omap_timer.8",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4a318000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("48032000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("48034000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("48036000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
++	CLK("49038000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4903a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
  };
  
+ int __init omap4xxx_clk_init(void)
 -- 
 1.7.9.5
