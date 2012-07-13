@@ -1,43 +1,23 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Jul 2012 20:28:03 +0900
-Subject: [PATCH v5 6/6] spi: s3c64xx: add device tree support
-In-Reply-To: <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
-References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
- <1342021265-11212-7-git-send-email-thomas.abraham@linaro.org>
- <4FFF51EE.4080609@samsung.com>
- <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
-Message-ID: <117c01cd60ea$90f76ac0$b2e64040$%kim@samsung.com>
+Date: Fri, 13 Jul 2012 20:28:10 +0900
+Subject: [PATCH] ARM: samsung: adc: fix race in s3c_adc_start
+In-Reply-To: <20120713013529.GA16856@google.com>
+References: <1342059131-31251-1-git-send-email-toddpoynor@google.com>
+ <20120712123125.GJ18513@trinity.fluff.org> <4FFF5287.8000608@samsung.com>
+ <20120713013529.GA16856@google.com>
+Message-ID: <117d01cd60ea$9544a4d0$bfcdee70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+Todd Poynor wrote:
 > 
-> On 13 July 2012 04:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Thomas, the DMACH_DT_PROP is available only on pl330 now. So seems occur
-> > following build error with s3c6400_defconfig.
-> >
-> > drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_get_dmares':
-> > drivers/spi/spi-s3c64xx.c:1098: error: 'DMACH_DT_PROP' undeclared (first
-> use
-> > in this function)
-> > drivers/spi/spi-s3c64xx.c:1098: error: (Each undeclared identifier is
-> > reported only once
-> > drivers/spi/spi-s3c64xx.c:1098: error: for each function it appears in.)
-> > make[3]: *** [drivers/spi/spi-s3c64xx.o] Error 1
-> > make[2]: *** [drivers/spi] Error 2
-> >
+> On Fri, Jul 13, 2012 at 07:41:11AM +0900, Kukjin Kim wrote:
+> > BTW, Todd, do you want to keep the 'Change-Id' in mainline?
+> > If you don't mind, I'd like to remove it...
 > 
-> Dear Mr. Kim,
+> Oops, I forgot to take it out, please do remove it, thanks.
 > 
-> Thanks for considering these patches to be merged via your tree. For
-> the build break you mentioned above, there was a patch submitted some
-> time back to handle this. The link to that patch is:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
-> June/102627.html.
-> Could you please apply this patch also to your tree.
-> 
-Sure, it looks good to me, will apply that then this series will be rebased
-on top of that.
+Sure, will remove when I apply this into -fixes.
 
 Thanks.
 
