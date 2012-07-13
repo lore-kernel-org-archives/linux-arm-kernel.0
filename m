@@ -1,27 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 14:48:52 -0500
-Subject: [PATCH 00/11] make struct of_device_id.data const
-In-Reply-To: <20120713174935.GN592@pengutronix.de>
-References: <1342182734-321-1-git-send-email-y> <5000175E.4070702@gmail.com>
- <20120713134638.GH592@pengutronix.de> <201207131624.27266.arnd@arndb.de>
- <20120713174935.GN592@pengutronix.de>
-Message-ID: <50007BA4.90804@gmail.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Fri, 13 Jul 2012 21:51:15 +0200
+Subject: Loading handle_arch_irq with a PC relative load
+In-Reply-To: <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
+References: <50007197.8030403@xenomai.org>
+ <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
+Message-ID: <50007C33.4000105@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 12:49 PM, Uwe Kleine-K?nig wrote:
-
-[snip]
-
-> I guess this results in a warning until after patch 10 is applied? (A
-> few more down below.)
+On 07/13/2012 09:40 PM, Nicolas Pitre wrote:
+> On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
 > 
-> In the meantime I expanded my defconfig build script to handle powerpc,
-> too. I'll check these. I think I'll have to let the build run over
-> night...
+>>
+>> I do not know if it is really useful, but it seems it would be possible 
+>> to reduce the number of memory accesses to just one in the irq_handler 
+>> macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
+>> PC relative load, with something like the following patch:
+> 
+> To be strict with ccode sections, you can't do this.  The 
+> handle_arch_irq symbol identifies a variable and with your patch you're 
+> moving it from the .data section to the .text section.  The .text 
+> section is meant to be read only, and this is even more true when using 
+> a XIP kernel where .text is in ROM, or if we could make the access 
+> protection of the kernel ro.
 
-I'm not certain but just an allyesconfig build on powerpc should be
-sufficient rather than building defconfigs. We still dream about doing
-that on ARM.
+I understand that but, XIP kernel aside, the handle_arch_irq variable is
+set only once very early during the boot process, so, almost read-only.
+Is not Linux using self-modifying code in some cases anyway (booting an
+SMP kernel on an UP processor for instance).
 
-Rob
+-- 
+                                                                Gilles.
