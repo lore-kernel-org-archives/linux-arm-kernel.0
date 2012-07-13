@@ -1,23 +1,51 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Jul 2012 20:28:10 +0900
-Subject: [PATCH] ARM: samsung: adc: fix race in s3c_adc_start
-In-Reply-To: <20120713013529.GA16856@google.com>
-References: <1342059131-31251-1-git-send-email-toddpoynor@google.com>
- <20120712123125.GJ18513@trinity.fluff.org> <4FFF5287.8000608@samsung.com>
- <20120713013529.GA16856@google.com>
-Message-ID: <117d01cd60ea$9544a4d0$bfcdee70$%kim@samsung.com>
+Date: Fri, 13 Jul 2012 20:28:18 +0900
+Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
+In-Reply-To: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
+References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Todd Poynor wrote:
+Amit Daniel Kachhap wrote:
 > 
-> On Fri, Jul 13, 2012 at 07:41:11AM +0900, Kukjin Kim wrote:
-> > BTW, Todd, do you want to keep the 'Change-Id' in mainline?
-> > If you don't mind, I'd like to remove it...
+> These TMU enablement patches are needed for exynos4 and exynos5 TMU
+> driver patches sent earlier. The link for those are
+> http://www.spinics.net/lists/lm-sensors/msg35858.html.
 > 
-> Oops, I forgot to take it out, please do remove it, thanks.
+How was going on above patches? I can't see them you said in linux-next now,
+it means if I apply this series in my tree, problem will be happened :(
+
+Note1: I've seen Rafael's updating exynos4_tmu patch which is using struct
+dev_pm_ops for pm and applied by Guenter.
+
+Note2: would be helpful if you could do adding me in Cc of exynos tmu
+patches...
+
+> Also patch 1 depends on combiner dt node patch sent by Thomas Abraham.
+> (http://www.spinics.net/lists/arm-kernel/msg184129.html)
 > 
-Sure, will remove when I apply this into -fixes.
+Already in my tree.
+
+> This patchset is based Samsung Maintainer's tree,
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-
+> next
+> 
+OK.
+
+> Amit Daniel Kachhap (2):
+>   ARM: exynos4: Add devicetree node for TMU driver
+>   ARM: exynos5: Add devicetree node for TMU driver
+> 
+>  arch/arm/boot/dts/exynos4210.dtsi        |    7 +++++++
+>  arch/arm/boot/dts/exynos5250.dtsi        |    6 ++++++
+>  arch/arm/mach-exynos/clock-exynos4.c     |    5 +++++
+>  arch/arm/mach-exynos/clock-exynos5.c     |    5 +++++
+>  arch/arm/mach-exynos/include/mach/irqs.h |    3 +++
+>  arch/arm/mach-exynos/include/mach/map.h  |    3 +++
+>  arch/arm/mach-exynos/mach-exynos4-dt.c   |    2 ++
+>  arch/arm/mach-exynos/mach-exynos5-dt.c   |    2 ++
+>  8 files changed, 33 insertions(+), 0 deletions(-)
 
 Thanks.
 
