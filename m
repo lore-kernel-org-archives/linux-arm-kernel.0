@@ -1,55 +1,106 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Fri, 13 Jul 2012 22:13:55 +0200
-Subject: Loading handle_arch_irq with a PC relative load
-In-Reply-To: <alpine.LFD.2.02.1207131604470.14068@xanadu.home>
-References: <50007197.8030403@xenomai.org>
- <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
- <50007C33.4000105@xenomai.org>
- <alpine.LFD.2.02.1207131604470.14068@xanadu.home>
-Message-ID: <50008183.1070203@xenomai.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 13 Jul 2012 15:00:25 -0600 (MDT)
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <500028B3.1040309@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+Message-ID: <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 10:09 PM, Nicolas Pitre wrote:
-> On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
-> 
->> On 07/13/2012 09:40 PM, Nicolas Pitre wrote:
->>> On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
->>>
->>>>
->>>> I do not know if it is really useful, but it seems it would be possible 
->>>> to reduce the number of memory accesses to just one in the irq_handler 
->>>> macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
->>>> PC relative load, with something like the following patch:
->>>
->>> To be strict with ccode sections, you can't do this.  The 
->>> handle_arch_irq symbol identifies a variable and with your patch you're 
->>> moving it from the .data section to the .text section.  The .text 
->>> section is meant to be read only, and this is even more true when using 
->>> a XIP kernel where .text is in ROM, or if we could make the access 
->>> protection of the kernel ro.
->>
->> I understand that but, XIP kernel aside, the handle_arch_irq variable is
->> set only once very early during the boot process, so, almost read-only.
->> Is not Linux using self-modifying code in some cases anyway (booting an
->> SMP kernel on an UP processor for instance).
-> 
-> There are limits to which such tricks should be applied.  In the SMP on 
-> UP case this is a matter of making the kernel boot at all which is a 
-> rather strong reason.
-> 
-> Do you have performance numbers like interrupt latency that show this 
-> patch being worth it?  Without concrete justifications I don't think we 
-> should go down that path.
+Hi Jon
 
-I intend to do some interrupt latency measurements soon. But I suspect
-CONFIG_MULTI_IRQ_HANDLER will cause more differences due to the fact
-that the irq handlers are now fat C compiled code instead of carefully
-optimized assembly code, than because of these two memory accesses.
+On Fri, 13 Jul 2012, Jon Hunter wrote:
 
-And in fact, chances are that I will observe nothing at all since the
-low end platforms I have are AT91 which are not using
-CONFIG_MULTI_IRQ_HANDLER yet.
+> On 07/12/2012 04:17 PM, Paul Walmsley wrote:
+> > On Thu, 7 Jun 2012, Jon Hunter wrote:
+> > 
+> > Hmm, it would be nice if we could keep the CLKDM_CAN_* flags matching the 
+> > hardware capabilities.  Looking at the 4430 TRM Rev X Table 3-744 
+> > "CM_EMU_CLKSTCTRL", the CLKTRCTRL field isn't documented as supporting the 
+> > SW_SLEEP mode (which CLKDM_CAN_FORCE_SLEEP will set).
+> 
+> Right, however, this was part of the recommendation from Benoit. In
+> patch #7 of this series we actually made the following modification ...
 
--- 
-                                                                Gilles.
+[ ... ]
+
+> So now, by setting CLKDM_CAN_FORCE_SLEEP we are actually enabling
+> HW_AUTO and not SW_SLEEP (for OMAP4). This was the purpose of patch #7
+> was to remove the SW_SLEEP for OMAP4 as it is equivalent to HW_AUTO when
+> using it to disable the module. 
+
+OK, that's right.
+
+> Unfortunately, although this works it does make the flags a bit less 
+> clearer. The upside is the solution is simpler.
+
+Yeah, the problem is the clockdomain CLKDM_CAN_* flags are just intended 
+to represent the available bits from the register bitfield, rather than a 
+higher-level concept.  Among other things, it allows the maintainers and 
+users of this code to verify it by comparing it to the TRM.  Changing the 
+CLKDM_CAN_* flags in the kernel is not actually that simple since it 
+involves overriding the hardware data for the EMU clockdomain for every 
+applicable chip.  In other words, it just moves the complexity 
+elsewhere.
+
+> I am not sure if it is really a matter of the clock domain missing the
+> idle reporting, but more of a problem that the EMU power domain power
+> state is programmed in HW to OFF and cannot be changed by software. (see
+> POWER_STATE field of PM_EMU_PWRSTCTRL register description in the TRM).
+> 
+> This means that when the EMU clock domain does idle, the EMU power
+> domain can transition to OFF and hence we loss the EMU logic context. So
+> we need to keep the EMU CLKDM on to keep the EMU PWRDM on, but it is
+> really the lack of control we have over the PWRDM that is the problem. I
+> would not say this is a HW bug but more of a design choice probably to
+> keep the design simpler at the expense of power.
+
+I really wonder how much more difficult it would have been to add the 
+ON state to the EMU powerdomain next-power-state control bitfields...
+
+> I believe that this problem would happen to all power domains if they
+> were programmed for the OFF power state when the clock domain idled. For
+> other power domains we avoid this by programming them to the ON state
+> when we are using them.
+
+Hmm.  In the case of most other clockdomains, we have some way to indicate 
+to the PRCM whether the IP block/clock is in use or not: functional clock 
+control bits or modulemode control bits or CLKACTIVITY bits or (in the 
+worst case) SIDLEMODE bits.  We don't really have any of these control 
+mechanisms for most of the EMU clockdomain IP blocks/clocks.
+
+>From a theoretical perspective, assigning the problem solely to the 
+powerdomain next-power-state bits might also ignore the impact on 
+clockdomain dependencies.  These take effect based on the clockdomain 
+activity state, rather than powerdomain next-power-states.  Although, for 
+the specific case of the EMU clockdomains on OMAP3/4, it looks like this 
+is not a practical problem according to the TRM.
+
+> Thanks for the detailed suggestion! Adding a flag to prevent programming
+> the HW_AUTO while the CLKDM is active could definitely work (although I
+> may change the name/description of the flag a little).
+
+Sure, let me know what you think of the above reasoning.
+
+> Another proposal I also thought of is re-working the flags to describe
+> the HW mode to be used when turning on the CLKDM, when the CLKDM is
+> active and when the CLKDM is shut down. So instead of saying what modes
+> the CLKDM supports, specify what modes should be used for pre-ON (i.e.
+> turn ON), ON and OFF. Right now software is trying to decide for us by
+> what is available (which is ideal) but makes working around such nuances
+> a little more painful.
+
+With the hardware data, it would be good to keep it something that can be 
+generated with as little human intervention as possible, except in the 
+case of bug workarounds or departures from standard practice.  The idea is 
+to reduce the amount of human interaction needed to generate data to 
+support new chips, when everything works as it should.  It also allows us 
+software forks to explicitly mark unusual quirks or bugs that we'd like 
+the hardware people to change for future revisions :-)
+
+
+- Paul
