@@ -1,30 +1,54 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Fri, 13 Jul 2012 00:29:08 -0500
-Subject: [PATCH 2/8] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <4FFFB19D.2090808@ti.com>
-References: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
- <1339685591-11177-3-git-send-email-j-pihet@ti.com>
- <CAOMWX4cT+U2iq3e=rfBaSX5Hdn_kNEkdF0ffC33UCuEfEjdisw@mail.gmail.com>
- <4FFFB19D.2090808@ti.com>
-Message-ID: <CAOMWX4ctd20p2qBKyVBEE7PxXaEoExMivnE9Kcx6Om1w6U5yCw@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 13 Jul 2012 11:02:35 +0530
+Subject: [PATCH] ARM: Exynos: Add device tree node for Exynos4 interrupt
+ combiner controller
+In-Reply-To: <0fab01cd600e$27d56ec0$77804c40$%kim@samsung.com>
+References: <1342068948-20755-1-git-send-email-thomas.abraham@linaro.org>
+ <0fab01cd600e$27d56ec0$77804c40$%kim@samsung.com>
+Message-ID: <CAJuYYwTJeS9NgBRZgyDgbNh1u0DpHX2+EZ1TtrcCYUg+5EJf_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 12:26 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> On Friday 13 July 2012 08:31 AM, Menon, Nishanth wrote:
+On 12 July 2012 14:40, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Thomas Abraham wrote:
 >>
->> my Crib about the above apis are lack of logic power state handling:(
->> which forces code like cpuidle to use different apis for logic
->> power state and force them to use these apis just for pwrst.
+>> Add node for Exynos4 interrupt combiner controller.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/exynos4210.dtsi |   11 +++++++++++
+>>  1 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+>> b/arch/arm/boot/dts/exynos4210.dtsi
+>> index a1dd2ee..0e4f659 100644
+>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>> @@ -33,6 +33,17 @@
+>>               reg = <0x10490000 0x1000>, <0x10480000 0x100>;
+>>       };
+>>
+>> +     combiner:interrupt-controller at 10440000 {
+>> +             compatible = "samsung,exynos4210-combiner";
+>> +             interrupt-controller;
+>> +             #interrupt-cells = <2>;
 >
->
-> Have you looked at an alternate approach that was proposed here..
-> https://patchwork.kernel.org/patch/1160431/
->
-Santosh pointed me to the thread offline. This is indeed a much better
-approach IMHO than having 3 conflicting options inside powerdomain
-framework.
+> How about changing above ordering like interrupt gic controller?
 
-Regards,
-Nishanth Menon
+Ok.
+
+>
+> +               #interrupt-cells = <2>;
+> +               interrupt-controller;
+>
+> And, don't we need combiner-nr?
+> +               samsung,combiner-nr = <16>;
+
+'samsung,combiner-nr' is an optional property. If it is not specfied,
+the default value is set as 16. So it is not required for Exynos4
+combiner node.
+
+I will resubmit this patch with your suggested change.
+
+Thanks,
+Thomas.
