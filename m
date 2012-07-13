@@ -1,50 +1,54 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 17:28:54 -0500
-Subject: [RFC 0/4] ARM: OMAP3+: Add device-tree support for timers
-In-Reply-To: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
-References: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <5000A126.7090707@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 14 Jul 2012 08:38:55 +0900
+Subject: [GIT PULL] Samsung fixes-2 for v3.5
+Message-ID: <11fd01cd6150$aaf8ea50$00eabef0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for all the noise. I was having network problems in the midst of
-sending and then I royally screwed it up by deciding to make some last
-minute edits. So ignore this version of the series.
+Hi Arnd, Olof,
 
-Jon
+Please pull second samsung fixes for v3.5 from:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.5-samsung-fixes-2
 
-On 07/13/2012 05:19 PM, Jon Hunter wrote:
-> This series adds device-tree support for the timers on OMAP3/4 devices. Once
-> everyone is happy with the implementation I can add support for OMAP2/5 devices
-> too.
-> 
-> Testing:
-> - I have tested the all the timers (not used by the kernel as sys-timers) on
->   both OMAP3430 Beagle and OMAP4460 Panda with/without device-tree with this
->   series.
-> - The testing includes
-> 	- Configuring, starting a timer and checking the counter value is
-> 	  incrementing.
-> 	- Testing timer overflow interrupt when timer expires.
-> 	- Using different clock sources to operate the timer with.
-> 	- Using DT to provide resource information for IRQ and memory by
-> 	  removing Benoit's intention "HACK" in commit a4f6cdb0 (ARM: OMAP:
-> 	  omap_device: Add omap_device_[alloc|delete] for DT integration)
-> 
-> Jon Hunter (4):
->   arm/dts: OMAP: Add timer nodes
->   ARM: OMAP3: Dynamically disable secure timer nodes for secure devices
->   ARM: OMAP4: Add timer clock aliases for device-tree
->   ARM: OMAP: Add DT support for timer driver
-> 
->  .../devicetree/bindings/arm/omap/timer.txt         |   34 +++++++
->  arch/arm/boot/dts/omap3.dtsi                       |  104 ++++++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi                       |   93 +++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c                |    1 +
->  arch/arm/mach-omap2/clock44xx_data.c               |   12 +++
->  arch/arm/mach-omap2/common.h                       |    1 +
->  arch/arm/mach-omap2/timer.c                        |   40 ++++++++
->  arch/arm/plat-omap/dmtimer.c                       |   32 ++++--
->  8 files changed, 311 insertions(+), 6 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/timer.txt
-> 
+Correcting some values, fixing race and fixing regarding pm_domains are
+included in.
+
+If any problems, please kindly let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
+
+  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.5-samsung-fixes-2
+
+Marek Szyprowski (2):
+      ARM: EXYNOS: read initial state of power domain from hw registers
+      ARM: EXYNOS: register devices in 'need_restore' state for pm_domains
+
+Sylwester Nawrocki (2):
+      ARM: S3C24XX: Correct AC97 clock control bit for S3C2440
+      ARM: S3C24XX: Correct CAMIF interrupt definitions
+
+Todd Poynor (1):
+      ARM: SAMSUNG: fix race in s3c_adc_start for ADC
+
+Tushar Behera (1):
+      ARM: SAMSUNG: Update default rate for xusbxti clock
+
+ arch/arm/mach-exynos/pm_domains.c     |   13 +++++++++----
+ arch/arm/mach-s3c24xx/clock-s3c2440.c |    2 +-
+ arch/arm/plat-samsung/adc.c           |    8 +++++---
+ arch/arm/plat-samsung/devs.c          |    3 ++-
+ arch/arm/plat-samsung/s5p-clock.c     |    1 +
+ 5 files changed, 18 insertions(+), 9 deletions(-)
