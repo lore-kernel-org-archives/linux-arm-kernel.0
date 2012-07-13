@@ -1,9 +1,9 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 17:19:31 -0500
-Subject: [RFC 1/4] arm/dts: OMAP: Add genernal purpose timer nodes
+Date: Fri, 13 Jul 2012 17:19:32 -0500
+Subject: [RFC 1/4] arm/dts: OMAP: Add timer nodes
 In-Reply-To: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
 References: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1342217976-29802-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <1342217976-29802-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
