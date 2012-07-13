@@ -1,168 +1,97 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jul 2012 18:16:07 +0100
-Subject: [PATCH v2] ARM: mutex: use generic xchg-based implementation for
- ARMv6+
-Message-ID: <1342199767-15108-1-git-send-email-will.deacon@arm.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 13 Jul 2012 10:25:32 -0700
+Subject: Device tree binding for DVFS table
+In-Reply-To: <20120713103408.GF9437@tbergstrom-lnx.Nvidia.com>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+ <20120711144449.GA23654@sirena.org.uk>
+ <20120711200402.GC2772@gmail.com>
+ <20120712141001.GE9437@tbergstrom-lnx.Nvidia.com>
+ <20120712171016.GL2772@gmail.com>
+ <20120713103408.GF9437@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20120713172532.GN2772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The open-coded mutex implementation for ARMv6+ cores suffers from a
-severe lack of barriers, so in the uncontended case we don't actually
-protect any accesses performed during the critical section.
+On 20120713-13:34, Peter De Schrijver wrote:
+> Hi Mike,
+> 
+> > 
+> > Peter,
+> > 
+> > I agree with your observations in general, but I think some specificity
+> > is needed:
+> > 
+> > > + frequency/voltage relationships
+> > 
+> > We should be clear that the voltage does NOT belong to the clock, but to
+> > the device/module/IP block that consumes that clock.  This is an
+> > important detail since it means that a clock does not have a
+> > corresponding table of voltages (e.g. one table per clock), but instead
+> > a device has a table of voltages corresponding to each clock.
+> > 
+> 
+> Or the other way around, a table of clock frequencies, 1 for each voltage.
+> 
 
-Furthermore, the code is largely a duplication of the ARMv6+ atomic_dec
-code but optimised to remove a branch instruction, as the mutex fastpath
-was previously inlined. Now that this is executed out-of-line, we can
-reuse the atomic access code for the locking (in fact, we use the xchg
-code as this produces shorter critical sections).
+ACK
 
-This patch uses the generic xchg based implementation for mutexes on
-ARMv6+, which introduces barriers to the lock/unlock operations and also
-has the benefit of removing a fair amount of inline assembly code.
+You said what I meant to say.  Some previous iterations of an
+omap-specific dvfs api tried to use voltage as the unique key for
+accessing frequency/voltage tables, and that can get really ugly for a
+variety of reasons.  Plus device drivers typically request performance
+in Hertz (e.g. clk_set_rate), so exposing a voltage-centric interface to
+them is generally useless.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Reported-by: Shan Kang <kangshan0910@gmail.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+The OPP library does some of this right (drivers/base/power/opp.c).  It
+keeps a list of tables on a per-device bases, which is a big step in the
+right direction.  Unfortunately it is lacking in other areas, such as
+not specifying which clock corresponds to the to table.  Thus a device
+can only have one table and that table does not encode any information
+about which clock to use (which is important for devices that use a mux
+to change rate).  The dvfs DT bindings should not repeat those mistakes.
 
-Ok, so here's v2 following the feedback from Arnd and Nico. We now use
-the xchg-based version for all versions of the architecture and I've
-updated the commit message to reflect both that and also to remove the
-bit about avoiding the slowpath on frivolous CPUs!
+> > This is very necessary when a single clock drives multiple devices which
+> > are driven by separate voltage rails.
+> > 
+> 
+> Ah ok. How does this work in practice? A device can only run at a given clock
+> rate if all the rails are at a certain voltage?
+> 
 
- arch/arm/include/asm/mutex.h |  119 ++----------------------------------------
- 1 files changed, 4 insertions(+), 115 deletions(-)
+More like an adjustable rate clock higher up the tree affects the rate
+of multiple devices downstream, and those devices happen to be on
+separate rails.  Either way I think that the design should account for
+this possibility.
 
-diff --git a/arch/arm/include/asm/mutex.h b/arch/arm/include/asm/mutex.h
-index 93226cf..b1479fd 100644
---- a/arch/arm/include/asm/mutex.h
-+++ b/arch/arm/include/asm/mutex.h
-@@ -7,121 +7,10 @@
-  */
- #ifndef _ASM_MUTEX_H
- #define _ASM_MUTEX_H
--
--#if __LINUX_ARM_ARCH__ < 6
--/* On pre-ARMv6 hardware the swp based implementation is the most efficient. */
--# include <asm-generic/mutex-xchg.h>
--#else
--
- /*
-- * Attempting to lock a mutex on ARMv6+ can be done with a bastardized
-- * atomic decrement (it is not a reliable atomic decrement but it satisfies
-- * the defined semantics for our purpose, while being smaller and faster
-- * than a real atomic decrement or atomic swap.  The idea is to attempt
-- * decrementing the lock value only once.  If once decremented it isn't zero,
-- * or if its store-back fails due to a dispute on the exclusive store, we
-- * simply bail out immediately through the slow path where the lock will be
-- * reattempted until it succeeds.
-+ * On pre-ARMv6 hardware this results in a swp-based implementation,
-+ * which is the most efficient. For ARMv6+, we emit a pair of exclusive
-+ * accesses instead.
-  */
--static inline void
--__mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
--{
--	int __ex_flag, __res;
--
--	__asm__ (
--
--		"ldrex	%0, [%2]	\n\t"
--		"sub	%0, %0, #1	\n\t"
--		"strex	%1, %0, [%2]	"
--
--		: "=&r" (__res), "=&r" (__ex_flag)
--		: "r" (&(count)->counter)
--		: "cc","memory" );
--
--	__res |= __ex_flag;
--	if (unlikely(__res != 0))
--		fail_fn(count);
--}
--
--static inline int
--__mutex_fastpath_lock_retval(atomic_t *count, int (*fail_fn)(atomic_t *))
--{
--	int __ex_flag, __res;
--
--	__asm__ (
--
--		"ldrex	%0, [%2]	\n\t"
--		"sub	%0, %0, #1	\n\t"
--		"strex	%1, %0, [%2]	"
--
--		: "=&r" (__res), "=&r" (__ex_flag)
--		: "r" (&(count)->counter)
--		: "cc","memory" );
--
--	__res |= __ex_flag;
--	if (unlikely(__res != 0))
--		__res = fail_fn(count);
--	return __res;
--}
--
--/*
-- * Same trick is used for the unlock fast path. However the original value,
-- * rather than the result, is used to test for success in order to have
-- * better generated assembly.
-- */
--static inline void
--__mutex_fastpath_unlock(atomic_t *count, void (*fail_fn)(atomic_t *))
--{
--	int __ex_flag, __res, __orig;
--
--	__asm__ (
--
--		"ldrex	%0, [%3]	\n\t"
--		"add	%1, %0, #1	\n\t"
--		"strex	%2, %1, [%3]	"
--
--		: "=&r" (__orig), "=&r" (__res), "=&r" (__ex_flag)
--		: "r" (&(count)->counter)
--		: "cc","memory" );
--
--	__orig |= __ex_flag;
--	if (unlikely(__orig != 0))
--		fail_fn(count);
--}
--
--/*
-- * If the unlock was done on a contended lock, or if the unlock simply fails
-- * then the mutex remains locked.
-- */
--#define __mutex_slowpath_needs_to_unlock()	1
--
--/*
-- * For __mutex_fastpath_trylock we use another construct which could be
-- * described as a "single value cmpxchg".
-- *
-- * This provides the needed trylock semantics like cmpxchg would, but it is
-- * lighter and less generic than a true cmpxchg implementation.
-- */
--static inline int
--__mutex_fastpath_trylock(atomic_t *count, int (*fail_fn)(atomic_t *))
--{
--	int __ex_flag, __res, __orig;
--
--	__asm__ (
--
--		"1: ldrex	%0, [%3]	\n\t"
--		"subs		%1, %0, #1	\n\t"
--		"strexeq	%2, %1, [%3]	\n\t"
--		"movlt		%0, #0		\n\t"
--		"cmpeq		%2, #0		\n\t"
--		"bgt		1b		"
--
--		: "=&r" (__orig), "=&r" (__res), "=&r" (__ex_flag)
--		: "r" (&count->counter)
--		: "cc", "memory" );
--
--	return __orig;
--}
--
--#endif
-+#include <asm-generic/mutex-xchg.h>
- #endif
--- 
-1.7.4.1
+Regards,
+Mike
+
+> > > + power rail constraints (eg voltage difference limit between 2 rails)
+> > 
+> > This should come from regulator DT data and not anything DVFS-specific,
+> > correct?
+> > 
+> 
+> That's true. I think it can even be open-coded as this is a SoC internal
+> thing. All boards using this SoC will have the same limits, so I see little
+> reason to move this info to DT.
+> 
+> > > + clock constraints (eg. clock x frequency must be a fixed ratio of clock y
+> > >   frequency)
+> > 
+> > Yeah, after sending my email above yesterday I instantly regretted it.
+> > It is true that *functional* clock dependencies are really the purview
+> > of the device driver.  E.g. for Device X to operate at FAST_SPEED, scale
+> > functional_clk up to 200MHz and l3_ddr_clk up to 100MHz.  On OMAP our
+> > display subsystem block also has clock ratio rules that must be honored,
+> > but it just open-coded.
+> > 
+> > It is possible to model those in DT if we really want, but shouldn't be
+> > a priority for these dvfs-specific bindings.
+> > 
+> 
+> Agreed.
+> 
+> Cheers,
+> 
+> Peter.
