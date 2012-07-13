@@ -1,19 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Jul 2012 00:18:52 -0700
-Subject: [Ksummit-2012-discuss] ARM mini-summit
-In-Reply-To: <4FFF4AC6.10404@samsung.com>
-References: <1341994155.3522.16.camel@dabdike.int.hansenpartnership.com>
- <201207111128.29924.arnd@arndb.de> <20120711115755.GF22437@arm.com>
- <de55bfacdc06182dd4f3a36722fcc9fe@localhost>
- <4FFF4AC6.10404@samsung.com>
-Message-ID: <20120713071851.GO1122@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Jul 2012 15:44:02 +0800
+Subject: [PATCH] ARM: disable interrupt before spinning endlessly
+In-Reply-To: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
+References: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120713074400.GB10602@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kukjin Kim <kgene.kim@samsung.com> [120712 15:13]:
->
-> +1 same here, I'm interested in ARM mini-summit :)
+Russell,
 
-Yeah me too!
+I took this patch as a trivial one and just put it into the patch
+system as 7466/1, though I have got neither Reviewed-by nor Tested-by
+with the patch on the list for several days.
 
-Tony
+Regards,
+Shawn
+
+On Mon, Jul 09, 2012 at 05:09:48PM +0800, Shawn Guo wrote:
+> The CPU will endlessly spin at the end of machine_halt and
+> machine_restart calls.  However, this will lead to a soft lockup
+> warning after about 20 seconds, if CONFIG_LOCKUP_DETECTOR is enabled,
+> as system timer is still alive.
+> 
+> Disable interrupt before going to spin endlessly, so that the lockup
+> warning will never be seen.
+> 
+> Reported-by: Marek Vasut <marex@denx.de>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/kernel/process.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 19c95ea..693b744 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -247,6 +247,7 @@ void machine_shutdown(void)
+>  void machine_halt(void)
+>  {
+>  	machine_shutdown();
+> +	local_irq_disable();
+>  	while (1);
+>  }
+>  
+> @@ -268,6 +269,7 @@ void machine_restart(char *cmd)
+>  
+>  	/* Whoops - the platform was unable to reboot. Tell the user! */
+>  	printk("Reboot failed -- System halted\n");
+> +	local_irq_disable();
+>  	while (1);
+>  }
+>  
+> -- 
+> 1.7.5.4
+> 
+> 
