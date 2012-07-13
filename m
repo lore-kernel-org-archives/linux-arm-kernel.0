@@ -1,68 +1,41 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 13 Jul 2012 13:34:08 +0300
-Subject: Device tree binding for DVFS table
-In-Reply-To: <20120712171016.GL2772@gmail.com>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <20120711144449.GA23654@sirena.org.uk>
- <20120711200402.GC2772@gmail.com>
- <20120712141001.GE9437@tbergstrom-lnx.Nvidia.com>
- <20120712171016.GL2772@gmail.com>
-Message-ID: <20120713103408.GF9437@tbergstrom-lnx.Nvidia.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 13 Jul 2012 12:35:45 +0200
+Subject: [PATCH v4 2/2] serial: mxs-auart: Allow device tree probing
+In-Reply-To: <4FFFF968.5000801@pengutronix.de>
+References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
+ <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
+ <4FDF929B.7000809@grid-net.com> <4FFFF968.5000801@pengutronix.de>
+Message-ID: <4FFFFA01.6070306@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 07/13/2012 12:33 PM, Marc Kleine-Budde wrote:
+> On 06/18/2012 10:42 PM, Subodh Nijsure wrote:
+>>
+>> If one were to try run console on one of the /dev/ttyAPP* ports, as is
+>> the case for hardware I am working with, console output wouldn't show up
+>> without the following diff:
+>>
+>> Let me know if should send formal patch or we can include it as part of v5?
+> 
+> Has this patch been applied?
 
-> 
-> Peter,
-> 
-> I agree with your observations in general, but I think some specificity
-> is needed:
-> 
-> > + frequency/voltage relationships
-> 
-> We should be clear that the voltage does NOT belong to the clock, but to
-> the device/module/IP block that consumes that clock.  This is an
-> important detail since it means that a clock does not have a
-> corresponding table of voltages (e.g. one table per clock), but instead
-> a device has a table of voltages corresponding to each clock.
-> 
+Yes. [1]
 
-Or the other way around, a table of clock frequencies, 1 for each voltage.
+Marc
 
-> This is very necessary when a single clock drives multiple devices which
-> are driven by separate voltage rails.
-> 
+[1]
+http://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commit;h=1ea6607d4cdc917987e7e6cfaafc4a630d97a297
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Ah ok. How does this work in practice? A device can only run at a given clock
-rate if all the rails are at a certain voltage?
-
-> > + power rail constraints (eg voltage difference limit between 2 rails)
-> 
-> This should come from regulator DT data and not anything DVFS-specific,
-> correct?
-> 
-
-That's true. I think it can even be open-coded as this is a SoC internal
-thing. All boards using this SoC will have the same limits, so I see little
-reason to move this info to DT.
-
-> > + clock constraints (eg. clock x frequency must be a fixed ratio of clock y
-> >   frequency)
-> 
-> Yeah, after sending my email above yesterday I instantly regretted it.
-> It is true that *functional* clock dependencies are really the purview
-> of the device driver.  E.g. for Device X to operate at FAST_SPEED, scale
-> functional_clk up to 200MHz and l3_ddr_clk up to 100MHz.  On OMAP our
-> display subsystem block also has clock ratio rules that must be honored,
-> but it just open-coded.
-> 
-> It is possible to model those in DT if we really want, but shouldn't be
-> a priority for these dvfs-specific bindings.
-> 
-
-Agreed.
-
-Cheers,
-
-Peter.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120713/211eb46e/attachment.sig>
