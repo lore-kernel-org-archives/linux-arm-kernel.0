@@ -1,26 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jul 2012 18:56:40 +0000
-Subject: [PATCH 00/11] make struct of_device_id.data const
-In-Reply-To: <20120713174935.GN592@pengutronix.de>
-References: <1342182734-321-1-git-send-email-y>
- <201207131624.27266.arnd@arndb.de> <20120713174935.GN592@pengutronix.de>
-Message-ID: <201207131856.40599.arnd@arndb.de>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Fri, 13 Jul 2012 21:05:59 +0200
+Subject: Loading handle_arch_irq with a PC relative load
+Message-ID: <50007197.8030403@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 July 2012, Uwe Kleine-K?nig wrote:
-> > @@ -502,15 +502,15 @@ static const struct fsl_msi_feature vmpic_msi_feature = {
-> >  static const struct of_device_id fsl_of_msi_ids[] = {
-> >       {
-> >               .compatible = "fsl,mpic-msi",
-> > -             .data = (void *)&mpic_msi_feature,
-> > +             .data = &mpic_msi_feature,
-> This looks unrelated.
-> 
+
+I do not know if it is really useful, but it seems it would be possible 
+to reduce the number of memory accesses to just one in the irq_handler 
+macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
+PC relative load, with something like the following patch:
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0d1851c..48ee46a 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -37,10 +37,9 @@
+  */
+ 	.macro	irq_handler
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+-	ldr	r1, =handle_arch_irq
+ 	mov	r0, sp
+ 	adr	lr, BSYM(9997f)
+-	ldr	pc, [r1]
++	ldr	pc, handle_arch_irq
+ #else
+ 	arch_irq_handler_default
+ #endif
+@@ -325,6 +324,12 @@ ENDPROC(__pabt_svc)
+ #endif
+ .LCfp:
+ 	.word	fp_enter
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	.globl	handle_arch_irq
++handle_arch_irq:
++	.space	4
++#endif
++
+ 
+ /*
+  * User mode handlers
+@@ -1151,9 +1156,3 @@ cr_alignment:
+ 	.space	4
+ cr_no_alignment:
+ 	.space	4
+-
+-#ifdef CONFIG_MULTI_IRQ_HANDLER
+-	.globl	handle_arch_irq
+-handle_arch_irq:
+-	.space	4
+-#endif
 
 
-Well, the cast to (void *) was used to cast away the const-ness of the
-"static const struct fsl_msi_feature mpic_msi_feature", so that is no
-longer needed after the last patch.
-
-	Arnd.
+-- 
+                                                                Gilles.
