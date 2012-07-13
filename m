@@ -1,58 +1,26 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 13 Jul 2012 06:14:08 +0000
-Subject: [GIT PULL 1/5] omap device tree changes for v3.6 merge window
-In-Reply-To: <pull-1341925556-888624>
-References: <pull-1341925556-888624>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9A8BE1@DBDE01.ent.ti.com>
+From: vipulkumar.samar@st.com (Vipul Kumar Samar)
+Date: Fri, 13 Jul 2012 11:53:43 +0530
+Subject: [PATCH 0/4] clk:spear: Rename clk ids within predefined limit
+Message-ID: <cover.1342160220.git.vipulkumar.samar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The max limit of con_id is 16 and dev_id is 20. As of now for all SPEAr SOC's
+clk ids are exceeding this predefined limit.
+ 
+This patch set is intended to rename clk ids through out spear clk framework.
 
-On Tue, Jul 10, 2012 at 18:35:55, Tony Lindgren wrote:
-> The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
-> 
->   Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-dt-for-v3.6
-> 
-> for you to fetch changes up to f700c4d780f14125f61b70e86d805908efe3fb89:
-> 
->   arm/dts: New dts file for PandaBoardES (4460) (2012-07-09 05:37:05 -0700)
-> 
-> ----------------------------------------------------------------
-> Device tree related patches for omaps
-> 
-> ----------------------------------------------------------------
-> Afzal Mohammed (1):
->       arm/dts: am33xx wdt node
+Vipul Kumar Samar (4):
+  clk:spear1340:Fix: Rename clk ids within predefined limit
+  clk:spear1310:Fix: Rename clk ids within predefined limit
+  Clk:spear3xx:Fix: Rename clk ids within predefined limit
+  Clk:spear6xx:Fix: Rename clk ids within predefined limit
 
-The above patch seems to be an empty one, actual changes in it as in
-original patch [1] is missing, same changes are shown below for your
-reference [2].
+ drivers/clk/spear/spear1310_clock.c |  312 +++++++++++++++++------------------
+ drivers/clk/spear/spear1340_clock.c |  273 +++++++++++++++---------------
+ drivers/clk/spear/spear3xx_clock.c  |  180 ++++++++++-----------
+ drivers/clk/spear/spear6xx_clock.c  |  122 +++++++-------
+ 4 files changed, 436 insertions(+), 451 deletions(-)
 
-Can you please do the needful so that the intended change of this
-patch makes to mainline this merge window.
-
-Regards
-Afzal
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg71644.html
-[2]
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index f46e353..08b2a5b 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -185,5 +185,10 @@
-                        compatible = "ti,omap3-hsmmc";
-                        ti,hwmods = "mmc3";
-                };
-+
-+               wdt2: wdt at 44e35000 {
-+                       compatible = "ti,omap3-wdt";
-+                       ti,hwmods = "wd_timer2";
-+               };
-        };
- };
+-- 
+1.7.2.2
