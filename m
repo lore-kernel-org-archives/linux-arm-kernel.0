@@ -1,20 +1,43 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 13 Jul 2012 16:51:32 +0530
-Subject: [PATCHv11 1/6] i2c: omap: Optimise the remove code
-In-Reply-To: <20120712121857.GA2194@pengutronix.de>
+Date: Fri, 13 Jul 2012 16:55:53 +0530
+Subject: [PATCHv11 0/6] I2C cleanups
+In-Reply-To: <20120712125229.GG2194@pengutronix.de>
 References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
- <1340896292-12112-2-git-send-email-shubhrajyoti@ti.com>
- <20120712121857.GA2194@pengutronix.de>
-Message-ID: <500004BC.1060403@ti.com>
+ <CAM=Q2ct0PUisYGcaX6EAPWT-SmZAgRV_O8mAOodH-V4Q0O-Vww@mail.gmail.com>
+ <20120712125229.GG2194@pengutronix.de>
+Message-ID: <500005C1.4010203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 July 2012 05:48 PM, Wolfram Sang wrote:
-> On Thu, Jun 28, 2012 at 08:41:27PM +0530, Shubhrajyoti D wrote:
->> The omap_i2c_remove function may not be needed after
->> device exit so the memory could be freed.
->>
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Changed the title from "optimise" to "annotate" and pushed to next.
-Thanks for fixing that.
+On Thursday 12 July 2012 06:22 PM, Wolfram Sang wrote:
+> On Mon, Jul 09, 2012 at 05:17:07PM +0530, Shubhrajyoti Datta wrote:
+>> On Thu, Jun 28, 2012 at 8:41 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+>>> This is a minimal cleanup series.
+>> If there are no further comments can this series be queued?
+> I just applied a few of them. BTW I get a build warning when compiling the
+> kernel, maybe someone is interested. It is not related to the patches, though.
+OK could check that.
+>
+> ===
+>
+> WARNING: arch/arm/mach-omap2/built-in.o(.data+0x2b5c0): Section mismatch in reference from the variable rx51_si4713_dev to the (unknown reference) .init.data:(unknown)
+> The variable rx51_si4713_dev references
+> the (unknown reference) __initdata (unknown)
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+>
+> ===
+>
+> I think this is what I'll pull in for the next merge window. The big OMAP
+> cleanup (latest version from 3. July) would then go in early into -next for
+> 3.7. Is that OK with the omap-people?
+>
+> Also, thanks to Shubhrajyoti Datta for reviewing other patches on the
+> i2c-list, much appreciated.
+Thanks,
+
+> Thanks,
+>
+>    Wolfram
 >
