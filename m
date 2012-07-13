@@ -1,56 +1,116 @@
-From: vipulkumar.samar@st.com (vipul kumar samar)
-Date: Fri, 13 Jul 2012 13:48:53 +0530
-Subject: [PATCH 1/4] clk:spear1340:Fix: Rename clk ids within predefined
- limit
-In-Reply-To: <CAOh2x==4rQhAvZmmqiyi0jhF0Zz=v8OmuCBaFGFehOEt2kyd1w@mail.gmail.com>
-References: <cover.1342160220.git.vipulkumar.samar@st.com>
- <b43c4e64ed61d4c18f5c3326539f7f03e9604ef1.1342160220.git.vipulkumar.samar@st.com>
- <CAOh2x==4rQhAvZmmqiyi0jhF0Zz=v8OmuCBaFGFehOEt2kyd1w@mail.gmail.com>
-Message-ID: <4FFFD9ED.30606@st.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 13 Jul 2012 10:22:49 +0200
+Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <1341850974-11977-2-git-send-email-marex@denx.de>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+ <1341850974-11977-2-git-send-email-marex@denx.de>
+Message-ID: <20120713082249.GF32184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2012 1:36 PM, viresh kumar wrote:
-> On Fri, Jul 13, 2012 at 7:23 AM, Vipul Kumar Samar
-> <vipulkumar.samar@st.com>  wrote:
->> The max limit of con_id is 16 and dev_id is 20. As of now for spear1340, many
->> clk ids are exceeding this predefined limit.
->>
->> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
->
->> @@ -509,23 +507,23 @@ void __init spear1340_clk_init(void)
->
->> -       clk_register_clkdev(clk1, "uart0_synth_gate_clk", NULL);
->
->> -       clk_register_clkdev(clk1, "sdhci_synth_gate_clk", NULL);
->
->> -       clk_register_clkdev(clk, "gmac_phy_input_mux_clk", NULL);
->> -       clk_register_clkdev(clk1, "gmac_phy_synth_gate_clk", NULL);
->
-> These are the only places in this entire patch, where i found con_id
-> crossing the limit.
-> Then why so many changes? Aligning all to similar naming?
+Hi,
 
-Not only for gmac some other ips also like sdhi_synth_gate_clk, 
-uart1_synth_gate_clk, clcd_synth_mux_clk etc.
+On Mon, Jul 09, 2012 at 06:22:54PM +0200, Marek Vasut wrote:
+> This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
+> via DT. The DMA operation is enabled by default.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Detlev Zundel <dzu@denx.de>
+> CC: Dong Aisheng <b29396@freescale.com>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> Cc: linux-i2c at vger.kernel.org
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    5 +
+>  arch/arm/boot/dts/imx28.dtsi                      |    2 +
+>  drivers/i2c/busses/i2c-mxs.c                      |  267 +++++++++++++++++++--
+>  3 files changed, 252 insertions(+), 22 deletions(-)
+> 
+> V2: Fixed return value from mxs_i2c_dma_setup_xfer().
+>     Fixed coding style nitpicks
+>     Call mxs_i2c_dma_finish() in failpath only if DMA is active
+> V3: Align with changes in previous patch
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> index 30ac3a0..45b6307 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> @@ -6,6 +6,10 @@ Required properties:
+>  - interrupts: Should contain ERROR and DMA interrupts
+>  - clock-frequency: Desired I2C bus clock frequency in Hz.
+>                     Only 100000Hz and 400000Hz modes are supported.
+> +- fsl,i2c-dma-channel: APBX DMA channel for the I2C
+> +
+> +Optional properties:
+> +- fsl,use-pio: Use PIO transfers instead of DMA, useful for debug
 
-yes, to align all other gate, synth and mux clocks with similar naming.
+Having PIOQUEUE (not PIO) as a fallback is good. I'd rather like to see
+this as a module parameter, though. For one reason, this is not a
+hardware property or board specific, so not a good device tree property.
+Also, it is implicitly deprecated somehow since either we want DMA to
+fully work or, even better, somewhen be able to automatically switch
+between PIOQUEUE and DMA depending on the i2c_msg size. Deprecated
+properties are also troublesome. Third, we don't really need this per
+instance, if somebody really has problems with DMA, it will apply to all
+i2c busses. Makes sense?
 
->
->
->>          clk_register_clkdev(clk, NULL, "e0000000.serial");
->
-> @Russell&  Mike: Above line uses maximum length of dev_id, i.e. 16.
-> And because with DT we have so long device names now, out of which
-> 8 - address
-> 1 - '.'
-> 1 - '\0'
->
-> 10 are already gone and so only 6 are left for device name. Should we
-> consider updating
-> dev_id array size??
+>  
+>  Examples:
+>  
+> @@ -16,4 +20,5 @@ i2c0: i2c at 80058000 {
+>  	reg = <0x80058000 2000>;
+>  	interrupts = <111 68>;
+>  	clock-frequency = <100000>;
+> +	fsl,i2c-dma-channel = <6>;
+>  };
 
-dev_id is 20 and con_id is 16
+> +	/*
+> +	 * The MXS I2C DMA mode is prefered and enabled by default.
+> +	 * The PIO mode is still supported, but should be used only
 
-Regards
-Vipul Samar
+PIOQUEUE
+
+> +	 * for debuging purposes etc.
+> +	 */
+> +	i2c->dma_mode = 1;
+> +	if (of_find_property(node, "fsl,use-pio", NULL)) {
+> +		i2c->dma_mode = 0;
+> +		dev_info(dev, "Using PIO mode for I2C transfers!\n");
+> +	}
+> +
+> +	/*
+> +	 * TODO: This is a temporary solution and should be changed
+> +	 * to use generic DMA binding later when the helpers get in.
+> +	 */
+
+@Shawn: Any idea when this is going to happen? And why do we need this?
+AFAICT it will be always channel 6/7 on mx28?
+
+> +	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
+> +				   &i2c->dma_channel);
+> +	if (ret) {
+> +		dev_warn(dev, "Failed to get DMA channel!\n");
+> +		i2c->dma_mode = 0;
+> +	}
+> +
+
+Rest looks good, thanks!
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120713/622a36fd/attachment-0001.sig>
