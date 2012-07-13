@@ -1,86 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jul 2012 14:43:52 +0100
-Subject: [PATCH] ARM: mutex: use generic atomic_dec-based implementation
- for ARMv6+
-In-Reply-To: <alpine.LFD.2.02.1207130905390.14068@xanadu.home>
-References: <1342177463-21238-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1207130905390.14068@xanadu.home>
-Message-ID: <20120713134352.GR18079@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Jul 2012 15:46:38 +0200
+Subject: [PATCH 00/11] make struct of_device_id.data const
+In-Reply-To: <5000175E.4070702@gmail.com>
+References: <1342182734-321-1-git-send-email-y>
+ <5000175E.4070702@gmail.com>
+Message-ID: <20120713134638.GH592@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
-
-On Fri, Jul 13, 2012 at 02:21:41PM +0100, Nicolas Pitre wrote:
-> On Fri, 13 Jul 2012, Will Deacon wrote:
+On Fri, Jul 13, 2012 at 07:41:02AM -0500, Rob Herring wrote:
+> On 07/13/2012 07:32 AM, y at pengutronix.de wrote:
+> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > 
+> > this series' goal is to make struct of_device_id.data const.
+> > Conceptually a driver must not modify the data contained there so making
+> > it const is the right thing.
+> > 
+> > This change might introduce warnings because drivers don't use const to
+> > access the data pointed to by of_device_id.data. In most cases the fix
+> > is to add some consts.
+> > 
+> > This series (apart from adding this const in patch 10) fixes all drivers
+> > covered by all arm defconfigs (based on v3.5-rc6).
+> > 
 > 
-> > The open-coded mutex implementation for ARMv6+ cores suffers from a
-> > couple of problems:
-> > 
-> > 	1. (major) There aren't any barriers in sight, so in the
-> > 	   uncontended case we don't actually protect any accesses
-> > 	   performed in during the critical section.
-> > 
-> > 	2. (minor) If the strex indicates failure to complete the store,
-> > 	   we assume that the lock is contended and run away down the
-> > 	   failure (slow) path. This assumption isn't correct and the
-> > 	   core may fail the strex for reasons other than contention.
-> > 
-> > This patch solves both of these problems by using the generic atomic_dec
-> > based implementation for mutexes on ARMv6+. This also has the benefit of
-> > removing a fair amount of inline assembly code.
-> 
-> I don't agree with #2.  Mutexes should be optimized for the uncontended 
-> case.  And in such case, strex failures are unlikely.
+> What about other arches?
+I didn't looked at them, mainly because I don't have the scripts for
+arches other than arm to do such testing. Also note that it introduces
+only some warnings, but no breakage. So adding the const in the merge
+window might be ok?!
 
-Hmm, my only argument here is that the architecture doesn't actually define
-all the causes of such a failure, so assuming that they are unlikely is
-really down to the CPU implementation. However, whilst I haven't benchmarked
-the strex failure rate, it wouldn't make sense to fail them gratuitously
-although we may still end up on the slow path for the uncontended case.
+I'm not sure I'll have the capacity to fix other arches now. Maybe only
+add the const for ARCH=arm for now and I'll address the other archs as
+time permits even though this is ugly? At least getting in patches 1-9
+would be nice to get in to save me from keeping them up to date.
 
-> There was a time where the fast path was inlined in the code while any 
-> kind of contention processing was pushed out of line.  Going to the slow 
-> path on strex failure just followed that model and provided correct 
-> mutex behavior while making the inlined sequence one instruction 
-> shorter.  Therefore #2 is not a problem at all, not even a minor one.
+Which other arches do you consider relevant?
 
-Ok, I wasn't aware of the history, thanks. The trade-off between size of
-inlined code and possibly taking the slow path unnecessarily seems like a
-compromise, so point (2) doesn't stand there...
+$ git grep -l '\<OF\>' arch/*/Kconfig
+arch/arm/Kconfig
+arch/c6x/Kconfig
+arch/microblaze/Kconfig
+arch/mips/Kconfig
+arch/openrisc/Kconfig
+arch/powerpc/Kconfig
+arch/sparc/Kconfig
+arch/x86/Kconfig
 
-> These days the whole mutex code is always out of line so the saving of a 
-> single branch instruction in the whole kernel doesn't really matter 
-> anymore. So to say that I agree with the patch but not the second half 
-> of its justification.
+For most of these I first have to look where to get a toolchain from.
 
-... but like you say, the size of the out-of-line code doesn't matter as
-much, so surely taking the slow patch for an uncontended mutex is a minor
-issue here?
+Best regards
+Uwe
 
-Anyway, that's an interesting discussion but I'll reword the commit message
-so we can get this in while we ponder strex failures :)
-
-How about:
-
-
-    ARM: mutex: use generic atomic_dec-based implementation for ARMv6+
-
-    The open-coded mutex implementation for ARMv6+ cores suffers from a
-    severe lack of barriers, so in the uncontended case we don't actually
-    protect any accesses performed during the critical section.
-
-    Furthermore, the code is largely a duplication of the ARMv6+ atomic_dec
-    code but optimised to remove a branch instruction, as the mutex fastpath
-    was previously inlined. Now that this is executed out-of-line, we can
-    reuse the atomic access code for the locking.
-
-    This patch solves uses the generic atomic_dec based implementation for
-    mutexes on ARMv6+, which introduces barriers to the lock/unlock
-    operations and also has the benefit of removing a fair amount of inline
-    assembly code.
-
-
-Cheers,
-
-Will
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
