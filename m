@@ -1,146 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 13 Jul 2012 14:10:29 +0200
-Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <20120713082249.GF32184@pengutronix.de>
-References: <1341850974-11977-1-git-send-email-marex@denx.de>
- <1341850974-11977-2-git-send-email-marex@denx.de>
- <20120713082249.GF32184@pengutronix.de>
-Message-ID: <201207131410.29469.marex@denx.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 13 Jul 2012 17:44:59 +0530
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
+ to be selected
+In-Reply-To: <20120713120857.GJ18079@mudshark.cambridge.arm.com>
+References: <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+ <4FFE7DB2.4040702@renesas.com>
+ <20120712084432.GA2816@mudshark.cambridge.arm.com>
+ <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
+ <4FFF8509.2050302@renesas.com>
+ <20120713085746.GA18079@mudshark.cambridge.arm.com>
+ <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
+ <20120713111337.GH18079@mudshark.cambridge.arm.com>
+ <CAMQu2gyUWYOmRNAiHJ-3-feThaEjC5cUO3krsNPX4PTFHqFF=Q@mail.gmail.com>
+ <20120713120857.GJ18079@mudshark.cambridge.arm.com>
+Message-ID: <CAMQu2gykoJpw+sAvGYK2++i=GXHuSUF8YKD3o8nv-vpZzTL=Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Fri, Jul 13, 2012 at 5:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jul 13, 2012 at 01:04:27PM +0100, Shilimkar, Santosh wrote:
+>> On Fri, Jul 13, 2012 at 4:43 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > I was anticipating that the platform would set the initial loops_per_jiffy
+>> > value if it requires udelays before loop calibration and the default of 4k
+>> > is wildly off.
+>> >
+>> > If people need loops_per_jiffy to be updated at the same time as lpj_fine,
+>> > I can post that as a separate patch (below) as Russell has merged v2 of these
+>> > patches into his delay branch. That said, I'd certainly like to know if this
+>> > is actually a real problem (and can't be solved by choosing a compromise value
+>> > as the initial loops_per_jiffy). I think Shinya was doing some tests so
+>> > I'll wait to see how those went.
+>> >
+>> I just tried the suggested change + two patches.
+>> I haven't gone through the complete discussion but quick test of your patches
+>> on OMAP5, shows me, the BOGOMIPS is completely wrong. Looks like
+>> you are not updating the  'loops_per_jiffy' in the calibration loop.
+>
+> What is your bogomips reading and what frequency is your architected timer
+> ticking at? loops_per_jiffy is updated by calibrate_delay in
+> init/calibrate.c so we shouldn't need to worry about that (the diff I posted
+> in my last email is just for udelay calls between switching to the timer and
+> doing the calibration).
+>
+>> What Am I missing ?
+>
+> Well, your bogomips number will probably be *much* lower than before, so
+> don't be surprised by that.
+>
+Indeed !!
+This is what I observed. Can we not keep that behavior old way. BogoMIPS and
+CPU clock is often very easy to co-related and helpful for CPUFREQ stats.
 
-> Hi,
-> 
-> On Mon, Jul 09, 2012 at 06:22:54PM +0200, Marek Vasut wrote:
-> > This patch implements DMA support into mxs-i2c. DMA transfers are now
-> > enabled via DT. The DMA operation is enabled by default.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Detlev Zundel <dzu@denx.de>
-> > CC: Dong Aisheng <b29396@freescale.com>
-> > CC: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> > Cc: linux-i2c at vger.kernel.org
-> > CC: Sascha Hauer <s.hauer@pengutronix.de>
-> > CC: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Stefano Babic <sbabic@denx.de>
-> > CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Cc: Wolfgang Denk <wd@denx.de>
-> > Cc: Wolfram Sang <w.sang@pengutronix.de>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    5 +
-> >  arch/arm/boot/dts/imx28.dtsi                      |    2 +
-> >  drivers/i2c/busses/i2c-mxs.c                      |  267
-> >  +++++++++++++++++++-- 3 files changed, 252 insertions(+), 22
-> >  deletions(-)
-> > 
-> > V2: Fixed return value from mxs_i2c_dma_setup_xfer().
-> > 
-> >     Fixed coding style nitpicks
-> >     Call mxs_i2c_dma_finish() in failpath only if DMA is active
-> > 
-> > V3: Align with changes in previous patch
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> > b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt index
-> > 30ac3a0..45b6307 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> > 
-> > @@ -6,6 +6,10 @@ Required properties:
-> >  - interrupts: Should contain ERROR and DMA interrupts
-> >  - clock-frequency: Desired I2C bus clock frequency in Hz.
-> >  
-> >                     Only 100000Hz and 400000Hz modes are supported.
-> > 
-> > +- fsl,i2c-dma-channel: APBX DMA channel for the I2C
-> > +
-> > +Optional properties:
-> > +- fsl,use-pio: Use PIO transfers instead of DMA, useful for debug
-> 
-> Having PIOQUEUE (not PIO) as a fallback is good. I'd rather like to see
-> this as a module parameter, though.
-
-It'd be cool if someone complained earlier and the responses to new patches 
-would be faster. This series has been going on for more than two months and 
-noone complained about this part until now. Instead I was made to document this 
-and now I have to do it in completely different way? Decide already ...
-
-> For one reason, this is not a
-> hardware property or board specific, so not a good device tree property.
-
-Actually, there're still people who might benefit of doing PIOq only, since they 
-do small (eg. one byte) transfers. And this is good to have configurable per 
-bus.
-
-> Also, it is implicitly deprecated somehow since either we want DMA to
-> fully work
-
-And the DMA doesn't fully work?
-
-> or, even better, somewhen be able to automatically switch
-> between PIOQUEUE and DMA depending on the i2c_msg size.
-
-That'd be cool. Some months ago, you promised to take a look. I tried it 
-recently again with not much luck.
-
-> Deprecated
-> properties are also troublesome. Third, we don't really need this per
-> instance, if somebody really has problems with DMA, it will apply to all
-> i2c busses. Makes sense?
-
-No, it doesn't. See above about small transfers. Consider the easy situation 
-where you have sensor on one bus (so you do PIO because you transfer small data) 
-and you have EEPROM on other bus, where you use DMA because you transfer large 
-data. And the mixed mode isn't there yet.
-
-> >  Examples:
-> > @@ -16,4 +20,5 @@ i2c0: i2c at 80058000 {
-> > 
-> >  	reg = <0x80058000 2000>;
-> >  	interrupts = <111 68>;
-> >  	clock-frequency = <100000>;
-> > 
-> > +	fsl,i2c-dma-channel = <6>;
-> > 
-> >  };
-> > 
-> > +	/*
-> > +	 * The MXS I2C DMA mode is prefered and enabled by default.
-> > +	 * The PIO mode is still supported, but should be used only
-> 
-> PIOQUEUE
-> 
-> > +	 * for debuging purposes etc.
-> > +	 */
-> > +	i2c->dma_mode = 1;
-> > +	if (of_find_property(node, "fsl,use-pio", NULL)) {
-> > +		i2c->dma_mode = 0;
-> > +		dev_info(dev, "Using PIO mode for I2C transfers!\n");
-> > +	}
-> > +
-> > +	/*
-> > +	 * TODO: This is a temporary solution and should be changed
-> > +	 * to use generic DMA binding later when the helpers get in.
-> > +	 */
-> 
-> @Shawn: Any idea when this is going to happen? And why do we need this?
-> AFAICT it will be always channel 6/7 on mx28?
-> 
-> > +	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
-> > +				   &i2c->dma_channel);
-> > +	if (ret) {
-> > +		dev_warn(dev, "Failed to get DMA channel!\n");
-> > +		i2c->dma_mode = 0;
-> > +	}
-> > +
-> 
-> Rest looks good, thanks!
-> 
->    Wolfram
-
-Best regards,
-Marek Vasut
+Regards
+Santosh
