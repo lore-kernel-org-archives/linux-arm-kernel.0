@@ -1,38 +1,33 @@
-From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Fri, 13 Jul 2012 17:51:06 +0530
-Subject: [PATCH 3/3] ARM: dts: SPEAr320: Fix no. of supported pinmux mode
-In-Reply-To: <cover.1342181727.git.vipulkumar.samar@st.com>
-References: <cover.1342181727.git.vipulkumar.samar@st.com>
-Message-ID: <37075889880066dd96dc2004ac1116c1c17c70cd.1342181727.git.vipulkumar.samar@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jul 2012 13:23:26 +0100
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
+ implementation to be selected
+In-Reply-To: <CAMQu2gykoJpw+sAvGYK2++i=GXHuSUF8YKD3o8nv-vpZzTL=Gg@mail.gmail.com>
+References: <20120712084432.GA2816@mudshark.cambridge.arm.com>
+ <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
+ <4FFF8509.2050302@renesas.com>
+ <20120713085746.GA18079@mudshark.cambridge.arm.com>
+ <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
+ <20120713111337.GH18079@mudshark.cambridge.arm.com>
+ <CAMQu2gyUWYOmRNAiHJ-3-feThaEjC5cUO3krsNPX4PTFHqFF=Q@mail.gmail.com>
+ <20120713120857.GJ18079@mudshark.cambridge.arm.com>
+ <CAMQu2gykoJpw+sAvGYK2++i=GXHuSUF8YKD3o8nv-vpZzTL=Gg@mail.gmail.com>
+Message-ID: <20120713122325.GK18079@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On spear320 machine no. of supported mode is 4 and by mistake it is programmed
-to 3.
-Supported modes are:
-	AUTO_NET_SMII_MODE
-	AUTO_NET_MII_MODE
-	AUTO_EXP_MODE
-	SMALL_PRINTERS_MODE
-	EXTENDED_MODE
+On Fri, Jul 13, 2012 at 01:14:59PM +0100, Shilimkar, Santosh wrote:
+> On Fri, Jul 13, 2012 at 5:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > Well, your bogomips number will probably be *much* lower than before, so
+> > don't be surprised by that.
+> >
+> Indeed !!
+> This is what I observed. Can we not keep that behavior old way. BogoMIPS and
+> CPU clock is often very easy to co-related and helpful for CPUFREQ stats.
 
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
----
- arch/arm/boot/dts/spear320-evb.dts |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I defer to David Miller, who had a similar reaction when he did this for
+sparc:
 
-diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
-index 4d55b67..c99f055 100644
---- a/arch/arm/boot/dts/spear320-evb.dts
-+++ b/arch/arm/boot/dts/spear320-evb.dts
-@@ -26,7 +26,7 @@
- 
- 	ahb {
- 		pinmux at b3000000 {
--			st,pinmux-mode = <3>;
-+			st,pinmux-mode = <4>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&state_default>;
- 
--- 
-1.7.2.2
+http://www.spinics.net/lists/sparclinux/msg08550.html
+
+Will
