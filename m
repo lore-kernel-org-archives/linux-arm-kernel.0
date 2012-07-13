@@ -1,9 +1,9 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 17:19:36 -0500
-Subject: [RFC 4/4] ARM: OMAP: Add DT support for timer driver
+Date: Fri, 13 Jul 2012 17:19:35 -0500
+Subject: [RFC 4/4] ARM: OMAP: Add DT support for dmtimer driver
 In-Reply-To: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
 References: <1342217976-29802-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1342217976-29802-7-git-send-email-jon-hunter@ti.com>
+Message-ID: <1342217976-29802-6-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
