@@ -1,66 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Jul 2012 22:42:52 +0900
-Subject: [PATCH v5 6/6] spi: s3c64xx: add device tree support
-In-Reply-To: <CAJuYYwRiR8M5m9rDE6dzMawuSLO03f7mydoks+zU2ByTmbtMrA@mail.gmail.com>
-References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
- <1342021265-11212-7-git-send-email-thomas.abraham@linaro.org>
- <4FFF51EE.4080609@samsung.com>
- <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
- <117c01cd60ea$90f76ac0$b2e64040$%kim@samsung.com>
- <CAJuYYwRiR8M5m9rDE6dzMawuSLO03f7mydoks+zU2ByTmbtMrA@mail.gmail.com>
-Message-ID: <118901cd60fd$66c26260$34472720$%kim@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 13 Jul 2012 14:43:39 +0100
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <CACRpkdYJi3Kk3gpdgFLWr+tun4LZNMw0ET6W2nHJfY5jSvgcjw@mail.gmail.com>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
+ <4FFB40A4.5060505@linaro.org> <20120709204620.GA12692@core.coreip.homeip.net>
+ <4FFB463F.9040201@linaro.org>
+ <CACRpkdbjkLvD13_g=TvCUYjqhZ7ySOiEL51h9eT3YVMO4Vnr3A@mail.gmail.com>
+ <4FFB4B5F.30103@linaro.org>
+ <CACRpkdYJi3Kk3gpdgFLWr+tun4LZNMw0ET6W2nHJfY5jSvgcjw@mail.gmail.com>
+Message-ID: <5000260B.8070907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> On 13 July 2012 16:58, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Thomas Abraham wrote:
-> >>
-> >> On 13 July 2012 04:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >> > Thomas, the DMACH_DT_PROP is available only on pl330 now. So seems
-> occur
-> >> > following build error with s3c6400_defconfig.
-> >> >
-> >> > drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_get_dmares':
-> >> > drivers/spi/spi-s3c64xx.c:1098: error: 'DMACH_DT_PROP' undeclared
-> (first
-> >> use
-> >> > in this function)
-> >> > drivers/spi/spi-s3c64xx.c:1098: error: (Each undeclared identifier is
-> >> > reported only once
-> >> > drivers/spi/spi-s3c64xx.c:1098: error: for each function it appears
-> in.)
-> >> > make[3]: *** [drivers/spi/spi-s3c64xx.o] Error 1
-> >> > make[2]: *** [drivers/spi] Error 2
-> >> >
-> >>
-> >> Dear Mr. Kim,
-> >>
-> >> Thanks for considering these patches to be merged via your tree. For
-> >> the build break you mentioned above, there was a patch submitted some
-> >> time back to handle this. The link to that patch is:
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
-> >> June/102627.html.
-> >> Could you please apply this patch also to your tree.
-> >>
-> > Sure, it looks good to me, will apply that then this series will be
-> rebased
-> > on top of that.
-> 
-> There are six more patches that enable spi device tree support for
-> Exynos4 and Exynos5 platforms. Could you consider to apply those
-> patches as well. The link to those patches is:
-> http://www.mail-archive.com/linux-samsung-
-> soc at vger.kernel.org/msg10851.html.
-> 
-Yeah, I remember, but I think some patches is needed to re-work as per
-comments...?
+On 10/07/12 22:08, Linus Walleij wrote:
+> On Mon, Jul 9, 2012 at 11:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> On 09/07/12 23:03, Linus Walleij wrote:
+>
+>>> Now since I was fooled by the last patch, thinking you had tested it
+>>> before
+>>> submitting (obviously not) - please send a test log of some
+>>> cat /dev/input/event* for this one before I ACK it this time.
+>
+> (Hm, sorry for grumpy mode...)
+>
+>> I did test it, but must have only looked at the one IRQ incrementing.
+>
+> That's not enough, cat /dev/input/event/* whatever event node is used
+> by the ponkey, press it and verify you get some garbage (=events)
+> in the console.
 
-Thanks.
+Yes, garbage seen, works fine.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Also:
+
+> # cat /proc/interrupts
+>            CPU0       CPU1
+>   6:          0          0    ab8500  ab8500-ponkey-dbf
+>   7:          0          0    ab8500  ab8500-ponkey-dbr
+
+Press, release, press, release:
+
+> # cat /proc/interrupts
+>            CPU0       CPU1
+>   6:          0          2    ab8500  ab8500-ponkey-dbf
+>   7:          0          2    ab8500  ab8500-ponkey-dbr
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
