@@ -1,405 +1,325 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 13 Jul 2012 08:54:59 -0500
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
-Message-ID: <500028B3.1040309@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 13 Jul 2012 19:27:32 +0530
+Subject: [PATCH v5 5/7] ARM: davinci: i2c: add OF support
+In-Reply-To: <1338373143-7467-6-git-send-email-hs@denx.de>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-6-git-send-email-hs@denx.de>
+Message-ID: <5000294C.5070606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Heiko,
 
-On 07/12/2012 04:17 PM, Paul Walmsley wrote:
-> Hello Jon
+On 5/30/2012 3:49 PM, Heiko Schocher wrote:
+> add of support for the davinci i2c driver.
 > 
-> On Thu, 7 Jun 2012, Jon Hunter wrote:
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-i2c at vger.kernel.org
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
->> By removing the CLKDM_CAN_ENABLE_AUTO flag, the EMU clock domain will always
->> remain on and hence, this will break low-power modes. The EMU clock domain only
->> support the SW_WKUP and HW_AUTO transition modes (for more details refer to the
->> OMAP4430 TRM) and power down the EMU power domain we need to place the EMU
->> clock domain back into the HW_AUTO mode. This can be accomplished by setting
->> the CLKDM_CAN_FORCE_SLEEP flag, which for an OMAP4 device will enable the
->> HW_AUTO mode.
-> 
-> Hmm, it would be nice if we could keep the CLKDM_CAN_* flags matching the 
-> hardware capabilities.  Looking at the 4430 TRM Rev X Table 3-744 
-> "CM_EMU_CLKSTCTRL", the CLKTRCTRL field isn't documented as supporting the 
-> SW_SLEEP mode (which CLKDM_CAN_FORCE_SLEEP will set).
-
-Right, however, this was part of the recommendation from Benoit. In
-patch #7 of this series we actually made the following modification ...
-
-"By eliminating the SW_SLEEP mode the the mapping of the flags for OMAP4
-devices can becomes ...
-
-CLKDM_CAN_DISABLE_AUTO	--> NO_SLEEP
-CLKDM_CAN_ENABLE_AUTO	--> HW_AUTO
-CLKDM_CAN_FORCE_SLEEP	--> HW_AUTO
-CLKDM_CAN_FORCE_WAKEUP	--> SW_WKUP"
-
-So now, by setting CLKDM_CAN_FORCE_SLEEP we are actually enabling
-HW_AUTO and not SW_SLEEP (for OMAP4). This was the purpose of patch #7
-was to remove the SW_SLEEP for OMAP4 as it is equivalent to HW_AUTO when
-using it to disable the module. Unfortunately, although this works it
-does make the flags a bit less clearer. The upside is the solution is
-simpler.
-
-> Maybe the CLKDM_CAN_* flags should be moved to a separate u8...
-> 
-> Anyway, what do you think about the following approach?  It uses a 
-> special flag to indicate that the EMU clockdomain is behaving in an 
-> unexpected way.  If you think it's reasonable, perhaps you could try your 
-> PMU tests with it?  It applies on top of linux-omap master 
-> (cb07e3394573a419147a1783f3bd7ef13045353c) plus the clockdomain patch 
-> posted earlier at:
-> 
-> http://marc.info/?l=linux-omap&m=134209072829531&w=2
-> 
-> But these patches may need to be applied on Kevin's 'pm' branch for 
-> meaningful PM testing:
-> 
-> http://marc.info/?l=linux-omap&m=134196493819792&w=2
-> 
-> 
-> 
-> - Paul
-> 
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Thu, 12 Jul 2012 14:58:43 -0600
-> Subject: [PATCH] ARM: OMAP2+: clockdomain/hwmod: add workaround for EMU
->  clockdomain idle problems
-> 
-> The idle status of the IP blocks and clocks inside the EMU clockdomain
-> isn't taken into account by the PRCM hardware when deciding whether
-> the clockdomain is idle.  Add a workaround flag, CLKDM_MISSING_IDLE_REPORTING,
-> to deal with this problem, and add the code necessary to support it.
-> 
-> XXX Add more description of what this flag actually does
-> 
-> XXX Jon, Ming, Will
 > ---
->  arch/arm/mach-omap2/clockdomain.c           |   17 ++++++
->  arch/arm/mach-omap2/clockdomain.h           |   20 ++++++-
->  arch/arm/mach-omap2/clockdomain2xxx_3xxx.c  |   86 +++++++++++++++++----------
->  arch/arm/mach-omap2/clockdomain44xx.c       |   11 ++++
->  arch/arm/mach-omap2/clockdomains3xxx_data.c |    7 +--
->  arch/arm/mach-omap2/clockdomains44xx_data.c |    3 +-
->  arch/arm/mach-omap2/omap_hwmod.c            |    3 +-
->  7 files changed, 105 insertions(+), 42 deletions(-)
+> - changes for v2:
+> - add comments from Sylwester Nawrocki <s.nawrocki@samsung.com>:
+>   - use "cell-index" instead "id"
+>   - OF_DEV_AUXDATA in the machine code, instead pre-define platform
+>     device name
+> - add comment from Grant Likely:
+>   - removed "id" resp. "cell-index" completely
+>   - fixed documentation
+>   - use of_match_ptr()
+>   - use devm_kzalloc() for allocating plattform data mem
+>   - fixed a whitespace issue
+> - no changes for v3
+> - changes for v4
+>   remove "pinmux-handle" property as discussed here:
+>   http://www.spinics.net/lists/arm-kernel/msg175701.html
+>   with Nori Sekhar
 > 
-> diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-> index b851ba4..17b1d32 100644
-> --- a/arch/arm/mach-omap2/clockdomain.c
-> +++ b/arch/arm/mach-omap2/clockdomain.c
-> @@ -914,6 +914,23 @@ bool clkdm_in_hwsup(struct clockdomain *clkdm)
->  	return ret;
+> - changes for v5
+>   add comments from Grant Likely:
+>   - do not change value of dev->dev->platform_data, instead
+>     hold a copy in davinci_i2c_dev.
+> 
+>  .../devicetree/bindings/arm/davinci/i2c.txt        |   31 ++++++++++++
+>  drivers/i2c/busses/i2c-davinci.c                   |   49 ++++++++++++++++++--
+>  2 files changed, 76 insertions(+), 4 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> new file mode 100644
+> index 0000000..e98a025
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> @@ -0,0 +1,31 @@
+> +* Texas Instruments Davinci I2C
+> +
+> +This file provides information, what the device node for the
+> +davinci i2c interface contain.
+> +
+> +Required properties:
+> +- compatible: "ti,davinci-i2c";
+> +- reg : Offset and length of the register set for the device
+> +
+> +Recommended properties :
+> +- interrupts : <a> standard interrupt property.
+> +- clock-frequency : desired I2C bus clock frequency in Hz.
+> +
+> +Optional properties:
+> +- bus-delay: bus delay in usec
+> +
+> +Example (enbw_cmc board):
+> +	i2c at 1c22000 {
+> +		compatible = "ti,davinci-i2c";
+> +		reg = <0x22000 0x1000>;
+> +		clock-frequency = <100000>;
+> +		interrupts = <15>;
+> +		interrupt-parent = <&intc>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		dtt at 48 {
+> +				compatible = "national,lm75";
+> +				reg = <0x48>;
+> +			};
+> +	};
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index a76d85f..4e7a966 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -38,9 +38,12 @@
+>  #include <linux/slab.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/gpio.h>
+> +#include <linux/of_i2c.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/i2c.h>
+> +#include <mach/mux.h>
+
+Seems like a stray change. I was able to build and use just fine
+without this include.
+
+>  
+>  /* ----- global defines ----------------------------------------------- */
+>  
+> @@ -114,6 +117,7 @@ struct davinci_i2c_dev {
+>  	struct completion	xfr_complete;
+>  	struct notifier_block	freq_transition;
+>  #endif
+> +	struct davinci_i2c_platform_data *pdata;
+>  };
+>  
+>  /* default platform data to use if not supplied in the platform_device */
+> @@ -149,13 +153,22 @@ static void generic_i2c_clock_pulse(unsigned int scl_pin)
+>  	}
 >  }
 >  
-> +/**
-> + * clkdm_missing_idle_reporting - can @clkdm enter autoidle even if in use?
-> + * @clkdm: struct clockdomain *
-> + *
-> + * Returns true if clockdomain @clkdm has the
-> + * CLKDM_MISSING_IDLE_REPORTING flag set, or false if not or @clkdm is
-> + * null.  More information is available in the documentation for the
-> + * CLKDM_MISSING_IDLE_REPORTING macro.
-> + */
-> +bool clkdm_missing_idle_reporting(struct clockdomain *clkdm)
+> +static struct davinci_i2c_platform_data
+> +		*i2c_get_plattformdata(struct davinci_i2c_dev *dev)
 > +{
-> +	if (!clkdm)
-> +		return false;
+> +	if (dev->dev->platform_data == NULL)
+> +		return dev->pdata;
 > +
-> +	return (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) ? true : false;
+> +	return dev->dev->platform_data;
 > +}
+
+It seems to me that if we setup the newly introduced dev->pdata
+member correctly once in probe, there should not be a need for this
+function. We can also eliminate multiple checks for pdata in code.
+See below for more.
+
 > +
->  /* Clockdomain-to-clock/hwmod framework interface code */
->  
->  static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
-> diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-> index 7b3c1d2..fb5d37f 100644
-> --- a/arch/arm/mach-omap2/clockdomain.h
-> +++ b/arch/arm/mach-omap2/clockdomain.h
-> @@ -1,9 +1,7 @@
->  /*
-> - * arch/arm/plat-omap/include/mach/clockdomain.h
-> - *
->   * OMAP2/3 clockdomain framework functions
->   *
-> - * Copyright (C) 2008 Texas Instruments, Inc.
-> + * Copyright (C) 2008, 2012 Texas Instruments, Inc.
->   * Copyright (C) 2008-2011 Nokia Corporation
->   *
->   * Paul Walmsley
-> @@ -34,6 +32,20 @@
->   * CLKDM_ACTIVE_WITH_MPU: The PRCM guarantees that this clockdomain is
->   *     active whenever the MPU is active.  True for interconnects and
->   *     the WKUP clockdomains.
-> + * CLKDM_MISSING_IDLE_REPORTING: The idle status of the IP blocks and
-> + *     clocks inside this clockdomain are not taken into account by
-> + *     the PRCM when determining whether the clockdomain is idle.
-> + *     Without this flag, if the clockdomain is set to
-> + *     hardware-supervised idle mode, the PRCM may transition the
-> + *     enclosing powerdomain to a low power state, even when devices
-> + *     inside the clockdomain and powerdomain are in use.  (An example
-> + *     of such a clockdomain is the EMU clockdomain on OMAP3/4.)  If
-> + *     this flag is set, and the clockdomain does not support the
-> + *     force-sleep mode, then the HW_AUTO mode will be used to put the
-> + *     clockdomain to sleep.  Similarly, if the clockdomain supports
-> + *     the force-wakeup mode, then it will be used whenever a clock or
-> + *     IP block inside the clockdomain is active, rather than the
-> + *     HW_AUTO mode.
-
-I am not sure if it is really a matter of the clock domain missing the
-idle reporting, but more of a problem that the EMU power domain power
-state is programmed in HW to OFF and cannot be changed by software. (see
-POWER_STATE field of PM_EMU_PWRSTCTRL register description in the TRM).
-
-This means that when the EMU clock domain does idle, the EMU power
-domain can transition to OFF and hence we loss the EMU logic context. So
-we need to keep the EMU CLKDM on to keep the EMU PWRDM on, but it is
-really the lack of control we have over the PWRDM that is the problem. I
-would not say this is a HW bug but more of a design choice probably to
-keep the design simpler at the expense of power.
-
-I believe that this problem would happen to all power domains if they
-were programmed for the OFF power state when the clock domain idled. For
-other power domains we avoid this by programming them to the ON state
-when we are using them.
-
-Therefore, we need to keep the EMU CLKDM ON while active to prevent the
-PWRDM transitioning to OFF, when the CLKDM idles. So I would see this
-problem as more like the CLKDM_CANNOT_IDLE_WHILE_ACTIVE vs
-CLKDM_MISSING_IDLE_REPORTING.
-
+>  /* This routine does i2c bus recovery as specified in the
+>   * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
 >   */
->  #define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
->  #define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
-> @@ -41,6 +53,7 @@
->  #define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
->  #define CLKDM_NO_AUTODEPS			(1 << 4)
->  #define CLKDM_ACTIVE_WITH_MPU			(1 << 5)
-> +#define CLKDM_MISSING_IDLE_REPORTING		(1 << 6)
->  
->  #define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
->  #define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
-> @@ -188,6 +201,7 @@ int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm);
->  void clkdm_allow_idle(struct clockdomain *clkdm);
->  void clkdm_deny_idle(struct clockdomain *clkdm);
->  bool clkdm_in_hwsup(struct clockdomain *clkdm);
-> +bool clkdm_missing_idle_reporting(struct clockdomain *clkdm);
->  
->  int clkdm_wakeup(struct clockdomain *clkdm);
->  int clkdm_sleep(struct clockdomain *clkdm);
-> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> index a0d68db..09385a9 100644
-> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> @@ -162,6 +162,37 @@ static void _disable_hwsup(struct clockdomain *clkdm)
->  						clkdm->clktrctrl_mask);
->  }
->  
-> +static int omap3_clkdm_sleep(struct clockdomain *clkdm)
-> +{
-> +	omap3xxx_cm_clkdm_force_sleep(clkdm->pwrdm.ptr->prcm_offs,
-> +				      clkdm->clktrctrl_mask);
-> +	return 0;
-> +}
-> +
-> +static int omap3_clkdm_wakeup(struct clockdomain *clkdm)
-> +{
-> +	omap3xxx_cm_clkdm_force_wakeup(clkdm->pwrdm.ptr->prcm_offs,
-> +				       clkdm->clktrctrl_mask);
-> +	return 0;
-> +}
-> +
-> +static void omap3_clkdm_allow_idle(struct clockdomain *clkdm)
-> +{
-> +	if (atomic_read(&clkdm->usecount) > 0)
-> +		_clkdm_add_autodeps(clkdm);
-> +
-> +	omap3xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-> +				       clkdm->clktrctrl_mask);
-> +}
-> +
-> +static void omap3_clkdm_deny_idle(struct clockdomain *clkdm)
-> +{
-> +	omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-> +					clkdm->clktrctrl_mask);
-> +
-> +	if (atomic_read(&clkdm->usecount) > 0)
-> +		_clkdm_del_autodeps(clkdm);
-> +}
->  
->  static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
+>  static void i2c_recover_bus(struct davinci_i2c_dev *dev)
 >  {
-> @@ -170,6 +201,18 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
->  	if (!clkdm->clktrctrl_mask)
->  		return 0;
+>  	u32 flag = 0;
+> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
 >  
-> +	/*
-> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-> +	 * more details on the unpleasant problem this is working
-> +	 * around
-> +	 */
-> +	if (clkdm->flags & (CLKDM_MISSING_IDLE_REPORTING |
-> +			    CLKDM_CAN_FORCE_WAKEUP)) {
-> +		(cpu_is_omap24xx()) ? omap2_clkdm_wakeup(clkdm) :
-> +			omap3_clkdm_wakeup(clkdm);
-> +		return 0;
-> +	}
-> +
->  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
->  				clkdm->clktrctrl_mask);
+>  	dev_err(dev->dev, "initiating i2c bus recovery\n");
+>  	/* Send NACK to the slave */
+> @@ -187,7 +200,7 @@ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
 >  
-> @@ -193,6 +236,17 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
->  	if (!clkdm->clktrctrl_mask)
->  		return 0;
+>  static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>  {
+> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+>  	u16 psc;
+>  	u32 clk;
+>  	u32 d;
+> @@ -235,7 +248,7 @@ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>   */
+>  static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+>  {
+> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
 >  
-> +	/*
-> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-> +	 * more details on the unpleasant problem this is working
-> +	 * around
-> +	 */
-> +	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
-> +	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
-> +		_enable_hwsup(clkdm);
-> +		return 0;
-> +	}
-> +
->  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
->  				clkdm->clktrctrl_mask);
->  
-> @@ -209,38 +263,6 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
->  	return 0;
->  }
->  
-> -static int omap3_clkdm_sleep(struct clockdomain *clkdm)
-> -{
-> -	omap3xxx_cm_clkdm_force_sleep(clkdm->pwrdm.ptr->prcm_offs,
-> -				clkdm->clktrctrl_mask);
-> -	return 0;
-> -}
-> -
-> -static int omap3_clkdm_wakeup(struct clockdomain *clkdm)
-> -{
-> -	omap3xxx_cm_clkdm_force_wakeup(clkdm->pwrdm.ptr->prcm_offs,
-> -				clkdm->clktrctrl_mask);
-> -	return 0;
-> -}
-> -
-> -static void omap3_clkdm_allow_idle(struct clockdomain *clkdm)
-> -{
-> -	if (atomic_read(&clkdm->usecount) > 0)
-> -		_clkdm_add_autodeps(clkdm);
-> -
-> -	omap3xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-> -				clkdm->clktrctrl_mask);
-> -}
-> -
-> -static void omap3_clkdm_deny_idle(struct clockdomain *clkdm)
-> -{
-> -	omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-> -				clkdm->clktrctrl_mask);
-> -
-> -	if (atomic_read(&clkdm->usecount) > 0)
-> -		_clkdm_del_autodeps(clkdm);
-> -}
-> -
->  struct clkdm_ops omap2_clkdm_operations = {
->  	.clkdm_add_wkdep	= omap2_clkdm_add_wkdep,
->  	.clkdm_del_wkdep	= omap2_clkdm_del_wkdep,
-> diff --git a/arch/arm/mach-omap2/clockdomain44xx.c b/arch/arm/mach-omap2/clockdomain44xx.c
-> index 762f2cc..6fc6155 100644
-> --- a/arch/arm/mach-omap2/clockdomain44xx.c
-> +++ b/arch/arm/mach-omap2/clockdomain44xx.c
-> @@ -113,6 +113,17 @@ static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
->  	if (!clkdm->prcm_partition)
->  		return 0;
->  
-> +	/*
-> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-> +	 * more details on the unpleasant problem this is working
-> +	 * around
-> +	 */
-> +	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
-> +	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
-> +		omap4_clkdm_allow_idle(clkdm);
-> +		return 0;
-> +	}
-> +
->  	hwsup = omap4_cminst_is_clkdm_in_hwsup(clkdm->prcm_partition,
->  					clkdm->cm_inst, clkdm->clkdm_offs);
->  
-> diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> index 56089c4..933a35c 100644
-> --- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> @@ -387,14 +387,11 @@ static struct clockdomain per_am35x_clkdm = {
->  	.clktrctrl_mask = OMAP3430_CLKTRCTRL_PER_MASK,
+>  	if (!pdata)
+>  		pdata = &davinci_i2c_platform_data_default;
+> @@ -308,7 +321,7 @@ static int
+>  i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+>  {
+>  	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
+> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+>  	u32 flag;
+>  	u16 w;
+>  	int r;
+> @@ -635,6 +648,12 @@ static struct i2c_algorithm i2c_davinci_algo = {
+>  	.functionality	= i2c_davinci_func,
 >  };
 >  
-> -/*
-> - * Disable hw supervised mode for emu_clkdm, because emu_pwrdm is
-> - * switched of even if sdti is in use
-> - */
->  static struct clockdomain emu_clkdm = {
->  	.name		= "emu_clkdm",
->  	.pwrdm		= { .name = "emu_pwrdm" },
-> -	.flags		= /* CLKDM_CAN_ENABLE_AUTO |  */CLKDM_CAN_SWSUP,
-> +	.flags		= (CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_SWSUP |
-> +			   CLKDM_MISSING_IDLE_REPORTING),
->  	.clktrctrl_mask = OMAP3430_CLKTRCTRL_EMU_MASK,
->  };
+> +static const struct of_device_id davinci_i2c_of_match[] = {
+> +	{.compatible = "ti,davinci-i2c", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
+> +
+>  static int davinci_i2c_probe(struct platform_device *pdev)
+>  {
+>  	struct davinci_i2c_dev *dev;
+> @@ -676,6 +695,25 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>  	dev->irq = irq->start;
+>  	platform_set_drvdata(pdev, dev);
 >  
-> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> index 63d60a7..b56d06b 100644
-> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> @@ -390,7 +390,8 @@ static struct clockdomain emu_sys_44xx_clkdm = {
->  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->  	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
->  	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
-> -	.flags		  = CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP,
-> +	.flags		  = (CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP |
-> +			     CLKDM_MISSING_IDLE_REPORTING),
->  };
->  
->  static struct clockdomain l3_dma_44xx_clkdm = {
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 6ca8e51..36f0603 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1857,7 +1857,8 @@ static int _enable(struct omap_hwmod *oh)
->  		 * completely the module. The clockdomain can be set
->  		 * in HW_AUTO only when the module become ready.
->  		 */
-> -		hwsup = clkdm_in_hwsup(oh->clkdm);
-> +		hwsup = clkdm_in_hwsup(oh->clkdm) &&
-> +			!clkdm_missing_idle_reporting(oh->clkdm);
->  		r = clkdm_hwmod_enable(oh->clkdm, oh);
->  		if (r) {
->  			WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
-> 
+> +	if ((dev->dev->platform_data == NULL) &&
+> +		(pdev->dev.of_node)) {
+> +		u32 prop;
+> +
+> +		dev->pdata = devm_kzalloc(&pdev->dev,
+> +			sizeof(struct davinci_i2c_platform_data), GFP_KERNEL);
+> +		if (!dev->pdata) {
+> +			r = -ENOMEM;
+> +			goto err_free_mem;
+> +		}
+> +		memcpy(dev->pdata, &davinci_i2c_platform_data_default,
+> +			sizeof(struct davinci_i2c_platform_data));
+> +		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+> +			&prop))
+> +			dev->pdata->bus_freq = prop / 1000;
+> +		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
+> +			&prop))
+> +			dev->pdata->bus_delay = prop;
 
-Thanks for the detailed suggestion! Adding a flag to prevent programming
-the HW_AUTO while the CLKDM is active could definitely work (although I
-may change the name/description of the flag a little).
+You are leaving out two other platform data members (the gpio pins
+corresponding to data and clock) from DT data. We should be able to
+get that information from DT too, right?
 
-Another proposal I also thought of is re-working the flags to describe
-the HW mode to be used when turning on the CLKDM, when the CLKDM is
-active and when the CLKDM is shut down. So instead of saying what modes
-the CLKDM supports, specify what modes should be used for pre-ON (i.e.
-turn ON), ON and OFF. Right now software is trying to decide for us by
-what is available (which is ideal) but makes working around such nuances
-a little more painful.
+So, I took this patch and tried to see if pdata maintenance can be
+simplified and came with the diff below. Can you have a look and see
+if this makes sense? I tested this using i2cdetect both with and
+without DT.
 
-By the way, I did do some testing on OMAP3, but I don't recall now
-whether I was having such problems with OMAP3. I need to go back and
-test perf again on OMAP3 to see if such a flag is needed.
+Thanks,
+Sekhar
 
-Cheers
-Jon
+---8<---
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index 16d7645..d07c207 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -153,22 +153,13 @@ static void generic_i2c_clock_pulse(unsigned int scl_pin)
+ 	}
+ }
+ 
+-static struct davinci_i2c_platform_data
+-		*i2c_get_plattformdata(struct davinci_i2c_dev *dev)
+-{
+-	if (dev->dev->platform_data == NULL)
+-		return dev->pdata;
+-
+-	return dev->dev->platform_data;
+-}
+-
+ /* This routine does i2c bus recovery as specified in the
+  * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
+  */
+ static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+ {
+ 	u32 flag = 0;
+-	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
++	struct davinci_i2c_platform_data *pdata = dev->pdata;
+ 
+ 	dev_err(dev->dev, "initiating i2c bus recovery\n");
+ 	/* Send NACK to the slave */
+@@ -176,8 +167,7 @@ static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+ 	flag |=  DAVINCI_I2C_MDR_NACK;
+ 	/* write the data into mode register */
+ 	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+-	if (pdata)
+-		generic_i2c_clock_pulse(pdata->scl_pin);
++	generic_i2c_clock_pulse(pdata->scl_pin);
+ 	/* Send STOP */
+ 	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+ 	flag |= DAVINCI_I2C_MDR_STP;
+@@ -200,7 +190,7 @@ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
+ 
+ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+ {
+-	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
++	struct davinci_i2c_platform_data *pdata = dev->pdata;
+ 	u16 psc;
+ 	u32 clk;
+ 	u32 d;
+@@ -248,10 +238,7 @@ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+  */
+ static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+ {
+-	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+-
+-	if (!pdata)
+-		pdata = &davinci_i2c_platform_data_default;
++	struct davinci_i2c_platform_data *pdata = dev->pdata;
+ 
+ 	/* put I2C into reset */
+ 	davinci_i2c_reset_ctrl(dev, 0);
+@@ -321,13 +308,11 @@ static int
+ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+ {
+ 	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
+-	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
++	struct davinci_i2c_platform_data *pdata = dev->pdata;
+ 	u32 flag;
+ 	u16 w;
+ 	int r;
+ 
+-	if (!pdata)
+-		pdata = &davinci_i2c_platform_data_default;
+ 	/* Introduce a delay, required for some boards (e.g Davinci EVM) */
+ 	if (pdata->bus_delay)
+ 		udelay(pdata->bus_delay);
+@@ -693,10 +678,10 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ #endif
+ 	dev->dev = get_device(&pdev->dev);
+ 	dev->irq = irq->start;
++	dev->pdata = dev->dev->platform_data;
+ 	platform_set_drvdata(pdev, dev);
+ 
+-	if ((dev->dev->platform_data == NULL) &&
+-		(pdev->dev.of_node)) {
++	if (!dev->pdata && pdev->dev.of_node) {
+ 		u32 prop;
+ 
+ 		dev->pdata = devm_kzalloc(&pdev->dev,
+@@ -713,7 +698,10 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
+ 			&prop))
+ 			dev->pdata->bus_delay = prop;
++	} else if (!dev->pdata) {
++		dev->pdata = &davinci_i2c_platform_data_default;
+ 	}
++
+ 	dev->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
+ 		r = -ENODEV;
