@@ -1,43 +1,48 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 13 Jul 2012 16:55:53 +0530
-Subject: [PATCHv11 0/6] I2C cleanups
-In-Reply-To: <20120712125229.GG2194@pengutronix.de>
-References: <1340896292-12112-1-git-send-email-shubhrajyoti@ti.com>
- <CAM=Q2ct0PUisYGcaX6EAPWT-SmZAgRV_O8mAOodH-V4Q0O-Vww@mail.gmail.com>
- <20120712125229.GG2194@pengutronix.de>
-Message-ID: <500005C1.4010203@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 13 Jul 2012 20:28:03 +0900
+Subject: [PATCH v5 6/6] spi: s3c64xx: add device tree support
+In-Reply-To: <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+ <1342021265-11212-7-git-send-email-thomas.abraham@linaro.org>
+ <4FFF51EE.4080609@samsung.com>
+ <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
+Message-ID: <117c01cd60ea$90f76ac0$b2e64040$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 July 2012 06:22 PM, Wolfram Sang wrote:
-> On Mon, Jul 09, 2012 at 05:17:07PM +0530, Shubhrajyoti Datta wrote:
->> On Thu, Jun 28, 2012 at 8:41 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
->>> This is a minimal cleanup series.
->> If there are no further comments can this series be queued?
-> I just applied a few of them. BTW I get a build warning when compiling the
-> kernel, maybe someone is interested. It is not related to the patches, though.
-OK could check that.
->
-> ===
->
-> WARNING: arch/arm/mach-omap2/built-in.o(.data+0x2b5c0): Section mismatch in reference from the variable rx51_si4713_dev to the (unknown reference) .init.data:(unknown)
-> The variable rx51_si4713_dev references
-> the (unknown reference) __initdata (unknown)
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
->
-> ===
->
-> I think this is what I'll pull in for the next merge window. The big OMAP
-> cleanup (latest version from 3. July) would then go in early into -next for
-> 3.7. Is that OK with the omap-people?
->
-> Also, thanks to Shubhrajyoti Datta for reviewing other patches on the
-> i2c-list, much appreciated.
-Thanks,
+Thomas Abraham wrote:
+> 
+> On 13 July 2012 04:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Thomas, the DMACH_DT_PROP is available only on pl330 now. So seems occur
+> > following build error with s3c6400_defconfig.
+> >
+> > drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_get_dmares':
+> > drivers/spi/spi-s3c64xx.c:1098: error: 'DMACH_DT_PROP' undeclared (first
+> use
+> > in this function)
+> > drivers/spi/spi-s3c64xx.c:1098: error: (Each undeclared identifier is
+> > reported only once
+> > drivers/spi/spi-s3c64xx.c:1098: error: for each function it appears in.)
+> > make[3]: *** [drivers/spi/spi-s3c64xx.o] Error 1
+> > make[2]: *** [drivers/spi] Error 2
+> >
+> 
+> Dear Mr. Kim,
+> 
+> Thanks for considering these patches to be merged via your tree. For
+> the build break you mentioned above, there was a patch submitted some
+> time back to handle this. The link to that patch is:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
+> June/102627.html.
+> Could you please apply this patch also to your tree.
+> 
+Sure, it looks good to me, will apply that then this series will be rebased
+on top of that.
 
-> Thanks,
->
->    Wolfram
->
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
