@@ -1,177 +1,46 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 13 Jul 2012 10:01:45 +0200
-Subject: [PATCH] ARM: OMAP4: twl-common: Support for additional devices on
- i2c1 bus
-Message-ID: <1342166505-15275-1-git-send-email-peter.ujfalusi@ti.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Fri, 13 Jul 2012 09:06:58 +0100
+Subject: [PATCH 1/4] clk:spear1340:Fix: Rename clk ids within predefined
+ limit
+In-Reply-To: <b43c4e64ed61d4c18f5c3326539f7f03e9604ef1.1342160220.git.vipulkumar.samar@st.com>
+References: <cover.1342160220.git.vipulkumar.samar@st.com>
+ <b43c4e64ed61d4c18f5c3326539f7f03e9604ef1.1342160220.git.vipulkumar.samar@st.com>
+Message-ID: <CAOh2x==4rQhAvZmmqiyi0jhF0Zz=v8OmuCBaFGFehOEt2kyd1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
-Manufacturers can opt to use different codec than twl6040 and also can add
-audio related IC to the bus (external amplifier for example on SDP4430).
+On Fri, Jul 13, 2012 at 7:23 AM, Vipul Kumar Samar
+<vipulkumar.samar@st.com> wrote:
+> The max limit of con_id is 16 and dev_id is 20. As of now for spear1340, many
+> clk ids are exceeding this predefined limit.
+>
+> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
 
-Make it possible to add differnet set of additional devices to i2c1 bus on
-OMAP4 boards.
+> @@ -509,23 +507,23 @@ void __init spear1340_clk_init(void)
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/board-4430sdp.c    |   14 ++++++++++--
- arch/arm/mach-omap2/board-omap4panda.c |   12 +++++++++-
- arch/arm/mach-omap2/twl-common.c       |   35 +++++++++----------------------
- arch/arm/mach-omap2/twl-common.h       |    3 +-
- 4 files changed, 33 insertions(+), 31 deletions(-)
+> -       clk_register_clkdev(clk1, "uart0_synth_gate_clk", NULL);
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 2fd7b03..1d81f62 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -542,7 +542,7 @@ static struct twl6040_vibra_data twl6040_vibra = {
- 
- static struct twl6040_gpo_data twl6040_gpo = {
- 	.nr_gpo = TWL6040_GPO_MAX,
--	.gpio_base = -1,
-+	.gpio_base = 192,
- };
- 
- static struct twl6040_platform_data twl6040_data = {
-@@ -553,6 +553,14 @@ static struct twl6040_platform_data twl6040_data = {
- 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
- };
- 
-+static struct i2c_board_info __initdata sdp4430_i2c_1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("twl6040", 0x4b),
-+		.irq = OMAP44XX_IRQ_SYS_2N,
-+		.platform_data = &twl6040_data,
-+	},
-+};
-+
- static struct twl4030_platform_data sdp4430_twldata = {
- 	/* Regulators */
- 	.vusim		= &sdp4430_vusim,
-@@ -586,8 +594,8 @@ static int __init omap4_i2c_init(void)
- 			TWL_COMMON_REGULATOR_CLK32KG |
- 			TWL_COMMON_REGULATOR_V1V8 |
- 			TWL_COMMON_REGULATOR_V2V1);
--	omap4_pmic_init("twl6030", &sdp4430_twldata,
--			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
-+	omap4_pmic_init("twl6030", &sdp4430_twldata, sdp4430_i2c_1_boardinfo,
-+			ARRAY_SIZE(sdp4430_i2c_1_boardinfo));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
- 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
- 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index b627cdc..5becba2 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -266,6 +266,14 @@ static struct twl6040_platform_data twl6040_data = {
- 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
- };
- 
-+static struct i2c_board_info __initdata panda_i2c_1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("twl6040", 0x4b),
-+		.irq = OMAP44XX_IRQ_SYS_2N,
-+		.platform_data = &twl6040_data,
-+	},
-+};
-+
- /* Panda board uses the common PMIC configuration */
- static struct twl4030_platform_data omap4_panda_twldata;
- 
-@@ -293,8 +301,8 @@ static int __init omap4_panda_i2c_init(void)
- 			TWL_COMMON_REGULATOR_CLK32KG |
- 			TWL_COMMON_REGULATOR_V1V8 |
- 			TWL_COMMON_REGULATOR_V2V1);
--	omap4_pmic_init("twl6030", &omap4_panda_twldata,
--			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
-+	omap4_pmic_init("twl6030", &omap4_panda_twldata, panda_i2c_1_boardinfo,
-+			ARRAY_SIZE(panda_i2c_1_boardinfo));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
- 	/*
- 	 * Bus 3 is attached to the DVI port where devices like the pico DLP
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index c76d075..94c8280 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -39,16 +39,6 @@ static struct i2c_board_info __initdata pmic_i2c_board_info = {
- 	.flags		= I2C_CLIENT_WAKE,
- };
- 
--static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
--	{
--		.addr		= 0x48,
--		.flags		= I2C_CLIENT_WAKE,
--	},
--	{
--		I2C_BOARD_INFO("twl6040", 0x4b),
--	},
--};
--
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- static int twl_set_voltage(void *data, int target_uV)
- {
-@@ -77,30 +67,25 @@ void __init omap_pmic_init(int bus, u32 clkrate,
- 
- void __init omap4_pmic_init(const char *pmic_type,
- 		    struct twl4030_platform_data *pmic_data,
--		    struct twl6040_platform_data *twl6040_data, int twl6040_irq)
-+		    struct i2c_board_info *devices, int nr_devices)
- {
- 	/* PMIC part*/
- 	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
--	strncpy(omap4_i2c1_board_info[0].type, pmic_type,
--		sizeof(omap4_i2c1_board_info[0].type));
--	omap4_i2c1_board_info[0].irq = OMAP44XX_IRQ_SYS_1N;
--	omap4_i2c1_board_info[0].platform_data = pmic_data;
--
--	/* TWL6040 audio IC part */
--	omap4_i2c1_board_info[1].irq = twl6040_irq;
--	omap4_i2c1_board_info[1].platform_data = twl6040_data;
--
--	omap_register_i2c_bus(1, 400, omap4_i2c1_board_info, 2);
-+	omap_pmic_init(1, 400, pmic_type, OMAP44XX_IRQ_SYS_1N, pmic_data);
- 
-+	/* Register additional devices on i2c1 bus if needed */
-+	if (devices)
-+		i2c_register_board_info(1, devices, nr_devices);
- }
- 
- void __init omap_pmic_late_init(void)
- {
- 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
--	if (pmic_i2c_board_info.irq)
--		omap3_twl_init();
--	if (omap4_i2c1_board_info[0].irq)
--		omap4_twl_init();
-+	if (!pmic_i2c_board_info.irq)
-+		return;
-+
-+	omap3_twl_init();
-+	omap4_twl_init();
- }
- 
- #if defined(CONFIG_ARCH_OMAP3)
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index 8fe71cf..de062c7 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -32,6 +32,7 @@
- 
- struct twl4030_platform_data;
- struct twl6040_platform_data;
-+struct i2c_board_info;
- 
- void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
- 		    struct twl4030_platform_data *pmic_data);
-@@ -51,7 +52,7 @@ static inline void omap3_pmic_init(const char *pmic_type,
- 
- void omap4_pmic_init(const char *pmic_type,
- 		    struct twl4030_platform_data *pmic_data,
--		    struct twl6040_platform_data *audio_data, int twl6040_irq);
-+		    struct i2c_board_info *devices, int nr_devices);
- 
- void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 			   u32 pdata_flags, u32 regulators_flags);
--- 
-1.7.8.6
+> -       clk_register_clkdev(clk1, "sdhci_synth_gate_clk", NULL);
+
+> -       clk_register_clkdev(clk, "gmac_phy_input_mux_clk", NULL);
+> -       clk_register_clkdev(clk1, "gmac_phy_synth_gate_clk", NULL);
+
+These are the only places in this entire patch, where i found con_id
+crossing the limit.
+Then why so many changes? Aligning all to similar naming?
+
+
+>         clk_register_clkdev(clk, NULL, "e0000000.serial");
+
+@Russell & Mike: Above line uses maximum length of dev_id, i.e. 16.
+And because with DT we have so long device names now, out of which
+8 - address
+1 - '.'
+1 - '\0'
+
+10 are already gone and so only 6 are left for device name. Should we
+consider updating
+dev_id array size??
+
+--
+viresh
