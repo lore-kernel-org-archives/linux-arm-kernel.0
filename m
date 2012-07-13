@@ -1,41 +1,150 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 13 Jul 2012 12:35:45 +0200
-Subject: [PATCH v4 2/2] serial: mxs-auart: Allow device tree probing
-In-Reply-To: <4FFFF968.5000801@pengutronix.de>
-References: <1339774557-23588-1-git-send-email-fabio.estevam@freescale.com>
- <1340024769-7122-1-git-send-email-fabio.estevam@freescale.com>
- <4FDF929B.7000809@grid-net.com> <4FFFF968.5000801@pengutronix.de>
-Message-ID: <4FFFFA01.6070306@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 13 Jul 2012 12:42:26 +0200
+Subject: [PATCH] Documentation: Describe the AB8500 Device Tree bindings
+Message-ID: <1342176146-22765-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 12:33 PM, Marc Kleine-Budde wrote:
-> On 06/18/2012 10:42 PM, Subodh Nijsure wrote:
->>
->> If one were to try run console on one of the /dev/ttyAPP* ports, as is
->> the case for hardware I am working with, console output wouldn't show up
->> without the following diff:
->>
->> Let me know if should send formal patch or we can include it as part of v5?
-> 
-> Has this patch been applied?
+Although for the most part, the AB8500 uses common bindings, some
+of the ways in which they are used differ slightly to the common
+uses of those bindings. To clear up some of these varying concepts
+we provide some documentation describing each of the properties and
+how they are used.
 
-Yes. [1]
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/ab8500.txt |  123 ++++++++++++++++++++++
+ 1 file changed, 123 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/ab8500.txt
 
-Marc
-
-[1]
-http://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commit;h=1ea6607d4cdc917987e7e6cfaafc4a630d97a297
+diff --git a/Documentation/devicetree/bindings/mfd/ab8500.txt b/Documentation/devicetree/bindings/mfd/ab8500.txt
+new file mode 100644
+index 0000000..69e757a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/ab8500.txt
+@@ -0,0 +1,123 @@
++* AB8500 Multi-Functional Device (MFD)
++
++Required parent device properties:
++- compatible             : contains "stericsson,ab8500";
++- interrupts             : contains the IRQ line for the AB8500
++- interrupt-controller   : describes the AB8500 as an Interrupt Controller (has its own domain)
++- #interrupt-cells       : should be 2, for 2-cell format
++                            - The first cell is the AB8500 local IRQ number
++                            - The second cell is used to specify optional parameters
++                              - bits[3:0] trigger type and level flags:
++                                  1 = low-to-high edge triggered
++                                  2 = high-to-low edge triggered
++                                  4 = active high level-sensitive
++                                  8 = active low level-sensitive
++
++Optional parent device properties:
++- reg                    : contains the PRCMU mailbox address for the AB8500 i2c port
++
++The AB8500 consists of a large and varied group of sub-devices:
++
++Device                     IRQ Names              Supply Names   Description
++------                     ---------              ------------   -----------
++ab8500-bm                :                      :              : Battery Manager
++ab8500-btemp             :                      :              : Battery Temperature
++ab8500-charger           :                      :              : Battery Charger
++ab8500-fg                :                      :              : Fuel Gauge
++ab8500-gpadc             : HW_CONV_END          : vddadc       : Analogue to Digital Converter
++                           SW_CONV_END          :              :
++ab8500-gpio              :                      :              : GPIO Controller
++ab8500-ponkey            : ONKEY_DBF            :              : Power-on Key
++                           ONKEY_DBR            :              :
++ab8500-pwm               :                      :              : Pulse Width Modulator
++ab8500-regulator         :                      :              : Regulators
++ab8500-rtc               : 60S                  :              : Real Time Clock
++                         : ALARM                :              :
++ab8500-sysctrl           :                      :              : System Control
++ab8500-usb               : ID_WAKEUP_R          : vddulpivio18 : Universal Serial Bus
++                         : ID_WAKEUP_F          : v-ape        :
++                         : VBUS_DET_F           : musb_1v8     :
++                         : VBUS_DET_R           :              :
++                         : USB_LINK_STATUS      :              :
++                         : USB_ADP_PROBE_PLUG   :              :
++                         : USB_ADP_PROBE_UNPLUG :              :
++
++Required child device properties:
++- compatible             : "stericsson,ab8500-[bm|btemp|charger|fg|gpadc|gpio|ponkey|
++                                               pwm|regulator|rtc|sysctrl|usb]";
++
++Optional child device properties:
++- interrupts             : contains the device IRQ(s) using the 2-cell format (see above)
++- interrupt-names        : contains names of IRQ resource in the order in which they were
++                           supplied in the interrupts property
++- <supply_name>-supply   : contains a phandle to the regulator supply node in Device Tree
++
++ab8500 at 5 {
++         compatible = "stericsson,ab8500";
++         reg = <5>; /* mailbox 5 is i2c */
++         interrupts = <0 40 0x4>;
++         interrupt-controller;
++         #interrupt-cells = <2>;
++
++         ab8500-rtc {
++                 compatible = "stericsson,ab8500-rtc";
++                 interrupts = <17 0x4
++                               18 0x4>;
++                 interrupt-names = "60S", "ALARM";
++         };
++
++        ab8500-gpadc {
++                compatible = "stericsson,ab8500-gpadc";
++                interrupts = <32 0x4
++                              39 0x4>;
++                interrupt-names = "HW_CONV_END", "SW_CONV_END";
++                vddadc-supply = <&ab8500_ldo_tvout_reg>;
++        };
++
++        ab8500-usb {
++                compatible = "stericsson,ab8500-usb";
++                interrupts = < 90 0x4
++                               96 0x4
++                               14 0x4
++                               15 0x4
++                               79 0x4
++                               74 0x4
++                               75 0x4>;
++                interrupt-names = "ID_WAKEUP_R",
++                                  "ID_WAKEUP_F",
++                                  "VBUS_DET_F",
++                                  "VBUS_DET_R",
++                                  "USB_LINK_STATUS",
++                                  "USB_ADP_PROBE_PLUG",
++                                  "USB_ADP_PROBE_UNPLUG";
++                vddulpivio18-supply = <&ab8500_ldo_initcore_reg>;
++                v-ape-supply = <&db8500_vape_reg>;
++                musb_1v8-supply = <&db8500_vsmps2_reg>;
++        };
++
++        ab8500-ponkey {
++                compatible = "stericsson,ab8500-ponkey";
++                interrupts = <6 0x4
++                              7 0x4>;
++                interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
++        };
++
++        ab8500-sysctrl {
++                compatible = "stericsson,ab8500-sysctrl";
++        };
++
++        ab8500-pwm {
++                compatible = "stericsson,ab8500-pwm";
++        };
++
++        ab8500-regulators {
++                compatible = "stericsson,ab8500-regulator";
++
++                ab8500_ldo_aux1_reg: ab8500_ldo_aux1 {
++                        /*
++                         * See: Documentation/devicetree/bindings/regulator/regulator.txt
++                         * for more information on regulators
++                         */
++                };
++        };
++};
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120713/211eb46e/attachment.sig>
+1.7.9.5
