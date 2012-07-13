@@ -1,116 +1,175 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 13 Jul 2012 10:22:49 +0200
-Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <1341850974-11977-2-git-send-email-marex@denx.de>
-References: <1341850974-11977-1-git-send-email-marex@denx.de>
- <1341850974-11977-2-git-send-email-marex@denx.de>
-Message-ID: <20120713082249.GF32184@pengutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 13 Jul 2012 10:38:02 +0200
+Subject: [PATCH v2] ARM: OMAP4: twl-common: Support for additional devices on
+ i2c1 bus
+Message-ID: <1342168682-15888-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
+Manufacturers can opt to use different codec than twl6040 and also can add
+audio related IC to the bus (external amplifier for example on SDP4430).
 
-On Mon, Jul 09, 2012 at 06:22:54PM +0200, Marek Vasut wrote:
-> This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
-> via DT. The DMA operation is enabled by default.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Detlev Zundel <dzu@denx.de>
-> CC: Dong Aisheng <b29396@freescale.com>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> Cc: linux-i2c at vger.kernel.org
-> CC: Sascha Hauer <s.hauer@pengutronix.de>
-> CC: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    5 +
->  arch/arm/boot/dts/imx28.dtsi                      |    2 +
->  drivers/i2c/busses/i2c-mxs.c                      |  267 +++++++++++++++++++--
->  3 files changed, 252 insertions(+), 22 deletions(-)
-> 
-> V2: Fixed return value from mxs_i2c_dma_setup_xfer().
->     Fixed coding style nitpicks
->     Call mxs_i2c_dma_finish() in failpath only if DMA is active
-> V3: Align with changes in previous patch
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> index 30ac3a0..45b6307 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-> @@ -6,6 +6,10 @@ Required properties:
->  - interrupts: Should contain ERROR and DMA interrupts
->  - clock-frequency: Desired I2C bus clock frequency in Hz.
->                     Only 100000Hz and 400000Hz modes are supported.
-> +- fsl,i2c-dma-channel: APBX DMA channel for the I2C
-> +
-> +Optional properties:
-> +- fsl,use-pio: Use PIO transfers instead of DMA, useful for debug
+Make it possible to add differnet set of additional devices to i2c1 bus on
+OMAP4 boards.
 
-Having PIOQUEUE (not PIO) as a fallback is good. I'd rather like to see
-this as a module parameter, though. For one reason, this is not a
-hardware property or board specific, so not a good device tree property.
-Also, it is implicitly deprecated somehow since either we want DMA to
-fully work or, even better, somewhen be able to automatically switch
-between PIOQUEUE and DMA depending on the i2c_msg size. Deprecated
-properties are also troublesome. Third, we don't really need this per
-instance, if somebody really has problems with DMA, it will apply to all
-i2c busses. Makes sense?
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
 
->  
->  Examples:
->  
-> @@ -16,4 +20,5 @@ i2c0: i2c at 80058000 {
->  	reg = <0x80058000 2000>;
->  	interrupts = <111 68>;
->  	clock-frequency = <100000>;
-> +	fsl,i2c-dma-channel = <6>;
->  };
+Changes since v1:
+Generated against l-o/master
 
-> +	/*
-> +	 * The MXS I2C DMA mode is prefered and enabled by default.
-> +	 * The PIO mode is still supported, but should be used only
+Regards,
+Peter
 
-PIOQUEUE
+ arch/arm/mach-omap2/board-4430sdp.c    |   12 +++++++++-
+ arch/arm/mach-omap2/board-omap4panda.c |   12 +++++++++-
+ arch/arm/mach-omap2/twl-common.c       |   35 +++++++++----------------------
+ arch/arm/mach-omap2/twl-common.h       |    3 +-
+ 4 files changed, 32 insertions(+), 30 deletions(-)
 
-> +	 * for debuging purposes etc.
-> +	 */
-> +	i2c->dma_mode = 1;
-> +	if (of_find_property(node, "fsl,use-pio", NULL)) {
-> +		i2c->dma_mode = 0;
-> +		dev_info(dev, "Using PIO mode for I2C transfers!\n");
-> +	}
-> +
-> +	/*
-> +	 * TODO: This is a temporary solution and should be changed
-> +	 * to use generic DMA binding later when the helpers get in.
-> +	 */
-
-@Shawn: Any idea when this is going to happen? And why do we need this?
-AFAICT it will be always channel 6/7 on mx28?
-
-> +	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
-> +				   &i2c->dma_channel);
-> +	if (ret) {
-> +		dev_warn(dev, "Failed to get DMA channel!\n");
-> +		i2c->dma_mode = 0;
-> +	}
-> +
-
-Rest looks good, thanks!
-
-   Wolfram
-
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index ad8a7d9..26466f2 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -547,6 +547,14 @@ static struct twl6040_platform_data twl6040_data = {
+ 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+ };
+ 
++static struct i2c_board_info __initdata sdp4430_i2c_1_boardinfo[] = {
++	{
++		I2C_BOARD_INFO("twl6040", 0x4b),
++		.irq = OMAP44XX_IRQ_SYS_2N,
++		.platform_data = &twl6040_data,
++	},
++};
++
+ static struct twl4030_platform_data sdp4430_twldata = {
+ 	/* Regulators */
+ 	.vusim		= &sdp4430_vusim,
+@@ -580,8 +588,8 @@ static int __init omap4_i2c_init(void)
+ 			TWL_COMMON_REGULATOR_CLK32KG |
+ 			TWL_COMMON_REGULATOR_V1V8 |
+ 			TWL_COMMON_REGULATOR_V2V1);
+-	omap4_pmic_init("twl6030", &sdp4430_twldata,
+-			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
++	omap4_pmic_init("twl6030", &sdp4430_twldata, sdp4430_i2c_1_boardinfo,
++			ARRAY_SIZE(sdp4430_i2c_1_boardinfo));
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
+ 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index b627cdc..5becba2 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -266,6 +266,14 @@ static struct twl6040_platform_data twl6040_data = {
+ 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+ };
+ 
++static struct i2c_board_info __initdata panda_i2c_1_boardinfo[] = {
++	{
++		I2C_BOARD_INFO("twl6040", 0x4b),
++		.irq = OMAP44XX_IRQ_SYS_2N,
++		.platform_data = &twl6040_data,
++	},
++};
++
+ /* Panda board uses the common PMIC configuration */
+ static struct twl4030_platform_data omap4_panda_twldata;
+ 
+@@ -293,8 +301,8 @@ static int __init omap4_panda_i2c_init(void)
+ 			TWL_COMMON_REGULATOR_CLK32KG |
+ 			TWL_COMMON_REGULATOR_V1V8 |
+ 			TWL_COMMON_REGULATOR_V2V1);
+-	omap4_pmic_init("twl6030", &omap4_panda_twldata,
+-			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
++	omap4_pmic_init("twl6030", &omap4_panda_twldata, panda_i2c_1_boardinfo,
++			ARRAY_SIZE(panda_i2c_1_boardinfo));
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	/*
+ 	 * Bus 3 is attached to the DVI port where devices like the pico DLP
+diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+index 3882f3c..d52be85 100644
+--- a/arch/arm/mach-omap2/twl-common.c
++++ b/arch/arm/mach-omap2/twl-common.c
+@@ -39,16 +39,6 @@ static struct i2c_board_info __initdata pmic_i2c_board_info = {
+ 	.flags		= I2C_CLIENT_WAKE,
+ };
+ 
+-static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
+-	{
+-		.addr		= 0x48,
+-		.flags		= I2C_CLIENT_WAKE,
+-	},
+-	{
+-		I2C_BOARD_INFO("twl6040", 0x4b),
+-	},
+-};
+-
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+ static int twl_set_voltage(void *data, int target_uV)
+ {
+@@ -77,30 +67,25 @@ void __init omap_pmic_init(int bus, u32 clkrate,
+ 
+ void __init omap4_pmic_init(const char *pmic_type,
+ 		    struct twl4030_platform_data *pmic_data,
+-		    struct twl6040_platform_data *twl6040_data, int twl6040_irq)
++		    struct i2c_board_info *devices, int nr_devices)
+ {
+ 	/* PMIC part*/
+ 	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+-	strncpy(omap4_i2c1_board_info[0].type, pmic_type,
+-		sizeof(omap4_i2c1_board_info[0].type));
+-	omap4_i2c1_board_info[0].irq = OMAP44XX_IRQ_SYS_1N;
+-	omap4_i2c1_board_info[0].platform_data = pmic_data;
+-
+-	/* TWL6040 audio IC part */
+-	omap4_i2c1_board_info[1].irq = twl6040_irq;
+-	omap4_i2c1_board_info[1].platform_data = twl6040_data;
+-
+-	omap_register_i2c_bus(1, 400, omap4_i2c1_board_info, 2);
++	omap_pmic_init(1, 400, pmic_type, OMAP44XX_IRQ_SYS_1N, pmic_data);
+ 
++	/* Register additional devices on i2c1 bus if needed */
++	if (devices)
++		i2c_register_board_info(1, devices, nr_devices);
+ }
+ 
+ void __init omap_pmic_late_init(void)
+ {
+ 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
+-	if (pmic_i2c_board_info.irq)
+-		omap3_twl_init();
+-	if (omap4_i2c1_board_info[0].irq)
+-		omap4_twl_init();
++	if (!pmic_i2c_board_info.irq)
++		return;
++
++	omap3_twl_init();
++	omap4_twl_init();
+ }
+ 
+ #if defined(CONFIG_ARCH_OMAP3)
+diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
+index 8fe71cf..de062c7 100644
+--- a/arch/arm/mach-omap2/twl-common.h
++++ b/arch/arm/mach-omap2/twl-common.h
+@@ -32,6 +32,7 @@
+ 
+ struct twl4030_platform_data;
+ struct twl6040_platform_data;
++struct i2c_board_info;
+ 
+ void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
+ 		    struct twl4030_platform_data *pmic_data);
+@@ -51,7 +52,7 @@ static inline void omap3_pmic_init(const char *pmic_type,
+ 
+ void omap4_pmic_init(const char *pmic_type,
+ 		    struct twl4030_platform_data *pmic_data,
+-		    struct twl6040_platform_data *audio_data, int twl6040_irq);
++		    struct i2c_board_info *devices, int nr_devices);
+ 
+ void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+ 			   u32 pdata_flags, u32 regulators_flags);
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120713/622a36fd/attachment-0001.sig>
+1.7.8.6
