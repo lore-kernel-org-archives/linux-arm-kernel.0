@@ -1,41 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jul 2012 15:30:27 +0100
-Subject: [PATCH] ARM: mutex: use generic atomic_dec-based implementation
- for ARMv6+
-In-Reply-To: <201207131414.37078.arnd@arndb.de>
-References: <1342177463-21238-1-git-send-email-will.deacon@arm.com>
- <201207131414.37078.arnd@arndb.de>
-Message-ID: <20120713143026.GV18079@mudshark.cambridge.arm.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 13 Jul 2012 20:21:53 +0530
+Subject: [PATCH v5 6/6] spi: s3c64xx: add device tree support
+In-Reply-To: <118901cd60fd$66c26260$34472720$%kim@samsung.com>
+References: <1342021265-11212-1-git-send-email-thomas.abraham@linaro.org>
+ <1342021265-11212-7-git-send-email-thomas.abraham@linaro.org>
+ <4FFF51EE.4080609@samsung.com>
+ <CAJuYYwQBL6OGJM41e9kD2ATUj3g9NTs-OC+G_gMKMScn3ms=hw@mail.gmail.com>
+ <117c01cd60ea$90f76ac0$b2e64040$%kim@samsung.com>
+ <CAJuYYwRiR8M5m9rDE6dzMawuSLO03f7mydoks+zU2ByTmbtMrA@mail.gmail.com>
+ <118901cd60fd$66c26260$34472720$%kim@samsung.com>
+Message-ID: <CAJuYYwQ9AyVPiZzV4-ncYF-Z1JqwHx-xKGHJXGhugc_w+KUHZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 13 July 2012 19:12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Thomas Abraham wrote:
+>>
+>> On 13 July 2012 16:58, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > Thomas Abraham wrote:
+>> >>
+>> >> On 13 July 2012 04:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> >> > Thomas, the DMACH_DT_PROP is available only on pl330 now. So seems
+>> occur
+>> >> > following build error with s3c6400_defconfig.
+>> >> >
+>> >> > drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_get_dmares':
+>> >> > drivers/spi/spi-s3c64xx.c:1098: error: 'DMACH_DT_PROP' undeclared
+>> (first
+>> >> use
+>> >> > in this function)
+>> >> > drivers/spi/spi-s3c64xx.c:1098: error: (Each undeclared identifier is
+>> >> > reported only once
+>> >> > drivers/spi/spi-s3c64xx.c:1098: error: for each function it appears
+>> in.)
+>> >> > make[3]: *** [drivers/spi/spi-s3c64xx.o] Error 1
+>> >> > make[2]: *** [drivers/spi] Error 2
+>> >> >
+>> >>
+>> >> Dear Mr. Kim,
+>> >>
+>> >> Thanks for considering these patches to be merged via your tree. For
+>> >> the build break you mentioned above, there was a patch submitted some
+>> >> time back to handle this. The link to that patch is:
+>> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
+>> >> June/102627.html.
+>> >> Could you please apply this patch also to your tree.
+>> >>
+>> > Sure, it looks good to me, will apply that then this series will be
+>> rebased
+>> > on top of that.
+>>
+>> There are six more patches that enable spi device tree support for
+>> Exynos4 and Exynos5 platforms. Could you consider to apply those
+>> patches as well. The link to those patches is:
+>> http://www.mail-archive.com/linux-samsung-
+>> soc at vger.kernel.org/msg10851.html.
+>>
+> Yeah, I remember, but I think some patches is needed to re-work as per
+> comments...?
 
-On Fri, Jul 13, 2012 at 03:14:36PM +0100, Arnd Bergmann wrote:
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks for that.
-
-> One question though: can you explain why the xchg implementation is better
-> on pre-v6, while the dec implementation is better on v6+? It would probably
-> be helpful to put that in the comment at
-> 
->  /* On pre-ARMv6 hardware the swp based implementation is the most efficient. */
->  # include <asm-generic/mutex-xchg.h>
->  #else
->  /* ARMv6+ can implement efficient atomic decrement using exclusive accessors. */
->  # include <asm-generic/mutex-dec.h>
-> 
-> Intuitively, I'd guess that both implementations are equally efficient
-> on ARMv6 because they use the same ldrex/strex loop.
-
-I used the atomic decrement version because that's what the old
-implementation was most similar to. For some reason I thought that maybe the
-register pressure would be higher for xchg, but it doesn't look like that's
-the case (there are compiler barriers anyway) and we actually end up with one
-fewer instruction using xchg as we longer need the subtract.
-
-If Nicolas is happy with it, I'd be tempted to use mutex-xchg.h regardless
-of the architecture version (unfortunately we can't use generic-y for that).
-
-Will
+I checked again for any pending comments on v2 version. There are no
+pending comments for the v2 version of this patch series. Thanks.
