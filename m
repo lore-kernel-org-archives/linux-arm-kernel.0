@@ -1,35 +1,48 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 13 Jul 2012 07:41:38 -0700
-Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
-In-Reply-To: <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
-References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
- <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
-Message-ID: <20120713144138.GB25264@roeck-us.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jul 2012 10:10:39 -0500
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <20120713151451.b2ef97045ef2273ea15973c9@canb.auug.org.au>
+References: <20120713151451.b2ef97045ef2273ea15973c9@canb.auug.org.au>
+Message-ID: <50003A6F.5090008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 08:28:18PM +0900, Kukjin Kim wrote:
-> Amit Daniel Kachhap wrote:
-> > 
-> > These TMU enablement patches are needed for exynos4 and exynos5 TMU
-> > driver patches sent earlier. The link for those are
-> > http://www.spinics.net/lists/lm-sensors/msg35858.html.
-> > 
-> How was going on above patches? I can't see them you said in linux-next now,
-> it means if I apply this series in my tree, problem will be happened :(
-> 
-> Note1: I've seen Rafael's updating exynos4_tmu patch which is using struct
-> dev_pm_ops for pm and applied by Guenter.
-> 
-If that is in the way, I can drop it, to be applied after the move. Let me know.
-There is now another patch pending, to convert the driver to use devm_ functions.
-Please let me know what you want me to do with it.
 
-> Note2: would be helpful if you could do adding me in Cc of exynos tmu
-> patches...
-> 
-If you want to be copied, it might make sense to add yourself as maintainer for
-this file. Otherwise you can not expect people to know.
 
-Thanks,
-Guenter
+On 07/13/2012 12:14 AM, Stephen Rothwell wrote:
+> Hi Mike,
+> 
+> Today's linux-next merge of the clk tree got a conflict in
+> drivers/clk/Makefile between commit 4a31bd28e86a ("ARM: nomadik: convert
+> to generic clock") from the arm-soc tree and commit 8d4d9f52081c ("clk:
+> add highbank clock support") from the clk tree.
+> 
+> Just context changes.  I fixed it up (see below) and can carry the fix as
+> necessary.
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc drivers/clk/Makefile
+> index 26b6b92,02ffdf6..0000000
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@@ -3,6 -3,11 +3,12 @@@ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.
+>   obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+>   				   clk-mux.o clk-divider.o clk-fixed-factor.o
+>   # SoCs specific
+>  +obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+> + obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+>   obj-$(CONFIG_ARCH_MXS)		+= mxs/
+>   obj-$(CONFIG_PLAT_SPEAR)	+= spear/
+> + obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
+> + obj-$(CONFIG_ARCH_INTEGRATOR)	+= versatile/
+
+These should be sorted.
+
+Rob
+
+> + 
+> + # Chip specific
+> + obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
