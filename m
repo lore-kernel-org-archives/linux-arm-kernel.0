@@ -1,24 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2012 23:38:03 +0200
-Subject: [PATCH] Documentation: Describe the AB8500 Device Tree bindings
-In-Reply-To: <1342176146-22765-1-git-send-email-lee.jones@linaro.org>
-References: <1342176146-22765-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbjFRk9qVZ8FzZ0yTqEqETRHZHOA7uXLaBsdpbcUMQkuA@mail.gmail.com>
+Date: Sat, 14 Jul 2012 23:42:14 +0200
+Subject: [PATCH 05/11] gpio/gpio-omap.c: add a const qualifier
+In-Reply-To: <50001a32.e50f320a.6348.fffff4bcSMTPIN_ADDED@mx.google.com>
+References: <50001a32.e50f320a.6348.fffff4bcSMTPIN_ADDED@mx.google.com>
+Message-ID: <CACRpkdYXZ_--FG5sSFu0iLOz24uWF0i7D1Za-Az9peyHRvKJJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 12:42 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Fri, Jul 13, 2012 at 2:32 PM,  <y@pengutronix.de> wrote:
 
-> Although for the most part, the AB8500 uses common bindings, some
-> of the ways in which they are used differ slightly to the common
-> uses of those bindings. To clear up some of these varying concepts
-> we provide some documentation describing each of the properties and
-> how they are used.
+> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> This prepares of_device_id.data becoming const. Without this change
+> the following warning would occur:
+>
+>         drivers/gpio/gpio-omap.c: In function 'omap_gpio_probe':
+>         drivers/gpio/gpio-omap.c:1060: warning: assignment discards qualifiers from pointer target type
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
 
-Cool! Thanks for doing this.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Pls run all OMAP-related patches by Kevin Hilman, I need his ACK on
+this and the other patch to move on.
 
 Yours,
 Linus Walleij
