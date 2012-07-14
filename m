@@ -1,37 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2012 23:34:54 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <20120712131231.GH2194@pengutronix.de>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
- <20120712131231.GH2194@pengutronix.de>
-Message-ID: <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
+Date: Sat, 14 Jul 2012 23:36:10 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <5000260B.8070907@linaro.org>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org>
+ <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org>
+ <20120709201422.GA12242@core.coreip.homeip.net>
+ <4FFB40A4.5060505@linaro.org>
+ <20120709204620.GA12692@core.coreip.homeip.net>
+ <4FFB463F.9040201@linaro.org>
+ <CACRpkdbjkLvD13_g=TvCUYjqhZ7ySOiEL51h9eT3YVMO4Vnr3A@mail.gmail.com>
+ <4FFB4B5F.30103@linaro.org>
+ <CACRpkdYJi3Kk3gpdgFLWr+tun4LZNMw0ET6W2nHJfY5jSvgcjw@mail.gmail.com>
+ <5000260B.8070907@linaro.org>
+Message-ID: <CACRpkdbMfC2Yga-8bUFUbMB2vwJuxeqDwDkVjud5ed7+AhOopQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2012 at 3:12 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+On Fri, Jul 13, 2012 at 3:43 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 10/07/12 22:08, Linus Walleij wrote:
 
-> Arnd, since you committed the patches, can you please comment? I'd
-> prefer to drop this DT conversion for now, otherwise we might have to
-> support this possibly rushed bindings forever? LinusW, what do you
-> think?
+>> That's not enough, cat /dev/input/event/* whatever event node is used
+>> by the ponkey, press it and verify you get some garbage (=events)
+>> in the console.
+>
+> Yes, garbage seen, works fine.
 
-Well I think I ACKed that from the point of view that it will work as
-expected with ux500 with these bindings. What is best from the I2C
-subsystem point of view is another question ...
-
-Overall I think we have this general problem with a lot of DT
-conversion happening right now: the tempo is set very high and
-all chip vendors want DT support RealQuickNowPreferrablyYesterday
-and that makes it hard for subsystem maintainers to hold back,
-and I also fear vendor-specific properties are overused for this
-reason.
-
-And about the perpetual nature of device tree bindings it
-appears to me that the modus operandi right now is to not
-regard any of these as written in stone until they are removed
-from the kernel tree. We have plenty of drivers patching
-trees and drivers in one for the moment.
+OK!
+Acked-by: on whatever Dmitry Acked.
 
 Yours,
 Linus Walleij
