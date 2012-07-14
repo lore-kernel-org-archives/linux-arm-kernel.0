@@ -1,74 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 14 Jul 2012 00:00:01 -0500
-Subject: [RESEND PATCH 1/1] clk: add DT support for clock gating control
-In-Reply-To: <4FFFED7C.9050406@googlemail.com>
-References: <4FFE7979.4060000@googlemail.com> <4FFEBF8A.1020700@gmail.com>
- <4FFECC4E.4070001@googlemail.com> <4FFF93DC.30103@gmail.com>
- <4FFFED7C.9050406@googlemail.com>
-Message-ID: <5000FCD1.70408@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 14 Jul 2012 00:56:16 -0600 (MDT)
+Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
+In-Reply-To: <5000D647.4090200@gmail.com>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+ <5000D647.4090200@gmail.com>
+Message-ID: <alpine.DEB.2.00.1207140048210.3876@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 04:42 AM, Sebastian Hesselbarh wrote:
-> On 07/13/2012 05:19 AM, Rob Herring wrote:
->> What's implemented in Linux should not define the binding. The binding
->> should describe the hardware.
->> [...]
->> True, but not your problem to implement. A binding doesn't necessarily
->> mean there is a full Linux implementation. We just don't want to create
->> something only to find others need something completely different.
-> 
-> Ok, what about a DT describing the following for a simple register-based
-> clock gating controller and the corresponding gated-clock independent of
-> the controller. I am sure there are a bunch of SoCs out there that
-> control their clock gates by writing some bits to a register. If that
-> DT description matches your expectations, I ll prepare patches with
-> documentation and implementation for common clock framework.
-> 
+Hi
 
-Clock gates are just 1 part. There's muxes, dividers, plls, etc. I'm not
-convinced that it makes sense to define clocks at this level. For
-complex chips, I think just defining the chips clock controller module
-as a single node with lots of clock outputs. The primary need is to
-describe board specific changes not SOC level clock tree. Much of it is
-static and generally only a few clocks may change config board to board.
+On Fri, 13 Jul 2012, Rob Herring wrote:
 
-> Sebastian
-> 
-> -- 
->  /* Simple clock gating controller based on bitmasks and register */
-> cgc: clock-gating-control at f1000000 {
->   compatible = "clock-gating-control-register";
->   reg = <0xf1000000 0x4>;
-> 
->   /* Clock gating control with one bit at bit position 0
->      enable with (1<<0), disable with (0<<0) */
->   cgctrl_usb0: cgc_usb0 {
->     clock-gating-control,shift = <0>;
->     clock-gating-control,mask = <1>;
->     clock-gating-control,enable = <1>;
->     clock-gating-control,disable = <0>;
->   };
-> 
->   /* Clock gating control with two bits at bit position 1-2
->      enable with (2<<1), disable with (0<<1) */
->   cgctrl_sata: cgc_sata {
->     clock-gating-control,shift = <1>;
->     clock-gating-control,mask = <3>;
->     clock-gating-control,enable = <2>;
->     clock-gating-control,disable = <0>;
->   };
-> };
-> 
-> /* Generic clock gate description that can be used with
->    any clock gating controller */
-> cg_usb0: clockgate at 0 {
->   compatible = "gated-clock";
->   #clock-cells = <0>;
->   clocks = <&osc>;
->   clock-gate-control = <&cgctrl_usb0>;
-> };
+> I'm not sure this is really a good use of aliases. UARTs use aliases 
+> because it is important that the UART number to tty number is known and 
+> fixed. IIUC, as an example you are picking timer1 because it has 
+> properties X, Y and Z. If so, then you should describe those h/w 
+> properties within the timer nodes so you can pick which timer to use 
+> based on it's h/w properties.
 
-I don't see this scaling to ~50 clocks.
+Some GPTIMER blocks have input and output signals that can be routed to 
+external package balls.  So it's possible that some application may need 
+to request a specific timer ID, since that timer would be connected to a 
+specific off-chip device.
 
-Rob
+
+- Paul
