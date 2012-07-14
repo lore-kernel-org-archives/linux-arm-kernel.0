@@ -1,321 +1,284 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 21:15:35 -0500
-Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
-In-Reply-To: <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
-References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
- <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <5000D647.4090200@gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Sat, 14 Jul 2012 06:15:50 +0200
+Subject: [PATCH v5 5/7] ARM: davinci: i2c: add OF support
+In-Reply-To: <5000294C.5070606@ti.com>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-6-git-send-email-hs@denx.de> <5000294C.5070606@ti.com>
+Message-ID: <5000F276.3080301@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 05:26 PM, Jon Hunter wrote:
-> Add the 12 GP timers nodes present in OMAP3.
-> Add the 11 GP timers nodes present in OMAP4.
-> 
-> Add documentation for timer properties specific to OMAP.
-> 
-> For each timer an alias is being added. The purpose for doing this is because
-> the OMAP dmtimer driver uses an ID to distinguish between the different timer
-> instances. For example, a timer can be requested by its ID. By adding an alias
-> for each timer we can then use the function of_alias_get_id() to extract the
-> ID for each timer from the alias name. The same method is used for the TTY
-> serial devices. If it is preferred that such an alias is not added and there
-> is a better way to pass an ID from device-tree let me know.
+Hello Sekhar,
 
-I'm not sure this is really a good use of aliases. UARTs use aliases
-because it is important that the UART number to tty number is known and
-fixed. IIUC, as an example you are picking timer1 because it has
-properties X, Y and Z. If so, then you should describe those h/w
-properties within the timer nodes so you can pick which timer to use
-based on it's h/w properties.
+On 13.07.2012 15:57, Sekhar Nori wrote:
+> Hi Heiko,
+>
+> On 5/30/2012 3:49 PM, Heiko Schocher wrote:
+>> add of support for the davinci i2c driver.
+>>
+>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: linux-i2c at vger.kernel.org
+>> Cc: Ben Dooks<ben-linux@fluff.org>
+>> Cc: Wolfram Sang<w.sang@pengutronix.de>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Wolfgang Denk<wd@denx.de>
+>> Cc: Sylwester Nawrocki<s.nawrocki@samsung.com>
+[...]
+>> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>> new file mode 100644
+>> index 0000000..e98a025
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+[...]
+>> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+>> index a76d85f..4e7a966 100644
+>> --- a/drivers/i2c/busses/i2c-davinci.c
+>> +++ b/drivers/i2c/busses/i2c-davinci.c
+>> @@ -38,9 +38,12 @@
+>>   #include<linux/slab.h>
+>>   #include<linux/cpufreq.h>
+>>   #include<linux/gpio.h>
+>> +#include<linux/of_i2c.h>
+>> +#include<linux/of_device.h>
+>>
+>>   #include<mach/hardware.h>
+>>   #include<mach/i2c.h>
+>> +#include<mach/mux.h>
+>
+> Seems like a stray change. I was able to build and use just fine
+> without this include.
 
-Rob
+Hups. Good catch! Removed.
 
-> 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  .../devicetree/bindings/arm/omap/timer.txt         |   34 +++++++
->  arch/arm/boot/dts/omap3.dtsi                       |  104 ++++++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi                       |   93 +++++++++++++++++
->  3 files changed, 231 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/timer.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
-> new file mode 100644
-> index 0000000..dcbb451
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
-> @@ -0,0 +1,34 @@
-> +OMAP Timer controller bindings
+>>
+>>   /* ----- global defines ----------------------------------------------- */
+>>
+>> @@ -114,6 +117,7 @@ struct davinci_i2c_dev {
+>>   	struct completion	xfr_complete;
+>>   	struct notifier_block	freq_transition;
+>>   #endif
+>> +	struct davinci_i2c_platform_data *pdata;
+>>   };
+>>
+>>   /* default platform data to use if not supplied in the platform_device */
+>> @@ -149,13 +153,22 @@ static void generic_i2c_clock_pulse(unsigned int scl_pin)
+>>   	}
+>>   }
+>>
+>> +static struct davinci_i2c_platform_data
+>> +		*i2c_get_plattformdata(struct davinci_i2c_dev *dev)
+>> +{
+>> +	if (dev->dev->platform_data == NULL)
+>> +		return dev->pdata;
+>> +
+>> +	return dev->dev->platform_data;
+>> +}
+>
+> It seems to me that if we setup the newly introduced dev->pdata
+> member correctly once in probe, there should not be a need for this
+> function. We can also eliminate multiple checks for pdata in code.
+> See below for more.
+
+Ok.
+
+>> +
+>>   /* This routine does i2c bus recovery as specified in the
+>>    * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
+>>    */
+>>   static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+>>   {
+>>   	u32 flag = 0;
+>> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+>> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+>>
+>>   	dev_err(dev->dev, "initiating i2c bus recovery\n");
+>>   	/* Send NACK to the slave */
+>> @@ -187,7 +200,7 @@ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
+>>
+>>   static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>>   {
+>> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+>> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+>>   	u16 psc;
+>>   	u32 clk;
+>>   	u32 d;
+>> @@ -235,7 +248,7 @@ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>>    */
+>>   static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+>>   {
+>> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+>> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+>>
+>>   	if (!pdata)
+>>   		pdata =&davinci_i2c_platform_data_default;
+>> @@ -308,7 +321,7 @@ static int
+>>   i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+>>   {
+>>   	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
+>> -	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+>> +	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+>>   	u32 flag;
+>>   	u16 w;
+>>   	int r;
+>> @@ -635,6 +648,12 @@ static struct i2c_algorithm i2c_davinci_algo = {
+>>   	.functionality	= i2c_davinci_func,
+>>   };
+>>
+>> +static const struct of_device_id davinci_i2c_of_match[] = {
+>> +	{.compatible = "ti,davinci-i2c", },
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
+>> +
+>>   static int davinci_i2c_probe(struct platform_device *pdev)
+>>   {
+>>   	struct davinci_i2c_dev *dev;
+>> @@ -676,6 +695,25 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>   	dev->irq = irq->start;
+>>   	platform_set_drvdata(pdev, dev);
+>>
+>> +	if ((dev->dev->platform_data == NULL)&&
+>> +		(pdev->dev.of_node)) {
+>> +		u32 prop;
+>> +
+>> +		dev->pdata = devm_kzalloc(&pdev->dev,
+>> +			sizeof(struct davinci_i2c_platform_data), GFP_KERNEL);
+>> +		if (!dev->pdata) {
+>> +			r = -ENOMEM;
+>> +			goto err_free_mem;
+>> +		}
+>> +		memcpy(dev->pdata,&davinci_i2c_platform_data_default,
+>> +			sizeof(struct davinci_i2c_platform_data));
+>> +		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+>> +			&prop))
+>> +			dev->pdata->bus_freq = prop / 1000;
+>> +		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
+>> +			&prop))
+>> +			dev->pdata->bus_delay = prop;
+>
+> You are leaving out two other platform data members (the gpio pins
+> corresponding to data and clock) from DT data. We should be able to
+> get that information from DT too, right?
+
+Yes, but I had not ported the GPIO driver to OF ...
+
+> So, I took this patch and tried to see if pdata maintenance can be
+> simplified and came with the diff below. Can you have a look and see
+> if this makes sense? I tested this using i2cdetect both with and
+> without DT.
+
+Tested your patch on the enbw_cmc board with a LM75 on the enbw_cmc
+board, works fine. Can I post a "v6" of my patch, merged with your
+patch below and your Signed-off?
+
+> ---8<---
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index 16d7645..d07c207 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -153,22 +153,13 @@ static void generic_i2c_clock_pulse(unsigned int scl_pin)
+>   	}
+>   }
+>
+> -static struct davinci_i2c_platform_data
+> -		*i2c_get_plattformdata(struct davinci_i2c_dev *dev)
+> -{
+> -	if (dev->dev->platform_data == NULL)
+> -		return dev->pdata;
+> -
+> -	return dev->dev->platform_data;
+> -}
+> -
+>   /* This routine does i2c bus recovery as specified in the
+>    * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
+>    */
+>   static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+>   {
+>   	u32 flag = 0;
+> -	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+> +	struct davinci_i2c_platform_data *pdata = dev->pdata;
+>
+>   	dev_err(dev->dev, "initiating i2c bus recovery\n");
+>   	/* Send NACK to the slave */
+> @@ -176,8 +167,7 @@ static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+>   	flag |=  DAVINCI_I2C_MDR_NACK;
+>   	/* write the data into mode register */
+>   	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+> -	if (pdata)
+> -		generic_i2c_clock_pulse(pdata->scl_pin);
+> +	generic_i2c_clock_pulse(pdata->scl_pin);
+>   	/* Send STOP */
+>   	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+>   	flag |= DAVINCI_I2C_MDR_STP;
+> @@ -200,7 +190,7 @@ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
+>
+>   static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>   {
+> -	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+> +	struct davinci_i2c_platform_data *pdata = dev->pdata;
+>   	u16 psc;
+>   	u32 clk;
+>   	u32 d;
+> @@ -248,10 +238,7 @@ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>    */
+>   static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+>   {
+> -	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+> -
+> -	if (!pdata)
+> -		pdata =&davinci_i2c_platform_data_default;
+> +	struct davinci_i2c_platform_data *pdata = dev->pdata;
+>
+>   	/* put I2C into reset */
+>   	davinci_i2c_reset_ctrl(dev, 0);
+> @@ -321,13 +308,11 @@ static int
+>   i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+>   {
+>   	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
+> -	struct davinci_i2c_platform_data *pdata = i2c_get_plattformdata(dev);
+> +	struct davinci_i2c_platform_data *pdata = dev->pdata;
+>   	u32 flag;
+>   	u16 w;
+>   	int r;
+>
+> -	if (!pdata)
+> -		pdata =&davinci_i2c_platform_data_default;
+>   	/* Introduce a delay, required for some boards (e.g Davinci EVM) */
+>   	if (pdata->bus_delay)
+>   		udelay(pdata->bus_delay);
+> @@ -693,10 +678,10 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>   #endif
+>   	dev->dev = get_device(&pdev->dev);
+>   	dev->irq = irq->start;
+> +	dev->pdata = dev->dev->platform_data;
+>   	platform_set_drvdata(pdev, dev);
+>
+> -	if ((dev->dev->platform_data == NULL)&&
+> -		(pdev->dev.of_node)) {
+> +	if (!dev->pdata&&  pdev->dev.of_node) {
+>   		u32 prop;
+>
+>   		dev->pdata = devm_kzalloc(&pdev->dev,
+> @@ -713,7 +698,10 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>   		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
+>   			&prop))
+>   			dev->pdata->bus_delay = prop;
+> +	} else if (!dev->pdata) {
+> +		dev->pdata =&davinci_i2c_platform_data_default;
+>   	}
 > +
-> +Required properties:
-> +- compatible:
-> +  - "ti,omap3-timer" for OMAP3+ controllers
-> +- reg: Contains timer register address range (base address and length)
-> +- interrupts: Contains the interrupt information for the timer. The format is
-> +  being dependent on which interrupt controller the OMAP device uses.
-> +
-> +OMAP specific properties:
-> +- ti,hwmods: Name of the hwmod associated to the timer:
-> +  "timer<X>", <X> being the 1-based instance number from the HW spec
-> +- ti,timer-alwon: Indicates the timer is in an alway-on power domain.
-> +- ti,timer-pwm: Indicates the timer supports can generate PWM output.
-> +- ti,timer-secure: Indicates the timer is reserved on a secure OMAP device and
-> +  therefore cannot be used by the kernel.
-> +
-> +Note: Each timer should have an alias correctly numbered in "aliases" node. The
-> +      alias is used to identify the timer instance in the driver.
-> +
-> +Example:
-> +
-> +aliases {
-> +	timer12 = &timer12;
-> +};
-> +
-> +timer12: timer at 48304000 {
-> +	compatible = "ti,omap3-timer";
-> +	reg = <0x48304000 0xfff>;
-> +	interrupts = <95>;
-> +	ti,hwmods = "timer12"
-> +	ti,timer-alwon;
-> +	ti,timer-secure;
-> +};
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 8109471..f309f2a 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -12,12 +12,25 @@
->  
->  / {
->  	compatible = "ti,omap3430", "ti,omap3";
-> +	interrupt-parent = <&intc>;
->  
->  	aliases {
->  		serial0 = &uart1;
->  		serial1 = &uart2;
->  		serial2 = &uart3;
->  		serial3 = &uart4;
-> +		timer1 = &timer1;
-> +		timer2 = &timer2;
-> +		timer3 = &timer3;
-> +		timer4 = &timer4;
-> +		timer5 = &timer5;
-> +		timer6 = &timer6;
-> +		timer7 = &timer7;
-> +		timer8 = &timer8;
-> +		timer9 = &timer9;
-> +		timer10 = &timer10;
-> +		timer11 = &timer11;
-> +		timer12 = &timer12;
->  	};
->  
->  	cpus {
-> @@ -220,5 +233,96 @@
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
->  		};
-> +
-> +		timer1: timer at 48318000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48318000 0xfff>;
-> +			interrupts = <37>;
-> +			ti,hwmods = "timer1";
-> +			ti,timer-alwon;
-> +		};
-> +
-> +		timer2: timer at 49032000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x49032000 0xfff>;
-> +			interrupts = <38>;
-> +			ti,hwmods = "timer2";
-> +		};
-> +
-> +		timer3: timer at 49034000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x49034000 0xfff>;
-> +			interrupts = <39>;
-> +			ti,hwmods = "timer3";
-> +		};
-> +
-> +		timer4: timer at 49036000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x49036000 0xfff>;
-> +			interrupts = <40>;
-> +			ti,hwmods = "timer4";
-> +		};
-> +
-> +		timer5: timer at 49038000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x49038000 0xfff>;
-> +			interrupts = <41>;
-> +			ti,hwmods = "timer5";
-> +		};
-> +
-> +		timer6: timer at 4903a000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4903a000 0xfff>;
-> +			interrupts = <42>;
-> +			ti,hwmods = "timer6";
-> +		};
-> +
-> +		timer7: timer at 4903c000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4903c000 0xfff>;
-> +			interrupts = <43>;
-> +			ti,hwmods = "timer7";
-> +		};
-> +
-> +		timer8: timer at 4903e000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4903e000 0xfff>;
-> +			interrupts = <44>;
-> +			ti,hwmods = "timer8";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer9: timer at 49040000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x49040000 0xfff>;
-> +			interrupts = <45>;
-> +			ti,hwmods = "timer9";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer10: timer at 48086000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48086000 0xfff>;
-> +			interrupts = <46>;
-> +			ti,hwmods = "timer10";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer11: timer at 48088000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48088000 0xfff>;
-> +			interrupts = <47>;
-> +			ti,hwmods = "timer11";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer12: timer at 48304000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48304000 0xfff>;
-> +			interrupts = <95>;
-> +			ti,hwmods = "timer12";
-> +			ti,timer-alwon;
-> +			ti,timer-secure;
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 04cbbcb..39716c5 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -25,6 +25,17 @@
->  		serial1 = &uart2;
->  		serial2 = &uart3;
->  		serial3 = &uart4;
-> +		timer1 = &timer1;
-> +		timer2 = &timer2;
-> +		timer3 = &timer3;
-> +		timer4 = &timer4;
-> +		timer5 = &timer5;
-> +		timer6 = &timer6;
-> +		timer7 = &timer7;
-> +		timer8 = &timer8;
-> +		timer9 = &timer9;
-> +		timer10 = &timer10;
-> +		timer11 = &timer11;
->  	};
->  
->  	cpus {
-> @@ -295,5 +306,87 @@
->  			interrupt-parent = <&gic>;
->  			ti,hwmods = "dmic";
->  		};
-> +
-> +		timer1: timer at 4a318000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4a318000 0x7f>;
-> +			interrupts = <0 37 0x4>;
-> +			ti,hwmods = "timer1";
-> +			ti,timer-alwon;
-> +		};
-> +
-> +		timer2: timer at 48032000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48032000 0x7f>;
-> +			interrupts = <0 38 0x4>;
-> +			ti,hwmods = "timer2";
-> +		};
-> +
-> +		timer3: timer at 48034000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48034000 0x7f>;
-> +			interrupts = <0 39 0x4>;
-> +			ti,hwmods = "timer3";
-> +		};
-> +
-> +		timer4: timer at 48036000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48036000 0x7f>;
-> +			interrupts = <0 40 0x4>;
-> +			ti,hwmods = "timer4";
-> +		};
-> +
-> +		timer5: timer at 49038000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x49038000 0x7f>;
-> +			interrupts = <0 41 0x4>;
-> +			ti,hwmods = "timer5";
-> +		};
-> +
-> +		timer6: timer at 4903a000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4903a000 0x7f>;
-> +			interrupts = <0 42 0x4>;
-> +			ti,hwmods = "timer6";
-> +		};
-> +
-> +		timer7: timer at 4903c000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4903c000 0x7f>;
-> +			interrupts = <0 43 0x4>;
-> +			ti,hwmods = "timer7";
-> +		};
-> +
-> +		timer8: timer at 4903e000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4903e000 0x7f>;
-> +			interrupts = <0 44 0x4>;
-> +			ti,hwmods = "timer8";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer9: timer at 4803e000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x4803e000 0x7f>;
-> +			interrupts = <0 45 0x4>;
-> +			ti,hwmods = "timer9";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer10: timer at 48086000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48086000 0x7f>;
-> +			interrupts = <0 46 0x4>;
-> +			ti,hwmods = "timer10";
-> +			ti,timer-pwm;
-> +		};
-> +
-> +		timer11: timer at 48088000 {
-> +			compatible = "ti,omap3-timer";
-> +			reg = <0x48088000 0x7f>;
-> +			interrupts = <0 47 0x4>;
-> +			ti,hwmods = "timer11";
-> +			ti,timer-pwm;
-> +		};
->  	};
->  };
-> 
+>   	dev->clk = clk_get(&pdev->dev, NULL);
+>   	if (IS_ERR(dev->clk)) {
+>   		r = -ENODEV;
+>
+>
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
