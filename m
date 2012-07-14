@@ -1,50 +1,37 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 14 Jul 2012 11:42:58 -0600 (MDT)
-Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
-In-Reply-To: <50017BB1.8010702@gmail.com>
-References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
- <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
- <5000D647.4090200@gmail.com>
- <alpine.DEB.2.00.1207140048210.3876@utopia.booyaka.com>
- <50017BB1.8010702@gmail.com>
-Message-ID: <alpine.DEB.2.00.1207141138160.3876@utopia.booyaka.com>
+Date: Sat, 14 Jul 2012 11:54:52 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP3: clockdomain: fix accidental duplicate
+ registration
+In-Reply-To: <20120714085257.GB6522@atomide.com>
+References: <alpine.DEB.2.00.1207120448120.25585@utopia.booyaka.com>
+ <87394wg97u.fsf@ti.com> <20120713064713.GI1122@atomide.com>
+ <20120714085257.GB6522@atomide.com>
+Message-ID: <alpine.DEB.2.00.1207141150340.3876@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Sat, 14 Jul 2012, Tony Lindgren wrote:
 
-thanks for your response.
-
-On Sat, 14 Jul 2012, Rob Herring wrote:
-
-> On 07/14/2012 01:56 AM, Paul Walmsley wrote:
-> > On Fri, 13 Jul 2012, Rob Herring wrote:
-> > 
-> >> I'm not sure this is really a good use of aliases. UARTs use aliases 
-> >> because it is important that the UART number to tty number is known and 
-> >> fixed. IIUC, as an example you are picking timer1 because it has 
-> >> properties X, Y and Z. If so, then you should describe those h/w 
-> >> properties within the timer nodes so you can pick which timer to use 
-> >> based on it's h/w properties.
-> > 
-> > Some GPTIMER blocks have input and output signals that can be routed to 
-> > external package balls.  So it's possible that some application may need 
-> > to request a specific timer ID, since that timer would be connected to a 
-> > specific off-chip device.
+> As the tmp-merge branch has other branches and never goes upstream, the
+> commit should say:
 > 
-> Yes, I understand that. So you
+> Commit 472fd5401561f94698f4c8f9dbbbfbf76ab55626 (Merge branch 'cleanup-hwmod'
+> into cleanup)... So I've updated the patch and applied it into l-o master.
 
-(just to clarify, these are Jon's patches)
+Thanks for fixing it.
 
-> should be describing which ones have i/o and what they are connected to. 
+> The patch seems to produce a new warning against arm soc tree 
+> next/cleanup branch:
+> 
+> warning: ?mpu_3xxx_clkdm? defined but not used
+> 
+> Paul, care to check if a change is needed for the arm soc tree
+> next/cleanup branch version of this patch?
 
-Right, agreed.
-
-> The PWM binding is probably a starting point.
-
-My point, perhaps unclear, was about the aliases.  Do you have a different 
-approach in mind that applications should use, other than requesting a 
-specific timer by ID?
+arm-soc next/cleanup branch doesn't include commit 16e5e2c4 ("ARM: OMAP 
+AM35x: clockdomain data: Fix clockdomain dependencies").  So that patch 
+won't apply there, and the copy of mach-omap2/clockdomains3xxx_data.c in 
+that branch is clean.
 
 
 - Paul
