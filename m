@@ -1,165 +1,170 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 21:03:59 -0500
-Subject: [PATCH v2 03/15] ARM: versatile: use fixed PCI i/o mapping
+Date: Fri, 13 Jul 2012 21:04:03 -0500
+Subject: [PATCH v2 07/15] ARM: shark: use fixed PCI i/o mapping
 In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
 References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1342231451-28861-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1342231451-28861-8-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move versatile PCI to fixed i/o mapping and remove io.h.
+Convert shark to use the fixed i/o mapping and remove io.h.
+
+This shrinks the mapping from 256MB to 64KB, but nothing is using that much
+space AFAICT.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                                |    1 -
- arch/arm/mach-versatile/core.c                  |    5 -----
- arch/arm/mach-versatile/include/mach/hardware.h |    1 -
- arch/arm/mach-versatile/include/mach/io.h       |   27 -----------------------
- arch/arm/mach-versatile/pci.c                   |   22 ++++--------------
- 5 files changed, 4 insertions(+), 52 deletions(-)
- delete mode 100644 arch/arm/mach-versatile/include/mach/io.h
+ arch/arm/Kconfig                               |    1 -
+ arch/arm/mach-shark/core.c                     |   18 ------------------
+ arch/arm/mach-shark/include/mach/debug-macro.S |    7 ++++---
+ arch/arm/mach-shark/include/mach/entry-macro.S |    3 ++-
+ arch/arm/mach-shark/include/mach/io.h          |   18 ------------------
+ arch/arm/mach-shark/pci.c                      |    5 +++++
+ 6 files changed, 11 insertions(+), 41 deletions(-)
+ delete mode 100644 arch/arm/mach-shark/include/mach/io.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a91009c..8fb7e4a 100644
+index 5d37628..3dfc555 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -293,7 +293,6 @@ config ARCH_VERSATILE
- 	select ICST
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select NEED_MACH_IO_H if PCI
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_FPGA_IRQ
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index cd8ea35..ca7902c 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -169,11 +169,6 @@ static struct map_desc versatile_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(VERSATILE_PCI_CFG_BASE),
- 		.length		= VERSATILE_PCI_CFG_BASE_SIZE,
- 		.type		= MT_DEVICE
--	}, {
--		.virtual	=  (unsigned long)VERSATILE_PCI_VIRT_MEM_BASE0,
--		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE0),
--		.length		= IO_SPACE_LIMIT,
--		.type		= MT_DEVICE
- 	},
- #endif
- };
-diff --git a/arch/arm/mach-versatile/include/mach/hardware.h b/arch/arm/mach-versatile/include/mach/hardware.h
-index 408e58d..3e5d425 100644
---- a/arch/arm/mach-versatile/include/mach/hardware.h
-+++ b/arch/arm/mach-versatile/include/mach/hardware.h
-@@ -29,7 +29,6 @@
-  */
- #define VERSATILE_PCI_VIRT_BASE		(void __iomem *)0xe8000000ul
- #define VERSATILE_PCI_CFG_VIRT_BASE	(void __iomem *)0xe9000000ul
--#define VERSATILE_PCI_VIRT_MEM_BASE0	(void __iomem *)PCIO_BASE
+@@ -869,7 +869,6 @@ config ARCH_SHARK
+ 	select PCI
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select NEED_MACH_MEMORY_H
+-	select NEED_MACH_IO_H
+ 	help
+ 	  Support for the StrongARM based Digital DNARD machine, also known
+ 	  as "Shark" (<http://www.shark-linux.de/shark.html>).
+diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
+index 2704bcd..d35b94e 100644
+--- a/arch/arm/mach-shark/core.c
++++ b/arch/arm/mach-shark/core.c
+@@ -21,9 +21,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
  
- /* macro to get at MMIO space when running virtually */
- #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
-diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
+-#define IO_BASE                 0xe0000000
+-#define IO_SIZE                 0x08000000
+-#define IO_START                0x40000000
+ #define ROMCARD_SIZE            0x08000000
+ #define ROMCARD_START           0x10000000
+ 
+@@ -104,20 +101,6 @@ arch_initcall(shark_init);
+ 
+ extern void shark_init_irq(void);
+ 
+-static struct map_desc shark_io_desc[] __initdata = {
+-	{
+-		.virtual	= IO_BASE,
+-		.pfn		= __phys_to_pfn(IO_START),
+-		.length		= IO_SIZE,
+-		.type		= MT_DEVICE
+-	}
+-};
+-
+-static void __init shark_map_io(void)
+-{
+-	iotable_init(shark_io_desc, ARRAY_SIZE(shark_io_desc));
+-}
+-
+ #define IRQ_TIMER 0
+ #define HZ_TIME ((1193180 + HZ/2) / HZ)
+ 
+@@ -158,7 +141,6 @@ static void shark_init_early(void)
+ MACHINE_START(SHARK, "Shark")
+ 	/* Maintainer: Alexander Schulz */
+ 	.atag_offset	= 0x3000,
+-	.map_io		= shark_map_io,
+ 	.init_early	= shark_init_early,
+ 	.init_irq	= shark_init_irq,
+ 	.timer		= &shark_timer,
+diff --git a/arch/arm/mach-shark/include/mach/debug-macro.S b/arch/arm/mach-shark/include/mach/debug-macro.S
+index 20eb2bf..d129119 100644
+--- a/arch/arm/mach-shark/include/mach/debug-macro.S
++++ b/arch/arm/mach-shark/include/mach/debug-macro.S
+@@ -12,9 +12,10 @@
+ */
+ 
+ 		.macro	addruart, rp, rv, tmp
+-		mov	\rp, #0xe0000000
+-		orr	\rp, \rp, #0x000003f8
+-		mov	\rv, \rp
++		mov	\rp, #0x3f8
++		orr	\rv, \rp, #0xfe000000
++		orr	\rv, \rv, #0x00e00000
++		orr	\rp, \rp, #0x40000000
+ 		.endm
+ 
+ 		.macro	senduart,rd,rx
+diff --git a/arch/arm/mach-shark/include/mach/entry-macro.S b/arch/arm/mach-shark/include/mach/entry-macro.S
+index 5901b09..c9e49f0 100644
+--- a/arch/arm/mach-shark/include/mach/entry-macro.S
++++ b/arch/arm/mach-shark/include/mach/entry-macro.S
+@@ -8,7 +8,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 		.macro  get_irqnr_preamble, base, tmp
+-		mov	\base, #0xe0000000
++		mov	\base, #0xfe000000
++		orr	\base, \base, #0x00e00000
+ 		.endm
+ 
+ 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+diff --git a/arch/arm/mach-shark/include/mach/io.h b/arch/arm/mach-shark/include/mach/io.h
 deleted file mode 100644
-index 0406513..0000000
---- a/arch/arm/mach-versatile/include/mach/io.h
+index 1a45fc0..0000000
+--- a/arch/arm/mach-shark/include/mach/io.h
 +++ /dev/null
-@@ -1,27 +0,0 @@
+@@ -1,18 +0,0 @@
 -/*
-- *  arch/arm/mach-versatile/include/mach/io.h
+- * arch/arm/mach-shark/include/mach/io.h
 - *
-- *  Copyright (C) 2003 ARM Limited
+- * by Alexander Schulz
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- * derived from:
+- * arch/arm/mach-ebsa110/include/mach/io.h
+- * Copyright (C) 1997,1998 Russell King
 - */
+-
 -#ifndef __ASM_ARM_ARCH_IO_H
 -#define __ASM_ARM_ARCH_IO_H
 -
--#define PCIO_BASE	0xeb000000ul
+-#define IO_SPACE_LIMIT 0xffffffff
 -
--#define __io(a)		((a) + PCIO_BASE)
+-#define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
 -
 -#endif
-diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-index e95bf84..2f84f40 100644
---- a/arch/arm/mach-versatile/pci.c
-+++ b/arch/arm/mach-versatile/pci.c
-@@ -169,13 +169,6 @@ static struct pci_ops pci_versatile_ops = {
- 	.write	= versatile_write_config,
- };
+diff --git a/arch/arm/mach-shark/pci.c b/arch/arm/mach-shark/pci.c
+index 9089407..b8b4ab3 100644
+--- a/arch/arm/mach-shark/pci.c
++++ b/arch/arm/mach-shark/pci.c
+@@ -8,12 +8,15 @@
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <video/vga.h>
  
--static struct resource io_port = {
--	.name	= "PCI",
--	.start	= 0,
--	.end	= IO_SPACE_LIMIT,
--	.flags	= IORESOURCE_IO,
--};
--
- static struct resource io_mem = {
- 	.name	= "PCI I/O space",
- 	.start	= VERSATILE_PCI_MEM_BASE0,
-@@ -207,12 +200,6 @@ static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
- 		       "memory region (%d)\n", ret);
- 		goto out;
- 	}
--	ret = request_resource(&ioport_resource, &io_port);
--	if (ret) {
--		printk(KERN_ERR "PCI: unable to allocate I/O "
--		       "port region (%d)\n", ret);
--		goto out;
--	}
- 	ret = request_resource(&iomem_resource, &non_mem);
- 	if (ret) {
- 		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
-@@ -227,11 +214,9 @@ static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
- 	}
+ #include <asm/irq.h>
+ #include <asm/mach/pci.h>
+ #include <asm/mach-types.h>
  
- 	/*
--	 * the IO resource for this bus
- 	 * the mem resource for this bus
- 	 * the prefetch mem resource for this bus
- 	 */
--	pci_add_resource_offset(&sys->resources, &io_port, sys->io_offset);
- 	pci_add_resource_offset(&sys->resources, &non_mem, sys->mem_offset);
- 	pci_add_resource_offset(&sys->resources, &pre_mem, sys->mem_offset);
- 
-@@ -260,9 +245,11 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
- 		goto out;
- 	}
- 
-+	ret = pci_ioremap_io(0, VERSATILE_PCI_MEM_BASE0);
-+	if (ret)
-+		goto out;
++#define IO_START	0x40000000
 +
- 	if (nr == 0) {
--		sys->mem_offset = 0;
--		sys->io_offset = 0;
- 		ret = pci_versatile_setup_resources(sys);
- 		if (ret < 0) {
- 			printk("pci_versatile_setup: resources... oops?\n");
-@@ -319,7 +306,6 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
- 
- void __init pci_versatile_preinit(void)
+ static int __init shark_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
  {
--	pcibios_min_io = 0x44000000;
+ 	if (dev->bus->number == 0)
+@@ -44,6 +47,8 @@ static int __init shark_pci_init(void)
  	pcibios_min_mem = 0x50000000;
+ 	vga_base = 0xe8000000;
  
- 	__raw_writel(VERSATILE_PCI_MEM_BASE0 >> 28, PCI_IMAP0);
++	pci_ioremap_io(0, IO_START);
++
+ 	pci_common_init(&shark_pci);
+ 
+ 	return 0;
 -- 
 1.7.9.5
