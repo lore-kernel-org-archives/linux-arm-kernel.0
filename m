@@ -1,217 +1,321 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 21:04:09 -0500
-Subject: [PATCH v2 13/15] ARM: iop13xx: use fixed PCI i/o mapping
-In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
-References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1342231451-28861-14-git-send-email-robherring2@gmail.com>
+Date: Fri, 13 Jul 2012 21:15:35 -0500
+Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
+In-Reply-To: <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <5000D647.4090200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 07/13/2012 05:26 PM, Jon Hunter wrote:
+> Add the 12 GP timers nodes present in OMAP3.
+> Add the 11 GP timers nodes present in OMAP4.
+> 
+> Add documentation for timer properties specific to OMAP.
+> 
+> For each timer an alias is being added. The purpose for doing this is because
+> the OMAP dmtimer driver uses an ID to distinguish between the different timer
+> instances. For example, a timer can be requested by its ID. By adding an alias
+> for each timer we can then use the function of_alias_get_id() to extract the
+> ID for each timer from the alias name. The same method is used for the TTY
+> serial devices. If it is preferred that such an alias is not added and there
+> is a better way to pass an ID from device-tree let me know.
 
-Move iop13xx PCI to fixed i/o mapping and remove io.h.
+I'm not sure this is really a good use of aliases. UARTs use aliases
+because it is important that the UART number to tty number is known and
+fixed. IIUC, as an example you are picking timer1 because it has
+properties X, Y and Z. If so, then you should describe those h/w
+properties within the timer nodes so you can pick which timer to use
+based on it's h/w properties.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/Kconfig                             |    1 -
- arch/arm/mach-iop13xx/include/mach/io.h      |   28 -------------------
- arch/arm/mach-iop13xx/include/mach/iop13xx.h |   21 +++------------
- arch/arm/mach-iop13xx/pci.c                  |   37 +++++++++-----------------
- arch/arm/mach-iop13xx/setup.c                |   10 -------
- 5 files changed, 16 insertions(+), 81 deletions(-)
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/io.h
+Rob
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e542f99..c61e0a4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -486,7 +486,6 @@ config ARCH_IOP13XX
- 	select PCI
- 	select ARCH_SUPPORTS_MSI
- 	select VMSPLIT_1G
--	select NEED_MACH_IO_H
- 	select NEED_MACH_MEMORY_H
- 	select NEED_RET_TO_USER
- 	help
-diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
-deleted file mode 100644
-index e197cb8..0000000
---- a/arch/arm/mach-iop13xx/include/mach/io.h
-+++ /dev/null
-@@ -1,28 +0,0 @@
--/*
-- * iop13xx custom ioremap implementation
-- * Copyright (c) 2005-2006, Intel Corporation.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-- * Place - Suite 330, Boston, MA 02111-1307 USA.
-- *
-- */
--#ifndef __ASM_ARM_ARCH_IO_H
--#define __ASM_ARM_ARCH_IO_H
--
--#include <mach/iop13xx.h>
--
--#define IO_SPACE_LIMIT (IOP13XX_PCIE_IO_WINDOW_SIZE + IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
--
--#define __io(a) (IOP13XX_PCIX_LOWER_IO_VA + ((a) & IO_SPACE_LIMIT))
--
--#endif
-diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-index d3777db..9278b8c 100644
---- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-+++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-@@ -69,19 +69,11 @@ extern unsigned long get_iop_tick_rate(void);
-  * 0x8000.0000 + 928M	0x2.8000.0000   (ioremap)	PCIE outbound memory window
-  *
-  * IO MAP
-- * 0x1000 + 64K	0x0.fffb.1000	0xfed6.1000	PCIX outbound i/o window
-- * 0x1000 + 64K	0x0.fffd.1000	0xfed7.1000	PCIE outbound i/o window
-+ * 0x00000 + 64K	0x0.fffb.0000	0xfee0.0000	PCIX outbound i/o window
-+ * 0x10000 + 64K	0x0.fffd.0000	0xfee1.0000	PCIE outbound i/o window
-  */
--#define IOP13XX_PCIX_IO_WINDOW_SIZE   0x10000UL
- #define IOP13XX_PCIX_LOWER_IO_PA      0xfffb0000UL
--#define IOP13XX_PCIX_LOWER_IO_VA      0xfed60000UL
- #define IOP13XX_PCIX_LOWER_IO_BA      0x0UL /* OIOTVR */
--#define IOP13XX_PCIX_IO_BUS_OFFSET    0x1000UL
--#define IOP13XX_PCIX_UPPER_IO_BA      (IOP13XX_PCIX_LOWER_IO_BA +\
--				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
--#define IOP13XX_PCIX_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
--					   (IOP13XX_PCIX_LOWER_IO_PA\
--					   - IOP13XX_PCIX_LOWER_IO_VA))
- 
- #define IOP13XX_PCIX_MEM_PHYS_OFFSET  0x100000000ULL
- #define IOP13XX_PCIX_MEM_WINDOW_SIZE  0x3a000000UL
-@@ -101,16 +93,9 @@ extern unsigned long get_iop_tick_rate(void);
- 					IOP13XX_PCIX_LOWER_MEM_BA)
- 
- /* PCI-E ranges */
--#define IOP13XX_PCIE_IO_WINDOW_SIZE   	 0x10000UL
- #define IOP13XX_PCIE_LOWER_IO_PA      	 0xfffd0000UL
--#define IOP13XX_PCIE_LOWER_IO_VA      	 0xfed70000UL
- #define IOP13XX_PCIE_LOWER_IO_BA      	 0x0UL  /* OIOTVR */
--#define IOP13XX_PCIE_IO_BUS_OFFSET	 0x1000UL
--#define IOP13XX_PCIE_UPPER_IO_BA      	 (IOP13XX_PCIE_LOWER_IO_BA +\
--					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
--#define IOP13XX_PCIE_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
--					   (IOP13XX_PCIE_LOWER_IO_PA\
--					   - IOP13XX_PCIE_LOWER_IO_VA))
-+#define IOP13XX_PCIE_LOWER_IO_BA      	 0x10000UL
- 
- #define IOP13XX_PCIE_MEM_PHYS_OFFSET  	 0x200000000ULL
- #define IOP13XX_PCIE_MEM_WINDOW_SIZE  	 0x3a000000UL
-diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
-index 1bb905a..f3826bb 100644
---- a/arch/arm/mach-iop13xx/pci.c
-+++ b/arch/arm/mach-iop13xx/pci.c
-@@ -970,7 +970,6 @@ void __init iop13xx_pci_init(void)
- 	__raw_writel(__raw_readl(IOP13XX_XBG_BECSR) & 3, IOP13XX_XBG_BECSR);
- 
- 	/* Setup the Min Address for PCI memory... */
--	pcibios_min_io = 0;
- 	pcibios_min_mem = IOP13XX_PCIX_LOWER_MEM_BA;
- 
- 	/* if Linux is given control of an ATU
-@@ -1003,7 +1002,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 	if (nr > 1)
- 		return 0;
- 
--	res = kcalloc(2, sizeof(struct resource), GFP_KERNEL);
-+	res = kzalloc(sizeof(struct resource), GFP_KERNEL);
- 	if (!res)
- 		panic("PCI: unable to alloc resources");
- 
-@@ -1042,17 +1041,13 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 				  << IOP13XX_ATUX_PCIXSR_FUNC_NUM;
- 		__raw_writel(pcixsr, IOP13XX_ATUX_PCIXSR);
- 
--		res[0].start = IOP13XX_PCIX_LOWER_IO_BA + IOP13XX_PCIX_IO_BUS_OFFSET;
--		res[0].end   = IOP13XX_PCIX_UPPER_IO_BA;
--		res[0].name  = "IQ81340 ATUX PCI I/O Space";
--		res[0].flags = IORESOURCE_IO;
-+		pci_ioremap_io(0, IOP13XX_PCIX_LOWER_IO_PA);
- 
--		res[1].start = IOP13XX_PCIX_LOWER_MEM_RA;
--		res[1].end   = IOP13XX_PCIX_UPPER_MEM_RA;
--		res[1].name  = "IQ81340 ATUX PCI Memory Space";
--		res[1].flags = IORESOURCE_MEM;
-+		res->start = IOP13XX_PCIX_LOWER_MEM_RA;
-+		res->end   = IOP13XX_PCIX_UPPER_MEM_RA;
-+		res->name  = "IQ81340 ATUX PCI Memory Space";
-+		res->flags = IORESOURCE_MEM;
- 		sys->mem_offset = IOP13XX_PCIX_MEM_OFFSET;
--		sys->io_offset = IOP13XX_PCIX_LOWER_IO_BA;
- 		break;
- 	case IOP13XX_INIT_ATU_ATUE:
- 		/* Note: the function number field in the PCSR is ro */
-@@ -1063,17 +1058,13 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 
- 		__raw_writel(pcsr, IOP13XX_ATUE_PCSR);
- 
--		res[0].start = IOP13XX_PCIE_LOWER_IO_BA + IOP13XX_PCIE_IO_BUS_OFFSET;
--		res[0].end   = IOP13XX_PCIE_UPPER_IO_BA;
--		res[0].name  = "IQ81340 ATUE PCI I/O Space";
--		res[0].flags = IORESOURCE_IO;
-+		pci_ioremap_io(IOP13XX_PCIE_LOWER_IO_BA, IOP13XX_PCIE_LOWER_IO_PA);
- 
--		res[1].start = IOP13XX_PCIE_LOWER_MEM_RA;
--		res[1].end   = IOP13XX_PCIE_UPPER_MEM_RA;
--		res[1].name  = "IQ81340 ATUE PCI Memory Space";
--		res[1].flags = IORESOURCE_MEM;
-+		res->start = IOP13XX_PCIE_LOWER_MEM_RA;
-+		res->end   = IOP13XX_PCIE_UPPER_MEM_RA;
-+		res->name  = "IQ81340 ATUE PCI Memory Space";
-+		res->flags = IORESOURCE_MEM;
- 		sys->mem_offset = IOP13XX_PCIE_MEM_OFFSET;
--		sys->io_offset = IOP13XX_PCIE_LOWER_IO_BA;
- 		sys->map_irq = iop13xx_pcie_map_irq;
- 		break;
- 	default:
-@@ -1081,11 +1072,9 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
- 		return 0;
- 	}
- 
--	request_resource(&ioport_resource, &res[0]);
--	request_resource(&iomem_resource, &res[1]);
-+	request_resource(&iomem_resource, res);
- 
--	pci_add_resource_offset(&sys->resources, &res[0], sys->io_offset);
--	pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
-+	pci_add_resource_offset(&sys->resources, res, sys->mem_offset);
- 
- 	return 1;
- }
-diff --git a/arch/arm/mach-iop13xx/setup.c b/arch/arm/mach-iop13xx/setup.c
-index daabb1f..4a7f20d 100644
---- a/arch/arm/mach-iop13xx/setup.c
-+++ b/arch/arm/mach-iop13xx/setup.c
-@@ -40,16 +40,6 @@ static struct map_desc iop13xx_std_desc[] __initdata = {
- 		.pfn 	 = __phys_to_pfn(IOP13XX_PMMR_PHYS_MEM_BASE),
- 		.length  = IOP13XX_PMMR_SIZE,
- 		.type	 = MT_DEVICE,
--	}, { /* PCIE IO space */
--		.virtual = IOP13XX_PCIE_LOWER_IO_VA,
--		.pfn 	 = __phys_to_pfn(IOP13XX_PCIE_LOWER_IO_PA),
--		.length  = IOP13XX_PCIX_IO_WINDOW_SIZE,
--		.type	 = MT_DEVICE,
--	}, { /* PCIX IO space */
--		.virtual = IOP13XX_PCIX_LOWER_IO_VA,
--		.pfn 	 = __phys_to_pfn(IOP13XX_PCIX_LOWER_IO_PA),
--		.length  = IOP13XX_PCIX_IO_WINDOW_SIZE,
--		.type	 = MT_DEVICE,
- 	},
- };
- 
--- 
-1.7.9.5
+> 
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  .../devicetree/bindings/arm/omap/timer.txt         |   34 +++++++
+>  arch/arm/boot/dts/omap3.dtsi                       |  104 ++++++++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi                       |   93 +++++++++++++++++
+>  3 files changed, 231 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/timer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+> new file mode 100644
+> index 0000000..dcbb451
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+> @@ -0,0 +1,34 @@
+> +OMAP Timer controller bindings
+> +
+> +Required properties:
+> +- compatible:
+> +  - "ti,omap3-timer" for OMAP3+ controllers
+> +- reg: Contains timer register address range (base address and length)
+> +- interrupts: Contains the interrupt information for the timer. The format is
+> +  being dependent on which interrupt controller the OMAP device uses.
+> +
+> +OMAP specific properties:
+> +- ti,hwmods: Name of the hwmod associated to the timer:
+> +  "timer<X>", <X> being the 1-based instance number from the HW spec
+> +- ti,timer-alwon: Indicates the timer is in an alway-on power domain.
+> +- ti,timer-pwm: Indicates the timer supports can generate PWM output.
+> +- ti,timer-secure: Indicates the timer is reserved on a secure OMAP device and
+> +  therefore cannot be used by the kernel.
+> +
+> +Note: Each timer should have an alias correctly numbered in "aliases" node. The
+> +      alias is used to identify the timer instance in the driver.
+> +
+> +Example:
+> +
+> +aliases {
+> +	timer12 = &timer12;
+> +};
+> +
+> +timer12: timer at 48304000 {
+> +	compatible = "ti,omap3-timer";
+> +	reg = <0x48304000 0xfff>;
+> +	interrupts = <95>;
+> +	ti,hwmods = "timer12"
+> +	ti,timer-alwon;
+> +	ti,timer-secure;
+> +};
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 8109471..f309f2a 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -12,12 +12,25 @@
+>  
+>  / {
+>  	compatible = "ti,omap3430", "ti,omap3";
+> +	interrupt-parent = <&intc>;
+>  
+>  	aliases {
+>  		serial0 = &uart1;
+>  		serial1 = &uart2;
+>  		serial2 = &uart3;
+>  		serial3 = &uart4;
+> +		timer1 = &timer1;
+> +		timer2 = &timer2;
+> +		timer3 = &timer3;
+> +		timer4 = &timer4;
+> +		timer5 = &timer5;
+> +		timer6 = &timer6;
+> +		timer7 = &timer7;
+> +		timer8 = &timer8;
+> +		timer9 = &timer9;
+> +		timer10 = &timer10;
+> +		timer11 = &timer11;
+> +		timer12 = &timer12;
+>  	};
+>  
+>  	cpus {
+> @@ -220,5 +233,96 @@
+>  			compatible = "ti,omap3-wdt";
+>  			ti,hwmods = "wd_timer2";
+>  		};
+> +
+> +		timer1: timer at 48318000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48318000 0xfff>;
+> +			interrupts = <37>;
+> +			ti,hwmods = "timer1";
+> +			ti,timer-alwon;
+> +		};
+> +
+> +		timer2: timer at 49032000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x49032000 0xfff>;
+> +			interrupts = <38>;
+> +			ti,hwmods = "timer2";
+> +		};
+> +
+> +		timer3: timer at 49034000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x49034000 0xfff>;
+> +			interrupts = <39>;
+> +			ti,hwmods = "timer3";
+> +		};
+> +
+> +		timer4: timer at 49036000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x49036000 0xfff>;
+> +			interrupts = <40>;
+> +			ti,hwmods = "timer4";
+> +		};
+> +
+> +		timer5: timer at 49038000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x49038000 0xfff>;
+> +			interrupts = <41>;
+> +			ti,hwmods = "timer5";
+> +		};
+> +
+> +		timer6: timer at 4903a000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4903a000 0xfff>;
+> +			interrupts = <42>;
+> +			ti,hwmods = "timer6";
+> +		};
+> +
+> +		timer7: timer at 4903c000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4903c000 0xfff>;
+> +			interrupts = <43>;
+> +			ti,hwmods = "timer7";
+> +		};
+> +
+> +		timer8: timer at 4903e000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4903e000 0xfff>;
+> +			interrupts = <44>;
+> +			ti,hwmods = "timer8";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer9: timer at 49040000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x49040000 0xfff>;
+> +			interrupts = <45>;
+> +			ti,hwmods = "timer9";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer10: timer at 48086000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48086000 0xfff>;
+> +			interrupts = <46>;
+> +			ti,hwmods = "timer10";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer11: timer at 48088000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48088000 0xfff>;
+> +			interrupts = <47>;
+> +			ti,hwmods = "timer11";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer12: timer at 48304000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48304000 0xfff>;
+> +			interrupts = <95>;
+> +			ti,hwmods = "timer12";
+> +			ti,timer-alwon;
+> +			ti,timer-secure;
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 04cbbcb..39716c5 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -25,6 +25,17 @@
+>  		serial1 = &uart2;
+>  		serial2 = &uart3;
+>  		serial3 = &uart4;
+> +		timer1 = &timer1;
+> +		timer2 = &timer2;
+> +		timer3 = &timer3;
+> +		timer4 = &timer4;
+> +		timer5 = &timer5;
+> +		timer6 = &timer6;
+> +		timer7 = &timer7;
+> +		timer8 = &timer8;
+> +		timer9 = &timer9;
+> +		timer10 = &timer10;
+> +		timer11 = &timer11;
+>  	};
+>  
+>  	cpus {
+> @@ -295,5 +306,87 @@
+>  			interrupt-parent = <&gic>;
+>  			ti,hwmods = "dmic";
+>  		};
+> +
+> +		timer1: timer at 4a318000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4a318000 0x7f>;
+> +			interrupts = <0 37 0x4>;
+> +			ti,hwmods = "timer1";
+> +			ti,timer-alwon;
+> +		};
+> +
+> +		timer2: timer at 48032000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48032000 0x7f>;
+> +			interrupts = <0 38 0x4>;
+> +			ti,hwmods = "timer2";
+> +		};
+> +
+> +		timer3: timer at 48034000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48034000 0x7f>;
+> +			interrupts = <0 39 0x4>;
+> +			ti,hwmods = "timer3";
+> +		};
+> +
+> +		timer4: timer at 48036000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48036000 0x7f>;
+> +			interrupts = <0 40 0x4>;
+> +			ti,hwmods = "timer4";
+> +		};
+> +
+> +		timer5: timer at 49038000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x49038000 0x7f>;
+> +			interrupts = <0 41 0x4>;
+> +			ti,hwmods = "timer5";
+> +		};
+> +
+> +		timer6: timer at 4903a000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4903a000 0x7f>;
+> +			interrupts = <0 42 0x4>;
+> +			ti,hwmods = "timer6";
+> +		};
+> +
+> +		timer7: timer at 4903c000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4903c000 0x7f>;
+> +			interrupts = <0 43 0x4>;
+> +			ti,hwmods = "timer7";
+> +		};
+> +
+> +		timer8: timer at 4903e000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4903e000 0x7f>;
+> +			interrupts = <0 44 0x4>;
+> +			ti,hwmods = "timer8";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer9: timer at 4803e000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x4803e000 0x7f>;
+> +			interrupts = <0 45 0x4>;
+> +			ti,hwmods = "timer9";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer10: timer at 48086000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48086000 0x7f>;
+> +			interrupts = <0 46 0x4>;
+> +			ti,hwmods = "timer10";
+> +			ti,timer-pwm;
+> +		};
+> +
+> +		timer11: timer at 48088000 {
+> +			compatible = "ti,omap3-timer";
+> +			reg = <0x48088000 0x7f>;
+> +			interrupts = <0 47 0x4>;
+> +			ti,hwmods = "timer11";
+> +			ti,timer-pwm;
+> +		};
+>  	};
+>  };
+> 
