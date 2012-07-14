@@ -1,123 +1,234 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 21:03:56 -0500
-Subject: [PATCH v2 00/15] PCI io.h clean-up
-Message-ID: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+Date: Fri, 13 Jul 2012 21:03:57 -0500
+Subject: [PATCH v2 01/15] ARM: Add fixed PCI i/o mapping
+In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1342231451-28861-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This is the 2nd part of mach/io.h removals. This series removes io.h on
-platforms with PCI by creating a fixed virtual I/O mapping and a common
-__io() macro.
+This adds a fixed virtual mapping for PCI i/o addresses. The mapping is
+located at the last 2MB of vmalloc region (0xfee00000-0xff000000). 2MB
+is used to align with PMD size, but IO_SPACE_LIMIT is 1MB. The space
+is reserved just before .map_io and can be mapped at any time later with
+pci_ioremap_io.
 
-This version has changed a bit to accommodate Tegra converting its PCIe
-host to a platform driver. Now the virtual space is only reserved during
-early boot before .map_io() is called. The mapping is not created until
-calling pci_ioremap_io which can be done at any point after vmalloc is
-initialized.
+This has changed completely from the 1st implementation which only
+supported creating the static mapping at .map_io.
 
-I've gone back to fixed 64K windows for each PCI bus. This allows
-removing all the i/o resource setup from the individually platforms and
-placing it within the common ARM PCI code.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Nicolas Pitre <nico@linaro.org>
+---
+ Documentation/arm/memory.txt    |    3 +++
+ arch/arm/include/asm/io.h       |    8 ++++++++
+ arch/arm/include/asm/mach/map.h |    7 +++++++
+ arch/arm/include/asm/mach/pci.h |   15 +++++++++++++++
+ arch/arm/kernel/bios32.c        |    1 +
+ arch/arm/mm/ioremap.c           |   14 ++++++++++++++
+ arch/arm/mm/mmu.c               |   25 +++++++++++++++++--------
+ 7 files changed, 65 insertions(+), 8 deletions(-)
 
-I've only tested versatilepb under qemu (with the model hacked up to
-actually enable i/o space), so any testing is appreciated. iop3xx and
-mv78xx0 have some risk of breaking as the PCI bus addresses are moved
-to 0 from matching the cpu host bus addesss.
-
-This is available from my git tree:
-
-git://sources.calxeda.com/kernel/linux.git io-cleanup-pci
-
-Rob
-
-Arnd Bergmann (1):
-  iop13xx: use more regular PCI I/O space handling
-
-Rob Herring (14):
-  ARM: Add fixed PCI i/o mapping
-  ARM: move PCI i/o resource setup into common code
-  ARM: versatile: use fixed PCI i/o mapping
-  ARM: tegra: use fixed PCI i/o mapping
-  ARM: integrator: use fixed PCI i/o mapping
-  ARM: integrator: remove trailing whitespace on pci_v3.c
-  ARM: shark: use fixed PCI i/o mapping
-  ARM: footbridge: use fixed PCI i/o mapping
-  ARM: dove: use fixed PCI i/o mapping
-  ARM: kirkwood: use fixed PCI i/o mapping
-  ARM: orion5x: use fixed PCI i/o mapping
-  ARM: iop13xx: use fixed PCI i/o mapping
-  ARM: mv78xx0: use fixed pci i/o mapping
-  ARM: iop3xx: use fixed PCI i/o mapping
-
- Documentation/arm/memory.txt                       |    3 +
- arch/arm/Kconfig                                   |   13 +--
- arch/arm/include/asm/hardware/iop3xx.h             |   12 +--
- arch/arm/include/asm/io.h                          |    8 ++
- arch/arm/include/asm/mach/map.h                    |    7 ++
- arch/arm/include/asm/mach/pci.h                    |   18 ++++
- arch/arm/kernel/bios32.c                           |   42 +++++++-
- arch/arm/mach-dove/common.c                        |   10 --
- arch/arm/mach-dove/include/mach/dove.h             |    8 +-
- arch/arm/mach-dove/include/mach/io.h               |   19 ----
- arch/arm/mach-dove/pcie.c                          |   23 +---
- arch/arm/mach-footbridge/common.c                  |    8 +-
- arch/arm/mach-footbridge/dc21285.c                 |   16 +--
- .../arm/mach-footbridge/include/mach/debug-macro.S |    3 +-
- arch/arm/mach-footbridge/include/mach/io.h         |   12 +--
- arch/arm/mach-integrator/include/mach/io.h         |   33 ------
- arch/arm/mach-integrator/include/mach/platform.h   |    4 +
- arch/arm/mach-integrator/integrator_ap.c           |    7 +-
- arch/arm/mach-integrator/pci_v3.c                  |   49 ++++-----
- arch/arm/mach-iop13xx/include/mach/io.h            |   28 -----
- arch/arm/mach-iop13xx/include/mach/iop13xx.h       |   27 +----
- arch/arm/mach-iop13xx/io.c                         |   27 -----
- arch/arm/mach-iop13xx/pci.c                        |   37 +++----
- arch/arm/mach-iop13xx/setup.c                      |   10 --
- arch/arm/mach-iop32x/include/mach/io.h             |   19 ----
- arch/arm/mach-iop33x/include/mach/io.h             |   19 ----
- arch/arm/mach-kirkwood/common.c                    |   10 --
- arch/arm/mach-kirkwood/include/mach/io.h           |   24 -----
- arch/arm/mach-kirkwood/include/mach/kirkwood.h     |    8 +-
- arch/arm/mach-kirkwood/pcie.c                      |   22 +---
- arch/arm/mach-mv78xx0/addr-map.c                   |    3 +-
- arch/arm/mach-mv78xx0/common.c                     |    5 -
- arch/arm/mach-mv78xx0/include/mach/io.h            |   24 -----
- arch/arm/mach-mv78xx0/include/mach/mv78xx0.h       |   21 ++--
- arch/arm/mach-mv78xx0/pcie.c                       |  110 ++++++--------------
- arch/arm/mach-orion5x/common.c                     |   10 --
- arch/arm/mach-orion5x/include/mach/io.h            |   22 ----
- arch/arm/mach-orion5x/include/mach/orion5x.h       |   20 ++--
- arch/arm/mach-orion5x/pci.c                        |   56 ++++------
- arch/arm/mach-shark/core.c                         |   18 ----
- arch/arm/mach-shark/include/mach/debug-macro.S     |    7 +-
- arch/arm/mach-shark/include/mach/entry-macro.S     |    3 +-
- arch/arm/mach-shark/include/mach/io.h              |   18 ----
- arch/arm/mach-shark/pci.c                          |    5 +
- arch/arm/mach-tegra/include/mach/io.h              |   46 --------
- arch/arm/mach-tegra/include/mach/iomap.h           |    3 +
- arch/arm/mach-tegra/pcie.c                         |   95 ++++-------------
- arch/arm/mach-versatile/core.c                     |    5 -
- arch/arm/mach-versatile/include/mach/hardware.h    |    1 -
- arch/arm/mach-versatile/include/mach/io.h          |   27 -----
- arch/arm/mach-versatile/pci.c                      |   22 +---
- arch/arm/mm/ioremap.c                              |   14 +++
- arch/arm/mm/mmu.c                                  |   25 +++--
- arch/arm/plat-iop/pci.c                            |   25 ++---
- arch/arm/plat-iop/setup.c                          |    5 -
- 55 files changed, 293 insertions(+), 823 deletions(-)
- delete mode 100644 arch/arm/mach-dove/include/mach/io.h
- delete mode 100644 arch/arm/mach-integrator/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop32x/include/mach/io.h
- delete mode 100644 arch/arm/mach-iop33x/include/mach/io.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/io.h
- delete mode 100644 arch/arm/mach-orion5x/include/mach/io.h
- delete mode 100644 arch/arm/mach-shark/include/mach/io.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/io.h
-
+diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
+index 208a2d4..83e9b18 100644
+--- a/Documentation/arm/memory.txt
++++ b/Documentation/arm/memory.txt
+@@ -51,6 +51,9 @@ ffc00000	ffefffff	DMA memory mapping region.  Memory returned
+ ff000000	ffbfffff	Reserved for future expansion of DMA
+ 				mapping region.
+ 
++fef00000	feffffff	Mapping of PCI I/O space. This is a static
++				mapping within the vmalloc space.
++
+ VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
+ 				Memory returned by vmalloc/ioremap will
+ 				be dynamically placed in this region.
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 815c669..8f4db67 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -113,11 +113,19 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ #define __iowmb()		do { } while (0)
+ #endif
+ 
++/* PCI fixed i/o mapping */
++#define PCI_IO_VIRT_BASE	0xfee00000
++
++extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
++
+ /*
+  * Now, pick up the machine-defined IO definitions
+  */
+ #ifdef CONFIG_NEED_MACH_IO_H
+ #include <mach/io.h>
++#elif defined(CONFIG_PCI)
++#define IO_SPACE_LIMIT	((resource_size_t)0xfffff)
++#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
+ #else
+ #define __io(a)		__typesafe_io((a) & IO_SPACE_LIMIT)
+ #endif
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index a6efcdd..808c517 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -9,6 +9,9 @@
+  *
+  *  Page table mapping constructs and function prototypes
+  */
++#ifndef __ASM_MACH_MAP_H
++#define __ASM_MACH_MAP_H
++
+ #include <asm/io.h>
+ 
+ struct map_desc {
+@@ -34,6 +37,7 @@ struct map_desc {
+ 
+ #ifdef CONFIG_MMU
+ extern void iotable_init(struct map_desc *, int);
++extern void vm_reserve_area_early(unsigned long addr, unsigned long size);
+ 
+ struct mem_type;
+ extern const struct mem_type *get_mem_type(unsigned int type);
+@@ -44,4 +48,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
+ 			const struct mem_type *mtype);
+ #else
+ #define iotable_init(map,num)	do { } while (0)
++#define vm_reserve_area_early(a,s)	do { } while (0)
++#endif
++
+ #endif
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 26c511f..51630c0 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -11,6 +11,8 @@
+ #ifndef __ASM_MACH_PCI_H
+ #define __ASM_MACH_PCI_H
+ 
++#include <asm/mach/map.h>
++
+ struct pci_sys_data;
+ struct pci_ops;
+ struct pci_bus;
+@@ -55,6 +57,19 @@ struct pci_sys_data {
+ void pci_common_init(struct hw_pci *);
+ 
+ /*
++ * Setup fixed I/O mapping.
++ */
++#if defined(CONFIG_PCI) && !defined(CONFIG_NEED_MACH_IO_H)
++/* Called from devicemaps_init before .map_io */
++static inline void pci_reserve_io(void)
++{
++	vm_reserve_area_early(PCI_IO_VIRT_BASE, SZ_2M);
++}
++#else
++static inline void pci_reserve_io(void) {}
++#endif
++
++/*
+  * PCI controllers
+  */
+ extern struct pci_ops iop3xx_ops;
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 2555250..311e1cc 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -13,6 +13,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/mach-types.h>
++#include <asm/mach/map.h>
+ #include <asm/mach/pci.h>
+ 
+ static int debug_pci;
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 4f55f50..8727802 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -36,6 +36,7 @@
+ #include <asm/system_info.h>
+ 
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ #include "mm.h"
+ 
+ int ioremap_page(unsigned long virt, unsigned long phys,
+@@ -383,3 +384,16 @@ void __arm_iounmap(volatile void __iomem *io_addr)
+ 	arch_iounmap(io_addr);
+ }
+ EXPORT_SYMBOL(__arm_iounmap);
++
++#ifdef CONFIG_PCI
++int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
++{
++	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
++
++	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
++				  PCI_IO_VIRT_BASE + offset + SZ_64K,
++				  phys_addr,
++				  __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
++}
++EXPORT_SYMBOL_GPL(pci_ioremap_io);
++#endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index cf4528d..c5ca07b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -31,6 +31,7 @@
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <asm/mach/pci.h>
+ 
+ #include "mm.h"
+ 
+@@ -791,6 +792,18 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+ 	}
+ }
+ 
++void __init vm_reserve_area_early(unsigned long addr, unsigned long size)
++{
++	struct vm_struct *vm;
++
++	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
++	vm->addr = (void *)addr;
++	vm->size = size;
++	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
++	vm->caller = vm_reserve_area_early;
++	vm_area_add_early(vm++);
++}
++
+ #ifndef CONFIG_ARM_LPAE
+ 
+ /*
+@@ -808,14 +821,7 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+ 
+ static void __init pmd_empty_section_gap(unsigned long addr)
+ {
+-	struct vm_struct *vm;
+-
+-	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
+-	vm->addr = (void *)addr;
+-	vm->size = SECTION_SIZE;
+-	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
+-	vm->caller = pmd_empty_section_gap;
+-	vm_area_add_early(vm);
++	vm_reserve_area_early(addr, SECTION_SIZE);
+ }
+ 
+ static void __init fill_pmd_gaps(void)
+@@ -1140,6 +1146,9 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 		create_mapping(&map);
+ 	}
+ 
++	/* Reserve fixed i/o space in VMALLOC region */
++	pci_reserve_io();
++
+ 	/*
+ 	 * Ask the machine support to map in the statically mapped devices.
+ 	 */
 -- 
 1.7.9.5
