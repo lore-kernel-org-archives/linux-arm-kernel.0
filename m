@@ -1,49 +1,53 @@
-From: amit.kachhap@gmail.com (amit kachhap)
-Date: Sat, 14 Jul 2012 12:55:14 +0530
-Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
-In-Reply-To: <20120713144138.GB25264@roeck-us.net>
-References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
- <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
- <20120713144138.GB25264@roeck-us.net>
-Message-ID: <CADGdYn5mrHVBEhYF-Zv1UJK1YtVNk=kBA98xOdWevRU+_tu6cg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 Jul 2012 07:35:28 +0000
+Subject: ARM: Samsung SoC fixes for 3.5-rc
+Message-ID: <201207140735.29019.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 8:11 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Fri, Jul 13, 2012 at 08:28:18PM +0900, Kukjin Kim wrote:
->> Amit Daniel Kachhap wrote:
->> >
->> > These TMU enablement patches are needed for exynos4 and exynos5 TMU
->> > driver patches sent earlier. The link for those are
->> > http://www.spinics.net/lists/lm-sensors/msg35858.html.
->> >
->> How was going on above patches? I can't see them you said in linux-next now,
->> it means if I apply this series in my tree, problem will be happened :(
->>
->> Note1: I've seen Rafael's updating exynos4_tmu patch which is using struct
->> dev_pm_ops for pm and applied by Guenter.
->>
-> If that is in the way, I can drop it, to be applied after the move. Let me know.
-> There is now another patch pending, to convert the driver to use devm_ functions.
-> Please let me know what you want me to do with it.
->
-Hi Guenter,
+Hi Linus,
 
-I rebased my V5 patch series with  hwmon-next branch so Rafael's pm
-changes are already included. Regarding the devm_ patch by sachin
-please hold it.
+Here's a second set of fixes for this -rc, all for the samsung platforms.
 
-Thanks,
-Amit D
->> Note2: would be helpful if you could do adding me in Cc of exynos tmu
->> patches...
->>
-> If you want to be copied, it might make sense to add yourself as maintainer for
-> this file. Otherwise you can not expect people to know.
->
-> Thanks,
-> Guenter
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	Arnd
+---
+The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
+
+  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to df4732abf91fa394bea95d912aff718ef5e2be5d:
+
+  Merge branch 'v3.5-samsung-fixes-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2012-07-14 09:14:35 +0200)
+
+----------------------------------------------------------------
+
+ARM: Samsung SoC fixes for 3.5-rc
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      Merge branch 'v3.5-samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+
+Marek Szyprowski (2):
+      ARM: EXYNOS: read initial state of power domain from hw registers
+      ARM: EXYNOS: register devices in 'need_restore' state for pm_domains
+
+Sylwester Nawrocki (2):
+      ARM: S3C24XX: Correct AC97 clock control bit for S3C2440
+      ARM: S3C24XX: Correct CAMIF interrupt definitions
+
+Todd Poynor (1):
+      ARM: SAMSUNG: fix race in s3c_adc_start for ADC
+
+Tushar Behera (1):
+      ARM: SAMSUNG: Update default rate for xusbxti clock
+
+ arch/arm/mach-exynos/pm_domains.c     |   13 +++++++++----
+ arch/arm/mach-s3c24xx/clock-s3c2440.c |    2 +-
+ arch/arm/plat-samsung/adc.c           |    8 +++++---
+ arch/arm/plat-samsung/devs.c          |    3 ++-
+ arch/arm/plat-samsung/s5p-clock.c     |    1 +
+ 5 files changed, 18 insertions(+), 9 deletions(-)
