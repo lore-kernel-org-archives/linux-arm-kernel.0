@@ -1,53 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Jul 2012 07:35:28 +0000
-Subject: ARM: Samsung SoC fixes for 3.5-rc
-Message-ID: <201207140735.29019.arnd@arndb.de>
+Date: Sat, 14 Jul 2012 07:57:39 +0000
+Subject: [PATCH v2 00/15] PCI io.h clean-up
+In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201207140757.40229.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Saturday 14 July 2012, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This is the 2nd part of mach/io.h removals. This series removes io.h on
+> platforms with PCI by creating a fixed virtual I/O mapping and a common
+> __io() macro.
+> 
+> This version has changed a bit to accommodate Tegra converting its PCIe
+> host to a platform driver. Now the virtual space is only reserved during
+> early boot before .map_io() is called. The mapping is not created until
+> calling pci_ioremap_io which can be done at any point after vmalloc is
+> initialized.
+> 
+> I've gone back to fixed 64K windows for each PCI bus. This allows
+> removing all the i/o resource setup from the individually platforms and
+> placing it within the common ARM PCI code.
+> 
+> I've only tested versatilepb under qemu (with the model hacked up to
+> actually enable i/o space), so any testing is appreciated. iop3xx and
+> mv78xx0 have some risk of breaking as the PCI bus addresses are moved
+> to 0 from matching the cpu host bus addesss.
+> 
+> This is available from my git tree:
+> 
+> git://sources.calxeda.com/kernel/linux.git io-cleanup-pci
 
-Here's a second set of fixes for this -rc, all for the samsung platforms.
+I would propose sticking it in the arm-soc tree as a staging branch for
+now to get some more testing on this. We can then decide in the merge
+window if we consider it good enough or whether we want to delay it
+to 3.7.
+
+Any objections?
 
 	Arnd
----
-The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
-
-  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to df4732abf91fa394bea95d912aff718ef5e2be5d:
-
-  Merge branch 'v3.5-samsung-fixes-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2012-07-14 09:14:35 +0200)
-
-----------------------------------------------------------------
-
-ARM: Samsung SoC fixes for 3.5-rc
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      Merge branch 'v3.5-samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-
-Marek Szyprowski (2):
-      ARM: EXYNOS: read initial state of power domain from hw registers
-      ARM: EXYNOS: register devices in 'need_restore' state for pm_domains
-
-Sylwester Nawrocki (2):
-      ARM: S3C24XX: Correct AC97 clock control bit for S3C2440
-      ARM: S3C24XX: Correct CAMIF interrupt definitions
-
-Todd Poynor (1):
-      ARM: SAMSUNG: fix race in s3c_adc_start for ADC
-
-Tushar Behera (1):
-      ARM: SAMSUNG: Update default rate for xusbxti clock
-
- arch/arm/mach-exynos/pm_domains.c     |   13 +++++++++----
- arch/arm/mach-s3c24xx/clock-s3c2440.c |    2 +-
- arch/arm/plat-samsung/adc.c           |    8 +++++---
- arch/arm/plat-samsung/devs.c          |    3 ++-
- arch/arm/plat-samsung/s5p-clock.c     |    1 +
- 5 files changed, 18 insertions(+), 9 deletions(-)
