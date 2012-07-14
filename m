@@ -1,234 +1,106 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 21:03:57 -0500
-Subject: [PATCH v2 01/15] ARM: Add fixed PCI i/o mapping
+Date: Fri, 13 Jul 2012 21:03:58 -0500
+Subject: [PATCH v2 02/15] ARM: move PCI i/o resource setup into common code
 In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
 References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1342231451-28861-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1342231451-28861-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This adds a fixed virtual mapping for PCI i/o addresses. The mapping is
-located at the last 2MB of vmalloc region (0xfee00000-0xff000000). 2MB
-is used to align with PMD size, but IO_SPACE_LIMIT is 1MB. The space
-is reserved just before .map_io and can be mapped at any time later with
-pci_ioremap_io.
+With consolidation of the PCI i/o mappings, the i/o space is being
+set to start at a PCI bus addr of 0x0 and fixed to 64K per bus. In
+this case the core ARM PCI setup code can setup the i/o resource.
 
-This has changed completely from the 1st implementation which only
-supported creating the static mapping at .map_io.
+Currently, the resource is only setup if the platform did not setup
+an i/o resource.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Nicolas Pitre <nico@linaro.org>
 ---
- Documentation/arm/memory.txt    |    3 +++
- arch/arm/include/asm/io.h       |    8 ++++++++
- arch/arm/include/asm/mach/map.h |    7 +++++++
- arch/arm/include/asm/mach/pci.h |   15 +++++++++++++++
- arch/arm/kernel/bios32.c        |    1 +
- arch/arm/mm/ioremap.c           |   14 ++++++++++++++
- arch/arm/mm/mmu.c               |   25 +++++++++++++++++--------
- 7 files changed, 65 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/mach/pci.h |    3 +++
+ arch/arm/kernel/bios32.c        |   41 ++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 39 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 208a2d4..83e9b18 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -51,6 +51,9 @@ ffc00000	ffefffff	DMA memory mapping region.  Memory returned
- ff000000	ffbfffff	Reserved for future expansion of DMA
- 				mapping region.
- 
-+fef00000	feffffff	Mapping of PCI I/O space. This is a static
-+				mapping within the vmalloc space.
-+
- VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
- 				Memory returned by vmalloc/ioremap will
- 				be dynamically placed in this region.
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 815c669..8f4db67 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -113,11 +113,19 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
- #define __iowmb()		do { } while (0)
- #endif
- 
-+/* PCI fixed i/o mapping */
-+#define PCI_IO_VIRT_BASE	0xfee00000
-+
-+extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
-+
- /*
-  * Now, pick up the machine-defined IO definitions
-  */
- #ifdef CONFIG_NEED_MACH_IO_H
- #include <mach/io.h>
-+#elif defined(CONFIG_PCI)
-+#define IO_SPACE_LIMIT	((resource_size_t)0xfffff)
-+#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
- #else
- #define __io(a)		__typesafe_io((a) & IO_SPACE_LIMIT)
- #endif
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index a6efcdd..808c517 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -9,6 +9,9 @@
-  *
-  *  Page table mapping constructs and function prototypes
-  */
-+#ifndef __ASM_MACH_MAP_H
-+#define __ASM_MACH_MAP_H
-+
- #include <asm/io.h>
- 
- struct map_desc {
-@@ -34,6 +37,7 @@ struct map_desc {
- 
- #ifdef CONFIG_MMU
- extern void iotable_init(struct map_desc *, int);
-+extern void vm_reserve_area_early(unsigned long addr, unsigned long size);
- 
- struct mem_type;
- extern const struct mem_type *get_mem_type(unsigned int type);
-@@ -44,4 +48,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
- 			const struct mem_type *mtype);
- #else
- #define iotable_init(map,num)	do { } while (0)
-+#define vm_reserve_area_early(a,s)	do { } while (0)
-+#endif
-+
- #endif
 diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 26c511f..51630c0 100644
+index 51630c0..423edff 100644
 --- a/arch/arm/include/asm/mach/pci.h
 +++ b/arch/arm/include/asm/mach/pci.h
-@@ -11,6 +11,8 @@
+@@ -11,6 +11,7 @@
  #ifndef __ASM_MACH_PCI_H
  #define __ASM_MACH_PCI_H
  
-+#include <asm/mach/map.h>
-+
- struct pci_sys_data;
- struct pci_ops;
- struct pci_bus;
-@@ -55,6 +57,19 @@ struct pci_sys_data {
- void pci_common_init(struct hw_pci *);
++#include <linux/ioport.h>
+ #include <asm/mach/map.h>
  
- /*
-+ * Setup fixed I/O mapping.
-+ */
-+#if defined(CONFIG_PCI) && !defined(CONFIG_NEED_MACH_IO_H)
-+/* Called from devicemaps_init before .map_io */
-+static inline void pci_reserve_io(void)
-+{
-+	vm_reserve_area_early(PCI_IO_VIRT_BASE, SZ_2M);
-+}
-+#else
-+static inline void pci_reserve_io(void) {}
-+#endif
-+
-+/*
-  * PCI controllers
-  */
- extern struct pci_ops iop3xx_ops;
+ struct pci_sys_data;
+@@ -44,6 +45,8 @@ struct pci_sys_data {
+ 	unsigned long	io_offset;	/* bus->cpu IO mapping offset		*/
+ 	struct pci_bus	*bus;		/* PCI bus				*/
+ 	struct list_head resources;	/* root bus resources (apertures)       */
++	struct resource io_res;
++	char		io_res_name[12];
+ 					/* Bridge swizzling			*/
+ 	u8		(*swizzle)(struct pci_dev *, u8 *);
+ 					/* IRQ mapping				*/
 diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 2555250..311e1cc 100644
+index 311e1cc..316dd02 100644
 --- a/arch/arm/kernel/bios32.c
 +++ b/arch/arm/kernel/bios32.c
-@@ -13,6 +13,7 @@
- #include <linux/io.h>
- 
- #include <asm/mach-types.h>
-+#include <asm/mach/map.h>
- #include <asm/mach/pci.h>
- 
- static int debug_pci;
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 4f55f50..8727802 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -36,6 +36,7 @@
- #include <asm/system_info.h>
- 
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- #include "mm.h"
- 
- int ioremap_page(unsigned long virt, unsigned long phys,
-@@ -383,3 +384,16 @@ void __arm_iounmap(volatile void __iomem *io_addr)
- 	arch_iounmap(io_addr);
- }
- EXPORT_SYMBOL(__arm_iounmap);
-+
-+#ifdef CONFIG_PCI
-+int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
-+{
-+	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
-+
-+	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
-+				  PCI_IO_VIRT_BASE + offset + SZ_64K,
-+				  phys_addr,
-+				  __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
-+}
-+EXPORT_SYMBOL_GPL(pci_ioremap_io);
-+#endif
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index cf4528d..c5ca07b 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -31,6 +31,7 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- 
- #include "mm.h"
- 
-@@ -791,6 +792,18 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
- 	}
+@@ -424,6 +424,38 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ 	return irq;
  }
  
-+void __init vm_reserve_area_early(unsigned long addr, unsigned long size)
++static int __init pcibios_init_resources(int busnr, struct pci_sys_data *sys)
 +{
-+	struct vm_struct *vm;
++	int ret;
++	struct pci_host_bridge_window *window;
 +
-+	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
-+	vm->addr = (void *)addr;
-+	vm->size = size;
-+	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-+	vm->caller = vm_reserve_area_early;
-+	vm_area_add_early(vm++);
++	if (list_empty(&sys->resources)) {
++		pci_add_resource_offset(&sys->resources,
++			 &iomem_resource, sys->mem_offset);
++	}
++
++	list_for_each_entry(window, &sys->resources, list) {
++		if (resource_type(window->res) == IORESOURCE_IO)
++			return 0;
++	}
++
++	sys->io_res.start = (busnr * SZ_64K) ?  : pcibios_min_io;
++	sys->io_res.end = (busnr + 1) * SZ_64K - 1;
++	sys->io_res.flags = IORESOURCE_IO;
++	sys->io_res.name = sys->io_res_name;
++	sprintf(sys->io_res_name, "PCI%d I/O", busnr);
++
++	ret = request_resource(&ioport_resource, &sys->io_res);
++	if (ret) {
++		pr_err("PCI: unable to allocate I/O port region (%d)\n", ret);
++		return ret;
++	}
++	pci_add_resource_offset(&sys->resources, &sys->io_res,
++				sys->io_offset);
++
++	return 0;
 +}
 +
- #ifndef CONFIG_ARM_LPAE
- 
- /*
-@@ -808,14 +821,7 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
- 
- static void __init pmd_empty_section_gap(unsigned long addr)
+ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
  {
--	struct vm_struct *vm;
--
--	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
--	vm->addr = (void *)addr;
--	vm->size = SECTION_SIZE;
--	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
--	vm->caller = pmd_empty_section_gap;
--	vm_area_add_early(vm);
-+	vm_reserve_area_early(addr, SECTION_SIZE);
- }
+ 	struct pci_sys_data *sys = NULL;
+@@ -446,11 +478,10 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 		ret = hw->setup(nr, sys);
  
- static void __init fill_pmd_gaps(void)
-@@ -1140,6 +1146,9 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
- 		create_mapping(&map);
- 	}
+ 		if (ret > 0) {
+-			if (list_empty(&sys->resources)) {
+-				pci_add_resource_offset(&sys->resources,
+-					 &ioport_resource, sys->io_offset);
+-				pci_add_resource_offset(&sys->resources,
+-					 &iomem_resource, sys->mem_offset);
++			ret = pcibios_init_resources(nr, sys);
++			if (ret)  {
++				kfree(sys);
++				break;
+ 			}
  
-+	/* Reserve fixed i/o space in VMALLOC region */
-+	pci_reserve_io();
-+
- 	/*
- 	 * Ask the machine support to map in the statically mapped devices.
- 	 */
+ 			if (hw->scan)
 -- 
 1.7.9.5
