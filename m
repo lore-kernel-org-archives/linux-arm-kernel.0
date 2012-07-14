@@ -1,59 +1,70 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 14 Jul 2012 14:09:38 +0200
-Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <20120714112929.GB29529@pengutronix.de>
-References: <1341850974-11977-1-git-send-email-marex@denx.de>
- <201207131410.29469.marex@denx.de> <20120714112929.GB29529@pengutronix.de>
-Message-ID: <201207141409.38554.marex@denx.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 14 Jul 2012 08:22:44 -0400 (EDT)
+Subject: [PATCH v2 01/15] ARM: Add fixed PCI i/o mapping
+In-Reply-To: <1342231451-28861-2-git-send-email-robherring2@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <1342231451-28861-2-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1207140815220.14068@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Fri, 13 Jul 2012, Rob Herring wrote:
 
-[...]
-
-> > That'd be cool. Some months ago, you promised to take a look. I tried it
-> > recently again with not much luck.
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Yes, I wanted to. I couldn't (see above). I do imagine that it really
-> might not be possible to switch modes at runtime. This is why I was
-> trying to get the patch into the next release without the
-> mode-switching. But for that to happen, there was the binding issue. I
-> came up with the module parameter as the easiest way to fix it. I am
-> open to other solutions. Simply dropping the binding might be another
-> idea if we pay attention that there are no regressions, going from
-> PIOQUEUE to DMA.
+> This adds a fixed virtual mapping for PCI i/o addresses. The mapping is
+> located at the last 2MB of vmalloc region (0xfee00000-0xff000000). 2MB
+> is used to align with PMD size, but IO_SPACE_LIMIT is 1MB. The space
+> is reserved just before .map_io and can be mapped at any time later with
+> pci_ioremap_io.
 > 
-> I am also still interested to check the runtime switching, but it might
-> take another month until I can really hack on it.
-
-Good, there is some bit that probably needs to be flipped to allow this 
-switching. I managed to get this working with SPI, not with i2c though. With 
-i2c, if I restarted the controller inbetween each transaction, it worked ... 
-which is not what I'd like to see there.
-
-> > > Deprecated
-> > > properties are also troublesome. Third, we don't really need this per
-> > > instance, if somebody really has problems with DMA, it will apply to
-> > > all i2c busses. Makes sense?
-> > 
-> > No, it doesn't. See above about small transfers. Consider the easy
-> > situation where you have sensor on one bus (so you do PIO because you
-> > transfer small data) and you have EEPROM on other bus, where you use DMA
-> > because you transfer large data. And the mixed mode isn't there yet.
+> This has changed completely from the 1st implementation which only
+> supported creating the static mapping at .map_io.
 > 
-> I fully understand what you want to configure. I did before. Yet,
-> devicetree bindings are not platform_data and shouldn't be used like
-> them.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Nicolas Pitre <nico@linaro.org>
 
-But then, how would you configure this detail on a per-bus basis? Well all 
-right, screw this, let's make it impotent and go for the module parameter. This 
-patch actually fixes a real issue, I'd like to have it in ASAP and it's been 
-aboue three months already, which sucks.
+A few comments below:
 
-> Regards,
-> 
->    Wolfram
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index cf4528d..c5ca07b 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -31,6 +31,7 @@
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> +#include <asm/mach/pci.h>
+>  
+>  #include "mm.h"
+>  
+> @@ -791,6 +792,18 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+>  	}
+>  }
+>  
+> +void __init vm_reserve_area_early(unsigned long addr, unsigned long size)
+> +{
+> +	struct vm_struct *vm;
+> +
+> +	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
+> +	vm->addr = (void *)addr;
+> +	vm->size = size;
+> +	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
+> +	vm->caller = vm_reserve_area_early;
 
-Best regards,
-Marek Vasut
+This is not providing much useful information when looking at 
+/proc/vmallocinfo anymore.  What about adding a void *caller argument to 
+this function and initializing vm->caller with it to identify the true 
+origin of the region?
+
+> +	vm_area_add_early(vm++);
+
+Why ++ ?
+
+Other than that...
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+Nicolas
