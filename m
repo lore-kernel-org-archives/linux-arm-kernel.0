@@ -1,21 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2012 23:43:10 +0200
-Subject: [PATCH 11/11] gpio/gpio-omap: make platformdata used as
- of_device_id.data const
-In-Reply-To: <500018d9.43b22a0a.42b7.1219SMTPIN_ADDED@mx.google.com>
-References: <500018d9.43b22a0a.42b7.1219SMTPIN_ADDED@mx.google.com>
-Message-ID: <CACRpkdbODpj_sBhYRM3bYssdeymLjLAcBUicDXP8aPVXQKh8CA@mail.gmail.com>
+Date: Sat, 14 Jul 2012 23:49:47 +0200
+Subject: [PATCH v2 05/15] ARM: integrator: use fixed PCI i/o mapping
+In-Reply-To: <1342231451-28861-6-git-send-email-robherring2@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <1342231451-28861-6-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkda_to3CzfhvOh-NDx_7Qz+Reg6m1k+uH2stRFy8KSqQmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 2:32 PM,  <y@pengutronix.de> wrote:
+On Sat, Jul 14, 2012 at 4:04 AM, Rob Herring <robherring2@gmail.com> wrote:
 
-> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Move integrator PCI to fixed i/o mapping and remove io.h.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-I'd like Kevin to look at this too.
+I think the PCI bus on my Integrator/AP is tilted and not suitable
+for tests. But IIRC Will Deacon actually has one of these machines
+and managed to get ethernet going on it. Maybe he can even test
+this patch?
 
-Thanks,
+Yours,
 Linus Walleij
