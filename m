@@ -1,89 +1,69 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 14 Jul 2012 18:43:05 +0200
-Subject: [PATCH 3/6] arch/arm/mach-netx/xc.c: ensure a consistent return value
- in error case
-In-Reply-To: <1342284188-19176-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1342284188-19176-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1342284188-19176-4-git-send-email-Julia.Lawall@lip6.fr>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Sat, 14 Jul 2012 07:07:17 -1000
+Subject: Mis?use of aliases
+In-Reply-To: <20120714163701.GI11326@truffala.fritz.box>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+ <5000D647.4090200@gmail.com> <50010402.3050502@firmworks.com>
+ <20120714163701.GI11326@truffala.fritz.box>
+Message-ID: <5001A745.3000509@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+On 7/14/2012 6:37 AM, David Gibson wrote:
+> On Fri, Jul 13, 2012 at 07:30:42PM -1000, Mitch Bradley wrote:
+>>> I'm not sure this is really a good use of aliases. UARTs use aliases
+>>> because it is important that the UART number to tty number is known and
+>>> fixed.
+>>
+>> This brings up an issue that I've been meaning to comment on.
+>>
+>> The use of phandle-valued properties in the aliases node causes real OFW
+>> implementations some amount of heartburn.  The Open Firmware standard
+>> says that the properties in /aliases are string-valued.  That's
+>> important, because aliases are shorthand for fragments of full device
+>> specifiers (pathnames that can include arguments to nodes).  Phandles
+>> can point to nodes, but can't be relative, and can't encode
+>> per-node-component arguments.
+> 
+> Um, so, properties in /aliases should not have phandle values, flat
+> tree or otherwise.  Has this been seen in the wild, or are you being
+> misled by the fact that dtc's reference-to-phandle and
+> reference-to-path syntax is very similar:
 
-Typically, the return value desired for the failure of a function with an
-integer return value is a negative integer.  In these cases, the return
-value is sometimes a negative integer and sometimes 0, due to a subsequent
-initialization of the return variable within the loop.
 
-Resetting ret to 0 at the end of the function is not necessary because the
-return value of xc_patch is either 0 or a negative integer.
+Yes, I was indeed being misled.  Thanks for the clarification.  The
+"&fred" syntax is present in the .dts files that I have looked at.
 
-A simplified version of the semantic match that finds this problem is:
-(http://coccinelle.lip6.fr/)
+> 
+> 	prop = <&fred>;
+> Will generate a phandle valued property, but
+> 	prop = &fred;
+> Will generate a string (path) valued property.
+> 
+>> For binding a Linux unit number to a device node, I would prefer to
+>> decorate the node with a property like "linux,unit#", instead of
+>> breaking the standard semantics of /aliases.
+> 
+> I don't see how using aliases for unit numbering (inherently) breaks
+> the semantics of /aliases.  If phandle valued properties are being
+> used that is wrong, but it's not necessary for the unit numbering
+> anyway.
 
-//<smpl>
-@r exists@
-identifier ret;
-position p;
-constant C;
-expression e1,e3,e4;
-statement S;
-@@
+I agree, the use of string-valued /aliases is not a semantic problem.
+That said, I still think that decorating individual nodes is a better
+approach, for locality reasons.  But, now that my misunderstanding has
+been cleared up, it's a mild preference instead of "heartburn".
 
-ret = -C
-... when != ret = e3
-    when any
-if at p (...) S
-... when any
-if (\(ret != 0\|ret < 0\|ret > 0\) || ...) { ... return ...; }
-... when != ret = e3
-    when any
-*if at p (...)
-{
-  ... when != ret = e4
-  return ret;
-}
-//</smpl>
+For historical reference: The original use of /aliases was as a
+component of pathname resolution, which is a "global" function.  In that
+usage model, a given alias does not necessarily refer specifically to
+exactly one node, so "localizing" an alias inside a node doesn't work.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+The new usage for binding to a Linux name could be localized.  My
+general preference is to localize whenever possible.  But, again,
+breaking that rule in this case is not a huge problem.
 
----
-If relying on the return value of xc_patch to set ret to 0 is considered
-too fragile this part of the patch could be dropped.
+Thanks again for zeroing in on my mistake.
 
- arch/arm/mach-netx/xc.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-netx/xc.c b/arch/arm/mach-netx/xc.c
-index e4cfb7e..18a98e0 100644
---- a/arch/arm/mach-netx/xc.c
-+++ b/arch/arm/mach-netx/xc.c
-@@ -149,16 +149,16 @@ int xc_request_firmware(struct xc *x)
- 	x->type = head->type;
- 	x->version = head->version;
- 
--	ret = -EINVAL;
--
- 	for (i = 0; i < 3; i++) {
- 		src = fw->data + head->fw_desc[i].ofs;
- 		dst = *(unsigned int *)src;
- 		src += sizeof (unsigned int);
- 		size = head->fw_desc[i].size - sizeof (unsigned int);
- 
--		if (xc_check_ptr(x, dst, size))
-+		if (xc_check_ptr(x, dst, size)) {
-+			ret = -EINVAL;
- 			goto exit_release_firmware;
-+		}
- 
- 		memcpy((void *)io_p2v(dst), src, size);
- 
-@@ -169,8 +169,6 @@ int xc_request_firmware(struct xc *x)
- 			goto exit_release_firmware;
- 	}
- 
--	ret = 0;
--
-       exit_release_firmware:
- 	release_firmware(fw);
- 
+Mitch
