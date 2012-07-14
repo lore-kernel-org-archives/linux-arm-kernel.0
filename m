@@ -1,135 +1,143 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jul 2012 21:04:01 -0500
-Subject: [PATCH v2 05/15] ARM: integrator: use fixed PCI i/o mapping
+Date: Fri, 13 Jul 2012 21:04:02 -0500
+Subject: [PATCH v2 06/15] ARM: integrator: remove trailing whitespace on
+ pci_v3.c
 In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
 References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1342231451-28861-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1342231451-28861-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move integrator PCI to fixed i/o mapping and remove io.h.
+No functional changes.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                                 |    1 -
- arch/arm/mach-integrator/include/mach/io.h       |   33 ----------------------
- arch/arm/mach-integrator/include/mach/platform.h |    4 +++
- arch/arm/mach-integrator/integrator_ap.c         |    7 +----
- arch/arm/mach-integrator/pci_v3.c                |    3 --
- 5 files changed, 5 insertions(+), 43 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/include/mach/io.h
+ arch/arm/mach-integrator/pci_v3.c |   46 ++++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ac446e3..5d37628 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -261,7 +261,6 @@ config ARCH_INTEGRATOR
- 	select GENERIC_CLOCKEVENTS
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_FPGA_IRQ
--	select NEED_MACH_IO_H
- 	select NEED_MACH_MEMORY_H
- 	select SPARSE_IRQ
- 	select MULTI_IRQ_HANDLER
-diff --git a/arch/arm/mach-integrator/include/mach/io.h b/arch/arm/mach-integrator/include/mach/io.h
-deleted file mode 100644
-index 8de70de..0000000
---- a/arch/arm/mach-integrator/include/mach/io.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- *  arch/arm/mach-integrator/include/mach/io.h
-- *
-- *  Copyright (C) 1999 ARM Limited
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#ifndef __ASM_ARM_ARCH_IO_H
--#define __ASM_ARM_ARCH_IO_H
--
--/*
-- * WARNING: this has to mirror definitions in platform.h
-- */
--#define PCI_MEMORY_VADDR        0xe8000000
--#define PCI_CONFIG_VADDR        0xec000000
--#define PCI_V3_VADDR            0xed000000
--#define PCI_IO_VADDR            0xee000000
--
--#define __io(a)			((void __iomem *)(PCI_IO_VADDR + (a)))
--
--#endif
-diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
-index ec467ba..4c03475 100644
---- a/arch/arm/mach-integrator/include/mach/platform.h
-+++ b/arch/arm/mach-integrator/include/mach/platform.h
-@@ -324,6 +324,10 @@
-  */
- #define PHYS_PCI_V3_BASE                0x62000000
- 
-+#define PCI_MEMORY_VADDR		0xe8000000
-+#define PCI_CONFIG_VADDR		0xec000000
-+#define PCI_V3_VADDR			0xed000000
-+
- /* ------------------------------------------------------------------------
-  *  Integrator Interrupt Controllers
-  * ------------------------------------------------------------------------
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index c857501..83bee54 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -72,7 +72,7 @@
-  * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
-  * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
-  * ed000000	62000000	PCI V3 regs		PHYS_PCI_V3_BASE	(max 64k)
-- * ee000000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
-+ * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
-  * ef000000			Cache flush
-  * f1000000	10000000	Core module registers
-  * f1100000	11000000	System controller registers
-@@ -146,11 +146,6 @@ static struct map_desc ap_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(PHYS_PCI_V3_BASE),
- 		.length		= SZ_64K,
- 		.type		= MT_DEVICE
--	}, {
--		.virtual	= PCI_IO_VADDR,
--		.pfn		= __phys_to_pfn(PHYS_PCI_IO_BASE),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE
- 	}
- };
- 
 diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index b866880..810f4ec 100644
+index 810f4ec..6f78aae 100644
 --- a/arch/arm/mach-integrator/pci_v3.c
 +++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -374,12 +374,9 @@ static int __init pci_v3_setup_resources(struct pci_sys_data *sys)
- 	}
- 
- 	/*
--	 * the IO resource for this bus
- 	 * the mem resource for this bus
- 	 * the prefetch mem resource for this bus
- 	 */
--	pci_add_resource_offset(&sys->resources,
--				&ioport_resource, sys->io_offset);
- 	pci_add_resource_offset(&sys->resources, &non_mem, sys->mem_offset);
- 	pci_add_resource_offset(&sys->resources, &pre_mem, sys->mem_offset);
+@@ -41,61 +41,61 @@
+ /*
+  * The V3 PCI interface chip in Integrator provides several windows from
+  * local bus memory into the PCI memory areas.   Unfortunately, there
+- * are not really enough windows for our usage, therefore we reuse 
++ * are not really enough windows for our usage, therefore we reuse
+  * one of the windows for access to PCI configuration space.  The
+  * memory map is as follows:
+- * 
++ *
+  * Local Bus Memory         Usage
+- * 
++ *
+  * 40000000 - 4FFFFFFF      PCI memory.  256M non-prefetchable
+  * 50000000 - 5FFFFFFF      PCI memory.  256M prefetchable
+  * 60000000 - 60FFFFFF      PCI IO.  16M
+  * 61000000 - 61FFFFFF      PCI Configuration. 16M
+- * 
++ *
+  * There are three V3 windows, each described by a pair of V3 registers.
+  * These are LB_BASE0/LB_MAP0, LB_BASE1/LB_MAP1 and LB_BASE2/LB_MAP2.
+  * Base0 and Base1 can be used for any type of PCI memory access.   Base2
+  * can be used either for PCI I/O or for I20 accesses.  By default, uHAL
+  * uses this only for PCI IO space.
+- * 
++ *
+  * Normally these spaces are mapped using the following base registers:
+- * 
++ *
+  * Usage Local Bus Memory         Base/Map registers used
+- * 
++ *
+  * Mem   40000000 - 4FFFFFFF      LB_BASE0/LB_MAP0
+  * Mem   50000000 - 5FFFFFFF      LB_BASE1/LB_MAP1
+  * IO    60000000 - 60FFFFFF      LB_BASE2/LB_MAP2
+  * Cfg   61000000 - 61FFFFFF
+- * 
++ *
+  * This means that I20 and PCI configuration space accesses will fail.
+- * When PCI configuration accesses are needed (via the uHAL PCI 
++ * When PCI configuration accesses are needed (via the uHAL PCI
+  * configuration space primitives) we must remap the spaces as follows:
+- * 
++ *
+  * Usage Local Bus Memory         Base/Map registers used
+- * 
++ *
+  * Mem   40000000 - 4FFFFFFF      LB_BASE0/LB_MAP0
+  * Mem   50000000 - 5FFFFFFF      LB_BASE0/LB_MAP0
+  * IO    60000000 - 60FFFFFF      LB_BASE2/LB_MAP2
+  * Cfg   61000000 - 61FFFFFF      LB_BASE1/LB_MAP1
+- * 
++ *
+  * To make this work, the code depends on overlapping windows working.
+- * The V3 chip translates an address by checking its range within 
++ * The V3 chip translates an address by checking its range within
+  * each of the BASE/MAP pairs in turn (in ascending register number
+  * order).  It will use the first matching pair.   So, for example,
+  * if the same address is mapped by both LB_BASE0/LB_MAP0 and
+- * LB_BASE1/LB_MAP1, the V3 will use the translation from 
++ * LB_BASE1/LB_MAP1, the V3 will use the translation from
+  * LB_BASE0/LB_MAP0.
+- * 
++ *
+  * To allow PCI Configuration space access, the code enlarges the
+  * window mapped by LB_BASE0/LB_MAP0 from 256M to 512M.  This occludes
+  * the windows currently mapped by LB_BASE1/LB_MAP1 so that it can
+  * be remapped for use by configuration cycles.
+- * 
+- * At the end of the PCI Configuration space accesses, 
++ *
++ * At the end of the PCI Configuration space accesses,
+  * LB_BASE1/LB_MAP1 is reset to map PCI Memory.  Finally the window
+  * mapped by LB_BASE0/LB_MAP0 is reduced in size from 512M to 256M to
+  * reveal the now restored LB_BASE1/LB_MAP1 window.
+- * 
++ *
+  * NOTE: We do not set up I2O mapping.  I suspect that this is only
+  * for an intelligent (target) device.  Using I2O disables most of
+  * the mappings into PCI memory.
+@@ -127,8 +127,8 @@
+  *
+  * returns:	configuration address to play on the PCI bus
+  *
+- * To generate the appropriate PCI configuration cycles in the PCI 
+- * configuration address space, you present the V3 with the following pattern 
++ * To generate the appropriate PCI configuration cycles in the PCI
++ * configuration address space, you present the V3 with the following pattern
+  * (which is very nearly a type 1 (except that the lower two bits are 00 and
+  * not 01).   In order for this mapping to work you need to set up one of
+  * the local to PCI aperatures to 16Mbytes in length translating to
+@@ -138,7 +138,7 @@
+  *
+  * Type 0:
+  *
+- *  3 3|3 3 2 2|2 2 2 2|2 2 2 2|1 1 1 1|1 1 1 1|1 1 
++ *  3 3|3 3 2 2|2 2 2 2|2 2 2 2|1 1 1 1|1 1 1 1|1 1
+  *  3 2|1 0 9 8|7 6 5 4|3 2 1 0|9 8 7 6|5 4 3 2|1 0 9 8|7 6 5 4|3 2 1 0
+  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  * | | |D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|D|F|F|F|R|R|R|R|R|R|0|0|
+@@ -150,7 +150,7 @@
+  *
+  * Type 1:
+  *
+- *  3 3|3 3 2 2|2 2 2 2|2 2 2 2|1 1 1 1|1 1 1 1|1 1 
++ *  3 3|3 3 2 2|2 2 2 2|2 2 2 2|1 1 1 1|1 1 1 1|1 1
+  *  3 2|1 0 9 8|7 6 5 4|3 2 1 0|9 8 7 6|5 4 3 2|1 0 9 8|7 6 5 4|3 2 1 0
+  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  * | | | | | | | | | | |B|B|B|B|B|B|B|B|D|D|D|D|D|F|F|F|R|R|R|R|R|R|0|1|
+@@ -161,7 +161,7 @@
+  *	15:11	Device number (5 bits)
+  *	10:8	function number
+  *	 7:2	register number
+- *  
++ *
+  */
+ static DEFINE_RAW_SPINLOCK(v3_lock);
  
 -- 
 1.7.9.5
