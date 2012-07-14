@@ -1,20 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 13 Jul 2012 17:41:45 -0600 (MDT)
-Subject: [RFC RESEND 4/4] ARM: OMAP: Add DT support for timer driver
-In-Reply-To: <1342218413-30116-5-git-send-email-jon-hunter@ti.com>
-References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
- <1342218413-30116-5-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1207131740460.25585@utopia.booyaka.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 13 Jul 2012 17:16:39 -0700
+Subject: [PATCH 0/2] [RFC] reentrancy in the common clk framework
+Message-ID: <1342225001-22962-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi all,
 
-On Fri, 13 Jul 2012, Jon Hunter wrote:
+This RFC series is meant to kick off some discussion around two related
+problems in the current clk framework implementation.
 
-> 1. If DT blob is present, then let HWMOD create the timer devices dynamically.
+First, clk_prepare for i2c devices might result in nested calls to
+clk_prepare (for preparing the clocks of the i2c controller).  So
+basically we need to make clk_prepare reentrant for these cases.  Due to
+the global prepare_lock mutex this currently results in a deadlock.
 
-This probably should read "is _not_ present", yes?
+Second, dynamic voltage and frequency scaling (dvfs) through the clock
+framework suffers from a similar issue as describe above.  To date
+several folks have expressed the desire to put voltage scaling logic
+into the clk rate change notifier handlers as a way to implement dvfs
+without creating a new driver-level api.  There are many benefits to
+this approach, but on many platforms it is likely that calling
+regulator_set_voltage within a rate change notifier handler will
+generate a call to clk_prepare while clk_set_rate is holding the global
+prepare_lock mutex.  This also results in a deadlock.
 
+The first patch in this series is an attempt to solve the locking
+problem via per-clock locks.  I do not like per-clock locks, but after
+some experimentation it held more promise than other approaches.  The
+implementation is only partially complete.  If you have any alternative
+ideas to that sort of approach please let me know as per-clock locks are
+really painful.
 
-- Paul
+The second patch in this series simply demonstrates dvfs via clk rate
+change notifiers.  The patch modifies the .target callback in OMAP's
+cpufreq driver by removing direct calls to regulator_set_voltage and
+instead registers a clk rate change notifier handler to do the same.
+And whaddaya know it works!  In a perfect world any cpufreq or devfreq
+driver would only need to call clk_set_rate within the .target callback
+and everything would Just Work(tm).
+
+Thanks in advance for any feedback, ideas or flames about how I don't
+understand lockdep and broke everything and per-clock locking is stupid,
+etc.
+
+Mike Turquette (2):
+  [RFC] clk: reentrancy via per-clock locking
+  [RFC] cpufreq: omap: scale regulator from clk notifier
+
+ drivers/clk/clk.c              |  202 +++++++++++++++++++++++++++++-----------
+ drivers/cpufreq/omap-cpufreq.c |  154 ++++++++++++++++++------------
+ include/linux/clk-private.h    |    5 +
+ 3 files changed, 250 insertions(+), 111 deletions(-)
+
+-- 
+1.7.9.5
