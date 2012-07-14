@@ -1,48 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2012 22:16:30 +0200
-Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree based
- pinctrl driver
-In-Reply-To: <20120710091131.GQ1122@atomide.com>
-References: <20120615094938.GQ12766@atomide.com>
- <4FDB6000.5080703@wwwdotorg.org>
- <20120618055036.GU12766@atomide.com>
- <20120619135600.GX12766@atomide.com>
- <4FE39C86.5070901@wwwdotorg.org>
- <20120622083955.GZ12766@atomide.com>
- <4FE4AC40.8080400@wwwdotorg.org>
- <20120626134319.GA3483@atomide.com>
- <4FE9EBEC.9040208@wwwdotorg.org>
- <20120627102851.GC3483@atomide.com>
- <20120710091131.GQ1122@atomide.com>
-Message-ID: <CACRpkdYUJ3v-DoVbK6Pc6Y833Hn_0KS9PtEpjUCnMr57zfH5Bw@mail.gmail.com>
+Date: Sat, 14 Jul 2012 22:24:16 +0200
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add support for set bits for
+ general purpose registers
+In-Reply-To: <1341565763-10074-1-git-send-email-b29396@freescale.com>
+References: <1341565763-10074-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdbKOQt=gqydQNRfCOU-TaschHtFq0e_86xgvtHYMnwpKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 11:11 AM, Tony Lindgren <tony@atomide.com> wrote:
+On Fri, Jul 6, 2012 at 11:09 AM, Dong Aisheng <b29396@freescale.com> wrote:
 
-> OK so no comments for a while. Here's the patch updated to leave out
-> the comments in the binding example.
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> The General Purpose Registers (GPR) is used to select operating modes for
+> general features in the SoC, usually not related to the IOMUX itself,
+> but it does belong to IOMUX controller.
+> We simply provide an convient API for driver to call to set the general purpose
+> register bits if needed.
+>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-I reason like this:
+I have an overall objection to this:
 
-- My fears is that the code gets hopeless to understand the mux, the
- only way to understand that aspect of the system will be to read the DTS
- and have the data sheet ready at hand.
+I have no idea at all about what's going on, and why this belongs in the pin
+control subsystem. On the contrary, from the commit description it seems to
+*not* belong in this subsystem at all.
 
-But:
+So: exactly what does this register do, and which are the consumers?
 
-- Tony knows what he's doing and what is best for OMAP. And this gets
- (hopefully) all that OMAP mux code out of arch/arm.
+Notice: nothing at all stops you from mapping the same address range or
+just this register in some other driver. So the same address range being
+used is not a reason to have this in this driver, it could very well be
+handled by drivers/misc/imx-syscon.c or maybe my postulated
+(but non-existent) drivers/syscon/*.
 
-- Surely it will be better to go through this subsystem if we're refactoring
-  it all again later, and all drivers can be transferred to the abstract
-  pinctrl API which is a big win in itself, bringing coherency to the
-  drivers/* at large.
-
-So applied it, so it can be evaluated in real operating environments.
-
-But if I don't see OMAP transferred to use this I'll simply delete it
-again. :-)
+The reason I react against it is that some GPIO drivers already have
+custom API:s doing pinctrl stuff, and shunning this kind of stuff into
+the pinctrl subsystem might hide it from the real subsystem where it
+actually belongs and hinder development of the proper subsystems.
 
 Yours,
 Linus Walleij
