@@ -1,40 +1,60 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2012 22:29:16 +0200
-Subject: [PATCH] pinctrl: pinctrl-imx: only print debug message when DEBUG
- is defined
-In-Reply-To: <20120712091206.GD22640@shlinux2.ap.freescale.net>
-References: <1340273435-7530-1-git-send-email-b29396@freescale.com>
- <20120706091139.GA28264@shlinux2.ap.freescale.net>
- <20120712091206.GD22640@shlinux2.ap.freescale.net>
-Message-ID: <CACRpkdZbboO=hrZK7B2pOLrwh+aqVfiC5y8zvJ5xzjtuBTfR9Q@mail.gmail.com>
+Date: Sat, 14 Jul 2012 22:43:03 +0200
+Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits for
+ general purpose registers
+In-Reply-To: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2012 at 11:12 AM, Dong Aisheng <b29396@freescale.com> wrote:
-> On Fri, Jul 06, 2012 at 05:11:40PM +0800, Dong Aisheng wrote:
->> On Thu, Jun 21, 2012 at 06:10:35PM +0800, Dong Aisheng wrote:
->> > From: Dong Aisheng <dong.aisheng@linaro.org>
->> >
->> > Fix regression for commit 3a86a5f8 (pinctrl: pinctrl-imx: free allocated
->> > pinctrl_map structure only once and use kernel facilities for IMX_PMX_DUMP)
->> > introduced in 3.5-rc3.
->> > With above commit, the debug code will alway be excuted.
->> > Change to excute it only when DEBUG is defined.
->> >
->> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->> > ---
->> > Hopefully it can catch 3.5.
->> > ---
->> >  drivers/pinctrl/pinctrl-imx.c |    2 ++
->> >  1 files changed, 2 insertions(+), 0 deletions(-)
->> >
->> Ping.
->>
-> Hi Linus,
->
-> Can you help merge this?
+On Thu, Jul 12, 2012 at 11:07 AM, Dong Aisheng <b29396@freescale.com> wrote:
 
-OK applied it, we'll see if I can get it to Torvalds in time...
+Hm, hm. This makes be ever more hesitant to have this in pinctrl.
+
+Remeber again that nothing stops you from remapping the same register
+range in another driver.
+
+> +#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_MASK                (0x3 << 30)
+
+This belongs in drivers/clk/*
+
+Why funnel these register writes through pinctrl? Just remap that address
+offset in the clk driver.
+
+> +#define IMX6Q_GPR0_DMAREQ_MUX_SEL7_MASK                BIT(7)
+
+This belongs in drivers/dma/*
+
+Same comments.
+
+> +#define IMX6Q_GPR1_PCIE_REQ_MASK               (0x3 << 30)
+
+Looks like it belongs in some PCI driver or glue layer.
+
+> +#define IMX6Q_GPR1_MIPI_COLOR_SW               BIT(25)
+> +#define IMX6Q_GPR1_DPI_OFF                     BIT(24)
+
+Looks related to some test or something...
+
+And so on.
+
+If you really wants a "funnel driver" doing all these diverse things,
+I'd put it in drivers/mfd.
+
+This whole issue appears in other systems so you're not alone
+on this, for example the ux500 PRCMU driver has exactly these
+properties.
+
+I'm also contemplating drivers/syscon again, but
+I have a hard time seeing it would be much more than another
+drivers/mfd-similar construct.
+
+I would really like input from Arnd and Samuel and other clever
+people on the placement of drivers like this one :-/
+
+But close address range proximity to the pin controller is not a
+reason to have it in pinctrl.
 
 Yours,
 Linus Walleij
