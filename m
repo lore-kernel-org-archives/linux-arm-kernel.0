@@ -1,70 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 14 Jul 2012 08:22:44 -0400 (EDT)
-Subject: [PATCH v2 01/15] ARM: Add fixed PCI i/o mapping
-In-Reply-To: <1342231451-28861-2-git-send-email-robherring2@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 14 Jul 2012 08:26:47 -0400 (EDT)
+Subject: [PATCH v2 00/15] PCI io.h clean-up
+In-Reply-To: <201207140757.40229.arnd@arndb.de>
 References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
- <1342231451-28861-2-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1207140815220.14068@xanadu.home>
+ <201207140757.40229.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1207140824230.14068@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jul 2012, Rob Herring wrote:
+On Sat, 14 Jul 2012, Arnd Bergmann wrote:
 
-> From: Rob Herring <rob.herring@calxeda.com>
+> On Saturday 14 July 2012, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > This is the 2nd part of mach/io.h removals. This series removes io.h on
+> > platforms with PCI by creating a fixed virtual I/O mapping and a common
+> > __io() macro.
+> > 
+> > This version has changed a bit to accommodate Tegra converting its PCIe
+> > host to a platform driver. Now the virtual space is only reserved during
+> > early boot before .map_io() is called. The mapping is not created until
+> > calling pci_ioremap_io which can be done at any point after vmalloc is
+> > initialized.
+> > 
+> > I've gone back to fixed 64K windows for each PCI bus. This allows
+> > removing all the i/o resource setup from the individually platforms and
+> > placing it within the common ARM PCI code.
+> > 
+> > I've only tested versatilepb under qemu (with the model hacked up to
+> > actually enable i/o space), so any testing is appreciated. iop3xx and
+> > mv78xx0 have some risk of breaking as the PCI bus addresses are moved
+> > to 0 from matching the cpu host bus addesss.
+> > 
+> > This is available from my git tree:
+> > 
+> > git://sources.calxeda.com/kernel/linux.git io-cleanup-pci
 > 
-> This adds a fixed virtual mapping for PCI i/o addresses. The mapping is
-> located at the last 2MB of vmalloc region (0xfee00000-0xff000000). 2MB
-> is used to align with PMD size, but IO_SPACE_LIMIT is 1MB. The space
-> is reserved just before .map_io and can be mapped at any time later with
-> pci_ioremap_io.
+> I would propose sticking it in the arm-soc tree as a staging branch for
+> now to get some more testing on this. We can then decide in the merge
+> window if we consider it good enough or whether we want to delay it
+> to 3.7.
 > 
-> This has changed completely from the 1st implementation which only
-> supported creating the static mapping at .map_io.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Nicolas Pitre <nico@linaro.org>
+> Any objections?
 
-A few comments below:
-
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index cf4528d..c5ca07b 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -31,6 +31,7 @@
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> +#include <asm/mach/pci.h>
->  
->  #include "mm.h"
->  
-> @@ -791,6 +792,18 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
->  	}
->  }
->  
-> +void __init vm_reserve_area_early(unsigned long addr, unsigned long size)
-> +{
-> +	struct vm_struct *vm;
-> +
-> +	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
-> +	vm->addr = (void *)addr;
-> +	vm->size = size;
-> +	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-> +	vm->caller = vm_reserve_area_early;
-
-This is not providing much useful information when looking at 
-/proc/vmallocinfo anymore.  What about adding a void *caller argument to 
-this function and initializing vm->caller with it to identify the true 
-origin of the region?
-
-> +	vm_area_add_early(vm++);
-
-Why ++ ?
-
-Other than that...
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
+I suggested a cosmetic fix I'd like to see before this goes into 
+mainline, but no objections otherwise.
 
 
 Nicolas
