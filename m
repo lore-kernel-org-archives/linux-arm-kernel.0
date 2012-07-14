@@ -1,62 +1,100 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Sat, 14 Jul 2012 12:39:11 +0200
-Subject: Loading handle_arch_irq with a PC relative load
-In-Reply-To: <alpine.LFD.2.02.1207131604470.14068@xanadu.home>
-References: <50007197.8030403@xenomai.org>
- <alpine.LFD.2.02.1207131536260.14068@xanadu.home>
- <50007C33.4000105@xenomai.org>
- <alpine.LFD.2.02.1207131604470.14068@xanadu.home>
-Message-ID: <50014C4F.8070002@xenomai.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 14 Jul 2012 13:29:29 +0200
+Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <201207131410.29469.marex@denx.de>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+ <1341850974-11977-2-git-send-email-marex@denx.de>
+ <20120713082249.GF32184@pengutronix.de>
+ <201207131410.29469.marex@denx.de>
+Message-ID: <20120714112929.GB29529@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2012 10:09 PM, Nicolas Pitre wrote:
-> On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
+Marek,
+
+> It'd be cool if someone complained earlier and the responses to new patches 
+> would be faster. This series has been going on for more than two months and 
+
+I agree it would be cool to response faster. Maintaining being mostly my
+priavte fun, I can't make guarantees, though. It just happened that I
+didn't have much time for Linux in the last weeks. Actually, I am quite
+happy that I managed to work through most of the backlog for the next
+merge-window at all (in my holidays!). That's from my side, I can't tell
+why other people didn't review; all being too busy is the most likely
+guess.
+
+> noone complained about this part until now. Instead I was made to document this 
+> and now I have to do it in completely different way? Decide already ...
+
+When we decided to have the fallback mode as a configuration option, the
+driver was still considering platform_data. That would have been no
+problem...
+
 > 
->> On 07/13/2012 09:40 PM, Nicolas Pitre wrote:
->>> On Fri, 13 Jul 2012, Gilles Chanteperdrix wrote:
->>>
->>>>
->>>> I do not know if it is really useful, but it seems it would be possible 
->>>> to reduce the number of memory accesses to just one in the irq_handler 
->>>> macro in the case where CONFIG_MULTI_IRQ_HANDLER is enabled, by using a 
->>>> PC relative load, with something like the following patch:
->>>
->>> To be strict with ccode sections, you can't do this.  The 
->>> handle_arch_irq symbol identifies a variable and with your patch you're 
->>> moving it from the .data section to the .text section.  The .text 
->>> section is meant to be read only, and this is even more true when using 
->>> a XIP kernel where .text is in ROM, or if we could make the access 
->>> protection of the kernel ro.
->>
->> I understand that but, XIP kernel aside, the handle_arch_irq variable is
->> set only once very early during the boot process, so, almost read-only.
->> Is not Linux using self-modifying code in some cases anyway (booting an
->> SMP kernel on an UP processor for instance).
+> > For one reason, this is not a
+> > hardware property or board specific, so not a good device tree property.
 > 
-> There are limits to which such tricks should be applied.  In the SMP on 
-> UP case this is a matter of making the kernel boot at all which is a 
-> rather strong reason.
+> Actually, there're still people who might benefit of doing PIOq only, since they 
+> do small (eg. one byte) transfers. And this is good to have configurable per 
+> bus.
+
+... but we are now on devicetree and things are different there, sadly.
+"use-pio" is exposing a driver specific detail which is neither
+describing the hardware nor it is OS agnostic. Other drivers from other
+OS might not even have the seperation, because they might only use PIO
+mode (not even PIOQUEUE). So, the binding is not acceptable AFAIK.
+We can add devicetree-discuss to the CC-list.
+
+> > Also, it is implicitly deprecated somehow since either we want DMA to
+> > fully work
 > 
-> Do you have performance numbers like interrupt latency that show this 
-> patch being worth it?  Without concrete justifications I don't think we 
-> should go down that path.
+> And the DMA doesn't fully work?
 
-So, I ran a few tests on at91rm9200, where I expected the differences to
-be most visible.
+It probably does. I was just stating the intention.
 
-First I enabled CONFIG_MULTI_IRQ_HANDLER and wrote the irq decoding
-handler in plain C. This increases the irq latency of 1.2us (measured
-with the average irq latency on an idle system).
+> > or, even better, somewhen be able to automatically switch
+> > between PIOQUEUE and DMA depending on the i2c_msg size.
+> 
+> That'd be cool. Some months ago, you promised to take a look. I tried it 
+> recently again with not much luck.
 
-I rewrote this irq decoding handler in assembly, using the macros in
-entry-macro.S. This decreases the irq latency of 600ns.
+Yes, I wanted to. I couldn't (see above). I do imagine that it really
+might not be possible to switch modes at runtime. This is why I was
+trying to get the patch into the next release without the
+mode-switching. But for that to happen, there was the binding issue. I
+came up with the module parameter as the easiest way to fix it. I am
+open to other solutions. Simply dropping the binding might be another
+idea if we pay attention that there are no regressions, going from
+PIOQUEUE to DMA.
 
-Then I try the trick at the beginning of this thread, and... could not
-measure any difference, so, you were right.
+I am also still interested to check the runtime switching, but it might
+take another month until I can really hack on it.
 
-Anyway, given that on at91rm9200 worst case irq latencies are in the
-80us range, all these optimizations are pointless.
+> > Deprecated
+> > properties are also troublesome. Third, we don't really need this per
+> > instance, if somebody really has problems with DMA, it will apply to all
+> > i2c busses. Makes sense?
+> 
+> No, it doesn't. See above about small transfers. Consider the easy situation 
+> where you have sensor on one bus (so you do PIO because you transfer small data) 
+> and you have EEPROM on other bus, where you use DMA because you transfer large 
+> data. And the mixed mode isn't there yet.
+
+I fully understand what you want to configure. I did before. Yet,
+devicetree bindings are not platform_data and shouldn't be used like
+them.
+
+Regards,
+
+   Wolfram
 
 -- 
-                                                                Gilles.
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120714/bcd928c3/attachment.sig>
