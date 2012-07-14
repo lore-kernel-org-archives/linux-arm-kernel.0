@@ -1,32 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2012 21:57:08 +0200
-Subject: [PATCH RESEND] gpio: of_get_named_gpio_flags() return
- -EPROBE_DEFER if GPIO not yet available
-In-Reply-To: <1340836334-20427-1-git-send-email-stigge@antcom.de>
-References: <1340836334-20427-1-git-send-email-stigge@antcom.de>
-Message-ID: <CACRpkdYrZizqvZqsocLEGrkY5yPMuYFfmR3UUSFZgPDvEPa0eA@mail.gmail.com>
+Date: Sat, 14 Jul 2012 21:59:41 +0200
+Subject: [PATCH 2/2] pinctrl: pinctrl-imx6q: add missed mux function for
+ USBOTG_ID
+In-Reply-To: <1341565763-10074-2-git-send-email-b29396@freescale.com>
+References: <1341565763-10074-1-git-send-email-b29396@freescale.com>
+ <1341565763-10074-2-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdbUqR2y0b4cvsDfOjDYdPt7XhUsEG5JJGDyyzFB2JFjYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2012 at 12:32 AM, Roland Stigge <stigge@antcom.de> wrote:
+On Fri, Jul 6, 2012 at 11:09 AM, Dong Aisheng <b29396@freescale.com> wrote:
 
-> of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
-> respective GPIO is not (yet) available. This is useful if driver's probe()
-> functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
-> can be probed again later on.
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 >
-> The function still returns -EINVAL on other errors (parse error or node doesn't
-> exist). This way, the case of an optional/intentionally missing GPIO is handled
-> appropriately.
+> The original pin registers table is derived from u-boot mainline,
+> but somehow it was found missing some mux functions for USBOTG_ID.
+> We added it at the bottom by following the exist pin function ids,
+> then it will not break the exist using of pin function id in dts file.
 >
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Reported-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-If I understand correctly this relates closely to another patch from Mark Brown
-we discussed the other day (sorry for missing this patch, which arrived
-earlier, for a while).
+Applied.
 
-Mark/Grant can you look at this patch?
-
-Yours,
+Thanks!
 Linus Walleij
