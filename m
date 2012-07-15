@@ -1,65 +1,130 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 15 Jul 2012 16:49:13 +0200
-Subject: [PATCH 7/8] ARM: MSC814X: add Kconfig and Makefile to arch/arm
+Date: Sun, 15 Jul 2012 16:49:09 +0200
+Subject: [PATCH 3/8] ARM: MCS814x: add Device Tree bindings documentation
 In-Reply-To: <1342363754-30808-1-git-send-email-florian@openwrt.org>
 References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
-Message-ID: <1342363754-30808-8-git-send-email-florian@openwrt.org>
+Message-ID: <1342363754-30808-4-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes arch/arm/{Kconfig,Makefile} reference the MCS814x
-machine code that we can now select and build it.
+This patch adds the device tree bindings documentation for the basic
+Moschip MCS814x bindings that we support:
+- soc
+- interrupt controller
+- timer
+- pci controller
 
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- arch/arm/Kconfig  |   15 +++++++++++++++
- arch/arm/Makefile |    1 +
- 2 files changed, 16 insertions(+)
+ .../devicetree/bindings/arm/mcs814x/mcs814x-intc.txt |   18 ++++++++++++++++++
+ .../devicetree/bindings/arm/mcs814x/mcs814x-pci.txt  |   16 ++++++++++++++++
+ .../bindings/arm/mcs814x/mcs814x-timer.txt           |   16 ++++++++++++++++
+ .../devicetree/bindings/arm/mcs814x/mcs814x.txt      |   13 +++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt          |    1 +
+ 5 files changed, 64 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 84449dd..ec7e340 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -618,6 +618,19 @@ config ARCH_KS8695
- 	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
- 	  System-on-Chip devices.
- 
-+config ARCH_MCS814X
-+	bool "Moschip MCS814x"
-+	select PCI
-+	select FIQ
-+	select GENERIC_IRQ_CHIP
-+	select GENERIC_GPIO
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+	select ARCH_USES_GETTIMEOFFSET
-+	select NEED_MACH_MEMORY_H
-+	help
-+	  Support for Moschip MCS814x SoCs (MCS8140 currently).
+diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
+new file mode 100644
+index 0000000..2bf0c47
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
+@@ -0,0 +1,18 @@
++Moschip MCS814x interrupt controller bindings
++----------------------------------------------
 +
- config ARCH_W90X900
- 	bool "Nuvoton W90X900 CPU"
- 	select CPU_ARM926T
-@@ -1054,6 +1067,8 @@ source "arch/arm/mach-sa1100/Kconfig"
- source "arch/arm/plat-samsung/Kconfig"
- source "arch/arm/plat-s3c24xx/Kconfig"
- 
-+source "arch/arm/mach-mcs814x/Kconfig"
++Required properties:
++- compatible: should be "moschip,mcs814x-intc"
++- interrupt-controller: identifies the node as an interrupt controller
++- #interrupt-cells: the number of cells to define the interrupts. Should be 1.
++The cells are the IRQ number
++- reg: contains the base address register and length, there should be only 1
++  cell
 +
- source "arch/arm/plat-spear/Kconfig"
- 
- source "arch/arm/mach-s3c24xx/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0298b00..1d9f377 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -151,6 +151,7 @@ machine-$(CONFIG_ARCH_IXP4XX)		:= ixp4xx
- machine-$(CONFIG_ARCH_KIRKWOOD)		:= kirkwood
- machine-$(CONFIG_ARCH_KS8695)		:= ks8695
- machine-$(CONFIG_ARCH_LPC32XX)		:= lpc32xx
-+machine-$(CONFIG_ARCH_MCS814X)		:= mcs814x
- machine-$(CONFIG_ARCH_MMP)		:= mmp
- machine-$(CONFIG_ARCH_MSM)		:= msm
- machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
++Example:
++	intc: interrupt-controller at 400e4000 {
++		compatible = "moschip,mcs814x-intc";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		reg = <0x400e4000 0x48>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
+new file mode 100644
+index 0000000..de59b04
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
+@@ -0,0 +1,16 @@
++Moschip MCS814x PCI controller bindings
++---------------------------------------
++
++Required properties:
++- compatible: should be "moschip,mcs814x-pci"
++- reg: should contain the base register address and length of the PCI controller
++  configuration register as well as the base register address and length of the
++  PCI eeprom emulator
++- interrupts: should contain the interrupt line of the abort interrupt
++- #address-cells: should be 3
++- #size-cells: should be 2
++- ranges: should contain the properly encoded PCI ranges of the IO, non-prefetchable
++  and prefetchable memory regions
++- #interrupt-cells: should be 1
++- interrupt-map-mask: should be 0
++- interrupt-map: should be the properly encoded PCI slot/pin to interrupt line
+diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
+new file mode 100644
+index 0000000..0bf22d1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
+@@ -0,0 +1,16 @@
++MMoschip MCS814x timer bindings
++-------------------------------
++
++Required properties:
++- compatible: should be "moschip,mcs814x-timer"
++- interrupts: should be the physical interrupt number
++- reg: contains the base address register and length, there should be only 1
++  cell
++
++Example:
++	timer: timer at 400f800c {
++		compatible = "moschip,mcs814x-timer";
++		interrupts = <0>;
++		reg = <0x400f800c 0x8>;
++	};
++
+diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
+new file mode 100644
+index 0000000..503c234
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
+@@ -0,0 +1,13 @@
++MMoschip MCS814x SoC bindings
++
++-----------------------------
++
++Boards including a Moschip MCS814x SoC should include the following properties
++
++Required root node property:
++- compatible: must contain "moschip,mcs814x"
++
++Boards including a Moschip MCS8140 should also include the following property.
++
++Required root node property:
++- compatible: must contain "moschip,mcs8140"
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 6eab917..943e4f3 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -28,6 +28,7 @@ linux	Linux-specific binding
+ marvell	Marvell Technology Group Ltd.
+ maxim	Maxim Integrated Products
+ mosaixtech	Mosaix Technologies, Inc.
++moschp		Moschip Semiconductors
+ national	National Semiconductor
+ nintendo	Nintendo
+ nvidia	NVIDIA
 -- 
 1.7.10.4
