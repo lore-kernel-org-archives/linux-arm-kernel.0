@@ -1,31 +1,35 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 15 Jul 2012 13:11:46 +0300
-Subject: [PATCH] remoteproc: remove the get_by_name/put API
-In-Reply-To: <4FF335E3.5040509@codeaurora.org>
-References: <1341259857-17382-1-git-send-email-ohad@wizery.com>
- <4FF335E3.5040509@codeaurora.org>
-Message-ID: <CAK=WgbZ7ZoVqniJzfXXvq1krUWanteB73J=28GstnFmpWGHfvw@mail.gmail.com>
+Date: Sun, 15 Jul 2012 13:14:44 +0300
+Subject: [PATCH] remoteproc: adopt the driver core's alloc/add/del/put
+ naming
+In-Reply-To: <4FF50107.8030406@codeaurora.org>
+References: <1341409019-32166-1-git-send-email-ohad@wizery.com>
+ <4FF50107.8030406@codeaurora.org>
+Message-ID: <CAK=WgbbO72S9=T-dnJBHE5d5k9H8dtYFtxe_AMSe+ut+0ZPOHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2012 at 9:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 07/02/12 13:10, Ohad Ben-Cohen wrote:
->> Remove rproc_get_by_name() and rproc_put(), and the associated
->> remoteproc infrastructure that supports it (i.e. klist and friends),
->> because:
+On Thu, Jul 5, 2012 at 5:50 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 7/4/2012 6:36 AM, Ohad Ben-Cohen wrote:
+>> To make remoteproc's API more intuitive for developers, we adopt
+>> the driver core's naming, i.e. alloc -> add -> del -> put. We'll also
+>> add register/unregister when their first user shows up.
 >>
->> 1. No one uses them
->> 2. Using them is highly discouraged, and any potential user
->>    will be deeply scrutinized and encouraged to move.
+>> Otherwise - there's no functional change here.
 >>
->> If a user, that absolutely can't live with the direct boot/shutdown
->> model, does show up one day, then bringing this functionality back
->> is going to be trivial.
+>> Suggested by Russell King <linux@arm.linux.org.uk>.
 >>
->> At this point though, keeping this functionality around is way too
->> much of a maintenance burden.
->>
+>> Cc: Russell King <linux@arm.linux.org.uk>
 >
 > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Thanks, applied.
+On Thu, Jul 5, 2012 at 2:50 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> I understand this patch and it's a good thing, so:
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Yours,
+> Linus Walleij
+
+Thanks Linus and Stephen.
+
+Applied.
