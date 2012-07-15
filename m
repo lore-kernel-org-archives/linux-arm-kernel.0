@@ -1,141 +1,65 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 15 Jul 2012 16:49:11 +0200
-Subject: [PATCH 5/8] ARM: MCS814x: add DTS file for Devolo dLAN USB Extender
+Date: Sun, 15 Jul 2012 16:49:13 +0200
+Subject: [PATCH 7/8] ARM: MSC814X: add Kconfig and Makefile to arch/arm
 In-Reply-To: <1342363754-30808-1-git-send-email-florian@openwrt.org>
 References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
-Message-ID: <1342363754-30808-6-git-send-email-florian@openwrt.org>
+Message-ID: <1342363754-30808-8-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Devolo's dLAN USB Extender board:
-- 16MB of SDRAM available
-- GPIO for the USB port activity
-- MTD partition map
+This patch makes arch/arm/{Kconfig,Makefile} reference the MCS814x
+machine code that we can now select and build it.
 
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- arch/arm/boot/dts/dlan-usb-extender.dts  |   68 ++++++++++++++++++++++++++++++
- arch/arm/mach-mcs814x/Kconfig            |    9 ++++
- arch/arm/mach-mcs814x/Makefile.boot      |    1 +
- arch/arm/mach-mcs814x/board-mcs8140-dt.c |    1 +
- 4 files changed, 79 insertions(+)
- create mode 100644 arch/arm/boot/dts/dlan-usb-extender.dts
+ arch/arm/Kconfig  |   15 +++++++++++++++
+ arch/arm/Makefile |    1 +
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dlan-usb-extender.dts b/arch/arm/boot/dts/dlan-usb-extender.dts
-new file mode 100644
-index 0000000..4adfaa3
---- /dev/null
-+++ b/arch/arm/boot/dts/dlan-usb-extender.dts
-@@ -0,0 +1,68 @@
-+/*
-+ * dlan-usb-extender.dts - Device Tree file for Devolo dLAN USB Extender
-+ *
-+ * Copyright (C) 2012, Florian Fainelli <florian@openwrt.org>
-+ *
-+ * Licensed under GPLv2
-+ */
-+
-+/dts-v1/;
-+/include/ "mcs8140.dtsi"
-+
-+/ {
-+	model = "Devolo dLAN USB Extender";
-+	compatible = "devolo,dlan-usb-extender", "moschip,mcs8140", "moschip,mcs814x";
-+
-+	chosen {
-+		bootargs = "mem=16M console=ttyS0,57600 earlyprintk";
-+	};
-+
-+	ahb {
-+		vci {
-+
-+			adc {
-+				sdram: memory at 0,0 {
-+					reg = <0 0 0x1000000>;
-+				};
-+
-+				nor: flash at 7,0 {
-+
-+					partition at 0 {
-+						label = "ArmBoot";
-+						reg = <0 0x30000>;
-+					};
-+					partition at 30000 {
-+						label = "Config1";
-+						reg = <0x30000 0x10000>;
-+					};
-+					partition at 40000 {
-+						label = "Config2";
-+						reg = <0x40000 0x10000>;
-+					};
-+					partition at 50000 {
-+						label = "bZimage";
-+						reg = <0x50000 0x100000>;
-+					};
-+					partition at 150000 {
-+						label = "UserFS";
-+						reg = <0x150000 0x3C0000>;
-+					};
-+					partition at 50001 {
-+						label = "Combined";
-+						reg = <0x50000 0x4C0000>;
-+					};
-+				};
-+			};
-+
-+			leds {
-+				compatible = "gpio-leds";
-+
-+				usb {
-+					label = "dlan-usb-extender:green:usb";
-+					gpios = <&gpio 19 0>;	// gpio 19 active high
-+				};
-+			};
-+		};
-+	};
-+};
-+
-diff --git a/arch/arm/mach-mcs814x/Kconfig b/arch/arm/mach-mcs814x/Kconfig
-index 604537b..aa312d1 100644
---- a/arch/arm/mach-mcs814x/Kconfig
-+++ b/arch/arm/mach-mcs814x/Kconfig
-@@ -6,6 +6,15 @@ config MCS8140
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 84449dd..ec7e340 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -618,6 +618,19 @@ config ARCH_KS8695
+ 	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
+ 	  System-on-Chip devices.
  
- menu "Moschip MCS8140 boards"
- 
-+config MACH_DLAN_USB_EXT
-+	bool "Devolo dLAN USB Extender"
-+	select MCS8140
-+	select NEW_LEDS
-+	select LEDS_CLASS
-+	select LEDS_GPIO
++config ARCH_MCS814X
++	bool "Moschip MCS814x"
++	select PCI
++	select FIQ
++	select GENERIC_IRQ_CHIP
++	select GENERIC_GPIO
++	select ARCH_REQUIRE_GPIOLIB
++	select CLKDEV_LOOKUP
++	select ARCH_USES_GETTIMEOFFSET
++	select NEED_MACH_MEMORY_H
 +	help
-+	  Machine support for the Devolo dLAN USB Extender
++	  Support for Moschip MCS814x SoCs (MCS8140 currently).
 +
- config MACH_RBT_832
- 	bool "Tigal RBT-832"
- 	select MCS8140
-diff --git a/arch/arm/mach-mcs814x/Makefile.boot b/arch/arm/mach-mcs814x/Makefile.boot
-index 3153a7c..60dfcf6 100644
---- a/arch/arm/mach-mcs814x/Makefile.boot
-+++ b/arch/arm/mach-mcs814x/Makefile.boot
-@@ -2,4 +2,5 @@
-  params_phys-y := 0x00000008
-  initrd_phys-y := 0x00400000
+ config ARCH_W90X900
+ 	bool "Nuvoton W90X900 CPU"
+ 	select CPU_ARM926T
+@@ -1054,6 +1067,8 @@ source "arch/arm/mach-sa1100/Kconfig"
+ source "arch/arm/plat-samsung/Kconfig"
+ source "arch/arm/plat-s3c24xx/Kconfig"
  
-+dtb-$(CONFIG_MACH_DLAN_USB_EXT) += dlan-usb-extender.dtb
- dtb-$(CONFIG_MACH_RBT_832) += rbt-832.dtb
-diff --git a/arch/arm/mach-mcs814x/board-mcs8140-dt.c b/arch/arm/mach-mcs814x/board-mcs8140-dt.c
-index 6f0804d..766166b 100644
---- a/arch/arm/mach-mcs814x/board-mcs8140-dt.c
-+++ b/arch/arm/mach-mcs814x/board-mcs8140-dt.c
-@@ -27,6 +27,7 @@ static void __init mcs814x_dt_device_init(void)
- }
++source "arch/arm/mach-mcs814x/Kconfig"
++
+ source "arch/arm/plat-spear/Kconfig"
  
- static const char *mcs8140_dt_board_compat[] __initdata = {
-+	"devolo,dlan-usb-extender",
- 	"tigal,rbt-832",
- 	"moschip,mcs8140",
- 	NULL,	/* sentinel */
+ source "arch/arm/mach-s3c24xx/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0298b00..1d9f377 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -151,6 +151,7 @@ machine-$(CONFIG_ARCH_IXP4XX)		:= ixp4xx
+ machine-$(CONFIG_ARCH_KIRKWOOD)		:= kirkwood
+ machine-$(CONFIG_ARCH_KS8695)		:= ks8695
+ machine-$(CONFIG_ARCH_LPC32XX)		:= lpc32xx
++machine-$(CONFIG_ARCH_MCS814X)		:= mcs814x
+ machine-$(CONFIG_ARCH_MMP)		:= mmp
+ machine-$(CONFIG_ARCH_MSM)		:= msm
+ machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
 -- 
 1.7.10.4
