@@ -1,56 +1,58 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 15 Jul 2012 15:16:18 +0200
-Subject: [PULL] [PATCH 0/4] arm: at91: gpio fix
-Message-ID: <20120715131618.GF4450@game.jcrosoft.org>
+Date: Sun, 15 Jul 2012 15:40:34 +0200
+Subject: [PATCH 1/4] ARM: at91: gpio: implement request
+In-Reply-To: <20120715131618.GF4450@game.jcrosoft.org>
+References: <20120715131618.GF4450@game.jcrosoft.org>
+Message-ID: <1342359637-15325-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+confire the pin as pio when requested
 
-	This patch series fix 2 issue on at91
-
-	first the gpio are not mux to gpio shen requested and free
-
-	second on the sam9x5 series we ma not have 32 pins routed on each bank
-
-The following changes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
-
-  Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-for-3.5-gpio-fix
-
-for you to fetch changes up to 8b8d117749961ec387e7a3b1ecc29eb24c73ca9c:
-
-  arm: at91: at91sam9x5: fix gpio number per bank (2012-07-15 20:46:06 +0800)
-
-----------------------------------------------------------------
-arm: at91: gpio fixes
-
-This patch series fix 2 issue on at91
-
-first the gpio are not mux to gpio shen requested and free
-
-second on the sam9x5 series we ma not have 32 pins routed on each bank
-
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/gpio.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (4):
-      ARM: at91: gpio: implement request
-      ARM: at91: gpio: implement gpio_free
-      at91: regroup gpio and pinctrl under a simple-bus
-      arm: at91: at91sam9x5: fix gpio number per bank
-
- Documentation/devicetree/bindings/gpio/gpio_atmel.txt |    5 +++++
- arch/arm/boot/dts/at91sam9260.dtsi                    |   56 +++++++++++++++++++++++++++++++++-----------------------
- arch/arm/boot/dts/at91sam9263.dtsi                    |   98 +++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------
- arch/arm/boot/dts/at91sam9g45.dtsi                    |   87 ++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------
- arch/arm/boot/dts/at91sam9n12.dtsi                    |   79 +++++++++++++++++++++++++++++++++++++++++++++----------------------------------
- arch/arm/boot/dts/at91sam9x5.dtsi                     |   75 ++++++++++++++++++++++++++++++++++++++++++++-------------------------------
- arch/arm/mach-at91/gpio.c                             |   52 +++++++++++++++++++++++++++++++++++++++++-----------
- 7 files changed, 271 insertions(+), 181 deletions(-)
-
-Best Regards,
-J.
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 325837a..994ed02 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -44,6 +44,7 @@ struct at91_gpio_chip {
+ 
+ #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+ 
++static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
+@@ -57,6 +58,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
++			.request	  = at91_gpiolib_request,	\
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
+@@ -861,6 +863,18 @@ void __init at91_gpio_irq_setup(void)
+ }
+ 
+ /* gpiolib support */
++
++
++static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++
++	__raw_writel(mask, pio + PIO_PER);
++	return 0;
++}
++
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset)
+ {
+-- 
+1.7.10
