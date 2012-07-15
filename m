@@ -1,130 +1,197 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 15 Jul 2012 16:49:09 +0200
-Subject: [PATCH 3/8] ARM: MCS814x: add Device Tree bindings documentation
+Date: Sun, 15 Jul 2012 16:49:12 +0200
+Subject: [PATCH 6/8] ARM: MCS814x: provide a sample defconfig file
 In-Reply-To: <1342363754-30808-1-git-send-email-florian@openwrt.org>
 References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
-Message-ID: <1342363754-30808-4-git-send-email-florian@openwrt.org>
+Message-ID: <1342363754-30808-7-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree bindings documentation for the basic
-Moschip MCS814x bindings that we support:
-- soc
-- interrupt controller
-- timer
-- pci controller
-
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- .../devicetree/bindings/arm/mcs814x/mcs814x-intc.txt |   18 ++++++++++++++++++
- .../devicetree/bindings/arm/mcs814x/mcs814x-pci.txt  |   16 ++++++++++++++++
- .../bindings/arm/mcs814x/mcs814x-timer.txt           |   16 ++++++++++++++++
- .../devicetree/bindings/arm/mcs814x/mcs814x.txt      |   13 +++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt          |    1 +
- 5 files changed, 64 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
+ arch/arm/configs/mcs814x_defconfig |  174 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 174 insertions(+)
+ create mode 100644 arch/arm/configs/mcs814x_defconfig
 
-diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
+diff --git a/arch/arm/configs/mcs814x_defconfig b/arch/arm/configs/mcs814x_defconfig
 new file mode 100644
-index 0000000..2bf0c47
+index 0000000..7fa3dd6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
-@@ -0,0 +1,18 @@
-+Moschip MCS814x interrupt controller bindings
-+----------------------------------------------
-+
-+Required properties:
-+- compatible: should be "moschip,mcs814x-intc"
-+- interrupt-controller: identifies the node as an interrupt controller
-+- #interrupt-cells: the number of cells to define the interrupts. Should be 1.
-+The cells are the IRQ number
-+- reg: contains the base address register and length, there should be only 1
-+  cell
-+
-+Example:
-+	intc: interrupt-controller at 400e4000 {
-+		compatible = "moschip,mcs814x-intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		reg = <0x400e4000 0x48>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
-new file mode 100644
-index 0000000..de59b04
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
-@@ -0,0 +1,16 @@
-+Moschip MCS814x PCI controller bindings
-+---------------------------------------
-+
-+Required properties:
-+- compatible: should be "moschip,mcs814x-pci"
-+- reg: should contain the base register address and length of the PCI controller
-+  configuration register as well as the base register address and length of the
-+  PCI eeprom emulator
-+- interrupts: should contain the interrupt line of the abort interrupt
-+- #address-cells: should be 3
-+- #size-cells: should be 2
-+- ranges: should contain the properly encoded PCI ranges of the IO, non-prefetchable
-+  and prefetchable memory regions
-+- #interrupt-cells: should be 1
-+- interrupt-map-mask: should be 0
-+- interrupt-map: should be the properly encoded PCI slot/pin to interrupt line
-diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
-new file mode 100644
-index 0000000..0bf22d1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
-@@ -0,0 +1,16 @@
-+MMoschip MCS814x timer bindings
-+-------------------------------
-+
-+Required properties:
-+- compatible: should be "moschip,mcs814x-timer"
-+- interrupts: should be the physical interrupt number
-+- reg: contains the base address register and length, there should be only 1
-+  cell
-+
-+Example:
-+	timer: timer at 400f800c {
-+		compatible = "moschip,mcs814x-timer";
-+		interrupts = <0>;
-+		reg = <0x400f800c 0x8>;
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
-new file mode 100644
-index 0000000..503c234
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
-@@ -0,0 +1,13 @@
-+MMoschip MCS814x SoC bindings
-+
-+-----------------------------
-+
-+Boards including a Moschip MCS814x SoC should include the following properties
-+
-+Required root node property:
-+- compatible: must contain "moschip,mcs814x"
-+
-+Boards including a Moschip MCS8140 should also include the following property.
-+
-+Required root node property:
-+- compatible: must contain "moschip,mcs8140"
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 6eab917..943e4f3 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -28,6 +28,7 @@ linux	Linux-specific binding
- marvell	Marvell Technology Group Ltd.
- maxim	Maxim Integrated Products
- mosaixtech	Mosaix Technologies, Inc.
-+moschp		Moschip Semiconductors
- national	National Semiconductor
- nintendo	Nintendo
- nvidia	NVIDIA
++++ b/arch/arm/configs/mcs814x_defconfig
+@@ -0,0 +1,174 @@
++# CONFIG_ARM_PATCH_PHYS_VIRT is not set
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++# CONFIG_KALLSYMS is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MCS814X=y
++CONFIG_MACH_DLAN_USB_EXT=y
++CONFIG_MACH_RBT_832=y
++# CONFIG_ARM_THUMB is not set
++CONFIG_PCI_DEBUG=y
++CONFIG_AEABI=y
++CONFIG_USE_OF=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_CMDLINE="earlyprintk"
++CONFIG_CMDLINE_EXTEND=y
++CONFIG_FPE_NWFPE=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_BINFMT_MISC=y
++# CONFIG_SUSPEND is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++CONFIG_TCP_CONG_ADVANCED=y
++CONFIG_TCP_CONG_BIC=y
++# CONFIG_TCP_CONG_WESTWOOD is not set
++CONFIG_TCP_CONG_HTCP=y
++# CONFIG_IPV6 is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_MTD=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_JEDECPROBE=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_PROC_DEVICETREE=y
++# CONFIG_BLK_DEV is not set
++CONFIG_SCSI=m
++CONFIG_BLK_DEV_SD=m
++CONFIG_SCSI_MULTI_LUN=y
++CONFIG_NETDEVICES=y
++CONFIG_MII=y
++# CONFIG_NET_VENDOR_3COM is not set
++# CONFIG_NET_VENDOR_ADAPTEC is not set
++# CONFIG_NET_VENDOR_ALTEON is not set
++# CONFIG_NET_VENDOR_AMD is not set
++# CONFIG_NET_VENDOR_ATHEROS is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_BROCADE is not set
++# CONFIG_NET_VENDOR_CHELSIO is not set
++# CONFIG_NET_VENDOR_CISCO is not set
++# CONFIG_NET_VENDOR_DEC is not set
++# CONFIG_NET_VENDOR_DLINK is not set
++# CONFIG_NET_VENDOR_EMULEX is not set
++# CONFIG_NET_VENDOR_EXAR is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_HP is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MELLANOX is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MYRI is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_NVIDIA is not set
++# CONFIG_NET_VENDOR_OKI is not set
++# CONFIG_NET_PACKET_ENGINE is not set
++# CONFIG_NET_VENDOR_QLOGIC is not set
++# CONFIG_NET_VENDOR_REALTEK is not set
++# CONFIG_NET_VENDOR_RDC is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SILAN is not set
++# CONFIG_NET_VENDOR_SIS is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_SUN is not set
++# CONFIG_NET_VENDOR_TEHUTI is not set
++# CONFIG_NET_VENDOR_TI is not set
++# CONFIG_NET_VENDOR_VIA is not set
++CONFIG_PHYLIB=y
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_MISC=y
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++# CONFIG_SERIAL_8250_PCI is not set
++CONFIG_SERIAL_8250_NR_UARTS=2
++CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_HW_RANDOM=y
++CONFIG_GPIO_SYSFS=y
++# CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_CORE=y
++CONFIG_WATCHDOG_NOWAYOUT=y
++# CONFIG_VGA_ARB is not set
++CONFIG_USB=m
++CONFIG_USB_EHCI_HCD=m
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=m
++CONFIG_USB_STORAGE=m
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_STAGING=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT4_FS=m
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_VFAT_FS=m
++# CONFIG_PROC_PAGE_MONITOR is not set
++CONFIG_TMPFS=y
++CONFIG_TMPFS_XATTR=y
++CONFIG_JFFS2_FS=y
++CONFIG_JFFS2_FS_XATTR=y
++# CONFIG_JFFS2_FS_POSIX_ACL is not set
++# CONFIG_JFFS2_FS_SECURITY is not set
++CONFIG_JFFS2_COMPRESSION_OPTIONS=y
++CONFIG_JFFS2_LZO=y
++CONFIG_JFFS2_RUBIN=y
++CONFIG_SQUASHFS=y
++# CONFIG_SQUASHFS_ZLIB is not set
++CONFIG_SQUASHFS_XZ=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-15"
++CONFIG_NLS_ISO8859_1=m
++CONFIG_NLS_ISO8859_15=m
++CONFIG_NLS_UTF8=m
++CONFIG_PRINTK_TIME=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_STRIP_ASM_SYMS=y
++CONFIG_DEBUG_FS=y
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
++# CONFIG_ARM_UNWIND is not set
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_CCITT=y
++CONFIG_CRC_ITU_T=y
++CONFIG_LIBCRC32C=y
++# CONFIG_XZ_DEC_X86 is not set
++# CONFIG_XZ_DEC_POWERPC is not set
++# CONFIG_XZ_DEC_IA64 is not set
++# CONFIG_XZ_DEC_ARM is not set
++# CONFIG_XZ_DEC_ARMTHUMB is not set
++# CONFIG_XZ_DEC_SPARC is not set
 -- 
 1.7.10.4
