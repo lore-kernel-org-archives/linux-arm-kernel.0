@@ -1,13 +1,14 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 15 Jul 2012 10:10:59 -0500
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 15 Jul 2012 17:20:40 +0200
 Subject: [PATCH] clk: fix clk_get on of_clk_get_by_name return check
 In-Reply-To: <1342361384-21299-1-git-send-email-shawn.guo@linaro.org>
 References: <1342361384-21299-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <5002DD83.2020808@gmail.com>
+Message-ID: <201207151720.40750.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2012 09:09 AM, Shawn Guo wrote:
+Dear Shawn Guo,
+
 > The commit 766e6a4 (clk: add DT clock binding support) plugs device
 > tree clk lookup of_clk_get_by_name into clk_get, and fall on non-DT
 > lookup clk_get_sys if DT lookup fails.
@@ -23,9 +24,7 @@ On 07/15/2012 09:09 AM, Shawn Guo wrote:
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks Shawn.
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Tested-by: Marek Vasut <marex@denx.de>
 
 > ---
 >  drivers/clk/clkdev.c |    2 +-
@@ -35,13 +34,15 @@ Acked-by: Rob Herring <rob.herring@calxeda.com>
 > index 20649b3..69085e0 100644
 > --- a/drivers/clk/clkdev.c
 > +++ b/drivers/clk/clkdev.c
-> @@ -157,7 +157,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->  
+> @@ -157,7 +157,7 @@ struct clk *clk_get(struct device *dev, const char
+> *con_id)
+> 
 >  	if (dev) {
 >  		clk = of_clk_get_by_name(dev->of_node, con_id);
 > -		if (clk && __clk_get(clk))
 > +		if (!IS_ERR(clk) && __clk_get(clk))
 >  			return clk;
 >  	}
->  
-> 
+
+Best regards,
+Marek Vasut
