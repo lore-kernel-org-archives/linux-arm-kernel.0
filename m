@@ -1,39 +1,31 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 15 Jul 2012 13:10:05 +0300
-Subject: [PATCH 2/2] remoteproc: remove the now-redundant kref
-In-Reply-To: <CAK=WgbZu1hYOd27r259b2v48VFYeOZ4UE5sD2awZDxgBgjAsXw@mail.gmail.com>
-References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
- <1338017791-9442-2-git-send-email-ohad@wizery.com>
- <4FC5DD74.4030202@codeaurora.org>
- <CAK=WgbbwaMAnTGcivC9ZR8K-MtTqHAV3+BgUmk8WjCaayifJxw@mail.gmail.com>
- <4FCD272E.1020300@codeaurora.org>
- <CAK=WgbZu1hYOd27r259b2v48VFYeOZ4UE5sD2awZDxgBgjAsXw@mail.gmail.com>
-Message-ID: <CAK=WgbY3BbAN73k8yzNBXob2gkY2_sbhh9a_0yjvy=3Hy5wEbw@mail.gmail.com>
+Date: Sun, 15 Jul 2012 13:11:46 +0300
+Subject: [PATCH] remoteproc: remove the get_by_name/put API
+In-Reply-To: <4FF335E3.5040509@codeaurora.org>
+References: <1341259857-17382-1-git-send-email-ohad@wizery.com>
+ <4FF335E3.5040509@codeaurora.org>
+Message-ID: <CAK=WgbZ7ZoVqniJzfXXvq1krUWanteB73J=28GstnFmpWGHfvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2012 at 11:52 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> From 0fbf3004c1a52ae4c0554366409a2bfe401801ef Mon Sep 17 00:00:00 2001
-> From: Ohad Ben-Cohen <ohad@wizery.com>
-> Date: Mon, 2 Jul 2012 11:41:16 +0300
-> Subject: [PATCH] remoteproc: simplify unregister/free interfaces
+On Tue, Jul 3, 2012 at 9:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/02/12 13:10, Ohad Ben-Cohen wrote:
+>> Remove rproc_get_by_name() and rproc_put(), and the associated
+>> remoteproc infrastructure that supports it (i.e. klist and friends),
+>> because:
+>>
+>> 1. No one uses them
+>> 2. Using them is highly discouraged, and any potential user
+>>    will be deeply scrutinized and encouraged to move.
+>>
+>> If a user, that absolutely can't live with the direct boot/shutdown
+>> model, does show up one day, then bringing this functionality back
+>> is going to be trivial.
+>>
+>> At this point though, keeping this functionality around is way too
+>> much of a maintenance burden.
+>>
 >
-> Simplify the unregister/free interfaces, and make them easier
-> to understand and use, by moving to a symmetric and consistent
-> alloc() -> register() -> unregister() -> free() flow.
->
-> To create and register an rproc instance, one needed to invoke
-> rproc_alloc() followed by rproc_register().
->
-> To unregister and free an rproc instance, one now needs to invoke
-> rproc_unregister() followed by rproc_free().
->
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> ---
->  Documentation/remoteproc.txt         | 21 ++++++++-------------
->  drivers/remoteproc/omap_remoteproc.c |  5 ++++-
->  drivers/remoteproc/remoteproc_core.c | 25 ++++++++-----------------
->  3 files changed, 20 insertions(+), 31 deletions(-)
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Applied.
+Thanks, applied.
