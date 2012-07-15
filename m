@@ -1,42 +1,32 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Sat, 14 Jul 2012 22:49:46 -0600
-Subject: Losing VFP registers over suspend/resume
-Message-ID: <CAMLZHHTvogPv06zukuUTuc6ezLuoMDwNSy6nPS_q=ambadi8VQ@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 15 Jul 2012 10:00:45 +0400
+Subject: [PATCH] ARM: Fix compile breakage when CONFIG_XIP_KERNEL is set
+Message-ID: <1342332045-25632-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+arch/arm/kernel/head.o: In function `stext':
+(.head.text+0x34): undefined reference to `PHYS_OFFSET'
 
-Testing XO-1.75 ARMv7 hardfp, the following simple test gives bad results:
+This patch fix this problem by replacing PHYS_OFFSET to PLAT_PHYS_OFFSET.
 
-In one terminal, run this python program:
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/kernel/head.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-import math
-answer = math.cos(3.1415)
-while True:
-    x = math.cos(3.1415)
-    if x != answer:
-        print "Bad answer", x
-
-
-In another terminal:
-while sleep 3; do rtcwake -s 3 -m mem; done
-
-
-This sets up a FP-heavy app running while the system is suspending and
-resuming every few seconds.
-The results are that every few minutes, one of the cosine calculations
-produces the wrong result, and after a few hours the program can even
-crash.
-
-Applying the patch "ARM: vfp: Always save VFP state in vfp_pm_suspend"
-solves the issue.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/042048.html
-I tested with the above test case for several hours, and another OLPC
-developer verified. No more bad calculations, no more crashes.
-
-Any chance this effort could be revived? Looks like the patch was almost acked:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/042930.html
-
-Thanks
-Daniel
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 835898e..8fb7502 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -113,7 +113,7 @@ ENTRY(stext)
+ 	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
+ 	add	r8, r8, r4			@ PHYS_OFFSET
+ #else
+-	ldr	r8, =PHYS_OFFSET		@ always constant in this case
++	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
+ #endif
+ 
+ 	/*
+-- 
+1.7.3.4
