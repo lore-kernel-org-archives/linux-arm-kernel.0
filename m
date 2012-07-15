@@ -1,29 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 15 Jul 2012 17:21:06 +0200
-Subject: MX28 boot problem
-In-Reply-To: <20120715145425.GC2429@S2100-06.ap.freescale.net>
-References: <201207131510.24634.marex@denx.de>
- <20120715145425.GC2429@S2100-06.ap.freescale.net>
-Message-ID: <201207151721.06719.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 Jul 2012 19:59:19 +0000
+Subject: [PATCH 0/8] ARM: support for Moschip MCS814x SoCs
+In-Reply-To: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+Message-ID: <201207151959.19620.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Fri, Jul 13, 2012 at 03:10:24PM +0200, Marek Vasut wrote:
-> > Hello,
-> > 
-> > did you test latest -next on any mx28 platform? It seems neither of mine
-> > boots at all with today's next.
+On Sunday 15 July 2012, Florian Fainelli wrote:
+> This patchset adds basic support for Mocship MCS814x, and in particular
+> MCS8140, and allows one booting to user space. Two off-the-shelf boards
+> are support: Tigal/Robotech RBT-832 and Devolo dLAN USB Extender.
 > 
-> Just sent a fix [1].  Let me know whether it fixes your problem.
-> 
-> Regards,
-> Shawn
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg184597.html
+> Support for other on-board peripherals will obviously be contributed later
+> once the basic SoC support has been accepted.
 
-It does, feel free to add my tested-by. Thanks
+Hi Florian,
 
-Best regards,
-Marek Vasut
+This looks quite nice at first sight, but I have to say that your timing
+is rather unfortunate. We're getting rather close to the 3.6 merge window,
+so there is not much time to review the platform thoroughly before that
+and I'd feel more comfortable about putting it into 3.7. I'll let others
+weigh in, too. At least there is no risk of regressions for a new platform
+getting added, so if other people think we should take it for 3.5, I might
+get convinced.
+
+I'll follow up with more detailed feedback on the individual patches.
+
+	Arnd
