@@ -1,48 +1,29 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 15 Jul 2012 17:20:40 +0200
-Subject: [PATCH] clk: fix clk_get on of_clk_get_by_name return check
-In-Reply-To: <1342361384-21299-1-git-send-email-shawn.guo@linaro.org>
-References: <1342361384-21299-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201207151720.40750.marex@denx.de>
+Date: Sun, 15 Jul 2012 17:21:06 +0200
+Subject: MX28 boot problem
+In-Reply-To: <20120715145425.GC2429@S2100-06.ap.freescale.net>
+References: <201207131510.24634.marex@denx.de>
+ <20120715145425.GC2429@S2100-06.ap.freescale.net>
+Message-ID: <201207151721.06719.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> The commit 766e6a4 (clk: add DT clock binding support) plugs device
-> tree clk lookup of_clk_get_by_name into clk_get, and fall on non-DT
-> lookup clk_get_sys if DT lookup fails.
+> On Fri, Jul 13, 2012 at 03:10:24PM +0200, Marek Vasut wrote:
+> > Hello,
+> > 
+> > did you test latest -next on any mx28 platform? It seems neither of mine
+> > boots at all with today's next.
 > 
-> The return check on of_clk_get_by_name takes (clk != NULL) as a
-> successful DT lookup.  But it's not the case.  For any system that
-> does not define clk lookup in device tree, ERR_PTR(-ENOENT) will be
-> returned, and consequently, all the client drivers calling clk_get
-> in their probe functions will fail to probe with error code -ENOENT
-> returned.
+> Just sent a fix [1].  Let me know whether it fixes your problem.
 > 
-> Fix the issue by checking of_clk_get_by_name return with !IS_ERR(clk).
+> Regards,
+> Shawn
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> [1] http://www.spinics.net/lists/arm-kernel/msg184597.html
 
-Tested-by: Marek Vasut <marex@denx.de>
-
-> ---
->  drivers/clk/clkdev.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 20649b3..69085e0 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -157,7 +157,7 @@ struct clk *clk_get(struct device *dev, const char
-> *con_id)
-> 
->  	if (dev) {
->  		clk = of_clk_get_by_name(dev->of_node, con_id);
-> -		if (clk && __clk_get(clk))
-> +		if (!IS_ERR(clk) && __clk_get(clk))
->  			return clk;
->  	}
+It does, feel free to add my tested-by. Thanks
 
 Best regards,
 Marek Vasut
