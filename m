@@ -1,90 +1,141 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 15 Jul 2012 16:49:06 +0200
-Subject: [PATCH 0/8] ARM: support for Moschip MCS814x SoCs
-Message-ID: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+Date: Sun, 15 Jul 2012 16:49:11 +0200
+Subject: [PATCH 5/8] ARM: MCS814x: add DTS file for Devolo dLAN USB Extender
+In-Reply-To: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+Message-ID: <1342363754-30808-6-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds support for Devolo's dLAN USB Extender board:
+- 16MB of SDRAM available
+- GPIO for the USB port activity
+- MTD partition map
 
-This patchset adds basic support for Mocship MCS814x, and in particular
-MCS8140, and allows one booting to user space. Two off-the-shelf boards
-are support: Tigal/Robotech RBT-832 and Devolo dLAN USB Extender.
-
-Support for other on-board peripherals will obviously be contributed later
-once the basic SoC support has been accepted.
-
-Florian Fainelli (8):
-  ARM: support for Moschip MCS814x SoCs
-  ARM: MCS814x: add Device Tree based MCS8140 board support
-  ARM: MCS814x: add Device Tree bindings documentation
-  ARM: MCS814X: add DTS file for Tigal/Robotech RBT-832
-  ARM: MCS814x: add DTS file for Devolo dLAN USB Extender
-  ARM: MCS814x: provide a sample defconfig file
-  ARM: MSC814X: add Kconfig and Makefile to arch/arm
-  ARM: MSC814x: add MAINTAINERS entry
-
- .../bindings/arm/mcs814x/mcs814x-intc.txt          |   18 +
- .../bindings/arm/mcs814x/mcs814x-pci.txt           |   16 +
- .../bindings/arm/mcs814x/mcs814x-timer.txt         |   16 +
- .../devicetree/bindings/arm/mcs814x/mcs814x.txt    |   13 +
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- MAINTAINERS                                        |    6 +
- arch/arm/Kconfig                                   |   28 ++
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/dlan-usb-extender.dts            |   68 +++
- arch/arm/boot/dts/mcs8140.dtsi                     |  207 +++++++++
- arch/arm/boot/dts/rbt-832.dts                      |   83 ++++
- arch/arm/configs/mcs814x_defconfig                 |  174 ++++++++
- arch/arm/mach-mcs814x/Kconfig                      |   29 ++
- arch/arm/mach-mcs814x/Makefile                     |    6 +
- arch/arm/mach-mcs814x/Makefile.boot                |    6 +
- arch/arm/mach-mcs814x/board-mcs8140-dt.c           |   46 ++
- arch/arm/mach-mcs814x/clock.c                      |  271 ++++++++++++
- arch/arm/mach-mcs814x/common.c                     |   97 +++++
- arch/arm/mach-mcs814x/common.h                     |   15 +
- arch/arm/mach-mcs814x/include/mach/cpu.h           |   16 +
- arch/arm/mach-mcs814x/include/mach/debug-macro.S   |   11 +
- arch/arm/mach-mcs814x/include/mach/entry-macro.S   |   29 ++
- arch/arm/mach-mcs814x/include/mach/gpio.h          |    1 +
- arch/arm/mach-mcs814x/include/mach/hardware.h      |   16 +
- arch/arm/mach-mcs814x/include/mach/irqs.h          |   22 +
- arch/arm/mach-mcs814x/include/mach/mcs814x.h       |   53 +++
- arch/arm/mach-mcs814x/include/mach/memory.h        |   16 +
- arch/arm/mach-mcs814x/include/mach/timex.h         |   18 +
- arch/arm/mach-mcs814x/include/mach/uncompress.h    |   41 ++
- arch/arm/mach-mcs814x/irq.c                        |   69 +++
- arch/arm/mach-mcs814x/pci.c                        |  446 ++++++++++++++++++++
- arch/arm/mach-mcs814x/timer.c                      |  133 ++++++
- 32 files changed, 1972 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-intc.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x-timer.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mcs814x/mcs814x.txt
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+ arch/arm/boot/dts/dlan-usb-extender.dts  |   68 ++++++++++++++++++++++++++++++
+ arch/arm/mach-mcs814x/Kconfig            |    9 ++++
+ arch/arm/mach-mcs814x/Makefile.boot      |    1 +
+ arch/arm/mach-mcs814x/board-mcs8140-dt.c |    1 +
+ 4 files changed, 79 insertions(+)
  create mode 100644 arch/arm/boot/dts/dlan-usb-extender.dts
- create mode 100644 arch/arm/boot/dts/mcs8140.dtsi
- create mode 100644 arch/arm/boot/dts/rbt-832.dts
- create mode 100644 arch/arm/configs/mcs814x_defconfig
- create mode 100644 arch/arm/mach-mcs814x/Kconfig
- create mode 100644 arch/arm/mach-mcs814x/Makefile
- create mode 100644 arch/arm/mach-mcs814x/Makefile.boot
- create mode 100644 arch/arm/mach-mcs814x/board-mcs8140-dt.c
- create mode 100644 arch/arm/mach-mcs814x/clock.c
- create mode 100644 arch/arm/mach-mcs814x/common.c
- create mode 100644 arch/arm/mach-mcs814x/common.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/cpu.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-mcs814x/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-mcs814x/include/mach/gpio.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/hardware.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/irqs.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/mcs814x.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/memory.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/timex.h
- create mode 100644 arch/arm/mach-mcs814x/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-mcs814x/irq.c
- create mode 100644 arch/arm/mach-mcs814x/pci.c
- create mode 100644 arch/arm/mach-mcs814x/timer.c
 
+diff --git a/arch/arm/boot/dts/dlan-usb-extender.dts b/arch/arm/boot/dts/dlan-usb-extender.dts
+new file mode 100644
+index 0000000..4adfaa3
+--- /dev/null
++++ b/arch/arm/boot/dts/dlan-usb-extender.dts
+@@ -0,0 +1,68 @@
++/*
++ * dlan-usb-extender.dts - Device Tree file for Devolo dLAN USB Extender
++ *
++ * Copyright (C) 2012, Florian Fainelli <florian@openwrt.org>
++ *
++ * Licensed under GPLv2
++ */
++
++/dts-v1/;
++/include/ "mcs8140.dtsi"
++
++/ {
++	model = "Devolo dLAN USB Extender";
++	compatible = "devolo,dlan-usb-extender", "moschip,mcs8140", "moschip,mcs814x";
++
++	chosen {
++		bootargs = "mem=16M console=ttyS0,57600 earlyprintk";
++	};
++
++	ahb {
++		vci {
++
++			adc {
++				sdram: memory at 0,0 {
++					reg = <0 0 0x1000000>;
++				};
++
++				nor: flash at 7,0 {
++
++					partition at 0 {
++						label = "ArmBoot";
++						reg = <0 0x30000>;
++					};
++					partition at 30000 {
++						label = "Config1";
++						reg = <0x30000 0x10000>;
++					};
++					partition at 40000 {
++						label = "Config2";
++						reg = <0x40000 0x10000>;
++					};
++					partition at 50000 {
++						label = "bZimage";
++						reg = <0x50000 0x100000>;
++					};
++					partition at 150000 {
++						label = "UserFS";
++						reg = <0x150000 0x3C0000>;
++					};
++					partition at 50001 {
++						label = "Combined";
++						reg = <0x50000 0x4C0000>;
++					};
++				};
++			};
++
++			leds {
++				compatible = "gpio-leds";
++
++				usb {
++					label = "dlan-usb-extender:green:usb";
++					gpios = <&gpio 19 0>;	// gpio 19 active high
++				};
++			};
++		};
++	};
++};
++
+diff --git a/arch/arm/mach-mcs814x/Kconfig b/arch/arm/mach-mcs814x/Kconfig
+index 604537b..aa312d1 100644
+--- a/arch/arm/mach-mcs814x/Kconfig
++++ b/arch/arm/mach-mcs814x/Kconfig
+@@ -6,6 +6,15 @@ config MCS8140
+ 
+ menu "Moschip MCS8140 boards"
+ 
++config MACH_DLAN_USB_EXT
++	bool "Devolo dLAN USB Extender"
++	select MCS8140
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_GPIO
++	help
++	  Machine support for the Devolo dLAN USB Extender
++
+ config MACH_RBT_832
+ 	bool "Tigal RBT-832"
+ 	select MCS8140
+diff --git a/arch/arm/mach-mcs814x/Makefile.boot b/arch/arm/mach-mcs814x/Makefile.boot
+index 3153a7c..60dfcf6 100644
+--- a/arch/arm/mach-mcs814x/Makefile.boot
++++ b/arch/arm/mach-mcs814x/Makefile.boot
+@@ -2,4 +2,5 @@
+  params_phys-y := 0x00000008
+  initrd_phys-y := 0x00400000
+ 
++dtb-$(CONFIG_MACH_DLAN_USB_EXT) += dlan-usb-extender.dtb
+ dtb-$(CONFIG_MACH_RBT_832) += rbt-832.dtb
+diff --git a/arch/arm/mach-mcs814x/board-mcs8140-dt.c b/arch/arm/mach-mcs814x/board-mcs8140-dt.c
+index 6f0804d..766166b 100644
+--- a/arch/arm/mach-mcs814x/board-mcs8140-dt.c
++++ b/arch/arm/mach-mcs814x/board-mcs8140-dt.c
+@@ -27,6 +27,7 @@ static void __init mcs814x_dt_device_init(void)
+ }
+ 
+ static const char *mcs8140_dt_board_compat[] __initdata = {
++	"devolo,dlan-usb-extender",
+ 	"tigal,rbt-832",
+ 	"moschip,mcs8140",
+ 	NULL,	/* sentinel */
 -- 
 1.7.10.4
