@@ -1,197 +1,157 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 15 Jul 2012 16:49:12 +0200
-Subject: [PATCH 6/8] ARM: MCS814x: provide a sample defconfig file
+Date: Sun, 15 Jul 2012 16:49:10 +0200
+Subject: [PATCH 4/8] ARM: MCS814X: add DTS file for Tigal/Robotech RBT-832
 In-Reply-To: <1342363754-30808-1-git-send-email-florian@openwrt.org>
 References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
-Message-ID: <1342363754-30808-7-git-send-email-florian@openwrt.org>
+Message-ID: <1342363754-30808-5-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This DTS files defines the following specifities:
+- 32MB of RAM
+- 5 GPIO controlled LEDs
+- LED activity for the Ethernet port
+- MTD partitions
+
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- arch/arm/configs/mcs814x_defconfig |  174 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 174 insertions(+)
- create mode 100644 arch/arm/configs/mcs814x_defconfig
+ arch/arm/boot/dts/rbt-832.dts            |   83 ++++++++++++++++++++++++++++++
+ arch/arm/mach-mcs814x/Kconfig            |    9 ++++
+ arch/arm/mach-mcs814x/Makefile.boot      |    2 +
+ arch/arm/mach-mcs814x/board-mcs8140-dt.c |    1 +
+ 4 files changed, 95 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rbt-832.dts
 
-diff --git a/arch/arm/configs/mcs814x_defconfig b/arch/arm/configs/mcs814x_defconfig
+diff --git a/arch/arm/boot/dts/rbt-832.dts b/arch/arm/boot/dts/rbt-832.dts
 new file mode 100644
-index 0000000..7fa3dd6
+index 0000000..cc7fab8
 --- /dev/null
-+++ b/arch/arm/configs/mcs814x_defconfig
-@@ -0,0 +1,174 @@
-+# CONFIG_ARM_PATCH_PHYS_VIRT is not set
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+# CONFIG_KALLSYMS is not set
-+# CONFIG_AIO is not set
-+CONFIG_EMBEDDED=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+CONFIG_ARCH_MCS814X=y
-+CONFIG_MACH_DLAN_USB_EXT=y
-+CONFIG_MACH_RBT_832=y
-+# CONFIG_ARM_THUMB is not set
-+CONFIG_PCI_DEBUG=y
-+CONFIG_AEABI=y
-+CONFIG_USE_OF=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_CMDLINE="earlyprintk"
-+CONFIG_CMDLINE_EXTEND=y
-+CONFIG_FPE_NWFPE=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_BINFMT_MISC=y
-+# CONFIG_SUSPEND is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_NET_KEY=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+CONFIG_TCP_CONG_ADVANCED=y
-+CONFIG_TCP_CONG_BIC=y
-+# CONFIG_TCP_CONG_WESTWOOD is not set
-+CONFIG_TCP_CONG_HTCP=y
-+# CONFIG_IPV6 is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_PROC_DEVICETREE=y
-+# CONFIG_BLK_DEV is not set
-+CONFIG_SCSI=m
-+CONFIG_BLK_DEV_SD=m
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_NETDEVICES=y
-+CONFIG_MII=y
-+# CONFIG_NET_VENDOR_3COM is not set
-+# CONFIG_NET_VENDOR_ADAPTEC is not set
-+# CONFIG_NET_VENDOR_ALTEON is not set
-+# CONFIG_NET_VENDOR_AMD is not set
-+# CONFIG_NET_VENDOR_ATHEROS is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_BROCADE is not set
-+# CONFIG_NET_VENDOR_CHELSIO is not set
-+# CONFIG_NET_VENDOR_CISCO is not set
-+# CONFIG_NET_VENDOR_DEC is not set
-+# CONFIG_NET_VENDOR_DLINK is not set
-+# CONFIG_NET_VENDOR_EMULEX is not set
-+# CONFIG_NET_VENDOR_EXAR is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_HP is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MELLANOX is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MYRI is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_NVIDIA is not set
-+# CONFIG_NET_VENDOR_OKI is not set
-+# CONFIG_NET_PACKET_ENGINE is not set
-+# CONFIG_NET_VENDOR_QLOGIC is not set
-+# CONFIG_NET_VENDOR_REALTEK is not set
-+# CONFIG_NET_VENDOR_RDC is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SILAN is not set
-+# CONFIG_NET_VENDOR_SIS is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_SUN is not set
-+# CONFIG_NET_VENDOR_TEHUTI is not set
-+# CONFIG_NET_VENDOR_TI is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+CONFIG_PHYLIB=y
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_MISC=y
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+# CONFIG_SERIAL_8250_PCI is not set
-+CONFIG_SERIAL_8250_NR_UARTS=2
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_GPIO_SYSFS=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_WATCHDOG_CORE=y
-+CONFIG_WATCHDOG_NOWAYOUT=y
-+# CONFIG_VGA_ARB is not set
-+CONFIG_USB=m
-+CONFIG_USB_EHCI_HCD=m
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+# CONFIG_USB_EHCI_TT_NEWSCHED is not set
-+CONFIG_USB_OHCI_HCD=m
-+CONFIG_USB_STORAGE=m
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_STAGING=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT4_FS=m
-+# CONFIG_FILE_LOCKING is not set
-+# CONFIG_DNOTIFY is not set
-+CONFIG_VFAT_FS=m
-+# CONFIG_PROC_PAGE_MONITOR is not set
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_XATTR=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_JFFS2_FS_XATTR=y
-+# CONFIG_JFFS2_FS_POSIX_ACL is not set
-+# CONFIG_JFFS2_FS_SECURITY is not set
-+CONFIG_JFFS2_COMPRESSION_OPTIONS=y
-+CONFIG_JFFS2_LZO=y
-+CONFIG_JFFS2_RUBIN=y
-+CONFIG_SQUASHFS=y
-+# CONFIG_SQUASHFS_ZLIB is not set
-+CONFIG_SQUASHFS_XZ=y
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="iso8859-15"
-+CONFIG_NLS_ISO8859_1=m
-+CONFIG_NLS_ISO8859_15=m
-+CONFIG_NLS_UTF8=m
-+CONFIG_PRINTK_TIME=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_DEBUG_FS=y
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+# CONFIG_FTRACE is not set
-+# CONFIG_ARM_UNWIND is not set
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
-+CONFIG_CRC_CCITT=y
-+CONFIG_CRC_ITU_T=y
-+CONFIG_LIBCRC32C=y
-+# CONFIG_XZ_DEC_X86 is not set
-+# CONFIG_XZ_DEC_POWERPC is not set
-+# CONFIG_XZ_DEC_IA64 is not set
-+# CONFIG_XZ_DEC_ARM is not set
-+# CONFIG_XZ_DEC_ARMTHUMB is not set
-+# CONFIG_XZ_DEC_SPARC is not set
++++ b/arch/arm/boot/dts/rbt-832.dts
+@@ -0,0 +1,83 @@
++/*
++ * rbt-832.dts - Device Tree file for Tigal RBT-832
++ *
++ * Copyright (C) 2012, Florian Fainelli <florian@openwrt.org>
++ *
++ * Licensed under GPLv2
++ */
++
++/dts-v1/;
++/include/ "mcs8140.dtsi"
++
++/ {
++	model = "Tigal RBT-832";
++	compatible = "tigal,rbt-832", "moschip,mcs8140", "moschip,mcs814x";
++
++	chosen {
++		bootargs = "mem=32M console=ttyS0,115200 earlyprintk";
++	};
++
++	ahb {
++		vci {
++			eth0: ethernet at 40084000 {
++				nuport-mac,link-activity = <0x01>;
++			};
++
++			adc {
++				sdram: memory at 0,0 {
++					reg = <0 0 0x2000000>;
++				};
++
++				nor: flash at 7,0 {
++
++					partition at 0 {
++						label = "ArmBoot";
++						reg = <0 0x40000>;
++					};
++					partition at 30000 {
++						label = "Enviroment";
++						reg = <0x40000 0x20000>;
++					};
++					partition at 50000 {
++						label = "bZimage";
++						reg = <0x60000 0x1a0000>;
++					};
++					partition at 150000 {
++						label = "UserFS";
++						reg = <0x200000 0x600000>;
++					};
++				};
++			};
++
++			leds {
++				compatible = "gpio-leds";
++
++				ethernet {
++					label = "rbt-832:red:ethernet";
++					gpios = <&gpio 0 0>;	// gpio 0 active high
++				};
++
++				usb0 {
++					label = "rbt-832:red:usb0";
++					gpios = <&gpio 4 0>;	// gpio 4 active high
++				};
++
++				usb1 {
++					label = "rbt-832:red:usb1";
++					gpios = <&gpio 3 0>;	// gpio 3 active high
++				};
++
++				usb2 {
++					label = "rbt-832:red:usb2";
++					gpios = <&gpio 2 0>;	// gpio 2 active high
++				};
++
++				usb3 {
++					label = "rbt-832:red:usb3";
++					gpios = <&gpio 1 0>;	// gpio 1 active high
++				};
++			};
++		};
++	};
++};
++
+diff --git a/arch/arm/mach-mcs814x/Kconfig b/arch/arm/mach-mcs814x/Kconfig
+index c89422f..604537b 100644
+--- a/arch/arm/mach-mcs814x/Kconfig
++++ b/arch/arm/mach-mcs814x/Kconfig
+@@ -6,6 +6,15 @@ config MCS8140
+ 
+ menu "Moschip MCS8140 boards"
+ 
++config MACH_RBT_832
++	bool "Tigal RBT-832"
++	select MCS8140
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_GPIO
++	help
++	  Machine support for the Tigal RBT-832 board
++
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-mcs814x/Makefile.boot b/arch/arm/mach-mcs814x/Makefile.boot
+index 414db8b..3153a7c 100644
+--- a/arch/arm/mach-mcs814x/Makefile.boot
++++ b/arch/arm/mach-mcs814x/Makefile.boot
+@@ -1,3 +1,5 @@
+     zreladdr-y := 0x00008000
+  params_phys-y := 0x00000008
+  initrd_phys-y := 0x00400000
++
++dtb-$(CONFIG_MACH_RBT_832) += rbt-832.dtb
+diff --git a/arch/arm/mach-mcs814x/board-mcs8140-dt.c b/arch/arm/mach-mcs814x/board-mcs8140-dt.c
+index 5d13283..6f0804d 100644
+--- a/arch/arm/mach-mcs814x/board-mcs8140-dt.c
++++ b/arch/arm/mach-mcs814x/board-mcs8140-dt.c
+@@ -27,6 +27,7 @@ static void __init mcs814x_dt_device_init(void)
+ }
+ 
+ static const char *mcs8140_dt_board_compat[] __initdata = {
++	"tigal,rbt-832",
+ 	"moschip,mcs8140",
+ 	NULL,	/* sentinel */
+ };
 -- 
 1.7.10.4
