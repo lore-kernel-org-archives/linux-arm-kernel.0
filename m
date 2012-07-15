@@ -1,44 +1,42 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sun, 15 Jul 2012 05:03:18 +0200
-Subject: [PATCH 1/1] ARM: OMAP2+: omap2plus_defconfig: enable OMAP DMA engine
- support
-Message-ID: <1342321398-11009-1-git-send-email-javier@dowhile0.org>
+From: dsd@laptop.org (Daniel Drake)
+Date: Sat, 14 Jul 2012 22:49:46 -0600
+Subject: Losing VFP registers over suspend/resume
+Message-ID: <CAMLZHHTvogPv06zukuUTuc6ezLuoMDwNSy6nPS_q=ambadi8VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 13f30fc893e4610f67dd7a8b0b67aec02eac1775
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Sat Apr 21 22:41:10 2012 +0100
+Hi,
 
-    mmc: omap: remove private DMA API implementation
+Testing XO-1.75 ARMv7 hardfp, the following simple test gives bad results:
 
-removed the private DMA API implementation from the OMAP mmc host to
-make it use exclusively the DMA engine API.
+In one terminal, run this python program:
 
-Unfortunately the omap2plus_defconfig doesn't enable this feature
-leading to the following error on an IGEPv2 Rev.C (and probably on most
-boards with MMC support):
+import math
+answer = math.cos(3.1415)
+while True:
+    x = math.cos(3.1415)
+    if x != answer:
+        print "Bad answer", x
 
-[    2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA engine channel 48
-[    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 62
 
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
----
- arch/arm/configs/omap2plus_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+In another terminal:
+while sleep 3; do rtcwake -s 3 -m mem; done
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index b152de7..e58edc3 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -193,6 +193,8 @@ CONFIG_MMC_OMAP_HS=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=y
-+CONFIG_DMADEVICES=y
-+CONFIG_DMA_OMAP=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
--- 
-1.7.7.6
+
+This sets up a FP-heavy app running while the system is suspending and
+resuming every few seconds.
+The results are that every few minutes, one of the cosine calculations
+produces the wrong result, and after a few hours the program can even
+crash.
+
+Applying the patch "ARM: vfp: Always save VFP state in vfp_pm_suspend"
+solves the issue.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/042048.html
+I tested with the above test case for several hours, and another OLPC
+developer verified. No more bad calculations, no more crashes.
+
+Any chance this effort could be revived? Looks like the patch was almost acked:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/042930.html
+
+Thanks
+Daniel
