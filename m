@@ -1,33 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 15 Jul 2012 22:40:34 +0100
-Subject: Device tree binding for DVFS table
-In-Reply-To: <50006935.2080606@nvidia.com>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <4FFE4DD0.7020407@nvidia.com> <50006935.2080606@nvidia.com>
-Message-ID: <20120715214033.GK4041@opensource.wolfsonmicro.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Sun, 15 Jul 2012 15:49:03 -0600
+Subject: Losing VFP registers over suspend/resume
+In-Reply-To: <CAMLZHHTvogPv06zukuUTuc6ezLuoMDwNSy6nPS_q=ambadi8VQ@mail.gmail.com>
+References: <CAMLZHHTvogPv06zukuUTuc6ezLuoMDwNSy6nPS_q=ambadi8VQ@mail.gmail.com>
+Message-ID: <CAMLZHHSgOehpKv56Osccueb+xYt36J0S54Na8D0eqdCkxMzhTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 14, 2012 at 12:00:14AM +0530, Prashant Gaikwad wrote:
-> On Thursday 12 July 2012 09:38 AM, Prashant Gaikwad wrote:
+On Sat, Jul 14, 2012 at 10:49 PM, Daniel Drake <dsd@laptop.org> wrote:
+> Applying the patch "ARM: vfp: Always save VFP state in vfp_pm_suspend"
+> solves the issue.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/042048.html
+> I tested with the above test case for several hours, and another OLPC
+> developer verified. No more bad calculations, no more crashes.
+>
+> Any chance this effort could be revived? Looks like the patch was almost acked:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/042930.html
 
-> >About repeating frequencies, operating voltage for a frequency
-> >would be the highest one mapped in the table.
+That was an old patch. We think the latest one is here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-May/051091.html
 
-This sounds very surprising...  that would generally just result in
-higher power consumption.
+This no longer applies due to last_VFP_context being renamed. I'll
+send a v5 patch now to fix that.
 
-> >I know this makes reading difficult but it provides flexibility,
-
-> Does this explanation help?
-
-The loss of comprehensibility seems like a really major disadvantage for
-very little practical gain here.  Big arrays in DT are already hard
-enough to read without adding extra complexity on top of that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120715/d6dbc57c/attachment.sig>
+Thanks
+Daniel
