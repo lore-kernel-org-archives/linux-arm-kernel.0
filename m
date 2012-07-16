@@ -1,48 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 16 Jul 2012 12:38:27 -0600 (MDT)
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <50045D17.9050704@ti.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com>
- <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
- <50045D17.9050704@ti.com>
-Message-ID: <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Mon, 16 Jul 2012 14:21:22 -0500
+Subject: [PATCH 0/3] OMAP: hwmod: reset API proposal
+Message-ID: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+From: Omar Ramirez Luna <omar.ramirez@copitl.com>
 
-On Mon, 16 Jul 2012, Jon Hunter wrote:
+***
+RESEND: http://bit.ly/PZDbcc
+Needed for ipu, dsp and their mmu reset lines.
+***
 
-> Yes I see that makes sense. However, patch #7 has already changed the
-> mapping of the flags. I had intended that patch #7 and #8 would be
-> applied together. However, I could see that patch #7 can be taken just
-> to eliminate using the SW_SLEEP state. So basically, what I am saying is
-> does patch #7 have any value without #8?
+Recent changes in omap_hwmod framework have reworked the behaviour
+towards hardreset handling, commit 747834a (ARM: OMAP2+: hwmod:
+revise hardreset behavior) recommends for drivers to implement
+their own reset sequences until code out-of-tree hits mainline
+and then their needs and code can be reviewed.
 
-Certainly not as much value as it had before.  But my understanding, which 
-is possibly incorrect, matches what you wrote in patch #7's description:
+Since it is not clear when this will occur for all drivers and
+hwmod code was not deleted (presumably because at some point it
+will handle the resets once again), this series exports functions
+to handle hardreset lines in an attempt to reduce code duplication
+for those who have a common reset sequence.
 
-"For OMAP4 devices, SW_SLEEP is equivalent to HW_AUTO and NO_SLEEP is 
-equivalent to SW_WKUP. The only difference between HW_AUTO and SW_SLEEP 
-for OMAP4 devices is that the PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt 
-status is set in case of SW_SLEEP transition, and not set in case of 
-HW_AUTO transition."
+These APIs are intended to be used by iommu for now, but were
+tested with IPU and remoteproc on Pandaboard.
 
-We don't use that PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt bit.  So if 
-SW_SLEEP and HW_AUTO really have identical meanings otherwise, then I 
-suppose we might as well use the one that does what we need with no 
-extraneous side-effects?  My recollection from a conversation with Beno?t 
-a few months ago was that this was his view as well.
+Omar Ramirez Luna (3):
+  ARM: OMAP: hwmod: partially un-reset hwmods might not be properly
+    enabled
+  ARM: OMAP: hwmod: revise deassert sequence
+  ARM: OMAP: omap_device: expose hwmod assert/deassert to omap devices
 
-> That's fine with me. We can always workaround such issues by adding flags.
-> 
-> I can give this a try this week and let you know how it goes.
+ arch/arm/mach-omap2/omap_hwmod.c              |   70 +++++++++++++++++++-----
+ arch/arm/plat-omap/include/plat/omap_device.h |    4 ++
+ arch/arm/plat-omap/omap_device.c              |   45 ++++++++++++++++
+ 3 files changed, 104 insertions(+), 15 deletions(-)
 
-Okay, great.  No rush on my account.
-
-
-- Paul
+-- 
+1.7.4.1
