@@ -1,43 +1,51 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Jul 2012 23:19:22 +0200
-Subject: [PATCH] ARM i.MX53: clk: change cspi_ipg_gate device name
-In-Reply-To: <1342425205-24567-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1342425205-24567-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20120716211922.GS30009@pengutronix.de>
+Date: Mon, 16 Jul 2012 23:20:12 +0200
+Subject: [PATCH] ARM: imx: add missing item to the list of clock event
+ modes
+In-Reply-To: <1342469226-12293-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1342469226-12293-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120716212012.GT30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 09:53:25AM +0200, Steffen Trumtrar wrote:
-> The cspi is compatible to the imx35 one. imx51-dt.c, imx53-dt.c, imx53.dtsi and
-> imx51.dtsi already reflect this fact. But as the clock driver is not registered
-> accordingly, spi-imx can not probe for the device, as it can not find the clock
-> device and return with an error.
-> A rename of the clock device fixes this.
+On Mon, Jul 16, 2012 at 10:07:06PM +0200, Uwe Kleine-K?nig wrote:
+> This prevents an out-of-bounds access to the clock_event_mode_label when
+> debugging.
 > 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I applied the version from Alexander instead which is more consistent
-with i.MX51 cspi support.
+Applied, thanks
 
 Sascha
 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Hello,
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index a2200c7..508f104 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -248,7 +248,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_register_clkdev(clk[ecspi1_ipg_gate], "ipg", "imx51-ecspi.0");
->  	clk_register_clkdev(clk[ecspi2_per_gate], "per", "imx51-ecspi.1");
->  	clk_register_clkdev(clk[ecspi2_ipg_gate], "ipg", "imx51-ecspi.1");
-> -	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx51-cspi.0");
-> +	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx35-cspi.0");
->  	clk_register_clkdev(clk[pwm1_ipg_gate], "pwm", "mxc_pwm.0");
->  	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
->  	clk_register_clkdev(clk[i2c1_gate], NULL, "imx-i2c.0");
+> I consider this to be an uncritical fix as it's only relevant with DEBUG
+> #defined.
+> 
+> Best regards
+> Uwe
+>  arch/arm/plat-mxc/time.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+> index 00e8e65..a17abcf 100644
+> --- a/arch/arm/plat-mxc/time.c
+> +++ b/arch/arm/plat-mxc/time.c
+> @@ -160,7 +160,8 @@ static const char *clock_event_mode_label[] = {
+>  	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
+>  	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
+>  	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
+> -	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED"
+> +	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED",
+> +	[CLOCK_EVT_MODE_RESUME]   = "CLOCK_EVT_MODE_RESUME",
+>  };
+>  #endif /* DEBUG */
+>  
+> -- 
+> 1.7.10.4
+> 
 > 
 
 -- 
