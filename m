@@ -1,92 +1,49 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 16 Jul 2012 15:34:39 +0530
-Subject: [PATCHv4 1/8] ARM: OMAP: clk: add support for omap_clk_for_each
-In-Reply-To: <1342189185-5306-2-git-send-email-t-kristo@ti.com>
+Date: Mon, 16 Jul 2012 15:45:14 +0530
+Subject: [PATCHv4 2/8] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add recursive
+ usecount tracking
+In-Reply-To: <1342189185-5306-3-git-send-email-t-kristo@ti.com>
 References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-2-git-send-email-t-kristo@ti.com>
-Message-ID: <5003E737.60406@ti.com>
+ <1342189185-5306-3-git-send-email-t-kristo@ti.com>
+Message-ID: <5003E9B2.8060504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 13 July 2012 07:49 PM, Tero Kristo wrote:
-> This works similarly to e.g. pwrdm_for_each(). Needed by enhanced
-> usecounting debug functionality that will be added to pm-debug.
-
-OMAP clock framework has its own debugfs entry (/debug/clock) to expose
-usecounts for clocks, so does the COMMON clock framework (/debug/clk).
-Maybe there isn't one which dumps usecounts for the complete tree,
-instead there is one per each clock node.
-
-I agree having a complete dump of the clock tree usecounts can be
-useful, but can we keep it in /debug/clock for now?
-The reason I am saying this is because once we move from OMAP clock to
-COMMON clock, something like what 'omap_clk_for_each' does will
-not be possible anyway. We might have to add the support for
-dumping complete tree usecounts into the COMMON clock core.
-
+> This patch fixes the usecount tracking for omap3+, previously the
+> usecount numbers were rather bogus and were not really useful for
+> any purpose. Now usecount numbers track the number of really active
+> clients on each domain. This patch also adds support for usecount
+> tracking on powerdomain level and autoidle flag for clocks that
+> are hardware controlled and should be skipped in usecount
+> calculations.
 >
 > Signed-off-by: Tero Kristo<t-kristo@ti.com>
 > Cc: Paul Walmsley<paul@pwsan.com>
 > Cc: Kevin Hilman<khilman@ti.com>
+
+Reviewed by: Rajendra Nayak <rnayak@ti.com>
+
 > ---
->   arch/arm/plat-omap/clock.c              |   33 +++++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/clkt_iclk.c         |   21 +++++++++++
+>   arch/arm/mach-omap2/clockdomain.c       |   59 +++++++++++++++++++++++++++++-
+>   arch/arm/mach-omap2/clockdomain.h       |    2 +
+>   arch/arm/mach-omap2/dpll3xxx.c          |   19 ++++++++++
+>   arch/arm/mach-omap2/powerdomain.c       |   35 ++++++++++++++++++
+>   arch/arm/mach-omap2/powerdomain.h       |    5 +++
+>   arch/arm/plat-omap/clock.c              |    6 +++
 >   arch/arm/plat-omap/include/plat/clock.h |    2 +
->   2 files changed, 35 insertions(+), 0 deletions(-)
+>   8 files changed, 147 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-> index 706b7e2..ad9dc59 100644
-> --- a/arch/arm/plat-omap/clock.c
-> +++ b/arch/arm/plat-omap/clock.c
-> @@ -355,6 +355,39 @@ int omap_clk_enable_autoidle_all(void)
->   	return 0;
->   }
+
 >
-> +/**
-> + * omap_clk_for_each - call a function for each registered clock
-> + * @fn: pointer to callback function
-> + * @data: void * data to pass to callback function
-> + *
-> + * Call @fn for each registered clock, passing @data to each function.
-> + * @fn must return 0 for success or any other value for failure. If
-> + * @fn returns non-zero, the iteration across clocks will stop and
-> + * the non-zero return value will be passed to the caller of
-> + * omap_clk_for_each(). @fn is called with clockfw_lock held.
-> + */
-> +int omap_clk_for_each(int (*fn)(struct clk *clk, void *user), void *user)
-> +{
-> +	struct clk *c;
-> +	unsigned long flags;
-> +	int ret = 0;
-> +
-> +	if (!fn)
-> +		return -EINVAL;
-> +
-> +	spin_lock_irqsave(&clockfw_lock, flags);
-> +
-> +	list_for_each_entry(c,&clocks, node) {
-> +		ret = fn(c, user);
-> +		if (ret)
-> +			break;
-> +	}
-> +
-> +	spin_unlock_irqrestore(&clockfw_lock, flags);
-> +
-> +	return ret;
-> +}
-> +
->   int omap_clk_disable_autoidle_all(void)
->   {
->   	struct clk *c;
-> diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-> index d0ef57c..998947e 100644
-> --- a/arch/arm/plat-omap/include/plat/clock.h
-> +++ b/arch/arm/plat-omap/include/plat/clock.h
-> @@ -294,6 +294,8 @@ extern void propagate_rate(struct clk *clk);
->   extern void recalculate_root_clocks(void);
->   extern unsigned long followparent_recalc(struct clk *clk);
->   extern void clk_enable_init_clocks(void);
-> +extern int omap_clk_for_each(int (*fn)(struct clk *clk, void *user),
-> +				void *user);
->   unsigned long omap_fixed_divisor_recalc(struct clk *clk);
->   extern struct clk *omap_clk_get_by_name(const char *name);
->   extern int omap_clk_enable_autoidle_all(void);
+>   	list_add(&clk->node,&clocks);
+> +	/*
+> +	 * If clock has no ops, it is handled by hardware and thus will
+> +	 * idle automatically
+> +	 */
+> +	if (clk->ops ==&clkops_null)
+> +		clk->autoidle = true;
+
+I was a little skeptical about this when I first saw it. But I am
+sure you would have thought through :)
