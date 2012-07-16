@@ -1,58 +1,68 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 16 Jul 2012 11:12:05 +0300
-Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
- ocp2scp
-In-Reply-To: <201206251626.09666.arnd@arndb.de>
-References: <1340370942-23201-1-git-send-email-kishon@ti.com>
- <CAAe_U6+dkiQw-i93pFapt6qKrArzaQoE8X3GjDzUDraziG8B2Q@mail.gmail.com>
- <20120625122449.GA30463@arwen.pp.htv.fi>
- <201206251626.09666.arnd@arndb.de>
-Message-ID: <20120716081204.GI7955@arwen.pp.htv.fi>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 16 Jul 2012 16:17:04 +0800
+Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits
+ for general purpose registers
+In-Reply-To: <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
+References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+ <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
+Message-ID: <20120716081703.GH21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 25, 2012 at 04:26:08PM +0000, Arnd Bergmann wrote:
-> On Monday 25 June 2012, Felipe Balbi wrote:
-> > > > Can't this live where the scp drivers live?  Actually, where is that at?
-> > > > Do we have scp drivers?
-> > > AFAIK, there isn't any driver for scp. But we have a driver for ocp
-> > > and it is present at arch/arm/mach-omap2/omap_l3_noc.c
-> > 
-> > I don't think this deserves a directory of its own. Maybe
-> > drivers/platform/arm/omap/ ?? the l3_noc is an OMAP-specific
-> > interconnect and the SCP bus is also an OMAP-specific bus. I don't know
-> > of any other arch/soc who uses the same interconnect IP as OMAP and the
-> > same ocp2scp bridge. That bridge was created by TI for all I know.
-> > 
-> > Greg, would drivers/platform/arm/omap/ work for you ? We could also move
-> > the interconnect drivers there.
+On Sat, Jul 14, 2012 at 10:43:03PM +0200, Linus Walleij wrote:
+> On Thu, Jul 12, 2012 at 11:07 AM, Dong Aisheng <b29396@freescale.com> wrote:
 > 
-> I really don't like the idea of introducing drivers/platform/arm/ because
-> very little of the stuff that one would put in there are actually ARM
-> specific.
+> Hm, hm. This makes be ever more hesitant to have this in pinctrl.
 > 
-> I have suggested a drivers/bus/ before and people did not see the need
-> back then, and we agreed to continue having a directory for each bus,
-> as we have for the big ones (pci, usb, i2c, spi, ...) and a lot of
-> simple (amba, rapidio, bcma, ...) or obscure (tc,  vlynq, nubus, ...)
-> ones.
+> Remeber again that nothing stops you from remapping the same register
+> range in another driver.
 > 
-> I think we should reconsider the idea of drivers/bus/ with a file per
-> bus in there at least for new buses, but doing a new drivers/scp/
-> would be ok for me if there is enough opposition against the idea
-> of drivers/bus aggregating different buses.
+> > +#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_MASK                (0x3 << 30)
+> 
+> This belongs in drivers/clk/*
+> 
+> Why funnel these register writes through pinctrl? Just remap that address
+> offset in the clk driver.
+> 
+> > +#define IMX6Q_GPR0_DMAREQ_MUX_SEL7_MASK                BIT(7)
+> 
+> This belongs in drivers/dma/*
+> 
+> Same comments.
+> 
+> > +#define IMX6Q_GPR1_PCIE_REQ_MASK               (0x3 << 30)
+> 
+> Looks like it belongs in some PCI driver or glue layer.
+> 
+> > +#define IMX6Q_GPR1_MIPI_COLOR_SW               BIT(25)
+> > +#define IMX6Q_GPR1_DPI_OFF                     BIT(24)
+> 
+> Looks related to some test or something...
+> 
+> And so on.
+> 
+> If you really wants a "funnel driver" doing all these diverse things,
+> I'd put it in drivers/mfd.
+It's like driver drivers/mfd/anatop-mfd.c. They both store misc bits.
+We may need a generic driver to simply provide register accessor.
 
-I don't mind either way. The fact is that this ocp-to-scp bridge is
-really a TI/OMAP thing. Not sure it deserves a directory of its own.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/144f22e9/attachment-0001.sig>
+Thanks
+Richard
+> 
+> This whole issue appears in other systems so you're not alone
+> on this, for example the ux500 PRCMU driver has exactly these
+> properties.
+> 
+> I'm also contemplating drivers/syscon again, but
+> I have a hard time seeing it would be much more than another
+> drivers/mfd-similar construct.
+> 
+> I would really like input from Arnd and Samuel and other clever
+> people on the placement of drivers like this one :-/
+> 
+> But close address range proximity to the pin controller is not a
+> reason to have it in pinctrl.
+> 
+> Yours,
+> Linus Walleij
+> 
