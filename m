@@ -1,43 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jul 2012 21:45:29 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <20120716123550.GE17435@pengutronix.de>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
- <20120712131231.GH2194@pengutronix.de>
- <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
- <20120716101706.GB17435@pengutronix.de>
- <CACRpkdY626iYATorphAvg7cQxD2ufysBvXdt3Z644zEuW0wS=w@mail.gmail.com>
- <20120716123550.GE17435@pengutronix.de>
-Message-ID: <CACRpkdaMB-n7XYcxE8QtAm-WrGc2DR0krfTjQZCbvOL1HYep1Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Jul 2012 19:47:01 +0000
+Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
+ ocp2scp
+In-Reply-To: <CAAe_U6JMGP3jEkkd=vqpR5KTeOnY51AOcb65zqKRRa8MtnWjzQ@mail.gmail.com>
+References: <1340370942-23201-1-git-send-email-kishon@ti.com>
+ <20120716081204.GI7955@arwen.pp.htv.fi>
+ <CAAe_U6JMGP3jEkkd=vqpR5KTeOnY51AOcb65zqKRRa8MtnWjzQ@mail.gmail.com>
+Message-ID: <201207161947.01751.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 2:35 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+On Monday 16 July 2012, ABRAHAM, KISHON VIJAY wrote:
+> >>
+> >> I think we should reconsider the idea of drivers/bus/ with a file per
+> >> bus in there at least for new buses, but doing a new drivers/scp/
+> >> would be ok for me if there is enough opposition against the idea
+> >> of drivers/bus aggregating different buses.
+> >
+> > I don't mind either way. The fact is that this ocp-to-scp bridge is
+> > really a TI/OMAP thing. Not sure it deserves a directory of its own.
+> 
+> Ok. Then I'll have a file in drivers/bus/ for ocp2scp driver.
 
-> Uhm, I seem to have missed that bindings are deemed more "flexible" as
-> long as they are coupled to in-kernel dts files? Is that discussed
-> somewhere? I do wonder about it...
+Sounds good to me. I don't care if it's the only file in that directory.
+We can point the next person to a bus with a single file to that directory
+and let them add theirs.
 
-Well patches like this are sent out but not commented on from
-the perspective of binding stability. So of course, they get merged.
-
-Have a look at this commit:
-
-commit 7f217794ffa72f208a250b79ab0b7ea3de19677f
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Sun May 13 00:14:24 2012 -0400
-
-    mmc: dt: Consolidate DT bindings
-
-This is deleting custom properties from DTS files without
-adding any code to fallback-support them on old device trees.
-
-(Actually I like this commit a lot, since it is removing custom MMC
-props and replacing these with standard bindings common for all
-MMC/SD controllers, but ...)
-
-I think there are more examples if you git log on arch/arm/boot/dts...
-
-Yours,
-Linus Walleij
+	Arnd
