@@ -1,46 +1,50 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 16 Jul 2012 12:17:06 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
- <20120712131231.GH2194@pengutronix.de>
- <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
-Message-ID: <20120716101706.GB17435@pengutronix.de>
+Date: Mon, 16 Jul 2012 12:21:51 +0200
+Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <201207141409.38554.marex@denx.de>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+ <201207131410.29469.marex@denx.de>
+ <20120714112929.GB29529@pengutronix.de>
+ <201207141409.38554.marex@denx.de>
+Message-ID: <20120716102151.GC17435@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Marek,
 
-> Well I think I ACKed that from the point of view that it will work as
-> expected with ux500 with these bindings. What is best from the I2C
-> subsystem point of view is another question ...
+> > I am also still interested to check the runtime switching, but it might
+> > take another month until I can really hack on it.
+> 
+> Good, there is some bit that probably needs to be flipped to allow this 
+> switching. I managed to get this working with SPI, not with i2c though. With 
 
-Okay, thanks for clarifying.
+Ah, hearing that it works with SPI is good news.
 
-> Overall I think we have this general problem with a lot of DT
-> conversion happening right now: the tempo is set very high and
-> all chip vendors want DT support RealQuickNowPreferrablyYesterday
-> and that makes it hard for subsystem maintainers to hold back,
-> and I also fear vendor-specific properties are overused for this
-> reason.
+> i2c, if I restarted the controller inbetween each transaction, it worked ... 
+> which is not what I'd like to see there.
 
-Word.
+Agreed.
 
-> And about the perpetual nature of device tree bindings it
-> appears to me that the modus operandi right now is to not
-> regard any of these as written in stone until they are removed
-> from the kernel tree. We have plenty of drivers patching
-> trees and drivers in one for the moment.
+> > > No, it doesn't. See above about small transfers. Consider the easy
+> > > situation where you have sensor on one bus (so you do PIO because you
+> > > transfer small data) and you have EEPROM on other bus, where you use DMA
+> > > because you transfer large data. And the mixed mode isn't there yet.
+> > 
+> > I fully understand what you want to configure. I did before. Yet,
+> > devicetree bindings are not platform_data and shouldn't be used like
+> > them.
+> 
+> But then, how would you configure this detail on a per-bus basis? Well all 
 
-I don't get this one. Yes, they are of perpetual nature, so how could we
-remove them from the kernel tree?
+This is a question for devicetree-discuss.
 
-What I am afraid of is: tentative solutions tend to stay, because the
-need for a proper solution is reduced. Yet, finding proper generic
-bindings might take some time which doesn't meet the high pressure
-around DT at the moment.
+> patch actually fixes a real issue, I'd like to have it in ASAP and it's been 
+> aboue three months already, which sucks.
 
-Regards,
+I am open to ideas improving the situation (which is: a lot more
+patches, but not a lot more reviewers)
+
+Thanks,
 
    Wolfram
 
@@ -53,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/b629a373/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/ef204b42/attachment.sig>
