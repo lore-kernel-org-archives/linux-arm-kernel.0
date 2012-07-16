@@ -1,37 +1,28 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 16 Jul 2012 09:32:00 -0400 (EDT)
-Subject: [PATCH v2 01/15] ARM: Add fixed PCI i/o mapping
-In-Reply-To: <50039A02.6040507@gmail.com>
-References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
- <1342231451-28861-2-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1207140815220.14068@xanadu.home>
- <50039A02.6040507@gmail.com>
-Message-ID: <alpine.LFD.2.02.1207160925550.14068@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Jul 2012 13:40:17 +0000
+Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits for
+ general purpose registers
+In-Reply-To: <20120716081703.GH21635@b20223-02.ap.freescale.net>
+References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+ <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
+ <20120716081703.GH21635@b20223-02.ap.freescale.net>
+Message-ID: <201207161340.18528.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Jul 2012, Rob Herring wrote:
+On Monday 16 July 2012, Richard Zhao wrote:
+> > If you really wants a "funnel driver" doing all these diverse things,
+> > I'd put it in drivers/mfd.
+>
+> It's like driver drivers/mfd/anatop-mfd.c. They both store misc bits.
+> We may need a generic driver to simply provide register accessor.
 
-> On 07/14/2012 07:22 AM, Nicolas Pitre wrote:
-> > On Fri, 13 Jul 2012, Rob Herring wrote:
-> 
-> >> +	vm->size = size;
-> >> +	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-> >> +	vm->caller = vm_reserve_area_early;
-> > 
-> > This is not providing much useful information when looking at 
-> > /proc/vmallocinfo anymore.  What about adding a void *caller argument to 
-> > this function and initializing vm->caller with it to identify the true 
-> > origin of the region?
-> 
-> What about just using __builtin_return_address(0)? Since pci_reserve_io
-> and devicemaps_init get inlined, ultimately it shows paging_init doing that.
+We already have the "regmap" framework that deals with sets of registers
+on spi, i2c or memory mapped buses. One thing I've thought about
+before is to create some kind of very simple "system controller"
+framework based on regmap that lets you register a single global
+"struct regmap" pointer from an SoC specific driver, and have drivers
+call a function into that framework to get a reference to that
+regmap.
 
-Using __builtin_return_address(0) doesn't prevent gcc from inlining the 
-callers in their own callers and then the provided information isn't as 
-useful.  They won't get inlined if you pass the address of the caller.  
-Furthermore __builtin_return_address(0) provides the call site address 
-and not the caller's start address which isn't as pretty.
-
-
-Nicolas
+	Arnd
