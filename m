@@ -1,119 +1,48 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 16 Jul 2012 11:36:17 -0700
-Subject: Device tree binding for DVFS table
-In-Reply-To: <50035582.9070308@gmail.com>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <4FFE4DD0.7020407@nvidia.com> <50035582.9070308@gmail.com>
-Message-ID: <CAJOA=zMKE1Z_AsYeWr22k58EDskx0eshEjv9VbLQHKFsA0uThw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Jul 2012 12:38:27 -0600 (MDT)
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <50045D17.9050704@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+ <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+ <50045D17.9050704@ti.com>
+Message-ID: <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2012 at 4:42 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 07/11/2012 11:08 PM, Prashant Gaikwad wrote:
->> On Wednesday 11 July 2012 07:33 PM, Rob Herring wrote:
->>> On 07/11/2012 07:56 AM, Prashant Gaikwad wrote:
->
->>>> cpu-dvfs-table : dvfs-table {
->>> This should be located with the node that the frequencies correspond to.
->>>
->>
->> With CAR node?
->
-> With the power domain it corresponds to or the cpu nodes.
->
->>
->>>>                compatible = "nvidia,tegra30-dvfs-table";
->>>>                reg_id =<&sm0>;
->>>>                #address-cells =<1>;
->>>>                #size-cells =<0>;
->>>>                voltage-array =<750 775 800 825 850 875 900 925 950 975
->>>> 1000 1025 1050 1100 1125>;
->>> The SOC is really characterized at all these voltages?
->>
->> Not really, but different processes of single SoC are characterized for
->> different voltages and this array covers all those voltages.
->>
->>>> };
->>>>
->>>> device {
->>>>               dvfs =<&cpu-dvfs-table>;
->>>>               frequency-table at 102 {
->>>>                        reg =<0x102>;
->>>>                        frequencies =<314 314 314 456 456 456 608 608 608
->>>> 760 817 817 912 1000>;
->>> I don't see the point of repeating frequencies.
->>>>               };
->>>>               frequency-table at 002 {
->>>>                        reg =<0x002>;
->>>>                        frequencies =<598 598 750 750 893 893 1000>;
->>>>               };
->>> How do you determine the voltage for a frequency on table 2?
->>>
->>> I'd expect a single property with freq/volt pairs or 2 properties for
->>> freq and voltage where there is a 1:1 relationship (freq N uses
->>> voltage N).
->>
->>
->> How this will work:
->>
->> voltage-array =<750 775 800 825 850 875 900  925 950 975 1000 1025 1050
->> 1100 1125>
->> frequencies-1 =<314 314 314 456 456 456 608  608 608 760 817  817  912
->> 1000>;
->> frequencies-2 =<598 598 750 750 893 893 1000>;
->>
->
-> I don't see the point trying to share a voltage range. Not sharing it is
-> fewer array elements (22 vs 36):
->
-> voltage-array-1 =<750 825 900 975 1000 1050 1100>;
-> frequencies-1   =<314 456 608 760  817  912 1000>;
->
-> voltage-array-2 =<750 800 850  900>
-> frequencies-2   =<598 750 893 1000>;
->
+Hi Jon,
 
-This is significantly more readable.
+On Mon, 16 Jul 2012, Jon Hunter wrote:
 
-Regards,
-Mike
+> Yes I see that makes sense. However, patch #7 has already changed the
+> mapping of the flags. I had intended that patch #7 and #8 would be
+> applied together. However, I could see that patch #7 can be taken just
+> to eliminate using the SW_SLEEP state. So basically, what I am saying is
+> does patch #7 have any value without #8?
 
-> Rob
->
->>
->> Freq and voltage has 1:1 relationship but as single voltage table is
->> used for different processes we have more entries in voltage table than
->> freq table.
->> Frequency table 1 is mapped till 1100mV while frequency table 2 is
->> mapped till 900mV only, it maintains 1:1 relationship.
->>
->> About repeating frequencies, operating voltage for a frequency would be
->> the highest one mapped in the table.
->> For example, in frequency table 2 operating voltage for 750MHz would be
->> 825mV while for 893MHz it would be 875mV. Unmapped entries could be
->> replaced with 0 to make reading better.
->>
->> Advantage it provides is single voltage table used for multiple
->> frequency tables, as can be observed from above tables, operating
->> voltage for 314MHz in freq table 1 is 800mV while there is no frequency
->> in table 2 at that voltage.
->>
->> I know this makes reading difficult but it provides flexibility,
->>
->> I hope it explains the implementation.
->>
->>> Rob
->>>
->>>> };
->>>>
->>>> Thanks&  Regards,
->>>> Prashant G
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->
->
+Certainly not as much value as it had before.  But my understanding, which 
+is possibly incorrect, matches what you wrote in patch #7's description:
+
+"For OMAP4 devices, SW_SLEEP is equivalent to HW_AUTO and NO_SLEEP is 
+equivalent to SW_WKUP. The only difference between HW_AUTO and SW_SLEEP 
+for OMAP4 devices is that the PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt 
+status is set in case of SW_SLEEP transition, and not set in case of 
+HW_AUTO transition."
+
+We don't use that PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt bit.  So if 
+SW_SLEEP and HW_AUTO really have identical meanings otherwise, then I 
+suppose we might as well use the one that does what we need with no 
+extraneous side-effects?  My recollection from a conversation with Beno?t 
+a few months ago was that this was his view as well.
+
+> That's fine with me. We can always workaround such issues by adding flags.
+> 
+> I can give this a try this week and let you know how it goes.
+
+Okay, great.  No rush on my account.
+
+
+- Paul
