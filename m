@@ -1,73 +1,37 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 16 Jul 2012 13:47:01 -0700
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <201207161554.04812.arnd@arndb.de>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <1342363754-30808-2-git-send-email-florian@openwrt.org>
- <201207161554.04812.arnd@arndb.de>
-Message-ID: <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Jul 2012 22:49:17 +0200
+Subject: [PATCH 2/2] gpio/omap: add *remove* callback in platform_driver
+In-Reply-To: <87ipdnein1.fsf@ti.com>
+References: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
+ <1341997995-14020-3-git-send-email-tarun.kanti@ti.com>
+ <87394xhocn.fsf@ti.com>
+ <CACRpkdZMG_ZHW_eGGrdrJh1SuO_=hOObijzmxG1ob6RoNf_dwg@mail.gmail.com>
+ <87a9z4g9bi.fsf@ti.com>
+ <CACRpkdZxUpQ=a-yQ8b4bnX3S9penPWkxJ+PG2Zi4i9YZibYRiw@mail.gmail.com>
+ <87ipdnein1.fsf@ti.com>
+Message-ID: <CACRpkdYMzdjFXBMs6do-yqiBFV5ru28SftA5u+ZkP5KO+PhjCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 15 July 2012, Florian Fainelli wrote:
->
->> diff --git a/arch/arm/mach-mcs814x/Kconfig b/arch/arm/mach-mcs814x/Kconfig
->> new file mode 100644
->> index 0000000..c89422f
->> --- /dev/null
->> +++ b/arch/arm/mach-mcs814x/Kconfig
->> @@ -0,0 +1,11 @@
->> +if ARCH_MCS814X
->> +
->> +config MCS8140
->> +     select CPU_ARM926T
->> +     bool
->> +
->> +menu "Moschip MCS8140 boards"
->> +
->> +endmenu
->> +
->> +endif
->
-> What values does the Kconfig file actually provide? I see that you are
-> adding the boards here later, but I think it would be nice to just
-> make the new platform a single Kconfig option with no individual
-> board selection.
->
->> +struct clk {
->> +     struct clk *parent;             /* parent clk */
->> +     unsigned long rate;             /* clock rate in Hz */
->> +     unsigned long divider;          /* clock divider */
->> +     u32 usecount;                   /* reference count */
->> +     struct clk_ops *ops;            /* clock operation */
->> +     u32 enable_reg;                 /* clock enable register */
->> +     u32 enable_mask;                /* clock enable mask */
->> +};
->
-> Platforms are now converting to the common clock framework in drivers/clk.
-> Mike Turquette as the subsystem maintainer can probably judge better whether
-> we should still be allowing new platforms with their own implementation
-> of clk, but my feeling is that you should use the subsystem instead
-> and add a driver in a subdirectory of drivers/clk instead of in the
-> platform.
+On Mon, Jul 16, 2012 at 7:10 PM, Kevin Hilman <khilman@ti.com> wrote:
 
-Hi Florian & Arnd,
+> Subject: [PATCH] MAINTAINERS: add entry OMAP GPIO driver
+>
+> Since I've been maintaining this, making it official at the request of the
+> GPIO maintainers.
+>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-Adopting the new clock framework is highly preferable, especially if
-MCS814x support is being delayed until 3.7.  There is also a push to
-put clock drivers into drivers/clk and I would like to continue that
-trend, but I'm less strict on that measure if it proves very difficult
-for your platform immediately (e.g. duplicating headers across
-platform and generic code, etc).  Migrating code from arch/arm to
-drivers/clk can always be done in a future series.
+Thank! Applied, but:
 
-This platform also seems to be making use of DT so it would be very
-nice if we use MCS814x to push the state of clk DT bindings and
-adoption forward a bit.  There are not a lot of folks using the
-patches from Rob/Grant today.  Hopefully delaying these patches by
-another merge cycle means that these requests are not asking too much
-:-)
+> +F:     drivers/gpio/gpio.omap.c
 
-Regards,
-Mike
+I replaced the period with a dash:
+drivers/gpio/gpio-omap.c
+
+Yours,
+Linus Walleij
