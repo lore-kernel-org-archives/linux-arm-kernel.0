@@ -1,47 +1,73 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 16 Jul 2012 13:15:59 -0700
-Subject: [PATCH 4/9] ARM: vexpress: Initial common clock support
-In-Reply-To: <1342025844.25865.3.camel@hornet>
-References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
- <1342013791-19516-5-git-send-email-pawel.moll@arm.com>
- <CACRpkdZGVgO-1jnfK=fpo73ryLDe05R0_hghwBxzDfbBK9jBRA@mail.gmail.com>
- <1342025844.25865.3.camel@hornet>
-Message-ID: <CAJOA=zOe79YK06Rq2wmqkyGrHopyDi5ZWB25qL53g_nxu9T-TQ@mail.gmail.com>
+Date: Mon, 16 Jul 2012 13:47:01 -0700
+Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
+In-Reply-To: <201207161554.04812.arnd@arndb.de>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <1342363754-30808-2-git-send-email-florian@openwrt.org>
+ <201207161554.04812.arnd@arndb.de>
+Message-ID: <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 9:57 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Wed, 2012-07-11 at 17:51 +0100, Linus Walleij wrote:
->> Hi Pawel,
->>
->> can you please move the vexpress clock implementation to
->> drivers/clk/versatile/clk-vexpress.c as per the pattern from the
->> Integrator rework?
->>
->> Clock drivers go into the drivers/* hierarchy just like any other
->> driver these days.
+On Mon, Jul 16, 2012 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 15 July 2012, Florian Fainelli wrote:
 >
-> I will, but I'd rather avoid doing this right now.
+>> diff --git a/arch/arm/mach-mcs814x/Kconfig b/arch/arm/mach-mcs814x/Kconfig
+>> new file mode 100644
+>> index 0000000..c89422f
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mcs814x/Kconfig
+>> @@ -0,0 +1,11 @@
+>> +if ARCH_MCS814X
+>> +
+>> +config MCS8140
+>> +     select CPU_ARM926T
+>> +     bool
+>> +
+>> +menu "Moschip MCS8140 boards"
+>> +
+>> +endmenu
+>> +
+>> +endif
 >
->> >This is a simple conversion of the existing state and will be
->> > extended (and migrated to drivers/clk) in the near future.
->>
-> This patch is only a first step. I'm working now on a major rework of
-> the VE control infrastructure, and I do have drivers/clk/vexpress (can
-> be versatile, I don't really mind) directory in my local repo. This will
-> happen in time for the next merge window.
+> What values does the Kconfig file actually provide? I see that you are
+> adding the boards here later, but I think it would be nice to just
+> make the new platform a single Kconfig option with no individual
+> board selection.
 >
+>> +struct clk {
+>> +     struct clk *parent;             /* parent clk */
+>> +     unsigned long rate;             /* clock rate in Hz */
+>> +     unsigned long divider;          /* clock divider */
+>> +     u32 usecount;                   /* reference count */
+>> +     struct clk_ops *ops;            /* clock operation */
+>> +     u32 enable_reg;                 /* clock enable register */
+>> +     u32 enable_mask;                /* clock enable mask */
+>> +};
+>
+> Platforms are now converting to the common clock framework in drivers/clk.
+> Mike Turquette as the subsystem maintainer can probably judge better whether
+> we should still be allowing new platforms with their own implementation
+> of clk, but my feeling is that you should use the subsystem instead
+> and add a driver in a subdirectory of drivers/clk instead of in the
+> platform.
 
-I'd rather not take any more patches this close to the 3.6 merge
-window.  How do you feel about holding onto this patch and
-implementing some of the longer term changes mentioned by Linus
-towards 3.7?
+Hi Florian & Arnd,
+
+Adopting the new clock framework is highly preferable, especially if
+MCS814x support is being delayed until 3.7.  There is also a push to
+put clock drivers into drivers/clk and I would like to continue that
+trend, but I'm less strict on that measure if it proves very difficult
+for your platform immediately (e.g. duplicating headers across
+platform and generic code, etc).  Migrating code from arch/arm to
+drivers/clk can always be done in a future series.
+
+This platform also seems to be making use of DT so it would be very
+nice if we use MCS814x to push the state of clk DT bindings and
+adoption forward a bit.  There are not a lot of folks using the
+patches from Rob/Grant today.  Hopefully delaying these patches by
+another merge cycle means that these requests are not asking too much
+:-)
 
 Regards,
 Mike
-
-> Cheers!
->
-> Pawel
->
->
