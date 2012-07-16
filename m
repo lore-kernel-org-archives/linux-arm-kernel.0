@@ -1,65 +1,162 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jul 2012 00:10:18 -0700
-Subject: [PATCH] pinctrl: Add one-register-per-pin type device tree
- based pinctrl driver
-In-Reply-To: <CACRpkdYUJ3v-DoVbK6Pc6Y833Hn_0KS9PtEpjUCnMr57zfH5Bw@mail.gmail.com>
-References: <20120618055036.GU12766@atomide.com>
- <20120619135600.GX12766@atomide.com>
- <4FE39C86.5070901@wwwdotorg.org>
- <20120622083955.GZ12766@atomide.com>
- <4FE4AC40.8080400@wwwdotorg.org>
- <20120626134319.GA3483@atomide.com>
- <4FE9EBEC.9040208@wwwdotorg.org>
- <20120627102851.GC3483@atomide.com>
- <20120710091131.GQ1122@atomide.com>
- <CACRpkdYUJ3v-DoVbK6Pc6Y833Hn_0KS9PtEpjUCnMr57zfH5Bw@mail.gmail.com>
-Message-ID: <20120716071017.GC6522@atomide.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 16 Jul 2012 09:10:57 +0200
+Subject: [PATCH v2 10/15] ARM: kirkwood: use fixed PCI i/o mapping
+In-Reply-To: <1342231451-28861-11-git-send-email-robherring2@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <1342231451-28861-11-git-send-email-robherring2@gmail.com>
+Message-ID: <20120716071057.GB2163@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [120714 13:21]:
-> On Tue, Jul 10, 2012 at 11:11 AM, Tony Lindgren <tony@atomide.com> wrote:
+On Fri, Jul 13, 2012 at 09:04:06PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> > OK so no comments for a while. Here's the patch updated to leave out
-> > the comments in the binding example.
+> Move kirkwood PCI to fixed i/o mapping and remove io.h.
 > 
-> I reason like this:
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+
+Hi Rob
+
+I boot tested this, on a board without any PCI devices.
+At least the PCI controllers were found O.K.
+
+So although its not worth much:
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+I have one question, see below.
+
+
+> ---
+>  arch/arm/Kconfig                               |    1 -
+>  arch/arm/mach-kirkwood/common.c                |   10 ----------
+>  arch/arm/mach-kirkwood/include/mach/io.h       |   24 ------------------------
+>  arch/arm/mach-kirkwood/include/mach/kirkwood.h |    8 +++-----
+>  arch/arm/mach-kirkwood/pcie.c                  |   22 ++--------------------
+>  5 files changed, 5 insertions(+), 60 deletions(-)
+>  delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
 > 
-> - My fears is that the code gets hopeless to understand the mux, the
->  only way to understand that aspect of the system will be to read the DTS
->  and have the data sheet ready at hand.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ed930ad..8a74244 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -547,7 +547,6 @@ config ARCH_KIRKWOOD
+>  	select PCI
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select GENERIC_CLOCKEVENTS
+> -	select NEED_MACH_IO_H
+>  	select PLAT_ORION
+>  	help
+>  	  Support for the following Marvell Kirkwood series SoCs:
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index f261cd2..55e4d79 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -41,16 +41,6 @@
+>   ****************************************************************************/
+>  static struct map_desc kirkwood_io_desc[] __initdata = {
+>  	{
+> -		.virtual	= KIRKWOOD_PCIE_IO_VIRT_BASE,
+> -		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE_IO_PHYS_BASE),
+> -		.length		= KIRKWOOD_PCIE_IO_SIZE,
+> -		.type		= MT_DEVICE,
+> -	}, {
+> -		.virtual	= KIRKWOOD_PCIE1_IO_VIRT_BASE,
+> -		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
+> -		.length		= KIRKWOOD_PCIE1_IO_SIZE,
+> -		.type		= MT_DEVICE,
+> -	}, {
+>  		.virtual	= KIRKWOOD_REGS_VIRT_BASE,
+>  		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
+>  		.length		= KIRKWOOD_REGS_SIZE,
+> diff --git a/arch/arm/mach-kirkwood/include/mach/io.h b/arch/arm/mach-kirkwood/include/mach/io.h
+> deleted file mode 100644
+> index 5d0ab61..0000000
+> --- a/arch/arm/mach-kirkwood/include/mach/io.h
+> +++ /dev/null
+> @@ -1,24 +0,0 @@
+> -/*
+> - * arch/arm/mach-kirkwood/include/mach/io.h
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#ifndef __ASM_ARCH_IO_H
+> -#define __ASM_ARCH_IO_H
+> -
+> -#include "kirkwood.h"
+> -
+> -#define IO_SPACE_LIMIT		0xffffffff
+> -
+> -static inline void __iomem *__io(unsigned long addr)
+> -{
+> -	return (void __iomem *)((addr - KIRKWOOD_PCIE_IO_BUS_BASE)
+> -					+ KIRKWOOD_PCIE_IO_VIRT_BASE);
+> -}
+> -
+> -#define __io(a)			__io(a)
+> -
+> -#endif
+> diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+> index c5b6851..af4f000 100644
+> --- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+> +++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+> @@ -37,14 +37,12 @@
+>  #define KIRKWOOD_NAND_MEM_SIZE		SZ_1K
+>  
+>  #define KIRKWOOD_PCIE1_IO_PHYS_BASE	0xf3000000
+> -#define KIRKWOOD_PCIE1_IO_VIRT_BASE	0xfef00000
+> -#define KIRKWOOD_PCIE1_IO_BUS_BASE	0x00100000
+> -#define KIRKWOOD_PCIE1_IO_SIZE		SZ_1M
+> +#define KIRKWOOD_PCIE1_IO_BUS_BASE	0x00010000
+> +#define KIRKWOOD_PCIE1_IO_SIZE		SZ_64K
+>  
+>  #define KIRKWOOD_PCIE_IO_PHYS_BASE	0xf2000000
+> -#define KIRKWOOD_PCIE_IO_VIRT_BASE	0xfee00000
+>  #define KIRKWOOD_PCIE_IO_BUS_BASE	0x00000000
+> -#define KIRKWOOD_PCIE_IO_SIZE		SZ_1M
+> +#define KIRKWOOD_PCIE_IO_SIZE		SZ_64K
+>  
+>  #define KIRKWOOD_REGS_PHYS_BASE		0xf1000000
+>  #define KIRKWOOD_REGS_VIRT_BASE		0xfed00000
+> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+> index 6e8b2ef..092b36f 100644
+> --- a/arch/arm/mach-kirkwood/pcie.c
+> +++ b/arch/arm/mach-kirkwood/pcie.c
+> @@ -137,14 +137,6 @@ static void __init pcie0_ioresources_init(struct pcie_port *pp)
+>  	pp->irq	= IRQ_KIRKWOOD_PCIE;
+>  
+>  	/*
+> -	 * IORESOURCE_IO
+> -	 */
+> -	pp->res[0].name = "PCIe 0 I/O Space";
+> -	pp->res[0].start = KIRKWOOD_PCIE_IO_BUS_BASE;
+> -	pp->res[0].end = pp->res[0].start + KIRKWOOD_PCIE_IO_SIZE - 1;
+> -	pp->res[0].flags = IORESOURCE_IO;
+> -
+> -	/*
+>  	 * IORESOURCE_MEM
+>  	 */
+>  	pp->res[1].name = "PCIe 0 MEM";
 
-Yes that is a valid concern. Once we have the preprocessing available
-for DTS files reading should be easier. Also user space tools can be
-developed for showing the package specific data in detailed form.
- 
-> But:
-> 
-> - Tony knows what he's doing and what is best for OMAP. And this gets
->  (hopefully) all that OMAP mux code out of arch/arm.
+...
 
-Heh thanks for the positive feedback ;) Yes this should allow us to
-drop close to 8k lines of data and code from arch/arm/mach-omap2 
-once the conversion is done. I'm planning to drop the unused entries
-first to cut down the data quite a bit. And already omap5 and am33xx
-are DT only and using pinctrl-single to start with. The remaining
-legacy mux code can be dropped once we are done with the DT conversion.
+>  	if (request_resource(&iomem_resource, &pp->res[1]))
+>  		panic("Request PCIe%d Memory resource failed\n", index);
+>  
+> -	sys->io_offset = 0;
+> -	pci_add_resource_offset(&sys->resources, &pp->res[0], sys->io_offset);
+>  	pci_add_resource_offset(&sys->resources, &pp->res[1], sys->mem_offset);
 
-> - Surely it will be better to go through this subsystem if we're refactoring
->   it all again later, and all drivers can be transferred to the abstract
->   pinctrl API which is a big win in itself, bringing coherency to the
->   drivers/* at large.
-> 
-> So applied it, so it can be evaluated in real operating environments.
-> 
-> But if I don't see OMAP transferred to use this I'll simply delete it
-> again. :-)
+pp->res[0] is now unused. Do you plan to also clean up the PCI MEM
+space at some point? And then at the same time remove the rest of this
+code?
 
-OK thanks, for reference some am33xx patches for beagle bone already
-got posted using an earlier revision of this binding:
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg71695.html
-
-Regards,
-
-Tony
+Thanks
+	Andrew
