@@ -1,68 +1,45 @@
-From: andreasgretler@googlemail.com (Andreas Gretler)
-Date: Mon, 16 Jul 2012 13:23:42 +0200
-Subject: MX28EVK mainline 3.5-Patchs-3.5-rc5 sgtl5000 record not working
-In-Reply-To: <20120711085244.GA22640@shlinux2.ap.freescale.net>
-References: <CAHE2-smsOufHjfyjKARcwHve4cGqWeM8y7ALxcJkaqLiZBNoSw@mail.gmail.com>
- <20120711031446.GB14060@S2101-09.ap.freescale.net>
- <20120711085244.GA22640@shlinux2.ap.freescale.net>
-Message-ID: <CAHE2-snYoZB8tTOaZ29nxOU3KNBKut_EaGif_LKNQx9VMNii=g@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 16 Jul 2012 12:59:14 +0200
+Subject: [PATCH 04/10 RESEND] mmc: spi: Pull out parts shared between MMC
+ and SPI
+In-Reply-To: <20120716095741.85d959fc81ab759b10adcf25@kinali.ch>
+References: <1341555449-17507-1-git-send-email-marex@denx.de>
+ <1341555449-17507-4-git-send-email-marex@denx.de>
+ <20120716095741.85d959fc81ab759b10adcf25@kinali.ch>
+Message-ID: <201207161259.15034.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I can see the same problem at my side.
-> Usually it's caused by clock issue.
-> I will try to fix it tomorrow when have time.
->
-> Regards
-> Dong Aisheng
->
- Hi,
+Dear Attila Kinali,
 
-i did a bit more research on it. Before the change to common clock
-framework, it seems that I can toggle the headphone and adc from Mic
-to Line in. The headphone toggle to direct output works, but
-unfortunately if i toggle the ADC input source to Line-In  the
-recorded sound is only a noisy signal.
+> Moin,
+> 
+> I just wanted to try out this patchset as i have a use for proper spi
+> support on i.mx23. But this patch (4/10) fails to apply at line 635
+> 
+[...]
 
-I test several past version, but I can not find a version where the
-recording function for Line-In works.
+> > +	struct mxs_ssp *ssp;
+> > 
+> >  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> 
+> The function variables do not match.
+> 
+> Also a 3way merge didnt work as the comit on which this patchset was
+> based on wasnt found. I tried linux, linux-next, and the imx repos
+> from pengutronix and Shawn, to no avail.
+> 
+> Is there any other repo around that i'm not aware of?
+> 
+> 			Attila Kinali
 
+Well I have it rebased on top of current -next, but ... will some of the SPI 
+maintainers possibly apply it to their -next tree any soon? Or why are these 
+patches stuck as they are without much review ?
 
-I try to understand the saif-code, but i does not understand why not
-all clk_enable are replaced by clk_prepare_enable. Can anyone explain
-that? I replaced the clk_enable clk_prepare_enableand the board does
-not crash, but there is an input/output error.
+It seems Shawn is OK with the latest version, so can these be applied? I'll post 
+the rebased version again if necessary.
 
-                /*
-                 * If the saif's master is not himself, we also need to enable
-                 * itself clk for its internal basic logic to work.
-                 */
-                if (saif != master_saif) {
-                        clk_enable(saif->clk);
-                        __raw_writel(BM_SAIF_CTRL_RUN,
-                                saif->base + SAIF_CTRL + MXS_SET_ADDR);
-                }
-
-
-Another question is about the initial clock rate for the saif internal
-logic. Befor the clock_mx28.c was deleted, there was an
-clk_set_rate(&saif1_clk, 24000000); for internal logic. Where it is
-now being made? I did not found it.
-
-I'm new to driver development and I want to develop a driver for the
-Cirrus cs5381 ADC Codec. That's why I want to understand the saif
-code.  The codec is pretty simple, because it can be only configured
-the data output format and the Master/slave Clock mode.  Unfortunately
-i would like to get the codec working in master mode with MCLK is
-driven by external clock source to the codec. I see in the source code
-that only EXTMSTR0 mode is implemented. I would like to get the DIRECT
-mode working, and use SAIF1 in Slave mode for recive only.  For my
-understanding in the SGTL5000 drive, the SAIF1 works in slave mode and
-get it BITCLK and LRCLK from Saif0. I think and hope that the changes
-to get the Directmode working is not very much.  The Codec provide the
-BITCLK and LRCLK to the cpu . But I don't unterstand to handle that
-each Saif must have a master, described in the mxs-saif.c comment.
-Because in my hardware setup I only need SAIF1 in Slave mode. Can you
-give me a hint howto handle this?
-
-Best regards Andreas
+Best regards,
+Marek Vasut
