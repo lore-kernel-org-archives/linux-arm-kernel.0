@@ -1,30 +1,58 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Mon, 16 Jul 2012 09:01:29 +0100
-Subject: [PATCH v2 0/4] Clk: SPEAr: Rename clk ids within predefined limit
-In-Reply-To: <cover.1342411982.git.vipulkumar.samar@st.com>
-References: <cover.1342411982.git.vipulkumar.samar@st.com>
-Message-ID: <CAOh2x=k1YifBUL4Wr78YJQNyLv4i8nOLdCChEHWBJ0thv5u98A@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 16 Jul 2012 11:12:05 +0300
+Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
+ ocp2scp
+In-Reply-To: <201206251626.09666.arnd@arndb.de>
+References: <1340370942-23201-1-git-send-email-kishon@ti.com>
+ <CAAe_U6+dkiQw-i93pFapt6qKrArzaQoE8X3GjDzUDraziG8B2Q@mail.gmail.com>
+ <20120625122449.GA30463@arwen.pp.htv.fi>
+ <201206251626.09666.arnd@arndb.de>
+Message-ID: <20120716081204.GI7955@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 5:25 AM, Vipul Kumar Samar
-<vipulkumar.samar@st.com> wrote:
-> The max limit of con_id is 16 and dev_id is 20. As of now for all SPEAr SOC's
-> clk ids are exceeding this predefined limit.
->
-> This patch set is intended to rename clk ids through out spear clk framework.
->
-> -v2:
-> -Rename gpt timer parent clk id on spear3xx and spear6xx machine as pll3_48m_clk
-> is renamed to pll3_clk.
->
->
-> Vipul Kumar Samar (4):
->   clk:spear1340:Fix: Rename clk ids within predefined limit
->   clk:spear1310:Fix: Rename clk ids within predefined limit
->   Clk:spear3xx:Fix: Rename clk ids within predefined limit
->   Clk:spear6xx:Fix: Rename clk ids within predefined limit
+Hi,
 
-Looks Good.
+On Mon, Jun 25, 2012 at 04:26:08PM +0000, Arnd Bergmann wrote:
+> On Monday 25 June 2012, Felipe Balbi wrote:
+> > > > Can't this live where the scp drivers live?  Actually, where is that at?
+> > > > Do we have scp drivers?
+> > > AFAIK, there isn't any driver for scp. But we have a driver for ocp
+> > > and it is present at arch/arm/mach-omap2/omap_l3_noc.c
+> > 
+> > I don't think this deserves a directory of its own. Maybe
+> > drivers/platform/arm/omap/ ?? the l3_noc is an OMAP-specific
+> > interconnect and the SCP bus is also an OMAP-specific bus. I don't know
+> > of any other arch/soc who uses the same interconnect IP as OMAP and the
+> > same ocp2scp bridge. That bridge was created by TI for all I know.
+> > 
+> > Greg, would drivers/platform/arm/omap/ work for you ? We could also move
+> > the interconnect drivers there.
+> 
+> I really don't like the idea of introducing drivers/platform/arm/ because
+> very little of the stuff that one would put in there are actually ARM
+> specific.
+> 
+> I have suggested a drivers/bus/ before and people did not see the need
+> back then, and we agreed to continue having a directory for each bus,
+> as we have for the big ones (pci, usb, i2c, spi, ...) and a lot of
+> simple (amba, rapidio, bcma, ...) or obscure (tc,  vlynq, nubus, ...)
+> ones.
+> 
+> I think we should reconsider the idea of drivers/bus/ with a file per
+> bus in there at least for new buses, but doing a new drivers/scp/
+> would be ok for me if there is enough opposition against the idea
+> of drivers/bus aggregating different buses.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I don't mind either way. The fact is that this ocp-to-scp bridge is
+really a TI/OMAP thing. Not sure it deserves a directory of its own.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/144f22e9/attachment-0001.sig>
