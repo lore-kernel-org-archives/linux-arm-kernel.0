@@ -1,40 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Jul 2012 14:55:40 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-In-Reply-To: <20120716130015.GF17435@pengutronix.de>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
- <20120712131231.GH2194@pengutronix.de>
- <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
- <20120716101706.GB17435@pengutronix.de> <5003FB7C.4030509@linaro.org>
- <20120716130015.GF17435@pengutronix.de>
-Message-ID: <50041D5C.7010904@linaro.org>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 16 Jul 2012 15:57:28 +0200
+Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+In-Reply-To: <5003C449.6000806@linaro.org>
+References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
+ <4FF6994B.9040801@linaro.org>
+ <20120706173957.GA10202@core.coreip.homeip.net>
+ <4FFB288D.4080606@linaro.org>
+ <20120709201422.GA12242@core.coreip.homeip.net>
+ <4FFB40A4.5060505@linaro.org>
+ <20120709204620.GA12692@core.coreip.homeip.net>
+ <4FFB463F.9040201@linaro.org>
+ <20120710061757.GB29257@core.coreip.homeip.net>
+ <5003C449.6000806@linaro.org>
+Message-ID: <20120716135728.GK20652@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/12 14:00, Wolfram Sang wrote:
->>> What I am afraid of is: tentative solutions tend to stay, because the
->>> need for a proper solution is reduced. Yet, finding proper generic
->>> bindings might take some time which doesn't meet the high pressure
->>> around DT at the moment.
->>
->> I agree with what you say to some extent, but I believe that it is
->> more important to have a working solution now than to ensure that
->> each bindings are as unique as possible. After any suggestion of
->> consolidation, a move from vendor specific to generically defined
->> Device Tree bindings is trivial. Especially in the current stage
->> where adaptions and definitions are still fluid.
->
-> See my response to Linus. I do understand your view and where it comes
-> from. As a maintainer, I have other priorities. No offence involved,
-> it needs some settlement.
+Hi Lee,
 
-I'm certainly not adverse to doing this, although I'd prefer it was 
-completed in the short-term. So should we do it?
+On Mon, Jul 16, 2012 at 08:35:37AM +0100, Lee Jones wrote:
+> > I think it would be best if this got merged through whatever tree that
+> > was used to introduce ab8500_irq_get_virq(); otherwise it will have to
+> > wait till I resync with mainline sometime in the middle of the next
+> > release cycle.
+> 
+> I agree. Sam that's you, patch below. :)
+Applied, thanks.
+
+Cheers,
+Samuel.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Intel Open Source Technology Centre
+http://oss.intel.com/
