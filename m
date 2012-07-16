@@ -1,58 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jul 2012 12:33:02 +0100
-Subject: [PATCH v5] ARM: vfp: Always save VFP state in vfp_pm_suspend
-In-Reply-To: <CAGsJ_4x5S4Aq-nJU1nyyw7E8Q82UPm0pNP-NYJ5N8aGn=nMdgw@mail.gmail.com>
-References: <20120715215342.4DAB99D401E@zog.reactivated.net>
- <CAGsJ_4x5S4Aq-nJU1nyyw7E8Q82UPm0pNP-NYJ5N8aGn=nMdgw@mail.gmail.com>
-Message-ID: <20120716113302.GG26723@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Jul 2012 13:37:13 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <20120716101706.GB17435@pengutronix.de>
+References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
+ <20120712131231.GH2194@pengutronix.de>
+ <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
+ <20120716101706.GB17435@pengutronix.de>
+Message-ID: <CACRpkdY626iYATorphAvg7cQxD2ufysBvXdt3Z644zEuW0wS=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 02:40:06AM +0100, Barry Song wrote:
-> 2012/7/16 Daniel Drake <dsd@laptop.org>:
-> > From: Colin Cross <ccross@android.com>
-> >
-> > vfp_pm_suspend should save the VFP state any time there is
-> > a vfp_current_hw_state.  If it only saves when the VFP is enabled,
-> > the state can get lost when, on a UP system:
-> >    Thread 1 uses the VFP
-> >    Context switch occurs to thread 2, VFP is disabled but the
-> >       VFP context is not saved to allow lazy save and restore
-> >    Thread 2 initiates suspend
-> >    vfp_pm_suspend is called with the VFP disabled, but the
-> >       context has not been saved.
-> >
-> > Modify vfp_pm_suspend to save the VFP context whenever
-> > vfp_current_hw_state is set.
-> >
-> > Signed-off-by: Colin Cross <ccross@android.com>
-> > Cc: Binghua Duan <binghua.duan@csr.com>
-> > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-> > Signed-off-by: Barry Song <21cnbao@gmail.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> we also found this kind of issue too, sometimes suspend/resume will
-> fail with this bug.
-> so we refined this patch before. but i am really wondering why it has
-> not been committed yet.
+On Mon, Jul 16, 2012 at 12:17 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
 
-At a guess, it hasn't been applied because nobody has submitted it to the
-patch system.
+>> And about the perpetual nature of device tree bindings it
+>> appears to me that the modus operandi right now is to not
+>> regard any of these as written in stone until they are removed
+>> from the kernel tree. We have plenty of drivers patching
+>> trees and drivers in one for the moment.
+>
+> I don't get this one. Yes, they are of perpetual nature, so how could we
+> remove them from the kernel tree?
 
-> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> > index 58696192..c86fc52 100644
-> > --- a/arch/arm/vfp/vfpmodule.c
-> > +++ b/arch/arm/vfp/vfpmodule.c
-> > @@ -457,6 +457,10 @@ static int vfp_pm_suspend(void)
-> >
-> >                 /* disable, just in case */
-> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> > +       } else if (vfp_current_hw_state[ti->cpu]) {
-> > +               fmxr(FPEXC, fpexc | FPEXC_EN);
-> > +               vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
-> > +               fmxr(FPEXC, fpexc);
+What I meant was that at the point when arch/arm/boot/dts/*
+is (if ever) removed from the kernel tree and into its own git, so that
+the standardization of bindings is decoupled from the Linux kernel
+tree, from that point it is no longer possible to alter the bindings
+and the code in sync, so at that point the bindings need to be
+frozen and all subsequent work will need to gear down and
+work on bindings before deployment.
 
-Given that we don't do lazy saving on SMP systems, can we make this
-conditional on !SMP?
+That said, this does not at all solve the problem of already-deployed
+device trees using old bindings...
 
-Will
+> What I am afraid of is: tentative solutions tend to stay, because the
+> need for a proper solution is reduced. Yet, finding proper generic
+> bindings might take some time which doesn't meet the high pressure
+> around DT at the moment.
+
+I'm +1 on this. But I have learned that I have had to strike a
+compromise with people who want to forge ahead. They see things
+in the other way: perpetual committee discussions and no code
+nor device trees being deployed... :-)
+
+Yours,
+Linus Walleij
