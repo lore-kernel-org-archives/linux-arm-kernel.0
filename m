@@ -1,71 +1,41 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 16 Jul 2012 16:22:35 -0700
-Subject: [PATCH 2/2] [RFC] cpufreq: omap: scale regulator from clk notifier
-In-Reply-To: <CACRpkda7g2qMErwf-nebKSOW=044=YadEzEoKWM1dT=29yueeA@mail.gmail.com>
-References: <1342225001-22962-1-git-send-email-mturquette@linaro.org>
- <1342225001-22962-3-git-send-email-mturquette@linaro.org>
- <CACRpkda7g2qMErwf-nebKSOW=044=YadEzEoKWM1dT=29yueeA@mail.gmail.com>
-Message-ID: <CAJOA=zOSwfVnL=JrNfY5fE2tjzL1T_2Sd0rCrijaO3AxosStDg@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 17 Jul 2012 01:28:04 +0200
+Subject: [PATCH 1/1] ARM: OMAP2+: omap2plus_defconfig: enable OMAP DMA
+ engine support
+In-Reply-To: <87bojfeikj.fsf@ti.com>
+References: <1342321398-11009-1-git-send-email-javier@dowhile0.org>
+ <87bojfeikj.fsf@ti.com>
+Message-ID: <CABxcv=nbUOKKhJxTG302fX=UzHsX3mN=R2nEi88VZM61ka11Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 3:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Jul 14, 2012 at 2:16 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> '
->> This patch moves direct control of the MPU voltage regulator out of the
->> cpufreq driver .target callback and instead puts that logic into a clock
->> rate change notifier callback.
+On Mon, Jul 16, 2012 at 7:12 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Javier Martinez Canillas <javier@dowhile0.org> writes:
 >
-> That's heavy stuff.
+>> commit 13f30fc893e4610f67dd7a8b0b67aec02eac1775
+>> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Date:   Sat Apr 21 22:41:10 2012 +0100
+>>
+>>     mmc: omap: remove private DMA API implementation
+>>
+>> removed the private DMA API implementation from the OMAP mmc host to
+>> make it use exclusively the DMA engine API.
+>>
+>> Unfortunately the omap2plus_defconfig doesn't enable this feature
+>> leading to the following error on an IGEPv2 Rev.C (and probably on most
+>> boards with MMC support):
 >
-
-Gravity is stronger here.
-
-CPU dvfs is the least interesting dvfs in my opinion, since it has
-been solved by CPUfreq for eons.  However it was the lowest hanging
-fruit for demoing the idea behind dvfs-via-clk-notifer.
-
-This is a chicken before the egg problem: drivers are not adapted for
-dvfs since we have no dvfs api.  In trying to demonstrate
-dvfs-via-clk-notifier it was much easier for me to hijack one of the
-few existing sources of dvfs in the kernel: cpufreq.  If my platform
-of choice (pandaboard) had any device which supported devfreq (e.g.
-gpu, ddr or mmc controller) then I might have chosen that instead, but
-the change would have been essentially the same as the one above.
-
-> I was hoping that the first example of using clk notifiers would be
-> something like mach-davinci replacing it's legacy clock framework
-> with drivers/clk and then go in and change the horrid cpufreq hack
-> that is currently in drivers/mmc/host/davinci_mmc.c to use a
-> clock notifier instead of cpufreq.
+> Personally, I'd rather see this fixed by having the drivers that depend
+> on DMA engine 'select DMADEVICES'.  That way, any defconfig will work
+> correctly instead of just omap2plus_defconfig.
+>
+> Kevin
 >
 
-I am not familiar with the issue you're talking about here, but it
-sounds more like some clk functional dependencies have been stuffed
-into the davinci cpufreq driver?  clk notifiers can handle that as
-well, and the reentrancy issues would remain (calling clk_set_rate
-from within clk_set_rate).  The point of this series is that the state
-of reentrancy in the clk framework sucks and I could use some
-collective brainpower to improve it :-)
+Hi Kevin,
 
-> Sekhar/Kevin, any chance to have DaVinci converted to Mikes new
-> clock framework? It doesn't look super-complex and would be a
-> good example for others I think.
->
+Thanks a lot for your feedback. I'll do what you suggest and send a v2
+of the patch.
 
-Again, I'd love more platform ports to the common clock framework, but
-I hope that the purpose of this RFC is not lost in the noise.  Devices
-like off-soc audio chips and pmics are screwed without some change to
-the core code and we are not advancing the state of dvfs in an
-upstream kernel until some of these issues are sorted.
-
-Thanks much,
-Mike
-
-> Yours,
-> Linus Walleij
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best regards,
+Javier
