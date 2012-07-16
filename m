@@ -1,60 +1,178 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 16 Jul 2012 12:21:51 +0200
-Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <201207141409.38554.marex@denx.de>
-References: <1341850974-11977-1-git-send-email-marex@denx.de>
- <201207131410.29469.marex@denx.de>
- <20120714112929.GB29529@pengutronix.de>
- <201207141409.38554.marex@denx.de>
-Message-ID: <20120716102151.GC17435@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 16 Jul 2012 15:53:05 +0530
+Subject: [PATCHv4 3/8] ARM: OMAP3+: voltage: add support for voltagedomain
+ usecounts
+In-Reply-To: <1342189185-5306-4-git-send-email-t-kristo@ti.com>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-4-git-send-email-t-kristo@ti.com>
+Message-ID: <5003EB89.3010207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek,
+On Friday 13 July 2012 07:49 PM, Tero Kristo wrote:
+> These are updated based on powerdomain usecounts. Also added support
+> for voltdm->sleep and voltdm->wakeup calls that will be invoked once
+> voltagedomain enters sleep or wakes up based on usecount numbers. These
+> will be used for controlling voltage scaling functionality.
+>
+> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> Cc: Paul Walmsley<paul@pwsan.com>
+> Cc: Kevin Hilman<khilman@ti.com>
 
-> > I am also still interested to check the runtime switching, but it might
-> > take another month until I can really hack on it.
-> 
-> Good, there is some bit that probably needs to be flipped to allow this 
-> switching. I managed to get this working with SPI, not with i2c though. With 
+Reviewed-by: Rajendra Nayak <rnayak@ti.com>
 
-Ah, hearing that it works with SPI is good news.
+I am working on a series to cleanup CPUidle, on top of this series,
+where I add similar callbacks at the pwrdm level too. Something like
+pwrdm->power_on and pwrdm->power_down. Helps get rid of a lot of
+code stuffed inside idle/suspend.
 
-> i2c, if I restarted the controller inbetween each transaction, it worked ... 
-> which is not what I'd like to see there.
-
-Agreed.
-
-> > > No, it doesn't. See above about small transfers. Consider the easy
-> > > situation where you have sensor on one bus (so you do PIO because you
-> > > transfer small data) and you have EEPROM on other bus, where you use DMA
-> > > because you transfer large data. And the mixed mode isn't there yet.
-> > 
-> > I fully understand what you want to configure. I did before. Yet,
-> > devicetree bindings are not platform_data and shouldn't be used like
-> > them.
-> 
-> But then, how would you configure this detail on a per-bus basis? Well all 
-
-This is a question for devicetree-discuss.
-
-> patch actually fixes a real issue, I'd like to have it in ASAP and it's been 
-> aboue three months already, which sucks.
-
-I am open to ideas improving the situation (which is: a lot more
-patches, but not a lot more reviewers)
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/ef204b42/attachment.sig>
+>   arch/arm/mach-omap2/powerdomain.c |    6 +++-
+>   arch/arm/mach-omap2/voltage.c     |   56 +++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/voltage.h     |   11 +++++++
+>   3 files changed, 72 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 68bdf36..3b4b15d 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -994,7 +994,8 @@ void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
+>   	if (!pwrdm)
+>   		return;
+>
+> -	atomic_inc(&pwrdm->usecount);
+> +	if (atomic_inc_return(&pwrdm->usecount) == 1)
+> +		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
+>   }
+>
+>   /**
+> @@ -1013,6 +1014,9 @@ void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
+>
+>   	val = atomic_dec_return(&pwrdm->usecount);
+>
+> +	if (!val)
+> +		voltdm_pwrdm_disable(pwrdm->voltdm.ptr);
+> +
+>   	BUG_ON(val<  0);
+>   }
+>
+> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+> index 4dc60e8..8c6439b 100644
+> --- a/arch/arm/mach-omap2/voltage.c
+> +++ b/arch/arm/mach-omap2/voltage.c
+> @@ -38,6 +38,7 @@
+>
+>   #include "voltage.h"
+>   #include "powerdomain.h"
+> +#include "smartreflex.h"
+>
+>   #include "vc.h"
+>   #include "vp.h"
+> @@ -340,6 +341,61 @@ int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
+>   }
+>
+>   /**
+> + * voltdm_pwrdm_enable - increase usecount for a voltagedomain
+> + * @voltdm: struct voltagedomain * to increase count for
+> + *
+> + * Increases usecount for a given voltagedomain. If the usecount reaches
+> + * 1, the domain is awakened from idle and the function will call the
+> + * voltagedomain->wakeup callback for this domain.
+> + */
+> +void voltdm_pwrdm_enable(struct voltagedomain *voltdm)
+> +{
+> +	if (!voltdm)
+> +		return;
+> +
+> +	if (atomic_inc_return(&voltdm->usecount) == 1) {
+> +		if (voltdm->wakeup)
+> +			voltdm->wakeup(voltdm);
+> +	}
+> +}
+> +
+> +/**
+> + * voltdm_pwrdm_disable - decrease usecount for a voltagedomain
+> + * @voltdm: struct voltagedomain * to decrease count for
+> + *
+> + * Decreases the usecount for a given voltagedomain. If the usecount
+> + * reaches zero, the domain can idle and the function will call the
+> + * voltagedomain->sleep callback, and calculate the overall target
+> + * state for the voltagedomain.
+> + */
+> +void voltdm_pwrdm_disable(struct voltagedomain *voltdm)
+> +{
+> +	u8 target_state = PWRDM_POWER_OFF;
+> +	int state;
+> +	struct powerdomain *pwrdm;
+> +	int val;
+> +
+> +	if (!voltdm)
+> +		return;
+> +
+> +	val = atomic_dec_return(&voltdm->usecount);
+> +
+> +	BUG_ON(val<  0);
+> +
+> +	if (val == 0) {
+> +		/* Determine target state for voltdm */
+> +		list_for_each_entry(pwrdm,&voltdm->pwrdm_list, voltdm_node) {
+> +			state = pwrdm_read_next_pwrst(pwrdm);
+> +			if (state>  target_state)
+> +				target_state = state;
+> +		}
+> +		voltdm->target_state = target_state;
+> +		if (voltdm->sleep)
+> +			voltdm->sleep(voltdm);
+> +	}
+> +}
+> +
+> +/**
+>    * voltdm_for_each_pwrdm - call function for each pwrdm in a voltdm
+>    * @voltdm: struct voltagedomain * to iterate over
+>    * @fn: callback function *
+> diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+> index 16a1b09..c1f4ae8 100644
+> --- a/arch/arm/mach-omap2/voltage.h
+> +++ b/arch/arm/mach-omap2/voltage.h
+> @@ -54,10 +54,14 @@ struct omap_vfsm_instance {
+>    * @pwrdm_list: list_head linking all powerdomains in this voltagedomain
+>    * @vc: pointer to VC channel associated with this voltagedomain
+>    * @vp: pointer to VP associated with this voltagedomain
+> + * @usecount: number of users for this voltagedomain
+> + * @target_state: calculated target state for the children of this domain
+>    * @read: read a VC/VP register
+>    * @write: write a VC/VP register
+>    * @read: read-modify-write a VC/VP register
+>    * @sys_clk: system clock name/frequency, used for various timing calculations
+> + * @sleep: function to call once the domain enters idle
+> + * @wakeup: function to call once the domain wakes up from idle
+>    * @scale: function used to scale the voltage of the voltagedomain
+>    * @nominal_volt: current nominal voltage for this voltage domain
+>    * @volt_data: voltage table having the distinct voltages supported
+> @@ -73,6 +77,9 @@ struct voltagedomain {
+>   	struct omap_vp_instance *vp;
+>   	struct omap_voltdm_pmic *pmic;
+>
+> +	atomic_t usecount;
+> +	u8 target_state;
+> +
+>   	/* VC/VP register access functions: SoC specific */
+>   	u32 (*read) (u8 offset);
+>   	void (*write) (u32 val, u8 offset);
+> @@ -83,6 +90,8 @@ struct voltagedomain {
+>   		u32 rate;
+>   	} sys_clk;
+>
+> +	void (*sleep) (struct voltagedomain *voltdm);
+> +	void (*wakeup) (struct voltagedomain *voltdm);
+>   	int (*scale) (struct voltagedomain *voltdm,
+>   		      unsigned long target_volt);
+>
+> @@ -161,6 +170,8 @@ extern void omap44xx_voltagedomains_init(void);
+>   struct voltagedomain *voltdm_lookup(const char *name);
+>   void voltdm_init(struct voltagedomain **voltdm_list);
+>   int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm);
+> +void voltdm_pwrdm_enable(struct voltagedomain *voltdm);
+> +void voltdm_pwrdm_disable(struct voltagedomain *voltdm);
+>   int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
+>   		    void *user);
+>   int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
