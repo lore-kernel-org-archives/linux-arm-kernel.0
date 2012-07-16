@@ -1,37 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jul 2012 22:49:17 +0200
-Subject: [PATCH 2/2] gpio/omap: add *remove* callback in platform_driver
-In-Reply-To: <87ipdnein1.fsf@ti.com>
-References: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
- <1341997995-14020-3-git-send-email-tarun.kanti@ti.com>
- <87394xhocn.fsf@ti.com>
- <CACRpkdZMG_ZHW_eGGrdrJh1SuO_=hOObijzmxG1ob6RoNf_dwg@mail.gmail.com>
- <87a9z4g9bi.fsf@ti.com>
- <CACRpkdZxUpQ=a-yQ8b4bnX3S9penPWkxJ+PG2Zi4i9YZibYRiw@mail.gmail.com>
- <87ipdnein1.fsf@ti.com>
-Message-ID: <CACRpkdYMzdjFXBMs6do-yqiBFV5ru28SftA5u+ZkP5KO+PhjCA@mail.gmail.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 16 Jul 2012 21:49:57 +0100
+Subject: [PATCH 2/2] mtd: gpmi: update the bitflip_threshold
+In-Reply-To: <1341303873-23040-2-git-send-email-b32955@freescale.com>
+References: <1341303873-23040-1-git-send-email-b32955@freescale.com>
+ <1341303873-23040-2-git-send-email-b32955@freescale.com>
+Message-ID: <1342471797.25411.31.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 7:10 PM, Kevin Hilman <khilman@ti.com> wrote:
+On Tue, 2012-07-03 at 16:24 +0800, Huang Shijie wrote:
+> The origin code misses to update the bitflip_threshold when
+> we have already get the right ecc_strength.
+> 
+> The patch fixes it.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com> 
 
-> Subject: [PATCH] MAINTAINERS: add entry OMAP GPIO driver
->
-> Since I've been maintaining this, making it official at the request of the
-> GPIO maintainers.
->
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+Should we be pushing this for 3.5?
 
-Thank! Applied, but:
-
-> +F:     drivers/gpio/gpio.omap.c
-
-I replaced the period with a dash:
-drivers/gpio/gpio-omap.c
-
-Yours,
-Linus Walleij
+-- 
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6171 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/56147f6f/attachment.bin>
