@@ -1,596 +1,521 @@
-From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Mon, 16 Jul 2012 09:55:38 +0530
-Subject: [PATCH v2 1/4] clk:spear1340:Fix: Rename clk ids within predefined
- limit
-In-Reply-To: <cover.1342411982.git.vipulkumar.samar@st.com>
-References: <cover.1342411982.git.vipulkumar.samar@st.com>
-Message-ID: <b43c4e64ed61d4c18f5c3326539f7f03e9604ef1.1342411982.git.vipulkumar.samar@st.com>
+From: girish.shivananjappa@linaro.org (Girish K S)
+Date: Mon, 16 Jul 2012 10:00:47 +0530
+Subject: [PATCH v3 5/6] mmc: dw_mmc: add device tree support
+In-Reply-To: <CAGxe1ZHZr2=127p8X-A12K2-zOyKMOJ0fkx5pWNovVteFfSPwg@mail.gmail.com>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+ <1342097668-25243-6-git-send-email-thomas.abraham@linaro.org>
+ <CAGxe1ZHZr2=127p8X-A12K2-zOyKMOJ0fkx5pWNovVteFfSPwg@mail.gmail.com>
+Message-ID: <CAGxe1ZGROitWwRbqhc7Swt+5Em-bL0fsYi7-YmBrhhT3pvzdow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The max limit of con_id is 16 and dev_id is 20. As of now for spear1340, many
-clk ids are exceeding this predefined limit.
-
-This patch rename clk ids like:
-    mux_clk -> _mclk
-    gate_clk -> _gclk
-    synth_clk -> syn_clk
-    gmac_phy -> phy_
-    gmii_125m_pad_ -> gmii_pad
-
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-Acked-by: Viiresh Kumar <viresh.kumar@linaro.org>
----
- drivers/clk/spear/spear1340_clock.c |  273 +++++++++++++++++------------------
- 1 files changed, 135 insertions(+), 138 deletions(-)
-
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index e3ea721..0f2324b 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -370,26 +370,24 @@ static struct frac_rate_tbl gen_rtbl[] = {
- /* clock parents */
- static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
- static const char *sys_parents[] = { "none", "pll1_clk", "none", "none",
--	"sys_synth_clk", "none", "pll2_clk", "pll3_clk", };
--static const char *ahb_parents[] = { "cpu_div3_clk", "amba_synth_clk", };
-+	"sys_syn_clk", "none", "pll2_clk", "pll3_clk", };
-+static const char *ahb_parents[] = { "cpu_div3_clk", "amba_syn_clk", };
- static const char *gpt_parents[] = { "osc_24m_clk", "apb_clk", };
- static const char *uart0_parents[] = { "pll5_clk", "osc_24m_clk",
--	"uart0_synth_gate_clk", };
-+	"uart0_syn_gclk", };
- static const char *uart1_parents[] = { "pll5_clk", "osc_24m_clk",
--	"uart1_synth_gate_clk", };
--static const char *c3_parents[] = { "pll5_clk", "c3_synth_gate_clk", };
--static const char *gmac_phy_input_parents[] = { "gmii_125m_pad_clk", "pll2_clk",
-+	"uart1_syn_gclk", };
-+static const char *c3_parents[] = { "pll5_clk", "c3_syn_gclk", };
-+static const char *gmac_phy_input_parents[] = { "gmii_pad_clk", "pll2_clk",
- 	"osc_25m_clk", };
--static const char *gmac_phy_parents[] = { "gmac_phy_input_mux_clk",
--	"gmac_phy_synth_gate_clk", };
-+static const char *gmac_phy_parents[] = { "phy_input_mclk", "phy_syn_gclk", };
- static const char *clcd_synth_parents[] = { "vco1div4_clk", "pll2_clk", };
--static const char *clcd_pixel_parents[] = { "pll5_clk", "clcd_synth_clk", };
-+static const char *clcd_pixel_parents[] = { "pll5_clk", "clcd_syn_clk", };
- static const char *i2s_src_parents[] = { "vco1div2_clk", "pll2_clk", "pll3_clk",
- 	"i2s_src_pad_clk", };
--static const char *i2s_ref_parents[] = { "i2s_src_mux_clk", "i2s_prs1_clk", };
--static const char *spdif_out_parents[] = { "i2s_src_pad_clk", "gen_synth2_clk",
--};
--static const char *spdif_in_parents[] = { "pll2_clk", "gen_synth3_clk", };
-+static const char *i2s_ref_parents[] = { "i2s_src_mclk", "i2s_prs1_clk", };
-+static const char *spdif_out_parents[] = { "i2s_src_pad_clk", "gen_syn2_clk", };
-+static const char *spdif_in_parents[] = { "pll2_clk", "gen_syn3_clk", };
- 
- static const char *gen_synth0_1_parents[] = { "vco1div4_clk", "vco3div2_clk",
- 	"pll3_clk", };
-@@ -415,9 +413,9 @@ void __init spear1340_clk_init(void)
- 			25000000);
- 	clk_register_clkdev(clk, "osc_25m_clk", NULL);
- 
--	clk = clk_register_fixed_rate(NULL, "gmii_125m_pad_clk", NULL,
--			CLK_IS_ROOT, 125000000);
--	clk_register_clkdev(clk, "gmii_125m_pad_clk", NULL);
-+	clk = clk_register_fixed_rate(NULL, "gmii_pad_clk", NULL, CLK_IS_ROOT,
-+			125000000);
-+	clk_register_clkdev(clk, "gmii_pad_clk", NULL);
- 
- 	clk = clk_register_fixed_rate(NULL, "i2s_src_pad_clk", NULL,
- 			CLK_IS_ROOT, 12288000);
-@@ -431,35 +429,35 @@ void __init spear1340_clk_init(void)
- 
- 	/* clock derived from 24 or 25 MHz osc clk */
- 	/* vco-pll */
--	clk = clk_register_mux(NULL, "vco1_mux_clk", vco_parents,
-+	clk = clk_register_mux(NULL, "vco1_mclk", vco_parents,
- 			ARRAY_SIZE(vco_parents), 0, SPEAR1340_PLL_CFG,
- 			SPEAR1340_PLL1_CLK_SHIFT, SPEAR1340_PLL_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "vco1_mux_clk", NULL);
--	clk = clk_register_vco_pll("vco1_clk", "pll1_clk", NULL, "vco1_mux_clk",
--			0, SPEAR1340_PLL1_CTR, SPEAR1340_PLL1_FRQ, pll_rtbl,
-+	clk_register_clkdev(clk, "vco1_mclk", NULL);
-+	clk = clk_register_vco_pll("vco1_clk", "pll1_clk", NULL, "vco1_mclk", 0,
-+			SPEAR1340_PLL1_CTR, SPEAR1340_PLL1_FRQ, pll_rtbl,
- 			ARRAY_SIZE(pll_rtbl), &_lock, &clk1, NULL);
- 	clk_register_clkdev(clk, "vco1_clk", NULL);
- 	clk_register_clkdev(clk1, "pll1_clk", NULL);
- 
--	clk = clk_register_mux(NULL, "vco2_mux_clk", vco_parents,
-+	clk = clk_register_mux(NULL, "vco2_mclk", vco_parents,
- 			ARRAY_SIZE(vco_parents), 0, SPEAR1340_PLL_CFG,
- 			SPEAR1340_PLL2_CLK_SHIFT, SPEAR1340_PLL_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "vco2_mux_clk", NULL);
--	clk = clk_register_vco_pll("vco2_clk", "pll2_clk", NULL, "vco2_mux_clk",
--			0, SPEAR1340_PLL2_CTR, SPEAR1340_PLL2_FRQ, pll_rtbl,
-+	clk_register_clkdev(clk, "vco2_mclk", NULL);
-+	clk = clk_register_vco_pll("vco2_clk", "pll2_clk", NULL, "vco2_mclk", 0,
-+			SPEAR1340_PLL2_CTR, SPEAR1340_PLL2_FRQ, pll_rtbl,
- 			ARRAY_SIZE(pll_rtbl), &_lock, &clk1, NULL);
- 	clk_register_clkdev(clk, "vco2_clk", NULL);
- 	clk_register_clkdev(clk1, "pll2_clk", NULL);
- 
--	clk = clk_register_mux(NULL, "vco3_mux_clk", vco_parents,
-+	clk = clk_register_mux(NULL, "vco3_mclk", vco_parents,
- 			ARRAY_SIZE(vco_parents), 0, SPEAR1340_PLL_CFG,
- 			SPEAR1340_PLL3_CLK_SHIFT, SPEAR1340_PLL_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "vco3_mux_clk", NULL);
--	clk = clk_register_vco_pll("vco3_clk", "pll3_clk", NULL, "vco3_mux_clk",
--			0, SPEAR1340_PLL3_CTR, SPEAR1340_PLL3_FRQ, pll_rtbl,
-+	clk_register_clkdev(clk, "vco3_mclk", NULL);
-+	clk = clk_register_vco_pll("vco3_clk", "pll3_clk", NULL, "vco3_mclk", 0,
-+			SPEAR1340_PLL3_CTR, SPEAR1340_PLL3_FRQ, pll_rtbl,
- 			ARRAY_SIZE(pll_rtbl), &_lock, &clk1, NULL);
- 	clk_register_clkdev(clk, "vco3_clk", NULL);
- 	clk_register_clkdev(clk1, "pll3_clk", NULL);
-@@ -498,7 +496,7 @@ void __init spear1340_clk_init(void)
- 	/* peripherals */
- 	clk_register_fixed_factor(NULL, "thermal_clk", "osc_24m_clk", 0, 1,
- 			128);
--	clk = clk_register_gate(NULL, "thermal_gate_clk", "thermal_clk", 0,
-+	clk = clk_register_gate(NULL, "thermal_gclk", "thermal_clk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_THSENS_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_thermal");
-@@ -509,23 +507,23 @@ void __init spear1340_clk_init(void)
- 	clk_register_clkdev(clk, "ddr_clk", NULL);
- 
- 	/* clock derived from pll1 clk */
--	clk = clk_register_frac("sys_synth_clk", "vco1div2_clk", 0,
-+	clk = clk_register_frac("sys_syn_clk", "vco1div2_clk", 0,
- 			SPEAR1340_SYS_CLK_SYNT, sys_synth_rtbl,
- 			ARRAY_SIZE(sys_synth_rtbl), &_lock);
--	clk_register_clkdev(clk, "sys_synth_clk", NULL);
-+	clk_register_clkdev(clk, "sys_syn_clk", NULL);
- 
--	clk = clk_register_frac("amba_synth_clk", "vco1div2_clk", 0,
-+	clk = clk_register_frac("amba_syn_clk", "vco1div2_clk", 0,
- 			SPEAR1340_AMBA_CLK_SYNT, amba_synth_rtbl,
- 			ARRAY_SIZE(amba_synth_rtbl), &_lock);
--	clk_register_clkdev(clk, "amba_synth_clk", NULL);
-+	clk_register_clkdev(clk, "amba_syn_clk", NULL);
- 
--	clk = clk_register_mux(NULL, "sys_mux_clk", sys_parents,
-+	clk = clk_register_mux(NULL, "sys_mclk", sys_parents,
- 			ARRAY_SIZE(sys_parents), 0, SPEAR1340_SYS_CLK_CTRL,
- 			SPEAR1340_SCLK_SRC_SEL_SHIFT,
- 			SPEAR1340_SCLK_SRC_SEL_MASK, 0, &_lock);
- 	clk_register_clkdev(clk, "sys_clk", NULL);
- 
--	clk = clk_register_fixed_factor(NULL, "cpu_clk", "sys_mux_clk", 0, 1,
-+	clk = clk_register_fixed_factor(NULL, "cpu_clk", "sys_mclk", 0, 1,
- 			2);
- 	clk_register_clkdev(clk, "cpu_clk", NULL);
- 
-@@ -548,194 +546,193 @@ void __init spear1340_clk_init(void)
- 	clk_register_clkdev(clk, "apb_clk", NULL);
- 
- 	/* gpt clocks */
--	clk = clk_register_mux(NULL, "gpt0_mux_clk", gpt_parents,
-+	clk = clk_register_mux(NULL, "gpt0_mclk", gpt_parents,
- 			ARRAY_SIZE(gpt_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_GPT0_CLK_SHIFT, SPEAR1340_GPT_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "gpt0_mux_clk", NULL);
--	clk = clk_register_gate(NULL, "gpt0_clk", "gpt0_mux_clk", 0,
-+	clk_register_clkdev(clk, "gpt0_mclk", NULL);
-+	clk = clk_register_gate(NULL, "gpt0_clk", "gpt0_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_GPT0_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "gpt0");
- 
--	clk = clk_register_mux(NULL, "gpt1_mux_clk", gpt_parents,
-+	clk = clk_register_mux(NULL, "gpt1_mclk", gpt_parents,
- 			ARRAY_SIZE(gpt_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_GPT1_CLK_SHIFT, SPEAR1340_GPT_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "gpt1_mux_clk", NULL);
--	clk = clk_register_gate(NULL, "gpt1_clk", "gpt1_mux_clk", 0,
-+	clk_register_clkdev(clk, "gpt1_mclk", NULL);
-+	clk = clk_register_gate(NULL, "gpt1_clk", "gpt1_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_GPT1_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "gpt1");
- 
--	clk = clk_register_mux(NULL, "gpt2_mux_clk", gpt_parents,
-+	clk = clk_register_mux(NULL, "gpt2_mclk", gpt_parents,
- 			ARRAY_SIZE(gpt_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_GPT2_CLK_SHIFT, SPEAR1340_GPT_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "gpt2_mux_clk", NULL);
--	clk = clk_register_gate(NULL, "gpt2_clk", "gpt2_mux_clk", 0,
-+	clk_register_clkdev(clk, "gpt2_mclk", NULL);
-+	clk = clk_register_gate(NULL, "gpt2_clk", "gpt2_mclk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_GPT2_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "gpt2");
- 
--	clk = clk_register_mux(NULL, "gpt3_mux_clk", gpt_parents,
-+	clk = clk_register_mux(NULL, "gpt3_mclk", gpt_parents,
- 			ARRAY_SIZE(gpt_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_GPT3_CLK_SHIFT, SPEAR1340_GPT_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "gpt3_mux_clk", NULL);
--	clk = clk_register_gate(NULL, "gpt3_clk", "gpt3_mux_clk", 0,
-+	clk_register_clkdev(clk, "gpt3_mclk", NULL);
-+	clk = clk_register_gate(NULL, "gpt3_clk", "gpt3_mclk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_GPT3_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "gpt3");
- 
- 	/* others */
--	clk = clk_register_aux("uart0_synth_clk", "uart0_synth_gate_clk",
-+	clk = clk_register_aux("uart0_syn_clk", "uart0_syn_gclk",
- 			"vco1div2_clk", 0, SPEAR1340_UART0_CLK_SYNT, NULL,
- 			aux_rtbl, ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "uart0_synth_clk", NULL);
--	clk_register_clkdev(clk1, "uart0_synth_gate_clk", NULL);
-+	clk_register_clkdev(clk, "uart0_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "uart0_syn_gclk", NULL);
- 
--	clk = clk_register_mux(NULL, "uart0_mux_clk", uart0_parents,
-+	clk = clk_register_mux(NULL, "uart0_mclk", uart0_parents,
- 			ARRAY_SIZE(uart0_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_UART0_CLK_SHIFT, SPEAR1340_UART_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "uart0_mux_clk", NULL);
-+	clk_register_clkdev(clk, "uart0_mclk", NULL);
- 
--	clk = clk_register_gate(NULL, "uart0_clk", "uart0_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "uart0_clk", "uart0_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_UART0_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "e0000000.serial");
- 
--	clk = clk_register_aux("uart1_synth_clk", "uart1_synth_gate_clk",
-+	clk = clk_register_aux("uart1_syn_clk", "uart1_syn_gclk",
- 			"vco1div2_clk", 0, SPEAR1340_UART1_CLK_SYNT, NULL,
- 			aux_rtbl, ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "uart1_synth_clk", NULL);
--	clk_register_clkdev(clk1, "uart1_synth_gate_clk", NULL);
-+	clk_register_clkdev(clk, "uart1_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "uart1_syn_gclk", NULL);
- 
--	clk = clk_register_mux(NULL, "uart1_mux_clk", uart1_parents,
-+	clk = clk_register_mux(NULL, "uart1_mclk", uart1_parents,
- 			ARRAY_SIZE(uart1_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_UART1_CLK_SHIFT, SPEAR1340_UART_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "uart1_mux_clk", NULL);
-+	clk_register_clkdev(clk, "uart1_mclk", NULL);
- 
--	clk = clk_register_gate(NULL, "uart1_clk", "uart1_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "uart1_clk", "uart1_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_UART1_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "b4100000.serial");
- 
--	clk = clk_register_aux("sdhci_synth_clk", "sdhci_synth_gate_clk",
-+	clk = clk_register_aux("sdhci_syn_clk", "sdhci_syn_gclk",
- 			"vco1div2_clk", 0, SPEAR1340_SDHCI_CLK_SYNT, NULL,
- 			aux_rtbl, ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "sdhci_synth_clk", NULL);
--	clk_register_clkdev(clk1, "sdhci_synth_gate_clk", NULL);
-+	clk_register_clkdev(clk, "sdhci_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "sdhci_syn_gclk", NULL);
- 
--	clk = clk_register_gate(NULL, "sdhci_clk", "sdhci_synth_gate_clk", 0,
-+	clk = clk_register_gate(NULL, "sdhci_clk", "sdhci_syn_gclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_SDHCI_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "b3000000.sdhci");
- 
--	clk = clk_register_aux("cfxd_synth_clk", "cfxd_synth_gate_clk",
--			"vco1div2_clk", 0, SPEAR1340_CFXD_CLK_SYNT, NULL,
--			aux_rtbl, ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "cfxd_synth_clk", NULL);
--	clk_register_clkdev(clk1, "cfxd_synth_gate_clk", NULL);
-+	clk = clk_register_aux("cfxd_syn_clk", "cfxd_syn_gclk", "vco1div2_clk",
-+			0, SPEAR1340_CFXD_CLK_SYNT, NULL, aux_rtbl,
-+			ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
-+	clk_register_clkdev(clk, "cfxd_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "cfxd_syn_gclk", NULL);
- 
--	clk = clk_register_gate(NULL, "cfxd_clk", "cfxd_synth_gate_clk", 0,
-+	clk = clk_register_gate(NULL, "cfxd_clk", "cfxd_syn_gclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_CFXD_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "b2800000.cf");
- 	clk_register_clkdev(clk, NULL, "arasan_xd");
- 
--	clk = clk_register_aux("c3_synth_clk", "c3_synth_gate_clk",
--			"vco1div2_clk", 0, SPEAR1340_C3_CLK_SYNT, NULL,
--			aux_rtbl, ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "c3_synth_clk", NULL);
--	clk_register_clkdev(clk1, "c3_synth_gate_clk", NULL);
-+	clk = clk_register_aux("c3_syn_clk", "c3_syn_gclk", "vco1div2_clk", 0,
-+			SPEAR1340_C3_CLK_SYNT, NULL, aux_rtbl,
-+			ARRAY_SIZE(aux_rtbl), &_lock, &clk1);
-+	clk_register_clkdev(clk, "c3_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "c3_syn_gclk", NULL);
- 
--	clk = clk_register_mux(NULL, "c3_mux_clk", c3_parents,
-+	clk = clk_register_mux(NULL, "c3_mclk", c3_parents,
- 			ARRAY_SIZE(c3_parents), 0, SPEAR1340_PERIP_CLK_CFG,
- 			SPEAR1340_C3_CLK_SHIFT, SPEAR1340_C3_CLK_MASK, 0,
- 			&_lock);
--	clk_register_clkdev(clk, "c3_mux_clk", NULL);
-+	clk_register_clkdev(clk, "c3_mclk", NULL);
- 
--	clk = clk_register_gate(NULL, "c3_clk", "c3_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "c3_clk", "c3_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_C3_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "c3");
- 
- 	/* gmac */
--	clk = clk_register_mux(NULL, "gmac_phy_input_mux_clk",
--			gmac_phy_input_parents,
-+	clk = clk_register_mux(NULL, "phy_input_mclk", gmac_phy_input_parents,
- 			ARRAY_SIZE(gmac_phy_input_parents), 0,
- 			SPEAR1340_GMAC_CLK_CFG,
- 			SPEAR1340_GMAC_PHY_INPUT_CLK_SHIFT,
- 			SPEAR1340_GMAC_PHY_INPUT_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "gmac_phy_input_mux_clk", NULL);
-+	clk_register_clkdev(clk, "phy_input_mclk", NULL);
- 
--	clk = clk_register_aux("gmac_phy_synth_clk", "gmac_phy_synth_gate_clk",
--			"gmac_phy_input_mux_clk", 0, SPEAR1340_GMAC_CLK_SYNT,
--			NULL, gmac_rtbl, ARRAY_SIZE(gmac_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "gmac_phy_synth_clk", NULL);
--	clk_register_clkdev(clk1, "gmac_phy_synth_gate_clk", NULL);
-+	clk = clk_register_aux("phy_syn_clk", "phy_syn_gclk", "phy_input_mclk",
-+			0, SPEAR1340_GMAC_CLK_SYNT, NULL, gmac_rtbl,
-+			ARRAY_SIZE(gmac_rtbl), &_lock, &clk1);
-+	clk_register_clkdev(clk, "phy_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "phy_syn_gclk", NULL);
- 
--	clk = clk_register_mux(NULL, "gmac_phy_mux_clk", gmac_phy_parents,
-+	clk = clk_register_mux(NULL, "phy_mclk", gmac_phy_parents,
- 			ARRAY_SIZE(gmac_phy_parents), 0,
- 			SPEAR1340_PERIP_CLK_CFG, SPEAR1340_GMAC_PHY_CLK_SHIFT,
- 			SPEAR1340_GMAC_PHY_CLK_MASK, 0, &_lock);
- 	clk_register_clkdev(clk, NULL, "stmmacphy.0");
- 
- 	/* clcd */
--	clk = clk_register_mux(NULL, "clcd_synth_mux_clk", clcd_synth_parents,
-+	clk = clk_register_mux(NULL, "clcd_syn_mclk", clcd_synth_parents,
- 			ARRAY_SIZE(clcd_synth_parents), 0,
- 			SPEAR1340_CLCD_CLK_SYNT, SPEAR1340_CLCD_SYNT_CLK_SHIFT,
- 			SPEAR1340_CLCD_SYNT_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "clcd_synth_mux_clk", NULL);
-+	clk_register_clkdev(clk, "clcd_syn_mclk", NULL);
- 
--	clk = clk_register_frac("clcd_synth_clk", "clcd_synth_mux_clk", 0,
-+	clk = clk_register_frac("clcd_syn_clk", "clcd_syn_mclk", 0,
- 			SPEAR1340_CLCD_CLK_SYNT, clcd_rtbl,
- 			ARRAY_SIZE(clcd_rtbl), &_lock);
--	clk_register_clkdev(clk, "clcd_synth_clk", NULL);
-+	clk_register_clkdev(clk, "clcd_syn_clk", NULL);
- 
--	clk = clk_register_mux(NULL, "clcd_pixel_mux_clk", clcd_pixel_parents,
-+	clk = clk_register_mux(NULL, "clcd_pixel_mclk", clcd_pixel_parents,
- 			ARRAY_SIZE(clcd_pixel_parents), 0,
- 			SPEAR1340_PERIP_CLK_CFG, SPEAR1340_CLCD_CLK_SHIFT,
- 			SPEAR1340_CLCD_CLK_MASK, 0, &_lock);
- 	clk_register_clkdev(clk, "clcd_pixel_clk", NULL);
- 
--	clk = clk_register_gate(NULL, "clcd_clk", "clcd_pixel_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "clcd_clk", "clcd_pixel_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_CLCD_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, "clcd_clk", NULL);
- 
- 	/* i2s */
--	clk = clk_register_mux(NULL, "i2s_src_mux_clk", i2s_src_parents,
-+	clk = clk_register_mux(NULL, "i2s_src_mclk", i2s_src_parents,
- 			ARRAY_SIZE(i2s_src_parents), 0, SPEAR1340_I2S_CLK_CFG,
- 			SPEAR1340_I2S_SRC_CLK_SHIFT, SPEAR1340_I2S_SRC_CLK_MASK,
- 			0, &_lock);
- 	clk_register_clkdev(clk, "i2s_src_clk", NULL);
- 
--	clk = clk_register_aux("i2s_prs1_clk", NULL, "i2s_src_mux_clk", 0,
-+	clk = clk_register_aux("i2s_prs1_clk", NULL, "i2s_src_mclk", 0,
- 			SPEAR1340_I2S_CLK_CFG, &i2s_prs1_masks, i2s_prs1_rtbl,
- 			ARRAY_SIZE(i2s_prs1_rtbl), &_lock, NULL);
- 	clk_register_clkdev(clk, "i2s_prs1_clk", NULL);
- 
--	clk = clk_register_mux(NULL, "i2s_ref_mux_clk", i2s_ref_parents,
-+	clk = clk_register_mux(NULL, "i2s_ref_mclk", i2s_ref_parents,
- 			ARRAY_SIZE(i2s_ref_parents), 0, SPEAR1340_I2S_CLK_CFG,
- 			SPEAR1340_I2S_REF_SHIFT, SPEAR1340_I2S_REF_SEL_MASK, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, "i2s_ref_clk", NULL);
- 
--	clk = clk_register_gate(NULL, "i2s_ref_pad_clk", "i2s_ref_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "i2s_ref_pad_clk", "i2s_ref_mclk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_I2S_REF_PAD_CLK_ENB,
- 			0, &_lock);
- 	clk_register_clkdev(clk, "i2s_ref_pad_clk", NULL);
- 
--	clk = clk_register_aux("i2s_sclk_clk", "i2s_sclk_gate_clk",
--			"i2s_ref_mux_clk", 0, SPEAR1340_I2S_CLK_CFG,
--			&i2s_sclk_masks, i2s_sclk_rtbl,
--			ARRAY_SIZE(i2s_sclk_rtbl), &_lock, &clk1);
-+	clk = clk_register_aux("i2s_sclk_clk", "i2s_sclk_gclk", "i2s_ref_mclk",
-+			0, SPEAR1340_I2S_CLK_CFG, &i2s_sclk_masks,
-+			i2s_sclk_rtbl, ARRAY_SIZE(i2s_sclk_rtbl), &_lock,
-+			&clk1);
- 	clk_register_clkdev(clk, "i2s_sclk_clk", NULL);
--	clk_register_clkdev(clk1, "i2s_sclk_gate_clk", NULL);
-+	clk_register_clkdev(clk1, "i2s_sclk_gclk", NULL);
- 
- 	/* clock derived from ahb clk */
- 	clk = clk_register_gate(NULL, "i2c0_clk", "ahb_clk", 0,
-@@ -800,13 +797,13 @@ void __init spear1340_clk_init(void)
- 			&_lock);
- 	clk_register_clkdev(clk, "sysram1_clk", NULL);
- 
--	clk = clk_register_aux("adc_synth_clk", "adc_synth_gate_clk", "ahb_clk",
-+	clk = clk_register_aux("adc_syn_clk", "adc_syn_gclk", "ahb_clk",
- 			0, SPEAR1340_ADC_CLK_SYNT, NULL, adc_rtbl,
- 			ARRAY_SIZE(adc_rtbl), &_lock, &clk1);
--	clk_register_clkdev(clk, "adc_synth_clk", NULL);
--	clk_register_clkdev(clk1, "adc_synth_gate_clk", NULL);
-+	clk_register_clkdev(clk, "adc_syn_clk", NULL);
-+	clk_register_clkdev(clk1, "adc_syn_gclk", NULL);
- 
--	clk = clk_register_gate(NULL, "adc_clk", "adc_synth_gate_clk", 0,
-+	clk = clk_register_gate(NULL, "adc_clk", "adc_syn_gclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_ADC_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "adc_clk");
-@@ -843,39 +840,39 @@ void __init spear1340_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "e0300000.kbd");
- 
- 	/* RAS clks */
--	clk = clk_register_mux(NULL, "gen_synth0_1_mux_clk",
--			gen_synth0_1_parents, ARRAY_SIZE(gen_synth0_1_parents),
--			0, SPEAR1340_PLL_CFG, SPEAR1340_GEN_SYNT0_1_CLK_SHIFT,
-+	clk = clk_register_mux(NULL, "gen_syn0_1_mclk", gen_synth0_1_parents,
-+			ARRAY_SIZE(gen_synth0_1_parents), 0, SPEAR1340_PLL_CFG,
-+			SPEAR1340_GEN_SYNT0_1_CLK_SHIFT,
- 			SPEAR1340_GEN_SYNT_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "gen_synth0_1_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn0_1_clk", NULL);
- 
--	clk = clk_register_mux(NULL, "gen_synth2_3_mux_clk",
--			gen_synth2_3_parents, ARRAY_SIZE(gen_synth2_3_parents),
--			0, SPEAR1340_PLL_CFG, SPEAR1340_GEN_SYNT2_3_CLK_SHIFT,
-+	clk = clk_register_mux(NULL, "gen_syn2_3_mclk", gen_synth2_3_parents,
-+			ARRAY_SIZE(gen_synth2_3_parents), 0, SPEAR1340_PLL_CFG,
-+			SPEAR1340_GEN_SYNT2_3_CLK_SHIFT,
- 			SPEAR1340_GEN_SYNT_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "gen_synth2_3_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn2_3_clk", NULL);
- 
--	clk = clk_register_frac("gen_synth0_clk", "gen_synth0_1_clk", 0,
-+	clk = clk_register_frac("gen_syn0_clk", "gen_syn0_1_clk", 0,
- 			SPEAR1340_GEN_CLK_SYNT0, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
--	clk_register_clkdev(clk, "gen_synth0_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn0_clk", NULL);
- 
--	clk = clk_register_frac("gen_synth1_clk", "gen_synth0_1_clk", 0,
-+	clk = clk_register_frac("gen_syn1_clk", "gen_syn0_1_clk", 0,
- 			SPEAR1340_GEN_CLK_SYNT1, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
--	clk_register_clkdev(clk, "gen_synth1_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn1_clk", NULL);
- 
--	clk = clk_register_frac("gen_synth2_clk", "gen_synth2_3_clk", 0,
-+	clk = clk_register_frac("gen_syn2_clk", "gen_syn2_3_clk", 0,
- 			SPEAR1340_GEN_CLK_SYNT2, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
--	clk_register_clkdev(clk, "gen_synth2_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn2_clk", NULL);
- 
--	clk = clk_register_frac("gen_synth3_clk", "gen_synth2_3_clk", 0,
-+	clk = clk_register_frac("gen_syn3_clk", "gen_syn2_3_clk", 0,
- 			SPEAR1340_GEN_CLK_SYNT3, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
--	clk_register_clkdev(clk, "gen_synth3_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn3_clk", NULL);
- 
--	clk = clk_register_gate(NULL, "mali_clk", "gen_synth3_clk", 0,
-+	clk = clk_register_gate(NULL, "mali_clk", "gen_syn3_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_MALI_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "mali");
-@@ -890,74 +887,74 @@ void __init spear1340_clk_init(void)
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_cec.1");
- 
--	clk = clk_register_mux(NULL, "spdif_out_mux_clk", spdif_out_parents,
-+	clk = clk_register_mux(NULL, "spdif_out_mclk", spdif_out_parents,
- 			ARRAY_SIZE(spdif_out_parents), 0,
- 			SPEAR1340_PERIP_CLK_CFG, SPEAR1340_SPDIF_OUT_CLK_SHIFT,
- 			SPEAR1340_SPDIF_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "spdif_out_mux_clk", NULL);
-+	clk_register_clkdev(clk, "spdif_out_mclk", NULL);
- 
--	clk = clk_register_gate(NULL, "spdif_out_clk", "spdif_out_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "spdif_out_clk", "spdif_out_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_SPDIF_OUT_CLK_ENB,
- 			0, &_lock);
- 	clk_register_clkdev(clk, NULL, "spdif-out");
- 
--	clk = clk_register_mux(NULL, "spdif_in_mux_clk", spdif_in_parents,
-+	clk = clk_register_mux(NULL, "spdif_in_mclk", spdif_in_parents,
- 			ARRAY_SIZE(spdif_in_parents), 0,
- 			SPEAR1340_PERIP_CLK_CFG, SPEAR1340_SPDIF_IN_CLK_SHIFT,
- 			SPEAR1340_SPDIF_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "spdif_in_mux_clk", NULL);
-+	clk_register_clkdev(clk, "spdif_in_mclk", NULL);
- 
--	clk = clk_register_gate(NULL, "spdif_in_clk", "spdif_in_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "spdif_in_clk", "spdif_in_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_SPDIF_IN_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spdif-in");
- 
--	clk = clk_register_gate(NULL, "acp_clk", "acp_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "acp_clk", "acp_mclk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_ACP_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "acp_clk");
- 
--	clk = clk_register_gate(NULL, "plgpio_clk", "plgpio_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "plgpio_clk", "plgpio_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_PLGPIO_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "plgpio");
- 
--	clk = clk_register_gate(NULL, "video_dec_clk", "video_dec_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "video_dec_clk", "video_dec_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_VIDEO_DEC_CLK_ENB,
- 			0, &_lock);
- 	clk_register_clkdev(clk, NULL, "video_dec");
- 
--	clk = clk_register_gate(NULL, "video_enc_clk", "video_enc_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "video_enc_clk", "video_enc_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_VIDEO_ENC_CLK_ENB,
- 			0, &_lock);
- 	clk_register_clkdev(clk, NULL, "video_enc");
- 
--	clk = clk_register_gate(NULL, "video_in_clk", "video_in_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "video_in_clk", "video_in_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_VIDEO_IN_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_vip");
- 
--	clk = clk_register_gate(NULL, "cam0_clk", "cam0_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "cam0_clk", "cam0_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM0_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_camif.0");
- 
--	clk = clk_register_gate(NULL, "cam1_clk", "cam1_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "cam1_clk", "cam1_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM1_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_camif.1");
- 
--	clk = clk_register_gate(NULL, "cam2_clk", "cam2_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "cam2_clk", "cam2_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM2_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_camif.2");
- 
--	clk = clk_register_gate(NULL, "cam3_clk", "cam3_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "cam3_clk", "cam3_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM3_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_camif.3");
- 
--	clk = clk_register_gate(NULL, "pwm_clk", "pwm_mux_clk", 0,
-+	clk = clk_register_gate(NULL, "pwm_clk", "pwm_mclk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_PWM_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "pwm");
--- 
-1.7.2.2
+On 16 July 2012 09:45, Girish K S <girish.shivananjappa@linaro.org> wrote:
+> On 12 July 2012 18:24, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> Add device tree based discovery support.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  .../devicetree/bindings/mmc/synposis-dw-mshc.txt   |  108 +++++++++++
+>>  drivers/mmc/host/dw_mmc-pltfm.c                    |   24 +++
+>>  drivers/mmc/host/dw_mmc.c                          |  201 +++++++++++++++++++-
+>>  drivers/mmc/host/dw_mmc.h                          |    9 +
+>>  include/linux/mmc/dw_mmc.h                         |    2 +
+>>  5 files changed, 338 insertions(+), 6 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+>> new file mode 100644
+>> index 0000000..3acd6c9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+>> @@ -0,0 +1,108 @@
+>> +* Synopsis Designware Mobile Storage Host Controller
+>> +
+>> +The Synopsis designware mobile storage host controller is used to interface
+>> +a SoC with storage medium such as eMMC or SD/MMC cards.
+>> +
+>> +Required Properties:
+>> +
+>> +* compatible: should be one of the following
+>> +       - snps,dw-mshc: for controllers compliant with synopsis dw-mshc.
+>> +
+>> +* reg: physical base address of the dw-mshc controller and size of its memory
+>> +  region.
+>> +
+>> +* interrupts: interrupt specifier for the controller. The format and value of
+>> +  the interrupt specifier depends on the interrupt parent for the controller.
+>> +
+>> +* #address-cells: should be 1.
+>> +
+>> +* #size-cells: should be 0.
+>> +
+>> +# Slots: The slot specific information are contained within child-nodes with
+>> +  each child-node representing a supported slot. There should be atleast one
+>> +  child node representing a card slot. The name of the child node representing
+>> +  the slot is recommended to be slot at n where n is the unique number of the slot
+>> +  connnected to the controller. The following are optional properties which
+>> +  can be included in the slot child node.
+>> +
+>> +       * reg: specifies the physical slot number. The valid values of this
+>> +         property is 0 to (num-slots -1), where num-slots is the value
+>> +         specified by the num-slots property.
+>> +
+>> +       * bus-width: specifies the width of the data bus connected from the
+>> +         controller to the card slot. The value should be 1, 4 or 8. In case
+>> +         this property is not specified, a default value of 1 is assumed for
+>> +         this property.
+>> +
+>> +       * cd-gpios: specifies the card detect gpio line. The format of the
+>> +         gpio specifier depends on the gpio controller.
+>> +
+>> +       * wp-gpios: specifies the write protect gpio line. The format of the
+>> +         gpio specifier depends on the gpio controller.
+>> +
+>> +       * gpios: specifies a list of gpios used for command, clock and data
+>> +         bus. The first gpio is the command line and the second gpio is the
+>> +         clock line. The rest of the gpios (depending on the bus-width
+>> +         property) are the data lines in no particular order. The format of
+>> +         the gpio specifier depends on the gpio controller.
+>> +
+>> +Optional properties:
+>> +
+>> +* num-slots: specifies the number of slots supported by the controller.
+>> +  The number of physical slots actually used could be equal or less than the
+>> +  value specified by num-slots. If this property is not specified, the value
+>> +  of num-slot property is assumed to be 1.
+>> +
+>> +* fifo-depth: The maximum size of the tx/rx fifo's. If this property is not
+>> +  specified, the default value of the fifo size is determined from the
+>> +  controller registers.
+>> +
+>> +* card-detect-delay: Delay in milli-seconds before detecting card after card
+>> +  insert event. The default value is 0.
+>> +
+>> +* supports-highspeed: Enables support for high speed cards (upto 50MHz)
+>> +
+>> +* card-detection-broken: The card detection functionality is not available on
+>> +  any of the slots.
+>> +
+>> +* no-write-protect: The write protect pad of the controller is not connected
+>> +  to the write protect pin on the slot.
+>> +
+>> +Aliases:
+>> +
+>> +- All the MSHC controller nodes should be represented in the aliases node using
+>> +  the following format 'mshc{n}' where n is a unique number for the alias.
+>> +
+>> +
+>> +Example:
+>> +
+>> +  The MSHC controller node can be split into two portions, SoC specific and
+>> +  board specific portions as listed below.
+>> +
+>> +       dwmmc0 at 12200000 {
+>> +               compatible = "snps,dw-mshc";
+>> +               reg = <0x12200000 0x1000>;
+>> +               interrupts = <0 75 0>;
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +       };
+>> +
+>> +       dwmmc0 at 12200000 {
+>> +               num-slots = <1>;
+>> +               supports-highspeed;
+>> +               card-detection-broken;
+>> +               no-write-protect;
+>> +               fifo-depth = <0x80>;
+>> +               card-detect-delay = <200>;
+>> +
+>> +               slot at 0 {
+>> +                       reg = <0>;
+>> +                       bus-width = <8>;
+>> +                       cd-gpios = <&gpc0 2 2 3 3>;
+>> +                       gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
+>> +                               <&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
+>> +                               <&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
+>> +                               <&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
+>> +                               <&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
+>> +               };
+>> +       };
+>> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+>> index 9a63299..8d24f6d 100644
+>> --- a/drivers/mmc/host/dw_mmc-pltfm.c
+>> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
+>> @@ -19,8 +19,24 @@
+>>  #include <linux/mmc/host.h>
+>>  #include <linux/mmc/mmc.h>
+>>  #include <linux/mmc/dw_mmc.h>
+>> +#include <linux/of.h>
+>>  #include "dw_mmc.h"
+>>
+>> +#ifdef CONFIG_OF
+>> +static struct dw_mci_drv_data synopsis_drv_data = {
+>> +       .ctrl_type      = DW_MCI_TYPE_SYNOPSIS,
+>> +};
+>> +
+>> +static const struct of_device_id dw_mci_pltfm_match[] = {
+>> +       { .compatible = "snps,dw-mshc",
+>> +                       .data = (void *)&synopsis_drv_data, },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
+>> +#else
+>> +static const struct of_device_id dw_mci_pltfm_match[];
+> the #else and a statement can be completely removed if of_match_ptr is
+> used while accessing the dw_mci_pltfm_match in of_match_node function.
+>> +#endif
+>> +
+>>  static int dw_mci_pltfm_probe(struct platform_device *pdev)
+>>  {
+>>         struct dw_mci *host;
+>> @@ -51,6 +67,13 @@ static int dw_mci_pltfm_probe(struct platform_device *pdev)
+>>         if (!host->regs)
+>>                 goto err_free;
+>>         platform_set_drvdata(pdev, host);
+>> +
+>> +       if (pdev->dev.of_node) {
+>> +               const struct of_device_id *match;
+>> +               match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
+> can be modified to of_match_node(of_match_pt(dw_mci_pltfm_match),
+> pdev->dev.of_node);
+> This will remove the dummy allocation of variable as mentioned above.
+Sorry not allocation but declaration
+> Also it will be generic in non dt case.
+>> +               host->drv_data = match->data;
+>> +       }
+>> +
+>>         ret = dw_mci_probe(host);
+>>         if (ret)
+>>                 goto err_out;
+>> @@ -111,6 +134,7 @@ static struct platform_driver dw_mci_pltfm_driver = {
+>>         .remove         = __exit_p(dw_mci_pltfm_remove),
+>>         .driver         = {
+>>                 .name           = "dw_mmc",
+>> +               .of_match_table = of_match_ptr(dw_mci_pltfm_match),
+>>                 .pm             = &dw_mci_pltfm_pmops,
+>>         },
+>>  };
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 075f89d..3bc276d 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -33,9 +33,13 @@
+>>  #include <linux/bitops.h>
+>>  #include <linux/regulator/consumer.h>
+>>  #include <linux/workqueue.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_gpio.h>
+>>
+>>  #include "dw_mmc.h"
+>>
+>> +#define NUM_PINS(x) (x + 2)
+>> +
+>>  /* Common flag combinations */
+>>  #define DW_MCI_DATA_ERROR_FLAGS        (SDMMC_INT_DTO | SDMMC_INT_DCRC | \
+>>                                  SDMMC_INT_HTO | SDMMC_INT_SBE  | \
+>> @@ -86,6 +90,8 @@ struct idmac_desc {
+>>  struct dw_mci_slot {
+>>         struct mmc_host         *mmc;
+>>         struct dw_mci           *host;
+>> +       int                     wp_gpio;
+>> +       int                     cd_gpio;
+>>
+>>         u32                     ctype;
+>>
+>> @@ -1762,10 +1768,106 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+>>         }
+>>  }
+>>
+>> +#ifdef CONFIG_OF
+>> +static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
+>> +{
+>> +       struct device_node *np;
+>> +       const __be32 *addr;
+>> +       int len;
+>> +
+>> +       if (!dev || !dev->of_node)
+>> +               return NULL;
+>> +
+>> +       for_each_child_of_node(dev->of_node, np) {
+>> +               addr = of_get_property(np, "reg", &len);
+>> +               if (!addr || (len < sizeof(int)))
+>> +                       continue;
+>> +               if (be32_to_cpup(addr) == slot)
+>> +                       return np;
+>> +       }
+>> +       return NULL;
+>> +}
+>> +
+>> +static u32 dw_mci_of_get_bus_wd(struct device *dev, u8 slot)
+>> +{
+>> +       struct device_node *np = dw_mci_of_find_slot_node(dev, slot);
+>> +       u32 bus_wd = 1;
+>> +
+>> +       if (!np)
+>> +               return 1;
+>> +
+>> +       if (of_property_read_u32(np, "bus-width", &bus_wd))
+>> +               dev_err(dev, "bus-width property not found, assuming width"
+>> +                              " as 1\n");
+>> +       return bus_wd;
+>> +}
+>> +
+>> +static int dw_mci_of_setup_bus(struct dw_mci *host, u8 slot, u32 bus_wd)
+>> +{
+>> +       struct device_node *np = dw_mci_of_find_slot_node(host->dev, slot);
+>> +       int idx, gpio, ret;
+>> +
+>> +       if (!np)
+>> +               return -EINVAL;
+>> +
+>> +       for (idx = 0; idx < NUM_PINS(bus_wd); idx++) {
+>> +               gpio = of_get_gpio(np, idx);
+>> +               if (!gpio_is_valid(gpio)) {
+>> +                       dev_err(host->dev, "invalid gpio: %d\n", gpio);
+>> +                       return -EINVAL;
+>> +               }
+>> +
+>> +               ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
+>> +               if (ret) {
+>> +                       dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+>> +                       return -EBUSY;
+>> +               }
+>> +       }
+>> +
+>> +       host->slot[slot]->wp_gpio = -1;
+>> +       gpio = of_get_named_gpio(np, "wp-gpios", 0);
+>> +       if (!gpio_is_valid(gpio)) {
+>> +               dev_info(host->dev, "wp gpio not available");
+>> +       } else {
+>> +               ret = devm_gpio_request(host->dev, gpio, "dw-mci-wp");
+>> +               if (ret)
+>> +                       dev_info(host->dev, "gpio [%d] request failed\n",
+>> +                                               gpio);
+>> +               else
+>> +                       host->slot[slot]->wp_gpio = gpio;
+>> +       }
+>> +
+>> +       host->slot[slot]->cd_gpio = -1;
+>> +       gpio = of_get_named_gpio(np, "cd-gpios", 0);
+>> +       if (!gpio_is_valid(gpio)) {
+>> +               dev_info(host->dev, "cd gpio not available");
+>> +       } else {
+>> +               ret = devm_gpio_request(host->dev, gpio, "dw-mci-cd");
+>> +               if (ret)
+>> +                       dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+>> +               else
+>> +                       host->slot[slot]->cd_gpio = gpio;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +#else /* CONFIG_OF */
+>> +static u32 dw_mci_of_get_bus_wd(struct device *dev, u8 slot)
+>> +{
+>> +       return 1;
+>> +}
+>> +
+>> +static int dw_mci_of_setup_bus(struct dw_mci *host, u8 slot, u32 bus_wd)
+>> +{
+>> +       return -EINVAL;
+>> +}
+>> +#endif /* CONFIG_OF */
+>> +
+>>  static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>  {
+>>         struct mmc_host *mmc;
+>>         struct dw_mci_slot *slot;
+>> +       int ctrl_id, ret;
+>>
+>>         mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
+>>         if (!mmc)
+>> @@ -1775,6 +1877,7 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>         slot->id = id;
+>>         slot->mmc = mmc;
+>>         slot->host = host;
+>> +       host->slot[id] = slot;
+>>
+>>         mmc->ops = &dw_mci_ops;
+>>         mmc->f_min = DIV_ROUND_UP(host->bus_hz, 510);
+>> @@ -1795,12 +1898,33 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>         if (host->pdata->caps)
+>>                 mmc->caps = host->pdata->caps;
+>>
+>> +       if (host->dev->of_node) {
+>> +               ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
+>> +               if (ctrl_id < 0)
+>> +                       ctrl_id = 0;
+>> +       }
+>> +       if (host->drv_data->caps)
+>> +               mmc->caps |= host->drv_data->caps[ctrl_id];
+>> +
+>>         if (host->pdata->caps2)
+>>                 mmc->caps2 = host->pdata->caps2;
+>>
+>> -       if (host->pdata->get_bus_wd)
+>> +       if (host->pdata->get_bus_wd) {
+>>                 if (host->pdata->get_bus_wd(slot->id) >= 4)
+>>                         mmc->caps |= MMC_CAP_4_BIT_DATA;
+>> +       } else if (host->dev->of_node) {
+>> +               unsigned int bus_width;
+>> +               bus_width = dw_mci_of_get_bus_wd(host->dev, slot->id);
+>> +               switch (bus_width) {
+>> +               case 8:
+>> +                       mmc->caps |= MMC_CAP_8_BIT_DATA;
+>> +               case 4:
+>> +                       mmc->caps |= MMC_CAP_4_BIT_DATA;
+>> +               }
+>> +               ret = dw_mci_of_setup_bus(host, slot->id, bus_width);
+>> +               if (ret)
+>> +                       goto err_setup_bus;
+>> +       }
+>>
+>>         if (host->pdata->quirks & DW_MCI_QUIRK_HIGHSPEED)
+>>                 mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
+>> @@ -1845,7 +1969,6 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>         else
+>>                 clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+>>
+>> -       host->slot[id] = slot;
+>>         mmc_add_host(mmc);
+>>
+>>  #if defined(CONFIG_DEBUG_FS)
+>> @@ -1862,6 +1985,10 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>         queue_work(host->card_workqueue, &host->card_work);
+>>
+>>         return 0;
+>> +
+>> +err_setup_bus:
+>> +       mmc_free_host(mmc);
+>> +       return -EINVAL;
+>>  }
+>>
+>>  static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
+>> @@ -1937,16 +2064,78 @@ static bool mci_wait_reset(struct device *dev, struct dw_mci *host)
+>>         return false;
+>>  }
+>>
+>> +#ifdef CONFIG_OF
+>> +static struct dw_mci_of_quirks {
+>> +       char *quirk;
+>> +       int id;
+>> +} of_quriks[] = {
+>> +       {
+>> +               .quirk  = "supports-highspeed",
+>> +               .id     = DW_MCI_QUIRK_HIGHSPEED,
+>> +       }, {
+>> +               .quirk  = "card-detection-broken",
+>> +               .id     = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
+>> +       }, {
+>> +               .quirk  = "no-write-protect",
+>> +               .id     = DW_MCI_QUIRK_NO_WRITE_PROTECT,
+>> +       }
+>> +};
+>> +
+>> +static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+>> +{
+>> +       struct dw_mci_board *pdata;
+>> +       struct device *dev = host->dev;
+>> +       struct device_node *np = dev->of_node;
+>> +       int idx, cnt;
+>> +
+>> +       pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+>> +       if (!pdata) {
+>> +               dev_err(dev, "could not allocate memory for pdata\n");
+>> +               return ERR_PTR(-ENOMEM);
+>> +       }
+>> +
+>> +       /* find out number of slots supported */
+>> +       if (of_property_read_u32(dev->of_node, "num-slots",
+>> +                               &pdata->num_slots)) {
+>> +               dev_info(dev, "num-slots property not found, "
+>> +                               "assuming 1 slot is available\n");
+>> +               pdata->num_slots = 1;
+>> +       }
+>> +
+>> +       /* get quirks */
+>> +       cnt = sizeof(of_quriks) / sizeof(struct dw_mci_of_quirks);
+>> +       for (idx = 0; idx < cnt; idx++)
+>> +               if (of_get_property(np, of_quriks[idx].quirk, NULL))
+>> +                       pdata->quirks |= of_quriks[idx].id;
+>> +
+>> +       if (of_property_read_u32(np, "fifo-depth", &pdata->fifo_depth))
+>> +               dev_info(dev, "fifo-depth property not found, using "
+>> +                               "value of FIFOTH register as default\n");
+>> +
+>> +       of_property_read_u32(np, "card-detect-delay", &pdata->detect_delay_ms);
+>> +
+>> +       return pdata;
+>> +}
+>> +
+>> +#else /* CONFIG_OF */
+>> +static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+>> +{
+>> +       return ERR_PTR(-EINVAL);
+>> +}
+>> +#endif /* CONFIG_OF */
+>> +
+>>  int dw_mci_probe(struct dw_mci *host)
+>>  {
+>>         int width, i, ret = 0;
+>>         u32 fifo_size;
+>>         int init_slots = 0;
+>>
+>> -       if (!host->pdata || !host->pdata->init) {
+>> -               dev_err(host->dev,
+>> -                       "Platform data must supply init function\n");
+>> -               return -ENODEV;
+>> +       if (!host->pdata) {
+>> +               host->pdata = dw_mci_parse_dt(host);
+>> +               if (IS_ERR(host->pdata)) {
+>> +                       dev_err(host->dev, "platform data not available\n");
+>> +                       return -EINVAL;
+>> +               }
+>>         }
+>>
+>>         if (!host->pdata->select_slot && host->pdata->num_slots > 1) {
+>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+>> index 15c27e1..1ecaa02 100644
+>> --- a/drivers/mmc/host/dw_mmc.h
+>> +++ b/drivers/mmc/host/dw_mmc.h
+>> @@ -182,4 +182,13 @@ extern int dw_mci_suspend(struct dw_mci *host);
+>>  extern int dw_mci_resume(struct dw_mci *host);
+>>  #endif
+>>
+>> +/* Variations in the dw_mci controller */
+>> +#define DW_MCI_TYPE_SYNOPSIS           0
+>> +
+>> +/* dw_mci platform driver data */
+>> +struct dw_mci_drv_data {
+>> +       unsigned long           ctrl_type;
+>> +       unsigned long           *caps;
+>> +};
+>> +
+>>  #endif /* _DW_MMC_H_ */
+>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+>> index b72e4aa..ae45e4f 100644
+>> --- a/include/linux/mmc/dw_mmc.h
+>> +++ b/include/linux/mmc/dw_mmc.h
+>> @@ -78,6 +78,7 @@ struct mmc_data;
+>>   * @data_offset: Set the offset of DATA register according to VERID.
+>>   * @dev: Device associated with the MMC controller.
+>>   * @pdata: Platform data associated with the MMC controller.
+>> + * @drv_data: Driver specific data for identified variant of the controller
+>>   * @biu_clk: Pointer to bus interface unit clock instance.
+>>   * @ciu_clk: Pointer to card interface unit clock instance.
+>>   * @slot: Slots sharing this MMC controller.
+>> @@ -160,6 +161,7 @@ struct dw_mci {
+>>         u16                     data_offset;
+>>         struct device           *dev;
+>>         struct dw_mci_board     *pdata;
+>> +       struct dw_mci_drv_data  *drv_data;
+>>         struct clk              *biu_clk;
+>>         struct clk              *ciu_clk;
+>>         struct dw_mci_slot      *slot[MAX_MCI_SLOTS];
+>> --
+>> 1.6.6.rc2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
