@@ -1,110 +1,60 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 16 Jul 2012 13:27:35 -0500
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com>
- <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
-Message-ID: <50045D17.9050704@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 16 Jul 2012 14:34:17 -0400 (EDT)
+Subject: [PATCH v6] ARM: vfp: Always save VFP state in vfp_pm_suspend on UP
+In-Reply-To: <1342462640-18410-1-git-send-email-ccross@android.com>
+References: <1342462640-18410-1-git-send-email-ccross@android.com>
+Message-ID: <alpine.LFD.2.02.1207161433420.14068@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Mon, 16 Jul 2012, Colin Cross wrote:
 
-On 07/13/2012 04:00 PM, Paul Walmsley wrote:
-
-[...]
-
->> Unfortunately, although this works it does make the flags a bit less 
->> clearer. The upside is the solution is simpler.
+> vfp_pm_suspend should save the VFP state in suspend after
+> any lazy context switch.  If it only saves when the VFP is enabled,
+> the state can get lost when, on a UP system:
+>   Thread 1 uses the VFP
+>   Context switch occurs to thread 2, VFP is disabled but the
+>      VFP context is not saved
+>   Thread 2 initiates suspend
+>   vfp_pm_suspend is called with the VFP disabled, and the unsaved
+>      VFP context of Thread 1 in the registers
 > 
-> Yeah, the problem is the clockdomain CLKDM_CAN_* flags are just intended 
-> to represent the available bits from the register bitfield, rather than a 
-> higher-level concept.  Among other things, it allows the maintainers and 
-> users of this code to verify it by comparing it to the TRM.  Changing the 
-> CLKDM_CAN_* flags in the kernel is not actually that simple since it 
-> involves overriding the hardware data for the EMU clockdomain for every 
-> applicable chip.  In other words, it just moves the complexity 
-> elsewhere.
-
-Yes I see that makes sense. However, patch #7 has already changed the
-mapping of the flags. I had intended that patch #7 and #8 would be
-applied together. However, I could see that patch #7 can be taken just
-to eliminate using the SW_SLEEP state. So basically, what I am saying is
-does patch #7 have any value without #8?
-
->> I am not sure if it is really a matter of the clock domain missing the
->> idle reporting, but more of a problem that the EMU power domain power
->> state is programmed in HW to OFF and cannot be changed by software. (see
->> POWER_STATE field of PM_EMU_PWRSTCTRL register description in the TRM).
->>
->> This means that when the EMU clock domain does idle, the EMU power
->> domain can transition to OFF and hence we loss the EMU logic context. So
->> we need to keep the EMU CLKDM on to keep the EMU PWRDM on, but it is
->> really the lack of control we have over the PWRDM that is the problem. I
->> would not say this is a HW bug but more of a design choice probably to
->> keep the design simpler at the expense of power.
+> Modify vfp_pm_suspend to save the VFP context whenever
+> vfp_current_hw_state is not NULL.
 > 
-> I really wonder how much more difficult it would have been to add the 
-> ON state to the EMU powerdomain next-power-state control bitfields...
-
-True, probably a good area for us to provide some feedback to the
-designers.
-
->> I believe that this problem would happen to all power domains if they
->> were programmed for the OFF power state when the clock domain idled. For
->> other power domains we avoid this by programming them to the ON state
->> when we are using them.
+> Includes a fix from Ido Yariv <ido@wizery.com>, who pointed out that on
+> SMP systems, the state pointer can be pointing to a freed task struct if
+> a task exited on another cpu, fixed by using #ifdef CONFIG_SMP in the
+> new if clause.
 > 
-> Hmm.  In the case of most other clockdomains, we have some way to indicate 
-> to the PRCM whether the IP block/clock is in use or not: functional clock 
-> control bits or modulemode control bits or CLKACTIVITY bits or (in the 
-> worst case) SIDLEMODE bits.  We don't really have any of these control 
-> mechanisms for most of the EMU clockdomain IP blocks/clocks.
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Barry Song <bs14@csr.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ido Yariv <ido@wizery.com>
+> Cc: Daniel Drake <dsd@laptop.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+>  arch/arm/vfp/vfpmodule.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
 > 
-> From a theoretical perspective, assigning the problem solely to the 
-> powerdomain next-power-state bits might also ignore the impact on 
-> clockdomain dependencies.  These take effect based on the clockdomain 
-> activity state, rather than powerdomain next-power-states.  Although, for 
-> the specific case of the EMU clockdomains on OMAP3/4, it looks like this 
-> is not a practical problem according to the TRM.
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index 58696192..ce55f05 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -457,6 +457,12 @@ static int vfp_pm_suspend(void)
+>  
+>  		/* disable, just in case */
+>  		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+> +	} else if (vfp_current_hw_state[ti->cpu]) {
+> +#ifndef CONFIG_SMP
+> +		fmxr(FPEXC, fpexc | FPEXC_EN);
+> +		vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
+> +		fmxr(FPEXC, fpexc);
+> +#endif
+>  	}
 
-Ok, yes I understand your point of view.
+Couldn't vfp_sync_hwstate() be used here instead?
 
->> Thanks for the detailed suggestion! Adding a flag to prevent programming
->> the HW_AUTO while the CLKDM is active could definitely work (although I
->> may change the name/description of the flag a little).
-> 
-> Sure, let me know what you think of the above reasoning.
 
-I would say it is fair (with limited knowledge of the h/w design
-decisions made here).
-
->> Another proposal I also thought of is re-working the flags to describe
->> the HW mode to be used when turning on the CLKDM, when the CLKDM is
->> active and when the CLKDM is shut down. So instead of saying what modes
->> the CLKDM supports, specify what modes should be used for pre-ON (i.e.
->> turn ON), ON and OFF. Right now software is trying to decide for us by
->> what is available (which is ideal) but makes working around such nuances
->> a little more painful.
-> 
-> With the hardware data, it would be good to keep it something that can be 
-> generated with as little human intervention as possible, except in the 
-> case of bug workarounds or departures from standard practice.  The idea is 
-> to reduce the amount of human interaction needed to generate data to 
-> support new chips, when everything works as it should.  It also allows us 
-> software forks to explicitly mark unusual quirks or bugs that we'd like 
-> the hardware people to change for future revisions :-)
-
-That's fine with me. We can always workaround such issues by adding flags.
-
-I can give this a try this week and let you know how it goes.
-
-I think that Benoit is out until the end of the month. I am not sure if
-he will have any inputs.
-
-Cheers
-Jon
+Nicolas
