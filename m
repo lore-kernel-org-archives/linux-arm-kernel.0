@@ -1,50 +1,74 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 16 Jul 2012 22:21:47 +0400
-Subject: [PATCH 3/4] ARM: clps711x: Remove the setting of the time
+Date: Mon, 16 Jul 2012 22:21:46 +0400
+Subject: [PATCH 2/4] ARM: clps711x: Removed superfluous transform virt_to_bus
+ and related functions
 In-Reply-To: <1342462908-18547-1-git-send-email-shc_work@mail.ru>
 References: <1342462908-18547-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1342462908-18547-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1342462908-18547-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes "bug: interrupts were enabled early" due to
-do_settimeofday() which used in common code for clps711x-platform.
+This override does not allow support for multiple machines in a single core.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/common.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/mach-clps711x/include/mach/memory.h |   37 --------------------------
+ 1 files changed, 0 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index c965fd8..f15293b 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -26,7 +26,6 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/sched.h>
--#include <linux/timex.h>
+diff --git a/arch/arm/mach-clps711x/include/mach/memory.h b/arch/arm/mach-clps711x/include/mach/memory.h
+index 3a032a6..fc0e028 100644
+--- a/arch/arm/mach-clps711x/include/mach/memory.h
++++ b/arch/arm/mach-clps711x/include/mach/memory.h
+@@ -25,26 +25,6 @@
+  */
+ #define PLAT_PHYS_OFFSET	UL(0xc0000000)
  
- #include <asm/sizes.h>
- #include <mach/hardware.h>
-@@ -188,7 +187,6 @@ static struct irqaction clps711x_timer_irq = {
- 
- static void __init clps711x_timer_init(void)
- {
--	struct timespec tv;
- 	unsigned int syscon;
- 
- 	syscon = clps_readl(SYSCON1);
-@@ -198,10 +196,6 @@ static void __init clps711x_timer_init(void)
- 	clps_writel(LATCH-1, TC2D); /* 512kHz / 100Hz - 1 */
- 
- 	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
+-#if !defined(CONFIG_ARCH_CDB89712) && !defined (CONFIG_ARCH_AUTCPU12)
 -
--	tv.tv_nsec = 0;
--	tv.tv_sec = clps_readl(RTCDR);
--	do_settimeofday(&tv);
- }
+-#define __virt_to_bus(x)	((x) - PAGE_OFFSET)
+-#define __bus_to_virt(x)	((x) + PAGE_OFFSET)
+-#define __pfn_to_bus(x)		(__pfn_to_phys(x) - PHYS_OFFSET)
+-#define __bus_to_pfn(x)		__phys_to_pfn((x) + PHYS_OFFSET)
+-
+-#endif
+-
+-
+-/*
+- * Like the SA1100, the EDB7211 has a large gap between physical RAM
+- * banks.  In 2.2, the Psion (CL-PS7110) port added custom support for
+- * discontiguous physical memory.  In 2.4, we can use the standard
+- * Linux NUMA support.
+- *
+- * This is not necessary for EP7211 implementations with only one used
+- * memory bank.  For those systems, simply undefine CONFIG_DISCONTIGMEM.
+- */
+-
+ /*
+  * The PS7211 allows up to 256MB max per DRAM bank, but the EDB7211
+  * uses only one of the two banks (bank #1).  However, even within
+@@ -54,23 +34,6 @@
+  * them, so we use 24 for the node max shift to get 16MB node sizes.
+  */
  
- struct sys_timer clps711x_timer = {
+-/*
+- * Because of the wide memory address space between physical RAM banks on the 
+- * SA1100, it's much more convenient to use Linux's NUMA support to implement
+- * our memory map representation.  Assuming all memory nodes have equal access 
+- * characteristics, we then have generic discontiguous memory support.
+- *
+- * Of course, all this isn't mandatory for SA1100 implementations with only
+- * one used memory bank.  For those, simply undefine CONFIG_DISCONTIGMEM.
+- *
+- * The nodes are matched with the physical memory bank addresses which are 
+- * incidentally the same as virtual addresses.
+- * 
+- * 	node 0:  0xc0000000 - 0xc7ffffff
+- * 	node 1:  0xc8000000 - 0xcfffffff
+- * 	node 2:  0xd0000000 - 0xd7ffffff
+- * 	node 3:  0xd8000000 - 0xdfffffff
+- */
+ #define SECTION_SIZE_BITS	24
+ #define MAX_PHYSMEM_BITS	32
+ 
 -- 
 1.7.3.4
