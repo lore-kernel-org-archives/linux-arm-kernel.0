@@ -1,28 +1,26 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 16 Jul 2012 16:55:57 +0800
-Subject: [PATCH] mfd: anatop: matches should be NULL when populate child
- devices
-Message-ID: <1342428957-14321-1-git-send-email-richard.zhao@freescale.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 16 Jul 2012 11:16:44 +0200
+Subject: [PATCHv3]   I2C: MV64XXX: Add Device Tree support
+Message-ID: <1342430205-13702-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/mfd/anatop-mfd.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is one patch out of a larger patchset adding DT support to a
+number of Orion drivers. All the other patches have been acked-by,
+etc, so i'm only re-posting the one which has been modified.
 
-diff --git a/drivers/mfd/anatop-mfd.c b/drivers/mfd/anatop-mfd.c
-index 6da0634..5576e07 100644
---- a/drivers/mfd/anatop-mfd.c
-+++ b/drivers/mfd/anatop-mfd.c
-@@ -83,7 +83,7 @@ static int __devinit of_anatop_probe(struct platform_device *pdev)
- 	drvdata->ioreg = ioreg;
- 	spin_lock_init(&drvdata->reglock);
- 	platform_set_drvdata(pdev, drvdata);
--	of_platform_populate(np, of_anatop_match, NULL, dev);
-+	of_platform_populate(np, NULL, NULL, dev);
- 
- 	return 0;
- }
+The I2C driver now uses the clock-frequency property.
+
+Andrew Lunn (1):
+  I2C: MV64XXX: Add Device Tree support
+
+ Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   21 +++-
+ arch/arm/boot/dts/kirkwood.dtsi                    |   11 ++
+ arch/arm/mach-kirkwood/board-dt.c                  |    2 +
+ arch/arm/mach-kirkwood/common.c                    |    2 +
+ arch/arm/plat-orion/common.c                       |    1 +
+ drivers/i2c/busses/i2c-mv64xxx.c                   |  107 +++++++++++++++++++-
+ 6 files changed, 138 insertions(+), 6 deletions(-)
+
 -- 
-1.7.9.5
+1.7.10
