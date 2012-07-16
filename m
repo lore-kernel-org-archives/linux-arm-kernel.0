@@ -1,104 +1,76 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 16 Jul 2012 14:10:23 +0200
-Subject: [PATCH 10/12] USB: chipidea: add set_vbus_power support
-In-Reply-To: <1342076512-19207-11-git-send-email-richard.zhao@freescale.com>
-References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
- <1342076512-19207-11-git-send-email-richard.zhao@freescale.com>
-Message-ID: <500404AF.3070100@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 16 Jul 2012 14:09:57 +0200
+Subject: [PATCH 10/10] ARM: mx28: Add SPI pinmux into imx28.dtsi
+In-Reply-To: <1342440597-8395-1-git-send-email-marex@denx.de>
+References: <1342440597-8395-1-git-send-email-marex@denx.de>
+Message-ID: <1342440597-8395-11-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2012 09:01 AM, Richard Zhao wrote:
-> set_vbus_power is used to enable or disable vbus power for usb host.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  drivers/usb/chipidea/ci13xxx_imx.c |   39 +++++++++++++++++++++++++-----------
->  drivers/usb/chipidea/host.c        |    8 ++++++++
->  include/linux/usb/chipidea.h       |    2 ++
->  3 files changed, 37 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index c94e30f..b3173d8 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -26,6 +26,8 @@
->  
->  #define pdev_to_phy(pdev) \
->  	((struct usb_phy *)platform_get_drvdata(pdev))
-> +#define ci_to_imx_data(ci) \
-> +	((struct ci13xxx_imx_data *)dev_get_drvdata(ci->dev->parent))
->  
->  struct ci13xxx_imx_data {
->  	struct device_node *phy_np;
-> @@ -35,12 +37,32 @@ struct ci13xxx_imx_data {
->  	struct regulator *reg_vbus;
->  };
->  
-> +static int ci13xxx_imx_vbus(struct ci13xxx *ci, int enable)
-> +{
-> +	struct ci13xxx_imx_data *data = ci_to_imx_data(ci);
-> +	int ret;
-> +
-> +	if (!data->reg_vbus)
-> +		return 0;
-> +
-> +	if (enable)
-> +		ret = regulator_enable(data->reg_vbus);
-> +	else
-> +		ret = regulator_disable(data->reg_vbus);
-> +	if (ret)
-> +		dev_err(ci->dev, "ci13xxx_imx_vbus failed, enable:%d err:%d\n",
-> +			enable, ret);
-> +
-> +	return ret;
-> +}
-> +
->  static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
->  	.name			= "ci13xxx_imx",
->  	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
->  				  CI13XXX_PULLUP_ON_VBUS |
->  				  CI13XXX_DISABLE_STREAMING,
->  	.capoffset		= DEF_CAPOFFSET,
-> +	.set_vbus_power		= ci13xxx_imx_vbus,
->  };
->  
->  static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
-> @@ -101,18 +123,10 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
->  
->  	/* we only support host now, so enable vbus here */
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Detlev Zundel <dzu@denx.de>
+CC: Dong Aisheng <b29396@freescale.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Wolfgang Denk <wd@denx.de>
+---
+ arch/arm/boot/dts/imx28.dtsi |   39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-With this patch, the comment becomes wrong.
-
->  	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> -	if (!IS_ERR(reg_vbus)) {
-> -		ret = regulator_enable(reg_vbus);
-> -		if (ret) {
-> -			dev_err(&pdev->dev,
-> -				"Failed to enable vbus regulator, err=%d\n",
-> -				ret);
-> -			goto put_np;
-> -		}
-> +	if (!IS_ERR(reg_vbus))
->  		data->reg_vbus = reg_vbus;
-> -	} else {
-> +	else
->  		reg_vbus = NULL;
-> -	}
->  
-
-Marc
-
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index badc76a..4a0f12c 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -507,6 +507,45 @@
+ 					fsl,voltage = <1>;
+ 					fsl,pull-up = <0>;
+ 				};
++
++				spi0_pins_a: spi0 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids =
++						<0x2000 0x2010 0x2020 0x2030
++						0x2040 0x2050 0x2060 0x2070
++						0x2080 0x2090 0x20a0>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++				spi1_pins_a: spi1 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids =
++						<0x20c0 0x20d0 0x20e0 0x20f0>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++				spi2_pins_a: spi2 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids =
++						<0x2100 0x2110 0x2120
++						0x2130 0x2140 0x2150>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++				spi3_pins_a: spi3 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids =
++						<0x2180 0x2190 0x21a0 0x21b0>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
+ 			};
+ 
+ 			digctl at 8001c000 {
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/c2d25a56/attachment.sig>
+1.7.10.4
