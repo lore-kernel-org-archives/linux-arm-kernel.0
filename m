@@ -1,282 +1,335 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 16 Jul 2012 11:29:56 +0900
-Subject: [RFC PATCH v2] ARM: Make a compile firmware conditionally
-Message-ID: <20120716022956.GA619@july>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 16 Jul 2012 10:53:13 +0800
+Subject: [PATCH 12/12] USB: chipidea: add imx usbmisc support
+In-Reply-To: <50002D43.1090602@pengutronix.de>
+References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
+ <1342076512-19207-13-git-send-email-richard.zhao@freescale.com>
+ <20120713122545.GA32247@pengutronix.de>
+ <20120713140235.GA2425@richard-laptop>
+ <50002D43.1090602@pengutronix.de>
+Message-ID: <20120716025312.GG21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+Sascha & Shawn, Felipe & Alex,
 
-Some boards can use the firmware at trustzone but others can't use this.
-However we need to build it simultaneously. To address this issue,
-introduce arm firmware support and use it at each board files.
+What's your opinion where I put this driver? The usbmisc drivers is
+SoC specific and provide callbacks to ci13xxx_imx driver at runtime.
 
-e.g., In boot_secondary at mach-exynos/platsmp.c
+- How to organize the driver
+This patch is designed to put all per-soc driver in one file. But
+I plan to put it in discrete files.
 
-        __raw_writel(virt_to_phys(exynos4_secondary_startup),
-                CPU1_BOOT_REG);
+- Where to put it
+  Option 1: arch/arm/mach-imx/ehci-imxXXX.c
+  Option 2: drivers/usb/chipidea/imx/ , yes, we may need a folder.
+  Both is fine for me.
 
-        if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
-                /* Call Exynos specific smc call */
-		firmware_ops.cpu_boot(cpu);
-        }
+On Fri, Jul 13, 2012 at 04:14:27PM +0200, Marc Kleine-Budde wrote:
+> On 07/13/2012 04:02 PM, Richard Zhao wrote:
+> > On Fri, Jul 13, 2012 at 02:25:45PM +0200, Michael Grzeschik wrote:
+> >> On Thu, Jul 12, 2012 at 03:01:52PM +0800, Richard Zhao wrote:
+> >>> i.MX usb controllers shares non-core registers, which may include
+> >>> SoC specific controls. We take it as a usbmisc device and usbmisc
+> >>> driver export functions needed by ci13xxx_imx driver.
+> >>
+> >> So this is SoC and not chipidea specific and should not be sorted into
+> >> this subdir.
+> > Yes, but it's usb specific and serve chipidea usb IP.
+> 
+> I don't care where this code is located.
+I need maintainers' instruction here. :)
+> 
+> >>> For example, Sabrelite board has bad over-current design, we can
+> >>> usbmisc to disable over-current detect.
+> >>
+> >> This driver layout is also reflected in:
+> >>
+> >> arch/arm/mach-imx/ehci-imx*.c
+> > It sounds sensible, but I'm not quite sure. I saw drivers are moving
+> > out of there, event it's SoC specific, for example, clk, pinmux. And
+> > the non-core registers might not only be setup onetime on boot, but
+> > be called at runtime by usb driver. For now, it's set once.
+> >>
+> >> You should use these existing mx*_initialize_usb_hw functions to avoid
+> >> code duplication
+> 
+> > I can not see what duplication it can avoid.
+> 
+> We want to use the chipidea driver for the other imx, too. We already
+> have existing code for the non-DT case in arch/arm/mach-imx/ehci-imx*.c.
+> So we need to glue these functions to the DT or duplicate the code,
+> which is to be avoided.
+The existing code is too simple. ci13xxx_imx may call them at runtime.
+> 
+> >> and add your mx6_initialize_usb_hw routine for mx6 there.
+> > Maybe.
+> 
+> Or at least next to the other imx usb-misc code (wherever that will end up).
+> 
+> >> This devicetree based glue code in this file can be reused to
+> >> call the right mx*_initialize_usb_hw by the compatible.
+> > The glue code makes it more like a normal driver. Doesn't it?
+> >>
+> >> We already have common flags available like i.e. MXC_EHCI_POWER_PINS_ENABLED
+> >> which is currently used to disable overcurrent detection.
+> > The flags may be replace with properties in DT bindings.
+> 
+> Yes, write some code that extracts these flags from the DT and then
+> calls the existing code (for the existing imx platforms).
+> 
+> >>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> >>> ---
+> >>>  .../devicetree/bindings/usb/imx-usbmisc.txt        |   15 ++
+> >>>  drivers/usb/chipidea/Makefile                      |    2 +-
+> >>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    4 +
+> >>>  drivers/usb/chipidea/imx_usbmisc.c                 |  144 ++++++++++++++++++++
+> >>>  4 files changed, 164 insertions(+), 1 deletion(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/usb/imx-usbmisc.txt
+> >>>  create mode 100644 drivers/usb/chipidea/imx_usbmisc.c
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/usb/imx-usbmisc.txt b/Documentation/devicetree/bindings/usb/imx-usbmisc.txt
+> >>> new file mode 100644
+> >>> index 0000000..09f01ca
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/usb/imx-usbmisc.txt
+> >>> @@ -0,0 +1,15 @@
+> >>> +* Freescale i.MX non-core registers
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible: Should be "fsl,imx6q-usbmisc"
+> >>> +- reg: Should contain registers location and length
+> >>> +
+> >>> +Optional properties:
+> >>> +- fsl,disable-over-current: disable over current detect
+> >>> +
+> >>> +Examples:
+> >>> +usbmisc at 02184800 {
+> >>> +	compatible = "fsl,imx6q-usbmisc";
+> >>> +	reg = <0x02184800 0x200>;
+> >>> +	fsl,disable-over-current;
+> >>> +};
+> >>> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> >>> index 3f56b76..46fc31c 100644
+> >>> --- a/drivers/usb/chipidea/Makefile
+> >>> +++ b/drivers/usb/chipidea/Makefile
+> >>> @@ -17,5 +17,5 @@ ifneq ($(CONFIG_PCI),)
+> >>>  endif
+> >>>  
+> >>>  ifneq ($(CONFIG_OF_DEVICE),)
+> >>> -	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
+> >>> +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o imx_usbmisc.o
+> >>>  endif
+> >>> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> >>> index b3173d8..dd7f3a3 100644
+> >>> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> >>> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> >>> @@ -24,6 +24,8 @@
+> >>>  
+> >>>  #include "ci.h"
+> >>>  
+> >>> +int imx_usbmisc_init(struct device *usbdev);
+> >>> +
+> >>>  #define pdev_to_phy(pdev) \
+> >>>  	((struct usb_phy *)platform_get_drvdata(pdev))
+> >>>  #define ci_to_imx_data(ci) \
+> >>> @@ -142,6 +144,8 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+> >>>  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
+> >>>  	}
+> >>>  
+> >>> +	imx_usbmisc_init(&pdev->dev);
+> >>> +
+> >>>  	platform_set_drvdata(pdev, data);
+> >>>  
+> >>>  	plat_ci = ci13xxx_add_device(&pdev->dev,
+> >>> diff --git a/drivers/usb/chipidea/imx_usbmisc.c b/drivers/usb/chipidea/imx_usbmisc.c
+> >>> new file mode 100644
+> >>> index 0000000..33a8ec0
+> >>> --- /dev/null
+> >>> +++ b/drivers/usb/chipidea/imx_usbmisc.c
+> >>> @@ -0,0 +1,144 @@
+> >>> +/*
+> >>> + * Copyright 2012 Freescale Semiconductor, Inc.
+> >>> + *
+> >>> + * The code contained herein is licensed under the GNU General Public
+> >>> + * License. You may obtain a copy of the GNU General Public License
+> >>> + * Version 2 or later at the following locations:
+> >>> + *
+> >>> + * http://www.opensource.org/licenses/gpl-license.html
+> >>> + * http://www.gnu.org/copyleft/gpl.html
+> >>> + */
+> >>> +
+> >>> +#include <linux/module.h>
+> >>> +#include <linux/of_platform.h>
+> >>> +#include <linux/clk.h>
+> >>> +#include <linux/err.h>
+> >>> +#include <asm/io.h>
+> >>> +
+> >>> +struct usbmisc;
+> >>> +
+> >>> +struct soc_data {
+> >>> +	int (*init) (struct usbmisc *usbmisc, int id);
+> >>> +	void (*exit) (struct usbmisc *usbmisc, int id);
+> >>> +};
+> >>> +
+> >>> +struct usbmisc {
+> >>> +	struct soc_data *soc_data;
+> >>> +	void __iomem *base;
+> >>> +	struct clk *clk;
+> >>> +
+> >>> +	int dis_oc:1;
+> >>> +};
+> >>> +
+> >>> +/* Since we only have one usbmisc device at runtime, we global variables */
+> >>> +static struct usbmisc *usbmisc;
+> >>
+> >> Global variable?
+> > Yes. we only have one usbmisc.
+> >>
+> >>> +
+> >>> +static int imx6q_usbmisc_init(struct usbmisc *usbmisc, int id)
+> >>
+> >> What is initialized here? How about "preconfigure"?
+> >> Even better is to reuse mx*_initialize_usb_hw here.
+> > It's used to call by ci13xxx_imx driver.
+> >>
+> >>> +{
+> >>> +	u32 reg;
+> >>> +
+> >>> +	if (usbmisc->dis_oc) {
+> >>> +		reg = readl_relaxed(usbmisc->base + id * 4);
+> >>> +		writel_relaxed(reg | (1 << 7), usbmisc->base + id * 4);
+> >>
+> >> #define IMX6_OTG_CTRL_USBMISC        1 << 7
+> > yes.
+> >>
+> >>> +	}
+> >>> +
+> >>> +	return 0;
+> >>> +}
+> >>> +
+> >>> +static struct soc_data imx6q_data = {
+> >>> +	.init = imx6q_usbmisc_init,
+> >>> +};
+> >>> +
+> >>> +
+> >>> +static const struct of_device_id imx_usbmisc_dt_ids[] = {
+> >>> +	{ .compatible = "fsl,imx6q-usbmisc", .data = &imx6q_data },
+> >>
+> >>         something like this:
+> >> 	{ .compatible = "fsl,imx6q-usbmisc", .data = &mx6_initialize_usb_hw },
+> > It's designed not only used when initialization.
+> >>
+> >>> +	{ /* sentinel */ }
+> >>> +};
+> >>> +
+> >>> +static int __devinit imx_usbmisc_probe(struct platform_device *pdev)
+> >>> +{
+> >>> +	struct resource	*res;
+> >>> +	struct usbmisc *data;
+> >>> +	const struct of_device_id *of_id =
+> >>> +			of_match_device(imx_usbmisc_dt_ids, &pdev->dev);
+> >>> +
+> >>> +	int ret;
+> >>> +
+> >>> +	if (usbmisc)
+> >>> +		return -EBUSY;
+> >>> +
+> >>> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> >>> +	if (!data)
+> >>> +		return -ENOMEM;
+> >>> +
+> >>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>> +	data->base = devm_request_and_ioremap(&pdev->dev, res);
+> >>> +	if (!data->base)
+> >>> +		return -EADDRNOTAVAIL;
+> >>> +
+> >>> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> >>> +	if (IS_ERR(data->clk)) {
+> >>> +		dev_err(&pdev->dev,
+> >>> +			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+> >>> +		return PTR_ERR(data->clk);
+> >>> +	}
+> >>> +
+> >>> +	ret = clk_prepare_enable(data->clk);
+> >>> +	if (!ret) {
+> >>
+> >> Better:
+> >>         if (ret)
+> >>                 return ret;
+> > To me, it does not make much difference.
+> 
+> Not the the compiler, but IMHO the common pattern in the kernel is:
+> 
+> ret = sensible_init();
+> if (ret)
+> 	return ret;
+> 
+> do_work();
+> 
+> >>
+> >>> +		if (of_find_property(pdev->dev.of_node,
+> >>> +			"fsl,disable-over-current", NULL))
+> >>> +			data->dis_oc = 1;
+> >>> +		data->soc_data = of_id->data;
+> >>> +		usbmisc = data;
+> >>> +	}
+> >>> +
+> >>         if (of_find_property(pdev->dev.of_node,
+> >>         ...
+> >>
+> >>> +	return ret;
+> >>> +}
+> >>> +
+> >>> +static int __devexit imx_usbmisc_remove(struct platform_device *pdev)
+> >>> +{
+> >>> +	clk_disable_unprepare(usbmisc->clk);
+> >>> +	return 0;
+> >>> +}
+> >>> +
+> >>> +static struct platform_driver imx_usbmisc_driver = {
+> >>> +	.probe = imx_usbmisc_probe,
+> >>> +	.remove = __devexit_p(imx_usbmisc_remove),
+> >>> +	.driver = {
+> >>> +		.name = "imx_usbmisc",
+> >>> +		.owner = THIS_MODULE,
+> >>> +		.of_match_table = imx_usbmisc_dt_ids,
+> >>> +	 },
+> >>> +};
+> >>> +
+> >>> +int imx_usbmisc_init(struct device *usbdev)
+> >>> +{
+> >>> +	struct device_node *np = usbdev->of_node;
+> >>> +	int ret;
+> >>> +
+> >>> +	if (!usbmisc)
+> >>> +		return 0;
+> >>> +
+> >>> +	ret = of_alias_get_id(np, "usb");
+> >>> +	if (ret < 0) {
+> >>> +		dev_err(usbdev, "failed to get alias id, errno %d\n", ret);
+> >>> +		return ret;
+> >>> +	}
+> >>> +
+> >>> +	return usbmisc->soc_data->init(usbmisc, ret);
+> >>> +}
+> >>> +EXPORT_SYMBOL_GPL(imx_usbmisc_init);
+> >>
+> >> EXPORT_SYMBOL is only needed because it is
+> >> compliled as an extra kernel module.
+> > ci13xxx_imx may be module.
+> 
+> Why make the usb_misc an independent module, why not just link it into
+> the ci13xxx_imx.ko
+Yes
 
-        gic_raise_softirq(cpumask_of(cpu), 1);
-
-        if (pen_release == -1)
-
-Now smp_ops is not yet merged, now just call the firmware_init at init_early
- at board file
-
-e.g., exynos4412 based board 
-
-static void __init board_init_early(void)
-{
-	exynos_firmware_init();
-}
-
-TODO
-	1. DT support.
-	2. call firmware init by smp_ops.
-
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
-new file mode 100644
-index 0000000..ffb6822
---- /dev/null
-+++ b/arch/arm/common/firmware.c
-@@ -0,0 +1,23 @@
-+/*
-+ *  Copyright (C) 2012 Samsung Electronics.
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+
-+#include <asm/firmware.h>
-+
-+static void cpu_boot(int cpu)
-+{
-+	/* Do nothing */
-+}
-+
-+struct firmware_ops firmware_ops = {
-+	.do_idle		= cpu_do_idle,
-+	.cpu_boot		= cpu_boot,
-+};
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-new file mode 100644
-index 0000000..c8c28bf
---- /dev/null
-+++ b/arch/arm/include/asm/firmware.h
-@@ -0,0 +1,20 @@
-+/*
-+ *  Copyright (C) 2012 Samsung Electronics.
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARM_FIRMWARE_H
-+#define __ASM_ARM_FIRMWARE_H
-+
-+struct firmware_ops {
-+	int	(*do_idle)(void);
-+	void	(*cpu_boot)(int cpu);
-+};
-+
-+extern struct firmware_ops firmware_ops;
-+
-+#endif
-diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
-new file mode 100644
-index 0000000..2e27aa3
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-smc.S
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2012 Samsung Electronics.
-+ *
-+ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+/*
-+ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
-+ */
-+
-+ENTRY(exynos_smc)
-+	stmfd	sp!, {r4-r11, lr}
-+	dsb
-+	smc	#0
-+	ldmfd	sp!, {r4-r11, pc}
-+ENDPROC(exynos_smc)
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-new file mode 100644
-index 0000000..6aa423b
---- /dev/null
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -0,0 +1,33 @@
-+/*
-+ *  Copyright (C) 2012 Samsung Electronics.
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include <asm/firmware.h>
-+
-+#include "smc.h"
-+
-+static int exynos_do_idle(void)
-+{
-+        exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-+        return 0;
-+}
-+
-+static void exynos_cpu_boot(int cpu)
-+{
-+	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-+}
-+
-+int __init exynos_firmware_init(void)
-+{
-+	firmware_ops.do_idle = exynos_do_idle;
-+	firmware_ops.cpu_boot = exynos_cpu_boot;
-+	return 0;
-+}
-diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
-new file mode 100644
-index 0000000..e972390
---- /dev/null
-+++ b/arch/arm/mach-exynos/smc.h
-@@ -0,0 +1,31 @@
-+/*
-+ *  Copyright (c) 2012 Samsung Electronics.
-+ *
-+ * EXYNOS - SMC Call
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_EXYNOS_SMC_H
-+#define __ASM_ARCH_EXYNOS_SMC_H
-+
-+#define SMC_CMD_INIT            (-1)
-+#define SMC_CMD_INFO            (-2)
-+/* For Power Management */
-+#define SMC_CMD_SLEEP           (-3)
-+#define SMC_CMD_CPU1BOOT        (-4)
-+#define SMC_CMD_CPU0AFTR        (-5)
-+/* For CP15 Access */
-+#define SMC_CMD_C15RESUME       (-11)
-+/* For L2 Cache Access */
-+#define SMC_CMD_L2X0CTRL        (-21)
-+#define SMC_CMD_L2X0SETUP1      (-22)
-+#define SMC_CMD_L2X0SETUP2      (-23)
-+#define SMC_CMD_L2X0INVALL      (-24)
-+#define SMC_CMD_L2X0DEBUG       (-25)
-+
-+extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
-+
-+#endif
-diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-index 283fa1d..5b097ca 100644
---- a/arch/arm/common/Kconfig
-+++ b/arch/arm/common/Kconfig
-@@ -21,6 +21,9 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
- 
-+config ARM_FIRMWARE
-+	bool
-+
- config ICST
- 	bool
- 
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index e8a4e58..4af6568 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -4,6 +4,7 @@
- 
- obj-$(CONFIG_ARM_GIC)		+= gic.o
- obj-$(CONFIG_ARM_VIC)		+= vic.o
-+obj-$(CONFIG_ARM_FIRMWARE)	+= firmware.o
- obj-$(CONFIG_ICST)		+= icst.o
- obj-$(CONFIG_SA1111)		+= sa1111.o
- obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 9b58024..8ee779c 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
- 
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
-+obj-$(CONFIG_ARM_FIRMWARE)	+= exynos-smc.o firmware.o
-+
-+plus_sec := $(call as-instr,.arch_extension sec,+sec)
-+AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-+
- # machine support
- 
- obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index aed2eeb..540918f 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -21,6 +21,8 @@ void exynos4_restart(char mode, const char *cmd);
- void exynos5_restart(char mode, const char *cmd);
- void exynos_init_late(void);
- 
-+void exynos_firmware_init(void);
-+
- #ifdef CONFIG_PM_GENERIC_DOMAINS
- int exynos_pm_late_initcall(void);
- #else
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 36c3984..3cec589 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -25,6 +25,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
-+#include <asm/firmware.h>
- 
- #include <mach/hardware.h>
- #include <mach/regs-clock.h>
-@@ -139,6 +140,12 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
- 			CPU1_BOOT_REG);
-+
-+		if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
-+			/* Call Exynos specific smc call */
-+			firmware_ops.cpu_boot(cpu);
-+		}
-+
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
- 		if (pen_release == -1)
+Thanks
+Richard
+> 
+> Marc
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
