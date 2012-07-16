@@ -1,161 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Jul 2012 10:25:20 +0200
-Subject: [PATCH 12/12] USB: chipidea: add imx usbmisc support
-In-Reply-To: <1342076512-19207-13-git-send-email-richard.zhao@freescale.com>
-References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
- <1342076512-19207-13-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120716082520.GN24458@pengutronix.de>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Mon, 16 Jul 2012 13:58:14 +0530
+Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
+ ocp2scp
+In-Reply-To: <20120716081204.GI7955@arwen.pp.htv.fi>
+References: <1340370942-23201-1-git-send-email-kishon@ti.com>
+ <CAAe_U6+dkiQw-i93pFapt6qKrArzaQoE8X3GjDzUDraziG8B2Q@mail.gmail.com>
+ <20120625122449.GA30463@arwen.pp.htv.fi>
+ <201206251626.09666.arnd@arndb.de>
+ <20120716081204.GI7955@arwen.pp.htv.fi>
+Message-ID: <CAAe_U6JMGP3jEkkd=vqpR5KTeOnY51AOcb65zqKRRa8MtnWjzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2012 at 03:01:52PM +0800, Richard Zhao wrote:
-> i.MX usb controllers shares non-core registers, which may include
-> SoC specific controls. We take it as a usbmisc device and usbmisc
-> driver export functions needed by ci13xxx_imx driver.
-> 
-> For example, Sabrelite board has bad over-current design, we can
-> usbmisc to disable over-current detect.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  .../devicetree/bindings/usb/imx-usbmisc.txt        |   15 ++
->  drivers/usb/chipidea/Makefile                      |    2 +-
->  drivers/usb/chipidea/ci13xxx_imx.c                 |    4 +
->  drivers/usb/chipidea/imx_usbmisc.c                 |  144 ++++++++++++++++++++
->  4 files changed, 164 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/imx-usbmisc.txt
->  create mode 100644 drivers/usb/chipidea/imx_usbmisc.c
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/imx-usbmisc.txt b/Documentation/devicetree/bindings/usb/imx-usbmisc.txt
-> new file mode 100644
-> index 0000000..09f01ca
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/imx-usbmisc.txt
-> @@ -0,0 +1,15 @@
-> +* Freescale i.MX non-core registers
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx6q-usbmisc"
-> +- reg: Should contain registers location and length
-> +
-> +Optional properties:
-> +- fsl,disable-over-current: disable over current detect
-> +
-> +Examples:
-> +usbmisc at 02184800 {
-> +	compatible = "fsl,imx6q-usbmisc";
-> +	reg = <0x02184800 0x200>;
-> +	fsl,disable-over-current;
-> +};
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 3f56b76..46fc31c 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -17,5 +17,5 @@ ifneq ($(CONFIG_PCI),)
->  endif
->  
->  ifneq ($(CONFIG_OF_DEVICE),)
-> -	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
-> +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o imx_usbmisc.o
->  endif
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index b3173d8..dd7f3a3 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -24,6 +24,8 @@
->  
->  #include "ci.h"
->  
-> +int imx_usbmisc_init(struct device *usbdev);
-> +
->  #define pdev_to_phy(pdev) \
->  	((struct usb_phy *)platform_get_drvdata(pdev))
->  #define ci_to_imx_data(ci) \
-> @@ -142,6 +144,8 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
->  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
->  	}
->  
-> +	imx_usbmisc_init(&pdev->dev);
-> +
->  	platform_set_drvdata(pdev, data);
->  
->  	plat_ci = ci13xxx_add_device(&pdev->dev,
-> diff --git a/drivers/usb/chipidea/imx_usbmisc.c b/drivers/usb/chipidea/imx_usbmisc.c
-> new file mode 100644
-> index 0000000..33a8ec0
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/imx_usbmisc.c
-> @@ -0,0 +1,144 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <asm/io.h>
+Hi,
 
-linux/io.h
+On Mon, Jul 16, 2012 at 1:42 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Mon, Jun 25, 2012 at 04:26:08PM +0000, Arnd Bergmann wrote:
+>> On Monday 25 June 2012, Felipe Balbi wrote:
+>> > > > Can't this live where the scp drivers live?  Actually, where is that at?
+>> > > > Do we have scp drivers?
+>> > > AFAIK, there isn't any driver for scp. But we have a driver for ocp
+>> > > and it is present at arch/arm/mach-omap2/omap_l3_noc.c
+>> >
+>> > I don't think this deserves a directory of its own. Maybe
+>> > drivers/platform/arm/omap/ ?? the l3_noc is an OMAP-specific
+>> > interconnect and the SCP bus is also an OMAP-specific bus. I don't know
+>> > of any other arch/soc who uses the same interconnect IP as OMAP and the
+>> > same ocp2scp bridge. That bridge was created by TI for all I know.
+>> >
+>> > Greg, would drivers/platform/arm/omap/ work for you ? We could also move
+>> > the interconnect drivers there.
+>>
+>> I really don't like the idea of introducing drivers/platform/arm/ because
+>> very little of the stuff that one would put in there are actually ARM
+>> specific.
+>>
+>> I have suggested a drivers/bus/ before and people did not see the need
+>> back then, and we agreed to continue having a directory for each bus,
+>> as we have for the big ones (pci, usb, i2c, spi, ...) and a lot of
+>> simple (amba, rapidio, bcma, ...) or obscure (tc,  vlynq, nubus, ...)
+>> ones.
+>>
+>> I think we should reconsider the idea of drivers/bus/ with a file per
+>> bus in there at least for new buses, but doing a new drivers/scp/
+>> would be ok for me if there is enough opposition against the idea
+>> of drivers/bus aggregating different buses.
+>
+> I don't mind either way. The fact is that this ocp-to-scp bridge is
+> really a TI/OMAP thing. Not sure it deserves a directory of its own.
 
-> +
-> +struct usbmisc;
-> +
-> +struct soc_data {
-> +	int (*init) (struct usbmisc *usbmisc, int id);
-> +	void (*exit) (struct usbmisc *usbmisc, int id);
-> +};
-> +
-> +struct usbmisc {
-> +	struct soc_data *soc_data;
-> +	void __iomem *base;
-> +	struct clk *clk;
-> +
-> +	int dis_oc:1;
-> +};
-> +
-> +/* Since we only have one usbmisc device at runtime, we global variables */
-> +static struct usbmisc *usbmisc;
+Ok. Then I'll have a file in drivers/bus/ for ocp2scp driver.
 
-NACK
-
-What you've done here exactly matches your current usecase but is not
-enough for any of the other usecases I can think of. Even the i.MX6 has
-three USB ports, each of them has a overcurrent disable bit. Also, there
-are more flags, like:
-
-- use internal phy
-- power pin polarity
-- ttl enabled
-
-I think the best you can do here is to add the flags to the
-fsl,imx6q-usb device nodes:
-
-	usb at 02184000 { /* USB OTG */
-		compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-		reg = <0x02184000 0x200>;
-		interrupts = <0 43 0x04>;
-		fsl,usbphy = <&usbphy1>;
-		status = "disabled";
-		fsl,disable-over-current;
-		<other flags>;
-	};
-
-Then add a usbmisc device which does not contain any flags. During
-initialization of the fsl,imx6q-usb device you can then pass a pointer
-to its device node to imx_usbmisc_init.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Kishon
