@@ -1,7 +1,9 @@
 From: michael@walle.cc (Michael Walle)
-Date: Mon, 16 Jul 2012 22:55:44 +0200
-Subject: [PATCH] ARM: kirkwood: Add LS-XHL and LS-CHLv2 support
-Message-ID: <1342472144-27703-1-git-send-email-michael@walle.cc>
+Date: Mon, 16 Jul 2012 23:02:52 +0200
+Subject: [PATCH v2] ARM: kirkwood: Add LS-XHL and LS-CHLv2 support
+In-Reply-To: <1342472144-27703-1-git-send-email-michael@walle.cc>
+References: <1342472144-27703-1-git-send-email-michael@walle.cc>
+Message-ID: <1342472572-27770-1-git-send-email-michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +15,10 @@ Signed-off-by: Michael Walle <michael@walle.cc>
 
 This patch is based on Andrew Lunn's kirkwood devicetree branch at:
   git://github.com/lunn/linux.git v3.5-rc7-qnap-dt
+
+Changes:
+v2:
+ - fixed keycodes
 
  arch/arm/boot/dts/kirkwood-lschlv2.dts |   20 +++++
  arch/arm/boot/dts/kirkwood-lsxhl.dts   |   20 +++++
@@ -82,7 +88,7 @@ index 0000000..eb3c071
 +};
 diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
 new file mode 100644
-index 0000000..5961d85
+index 0000000..8ac51c0
 --- /dev/null
 +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
 @@ -0,0 +1,95 @@
@@ -136,17 +142,17 @@ index 0000000..5961d85
 +		#size-cells = <0>;
 +		button at 1 {
 +			label = "Function Button";
-+			linux,code = <1>;
++			linux,code = <132>;
 +			gpios = <&gpio1 9 1>;
 +		};
 +		button at 2 {
 +			label = "Power-on Switch";
-+			linux,code = <2>;
++			linux,code = <116>;
 +			gpios = <&gpio1 10 1>;
 +		};
 +		button at 3 {
 +			label = "Power-auto Switch";
-+			linux,code = <3>;
++			linux,code = <142>;
 +			gpios = <&gpio1 11 1>;
 +		};
 +	};
