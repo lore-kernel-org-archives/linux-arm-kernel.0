@@ -1,28 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jul 2012 13:40:17 +0000
-Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits for
- general purpose registers
-In-Reply-To: <20120716081703.GH21635@b20223-02.ap.freescale.net>
-References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
- <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
- <20120716081703.GH21635@b20223-02.ap.freescale.net>
-Message-ID: <201207161340.18528.arnd@arndb.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 16 Jul 2012 15:41:51 +0200
+Subject: [RFC internal PATCH] mfd/mc13xxx: drop modifying driver's
+ id_table in probe
+In-Reply-To: <1342006608-30550-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1342006608-30550-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120716134151.GH20652@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 July 2012, Richard Zhao wrote:
-> > If you really wants a "funnel driver" doing all these diverse things,
-> > I'd put it in drivers/mfd.
->
-> It's like driver drivers/mfd/anatop-mfd.c. They both store misc bits.
-> We may need a generic driver to simply provide register accessor.
+Hi Uwe,
 
-We already have the "regmap" framework that deals with sets of registers
-on spi, i2c or memory mapped buses. One thing I've thought about
-before is to create some kind of very simple "system controller"
-framework based on regmap that lets you register a single global
-"struct regmap" pointer from an SoC specific driver, and have drivers
-call a function into that framework to get a reference to that
-regmap.
+On Wed, Jul 11, 2012 at 01:36:48PM +0200, Uwe Kleine-K?nig wrote:
+> This was introduced in commit
+> 
+> 	876989d (mfd: Add device tree probe support for mc13xxx)
+> 
+> for spi and later while introducing support for i2c copied to the i2c
+> driver.
+> 
+> Modifying driver details is very strange, for example probing an
+> mc13892 device (instantiated via dt) removes the driver's ability to
+> handle (traditionally probed) mc13783 devices in this case.
+> I'm not aware of any problems that make this hack necessary and if
+> there were some, they'd have to be fixed in the spi/i2c core, not in
+> a driver.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello Samuel,
+> 
+> even though this qualifies as fix, I don't think it's necessary to annoy
+> Linus with it for 3.5. Usually there is only one pmic on each machine so
+> it's not grave when probing one device disables support for another.
+I agree, and I'm pushing this one for the next merge window.
 
-	Arnd
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
