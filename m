@@ -1,41 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 16 Jul 2012 13:57:27 -0400 (EDT)
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <7233708.5ojzueYxjb@flexo>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <1342363754-30808-2-git-send-email-florian@openwrt.org>
- <20120716142941.666d928c@skate> <7233708.5ojzueYxjb@flexo>
-Message-ID: <alpine.LFD.2.02.1207161354500.14068@xanadu.home>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 16 Jul 2012 11:04:15 -0700
+Subject: [PATCH v5] ARM: vfp: Always save VFP state in vfp_pm_suspend
+In-Reply-To: <20120716113302.GG26723@mudshark.cambridge.arm.com>
+References: <20120715215342.4DAB99D401E@zog.reactivated.net>
+ <CAGsJ_4x5S4Aq-nJU1nyyw7E8Q82UPm0pNP-NYJ5N8aGn=nMdgw@mail.gmail.com>
+ <20120716113302.GG26723@mudshark.cambridge.arm.com>
+Message-ID: <CAMbhsRSCMZXyASdpUAhrHPBUr8CN4rgLFA29Z68j_GMta_kPNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Jul 2012, Florian Fainelli wrote:
+On Mon, Jul 16, 2012 at 4:33 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jul 16, 2012 at 02:40:06AM +0100, Barry Song wrote:
+>> 2012/7/16 Daniel Drake <dsd@laptop.org>:
+>> > From: Colin Cross <ccross@android.com>
+>> >
+>> > vfp_pm_suspend should save the VFP state any time there is
+>> > a vfp_current_hw_state.  If it only saves when the VFP is enabled,
+>> > the state can get lost when, on a UP system:
+>> >    Thread 1 uses the VFP
+>> >    Context switch occurs to thread 2, VFP is disabled but the
+>> >       VFP context is not saved to allow lazy save and restore
+>> >    Thread 2 initiates suspend
+>> >    vfp_pm_suspend is called with the VFP disabled, but the
+>> >       context has not been saved.
+>> >
+>> > Modify vfp_pm_suspend to save the VFP context whenever
+>> > vfp_current_hw_state is set.
+>> >
+>> > Signed-off-by: Colin Cross <ccross@android.com>
+>> > Cc: Binghua Duan <binghua.duan@csr.com>
+>> > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+>> > Signed-off-by: Barry Song <21cnbao@gmail.com>
+>> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> we also found this kind of issue too, sometimes suspend/resume will
+>> fail with this bug.
+>> so we refined this patch before. but i am really wondering why it has
+>> not been committed yet.
+>
+> At a guess, it hasn't been applied because nobody has submitted it to the
+> patch system.
+>
+>> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+>> > index 58696192..c86fc52 100644
+>> > --- a/arch/arm/vfp/vfpmodule.c
+>> > +++ b/arch/arm/vfp/vfpmodule.c
+>> > @@ -457,6 +457,10 @@ static int vfp_pm_suspend(void)
+>> >
+>> >                 /* disable, just in case */
+>> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+>> > +       } else if (vfp_current_hw_state[ti->cpu]) {
+>> > +               fmxr(FPEXC, fpexc | FPEXC_EN);
+>> > +               vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
+>> > +               fmxr(FPEXC, fpexc);
+>
+> Given that we don't do lazy saving on SMP systems, can we make this
+> conditional on !SMP?
 
-> Hi Thomas,
-> 
-> On Monday 16 July 2012 14:29:41 Thomas Petazzoni wrote:
-> > Hello Florian,
-> > 
-> > Le Sun, 15 Jul 2012 16:49:07 +0200,
-> > Florian Fainelli <florian@openwrt.org> a ?crit :
-> > 
-> > > diff --git a/arch/arm/mach-mcs814x/Makefile.boot b/arch/arm/mach-
-> mcs814x/Makefile.boot
-> > > new file mode 100644
-> > > index 0000000..414db8b
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-mcs814x/Makefile.boot
-> > > @@ -0,0 +1,3 @@
-> > > +    zreladdr-y := 0x00008000
-> > > + params_phys-y := 0x00000008
-> > > + initrd_phys-y := 0x00400000
-> > 
-> > params_phys-y and initrd_phys-y are useless for DT-based platforms, if
-> > I'm correct.
-> 
-> Indeed, only zreladdr is actually required.
-
-If you use CONFIG_AUTO_ZRELADDR then even zreladdr-y isn't needed.
-
-
-Nicolas
+Ido Yariv pointed out that this is actually unsafe on SMP systems,
+because vfp_current_hw_state can be a dangling pointer if a task exits
+on another cpu.  I'll squash his fix into this one (#ifdef CONFIG_SMP
+around the contents of the new if clause) and post v6.
