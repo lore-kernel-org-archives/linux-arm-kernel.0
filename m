@@ -1,120 +1,68 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 16 Jul 2012 17:12:31 -0400
-Subject: [RFC PATCH 1/4] ARM: arch_timers: enable the use of the virtual
- timer
-In-Reply-To: <1341566422-20368-2-git-send-email-marc.zyngier@arm.com>
-References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
- <1341566422-20368-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <500483BF.704@codeaurora.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 16 Jul 2012 23:17:51 +0200
+Subject: [PATCH v2 1/4] ARM: i.MX5x clocks: Add EPIT support This patch
+ adds support for Enhanced Periodic Interrupt Timer (EPIT) to clock
+ subsystem.
+In-Reply-To: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
+References: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20120716211751.GR30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Applied this series, thanks.
 
-On 07/06/2012 05:20 AM, Marc Zyngier wrote:
-> At the moment, the arch_timer driver only uses the physical timer,
-> which can cause problem if PL2 hasn't enabled PL1 access in CNTHCTL,
-> which is likely in a virtualized environment. Instead, the virtual
-> timer is always available.
+(fixed line wrapping in the subject while committing)
+
+Sascha
+
+On Thu, Jul 12, 2012 at 07:39:28PM +0400, Alexander Shiyan wrote:
 > 
-> This patch enables the use of both the virtual timer, unless no
-> interrupt is provided in the DT for it, in which case is falls
-> back to the physical timer.
-
-[...]
-
-> @@ -44,7 +62,37 @@ static struct clock_event_device __percpu **arch_timer_evt;
->  #define ARCH_TIMER_REG_FREQ		1
->  #define ARCH_TIMER_REG_TVAL		2
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index a2200c7..d4653d9 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -81,6 +81,7 @@ enum imx5_clks {
+>  	ssi1_root_podf, ssi2_root_pred, ssi2_root_podf, ssi_ext1_pred,
+>  	ssi_ext1_podf, ssi_ext2_pred, ssi_ext2_podf, ssi1_root_gate,
+>  	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
+> +	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
+>  	clk_max
+>  };
 >  
-> -static void arch_timer_reg_write(int reg, u32 val)
-> +static inline void arch_timer_reg_write(int reg, u32 val)
-
-Will GCC fail to inline without the hint?
-
-> +{
-> +	(*__this_cpu_ptr(arch_timer_reg_ops))->reg_write(reg, val);
-> +}
-> +
-> +static inline u32 arch_timer_reg_read(int reg)
-> +{
-> +	return (*__this_cpu_ptr(arch_timer_reg_ops))->reg_read(reg);
-> +}
-> +
-> +static inline cycle_t arch_timer_counter_read(void)
-> +{
-> +	return (*__this_cpu_ptr(arch_timer_reg_ops))->counter_read();
-> +}
-> +
-> +static u32 arch_timer_common_reg_read(int reg)
-> +{
-> +	u32 val;
-> +
-> +	switch (reg) {
-> +	case ARCH_TIMER_REG_FREQ:
-> +		asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
-> +		break;
-> +	default:
-> +		BUG();
-> +	}
-> +
-> +	return val;
-> +}
-> +
-> +static void arch_timer_phys_reg_write(int reg, u32 val)
->  {
->  	switch (reg) {
->  	case ARCH_TIMER_REG_CTRL:
-
-[...]
-
-> @@ -329,10 +443,24 @@ int __init arch_timer_of_register(void)
->  	if (!of_property_read_u32(np, "clock-frequency", &freq))
->  		arch_timer_rate = freq;
+> @@ -226,6 +227,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk[ssi3_root_gate] = imx_clk_gate2("ssi3_root_gate", "ssi3_root_sel", MXC_CCM_CCGR3, 26);
+>  	clk[ssi_ext1_gate] = imx_clk_gate2("ssi_ext1_gate", "ssi_ext1_com_sel", MXC_CCM_CCGR3, 28);
+>  	clk[ssi_ext2_gate] = imx_clk_gate2("ssi_ext2_gate", "ssi_ext2_com_sel", MXC_CCM_CCGR3, 30);
+> +	clk[epit1_ipg_gate] = imx_clk_gate2("epit1_ipg_gate", "ipg", MXC_CCM_CCGR2, 2);
+> +	clk[epit1_hf_gate] = imx_clk_gate2("epit1_hf_gate", "per_root", MXC_CCM_CCGR2, 4);
+> +	clk[epit2_ipg_gate] = imx_clk_gate2("epit2_ipg_gate", "ipg", MXC_CCM_CCGR2, 6);
+> +	clk[epit2_hf_gate] = imx_clk_gate2("epit2_hf_gate", "per_root", MXC_CCM_CCGR2, 8);
 >  
-> -	arch_timer_ppi = irq_of_parse_and_map(np, 0);
-> -	arch_timer_ppi2 = irq_of_parse_and_map(np, 1);
-> -	pr_info("arch_timer: found %s irqs %d %d\n",
-> -		np->name, arch_timer_ppi, arch_timer_ppi2);
-> +	pr_info("arch_timer: found %s irqs ", np->name);
-> +
-> +	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++) {
-> +		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
-> +		if (!arch_timer_ppi[i]) {
-> +			/*
-> +			 * No interrupt provided for virtual timer,
-> +			 * we'll have to stick to the physical timer.
-> +			 */
-> +			if (i == VIRT_PPI)
-> +				arch_timer_use_virtual = false;
-> +			
-
-It seems like it would be more straightforward to set the
-arch_timer_use_virtual variable outside of the loop, directly indexing
-into the array of timer PPI's. On a trivial note you've also got
-trailing whitespace here.
-
-> +			continue;
-> +		}
-> +		pr_cont("%d ", arch_timer_ppi[i]);
-> +	}
-> +
-> +	pr_cont("\n");
+>  	for (i = 0; i < ARRAY_SIZE(clk); i++)
+>  		if (IS_ERR(clk[i]))
+> @@ -279,6 +284,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk_register_clkdev(clk[dummy], NULL, "imx-keypad");
+>  	clk_register_clkdev(clk[tve_gate], NULL, "imx-tve.0");
+>  	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx-tve.0");
+> +	clk_register_clkdev(clk[epit1_ipg_gate], "ipg", "imx-epit.0");
+> +	clk_register_clkdev(clk[epit1_hf_gate], "per", "imx-epit.0");
+> +	clk_register_clkdev(clk[epit2_ipg_gate], "ipg", "imx-epit.1");
+> +	clk_register_clkdev(clk[epit2_hf_gate], "per", "imx-epit.1");
 >  
->  	return arch_timer_register();
->  }
-> @@ -345,6 +473,6 @@ int __init arch_timer_sched_clock_init(void)
->  	if (err)
->  		return err;
->  
-> -	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
-> +	setup_sched_clock(arch_counter_get_cnt32, 32, arch_timer_rate);
->  	return 0;
->  }
-
-Regards,
-Christopher
+>  	/* Set SDHC parents to be PLL2 */
+>  	clk_set_parent(clk[esdhc_a_sel], clk[pll2_sw]);
+> -- 
+> 1.7.3.4
+> 
+> 
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
