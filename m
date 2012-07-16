@@ -1,60 +1,119 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 16 Jul 2012 14:34:17 -0400 (EDT)
-Subject: [PATCH v6] ARM: vfp: Always save VFP state in vfp_pm_suspend on UP
-In-Reply-To: <1342462640-18410-1-git-send-email-ccross@android.com>
-References: <1342462640-18410-1-git-send-email-ccross@android.com>
-Message-ID: <alpine.LFD.2.02.1207161433420.14068@xanadu.home>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 16 Jul 2012 11:36:17 -0700
+Subject: Device tree binding for DVFS table
+In-Reply-To: <50035582.9070308@gmail.com>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+ <4FFE4DD0.7020407@nvidia.com> <50035582.9070308@gmail.com>
+Message-ID: <CAJOA=zMKE1Z_AsYeWr22k58EDskx0eshEjv9VbLQHKFsA0uThw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Jul 2012, Colin Cross wrote:
+On Sun, Jul 15, 2012 at 4:42 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 07/11/2012 11:08 PM, Prashant Gaikwad wrote:
+>> On Wednesday 11 July 2012 07:33 PM, Rob Herring wrote:
+>>> On 07/11/2012 07:56 AM, Prashant Gaikwad wrote:
+>
+>>>> cpu-dvfs-table : dvfs-table {
+>>> This should be located with the node that the frequencies correspond to.
+>>>
+>>
+>> With CAR node?
+>
+> With the power domain it corresponds to or the cpu nodes.
+>
+>>
+>>>>                compatible = "nvidia,tegra30-dvfs-table";
+>>>>                reg_id =<&sm0>;
+>>>>                #address-cells =<1>;
+>>>>                #size-cells =<0>;
+>>>>                voltage-array =<750 775 800 825 850 875 900 925 950 975
+>>>> 1000 1025 1050 1100 1125>;
+>>> The SOC is really characterized at all these voltages?
+>>
+>> Not really, but different processes of single SoC are characterized for
+>> different voltages and this array covers all those voltages.
+>>
+>>>> };
+>>>>
+>>>> device {
+>>>>               dvfs =<&cpu-dvfs-table>;
+>>>>               frequency-table at 102 {
+>>>>                        reg =<0x102>;
+>>>>                        frequencies =<314 314 314 456 456 456 608 608 608
+>>>> 760 817 817 912 1000>;
+>>> I don't see the point of repeating frequencies.
+>>>>               };
+>>>>               frequency-table at 002 {
+>>>>                        reg =<0x002>;
+>>>>                        frequencies =<598 598 750 750 893 893 1000>;
+>>>>               };
+>>> How do you determine the voltage for a frequency on table 2?
+>>>
+>>> I'd expect a single property with freq/volt pairs or 2 properties for
+>>> freq and voltage where there is a 1:1 relationship (freq N uses
+>>> voltage N).
+>>
+>>
+>> How this will work:
+>>
+>> voltage-array =<750 775 800 825 850 875 900  925 950 975 1000 1025 1050
+>> 1100 1125>
+>> frequencies-1 =<314 314 314 456 456 456 608  608 608 760 817  817  912
+>> 1000>;
+>> frequencies-2 =<598 598 750 750 893 893 1000>;
+>>
+>
+> I don't see the point trying to share a voltage range. Not sharing it is
+> fewer array elements (22 vs 36):
+>
+> voltage-array-1 =<750 825 900 975 1000 1050 1100>;
+> frequencies-1   =<314 456 608 760  817  912 1000>;
+>
+> voltage-array-2 =<750 800 850  900>
+> frequencies-2   =<598 750 893 1000>;
+>
 
-> vfp_pm_suspend should save the VFP state in suspend after
-> any lazy context switch.  If it only saves when the VFP is enabled,
-> the state can get lost when, on a UP system:
->   Thread 1 uses the VFP
->   Context switch occurs to thread 2, VFP is disabled but the
->      VFP context is not saved
->   Thread 2 initiates suspend
->   vfp_pm_suspend is called with the VFP disabled, and the unsaved
->      VFP context of Thread 1 in the registers
-> 
-> Modify vfp_pm_suspend to save the VFP context whenever
-> vfp_current_hw_state is not NULL.
-> 
-> Includes a fix from Ido Yariv <ido@wizery.com>, who pointed out that on
-> SMP systems, the state pointer can be pointing to a freed task struct if
-> a task exited on another cpu, fixed by using #ifdef CONFIG_SMP in the
-> new if clause.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Barry Song <bs14@csr.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ido Yariv <ido@wizery.com>
-> Cc: Daniel Drake <dsd@laptop.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
->  arch/arm/vfp/vfpmodule.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 58696192..ce55f05 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -457,6 +457,12 @@ static int vfp_pm_suspend(void)
->  
->  		/* disable, just in case */
->  		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> +	} else if (vfp_current_hw_state[ti->cpu]) {
-> +#ifndef CONFIG_SMP
-> +		fmxr(FPEXC, fpexc | FPEXC_EN);
-> +		vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
-> +		fmxr(FPEXC, fpexc);
-> +#endif
->  	}
+This is significantly more readable.
 
-Couldn't vfp_sync_hwstate() be used here instead?
+Regards,
+Mike
 
-
-Nicolas
+> Rob
+>
+>>
+>> Freq and voltage has 1:1 relationship but as single voltage table is
+>> used for different processes we have more entries in voltage table than
+>> freq table.
+>> Frequency table 1 is mapped till 1100mV while frequency table 2 is
+>> mapped till 900mV only, it maintains 1:1 relationship.
+>>
+>> About repeating frequencies, operating voltage for a frequency would be
+>> the highest one mapped in the table.
+>> For example, in frequency table 2 operating voltage for 750MHz would be
+>> 825mV while for 893MHz it would be 875mV. Unmapped entries could be
+>> replaced with 0 to make reading better.
+>>
+>> Advantage it provides is single voltage table used for multiple
+>> frequency tables, as can be observed from above tables, operating
+>> voltage for 314MHz in freq table 1 is 800mV while there is no frequency
+>> in table 2 at that voltage.
+>>
+>> I know this makes reading difficult but it provides flexibility,
+>>
+>> I hope it explains the implementation.
+>>
+>>> Rob
+>>>
+>>>> };
+>>>>
+>>>> Thanks&  Regards,
+>>>> Prashant G
+>>>>
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>
+>
