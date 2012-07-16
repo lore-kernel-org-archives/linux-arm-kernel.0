@@ -1,31 +1,47 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 16 Jul 2012 09:53:25 +0200
-Subject: [PATCH] ARM i.MX53: clk: change cspi_ipg_gate device name
-Message-ID: <1342425205-24567-1-git-send-email-s.trumtrar@pengutronix.de>
+From: attila@kinali.ch (Attila Kinali)
+Date: Mon, 16 Jul 2012 09:57:41 +0200
+Subject: [PATCH 04/10 RESEND] mmc: spi: Pull out parts shared between
+ MMC and SPI
+In-Reply-To: <1341555449-17507-4-git-send-email-marex@denx.de>
+References: <1341555449-17507-1-git-send-email-marex@denx.de>
+ <1341555449-17507-4-git-send-email-marex@denx.de>
+Message-ID: <20120716095741.85d959fc81ab759b10adcf25@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cspi is compatible to the imx35 one. imx51-dt.c, imx53-dt.c, imx53.dtsi and
-imx51.dtsi already reflect this fact. But as the clock driver is not registered
-accordingly, spi-imx can not probe for the device, as it can not find the clock
-device and return with an error.
-A rename of the clock device fixes this.
+Moin,
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx51-imx53.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I just wanted to try out this patchset as i have a use for proper spi
+support on i.mx23. But this patch (4/10) fails to apply at line 635
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index a2200c7..508f104 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -248,7 +248,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[ecspi1_ipg_gate], "ipg", "imx51-ecspi.0");
- 	clk_register_clkdev(clk[ecspi2_per_gate], "per", "imx51-ecspi.1");
- 	clk_register_clkdev(clk[ecspi2_ipg_gate], "ipg", "imx51-ecspi.1");
--	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx51-cspi.0");
-+	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx35-cspi.0");
- 	clk_register_clkdev(clk[pwm1_ipg_gate], "pwm", "mxc_pwm.0");
- 	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
- 	clk_register_clkdev(clk[i2c1_gate], NULL, "imx-i2c.0");
+On Fri,  6 Jul 2012 08:17:23 +0200
+Marek Vasut <marex@denx.de> wrote:
+
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index f9509e8..1ea1cba 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -635,6 +640,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	dma_cap_mask_t mask;
+>  	struct regulator *reg_vmmc;
+>  	enum of_gpio_flags flags;
+> +	struct mxs_ssp *ssp;
+>  
+>  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+
+The function variables do not match.
+
+Also a 3way merge didnt work as the comit on which this patchset was
+based on wasnt found. I tried linux, linux-next, and the imx repos
+from pengutronix and Shawn, to no avail.
+
+Is there any other repo around that i'm not aware of?
+
+			Attila Kinali
+
+-- 
+The trouble with you, Shev, is you don't say anything until you've saved
+up a whole truckload of damned heavy brick arguments and then you dump
+them all out and never look at the bleeding body mangled beneath the heap
+		-- Tirin, The Dispossessed, U. Le Guin
