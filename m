@@ -1,35 +1,48 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 16 Jul 2012 15:57:28 +0200
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
-In-Reply-To: <5003C449.6000806@linaro.org>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <4FF6994B.9040801@linaro.org>
- <20120706173957.GA10202@core.coreip.homeip.net>
- <4FFB288D.4080606@linaro.org>
- <20120709201422.GA12242@core.coreip.homeip.net>
- <4FFB40A4.5060505@linaro.org>
- <20120709204620.GA12692@core.coreip.homeip.net>
- <4FFB463F.9040201@linaro.org>
- <20120710061757.GB29257@core.coreip.homeip.net>
- <5003C449.6000806@linaro.org>
-Message-ID: <20120716135728.GK20652@sortiz-mobl>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 16 Jul 2012 09:03:15 -0500
+Subject: [PATCH v2 00/15] PCI io.h clean-up
+In-Reply-To: <20120716075214.GA2489@lunn.ch>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <20120716075214.GA2489@lunn.ch>
+Message-ID: <50041F23.2010908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Mon, Jul 16, 2012 at 08:35:37AM +0100, Lee Jones wrote:
-> > I think it would be best if this got merged through whatever tree that
-> > was used to introduce ab8500_irq_get_virq(); otherwise it will have to
-> > wait till I resync with mainline sometime in the middle of the next
-> > release cycle.
+On 07/16/2012 02:52 AM, Andrew Lunn wrote:
+> On Fri, Jul 13, 2012 at 09:03:56PM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This is the 2nd part of mach/io.h removals. This series removes io.h on
+>> platforms with PCI by creating a fixed virtual I/O mapping and a common
+>> __io() macro.
 > 
-> I agree. Sam that's you, patch below. :)
-Applied, thanks.
+> Hi Rob
+> 
+> Time to show my ignorance of PCI again.
+> 
+> root at orion5x:~# cat /proc/ioports 
+> 00001000-0000ffff : PCI0 I/O
+> 00010000-0001ffff : PCI1 I/O
+> 
+> The changes you made for Orion decreased the window to 64K. However, i
+> see here that PCI0 only gets 60K, where as PCI1 gets the full 64K.
+> 
+> Is this asymmetry correct?
 
-Cheers,
-Samuel.
+First, thanks for testing.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+PC's only have 64K, so that should be enough for any platform. 0-0x1000
+is reserved for legacy ISA range. Even if we set the start to 0,
+pcibios_min_io would still limit it to above 0x1000.
+
+Also, based on the address translation masking on these platforms, I
+believe it should be okay to start the PCI bus address on a 64K boundary.
+
+Rob
+
+> 
+> I see this for both orion5x and kirkwood.
+> 
+>    Thanks
+> 	Andrew
+> 
