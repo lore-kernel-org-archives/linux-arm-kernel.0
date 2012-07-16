@@ -1,21 +1,39 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 16 Jul 2012 12:00:46 +0530
-Subject: [PATCH] dma: mxs-dma: Export missing symbols from mxs-dma.c
-In-Reply-To: <1341579200-13268-1-git-send-email-attila@kinali.ch>
-References: <20120706122141.GE22133@S2101-09.ap.freescale.net>
- <1341579200-13268-1-git-send-email-attila@kinali.ch>
-Message-ID: <1342420246.1726.43.camel@vkoul-udesk3>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Mon, 16 Jul 2012 14:35:52 +0800
+Subject: [PATCH 3/3] ARM: convert asm/irqflags.h to use
+ asm-generic/irqflags.h
+In-Reply-To: <1342410836-6010-4-git-send-email-robherring2@gmail.com>
+References: <1342410836-6010-1-git-send-email-robherring2@gmail.com>
+ <1342410836-6010-4-git-send-email-robherring2@gmail.com>
+Message-ID: <5003B648.30802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-06 at 14:53 +0200, Attila Kinali wrote:
-> mxs-dma.c provides two functions mxs_dma_is_apbh and mxs_dma_is_apbx
-> which are used at least in mxs-mmc.c. Building mxs-mmc as module
-> fails due to those two symbols not being exported.
-Applied thanks.
+Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> By implmenting arch_local_irq_restore with constant flags, we can use
+> asm-generic/irqflags.h and remove some of the ARM version of irqflags.h.
+>
+>   
+[...]
+> -		: "r" (flags)
+> -		: "memory", "cc");
+> -}
+> -
+>  static inline int arch_irqs_disabled_flags(unsigned long flags)
+>  {
+>  	return flags & PSR_I_BIT;
+>  }
+> +#define arch_irqs_disabled_flags arch_irqs_disabled_flags
+> +
+>   
+Why don't directly define arch_irqs_disabled_flags like that:
 
-Please DO NOT forget to CC maintainers, the patch can get lost
-otherwise. get_maintainer.pl is your friend, use it!
+#define arch_irqs_disabled_flags(flags) (flags & PSR_I_BIT)
 
--- 
-~Vinod
+> +#include <asm-generic/irqflags.h>
+>  
+>  #endif
+>  #endif
+>   
