@@ -1,161 +1,120 @@
-From: michael@walle.cc (Michael Walle)
-Date: Mon, 16 Jul 2012 23:04:51 +0200
-Subject: [PATCH] ARM: kirkwood: Add LS-XHL and LS-CHLv2 support
-In-Reply-To: <1342472144-27703-1-git-send-email-michael@walle.cc>
-References: <1342472144-27703-1-git-send-email-michael@walle.cc>
-Message-ID: <201207162304.51598.michael@walle.cc>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 16 Jul 2012 17:12:31 -0400
+Subject: [RFC PATCH 1/4] ARM: arch_timers: enable the use of the virtual
+ timer
+In-Reply-To: <1341566422-20368-2-git-send-email-marc.zyngier@arm.com>
+References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
+ <1341566422-20368-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <500483BF.704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add support for Buffalo Linkstation LS-XHL and LS-CHLv2 using the device
-> tree where possible.
-> 
-> Signed-off-by: Michael Walle <michael@walle.cc>
-> ---
-> 
-> This patch is based on Andrew Lunn's kirkwood devicetree branch at:
->   git://github.com/lunn/linux.git v3.5-rc7-qnap-dt
-> 
->  arch/arm/boot/dts/kirkwood-lschlv2.dts |   20 +++++
->  arch/arm/boot/dts/kirkwood-lsxhl.dts   |   20 +++++
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi   |   95 ++++++++++++++++++++++
->  arch/arm/mach-kirkwood/Kconfig         |    8 ++
->  arch/arm/mach-kirkwood/Makefile        |    1 +
->  arch/arm/mach-kirkwood/board-dt.c      |    4 +
->  arch/arm/mach-kirkwood/board-lsxl.c    |  137
-> ++++++++++++++++++++++++++++++++ arch/arm/mach-kirkwood/common.h        | 
->   6 ++
->  8 files changed, 291 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-lschlv2.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-lsxhl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-lsxl.dtsi
->  create mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-lschlv2.dts
-> b/arch/arm/boot/dts/kirkwood-lschlv2.dts new file mode 100644
-> index 0000000..37649b5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-lschlv2.dts
-> @@ -0,0 +1,20 @@
-> +/dts-v1/;
-> +
-> +/include/ "kirkwood-lsxl.dtsi"
-> +
-> +/ {
-> +	model = "Buffalo Linkstation LS-CHLv2";
-> +	compatible = "buffalo,lschlv2", "buffalo,lsxl", 
-"mrvl,kirkwood-88f6281",
-> "mrvl,kirkwood"; +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x4000000>;
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		serial at 12000 {
-> +			clock-frequency = <166666667>;
-> +			status = "okay";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxhl.dts
-> b/arch/arm/boot/dts/kirkwood-lsxhl.dts new file mode 100644
-> index 0000000..eb3c071
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-lsxhl.dts
-> @@ -0,0 +1,20 @@
-> +/dts-v1/;
-> +
-> +/include/ "kirkwood-lsxl.dtsi"
-> +
-> +/ {
-> +	model = "Buffalo Linkstation LS-XHL";
-> +	compatible = "buffalo,lsxhl", "buffalo,lsxl", "mrvl,kirkwood-88f6281",
-> "mrvl,kirkwood"; +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x10000000>;
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		serial at 12000 {
-> +			clock-frequency = <200000000>;
-> +			status = "okay";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> b/arch/arm/boot/dts/kirkwood-lsxl.dtsi new file mode 100644
-> index 0000000..5961d85
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> @@ -0,0 +1,95 @@
-> +/include/ "kirkwood.dtsi"
-> +
-> +/ {
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		sata at 80000 {
-> +			status = "okay";
-> +			nr-ports = <1>;
-> +		};
-> +
-> +		spi at 10600 {
-> +			status = "okay";
-> +
-> +			m25p40 at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				compatible = "m25p40";
-> +				reg = <0>;
-> +				spi-max-frequency = <25000000>;
-> +				mode = <0>;
-> +
-> +				partition at 0 {
-> +					reg = <0x0 0x60000>;
-> +					label = "uboot";
-> +					read-only;
-> +				};
-> +
-> +				partition at 60000 {
-> +					reg = <0x60000 0x10000>;
-> +					label = "dtb";
-> +					read-only;
-> +				};
-> +
-> +				partition at 70000 {
-> +					reg = <0x70000 0x10000>;
-> +					label = "uboot_env";
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		button at 1 {
-> +			label = "Function Button";
-> +			linux,code = <1>;
-> +			gpios = <&gpio1 9 1>;
-> +		};
-> +		button at 2 {
-> +			label = "Power-on Switch";
-> +			linux,code = <2>;
-> +			gpios = <&gpio1 10 1>;
-> +		};
-> +		button at 3 {
-> +			label = "Power-auto Switch";
-> +			linux,code = <3>;
+Hi Marc,
 
-sorry somehow this slipped through... i've already posted a new patch with 
-some more meaningful event codes.
+On 07/06/2012 05:20 AM, Marc Zyngier wrote:
+> At the moment, the arch_timer driver only uses the physical timer,
+> which can cause problem if PL2 hasn't enabled PL1 access in CNTHCTL,
+> which is likely in a virtualized environment. Instead, the virtual
+> timer is always available.
+> 
+> This patch enables the use of both the virtual timer, unless no
+> interrupt is provided in the DT for it, in which case is falls
+> back to the physical timer.
 
-[..snip..]
+[...]
+
+> @@ -44,7 +62,37 @@ static struct clock_event_device __percpu **arch_timer_evt;
+>  #define ARCH_TIMER_REG_FREQ		1
+>  #define ARCH_TIMER_REG_TVAL		2
+>  
+> -static void arch_timer_reg_write(int reg, u32 val)
+> +static inline void arch_timer_reg_write(int reg, u32 val)
+
+Will GCC fail to inline without the hint?
+
+> +{
+> +	(*__this_cpu_ptr(arch_timer_reg_ops))->reg_write(reg, val);
+> +}
+> +
+> +static inline u32 arch_timer_reg_read(int reg)
+> +{
+> +	return (*__this_cpu_ptr(arch_timer_reg_ops))->reg_read(reg);
+> +}
+> +
+> +static inline cycle_t arch_timer_counter_read(void)
+> +{
+> +	return (*__this_cpu_ptr(arch_timer_reg_ops))->counter_read();
+> +}
+> +
+> +static u32 arch_timer_common_reg_read(int reg)
+> +{
+> +	u32 val;
+> +
+> +	switch (reg) {
+> +	case ARCH_TIMER_REG_FREQ:
+> +		asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
+> +		break;
+> +	default:
+> +		BUG();
+> +	}
+> +
+> +	return val;
+> +}
+> +
+> +static void arch_timer_phys_reg_write(int reg, u32 val)
+>  {
+>  	switch (reg) {
+>  	case ARCH_TIMER_REG_CTRL:
+
+[...]
+
+> @@ -329,10 +443,24 @@ int __init arch_timer_of_register(void)
+>  	if (!of_property_read_u32(np, "clock-frequency", &freq))
+>  		arch_timer_rate = freq;
+>  
+> -	arch_timer_ppi = irq_of_parse_and_map(np, 0);
+> -	arch_timer_ppi2 = irq_of_parse_and_map(np, 1);
+> -	pr_info("arch_timer: found %s irqs %d %d\n",
+> -		np->name, arch_timer_ppi, arch_timer_ppi2);
+> +	pr_info("arch_timer: found %s irqs ", np->name);
+> +
+> +	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++) {
+> +		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+> +		if (!arch_timer_ppi[i]) {
+> +			/*
+> +			 * No interrupt provided for virtual timer,
+> +			 * we'll have to stick to the physical timer.
+> +			 */
+> +			if (i == VIRT_PPI)
+> +				arch_timer_use_virtual = false;
+> +			
+
+It seems like it would be more straightforward to set the
+arch_timer_use_virtual variable outside of the loop, directly indexing
+into the array of timer PPI's. On a trivial note you've also got
+trailing whitespace here.
+
+> +			continue;
+> +		}
+> +		pr_cont("%d ", arch_timer_ppi[i]);
+> +	}
+> +
+> +	pr_cont("\n");
+>  
+>  	return arch_timer_register();
+>  }
+> @@ -345,6 +473,6 @@ int __init arch_timer_sched_clock_init(void)
+>  	if (err)
+>  		return err;
+>  
+> -	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
+> +	setup_sched_clock(arch_counter_get_cnt32, 32, arch_timer_rate);
+>  	return 0;
+>  }
+
+Regards,
+Christopher
 
 -- 
-Michael
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
