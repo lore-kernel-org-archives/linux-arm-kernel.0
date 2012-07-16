@@ -1,55 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Jul 2012 08:35:37 +0100
-Subject: [PATCH 7/9] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
-In-Reply-To: <20120710061757.GB29257@core.coreip.homeip.net>
-References: <1341493572-29735-1-git-send-email-lee.jones@linaro.org>
- <4FF6994B.9040801@linaro.org> <20120706173957.GA10202@core.coreip.homeip.net>
- <4FFB288D.4080606@linaro.org> <20120709201422.GA12242@core.coreip.homeip.net>
- <4FFB40A4.5060505@linaro.org> <20120709204620.GA12692@core.coreip.homeip.net>
- <4FFB463F.9040201@linaro.org> <20120710061757.GB29257@core.coreip.homeip.net>
-Message-ID: <5003C449.6000806@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 16 Jul 2012 09:52:14 +0200
+Subject: [PATCH v2 00/15] PCI io.h clean-up
+In-Reply-To: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120716075214.GA2489@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I think it would be best if this got merged through whatever tree that
-> was used to introduce ab8500_irq_get_virq(); otherwise it will have to
-> wait till I resync with mainline sometime in the middle of the next
-> release cycle.
+On Fri, Jul 13, 2012 at 09:03:56PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This is the 2nd part of mach/io.h removals. This series removes io.h on
+> platforms with PCI by creating a fixed virtual I/O mapping and a common
+> __io() macro.
 
-I agree. Sam that's you, patch below. :)
+Hi Rob
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Tue, 26 Jun 2012 10:46:50 +0100
-Subject: [PATCH 1/1] Input: ab8500-ponkey: Create AB8500 domain IRQ mapping
+Time to show my ignorance of PCI again.
 
-Before we can use any domain allocated IRQ, we need to first create a
-map between the Hardware IRQ (hwirq) and the Linux Virtual IRQ (virq).
-We do this with a helper function provided by the AB8500 IRQ domain
-controller called ab8500_irq_get_virq(). We need to do this for both
-IRQs which the Power-On-Key driver uses; one for button press, the other
-for button depress.
+root at orion5x:~# cat /proc/ioports 
+00001000-0000ffff : PCI0 I/O
+00010000-0001ffff : PCI1 I/O
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/input/misc/ab8500-ponkey.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The changes you made for Orion decreased the window to 64K. However, i
+see here that PCI0 only gets 60K, where as PCI1 gets the full 64K.
 
-diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-index 350fd0c..1a1d974 100644
---- a/drivers/input/misc/ab8500-ponkey.c
-+++ b/drivers/input/misc/ab8500-ponkey.c
-@@ -73,8 +73,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
- 
- 	ponkey->idev = input;
- 	ponkey->ab8500 = ab8500;
--	ponkey->irq_dbf = irq_dbf;
--	ponkey->irq_dbr = irq_dbr;
-+	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
-+	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
- 
- 	input->name = "AB8500 POn(PowerOn) Key";
- 	input->dev.parent = &pdev->dev;
--- 
-1.7.9.5
+Is this asymmetry correct?
+
+I see this for both orion5x and kirkwood.
+
+   Thanks
+	Andrew
