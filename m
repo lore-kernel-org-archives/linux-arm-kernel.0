@@ -1,28 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jul 2012 16:25:58 +0000
-Subject: [PATCH v2 10/15] ARM: kirkwood: use fixed PCI i/o mapping
-In-Reply-To: <20120716071057.GB2163@lunn.ch>
-References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
- <1342231451-28861-11-git-send-email-robherring2@gmail.com>
- <20120716071057.GB2163@lunn.ch>
-Message-ID: <201207161625.58768.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Jul 2012 21:45:29 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <20120716123550.GE17435@pengutronix.de>
+References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
+ <20120712131231.GH2194@pengutronix.de>
+ <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
+ <20120716101706.GB17435@pengutronix.de>
+ <CACRpkdY626iYATorphAvg7cQxD2ufysBvXdt3Z644zEuW0wS=w@mail.gmail.com>
+ <20120716123550.GE17435@pengutronix.de>
+Message-ID: <CACRpkdaMB-n7XYcxE8QtAm-WrGc2DR0krfTjQZCbvOL1HYep1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 July 2012, Andrew Lunn wrote:
-> >       if (request_resource(&iomem_resource, &pp->res[1]))
-> >               panic("Request PCIe%d Memory resource failed\n", index);
-> >  
-> > -     sys->io_offset = 0;
-> > -     pci_add_resource_offset(&sys->resources, &pp->res[0], sys->io_offset);
-> >       pci_add_resource_offset(&sys->resources, &pp->res[1], sys->mem_offset);
-> 
-> pp->res[0] is now unused. Do you plan to also clean up the PCI MEM
-> space at some point? And then at the same time remove the rest of this
-> code?
+On Mon, Jul 16, 2012 at 2:35 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
 
-I think we still want the pci host drivers to register the resources for
-the memory space. One thing is that they are not ioremapped at init
-time, and also they typically have a nonzero offset.
+> Uhm, I seem to have missed that bindings are deemed more "flexible" as
+> long as they are coupled to in-kernel dts files? Is that discussed
+> somewhere? I do wonder about it...
 
-	Arnd
+Well patches like this are sent out but not commented on from
+the perspective of binding stability. So of course, they get merged.
+
+Have a look at this commit:
+
+commit 7f217794ffa72f208a250b79ab0b7ea3de19677f
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Sun May 13 00:14:24 2012 -0400
+
+    mmc: dt: Consolidate DT bindings
+
+This is deleting custom properties from DTS files without
+adding any code to fallback-support them on old device trees.
+
+(Actually I like this commit a lot, since it is removing custom MMC
+props and replacing these with standard bindings common for all
+MMC/SD controllers, but ...)
+
+I think there are more examples if you git log on arch/arm/boot/dts...
+
+Yours,
+Linus Walleij
