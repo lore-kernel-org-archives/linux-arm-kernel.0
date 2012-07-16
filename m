@@ -1,139 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Jul 2012 17:46:04 -0500
-Subject: [RFC PATCHv2 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <1342113976-27140-2-git-send-email-dinguyen@altera.com>
-References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
- <1342113976-27140-2-git-send-email-dinguyen@altera.com>
-Message-ID: <500499AC.5060209@gmail.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 16 Jul 2012 16:22:35 -0700
+Subject: [PATCH 2/2] [RFC] cpufreq: omap: scale regulator from clk notifier
+In-Reply-To: <CACRpkda7g2qMErwf-nebKSOW=044=YadEzEoKWM1dT=29yueeA@mail.gmail.com>
+References: <1342225001-22962-1-git-send-email-mturquette@linaro.org>
+ <1342225001-22962-3-git-send-email-mturquette@linaro.org>
+ <CACRpkda7g2qMErwf-nebKSOW=044=YadEzEoKWM1dT=29yueeA@mail.gmail.com>
+Message-ID: <CAJOA=zOSwfVnL=JrNfY5fE2tjzL1T_2Sd0rCrijaO3AxosStDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2012 12:26 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Adding core definitions for Altera's SOCFPGA ARM platform.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Reviewed-by: Pavel Machek <pavel@denx.de>
+On Mon, Jul 16, 2012 at 3:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Jul 14, 2012 at 2:16 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> '
+>> This patch moves direct control of the MPU voltage regulator out of the
+>> cpufreq driver .target callback and instead puts that logic into a clock
+>> rate change notifier callback.
+>
+> That's heavy stuff.
+>
 
-Two comments below, but otherwise:
+Gravity is stronger here.
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+CPU dvfs is the least interesting dvfs in my opinion, since it has
+been solved by CPUfreq for eons.  However it was the lowest hanging
+fruit for demoing the idea behind dvfs-via-clk-notifer.
 
-> diff --git a/arch/arm/mach-socfpga/include/mach/iomap.h b/arch/arm/mach-socfpga/include/mach/iomap.h
-> new file mode 100644
-> index 0000000..d5f8493
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/include/mach/iomap.h
-> @@ -0,0 +1,33 @@
-> +/*
-> + *  Copyright (C) 2012 Altera Corporation <www.altera.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __MACH_SOCFPGA_IOMAP_H
-> +#define __MACH_SOCFPGA_IOMAP_H
-> +
-> +#include <asm/sizes.h>
-> +
-> +/* macro to get at IO space when running virtually */
-> +/*
-> + * Statically mapped addresses:
-> + *
-> + * 10xx xxxx -> fbxx xxxx
-> + * 1exx xxxx -> fdxx xxxx
-> + * 1fxx xxxx -> fexx xxxx
-> + */
-> +#define IO_ADDRESS(x)		(((x) & 0x03ffffff) + 0xfb000000)
-> +#define __io_address(n)		IOMEM(IO_ADDRESS(n))
+This is a chicken before the egg problem: drivers are not adapted for
+dvfs since we have no dvfs api.  In trying to demonstrate
+dvfs-via-clk-notifier it was much easier for me to hijack one of the
+few existing sources of dvfs in the kernel: cpufreq.  If my platform
+of choice (pandaboard) had any device which supported devfreq (e.g.
+gpu, ddr or mmc controller) then I might have chosen that instead, but
+the change would have been essentially the same as the one above.
 
-Is this used anywhere?
+> I was hoping that the first example of using clk notifiers would be
+> something like mach-davinci replacing it's legacy clock framework
+> with drivers/clk and then go in and change the horrid cpufreq hack
+> that is currently in drivers/mmc/host/davinci_mmc.c to use a
+> clock notifier instead of cpufreq.
+>
 
-> +
-> +#endif
-> diff --git a/arch/arm/mach-socfpga/include/mach/irqs.h b/arch/arm/mach-socfpga/include/mach/irqs.h
-> new file mode 100644
-> index 0000000..5e344db
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/include/mach/irqs.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + *  Copyright (C) 2012 Altera Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> +*/
-> +
-> +#ifndef __MACH_IRQS_H
-> +#define __MACH_IRQS_H
-> +
-> +#define IRQ_SOCFPGA_GIC_START	32
-> +#define IRQ_LOCALWDOG		30
-> +#define MAX_GIC_NR		1
+I am not familiar with the issue you're talking about here, but it
+sounds more like some clk functional dependencies have been stuffed
+into the davinci cpufreq driver?  clk notifiers can handle that as
+well, and the reentrancy issues would remain (calling clk_set_rate
+from within clk_set_rate).  The point of this series is that the state
+of reentrancy in the clk framework sucks and I could use some
+collective brainpower to improve it :-)
 
-This header should not be needed.
+> Sekhar/Kevin, any chance to have DaVinci converted to Mikes new
+> clock framework? It doesn't look super-complex and would be a
+> good example for others I think.
+>
 
-> +
-> +#endif	/* __MACH_IRQS_H */
-> diff --git a/arch/arm/mach-socfpga/include/mach/timex.h b/arch/arm/mach-socfpga/include/mach/timex.h
-> new file mode 100644
-> index 0000000..43df435
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/include/mach/timex.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + *  Copyright (C) 2003 ARM Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +
-> +#define CLOCK_TICK_RATE		(50000000 / 16)
-> diff --git a/arch/arm/mach-socfpga/include/mach/uncompress.h b/arch/arm/mach-socfpga/include/mach/uncompress.h
-> new file mode 100644
-> index 0000000..bbe20e6
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/include/mach/uncompress.h
-> @@ -0,0 +1,9 @@
-> +#ifndef __MACH_UNCOMPRESS_H
-> +#define __MACH_UNCOMPRESS_H
-> +
-> +#define putc(c)
-> +#define flush()
-> +#define arch_decomp_setup()
-> +#define arch_decomp_wdog()
-> +
-> +#endif
-> 
+Again, I'd love more platform ports to the common clock framework, but
+I hope that the purpose of this RFC is not lost in the noise.  Devices
+like off-soc audio chips and pmics are screwed without some change to
+the core code and we are not advancing the state of dvfs in an
+upstream kernel until some of these issues are sorted.
+
+Thanks much,
+Mike
+
+> Yours,
+> Linus Walleij
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
