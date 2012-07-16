@@ -1,94 +1,57 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon, 16 Jul 2012 14:21:25 -0500
-Subject: [PATCH 3/3] ARM: OMAP: omap_device: expose hwmod assert/deassert to
- omap devices
-In-Reply-To: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
-References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1342466485-1050-4-git-send-email-omar.luna@linaro.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 16 Jul 2012 14:38:49 -0500
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+ <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+ <50045D17.9050704@ti.com>
+ <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+Message-ID: <50046DC9.80203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This APIs are meant to be an interface to hwmod assert/deassert
-function, omap devices can call them through their platform data
-to control their reset lines, they are expected to know the name
-of the reset line they are trying to control.
+Hi Paul,
 
-Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
----
- arch/arm/plat-omap/include/plat/omap_device.h |    4 ++
- arch/arm/plat-omap/omap_device.c              |   45 +++++++++++++++++++++++++
- 2 files changed, 49 insertions(+), 0 deletions(-)
+On 07/16/2012 01:38 PM, Paul Walmsley wrote:
+> Hi Jon,
+> 
+> On Mon, 16 Jul 2012, Jon Hunter wrote:
+> 
+>> Yes I see that makes sense. However, patch #7 has already changed the
+>> mapping of the flags. I had intended that patch #7 and #8 would be
+>> applied together. However, I could see that patch #7 can be taken just
+>> to eliminate using the SW_SLEEP state. So basically, what I am saying is
+>> does patch #7 have any value without #8?
+> 
+> Certainly not as much value as it had before.  But my understanding, which 
+> is possibly incorrect, matches what you wrote in patch #7's description:
+> 
+> "For OMAP4 devices, SW_SLEEP is equivalent to HW_AUTO and NO_SLEEP is 
+> equivalent to SW_WKUP. The only difference between HW_AUTO and SW_SLEEP 
+> for OMAP4 devices is that the PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt 
+> status is set in case of SW_SLEEP transition, and not set in case of 
+> HW_AUTO transition."
+> 
+> We don't use that PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt bit.  So if 
+> SW_SLEEP and HW_AUTO really have identical meanings otherwise, then I 
+> suppose we might as well use the one that does what we need with no 
+> extraneous side-effects?  My recollection from a conversation with Beno?t 
+> a few months ago was that this was his view as well.
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 4327b2c..27bcc24 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -118,6 +118,10 @@ int omap_device_get_context_loss_count(struct platform_device *pdev);
- 
- /* Other */
- 
-+int omap_device_assert_hardreset(struct platform_device *pdev,
-+				 const char *name);
-+int omap_device_deassert_hardreset(struct platform_device *pdev,
-+				 const char *name);
- int omap_device_idle_hwmods(struct omap_device *od);
- int omap_device_enable_hwmods(struct omap_device *od);
- 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index c490240..8883074 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -925,6 +925,51 @@ int omap_device_shutdown(struct platform_device *pdev)
- }
- 
- /**
-+ * omap_device_assert_hardreset - set a device's reset line
-+ * @pdev: struct platform_device * to reset
-+ * @name: const char * with the name of the reset line
-+ *
-+ * According to @name, set the reset line of the hwmods associated
-+ * with this @pdev deivce.
-+ */
-+int omap_device_assert_hardreset(struct platform_device *pdev, const char *name)
-+{
-+	int i, ret = 0;
-+	struct omap_device *od = to_omap_device(pdev);
-+
-+	for (i = 0; i < od->hwmods_cnt; i++) {
-+		ret = omap_hwmod_assert_hardreset(od->hwmods[i], name);
-+		if (ret)
-+			break;
-+	}
-+
-+	return ret;
-+}
-+
-+/**
-+ * omap_device_deassert_hardreset - lift a device's reset line
-+ * @pdev: struct platform_device * to reset
-+ * @name: const char * with the name of the reset line
-+ *
-+ * According to @name, lift the reset line of the hwmods associated
-+ * with this @pdev deivce.
-+ */
-+int omap_device_deassert_hardreset(struct platform_device *pdev,
-+				const char *name)
-+{
-+	int i, ret = 0;
-+	struct omap_device *od = to_omap_device(pdev);
-+
-+	for (i = 0; i < od->hwmods_cnt; i++) {
-+		ret = omap_hwmod_deassert_hardreset(od->hwmods[i], name);
-+		if (ret)
-+			break;
-+	}
-+
-+	return ret;
-+}
-+
-+/**
-  * omap_device_align_pm_lat - activate/deactivate device to match wakeup lat lim
-  * @od: struct omap_device *
-  *
--- 
-1.7.4.1
+Yes that is my understanding too. So from that standpoint it is fine to
+keep. However, I just wanted to make sure I understood your thinking here.
+
+>> That's fine with me. We can always workaround such issues by adding flags.
+>>
+>> I can give this a try this week and let you know how it goes.
+> 
+> Okay, great.  No rush on my account.
+
+Ok. I have a few items on my plate that keep preventing me from getting
+back to this, but what to get this done.
+
+Jon
