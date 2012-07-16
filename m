@@ -1,50 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Jul 2012 23:20:12 +0200
-Subject: [PATCH] ARM: imx: add missing item to the list of clock event
- modes
-In-Reply-To: <1342469226-12293-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1342469226-12293-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120716212012.GT30009@pengutronix.de>
+Date: Mon, 16 Jul 2012 23:27:05 +0200
+Subject: [PATCH 2/2] ARM: imx: clk-imx31: Fix clock id for rnga driver
+In-Reply-To: <1341606020-26449-2-git-send-email-fabio.estevam@freescale.com>
+References: <1341606020-26449-1-git-send-email-fabio.estevam@freescale.com>
+ <1341606020-26449-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120716212705.GV30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 10:07:06PM +0200, Uwe Kleine-K?nig wrote:
-> This prevents an out-of-bounds access to the clock_event_mode_label when
-> debugging.
+On Fri, Jul 06, 2012 at 05:20:20PM -0300, Fabio Estevam wrote:
+> Fix clock id for rnga driver.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied, thanks
+Applied (only this one)
 
-Sascha
+Thanks,
+  Sascha
 
 > ---
-> Hello,
+>  arch/arm/mach-imx/clk-imx31.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> I consider this to be an uncritical fix as it's only relevant with DEBUG
-> #defined.
-> 
-> Best regards
-> Uwe
->  arch/arm/plat-mxc/time.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-> index 00e8e65..a17abcf 100644
-> --- a/arch/arm/plat-mxc/time.c
-> +++ b/arch/arm/plat-mxc/time.c
-> @@ -160,7 +160,8 @@ static const char *clock_event_mode_label[] = {
->  	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
->  	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
->  	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
-> -	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED"
-> +	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED",
-> +	[CLOCK_EVT_MODE_RESUME]   = "CLOCK_EVT_MODE_RESUME",
->  };
->  #endif /* DEBUG */
+> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+> index c9a06d8..8a7ef99 100644
+> --- a/arch/arm/mach-imx/clk-imx31.c
+> +++ b/arch/arm/mach-imx/clk-imx31.c
+> @@ -165,7 +165,7 @@ int __init mx31_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[firi_gate], "firi", NULL);
+>  	clk_register_clkdev(clk[ata_gate], NULL, "pata_imx");
+>  	clk_register_clkdev(clk[rtic_gate], "rtic", NULL);
+> -	clk_register_clkdev(clk[rng_gate], "rng", NULL);
+> +	clk_register_clkdev(clk[rng_gate], NULL, "mxc_rnga");
+>  	clk_register_clkdev(clk[sdma_gate], NULL, "imx31-sdma");
+>  	clk_register_clkdev(clk[iim_gate], "iim", NULL);
 >  
 > -- 
-> 1.7.10.4
+> 1.7.1
+> 
 > 
 > 
 
