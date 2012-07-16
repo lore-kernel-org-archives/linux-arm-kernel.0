@@ -1,45 +1,55 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 16 Jul 2012 13:10:13 +0000
-Subject: [PATCH RESEND V3 0/3] Watchdog: OMAP3: bootstatus fix and
- changes for the current watchdog framework
-In-Reply-To: <1342338246-29101-1-git-send-email-zumeng.chen@windriver.com>
-References: <1342338246-29101-1-git-send-email-zumeng.chen@windriver.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA6DFAE@DBDE01.ent.ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 16 Jul 2012 15:25:48 +0200
+Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <201207161506.08147.marex@denx.de>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+ <201207141409.38554.marex@denx.de>
+ <20120716102151.GC17435@pengutronix.de>
+ <201207161506.08147.marex@denx.de>
+Message-ID: <20120716132548.GG17435@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2012 at 13:14:03, Zumeng Chen wrote:
-> Hello,
-> 
-> The following patches based on the 3.5-rc6 from Wim, which
-> focus on:
-> 
-> 1. bootstatus fix for omap3,
-> 
-> 2. omap-wdt framework update cater for the current framework
->    as Shubhrajyoti comments mentioned.
-> 
-> V3 changes:
-> 
-> 1. New comments updated as Kevin mentioned in the third patch;
-> 2. 3530evm works well,
->    AM33xx seems work well with the following changes:
-> 	+   if (cpu_is_am335x())
-> 	+       return omap2_prm_read_mod_reg(AM33XX_PRM_DEVICE_MOD,
-> 	+           AM33XX_PRM_RSTST_OFFSET) & 0x7f;
->    But since some definitions not ready for am33xx, so I don't
->    give the patch, if they have been updated, feel free to take these. 
-> 
 
-Did you test it on any of AM33xx platform? If you use linux-omap/master pr 
-linux-next branch as a baseline you should have basic things (except hwmod 
-data) available.
+> > > > > No, it doesn't. See above about small transfers. Consider the easy
+> > > > > situation where you have sensor on one bus (so you do PIO because you
+> > > > > transfer small data) and you have EEPROM on other bus, where you use
+> > > > > DMA because you transfer large data. And the mixed mode isn't there
+> > > > > yet.
+> > > > 
+> > > > I fully understand what you want to configure. I did before. Yet,
+> > > > devicetree bindings are not platform_data and shouldn't be used like
+> > > > them.
+> > > 
+> > > But then, how would you configure this detail on a per-bus basis? Well
+> > > all
+> > 
+> > This is a question for devicetree-discuss.
+> 
+> Did you Cc it?
 
-I will test it and send a patch for this on your behalf (if you are ok with 
-it).
+Well, I guess you already checked the mail headers and found out
+yourself. The question behind the question probably is "Why didn't you
+CC it?". The answer to that is that I didn't have much success by adding
+it to $RANDOM_THREAD. It might be more efficient to answer starting a
+new thread with explicit "[RFC] $THE_ISSUE". Since a conclusion there
+won't make the next merge-window anyhow, I haven't done that now. That
+put aside, it might be more efficient if someone with a bigger urge
+might strive for a solution (yes, probably, but not necessarily you).
+For me, it currently is just one task which needs to be scheduled
+inbetween others.
 
+Regards,
 
-Note: Change in convention, cpu_is_am335x() => soc_is_am335x()
+   Wolfram
 
-Thanks,
-Vaibhav
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/d049fd78/attachment.sig>
