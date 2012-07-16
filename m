@@ -1,18 +1,18 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Jul 2012 17:43:34 -0500
-Subject: [RFC PATCHv2 2/2] ARM: socfpga: Add board support for Altera's
- SOCFPGA  Cyclone 5 HW
-In-Reply-To: <1342113976-27140-3-git-send-email-dinguyen@altera.com>
+Date: Mon, 16 Jul 2012 17:46:04 -0500
+Subject: [RFC PATCHv2 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform.
+In-Reply-To: <1342113976-27140-2-git-send-email-dinguyen@altera.com>
 References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
- <1342113976-27140-3-git-send-email-dinguyen@altera.com>
-Message-ID: <50049916.3080509@gmail.com>
+ <1342113976-27140-2-git-send-email-dinguyen@altera.com>
+Message-ID: <500499AC.5060209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/12/2012 12:26 PM, dinguyen at altera.com wrote:
 > From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> - Mininum support for Altera's SOCFPGA Cyclone 5 hardware.
+> Adding core definitions for Altera's SOCFPGA ARM platform.
 > 
 > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 > Reviewed-by: Pavel Machek <pavel@denx.de>
@@ -21,34 +21,119 @@ Two comments below, but otherwise:
 
 Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
-> ---
->  arch/arm/boot/dts/socfpga.dtsi           |   73 ++++++++++++++++++
->  arch/arm/boot/dts/socfpga_cyclone5.dts   |  118 ++++++++++++++++++++++++++++++
->  arch/arm/configs/socfpga_defconfig       |   83 +++++++++++++++++++++
->  arch/arm/mach-socfpga/Kconfig            |    7 ++
->  arch/arm/mach-socfpga/Makefile           |    6 ++
->  arch/arm/mach-socfpga/Makefile.boot      |    1 +
->  arch/arm/mach-socfpga/common.h           |    2 +-
->  arch/arm/mach-socfpga/socfpga_cyclone5.c |   60 +++++++++++++++
-
-I don't think this patch split makes too much sense. I would put all but
-the dts files and defconfig in the first patch.
-
-
-> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+> diff --git a/arch/arm/mach-socfpga/include/mach/iomap.h b/arch/arm/mach-socfpga/include/mach/iomap.h
 > new file mode 100644
-> index 0000000..133fc89
+> index 0000000..d5f8493
 > --- /dev/null
-> +++ b/arch/arm/mach-socfpga/Kconfig
-> @@ -0,0 +1,7 @@
-> +config MACH_SOCFPGA_CYCLONE5
-> +       bool "SOCFPGA Cyclone5 platform"
-> +       select COMMON_CLK
-> +       select HAVE_SMP
-> +       select PLAT_SOCFPGA_ETH
-> +       help
-> +         Include support for the Altera(R) Cyclone5 development platform.
+> +++ b/arch/arm/mach-socfpga/include/mach/iomap.h
+> @@ -0,0 +1,33 @@
+> +/*
+> + *  Copyright (C) 2012 Altera Corporation <www.altera.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __MACH_SOCFPGA_IOMAP_H
+> +#define __MACH_SOCFPGA_IOMAP_H
+> +
+> +#include <asm/sizes.h>
+> +
+> +/* macro to get at IO space when running virtually */
+> +/*
+> + * Statically mapped addresses:
+> + *
+> + * 10xx xxxx -> fbxx xxxx
+> + * 1exx xxxx -> fdxx xxxx
+> + * 1fxx xxxx -> fexx xxxx
+> + */
+> +#define IO_ADDRESS(x)		(((x) & 0x03ffffff) + 0xfb000000)
+> +#define __io_address(n)		IOMEM(IO_ADDRESS(n))
 
-You don't need a config option for a machine with DT.
+Is this used anywhere?
 
-Rob
+> +
+> +#endif
+> diff --git a/arch/arm/mach-socfpga/include/mach/irqs.h b/arch/arm/mach-socfpga/include/mach/irqs.h
+> new file mode 100644
+> index 0000000..5e344db
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/include/mach/irqs.h
+> @@ -0,0 +1,24 @@
+> +/*
+> + *  Copyright (C) 2012 Altera Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> +*/
+> +
+> +#ifndef __MACH_IRQS_H
+> +#define __MACH_IRQS_H
+> +
+> +#define IRQ_SOCFPGA_GIC_START	32
+> +#define IRQ_LOCALWDOG		30
+> +#define MAX_GIC_NR		1
+
+This header should not be needed.
+
+> +
+> +#endif	/* __MACH_IRQS_H */
+> diff --git a/arch/arm/mach-socfpga/include/mach/timex.h b/arch/arm/mach-socfpga/include/mach/timex.h
+> new file mode 100644
+> index 0000000..43df435
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/include/mach/timex.h
+> @@ -0,0 +1,19 @@
+> +/*
+> + *  Copyright (C) 2003 ARM Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#define CLOCK_TICK_RATE		(50000000 / 16)
+> diff --git a/arch/arm/mach-socfpga/include/mach/uncompress.h b/arch/arm/mach-socfpga/include/mach/uncompress.h
+> new file mode 100644
+> index 0000000..bbe20e6
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/include/mach/uncompress.h
+> @@ -0,0 +1,9 @@
+> +#ifndef __MACH_UNCOMPRESS_H
+> +#define __MACH_UNCOMPRESS_H
+> +
+> +#define putc(c)
+> +#define flush()
+> +#define arch_decomp_setup()
+> +#define arch_decomp_wdog()
+> +
+> +#endif
+> 
