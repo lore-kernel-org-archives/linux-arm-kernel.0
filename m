@@ -1,32 +1,58 @@
-From: attila@kinali.ch (Attila Kinali)
-Date: Mon, 16 Jul 2012 13:32:44 +0200
-Subject: [PATCH 04/10 RESEND] mmc: spi: Pull out parts shared between
- MMC and SPI
-In-Reply-To: <201207161259.15034.marex@denx.de>
-References: <1341555449-17507-1-git-send-email-marex@denx.de>
- <1341555449-17507-4-git-send-email-marex@denx.de>
- <20120716095741.85d959fc81ab759b10adcf25@kinali.ch>
- <201207161259.15034.marex@denx.de>
-Message-ID: <20120716133244.667f71af388e2950a6b82b14@kinali.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jul 2012 12:33:02 +0100
+Subject: [PATCH v5] ARM: vfp: Always save VFP state in vfp_pm_suspend
+In-Reply-To: <CAGsJ_4x5S4Aq-nJU1nyyw7E8Q82UPm0pNP-NYJ5N8aGn=nMdgw@mail.gmail.com>
+References: <20120715215342.4DAB99D401E@zog.reactivated.net>
+ <CAGsJ_4x5S4Aq-nJU1nyyw7E8Q82UPm0pNP-NYJ5N8aGn=nMdgw@mail.gmail.com>
+Message-ID: <20120716113302.GG26723@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moin Marek,
+On Mon, Jul 16, 2012 at 02:40:06AM +0100, Barry Song wrote:
+> 2012/7/16 Daniel Drake <dsd@laptop.org>:
+> > From: Colin Cross <ccross@android.com>
+> >
+> > vfp_pm_suspend should save the VFP state any time there is
+> > a vfp_current_hw_state.  If it only saves when the VFP is enabled,
+> > the state can get lost when, on a UP system:
+> >    Thread 1 uses the VFP
+> >    Context switch occurs to thread 2, VFP is disabled but the
+> >       VFP context is not saved to allow lazy save and restore
+> >    Thread 2 initiates suspend
+> >    vfp_pm_suspend is called with the VFP disabled, but the
+> >       context has not been saved.
+> >
+> > Modify vfp_pm_suspend to save the VFP context whenever
+> > vfp_current_hw_state is set.
+> >
+> > Signed-off-by: Colin Cross <ccross@android.com>
+> > Cc: Binghua Duan <binghua.duan@csr.com>
+> > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+> > Signed-off-by: Barry Song <21cnbao@gmail.com>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> we also found this kind of issue too, sometimes suspend/resume will
+> fail with this bug.
+> so we refined this patch before. but i am really wondering why it has
+> not been committed yet.
 
-On Mon, 16 Jul 2012 12:59:14 +0200
-Marek Vasut <marex@denx.de> wrote:
+At a guess, it hasn't been applied because nobody has submitted it to the
+patch system.
 
-> Well I have it rebased on top of current -next, but ... will some of the SPI 
-> maintainers possibly apply it to their -next tree any soon? Or why are these 
-> patches stuck as they are without much review ?
+> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> > index 58696192..c86fc52 100644
+> > --- a/arch/arm/vfp/vfpmodule.c
+> > +++ b/arch/arm/vfp/vfpmodule.c
+> > @@ -457,6 +457,10 @@ static int vfp_pm_suspend(void)
+> >
+> >                 /* disable, just in case */
+> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+> > +       } else if (vfp_current_hw_state[ti->cpu]) {
+> > +               fmxr(FPEXC, fpexc | FPEXC_EN);
+> > +               vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
+> > +               fmxr(FPEXC, fpexc);
 
-Do you have somewhere a public git repo with the patches?
-I'd like to give them a try.
+Given that we don't do lazy saving on SMP systems, can we make this
+conditional on !SMP?
 
-			Attila Kinali
-
--- 
-The trouble with you, Shev, is you don't say anything until you've saved
-up a whole truckload of damned heavy brick arguments and then you dump
-them all out and never look at the bleeding body mangled beneath the heap
-		-- Tirin, The Dispossessed, U. Le Guin
+Will
