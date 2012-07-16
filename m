@@ -1,57 +1,115 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Mon, 16 Jul 2012 13:58:14 +0530
-Subject: [RFC PATCH v2 1/2] drivers: misc: omap: add a new driver for
- ocp2scp
-In-Reply-To: <20120716081204.GI7955@arwen.pp.htv.fi>
-References: <1340370942-23201-1-git-send-email-kishon@ti.com>
- <CAAe_U6+dkiQw-i93pFapt6qKrArzaQoE8X3GjDzUDraziG8B2Q@mail.gmail.com>
- <20120625122449.GA30463@arwen.pp.htv.fi>
- <201206251626.09666.arnd@arndb.de>
- <20120716081204.GI7955@arwen.pp.htv.fi>
-Message-ID: <CAAe_U6JMGP3jEkkd=vqpR5KTeOnY51AOcb65zqKRRa8MtnWjzQ@mail.gmail.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Mon, 16 Jul 2012 13:56:55 +0530
+Subject: [PATCH 4/7] ARM: EXYNOS: Adding DRM platform device
+In-Reply-To: <001d01cd5f4e$ff51c850$fdf558f0$%han@samsung.com>
+References: <1341999741-15578-1-git-send-email-l.krishna@samsung.com>
+ <1341999741-15578-5-git-send-email-l.krishna@samsung.com>
+ <001d01cd5f4e$ff51c850$fdf558f0$%han@samsung.com>
+Message-ID: <CAL1wa8d-Hq1mnwtRD9HR8Fopv2U8ka+s6ppbLbanFVqee4g-Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jul 16, 2012 at 1:42 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
+On Wed, Jul 11, 2012 at 3:51 PM, Jingoo Han <jg1.han@samsung.com> wrote:
 >
-> On Mon, Jun 25, 2012 at 04:26:08PM +0000, Arnd Bergmann wrote:
->> On Monday 25 June 2012, Felipe Balbi wrote:
->> > > > Can't this live where the scp drivers live?  Actually, where is that at?
->> > > > Do we have scp drivers?
->> > > AFAIK, there isn't any driver for scp. But we have a driver for ocp
->> > > and it is present at arch/arm/mach-omap2/omap_l3_noc.c
->> >
->> > I don't think this deserves a directory of its own. Maybe
->> > drivers/platform/arm/omap/ ?? the l3_noc is an OMAP-specific
->> > interconnect and the SCP bus is also an OMAP-specific bus. I don't know
->> > of any other arch/soc who uses the same interconnect IP as OMAP and the
->> > same ocp2scp bridge. That bridge was created by TI for all I know.
->> >
->> > Greg, would drivers/platform/arm/omap/ work for you ? We could also move
->> > the interconnect drivers there.
->>
->> I really don't like the idea of introducing drivers/platform/arm/ because
->> very little of the stuff that one would put in there are actually ARM
->> specific.
->>
->> I have suggested a drivers/bus/ before and people did not see the need
->> back then, and we agreed to continue having a directory for each bus,
->> as we have for the big ones (pci, usb, i2c, spi, ...) and a lot of
->> simple (amba, rapidio, bcma, ...) or obscure (tc,  vlynq, nubus, ...)
->> ones.
->>
->> I think we should reconsider the idea of drivers/bus/ with a file per
->> bus in there at least for new buses, but doing a new drivers/scp/
->> would be ok for me if there is enough opposition against the idea
->> of drivers/bus aggregating different buses.
 >
-> I don't mind either way. The fact is that this ocp-to-scp bridge is
-> really a TI/OMAP thing. Not sure it deserves a directory of its own.
+>> -----Original Message-----
+>> From: Leela Krishna Amudala [mailto:l.krishna at samsung.com]
+>> Sent: Wednesday, July 11, 2012 6:42 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: grant.likely at secretlab.ca; olofj at google.com; thomas.ab at samsung.com; kgene.kim at samsung.com;
+>> joshi at samsung.com; jg1.han at samsung.com
+>> Subject: [PATCH 4/7] ARM: EXYNOS: Adding DRM platform device
+>>
+>> Add DRM platform device to machine file for exynos5.
+>>
+>> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
+>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/mach-exynos5-dt.c |   27 +++++++++++++++++++++++++++
+>>  1 files changed, 27 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> index 652a537..a91c928 100644
+>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> @@ -17,6 +17,7 @@
+>>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/hardware/gic.h>
+>> +#include <asm/io.h>
+>>  #include <mach/map.h>
+>>
+>>  #include <plat/cpu.h>
+>> @@ -29,6 +30,22 @@
+>>  #include <video/platform_lcd.h>
+>>
+>>
+>> +static void exynos_fimd_gpio_setup_24bpp(void)
+>> +{
+>> +     unsigned int reg = 0;
+>> +     /*
+>> +      * Set DISP1BLK_CFG register for Display path selection
+>> +      * FIMD of DISP1_BLK Bypass selection : DISP1BLK_CFG[15]
+>> +      * ---------------------
+>> +      * 0 | MIE/MDNIE
+>> +      * 1 | FIMD : selected
+>> +      */
+>> +     reg = __raw_readl(S3C_VA_SYS + 0x0214);
+>> +     reg &= ~(1 << 15);      /* To save other reset values */
+>> +     reg |= (1 << 15);
+>> +     __raw_writel(reg, S3C_VA_SYS + 0x0214);
+>> +}
+>> +
+>>  static int smdk5250_bl_notify(struct device *unused, int brightness)
+>>  {
+>>       /* manage lcd_bl_en signal */
+>> @@ -51,6 +68,14 @@ static struct platform_pwm_backlight_data smdk5250_bl_data = {
+>>       .notify         = smdk5250_bl_notify,
+>>  };
+>>
+>> +static struct platform_device exynos_drm_device = {
+>> +     .name           = "exynos-drm",
+>> +     .dev = {
+>> +             .dma_mask = &exynos_drm_device.dev.coherent_dma_mask,
+>> +             .coherent_dma_mask = 0xffffffffUL,
+>> +     }
+>> +};
+>> +
+>
+>
+> If your patches use ./drivers/video/s3c-fb.c, please use the term 'FB'.
+> In this case, this 'exynos_drm_device' is not unnecessary.
+>
+> Um... Have you tested this patchset with board such as SMDK5250?
+> Does it work properly?
+>
+>
 
-Ok. Then I'll have a file in drivers/bus/ for ocp2scp driver.
+Yes, I tested this patchset with smdk5250 board, and I could see bootup logo.
 
-Thanks
-Kishon
+>>  static void lcd_set_power(struct plat_lcd_data *pd,
+>>                       unsigned int power)
+>>  {
+>> @@ -134,6 +159,7 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+>>
+>>  static struct platform_device *smdk5250_devices[] __initdata = {
+>>       &smdk5250_lcd, /* for platform_lcd device */
+>> +     &exynos_drm_device,
+>>  };
+>>
+>>  static void __init exynos5250_dt_map_io(void)
+>> @@ -147,6 +173,7 @@ static void __init exynos5250_dt_machine_init(void)
+>>       samsung_bl_set(&smdk5250_bl_gpio_info, &smdk5250_bl_data);
+>>       of_platform_populate(NULL, of_default_bus_match_table,
+>>                               exynos5250_auxdata_lookup, NULL);
+>> +     exynos_fimd_gpio_setup_24bpp();
+>>       platform_add_devices(smdk5250_devices, ARRAY_SIZE(smdk5250_devices));
+>>  }
+>>
+>> --
+>> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
