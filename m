@@ -1,64 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Jul 2012 23:17:51 +0200
-Subject: [PATCH v2 1/4] ARM: i.MX5x clocks: Add EPIT support This patch
- adds support for Enhanced Periodic Interrupt Timer (EPIT) to clock
- subsystem.
-In-Reply-To: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
-References: <1342107571-15454-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20120716211751.GR30009@pengutronix.de>
+Date: Mon, 16 Jul 2012 23:19:22 +0200
+Subject: [PATCH] ARM i.MX53: clk: change cspi_ipg_gate device name
+In-Reply-To: <1342425205-24567-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1342425205-24567-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20120716211922.GS30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applied this series, thanks.
+On Mon, Jul 16, 2012 at 09:53:25AM +0200, Steffen Trumtrar wrote:
+> The cspi is compatible to the imx35 one. imx51-dt.c, imx53-dt.c, imx53.dtsi and
+> imx51.dtsi already reflect this fact. But as the clock driver is not registered
+> accordingly, spi-imx can not probe for the device, as it can not find the clock
+> device and return with an error.
+> A rename of the clock device fixes this.
+> 
 
-(fixed line wrapping in the subject while committing)
+I applied the version from Alexander instead which is more consistent
+with i.MX51 cspi support.
 
 Sascha
 
-On Thu, Jul 12, 2012 at 07:39:28PM +0400, Alexander Shiyan wrote:
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
+>  arch/arm/mach-imx/clk-imx51-imx53.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index a2200c7..d4653d9 100644
+> index a2200c7..508f104 100644
 > --- a/arch/arm/mach-imx/clk-imx51-imx53.c
 > +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -81,6 +81,7 @@ enum imx5_clks {
->  	ssi1_root_podf, ssi2_root_pred, ssi2_root_podf, ssi_ext1_pred,
->  	ssi_ext1_podf, ssi_ext2_pred, ssi_ext2_podf, ssi1_root_gate,
->  	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
-> +	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
->  	clk_max
->  };
->  
-> @@ -226,6 +227,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk[ssi3_root_gate] = imx_clk_gate2("ssi3_root_gate", "ssi3_root_sel", MXC_CCM_CCGR3, 26);
->  	clk[ssi_ext1_gate] = imx_clk_gate2("ssi_ext1_gate", "ssi_ext1_com_sel", MXC_CCM_CCGR3, 28);
->  	clk[ssi_ext2_gate] = imx_clk_gate2("ssi_ext2_gate", "ssi_ext2_com_sel", MXC_CCM_CCGR3, 30);
-> +	clk[epit1_ipg_gate] = imx_clk_gate2("epit1_ipg_gate", "ipg", MXC_CCM_CCGR2, 2);
-> +	clk[epit1_hf_gate] = imx_clk_gate2("epit1_hf_gate", "per_root", MXC_CCM_CCGR2, 4);
-> +	clk[epit2_ipg_gate] = imx_clk_gate2("epit2_ipg_gate", "ipg", MXC_CCM_CCGR2, 6);
-> +	clk[epit2_hf_gate] = imx_clk_gate2("epit2_hf_gate", "per_root", MXC_CCM_CCGR2, 8);
->  
->  	for (i = 0; i < ARRAY_SIZE(clk); i++)
->  		if (IS_ERR(clk[i]))
-> @@ -279,6 +284,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_register_clkdev(clk[dummy], NULL, "imx-keypad");
->  	clk_register_clkdev(clk[tve_gate], NULL, "imx-tve.0");
->  	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx-tve.0");
-> +	clk_register_clkdev(clk[epit1_ipg_gate], "ipg", "imx-epit.0");
-> +	clk_register_clkdev(clk[epit1_hf_gate], "per", "imx-epit.0");
-> +	clk_register_clkdev(clk[epit2_ipg_gate], "ipg", "imx-epit.1");
-> +	clk_register_clkdev(clk[epit2_hf_gate], "per", "imx-epit.1");
->  
->  	/* Set SDHC parents to be PLL2 */
->  	clk_set_parent(clk[esdhc_a_sel], clk[pll2_sw]);
-> -- 
-> 1.7.3.4
-> 
+> @@ -248,7 +248,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk_register_clkdev(clk[ecspi1_ipg_gate], "ipg", "imx51-ecspi.0");
+>  	clk_register_clkdev(clk[ecspi2_per_gate], "per", "imx51-ecspi.1");
+>  	clk_register_clkdev(clk[ecspi2_ipg_gate], "ipg", "imx51-ecspi.1");
+> -	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx51-cspi.0");
+> +	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx35-cspi.0");
+>  	clk_register_clkdev(clk[pwm1_ipg_gate], "pwm", "mxc_pwm.0");
+>  	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
+>  	clk_register_clkdev(clk[i2c1_gate], NULL, "imx-i2c.0");
 > 
 
 -- 
