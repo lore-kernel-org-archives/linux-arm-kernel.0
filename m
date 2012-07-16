@@ -1,58 +1,31 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 16 Jul 2012 18:12:49 +0300
-Subject: [PATCH v4 0/2] add gpmi support for imx6q
-In-Reply-To: <1341279572-6098-1-git-send-email-shijie8@gmail.com>
-References: <1341279572-6098-1-git-send-email-shijie8@gmail.com>
-Message-ID: <1342451569.7270.11.camel@brekeke>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 16 Jul 2012 15:33:13 +0000
+Subject: [PATCH] ARM: OMAP2+: hwmod: Hook-up am33xx support in
+ omap_hwmod framework
+In-Reply-To: <alpine.DEB.2.00.1207111431590.25585@utopia.booyaka.com>
+References: <1340898256-22884-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA624A5@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1207040311400.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA6334A@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1207040329120.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA6A5F4@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1207111431590.25585@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA6E291@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-02 at 21:39 -0400, Huang Shijie wrote:
-> This patch set adds the gpmi-nand support for imx6q.
+On Thu, Jul 12, 2012 at 02:03:06, Paul Walmsley wrote:
+> On Wed, 11 Jul 2012, Hiremath, Vaibhav wrote:
+> 
+> > Agreed, but would it make sense to include in v3.6 merge window?
+> 
+> Barring force majeure, I'm pretty much done with patches for the v3.6 
+> merge window.  Am working on this patch and the AM33xx hwmod data for 
+> v3.7.
+> 
 
-Shawn's ack would be nice to have. BTW, aiaiai complains like this about
-your driver:
+Thanks Paul for the update, I will wait for it.
+Also, Please let me know if you have any comments.
 
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:327:11: warning: incorrect type in assignment (different address spaces) [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:327:11:    expected void *p [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:327:11:    got void [noderef] <asn:2>* [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:347:28: warning: incorrect type in argument 1 (different address spaces) [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:347:28:    expected void volatile [noderef] <asn:2>*addr [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:347:28:    got void *gpmi_regs [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:349:28: warning: incorrect type in argument 1 (different address spaces) [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:349:28:    expected void volatile [noderef] <asn:2>*addr [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:349:28:    got void *bch_regs [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1464:6: warning: symbol 'gpmi_nfc_exit' was not declared. Should it be static? [sparse]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:670 gpmi_alloc_dma_buffer() error: no modifiers for allocation. [smatch]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:675 gpmi_alloc_dma_buffer() error: no modifiers for allocation. [smatch]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'mx23_check_transcription_stamp':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1198:9: warning: variable 'byte' set but not used [-Wunused-but-set-variable]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'mx23_write_transcription_stamp':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1259:15: warning: variable 'byte' set but not used [-Wunused-but-set-variable]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: At top level:
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1464:6: warning: no previous prototype for 'gpmi_nfc_exit' [-Wmissing-prototypes]
-
-I did not check whether they are false-positives or not, but some of
-these are reasonable warnings - could you please take a look and
-possibly fix?
-
-To make sure the line numbers are the same for you, I've attached the
-gpmi-nand.c which was tested.
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: gpmi-nand.c
-Type: text/x-csrc
-Size: 47854 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/d30403a5/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120716/d30403a5/attachment-0001.sig>
+Thanks,
+Vaibhav
