@@ -1,227 +1,103 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 16 Jul 2012 16:20:17 +0530
-Subject: [PATCHv4 6/8] ARM: OMAP: pm-debug: enhanced usecount debug support
-In-Reply-To: <1342189185-5306-7-git-send-email-t-kristo@ti.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-7-git-send-email-t-kristo@ti.com>
-Message-ID: <5003F1E9.5080700@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Jul 2012 10:51:58 +0000
+Subject: [PATCH 1/3] ARM: use generic version of identical asm headers
+In-Reply-To: <1342410836-6010-2-git-send-email-robherring2@gmail.com>
+References: <1342410836-6010-1-git-send-email-robherring2@gmail.com>
+ <1342410836-6010-2-git-send-email-robherring2@gmail.com>
+Message-ID: <201207161051.58878.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 July 2012 07:49 PM, Tero Kristo wrote:
-> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
-> their own file, 'usecount'. This file shows the usecounts for every
-> active domain and their children recursively. 'count' file now only
-> shows power state counts for powerdomains.
+On Monday 16 July 2012, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Inspired by the AArgh64 claim that it should be separate from ARM and one
+> reason was being able to use more asm-generic headers. Doing a diff of
+> arch/arm/include/asm and include/asm-generic there are numerous asm
+> headers which are functionally identical to their asm-generic counterparts.
+> Delete the ARM version and use the generic ones.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-The only comment I had on this patch was what I also said in response
-to PATCH 1/8 about keeping the clock usecounts separate if possible.
-voltdm, pwrdm, clkdm and hwmod are OMAP specific frameworks (and so is
-clock framework for now) but sooner than later we would move to using
-COMMON clock framework and then supporting the clock usecounts in
-/debug/pm_debug/usecount would not be possible.
+Great stuff!
 
->
-> This patch also provices a way to do printk dumps from kernel code,
-> by calling the pm_dbg_dump_X functions. The plan is to call these
-> functions once an error condition is detected, e.g. failed suspend.
->
-> Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> Cc: Paul Walmsley<paul@pwsan.com>
-> Cc: Kevin Hilman<khilman@ti.com>
-> ---
->   arch/arm/mach-omap2/pm-debug.c |  128 ++++++++++++++++++++++++++++++++++------
->   arch/arm/mach-omap2/pm.h       |    6 ++
->   2 files changed, 115 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> index 814bcd9..cfc46a8 100644
-> --- a/arch/arm/mach-omap2/pm-debug.c
-> +++ b/arch/arm/mach-omap2/pm-debug.c
-> @@ -51,6 +51,7 @@ static int pm_dbg_init(void);
->   enum {
->   	DEBUG_FILE_COUNTERS = 0,
->   	DEBUG_FILE_TIMERS,
-> +	DEBUG_FILE_USECOUNT,
->   };
->
->   static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
-> @@ -75,23 +76,6 @@ void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
->   	pwrdm->timer = t;
->   }
->
-> -static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
-> -{
-> -	struct seq_file *s = (struct seq_file *)user;
-> -
-> -	if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
-> -		strcmp(clkdm->name, "wkup_clkdm") == 0 ||
-> -		strncmp(clkdm->name, "dpll", 4) == 0)
-> -		return 0;
-> -
-> -	seq_printf(s, "%s->%s (%d)", clkdm->name,
-> -			clkdm->pwrdm.ptr->name,
-> -			atomic_read(&clkdm->usecount));
-> -	seq_printf(s, "\n");
-> -
-> -	return 0;
+I had a similar series once but lost it when the kernel.org went down.
+I've looked at all your patches and noticed two files that are changing
+semantically with your patch. If we want to have the generic behavior,
+it's probably best to do those as separate patches.
+
+
+> -/*
+> - * Translate a "termio" structure into a "termios". Ugh.
+> - */
+> -#define SET_LOW_TERMIOS_BITS(termios, termio, x) {		\
+> -	unsigned short __tmp;					\
+> -	get_user(__tmp,&(termio)->x);				\
+> -	*(unsigned short *) &(termios)->x = __tmp;		\
 > -}
 > -
->   static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
->   {
->   	struct seq_file *s = (struct seq_file *)user;
-> @@ -145,11 +129,112 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
->   	return 0;
->   }
->
-> +static struct voltagedomain *parent_voltdm;
-> +static struct powerdomain *parent_pwrdm;
-> +static struct clockdomain *parent_clkdm;
-> +
-> +#define PM_DBG_PRINT(s, fmt, args...)			\
-> +	{						\
-> +		if (s)					\
-> +			seq_printf(s, fmt, ## args);	\
-> +		else					\
-> +			pr_info(fmt, ## args);		\
-> +	}
-> +
-> +static int _pm_dbg_dump_clk(struct clk *clk, void *user)
-> +{
-> +	struct seq_file *s = user;
-> +
-> +	if (clk->clkdm == parent_clkdm&&  clk->usecount&&  !clk->autoidle)
-> +		PM_DBG_PRINT(s, "      ck:%s: %d\n", clk->name, clk->usecount);
-> +
-> +	return 0;
-> +}
-> +
-> +static int _pm_dbg_dump_hwmod(struct omap_hwmod *oh, void *user)
-> +{
-> +	struct seq_file *s = user;
-> +
-> +	if (oh->clkdm != parent_clkdm)
-> +		return 0;
-> +
-> +	if (oh->_state != _HWMOD_STATE_ENABLED)
-> +		return 0;
-> +
-> +	PM_DBG_PRINT(s, "      oh:%s: enabled\n", oh->name);
-> +
-> +	return 0;
-> +}
-> +
-> +static int _pm_dbg_dump_clkdm(struct clockdomain *clkdm, void *user)
-> +{
-> +	struct seq_file *s = user;
-> +	u32 usecount;
-> +
-> +	if (clkdm->pwrdm.ptr == parent_pwrdm) {
-> +		usecount = atomic_read(&clkdm->usecount);
-> +		if (usecount) {
-> +			PM_DBG_PRINT(s, "    cd:%s: %d\n", clkdm->name,
-> +				usecount);
-> +			parent_clkdm = clkdm;
-> +			omap_hwmod_for_each(_pm_dbg_dump_hwmod, s);
-> +			omap_clk_for_each(_pm_dbg_dump_clk, s);
-> +		}
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int _pm_dbg_dump_pwrdm(struct powerdomain *pwrdm, void *user)
-> +{
-> +	struct seq_file *s = user;
-> +	u32 usecount;
-> +
-> +	if (pwrdm->voltdm.ptr == parent_voltdm) {
-> +		usecount = atomic_read(&pwrdm->usecount);
-> +		if (usecount) {
-> +			PM_DBG_PRINT(s, "  pd:%s: %d\n", pwrdm->name, usecount);
-> +			parent_pwrdm = pwrdm;
-> +			clkdm_for_each(_pm_dbg_dump_clkdm, s);
-> +		}
-> +	}
-> +	return 0;
-> +}
-> +
-> +void pm_dbg_dump_pwrdm(struct powerdomain *pwrdm)
-> +{
-> +	pr_info("pd:%s: %d\n", pwrdm->name, atomic_read(&pwrdm->usecount));
-> +	parent_pwrdm = pwrdm;
-> +	clkdm_for_each(_pm_dbg_dump_clkdm, NULL);
-> +}
-> +
-> +void pm_dbg_dump_voltdm(struct voltagedomain *voltdm)
-> +{
-> +	pr_info("vd:%s: %d\n", voltdm->name, atomic_read(&voltdm->usecount));
-> +	parent_voltdm = voltdm;
-> +	pwrdm_for_each(_pm_dbg_dump_pwrdm, NULL);
-> +}
-> +
-> +static int _voltdm_dbg_show_counters(struct voltagedomain *voltdm, void *user)
-> +{
-> +	struct seq_file *s = user;
-> +
-> +	seq_printf(s, "vd:%s: %d\n", voltdm->name,
-> +		atomic_read(&voltdm->usecount));
-> +
-> +	parent_voltdm = voltdm;
-> +	pwrdm_for_each(_pm_dbg_dump_pwrdm, s);
-> +	return 0;
-> +}
-> +
-> +static int pm_dbg_show_usecount(struct seq_file *s, void *unused)
-> +{
-> +	voltdm_for_each(_voltdm_dbg_show_counters, s);
-> +	return 0;
-> +}
-> +
->   static int pm_dbg_show_counters(struct seq_file *s, void *unused)
->   {
->   	pwrdm_for_each(pwrdm_dbg_show_counter, s);
-> -	clkdm_for_each(clkdm_dbg_show_counter, s);
+> -#define user_termio_to_kernel_termios(termios, termio) \
+> -({ \
+> -	SET_LOW_TERMIOS_BITS(termios, termio, c_iflag); \
+> -	SET_LOW_TERMIOS_BITS(termios, termio, c_oflag); \
+> -	SET_LOW_TERMIOS_BITS(termios, termio, c_cflag); \
+> -	SET_LOW_TERMIOS_BITS(termios, termio, c_lflag); \
+> -	copy_from_user((termios)->c_cc, (termio)->c_cc, NCC); \
+> -})
+
+This code is not endian-safe, which means it's currently broken
+on big-endian machines. Using the asm-generic version fixes that
+problem but increases the code sizes.
+
+> -/*
+> - * Translate a "termios" structure into a "termio". Ugh.
+> - */
+> -#define kernel_termios_to_user_termio(termio, termios) \
+> -({ \
+> -	put_user((termios)->c_iflag, &(termio)->c_iflag); \
+> -	put_user((termios)->c_oflag, &(termio)->c_oflag); \
+> -	put_user((termios)->c_cflag, &(termio)->c_cflag); \
+> -	put_user((termios)->c_lflag, &(termio)->c_lflag); \
+> -	put_user((termios)->c_line,  &(termio)->c_line); \
+> -	copy_to_user((termio)->c_cc, (termios)->c_cc, NCC); \
+> -})
+
+This code is missing error handling, and again fixing this
+will increase the code size.
+
+I think it's a good idea to fix these two issues, but let's
+use a separate patch for it.
+
+> diff --git a/arch/arm/include/asm/unaligned.h b/arch/arm/include/asm/unaligned.h
+> deleted file mode 100644
+> index 44593a8..0000000
+> --- a/arch/arm/include/asm/unaligned.h
+> +++ /dev/null
+> @@ -1,19 +0,0 @@
+> -#ifndef _ASM_ARM_UNALIGNED_H
+> -#define _ASM_ARM_UNALIGNED_H
 > -
->   	return 0;
->   }
->
-> @@ -162,6 +247,9 @@ static int pm_dbg_show_timers(struct seq_file *s, void *unused)
->   static int pm_dbg_open(struct inode *inode, struct file *file)
->   {
->   	switch ((int)inode->i_private) {
-> +	case DEBUG_FILE_USECOUNT:
-> +		return single_open(file, pm_dbg_show_usecount,
-> +			&inode->i_private);
->   	case DEBUG_FILE_COUNTERS:
->   		return single_open(file, pm_dbg_show_counters,
->   			&inode->i_private);
-> @@ -271,6 +359,8 @@ static int __init pm_dbg_init(void)
->   		d, (void *)DEBUG_FILE_COUNTERS,&debug_fops);
->   	(void) debugfs_create_file("time", S_IRUGO,
->   		d, (void *)DEBUG_FILE_TIMERS,&debug_fops);
-> +	(void) debugfs_create_file("usecount", S_IRUGO,
-> +		d, (void *)DEBUG_FILE_USECOUNT,&debug_fops);
->
->   	pwrdm_for_each(pwrdms_setup, (void *)d);
->
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 7856489..312f2de 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -41,10 +41,16 @@ static inline int omap4_opp_init(void)
->   extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
->   extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
->
-> +struct clk;
-> +
->   #ifdef CONFIG_PM_DEBUG
->   extern u32 enable_off_mode;
-> +extern void pm_dbg_dump_pwrdm(struct powerdomain *pwrdm);
-> +extern void pm_dbg_dump_voltdm(struct voltagedomain *voltdm);
->   #else
->   #define enable_off_mode 0
-> +static inline void pm_dbg_dump_pwrdm(struct powerdomain *pwrdm) { }
-> +static inline void pm_dbg_dump_voltdm(struct voltagedomain *voltdm) { }
->   #endif
->
->   #if defined(CONFIG_PM_DEBUG)&&  defined(CONFIG_DEBUG_FS)
+> -#include <linux/unaligned/le_byteshift.h>
+> -#include <linux/unaligned/be_byteshift.h>
+> -#include <linux/unaligned/generic.h>
+> -
+> -/*
+> - * Select endianness
+> - */
+> -#ifndef __ARMEB__
+> -#define get_unaligned	__get_unaligned_le
+> -#define put_unaligned	__put_unaligned_le
+> -#else
+> -#define get_unaligned	__get_unaligned_be
+> -#define put_unaligned	__put_unaligned_be
+> -#endif
+> -
+> -#endif /* _ASM_ARM_UNALIGNED_H */
+
+The asm-generic version uses the "struct" version for native-endian
+unaligned access and the "byteshift" version for the opposite endianess.
+The current ARM version however uses the "byteshift" implementation for
+both. I don't know what works better on ARM, but I'd say we should not
+change it unless we understand the effects.
+
+	Arnd
