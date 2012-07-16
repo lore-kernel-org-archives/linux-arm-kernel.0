@@ -1,33 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 16 Jul 2012 16:05:44 +0200
-Subject: MXS i2c PIOQ/DMA mode selection via DT
-Message-ID: <201207161605.44379.marek.vasut@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 16 Jul 2012 19:43:43 +0530
+Subject: [PATCH 2/2] arm/dts: omap4: Add ocp2scp data
+In-Reply-To: <1342448023-14438-1-git-send-email-kishon@ti.com>
+References: <1342448023-14438-1-git-send-email-kishon@ti.com>
+Message-ID: <1342448023-14438-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add ocp2scp data node in omap4 device tree file.
 
-There's been this patch going on, which adds DMA mode into MXS i2c driver:
-https://patchwork.kernel.org/patch/1174051/
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Recent nitpick was about toggling the PIOQUEUE (almost like PIO, only transfer 
-mode in current implementation) vs. DMA mode (newly added) on a per-bus basis.
-
-Current implementation in the patch adds a DT property, "fsl,use-pio" (shall be 
-changed to "fsl,use-pioqueue", but that's irrelevant) to select between the 
-PIOQUEUE and DMA mode on per-bus basis.
-
-There was now a suggestion to dump this property and use kernel module parameter 
-instead. This obviously disallows to configure this behavior on per-bus basis. 
-Consider a scenario where small transfers happens on one bus (possibly from a 
-sensor) and large transfers on the other bus (eg. i2c EEPROM). In such scenario, 
-it's beneficial to enable PIOQUEUE mode for the sensor and DMA mode for the 
-EEPROM to minimize the overall overhead.
-
-The mixed mode (PIOQ for small data and DMA for large data transfers) isn't 
-supported yet.
-
-Please advise.
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 359c497..bda5df3 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -272,5 +272,13 @@
+ 			ti,hwmods = "mmc5";
+ 			ti,needs-special-reset;
+ 		};
++
++		ocp2scp at 4a0ad000  {
++			compatible = "ti,omap-ocp2scp";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			ti,hwmods = "ocp2scp_usb_phy";
++		};
+ 	};
+ };
+-- 
+1.7.5.4
