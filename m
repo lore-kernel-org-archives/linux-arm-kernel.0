@@ -1,63 +1,50 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 16 Jul 2012 11:04:15 -0700
-Subject: [PATCH v5] ARM: vfp: Always save VFP state in vfp_pm_suspend
-In-Reply-To: <20120716113302.GG26723@mudshark.cambridge.arm.com>
-References: <20120715215342.4DAB99D401E@zog.reactivated.net>
- <CAGsJ_4x5S4Aq-nJU1nyyw7E8Q82UPm0pNP-NYJ5N8aGn=nMdgw@mail.gmail.com>
- <20120716113302.GG26723@mudshark.cambridge.arm.com>
-Message-ID: <CAMbhsRSCMZXyASdpUAhrHPBUr8CN4rgLFA29Z68j_GMta_kPNg@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 16 Jul 2012 23:39:18 +0530
+Subject: [PATCH] ARM: OMAP2+: am33xx: Fix the timer fck clock naming convention
+Message-ID: <1342462158-15998-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 4:33 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jul 16, 2012 at 02:40:06AM +0100, Barry Song wrote:
->> 2012/7/16 Daniel Drake <dsd@laptop.org>:
->> > From: Colin Cross <ccross@android.com>
->> >
->> > vfp_pm_suspend should save the VFP state any time there is
->> > a vfp_current_hw_state.  If it only saves when the VFP is enabled,
->> > the state can get lost when, on a UP system:
->> >    Thread 1 uses the VFP
->> >    Context switch occurs to thread 2, VFP is disabled but the
->> >       VFP context is not saved to allow lazy save and restore
->> >    Thread 2 initiates suspend
->> >    vfp_pm_suspend is called with the VFP disabled, but the
->> >       context has not been saved.
->> >
->> > Modify vfp_pm_suspend to save the VFP context whenever
->> > vfp_current_hw_state is set.
->> >
->> > Signed-off-by: Colin Cross <ccross@android.com>
->> > Cc: Binghua Duan <binghua.duan@csr.com>
->> > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
->> > Signed-off-by: Barry Song <21cnbao@gmail.com>
->> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> we also found this kind of issue too, sometimes suspend/resume will
->> fail with this bug.
->> so we refined this patch before. but i am really wondering why it has
->> not been committed yet.
->
-> At a guess, it hasn't been applied because nobody has submitted it to the
-> patch system.
->
->> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
->> > index 58696192..c86fc52 100644
->> > --- a/arch/arm/vfp/vfpmodule.c
->> > +++ b/arch/arm/vfp/vfpmodule.c
->> > @@ -457,6 +457,10 @@ static int vfp_pm_suspend(void)
->> >
->> >                 /* disable, just in case */
->> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
->> > +       } else if (vfp_current_hw_state[ti->cpu]) {
->> > +               fmxr(FPEXC, fpexc | FPEXC_EN);
->> > +               vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
->> > +               fmxr(FPEXC, fpexc);
->
-> Given that we don't do lazy saving on SMP systems, can we make this
-> conditional on !SMP?
+With commit ae6df418a21f3a361c5f9b878e32a8aba4e17692
+Sub: ARM: OMAP2+: dmtimer: cleanup fclk usage)
+The Timer functional clock naming convention has changed from
+gptX_fck => timerXfck, and so as the timer init function
+in mach-omap2/timer.c.
+OMAP4 clocktree also has changed accordingly.
 
-Ido Yariv pointed out that this is actually unsafe on SMP systems,
-because vfp_current_hw_state can be a dangling pointer if a task exits
-on another cpu.  I'll squash his fix into this one (#ifdef CONFIG_SMP
-around the contents of the new if clause) and post v6.
+AM33xx Clock Tree has been merged during rc3-4 timeframe,
+before above commit got merged, so similar change is required
+for AM33xx as well (Change the gptX_fck => timerX_fck).
+
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+ arch/arm/mach-omap2/clock33xx_data.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index 25bbcc7..ae27de8 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1036,13 +1036,13 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
+ 	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
+ 	CLK(NULL,	"smartreflex1_fck",	&smartreflex1_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt1_fck",		&timer1_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt2_fck",		&timer2_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt3_fck",		&timer3_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt4_fck",		&timer4_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt5_fck",		&timer5_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt6_fck",		&timer6_fck,	CK_AM33XX),
+-	CLK(NULL,	"gpt7_fck",		&timer7_fck,	CK_AM33XX),
++	CLK(NULL,	"timer1_fck",		&timer1_fck,	CK_AM33XX),
++	CLK(NULL,	"timer2_fck",		&timer2_fck,	CK_AM33XX),
++	CLK(NULL,	"timer3_fck",		&timer3_fck,	CK_AM33XX),
++	CLK(NULL,	"timer4_fck",		&timer4_fck,	CK_AM33XX),
++	CLK(NULL,	"timer5_fck",		&timer5_fck,	CK_AM33XX),
++	CLK(NULL,	"timer6_fck",		&timer6_fck,	CK_AM33XX),
++	CLK(NULL,	"timer7_fck",		&timer7_fck,	CK_AM33XX),
+ 	CLK(NULL,	"usbotg_fck",		&usbotg_fck,	CK_AM33XX),
+ 	CLK(NULL,	"ieee5000_fck",		&ieee5000_fck,	CK_AM33XX),
+ 	CLK(NULL,	"wdt1_fck",		&wdt1_fck,	CK_AM33XX),
+-- 
+1.7.0.4
