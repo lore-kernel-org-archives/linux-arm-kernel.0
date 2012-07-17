@@ -1,16 +1,97 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 17 Jul 2012 13:41:34 +0800
-Subject: [PATCH v4 1/2] ARM: imx6q: add clocks for gpmi-nand
-In-Reply-To: <1341279572-6098-2-git-send-email-shijie8@gmail.com>
-References: <1341279572-6098-1-git-send-email-shijie8@gmail.com>
- <1341279572-6098-2-git-send-email-shijie8@gmail.com>
-Message-ID: <20120717054133.GA3109@S2100-06.ap.freescale.net>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 17 Jul 2012 10:50:56 +0530
+Subject: [PATCH 2/2] [RFC] cpufreq: omap: scale regulator from clk notifier
+In-Reply-To: <1342225001-22962-3-git-send-email-mturquette@linaro.org>
+References: <1342225001-22962-1-git-send-email-mturquette@linaro.org>
+ <1342225001-22962-3-git-send-email-mturquette@linaro.org>
+Message-ID: <5004F638.6020301@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2012 at 09:39:31PM -0400, Huang Shijie wrote:
-> Add clocks for gpmi-nand.
-> 
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+On Saturday 14 July 2012 05:46 AM, Mike Turquette wrote:
+> This patch moves direct control of the MPU voltage regulator out of the
+> cpufreq driver .target callback and instead puts that logic into a clock
+> rate change notifier callback.
+>
+> The same frequency/voltage lookup via the OPP library is present, except
+> that the calls to regulator_set_voltage are done from the clock
+> framework instead of cpufreq.
+>
+> Ideally it would be nice to reduce the .target callback for OMAP's
+> cpufreq driver to a simple call to clk_set_rate.  For now there is still
+> some other stuff needed there (jiffies per loop, rounding the rate, etc
+> etc).
+>
+> Not-signed-off-by: Mike Turquette<mturquette@linaro.org>
+> ---
+>   drivers/cpufreq/omap-cpufreq.c |  154 +++++++++++++++++++++++++---------------
+>   1 file changed, 96 insertions(+), 58 deletions(-)
+>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+<snip>
+
+>
+> -static int __init omap_cpufreq_init(void)
+> +static int mpu_clk_volt_scale_handler(struct notifier_block *nb,
+> +	unsigned long flags, void *data)
+>   {
+> -	if (cpu_is_omap24xx())
+> -		mpu_clk_name = "virt_prcm_set";
+> -	else if (cpu_is_omap34xx())
+> -		mpu_clk_name = "dpll1_ck";
+> -	else if (cpu_is_omap44xx())
+> -		mpu_clk_name = "dpll_mpu_ck";
+> +	struct clk_notifier_data *cnd = data;
+> +	unsigned long tol;
+> +	int ret, volt_new, volt_old;
+> +	struct opp *opp;
+>
+> -	if (!mpu_clk_name) {
+> -		pr_err("%s: unsupported Silicon?\n", __func__);
+> -		return -EINVAL;
+> +	volt_old = regulator_get_voltage(mpu_reg);
+> +	opp = opp_find_freq_exact(mpu_dev, cnd->new_rate, true);
+> +	volt_new = opp_get_voltage(opp);
+> +
+> +	tol = volt_new * OPP_TOLERANCE / 100;
+> +
+> +	/* scaling up?  scale voltage before frequency */
+> +	if (cnd->new_rate>  cnd->old_rate) {
+> +		dev_dbg(mpu_dev, "cpufreq-omap: %d mV -->  %d mV\n",
+> +				volt_old, volt_new);
+> +
+> +		ret = regulator_set_voltage(mpu_reg, volt_new - tol, volt_new + tol);
+> +
+> +		if (ret<  0) {
+> +			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
+> +				 __func__);
+> +			return NOTIFY_BAD;
+> +		}
+> +	}
+> +
+> +	/* scaling down?  scale voltage after frequency */
+> +	if (cnd->new_rate<  cnd->old_rate) {
+> +		dev_dbg(mpu_dev, "cpufreq-omap: %d mV -->  %d mV\n",
+> +				volt_old, volt_new);
+> +
+> +		ret = regulator_set_voltage(mpu_reg, volt_new - tol, volt_new + tol);
+> +
+> +		if (ret<  0) {
+> +			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
+> +				 __func__);
+> +			return NOTIFY_BAD;
+> +		}
+>   	}
+
+How are you checking pre and post rate change condition here? Need 
+switch case for event?
+
+>
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block mpu_clk_volt_scale_nb = {
+> +	.notifier_call = mpu_clk_volt_scale_handler,
+> +};
+> +
+> +
