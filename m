@@ -1,72 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Jul 2012 13:59:01 -0600 (MDT)
-Subject: [PATCH-V2 4/4] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data
-In-Reply-To: <1338285402-11306-5-git-send-email-hvaibhav@ti.com>
-References: <1338285402-11306-1-git-send-email-hvaibhav@ti.com>
- <1338285402-11306-5-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1207171353190.28834@utopia.booyaka.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 18 Jul 2012 04:02:16 +0800
+Subject: [PATCH 0/3 V2] Initial PXA DT bindings
+In-Reply-To: <5005C39A.5000903@gmail.com>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+ <201207171403.43689.arnd@arndb.de> <50057AE8.5000806@gmail.com>
+ <201207171531.23052.arnd@arndb.de>
+ <CAMPhdO-U-yfCcaOYGPWTeac5EpJBEEHgZOXg9U2zdjB1ST6e6g@mail.gmail.com>
+ <5005C39A.5000903@gmail.com>
+Message-ID: <CAMPhdO802n6VDrVT96ZNyZ6NuVYFOGFRwaTaJLh=3zpfUTPPtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav
+On Wed, Jul 18, 2012 at 3:57 AM, Daniel Mack <zonque@gmail.com> wrote:
+> On 17.07.2012 20:04, Eric Miao wrote:
+>> On Tue, Jul 17, 2012 at 11:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Tuesday 17 July 2012, Daniel Mack wrote:
+>>>>> Of course if Marek is interested in picking up where he left, that
+>>>>> would also be appreciated.
+>>>>
+>>>> What about just taking them as they are? I believe Marek tested them
+>>>> back in the days when he submitted.
+>>>
+>>> The patches are 9 months old now, which means the probably don't apply
+>>> any more. If you send us a version that applies and builds on v3.5-rc7
+>>> and the maintainers don't object, we can definitely take them.
+>>
+>> As Haojian is currently working on the support for MMP series,
+>
+> I've seen that. The code looks very clean in that area.
+>
+>> I'm not
+>> sure if he has any update on the PXA side?
+>
+> If not, I would use the mmp code as reference. Just let me know :)
 
-a comment.
-
-On Tue, 29 May 2012, Vaibhav Hiremath wrote:
-
-> This patch adds HWMOD data for all the peripherals of
-> AM335X device and also hooks up to the existing OMAP framework.
-
-
-...
-
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> new file mode 100644
-> index 0000000..df888fe
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -0,0 +1,3368 @@
-
-...
-
-> +static struct omap_hwmod_irq_info am33xx_emif_irqs[] = {
-> +	{ .name = "ddrerr0", .irq = 101 },
-> +	{ .irq = -1 }
-> +};
-
-So the above array of struct omap_hwmod_irq_info records has a terminator 
-(which is correct), but many similar arrays do not, such as:
-
-> +/* l3_main (l3_fast) */
-> +static struct omap_hwmod_irq_info am33xx_l3_main_irqs[] = {
-> +	{ .name = "l3debug", .irq = 9 },
-> +	{ .name = "l3appint", .irq = 10 },
-> +};
-
-and
-
-> +static struct omap_hwmod_irq_info am33xx_mpu_irqs[] = {
-> +	{ .name = "emuint", .irq = 0 },
-> +	{ .name = "commtx", .irq = 1 },
-> +	{ .name = "commrx", .irq = 2 },
-> +	{ .name = "bench", .irq = 3 },
-> +};
-
-and
-
-> +static struct omap_hwmod_rst_info am33xx_wkup_m3_resets[] = {
-> +	{ .name = "wkup_m3", .rst_shift = 3, .st_shift = 5 },
-> +};
-> +
-> +static struct omap_hwmod_irq_info am33xx_wkup_m3_irqs[] = {
-> +	{ .name = "txev", .irq = 78 },
-> +};
-
-and several others.  
-
-Could you add those, please?
-
-The omap_hwmod_dma_info arrays look clean to me.
-
-
-- Paul
+Yeah, that would be great, thanks.
