@@ -1,14 +1,14 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 17 Jul 2012 16:59:01 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 15:09:29 +0000
 Subject: [PATCH] [RFC] arm: add documentation describing Marvell families
  of SoC
 In-Reply-To: <1342535201-12907-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1342535201-12907-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20120717145901.GQ2489@lunn.ch>
+Message-ID: <201207171509.30509.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 04:26:41PM +0200, Thomas Petazzoni wrote:
+On Tuesday 17 July 2012, Thomas Petazzoni wrote:
 > As stated in the introduction of the document, the families of ARM
 > SoCs at Marvell are very complicated, and it is difficult for
 > newcomers to understand the organization of this SoC family and how it
@@ -23,7 +23,14 @@ On Tue, Jul 17, 2012 at 04:26:41PM +0200, Thomas Petazzoni wrote:
 > Kirkwood/Dove/Armada 370-XP/etc. hardware IPs (I2C, SPI, USB, SATA,
 > etc.) are identical, while the PXA and MMP families are completely
 > separate.
-> 
+
+This is wonderful! Even if there are some pieces missing or incorrect,
+it looks extremely valuable. I remember countless times of browsing
+through the marvell web site and the source code trying to make sense
+of how things fit together.
+
+Thanks a lot for compiling the list!
+
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > Cc: Andrew Lunn <andrew@lunn.ch>
 > Cc: Jason Cooper <jason@lakedaemon.net>
@@ -34,27 +41,10 @@ On Tue, Jul 17, 2012 at 04:26:41PM +0200, Thomas Petazzoni wrote:
 > Cc: Nicolas Pitre <nico@fluxnic.net>
 > Cc: Arnd Bergmann <arnd@arndb.de>
 > Cc: Olof Johansson <olof@lixom.net>
-> ---
->  Documentation/arm/Marvell/README |  168 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 168 insertions(+)
->  create mode 100644 Documentation/arm/Marvell/README
-> 
-> diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-> new file mode 100644
-> index 0000000..4f33433
-> --- /dev/null
-> +++ b/Documentation/arm/Marvell/README
-> @@ -0,0 +1,168 @@
-> +ARM Marvell SoCs
-> +================
-> +
-> +This document lists all the ARM Marvell SoCs that are currently
-> +supported in mainline by the Linux kernel. As the Marvell families of
-> +SoCs are large and complex, it is hard to understand where the support
-> +for a particular SoC is available in the Linux kernel. This document
-> +tries to help in understanding where those SoCs are supported, and to
-> +match them with their corresponding public datasheet, when available.
-> +
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+
 > +Orion family
 > +------------
 > +
@@ -69,9 +59,26 @@ On Tue, Jul 17, 2012 at 04:26:41PM +0200, Thomas Petazzoni wrote:
 > +  Linux kernel directory: arch/arm/mach-orion5x
 > +  No public datasheets available.
 
-There is a MV88F5182-opensource-manual.pdf document. It
-can be downloaded from:
+I would also mention that the core in this is "Feroceon", not just that it's ARMv5.
+Same for mv78xx0 and kirkwood.
 
-www.embeddedarm.com/.../MV88F5182-opensource-manual.pdf
+> +        PXA930, PXA935, PXA955
+> +             Core: ARMv5 compatible Sheeva core
 
-	Andrew
+This looks wrong. According to the Kconfig file, PXA93x actually uses the
+same core as PXA3xx, while PXA955 uses an ARMv7 PJ4 core.
+
+> +MMP/MMP2 family (communication processor)
+> +-----------------------------------------
+> +             Core: ARMv5 compatible Marvell PJ1 (Mohawk)
+> +        MMP2, a.k.a Armada 610
+> +             Product Brief        : http://www.marvell.com/application-processors/armada-600/assets/armada610_pb.pdf
+> +             Core: ARMv7 compatible Sheeva PJ4 core
+> +   Linux kernel directory: arch/arm/mach-mmp
+
+I'd also like to bring up the question of merging the pxa and mmp
+directories again. It would simplify the task of building a multiplatform
+kernel significantly as they have shared device drivers with some duplicate
+header files (e.g. dma, gpio, ...).
+
+	Arnd
