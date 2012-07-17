@@ -1,54 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Jul 2012 15:52:10 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-In-Reply-To: <20120717142222.GE4477@opensource.wolfsonmicro.com>
-References: <5003FB7C.4030509@linaro.org>
- <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
- <20120717133550.GC4477@opensource.wolfsonmicro.com>
- <50057058.2060002@linaro.org>
- <20120717142222.GE4477@opensource.wolfsonmicro.com>
-Message-ID: <50057C1A.80606@linaro.org>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Tue, 17 Jul 2012 16:54:46 +0200
+Subject: [RFC PATCH 00/12] ARM: Decompressor multiplatform support
+In-Reply-To: <201207171431.16111.arnd@arndb.de>
+References: <20120715024408.747946928@gmail.com>
+ <201207171431.16111.arnd@arndb.de>
+Message-ID: <20120717145446.GB9991@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/12 15:22, Mark Brown wrote:
-> On Tue, Jul 17, 2012 at 03:02:00PM +0100, Lee Jones wrote:
->
->> I'm sure sure this is relevant in the current case though, as the
->> i2c properties proposed here are platform specific. What we're
->
-> I've not seen the specific example (though fankly it seems quite
-> surprising that there's anything other than bus speed that the platform
-> might want to configure for I2C...).
->
->> discussing is some consolidation of property names, which I do
->> support in theory. What I fear is that this driver will lack Device
->> Tree functionality for yet another kernel version if it isn't
->> resolved quickly.
->
-> Well, if checking the DT checky box is the important thing then just
-> adding an of_match_table ought to be enough?  It's fairly common for
-> platform data to have lots of stuff that's not used by most systems
-> so you can often cover 90% of systems with a very small subset of the
-> configurability.
+On Tue, Jul 17, 2012 at 02:31:15PM +0000, Arnd Bergmann wrote:
+> On Sunday 15 July 2012, Domenico Andreoli wrote:
+> > My intent is to get rid of uncompress.h and prepare the decompressor
+> > to dynamically select the various machine specific decompressor init
+> > steps, included the selection of the appropriate console driver.
+> > 
+> > Currently the mainline kernel defines these steps statically and indeed
+> > has some trouble to boot on different boards with the same binary.
+> > 
+> > What this patch does is allowing the four functions (arch_decomp_setup,
+> > arch_error, putc and flush) currently used to define such static steps
+> > to be packed in quantity and to be selected/executed by the decompressor
+> > accordingly to the machid or DT passed by the boot loader.
+> 
+> I definitely like the implementation, it looks very nicely done with the
+> driver specific code being right inside of the actual device drivers.
 
-We could do that, but I'd rather do it in full.
+yep, thanks.
 
-I think it would be okay to take the 3 patches due for the v3.6 merge 
-window, which target the nmk-i2c driver. If any consolidation happens in 
-the mean-time/future I will personally do the work to bring the nmk-i2c 
-into line to use any generic bindings which result.
+> I think the main question we have to answer is whether we want to go
+> this far for the decompressor output. IIRC the last time this was
+> debated, the argument was made (I don't remember if it was by Russell
+> or someone else) that the decompressor code is designed to be as simple
+> as possible and we should add too much complexity in it that would make
+> it harder to debug when the only purpose of that code is to debug the
+> decompressor code itself.
 
-No one else is ever going to use these vendor specific bindings, so I'm 
-sure no issues will arise. It also means that we have a fully enabled 
-driver which is capable of receiving a new configuration via minor 
-changes to the dts, which is important for the current (only) user of 
-this driver for an upcoming project.
+I also made this question [0] but probably the message was too long and
+nobody bothered to read it fully :)
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The question applies almost unchanged for the arch_decomp_setup()/arch_error()
+calls. Those could be worthy to preserve and probably less easy to dismiss
+than the console ;)
+
+> I find it hard to judge what the benefit of your implementation is
+> compared to the risk of introducing bugs.
+
+Indeed. I can also add that without a sound extraction of console data
+from DT, where arm is heading, the thing looks even less appealing.
+
+But I needed to publish it :)
+
+> The other part I don't understand is how it relates to the
+> early_print() infrastructure that has some of the same requirements.
+
+If there is, it's not intentional.
+
+cheers,
+Domenico
+
+[0] http://www.spinics.net/lists/arm-kernel/msg177843.html
