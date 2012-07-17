@@ -1,28 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 17 Jul 2012 13:51:12 +0300
-Subject: [PATCH 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
-In-Reply-To: <20120717101100.GI4213@amd.com>
-References: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
- <20120717101100.GI4213@amd.com>
-Message-ID: <CAK=WgbbVvFoGRoitscvTRUWUWd=3HLiuvs6ZUNZnAbF67tXO5A@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 17 Jul 2012 12:53:38 +0200 (CEST)
+Subject: [PATCH/RFC 0/4] dma: Add multiplexer call-back for channel allocation
+Message-ID: <Pine.LNX.4.64.1207171201550.11241@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Paul
+Hi all
 
-On Tue, Jul 17, 2012 at 1:11 PM, Joerg Roedel <joerg.roedel@amd.com> wrote:
-> On Fri, Jun 15, 2012 at 08:55:58PM -0500, Omar Ramirez Luna wrote:
->> Omar Ramirez Luna (6):
->>   ARM: OMAP: iommu: fix including iommu.h without IOMMU_API selected
->>   ARM: OMAP3: hwmod data: add mmu data for iva and isp
->>   ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
->>   ARM: OMAP3/4: iommu: migrate to hwmod framework
->>   ARM: OMAP2+: iommu: add reset handling
->>   ARM: OMAP3/4: iommu: adapt to runtime pm
->
-> What happens with this patch-set. Comments anyone? Ohad?
+As recently [1] proposed, a DMA channel multiplexer can be user to 
+flexibly allocate DMA channels without a use of a DMAC-specific filter 
+function. This patch set presents a possible implementation. Of the 3 
+patches in this series the first one is the actual proposal, the other two 
+are an illustration, using the shdma dmaengine and the sh_mmcif mmc 
+drivers on the sh7372 mackerel board.
 
-Looks like it depends on a few OMAP hwmod changes (reset handling)
-which require Paul's ACK.
+This is an RFC, please, comment. One extension, that seems to make sense 
+is an addition of a multiplexer-configure call-back to actually configure 
+the routing. It isn't needed in the shdma case, so, I didn't want to add 
+it without real users. Something along the lines of
 
-Ohad.
+	struct dma_chan *(*route_chan)(struct dma_chan *, struct device *,
+				enum dma_transfer_direction, const char *);
+
+perhaps?
+
+Thanks
+Guennadi
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/75828/focus=76295
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
