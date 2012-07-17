@@ -1,99 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 17 Jul 2012 08:46:27 -0500
-Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
-In-Reply-To: <50056648.6000906@ti.com>
-References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
- <20120717001228.GA28886@gmail.com> <5004C935.4050707@gmail.com>
- <50056648.6000906@ti.com>
-Message-ID: <50056CB3.90004@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 13:51:14 +0000
+Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
+In-Reply-To: <20120717152826.2bf75948@skate>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <201207171312.06987.arnd@arndb.de> <20120717152826.2bf75948@skate>
+Message-ID: <201207171351.15034.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2012 08:19 AM, Rajendra Nayak wrote:
-> Rob, Mike,
-> 
-> On Tuesday 17 July 2012 07:38 AM, Rob Herring wrote:
->> On 07/16/2012 07:12 PM, Mike Turquette wrote:
->>> On 20120716-16:46, Rob Herring wrote:
->>>> From: Rob Herring<rob.herring@calxeda.com>
->>>>
->>>> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
->>>> compiling with OF&&  !COMMON_CLK is broken.
->>>>
->>>
->>> Hi Rob,
->>>
->>> Thanks for sending this quickly.
->>>
->>> <snip>
->>>> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const
->>>> char *alias_dev_name, char *id,
->>>>   struct device_node;
->>>>   struct of_phandle_args;
->>>>
->>>> -#ifdef CONFIG_OF
->>>> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
->>>>   struct clk *of_clk_get(struct device_node *np, int index);
->>>>   struct clk *of_clk_get_by_name(struct device_node *np, const char
->>>> *name);
->>>>   struct clk *of_clk_get_from_provider(struct of_phandle_args
->>>> *clkspec);
->>>>   #else
->>>>   static inline struct clk *of_clk_get(struct device_node *np, int
->>>> index)
->>>>   {
->>>> -    return NULL;
->>>> +    return ERR_PTR(-EINVAL);
-> 
-> So how is this expected to work on platforms (like OMAP) which have
-> CONFIG_OF enabled but not CONFIG_COMMON_CLK?
-> 
+On Tuesday 17 July 2012, Thomas Petazzoni wrote:
+> And then, on PowerPC, which accessors do you use to access
+> SoC-peripherals that are not on the PCI bus?
 
-As I mentioned in my other reply, this really belongs with Shawn's patch
-that changes the return value checking from NULL to err values.
+PowerPC has in_le32/out_le32 and variants of those, which unfortunately
+are not defined for most other architectures, so you cannot use them
+in portable code. They are the same as readl/writel, but without the
+PCI error handling.
 
-> Archit has been seeing issues with failed clk_get's in the omap dss
-> driver on linux-next.
-> The clk_gets pass a valid dev pointer and an alias/con-id.
+> For example, drivers/tty/serial/mpsc.c uses writel/readl, so a
+> conversion to/from little-endian is done when writing/reading
+> registers. Are those memory-mapped devices little-endian even though
+> they are used on big-endian PowerPCs?
 > 
-> With the $Subject patch, the of_clk_get_by_name() for our builds always
-> returns a ERR_PTR(-EINVAL).
-> 
-> Even if we do get the right of_clk_get_by_name() built in,
-> there is another issue on OMAP where in we have CONFIG_OF
-> enabled/selected by default for all OMAP2+ builds, even when we
-> *do not* pass a dt blob to the kernel.
-> 
-> So would the below code fail in such cases because it expects a
-> valid of_node to be populated for a device (which also has clock
-> information in it)? if CONFIG_OF is set.
-> 
-> struct clk *clk_get(struct device *dev, const char *con_id)
-> {
->         const char *dev_id = dev ? dev_name(dev) : NULL;
->         struct clk *clk;
-> 
->         if (dev) {
-> ---->
->     Any reason why this isn't
->     if (dev->of_node) {
-> ---->
+> I apologize for the silly questions, but I'm trying to make some sense
+> out of these numerous I/O and memory accessors.
 
-dev may be null, we could do (dev && dev->of_node) though. Either way
-the error handling here needs to do the right thing.
+All combinations of little/big endian CPUs and peripherals have been
+done in the past, including peripherals that switch their endianess
+dynamically when you change the mode of the CPU, and those that come
+with an extra register to add byte-swapping for operating systems
+that don't deal with it.
 
->                 clk = of_clk_get_by_name(dev->of_node, con_id);
->                 if (clk && __clk_get(clk))
->                         return clk;
->         }
-> 
->         return clk_get_sys(dev_id, con_id);
-> }
-> 
-> regards,
-> Rajendra
-> 
-> 
-> 
-> 
-> 
+It's all a big mess and there is no good solution that anyone has
+managed to come with to cover all possibilities. My recommendation
+is generally to use the little-endian accessors when they work,
+and have your bus-specific or driver-specific wrapper around those
+when the endianess is not always the same.
+
+	Arnd
