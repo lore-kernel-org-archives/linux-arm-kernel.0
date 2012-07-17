@@ -1,29 +1,41 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 17 Jul 2012 12:11:00 +0200
-Subject: [PATCH 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
-In-Reply-To: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
-References: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <20120717101100.GI4213@amd.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jul 2012 12:16:40 +0200
+Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
+In-Reply-To: <201207161554.04812.arnd@arndb.de>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <1342363754-30808-2-git-send-email-florian@openwrt.org>
+ <201207161554.04812.arnd@arndb.de>
+Message-ID: <20120717121640.589780ce@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2012 at 08:55:58PM -0500, Omar Ramirez Luna wrote:
-> Omar Ramirez Luna (6):
->   ARM: OMAP: iommu: fix including iommu.h without IOMMU_API selected
->   ARM: OMAP3: hwmod data: add mmu data for iva and isp
->   ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
->   ARM: OMAP3/4: iommu: migrate to hwmod framework
->   ARM: OMAP2+: iommu: add reset handling
->   ARM: OMAP3/4: iommu: adapt to runtime pm
+Le Mon, 16 Jul 2012 15:54:04 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-What happens with this patch-set. Comments anyone? Ohad?
+> > +void mcs814x_restart(char mode, const char *cmd)
+> > +{
+> > +	__raw_writel(~(1 << 31), mcs814x_sysdbg_base);
+> > +}
+> 
+> You should generally avoid using __raw_readl etc. and instead use
+> readl/write or readl_relaxed/writel_relaxed.
 
+I thought that readl/writel and readl_relaxed/writel_relaxed were used
+for PCI-style access, for which these macros/functions do automatically
+a conversion from the CPU-endianness to the PCI-endianness
+(little-endian). Here of course, this the SoC is used little-endian, it
+will just work because readl/writel will not do any endianness
+conversion, but if we were on a big-endian machine?
 
-	Joerg
+My understanding until now was that __raw_readl/__raw_writel should be
+used for accesses with native endianness, but apparently, it's more
+subtle than this. Would you mind expanding a bit on this?
 
+Best regards,
+
+Thomas
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
