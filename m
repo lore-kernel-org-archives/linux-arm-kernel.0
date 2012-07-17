@@ -1,116 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 13:19:43 +0000
-Subject: [PATCH 2/8] ARM: MCS814x: add Device Tree based MCS8140 board
- support
-In-Reply-To: <1342363754-30808-3-git-send-email-florian@openwrt.org>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <1342363754-30808-3-git-send-email-florian@openwrt.org>
-Message-ID: <201207171319.43593.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Jul 2012 14:20:32 +0100
+Subject: Device tree binding for DVFS table
+In-Reply-To: <50055C83.7060700@nvidia.com>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+ <4FFE4DD0.7020407@nvidia.com> <50035582.9070308@gmail.com>
+ <CAJOA=zMKE1Z_AsYeWr22k58EDskx0eshEjv9VbLQHKFsA0uThw@mail.gmail.com>
+ <50055C83.7060700@nvidia.com>
+Message-ID: <20120717132032.GD27595@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 July 2012, Florian Fainelli wrote:
+On Tue, Jul 17, 2012 at 06:07:23PM +0530, Prashant Gaikwad wrote:
+> On Tuesday 17 July 2012 12:06 AM, Turquette, Mike wrote:
 
-> +
-> +			uart0: serial at 400dc000 {
-> +				compatible = "ns16550";
-> +				reg = <0x400dc000 0x20>;
-> +				clock-frequency = <50000000>;
-> +				reg-shift = <2>;
-> +				interrupts = <21>;
-> +				status = "okay";
-> +			};
+> reg : operating voltage in microvolt
 
-We often mark stuff like the uart as status="disabled" in the .dtsi file
-and only enable it in the board specific .dts file when it's actually
-connected. For components that are always present and usable, that's
-of course not necessary.
+What happens if there's more than one supply that needs to be varied?
 
-> +
-> +			adc {
-> +				compatible = "simple-bus";
-> +				#address-cells = <2>;
-> +				#size-cells = <1>;
-> +				// 8 64MB chip-selects
-> +				ranges = <0 0 0x00000000 0x4000000	// sdram
-> +					  1 0 0x04000000 0x4000000	// sdram
-> +					  2 0 0x08000000 0x4000000	// reserved
-> +					  3 0 0x0c000000 0x4000000	// flash/localbus
-> +					  4 0 0x10000000 0x4000000	// flash/localbus
-> +					  5 0 0x14000000 0x4000000	// flash/localbus
-> +					  6 0 0x18000000 0x4000000	// flash/localbus
-> +					  7 0 0x1c000000 0x4000000>;	// flash/localbus
-> +
-> +				sdram: memory at 0,0 {
-> +					reg = <0 0 0>;
-> +				};
-> +
-> +				nor: flash at 7,0 {
-> +					reg = <7 0 0x4000000>;
-> +					compatible = "cfi-flash";
-> +					bank-width = <1>;		// 8-bit external flash
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +                                };
-> +                        };
+> tolerance : can be used to calculate required voltage. (optional,
+> can be replaced by other relevant parameter to calculate required
+> voltage)
 
-Nice representation of the external buses. It does seem however that at
-least the nor flash entry is board specific and should be moved into the
-board .dts file.
-I would probably do the same for the memory node, but that one is less
-obvious as it seems that there is not much choice here.
-
-> +			usb0: ehci at 400fc000 {
-> +				compatible = "moschip,mcs814x-ehci", "usb-ehci";
-> +				reg = <0x400fc000 0x74>;
-> +				interrupts = <2>;
-> +			};
-> +
-> +			usb1: ohci at 400fd000 {
-> +				compatible = "moschip,mcs814x-ohci", "ohci-le";
-> +				reg = <0x400fd000 0x74>;
-> +				interrupts = <11>;
-> +			};
-> +
-> +			usb2: ohci at 400fe000 {
-> +				compatible = "moschip,mcs814x-ohci", "ohci-le";
-> +				reg = <0x400fe000 0x74>;
-> +				interrupts = <12>;
-> +			};
-> +
-> +			usb3: otg at 400ff000 {
-> +				compatible = "moschip,msc814x-otg", "usb-otg";
-> +				reg = <0x400ff000 0x1000>;
-> +				interrupts = <13>;
-> +			};
-
-same comment as for the uart, I would mark these as disabled and only
-enable the ones that are connected on a give board.
-
-> +
-> +static void __init mcs814x_dt_device_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +	mcs814x_init_machine();
-> +}
-> +
-> +static const char *mcs8140_dt_board_compat[] __initdata = {
-> +	"moschip,mcs8140",
-> +	NULL,	/* sentinel */
-> +};
-> +
-> +DT_MACHINE_START(mcs8140_dt, "Moschip MCS8140 board")
-> +	/* Maintainer: Florian Fainelli <florian@openwrt.org> */
-> +	.timer		= &mcs814x_timer,
-> +	.map_io		= mcs814x_map_io,
-> +	.init_early	= mcs814x_clk_init,
-> +	.init_irq	= mcs814x_of_irq_init,
-> +	.init_machine	= mcs814x_dt_device_init,
-> +	.restart	= mcs814x_restart,
-> +	.dt_compat	= mcs8140_dt_board_compat,
-> +MACHINE_END
-
-Not much to see here. Just move this into the common.c file. There is no
-need to have a separate board file when all boards use the same one.
-
-	Arnd
+What are the semantics of this field?
