@@ -1,29 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 16 Jul 2012 17:54:39 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP2+: am33xx: Fix the timer fck clock naming
- convention
-In-Reply-To: <1342462158-15998-1-git-send-email-hvaibhav@ti.com>
-References: <1342462158-15998-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1207161754230.28834@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 17 Jul 2012 09:07:39 +0900
+Subject: BAST: update MAINTAINERS entry
+In-Reply-To: <1340619670.1773.162.camel@x61.thuisdomein>
+References: <1340619670.1773.162.camel@x61.thuisdomein>
+Message-ID: <144401cd63b0$2dbd7f80$89387e80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Jul 2012, Vaibhav Hiremath wrote:
-
-> With commit ae6df418a21f3a361c5f9b878e32a8aba4e17692
-> Sub: ARM: OMAP2+: dmtimer: cleanup fclk usage)
-> The Timer functional clock naming convention has changed from
-> gptX_fck => timerXfck, and so as the timer init function
-> in mach-omap2/timer.c.
-> OMAP4 clocktree also has changed accordingly.
+Paul Bolle wrote:
 > 
-> AM33xx Clock Tree has been merged during rc3-4 timeframe,
-> before above commit got merged, so similar change is required
-> for AM33xx as well (Change the gptX_fck => timerX_fck).
+> Commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410: move
+> mach-s3c2410/* into mach-s3c24xx/") moved the three files mentioned in
+> the "SIMTEC EB2410ITX (BAST)" MAINTAINERS entry to the arch/arm/s3c24xx
+> directory. Update that entry accordingly.
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+>  MAINTAINERS |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index eb22272..df09359 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6145,9 +6145,9 @@ P:	Vincent Sanders <vince@simtec.co.uk>
+>  M:	Simtec Linux Team <linux@simtec.co.uk>
+>  W:	http://www.simtec.co.uk/products/EB2410ITX/
+>  S:	Supported
+> -F:	arch/arm/mach-s3c2410/mach-bast.c
+> -F:	arch/arm/mach-s3c2410/bast-ide.c
+> -F:	arch/arm/mach-s3c2410/bast-irq.c
+> +F:	arch/arm/mach-s3c24xx/mach-bast.c
+> +F:	arch/arm/mach-s3c24xx/bast-ide.c
+> +F:	arch/arm/mach-s3c24xx/bast-irq.c
+> 
+>  TI DAVINCI MACHINE SUPPORT
+>  M:	Sekhar Nori <nsekhar@ti.com>
+> --
+> 1.7.7.6
 
-Thanks, this looks like 3.6-rc material, right?
+OK, looks good to me, but I'm not sure Simtec Linux Team and Vincent are still supporting BAST?
 
+Thanks.
 
-- Paul
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
