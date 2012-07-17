@@ -1,50 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 17 Jul 2012 09:07:39 +0900
-Subject: BAST: update MAINTAINERS entry
-In-Reply-To: <1340619670.1773.162.camel@x61.thuisdomein>
-References: <1340619670.1773.162.camel@x61.thuisdomein>
-Message-ID: <144401cd63b0$2dbd7f80$89387e80$%kim@samsung.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 16 Jul 2012 17:12:28 -0700
+Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
+In-Reply-To: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120717001228.GA28886@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
+On 20120716-16:46, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410: move
-> mach-s3c2410/* into mach-s3c24xx/") moved the three files mentioned in
-> the "SIMTEC EB2410ITX (BAST)" MAINTAINERS entry to the arch/arm/s3c24xx
-> directory. Update that entry accordingly.
+> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
+> compiling with OF && !COMMON_CLK is broken.
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
->  MAINTAINERS |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index eb22272..df09359 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6145,9 +6145,9 @@ P:	Vincent Sanders <vince@simtec.co.uk>
->  M:	Simtec Linux Team <linux@simtec.co.uk>
->  W:	http://www.simtec.co.uk/products/EB2410ITX/
->  S:	Supported
-> -F:	arch/arm/mach-s3c2410/mach-bast.c
-> -F:	arch/arm/mach-s3c2410/bast-ide.c
-> -F:	arch/arm/mach-s3c2410/bast-irq.c
-> +F:	arch/arm/mach-s3c24xx/mach-bast.c
-> +F:	arch/arm/mach-s3c24xx/bast-ide.c
-> +F:	arch/arm/mach-s3c24xx/bast-irq.c
-> 
->  TI DAVINCI MACHINE SUPPORT
->  M:	Sekhar Nori <nsekhar@ti.com>
-> --
-> 1.7.7.6
 
-OK, looks good to me, but I'm not sure Simtec Linux Team and Vincent are still supporting BAST?
+Hi Rob,
 
-Thanks.
+Thanks for sending this quickly.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+<snip>
+> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+>  struct device_node;
+>  struct of_phandle_args;
+>  
+> -#ifdef CONFIG_OF
+> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+>  struct clk *of_clk_get(struct device_node *np, int index);
+>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  #else
+>  static inline struct clk *of_clk_get(struct device_node *np, int index)
+>  {
+> -	return NULL;
+> +	return ERR_PTR(-EINVAL);
+
+This change seems unrelated?
+
+>  }
+>  static inline struct clk *of_clk_get_by_name(struct device_node *np,
+>  					     const char *name)
+>  {
+> -	return NULL;
+> +	return ERR_PTR(-EINVAL);
+
+Ditto.
+
+Thanks,
+Mike
+
+>  }
+>  #endif
+>  
+> -- 
+> 1.7.9.5
+> 
