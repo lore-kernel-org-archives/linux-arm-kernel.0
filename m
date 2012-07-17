@@ -1,94 +1,39 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Tue, 17 Jul 2012 17:16:10 +0300
-Subject: [PATCH 2/2] mmc: mxs-mmc: fix deadlock caused by recursion loop
-In-Reply-To: <1342534570-8293-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1342534570-8293-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <1342534570-8293-3-git-send-email-lauri.hintsala@bluegiga.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Jul 2012 15:22:22 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <50057058.2060002@linaro.org>
+References: <5003FB7C.4030509@linaro.org>
+ <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
+ <20120717133550.GC4477@opensource.wolfsonmicro.com>
+ <50057058.2060002@linaro.org>
+Message-ID: <20120717142222.GE4477@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Release the lock before mmc_signal_sdio_irq is called by
-mxs_mmc_enable_sdio_irq.
+On Tue, Jul 17, 2012 at 03:02:00PM +0100, Lee Jones wrote:
 
-Backtrace:
-[   65.470000] =============================================
-[   65.470000] [ INFO: possible recursive locking detected ]
-[   65.470000] 3.5.0-rc5 #2 Not tainted
-[   65.470000] ---------------------------------------------
-[   65.470000] ksdioirqd/mmc0/73 is trying to acquire lock:
-[   65.470000]  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
-[   65.470000]
-[   65.470000] but task is already holding lock:
-[   65.470000]  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
-[   65.470000]
-[   65.470000] other info that might help us debug this:
-[   65.470000]  Possible unsafe locking scenario:
-[   65.470000]
-[   65.470000]        CPU0
-[   65.470000]        ----
-[   65.470000]   lock(&(&host->lock)->rlock#2);
-[   65.470000]   lock(&(&host->lock)->rlock#2);
-[   65.470000]
-[   65.470000]  *** DEADLOCK ***
-[   65.470000]
-[   65.470000]  May be due to missing lock nesting notation
-[   65.470000]
-[   65.470000] 1 lock held by ksdioirqd/mmc0/73:
-[   65.470000]  #0:  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
-[   65.470000]
-[   65.470000] stack backtrace:
-[   65.470000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c005ccb8>] (__lock_acquire+0x14f8/0x1b98)
-[   65.470000] [<c005ccb8>] (__lock_acquire+0x14f8/0x1b98) from [<c005d3f8>] (lock_acquire+0xa0/0x108)
-[   65.470000] [<c005d3f8>] (lock_acquire+0xa0/0x108) from [<c02f671c>] (_raw_spin_lock_irqsave+0x48/0x5c)
-[   65.470000] [<c02f671c>] (_raw_spin_lock_irqsave+0x48/0x5c) from [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc])
-[   65.470000] [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]) from [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc])
-[   65.470000] [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc]) from [<c0219b38>] (sdio_irq_thread+0x1bc/0x274)
-[   65.470000] [<c0219b38>] (sdio_irq_thread+0x1bc/0x274) from [<c003c324>] (kthread+0x8c/0x98)
-[   65.470000] [<c003c324>] (kthread+0x8c/0x98) from [<c00101ac>] (kernel_thread_exit+0x0/0x8)
-[   65.470000] BUG: spinlock lockup suspected on CPU#0, ksdioirqd/mmc0/73
-[   65.470000]  lock: 0xc3358724, .magic: dead4ead, .owner: ksdioirqd/mmc0/73, .owner_cpu: 0
-[   65.470000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c01b46b0>] (do_raw_spin_lock+0x100/0x144)
-[   65.470000] [<c01b46b0>] (do_raw_spin_lock+0x100/0x144) from [<c02f6724>] (_raw_spin_lock_irqsave+0x50/0x5c)
-[   65.470000] [<c02f6724>] (_raw_spin_lock_irqsave+0x50/0x5c) from [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc])
-[   65.470000] [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]) from [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc])
-[   65.470000] [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc]) from [<c0219b38>] (sdio_irq_thread+0x1bc/0x274)
-[   65.470000] [<c0219b38>] (sdio_irq_thread+0x1bc/0x274) from [<c003c324>] (kthread+0x8c/0x98)
-[   65.470000] [<c003c324>] (kthread+0x8c/0x98) from [<c00101ac>] (kernel_thread_exit+0x0/0x8)
+> I'm sure sure this is relevant in the current case though, as the
+> i2c properties proposed here are platform specific. What we're
 
-Reported-by: Attila Kinali <attila@kinali.ch>
-Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/mxs-mmc.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I've not seen the specific example (though fankly it seems quite
+surprising that there's anything other than bus speed that the platform
+might want to configure for I2C...).
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 20a0550..e1fd2c8 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -637,11 +637,6 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
- 		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
- 		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
--
--		if (readl(host->base + HW_SSP_STATUS(host)) &
--				BM_SSP_STATUS_SDIO_IRQ)
--			mmc_signal_sdio_irq(host->mmc);
--
- 	} else {
- 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
- 		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
-@@ -650,6 +645,11 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	}
- 
- 	spin_unlock_irqrestore(&host->lock, flags);
-+
-+	if (enable && readl(host->base + HW_SSP_STATUS(host)) &
-+			BM_SSP_STATUS_SDIO_IRQ)
-+		mmc_signal_sdio_irq(host->mmc);
-+
- }
- 
- static const struct mmc_host_ops mxs_mmc_ops = {
--- 
-1.7.9.5
+> discussing is some consolidation of property names, which I do
+> support in theory. What I fear is that this driver will lack Device
+> Tree functionality for yet another kernel version if it isn't
+> resolved quickly.
+
+Well, if checking the DT checky box is the important thing then just
+adding an of_match_table ought to be enough?  It's fairly common for
+platform data to have lots of stuff that's not used by most systems
+so you can often cover 90% of systems with a very small subset of the 
+configurability.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120717/d6cb8b1b/attachment.sig>
