@@ -1,40 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 14:31:15 +0000
-Subject: [RFC PATCH 00/12] ARM: Decompressor multiplatform support
-In-Reply-To: <20120715024408.747946928@gmail.com>
-References: <20120715024408.747946928@gmail.com>
-Message-ID: <201207171431.16111.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Jul 2012 15:37:54 +0100
+Subject: Device tree binding for DVFS table
+In-Reply-To: <50057514.5070501@nvidia.com>
+References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
+ <4FFE4DD0.7020407@nvidia.com> <50035582.9070308@gmail.com>
+ <CAJOA=zMKE1Z_AsYeWr22k58EDskx0eshEjv9VbLQHKFsA0uThw@mail.gmail.com>
+ <50055C83.7060700@nvidia.com>
+ <20120717132032.GD27595@sirena.org.uk>
+ <50057514.5070501@nvidia.com>
+Message-ID: <20120717143754.GB3107@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 July 2012, Domenico Andreoli wrote:
-> My intent is to get rid of uncompress.h and prepare the decompressor
-> to dynamically select the various machine specific decompressor init
-> steps, included the selection of the appropriate console driver.
-> 
-> Currently the mainline kernel defines these steps statically and indeed
-> has some trouble to boot on different boards with the same binary.
-> 
-> What this patch does is allowing the four functions (arch_decomp_setup,
-> arch_error, putc and flush) currently used to define such static steps
-> to be packed in quantity and to be selected/executed by the decompressor
-> accordingly to the machid or DT passed by the boot loader.
+On Tue, Jul 17, 2012 at 07:52:12PM +0530, Prashant Gaikwad wrote:
 
-I definitely like the implementation, it looks very nicely done with the
-driver specific code being right inside of the actual device drivers.
+> >What happens if there's more than one supply that needs to be varied?
 
-I think the main question we have to answer is whether we want to go
-this far for the decompressor output. IIRC the last time this was
-debated, the argument was made (I don't remember if it was by Russell
-or someone else) that the decompressor code is designed to be as simple
-as possible and we should add too much complexity in it that would make
-it harder to debug when the only purpose of that code is to debug the
-decompressor code itself.
+> Each rail's dvfs-table will have OPP nodes defined for different
+> voltages and each OPP node contains frequency for all clocks
+> affecting that rail.
 
-I find it hard to judge what the benefit of your implementation is
-compared to the risk of introducing bugs.
-
-The other part I don't understand is how it relates to the
-early_print() infrastructure that has some of the same requirements.
-
-	Arnd
+Right, but some systems have operating points which cover a combination
+of voltages and frequencies in one operating point.  Your binding seems
+to define operating points per supply with no tie in between supplies.
