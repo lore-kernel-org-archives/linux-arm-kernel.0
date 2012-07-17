@@ -1,66 +1,116 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 17 Jul 2012 16:42:49 +0200
-Subject: [PATCH] ARM i.MX53: register CAN clocks
-Message-ID: <1342536169-3878-1-git-send-email-s.trumtrar@pengutronix.de>
+From: dinguyen@altera.com (Dinh.Nguyen)
+Date: Tue, 17 Jul 2012 09:44:22 -0600
+Subject: [RFC PATCHv2 2/2] ARM: socfpga: Add board support for Altera's
+ SOCFPGA  Cyclone 5 HW
+In-Reply-To: <20120717091343.1eb8939d@skate>
+References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
+ <1342113976-27140-3-git-send-email-dinguyen@altera.com>
+ <20120717091343.1eb8939d@skate>
+Message-ID: <1342539862.13530.2.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Tue, 2012-07-17 at 09:13 +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> Le Thu, 12 Jul 2012 12:26:16 -0500,
+> <dinguyen@altera.com> a ?crit :
+> 
+> > diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > new file mode 100644
+> > index 0000000..710c773
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > @@ -0,0 +1,118 @@
+> > +/*
+> > + *  Copyright (C) 2012 Altera Corporation <www.altera.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +/include/ "socfpga.dtsi"
+> > +
+> > +/ {
+> > +	model = "Altera SOCFPGA Cyclone V";
+> > +	compatible = "altr,socfpga-cyclone5";
+> > +
+> > +	aliases {
+> > +		ethernet0 = &gmac0;
+> > +		serial0 = &uart0;
+> > +		serial1 = &uart1;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,57600";
+> > +	};
+> > +
+> > +	memory {
+> > +		name = "memory";
+> > +		device_type = "memory";
+> > +		reg = <0x0 0x10000000>; /* 256MB */
+> > +	};
+> > +
+> > +	soc {
+> > +		amba {
+> > +			compatible = "arm,amba-bus";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges;
+> > +
+> > +			pdma: pdma at ffe01000 {
+> > +				compatible = "arm,pl330", "arm,primecell";
+> > +				reg = <0xffe01000 0x1000>;
+> > +				interrupts = <0 180 4>;
+> > +			};
+> > +		};
+> > +
+> > +		apb_periphs {
+> > +			compatible = "simple-bus";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges;
+> > +
+> > +			uart0: uart at ffc02000 {
+> > +				compatible = "snps,dw-apb-uart";
+> > +				reg = <0xffc02000 0x1000>;
+> > +				clock-frequency = <7372800>;
+> > +				interrupts = <0 162 4>;
+> > +				reg-shift = <2>;
+> > +				reg-io-width = <4>;
+> > +			};
+> > +
+> > +		timer0: timer at ffc08000 {
+> > +				compatible = "snps,dw-apb-timer-sp";
+> > +				interrupts = <0 167 4>;
+> > +				clock-frequency = <200000000>;
+> > +				reg = <0xffc08000 0x1000>;
+> > +			};
+> 
+> There is an indentation problem here, the timer0 (and the following)
+> should be at the same level as uart0.
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+Will fix..
 
-This adds the clocks for the flexcans on the imx53.
+> 
+> Also, are all those peripherals (uarts, timers) really board-specific?
+> I.e, are they synthesized on the FPGA part, or are they part of the ARM
+> SoC, in which case they should be listed in the .dtsi and not in
+> the .dts.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx51-imx53.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index a2200c7..37eb420 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -49,6 +49,7 @@ static const char *mx53_tve_ext_sel[] = { "pll4_sw", "ckih1", };
- static const char *tve_sel[] = { "tve_pred", "tve_ext_sel", };
- static const char *ipu_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb", };
- static const char *vpu_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb", };
-+static const char *mx53_can_sel[] = { "ipg", "ckih1", "ckih2", "lp_apm", };
- 
- enum imx5_clks {
- 	dummy, ckil, osc, ckih1, ckih2, ahb, ipg, axi_a, axi_b, uart_pred,
-@@ -81,6 +82,7 @@ enum imx5_clks {
- 	ssi1_root_podf, ssi2_root_pred, ssi2_root_podf, ssi_ext1_pred,
- 	ssi_ext1_podf, ssi_ext2_pred, ssi_ext2_podf, ssi1_root_gate,
- 	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
-+	can_sel, can1_serial_gate, can1_ipg_gate,
- 	clk_max
- };
- 
-@@ -411,8 +413,12 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk[esdhc4_per_gate] = imx_clk_gate2("esdhc4_per_gate", "esdhc_d_sel", MXC_CCM_CCGR3, 14);
- 	clk[usb_phy1_gate] = imx_clk_gate2("usb_phy1_gate", "usb_phy_sel", MXC_CCM_CCGR4, 10);
- 	clk[usb_phy2_gate] = imx_clk_gate2("usb_phy2_gate", "usb_phy_sel", MXC_CCM_CCGR4, 12);
--	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "ipg", MXC_CCM_CCGR4, 6);
--	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
-+	clk[can_sel] = imx_clk_mux("can_sel", MXC_CCM_CSCMR2, 6, 2,
-+				mx53_can_sel, ARRAY_SIZE(mx53_can_sel));
-+	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR6, 22);
-+	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR6, 20);
-+	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 8);
-+	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 6);
- 	clk[i2c3_gate] = imx_clk_gate2("i2c3_gate", "per_root", MXC_CCM_CCGR1, 22);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
-@@ -445,6 +451,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "63fcc000.ssi");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "50014000.ssi");
- 	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "63fd0000.ssi");
-+	clk_register_clkdev(clk[can1_ipg_gate], "ipg", "53fc8000.can");
-+	clk_register_clkdev(clk[can1_serial_gate], "per", "53fc8000.can");
-+	clk_register_clkdev(clk[can2_ipg_gate], "ipg", "53fcc000.can");
-+	clk_register_clkdev(clk[can2_serial_gate], "per", "53fcc000.can");
- 
- 	/* set SDHC root clock to 200MHZ*/
- 	clk_set_rate(clk[esdhc_a_podf], 200000000);
--- 
-1.7.10.4
+Agreed. The peripherals are just part of the ARM SoC. 
+> 
+> Best regards,
+> 
+> Thomas
