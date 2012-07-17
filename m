@@ -1,54 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Jul 2012 15:02:00 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-In-Reply-To: <20120717133550.GC4477@opensource.wolfsonmicro.com>
-References: <5003FB7C.4030509@linaro.org>
- <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
- <20120717133550.GC4477@opensource.wolfsonmicro.com>
-Message-ID: <50057058.2060002@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 14:03:43 +0000
+Subject: [PATCH 0/3 V2] Initial PXA DT bindings
+In-Reply-To: <500568F0.8000202@gmail.com>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+ <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
+ <500568F0.8000202@gmail.com>
+Message-ID: <201207171403.43689.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/12 14:35, Mark Brown wrote:
-> On Tue, Jul 17, 2012 at 02:30:01PM +0100, Lee Jones wrote:
->> On 17/07/12 14:06, Mark Brown wrote:
->
->>> It's not just about having generic bindings, it's also about having
->>> bindings which have some abstraction and hope of reusability. An awful
->>> lot of bindings are just straight dumps of Linux data structures into
->>> the device tree which don't make a terribly great deal of sense as
->>> bindings.
->
->> The Device Tree should supply any platform configuration which the
->> driver needs in order to correctly setup for a particular machine.
->> This is exactly what the platform_data structure did before, hence
->> is is reasonable to assume that whatever information resides in that
->> structure would be required in the Device Tree.
->
-> An *awful* lot of what people are trying to put into platform data is
-> nothing to do with that, it's just the generic data the driver needs to
-> be able to understand the hardware at all.  Things like the MFD
-> breakdown, random parameters of the hardware which you can infer from
-> the device name and so on.
+On Tuesday 17 July 2012, Daniel Mack wrote:
+> I wonder what happend to this patch series. I can't seem to find the
+> patches in mainline, although it's more than 8 months ago when they were
+> discussed. And I can't see any reason for rejecting them in the thread
+> either.
 
-I can only speak from a personal perspective on that one. I do _try_ not 
-to put anything in there (platform data or Device Tree), which does not 
-belong. I have no idea how successful that notion was however.
+I agree. The patches look like they were on the right track and then
+just dropped. If you have a vpac270 board, it would be nice if you
+could get them running on a newer kernel and submit them again.
+Of course if Marek is interested in picking up where he left, that
+would also be appreciated.
 
-I'm sure sure this is relevant in the current case though, as the i2c 
-properties proposed here are platform specific. What we're discussing is 
-some consolidation of property names, which I do support in theory. What 
-I fear is that this driver will lack Device Tree functionality for yet 
-another kernel version if it isn't resolved quickly.
+> I'd like to extend the support to PXA3xx chips and get rid of some board
+> files in favour of DT. One uncertainty I have about that is clock
+> handling. What's a good migration path to get those bits moved over?
+> From what I can see, when probed solely from the device tree, device
+> names default to their base address, and the dev_id is a globally
+> incrementing counter. Are platforms supposed to provide clock aliases in
+> that form?
 
-Wolfram, are you theorising about these the multiple use of these 
-properties, or do you have some examples? I think we would do well to 
-work on these, or else they're just going to lie dormant and not get done.
+There are three possible ways to handle that:
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1. For the most basic conversion, use an auxdata table to restore the
+original names of all devices and don't touch the clock lookup table.
+
+2. For a platform that has all (or most) boards converted to DT, try
+not to use an auxdata table and use the names from the device tree
+in the clock lookup table.
+
+3. For new platforms and those that want to be up to the latest standards,
+use the common clock framework and put the clock lookup into the device
+tree using the new clock bindings.
+
+For an incremental conversion, starting with the first option is usually
+the easiest.
+
+	Arnd
