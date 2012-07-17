@@ -1,50 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 15:32:55 +0200
-Subject: Device tree.
-In-Reply-To: <4030979.D58EjbuuB0@flexo>
-References: <500552C9.4090107@codethink.co.uk>
- <500556CF.6030704@codethink.co.uk> <20120717142926.05c0c17f@skate>
- <4030979.D58EjbuuB0@flexo>
-Message-ID: <20120717153255.2d171eac@skate>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 17 Jul 2012 19:04:13 +0530
+Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
+In-Reply-To: <50056648.6000906@ti.com>
+References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+ <20120717001228.GA28886@gmail.com> <5004C935.4050707@gmail.com>
+ <50056648.6000906@ti.com>
+Message-ID: <500569D5.3020508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 17 Jul 2012 14:41:35 +0200,
-Florian Fainelli <florian@openwrt.org> a ?crit :
+On Tuesday 17 July 2012 06:49 PM, Rajendra Nayak wrote:
+> struct clk *clk_get(struct device *dev, const char *con_id)
+> {
+>          const char *dev_id = dev ? dev_name(dev) : NULL;
+>          struct clk *clk;
+>
+>          if (dev) {
+> ---->
+>      Any reason why this isn't
+>      if (dev->of_node) {
+> ---->
 
-> > What I typically do is generate a zImage, do the appending, and then
-> > generate the uImage manually with mkimage. But I agree it could be
-> > useful to have a 'make uImage.myboard' target which would happen the
-> > myboard.dtb before preparing the uImage.
-> 
-> Appending a given device tree blob to a zImage is something that
-> should be solved outside of the kernel build imho.
-
-Well, both PowerPC and Microblaze, and apparently C6X, have some sort
-of <imageFormat>.<dtbName> make target:
-
-$ make ARCH=microblaze help
-[...]
-  simpleImage.<dt> - ELF image with /boot/dts/<dt>.dts linked in
-                   - stripped elf with fdt blob
-  simpleImage.<dt>.unstrip - full ELF image with fdt blob
-
-$ make ARCH=powerpc help
-[...]
-  cuImage.<dt>    - Backwards compatible U-Boot image for older
-                    versions which do not support device trees
-  dtbImage.<dt>   - zImage with an embedded device tree blob
-  simpleImage.<dt> - Firmware independent image.
-  treeImage.<dt>  - Support for older IBM 4xx firmware (not U-Boot)
-
-$ make ARCH=c6x help
-[...]
-  dtbImage.<dt>   - ELF image with /boot/dts/<dt>.dts linked in
-                  - stripped elf with fdt blob
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Or rather,
+	if (dev && dev->of_node) {
+as Archit just pointed out to me.
