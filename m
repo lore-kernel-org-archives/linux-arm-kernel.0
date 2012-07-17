@@ -1,82 +1,62 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 17 Jul 2012 11:35:20 +0200
+Date: Tue, 17 Jul 2012 11:41:56 +0200
 Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <CACRpkdbxesmgFswBKzAFHUBt-Np7wX0SXXVKrmGzubUN3OVN2w@mail.gmail.com>
+In-Reply-To: <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
 References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
  <201207161554.04812.arnd@arndb.de>
- <CACRpkdbxesmgFswBKzAFHUBt-Np7wX0SXXVKrmGzubUN3OVN2w@mail.gmail.com>
-Message-ID: <3983660.QARsS5NXnS@flexo>
+ <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
+Message-ID: <2442382.A2GKNpPZbv@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012 00:12:01 Linus Walleij wrote:
-> On Mon, Jul 16, 2012 at 5:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> >> +static const struct cpu_mode cpu_modes[] = {
-> >> +     {
-> >> +             .name           = "I2S",
-> >> +             .gpio_start     = 4,
-> >> +             .gpio_end       = 8,
-> >> +     },
-> >> +     {
-> >> +             .name           = "UART",
-> >> +             .gpio_start     = 4,
-> >> +             .gpio_end       = 9,
-> >> +     },
-> >> +     {
-> >> +             .name           = "External MII",
-> >> +             .gpio_start     = 0,
-> >> +             .gpio_end       = 16,
-> >> +     },
-> >> +     {
-> >> +             .name           = "Normal",
-> >> +             .gpio_start     = -1,
-> >> +             .gpio_end       = -1,
-> >> +     },
-> >> +};
-> >> +
-> >> +void __init mcs814x_init_machine(void)
-> >> +{
-> >> +     u32 bs2, cpu_mode;
-> >> +     int gpio;
-> >> +
-> >> +     bs2 = __raw_readl(mcs814x_sysdbg_base + SYSDBG_BS2);
-> >> +     cpu_mode = (bs2 >> CPU_MODE_SHIFT) & CPU_MODE_MASK;
-> >> +
-> >> +     pr_info("CPU mode: %s\n", cpu_modes[cpu_mode].name);
-> >> +
-> >> +     /* request the gpios since the pins are muxed for functionnality */
-> >> +     for (gpio = cpu_modes[cpu_mode].gpio_start;
-> >> +             gpio == cpu_modes[cpu_mode].gpio_end; gpio++) {
-> >> +             if (gpio != -1)
-> >> +                     gpio_request(gpio, cpu_modes[cpu_mode].name);
-> >> +     }
-> >> +}
+Hi Mike,
+
+On Monday 16 July 2012 13:47:01 Turquette, Mike wrote:
+> On Mon, Jul 16, 2012 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+[snip]
+> > board selection.
 > >
-> > This looks like a very simple instance of a pinmux driver. I wonder
-> > if it's worth doing an actual pinctrl driver that knows about these
-> > modes and about the gpio handling of the platform. Maybe Linus Walleij
-> > can comment on that.
+> >> +struct clk {
+> >> +     struct clk *parent;             /* parent clk */
+> >> +     unsigned long rate;             /* clock rate in Hz */
+> >> +     unsigned long divider;          /* clock divider */
+> >> +     u32 usecount;                   /* reference count */
+> >> +     struct clk_ops *ops;            /* clock operation */
+> >> +     u32 enable_reg;                 /* clock enable register */
+> >> +     u32 enable_mask;                /* clock enable mask */
+> >> +};
+> >
+> > Platforms are now converting to the common clock framework in drivers/clk.
+> > Mike Turquette as the subsystem maintainer can probably judge better 
+whether
+> > we should still be allowing new platforms with their own implementation
+> > of clk, but my feeling is that you should use the subsystem instead
+> > and add a driver in a subdirectory of drivers/clk instead of in the
+> > platform.
 > 
-> It is worth, because usually it is not simple at all but these are,
-> as I highly suspect, the first few entries to get the platform up and
-> running. Then it's going to need to add another one, and then
-> another one, and then break it into a separate file, and then it's a
-> custom pin controller implementation all over again
+> Hi Florian & Arnd,
 > 
-> Nothing is forbidding a simple pin controller implementation
-> in drivers/pinctrl, just a few tens of lines is perfectly OK
-> with me.
+> Adopting the new clock framework is highly preferable, especially if
+> MCS814x support is being delayed until 3.7.  There is also a push to
+> put clock drivers into drivers/clk and I would like to continue that
+> trend, but I'm less strict on that measure if it proves very difficult
+> for your platform immediately (e.g. duplicating headers across
+> platform and generic code, etc).  Migrating code from arch/arm to
+> drivers/clk can always be done in a future series.
 
-In this particular case, I do not think it is even worth having a pinctrl 
-driver since the settings are hardwired using bootstrap registers, so we 
-cannot runtime change them afterwards.
+Since we are now targetting 3.7, I would rather come up with proper DT clock 
+bindings, which should make the mcs814x clock driver much nicer.
 
 > 
-> Documentation/pinctrl.txt is the friend at all times.
-> arch/arm/mach-u300/core.c shows how a simple set-up
-> at boot time can be achieved using so-called pinctrl
-> hogs.
-> 
-> Yours,
-> Linus Walleij
+> This platform also seems to be making use of DT so it would be very
+> nice if we use MCS814x to push the state of clk DT bindings and
+> adoption forward a bit.  There are not a lot of folks using the
+> patches from Rob/Grant today.  Hopefully delaying these patches by
+> another merge cycle means that these requests are not asking too much
+> :-)
+
+If we could get them merged during 3.6 that would allow me, and other ARM-soc 
+maintainers to get their stuff fully migrated to DT. Are there any blockers to 
+these patches?
+--
+Florian
