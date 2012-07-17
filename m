@@ -1,33 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Jul 2012 20:57:19 +0200
-Subject: [PATCH -next] random: Remove remaining relicts of
- rand_initialize_irq()
-In-Reply-To: <20120717171251.GD6049@thunk.org>
-References: <1342524793-2522-1-git-send-email-sedat.dilek@gmail.com>
- <20120717171251.GD6049@thunk.org>
-Message-ID: <CACRpkdZe48FrDJx1p8ojfqwVBE95hSJipE8rViAi=E28uumYOQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Jul 2012 19:57:49 +0100
+Subject: Boot breaks in -next from LEGACY to LINEAR conversion
+Message-ID: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 7:12 PM, Theodore Ts'o <tytso@mit.edu> wrote:
-> On Tue, Jul 17, 2012 at 01:33:13PM +0200, Sedat Dilek wrote:
->> rand_initialize_irq() was removed here:
->>
->> commit 946672f548682905d8ecdab33bb6e2c705418505
->> "random: remove rand_initialize_irq()"
->>
->> The AB3100 mfd-driver is the only driver still using it and breaks
->> with the following error-messages in linux-next (next-20120717)
->
-> Oops.  Sorry, I thought I had caught all of the users of
-> rand_initialize_irq().  Thanks for catching this!
->
-> I'll take your advice and merge it into the original commit.
-
-So the IRQ will be auto-sampled now or something?
-
-Sorry for not quite following, which commit do I look at to
-understand this now...
-
-Yours,
-Linus Walleij
+-next fails to boot for me today on my s3c64xx based systems.  Walking
+back to the last time I tried and bisecting likely branches I find that
+commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
+that introduces the build break.  Unfortunately the boot fails before I
+get a console which makes diagnosis somewhat more tricky than would be
+ideal.  Any ideas?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120717/b89437d7/attachment.sig>
