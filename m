@@ -1,78 +1,139 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Mon, 16 Jul 2012 21:43:26 -0300
-Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
-In-Reply-To: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
-References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAAAP30HO=Khku3HeMUSJxwpzUaVBoiC+-jm+RQ4mUGp6_HNS=A@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 16 Jul 2012 18:06:49 -0700
+Subject: [Linaro-mm-sig] [PATCH][RFC] arm: dma-mapping: Add support for
+ allocating/mapping cached buffers
+In-Reply-To: <CAO8GWq=TdUerZp72yiheF3_AfjHUtsypQD-3xajudwodApWM0Q@mail.gmail.com>
+References: <1342202506-12449-1-git-send-email-lauraa@codeaurora.org>
+ <1342202506-12449-2-git-send-email-lauraa@codeaurora.org>
+ <CAO8GWq=TdUerZp72yiheF3_AfjHUtsypQD-3xajudwodApWM0Q@mail.gmail.com>
+Message-ID: <5004BAA9.5070903@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 6:46 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 7/14/2012 6:53 AM, Clark, Rob wrote:
+> On Fri, Jul 13, 2012 at 1:01 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> There are currently no dma allocation APIs that support cached
+>> buffers. For some use cases, caching provides a signficiant
+>> performance boost that beats write-combining regions. Add
+>> apis to allocate and map a cached DMA region.
 >
-> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
-> compiling with OF && !COMMON_CLK is broken.
+> btw, there were recent patches for allocating dma memory without a
+> virtual mapping.  With this you could map however you want to
+> userspace (for example, cached)
+>
+> I'm assuming that you are not needing it to be mapped cached to kernel?
+>
 
-Thanks, Rob.
+Thanks for reminding me about those patches. They don't quite solve the 
+problem as is for two reasons: 1) I'm looking at regular CMA 
+allocations, not iommu allocations which is what the patches covered 2) 
+I do actually need a kernel cached mapping in addition to the userspace 
+mappings.
 
-This fixed the issue for me, but Mike's comments applies.
+I've obviously missed the last DMA rework patches, and I should 
+rebase/rework against those. Is another DMA attribute (DMA_ATTR_CACHED) 
+an acceptable option?
 
-> Reported-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> Reported-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  drivers/clk/clkdev.c |    2 +-
->  include/linux/clk.h  |    7 ++++---
->  2 files changed, 5 insertions(+), 4 deletions(-)
+> BR,
+> -R
 >
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 20649b3..8f87b0f 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -24,7 +24,7 @@
->  static LIST_HEAD(clocks);
->  static DEFINE_MUTEX(clocks_mutex);
->
-> -#ifdef CONFIG_OF
-> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->  struct clk *of_clk_get(struct device_node *np, int index)
->  {
->         struct of_phandle_args clkspec;
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 8b70342..35f7492 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -12,6 +12,7 @@
->  #ifndef __LINUX_CLK_H
->  #define __LINUX_CLK_H
->
-> +#include <linux/err.h>
->  #include <linux/kernel.h>
->  #include <linux/notifier.h>
->
-> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
->  struct device_node;
->  struct of_phandle_args;
->
-> -#ifdef CONFIG_OF
-> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->  struct clk *of_clk_get(struct device_node *np, int index);
->  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
->  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
->  #else
->  static inline struct clk *of_clk_get(struct device_node *np, int index)
->  {
-> -       return NULL;
-> +       return ERR_PTR(-EINVAL);
->  }
->  static inline struct clk *of_clk_get_by_name(struct device_node *np,
->                                              const char *name)
->  {
-> -       return NULL;
-> +       return ERR_PTR(-EINVAL);
->  }
->  #endif
->
-> --
-> 1.7.9.5
->
+
+Thanks,
+Laura
+
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
+>>   arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++++++
+>>   arch/arm/mm/dma-mapping.c          |   21 +++++++++++++++++++++
+>>   2 files changed, 42 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+>> index dc988ff..1565403 100644
+>> --- a/arch/arm/include/asm/dma-mapping.h
+>> +++ b/arch/arm/include/asm/dma-mapping.h
+>> @@ -239,12 +239,33 @@ int dma_mmap_coherent(struct device *, struct vm_area_struct *,
+>>   extern void *dma_alloc_writecombine(struct device *, size_t, dma_addr_t *,
+>>                  gfp_t);
+>>
+>> +/**
+>> + * dma_alloc_cached - allocate cached memory for DMA
+>> + * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>> + * @size: required memory size
+>> + * @handle: bus-specific DMA address
+>> + *
+>> + * Allocate some cached memory for a device for
+>> + * performing DMA.  This function allocates pages, and will
+>> + * return the CPU-viewed address, and sets @handle to be the
+>> + * device-viewed address.
+>> + */
+>> +extern void *dma_alloc_cached(struct device *, size_t, dma_addr_t *,
+>> +               gfp_t);
+>> +
+>>   #define dma_free_writecombine(dev,size,cpu_addr,handle) \
+>>          dma_free_coherent(dev,size,cpu_addr,handle)
+>>
+>> +#define dma_free_cached(dev,size,cpu_addr,handle) \
+>> +       dma_free_coherent(dev,size,cpu_addr,handle)
+>> +
+>>   int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
+>>                  void *, dma_addr_t, size_t);
+>>
+>> +
+>> +int dma_mmap_cached(struct device *, struct vm_area_struct *,
+>> +               void *, dma_addr_t, size_t);
+>> +
+>>   /*
+>>    * This can be called during boot to increase the size of the consistent
+>>    * DMA region above it's default value of 2MB. It must be called before the
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index b1911c4..f396ddc 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -633,6 +633,20 @@ dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_
+>>   }
+>>   EXPORT_SYMBOL(dma_alloc_writecombine);
+>>
+>> +/*
+>> + * Allocate a cached DMA region
+>> + */
+>> +void *
+>> +dma_alloc_cached(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+>> +{
+>> +       return __dma_alloc(dev, size, handle, gfp,
+>> +                          pgprot_kernel,
+>> +                          __builtin_return_address(0));
+>> +}
+>> +EXPORT_SYMBOL(dma_alloc_cached);
+>> +
+>> +
+>> +
+>>   static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>>                      void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>>   {
+>> @@ -664,6 +678,13 @@ int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
+>>   }
+>>   EXPORT_SYMBOL(dma_mmap_writecombine);
+>>
+>> +int dma_mmap_cached(struct device *dev, struct vm_area_struct *vma,
+>> +                         void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>> +{
+>> +       return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
+>> +}
+>> +EXPORT_SYMBOL(dma_mmap_cached);
+>> +
+>>
+>>   /*
+>>    * Free a buffer as defined by the above mapping.
+>> --
+>> 1.7.8.3
+>>
+>>
+>> _______________________________________________
+>> Linaro-mm-sig mailing list
+>> Linaro-mm-sig at lists.linaro.org
+>> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
