@@ -1,51 +1,19 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Tue, 17 Jul 2012 11:12:25 +0300
-Subject: [PATCH] clk: fix clk_get on of_clk_get_by_name return check
-In-Reply-To: <1342361384-21299-1-git-send-email-shawn.guo@linaro.org>
-References: <1342361384-21299-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <50051E69.9090204@bluegiga.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Tue, 17 Jul 2012 09:24:51 +0100
+Subject: [PATCH v2 1/2] ARM: dts: SPEAr320: Fix compatible string
+In-Reply-To: <004cd5118cabfe44e9d5b256684122016a1728f4.1342508737.git.vipulkumar.samar@st.com>
+References: <004cd5118cabfe44e9d5b256684122016a1728f4.1342508737.git.vipulkumar.samar@st.com>
+Message-ID: <CAOh2x==Vn0VG-sQiFp=WxKiwdcB43JBjqjwjyNNaTb0Z7AxfDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the boot issue on mx28evk and apx4devkit.
-
-On 07/15/2012 05:09 PM, Shawn Guo wrote:
-> The commit 766e6a4 (clk: add DT clock binding support) plugs device
-> tree clk lookup of_clk_get_by_name into clk_get, and fall on non-DT
-> lookup clk_get_sys if DT lookup fails.
->
-> The return check on of_clk_get_by_name takes (clk != NULL) as a
-> successful DT lookup.  But it's not the case.  For any system that
-> does not define clk lookup in device tree, ERR_PTR(-ENOENT) will be
-> returned, and consequently, all the client drivers calling clk_get
-> in their probe functions will fail to probe with error code -ENOENT
-> returned.
->
-> Fix the issue by checking of_clk_get_by_name return with !IS_ERR(clk).
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-Tested-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-
-Best regards,
-Lauri Hintsala
-
-
+On Tue, Jul 17, 2012 at 8:09 AM, Vipul Kumar Samar
+<vipulkumar.samar@st.com> wrote:
+> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 > ---
->   drivers/clk/clkdev.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 20649b3..69085e0 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -157,7 +157,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->
->   	if (dev) {
->   		clk = of_clk_get_by_name(dev->of_node, con_id);
-> -		if (clk && __clk_get(clk))
-> +		if (!IS_ERR(clk) && __clk_get(clk))
->   			return clk;
->   	}
->
->
+>  arch/arm/boot/dts/spear320-evb.dts |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+
+For both patches:
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
