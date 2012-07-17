@@ -1,68 +1,75 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Tue, 17 Jul 2012 07:54:39 +0300
-Subject: mmc: mxs: DEADLOCK
-In-Reply-To: <5003AD52.7070304@bluegiga.com>
-References: <4FFC367A.8020100@bluegiga.com>
- <20120711060607.GE14060@S2101-09.ap.freescale.net>
- <20120712160008.03731746cdc5cf4bb0548256@kinali.ch>
- <5003AD52.7070304@bluegiga.com>
-Message-ID: <5004F00F.5000800@bluegiga.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 17 Jul 2012 10:28:41 +0530
+Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
+In-Reply-To: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+Message-ID: <5004F101.7040909@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
-
-Could you review this patch? Attila reported it fixes his SDIO 
-initialization issue.
-
-Lauri
-
-
-On 07/16/2012 08:57 AM, Lauri Hintsala wrote:
->> Any hints how to work around or fix this, would be appreciated
+On Tuesday 17 July 2012 03:16 AM, Rob Herring wrote:
+> From: Rob Herring<rob.herring@calxeda.com>
 >
+> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
+> compiling with OF&&  !COMMON_CLK is broken.
+
+Thanks Rob!!
+
+This patch fixed the build failure for Tegra.
+
+> Reported-by: Alexandre Pereira da Silva<aletes.xgr@gmail.com>
+> Reported-by: Prashant Gaikwad<pgaikwad@nvidia.com>
+> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+> ---
+>   drivers/clk/clkdev.c |    2 +-
+>   include/linux/clk.h  |    7 ++++---
+>   2 files changed, 5 insertions(+), 4 deletions(-)
 >
-> Does this patch fix your issue?
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 20649b3..8f87b0f 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -24,7 +24,7 @@
+>   static LIST_HEAD(clocks);
+>   static DEFINE_MUTEX(clocks_mutex);
 >
->  >>>>>>>
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -637,11 +637,6 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
-> *mmc, int enable)
->                  host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
->           writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
->                  host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
-> -
-> -        if (readl(host->base + HW_SSP_STATUS(host)) &
-> -                BM_SSP_STATUS_SDIO_IRQ)
-> -            mmc_signal_sdio_irq(host->mmc);
-> -
->       } else {
->           writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
->                  host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
-> @@ -650,6 +645,11 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
-> *mmc, int enable)
->       }
+> -#ifdef CONFIG_OF
+> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
+>   struct clk *of_clk_get(struct device_node *np, int index)
+>   {
+>   	struct of_phandle_args clkspec;
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 8b70342..35f7492 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -12,6 +12,7 @@
+>   #ifndef __LINUX_CLK_H
+>   #define __LINUX_CLK_H
 >
->       spin_unlock_irqrestore(&host->lock, flags);
-> +
-> +    if (enable && readl(host->base + HW_SSP_STATUS(host)) &
-> +            BM_SSP_STATUS_SDIO_IRQ)
-> +        mmc_signal_sdio_irq(host->mmc);
-> +
+> +#include<linux/err.h>
+>   #include<linux/kernel.h>
+>   #include<linux/notifier.h>
+>
+> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+>   struct device_node;
+>   struct of_phandle_args;
+>
+> -#ifdef CONFIG_OF
+> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
+>   struct clk *of_clk_get(struct device_node *np, int index);
+>   struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>   struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>   #else
+>   static inline struct clk *of_clk_get(struct device_node *np, int index)
+>   {
+> -	return NULL;
+> +	return ERR_PTR(-EINVAL);
 >   }
+>   static inline struct clk *of_clk_get_by_name(struct device_node *np,
+>   					     const char *name)
+>   {
+> -	return NULL;
+> +	return ERR_PTR(-EINVAL);
+>   }
+>   #endif
 >
->   static const struct mmc_host_ops mxs_mmc_ops = {
-> <<<<<<<
->
-> mxs_mmc_enable_sdio_irq was called by mmc_signal_sdio_irq.
-> mmc_signal_sdio_irq was called inside spin lock. So the lock was tried
-> to acquire before it was released.
->
->
-> Best regards,
-> Lauri Hintsala
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
