@@ -1,50 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 13:12:06 +0000
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <20120717121640.589780ce@skate>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <201207161554.04812.arnd@arndb.de> <20120717121640.589780ce@skate>
-Message-ID: <201207171312.06987.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Jul 2012 14:10:37 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <20120716123550.GE17435@pengutronix.de>
+References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
+ <20120712131231.GH2194@pengutronix.de>
+ <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
+ <20120716101706.GB17435@pengutronix.de>
+ <CACRpkdY626iYATorphAvg7cQxD2ufysBvXdt3Z644zEuW0wS=w@mail.gmail.com>
+ <20120716123550.GE17435@pengutronix.de>
+Message-ID: <20120717131037.GC27595@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Thomas Petazzoni wrote:
-> Le Mon, 16 Jul 2012 15:54:04 +0000,
-> Arnd Bergmann <arnd@arndb.de> a ?crit :
-> 
-> > > +void mcs814x_restart(char mode, const char *cmd)
-> > > +{
-> > > +   __raw_writel(~(1 << 31), mcs814x_sysdbg_base);
-> > > +}
-> > 
-> > You should generally avoid using __raw_readl etc. and instead use
-> > readl/write or readl_relaxed/writel_relaxed.
-> 
-> I thought that readl/writel and readl_relaxed/writel_relaxed were used
-> for PCI-style access, for which these macros/functions do automatically
-> a conversion from the CPU-endianness to the PCI-endianness
-> (little-endian). Here of course, this the SoC is used little-endian, it
-> will just work because readl/writel will not do any endianness
-> conversion, but if we were on a big-endian machine?
-> 
-> My understanding until now was that __raw_readl/__raw_writel should be
-> used for accesses with native endianness, but apparently, it's more
-> subtle than this. Would you mind expanding a bit on this?
+On Mon, Jul 16, 2012 at 02:35:50PM +0200, Wolfram Sang wrote:
 
-The __raw_* versions are basically only valid if you access a memory
-buffer, such as a video framebuffer. They do the conversion of an
-__iomem pointer into something that can be accessed by the compiler.
+> I do know both sides. I easily agree that we have to find a balance
+> somewhere to meet both interests. Though, currently my impressions from
+> maintaining I2C are:
 
-The non-raw versions have fixed endianess, guarantee that the access
-is done atomically (could be byte-wise otherwise) and that all the
-necessary barriers are used to synchronize against DMA and out-of-order
-execution.
+> a) it is not balanced, but too far on the "let's deploy stuff" side
+> b) developers have a tendency to simply map platform_data to bindings
+>    and are surprised when told this is often not possible
 
-We don't actually have accessors that are CPU-endian and guarantee that
-you can access an MMIO register properly.
+> which adds burden to the maintainers (who sometimes might not even be
+> familiar with devicetree because they are not focused on embedded). And
+> I worry about bindings of unmaintained subsystems.
 
-On powerpc, the convention is that readl/writel should only be used
-to access PCI, but that is for the enhanced error handling, not for
-endianess.
-
-	Arnd
+A issue I'm seeing with some of the subsystems mantained by people who
+don't work on ARM is that they've got the DT message so strongly that
+they're pushing back on people trying to add platform data at all even
+on off SoC things that need to work with non-ARM processors.
