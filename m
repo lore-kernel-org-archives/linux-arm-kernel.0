@@ -1,48 +1,67 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 17 Jul 2012 14:56:33 +0100
-Subject: Device tree.
-In-Reply-To: <50056E22.5040308@gmail.com>
-References: <500552C9.4090107@codethink.co.uk>
- <20120717140100.7c0ae90c@skate> <500556CF.6030704@codethink.co.uk>
- <CAMW5UfZR5qrY4K=ty9HDcd9UqYGtfZitH0CBgDbZWvpAoTve2Q@mail.gmail.com>
- <50056391.3060208@codethink.co.uk>
- <8f3d9be256cbe0feec86cca6aaefd437@codethink.co.uk>
- <50056E22.5040308@gmail.com>
-Message-ID: <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 17 Jul 2012 15:57:55 +0200
+Subject: [PATCH 2/8] ARM: MCS814x: add Device Tree based MCS8140 board
+ support
+In-Reply-To: <201207171353.14070.arnd@arndb.de>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <6873084.DUBYG1ACKX@flexo> <201207171353.14070.arnd@arndb.de>
+Message-ID: <2127715.xEAHMTj091@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/2012 14:52, Rob Herring wrote:
-> On 07/17/2012 08:25 AM, Ben Dooks wrote:
->> On 17/07/2012 14:07, Ian Molton wrote:
->>> On 17/07/12 13:32, Josh Coombs wrote:
->>>> make make target.dtb
->>>> cat arch/arm/boot/target.dtb  >> arch/arm/boot/zImage
->>>> make uImage
->>>
->>> Yick...
->>
->> How about adding a dts=<address> argument to the current
->> command line handling. If this is found, then the system
->> ignores the rest of the atags passed and uses the passed
->> address for the device-tree settings.
->>
->> This means in u-boot, you just need to load the .dts file
->> into place before booting the kernel.
->>
-> You mean dtb...
->
-> But no, we don't need a 3rd boot interface in the kernel. I don't see
-> why cat + mkimage is too hard to run.
+On Tuesday 17 July 2012 13:53:13 Arnd Bergmann wrote:
+> On Tuesday 17 July 2012, Florian Fainelli wrote:
+> > On Tuesday 17 July 2012 13:19:43 Arnd Bergmann wrote:
+> > > On Sunday 15 July 2012, Florian Fainelli wrote:
+> 
+> > > > +			adc {
+> > > > +				compatible = "simple-bus";
+> > > > +				#address-cells = <2>;
+> > > > +				#size-cells = <1>;
+> > > > +				// 8 64MB chip-selects
+> > > > +				ranges = <0 0 0x00000000 0x4000000	// sdram
+> > > > +					  1 0 0x04000000 0x4000000	// sdram
+> > > > +					  2 0 0x08000000 0x4000000	// reserved
+> > > > +					  3 0 0x0c000000 0x4000000	// 
+> > flash/localbus
+> > > > +					  4 0 0x10000000 0x4000000	// 
+> > flash/localbus
+> > > > +					  5 0 0x14000000 0x4000000	// 
+> > flash/localbus
+> > > > +					  6 0 0x18000000 0x4000000	// 
+> > flash/localbus
+> > > > +					  7 0 0x1c000000 0x4000000>;	// 
+> > flash/localbus
+> > > > +
+> > > > +				sdram: memory at 0,0 {
+> > > > +					reg = <0 0 0>;
+> > > > +				};
+> > > > +
+> > > > +				nor: flash at 7,0 {
+> > > > +					reg = <7 0 0x4000000>;
+> > > > +					compatible = "cfi-flash";
+> > > > +					bank-width = <1>;		// 8-bit external 
+> > flash
+> > > > +					#address-cells = <1>;
+> > > > +					#size-cells = <1>;
+> > > > +                                };
+> > > > +                        };
+> > > 
+> > > Nice representation of the external buses. It does seem however that at
+> > > least the nor flash entry is board specific and should be moved into the
+> > > board .dts file.
+> > 
+> > In fact, MCS8140 only supports 8-bit CFI Flash chips, so this really is 
+the 
+> > common point of all MCS8140-based boards. As you can see in the following 
+> > board-specific DTS patches, only the partition layout is different.
+> 
+> But is the flash always connected to bank 7? It looks like you could easily 
+have
+> a NIC on that one and the flash on a different bank.
 
-I suppose we can produce our own build-script
-
-> Now that u-boot has direct support for zImage booting, I doubt 
-> anything
-> uImage building related will ever be accepted into the kernel.
-
-Depends on u-boot, the one we have been supplied doesn't seem to
-have any interest in booting zImages.
-
--- 
-Ben
+In fact, the only constraint is that bank7 is the only one which can be used 
+for an external boot flash. I do not have any problem moving this to the per-
+board DTS file.
+--
+Florian
