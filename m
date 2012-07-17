@@ -1,108 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 09:13:43 +0200
+Date: Tue, 17 Jul 2012 09:20:14 +0200
 Subject: [RFC PATCHv2 2/2] ARM: socfpga: Add board support for Altera's
  SOCFPGA  Cyclone 5 HW
-In-Reply-To: <1342113976-27140-3-git-send-email-dinguyen@altera.com>
+In-Reply-To: <50049916.3080509@gmail.com>
 References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
  <1342113976-27140-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20120717091343.1eb8939d@skate>
+ <50049916.3080509@gmail.com>
+Message-ID: <20120717092014.53392f77@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Le Mon, 16 Jul 2012 17:43:34 -0500,
+Rob Herring <robherring2@gmail.com> a ?crit :
 
-Le Thu, 12 Jul 2012 12:26:16 -0500,
-<dinguyen@altera.com> a ?crit :
+> > diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+> > new file mode 100644
+> > index 0000000..133fc89
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/Kconfig
+> > @@ -0,0 +1,7 @@
+> > +config MACH_SOCFPGA_CYCLONE5
+> > +       bool "SOCFPGA Cyclone5 platform"
+> > +       select COMMON_CLK
+> > +       select HAVE_SMP
+> > +       select PLAT_SOCFPGA_ETH
+> > +       help
+> > +         Include support for the Altera(R) Cyclone5 development platform.
+> 
+> You don't need a config option for a machine with DT.
 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-> new file mode 100644
-> index 0000000..710c773
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-> @@ -0,0 +1,118 @@
-> +/*
-> + *  Copyright (C) 2012 Altera Corporation <www.altera.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "socfpga.dtsi"
-> +
-> +/ {
-> +	model = "Altera SOCFPGA Cyclone V";
-> +	compatible = "altr,socfpga-cyclone5";
-> +
-> +	aliases {
-> +		ethernet0 = &gmac0;
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,57600";
-> +	};
-> +
-> +	memory {
-> +		name = "memory";
-> +		device_type = "memory";
-> +		reg = <0x0 0x10000000>; /* 256MB */
-> +	};
-> +
-> +	soc {
-> +		amba {
-> +			compatible = "arm,amba-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			pdma: pdma at ffe01000 {
-> +				compatible = "arm,pl330", "arm,primecell";
-> +				reg = <0xffe01000 0x1000>;
-> +				interrupts = <0 180 4>;
-> +			};
-> +		};
-> +
-> +		apb_periphs {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			uart0: uart at ffc02000 {
-> +				compatible = "snps,dw-apb-uart";
-> +				reg = <0xffc02000 0x1000>;
-> +				clock-frequency = <7372800>;
-> +				interrupts = <0 162 4>;
-> +				reg-shift = <2>;
-> +				reg-io-width = <4>;
-> +			};
-> +
-> +		timer0: timer at ffc08000 {
-> +				compatible = "snps,dw-apb-timer-sp";
-> +				interrupts = <0 167 4>;
-> +				clock-frequency = <200000000>;
-> +				reg = <0xffc08000 0x1000>;
-> +			};
+Ah, interesting, I was precisely going to send an e-mail today about
+this, because we currently have different cases in tree:
 
-There is an indentation problem here, the timer0 (and the following)
-should be at the same level as uart0.
+ * In mach-tegra/Kconfig, there is one Kconfig option per-board, and
+   then mach-tegra/Makefile.boot contains lines like
+   dtb-$(CONFIG_MACH_<board>) += <board>.dtb. So there is one Kconfig
+   option per-board, and a .dtb generation per-board.
 
-Also, are all those peripherals (uarts, timers) really board-specific?
-I.e, are they synthesized on the FPGA part, or are they part of the ARM
-SoC, in which case they should be listed in the .dtsi and not in
-the .dts.
+ * In mach-at91/Kconfig, there is only one Kconfig option to support
+   all DT-based platforms (CONFIG_MACH_AT91SAM_DT), and
+   mach-at91/Makefile.boot generates the .dtb files for all boards as
+   soon as CONFIG_MACH_AT91SAM_DT is enabled. So very different
+   strategy from mach-tegra.
+
+ * In mach-mxs/Kconfig, there is only one Kconfig option to support all
+   DT-based platforms (MACH_MXS_DT), but the mach-mxs/Makefile.boot
+   does not have any dtb-... += line.
+
+Which approach is the correct one? My feeling would be that the
+mach-at91 approach is the right one, because it doesn't make sense to
+have one Kconfig option per board when we use the device tree. Is this
+correct?
 
 Best regards,
 
