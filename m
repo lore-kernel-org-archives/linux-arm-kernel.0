@@ -1,26 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 20:46:20 +0000
-Subject: [GIT PULL] i.MX clk fixes and updates
-In-Reply-To: <20120717072833.GZ30009@pengutronix.de>
-References: <20120717072833.GZ30009@pengutronix.de>
-Message-ID: <201207172046.20783.arnd@arndb.de>
+Date: Tue, 17 Jul 2012 20:58:28 +0000
+Subject: [GIT PULL] Samsung cleanup-2 for v3.6
+In-Reply-To: <142c01cd639c$2f081800$8d184800$%kim@samsung.com>
+References: <142c01cd639c$2f081800$8d184800$%kim@samsung.com>
+Message-ID: <201207172058.28993.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Sascha Hauer wrote:
-> Hi Arnd, Olof,
+On Monday 16 July 2012, Kukjin Kim wrote:
+> Here is second Samsung cleanup pull request for v3.6.
+> Please pull from: 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/cleanup-samsung-2
 > 
-> Please pull the following i.MX clk fixes and updates for next. Not
-> strictly divided into fixes/features, but all around clk support, hope
-> that's ok.
+> It is related in using common GPIO API and removing unused GPIOs.
+> 
+> If any problems, please let me know.
+> 
 
-Yes, that's all good. I've appled it to the next/clk branch that
-I already have for other clock related changes.
+Very nice series, I've merged it into next/cleanup now.
 
-If you are in a similar situation next time, you can also order the
-patches so that the bug fixes come first so I can apply the patches
-at the bottom to the fixes-non-critical branch in addition to the
-topic branch. If you prefer not to rebase the series though, it's
-also ok to send a topic like this.
+Two general comments on your submissions:
+
+1. Please put the branch name into the same line as the git url, that
+makes it slightly faster for me to copy-and-paste the pull location.
+
+2. If you can, please use signed tags for your pull requests rather
+than branch names. A signed tag means that you can write the text
+for the merge changeset yourself so I don't have to do the description.
+Ideally the signing key should have signatures from other people in the
+keyring so everybody can check the authenticity of the request, but
+just having the changelog there also helps.
 
 	Arnd
