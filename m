@@ -1,19 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 20:40:34 +0000
-Subject: [PATCH] arm: mvebu: generate DTBs for supported SoCs
-In-Reply-To: <1342526360-8417-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1342526360-8417-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201207172040.34835.arnd@arndb.de>
+Date: Tue, 17 Jul 2012 20:46:20 +0000
+Subject: [GIT PULL] i.MX clk fixes and updates
+In-Reply-To: <20120717072833.GZ30009@pengutronix.de>
+References: <20120717072833.GZ30009@pengutronix.de>
+Message-ID: <201207172046.20783.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Thomas Petazzoni wrote:
-> Add the necessary dtb-$(CONFIG_...) entries so that "make dtbs"
-> generates the Device Tree Blobs that correspond to the selected mvebu
-> SoCs.
+On Tuesday 17 July 2012, Sascha Hauer wrote:
+> Hi Arnd, Olof,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Please pull the following i.MX clk fixes and updates for next. Not
+> strictly divided into fixes/features, but all around clk support, hope
+> that's ok.
 
-Applied to next/newsoc branch.
+Yes, that's all good. I've appled it to the next/clk branch that
+I already have for other clock related changes.
+
+If you are in a similar situation next time, you can also order the
+patches so that the bug fixes come first so I can apply the patches
+at the bottom to the fixes-non-critical branch in addition to the
+topic branch. If you prefer not to rebase the series though, it's
+also ok to send a topic like this.
 
 	Arnd
