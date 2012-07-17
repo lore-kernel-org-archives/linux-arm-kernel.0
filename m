@@ -1,75 +1,217 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 17 Jul 2012 10:28:41 +0530
-Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
-In-Reply-To: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
-References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
-Message-ID: <5004F101.7040909@nvidia.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 17 Jul 2012 10:43:29 +0530
+Subject: [PATCH 1/2] drivers: bus: add a new driver for omap-ocp2scp
+In-Reply-To: <1342448023-14438-2-git-send-email-kishon@ti.com>
+References: <1342448023-14438-1-git-send-email-kishon@ti.com>
+ <1342448023-14438-2-git-send-email-kishon@ti.com>
+Message-ID: <CAAe_U6K9sm-sDK80ySSHPGf5SYuwDkhW+4q8r2deXi7Tz3TxJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012 03:16 AM, Rob Herring wrote:
-> From: Rob Herring<rob.herring@calxeda.com>
++Arnd Bergmann
+
+On Mon, Jul 16, 2012 at 7:43 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Adds a new driver *omap-ocp2scp*. This driver takes the responsibility of
+> creating all the devices that is connected to OCP2SCP. In the case of OMAP4,
+> USB2PHY is connected to ocp2scp.
 >
-> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
-> compiling with OF&&  !COMMON_CLK is broken.
-
-Thanks Rob!!
-
-This patch fixed the build failure for Tegra.
-
-> Reported-by: Alexandre Pereira da Silva<aletes.xgr@gmail.com>
-> Reported-by: Prashant Gaikwad<pgaikwad@nvidia.com>
-> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+> This also includes device tree support for ocp2scp driver and
+> the documentation with device tree binding information is updated.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->   drivers/clk/clkdev.c |    2 +-
->   include/linux/clk.h  |    7 ++++---
->   2 files changed, 5 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/bus/omap-ocp2scp.txt       |   10 ++
+>  drivers/Kconfig                                    |    2 +
+>  drivers/Makefile                                   |    2 +
+>  drivers/bus/Kconfig                                |   15 +++
+>  drivers/bus/Makefile                               |    5 +
+>  drivers/bus/omap-ocp2scp.c                         |   98 ++++++++++++++++++++
+>  6 files changed, 132 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+>  create mode 100644 drivers/bus/Kconfig
+>  create mode 100644 drivers/bus/Makefile
+>  create mode 100644 drivers/bus/omap-ocp2scp.c
 >
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 20649b3..8f87b0f 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -24,7 +24,7 @@
->   static LIST_HEAD(clocks);
->   static DEFINE_MUTEX(clocks_mutex);
+> diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> new file mode 100644
+> index 0000000..d2fe064
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> @@ -0,0 +1,10 @@
+> +* OMAP OCP2SCP - ocp interface to scp interface
+> +
+> +properties:
+> +- compatible : Should be "ti,omap-ocp2scp"
+> +- #address-cells, #size-cells : Must be present if the device has sub-nodes
+> +- ranges : the child address space are mapped 1:1 onto the parent address space
+> +- ti,hwmods : must be "ocp2scp_usb_phy"
+> +
+> +Sub-nodes:
+> +All the devices connected to ocp2scp are described using sub-node to ocp2scp
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> index bfc9186..4fe1e4c 100644
+> --- a/drivers/Kconfig
+> +++ b/drivers/Kconfig
+> @@ -2,6 +2,8 @@ menu "Device Drivers"
 >
-> -#ifdef CONFIG_OF
-> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
->   struct clk *of_clk_get(struct device_node *np, int index)
->   {
->   	struct of_phandle_args clkspec;
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 8b70342..35f7492 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -12,6 +12,7 @@
->   #ifndef __LINUX_CLK_H
->   #define __LINUX_CLK_H
+>  source "drivers/base/Kconfig"
 >
-> +#include<linux/err.h>
->   #include<linux/kernel.h>
->   #include<linux/notifier.h>
+> +source "drivers/bus/Kconfig"
+> +
+>  source "drivers/connector/Kconfig"
 >
-> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
->   struct device_node;
->   struct of_phandle_args;
+>  source "drivers/mtd/Kconfig"
+> diff --git a/drivers/Makefile b/drivers/Makefile
+> index 2ba29ff..cac3819 100644
+> --- a/drivers/Makefile
+> +++ b/drivers/Makefile
+> @@ -5,6 +5,8 @@
+>  # Rewritten to use lists instead of if-statements.
+>  #
 >
-> -#ifdef CONFIG_OF
-> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
->   struct clk *of_clk_get(struct device_node *np, int index);
->   struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
->   struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
->   #else
->   static inline struct clk *of_clk_get(struct device_node *np, int index)
->   {
-> -	return NULL;
-> +	return ERR_PTR(-EINVAL);
->   }
->   static inline struct clk *of_clk_get_by_name(struct device_node *np,
->   					     const char *name)
->   {
-> -	return NULL;
-> +	return ERR_PTR(-EINVAL);
->   }
->   #endif
+> +obj-y                          += bus/
+> +
+>  # GPIO must come after pinctrl as gpios may need to mux pins etc
+>  obj-y                          += pinctrl/
+>  obj-y                          += gpio/
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> new file mode 100644
+> index 0000000..6270415
+> --- /dev/null
+> +++ b/drivers/bus/Kconfig
+> @@ -0,0 +1,15 @@
+> +#
+> +# Bus Devices
+> +#
+> +
+> +menu "Bus devices"
+> +
+> +config OMAP_OCP2SCP
+> +       tristate "OMAP OCP2SCP DRIVER"
+> +       help
+> +         Driver to enable ocp2scp module which transforms ocp interface
+> +         protocol to scp protocol. In OMAP4, USB PHY is connected via
+> +         OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+> +         OCP2SCP.
+> +
+> +endmenu
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> new file mode 100644
+> index 0000000..0ec50bc
+> --- /dev/null
+> +++ b/drivers/bus/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for the bus drivers.
+> +#
+> +
+> +obj-$(CONFIG_OMAP_OCP2SCP)     += omap-ocp2scp.o
+> diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
+> new file mode 100644
+> index 0000000..8c3db3a
+> --- /dev/null
+> +++ b/drivers/bus/omap-ocp2scp.c
+> @@ -0,0 +1,98 @@
+> +/*
+> + * omap-ocp2scp.c - transform ocp interface protocol to scp protocol
+> + *
+> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/err.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +
+> +static int ocp2scp_remove_devices(struct device *dev, void *c)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +
+> +       platform_device_unregister(pdev);
+> +
+> +       return 0;
+> +}
+> +
+> +static int __devinit omap_ocp2scp_probe(struct platform_device *pdev)
+> +{
+> +       int                     ret;
+> +       struct device_node      *np = pdev->dev.of_node;
+> +
+> +       if (np) {
+> +               ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
+> +               if (ret) {
+> +                       dev_err(&pdev->dev, "failed to add resources for ocp2scp child\n");
+> +                       goto err0;
+> +               }
+> +       }
+> +       pm_runtime_enable(&pdev->dev);
+> +
+> +       return 0;
+> +
+> +err0:
+> +       device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
+> +
+> +       return ret;
+> +}
+> +
+> +static int __devexit omap_ocp2scp_remove(struct platform_device *pdev)
+> +{
+> +       pm_runtime_disable(&pdev->dev);
+> +       device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
+> +
+> +       return 0;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id omap_ocp2scp_id_table[] = {
+> +       { .compatible = "ti,omap-ocp2scp" },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, omap_usb2_id_table);
+> +#endif
+> +
+> +static struct platform_driver omap_ocp2scp_driver = {
+> +       .probe          = omap_ocp2scp_probe,
+> +       .remove         = __devexit_p(omap_ocp2scp_remove),
+> +       .driver         = {
+> +               .name   = "omap-ocp2scp",
+> +               .owner  = THIS_MODULE,
+> +               .of_match_table = of_match_ptr(omap_ocp2scp_id_table),
+> +       },
+> +};
+> +
+> +static int __init omap_ocp2scp_init(void)
+> +{
+> +       return platform_driver_register(&omap_ocp2scp_driver);
+> +}
+> +arch_initcall(omap_ocp2scp_init);
+> +
+> +static void __exit omap_ocp2scp_exit(void)
+> +{
+> +       platform_driver_unregister(&omap_ocp2scp_driver);
+> +}
+> +module_exit(omap_ocp2scp_exit);
+> +
+> +MODULE_ALIAS("platform: omap-ocp2scp");
+> +MODULE_AUTHOR("Texas Instruments Inc.");
+> +MODULE_DESCRIPTION("OMAP OCP2SCP DRIVER");
+> +MODULE_LICENSE("GPLv2");
+> --
+> 1.7.5.4
 >
