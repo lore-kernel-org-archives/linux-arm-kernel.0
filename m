@@ -1,56 +1,89 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Jul 2012 15:49:58 +0530
-Subject: [PATCH v3 5/6] mmc: dw_mmc: add device tree support
-In-Reply-To: <CAGxe1ZHZr2=127p8X-A12K2-zOyKMOJ0fkx5pWNovVteFfSPwg@mail.gmail.com>
-References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
- <1342097668-25243-6-git-send-email-thomas.abraham@linaro.org>
- <CAGxe1ZHZr2=127p8X-A12K2-zOyKMOJ0fkx5pWNovVteFfSPwg@mail.gmail.com>
-Message-ID: <CAJuYYwTLxEgm3CnPof4ub=XQazJ+PaUG-zk14nGnpBwWsnHMvw@mail.gmail.com>
+From: sedat.dilek@gmail.com (Sedat Dilek)
+Date: Tue, 17 Jul 2012 12:21:17 +0200
+Subject: linux-next: Tree for July 17 (mfd: AB3100 - ab3100_probe:
+ undefined reference to `rand_initialize_irq')
+In-Reply-To: <CA+icZUXjc+13YjoJ6FjDFboX20j3mqHNtvV2Av2-H0My8V2Mgg@mail.gmail.com>
+References: <CA+icZUXjc+13YjoJ6FjDFboX20j3mqHNtvV2Av2-H0My8V2Mgg@mail.gmail.com>
+Message-ID: <CA+icZUW4gNqspcJ1sjBD-3GCVee2VWVV5NPAr6Eo-aZHjp3y+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2012 09:45, Girish K S <girish.shivananjappa@linaro.org> wrote:
-> On 12 July 2012 18:24, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-
-[...]
-
+On Tue, Jul 17, 2012 at 11:47 AM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
+> On Tue, Jul 17, 2012 at 7:41 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>> Hi all,
 >>
->> +#ifdef CONFIG_OF
->> +static struct dw_mci_drv_data synopsis_drv_data = {
->> +       .ctrl_type      = DW_MCI_TYPE_SYNOPSIS,
->> +};
->> +
->> +static const struct of_device_id dw_mci_pltfm_match[] = {
->> +       { .compatible = "snps,dw-mshc",
->> +                       .data = (void *)&synopsis_drv_data, },
->> +       {},
->> +};
->> +MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
->> +#else
->> +static const struct of_device_id dw_mci_pltfm_match[];
-> the #else and a statement can be completely removed if of_match_ptr is
-> used while accessing the dw_mci_pltfm_match in of_match_node function.
->> +#endif
->> +
->>  static int dw_mci_pltfm_probe(struct platform_device *pdev)
->>  {
->>         struct dw_mci *host;
->> @@ -51,6 +67,13 @@ static int dw_mci_pltfm_probe(struct platform_device *pdev)
->>         if (!host->regs)
->>                 goto err_free;
->>         platform_set_drvdata(pdev, host);
->> +
->> +       if (pdev->dev.of_node) {
->> +               const struct of_device_id *match;
->> +               match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
-> can be modified to of_match_node(of_match_pt(dw_mci_pltfm_match),
-> pdev->dev.of_node);
-> This will remove the dummy allocation of variable as mentioned above.
-> Also it will be generic in non dt case.
+>> Changes since 20120716:
+>>
+>> The vfs tree lost its build failure.
+>>
+>> The l2-mtd tree gained a conflict against the mtd tree.
+>>
+>> The battery tree tree lost its build failure.
+>>
+>> The regulator tree gained conflicts against the mfd tree.
+>>
+>> The tty tree lost its build failure but gained another, so I used the
+>> version from next-20120712.
+>>
+>> I have still reverted 3 commits from the signal tree at the request of the
+>> arm maintainer.
+>>
+>> The akpm tree lost a few patches that turned up elsewhere.
+>>
+>
+> From my today's build-log on a Ubuntu/precise AMD64 host:
+> [...]
+>   LD      drivers/video/built-in.o
+>   LD      drivers/built-in.o
+>   LINK    vmlinux
+>   LD      vmlinux.o
+>   MODPOST vmlinux.o
+>   GEN     .version
+>   CHK     include/generated/compile.h
+>   UPD     include/generated/compile.h
+>   CC      init/version.o
+>   LD      init/built-in.o
+> drivers/built-in.o: In function `ab3100_probe':
+> ab3100-core.c:(.devinit.text+0xbf97): undefined reference to
+> `rand_initialize_irq'
+> make[2]: *** [vmlinux] Error 1
+> make[1]: *** [deb-pkg] Error 2
+> make: *** [deb-pkg] Error 2
+>
+> MFD / AB3100 kernel-config settings:
+>
+> CONFIG_AB3100_CORE=y
+> CONFIG_AB3100_OTP=m
+> CONFIG_REGULATOR_AB3100=m
+> CONFIG_RTC_DRV_AB3100=m
+>
+> If you need further informations, please let me know.
+>
+> - Sedat -
 
-Ok. Thanks for the suggestion. I will modify it as per your suggestion.
+[ CC Ted (new random maintainer) ]
 
-Thanks,
-Thomas.
+Is this due to this change?
 
-[...]
+>From 946672f548682905d8ecdab33bb6e2c705418505 Mon Sep 17 00:00:00 2001
+From: Theodore Ts'o <tytso@mit.edu>
+Date: Sat, 14 Jul 2012 20:27:52 -0400
+Subject: [PATCH] random: remove rand_initialize_irq()
+
+With the new interrupt sampling system, we are no longer using the
+timer_rand_state structure in the irq descriptor, so we can stop
+initializing it now.
+
+Signed-off-by: "Theodore Ts'o" <tytso@mit.edu
+
+...looks like AB3100 is the *only* driver still using rand_initialize_irq()...
+
+drivers/mfd/ab3100-core.c:939:  rand_initialize_irq(client->irq);
+
+...but why has random.h still this...?
+
+include/linux/random.h:51:extern void rand_initialize_irq(int irq);
+
+Just thinking "loud"...
+
+- Sedat -
