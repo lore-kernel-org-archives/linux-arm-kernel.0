@@ -1,34 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 14:01:00 +0200
-Subject: Device tree.
-In-Reply-To: <500552C9.4090107@codethink.co.uk>
-References: <500552C9.4090107@codethink.co.uk>
-Message-ID: <20120717140100.7c0ae90c@skate>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 17 Jul 2012 14:01:30 +0200
+Subject: [PATCH] irqdomain: let the output of irq number align from left
+ side
+In-Reply-To: <1342514230-8729-1-git-send-email-jason77.wang@gmail.com>
+References: <1342514230-8729-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20485.21530.841814.172762@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 17 Jul 2012 12:55:53 +0100,
-Ian Molton <ian.molton@codethink.co.uk> a ?crit :
+Hi,
 
-> I've found some references to this in the mailinglist archives but 
-> nothing conclusive.
+Hui Wang writes:
+> Except irq number, the rest columns all align from left side, the
+> output is ugly as following shows,
+> irq    hwirq    chip name        chip data   domain name
+>    29  0x0001d  GIC              0x805e1070  /interrupt-<snip>
+>    34  0x00022  GIC              0x805e1070  /interrupt-<snip>
 > 
-> Whats the recommended way of dealing with devicetree when one is
-> stuck with an unco-operative bootloader?
+> After applying the fix, the output like that,
+> irq    hwirq    chip name        chip data   domain name
+> 29     0x0001d  GIC              0x805e1070  /interrupt-<snip>
+> 34     0x00022  GIC              0x805e1070  /interrupt-<snip>
 > 
-> I've made a small hack (below) to allow me to append a .dtb to the
-> end of the kernel image. I note that other similar hacks have not
-> been picked up, but I can't see why. Or I've missed the one that did
-> get chosen.
+I prefer numbers to be right aligned, because that makes numbers with
+different numbers of digits easier to read.
 
-You surely want to have a look at CONFIG_ARM_APPENDED_DTB, which does
-what you want and is already part of the ARM kernel.
 
-Best regards,
-
-Thomas
+Lothar Wa?mann
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
