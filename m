@@ -1,97 +1,127 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 17 Jul 2012 10:50:56 +0530
-Subject: [PATCH 2/2] [RFC] cpufreq: omap: scale regulator from clk notifier
-In-Reply-To: <1342225001-22962-3-git-send-email-mturquette@linaro.org>
-References: <1342225001-22962-1-git-send-email-mturquette@linaro.org>
- <1342225001-22962-3-git-send-email-mturquette@linaro.org>
-Message-ID: <5004F638.6020301@nvidia.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 17 Jul 2012 07:58:19 +0200
+Subject: [PATCH][RFC] arm: dma-mapping: Add support for allocating/mapping
+ cached buffers
+In-Reply-To: <1342202506-12449-2-git-send-email-lauraa@codeaurora.org>
+References: <1342202506-12449-1-git-send-email-lauraa@codeaurora.org>
+ <1342202506-12449-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <009901cd63e1$2d6445b0$882cd110$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 July 2012 05:46 AM, Mike Turquette wrote:
-> This patch moves direct control of the MPU voltage regulator out of the
-> cpufreq driver .target callback and instead puts that logic into a clock
-> rate change notifier callback.
->
-> The same frequency/voltage lookup via the OPP library is present, except
-> that the calls to regulator_set_voltage are done from the clock
-> framework instead of cpufreq.
->
-> Ideally it would be nice to reduce the .target callback for OMAP's
-> cpufreq driver to a simple call to clk_set_rate.  For now there is still
-> some other stuff needed there (jiffies per loop, rounding the rate, etc
-> etc).
->
-> Not-signed-off-by: Mike Turquette<mturquette@linaro.org>
+Hi Laura,
+
+On Friday, July 13, 2012 8:02 PM Laura Abbott wrote:
+
+> There are currently no dma allocation APIs that support cached
+> buffers. For some use cases, caching provides a signficiant
+> performance boost that beats write-combining regions. Add
+> apis to allocate and map a cached DMA region.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+I agree that there is a need for cached contiguous memory blocks. I see that your patch
+is based on some older version of CMA/dma-mapping code. In v3.5-rc1 CMA has been merged
+to mainline kernel together with DMA-mapping redesign patches, so an attribute approach
+can be used instead of adding new functions to the API. My original idea was to utilize
+the dma_alloc_nonconsistent() call and DMA_ATTR_NONCONSISTENT for allocating/mapping
+cached contiguous buffers, but I didn't have enough time for completing this work. 
+
+The main missing piece is the API for managing cache synchronization on such buffers.
+There is a dma_cache_synch() functions but it is broken from the API point of view. To
+replace it with something better, some additional work is needed for all drivers which
+already use it. Also some work in needed for cleanup dma_alloc_nonconsistent() 
+implementations for all the architectures using dma_map_ops approach. All this is on my
+TODO list, but I currently I'm really busy with other tasks related to CMA (mainly 
+bugfixes for some special use-cases).
+
 > ---
->   drivers/cpufreq/omap-cpufreq.c |  154 +++++++++++++++++++++++++---------------
->   1 file changed, 96 insertions(+), 58 deletions(-)
->
-
-<snip>
-
->
-> -static int __init omap_cpufreq_init(void)
-> +static int mpu_clk_volt_scale_handler(struct notifier_block *nb,
-> +	unsigned long flags, void *data)
->   {
-> -	if (cpu_is_omap24xx())
-> -		mpu_clk_name = "virt_prcm_set";
-> -	else if (cpu_is_omap34xx())
-> -		mpu_clk_name = "dpll1_ck";
-> -	else if (cpu_is_omap44xx())
-> -		mpu_clk_name = "dpll_mpu_ck";
-> +	struct clk_notifier_data *cnd = data;
-> +	unsigned long tol;
-> +	int ret, volt_new, volt_old;
-> +	struct opp *opp;
->
-> -	if (!mpu_clk_name) {
-> -		pr_err("%s: unsupported Silicon?\n", __func__);
-> -		return -EINVAL;
-> +	volt_old = regulator_get_voltage(mpu_reg);
-> +	opp = opp_find_freq_exact(mpu_dev, cnd->new_rate, true);
-> +	volt_new = opp_get_voltage(opp);
+>  arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++++++
+>  arch/arm/mm/dma-mapping.c          |   21 +++++++++++++++++++++
+>  2 files changed, 42 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index dc988ff..1565403 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -239,12 +239,33 @@ int dma_mmap_coherent(struct device *, struct vm_area_struct *,
+>  extern void *dma_alloc_writecombine(struct device *, size_t, dma_addr_t *,
+>  		gfp_t);
+> 
+> +/**
+> + * dma_alloc_cached - allocate cached memory for DMA
+> + * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+> + * @size: required memory size
+> + * @handle: bus-specific DMA address
+> + *
+> + * Allocate some cached memory for a device for
+> + * performing DMA.  This function allocates pages, and will
+> + * return the CPU-viewed address, and sets @handle to be the
+> + * device-viewed address.
+> + */
+> +extern void *dma_alloc_cached(struct device *, size_t, dma_addr_t *,
+> +		gfp_t);
 > +
-> +	tol = volt_new * OPP_TOLERANCE / 100;
+>  #define dma_free_writecombine(dev,size,cpu_addr,handle) \
+>  	dma_free_coherent(dev,size,cpu_addr,handle)
+> 
+> +#define dma_free_cached(dev,size,cpu_addr,handle) \
+> +	dma_free_coherent(dev,size,cpu_addr,handle)
 > +
-> +	/* scaling up?  scale voltage before frequency */
-> +	if (cnd->new_rate>  cnd->old_rate) {
-> +		dev_dbg(mpu_dev, "cpufreq-omap: %d mV -->  %d mV\n",
-> +				volt_old, volt_new);
+>  int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
+>  		void *, dma_addr_t, size_t);
+> 
 > +
-> +		ret = regulator_set_voltage(mpu_reg, volt_new - tol, volt_new + tol);
+> +int dma_mmap_cached(struct device *, struct vm_area_struct *,
+> +		void *, dma_addr_t, size_t);
 > +
-> +		if (ret<  0) {
-> +			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
-> +				 __func__);
-> +			return NOTIFY_BAD;
-> +		}
-> +	}
-> +
-> +	/* scaling down?  scale voltage after frequency */
-> +	if (cnd->new_rate<  cnd->old_rate) {
-> +		dev_dbg(mpu_dev, "cpufreq-omap: %d mV -->  %d mV\n",
-> +				volt_old, volt_new);
-> +
-> +		ret = regulator_set_voltage(mpu_reg, volt_new - tol, volt_new + tol);
-> +
-> +		if (ret<  0) {
-> +			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
-> +				 __func__);
-> +			return NOTIFY_BAD;
-> +		}
->   	}
-
-How are you checking pre and post rate change condition here? Need 
-switch case for event?
-
->
-> +	return NOTIFY_OK;
+>  /*
+>   * This can be called during boot to increase the size of the consistent
+>   * DMA region above it's default value of 2MB. It must be called before the
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index b1911c4..f396ddc 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -633,6 +633,20 @@ dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t
+> *handle, gfp_
+>  }
+>  EXPORT_SYMBOL(dma_alloc_writecombine);
+> 
+> +/*
+> + * Allocate a cached DMA region
+> + */
+> +void *
+> +dma_alloc_cached(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+> +{
+> +	return __dma_alloc(dev, size, handle, gfp,
+> +			   pgprot_kernel,
+> +			   __builtin_return_address(0));
 > +}
-> +
-> +static struct notifier_block mpu_clk_volt_scale_nb = {
-> +	.notifier_call = mpu_clk_volt_scale_handler,
-> +};
+> +EXPORT_SYMBOL(dma_alloc_cached);
 > +
 > +
+> +
+>  static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>  		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>  {
+> @@ -664,6 +678,13 @@ int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
+>  }
+>  EXPORT_SYMBOL(dma_mmap_writecombine);
+> 
+> +int dma_mmap_cached(struct device *dev, struct vm_area_struct *vma,
+> +			  void *cpu_addr, dma_addr_t dma_addr, size_t size)
+> +{
+> +	return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
+> +}
+> +EXPORT_SYMBOL(dma_mmap_cached);
+> +
+> 
+>  /*
+>   * Free a buffer as defined by the above mapping.
+> --
+> 1.7.8.3
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
