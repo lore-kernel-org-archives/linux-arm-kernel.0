@@ -1,35 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 17 Jul 2012 17:18:28 -0400 (EDT)
-Subject: Device tree.
-In-Reply-To: <50057CD2.2060001@codethink.co.uk>
-References: <500552C9.4090107@codethink.co.uk> <50056E22.5040308@gmail.com>
- <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk> <13863985.aH2icoQzEI@flexo>
- <50057CD2.2060001@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1207171712070.9293@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 21:23:17 +0000
+Subject: [RFC PATCHv2 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform.
+In-Reply-To: <1342560692.26186.2.camel@dinh-ubuntu>
+References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
+ <201207171547.58324.arnd@arndb.de> <1342560692.26186.2.camel@dinh-ubuntu>
+Message-ID: <201207172123.17473.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jul 2012, Ian Molton wrote:
-
-> On 17/07/12 15:02, Florian Fainelli wrote:
-> > Depends on u-boot, the one we have been supplied doesn't seem to
-> > have any interest in booting zImages.
-> > In that case you just need to make sure that you produce a valid uImage of
-> > your zImage+dtb appended. This is what I use on old (1.1.6) uboot versions
-> > without any issues.
+On Tuesday 17 July 2012, Dinh.Nguyen wrote:
+> > > +static struct clk apb_pclk = { .rate = 200000000};
+> > > +static struct clk i2c_clk = { .rate = 100000000};
+> > > +static struct clk spim_clk = { .rate = 100000000};
+> > > +static struct clk mpu_pclk = { .rate = SOCFPGA_MPU_PERIHCLK_FREQ_HZ};
+> > > +static struct clk l4_main_clk = { .rate = SOCFPGA_L4_MAIN_CLK};
+> > 
+> > Then move this file into drivers/clk/ using that code.
 > 
-> Thats what my little patch does. It just makes life a bit less painful if
-> you're stuck with a particular bootloader. Its not an uncommon problem.
+> This doesn't quite make sense to me. You want me to move platform
+> specific information to drivers folder? I only see mxs and spear under
+> drivers/clk. Surely, you don't want me to create another socfpga folder
+> under there, or do you?
 
-That pain is the only leverage we have to have you fix the bootloader 
-somehow.  If you prefer or have to bodge around it then you keep the 
-hack for yourself.
+Yes, that was the idea. We're in the process of moving most or all of
+the clock drivers there, and the two that you see there are just the
+start.
 
-We want people to get into the habit of building and distributing a 
-generic kernel image.  Appending a dtb to zImage and/or wrapping it into 
-a uImage should be considered installation steps which are best done 
-outside of the kernel build system.  And they are quite trivial to do as 
-well.
+The distinction between "platform specific code" and "device driver"
+is quite artificial anyway, and we're constantly moving it so that
+we have less platform code.
 
-
-Nicolas
+	Arnd
