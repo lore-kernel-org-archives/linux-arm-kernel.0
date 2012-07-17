@@ -1,31 +1,58 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue, 17 Jul 2012 13:47:49 +0200
-Subject: [PATCH v2 0/4] Clk: SPEAr: Rename clk ids within predefined limit
-In-Reply-To: <20120717103832.GK1994@localhost.localdomain>
-References: <cover.1342411982.git.vipulkumar.samar@st.com>
- <201207170915.14246.arnd@arndb.de>
- <20120717103832.GK1994@localhost.localdomain>
-Message-ID: <201207171347.49721.sr@denx.de>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Tue, 17 Jul 2012 12:55:53 +0100
+Subject: Device tree.
+Message-ID: <500552C9.4090107@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shiraz,
+I've found some references to this in the mailinglist archives but 
+nothing conclusive.
 
-On Tuesday 17 July 2012 12:38:32 Shiraz Hashim wrote:
-> On Tue, Jul 17, 2012 at 09:15:13AM +0000, Arnd Bergmann wrote:
-> > What's the plan for these patches? Are you (either of you) sending a pull
-> > request for v3.6 or are they actually required for v3.5 as well?
-> 
-> Yes they are required (together with other acked fixes) for v3.5,
-> else SPEAr support won't be functional. I hope it is not too late.
-> 
-> We can prepare fixes branch and send across a pull request.
+Whats the recommended way of dealing with devicetree when one is stuck 
+with an unco-operative bootloader?
 
-Could you please also push this patch for 3.5:
+I've made a small hack (below) to allow me to append a .dtb to the end 
+of the kernel image. I note that other similar hacks have not been 
+picked up, but I can't see why. Or I've missed the one that did get chosen.
 
-http://www.spinics.net/lists/arm-kernel/msg174614.html
+TTFN!
 
-Without it, SPEAr600 won't boot as I already mentioned a few times.
+-Ian
 
-Thanks,
-Stefan
+------------------------------- arch/arm/Kconfig 
+-------------------------------
+index 519b5e0..cd82cbc 100644
+@@ -1105,6 +1105,10 @@ source "arch/arm/mach-vt8500/Kconfig"
+
+  source "arch/arm/mach-w90x900/Kconfig"
+
++config EMBEDDED_DTB
++    string "Embedded device tree blob" if OF
++    default ""
++
+  # Definitions to make life easier
+  config ARCH_ACORN
+      bool
+
+---------------------------- arch/arm/boot/Makefile 
+----------------------------
+index c877087..8e43741 100644
+@@ -44,6 +44,9 @@ $(obj)/xipImage: FORCE
+      @echo 'Kernel not configured for XIP (CONFIG_XIP_KERNEL!=y)'
+      @false
+
++#append Device Tree .dtb file after vmlinux
++cmd_do_append_dtb = if [ "$(CONFIG_EMBEDDED_DTB)" != "" ]; then cat 
+$(CONFIG_EMBEDDED_DTB) >> $@ ; fi
++
+  $(obj)/Image: vmlinux FORCE
+      $(call if_changed,objcopy)
+      @echo '  Kernel: $@ is ready'
+@@ -53,6 +56,7 @@ $(obj)/compressed/vmlinux: $(obj)/Image FORCE
+
+  $(obj)/zImage:    $(obj)/compressed/vmlinux FORCE
+      $(call if_changed,objcopy)
++    $(call if_changed,do_append_dtb)
+      @echo '  Kernel: $@ is ready'
+
+  endif
