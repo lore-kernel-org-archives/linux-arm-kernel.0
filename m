@@ -1,127 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 17 Jul 2012 07:58:19 +0200
-Subject: [PATCH][RFC] arm: dma-mapping: Add support for allocating/mapping
- cached buffers
-In-Reply-To: <1342202506-12449-2-git-send-email-lauraa@codeaurora.org>
-References: <1342202506-12449-1-git-send-email-lauraa@codeaurora.org>
- <1342202506-12449-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <009901cd63e1$2d6445b0$882cd110$%szyprowski@samsung.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 17 Jul 2012 11:33:04 +0530
+Subject: [PATCH 2/2] gpio/omap: add *remove* callback in platform_driver
+In-Reply-To: <87ipdnein1.fsf@ti.com>
+References: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
+ <1341997995-14020-3-git-send-email-tarun.kanti@ti.com> <87394xhocn.fsf@ti.com>
+ <CACRpkdZMG_ZHW_eGGrdrJh1SuO_=hOObijzmxG1ob6RoNf_dwg@mail.gmail.com>
+ <87a9z4g9bi.fsf@ti.com>
+ <CACRpkdZxUpQ=a-yQ8b4bnX3S9penPWkxJ+PG2Zi4i9YZibYRiw@mail.gmail.com>
+ <87ipdnein1.fsf@ti.com>
+Message-ID: <CAMQu2gwvPuGBWc+R651EiDqHMcGQEF6SZBNpwJZ=Kxh8hwov2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Mon, Jul 16, 2012 at 10:40 PM, Kevin Hilman <khilman@ti.com> wrote:
+>
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+> > On Thu, Jul 12, 2012 at 7:48 PM, Kevin Hilman <khilman@ti.com> wrote:
+> >
+> >> In the case of OMAP GPIO, unless it's an obvious fix, I would recommend
+> >> you wait at least until you see some acks/tested tags from any of
+> >>
+> >> - Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> - Rajendra Nayak <rnayak@ti.com>
+> >> - Benoit Cousson <b-cousson@ti.com>
+> >>
+> >> or Tony, Paul or myself.
+> >
+> > Instead of trying to store this information in my and Grants brains and
+> > us forgetting it, what about patching MAINTAINERS to reflect the fact
+> > instead? That's better I think, plus I use that file a lot.
+> >
+> >> For major series, I have been collecting/queueing them for Grant after
+> >> ensuring they have been well reviewed and well tested (although I am
+> >> eagerly hoping to hand off this role to someone else.)
+> >
+> > Listing it under your GIT tree in MAINTAINERS for this driver will make
+> > this work better I think.
+> >
+> > One path for OMAP GPIO patches, simple. It's obviously the
+> > ambiguity that cause the trouble. Then you can also decide
+> > on each cycle whether to send these to GPIO or ARM SoC
+> > etc.
+>
+> Yeah, I understand the process, but I've been avoiding doing that
+> because, well, I don't want the job.  I have been trying to get someone
+> else at TI to maintain this driver, but have not been successful.
+>
+> So, until that happens, feel free to queue up the patch below.
+>
+> Santosh, note that I've put you as co-maintainer of this driver.
+>
+No problem Kevin.
 
-On Friday, July 13, 2012 8:02 PM Laura Abbott wrote:
-
-> There are currently no dma allocation APIs that support cached
-> buffers. For some use cases, caching provides a signficiant
-> performance boost that beats write-combining regions. Add
-> apis to allocate and map a cached DMA region.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-
-I agree that there is a need for cached contiguous memory blocks. I see that your patch
-is based on some older version of CMA/dma-mapping code. In v3.5-rc1 CMA has been merged
-to mainline kernel together with DMA-mapping redesign patches, so an attribute approach
-can be used instead of adding new functions to the API. My original idea was to utilize
-the dma_alloc_nonconsistent() call and DMA_ATTR_NONCONSISTENT for allocating/mapping
-cached contiguous buffers, but I didn't have enough time for completing this work. 
-
-The main missing piece is the API for managing cache synchronization on such buffers.
-There is a dma_cache_synch() functions but it is broken from the API point of view. To
-replace it with something better, some additional work is needed for all drivers which
-already use it. Also some work in needed for cleanup dma_alloc_nonconsistent() 
-implementations for all the architectures using dma_map_ops approach. All this is on my
-TODO list, but I currently I'm really busy with other tasks related to CMA (mainly 
-bugfixes for some special use-cases).
-
-> ---
->  arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++++++
->  arch/arm/mm/dma-mapping.c          |   21 +++++++++++++++++++++
->  2 files changed, 42 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index dc988ff..1565403 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -239,12 +239,33 @@ int dma_mmap_coherent(struct device *, struct vm_area_struct *,
->  extern void *dma_alloc_writecombine(struct device *, size_t, dma_addr_t *,
->  		gfp_t);
-> 
-> +/**
-> + * dma_alloc_cached - allocate cached memory for DMA
-> + * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
-> + * @size: required memory size
-> + * @handle: bus-specific DMA address
-> + *
-> + * Allocate some cached memory for a device for
-> + * performing DMA.  This function allocates pages, and will
-> + * return the CPU-viewed address, and sets @handle to be the
-> + * device-viewed address.
-> + */
-> +extern void *dma_alloc_cached(struct device *, size_t, dma_addr_t *,
-> +		gfp_t);
-> +
->  #define dma_free_writecombine(dev,size,cpu_addr,handle) \
->  	dma_free_coherent(dev,size,cpu_addr,handle)
-> 
-> +#define dma_free_cached(dev,size,cpu_addr,handle) \
-> +	dma_free_coherent(dev,size,cpu_addr,handle)
-> +
->  int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
->  		void *, dma_addr_t, size_t);
-> 
-> +
-> +int dma_mmap_cached(struct device *, struct vm_area_struct *,
-> +		void *, dma_addr_t, size_t);
-> +
->  /*
->   * This can be called during boot to increase the size of the consistent
->   * DMA region above it's default value of 2MB. It must be called before the
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index b1911c4..f396ddc 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -633,6 +633,20 @@ dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t
-> *handle, gfp_
->  }
->  EXPORT_SYMBOL(dma_alloc_writecombine);
-> 
-> +/*
-> + * Allocate a cached DMA region
-> + */
-> +void *
-> +dma_alloc_cached(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
-> +{
-> +	return __dma_alloc(dev, size, handle, gfp,
-> +			   pgprot_kernel,
-> +			   __builtin_return_address(0));
-> +}
-> +EXPORT_SYMBOL(dma_alloc_cached);
-> +
-> +
-> +
->  static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
->  		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
->  {
-> @@ -664,6 +678,13 @@ int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
->  }
->  EXPORT_SYMBOL(dma_mmap_writecombine);
-> 
-> +int dma_mmap_cached(struct device *dev, struct vm_area_struct *vma,
-> +			  void *cpu_addr, dma_addr_t dma_addr, size_t size)
-> +{
-> +	return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
-> +}
-> +EXPORT_SYMBOL(dma_mmap_cached);
-> +
-> 
->  /*
->   * Free a buffer as defined by the above mapping.
-> --
-> 1.7.8.3
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Regards
+Santosh
