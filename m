@@ -1,31 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 08:00:42 +0000
-Subject: [PATCH 1/2] drivers: bus: add a new driver for omap-ocp2scp
-In-Reply-To: <CAAe_U6K9sm-sDK80ySSHPGf5SYuwDkhW+4q8r2deXi7Tz3TxJw@mail.gmail.com>
-References: <1342448023-14438-1-git-send-email-kishon@ti.com>
- <1342448023-14438-2-git-send-email-kishon@ti.com>
- <CAAe_U6K9sm-sDK80ySSHPGf5SYuwDkhW+4q8r2deXi7Tz3TxJw@mail.gmail.com>
-Message-ID: <201207170800.43300.arnd@arndb.de>
+Date: Tue, 17 Jul 2012 09:15:13 +0000
+Subject: [PATCH v2 0/4] Clk: SPEAr: Rename clk ids within predefined limit
+In-Reply-To: <CAOh2x=k1YifBUL4Wr78YJQNyLv4i8nOLdCChEHWBJ0thv5u98A@mail.gmail.com>
+References: <cover.1342411982.git.vipulkumar.samar@st.com>
+ <CAOh2x=k1YifBUL4Wr78YJQNyLv4i8nOLdCChEHWBJ0thv5u98A@mail.gmail.com>
+Message-ID: <201207170915.14246.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, ABRAHAM, KISHON VIJAY wrote:
-> On Mon, Jul 16, 2012 at 7:43 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> > Adds a new driver *omap-ocp2scp*. This driver takes the responsibility of
-> > creating all the devices that is connected to OCP2SCP. In the case of OMAP4,
-> > USB2PHY is connected to ocp2scp.
+On Monday 16 July 2012, viresh kumar wrote:
+> 
+> On Mon, Jul 16, 2012 at 5:25 AM, Vipul Kumar Samar
+> <vipulkumar.samar@st.com> wrote:
+> > The max limit of con_id is 16 and dev_id is 20. As of now for all SPEAr SOC's
+> > clk ids are exceeding this predefined limit.
 > >
-> > This also includes device tree support for ocp2scp driver and
-> > the documentation with device tree binding information is updated.
+> > This patch set is intended to rename clk ids through out spear clk framework.
 > >
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > -v2:
+> > -Rename gpt timer parent clk id on spear3xx and spear6xx machine as pll3_48m_clk
+> > is renamed to pll3_clk.
+> >
+> >
+> > Vipul Kumar Samar (4):
+> >   clk:spear1340:Fix: Rename clk ids within predefined limit
+> >   clk:spear1310:Fix: Rename clk ids within predefined limit
+> >   Clk:spear3xx:Fix: Rename clk ids within predefined limit
+> >   Clk:spear6xx:Fix: Rename clk ids within predefined limit
+> 
+> Looks Good.
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Now that we've found a place for the code to live, do we know which maintainer is
-going to pick it up? If nobody else volunteers, we can take it through the
-arm-soc tree.
+What's the plan for these patches? Are you (either of you) sending a pull request
+for v3.6 or are they actually required for v3.5 as well?
 
 	Arnd
