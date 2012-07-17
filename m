@@ -1,71 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 20:35:50 +0200
-Subject: [PATCH] [RFC] arm: add documentation describing Marvell
- families of SoC
-In-Reply-To: <CAMPhdO8jiTwfdk0DkhjdwMbH3Mt6=XXZKhwNH412UfNbodu7Ww@mail.gmail.com>
-References: <1342535201-12907-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAMPhdO8jiTwfdk0DkhjdwMbH3Mt6=XXZKhwNH412UfNbodu7Ww@mail.gmail.com>
-Message-ID: <20120717203550.5a24374a@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Jul 2012 20:40:54 +0200
+Subject: linux-next: Tree for July 17 (mfd: AB3100 - ab3100_probe:
+ undefined reference to `rand_initialize_irq')
+In-Reply-To: <CA+icZUW+Gp9HK-6dzHjtTwSc9RaLD3sV+WPMM-vO3A6fj6frwQ@mail.gmail.com>
+References: <CA+icZUXjc+13YjoJ6FjDFboX20j3mqHNtvV2Av2-H0My8V2Mgg@mail.gmail.com>
+ <CA+icZUW4gNqspcJ1sjBD-3GCVee2VWVV5NPAr6Eo-aZHjp3y+Q@mail.gmail.com>
+ <CA+icZUW+Gp9HK-6dzHjtTwSc9RaLD3sV+WPMM-vO3A6fj6frwQ@mail.gmail.com>
+Message-ID: <CACRpkdbAnBza0Nd4Qw_LinRDa4XVuzUdJFX==YeML2z7H6gzwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 18 Jul 2012 02:01:51 +0800,
-Eric Miao <eric.y.miao@gmail.com> a ?crit :
+On Tue, Jul 17, 2012 at 12:39 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
+> On Tue, Jul 17, 2012 at 12:21 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
+>> ...looks like AB3100 is the *only* driver still using rand_initialize_irq()...
+>>
+>> drivers/mfd/ab3100-core.c:939:  rand_initialize_irq(client->irq);
+>>
+>> ...but why has random.h still this...?
+>>
+>> include/linux/random.h:51:extern void rand_initialize_irq(int irq);
+>>
+>> Just thinking "loud"...
+>>
+>> - Sedat -
+>
+> Is this attached patch OK, Ted?
 
-> This is so useful to Marvell processor new comers, thanks everyone to
-> compile this.
+You're just deleting a line from the AB3100 driver, so I guess you're
+regressing the system since that IRQ will no longer contribute
+to the entropy pool?
 
-You're welcome. Glad to see that this is seen as a useful thing.
+How do we simultaneously make sure that this IRQ is still
+contributing to the entropy?
 
-> The PXA side might need a bit modification though, so for historical reason
-> there is PXA series as originated back from Intel. So there are really those
-> legacy ones:
-> 
->   PXA21x/PXA25x/PXA27x/PXA3xx/PXA93x
-> 
-> The new ones developed after Marvell acquired Intel's XScale biz are:
-> 
->   PXA95x/PXA168/PXA910/MMP2
-> 
-> And among these, they are actually categorized into two flavors:
-> 
->   AP with CP: PXA93x/PXA95X/PXA910
->   AP only without CP: the rest of them
-> 
-> And the ARM cores used are also a bit different:
-> 
->   XScale (Intel's ARMv5te compatible): PXA21x/PXA25x/PXA27x/PXA3xx/PXA93x
->   Marvell's PJ1 (Marvell's ARMv5te compatible): PXA168/PXA910
->   Marvell's PJ4 (Marvell's ARMv7 compatible): PXA95x/MMP2
-> 
-> So these are really a bit complicated, by the end of the day, we would still
-> go the way as Arnd suggested, that to collapse PXA and MMP series into one,
-> so that will be simpler and easier to understand.
-> 
-> Considering the complications here, I would suggest to simply have a single
-> processor line as: PXA/MMP processor line, and list all the processor flavors
-> under, whether it's an AP or a AP+CP could be individually indicated.
-
-Ok, thanks, I'll try to take this into account in the next spin.
-However, I'm not sure about putting them into a single family, because
-what I tried to do until now is to map mach-* directories to the
-families, even if down the road there is a wish to merge some of them.
-
-Maybe you could share some insights on why in the first place mach-pxa
-and mach-mmp were both created? I guess at some point in time there was
-a vision that there were two SoC families with enough differences so
-that it required two mach-* directories. I'd like to document this if
-possible.
-
-Also, do you have more public datasheet links available for those SoCs?
-I think I've gathered all the ones I could find on the Marvell website,
-but there are a lot of missing datasheets.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
