@@ -1,26 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 12:54:09 +0000
-Subject: [PATCH v2 0/4] Clk: SPEAr: Rename clk ids within predefined limit
-In-Reply-To: <20120717103832.GK1994@localhost.localdomain>
-References: <cover.1342411982.git.vipulkumar.samar@st.com>
- <201207170915.14246.arnd@arndb.de>
- <20120717103832.GK1994@localhost.localdomain>
-Message-ID: <201207171254.10210.arnd@arndb.de>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Tue, 17 Jul 2012 18:31:50 +0530
+Subject: [GIT PULL] SPEAr platform fixes over 3.5-rc7
+Message-ID: <20120717130150.GM1994@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Shiraz Hashim wrote:
-> On Tue, Jul 17, 2012 at 09:15:13AM +0000, Arnd Bergmann wrote:
-> > What's the plan for these patches? Are you (either of you) sending a pull request
-> > for v3.6 or are they actually required for v3.5 as well?
-> 
-> Yes they are required (together with other acked fixes) for v3.5,
-> else SPEAr support won't be functional. I hope it is not too late.
-> 
-> We can prepare fixes branch and send across a pull request.
+Hi Arnd,
 
-Yes, please do that. I'll try my best to get it into v3.5, but it's really
-late now, and Linus already complained about too many last-minute changes
-in -rc7.
+Please pull following fixes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
 
-	Arnd
+  Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
+
+from git repository at:
+
+  git://git.stlinux.com/spear/linux-2.6.git for-3.5-spear-fixes
+
+with changes up to b35b8e4e63618f17dc61520515ccdcf10e6d2b57:
+
+  ARM: SPEAr600: Fix timer interrupt definition in spear600.dtsi (2012-07-17 18:04:48 +0530)
+
+----------------------------------------------------------------
+Stefan Roese (1):
+      ARM: SPEAr600: Fix timer interrupt definition in spear600.dtsi
+
+Vipul Kumar Samar (10):
+      clk:spear1340:Fix: Rename clk ids within predefined limit
+      clk:spear1310:Fix: Rename clk ids within predefined limit
+      Clk:spear3xx:Fix: Rename clk ids within predefined limit
+      Clk:spear6xx:Fix: Rename clk ids within predefined limit
+      ARM: SPEAr13xx: Fix Interrupt bindings
+      clk: SPEAr1340: Fix clk enable register for uart1 and i2c1.
+      clk: SPEAr13xx: Add localtimer (twd) clock support
+      Clk: SPEAr1340: Update sys clock parent array
+      ARM: dts: SPEAr320: Fix compatible string
+      ARM: dts: SPEAr320: Boot the board in EXTENDED_MODE
+
+ arch/arm/boot/dts/spear13xx.dtsi    |   11 +-
+ arch/arm/boot/dts/spear320-evb.dts  |    6 +-
+ arch/arm/boot/dts/spear600.dtsi     |    1 +
+ arch/arm/mach-spear3xx/spear3xx.c   |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c   |    2 +-
+ drivers/clk/spear/spear1310_clock.c |  316 ++++++++++++++++++-----------------
+ drivers/clk/spear/spear1340_clock.c |  283 +++++++++++++++----------------
+ drivers/clk/spear/spear3xx_clock.c  |  180 ++++++++++----------
+ drivers/clk/spear/spear6xx_clock.c  |  122 +++++++-------
+ 9 files changed, 459 insertions(+), 464 deletions(-)
+
+--
+regards
+Shiraz
