@@ -1,108 +1,84 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 17 Jul 2012 13:57:46 +0800
-Subject: [PATCH v2] mtd: gpmi: fix the compiler warnings
-In-Reply-To: <1342451569.7270.11.camel@brekeke>
-References: <1342451569.7270.11.camel@brekeke>
-Message-ID: <1342504666-27340-1-git-send-email-b32955@freescale.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 17 Jul 2012 11:41:43 +0530
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
+ to be selected
+In-Reply-To: <5004D78E.4050606@renesas.com>
+References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+ <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+ <4FFE7DB2.4040702@renesas.com>
+ <20120712084432.GA2816@mudshark.cambridge.arm.com>
+ <4FFE9A69.3060301@renesas.com>
+ <4FFEFDE3.5000403@codeaurora.org> <4FFF8509.2050302@renesas.com>
+ <20120713085746.GA18079@mudshark.cambridge.arm.com>
+ <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
+ <20120713111337.GH18079@mudshark.cambridge.arm.com>
+ <5004D78E.4050606@renesas.com>
+Message-ID: <CAMQu2gx9EU4GZ634RKiwD+sg0MoO-FAqc-pPU+HkryX8rXVBjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix the compiler warnings.
+On Tue, Jul 17, 2012 at 8:40 AM, Shinya Kuribayashi
+<shinya.kuribayashi.px@renesas.com> wrote:
+> Will, Stephen and Santosh,
+>
+> On 7/13/2012 8:13 PM, Will Deacon wrote:
+>> I was anticipating that the platform would set the initial loops_per_jiffy
+>> value if it requires udelays before loop calibration and the default of 4k
+>> is wildly off.
+>
+> I overlooked two different lpj setups were involved at hand.
+>
+> First one was, the initial loops_per_jiffy value of 4k was too small for
+> almost all processors running Linux today, so I set up loops_per_jiffy
+> _early_, calculated from the CPU clock speed.  I didn't mentioned this
+> before, sorry for confusion.
+>
+> So my initial loops_per_jiffy is not 4k at this point.  It's optimized
+> for loop-based delay with the CPU running at 1.2GHz (much bigger than
+> default 4k).
+>
+> And later, init_current_timer_delay() got processed.  Actual udelay()
+> behavior switched from loop-based delay to timer-based one immediately,
+> while my loops_per_jiffy was not changed/updated to appropriate value.
+>
+> This is why my udelay()s, used after init_current_timer_delay(), were
+> taking considerable long time to expire.   Note that my initial tests
+> for Will's patchset was done using a loadable module dedicated for
+> udelay tests, that was prepared for 2.6.35/3.0 kernels beforehand.
+>
+> And this time, I confirmed that updating loops_per_jiffy at the same
+> time as lpj_fine, works perfectly as expected for me.
+>
+>> If people need loops_per_jiffy to be updated at the same time as lpj_fine,
+>> I can post that as a separate patch (below) as Russell has merged v2 of these
+>> patches into his delay branch. That said, I'd certainly like to know if this
+>> is actually a real problem (and can't be solved by choosing a compromise value
+>> as the initial loops_per_jiffy). I think Shinya was doing some tests so
+>> I'll wait to see how those went.
+>
+> From my observations:
+>
+> (1) loops_per_jiffy can easily be calculated from the CPU clock speed.
+> If your platform is capable of detecting CPU frequency at run-time,
+> settingi up loops_per_jiffy _early_ can allow you early use of udelay()s.
+>
+> Or even if you don't need udelay() early, setting up lpj_fine (or having
+> calibrate_delay_is_known()) allows you to skip calibrate_delay() later.
+> This is useful and can be applied to both UP and SMP systems.
+>
+> (2) For SMP platforms, if you need ealy use of udelay(), you have to
+> update loops_per_jiffy at the same time as init_current_timer_delay().
+> It could be done in init_current_timer_delay(), or platforms can take
+> care of that, that need udelay() available early.  Either one should be
+> fine with me.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
-v1 --> v2:
-         fix the "no modifiers for allocation" warnings by the smatch
----
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    4 ++--
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   12 ++++++------
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    4 ++--
- 3 files changed, 10 insertions(+), 10 deletions(-)
+Thanks for the detailed explanation. CPU clock detection is indeed the
+nit way to skip the calibration overhead and this was one of the comment
+when I tried to push the skipping of calibration for secondary CPUs.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 6bb0998..2289cf8 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -26,7 +26,7 @@
- #include "gpmi-regs.h"
- #include "bch-regs.h"
- 
--struct timing_threshod timing_default_threshold = {
-+static struct timing_threshod timing_default_threshold = {
- 	.max_data_setup_cycles       = (BM_GPMI_TIMING0_DATA_SETUP >>
- 						BP_GPMI_TIMING0_DATA_SETUP),
- 	.internal_data_setup_in_ns   = 0,
-@@ -738,7 +738,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
- {
- 	struct resources *r = &this->resources;
- 	struct timing_threshod *nfc = &timing_default_threshold;
--	unsigned char  *gpmi_regs = r->gpmi_regs;
-+	void __iomem *gpmi_regs = r->gpmi_regs;
- 	unsigned int   clock_period_in_ns;
- 	uint32_t       reg;
- 	unsigned int   dll_wait_time_in_us;
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 8c0d2f0..7d31321 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -317,7 +317,7 @@ acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
- 	struct platform_device *pdev = this->pdev;
- 	struct resources *res = &this->resources;
- 	struct resource *r;
--	void *p;
-+	void __iomem *p;
- 
- 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
- 	if (!r) {
-@@ -424,8 +424,8 @@ static int __devinit acquire_dma_channels(struct gpmi_nand_data *this)
- 	struct platform_device *pdev = this->pdev;
- 	struct resource *r_dma;
- 	struct device_node *dn;
--	int dma_channel;
--	unsigned int ret;
-+	u32 dma_channel;
-+	int ret;
- 	struct dma_chan *dma_chan;
- 	dma_cap_mask_t mask;
- 
-@@ -732,12 +732,12 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
- 	struct device *dev = this->dev;
- 
- 	/* [1] Allocate a command buffer. PAGE_SIZE is enough. */
--	this->cmd_buffer = kzalloc(PAGE_SIZE, GFP_DMA);
-+	this->cmd_buffer = kzalloc(PAGE_SIZE, GFP_DMA | GFP_KERNEL);
- 	if (this->cmd_buffer == NULL)
- 		goto error_alloc;
- 
- 	/* [2] Allocate a read/write data buffer. PAGE_SIZE is enough. */
--	this->data_buffer_dma = kzalloc(PAGE_SIZE, GFP_DMA);
-+	this->data_buffer_dma = kzalloc(PAGE_SIZE, GFP_DMA | GFP_KERNEL);
- 	if (this->data_buffer_dma == NULL)
- 		goto error_alloc;
- 
-@@ -1527,7 +1527,7 @@ static int gpmi_scan_bbt(struct mtd_info *mtd)
- 	return nand_default_bbt(mtd);
- }
- 
--void gpmi_nfc_exit(struct gpmi_nand_data *this)
-+static void gpmi_nfc_exit(struct gpmi_nand_data *this)
- {
- 	nand_release(&this->mtd);
- 	gpmi_free_dma_buffer(this);
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 1547a60..1f61217 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -24,8 +24,8 @@
- 
- #define GPMI_CLK_MAX 5 /* MX6Q needs five clocks */
- struct resources {
--	void          *gpmi_regs;
--	void          *bch_regs;
-+	void __iomem  *gpmi_regs;
-+	void __iomem  *bch_regs;
- 	unsigned int  bch_low_interrupt;
- 	unsigned int  bch_high_interrupt;
- 	unsigned int  dma_low_channel;
--- 
-1.7.0.4
+Looks like you have a working patch for the clock detection. Will
+you able to post that patch so that this long pending calibration
+for secondary CPUs gets optimized.
+
+Regards
+Santosh
