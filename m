@@ -1,27 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 13:45:56 +0000
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <2808767.4NLQARgpQ0@flexo>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <201207171307.23514.arnd@arndb.de> <2808767.4NLQARgpQ0@flexo>
-Message-ID: <201207171345.56988.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 17 Jul 2012 08:46:27 -0500
+Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
+In-Reply-To: <50056648.6000906@ti.com>
+References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+ <20120717001228.GA28886@gmail.com> <5004C935.4050707@gmail.com>
+ <50056648.6000906@ti.com>
+Message-ID: <50056CB3.90004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Florian Fainelli wrote:
-> On Tuesday 17 July 2012 13:07:23 Arnd Bergmann wrote:
-
-> > But is there much difference between the two? How much code would
-> > actually get built for one chip but not the other? If all the
-> > differences can be run-time detected from the device tree, I
-> > think it's better to not have different compile-time options at
-> > all.
+On 07/17/2012 08:19 AM, Rajendra Nayak wrote:
+> Rob, Mike,
 > 
-> The big difference between the two is actually the CPU core, for MCS8140 they 
-> used a genuine ARM926EJS and for MCS8142 they actually use a FA526 core.
+> On Tuesday 17 July 2012 07:38 AM, Rob Herring wrote:
+>> On 07/16/2012 07:12 PM, Mike Turquette wrote:
+>>> On 20120716-16:46, Rob Herring wrote:
+>>>> From: Rob Herring<rob.herring@calxeda.com>
+>>>>
+>>>> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
+>>>> compiling with OF&&  !COMMON_CLK is broken.
+>>>>
+>>>
+>>> Hi Rob,
+>>>
+>>> Thanks for sending this quickly.
+>>>
+>>> <snip>
+>>>> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const
+>>>> char *alias_dev_name, char *id,
+>>>>   struct device_node;
+>>>>   struct of_phandle_args;
+>>>>
+>>>> -#ifdef CONFIG_OF
+>>>> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
+>>>>   struct clk *of_clk_get(struct device_node *np, int index);
+>>>>   struct clk *of_clk_get_by_name(struct device_node *np, const char
+>>>> *name);
+>>>>   struct clk *of_clk_get_from_provider(struct of_phandle_args
+>>>> *clkspec);
+>>>>   #else
+>>>>   static inline struct clk *of_clk_get(struct device_node *np, int
+>>>> index)
+>>>>   {
+>>>> -    return NULL;
+>>>> +    return ERR_PTR(-EINVAL);
+> 
+> So how is this expected to work on platforms (like OMAP) which have
+> CONFIG_OF enabled but not CONFIG_COMMON_CLK?
+> 
 
-Ok, I see. That probably is enough difference to justify separate Kconfig
-statements, especially since building a combined ARMv4/v5 kernel has some
-overhead compared to supporting just one of the two.
+As I mentioned in my other reply, this really belongs with Shawn's patch
+that changes the return value checking from NULL to err values.
 
-	Arnd
+> Archit has been seeing issues with failed clk_get's in the omap dss
+> driver on linux-next.
+> The clk_gets pass a valid dev pointer and an alias/con-id.
+> 
+> With the $Subject patch, the of_clk_get_by_name() for our builds always
+> returns a ERR_PTR(-EINVAL).
+> 
+> Even if we do get the right of_clk_get_by_name() built in,
+> there is another issue on OMAP where in we have CONFIG_OF
+> enabled/selected by default for all OMAP2+ builds, even when we
+> *do not* pass a dt blob to the kernel.
+> 
+> So would the below code fail in such cases because it expects a
+> valid of_node to be populated for a device (which also has clock
+> information in it)? if CONFIG_OF is set.
+> 
+> struct clk *clk_get(struct device *dev, const char *con_id)
+> {
+>         const char *dev_id = dev ? dev_name(dev) : NULL;
+>         struct clk *clk;
+> 
+>         if (dev) {
+> ---->
+>     Any reason why this isn't
+>     if (dev->of_node) {
+> ---->
+
+dev may be null, we could do (dev && dev->of_node) though. Either way
+the error handling here needs to do the right thing.
+
+>                 clk = of_clk_get_by_name(dev->of_node, con_id);
+>                 if (clk && __clk_get(clk))
+>                         return clk;
+>         }
+> 
+>         return clk_get_sys(dev_id, con_id);
+> }
+> 
+> regards,
+> Rajendra
+> 
+> 
+> 
+> 
+> 
