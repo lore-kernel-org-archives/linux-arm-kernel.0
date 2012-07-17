@@ -1,33 +1,80 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Jul 2012 14:10:37 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <20120716123550.GE17435@pengutronix.de>
-References: <20120710164130.f38e4d1673f925ddb13914c9@canb.auug.org.au>
- <20120712131231.GH2194@pengutronix.de>
- <CACRpkdboeF_G=sTPeSyuZ6KGLCmGSKx_NS=6Rim6HkR2f9=AAQ@mail.gmail.com>
- <20120716101706.GB17435@pengutronix.de>
- <CACRpkdY626iYATorphAvg7cQxD2ufysBvXdt3Z644zEuW0wS=w@mail.gmail.com>
- <20120716123550.GE17435@pengutronix.de>
-Message-ID: <20120717131037.GC27595@sirena.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 17 Jul 2012 18:49:04 +0530
+Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
+In-Reply-To: <5004C935.4050707@gmail.com>
+References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
+ <20120717001228.GA28886@gmail.com> <5004C935.4050707@gmail.com>
+Message-ID: <50056648.6000906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 02:35:50PM +0200, Wolfram Sang wrote:
+Rob, Mike,
 
-> I do know both sides. I easily agree that we have to find a balance
-> somewhere to meet both interests. Though, currently my impressions from
-> maintaining I2C are:
+On Tuesday 17 July 2012 07:38 AM, Rob Herring wrote:
+> On 07/16/2012 07:12 PM, Mike Turquette wrote:
+>> On 20120716-16:46, Rob Herring wrote:
+>>> From: Rob Herring<rob.herring@calxeda.com>
+>>>
+>>> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
+>>> compiling with OF&&  !COMMON_CLK is broken.
+>>>
+>>
+>> Hi Rob,
+>>
+>> Thanks for sending this quickly.
+>>
+>> <snip>
+>>> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+>>>   struct device_node;
+>>>   struct of_phandle_args;
+>>>
+>>> -#ifdef CONFIG_OF
+>>> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
+>>>   struct clk *of_clk_get(struct device_node *np, int index);
+>>>   struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>>>   struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>>>   #else
+>>>   static inline struct clk *of_clk_get(struct device_node *np, int index)
+>>>   {
+>>> -	return NULL;
+>>> +	return ERR_PTR(-EINVAL);
 
-> a) it is not balanced, but too far on the "let's deploy stuff" side
-> b) developers have a tendency to simply map platform_data to bindings
->    and are surprised when told this is often not possible
+So how is this expected to work on platforms (like OMAP) which have 
+CONFIG_OF enabled but not CONFIG_COMMON_CLK?
 
-> which adds burden to the maintainers (who sometimes might not even be
-> familiar with devicetree because they are not focused on embedded). And
-> I worry about bindings of unmaintained subsystems.
+Archit has been seeing issues with failed clk_get's in the omap dss
+driver on linux-next.
+The clk_gets pass a valid dev pointer and an alias/con-id.
 
-A issue I'm seeing with some of the subsystems mantained by people who
-don't work on ARM is that they've got the DT message so strongly that
-they're pushing back on people trying to add platform data at all even
-on off SoC things that need to work with non-ARM processors.
+With the $Subject patch, the of_clk_get_by_name() for our builds always
+returns a ERR_PTR(-EINVAL).
+
+Even if we do get the right of_clk_get_by_name() built in,
+there is another issue on OMAP where in we have CONFIG_OF
+enabled/selected by default for all OMAP2+ builds, even when we
+*do not* pass a dt blob to the kernel.
+
+So would the below code fail in such cases because it expects a
+valid of_node to be populated for a device (which also has clock
+information in it)? if CONFIG_OF is set.
+
+struct clk *clk_get(struct device *dev, const char *con_id)
+{
+         const char *dev_id = dev ? dev_name(dev) : NULL;
+         struct clk *clk;
+
+         if (dev) {
+---->
+	Any reason why this isn't
+	if (dev->of_node) {
+---->
+                 clk = of_clk_get_by_name(dev->of_node, con_id);
+                 if (clk && __clk_get(clk))
+                         return clk;
+         }
+
+         return clk_get_sys(dev_id, con_id);
+}
+
+regards,
+Rajendra
