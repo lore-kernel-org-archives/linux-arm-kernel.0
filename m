@@ -1,48 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 14:03:43 +0000
-Subject: [PATCH 0/3 V2] Initial PXA DT bindings
-In-Reply-To: <500568F0.8000202@gmail.com>
-References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
- <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
- <500568F0.8000202@gmail.com>
-Message-ID: <201207171403.43689.arnd@arndb.de>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 17 Jul 2012 16:02:42 +0200
+Subject: Device tree.
+In-Reply-To: <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk>
+References: <500552C9.4090107@codethink.co.uk> <50056E22.5040308@gmail.com>
+ <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk>
+Message-ID: <13863985.aH2icoQzEI@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Daniel Mack wrote:
-> I wonder what happend to this patch series. I can't seem to find the
-> patches in mainline, although it's more than 8 months ago when they were
-> discussed. And I can't see any reason for rejecting them in the thread
-> either.
+On Tuesday 17 July 2012 14:56:33 Ben Dooks wrote:
+> On 17/07/2012 14:52, Rob Herring wrote:
+> > On 07/17/2012 08:25 AM, Ben Dooks wrote:
+> >> On 17/07/2012 14:07, Ian Molton wrote:
+> >>> On 17/07/12 13:32, Josh Coombs wrote:
+> >>>> make make target.dtb
+> >>>> cat arch/arm/boot/target.dtb  >> arch/arm/boot/zImage
+> >>>> make uImage
+> >>>
+> >>> Yick...
+> >>
+> >> How about adding a dts=<address> argument to the current
+> >> command line handling. If this is found, then the system
+> >> ignores the rest of the atags passed and uses the passed
+> >> address for the device-tree settings.
+> >>
+> >> This means in u-boot, you just need to load the .dts file
+> >> into place before booting the kernel.
+> >>
+> > You mean dtb...
+> >
+> > But no, we don't need a 3rd boot interface in the kernel. I don't see
+> > why cat + mkimage is too hard to run.
+> 
+> I suppose we can produce our own build-script
+> 
+> > Now that u-boot has direct support for zImage booting, I doubt 
+> > anything
+> > uImage building related will ever be accepted into the kernel.
+> 
+> Depends on u-boot, the one we have been supplied doesn't seem to
+> have any interest in booting zImages.
 
-I agree. The patches look like they were on the right track and then
-just dropped. If you have a vpac270 board, it would be nice if you
-could get them running on a newer kernel and submit them again.
-Of course if Marek is interested in picking up where he left, that
-would also be appreciated.
-
-> I'd like to extend the support to PXA3xx chips and get rid of some board
-> files in favour of DT. One uncertainty I have about that is clock
-> handling. What's a good migration path to get those bits moved over?
-> From what I can see, when probed solely from the device tree, device
-> names default to their base address, and the dev_id is a globally
-> incrementing counter. Are platforms supposed to provide clock aliases in
-> that form?
-
-There are three possible ways to handle that:
-
-1. For the most basic conversion, use an auxdata table to restore the
-original names of all devices and don't touch the clock lookup table.
-
-2. For a platform that has all (or most) boards converted to DT, try
-not to use an auxdata table and use the names from the device tree
-in the clock lookup table.
-
-3. For new platforms and those that want to be up to the latest standards,
-use the common clock framework and put the clock lookup into the device
-tree using the new clock bindings.
-
-For an incremental conversion, starting with the first option is usually
-the easiest.
-
-	Arnd
+In that case you just need to make sure that you produce a valid uImage of 
+your zImage+dtb appended. This is what I use on old (1.1.6) uboot versions 
+without any issues.
+--
+Florian
