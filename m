@@ -1,80 +1,116 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 17 Jul 2012 18:49:04 +0530
-Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
-In-Reply-To: <5004C935.4050707@gmail.com>
-References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
- <20120717001228.GA28886@gmail.com> <5004C935.4050707@gmail.com>
-Message-ID: <50056648.6000906@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 13:19:43 +0000
+Subject: [PATCH 2/8] ARM: MCS814x: add Device Tree based MCS8140 board
+ support
+In-Reply-To: <1342363754-30808-3-git-send-email-florian@openwrt.org>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <1342363754-30808-3-git-send-email-florian@openwrt.org>
+Message-ID: <201207171319.43593.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob, Mike,
+On Sunday 15 July 2012, Florian Fainelli wrote:
 
-On Tuesday 17 July 2012 07:38 AM, Rob Herring wrote:
-> On 07/16/2012 07:12 PM, Mike Turquette wrote:
->> On 20120716-16:46, Rob Herring wrote:
->>> From: Rob Herring<rob.herring@calxeda.com>
->>>
->>> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
->>> compiling with OF&&  !COMMON_CLK is broken.
->>>
->>
->> Hi Rob,
->>
->> Thanks for sending this quickly.
->>
->> <snip>
->>> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
->>>   struct device_node;
->>>   struct of_phandle_args;
->>>
->>> -#ifdef CONFIG_OF
->>> +#if defined(CONFIG_OF)&&  defined(CONFIG_COMMON_CLK)
->>>   struct clk *of_clk_get(struct device_node *np, int index);
->>>   struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
->>>   struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
->>>   #else
->>>   static inline struct clk *of_clk_get(struct device_node *np, int index)
->>>   {
->>> -	return NULL;
->>> +	return ERR_PTR(-EINVAL);
+> +
+> +			uart0: serial at 400dc000 {
+> +				compatible = "ns16550";
+> +				reg = <0x400dc000 0x20>;
+> +				clock-frequency = <50000000>;
+> +				reg-shift = <2>;
+> +				interrupts = <21>;
+> +				status = "okay";
+> +			};
 
-So how is this expected to work on platforms (like OMAP) which have 
-CONFIG_OF enabled but not CONFIG_COMMON_CLK?
+We often mark stuff like the uart as status="disabled" in the .dtsi file
+and only enable it in the board specific .dts file when it's actually
+connected. For components that are always present and usable, that's
+of course not necessary.
 
-Archit has been seeing issues with failed clk_get's in the omap dss
-driver on linux-next.
-The clk_gets pass a valid dev pointer and an alias/con-id.
+> +
+> +			adc {
+> +				compatible = "simple-bus";
+> +				#address-cells = <2>;
+> +				#size-cells = <1>;
+> +				// 8 64MB chip-selects
+> +				ranges = <0 0 0x00000000 0x4000000	// sdram
+> +					  1 0 0x04000000 0x4000000	// sdram
+> +					  2 0 0x08000000 0x4000000	// reserved
+> +					  3 0 0x0c000000 0x4000000	// flash/localbus
+> +					  4 0 0x10000000 0x4000000	// flash/localbus
+> +					  5 0 0x14000000 0x4000000	// flash/localbus
+> +					  6 0 0x18000000 0x4000000	// flash/localbus
+> +					  7 0 0x1c000000 0x4000000>;	// flash/localbus
+> +
+> +				sdram: memory at 0,0 {
+> +					reg = <0 0 0>;
+> +				};
+> +
+> +				nor: flash at 7,0 {
+> +					reg = <7 0 0x4000000>;
+> +					compatible = "cfi-flash";
+> +					bank-width = <1>;		// 8-bit external flash
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +                                };
+> +                        };
 
-With the $Subject patch, the of_clk_get_by_name() for our builds always
-returns a ERR_PTR(-EINVAL).
+Nice representation of the external buses. It does seem however that at
+least the nor flash entry is board specific and should be moved into the
+board .dts file.
+I would probably do the same for the memory node, but that one is less
+obvious as it seems that there is not much choice here.
 
-Even if we do get the right of_clk_get_by_name() built in,
-there is another issue on OMAP where in we have CONFIG_OF
-enabled/selected by default for all OMAP2+ builds, even when we
-*do not* pass a dt blob to the kernel.
+> +			usb0: ehci at 400fc000 {
+> +				compatible = "moschip,mcs814x-ehci", "usb-ehci";
+> +				reg = <0x400fc000 0x74>;
+> +				interrupts = <2>;
+> +			};
+> +
+> +			usb1: ohci at 400fd000 {
+> +				compatible = "moschip,mcs814x-ohci", "ohci-le";
+> +				reg = <0x400fd000 0x74>;
+> +				interrupts = <11>;
+> +			};
+> +
+> +			usb2: ohci at 400fe000 {
+> +				compatible = "moschip,mcs814x-ohci", "ohci-le";
+> +				reg = <0x400fe000 0x74>;
+> +				interrupts = <12>;
+> +			};
+> +
+> +			usb3: otg at 400ff000 {
+> +				compatible = "moschip,msc814x-otg", "usb-otg";
+> +				reg = <0x400ff000 0x1000>;
+> +				interrupts = <13>;
+> +			};
 
-So would the below code fail in such cases because it expects a
-valid of_node to be populated for a device (which also has clock
-information in it)? if CONFIG_OF is set.
+same comment as for the uart, I would mark these as disabled and only
+enable the ones that are connected on a give board.
 
-struct clk *clk_get(struct device *dev, const char *con_id)
-{
-         const char *dev_id = dev ? dev_name(dev) : NULL;
-         struct clk *clk;
+> +
+> +static void __init mcs814x_dt_device_init(void)
+> +{
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	mcs814x_init_machine();
+> +}
+> +
+> +static const char *mcs8140_dt_board_compat[] __initdata = {
+> +	"moschip,mcs8140",
+> +	NULL,	/* sentinel */
+> +};
+> +
+> +DT_MACHINE_START(mcs8140_dt, "Moschip MCS8140 board")
+> +	/* Maintainer: Florian Fainelli <florian@openwrt.org> */
+> +	.timer		= &mcs814x_timer,
+> +	.map_io		= mcs814x_map_io,
+> +	.init_early	= mcs814x_clk_init,
+> +	.init_irq	= mcs814x_of_irq_init,
+> +	.init_machine	= mcs814x_dt_device_init,
+> +	.restart	= mcs814x_restart,
+> +	.dt_compat	= mcs8140_dt_board_compat,
+> +MACHINE_END
 
-         if (dev) {
----->
-	Any reason why this isn't
-	if (dev->of_node) {
----->
-                 clk = of_clk_get_by_name(dev->of_node, con_id);
-                 if (clk && __clk_get(clk))
-                         return clk;
-         }
+Not much to see here. Just move this into the common.c file. There is no
+need to have a separate board file when all boards use the same one.
 
-         return clk_get_sys(dev_id, con_id);
-}
-
-regards,
-Rajendra
+	Arnd
