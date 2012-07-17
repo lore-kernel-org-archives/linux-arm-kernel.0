@@ -1,73 +1,88 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Tue, 17 Jul 2012 12:10:06 +0900
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <20120713111337.GH18079@mudshark.cambridge.arm.com>
-References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
- <1340991231-17682-3-git-send-email-will.deacon@arm.com>
- <4FFE7DB2.4040702@renesas.com>
- <20120712084432.GA2816@mudshark.cambridge.arm.com>
- <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
- <4FFF8509.2050302@renesas.com>
- <20120713085746.GA18079@mudshark.cambridge.arm.com>
- <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
- <20120713111337.GH18079@mudshark.cambridge.arm.com>
-Message-ID: <5004D78E.4050606@renesas.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 17 Jul 2012 11:02:26 +0800
+Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits
+ for general purpose registers
+In-Reply-To: <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
+References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
+ <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
+Message-ID: <20120717030225.GF19699@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will, Stephen and Santosh,
+On Sun, Jul 15, 2012 at 04:43:03AM +0800, Linus Walleij wrote:
+> On Thu, Jul 12, 2012 at 11:07 AM, Dong Aisheng <b29396@freescale.com> wrote:
+> 
+> Hm, hm. This makes be ever more hesitant to have this in pinctrl.
+> 
+> Remeber again that nothing stops you from remapping the same register
+> range in another driver.
+> 
+Well, i understand and agree with your point.
+We will try and see if we can find a better place.
 
-On 7/13/2012 8:13 PM, Will Deacon wrote:
-> I was anticipating that the platform would set the initial loops_per_jiffy
-> value if it requires udelays before loop calibration and the default of 4k
-> is wildly off.
+> > +#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_MASK                (0x3 << 30)
+> 
+> This belongs in drivers/clk/*
+> 
+> Why funnel these register writes through pinctrl? Just remap that address
+> offset in the clk driver.
+> 
+Hmm, i looked a bit more, not sure they could be put in driver/clk/*
+The mux here are module internal clocks, like:
+Selects the source of asrck_clock_3 in ASRC according to clock muxing scheme:
+00 audmux.amx_output_rxclk_p7 muxed with ssi3.ssi_srck
+01 audmux.amx_output_rxclk_p7
+10 ssi3.ssi_srck
+11 ssi3.rx_bit_clk
 
-I overlooked two different lpj setups were involved at hand.
+I'm not sure we should abstract them in clk framework since usually they're
+internally controlled by module driver itself.
 
-First one was, the initial loops_per_jiffy value of 4k was too small for
-almost all processors running Linux today, so I set up loops_per_jiffy
-_early_, calculated from the CPU clock speed.  I didn't mentioned this
-before, sorry for confusion.
+> > +#define IMX6Q_GPR0_DMAREQ_MUX_SEL7_MASK                BIT(7)
+> 
+> This belongs in drivers/dma/*
+> 
+> Same comments.
+> 
+> > +#define IMX6Q_GPR1_PCIE_REQ_MASK               (0x3 << 30)
+> 
+> Looks like it belongs in some PCI driver or glue layer.
+> 
+> > +#define IMX6Q_GPR1_MIPI_COLOR_SW               BIT(25)
+> > +#define IMX6Q_GPR1_DPI_OFF                     BIT(24)
+> 
+> Looks related to some test or something...
+> 
+> And so on.
+> 
+Yes, most of them are modules specific.
 
-So my initial loops_per_jiffy is not 4k at this point.  It's optimized
-for loop-based delay with the CPU running at 1.2GHz (much bigger than
-default 4k).
+> If you really wants a "funnel driver" doing all these diverse things,
+> I'd put it in drivers/mfd.
+Yes, we may wants this "funnel driver".
+What i'm thinking is we may only provides setting api for conveniently use
+and how drivers use it or abstract it is driver specific.
 
-And later, init_current_timer_delay() got processed.  Actual udelay()
-behavior switched from loop-based delay to timer-based one immediately,
-while my loops_per_jiffy was not changed/updated to appropriate value.
+> 
+> This whole issue appears in other systems so you're not alone
+> on this, for example the ux500 PRCMU driver has exactly these
+> properties.
+> 
+So how does ux500 PRCMU handle this?
 
-This is why my udelay()s, used after init_current_timer_delay(), were
-taking considerable long time to expire.   Note that my initial tests
-for Will's patchset was done using a loadable module dedicated for
-udelay tests, that was prepared for 2.6.35/3.0 kernels beforehand.
+> I'm also contemplating drivers/syscon again, but
+> I have a hard time seeing it would be much more than another
+> drivers/mfd-similar construct.
+> 
+yes, that may be a proper place.
 
-And this time, I confirmed that updating loops_per_jiffy at the same
-time as lpj_fine, works perfectly as expected for me.
+> I would really like input from Arnd and Samuel and other clever
+> people on the placement of drivers like this one :-/
+> 
+> But close address range proximity to the pin controller is not a
+> reason to have it in pinctrl.
+> 
+Well, understand.
 
-> If people need loops_per_jiffy to be updated at the same time as lpj_fine,
-> I can post that as a separate patch (below) as Russell has merged v2 of these
-> patches into his delay branch. That said, I'd certainly like to know if this
-> is actually a real problem (and can't be solved by choosing a compromise value
-> as the initial loops_per_jiffy). I think Shinya was doing some tests so
-> I'll wait to see how those went.
-
->From my observations:
-
-(1) loops_per_jiffy can easily be calculated from the CPU clock speed.
-If your platform is capable of detecting CPU frequency at run-time,
-settingi up loops_per_jiffy _early_ can allow you early use of udelay()s.
-
-Or even if you don't need udelay() early, setting up lpj_fine (or having
-calibrate_delay_is_known()) allows you to skip calibrate_delay() later.
-This is useful and can be applied to both UP and SMP systems.
-
-(2) For SMP platforms, if you need ealy use of udelay(), you have to
-update loops_per_jiffy at the same time as init_current_timer_delay().
-It could be done in init_current_timer_delay(), or platforms can take
-care of that, that need udelay() available early.  Either one should be
-fine with me.
---
-Shinya Kuribayashi
-Renesas Electronics
+Regards
+Dong Aisheng
