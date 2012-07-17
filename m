@@ -1,34 +1,30 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 17 Jul 2012 16:27:13 +0400
-Subject: [PATCH v2 02/11] arm/dts: omap: Add omap-usb2 dt data
-In-Reply-To: <1342512611-20529-3-git-send-email-kishon@ti.com>
-References: <1342512611-20529-1-git-send-email-kishon@ti.com>
- <1342512611-20529-3-git-send-email-kishon@ti.com>
-Message-ID: <50055A21.5010206@mvista.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jul 2012 14:29:26 +0200
+Subject: Device tree.
+In-Reply-To: <500556CF.6030704@codethink.co.uk>
+References: <500552C9.4090107@codethink.co.uk> <20120717140100.7c0ae90c@skate>
+ <500556CF.6030704@codethink.co.uk>
+Message-ID: <20120717142926.05c0c17f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Le Tue, 17 Jul 2012 13:13:03 +0100,
+Ian Molton <ian.molton@codethink.co.uk> a ?crit :
 
-On 17-07-2012 12:10, Kishon Vijay Abraham I wrote:
+> Unless I'm misunderstanding it, thats not quite what I need -
+> although I should probably have made my hack depend on it.
+> 
+> I'm using a uImage; The prepending needs to happen to the zImage /
+> Image.
 
-> Add omap-usb2 data node in omap4 device tree file.
+What I typically do is generate a zImage, do the appending, and then
+generate the uImage manually with mkimage. But I agree it could be
+useful to have a 'make uImage.myboard' target which would happen the
+myboard.dtb before preparing the uImage.
 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->   arch/arm/boot/dts/omap4.dtsi |    5 +++++
->   1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index bda5df3..4d2dcc1 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -279,6 +279,11 @@
->   			#size-cells = <1>;
->   			ranges;
->   			ti,hwmods = "ocp2scp_usb_phy";
-> +			usb2phy at 0x4a0ad080 {
-
-    There should be no "0x" prefix here.
-
-WBR, Sergei
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
