@@ -1,40 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 13:51:14 +0000
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <20120717152826.2bf75948@skate>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <201207171312.06987.arnd@arndb.de> <20120717152826.2bf75948@skate>
-Message-ID: <201207171351.15034.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 17 Jul 2012 08:52:34 -0500
+Subject: Device tree.
+In-Reply-To: <8f3d9be256cbe0feec86cca6aaefd437@codethink.co.uk>
+References: <500552C9.4090107@codethink.co.uk> <20120717140100.7c0ae90c@skate>
+ <500556CF.6030704@codethink.co.uk>
+ <CAMW5UfZR5qrY4K=ty9HDcd9UqYGtfZitH0CBgDbZWvpAoTve2Q@mail.gmail.com>
+ <50056391.3060208@codethink.co.uk>
+ <8f3d9be256cbe0feec86cca6aaefd437@codethink.co.uk>
+Message-ID: <50056E22.5040308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, Thomas Petazzoni wrote:
-> And then, on PowerPC, which accessors do you use to access
-> SoC-peripherals that are not on the PCI bus?
-
-PowerPC has in_le32/out_le32 and variants of those, which unfortunately
-are not defined for most other architectures, so you cannot use them
-in portable code. They are the same as readl/writel, but without the
-PCI error handling.
-
-> For example, drivers/tty/serial/mpsc.c uses writel/readl, so a
-> conversion to/from little-endian is done when writing/reading
-> registers. Are those memory-mapped devices little-endian even though
-> they are used on big-endian PowerPCs?
+On 07/17/2012 08:25 AM, Ben Dooks wrote:
+> On 17/07/2012 14:07, Ian Molton wrote:
+>> On 17/07/12 13:32, Josh Coombs wrote:
+>>> make make target.dtb
+>>> cat arch/arm/boot/target.dtb  >> arch/arm/boot/zImage
+>>> make uImage
+>>
+>> Yick...
 > 
-> I apologize for the silly questions, but I'm trying to make some sense
-> out of these numerous I/O and memory accessors.
+> How about adding a dts=<address> argument to the current
+> command line handling. If this is found, then the system
+> ignores the rest of the atags passed and uses the passed
+> address for the device-tree settings.
+> 
+> This means in u-boot, you just need to load the .dts file
+> into place before booting the kernel.
+> 
+You mean dtb...
 
-All combinations of little/big endian CPUs and peripherals have been
-done in the past, including peripherals that switch their endianess
-dynamically when you change the mode of the CPU, and those that come
-with an extra register to add byte-swapping for operating systems
-that don't deal with it.
+But no, we don't need a 3rd boot interface in the kernel. I don't see
+why cat + mkimage is too hard to run.
 
-It's all a big mess and there is no good solution that anyone has
-managed to come with to cover all possibilities. My recommendation
-is generally to use the little-endian accessors when they work,
-and have your bus-specific or driver-specific wrapper around those
-when the endianess is not always the same.
+Now that u-boot has direct support for zImage booting, I doubt anything
+uImage building related will ever be accepted into the kernel.
 
-	Arnd
+Rob
