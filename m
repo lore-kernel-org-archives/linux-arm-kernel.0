@@ -1,25 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Jul 2012 19:24:34 +0100
-Subject: [PATCH v2 1/2] pinctrl: pinctrl-imx: add support for set bits
- for general purpose registers
-In-Reply-To: <CACRpkdZei=U67wHQW6rKGkv0X10t4k+BEYE8uFZPbp-6Y60deQ@mail.gmail.com>
-References: <1342084080-3145-1-git-send-email-b29396@freescale.com>
- <CACRpkdbHtgKLA3JJxc4VY35zSpJFvk15u62Z3aBCqERoeQ10CA@mail.gmail.com>
- <20120717030225.GF19699@shlinux2.ap.freescale.net>
- <CACRpkdZei=U67wHQW6rKGkv0X10t4k+BEYE8uFZPbp-6Y60deQ@mail.gmail.com>
-Message-ID: <20120717182434.GB11723@sirena.org.uk>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Tue, 17 Jul 2012 15:30:46 -0300
+Subject: [PATCH RESEND] gpio: of_get_named_gpio_flags() return
+ -EPROBE_DEFER if GPIO not yet available
+In-Reply-To: <CACRpkdYBBa8BZMeGK0kiXNysn_ErpyKhTtbK8yFxf+JyMSndFw@mail.gmail.com>
+References: <1340836334-20427-1-git-send-email-stigge@antcom.de>
+ <CACRpkdYBBa8BZMeGK0kiXNysn_ErpyKhTtbK8yFxf+JyMSndFw@mail.gmail.com>
+Message-ID: <CAAAP30FtFOQSJ8UvN6H+L6qwPyphi27L+mxi-3COu6RAJQTHcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 08:15:40PM +0200, Linus Walleij wrote:
+On Tue, Jul 17, 2012 at 3:24 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Jun 28, 2012 at 12:32 AM, Roland Stigge <stigge@antcom.de> wrote:
+>
+>> of_get_named_gpio_flags() and of_get_named_gpio() return -EPROBE_DEFER if the
+>> respective GPIO is not (yet) available. This is useful if driver's probe()
+>> functions try to get a GPIO whose controller isn't probed yet. Thus, the driver
+>> can be probed again later on.
+>>
+>> The function still returns -EINVAL on other errors (parse error or node doesn't
+>> exist). This way, the case of an optional/intentionally missing GPIO is handled
+>> appropriately.
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
+> Patch applied, if all gpio stuff shall defer properly in v3.6 we need this
+> so let's do some testing in -next!
+>
+> Would be nice to get some ACK besides my own...
 
-> u32 db8500_prcmu_read(unsigned int reg);
-> void db8500_prcmu_write(unsigned int reg, u32 value);
-> void db8500_prcmu_write_masked(unsigned int reg, u32 mask, u32 value);
+You can add mine. I've been using this patch for quite some time now.
 
-> The third function is an oddity which performs read-modify-write
-> on the other side (firmware).
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-Not so odd - a very high proportion of APIs like this have a r/m/w
-operation as there's usually a requirement for doing the updates
-atomically.
+> Yours,
+> Linus Walleij
