@@ -1,24 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Jul 2012 14:20:32 +0100
-Subject: Device tree binding for DVFS table
-In-Reply-To: <50055C83.7060700@nvidia.com>
-References: <4FFD77FE.8050206@nvidia.com> <4FFD87BD.2030206@gmail.com>
- <4FFE4DD0.7020407@nvidia.com> <50035582.9070308@gmail.com>
- <CAJOA=zMKE1Z_AsYeWr22k58EDskx0eshEjv9VbLQHKFsA0uThw@mail.gmail.com>
- <50055C83.7060700@nvidia.com>
-Message-ID: <20120717132032.GD27595@sirena.org.uk>
+From: joerg.roedel@amd.com (joerg.roedel at amd.com)
+Date: Tue, 17 Jul 2012 15:23:00 +0200
+Subject: [v3.6 3/3] iommu/tegra: smmu: Fix unsleepable memory allocation
+ at alloc_pdir()
+In-Reply-To: <20120717.152524.175499431618552821.hdoyu@nvidia.com>
+References: <1341228398-6878-1-git-send-email-hdoyu@nvidia.com>
+ <1341228398-6878-3-git-send-email-hdoyu@nvidia.com>
+ <20120717100901.GH4213@amd.com>
+ <20120717.152524.175499431618552821.hdoyu@nvidia.com>
+Message-ID: <20120717132300.GK4213@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 06:07:23PM +0530, Prashant Gaikwad wrote:
-> On Tuesday 17 July 2012 12:06 AM, Turquette, Mike wrote:
+On Tue, Jul 17, 2012 at 02:25:24PM +0200, Hiroshi Doyu wrote:
+> The above spin_lock is always necessary. "as->lock" should be held to
+> protect "as->pdir_page". Only when "as->pdir_page" is NULL,
+> "as->pdir_page" would be allocated in "alloc_pdir()". Without this
+> lock, the following race could happen:
+> 
+> 
+> Without as->lock:
+> A:			B:
+> i == 3
+> pdir_page == NULL
+> 			i == 3
+> 	     		pdir_page == NULL
+> pdir_page = a;
+> 			pdir_page = b;	!!!!!! OVERWRITTEN !!!!!!
+>
 
-> reg : operating voltage in microvolt
+Unless I am missing something, this is not the correct situation with my
+patch. It would look more like this:
 
-What happens if there's more than one supply that needs to be varied?
 
-> tolerance : can be used to calculate required voltage. (optional,
-> can be replaced by other relevant parameter to calculate required
-> voltage)
+ A:					B:
+ i == 3
+ pdir_page == NULL
+ 					i == 3
+ 	     				pdir_page == NULL
 
-What are the semantics of this field?
+ take as->lock
+
+ /* race check */
+ pdir_page == NULL -> proceed		/* spinning on as->lock */
+
+ pdir_page = a;
+
+ release as->lock
+
+					 take as->lock
+
+					 /* race check */
+					 pdir_page != NULL -> return
+
+This should be fine, no? Do I miss something?
+
+
+	Joerg
