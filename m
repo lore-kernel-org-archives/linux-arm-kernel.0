@@ -1,50 +1,31 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 17 Jul 2012 12:57:54 -0400
-Subject: [RFC PATCH 3/4] ARM: arch_timers: give the virtual timer its
- own interrupt handler
-In-Reply-To: <1341566422-20368-4-git-send-email-marc.zyngier@arm.com>
-References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
- <1341566422-20368-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <50059992.9020904@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jul 2012 18:04:15 +0100
+Subject: [PATCH v2 05/15] ARM: integrator: use fixed PCI i/o mapping
+In-Reply-To: <CACRpkda_to3CzfhvOh-NDx_7Qz+Reg6m1k+uH2stRFy8KSqQmQ@mail.gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <1342231451-28861-6-git-send-email-robherring2@gmail.com>
+ <CACRpkda_to3CzfhvOh-NDx_7Qz+Reg6m1k+uH2stRFy8KSqQmQ@mail.gmail.com>
+Message-ID: <20120717170413.GG14624@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 07/06/2012 05:20 AM, Marc Zyngier wrote:
-> In order to prepare for the timer interrupt offloading to the hypervisor,
-> give the virtual timer its own interrupt handler.
+On Sat, Jul 14, 2012 at 10:49:47PM +0100, Linus Walleij wrote:
+> On Sat, Jul 14, 2012 at 4:04 AM, Rob Herring <robherring2@gmail.com> wrote:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kernel/arch_timer.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
+> > From: Rob Herring <rob.herring@calxeda.com>
+> >
+> > Move integrator PCI to fixed i/o mapping and remove io.h.
+> >
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
 > 
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index 2b5da66..4473f66 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
+> I think the PCI bus on my Integrator/AP is tilted and not suitable
+> for tests. But IIRC Will Deacon actually has one of these machines
+> and managed to get ethernet going on it. Maybe he can even test
+> this patch?
 
-[...]
+I can try digging out my integrator at the weekend if you like. Are these
+patches sitting in a branch anywhere that I can grab?
 
-> @@ -408,6 +413,9 @@ static int __init arch_timer_register(void)
->  		if (!arch_timer_ppi[i])
->  			continue;
->  
-> +		if (i == VIRT_PPI)
-> +			handler = arch_timer_virt_handler;
-> +
-
-Again, it seems awkward to do this sort of thing inside the loop as
-you're only keying off of one value with a known index in the array.
-
->  		err = request_percpu_irq(arch_timer_ppi[i], handler,
->  					 "arch_timer", arch_timer_evt);
->  		if (err) {
-
-Regards,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
+Will
