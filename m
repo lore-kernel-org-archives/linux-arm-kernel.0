@@ -1,58 +1,54 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 17 Jul 2012 16:47:04 +0200
-Subject: [PATCH 0/3 V2] Initial PXA DT bindings
-In-Reply-To: <201207171403.43689.arnd@arndb.de>
-References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
- <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
- <500568F0.8000202@gmail.com> <201207171403.43689.arnd@arndb.de>
-Message-ID: <50057AE8.5000806@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Jul 2012 15:52:10 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
+ tree
+In-Reply-To: <20120717142222.GE4477@opensource.wolfsonmicro.com>
+References: <5003FB7C.4030509@linaro.org>
+ <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
+ <20120717133550.GC4477@opensource.wolfsonmicro.com>
+ <50057058.2060002@linaro.org>
+ <20120717142222.GE4477@opensource.wolfsonmicro.com>
+Message-ID: <50057C1A.80606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.07.2012 16:03, Arnd Bergmann wrote:
-> On Tuesday 17 July 2012, Daniel Mack wrote:
->> I wonder what happend to this patch series. I can't seem to find the
->> patches in mainline, although it's more than 8 months ago when they were
->> discussed. And I can't see any reason for rejecting them in the thread
->> either.
-> 
-> I agree. The patches look like they were on the right track and then
-> just dropped. If you have a vpac270 board, it would be nice if you
-> could get them running on a newer kernel and submit them again.
+On 17/07/12 15:22, Mark Brown wrote:
+> On Tue, Jul 17, 2012 at 03:02:00PM +0100, Lee Jones wrote:
+>
+>> I'm sure sure this is relevant in the current case though, as the
+>> i2c properties proposed here are platform specific. What we're
+>
+> I've not seen the specific example (though fankly it seems quite
+> surprising that there's anything other than bus speed that the platform
+> might want to configure for I2C...).
+>
+>> discussing is some consolidation of property names, which I do
+>> support in theory. What I fear is that this driver will lack Device
+>> Tree functionality for yet another kernel version if it isn't
+>> resolved quickly.
+>
+> Well, if checking the DT checky box is the important thing then just
+> adding an of_match_table ought to be enough?  It's fairly common for
+> platform data to have lots of stuff that's not used by most systems
+> so you can often cover 90% of systems with a very small subset of the
+> configurability.
 
-Nope, I don't.
+We could do that, but I'd rather do it in full.
 
-> Of course if Marek is interested in picking up where he left, that
-> would also be appreciated.
+I think it would be okay to take the 3 patches due for the v3.6 merge 
+window, which target the nmk-i2c driver. If any consolidation happens in 
+the mean-time/future I will personally do the work to bring the nmk-i2c 
+into line to use any generic bindings which result.
 
-What about just taking them as they are? I believe Marek tested them
-back in the days when he submitted.
+No one else is ever going to use these vendor specific bindings, so I'm 
+sure no issues will arise. It also means that we have a fully enabled 
+driver which is capable of receiving a new configuration via minor 
+changes to the dts, which is important for the current (only) user of 
+this driver for an upcoming project.
 
->> I'd like to extend the support to PXA3xx chips and get rid of some board
->> files in favour of DT. One uncertainty I have about that is clock
->> handling. What's a good migration path to get those bits moved over?
->> From what I can see, when probed solely from the device tree, device
->> names default to their base address, and the dev_id is a globally
->> incrementing counter. Are platforms supposed to provide clock aliases in
->> that form?
-> 
-> There are three possible ways to handle that:
-> 
-> 1. For the most basic conversion, use an auxdata table to restore the
-> original names of all devices and don't touch the clock lookup table.
-> 
-> 2. For a platform that has all (or most) boards converted to DT, try
-> not to use an auxdata table and use the names from the device tree
-> in the clock lookup table.
-> 
-> 3. For new platforms and those that want to be up to the latest standards,
-> use the common clock framework and put the clock lookup into the device
-> tree using the new clock bindings.
-> 
-> For an incremental conversion, starting with the first option is usually
-> the easiest.
-
-Ok, good. I'll have a look. Thanks for explaining!
-
-
-Daniel
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
