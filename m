@@ -1,134 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 15:47:57 +0000
-Subject: [RFC PATCHv2 1/2] ARM: socfpga: initial support for Altera's
- SOCFPGA platform.
-In-Reply-To: <1342113976-27140-2-git-send-email-dinguyen@altera.com>
+Date: Tue, 17 Jul 2012 15:56:27 +0000
+Subject: [RFC PATCHv2 2/2] ARM: socfpga: Add board support for Altera's
+ SOCFPGA Cyclone 5 HW
+In-Reply-To: <1342113976-27140-3-git-send-email-dinguyen@altera.com>
 References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
- <1342113976-27140-2-git-send-email-dinguyen@altera.com>
-Message-ID: <201207171547.58324.arnd@arndb.de>
+ <1342113976-27140-3-git-send-email-dinguyen@altera.com>
+Message-ID: <201207171556.28314.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 12 July 2012, dinguyen at altera.com wrote:
 
-> +config ARCH_SOCFPGA
-> +	bool "Altera SOCFPGA family"
-> +	select ARCH_WANT_OPTIONAL_GPIOLIB
-> +	select ARM_AMBA
-> +	select ARM_GIC
-> +	select CACHE_L2X0
-> +	select CLKDEV_LOOKUP
-> +	select CPU_V7
-> +	select DW_APB_TIMER
-> +	select DW_APB_TIMER_OF
-> +	select GENERIC_CLOCKEVENTS
-> +	select GPIO_PL061 if GPIOLIB
-> +	select HAVE_ARM_SCU
-> +	select SPARSE_IRQ
-> +	select USE_OF
-> +	help
-> +	  This enables support for Altera SOCFPGA Cyclone V platform
-
-Please select COMMON_CLK as well to use the generic clock implementation.
-
-> diff --git a/arch/arm/mach-socfpga/clock.c b/arch/arm/mach-socfpga/clock.c
+> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
 > new file mode 100644
-> index 0000000..79f3890
+> index 0000000..133fc89
 > --- /dev/null
-> +++ b/arch/arm/mach-socfpga/clock.c
-> @@ -0,0 +1,45 @@
+> +++ b/arch/arm/mach-socfpga/Kconfig
+> @@ -0,0 +1,7 @@
+> +config MACH_SOCFPGA_CYCLONE5
+> +       bool "SOCFPGA Cyclone5 platform"
+> +       select COMMON_CLK
+> +       select HAVE_SMP
+> +       select PLAT_SOCFPGA_ETH
+> +       help
+> +         Include support for the Altera(R) Cyclone5 development platform.
 
-> +#include <linux/clkdev.h>
-> +
-> +#define SOCFPGA_MPU_PERIHCLK_FREQ_HZ			(800000000 / 4)
-> +#define SOCFPGA_L4_MAIN_CLK					(400000000)
-> +
-> +struct clk {
-> +	unsigned long		rate;
+Ah, so you actually select COMMON_CLK already. I wonder why that works,
+since you are also defining your own "struct clk" that gets passed into
+the clk_lookup table. I guess there is a bug somewhere.
+
+> diff --git a/arch/arm/mach-socfpga/common.h b/arch/arm/mach-socfpga/common.h
+> index e66587f..ba90e7a 100644
+> --- a/arch/arm/mach-socfpga/common.h
+> +++ b/arch/arm/mach-socfpga/common.h
+> @@ -18,6 +18,6 @@
+>  #ifndef __MACH_SOCFPGA_COMMON_H
+>  #define __MACH_SOCFPGA_COMMON_H
+>  
+> -extern struct sys_timer socfpga_timer;
+> +extern struct sys_timer dw_apb_timer;
+>  
+>  #endif
+
+This should get folded into the first patch.
+
+> +static const char *altera_dt_match[] = {
+> +	"altr,socfpga-cyclone5",
+> +	NULL
 > +};
 > +
-> +static struct clk apb_pclk = { .rate = 200000000};
-> +static struct clk i2c_clk = { .rate = 100000000};
-> +static struct clk spim_clk = { .rate = 100000000};
-> +static struct clk mpu_pclk = { .rate = SOCFPGA_MPU_PERIHCLK_FREQ_HZ};
-> +static struct clk l4_main_clk = { .rate = SOCFPGA_L4_MAIN_CLK};
+> +DT_MACHINE_START(SOCFPGA_CYCLONE5, "Altera SOCFPGA Cyclone V")
+> +	.init_irq	= gic_init_irq,
+> +	.handle_irq     = gic_handle_irq,
+> +	.timer		= &dw_apb_timer,
+> +	.init_machine	= socfpga_cyclone5_init,
+> +	.restart	= socfpga_cyclone5_restart,
+> +	.dt_compat	= altera_dt_match,
+> +MACHINE_END
 
-Then move this file into drivers/clk/ using that code.
-
-> diff --git a/arch/arm/mach-socfpga/include/mach/iomap.h b/arch/arm/mach-socfpga/include/mach/iomap.h
-> new file mode 100644
-> index 0000000..d5f8493
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/include/mach/iomap.h
-> @@ -0,0 +1,33 @@
-> +/*
-> + *  Copyright (C) 2012 Altera Corporation <www.altera.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __MACH_SOCFPGA_IOMAP_H
-> +#define __MACH_SOCFPGA_IOMAP_H
-> +
-> +#include <asm/sizes.h>
-> +
-> +/* macro to get at IO space when running virtually */
-> +/*
-> + * Statically mapped addresses:
-> + *
-> + * 10xx xxxx -> fbxx xxxx
-> + * 1exx xxxx -> fdxx xxxx
-> + * 1fxx xxxx -> fexx xxxx
-> + */
-> +#define IO_ADDRESS(x)		(((x) & 0x03ffffff) + 0xfb000000)
-> +#define __io_address(n)		IOMEM(IO_ADDRESS(n))
-> +
-> +#endif
-
-This is unused, right? Just remove it.
-
-> diff --git a/arch/arm/mach-socfpga/include/mach/irqs.h b/arch/arm/mach-socfpga/include/mach/irqs.h
-> new file mode 100644
-> index 0000000..5e344db
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/include/mach/irqs.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + *  Copyright (C) 2012 Altera Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> +*/
-> +
-> +#ifndef __MACH_IRQS_H
-> +#define __MACH_IRQS_H
-> +
-> +#define IRQ_SOCFPGA_GIC_START	32
-> +#define IRQ_LOCALWDOG		30
-> +#define MAX_GIC_NR		1
-> +
-> +#endif	/* __MACH_IRQS_H */
-
-Same with this. Since you're using sparse IRQ, this file is not even included
-anywhere.
+I think you should not require more than one such file per platform,
+so I would either name the entire platform cyclone5 instead of socfpga,
+or if you expect this to all stay compatible with future products,
+remove the cyclone5 name here and just call it all socfpga. The dt_match
+array can still list multiple compatible strings, one for each family
+or so.
 
 	Arnd
