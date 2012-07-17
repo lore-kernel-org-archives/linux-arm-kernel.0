@@ -1,41 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 12:16:40 +0200
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <201207161554.04812.arnd@arndb.de>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <1342363754-30808-2-git-send-email-florian@openwrt.org>
- <201207161554.04812.arnd@arndb.de>
-Message-ID: <20120717121640.589780ce@skate>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 17 Jul 2012 15:49:58 +0530
+Subject: [PATCH v3 5/6] mmc: dw_mmc: add device tree support
+In-Reply-To: <CAGxe1ZHZr2=127p8X-A12K2-zOyKMOJ0fkx5pWNovVteFfSPwg@mail.gmail.com>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+ <1342097668-25243-6-git-send-email-thomas.abraham@linaro.org>
+ <CAGxe1ZHZr2=127p8X-A12K2-zOyKMOJ0fkx5pWNovVteFfSPwg@mail.gmail.com>
+Message-ID: <CAJuYYwTLxEgm3CnPof4ub=XQazJ+PaUG-zk14nGnpBwWsnHMvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 16 Jul 2012 15:54:04 +0000,
-Arnd Bergmann <arnd@arndb.de> a ?crit :
+On 16 July 2012 09:45, Girish K S <girish.shivananjappa@linaro.org> wrote:
+> On 12 July 2012 18:24, Thomas Abraham <thomas.abraham@linaro.org> wrote:
 
-> > +void mcs814x_restart(char mode, const char *cmd)
-> > +{
-> > +	__raw_writel(~(1 << 31), mcs814x_sysdbg_base);
-> > +}
-> 
-> You should generally avoid using __raw_readl etc. and instead use
-> readl/write or readl_relaxed/writel_relaxed.
+[...]
 
-I thought that readl/writel and readl_relaxed/writel_relaxed were used
-for PCI-style access, for which these macros/functions do automatically
-a conversion from the CPU-endianness to the PCI-endianness
-(little-endian). Here of course, this the SoC is used little-endian, it
-will just work because readl/writel will not do any endianness
-conversion, but if we were on a big-endian machine?
+>>
+>> +#ifdef CONFIG_OF
+>> +static struct dw_mci_drv_data synopsis_drv_data = {
+>> +       .ctrl_type      = DW_MCI_TYPE_SYNOPSIS,
+>> +};
+>> +
+>> +static const struct of_device_id dw_mci_pltfm_match[] = {
+>> +       { .compatible = "snps,dw-mshc",
+>> +                       .data = (void *)&synopsis_drv_data, },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
+>> +#else
+>> +static const struct of_device_id dw_mci_pltfm_match[];
+> the #else and a statement can be completely removed if of_match_ptr is
+> used while accessing the dw_mci_pltfm_match in of_match_node function.
+>> +#endif
+>> +
+>>  static int dw_mci_pltfm_probe(struct platform_device *pdev)
+>>  {
+>>         struct dw_mci *host;
+>> @@ -51,6 +67,13 @@ static int dw_mci_pltfm_probe(struct platform_device *pdev)
+>>         if (!host->regs)
+>>                 goto err_free;
+>>         platform_set_drvdata(pdev, host);
+>> +
+>> +       if (pdev->dev.of_node) {
+>> +               const struct of_device_id *match;
+>> +               match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
+> can be modified to of_match_node(of_match_pt(dw_mci_pltfm_match),
+> pdev->dev.of_node);
+> This will remove the dummy allocation of variable as mentioned above.
+> Also it will be generic in non dt case.
 
-My understanding until now was that __raw_readl/__raw_writel should be
-used for accesses with native endianness, but apparently, it's more
-subtle than this. Would you mind expanding a bit on this?
+Ok. Thanks for the suggestion. I will modify it as per your suggestion.
 
-Best regards,
+Thanks,
+Thomas.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[...]
