@@ -1,32 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Jul 2012 08:43:24 +0100
-Subject: [PATCH RESEND] gpio: of_get_named_gpio_flags() return
- -EPROBE_DEFER if GPIO not yet available
-In-Reply-To: <CACRpkdb0k4fNigA6FGyEobxUt-JnmUy-ni7XzH-gup-ic_j+VQ@mail.gmail.com>
-References: <1340836334-20427-1-git-send-email-stigge@antcom.de>
- <CACRpkdYrZizqvZqsocLEGrkY5yPMuYFfmR3UUSFZgPDvEPa0eA@mail.gmail.com>
- <20120715211120.GH4041@opensource.wolfsonmicro.com>
- <CACRpkdb0k4fNigA6FGyEobxUt-JnmUy-ni7XzH-gup-ic_j+VQ@mail.gmail.com>
-Message-ID: <20120717074324.GA12047@opensource.wolfsonmicro.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Tue, 17 Jul 2012 02:59:04 -0500
+Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per hwmod/module
+ context lost count
+In-Reply-To: <1339428387-4800-5-git-send-email-t-kristo@ti.com>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-5-git-send-email-t-kristo@ti.com>
+Message-ID: <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 12:16:48AM +0200, Linus Walleij wrote:
-> On Sun, Jul 15, 2012 at 11:11 PM, Mark Brown
+Couple of minor comments:
+On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
+[...]
+>  /**
+> + * _omap4_update_context_lost - increment hwmod context loss counter if
+> + * hwmod context was lost, and clear hardware context loss reg
+> + * @oh: hwmod to check for context loss
+> + *
+> + * If the PRCM indicates that the hwmod @oh lost context, increment
+> + * our in-memory context loss counter, and clear the RM_*_CONTEXT
+> + * bits. No return value.
+> + */
+> +static void _omap4_update_context_lost(struct omap_hwmod *oh)
+> +{
+> +       u32 r;
+> +
+> +       if (oh->prcm.omap4.context_offs == USHRT_MAX)
+> +               return;
+would'nt it be better to return a dummy incremental counter instead of
+returning no context loss (count = 0)?
 
-> > I had thought a version of this
-> > had been submitted already and was in a similar place to the one for
-> > gpio_request().
+> +
+> +       r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
+> +                                       oh->clkdm->pwrdm.ptr->prcm_offs,
+> +                                       oh->prcm.omap4.context_offs);
+> +
+> +       if (!r)
+> +               return;
+> +
+> +       oh->prcm.omap4.context_lost_counter++;
+need to be careful about counter overflow.
 
-> Me to...
 
-Greg just merged the driver core patch for pushing the deferred devices
-to the end of the dpm list before reprobing them which should address
-Grant's concern about doing this in gpiolib.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120717/bbaa4910/attachment.sig>
+Regards,
+Nishanth Menon
