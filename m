@@ -1,36 +1,33 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 17 Jul 2012 14:41:35 +0200
-Subject: Device tree.
-In-Reply-To: <20120717142926.05c0c17f@skate>
-References: <500552C9.4090107@codethink.co.uk>
- <500556CF.6030704@codethink.co.uk> <20120717142926.05c0c17f@skate>
-Message-ID: <4030979.D58EjbuuB0@flexo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 12:50:31 +0000
+Subject: [PATCH 1/1] Add Wondermedia Technologies (wmt) to
+ docs/devicetree/vendor-bindings.txt
+In-Reply-To: <76F764B079F92A4E843589C893D0A022C380F1D4@SERVER.prisktech.co.nz>
+References: <76F764B079F92A4E843589C893D0A022C380F1D4@SERVER.prisktech.co.nz>
+Message-ID: <201207171250.32265.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012 14:29:26 Thomas Petazzoni wrote:
-> Le Tue, 17 Jul 2012 13:13:03 +0100,
-> Ian Molton <ian.molton@codethink.co.uk> a ?crit :
-> 
-> > Unless I'm misunderstanding it, thats not quite what I need -
-> > although I should probably have made my hack depend on it.
-> > 
-> > I'm using a uImage; The prepending needs to happen to the zImage /
-> > Image.
-> 
-> What I typically do is generate a zImage, do the appending, and then
-> generate the uImage manually with mkimage. But I agree it could be
-> useful to have a 'make uImage.myboard' target which would happen the
-> myboard.dtb before preparing the uImage.
+On Tuesday 17 July 2012, Tony Prisk wrote:
+> From 756ae5c2f475d679649adff99058679b651af8d9 Mon Sep 17 00:00:00 2001
+> From: Tony Prisk <linux@prisktech.co.nz>
+> Date: Tue, 17 Jul 2012 19:09:31 +1200
+> Subject: [PATCH] Add Wondermedia Technologies (wmt) to vendor-prefixes.txt
+>  Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+ 
+Something went wrong with exporting the patch. You probably used git-show
+rather than git-format-patch, so you got the wrong headers.
 
-Appending a given device tree blob to a zImage is something that should be 
-solved outside of the kernel build imho.
+It would also be helpful to describe why the specific string is used here.
+Normally we use the stock ticker symbol and "wmt" refers to Wal-Mart,
+which would be unlikely but not impossible to produce their own hardware
+in the future. The same thing applies to "via", which is VIACOM. The symbol
+for VIA technologies is "2388.TW", but that is not particularly descriptive
+or well-known.
 
-Since your bootloader is already "non-cooperative" wrt DTBs, you need to 
-provide a specific uImage (zImage + dtb) for it.
+Maybe someone on the devicetree-discuss mailing list has a better
+suggestion. I think using "via" is probably the best compromise, as
+it's a well-known name and most of the components of the wondermedia
+chips were first made by VIA anyway.
 
-I do not think the kernel build should try to generate as many zImages as 
-there dtb files, nor any other combination, this really is distribution 
-specific.
---
-Florian
+	Arnd
