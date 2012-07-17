@@ -1,99 +1,77 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 17 Jul 2012 17:56:11 +0300
-Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for
- preventing autodep delete
-In-Reply-To: <5003F453.9020903@ti.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-8-git-send-email-t-kristo@ti.com>
- <5003F453.9020903@ti.com>
-Message-ID: <1342536971.4672.82.camel@sokoban>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 17 Jul 2012 16:59:01 +0200
+Subject: [PATCH] [RFC] arm: add documentation describing Marvell families
+ of SoC
+In-Reply-To: <1342535201-12907-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1342535201-12907-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20120717145901.GQ2489@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-16 at 16:30 +0530, Rajendra Nayak wrote:
-> Hi Tero,
+On Tue, Jul 17, 2012 at 04:26:41PM +0200, Thomas Petazzoni wrote:
+> As stated in the introduction of the document, the families of ARM
+> SoCs at Marvell are very complicated, and it is difficult for
+> newcomers to understand the organization of this SoC family and how it
+> relates to the Linux kernel support for those hardware platforms.
 > 
-> On Friday 13 July 2012 07:49 PM, Tero Kristo wrote:
-> > Some clockdomains bug out if their autodeps are deleted before idle.
-> > This happens namely with OMAP3 PER domain, it will bug out if it
-> > doesn't have wakedeps enabled when it enters off-mode. This patch
-> > adds support for new flag 'CLKDM_NO_AUTODEP_DISABLE' which does this.
+> This document is only at RFC stage for now, it requires reviews and
+> comments from the Marvell maintainers, the PXA maintainers and the MMP
+> maintainers. For correctness of course, but also to add any other
+> information that would be useful. For example, one of the thing that
+> wasn't clear how to detail in the documentation is how the SoCs relate
+> to each other in terms of hardware IP blocks. For example, most of the
+> Kirkwood/Dove/Armada 370-XP/etc. hardware IPs (I2C, SPI, USB, SATA,
+> etc.) are identical, while the PXA and MMP families are completely
+> separate.
 > 
-> I had one more thought on how we could handle this (without adding a new
-> flag :-))
-> How about marking OMAP3 PER with a CLKDM_NO_AUTODEPS (already existing
-> flag) and setting a sleep/wakeup dependency of OMAP3 PER with MPU and
-> IVA one time sometime during late PM init. Because thats what we intent
-> to do, which is have a sleep/wakeup dependency set *always* and never
-> try to remove it, right?
-
-I did some extra investigation on this, sorry for the delay. What is
-enough, is to just add a wakedep from wkup_clkdm to per_clkdm, as the
-wakedeps have usecounting so once this is done, the autodep handling
-can't remove the wakedep.
-
-Anyway, it also looks like this fix is no longer needed with the latest
-kernel, something has changed with the gpio code / or latencies and it
-doesn't crash anymore. Thus, it looks like patches 7 & 8 can be dropped
-from this set for now. This is the behavior with beagleboard at least,
-if someone can verify this with some other omap3 hw that would be nice.
-
-The underlying issue still remains, we have errata i582 which doesn't
-have any workarounds in the kernel yet. We should probably resurrect
-something like this:
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38834.html
-
-... or just pull the part which adds the dynamic wakedep add / remove
-for the per domain when attempting per OFF.
-
--Tero
-
-
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+>  Documentation/arm/Marvell/README |  168 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 168 insertions(+)
+>  create mode 100644 Documentation/arm/Marvell/README
 > 
-> regards,
-> Rajendra
-> 
-> >
-> > Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> > ---
-> >   arch/arm/mach-omap2/clockdomain.c |    3 +++
-> >   arch/arm/mach-omap2/clockdomain.h |    4 ++++
-> >   2 files changed, 7 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-> > index 7f5423e..56cef58 100644
-> > --- a/arch/arm/mach-omap2/clockdomain.c
-> > +++ b/arch/arm/mach-omap2/clockdomain.c
-> > @@ -201,6 +201,9 @@ void _clkdm_del_autodeps(struct clockdomain *clkdm)
-> >   	if (!autodeps || clkdm->flags&  CLKDM_NO_AUTODEPS)
-> >   		return;
-> >
-> > +	if (clkdm->flags&  CLKDM_NO_AUTODEP_DISABLE)
-> > +		return;
-> > +
-> >   	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
-> >   		if (IS_ERR(autodep->clkdm.ptr))
-> >   			continue;
-> > diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-> > index 373399a..1fc5314 100644
-> > --- a/arch/arm/mach-omap2/clockdomain.h
-> > +++ b/arch/arm/mach-omap2/clockdomain.h
-> > @@ -31,12 +31,16 @@
-> >    *
-> >    * CLKDM_NO_AUTODEPS: Prevent "autodeps" from being added/removed from this
-> >    *     clockdomain.  (Currently, this applies to OMAP3 clockdomains only.)
-> > + * CLKDM_NO_AUTODEP_DISABLE: Prevent clockdomain code from deleting autodeps.
-> > + *     Needed for PER domain on omap3, as it will bug out with off-mode if
-> > + *     wakedeps are removed.
-> >    */
-> >   #define CLKDM_CAN_FORCE_SLEEP			(1<<  0)
-> >   #define CLKDM_CAN_FORCE_WAKEUP			(1<<  1)
-> >   #define CLKDM_CAN_ENABLE_AUTO			(1<<  2)
-> >   #define CLKDM_CAN_DISABLE_AUTO			(1<<  3)
-> >   #define CLKDM_NO_AUTODEPS			(1<<  4)
-> > +#define CLKDM_NO_AUTODEP_DISABLE		(1<<  5)
-> >
-> >   #define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
-> >   #define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
-> 
+> diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+> new file mode 100644
+> index 0000000..4f33433
+> --- /dev/null
+> +++ b/Documentation/arm/Marvell/README
+> @@ -0,0 +1,168 @@
+> +ARM Marvell SoCs
+> +================
+> +
+> +This document lists all the ARM Marvell SoCs that are currently
+> +supported in mainline by the Linux kernel. As the Marvell families of
+> +SoCs are large and complex, it is hard to understand where the support
+> +for a particular SoC is available in the Linux kernel. This document
+> +tries to help in understanding where those SoCs are supported, and to
+> +match them with their corresponding public datasheet, when available.
+> +
+> +Orion family
+> +------------
+> +
+> +  Flavors:
+> +        88F5082
+> +        88F5181
+> +        88F5181L
+> +        88F5182
+> +        88F5281
+> +        88F6183
+> +  Core: ARMv5 compatible
+> +  Linux kernel directory: arch/arm/mach-orion5x
+> +  No public datasheets available.
+
+There is a MV88F5182-opensource-manual.pdf document. It
+can be downloaded from:
+
+www.embeddedarm.com/.../MV88F5182-opensource-manual.pdf
+
+	Andrew
