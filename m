@@ -1,177 +1,34 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 18 Jul 2012 00:05:48 +0200
-Subject: [PATCH] can: flexcan: add 2nd clock to support imx53 and newer
-Message-ID: <1342562748-24701-1-git-send-email-mkl@pengutronix.de>
+From: tytso@mit.edu (Theodore Ts'o)
+Date: Tue, 17 Jul 2012 17:42:19 -0400
+Subject: [PATCH -next] random: Remove remaining relicts of
+ rand_initialize_irq()
+In-Reply-To: <CACRpkdZe48FrDJx1p8ojfqwVBE95hSJipE8rViAi=E28uumYOQ@mail.gmail.com>
+References: <1342524793-2522-1-git-send-email-sedat.dilek@gmail.com>
+ <20120717171251.GD6049@thunk.org>
+ <CACRpkdZe48FrDJx1p8ojfqwVBE95hSJipE8rViAi=E28uumYOQ@mail.gmail.com>
+Message-ID: <20120717214219.GF6049@thunk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+On Tue, Jul 17, 2012 at 08:57:19PM +0200, Linus Walleij wrote:
+> So the IRQ will be auto-sampled now or something?
+> 
+> Sorry for not quite following, which commit do I look at to
+> understand this now...
 
-This patch add support for a second clock to the flexcan driver. On modern
-freescale ARM cores like the imx53 and imx6q two clocks ("ipg" and "per")
-must be enabled in order to access the CAN core.
+Yes, there was a huge discussion on LKML about two weeks ago.  The
+key commit that will be going in during the next merge window is:
 
-In the original driver, the clock was requested without specifying the
-connection id, further all mainline ARM archs with flexcan support
-(imx28, imx25, imx35) register their flexcan clock without a connection id,
-too.
+http://git.kernel.org/?p=linux/kernel/git/tytso/random.git;a=commitdiff;h=775f4b297b780601e61787b766f306ed3e1d23eb
 
-This patch first renames the existing clk variable to clk_ipg and adds the
-connection id "ipg" to the clk_get() call. Then a second clock "per" is
-requested. As all archs don't specify a connection id, both clk_get return
-the same clock. This ensures compatibility to existing flexcan support
-and adds support for imx53 at the same time.
+There are a whole lot of other changes, of course, but that's the key
+change which IRQF_SAMPLE_RANDOM a no-op.  People have tested this
+under extreme conditions (high speed networking tests with no
+interrupt mitigations, etc.) and the patch as tweaked had no
+measurable overhead, so we can simply sample every single commit with
+a low-overhead fast path which uses per-cpu buffers, and then mix into
+the /dev/random entropy pool less frequently (which is still fast, but
+requires a few more memory accesses to shared memory that may incur
+delays due to cache line bounces).
 
-After this patch hits mainline, the archs may give their existing flexcan
-clock the "ipg" connection id and implement a dummy "per" clock.
-
-This patch has been tested on imx28 (unmodified clk tree) and on imx53
-with a seperate "ipg" and "per" clock.
-
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Hui Wang <jason77.wang@gmail.com>
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/net/can/flexcan.c |   52 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 35 insertions(+), 17 deletions(-)
-
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index c8a6fc7..281d51f 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -190,7 +190,8 @@ struct flexcan_priv {
- 	u32 reg_esr;
- 	u32 reg_ctrl_default;
- 
--	struct clk *clk;
-+	struct clk *clk_ipg;
-+	struct clk *clk_per;
- 	struct flexcan_platform_data *pdata;
- 	const struct flexcan_devtype_data *devtype_data;
- };
-@@ -828,7 +829,8 @@ static int flexcan_open(struct net_device *dev)
- 	struct flexcan_priv *priv = netdev_priv(dev);
- 	int err;
- 
--	clk_prepare_enable(priv->clk);
-+	clk_prepare_enable(priv->clk_ipg);
-+	clk_prepare_enable(priv->clk_per);
- 
- 	err = open_candev(dev);
- 	if (err)
-@@ -850,7 +852,8 @@ static int flexcan_open(struct net_device *dev)
-  out_close:
- 	close_candev(dev);
-  out:
--	clk_disable_unprepare(priv->clk);
-+	clk_disable_unprepare(priv->clk_per);
-+	clk_disable_unprepare(priv->clk_ipg);
- 
- 	return err;
- }
-@@ -864,7 +867,8 @@ static int flexcan_close(struct net_device *dev)
- 	flexcan_chip_stop(dev);
- 
- 	free_irq(dev->irq, dev);
--	clk_disable_unprepare(priv->clk);
-+	clk_disable_unprepare(priv->clk_per);
-+	clk_disable_unprepare(priv->clk_ipg);
- 
- 	close_candev(dev);
- 
-@@ -903,7 +907,8 @@ static int __devinit register_flexcandev(struct net_device *dev)
- 	struct flexcan_regs __iomem *regs = priv->base;
- 	u32 reg, err;
- 
--	clk_prepare_enable(priv->clk);
-+	clk_prepare_enable(priv->clk_ipg);
-+	clk_prepare_enable(priv->clk_per);
- 
- 	/* select "bus clock", chip must be disabled */
- 	flexcan_chip_disable(priv);
-@@ -936,7 +941,8 @@ static int __devinit register_flexcandev(struct net_device *dev)
-  out:
- 	/* disable core and turn off clocks */
- 	flexcan_chip_disable(priv);
--	clk_disable_unprepare(priv->clk);
-+	clk_disable_unprepare(priv->clk_per);
-+	clk_disable_unprepare(priv->clk_ipg);
- 
- 	return err;
- }
-@@ -964,7 +970,7 @@ static int __devinit flexcan_probe(struct platform_device *pdev)
- 	struct net_device *dev;
- 	struct flexcan_priv *priv;
- 	struct resource *mem;
--	struct clk *clk = NULL;
-+	struct clk *clk_ipg = NULL, *clk_per = NULL;
- 	struct pinctrl *pinctrl;
- 	void __iomem *base;
- 	resource_size_t mem_size;
-@@ -980,13 +986,20 @@ static int __devinit flexcan_probe(struct platform_device *pdev)
- 						"clock-frequency", &clock_freq);
- 
- 	if (!clock_freq) {
--		clk = clk_get(&pdev->dev, NULL);
--		if (IS_ERR(clk)) {
--			dev_err(&pdev->dev, "no clock defined\n");
--			err = PTR_ERR(clk);
-+		clk_ipg = clk_get(&pdev->dev, "ipg");
-+		if (IS_ERR(clk_ipg)) {
-+			dev_err(&pdev->dev, "no ipg clock defined\n");
-+			err = PTR_ERR(clk_ipg);
-+			goto failed_clock;
-+		}
-+		clock_freq = clk_get_rate(clk_ipg);
-+
-+		clk_per = clk_get(&pdev->dev, "per");
-+		if (IS_ERR(clk_per)) {
-+			dev_err(&pdev->dev, "no per clock defined\n");
-+			err = PTR_ERR(clk_per);
- 			goto failed_clock;
- 		}
--		clock_freq = clk_get_rate(clk);
- 	}
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -1039,7 +1052,8 @@ static int __devinit flexcan_probe(struct platform_device *pdev)
- 		CAN_CTRLMODE_BERR_REPORTING;
- 	priv->base = base;
- 	priv->dev = dev;
--	priv->clk = clk;
-+	priv->clk_ipg = clk_ipg;
-+	priv->clk_per = clk_per;
- 	priv->pdata = pdev->dev.platform_data;
- 	priv->devtype_data = devtype_data;
- 
-@@ -1067,9 +1081,11 @@ static int __devinit flexcan_probe(struct platform_device *pdev)
-  failed_map:
- 	release_mem_region(mem->start, mem_size);
-  failed_get:
--	if (clk)
--		clk_put(clk);
-  failed_clock:
-+	if (clk_per)
-+		clk_put(clk_per);
-+	if (clk_ipg)
-+		clk_put(clk_ipg);
- 	return err;
- }
- 
-@@ -1086,8 +1102,10 @@ static int __devexit flexcan_remove(struct platform_device *pdev)
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(mem->start, resource_size(mem));
- 
--	if (priv->clk)
--		clk_put(priv->clk);
-+	if (priv->clk_per)
-+		clk_put(priv->clk_per);
-+	if (priv->clk_ipg)
-+		clk_put(priv->clk_ipg);
- 
- 	free_candev(dev);
- 
--- 
-1.7.10
+					- Ted
