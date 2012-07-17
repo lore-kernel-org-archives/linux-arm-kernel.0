@@ -1,26 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 13:59:20 +0200
-Subject: [PATCH] arm: mvebu: generate DTBs for supported SoCs
-Message-ID: <1342526360-8417-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 17 Jul 2012 14:01:00 +0200
+Subject: Device tree.
+In-Reply-To: <500552C9.4090107@codethink.co.uk>
+References: <500552C9.4090107@codethink.co.uk>
+Message-ID: <20120717140100.7c0ae90c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary dtb-$(CONFIG_...) entries so that "make dtbs"
-generates the Device Tree Blobs that correspond to the selected mvebu
-SoCs.
+Le Tue, 17 Jul 2012 12:55:53 +0100,
+Ian Molton <ian.molton@codethink.co.uk> a ?crit :
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/Makefile.boot |    2 ++
- 1 file changed, 2 insertions(+)
+> I've found some references to this in the mailinglist archives but 
+> nothing conclusive.
+> 
+> Whats the recommended way of dealing with devicetree when one is
+> stuck with an unco-operative bootloader?
+> 
+> I've made a small hack (below) to allow me to append a .dtb to the
+> end of the kernel image. I note that other similar hacks have not
+> been picked up, but I can't see why. Or I've missed the one that did
+> get chosen.
 
-diff --git a/arch/arm/mach-mvebu/Makefile.boot b/arch/arm/mach-mvebu/Makefile.boot
-index b327175..2579a2f 100644
---- a/arch/arm/mach-mvebu/Makefile.boot
-+++ b/arch/arm/mach-mvebu/Makefile.boot
-@@ -1 +1,3 @@
- zreladdr-y := 0x00008000
-+dtb-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-db.dtb
-+dtb-$(CONFIG_MACH_ARMADA_370_XP) += armada-xp-db.dtb
+You surely want to have a look at CONFIG_ARM_APPENDED_DTB, which does
+what you want and is already part of the ARM kernel.
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
