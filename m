@@ -1,127 +1,114 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 17 Jul 2012 09:11:16 +0200
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: set GPIO mode for mux
- mcspi1_cs2 pin
-In-Reply-To: <CAFqH_511c6CyAYnbtU0ECZwzRNwJEdTqtcZ63nODCYZU4GC0aA@mail.gmail.com>
-References: <1341885452-5372-1-git-send-email-javier@dowhile0.org>
- <CAFqH_511c6CyAYnbtU0ECZwzRNwJEdTqtcZ63nODCYZU4GC0aA@mail.gmail.com>
-Message-ID: <CABxcv=miEavW5Qf-Y+S4Nph+ah5gQ6QDpt-T44tdHLBxcP8pqQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jul 2012 09:13:43 +0200
+Subject: [RFC PATCHv2 2/2] ARM: socfpga: Add board support for Altera's
+ SOCFPGA  Cyclone 5 HW
+In-Reply-To: <1342113976-27140-3-git-send-email-dinguyen@altera.com>
+References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
+ <1342113976-27140-3-git-send-email-dinguyen@altera.com>
+Message-ID: <20120717091343.1eb8939d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2012 at 9:24 AM, Enric Balletb? i Serra
-<eballetbo@gmail.com> wrote:
->
->
-> 2012/7/10 Javier Martinez Canillas <javier@dowhile0.org>
->>
->> According to the IGEPv2 Rev.C data-sheet the LAN9221i pin 14 (IRQ) is
->> connected to the OMAP3730 mcspi1_cs2 pin. Since this omap mux pin acts
->> as an IRQ line, it has to be configured as an input GPIO.
->>
->> IGEPv2 platform code sets the smsc911x_cfg->gpio_irq to GPIO 176 but
->> since the mux pin default mode is MODE7 (safe_mode) the driver fails
->> when trying to register the IRQ with the following error message:
->>
->> [    1.994598] smsc911x: Driver version 2008-10-21
->> [    3.704162] irq 272: nobody cared (try booting with the "irqpoll"
->> option)
->> [    3.711364] [<c001a114>] (unwind_backtrace+0x0/0xf0) from [<c009a0d4>]
->> (__report_bad_irq+0x20/0xbc)
->> [    3.720916] [<c009a0d4>] (__report_bad_irq+0x20/0xbc) from [<c009a41c>]
->> (note_interrupt+0x1d8/0x238)
->> [    3.730560] [<c009a41c>] (note_interrupt+0x1d8/0x238) from [<c0098234>]
->> (handle_irq_event_percpu+0xc0/0x260)
->> [    3.740936] [<c0098234>] (handle_irq_event_percpu+0xc0/0x260) from
->> [<c0098410>] (handle_irq_event+0x3c/0x5c)
->> [    3.751312] [<c0098410>] (handle_irq_event+0x3c/0x5c) from [<c009abe0>]
->> (handle_level_irq+0xac/0x10c)
->> [    3.761047] [<c009abe0>] (handle_level_irq+0xac/0x10c) from
->> [<c0097a34>] (generic_handle_irq+0x30/0x48)
->> [    3.770935] [<c0097a34>] (generic_handle_irq+0x30/0x48) from
->> [<c02a6b74>] (gpio_irq_handler+0x180/0x1d4)
->> [    3.780944] [<c02a6b74>] (gpio_irq_handler+0x180/0x1d4) from
->> [<c0097a34>] (generic_handle_irq+0x30/0x48)
->> [    3.790954] [<c0097a34>] (generic_handle_irq+0x30/0x48) from
->> [<c0013e18>] (handle_IRQ+0x4c/0xac)
->> [    3.800231] [<c0013e18>] (handle_IRQ+0x4c/0xac) from [<c000858c>]
->> (omap3_intc_handle_irq+0x60/0x74)
->> [    3.809783] [<c000858c>] (omap3_intc_handle_irq+0x60/0x74) from
->> [<c04979e4>] (__irq_svc+0x44/0x60)
->> [    3.819213] Exception stack(0xee42fde0 to 0xee42fe28)
->> [    3.824554] fde0: 00000001 00000001 00000000 00000000 60000013 c06cce14
->> c06cce14 00000110
->> [    3.833190] fe00: 00000000 c06ccdf4 60000013 ee41d000 fb058064 ee42fe28
->> c0089e08 c04976b4
->> [    3.841796] fe20: 20000013 ffffffff
->> [    3.845489] [<c04979e4>] (__irq_svc+0x44/0x60) from [<c04976b4>]
->> (_raw_spin_unlock_irqrestore+0x34/0x44)
->> [    3.855499] [<c04976b4>] (_raw_spin_unlock_irqrestore+0x34/0x44) from
->> [<c0099744>] (__setup_irq+0x1b8/0x3f0)
->> [    3.865875] [<c0099744>] (__setup_irq+0x1b8/0x3f0) from [<c0099a34>]
->> (request_threaded_irq+0xb8/0x140)
->> [    3.875701] [<c0099a34>] (request_threaded_irq+0xb8/0x140) from
->> [<c0487950>] (smsc911x_drv_probe+0x75c/0x11a4)
->> [    3.886260] [<c0487950>] (smsc911x_drv_probe+0x75c/0x11a4) from
->> [<c02e9bcc>] (platform_drv_probe+0x18/0x1c)
->> [    3.906707] [<c02e89b8>] (driver_probe_device+0x90/0x210) from
->> [<c02e8bcc>] (__driver_attach+0x94/0x98)
->> [    3.916625] [<c02e8bcc>] (__driver_attach+0x94/0x98) from [<c02e7298>]
->> (bus_for_each_dev+0x50/0x7c)
->> [    3.926177] [<c02e7298>] (bus_for_each_dev+0x50/0x7c) from [<c02e81d4>]
->> (bus_add_driver+0x184/0x248)
->> [    3.935821] [<c02e81d4>] (bus_add_driver+0x184/0x248) from [<c02e909c>]
->> (driver_register+0x78/0x12c)
->> [    3.945465] [<c02e909c>] (driver_register+0x78/0x12c) from [<c0008648>]
->> (do_one_initcall+0x34/0x178)
->> [    3.955108] [<c0008648>] (do_one_initcall+0x34/0x178) from [<c066e8f4>]
->> (kernel_init+0xfc/0x1c0)
->> [    3.964385] [<c066e8f4>] (kernel_init+0xfc/0x1c0) from [<c00140b0>]
->> (kernel_thread_exit+0x0/0x8)
->> [    3.973632] handlers:
->> [    3.976043] [<c034e2cc>] smsc911x_irqhandler
->> [    3.980560] Disabling IRQ #272
->>
->> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->> ---
->>  arch/arm/mach-omap2/board-igep0020.c |    2 ++
->>  1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-igep0020.c
->> b/arch/arm/mach-omap2/board-igep0020.c
->> index 7491529..2821448 100644
->> --- a/arch/arm/mach-omap2/board-igep0020.c
->> +++ b/arch/arm/mach-omap2/board-igep0020.c
->> @@ -554,6 +554,8 @@ static const struct usbhs_omap_board_data
->> igep3_usbhs_bdata __initconst = {
->>
->>  #ifdef CONFIG_OMAP_MUX
->>  static struct omap_board_mux board_mux[] __initdata = {
->> +       /* SMSC9221 LAN Controller ETH IRQ (GPIO_176) */
->> +       OMAP3_MUX(MCSPI1_CS2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
->>         { .reg_offset = OMAP_MUX_TERMINATOR },
->>  };
->>  #endif
->> --
->> 1.7.7.6
->>
->
-> Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-> Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
->
-> Thanks Javier,
+Hello,
 
-Hi Tony,
+Le Thu, 12 Jul 2012 12:26:16 -0500,
+<dinguyen@altera.com> a ?crit :
 
-Just pinging to see if you have further comments on this patch or if
-it can be applied. It solves a bug on IGEPv2 boards.
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> new file mode 100644
+> index 0000000..710c773
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> @@ -0,0 +1,118 @@
+> +/*
+> + *  Copyright (C) 2012 Altera Corporation <www.altera.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "socfpga.dtsi"
+> +
+> +/ {
+> +	model = "Altera SOCFPGA Cyclone V";
+> +	compatible = "altr,socfpga-cyclone5";
+> +
+> +	aliases {
+> +		ethernet0 = &gmac0;
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,57600";
+> +	};
+> +
+> +	memory {
+> +		name = "memory";
+> +		device_type = "memory";
+> +		reg = <0x0 0x10000000>; /* 256MB */
+> +	};
+> +
+> +	soc {
+> +		amba {
+> +			compatible = "arm,amba-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			pdma: pdma at ffe01000 {
+> +				compatible = "arm,pl330", "arm,primecell";
+> +				reg = <0xffe01000 0x1000>;
+> +				interrupts = <0 180 4>;
+> +			};
+> +		};
+> +
+> +		apb_periphs {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			uart0: uart at ffc02000 {
+> +				compatible = "snps,dw-apb-uart";
+> +				reg = <0xffc02000 0x1000>;
+> +				clock-frequency = <7372800>;
+> +				interrupts = <0 162 4>;
+> +				reg-shift = <2>;
+> +				reg-io-width = <4>;
+> +			};
+> +
+> +		timer0: timer at ffc08000 {
+> +				compatible = "snps,dw-apb-timer-sp";
+> +				interrupts = <0 167 4>;
+> +				clock-frequency = <200000000>;
+> +				reg = <0xffc08000 0x1000>;
+> +			};
 
-I know the trend is to move away from board code. I'll start working
-on an device tree for the IGEPv2 but it will take some time until is
-ready (and I'm not sure if all the OMAP3 support is already present on
-DT).
+There is an indentation problem here, the timer0 (and the following)
+should be at the same level as uart0.
 
-So could you please take bug fixes for the board code in the meantime?
+Also, are all those peripherals (uarts, timers) really board-specific?
+I.e, are they synthesized on the FPGA part, or are they part of the ARM
+SoC, in which case they should be listed in the .dtsi and not in
+the .dts.
 
-Thanks a lot and best regards,
-Javier
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
