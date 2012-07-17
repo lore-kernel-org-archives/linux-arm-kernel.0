@@ -1,43 +1,73 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 17 Jul 2012 10:41:04 +0800
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add support for set bits for
- general purpose registers
-In-Reply-To: <CACRpkdbKOQt=gqydQNRfCOU-TaschHtFq0e_86xgvtHYMnwpKA@mail.gmail.com>
-References: <1341565763-10074-1-git-send-email-b29396@freescale.com>
- <CACRpkdbKOQt=gqydQNRfCOU-TaschHtFq0e_86xgvtHYMnwpKA@mail.gmail.com>
-Message-ID: <20120717024104.GE19699@shlinux2.ap.freescale.net>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Tue, 17 Jul 2012 12:10:06 +0900
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
+ to be selected
+In-Reply-To: <20120713111337.GH18079@mudshark.cambridge.arm.com>
+References: <1340991231-17682-1-git-send-email-will.deacon@arm.com>
+ <1340991231-17682-3-git-send-email-will.deacon@arm.com>
+ <4FFE7DB2.4040702@renesas.com>
+ <20120712084432.GA2816@mudshark.cambridge.arm.com>
+ <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
+ <4FFF8509.2050302@renesas.com>
+ <20120713085746.GA18079@mudshark.cambridge.arm.com>
+ <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
+ <20120713111337.GH18079@mudshark.cambridge.arm.com>
+Message-ID: <5004D78E.4050606@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2012 at 04:24:16AM +0800, Linus Walleij wrote:
-> On Fri, Jul 6, 2012 at 11:09 AM, Dong Aisheng <b29396@freescale.com> wrote:
-> 
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> >
-> > The General Purpose Registers (GPR) is used to select operating modes for
-> > general features in the SoC, usually not related to the IOMUX itself,
-> > but it does belong to IOMUX controller.
-> > We simply provide an convient API for driver to call to set the general purpose
-> > register bits if needed.
-> >
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> I have an overall objection to this:
-> 
-> I have no idea at all about what's going on, and why this belongs in the pin
-> control subsystem. On the contrary, from the commit description it seems to
-> *not* belong in this subsystem at all.
-> 
-Yes, it's just from hw point of view, these GPR registers are included in IOMUXC
-block. But as the spec says in my commit messages, most of what they do are not
-related to IOMUX itself.
-So i would agree it doesn't belong to pinctrl subsystem if we can find a better
-place.
+Will, Stephen and Santosh,
 
-> So: exactly what does this register do, and which are the consumers?
-> 
-They're used for general settings for different modules like DMA, USB, PCIe,
-IPU...
+On 7/13/2012 8:13 PM, Will Deacon wrote:
+> I was anticipating that the platform would set the initial loops_per_jiffy
+> value if it requires udelays before loop calibration and the default of 4k
+> is wildly off.
 
-Regards
-Dong Aisheng
+I overlooked two different lpj setups were involved at hand.
+
+First one was, the initial loops_per_jiffy value of 4k was too small for
+almost all processors running Linux today, so I set up loops_per_jiffy
+_early_, calculated from the CPU clock speed.  I didn't mentioned this
+before, sorry for confusion.
+
+So my initial loops_per_jiffy is not 4k at this point.  It's optimized
+for loop-based delay with the CPU running at 1.2GHz (much bigger than
+default 4k).
+
+And later, init_current_timer_delay() got processed.  Actual udelay()
+behavior switched from loop-based delay to timer-based one immediately,
+while my loops_per_jiffy was not changed/updated to appropriate value.
+
+This is why my udelay()s, used after init_current_timer_delay(), were
+taking considerable long time to expire.   Note that my initial tests
+for Will's patchset was done using a loadable module dedicated for
+udelay tests, that was prepared for 2.6.35/3.0 kernels beforehand.
+
+And this time, I confirmed that updating loops_per_jiffy at the same
+time as lpj_fine, works perfectly as expected for me.
+
+> If people need loops_per_jiffy to be updated at the same time as lpj_fine,
+> I can post that as a separate patch (below) as Russell has merged v2 of these
+> patches into his delay branch. That said, I'd certainly like to know if this
+> is actually a real problem (and can't be solved by choosing a compromise value
+> as the initial loops_per_jiffy). I think Shinya was doing some tests so
+> I'll wait to see how those went.
+
+>From my observations:
+
+(1) loops_per_jiffy can easily be calculated from the CPU clock speed.
+If your platform is capable of detecting CPU frequency at run-time,
+settingi up loops_per_jiffy _early_ can allow you early use of udelay()s.
+
+Or even if you don't need udelay() early, setting up lpj_fine (or having
+calibrate_delay_is_known()) allows you to skip calibrate_delay() later.
+This is useful and can be applied to both UP and SMP systems.
+
+(2) For SMP platforms, if you need ealy use of udelay(), you have to
+update loops_per_jiffy at the same time as init_current_timer_delay().
+It could be done in init_current_timer_delay(), or platforms can take
+care of that, that need udelay() available early.  Either one should be
+fine with me.
+--
+Shinya Kuribayashi
+Renesas Electronics
