@@ -1,19 +1,44 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Tue, 17 Jul 2012 09:24:51 +0100
-Subject: [PATCH v2 1/2] ARM: dts: SPEAr320: Fix compatible string
-In-Reply-To: <004cd5118cabfe44e9d5b256684122016a1728f4.1342508737.git.vipulkumar.samar@st.com>
-References: <004cd5118cabfe44e9d5b256684122016a1728f4.1342508737.git.vipulkumar.samar@st.com>
-Message-ID: <CAOh2x==Vn0VG-sQiFp=WxKiwdcB43JBjqjwjyNNaTb0Z7AxfDA@mail.gmail.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Tue, 17 Jul 2012 16:37:10 +0800
+Subject: [PATCH] irqdomain: let the output of irq number align from left side
+Message-ID: <1342514230-8729-1-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 8:09 AM, Vipul Kumar Samar
-<vipulkumar.samar@st.com> wrote:
-> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-> ---
->  arch/arm/boot/dts/spear320-evb.dts |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+Except irq number, the rest columns all align from left side, the
+output is ugly as following shows,
+irq    hwirq    chip name        chip data   domain name
+   29  0x0001d  GIC              0x805e1070  /interrupt-<snip>
+   34  0x00022  GIC              0x805e1070  /interrupt-<snip>
 
-For both patches:
+After applying the fix, the output like that,
+irq    hwirq    chip name        chip data   domain name
+29     0x0001d  GIC              0x805e1070  /interrupt-<snip>
+34     0x00022  GIC              0x805e1070  /interrupt-<snip>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+---
+This is a trivial output alignment fix, i don't know if Grant
+still maintain the irqdomain subsystem, Cced to Mark for a
+backup.
+
+ kernel/irq/irqdomain.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 41c1564..575e643 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -712,7 +712,7 @@ static int virq_debug_show(struct seq_file *m, void *private)
+ 		if (desc->action && desc->action->handler) {
+ 			struct irq_chip *chip;
+ 
+-			seq_printf(m, "%5d  ", i);
++			seq_printf(m, "%-5d  ", i);
+ 			seq_printf(m, "0x%05lx  ", desc->irq_data.hwirq);
+ 
+ 			chip = irq_desc_get_chip(desc);
+-- 
+1.7.6
