@@ -1,28 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 21:34:31 +0000
-Subject: [GIT PULL] ux500 dt for -next
-In-Reply-To: <4FFFDE93.6050702@linaro.org>
-References: <4FFFDE93.6050702@linaro.org>
-Message-ID: <201207172134.31885.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 17 Jul 2012 23:48:34 +0200
+Subject: [PATCH 05/10] mmc: spi: Pull out the SSP clock configuration
+ function
+In-Reply-To: <20120717153901.5530a246a7a5fecfef03b373@kinali.ch>
+References: <1342440597-8395-1-git-send-email-marex@denx.de>
+ <1342440597-8395-6-git-send-email-marex@denx.de>
+ <20120717153901.5530a246a7a5fecfef03b373@kinali.ch>
+Message-ID: <201207172348.34919.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 July 2012, Lee Jones wrote:
-> The following changes since commit 2b667a2d8005e7c8362a77365cedbcd71fa5d6c1:
-> 
->   ARM: ux500: Over-ride the DT device naming scheme for pinctrl (2012-07-06 21:42:10 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-arm-soc-next
-> 
-> for you to fetch changes up to da38487000de965bb94b8f4bca88eade4bb9a485:
-> 
->   ARM: ux500: Remove PMU platform registration when booting with DT (2012-07-13 10:14:41 +0200)
-> 
+Dear Attila Kinali,
 
-Pulled again now.
+> On Mon, 16 Jul 2012 14:09:52 +0200
+> 
+> Marek Vasut <marex@denx.de> wrote:
+> > Pull out the MMC clock configuration function and make it
+> > into SSP clock configuration function, so it can be used by
+> > the SPI driver too.
+> > 
+> > diff --git a/drivers/clk/mxs/clk-ssp.c b/drivers/clk/mxs/clk-ssp.c
+> > new file mode 100644
+> > index 0000000..b3c1e16
+> > --- /dev/null
+> > +++ b/drivers/clk/mxs/clk-ssp.c
+> > @@ -0,0 +1,61 @@
+> > +/*
+> > + * Copyright 2012 DENX Software Engineering, GmbH
+> > + *
+> > + * Pulled from code:
+> > + * Portions copyright (C) 2003 Russell King, PXA MMCI Driver
+> > + * Portions copyright (C) 2004-2005 Pierre Ossman, W83L51xD SD/MMC
+> > driver + *
+> > + * Copyright 2008 Embedded Alley Solutions, Inc.
+> > + * Copyright 2009-2011 Freescale Semiconductor, Inc.
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/init.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/module.h>
+> > +#include <linux/device.h>
+> > +#include <linux/io.h>
+> > +#include <linux/spi/mxs-spi.h>
+> > +
+> > +void mxs_ssp_set_clk_rate(struct mxs_ssp *ssp, unsigned int rate)
+> > +{
+> > +	unsigned int ssp_clk, ssp_sck;
+> > +	u32 clock_divide, clock_rate;
+> > +	u32 val;
+> > +
+> > +	ssp_clk = clk_get_rate(ssp->clk);
+> > +
+> > +	for (clock_divide = 2; clock_divide <= 254; clock_divide += 2) {
+> > +		clock_rate = DIV_ROUND_UP(ssp_clk, rate * clock_divide);
+> > +		clock_rate = (clock_rate > 0) ? clock_rate - 1 : 0;
+> > +		if (clock_rate <= 255)
+> > +			break;
+> > +	}
+> > +
+> > +	if (clock_divide > 254) {
+> > +		dev_err(ssp->dev,
+> > +			"%s: cannot set clock to %d\n", __func__, rate);
+> > +		return;
+> > +	}
+> > +
+> > +	ssp_sck = ssp_clk / clock_divide / (1 + clock_rate);
+> > +
+> > +	val = readl(ssp->base + HW_SSP_TIMING(ssp));
+> > +	val &= ~(BM_SSP_TIMING_CLOCK_DIVIDE | BM_SSP_TIMING_CLOCK_RATE);
+> > +	val |= BF_SSP(clock_divide, TIMING_CLOCK_DIVIDE);
+> > +	val |= BF_SSP(clock_rate, TIMING_CLOCK_RATE);
+> > +	writel(val, ssp->base + HW_SSP_TIMING(ssp));
+> > +
+> > +	ssp->clk_rate = ssp_sck;
+> > +
+> > +	dev_dbg(ssp->dev,
+> > +		"%s: clock_divide %d, clock_rate %d, ssp_clk %d, rate_actual %d,
+> > rate_requested %d\n", +		__func__, clock_divide, clock_rate, 
+ssp_clk,
+> > ssp_sck, rate);
+> > +}
+> 
+> There is a EXPORT_SYMBOL_GPL(mxs_ssp_set_clk_rate); missing here.
 
-Thanks,
+What for?
 
-	Arnd
+Best regards,
+Marek Vasut
