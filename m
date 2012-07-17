@@ -1,62 +1,35 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 17 Jul 2012 11:41:56 +0200
-Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
-In-Reply-To: <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
-References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
- <201207161554.04812.arnd@arndb.de>
- <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
-Message-ID: <2442382.A2GKNpPZbv@flexo>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 17 Jul 2012 10:48:41 +0100
+Subject: [PATCH 4/9] ARM: vexpress: Initial common clock support
+In-Reply-To: <CAJOA=zOe79YK06Rq2wmqkyGrHopyDi5ZWB25qL53g_nxu9T-TQ@mail.gmail.com>
+References: <1342013791-19516-1-git-send-email-pawel.moll@arm.com>
+ <1342013791-19516-5-git-send-email-pawel.moll@arm.com>
+ <CACRpkdZGVgO-1jnfK=fpo73ryLDe05R0_hghwBxzDfbBK9jBRA@mail.gmail.com>
+ <1342025844.25865.3.camel@hornet>
+ <CAJOA=zOe79YK06Rq2wmqkyGrHopyDi5ZWB25qL53g_nxu9T-TQ@mail.gmail.com>
+Message-ID: <1342518521.28167.4.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Monday 16 July 2012 13:47:01 Turquette, Mike wrote:
-> On Mon, Jul 16, 2012 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-[snip]
-> > board selection.
-> >
-> >> +struct clk {
-> >> +     struct clk *parent;             /* parent clk */
-> >> +     unsigned long rate;             /* clock rate in Hz */
-> >> +     unsigned long divider;          /* clock divider */
-> >> +     u32 usecount;                   /* reference count */
-> >> +     struct clk_ops *ops;            /* clock operation */
-> >> +     u32 enable_reg;                 /* clock enable register */
-> >> +     u32 enable_mask;                /* clock enable mask */
-> >> +};
-> >
-> > Platforms are now converting to the common clock framework in drivers/clk.
-> > Mike Turquette as the subsystem maintainer can probably judge better 
-whether
-> > we should still be allowing new platforms with their own implementation
-> > of clk, but my feeling is that you should use the subsystem instead
-> > and add a driver in a subdirectory of drivers/clk instead of in the
-> > platform.
+On Mon, 2012-07-16 at 21:15 +0100, Turquette, Mike wrote:
+> > This patch is only a first step. I'm working now on a major rework of
+> > the VE control infrastructure, and I do have drivers/clk/vexpress (can
+> > be versatile, I don't really mind) directory in my local repo. This will
+> > happen in time for the next merge window.
 > 
-> Hi Florian & Arnd,
-> 
-> Adopting the new clock framework is highly preferable, especially if
-> MCS814x support is being delayed until 3.7.  There is also a push to
-> put clock drivers into drivers/clk and I would like to continue that
-> trend, but I'm less strict on that measure if it proves very difficult
-> for your platform immediately (e.g. duplicating headers across
-> platform and generic code, etc).  Migrating code from arch/arm to
-> drivers/clk can always be done in a future series.
+> I'd rather not take any more patches this close to the 3.6 merge
+> window.  How do you feel about holding onto this patch and
+> implementing some of the longer term changes mentioned by Linus
+> towards 3.7?
 
-Since we are now targetting 3.7, I would rather come up with proper DT clock 
-bindings, which should make the mcs814x clock driver much nicer.
+Sorry, I wasn't precise enough... What I meant:
 
-> 
-> This platform also seems to be making use of DT so it would be very
-> nice if we use MCS814x to push the state of clk DT bindings and
-> adoption forward a bit.  There are not a lot of folks using the
-> patches from Rob/Grant today.  Hopefully delaying these patches by
-> another merge cycle means that these requests are not asking too much
-> :-)
+1. The "micro-changes" (contained to arch/arm/mach-vexpress) are going
+to 3.6 via arm-soc (already pulled by Arnd).
 
-If we could get them merged during 3.6 that would allow me, and other ARM-soc 
-maintainers to get their stuff fully migrated to DT. Are there any blockers to 
-these patches?
---
-Florian
+2. The "big changes" are waiting till 3.7 merge window, and the
+drivers/clk/*/clk-vexpress.c will go through your tree.
+
+Hope it makes sense,
+
+Pawe?
