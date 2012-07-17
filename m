@@ -1,45 +1,37 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 17 Jul 2012 08:51:19 +0200
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
-References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
- <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
-Message-ID: <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
+From: vipulkumar.samar@st.com (Vipul Kumar Samar)
+Date: Tue, 17 Jul 2012 12:39:23 +0530
+Subject: [PATCH v2 2/2] ARM: dts: SPEAr320: Boot the board in EXTENDED_MODE
+In-Reply-To: <004cd5118cabfe44e9d5b256684122016a1728f4.1342508737.git.vipulkumar.samar@st.com>
+References: <004cd5118cabfe44e9d5b256684122016a1728f4.1342508737.git.vipulkumar.samar@st.com>
+Message-ID: <4d27fa9cf26c74bec934d20701c2d1712dee369a.1342508737.git.vipulkumar.samar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 8:45 AM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> Hi,
->
-> On Tue, Jul 17, 2012 at 6:00 AM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
->> The OMAP MMC and OMAP High Speed MMC hosts now use entirely the DMA
->> engine API instead of the previous private DMA API implementation.
->>
->> So, if the kernel is built with support for any of these hosts but it
->> doesn't support DMA devices nor OMAP DMA support, it fails when trying
->> to obtain a DMA channel which leads to the following error on an OMAP3
->> IGEPv2 Rev.C board (and probably on most OMAP boards with MMC support):
->>
->> [    2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA engine channel 48
->> [    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 62
->>
->> selecting automatically CONFIG_DMADEVICES and CONFIG_DMA_OMAP solves it.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->> ---
-> Considering, we are updating drivers to select the DMA engine, can you
-> also include
-> "drivers/spi/spi-omap2-mcspi.c" which is also updated for DMA engine.
->
-> Regards
-> Santosh
+On spear320 machine no. of supported mode are:
+	AUTO_NET_SMII_MODE
+	AUTO_NET_MII_MODE
+	AUTO_EXP_MODE
+	SMALL_PRINTERS_MODE
+	EXTENDED_MODE
+This patch is to configure and boot the machine in EXTENDED_MODE.
 
-Hi Santosh,
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+---
+ arch/arm/boot/dts/spear320-evb.dts |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Ok, I'll send a v2 now which includes spi-omap2-mcspi then.
-
-Thanks a lot and best regards,
-Javier
+diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+index f28bea8..e4e912f 100644
+--- a/arch/arm/boot/dts/spear320-evb.dts
++++ b/arch/arm/boot/dts/spear320-evb.dts
+@@ -26,7 +26,7 @@
+ 
+ 	ahb {
+ 		pinmux at b3000000 {
+-			st,pinmux-mode = <3>;
++			st,pinmux-mode = <4>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&state_default>;
+ 
+-- 
+1.7.3.4
