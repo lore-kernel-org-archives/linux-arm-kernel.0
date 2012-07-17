@@ -1,57 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 17 Jul 2012 09:28:33 +0200
-Subject: [GIT PULL] i.MX clk fixes and updates
-Message-ID: <20120717072833.GZ30009@pengutronix.de>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Tue, 17 Jul 2012 10:36:00 +0300
+Subject: [PATCH for 3.6] ARM: mxs: fix the changed OF interface in MAC update
+ function
+Message-ID: <1342510560-24584-1-git-send-email-lauri.hintsala@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Commit 475d009429 "of: Improve prom_update_property() function" changes
+the usage of prom_update_property function. Fix compiler error and start
+to use the new improved interface.
 
-Please pull the following i.MX clk fixes and updates for next. Not
-strictly divided into fixes/features, but all around clk support, hope
-that's ok.
+Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+---
 
-Thanks
- Sascha
+Linux-next is broken becase of prom_update_property interface change.
 
-The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
+ arch/arm/mach-mxs/mach-mxs.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-clk
-
-for you to fetch changes up to 14ac5b884eff23f53139dd4508f428aee906d8c2:
-
-  ARM: imx: clk-imx31: Fix clock id for rnga driver (2012-07-16 23:25:48 +0200)
-
-----------------------------------------------------------------
-i.MX clk noncritical fixes and updates
-
-----------------------------------------------------------------
-Alexander Shiyan (4):
-      ARM: i.MX5x clocks: Add EPIT support
-      ARM: i.MX5x clocks: Fix parent for PWM clocks
-      ARM: i.MX5x clocks: Fix GPT clocks
-      ARM: i.MX5x CSPI: Fixed clock name for CSPI
-
-Fabio Estevam (3):
-      ARM: clk-imx27: Fix rtc clock id
-      ARM: mx27: Reenable silicon version print
-      ARM: imx: clk-imx31: Fix clock id for rnga driver
-
-Uwe Kleine-K?nig (1):
-      ARM: imx: add missing item to the list of clock event modes
-
- arch/arm/mach-imx/clk-imx27.c                |    4 +++-
- arch/arm/mach-imx/clk-imx31.c                |    4 ++--
- arch/arm/mach-imx/clk-imx51-imx53.c          |   23 ++++++++++++++++-------
- arch/arm/plat-mxc/devices/platform-spi_imx.c |    2 +-
- arch/arm/plat-mxc/time.c                     |    3 ++-
- 5 files changed, 24 insertions(+), 12 deletions(-)
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 648bdd0..8dabfe8 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -162,7 +162,7 @@ enum mac_oui {
+ static void __init update_fec_mac_prop(enum mac_oui oui)
+ {
+ 	struct device_node *np, *from = NULL;
+-	struct property *oldmac, *newmac;
++	struct property *newmac;
+ 	const u32 *ocotp = mxs_get_ocotp();
+ 	u8 *macaddr;
+ 	u32 val;
+@@ -208,11 +208,7 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 		macaddr[4] = (val >> 8) & 0xff;
+ 		macaddr[5] = (val >> 0) & 0xff;
+ 
+-		oldmac = of_find_property(np, newmac->name, NULL);
+-		if (oldmac)
+-			prom_update_property(np, newmac, oldmac);
+-		else
+-			prom_add_property(np, newmac);
++		prom_update_property(np, newmac);
+ 	}
+ }
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
