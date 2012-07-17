@@ -1,102 +1,78 @@
-From: sedat.dilek@gmail.com (Sedat Dilek)
-Date: Tue, 17 Jul 2012 12:39:07 +0200
-Subject: linux-next: Tree for July 17 (mfd: AB3100 - ab3100_probe:
- undefined reference to `rand_initialize_irq')
-In-Reply-To: <CA+icZUW4gNqspcJ1sjBD-3GCVee2VWVV5NPAr6Eo-aZHjp3y+Q@mail.gmail.com>
-References: <CA+icZUXjc+13YjoJ6FjDFboX20j3mqHNtvV2Av2-H0My8V2Mgg@mail.gmail.com>
- <CA+icZUW4gNqspcJ1sjBD-3GCVee2VWVV5NPAr6Eo-aZHjp3y+Q@mail.gmail.com>
-Message-ID: <CA+icZUW+Gp9HK-6dzHjtTwSc9RaLD3sV+WPMM-vO3A6fj6frwQ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 17 Jul 2012 12:41:06 +0200
+Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
+ controller.
+In-Reply-To: <50053DB5.1010704@st.com>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <214127499f10b0099e6f3542e1e879fdd8c1bdcf.1342171151.git.vipulkumar.samar@st.com>
+ <CAOh2x==ob+N26pJdc1DC8DfOomus1robkj=8DeyVE_ve_L-bAA@mail.gmail.com>
+ <201207131422.26274.arnd@arndb.de> <50053DB5.1010704@st.com>
+Message-ID: <20120717104106.GA2629@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 12:21 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
-> On Tue, Jul 17, 2012 at 11:47 AM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
->> On Tue, Jul 17, 2012 at 7:41 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>> Hi all,
->>>
->>> Changes since 20120716:
->>>
->>> The vfs tree lost its build failure.
->>>
->>> The l2-mtd tree gained a conflict against the mtd tree.
->>>
->>> The battery tree tree lost its build failure.
->>>
->>> The regulator tree gained conflicts against the mfd tree.
->>>
->>> The tty tree lost its build failure but gained another, so I used the
->>> version from next-20120712.
->>>
->>> I have still reverted 3 commits from the signal tree at the request of the
->>> arm maintainer.
->>>
->>> The akpm tree lost a few patches that turned up elsewhere.
->>>
->>
->> From my today's build-log on a Ubuntu/precise AMD64 host:
->> [...]
->>   LD      drivers/video/built-in.o
->>   LD      drivers/built-in.o
->>   LINK    vmlinux
->>   LD      vmlinux.o
->>   MODPOST vmlinux.o
->>   GEN     .version
->>   CHK     include/generated/compile.h
->>   UPD     include/generated/compile.h
->>   CC      init/version.o
->>   LD      init/built-in.o
->> drivers/built-in.o: In function `ab3100_probe':
->> ab3100-core.c:(.devinit.text+0xbf97): undefined reference to
->> `rand_initialize_irq'
->> make[2]: *** [vmlinux] Error 1
->> make[1]: *** [deb-pkg] Error 2
->> make: *** [deb-pkg] Error 2
->>
->> MFD / AB3100 kernel-config settings:
->>
->> CONFIG_AB3100_CORE=y
->> CONFIG_AB3100_OTP=m
->> CONFIG_REGULATOR_AB3100=m
->> CONFIG_RTC_DRV_AB3100=m
->>
->> If you need further informations, please let me know.
->>
->> - Sedat -
->
-> [ CC Ted (new random maintainer) ]
->
-> Is this due to this change?
->
-> From 946672f548682905d8ecdab33bb6e2c705418505 Mon Sep 17 00:00:00 2001
-> From: Theodore Ts'o <tytso@mit.edu>
-> Date: Sat, 14 Jul 2012 20:27:52 -0400
-> Subject: [PATCH] random: remove rand_initialize_irq()
->
-> With the new interrupt sampling system, we are no longer using the
-> timer_rand_state structure in the irq descriptor, so we can stop
-> initializing it now.
->
-> Signed-off-by: "Theodore Ts'o" <tytso@mit.edu
->
-> ...looks like AB3100 is the *only* driver still using rand_initialize_irq()...
->
-> drivers/mfd/ab3100-core.c:939:  rand_initialize_irq(client->irq);
->
-> ...but why has random.h still this...?
->
-> include/linux/random.h:51:extern void rand_initialize_irq(int irq);
->
-> Just thinking "loud"...
->
-> - Sedat -
+On 15:55 Tue 17 Jul     , deepaksi wrote:
+> Hi Arnd,
+> 
+> 
+> On 7/13/2012 7:52 PM, Arnd Bergmann wrote:
+> >On Friday 13 July 2012, viresh kumar wrote:
+> >>Adding Stefan and Peppe.
+> >>
+> >>I understand why you can't send all platform data from DT.
+> >>Let me elaborate the problem statement
+> >>
+> >>stmmac is used by platforms with and without DT.
+> >>- Without DT will pass platform data directly, without any issues.
+> >>- With DT have to pass all data, some of that via DT and other without
+> >>DT, like routines
+> >>   (atleast for now)
+> >>
+> >>For now what I suggest is, update DT support for whatever we can..
+> >>i.e. support Maximum
+> >>properties there. As finally we will support everything via DT, no
+> >>platform data.
+> >>
+> >>Whatever is left, that can't be passed via DT, like routine, pass it
+> >>from platform data
+> >>and merge both these versions of platform data in driver, keeping DT
+> >>ones in priority.
+> >>
+> >>i.e. Whatever is defined in DT properties must come from there and
+> >>left outs from
+> >>platform data.
+> >Absolutely agreed.
+> >
+> >The one part I think you both have wrong is the idea that the
+> >spear13xx_eth_phy_clk_cfg function is needed.
+> >
+> >I believe the correct answer for this is to introduce a driver for
+> >the phy in drivers/net/phy/, and have the phy be described correctly
+> >in the device tree and referenced found using the of_phy_find_device()
+> >function.
+> 
+> SPEAr platform has been using the generic phy framework, and it just
+> requires a register into mdio
+> bus and provide the necessary callback w.r.t mdio read and write.
+> These mdio read and write are more
+> into the GMAC registers, and hence a part of stmmac driver.
+> 
+> As far as my understanding is concerned, addition to the phy
+> framework could have been done had it been
+> some phy from stmicro, which requires some special addressing to be done.
+> The function we are talking about is more related to handling the
+> interface that phy has. The stmmac core has
+> been configured as rmii/smii/rgmii and requires the system to
+> generate corresponding clock to support data
+> transfers over PHY.
+> This was specifically the reason of aligning the phy clock
+> configuration function with stmmac driver, and could
+> well be taken as functional interface clock for mac core.
+> I do think that we should not add a new driver for aligning the
+> clock settings of the interfaces.
+this is not spear related but IP related this need to move the stmmac
 
-Is this attached patch OK, Ted?
+IIRC I see it on other ST SoC
 
-- Sedat -
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-random-remove-remaining-relicts-of-rand_initialize_i.patch
-Type: application/octet-stream
-Size: 2213 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120717/b9b6a87b/attachment-0001.obj>
+Best Regards,
+J.
