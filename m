@@ -1,66 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jul 2012 16:53:45 +0000
-Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
- controller.
-In-Reply-To: <500537C2.1030501@st.com>
-References: <cover.1342171151.git.vipulkumar.samar@st.com>
- <CAOh2x==ob+N26pJdc1DC8DfOomus1robkj=8DeyVE_ve_L-bAA@mail.gmail.com>
- <500537C2.1030501@st.com>
-Message-ID: <201207171653.45688.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 17 Jul 2012 12:57:54 -0400
+Subject: [RFC PATCH 3/4] ARM: arch_timers: give the virtual timer its
+ own interrupt handler
+In-Reply-To: <1341566422-20368-4-git-send-email-marc.zyngier@arm.com>
+References: <1341566422-20368-1-git-send-email-marc.zyngier@arm.com>
+ <1341566422-20368-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <50059992.9020904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012, deepaksi wrote:
-> I do differ on the point over here. I do believe that the code for now 
-> should be left as into mutually
-> exclusive sections.
-> As you said, without DT, the platform data would exist without any 
-> problem, Thats fine
+Hi Marc,
+
+On 07/06/2012 05:20 AM, Marc Zyngier wrote:
+> In order to prepare for the timer interrupt offloading to the hypervisor,
+> give the virtual timer its own interrupt handler.
 > 
-> But with DT also, as of now since the DT is still evolving we should not 
-> merge the data and keep it at
-> two places. The reasons being.
-> The stmmac driver is being used by multiple platforms, lets say within 
-> spear we have different variants
-> requiring different configurations and dividing those configurations at 
-> two different places will require larger
-> maintenance.
-
-I don't think that the STMMAC_PLATFORM part is used by any other
-platform in the mainline kernel, so we are definitely free to
-rip out (parts of) the platform_data and replace them with DT
-properties.
-There is also no platform defining plat_stmmacenet_data
-yet, which means that the code is completely untested at
-the moment.
-
-Don't worry about any out-of-tree platforms, they can keep
-their out of tree patches to add back the platform data if
-they don't want to move to DT booting.
-
-Since all the data you are adding to spear1340.c is constant
-anyway, I suppose that means this data is specific to
-the spear1340 soc, not to a particular board or configuration.
-I would suggest you add a preset like
-
-static const struct of_device_id stmmac_dt_ids[] = {
-        { .compatible = "st,spear600-gmac", .data = &spear600_data},
-        { .compatible = "st,spear1340-gmac", .data = &spear1340_data}
-};
-
-that contains all the soc-specific data. You can probably make
-that "const" and just kill off the platform_data path in the
-driver.
-
-> Any more changes in driver that has dependency on the 
-> platform data will require updates,
-> and more such conflicts will arrive related to maintenance.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kernel/arch_timer.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> Lets keep the platform data as a part of AUXDATA for now, till the tree 
-> evolves fully specifically if DT is being
-> used.
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> index 2b5da66..4473f66 100644
+> --- a/arch/arm/kernel/arch_timer.c
+> +++ b/arch/arm/kernel/arch_timer.c
 
-SPEAr is already fully using DT for everything except DMA channels.
-Please don't add any more such exceptions.
+[...]
 
-	Arnd
+> @@ -408,6 +413,9 @@ static int __init arch_timer_register(void)
+>  		if (!arch_timer_ppi[i])
+>  			continue;
+>  
+> +		if (i == VIRT_PPI)
+> +			handler = arch_timer_virt_handler;
+> +
+
+Again, it seems awkward to do this sort of thing inside the loop as
+you're only keying off of one value with a known index in the array.
+
+>  		err = request_percpu_irq(arch_timer_ppi[i], handler,
+>  					 "arch_timer", arch_timer_evt);
+>  		if (err) {
+
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
