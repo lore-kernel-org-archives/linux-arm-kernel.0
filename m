@@ -1,29 +1,37 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Tue, 17 Jul 2012 14:07:29 +0100
-Subject: Device tree.
-In-Reply-To: <CAMW5UfZR5qrY4K=ty9HDcd9UqYGtfZitH0CBgDbZWvpAoTve2Q@mail.gmail.com>
-References: <500552C9.4090107@codethink.co.uk> <20120717140100.7c0ae90c@skate>
- <500556CF.6030704@codethink.co.uk>
- <CAMW5UfZR5qrY4K=ty9HDcd9UqYGtfZitH0CBgDbZWvpAoTve2Q@mail.gmail.com>
-Message-ID: <50056391.3060208@codethink.co.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Jul 2012 14:06:50 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <5003FB7C.4030509@linaro.org>
+References: <5003FB7C.4030509@linaro.org>
+Message-ID: <20120717130650.GB27595@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/12 13:32, Josh Coombs wrote:
-> make make target.dtb
-> cat arch/arm/boot/target.dtb  >> arch/arm/boot/zImage
- >make uImage
+On Mon, Jul 16, 2012 at 12:31:08PM +0100, Lee Jones wrote:
 
-Yick...
+> I agree with what you say to some extent, but I believe that it is
+> more important to have a working solution now than to ensure that
+> each bindings are as unique as possible. After any suggestion of
+> consolidation, a move from vendor specific to generically defined
+> Device Tree bindings is trivial. Especially in the current stage
+> where adaptions and definitions are still fluid.
 
- >My understanding is you can
- > only append one DTB, there is no restriction on how many systems a
- > given kernel could support, so at the moment there isn't a clean way
- > of defining which DTB to append during make uImage? Josh C
+> Obviously some care is taken to ensure the bindings are as generic
+> as possible, but not to the extent that will put the project back
+> some months. Over past few months I have enabled many sub-systems;
 
-Yes, hence why it'd be useful to have a way of specifying a .dtb file as 
-a config option...
+It's not just about having generic bindings, it's also about having
+bindings which have some abstraction and hope of reusability. An awful
+lot of bindings are just straight dumps of Linux data structures into
+the device tree which don't make a terribly great deal of sense as
+bindings.
 
-There isnt really a good way to solve this, AFAICT.
+> however, I think it would have been a fraction of that if we'd gone
+> through the laborious process of immediate forced consolidation. I
+> think it's fine to have platform/vendor specific bindings that work,
+> then come back to unify them once the dust settles.
 
--Ian
+In many of these cases we'd be better off just not putting things into
+the device tree in the first place, leaving things at the basic "is the
+device there" stuff.
