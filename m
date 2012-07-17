@@ -1,30 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jul 2012 14:29:26 +0200
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Tue, 17 Jul 2012 08:32:35 -0400
 Subject: Device tree.
 In-Reply-To: <500556CF.6030704@codethink.co.uk>
 References: <500552C9.4090107@codethink.co.uk> <20120717140100.7c0ae90c@skate>
  <500556CF.6030704@codethink.co.uk>
-Message-ID: <20120717142926.05c0c17f@skate>
+Message-ID: <CAMW5UfZR5qrY4K=ty9HDcd9UqYGtfZitH0CBgDbZWvpAoTve2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 17 Jul 2012 13:13:03 +0100,
-Ian Molton <ian.molton@codethink.co.uk> a ?crit :
+On Tue, Jul 17, 2012 at 8:13 AM, Ian Molton <ian.molton@codethink.co.uk> wrote:
+> On 17/07/12 13:01, Thomas Petazzoni wrote:
+>>
+>> You surely want to have a look at CONFIG_ARM_APPENDED_DTB, which does what
+>> you want and is already part of the ARM kernel.
+>
+>
+> Hi, and thanks.
+>
+> Unless I'm misunderstanding it, thats not quite what I need - although I
+> should probably have made my hack depend on it.
+>
+> I'm using a uImage; The prepending needs to happen to the zImage / Image.
+>
+> -Ian
 
-> Unless I'm misunderstanding it, thats not quite what I need -
-> although I should probably have made my hack depend on it.
-> 
-> I'm using a uImage; The prepending needs to happen to the zImage /
-> Image.
+CONFIG_ARM_APPENDED_DTB sets the kernel up to expect a dtb appended to
+the end of the zImage.  Neither make or make uImage do the appending
+for you however.  What I've been doing is:
 
-What I typically do is generate a zImage, do the appending, and then
-generate the uImage manually with mkimage. But I agree it could be
-useful to have a 'make uImage.myboard' target which would happen the
-myboard.dtb before preparing the uImage.
+make
+make target.dtb
+cat arch/arm/boot/target.dtb >> arch/arm/boot/zImage
+make uImage
+move arch/arm/boot/uImage to wherever it needs to be and try booting
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+My understanding is you can only append one DTB, there is no
+restriction on how many systems a given kernel could support, so at
+the moment there isn't a clean way of defining which DTB to append
+during make uImage?
+
+Josh C
