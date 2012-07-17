@@ -1,57 +1,108 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 17 Jul 2012 11:33:04 +0530
-Subject: [PATCH 2/2] gpio/omap: add *remove* callback in platform_driver
-In-Reply-To: <87ipdnein1.fsf@ti.com>
-References: <1341997995-14020-1-git-send-email-tarun.kanti@ti.com>
- <1341997995-14020-3-git-send-email-tarun.kanti@ti.com> <87394xhocn.fsf@ti.com>
- <CACRpkdZMG_ZHW_eGGrdrJh1SuO_=hOObijzmxG1ob6RoNf_dwg@mail.gmail.com>
- <87a9z4g9bi.fsf@ti.com>
- <CACRpkdZxUpQ=a-yQ8b4bnX3S9penPWkxJ+PG2Zi4i9YZibYRiw@mail.gmail.com>
- <87ipdnein1.fsf@ti.com>
-Message-ID: <CAMQu2gwvPuGBWc+R651EiDqHMcGQEF6SZBNpwJZ=Kxh8hwov2A@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 17 Jul 2012 13:57:46 +0800
+Subject: [PATCH v2] mtd: gpmi: fix the compiler warnings
+In-Reply-To: <1342451569.7270.11.camel@brekeke>
+References: <1342451569.7270.11.camel@brekeke>
+Message-ID: <1342504666-27340-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 10:40 PM, Kevin Hilman <khilman@ti.com> wrote:
->
-> Linus Walleij <linus.walleij@linaro.org> writes:
->
-> > On Thu, Jul 12, 2012 at 7:48 PM, Kevin Hilman <khilman@ti.com> wrote:
-> >
-> >> In the case of OMAP GPIO, unless it's an obvious fix, I would recommend
-> >> you wait at least until you see some acks/tested tags from any of
-> >>
-> >> - Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> - Rajendra Nayak <rnayak@ti.com>
-> >> - Benoit Cousson <b-cousson@ti.com>
-> >>
-> >> or Tony, Paul or myself.
-> >
-> > Instead of trying to store this information in my and Grants brains and
-> > us forgetting it, what about patching MAINTAINERS to reflect the fact
-> > instead? That's better I think, plus I use that file a lot.
-> >
-> >> For major series, I have been collecting/queueing them for Grant after
-> >> ensuring they have been well reviewed and well tested (although I am
-> >> eagerly hoping to hand off this role to someone else.)
-> >
-> > Listing it under your GIT tree in MAINTAINERS for this driver will make
-> > this work better I think.
-> >
-> > One path for OMAP GPIO patches, simple. It's obviously the
-> > ambiguity that cause the trouble. Then you can also decide
-> > on each cycle whether to send these to GPIO or ARM SoC
-> > etc.
->
-> Yeah, I understand the process, but I've been avoiding doing that
-> because, well, I don't want the job.  I have been trying to get someone
-> else at TI to maintain this driver, but have not been successful.
->
-> So, until that happens, feel free to queue up the patch below.
->
-> Santosh, note that I've put you as co-maintainer of this driver.
->
-No problem Kevin.
+fix the compiler warnings.
 
-Regards
-Santosh
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+v1 --> v2:
+         fix the "no modifiers for allocation" warnings by the smatch
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    4 ++--
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   12 ++++++------
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    4 ++--
+ 3 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index 6bb0998..2289cf8 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -26,7 +26,7 @@
+ #include "gpmi-regs.h"
+ #include "bch-regs.h"
+ 
+-struct timing_threshod timing_default_threshold = {
++static struct timing_threshod timing_default_threshold = {
+ 	.max_data_setup_cycles       = (BM_GPMI_TIMING0_DATA_SETUP >>
+ 						BP_GPMI_TIMING0_DATA_SETUP),
+ 	.internal_data_setup_in_ns   = 0,
+@@ -738,7 +738,7 @@ void gpmi_begin(struct gpmi_nand_data *this)
+ {
+ 	struct resources *r = &this->resources;
+ 	struct timing_threshod *nfc = &timing_default_threshold;
+-	unsigned char  *gpmi_regs = r->gpmi_regs;
++	void __iomem *gpmi_regs = r->gpmi_regs;
+ 	unsigned int   clock_period_in_ns;
+ 	uint32_t       reg;
+ 	unsigned int   dll_wait_time_in_us;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 8c0d2f0..7d31321 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -317,7 +317,7 @@ acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
+ 	struct platform_device *pdev = this->pdev;
+ 	struct resources *res = &this->resources;
+ 	struct resource *r;
+-	void *p;
++	void __iomem *p;
+ 
+ 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
+ 	if (!r) {
+@@ -424,8 +424,8 @@ static int __devinit acquire_dma_channels(struct gpmi_nand_data *this)
+ 	struct platform_device *pdev = this->pdev;
+ 	struct resource *r_dma;
+ 	struct device_node *dn;
+-	int dma_channel;
+-	unsigned int ret;
++	u32 dma_channel;
++	int ret;
+ 	struct dma_chan *dma_chan;
+ 	dma_cap_mask_t mask;
+ 
+@@ -732,12 +732,12 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
+ 	struct device *dev = this->dev;
+ 
+ 	/* [1] Allocate a command buffer. PAGE_SIZE is enough. */
+-	this->cmd_buffer = kzalloc(PAGE_SIZE, GFP_DMA);
++	this->cmd_buffer = kzalloc(PAGE_SIZE, GFP_DMA | GFP_KERNEL);
+ 	if (this->cmd_buffer == NULL)
+ 		goto error_alloc;
+ 
+ 	/* [2] Allocate a read/write data buffer. PAGE_SIZE is enough. */
+-	this->data_buffer_dma = kzalloc(PAGE_SIZE, GFP_DMA);
++	this->data_buffer_dma = kzalloc(PAGE_SIZE, GFP_DMA | GFP_KERNEL);
+ 	if (this->data_buffer_dma == NULL)
+ 		goto error_alloc;
+ 
+@@ -1527,7 +1527,7 @@ static int gpmi_scan_bbt(struct mtd_info *mtd)
+ 	return nand_default_bbt(mtd);
+ }
+ 
+-void gpmi_nfc_exit(struct gpmi_nand_data *this)
++static void gpmi_nfc_exit(struct gpmi_nand_data *this)
+ {
+ 	nand_release(&this->mtd);
+ 	gpmi_free_dma_buffer(this);
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 1547a60..1f61217 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -24,8 +24,8 @@
+ 
+ #define GPMI_CLK_MAX 5 /* MX6Q needs five clocks */
+ struct resources {
+-	void          *gpmi_regs;
+-	void          *bch_regs;
++	void __iomem  *gpmi_regs;
++	void __iomem  *bch_regs;
+ 	unsigned int  bch_low_interrupt;
+ 	unsigned int  bch_high_interrupt;
+ 	unsigned int  dma_low_channel;
+-- 
+1.7.0.4
