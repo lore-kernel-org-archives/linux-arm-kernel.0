@@ -1,58 +1,58 @@
-From: joerg.roedel@amd.com (joerg.roedel at amd.com)
-Date: Tue, 17 Jul 2012 15:23:00 +0200
-Subject: [v3.6 3/3] iommu/tegra: smmu: Fix unsleepable memory allocation
- at alloc_pdir()
-In-Reply-To: <20120717.152524.175499431618552821.hdoyu@nvidia.com>
-References: <1341228398-6878-1-git-send-email-hdoyu@nvidia.com>
- <1341228398-6878-3-git-send-email-hdoyu@nvidia.com>
- <20120717100901.GH4213@amd.com>
- <20120717.152524.175499431618552821.hdoyu@nvidia.com>
-Message-ID: <20120717132300.GK4213@amd.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jul 2012 13:24:10 +0000
+Subject: [PATCH 3/8] ARM: MCS814x: add Device Tree bindings documentation
+In-Reply-To: <1342363754-30808-4-git-send-email-florian@openwrt.org>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <1342363754-30808-4-git-send-email-florian@openwrt.org>
+Message-ID: <201207171324.11392.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 02:25:24PM +0200, Hiroshi Doyu wrote:
-> The above spin_lock is always necessary. "as->lock" should be held to
-> protect "as->pdir_page". Only when "as->pdir_page" is NULL,
-> "as->pdir_page" would be allocated in "alloc_pdir()". Without this
-> lock, the following race could happen:
-> 
-> 
-> Without as->lock:
-> A:			B:
-> i == 3
-> pdir_page == NULL
-> 			i == 3
-> 	     		pdir_page == NULL
-> pdir_page = a;
-> 			pdir_page = b;	!!!!!! OVERWRITTEN !!!!!!
->
+On Sunday 15 July 2012, Florian Fainelli wrote:
 
-Unless I am missing something, this is not the correct situation with my
-patch. It would look more like this:
+> diff --git a/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
+> new file mode 100644
+> index 0000000..de59b04
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mcs814x/mcs814x-pci.txt
+> @@ -0,0 +1,16 @@
+> +Moschip MCS814x PCI controller bindings
+> +---------------------------------------
+> +
+> +Required properties:
+> +- compatible: should be "moschip,mcs814x-pci"
+> +- reg: should contain the base register address and length of the PCI controller
+> +  configuration register as well as the base register address and length of the
+> +  PCI eeprom emulator
+> +- interrupts: should contain the interrupt line of the abort interrupt
+> +- #address-cells: should be 3
+> +- #size-cells: should be 2
+> +- ranges: should contain the properly encoded PCI ranges of the IO, non-prefetchable
+> +  and prefetchable memory regions
+> +- #interrupt-cells: should be 1
+> +- interrupt-map-mask: should be 0
+> +- interrupt-map: should be the properly encoded PCI slot/pin to interrupt line
 
+interrupt-map-mask of 0 implies that all devices are wired to the
+same IRQ lines, which is rather unusual. Better leave that open
+so the interrupt-map can be written to work on any board.
 
- A:					B:
- i == 3
- pdir_page == NULL
- 					i == 3
- 	     				pdir_page == NULL
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 6eab917..943e4f3 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -28,6 +28,7 @@ linux	Linux-specific binding
+>  marvell	Marvell Technology Group Ltd.
+>  maxim	Maxim Integrated Products
+>  mosaixtech	Mosaix Technologies, Inc.
+> +moschp		Moschip Semiconductors
+>  national	National Semiconductor
+>  nintendo	Nintendo
+>  nvidia	NVIDIA
 
- take as->lock
+This string does not match what you use everywhere else. Please fix
+either the documentation here or every other instance. The stock
+ticker symbol is MOSCHIP.BO, so using "moschip" is probably better
+than "moschp".
 
- /* race check */
- pdir_page == NULL -> proceed		/* spinning on as->lock */
-
- pdir_page = a;
-
- release as->lock
-
-					 take as->lock
-
-					 /* race check */
-					 pdir_page != NULL -> return
-
-This should be fine, no? Do I miss something?
-
-
-	Joerg
+	Arnd
