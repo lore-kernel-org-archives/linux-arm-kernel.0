@@ -1,64 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Jul 2012 21:08:53 -0500
-Subject: [PATCH] clk: fix compile for OF && !COMMON_CLK
-In-Reply-To: <20120717001228.GA28886@gmail.com>
-References: <1342475161-20402-1-git-send-email-robherring2@gmail.com>
- <20120717001228.GA28886@gmail.com>
-Message-ID: <5004C935.4050707@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Jul 2012 19:19:43 -0700
+Subject: [PATCH] ARM: exynos: enable more platforms in defconfig
+In-Reply-To: <145c01cd63be$f6645900$e32d0b00$%kim@samsung.com>
+References: <1338784735-10683-1-git-send-email-olof@lixom.net>
+ <145c01cd63be$f6645900$e32d0b00$%kim@samsung.com>
+Message-ID: <CAOesGMicSKkDyg64mBMjbagFq-dp=B0DHgv1kpiEThT40LAA-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2012 07:12 PM, Mike Turquette wrote:
-> On 20120716-16:46, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Jul 16, 2012 at 6:53 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kukjin Kim wrote:
 >>
->> With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
->> compiling with OF && !COMMON_CLK is broken.
+>> Olof Johansson wrote:
+>> >
+>> Hi Olof,
 >>
-> 
-> Hi Rob,
-> 
-> Thanks for sending this quickly.
-> 
-> <snip>
->> @@ -313,19 +314,19 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
->>  struct device_node;
->>  struct of_phandle_args;
->>  
->> -#ifdef CONFIG_OF
->> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->>  struct clk *of_clk_get(struct device_node *np, int index);
->>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
->>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
->>  #else
->>  static inline struct clk *of_clk_get(struct device_node *np, int index)
->>  {
->> -	return NULL;
->> +	return ERR_PTR(-EINVAL);
-> 
-> This change seems unrelated?
-> 
->>  }
->>  static inline struct clk *of_clk_get_by_name(struct device_node *np,
->>  					     const char *name)
->>  {
->> -	return NULL;
->> +	return ERR_PTR(-EINVAL);
-> 
-> Ditto.
-
-Yeah, it should probably go in Shawn's fix as that is actually when it
-will start breaking.
-
-Rob
-
-> 
-> Thanks,
-> Mike
-> 
->>  }
->>  #endif
->>  
->> -- 
->> 1.7.9.5
+>> Sorry for late reply on this, I came back from travelling, anyway.
 >>
+>> > This enables the new EXYNOS5 platforms in the defconfig, and enables DT
+>> > support on EXYNOS4.
+>> >
+>> Yes, agree, it's time to move on new defconfig for supporting DT.
+>>
+>> > While I'm at it, I renamed it exynos4_defconfig -> exynos_defconfig,
+>> > since it now encompasses all (known and supported) versions of exynos.
+>> >
+>> OK, basically looks good to me. But how about keeping exynos4_defconfig
+>> for non-DT and creating exynos_defconfig for supporting DT on EXYNOS4 and
+>> EXYNOS5? Of course, we can remove exynos4_defconfig after finishing of
+>> EXYNOS DT later.
+>>
+> Olof, how about following?
+
+I think I would prefer a superset single config instead, that enables
+both DT and non-DT platforms. All drivers should compile just fine for
+either probe method in the same binary.
+
+But, I guess one of each is ok and better than nothing.
+
+
+-Olof
