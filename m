@@ -1,78 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 17 Jul 2012 12:41:06 +0200
-Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
- controller.
-In-Reply-To: <50053DB5.1010704@st.com>
-References: <cover.1342171151.git.vipulkumar.samar@st.com>
- <214127499f10b0099e6f3542e1e879fdd8c1bdcf.1342171151.git.vipulkumar.samar@st.com>
- <CAOh2x==ob+N26pJdc1DC8DfOomus1robkj=8DeyVE_ve_L-bAA@mail.gmail.com>
- <201207131422.26274.arnd@arndb.de> <50053DB5.1010704@st.com>
-Message-ID: <20120717104106.GA2629@game.jcrosoft.org>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 17 Jul 2012 12:47:42 +0200
+Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
+In-Reply-To: <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <201207161554.04812.arnd@arndb.de>
+ <CAJOA=zNEywZ6tbJDuLjekVQeJpr9O2X1u-sTXpp0GYWzc+OHig@mail.gmail.com>
+Message-ID: <2687165.ZxhDogvXZe@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:55 Tue 17 Jul     , deepaksi wrote:
-> Hi Arnd,
-> 
-> 
-> On 7/13/2012 7:52 PM, Arnd Bergmann wrote:
-> >On Friday 13 July 2012, viresh kumar wrote:
-> >>Adding Stefan and Peppe.
-> >>
-> >>I understand why you can't send all platform data from DT.
-> >>Let me elaborate the problem statement
-> >>
-> >>stmmac is used by platforms with and without DT.
-> >>- Without DT will pass platform data directly, without any issues.
-> >>- With DT have to pass all data, some of that via DT and other without
-> >>DT, like routines
-> >>   (atleast for now)
-> >>
-> >>For now what I suggest is, update DT support for whatever we can..
-> >>i.e. support Maximum
-> >>properties there. As finally we will support everything via DT, no
-> >>platform data.
-> >>
-> >>Whatever is left, that can't be passed via DT, like routine, pass it
-> >>from platform data
-> >>and merge both these versions of platform data in driver, keeping DT
-> >>ones in priority.
-> >>
-> >>i.e. Whatever is defined in DT properties must come from there and
-> >>left outs from
-> >>platform data.
-> >Absolutely agreed.
-> >
-> >The one part I think you both have wrong is the idea that the
-> >spear13xx_eth_phy_clk_cfg function is needed.
-> >
-> >I believe the correct answer for this is to introduce a driver for
-> >the phy in drivers/net/phy/, and have the phy be described correctly
-> >in the device tree and referenced found using the of_phy_find_device()
-> >function.
-> 
-> SPEAr platform has been using the generic phy framework, and it just
-> requires a register into mdio
-> bus and provide the necessary callback w.r.t mdio read and write.
-> These mdio read and write are more
-> into the GMAC registers, and hence a part of stmmac driver.
-> 
-> As far as my understanding is concerned, addition to the phy
-> framework could have been done had it been
-> some phy from stmicro, which requires some special addressing to be done.
-> The function we are talking about is more related to handling the
-> interface that phy has. The stmmac core has
-> been configured as rmii/smii/rgmii and requires the system to
-> generate corresponding clock to support data
-> transfers over PHY.
-> This was specifically the reason of aligning the phy clock
-> configuration function with stmmac driver, and could
-> well be taken as functional interface clock for mac core.
-> I do think that we should not add a new driver for aligning the
-> clock settings of the interfaces.
-this is not spear related but IP related this need to move the stmmac
+Hi Mike,
 
-IIRC I see it on other ST SoC
+On Monday 16 July 2012 13:47:01 Turquette, Mike wrote:
+> On Mon, Jul 16, 2012 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+[snip]
+> > board selection.
+> >
+> >> +struct clk {
+> >> +     struct clk *parent;             /* parent clk */
+> >> +     unsigned long rate;             /* clock rate in Hz */
+> >> +     unsigned long divider;          /* clock divider */
+> >> +     u32 usecount;                   /* reference count */
+> >> +     struct clk_ops *ops;            /* clock operation */
+> >> +     u32 enable_reg;                 /* clock enable register */
+> >> +     u32 enable_mask;                /* clock enable mask */
+> >> +};
+> >
+> > Platforms are now converting to the common clock framework in drivers/clk.
+> > Mike Turquette as the subsystem maintainer can probably judge better 
+whether
+> > we should still be allowing new platforms with their own implementation
+> > of clk, but my feeling is that you should use the subsystem instead
+> > and add a driver in a subdirectory of drivers/clk instead of in the
+> > platform.
+> 
+> Hi Florian & Arnd,
+> 
+> Adopting the new clock framework is highly preferable, especially if
+> MCS814x support is being delayed until 3.7.  There is also a push to
+> put clock drivers into drivers/clk and I would like to continue that
+> trend, but I'm less strict on that measure if it proves very difficult
+> for your platform immediately (e.g. duplicating headers across
+> platform and generic code, etc).  Migrating code from arch/arm to
+> drivers/clk can always be done in a future series.
 
-Best Regards,
-J.
+Since we are now targetting 3.7, I would rather come up with proper DT clock 
+bindings, which should make the mcs814x clock driver much nicer.
+
+> 
+> This platform also seems to be making use of DT so it would be very
+> nice if we use MCS814x to push the state of clk DT bindings and
+> adoption forward a bit.  There are not a lot of folks using the
+> patches from Rob/Grant today.  Hopefully delaying these patches by
+> another merge cycle means that these requests are not asking too much
+> :-)
+
+If we could get them merged during 3.6 that would allow me, and other ARM-soc 
+maintainers to get their stuff fully migrated to DT. Are there any blockers to 
+these patches?
+--
+Florian
