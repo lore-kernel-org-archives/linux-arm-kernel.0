@@ -1,84 +1,81 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 18 Jul 2012 15:14:28 +0530
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <CANfBPZ_N4ZK5PgFQLHWMwsG60tb-FPTjeieTJ92rBUNgONAxAw@mail.gmail.com>
-References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
- <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
- <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
- <20120718065951.GH6522@atomide.com>
- <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
- <20120718071039.GI6522@atomide.com>
- <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
- <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
- <CAMQu2gxLwGACAT-r6=L9DKB=3fTNaEJ4woZOb4zttJ8qTTJmFA@mail.gmail.com>
- <CAAwP0s2apfBHLKHtzvwqb2KPCMNhEXMe5R9792bO7FhfY5Y+uQ@mail.gmail.com>
- <CANfBPZ_N4ZK5PgFQLHWMwsG60tb-FPTjeieTJ92rBUNgONAxAw@mail.gmail.com>
-Message-ID: <CAMQu2gy+uXJFfmOwLX=YH41pr-N+T28-1wLo5rXEaj9MGffHPw@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 18 Jul 2012 09:46:39 +0000
+Subject: [PATCH-V2 4/4] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data
+In-Reply-To: <alpine.DEB.2.00.1207171353190.28834@utopia.booyaka.com>
+References: <1338285402-11306-1-git-send-email-hvaibhav@ti.com>
+ <1338285402-11306-5-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1207171353190.28834@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA70918@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 3:08 PM, S, Venkatraman <svenkatr@ti.com> wrote:
-> On Wed, Jul 18, 2012 at 2:46 PM, Javier Martinez Canillas
-> <martinez.javier@gmail.com> wrote:
+On Wed, Jul 18, 2012 at 01:29:01, Paul Walmsley wrote:
+> Hi Vaibhav
+> 
+> a comment.
+> 
+> On Tue, 29 May 2012, Vaibhav Hiremath wrote:
+> 
+> > This patch adds HWMOD data for all the peripherals of
+> > AM335X device and also hooks up to the existing OMAP framework.
+> 
+> 
+> ...
+> 
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > new file mode 100644
+> > index 0000000..df888fe
+> > --- /dev/null
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > @@ -0,0 +1,3368 @@
+> 
+> ...
+> 
+> > +static struct omap_hwmod_irq_info am33xx_emif_irqs[] = {
+> > +	{ .name = "ddrerr0", .irq = 101 },
+> > +	{ .irq = -1 }
+> > +};
+> 
+> So the above array of struct omap_hwmod_irq_info records has a terminator 
+> (which is correct), but many similar arrays do not, such as:
+> 
+> > +/* l3_main (l3_fast) */
+> > +static struct omap_hwmod_irq_info am33xx_l3_main_irqs[] = {
+> > +	{ .name = "l3debug", .irq = 9 },
+> > +	{ .name = "l3appint", .irq = 10 },
+> > +};
+> 
+> and
+> 
+> > +static struct omap_hwmod_irq_info am33xx_mpu_irqs[] = {
+> > +	{ .name = "emuint", .irq = 0 },
+> > +	{ .name = "commtx", .irq = 1 },
+> > +	{ .name = "commrx", .irq = 2 },
+> > +	{ .name = "bench", .irq = 3 },
+> > +};
+> 
+> and
+> 
+> > +static struct omap_hwmod_rst_info am33xx_wkup_m3_resets[] = {
+> > +	{ .name = "wkup_m3", .rst_shift = 3, .st_shift = 5 },
+> > +};
+> > +
+> > +static struct omap_hwmod_irq_info am33xx_wkup_m3_irqs[] = {
+> > +	{ .name = "txev", .irq = 78 },
+> > +};
+> 
+> and several others.  
+> 
+> Could you add those, please?
+> 
 
-[...]
+Thanks Paul for the review, I will fix it next version.
 
->>>>
->>>> And what about enabling it at the SoC config level but making the
->>>> drivers dependant on CONFIG_DMADEVICES and CONFIG_DMA_OMAP? If you
->>>> agree I can send something like this in two different patches (one for
->>>> the omap2plus_defconfig and another to make the drivers dependant on
->>>> the config option):
->>>>
->>>> diff --git a/arch/arm/configs/omap2plus_defconfig
->>>> b/arch/arm/configs/omap2plus_defconfig
->>>> index b152de7..e58edc3 100644
->>>> --- a/arch/arm/configs/omap2plus_defconfig
->>>> +++ b/arch/arm/configs/omap2plus_defconfig
->>>> @@ -193,6 +193,8 @@ CONFIG_MMC_OMAP_HS=y
->>>>  CONFIG_RTC_CLASS=y
->>>>  CONFIG_RTC_DRV_TWL92330=y
->>>>  CONFIG_RTC_DRV_TWL4030=y
->>>> +CONFIG_DMADEVICES=y
->>>> +CONFIG_DMA_OMAP=y
->>>>  CONFIG_EXT2_FS=y
->>>>  CONFIG_EXT3_FS=y
->>>>  # CONFIG_EXT3_FS_XATTR is not set
->>>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
->>>> index aa131b3..314c7bd 100644
->>>> --- a/drivers/mmc/host/Kconfig
->>>> +++ b/drivers/mmc/host/Kconfig
->>>> @@ -231,7 +231,7 @@ config MMC_SDHCI_S3C_DMA
->>>>
->>>>  config MMC_OMAP
->>>>         tristate "TI OMAP Multimedia Card Interface support"
->>>> -       depends on ARCH_OMAP
->>>> +       depends on ARCH_OMAP && DMADEVICES && DMA_OMAP
->>>
->>> May be. But since for sure a driver knows that it needs DMA
->>> support to be enabled, I will just select it rather than depends
->>> on.
->>>
->>> Regards
->>> santosh
->>
->> Yes I agree with you, I was just exploring other options :-)
->>
-> For MMC atleast, there's already a patch in mmc-next to do a "Depends On"
-> http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commit;h=7c68046c99f0b96d965c31cf42814b9a0f15ad46
+> The omap_hwmod_dma_info arrays look clean to me.
+> 
 
-Change log assumes says .
+Have you done with review? Should I wait for further comments or submit the 
+next version?
 
-"The patch simply make them depend on DMA_OMAP since DMA_OMAP
-will select DMA_ENGINE automatically"
-
-This won't be true if the DMA selection are not done
-at ARCH_OMAP level as discussed in this thread.
-
-Having said that, I think Russell and Tony need to
-take call on how this needs to be handled.
-
-Regards
-Santosh
+Thanks,
+Vaibhav
