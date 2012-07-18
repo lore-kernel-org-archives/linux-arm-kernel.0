@@ -1,122 +1,57 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 18 Jul 2012 14:41:08 +0530
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
-References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
- <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
- <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
- <20120718065951.GH6522@atomide.com>
- <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
- <20120718071039.GI6522@atomide.com>
- <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
- <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
-Message-ID: <CAMQu2gxLwGACAT-r6=L9DKB=3fTNaEJ4woZOb4zttJ8qTTJmFA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 18 Jul 2012 12:15:02 +0300
+Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per
+ hwmod/module context lost count
+In-Reply-To: <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-5-git-send-email-t-kristo@ti.com>
+ <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
+Message-ID: <1342602902.4672.91.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 2:19 PM, Javier Martinez Canillas
-<martinez.javier@gmail.com> wrote:
-> On Wed, Jul 18, 2012 at 10:36 AM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Wed, Jul 18, 2012 at 1:14 PM, S, Venkatraman <svenkatr@ti.com> wrote:
->>> On Wed, Jul 18, 2012 at 12:40 PM, Tony Lindgren <tony@atomide.com> wrote:
->>>> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 00:09]:
->>>>> On Wed, Jul 18, 2012 at 12:29 PM, Tony Lindgren <tony@atomide.com> wrote:
->>>>> > * Javier Martinez Canillas <javier@dowhile0.org> [120716 23:56]:
->>>>> >> On Tue, Jul 17, 2012 at 8:45 AM, Shilimkar, Santosh
->>>>> >> <santosh.shilimkar@ti.com> wrote:
->>>>> >> > Hi,
->>>>> >> >
->>>>> >> > On Tue, Jul 17, 2012 at 6:00 AM, Javier Martinez Canillas
->>>>> >> > <javier@dowhile0.org> wrote:
->>>>> >> >> The OMAP MMC and OMAP High Speed MMC hosts now use entirely the DMA
->>>>> >> >> engine API instead of the previous private DMA API implementation.
->>>>> >> >>
->>>>> >> >> So, if the kernel is built with support for any of these hosts but it
->>>>> >> >> doesn't support DMA devices nor OMAP DMA support, it fails when trying
->>>>> >> >> to obtain a DMA channel which leads to the following error on an OMAP3
->>>>> >> >> IGEPv2 Rev.C board (and probably on most OMAP boards with MMC support):
->>>>> >> >>
->>>>> >> >> [ 2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA engine channel 48
->>>>> >> >> [    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 62
->>>>> >> >>
->>>>> >> >> selecting automatically CONFIG_DMADEVICES and CONFIG_DMA_OMAP solves it.
->>>>> >> >>
->>>>> >> >> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->>>>> >> >> ---
->>>>> >> > Considering, we are updating drivers to select the DMA engine, can you
->>>>> >> > also include
->>>>> >> > "drivers/spi/spi-omap2-mcspi.c" which is also updated for DMA engine.
->>>>> >> >
->>>>> >> > Regards
->>>>> >> > Santosh
->>>>> >>
->>>>> >> Hi Santosh,
->>>>> >>
->>>>> >> Ok, I'll send a v2 now which includes spi-omap2-mcspi then.
->>>>> >
->>>>> > I don't think we should do this, the drivers should work with and without
->>>>> > dma. This just needs to be added to the omap2plus_defconfig.
->>>>> >
->>>>> Well this was not decided based on any DMA CONFIG option before for
->>>>> the subject drivers. It is already by default enabled if the DMA is supported
->>>>> by the driver IP. There is a possibility to disable it from driver platform/dt
->>>>> data so that still remains.
->>>>
->>>> I think it should rather be that if the driver is broken and does not work
->>>> without DMA, it should have depends on CONFIG_DMA_OMAP.
->>>>
->>> I can confirm that omap MMC can't work without DMA; polled mode is not
->>> supported / implemented.
->>
->> Same case for SPI driver as well. It uses DMA for everything except the cases
->> where DMA doesn't make sense like 1 byte/2 byte etc. And its not configurable,
->>
->> At least considering this, it is better we do this per driver than enabling
->> it at SOC config.
->>
->> Regards
->> Santosh
->> --
->
-> Hi Santosh,
->
-> And what about enabling it at the SoC config level but making the
-> drivers dependant on CONFIG_DMADEVICES and CONFIG_DMA_OMAP? If you
-> agree I can send something like this in two different patches (one for
-> the omap2plus_defconfig and another to make the drivers dependant on
-> the config option):
->
-> diff --git a/arch/arm/configs/omap2plus_defconfig
-> b/arch/arm/configs/omap2plus_defconfig
-> index b152de7..e58edc3 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -193,6 +193,8 @@ CONFIG_MMC_OMAP_HS=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_TWL92330=y
->  CONFIG_RTC_DRV_TWL4030=y
-> +CONFIG_DMADEVICES=y
-> +CONFIG_DMA_OMAP=y
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
->  # CONFIG_EXT3_FS_XATTR is not set
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index aa131b3..314c7bd 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -231,7 +231,7 @@ config MMC_SDHCI_S3C_DMA
->
->  config MMC_OMAP
->         tristate "TI OMAP Multimedia Card Interface support"
-> -       depends on ARCH_OMAP
-> +       depends on ARCH_OMAP && DMADEVICES && DMA_OMAP
+On Tue, 2012-07-17 at 02:59 -0500, Menon, Nishanth wrote:
+> Couple of minor comments:
+> On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> [...]
+> >  /**
+> > + * _omap4_update_context_lost - increment hwmod context loss counter if
+> > + * hwmod context was lost, and clear hardware context loss reg
+> > + * @oh: hwmod to check for context loss
+> > + *
+> > + * If the PRCM indicates that the hwmod @oh lost context, increment
+> > + * our in-memory context loss counter, and clear the RM_*_CONTEXT
+> > + * bits. No return value.
+> > + */
+> > +static void _omap4_update_context_lost(struct omap_hwmod *oh)
+> > +{
+> > +       u32 r;
+> > +
+> > +       if (oh->prcm.omap4.context_offs == USHRT_MAX)
+> > +               return;
+> would'nt it be better to return a dummy incremental counter instead of
+> returning no context loss (count = 0)?
 
-May be. But since for sure a driver knows that it needs DMA
-support to be enabled, I will just select it rather than depends
-on.
+I guess you are right, this way we may have some extra context restores
+for modules which don't have context offs defined, rather than not
+restoring them at all. Only thing I can think might prevent this is if
+there are modules that never lose context but don't have context
+register? How about omap5+?
 
-Regards
-santosh
+> 
+> > +
+> > +       r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
+> > +                                       oh->clkdm->pwrdm.ptr->prcm_offs,
+> > +                                       oh->prcm.omap4.context_offs);
+> > +
+> > +       if (!r)
+> > +               return;
+> > +
+> > +       oh->prcm.omap4.context_lost_counter++;
+> need to be careful about counter overflow.
+
+Well, this code can't do much for that even if it overflows... the type
+for the context_lost_counter is unsigned though, maybe it should be
+expanded if you are worried...?
+
+-Tero
