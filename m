@@ -1,48 +1,49 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 18 Jul 2012 12:36:42 +0200
-Subject: [RFC PATCHv2 0/2]arm: socfpga: Add initial support for Altera's
- SOCFPGA HW
-In-Reply-To: <20120718103531.GA12078@elf.ucw.cz>
-References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
- <20120716213752.GA28680@elf.ucw.cz>
- <201207171543.42889.arnd@arndb.de>
- <1342543585.13530.3.camel@dinh-ubuntu>
- <20120718103531.GA12078@elf.ucw.cz>
-Message-ID: <20120718103642.GA12422@elf.ucw.cz>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Wed, 18 Jul 2012 16:07:30 +0530
+Subject: [RFC][PATCH 1/1] ARM: OMAP2+: PM: Register suspend ops even in the
+ presence of DT blob
+Message-ID: <1342607850-12071-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2012-07-18 12:35:31, Pavel Machek wrote:
-> Hi!
-> 
-> > > > Arnd, do you think this is good enough to go to the next tree? It
-> > > > is new architecture, it should not break anything, I believe we
-> > > > addressed all the issues raised in the review, and noone is reporting
-> > > > new ones.
-> > > > 
-> > > > Plus, if we could make initial support into 3.6, that would be very
-> > > > nice :-).
-> > > 
-> > > I think we can make it for v3.6, but it's very late for that and I
-> > > haven't looked at it enough in the past. I have a few small
-> > > comments, so if you can address them quickly we can take it.
-> > 
-> > Hi Arnd. Thanks, please fire away your comments.
-> 
-> Arnd wanted quick reactions, so I took liberty of creating
-> PATCHv4. (You are marked in From: so you'll still get the credit
-> :-). I hope that is not a big problem.
-> 
-> I'm now pushing for-altera-0718 with the PATCHv4 (+ .config file).
-> 
-> Now, I guess at this point it would be useful to make our repository
-> public? 
-> 
-> (Oh, and cross the fingers for us so that it finally gets merged :-).
+As per the comment in omap2_common_late_init() looks like the
+original intent of the DT check was to treat only the PMIC
+and SR initialization differently. Recent changes to consolidate
+the suspend-resume code across OMAP3/4 resulted into the
+registration of suspend ops also being dependent on the check
+for DT blob. Since the suspend-resume operation should not
+really be dependent on the usage of DT, move the suspend ops
+registration before the check for DT.
 
-Ooops, this was not supposed to go to the lists. Sorry for the spam
-:-(.
-									Pavel
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+ arch/arm/mach-omap2/pm.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 9cb5ced..21761c0 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -297,6 +297,10 @@ postcore_initcall(omap2_common_pm_init);
+ 
+ int __init omap2_common_pm_late_init(void)
+ {
++#ifdef CONFIG_SUSPEND
++	suspend_set_ops(&omap_pm_ops);
++#endif
++
+ 	/*
+ 	 * In the case of DT, the PMIC and SR initialization will be done using
+ 	 * a completely different mechanism.
+@@ -316,9 +320,5 @@ int __init omap2_common_pm_late_init(void)
+ 	/* Smartreflex device init */
+ 	omap_devinit_smartreflex();
+ 
+-#ifdef CONFIG_SUSPEND
+-	suspend_set_ops(&omap_pm_ops);
+-#endif
+-
+ 	return 0;
+ }
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.0.4
