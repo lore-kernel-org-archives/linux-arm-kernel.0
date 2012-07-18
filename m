@@ -1,50 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Jul 2012 11:52:23 +0800
-Subject: [PATCH v2 2/2] clk: fix compile for OF && !COMMON_CLK
-In-Reply-To: <1342583543-20404-1-git-send-email-shawn.guo@linaro.org>
-References: <1342583543-20404-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1342583543-20404-3-git-send-email-shawn.guo@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 17 Jul 2012 20:43:34 -0700
+Subject: [GIT PULL] SPEAr platform fixes over 3.5-rc7
+In-Reply-To: <20120717130150.GM1994@localhost.localdomain>
+References: <20120717130150.GM1994@localhost.localdomain>
+Message-ID: <CAOesGMgHFrydxO-eJiuTL2yLKmVZXMcqiPhnBZQgbd=YcXD-Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hi Shiraz,
 
-With commit 766e6a4ec602d0c107 (clk: add DT clock binding support),
-compiling with OF && !COMMON_CLK is broken.
+I see that every commit in that branch is done by you, but not a
+single one has a Signed-off-by by you. Please fix that, it's important
+to track the history of how code is introduced to the kernel.
 
-Reported-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-Reported-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- drivers/clk/clkdev.c |    2 +-
- include/linux/clk.h  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Also, we are _very_ late in the 3.5 release cycle now. Only truly
+critical fixes can go in (3.5 is likely to come out by the weekend). I
+have some comments about the patches below.
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 69085e0..d423c9b 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -24,7 +24,7 @@
- static LIST_HEAD(clocks);
- static DEFINE_MUTEX(clocks_mutex);
- 
--#ifdef CONFIG_OF
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
- struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	struct of_phandle_args clkspec;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 6283e2e..f80ebad 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -364,7 +364,7 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
- struct device_node;
- struct of_phandle_args;
- 
--#ifdef CONFIG_OF
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
- struct clk *of_clk_get(struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
--- 
-1.7.4.1
+In general, to make our life easier, please make sure the commit
+message for the patch describes why the fix is needed when it's not
+obvious.
+
+I'll wait with pulling until you have a chance to fix up your branch
+based on the below comments. Please make sure you do it with extreme
+expediency though, or chances are it'll miss 3.5.
+
+
+Thanks,
+
+-Olof
+
+On Tue, Jul 17, 2012 at 6:01 AM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
+
+> Vipul Kumar Samar (10):
+>       clk:spear1340:Fix: Rename clk ids within predefined limit
+>       clk:spear1310:Fix: Rename clk ids within predefined limit
+>       Clk:spear3xx:Fix: Rename clk ids within predefined limit
+>       Clk:spear6xx:Fix: Rename clk ids within predefined limit
+
+Ok, those 4 are quite obvious why they're needed.
+
+>       ARM: SPEAr13xx: Fix Interrupt bindings
+>       clk: SPEAr1340: Fix clk enable register for uart1 and i2c1.
+
+Those two as well.
+
+>       clk: SPEAr13xx: Add localtimer (twd) clock support
+
+This doesn't look like a critical regression fix, does it?
+
+>       Clk: SPEAr1340: Update sys clock parent array
+
+Please help us out here by describing what is broken by the way it was
+before the patch.
+
+>       ARM: dts: SPEAr320: Fix compatible string
+
+This one seems straightforward.
+
+>       ARM: dts: SPEAr320: Boot the board in EXTENDED_MODE
+
+Same here, please elaborate on why / how it is broken today.
+
+
+Thanks,
+
+-Olof
