@@ -1,58 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 17 Jul 2012 22:41:29 -0700
-Subject: [PULL] [PATCH 0/4] arm: at91: gpio fix
-In-Reply-To: <20120718052344.GB2629@game.jcrosoft.org>
-References: <20120715131618.GF4450@game.jcrosoft.org>
- <CAOesGMgXAADDqAL5EvSdfaO0GzZJT0_a7-eNRPTJA73zYN-TEg@mail.gmail.com>
- <20120718052344.GB2629@game.jcrosoft.org>
-Message-ID: <CAOesGMhieXmf-WvS0eRLJ9UN2Z63xNr4mOKY2QdPLRvm-zoXDA@mail.gmail.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Wed, 18 Jul 2012 11:13:00 +0530
+Subject: [PATCH 2/2] arm/dts: omap4: Add ocp2scp data
+In-Reply-To: <50055C38.3000309@mvista.com>
+References: <1342448023-14438-1-git-send-email-kishon@ti.com>
+ <1342448023-14438-3-git-send-email-kishon@ti.com>
+ <50055C38.3000309@mvista.com>
+Message-ID: <CAAe_U6KGPnTefBVzYises6-+o40MZTr8j+zLRB504TDOfmsf9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 10:23 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 20:54 Tue 17 Jul     , Olof Johansson wrote:
->> Hi Jean-Christophe,
->>
->> Comments below. As I mentioned in the SPEAr pull request just now, we
->> are very close to final 3.5, so only fixes to bugs should go in.
->> Please help me out a bit below.
->>
->> On Sun, Jul 15, 2012 at 6:16 AM, Jean-Christophe PLAGNIOL-VILLARD
->> <plagnioj@jcrosoft.com> wrote:
->>
->> > Jean-Christophe PLAGNIOL-VILLARD (4):
->> >       ARM: at91: gpio: implement request
->> >       ARM: at91: gpio: implement gpio_free
->>
->> Are the two above regressions, or just general improvement? Looks like
->> the latter to me?
-> On non dt I agree but on DT the gpio are not mux in the kernel.
-> Today it work if the bootloader mux it as gpio so the kernel work onther wise BUG
+Hi,
+
+On Tue, Jul 17, 2012 at 6:06 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
 >
-> and this is the case today
-
-Ok, thanks -- that makes sense. Care to roll those two patches into
-one and document that in the commit message?
-
->>
->> >       at91: regroup gpio and pinctrl under a simple-bus
->>
->> This looks like a cleanup patch to me. I'm also not sure that this is
->> appropriate use of a simple-bus. The patch seems to have been posted
->> for review the same day as you sent the pull request, and not cc:d to
->> devicetree-discuss.
-> forget to cc the devicetree but on at91 the pintcrl and gpio use the same
-> registers so you must you the simple-bus
 >
-> As I've a huge patch series that I'm finishing to fix after found this bug on
-> the gpio it really help to do not rebase it
+> On 16-07-2012 18:13, Kishon Vijay Abraham I wrote:
+>
+>> Add ocp2scp data node in omap4 device tree file.
+>
+>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap4.dtsi |    8 ++++++++
+>>   1 files changed, 8 insertions(+), 0 deletions(-)
+>
+>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 359c497..bda5df3 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -272,5 +272,13 @@
+>>                         ti,hwmods = "mmc5";
+>>                         ti,needs-special-reset;
+>>                 };
+>> +
+>> +               ocp2scp at 4a0ad000  {
+>
+>
+>    "reg" property is absent, so why do you give the node name an address
+> postfix?
+When I was initially developing, I had "reg" property populated. Those
+info is now obtained from *ti,hwmods*. I'll resend the patch removing
+it.
 
-Defining the same device twice to have two drivers bind to it doesn't
-seem like the right solution here. That patch needs an acked-by from
-Rob Herring or Grant Likely before we pick it up. Existing device
-trees don't include the pinctrl nodes, so this is 3.6 material as far
-as I can tell.
-
-
--Olof
+Thanks
+Kishon
