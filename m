@@ -1,35 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jul 2012 01:08:41 +0800
-Subject: Device tree binding for DVFS table
-In-Reply-To: <4FFD77FE.8050206@nvidia.com>
-References: <4FFD77FE.8050206@nvidia.com>
-Message-ID: <20120718170838.GA27581@S2101-09.ap.freescale.net>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Wed, 18 Jul 2012 12:15:00 -0500
+Subject: [PATCH 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
+In-Reply-To: <CAK=WgbbVvFoGRoitscvTRUWUWd=3HLiuvs6ZUNZnAbF67tXO5A@mail.gmail.com>
+References: <1339811764-5337-1-git-send-email-omar.luna@linaro.org>
+ <20120717101100.GI4213@amd.com>
+ <CAK=WgbbVvFoGRoitscvTRUWUWd=3HLiuvs6ZUNZnAbF67tXO5A@mail.gmail.com>
+Message-ID: <CALLhW=7PcocUyG=b+LszJj+hvNqKAY8Gf6hNPc0XW3XtF=hG9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2012 at 06:26:30PM +0530, Prashant Gaikwad wrote:
-> Hi,
-> 
-> I am working on DT binding for Tegra DVFS.
-> 
-> For Tegra, DVFS node mainly consists of frequency and voltage pairs.
-> Frequency in the pair may change for different process. E.g. for
-> process 1 CPU clock frequency could be 900MHz at 1V while for
-> process 2 it could be 1GHz at 1V.
-> Tegra uses vendor specific ids to identify the correct frequency table.
-> 
-> Following is the proposed binding for voltage and frequency tables
-> used in DVFS. Looking for comments/suggestions to make it generic.
-> 
-It seems we are trying to approach a generic binding for DVFS operating
-points.  In that case, we will need a generic library helper function
-to parse it.  But since we already have such a library - OPP
-(drivers/base/power/opp.c) in place, I would approach the same goal
-in other way around, adding device tree binding for OPP.  Please see
-the patch I just sent out below and comment.
+On 17 July 2012 05:51, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> + Paul
+>
+> On Tue, Jul 17, 2012 at 1:11 PM, Joerg Roedel <joerg.roedel@amd.com> wrote:
+>> On Fri, Jun 15, 2012 at 08:55:58PM -0500, Omar Ramirez Luna wrote:
+>>> Omar Ramirez Luna (6):
+>>>   ARM: OMAP: iommu: fix including iommu.h without IOMMU_API selected
+>>>   ARM: OMAP3: hwmod data: add mmu data for iva and isp
+>>>   ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+>>>   ARM: OMAP3/4: iommu: migrate to hwmod framework
+>>>   ARM: OMAP2+: iommu: add reset handling
+>>>   ARM: OMAP3/4: iommu: adapt to runtime pm
+>>
+>> What happens with this patch-set. Comments anyone? Ohad?
+>
+> Looks like it depends on a few OMAP hwmod changes (reset handling)
+> which require Paul's ACK.
 
-[PATCH] PM / OPP: Initialize OPP table from device tree
+That's correct, sorry if I failed to mention that in the cover-letter,
+but it does depend on:
 
--- 
-Regards,
-Shawn
+http://lkml.indiana.edu/hypermail/linux/kernel/1207.2/00361.html
+
+For the hwmod reset handling. Mainly, I wanted to gather comments for
+this patch set.
+
+- omar
