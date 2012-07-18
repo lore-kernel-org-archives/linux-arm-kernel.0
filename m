@@ -1,56 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 18 Jul 2012 09:16:17 +0200
-Subject: [RFC PATCHv3 2/2] ARM: socfpga: Add DTS bindings for Altera's
- SOCFPGA
-In-Reply-To: <1342572656-5205-3-git-send-email-dinguyen@altera.com>
-References: <1342572656-5205-1-git-send-email-dinguyen@altera.com>
- <1342572656-5205-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20120718091617.572070c2@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Jul 2012 00:19:07 -0700
+Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
+In-Reply-To: <500439A8.1050705@ti.com>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+ <5000D647.4090200@gmail.com> <500439A8.1050705@ti.com>
+Message-ID: <20120718071906.GJ6522@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 17 Jul 2012 18:50:56 -0600,
-<dinguyen@altera.com> a ?crit :
+* Jon Hunter <jon-hunter@ti.com> [120716 09:01]:
+> On 07/13/2012 09:15 PM, Rob Herring wrote:
+> 
+> Tony, Tarun,
+> 
+> How would you feel on replacing omap_dmtimer_request_specific(int id)
+> with say omap_dm_timer_request_by_cap(int cap)?
+> 
+> I was thinking of changing the name so that it is clear that the API has
+> changed. The "int cap" passed to the above function would be an OR of
+> the appropriate the capabilities flags we have in dmtimer.h ...
+> 
+> /* timer capabilities used in hwmod database */
+> #define OMAP_TIMER_SECURE                               0x80000000
+> #define OMAP_TIMER_ALWON                                0x40000000
+> #define OMAP_TIMER_HAS_PWM                              0x20000000
+> ...
 
-> +	soc {
-> +		amba {
-> +			compatible = "arm,amba-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			pdma: pdma at ffe01000 {
-> +				compatible = "arm,pl330", "arm,primecell";
-> +				reg = <0xffe01000 0x1000>;
-> +				interrupts = <0 180 4>;
-> +			};
-> +		};
-> +
-> +		apb_periphs {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			gmac0: stmmac at ff700000 {
-> +				compatible = "st,spear600-gmac";
-> +				reg = <0xff700000 0x2000>;
-> +				interrupts = <0 115 4>;
-> +				interrupt-names = "macirq";
-> +				mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
-> +				phy-mode = "gmii";
-> +			};
-> +		};
+That may break coprocessors where the firmware may expect a hardcoded
+specific timer.. So at least that should be checked before the change.
+If the specific timer is still needed for some firmware, it's best to
+add a separate function for the capabilities.
 
-Are the pdma and gmac0 really specific to the cyclone board? Aren't
-they similar to the uarts and timers in that they are part of the SoC
-itself?
+Also, I believe it's up to the firmware running in secure mode to
+select the secure timers. So unless there's some way to query which
+timers are claimed by the secure mode, that too needs to be passed
+via DT.
 
-Best regards,
+Regards,
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
