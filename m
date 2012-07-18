@@ -1,57 +1,21 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 18 Jul 2012 22:01:20 +0530
-Subject: IRQ and FIQ disabling during sleep states.
-In-Reply-To: <CAMXH7KG_Q50AEkwm1B7YuhN2iy287BbMg8PB1EvBgNmBFCEvOw@mail.gmail.com>
-References: <20120711123020.GW2416@tbergstrom-lnx.Nvidia.com>
- <4FFEF5DA.8000505@linaro.org>
- <CAMXH7KG_Q50AEkwm1B7YuhN2iy287BbMg8PB1EvBgNmBFCEvOw@mail.gmail.com>
-Message-ID: <CAMQu2gyPkYz-=dyrRJGW_5QV+6rPj7bFZyqS2Mwt4tUEU-M+0Q@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 18 Jul 2012 09:45:00 -0700 (PDT)
+Subject: [net-next PATCH v7] net: ethernet: davinci_emac: add OF support
+In-Reply-To: <1342521264-18466-1-git-send-email-agust@denx.de>
+References: <1342521264-18466-1-git-send-email-agust@denx.de>
+Message-ID: <20120718.094500.2234614298478867072.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 9:49 PM, Rob Lee <rob.lee@linaro.org> wrote:
-> Hello Peter and Daniel,
->
-> On Thu, Jul 12, 2012 at 11:05 AM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 07/11/2012 02:30 PM, Peter De Schrijver wrote:
->>> Hi,
->>>
->>> I noticed several platforms exhibit different behaviour wrt disabling IRQ or
->>> FIQ when entering a CPU idle state. Tegra for example disables both FIQ and
->>> IRQ when entering CPU clockstop, but OMAP seems to only disable FIQs? Also
->>> the generic cpuidle_wrap_enter() function, enables IRQs after return from
->>> the idle state, but doesn't disable them.
->>>
->>> Some questions:
->>>
->>> 1) I assume we need to disable IRQ/FIQ to not confuse the cpuidle code due to
->>>    late interrupts?
->
-> Part of the a cpuidle irq and time keeping consolidation and cleanup
-> patch that went in a while back removed all the irq disable calls from
-> arm platform code as they are they are already disabled at the
-> arch/arm level in kernel/process.c before calling cpu_idle_call.  I
-> meant to remove these redundant platform calls for all ARM platforms
-> but it's possible I missed one for Tegra if its platform irq disable
-> still exists.
->
->>> 2) What prevents us from unifying this?
-> It may be good to also disable the FIQ's at the same time as IRQ's in
-> arch/arm/kernel/process.c.  I had made some mention of also global
-> disabling FIQs in my initial RFC submission and you can see the
-> responses here:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/076036.html
-> Given the response, I didn't pursue making any changes to FIQ
-> disabling.  But if would have suggested doing so at same location as
-> irq's are being disabled for ARM, perhaps it would have been better
-> received.  Now that many arm systems are using FIQs for handling
-> interrupts in the secure trust zone world, that may change things as
-> well.
->
-Actually the FIQ disable on OMAP is bogus and can be cleaned up.
-When FIQ is really used, it is used in secure world and it has banked
-register so the kernel FIQ disable doesn't help anyways.
+From: Anatolij Gustschin <agust@denx.de>
+Date: Tue, 17 Jul 2012 12:34:24 +0200
 
-Regards
-Santosh
+> From: Heiko Schocher <hs@denx.de>
+> 
+> add OF support for the davinci_emac driver.
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+
+Applied.
