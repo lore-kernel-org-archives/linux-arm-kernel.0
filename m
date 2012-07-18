@@ -1,55 +1,49 @@
-From: dinguyen@altera.com (Dinh.Nguyen)
-Date: Wed, 18 Jul 2012 12:53:31 -0600
-Subject: [PATCH v4] arm: socfpga: Add initial support for Altera's
- SOCFPGA HW
-In-Reply-To: <201207181242.44326.arnd@arndb.de>
-References: <20120718102507.GA11993@elf.ucw.cz>
- <201207181242.44326.arnd@arndb.de>
-Message-ID: <1342637611.13680.2.camel@dinh-ubuntu>
+From: sedat.dilek@gmail.com (Sedat Dilek)
+Date: Wed, 18 Jul 2012 19:54:46 +0200
+Subject: linux-next: Tree for July 17 (mfd: AB3100 - ab3100_probe:
+ undefined reference to `rand_initialize_irq')
+In-Reply-To: <CACRpkdbAnBza0Nd4Qw_LinRDa4XVuzUdJFX==YeML2z7H6gzwg@mail.gmail.com>
+References: <CA+icZUXjc+13YjoJ6FjDFboX20j3mqHNtvV2Av2-H0My8V2Mgg@mail.gmail.com>
+ <CA+icZUW4gNqspcJ1sjBD-3GCVee2VWVV5NPAr6Eo-aZHjp3y+Q@mail.gmail.com>
+ <CA+icZUW+Gp9HK-6dzHjtTwSc9RaLD3sV+WPMM-vO3A6fj6frwQ@mail.gmail.com>
+ <CACRpkdbAnBza0Nd4Qw_LinRDa4XVuzUdJFX==YeML2z7H6gzwg@mail.gmail.com>
+Message-ID: <CA+icZUWzS==NVNstc3RUfKe-=4UVtAza36LuFRuAp-zeX=5WyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-07-18 at 12:42 +0000, Arnd Bergmann wrote:
-> On Wednesday 18 July 2012, Pavel Machek wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Adding core definitions for Altera's SOCFPGA ARM platform.
-> >   
-> 
-> There are two small details I noticed. You can either send
-> a replacement patch or fixups on top of this one.
-> 
-> > +		gmac0: stmmac at ff700000 {
-> > +			compatible = "st,spear600-gmac";
-> > +			reg = <0xff700000 0x2000>;
-> > +			interrupts = <0 115 4>;
-> > +			interrupt-names = "macirq";
-> > +			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
-> > +			phy-mode = "gmii";
-> > +		};
-> 
-> We've just discussed the stmmac driver in the spear1340 update
-> series. My understanding is that there are multiple variants of this
-> that we may need to distintinguish. I think it's better if you
-> make the compatible string something that does not reference the
-> spear600 specific variant, unless you are certain that it is in fact
-> completely identical to that one.
-> 
-> Ideally you would have the version of the stmmac macro encoded
-> in there, in addition to a name identifying altera as the company
-> who added this one, ordered from most specific to least specific.
-> 
-> For instance, this could be
-> 
-> 	compatible = "altr,socfpga-stmmac", "st,stmmac-v12.3.45", "st,stmmac";
-> 
-> Looking at the driver, it seems that this should actually not be called
-> stmmac in the devicetree but rather dwmac, so better make it
-> 
-> 	compatible = "altr,socfpga-stmmac", "snps,dwmac-4.567", "snps,dwmac";
-> 
+On Tue, Jul 17, 2012 at 8:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Jul 17, 2012 at 12:39 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
+>> On Tue, Jul 17, 2012 at 12:21 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
+>>> ...looks like AB3100 is the *only* driver still using rand_initialize_irq()...
+>>>
+>>> drivers/mfd/ab3100-core.c:939:  rand_initialize_irq(client->irq);
+>>>
+>>> ...but why has random.h still this...?
+>>>
+>>> include/linux/random.h:51:extern void rand_initialize_irq(int irq);
+>>>
+>>> Just thinking "loud"...
+>>>
+>>> - Sedat -
+>>
+>> Is this attached patch OK, Ted?
+>
+> You're just deleting a line from the AB3100 driver, so I guess you're
+> regressing the system since that IRQ will no longer contribute
+> to the entropy pool?
+>
+> How do we simultaneously make sure that this IRQ is still
+> contributing to the entropy?
+>
 
-Is there already work to update the bindings to reflect this change in
-stmmac driver? Or could I help with setting up some patches for it?
+For the sake of completeness:
+* Ted explained in his answer in [1].
+* Just FYI: [2] has these changes merged into the original commit.
 
-Dinh
+- Sedat -
+
+[1] http://marc.info/?l=linux-next&m=134256445707799&w=2
+[2] http://git.kernel.org/?p=linux/kernel/git/tytso/random.git;a=commitdiff;h=627574db8b21c51217c683909458500916e64963
+
+> Yours,
+> Linus Walleij
