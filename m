@@ -1,30 +1,33 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Wed, 18 Jul 2012 12:53:18 +0530
-Subject: Devicetree: Initialization order of mmc block devices?
-In-Reply-To: <5006571A.7060103@de.bosch.com>
-References: <5006571A.7060103@de.bosch.com>
-Message-ID: <CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Jul 2012 07:27:31 +0000
+Subject: [RFC PATCHv3 1/2] ARM: socfpga: initial support for Altera's
+ SOCFPGA platform
+In-Reply-To: <1342572656-5205-2-git-send-email-dinguyen@altera.com>
+References: <1342572656-5205-1-git-send-email-dinguyen@altera.com>
+ <1342572656-5205-2-git-send-email-dinguyen@altera.com>
+Message-ID: <201207180727.32041.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2012 11:56, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->
-> Similar to [1] we have a device which has two mmc block devices connected:
-> One external removable and a second internal hard wired one. Depending on
-> the availability of the external removable mmc card at boot time, the
-> internal hard wired device becomes mmcblk1 (external mmc card available ==
-> mmcblk0) or mmcblk0 if the external one is not there. This order is given by
-> the hardware.
->
-> With older, non-DT kernels, we used the hack from [2] to control the
-> initialization order and force the internal hard wired device to mmcblk0.
->
-> Now, we are switching to a newer, DT based kernel. With a DT based kernel
-> this hack doesn't seem to work an more.
->
-> Any idea how we could influence the initialization order of the mmc block
-> devices using a DT based kernel? Ensuring that the internal, hard wired mmc
-> card is always mapped to mmcblk0?
->
-Doesn't it work by simply by moving the "internal" element before
-"external" in the array 'struct twl4030_hsmmc_info mmc[]' ?
+On Wednesday 18 July 2012, dinguyen at altera.com wrote:
+> +struct clk {
+> +       unsigned long rate;
+> +};
+> +
+> +static struct clk apb_pclk = { .rate = 200000000};
+> +static struct clk i2c_clk = { .rate = 100000000};
+> +static struct clk spim_clk = { .rate = 100000000};
+> +static struct clk mpu_pclk = { .rate = SOCFPGA_MPU_PERIHCLK_FREQ_HZ};
+> +static struct clk l4_main_clk = { .rate = SOCFPGA_L4_MAIN_CLK};
+> +
+> +static struct clk_lookup lookups[] = {
+> +       { .clk = &apb_pclk, .con_id = "apb_pclk", },
+
+I have one comment left: You still define "struct clk" privately here,
+which means that any driver using clk_get and clk_get_rate will
+access an invalid data structure and not get the rate you put in here.
+
+I believe you just need to be using clk_register_fixed_rate()
+rather than defining the clk structures statically.
+
+	Arnd
