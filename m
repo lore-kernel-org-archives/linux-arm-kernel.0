@@ -1,123 +1,56 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Wed, 18 Jul 2012 11:27:33 +0530
-Subject: [PATCH V2 7/7] ARM: EXYNOS5: Set parent clock to fimd
-In-Reply-To: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <1342591053-7092-8-git-send-email-l.krishna@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 17 Jul 2012 22:58:46 -0700
+Subject: [GIT PULL] SPEAr platform fixes over 3.5-rc7
+In-Reply-To: <20120718052911.GQ1994@localhost.localdomain>
+References: <20120717130150.GM1994@localhost.localdomain>
+ <CAOesGMgHFrydxO-eJiuTL2yLKmVZXMcqiPhnBZQgbd=YcXD-Mg@mail.gmail.com>
+ <20120718052911.GQ1994@localhost.localdomain>
+Message-ID: <CAOesGMhgdQKhfdZWq32ideX-m2-_Y=ANxBF+eMwgxFCkZpc_iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets mout_mpll_user as parent clock to fimd also
-sets Fimd source clock rate to 800 MHz for MIPI LCD
+On Tue, Jul 17, 2012 at 10:29 PM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
+> Hi Olof,
+>
+> On Tue, Jul 17, 2012 at 08:43:34PM -0700, Olof Johansson wrote:
+>> Hi Shiraz,
+>>
+>> I see that every commit in that branch is done by you, but not a
+>> single one has a Signed-off-by by you. Please fix that, it's important
+>> to track the history of how code is introduced to the kernel.
+>>
+>> Also, we are _very_ late in the 3.5 release cycle now. Only truly
+>> critical fixes can go in (3.5 is likely to come out by the weekend). I
+>> have some comments about the patches below.
+>>
+>> In general, to make our life easier, please make sure the commit
+>> message for the patch describes why the fix is needed when it's not
+>> obvious.
+>>
+>> I'll wait with pulling until you have a chance to fix up your branch
+>> based on the below comments. Please make sure you do it with extreme
+>> expediency though, or chances are it'll miss 3.5.
+>
+> I have tried to fix all points mentioned by you and updated the spear
+> fixes branch.
+>
+> The following changes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
+>
+>   Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
+>
+> are available in the git repository at:
+>
+>   http://git.stlinux.com/spear/linux-2.6.git for-3.5-spear-fixes
 
-Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
----
- arch/arm/mach-exynos/clock-exynos5.c       |   25 +++++++++++++++----------
- arch/arm/mach-exynos/mach-exynos5-dt.c     |   11 +++++++++++
- arch/arm/plat-samsung/include/plat/clock.h |    2 ++
- 3 files changed, 28 insertions(+), 10 deletions(-)
+Thanks for the quick turnaround. I've pulled this branch into fixes
+and will send it up to Linus tonight or tomorrow morning once the at91
+branch has been sorted out too.
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index f001876..8c20c4d 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -1125,6 +1125,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
- 	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
- };
- 
-+struct clksrc_clk exynos5_clk_sclk_fimd = {
-+	.clk	= {
-+		.name	        = "sclk_fimd",
-+		.devname        = "exynos5-fb",
-+		.enable         = exynos5_clksrc_mask_disp1_0_ctrl,
-+		.ctrlbit        = (1 << 0),
-+	},
-+	.sources = &exynos5_clkset_group,
-+	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
-+};
-+
- static struct clksrc_clk exynos5_clksrcs[] = {
- 	{
- 		.clk	= {
-@@ -1136,16 +1148,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
- 		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
- 	}, {
- 		.clk	= {
--			.name		= "sclk_fimd",
--			.devname	= "exynos5-fb",
--			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
--			.ctrlbit	= (1 << 0),
--		},
--		.sources = &exynos5_clkset_group,
--		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
--		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
--	}, {
--		.clk	= {
- 			.name		= "aclk_266_gscl",
- 		},
- 		.sources = &clk_src_gscl_266,
-@@ -1245,6 +1247,7 @@ static struct clksrc_clk *exynos5_sysclks[] = {
- 	&exynos5_clk_mdout_spi0,
- 	&exynos5_clk_mdout_spi1,
- 	&exynos5_clk_mdout_spi2,
-+	&exynos5_clk_sclk_fimd,
- };
- 
- static struct clk *exynos5_clk_cdev[] = {
-@@ -1497,6 +1500,8 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
- 
- 	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
- 	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
-+	clk_set_parent(&exynos5_clk_sclk_fimd.clk,
-+			&exynos5_clk_mout_mpll_user.clk);
- 
- 	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
- 		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 2107e01..19f3724 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -24,6 +24,9 @@
- #include <plat/regs-serial.h>
- #include <plat/backlight.h>
- #include <plat/gpio-cfg.h>
-+#include <plat/clock.h>
-+#include <plat/s5p-clock.h>
-+#include <plat/clock-clksrc.h>
- 
- #include "common.h"
- #include <video/platform_lcd.h>
-@@ -176,9 +179,17 @@ static void __init exynos5250_dt_map_io(void)
- 
- static void __init exynos5250_dt_machine_init(void)
- {
-+	struct device_node *fimd_node;
-+
- 	samsung_bl_set(&smdk5250_bl_gpio_info, &smdk5250_bl_data);
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 				exynos5250_auxdata_lookup, NULL);
-+
-+	fimd_node = of_find_node_with_property(NULL, "supports-mipi-panel");
-+	if (of_get_property(fimd_node, "supports-mipi-panel", NULL))
-+		clk_set_rate(&exynos5_clk_sclk_fimd.clk, 800000000);
-+	of_node_put(fimd_node);
-+
- 	exynos_fimd_gpio_setup_24bpp();
- 	platform_add_devices(smdk5250_devices, ARRAY_SIZE(smdk5250_devices));
- }
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index a62753d..3d27783 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -83,6 +83,8 @@ extern struct clk clk_ext;
- extern struct clksrc_clk clk_epllref;
- extern struct clksrc_clk clk_esysclk;
- 
-+extern struct clksrc_clk exynos5_clk_sclk_fimd;
-+
- /* S3C64XX specific clocks */
- extern struct clk clk_h2;
- extern struct clk clk_27m;
--- 
-1.7.0.4
+One remaining nit: Your signed-off-by lines should be the very last
+line, since you were the last person to touch the patch. You would
+normally add Acked-by lines that came in above your own S-o-b, not
+below. Please keep that in mind for future patches (if you use git am
+-s then git will handle this automatically).
+
+
+-Olof
