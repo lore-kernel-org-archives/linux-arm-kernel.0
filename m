@@ -1,35 +1,69 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Jul 2012 11:24:07 -0600 (MDT)
-Subject: [PATCHv6 3/7] ARM: OMAP4: hwmod: flag hwmods/modules not
- supporting module level context status
-In-Reply-To: <1342628606.4672.112.camel@sokoban>
-References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
- <1339428387-4800-4-git-send-email-t-kristo@ti.com>
- <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
- <1342628606.4672.112.camel@sokoban>
-Message-ID: <alpine.DEB.2.00.1207181122280.19048@utopia.booyaka.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 18 Jul 2012 13:38:53 -0400
+Subject: [PATCH] ARM: ftrace: Trace function entry before updating index
+In-Reply-To: <1342490592-20373-1-git-send-email-ccross@android.com>
+References: <1342490592-20373-1-git-send-email-ccross@android.com>
+Message-ID: <1342633133.11900.13.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jul 2012, Tero Kristo wrote:
-
-> On Tue, 2012-07-17 at 03:11 -0500, Menon, Nishanth wrote:
->
-> > OMAP4430_RM_ABE_AESS_CONTEXT? why not use LOSTMEM_AESSMEM ? ABE will
-> > need to know when it lost context to be able to reload it's firmware,
-> > no?
+On Mon, 2012-07-16 at 19:03 -0700, Colin Cross wrote:
+> Commit 722b3c74695377d11d18a52f3da08114d37f3f37 modified x86 ftrace to
+> avoid tracing all functions called from irqs when function graph was
+> used with a filter.  Port the same fix to ARM.
 > 
-> It looks like current hwmod data doesn't support specific bits to be
-> used for the context declaration, it is only specifying the register
-> offset. Also, the same register is used by aess hwmod, so this will
-> cause a conflict if I take the same register into use.
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+
+Someone on the ARM side needs to pull this in.
+
+I'll look into fixing this for PPC.
+
+Thanks!
+
+-- Steve
+
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
 > 
-> This could be fixed by adding a field for the context bits, but I guess
-> this should be commented upon by someone (Benoit / Paul) before I craft
-> some sort of patch for that.
-
-If you need to add a u8 there to specify the bitshift, go ahead and do it.  
-u8 lostmem_bit, perhaps?
-
-
-- Paul
+> It looks like the same issue affects blackfin, microblaze, mips,
+> parisc, powerpc, s390, sh, and sparc, but I don't have patches to
+> fix those.
+> 
+>  arch/arm/kernel/ftrace.c |   17 +++++++++--------
+>  1 files changed, 9 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index df0bf0c..34e5664 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -179,19 +179,20 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+>  	old = *parent;
+>  	*parent = return_hooker;
+>  
+> -	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
+> -				       frame_pointer);
+> -	if (err == -EBUSY) {
+> -		*parent = old;
+> -		return;
+> -	}
+> -
+>  	trace.func = self_addr;
+> +	trace.depth = current->curr_ret_stack + 1;
+>  
+>  	/* Only trace if the calling function expects to */
+>  	if (!ftrace_graph_entry(&trace)) {
+> -		current->curr_ret_stack--;
+>  		*parent = old;
+> +		return;
+> +	}
+> +
+> +	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
+> +				       frame_pointer);
+> +	if (err == -EBUSY) {
+> +		*parent = old;
+> +		return;
+>  	}
+>  }
+>  
