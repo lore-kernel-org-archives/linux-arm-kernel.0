@@ -1,20 +1,56 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 18 Jul 2012 12:45:16 +0530
-Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for preventing
- autodep delete
-In-Reply-To: <1342536971.4672.82.camel@sokoban>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>	
- <1342189185-5306-8-git-send-email-t-kristo@ti.com>	 <5003F453.9020903@ti.com>
- <1342536971.4672.82.camel@sokoban>
-Message-ID: <50066284.1030903@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 18 Jul 2012 09:16:17 +0200
+Subject: [RFC PATCHv3 2/2] ARM: socfpga: Add DTS bindings for Altera's
+ SOCFPGA
+In-Reply-To: <1342572656-5205-3-git-send-email-dinguyen@altera.com>
+References: <1342572656-5205-1-git-send-email-dinguyen@altera.com>
+ <1342572656-5205-3-git-send-email-dinguyen@altera.com>
+Message-ID: <20120718091617.572070c2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 July 2012 08:26 PM, Tero Kristo wrote:
-> Anyway, it also looks like this fix is no longer needed with the latest
-> kernel, something has changed with the gpio code / or latencies and it
-> doesn't crash anymore. Thus, it looks like patches 7&  8 can be dropped
-> from this set for now. This is the behavior with beagleboard at least,
-> if someone can verify this with some other omap3 hw that would be nice.
+Le Tue, 17 Jul 2012 18:50:56 -0600,
+<dinguyen@altera.com> a ?crit :
 
-I can test it on a omap3 SDP. What do you want me to test?
+> +	soc {
+> +		amba {
+> +			compatible = "arm,amba-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			pdma: pdma at ffe01000 {
+> +				compatible = "arm,pl330", "arm,primecell";
+> +				reg = <0xffe01000 0x1000>;
+> +				interrupts = <0 180 4>;
+> +			};
+> +		};
+> +
+> +		apb_periphs {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			gmac0: stmmac at ff700000 {
+> +				compatible = "st,spear600-gmac";
+> +				reg = <0xff700000 0x2000>;
+> +				interrupts = <0 115 4>;
+> +				interrupt-names = "macirq";
+> +				mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+> +				phy-mode = "gmii";
+> +			};
+> +		};
+
+Are the pdma and gmac0 really specific to the cyclone board? Aren't
+they similar to the uarts and timers in that they are part of the SoC
+itself?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
