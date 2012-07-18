@@ -1,46 +1,57 @@
-From: torbenh@linutronix.de (Torben Hohn)
-Date: Wed, 18 Jul 2012 14:58:25 +0200
-Subject: [PATCH] arm imx31: add a few pinmux settings the tt01 needs
-Message-ID: <1342616305-24722-1-git-send-email-torbenh@linutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 18 Jul 2012 15:03:41 +0200
+Subject: i.MX27: gpio device tree problems.
+Message-ID: <CACKLOr3TQXHekBM76LBL0AczUQrYTDxm6z5YWSdrbu5ug6EpTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are the Pinmux Settings for the PP4 SSI Port multiplexible
-onto the first UART Pins.
+Hi,
+we are trying to port our Visstrim SM10 [1] to device tree and we've
+found some problems related to gpios in the process:
 
-Signed-off-by: Torben Hohn <torbenh@linutronix.de>
----
- arch/arm/plat-mxc/include/mach/iomux-mx3.h |    5 +++++
- 1 file changed, 5 insertions(+)
+1.- IRQs don't work properly since the value of 'pdev->id' when using
+device tree is -1, so 'irq_set_chained_handler()' never gets called
+[2]
+2.- When using device tree GPIO numbers are allocated dynamically
+using gpiolib [3]. This leads to different GPIO numbers being used
+compared to the version without device tree. Since GPIOs are exposed
+to the user space by gpilib using sysfs this breaks compatibility with
+current user applications.
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-index 63f22a0..019b0a0 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-@@ -515,12 +515,16 @@ enum iomux_pins {
- #define MX31_PIN_CSPI3_SPI_RDY__CTS3	IOMUX_MODE(MX31_PIN_CSPI3_SPI_RDY, IOMUX_CONFIG_ALT1)
- #define MX31_PIN_CTS1__CTS1		IOMUX_MODE(MX31_PIN_CTS1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_RTS1__RTS1		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_RTS1__SFS		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_TXD1__TXD1		IOMUX_MODE(MX31_PIN_TXD1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_TXD1__SCK		IOMUX_MODE(MX31_PIN_TXD1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_RXD1__RXD1		IOMUX_MODE(MX31_PIN_RXD1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_RXD1__STXDA		IOMUX_MODE(MX31_PIN_RXD1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_DCD_DCE1__DCD_DCE1	IOMUX_MODE(MX31_PIN_DCD_DCE1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_RI_DCE1__RI_DCE1	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_DSR_DCE1__DSR_DCE1	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_DTR_DCE1__DTR_DCE1	IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_DTR_DCE1__SRXDA	IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_CTS2__CTS2		IOMUX_MODE(MX31_PIN_CTS2, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_RTS2__RTS2		IOMUX_MODE(MX31_PIN_RTS2, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_TXD2__TXD2		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_FUNC)
-@@ -724,6 +728,7 @@ enum iomux_pins {
- #define MX31_PIN_KEY_ROW2_KEY_ROW2	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW3_KEY_ROW3	IOMUX_MODE(MX31_PIN_KEY_ROW3, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW4_KEY_ROW4	IOMUX_MODE(MX31_PIN_KEY_ROW4, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_KEY_ROW4_GPIO		IOMUX_MODE(MX31_PIN_KEY_ROW4, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_KEY_ROW5_KEY_ROW5	IOMUX_MODE(MX31_PIN_KEY_ROW5, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW6_KEY_ROW6	IOMUX_MODE(MX31_PIN_KEY_ROW6, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_ROW7_KEY_ROW7	IOMUX_MODE(MX31_PIN_KEY_ROW7, IOMUX_CONFIG_FUNC)
+Here is an example:
+
+Version without device tree:
+gpiochip_add: registered GPIOs 0 to 31 on device: imx21-gpio.0
+gpiochip_add: registered GPIOs 32 to 63 on device: imx21-gpio.1
+gpiochip_add: registered GPIOs 64 to 95 on device: imx21-gpio.2
+gpiochip_add: registered GPIOs 96 to 127 on device: imx21-gpio.3
+gpiochip_add: registered GPIOs 128 to 159 on device: imx21-gpio.4
+gpiochip_add: registered GPIOs 160 to 191 on device: imx21-gpio.5
+
+Version with device tree:
+gpiochip_add: registered GPIOs 224 to 255 on device: 10015000.gpio
+gpiochip_add: registered GPIOs 192 to 223 on device: 10015100.gpio
+gpiochip_add: registered GPIOs 160 to 191 on device: 10015200.gpio
+gpiochip_add: registered GPIOs 128 to 159 on device: 10015300.gpio
+gpiochip_add: registered GPIOs 96 to 127 on device: 10015400.gpio
+gpiochip_add: registered GPIOs 64 to 95 on device: 10015500.gpio
+
+
+I'm sure that problem 1 is an bug that must be fixed but I'm not so
+confident about 2. Can we allow a change in the base number of the
+GPIOs?
+
+Regards.
+
+[1] http://lxr.linux.no/#linux+v3.4.5/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+[2] http://lxr.linux.no/#linux+v3.4.5/drivers/gpio/gpio-mxc.c#L400
+
+
 -- 
-1.7.10
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
