@@ -1,58 +1,20 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 18 Jul 2012 10:09:19 +0300
-Subject: [PATCH 1/5] ubi: introduce ubi->bad_peb_limit
-In-Reply-To: <1341389164-24409-2-git-send-email-shmulik.ladkani@gmail.com>
-References: <1341389164-24409-1-git-send-email-shmulik.ladkani@gmail.com>
- <1341389164-24409-2-git-send-email-shmulik.ladkani@gmail.com>
-Message-ID: <1342595359.31927.11.camel@brekeke>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 18 Jul 2012 12:45:16 +0530
+Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for preventing
+ autodep delete
+In-Reply-To: <1342536971.4672.82.camel@sokoban>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>	
+ <1342189185-5306-8-git-send-email-t-kristo@ti.com>	 <5003F453.9020903@ti.com>
+ <1342536971.4672.82.camel@sokoban>
+Message-ID: <50066284.1030903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-07-04 at 11:06 +0300, Shmulik Ladkani wrote:
-> Introduce 'ubi->bad_peb_limit', which specifies an upper limit of PEBs
-> ubi expects to go bad.
-> Currently, it is initialized to a fixed percentage of total PEBs in the
-> ubi device (configurable via CONFIG_MTD_UBI_BEB_LIMIT).
-> 
-> The 'bad_peb_limit' is intended to be used for calculating the amount of
-> PEBs ubi needs to reserve for bad eraseblock handling.
-> 
-> Signed-off-by: Shmulik Ladkani <shmulik.ladkani@gmail.com>
+On Tuesday 17 July 2012 08:26 PM, Tero Kristo wrote:
+> Anyway, it also looks like this fix is no longer needed with the latest
+> kernel, something has changed with the gpio code / or latencies and it
+> doesn't crash anymore. Thus, it looks like patches 7&  8 can be dropped
+> from this set for now. This is the behavior with beagleboard at least,
+> if someone can verify this with some other omap3 hw that would be nice.
 
-Created branch "beb" and pushed this patch there with minor amendments
-(see diff below). Let's use this branch in UBI tree for this work and
-merge it as soon as it is ready.
-
-diff --git a/drivers/mtd/ubi/build.c b/drivers/mtd/ubi/build.c
-index c33e25b..dee90b7 100644
---- a/drivers/mtd/ubi/build.c
-+++ b/drivers/mtd/ubi/build.c
-@@ -668,13 +668,12 @@ static int io_init(struct ubi_device *ubi)
-                ubi->bad_allowed = 1;
-                if (CONFIG_MTD_UBI_BEB_LIMIT > 0) {
-                        int percent = CONFIG_MTD_UBI_BEB_LIMIT;
--                       int beb_limit;
-+                       int limit = mult_frac(ubi->peb_count, percent, 100);
- 
--                       beb_limit = mult_frac(ubi->peb_count, percent, 100);
--                       /* round it up */
--                       if (mult_frac(beb_limit, 100, percent) < ubi->peb_count)
--                               beb_limit++;
--                       ubi->bad_peb_limit = beb_limit;
-+                       /* Round it up */
-+                       if (mult_frac(limit, 100, percent) < ubi->peb_count)
-+                               limit += 1;
-+                       ubi->bad_peb_limit = limit;
-                }
-        }
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/fff33c14/attachment-0001.sig>
+I can test it on a omap3 SDP. What do you want me to test?
