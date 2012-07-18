@@ -1,38 +1,85 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 18 Jul 2012 14:38:54 +0200
-Subject: MXS i2c PIOQ/DMA mode selection via DT
-In-Reply-To: <201207161605.44379.marek.vasut@gmail.com>
-References: <201207161605.44379.marek.vasut@gmail.com>
-Message-ID: <201207181438.54721.marek.vasut@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Jul 2012 12:42:44 +0000
+Subject: [PATCH v4] arm: socfpga: Add initial support for Altera's SOCFPGA
+ HW
+In-Reply-To: <20120718102507.GA11993@elf.ucw.cz>
+References: <20120718102507.GA11993@elf.ucw.cz>
+Message-ID: <201207181242.44326.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hello,
+On Wednesday 18 July 2012, Pavel Machek wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> There's been this patch going on, which adds DMA mode into MXS i2c driver:
-> https://patchwork.kernel.org/patch/1174051/
+> Adding core definitions for Altera's SOCFPGA ARM platform.
+>   
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Reviewed-by: Pavel Machek <pavel@denx.de>
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Pavel Machek <pavel@denx.de>
 > 
-> Recent nitpick was about toggling the PIOQUEUE (almost like PIO, only
-> transfer mode in current implementation) vs. DMA mode (newly added) on a
-> per-bus basis.
-> 
-> Current implementation in the patch adds a DT property, "fsl,use-pio"
-> (shall be changed to "fsl,use-pioqueue", but that's irrelevant) to select
-> between the PIOQUEUE and DMA mode on per-bus basis.
-> 
-> There was now a suggestion to dump this property and use kernel module
-> parameter instead. This obviously disallows to configure this behavior on
-> per-bus basis. Consider a scenario where small transfers happens on one
-> bus (possibly from a sensor) and large transfers on the other bus (eg. i2c
-> EEPROM). In such scenario, it's beneficial to enable PIOQUEUE mode for the
-> sensor and DMA mode for the EEPROM to minimize the overall overhead.
-> 
-> The mixed mode (PIOQ for small data and DMA for large data transfers) isn't
-> supported yet.
-> 
-> Please advise.
-> 
-> Best regards,
-> Marek Vasut
+> ---
+> Changes from V3: merged into single patch (it is now small enough),
+> moved dts pieces around (thanks to Thomas Petazzoni), removed clock
+> support (not neccessary with u-boot, needs to be redone). 
 
-BUMP?
+Looks good, I'll apply it to the next/newsoc branch for 3.6
+when I get the ok from Dinh. I'm not quite sure in what way you
+work together, but the patch lists only him in the MAINTAINERS
+file, so I'm making sure I'm not sidestepping him when I take
+the patch from you instead.
+
+There are two small details I noticed. You can either send
+a replacement patch or fixups on top of this one.
+
+> +		gmac0: stmmac at ff700000 {
+> +			compatible = "st,spear600-gmac";
+> +			reg = <0xff700000 0x2000>;
+> +			interrupts = <0 115 4>;
+> +			interrupt-names = "macirq";
+> +			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+> +			phy-mode = "gmii";
+> +		};
+
+We've just discussed the stmmac driver in the spear1340 update
+series. My understanding is that there are multiple variants of this
+that we may need to distintinguish. I think it's better if you
+make the compatible string something that does not reference the
+spear600 specific variant, unless you are certain that it is in fact
+completely identical to that one.
+
+Ideally you would have the version of the stmmac macro encoded
+in there, in addition to a name identifying altera as the company
+who added this one, ordered from most specific to least specific.
+
+For instance, this could be
+
+	compatible = "altr,socfpga-stmmac", "st,stmmac-v12.3.45", "st,stmmac";
+
+Looking at the driver, it seems that this should actually not be called
+stmmac in the devicetree but rather dwmac, so better make it
+
+	compatible = "altr,socfpga-stmmac", "snps,dwmac-4.567", "snps,dwmac";
+
+> diff --git a/arch/arm/mach-socfpga/common.h b/arch/arm/mach-socfpga/common.h
+> new file mode 100644
+> index 0000000..ba90e7a
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/common.h
+> @@ -0,0 +1,23 @@
+> +
+> +#ifndef __MACH_SOCFPGA_COMMON_H
+> +#define __MACH_SOCFPGA_COMMON_H
+> +
+> +extern struct sys_timer dw_apb_timer;
+> +
+> +#endif
+
+This header file is rather pointless when it is located in
+arch/arm/mach-socfpga where the driver cannot see it, so there
+is no guarantee that you actually use the same type in the
+declaration and the definition. I think it's better to also drop
+this header file and move the declaration into
+include/linux/dw_apb_timer.h
+
+	Arnd
