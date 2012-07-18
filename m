@@ -1,68 +1,52 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 18 Jul 2012 11:19:02 -0500
-Subject: IRQ and FIQ disabling during sleep states.
-In-Reply-To: <4FFEF5DA.8000505@linaro.org>
-References: <20120711123020.GW2416@tbergstrom-lnx.Nvidia.com>
- <4FFEF5DA.8000505@linaro.org>
-Message-ID: <CAMXH7KG_Q50AEkwm1B7YuhN2iy287BbMg8PB1EvBgNmBFCEvOw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 18 Jul 2012 19:23:26 +0300
+Subject: [PATCHv6 3/7] ARM: OMAP4: hwmod: flag hwmods/modules not
+ supporting module level context status
+In-Reply-To: <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-4-git-send-email-t-kristo@ti.com>
+ <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
+Message-ID: <1342628606.4672.112.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter and Daniel,
+On Tue, 2012-07-17 at 03:11 -0500, Menon, Nishanth wrote:
+> On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> > On OMAP4 most modules/hwmods support module level context status. On
+> > OMAP3 and earlier, we relied on the power domain level context status.
+> > Identify all modules that don't support 'context_offs' by marking the
+> > offset as USHRT_MAX. Rest have a valid 'context_offs' populated in
+> > .prcm structure already.
+> >
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > index 86fc513..828e7b8 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > @@ -208,6 +208,7 @@ static struct omap_hwmod omap44xx_l4_abe_hwmod = {
+> >         .prcm = {
+> >                 .omap4 = {
+> >                         .clkctrl_offs = OMAP4_CM1_ABE_L4ABE_CLKCTRL_OFFSET,
+> > +                       .context_offs = USHRT_MAX,
+> 
+> OMAP4430_RM_ABE_AESS_CONTEXT? why not use LOSTMEM_AESSMEM ? ABE will
+> need to know when it lost context to be able to reload it's firmware,
+> no?
 
-On Thu, Jul 12, 2012 at 11:05 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 07/11/2012 02:30 PM, Peter De Schrijver wrote:
->> Hi,
->>
->> I noticed several platforms exhibit different behaviour wrt disabling IRQ or
->> FIQ when entering a CPU idle state. Tegra for example disables both FIQ and
->> IRQ when entering CPU clockstop, but OMAP seems to only disable FIQs? Also
->> the generic cpuidle_wrap_enter() function, enables IRQs after return from
->> the idle state, but doesn't disable them.
->>
->> Some questions:
->>
->> 1) I assume we need to disable IRQ/FIQ to not confuse the cpuidle code due to
->>    late interrupts?
+It looks like current hwmod data doesn't support specific bits to be
+used for the context declaration, it is only specifying the register
+offset. Also, the same register is used by aess hwmod, so this will
+cause a conflict if I take the same register into use.
 
-Part of the a cpuidle irq and time keeping consolidation and cleanup
-patch that went in a while back removed all the irq disable calls from
-arm platform code as they are they are already disabled at the
-arch/arm level in kernel/process.c before calling cpu_idle_call.  I
-meant to remove these redundant platform calls for all ARM platforms
-but it's possible I missed one for Tegra if its platform irq disable
-still exists.
+This could be fixed by adding a field for the context bits, but I guess
+this should be commented upon by someone (Benoit / Paul) before I craft
+some sort of patch for that.
 
->> 2) What prevents us from unifying this?
-It may be good to also disable the FIQ's at the same time as IRQ's in
-arch/arm/kernel/process.c.  I had made some mention of also global
-disabling FIQs in my initial RFC submission and you can see the
-responses here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/076036.html
-Given the response, I didn't pursue making any changes to FIQ
-disabling.  But if would have suggested doing so at same location as
-irq's are being disabled for ARM, perhaps it would have been better
-received.  Now that many arm systems are using FIQs for handling
-interrupts in the secure trust zone world, that may change things as
-well.
+Meanwhile, I will keep the USHRT_MAX here until better solution is
+available.
 
-Rob
-
-
-
-
->
->
-> AFAIR, Rob Lee discussed about this point already. Maybe he has a
-> pointer to the discussion.
->
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+-Tero
