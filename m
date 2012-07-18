@@ -1,44 +1,37 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Jul 2012 12:00:42 +0300
-Subject: [PATCHv6 3/7] ARM: OMAP4: hwmod: flag hwmods/modules not
- supporting module level context status
-In-Reply-To: <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
-References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
- <1339428387-4800-4-git-send-email-t-kristo@ti.com>
- <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
-Message-ID: <1342602042.4672.85.camel@sokoban>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 18 Jul 2012 14:34:13 +0530
+Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for preventing
+ autodep delete
+In-Reply-To: <1342598720.4672.83.camel@sokoban>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>	
+ <1342189185-5306-8-git-send-email-t-kristo@ti.com>	 <5003F453.9020903@ti.com>
+ <1342536971.4672.82.camel@sokoban>	 <50066284.1030903@ti.com>
+ <1342598720.4672.83.camel@sokoban>
+Message-ID: <50067C0D.2040508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-07-17 at 03:11 -0500, Menon, Nishanth wrote:
-> On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> > On OMAP4 most modules/hwmods support module level context status. On
-> > OMAP3 and earlier, we relied on the power domain level context status.
-> > Identify all modules that don't support 'context_offs' by marking the
-> > offset as USHRT_MAX. Rest have a valid 'context_offs' populated in
-> > .prcm structure already.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > index 86fc513..828e7b8 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > @@ -208,6 +208,7 @@ static struct omap_hwmod omap44xx_l4_abe_hwmod = {
-> >         .prcm = {
-> >                 .omap4 = {
-> >                         .clkctrl_offs = OMAP4_CM1_ABE_L4ABE_CLKCTRL_OFFSET,
-> > +                       .context_offs = USHRT_MAX,
-> 
-> OMAP4430_RM_ABE_AESS_CONTEXT? why not use LOSTMEM_AESSMEM ? ABE will
-> need to know when it lost context to be able to reload it's firmware,
-> no?
+On Wednesday 18 July 2012 01:35 PM, Tero Kristo wrote:
+> On Wed, 2012-07-18 at 12:45 +0530, Rajendra Nayak wrote:
+>> On Tuesday 17 July 2012 08:26 PM, Tero Kristo wrote:
+>>> Anyway, it also looks like this fix is no longer needed with the latest
+>>> kernel, something has changed with the gpio code / or latencies and it
+>>> doesn't crash anymore. Thus, it looks like patches 7&   8 can be dropped
+>>> from this set for now. This is the behavior with beagleboard at least,
+>>> if someone can verify this with some other omap3 hw that would be nice.
+>>
+>> I can test it on a omap3 SDP. What do you want me to test?
+>
+> Just try suspend + cpuidle with and without off-mode enabled and see if
+> there are any problems. I've usually seen problems with off-mode myself.
 
-You are right, this should be possible to use. I just searched for
-modules which didn't have context_offs defined and added USHRT_MAX
-blindly there.
+So I just knocked off the last 2 patches from 'mainline-3.5-rc6-pwrdm-
+changes-v4' and tested on my 3430 SDP.
 
--Tero
+I was able to hit RET and OFF in both suspend and cpuidle. Did not see
+any issues.
+
+>
+> -Tero
+>
+>
