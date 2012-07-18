@@ -1,34 +1,21 @@
-From: knut.wohlrab@de.bosch.com (Knut Wohlrab)
-Date: Wed, 18 Jul 2012 16:11:25 +0200
-Subject: Devicetree: Initialization order of mmc block devices?
-In-Reply-To: <CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>
-References: <5006571A.7060103@de.bosch.com>
- <CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>
- <50068696.8070408@de.bosch.com>
- <CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>
-Message-ID: <5006C40D.300@de.bosch.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 18 Jul 2012 22:53:22 +0800
+Subject: [PATCH 2/2] ARM i.MX53: dts: add flexcan to imx53
+In-Reply-To: <1342604563-18915-3-git-send-email-mkl@pengutronix.de>
+References: <1342604563-18915-1-git-send-email-mkl@pengutronix.de>
+ <1342604563-18915-3-git-send-email-mkl@pengutronix.de>
+Message-ID: <20120718145320.GC30219@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2012 03:47 PM, Jassi Brar wrote:
-> On 18 July 2012 15:19, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
->
->> If a SD card is inserted at boot time, its "mmcblk0", the embedded
->> MMC (eMMC) device "mmcblk1".  This makes it difficult to give the kernel the
->> correct device for the eMMC root file system ("root=/dev/mmcblk?p1 ...").
->>
-> How about  root=UUID=<eMMC-partition>  ?
-Because we are talking about an embedded device, it is very difficult to 
-get a UUID of a eMMC partition into kernel command line with U-Boot. 
-Handling of UUID is also a big effort at board manufacturing.
+On Wed, Jul 18, 2012 at 11:42:43AM +0200, Marc Kleine-Budde wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Startup speed is very important for us. Searching for UUID on several 
-MMC/SD devices will significant slow down the boot process.
+I have sent all my 3.6 material to arm-soc, so queued it for 3.7.
 
-This problem can occur on many devices with embedded MMC and removable 
-SD, e.g. smart phones. So I think we should find an solution to define 
-MMC scan order or device number/name in a device tree.
-
-Thanks and regards
-
-Knut
+Shawn
