@@ -1,52 +1,40 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Jul 2012 19:23:26 +0300
-Subject: [PATCHv6 3/7] ARM: OMAP4: hwmod: flag hwmods/modules not
- supporting module level context status
-In-Reply-To: <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
-References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
- <1339428387-4800-4-git-send-email-t-kristo@ti.com>
- <CAOMWX4e9bpJivetsx-FD_U7BbjrWh0Xto-7MTUe5YK8Mjpi9Sg@mail.gmail.com>
-Message-ID: <1342628606.4672.112.camel@sokoban>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 18 Jul 2012 10:27:03 -0600
+Subject: Boot breaks in -next from LEGACY to LINEAR conversion
+In-Reply-To: <20120718161023.GE4495@opensource.wolfsonmicro.com>
+References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
+ <20120718161023.GE4495@opensource.wolfsonmicro.com>
+Message-ID: <CACxGe6tSWGOFs=FgUc8UADmnMM-kGCdwXj9hM2cAep_LKp4M-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-07-17 at 03:11 -0500, Menon, Nishanth wrote:
-> On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> > On OMAP4 most modules/hwmods support module level context status. On
-> > OMAP3 and earlier, we relied on the power domain level context status.
-> > Identify all modules that don't support 'context_offs' by marking the
-> > offset as USHRT_MAX. Rest have a valid 'context_offs' populated in
-> > .prcm structure already.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > index 86fc513..828e7b8 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > @@ -208,6 +208,7 @@ static struct omap_hwmod omap44xx_l4_abe_hwmod = {
-> >         .prcm = {
-> >                 .omap4 = {
-> >                         .clkctrl_offs = OMAP4_CM1_ABE_L4ABE_CLKCTRL_OFFSET,
-> > +                       .context_offs = USHRT_MAX,
-> 
-> OMAP4430_RM_ABE_AESS_CONTEXT? why not use LOSTMEM_AESSMEM ? ABE will
-> need to know when it lost context to be able to reload it's firmware,
-> no?
+On Wed, Jul 18, 2012 at 10:10 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Jul 17, 2012 at 07:57:49PM +0100, Mark Brown wrote:
+>> -next fails to boot for me today on my s3c64xx based systems.  Walking
+>> back to the last time I tried and bisecting likely branches I find that
+>> commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
+>> that introduces the build break.  Unfortunately the boot fails before I
+>> get a console which makes diagnosis somewhat more tricky than would be
+>> ideal.  Any ideas?
+>
+> Further data: the irq_domain_associate_many() calls that we're now doing
+> are also causing WARN_ON()s to go off during boot after commit 98aa46
+> (irqdomain: Support for static IRQ mapping and association) causing
+> breakage for my interrupt using MFDs.
+>
+> I don't really have time to investigate now but backing out that commit
+> seems to make things much happier, I suspect there's some collision with
+> IRQs allocated statically by the platform but I don't immediately see
+> what's new here.
 
-It looks like current hwmod data doesn't support specific bits to be
-used for the context declaration, it is only specifying the register
-offset. Also, the same register is used by aess hwmod, so this will
-cause a conflict if I take the same register into use.
+I had seen that on my end too, but I thought I had fixed it...  I
+guess not (or this is a similar type of failure).  I'll investigate.
 
-This could be fixed by adding a field for the context bits, but I guess
-this should be commented upon by someone (Benoit / Paul) before I craft
-some sort of patch for that.
+g.
 
-Meanwhile, I will keep the USHRT_MAX here until better solution is
-available.
 
--Tero
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
