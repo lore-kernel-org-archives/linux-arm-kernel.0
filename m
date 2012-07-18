@@ -1,69 +1,230 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 18 Jul 2012 13:38:53 -0400
-Subject: [PATCH] ARM: ftrace: Trace function entry before updating index
-In-Reply-To: <1342490592-20373-1-git-send-email-ccross@android.com>
-References: <1342490592-20373-1-git-send-email-ccross@android.com>
-Message-ID: <1342633133.11900.13.camel@gandalf.stny.rr.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 18 Jul 2012 23:15:28 +0530
+Subject: [PATCH v5 6/7] ARM: mtd: nand: davinci: add OF support for davinci
+ nand controller
+In-Reply-To: <1338373143-7467-7-git-send-email-hs@denx.de>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-7-git-send-email-hs@denx.de>
+Message-ID: <5006F638.2000301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-16 at 19:03 -0700, Colin Cross wrote:
-> Commit 722b3c74695377d11d18a52f3da08114d37f3f37 modified x86 ftrace to
-> avoid tracing all functions called from irqs when function graph was
-> used with a filter.  Port the same fix to ARM.
+Hi Heiko,
+
+On 5/30/2012 3:49 PM, Heiko Schocher wrote:
+> add OF support for the davinci nand controller.
 > 
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
-Someone on the ARM side needs to pull this in.
-
-I'll look into fixing this for PPC.
-
-Thanks!
-
--- Steve
-
-> Signed-off-by: Colin Cross <ccross@android.com>
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-mtd at lists.infradead.org
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Scott Wood <scottwood@freescale.com>
+> 
 > ---
+> - changes for v2:
+>   - add comments from Scott Wood:
+>     - add "ti,davinci-" prefix
+>     - Dashes are preferred to underscores
+>     - rename "nandflash" to "nand"
+>     - introduce new "ti,davinci" specific properties for setting
+>       up ecc_mode, ecc_bits, options and bbt options, instead
+>       using linux defines
+>     - readme fixes
+> - no changes for v3
+> - changes for v4
+>   remove "pinmux-handle" property as discussed here:
+>   http://www.spinics.net/lists/arm-kernel/msg175701.html
+>   with Nori Sekhar
+> - no changes for v5
 > 
-> It looks like the same issue affects blackfin, microblaze, mips,
-> parisc, powerpc, s390, sh, and sparc, but I don't have patches to
-> fix those.
+>  .../devicetree/bindings/arm/davinci/nand.txt       |   72 ++++++++++++++++++
+>  drivers/mtd/nand/davinci_nand.c                    |   80 +++++++++++++++++++-
+>  2 files changed, 151 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
 > 
->  arch/arm/kernel/ftrace.c |   17 +++++++++--------
->  1 files changed, 9 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> index df0bf0c..34e5664 100644
-> --- a/arch/arm/kernel/ftrace.c
-> +++ b/arch/arm/kernel/ftrace.c
-> @@ -179,19 +179,20 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
->  	old = *parent;
->  	*parent = return_hooker;
->  
-> -	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
-> -				       frame_pointer);
-> -	if (err == -EBUSY) {
-> -		*parent = old;
-> -		return;
-> -	}
-> -
->  	trace.func = self_addr;
-> +	trace.depth = current->curr_ret_stack + 1;
->  
->  	/* Only trace if the calling function expects to */
->  	if (!ftrace_graph_entry(&trace)) {
-> -		current->curr_ret_stack--;
->  		*parent = old;
-> +		return;
-> +	}
+> diff --git a/Documentation/devicetree/bindings/arm/davinci/nand.txt b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+> new file mode 100644
+> index 0000000..5afe4a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+> @@ -0,0 +1,72 @@
+> +* Texas Instruments Davinci NAND
 > +
-> +	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
-> +				       frame_pointer);
-> +	if (err == -EBUSY) {
-> +		*parent = old;
-> +		return;
->  	}
->  }
+> +This file provides information, what the device node for the
+> +davinci nand interface contain.
+> +
+> +Required properties:
+> +- compatible: "ti,davinci-nand";
+> +- reg : contain 2 offset/length values:
+> +        - offset and length for the access window
+> +        - offset and length for accessing the aemif control registers
+> +- ti,davinci-chipselect: Indicates on the davinci_nand driver which
+> +                         chipselect is used for accessing the nand.
+> +
+> +Recommended properties :
+> +- ti,davinci-mask-ale: mask for ale
+> +- ti,davinci-mask-cle: mask for cle
+> +- ti,davinci-mask-chipsel: mask for chipselect
+> +- ti,davinci-ecc-mode: ECC mode valid values for davinci driver:
+> +		- "none"
+> +		- "soft"
+> +		- "hw"
+> +- ti,davinci-ecc-bits: used ECC bits, currently supported 1 or 4.
+> +- ti,davinci-nand-buswidth: buswidth 8 or 16
+> +- ti,davinci-nand-use-bbt: use flash based bad block table support.
+> +
+> +Optional properties:
+> +- timing-handle: contains a handle to setup aemif timing.
+> +
+> +Example (enbw_cmc board):
+> +aemif at 60000000 {
+> +	compatible = "ti,davinci-aemif";
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	reg = <0x68000000 0x80000>;
+> +	ranges = <2 0 0x60000000 0x02000000
+> +		  3 0 0x62000000 0x02000000
+> +		  4 0 0x64000000 0x02000000
+> +		  5 0 0x66000000 0x02000000
+> +		  6 0 0x68000000 0x02000000>;
+> +	nand_cs: cs3 at 68000000 {
+> +		compatible = "ti,davinci-cs";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		/* all timings in nanoseconds */
+> +		cs = <3>;
+> +		asize = <0>;
+> +		ta = <0>;
+> +		rhold = <7>;
+> +		rstrobe = <42>;
+> +		rsetup = <7>;
+> +		whold = <7>;
+> +		wstrobe = <14>;
+> +		wsetup = <7>;
+> +		ew = <0>;
+> +		ss = <0>;
+> +	};
+> +	nand at 3,0 {
+> +		compatible = "ti,davinci-nand";
+> +		reg = <3 0x0 0x807ff
+> +			6 0x0 0x8000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ti,davinci-chipselect = <1>;
+> +		ti,davinci-mask-ale = <0>;
+> +		ti,davinci-mask-cle = <0>;
+> +		ti,davinci-mask-chipsel = <0>;
+> +		ti,davinci-ecc-mode = "hw";
+> +		ti,davinci-ecc-bits = <4>;
+> +		ti,davinci-nand-use-bbt;
+> +		timing-handle = <&nand_cs>;
+> +	};
+> +};
+> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> index d94b03c..67bdd29 100644
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -33,9 +33,12 @@
+>  #include <linux/mtd/nand.h>
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/slab.h>
+> +#include <linux/of_i2c.h>
+
+This include is not required.
+
+> +#include <linux/of_device.h>
 >  
+>  #include <mach/nand.h>
+>  #include <mach/aemif.h>
+> +#include <mach/mux.h>
+
+This too.
+
+>  
+>  /*
+>   * This is a device driver for the NAND flash controller found on the
+> @@ -518,9 +521,81 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
+>  	},
+>  };
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id davinci_nand_of_match[] = {
+> +	{.compatible = "ti,davinci-nand", },
+> +	{},
+> +}
+> +MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+> +
+> +static struct davinci_nand_pdata
+> +	*nand_davinci_get_pdata(struct platform_device *pdev)
+> +{
+> +	if ((pdev->dev.platform_data == NULL) &&
+> +		(pdev->dev.of_node)) {
+
+You can simplify this and also avoid breaking the statement.
+
+	if (!pdev->dev.platform_data && pdev->dev.of_node) {
+
+
+> +		struct device_node *tmp_np;
+> +		struct davinci_nand_pdata *pdata;
+> +		const char *mode;
+> +		u32 prop;
+> +		int len;
+> +
+> +		pdata =  kzalloc(sizeof(struct davinci_nand_pdata),
+> +				GFP_KERNEL);
+
+I don't see this getting freed anywhere. You wanted to use devm_kzalloc()?
+
+> +		pdev->dev.platform_data = pdata;
+> +		if (!pdata)
+> +			return NULL;
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"ti,davinci-chipselect", &prop))
+> +			pdev->id = prop;
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"ti,davinci-mask-ale", &prop))
+> +			pdata->mask_ale = prop;
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"ti,davinci-mask-cle", &prop))
+> +			pdata->mask_cle = prop;
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"ti,davinci-mask-chipsel", &prop))
+> +			pdata->mask_chipsel = prop;
+> +		if (!of_property_read_string(pdev->dev.of_node,
+> +			"ti,davinci-ecc-mode", &mode)) {
+> +			if (!strncmp("none", mode, 4))
+> +				pdata->ecc_mode = NAND_ECC_NONE;
+> +			if (!strncmp("soft", mode, 4))
+> +				pdata->ecc_mode = NAND_ECC_SOFT;
+> +			if (!strncmp("hw", mode, 2))
+> +				pdata->ecc_mode = NAND_ECC_HW;
+> +		}
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"ti,davinci-ecc-bits", &prop))
+> +			pdata->ecc_bits = prop;
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"ti,davinci-nand-buswidth", &prop))
+> +			if (prop == 16)
+> +				pdata->options |= NAND_BUSWIDTH_16;
+> +		if (of_find_property(pdev->dev.of_node,
+> +			"ti,davinci-nand-use-bbt", &len))
+> +			pdata->bbt_options = NAND_BBT_USE_FLASH;
+> +
+
+> +		tmp_np = of_parse_phandle(pdev->dev.of_node,
+> +				"timing-handle", 0);
+> +		if (tmp_np)
+> +			davinci_aemif_setup_timing_of(tmp_np);
+
+Since the aemif driver conversion to DT needs to be looked at along with
+its movement to drivers/ folder, is it possible to drop the AEMIF timing
+specific bindings from the patch and only keep the NAND specific ones?
+
+Thanks,
+Sekhar
