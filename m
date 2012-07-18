@@ -1,68 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 17 Jul 2012 20:43:34 -0700
-Subject: [GIT PULL] SPEAr platform fixes over 3.5-rc7
-In-Reply-To: <20120717130150.GM1994@localhost.localdomain>
-References: <20120717130150.GM1994@localhost.localdomain>
-Message-ID: <CAOesGMgHFrydxO-eJiuTL2yLKmVZXMcqiPhnBZQgbd=YcXD-Mg@mail.gmail.com>
+Date: Tue, 17 Jul 2012 20:54:31 -0700
+Subject: [PULL] [PATCH 0/4] arm: at91: gpio fix
+In-Reply-To: <20120715131618.GF4450@game.jcrosoft.org>
+References: <20120715131618.GF4450@game.jcrosoft.org>
+Message-ID: <CAOesGMgXAADDqAL5EvSdfaO0GzZJT0_a7-eNRPTJA73zYN-TEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shiraz,
+Hi Jean-Christophe,
 
-I see that every commit in that branch is done by you, but not a
-single one has a Signed-off-by by you. Please fix that, it's important
-to track the history of how code is introduced to the kernel.
+Comments below. As I mentioned in the SPEAr pull request just now, we
+are very close to final 3.5, so only fixes to bugs should go in.
+Please help me out a bit below.
 
-Also, we are _very_ late in the 3.5 release cycle now. Only truly
-critical fixes can go in (3.5 is likely to come out by the weekend). I
-have some comments about the patches below.
+On Sun, Jul 15, 2012 at 6:16 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
-In general, to make our life easier, please make sure the commit
-message for the patch describes why the fix is needed when it's not
-obvious.
+> Jean-Christophe PLAGNIOL-VILLARD (4):
+>       ARM: at91: gpio: implement request
+>       ARM: at91: gpio: implement gpio_free
 
-I'll wait with pulling until you have a chance to fix up your branch
-based on the below comments. Please make sure you do it with extreme
-expediency though, or chances are it'll miss 3.5.
+Are the two above regressions, or just general improvement? Looks like
+the latter to me?
 
+>       at91: regroup gpio and pinctrl under a simple-bus
 
-Thanks,
+This looks like a cleanup patch to me. I'm also not sure that this is
+appropriate use of a simple-bus. The patch seems to have been posted
+for review the same day as you sent the pull request, and not cc:d to
+devicetree-discuss.
 
--Olof
+>       arm: at91: at91sam9x5: fix gpio number per bank
 
-On Tue, Jul 17, 2012 at 6:01 AM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
+Ok, this one I can believe is a proper fix.
 
-> Vipul Kumar Samar (10):
->       clk:spear1340:Fix: Rename clk ids within predefined limit
->       clk:spear1310:Fix: Rename clk ids within predefined limit
->       Clk:spear3xx:Fix: Rename clk ids within predefined limit
->       Clk:spear6xx:Fix: Rename clk ids within predefined limit
-
-Ok, those 4 are quite obvious why they're needed.
-
->       ARM: SPEAr13xx: Fix Interrupt bindings
->       clk: SPEAr1340: Fix clk enable register for uart1 and i2c1.
-
-Those two as well.
-
->       clk: SPEAr13xx: Add localtimer (twd) clock support
-
-This doesn't look like a critical regression fix, does it?
-
->       Clk: SPEAr1340: Update sys clock parent array
-
-Please help us out here by describing what is broken by the way it was
-before the patch.
-
->       ARM: dts: SPEAr320: Fix compatible string
-
-This one seems straightforward.
-
->       ARM: dts: SPEAr320: Boot the board in EXTENDED_MODE
-
-Same here, please elaborate on why / how it is broken today.
+So, please let me know if I should just cherry-pick in the last patch
+and include that in the last 3.5 pull request, or if you want to
+respin the branch. Also, if any of the other patches are truly 3.5
+material, I'd like to hear a bit more motivation as to why.
 
 
-Thanks,
+Thanks!
+
 
 -Olof
