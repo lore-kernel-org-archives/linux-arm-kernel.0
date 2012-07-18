@@ -1,244 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Jul 2012 18:52:33 +0100
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
- implementation to be selected
-In-Reply-To: <5005176C.6050904@renesas.com>
-References: <20120712084432.GA2816@mudshark.cambridge.arm.com>
- <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
- <4FFF8509.2050302@renesas.com>
- <20120713085746.GA18079@mudshark.cambridge.arm.com>
- <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
- <20120713111337.GH18079@mudshark.cambridge.arm.com>
- <5004D78E.4050606@renesas.com>
- <CAMQu2gx9EU4GZ634RKiwD+sg0MoO-FAqc-pPU+HkryX8rXVBjA@mail.gmail.com>
- <5005176C.6050904@renesas.com>
-Message-ID: <20120718175233.GB16928@mudshark.cambridge.arm.com>
+From: dinguyen@altera.com (Dinh.Nguyen)
+Date: Wed, 18 Jul 2012 12:53:31 -0600
+Subject: [PATCH v4] arm: socfpga: Add initial support for Altera's
+ SOCFPGA HW
+In-Reply-To: <201207181242.44326.arnd@arndb.de>
+References: <20120718102507.GA11993@elf.ucw.cz>
+ <201207181242.44326.arnd@arndb.de>
+Message-ID: <1342637611.13680.2.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Jul 17, 2012 at 08:42:36AM +0100, Shinya Kuribayashi wrote:
-> On 7/17/2012 3:11 PM, Shilimkar, Santosh wrote:
-> > Looks like you have a working patch for the clock detection. Will
-> > you able to post that patch so that this long pending calibration
-> > for secondary CPUs gets optimized.
+On Wed, 2012-07-18 at 12:42 +0000, Arnd Bergmann wrote:
+> On Wednesday 18 July 2012, Pavel Machek wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Adding core definitions for Altera's SOCFPGA ARM platform.
+> >   
 > 
-> Something like this should work (not even build tested, can be applied
-> on top of Will's v2 patchset):
-
-[...]
-
-> And change your ->timer() func (called via time_init) to make use of it:
+> There are two small details I noticed. You can either send
+> a replacement patch or fixups on top of this one.
 > 
->         unsigned long freq;
+> > +		gmac0: stmmac at ff700000 {
+> > +			compatible = "st,spear600-gmac";
+> > +			reg = <0xff700000 0x2000>;
+> > +			interrupts = <0 115 4>;
+> > +			interrupt-names = "macirq";
+> > +			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+> > +			phy-mode = "gmii";
+> > +		};
 > 
->         /* For UP/SMP systems */
->         freq = get_CPU_frequency();
->         calibrate_delay_early(freq);
+> We've just discussed the stmmac driver in the spear1340 update
+> series. My understanding is that there are multiple variants of this
+> that we may need to distintinguish. I think it's better if you
+> make the compatible string something that does not reference the
+> spear600 specific variant, unless you are certain that it is in fact
+> completely identical to that one.
 > 
-> #ifdef CONFIG_SMP
->         /* For SMP systems */
->         freq = get_Timer_frequency();
->         init_current_timer_delay(freq);
-> #endif
+> Ideally you would have the version of the stmmac macro encoded
+> in there, in addition to a name identifying altera as the company
+> who added this one, ordered from most specific to least specific.
+> 
+> For instance, this could be
+> 
+> 	compatible = "altr,socfpga-stmmac", "st,stmmac-v12.3.45", "st,stmmac";
+> 
+> Looking at the driver, it seems that this should actually not be called
+> stmmac in the devicetree but rather dwmac, so better make it
+> 
+> 	compatible = "altr,socfpga-stmmac", "snps,dwmac-4.567", "snps,dwmac";
+> 
 
-Since this seems to be gaining some traction on platforms without the
-architected timers, Jonny and I have put together a simple registration
-mechanism for the delay timer to avoid people calling init_current_timer_delay
-(and defining the global read_current_timer symbol).
+Is there already work to update the bindings to reflect this change in
+stmmac driver? Or could I help with setting up some patches for it?
 
-The patch is sitting in my delay branch, but I've also included it below.
-Please give it a go and let us know what you think.
-
-Cheers,
-
-Will
-
----8<---
-
->From 8ea28b6f7acad17b9952f8eb533f2887504b462d Mon Sep 17 00:00:00 2001
-From: Jonathan Austin <Jonathan.Austin@arm.com>
-Date: Wed, 18 Jul 2012 15:24:53 +0100
-Subject: [PATCH] ARM: delay: add registration mechanism for delay timer sources
-
-The current timer-based delay loop relies on the architected timer to
-initiate the switch away from the polling-based implementation. This is
-unfortunate for platforms without the architected timers but with a
-suitable delay source (that is, constant frequency, always powered-up
-and ticking as long as the CPUs are online).
-
-This patch introduces a registration mechanism for the delay timer
-(which provides an unconditional read_current_timer implementation) and
-updates the architected timer code to use the new interface.
-
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/arch_timer.h |    1 -
- arch/arm/include/asm/delay.h      |    9 +++++++++
- arch/arm/include/asm/timex.h      |    6 ------
- arch/arm/kernel/arch_timer.c      |   12 +++++++-----
- arch/arm/lib/delay.c              |   30 +++++++++++++++++++++---------
- 5 files changed, 37 insertions(+), 21 deletions(-)
-
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 62e7547..88401c2 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -4,7 +4,6 @@
- #include <asm/errno.h>
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
--#define ARCH_HAS_READ_CURRENT_TIMER
- int arch_timer_of_register(void);
- int arch_timer_sched_clock_init(void);
- #else
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index dc61451..17deac7 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -15,6 +15,11 @@
- 
- #ifndef __ASSEMBLY__
- 
-+struct delay_timer {
-+	int (*read_current_timer)(unsigned long *timer_val);
-+	unsigned long freq;
-+};
-+
- extern struct arm_delay_ops {
- 	void (*delay)(unsigned long);
- 	void (*const_udelay)(unsigned long);
-@@ -56,6 +61,10 @@ extern void __loop_delay(unsigned long loops);
- extern void __loop_udelay(unsigned long usecs);
- extern void __loop_const_udelay(unsigned long);
- 
-+/* Delay-loop timer registration. */
-+#define ARCH_HAS_READ_CURRENT_TIMER
-+extern void register_current_timer_delay(struct delay_timer *timer);
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* defined(_ARM_DELAY_H) */
-diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
-index ce11944..9acc135 100644
---- a/arch/arm/include/asm/timex.h
-+++ b/arch/arm/include/asm/timex.h
-@@ -12,15 +12,9 @@
- #ifndef _ASMARM_TIMEX_H
- #define _ASMARM_TIMEX_H
- 
--#include <asm/arch_timer.h>
- #include <mach/timex.h>
- 
- typedef unsigned long cycles_t;
--
--#ifdef ARCH_HAS_READ_CURRENT_TIMER
- #define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
--#else
--#define get_cycles()	(0)
--#endif
- 
- #endif
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 675cee0..b624523 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -21,6 +21,7 @@
- #include <linux/io.h>
- 
- #include <asm/cputype.h>
-+#include <asm/delay.h>
- #include <asm/localtimer.h>
- #include <asm/arch_timer.h>
- #include <asm/system_info.h>
-@@ -31,8 +32,7 @@ static int arch_timer_ppi;
- static int arch_timer_ppi2;
- 
- static struct clock_event_device __percpu **arch_timer_evt;
--
--extern void init_current_timer_delay(unsigned long freq);
-+static struct delay_timer arch_delay_timer;
- 
- /*
-  * Architected system timer support.
-@@ -225,7 +225,7 @@ static cycle_t arch_counter_read(struct clocksource *cs)
- 	return arch_counter_get_cntpct();
- }
- 
--int read_current_timer(unsigned long *timer_val)
-+static int arch_timer_read_current_timer(unsigned long *timer_val)
- {
- 	if (!arch_timer_rate)
- 		return -ENXIO;
-@@ -302,11 +302,13 @@ static int __init arch_timer_register(void)
- 		arch_timer_global_evt.cpumask = cpumask_of(0);
- 		err = arch_timer_setup(&arch_timer_global_evt);
- 	}
--
- 	if (err)
- 		goto out_free_irq;
- 
--	init_current_timer_delay(arch_timer_rate);
-+	/* Use the architected timer for the delay loop. */
-+	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
-+	arch_delay_timer.freq = arch_timer_rate;
-+	register_current_timer_delay(&arch_delay_timer);
- 	return 0;
- 
- out_free_irq:
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 395d5fb..1b51570 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -34,7 +34,14 @@ struct arm_delay_ops arm_delay_ops = {
- 	.udelay		= __loop_udelay,
- };
- 
--#ifdef ARCH_HAS_READ_CURRENT_TIMER
-+static struct delay_timer *delay_timer;
-+static bool delay_calibrated;
-+
-+int read_current_timer(unsigned long *timer_val)
-+{
-+	return delay_timer ? delay_timer->read_current_timer(timer_val) : -ENXIO;
-+}
-+
- static void __timer_delay(unsigned long cycles)
- {
- 	cycles_t start = get_cycles();
-@@ -55,18 +62,23 @@ static void __timer_udelay(unsigned long usecs)
- 	__timer_const_udelay(usecs * UDELAY_MULT);
- }
- 
--void __init init_current_timer_delay(unsigned long freq)
-+void __init register_current_timer_delay(struct delay_timer *timer)
- {
--	pr_info("Switching to timer-based delay loop\n");
--	lpj_fine			= freq / HZ;
--	loops_per_jiffy			= lpj_fine;
--	arm_delay_ops.delay		= __timer_delay;
--	arm_delay_ops.const_udelay	= __timer_const_udelay;
--	arm_delay_ops.udelay		= __timer_udelay;
-+	if (!delay_calibrated) {
-+		pr_info("Switching to timer-based delay loop\n");
-+		delay_timer			= timer;
-+		lpj_fine			= timer->freq / HZ;
-+		loops_per_jiffy			= lpj_fine;
-+		arm_delay_ops.delay		= __timer_delay;
-+		arm_delay_ops.const_udelay	= __timer_const_udelay;
-+		arm_delay_ops.udelay		= __timer_udelay;
-+	} else {
-+		pr_info("Ignoring late registration of read_current_timer delay\n");
-+	}
- }
- 
- unsigned long __cpuinit calibrate_delay_is_known(void)
- {
-+	delay_calibrated = true;
- 	return lpj_fine;
- }
--#endif
--- 
-1.7.4.1
+Dinh
