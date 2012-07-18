@@ -1,27 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Jul 2012 10:49:44 +0200
-Subject: [PATCH] can: flexcan: add 2nd clock to support imx53 and newer
-In-Reply-To: <500675C2.9090303@pengutronix.de>
-References: <1342562748-24701-1-git-send-email-mkl@pengutronix.de>
- <50061B86.7080200@gmail.com> <500675C2.9090303@pengutronix.de>
-Message-ID: <20120718084944.GD30009@pengutronix.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 18 Jul 2012 10:50:35 +0200
+Subject: [v3.6 3/3] iommu/tegra: smmu: Fix unsleepable memory allocation
+ at alloc_pdir()
+In-Reply-To: <20120717132300.GK4213@amd.com>
+References: <20120717100901.GH4213@amd.com><20120717.152524.175499431618552821.hdoyu@nvidia.com><20120717132300.GK4213@amd.com>
+Message-ID: <20120718.115035.519900225393247427.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 10:37:22AM +0200, Marc Kleine-Budde wrote:
+"joerg.roedel at amd.com" <joerg.roedel@amd.com> wrote @ Tue, 17 Jul 2012 15:23:00 +0200:
+
+> On Tue, Jul 17, 2012 at 02:25:24PM +0200, Hiroshi Doyu wrote:
+> > The above spin_lock is always necessary. "as->lock" should be held to
+> > protect "as->pdir_page". Only when "as->pdir_page" is NULL,
+> > "as->pdir_page" would be allocated in "alloc_pdir()". Without this
+> > lock, the following race could happen:
+> > 
+> > 
+> > Without as->lock:
+> > A:			B:
+> > i == 3
+> > pdir_page == NULL
+> > 			i == 3
+> > 	     		pdir_page == NULL
+> > pdir_page = a;
+> > 			pdir_page = b;	!!!!!! OVERWRITTEN !!!!!!
+> >
 > 
-> Yes, good catch.
+> Unless I am missing something, this is not the correct situation with my
+> patch. It would look more like this:
 > 
-> Is it allowed to call clk_put with a NULL pointer?
+> 
+>  A:					B:
+>  i == 3
+>  pdir_page == NULL
+>  					i == 3
+>  	     				pdir_page == NULL
+> 
+>  take as->lock
+> 
+>  /* race check */
+>  pdir_page == NULL -> proceed		/* spinning on as->lock */
+> 
+>  pdir_page = a;
+> 
+>  release as->lock
+> 
+> 					 take as->lock
+> 
+> 					 /* race check */
+> 					 pdir_page != NULL -> return
+> 
+> This should be fine, no? Do I miss something?
 
-As NULL is a valid clock by definition it is allowed to do this.
-However, calling clk_put with a NULL pointer when a corresponding
-call to clk_get never returned NULL is probably not a good idea.
+You are right. I didn't get the point of your patch. In the case that
+you can return -EAGAIN, the complicated "lock,unlock,lock,check race"
+is not necessary as you did.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Verified the patch w/ Tegra3 based board. Please put this into next
+queue. Thanks.
