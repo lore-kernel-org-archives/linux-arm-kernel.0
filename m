@@ -1,83 +1,36 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Wed, 18 Jul 2012 09:52:11 +0530
-Subject: [GIT PULL] SPEAr platform fixes over 3.5-rc7
-In-Reply-To: <CAOesGMgHFrydxO-eJiuTL2yLKmVZXMcqiPhnBZQgbd=YcXD-Mg@mail.gmail.com>
-References: <20120717130150.GM1994@localhost.localdomain>
- <CAOesGMgHFrydxO-eJiuTL2yLKmVZXMcqiPhnBZQgbd=YcXD-Mg@mail.gmail.com>
-Message-ID: <20120718042211.GP1994@localhost.localdomain>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 18 Jul 2012 13:33:42 +0800
+Subject: linux-next: manual merge of the arm-soc tree with the
+ i2c-embedded tree
+In-Reply-To: <20120717152001.GF4477@opensource.wolfsonmicro.com>
+References: <5003FB7C.4030509@linaro.org>
+ <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
+ <20120717133550.GC4477@opensource.wolfsonmicro.com>
+ <50057058.2060002@linaro.org>
+ <20120717142222.GE4477@opensource.wolfsonmicro.com>
+ <50057C1A.80606@linaro.org>
+ <20120717152001.GF4477@opensource.wolfsonmicro.com>
+Message-ID: <20120718053341.GA4009@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Jul 17, 2012 at 04:20:01PM +0100, Mark Brown wrote:
+> Looking at what's specified in the platform data in the current kernel
+> it seems like there's a mixture of things in there that are board and
+> silicon specific.  We've got parameters like the the speed mode and
+> timeout which are reasonably board specific but we've also got things
+> like the FIFO sizes which shouldn't be at all board specific and slsu
+> which really looks like it's something that that the driver ought to be
+> able to figure out for itself.
 
-On Tue, Jul 17, 2012 at 08:43:34PM -0700, Olof Johansson wrote:
-> Hi Shiraz,
-> 
-> I see that every commit in that branch is done by you, but not a
-> single one has a Signed-off-by by you. Please fix that, it's important
-> to track the history of how code is introduced to the kernel.
+I have an IP block getting different FIFO size on different IMX SoCs.
+We could introduce a new compatible string for driver to figure it out,
+but I think the simpler way is just have the data encoded in device
+tree.  In any case DT is not completely limited in encoding board
+specific data.  Today, we have IO region and interrupt number of
+hardware blocks encoded in DT, and to me, FIFO size could just be
+another aspect of hardware block we could choose to encode in DT.
 
-Sorry, I would take care for this and all future pull requests.
-
-> Also, we are _very_ late in the 3.5 release cycle now. Only truly
-> critical fixes can go in (3.5 is likely to come out by the weekend). I
-> have some comments about the patches below.
-> 
-> In general, to make our life easier, please make sure the commit
-> message for the patch describes why the fix is needed when it's not
-> obvious.
-
-Sure.
-
-> I'll wait with pulling until you have a chance to fix up your branch
-> based on the below comments. Please make sure you do it with extreme
-> expediency though, or chances are it'll miss 3.5.
-
-OK.
-
-> On Tue, Jul 17, 2012 at 6:01 AM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
-> 
-> >       clk: SPEAr13xx: Add localtimer (twd) clock support
-> 
-> This doesn't look like a critical regression fix, does it?
-
-Yes, twd would rely on its calibration if we don't pass it.
-Although it would break other stuff like cpu-freq, but they are not
-yet upstreamed.
-
-I would remove it from fixes branch and schedule it later.
-
-> >       Clk: SPEAr1340: Update sys clock parent array
-> 
-> Please help us out here by describing what is broken by the way it was
-> before the patch.
-
-Out of several possibilities (h/w wise) to select same clock parent,
-Linux was considering just one value. When bootloader programmed
-different (valid) value to select a clock parent then Linux breaks.
-
-Here, we just try to list all possibilities which can lead to same
-clock selection thus making Linux independent of bootloader selection
-values.
-
-This was discussed in following thread
-http://www.spinics.net/lists/arm-kernel/msg183554.html
-
-> >       ARM: dts: SPEAr320: Fix compatible string
-> 
-> This one seems straightforward.
-> 
-> >       ARM: dts: SPEAr320: Boot the board in EXTENDED_MODE
-> 
-> Same here, please elaborate on why / how it is broken today.
-
-spear320-evb board is designed for EXTENDED_MODE only, hence it would
-not boot correctly in current form (pinctrl part for some devices would
-fail). I would update the commit message.
-
-Thanks for review. I would update the branch as soon as possible and
-send a fresh pull request.
-
---
-regards
-Shiraz
+-- 
+Regards,
+Shawn
