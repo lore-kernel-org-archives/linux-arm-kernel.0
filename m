@@ -1,21 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Jul 2012 23:00:38 +0800
-Subject: [PATCH v2 2/2] ARM: dts: imx6q-sabrelite: add usbmisc device
-In-Reply-To: <1342607348-8587-3-git-send-email-richard.zhao@freescale.com>
-References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
- <1342607348-8587-3-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120718150036.GD30219@S2100-06.ap.freescale.net>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Wed, 18 Jul 2012 07:54:43 -0700
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <5006C40D.300@de.bosch.com>
+References: <5006571A.7060103@de.bosch.com>
+ <CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>
+ <50068696.8070408@de.bosch.com>
+ <CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>
+ <5006C40D.300@de.bosch.com>
+Message-ID: <5006CE33.2040205@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 06:29:07PM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
->  arch/arm/boot/dts/imx6q.dtsi          |   19 +++++++++++++++----
->  arch/arm/mach-imx/clk-imx6q.c         |    1 +
+On 07/18/2012 07:11 AM, Knut Wohlrab wrote:
+> On 07/18/2012 03:47 PM, Jassi Brar wrote:
+>> On 18 July 2012 15:19, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
+>>
+>>> If a SD card is inserted at boot time, its "mmcblk0", the embedded
+>>> MMC (eMMC) device "mmcblk1". This makes it difficult to give the kernel the
+>>> correct device for the eMMC root file system ("root=/dev/mmcblk?p1 ...").
+>>>
+>> How about root=UUID=<eMMC-partition> ?
+> Because we are talking about an embedded device, it is very difficult to get a
+> UUID of a eMMC partition into kernel command line with U-Boot. Handling of UUID
+> is also a big effort at board manufacturing.
+>
+> Startup speed is very important for us. Searching for UUID on several MMC/SD
+> devices will significant slow down the boot process.
+>
+> This problem can occur on many devices with embedded MMC and removable SD, e.g.
+> smart phones. So I think we should find an solution to define MMC scan order or
+> device number/name in a device tree.
+>
 
-It seems that the patch is meant to have dts changes only by reading
-the subject.  So it might be good to get clk-imx6q.c out of here.
+Isn't /dev/disk/by-path what you're after?
 
-Shawn
+~$ ls -l /dev/disk/by-path/
+lrwxrwxrwx    1 root     root           13 Jan  1 15:22 platform-mmc0:b368 -> 
+../../mmcblk0
+lrwxrwxrwx    1 root     root           15 Jan  1 15:22 platform-mmc0:b368-part1 
+-> ../../mmcblk0p1
+lrwxrwxrwx    1 root     root           15 Jan  1 15:22 platform-mmc0:b368-part2 
+-> ../../mmcblk0p2
+lrwxrwxrwx    1 root     root           15 Jan  1 15:22 platform-mmc0:b368-part3 
+-> ../../mmcblk0p3
