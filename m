@@ -1,60 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jul 2012 08:35:21 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-In-Reply-To: <20120717152001.GF4477@opensource.wolfsonmicro.com>
-References: <5003FB7C.4030509@linaro.org>
- <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
- <20120717133550.GC4477@opensource.wolfsonmicro.com>
- <50057058.2060002@linaro.org>
- <20120717142222.GE4477@opensource.wolfsonmicro.com>
- <50057C1A.80606@linaro.org>
- <20120717152001.GF4477@opensource.wolfsonmicro.com>
-Message-ID: <50066739.4010206@linaro.org>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Wed, 18 Jul 2012 13:14:57 +0530
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <20120718071039.GI6522@atomide.com>
+References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
+ <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
+ <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
+ <20120718065951.GH6522@atomide.com>
+ <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
+ <20120718071039.GI6522@atomide.com>
+Message-ID: <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/12 16:20, Mark Brown wrote:
-> On Tue, Jul 17, 2012 at 03:52:10PM +0100, Lee Jones wrote:
-> 
->> I think it would be okay to take the 3 patches due for the v3.6
->> merge window, which target the nmk-i2c driver. If any consolidation
->> happens in the mean-time/future I will personally do the work to
->> bring the nmk-i2c into line to use any generic bindings which
->> result.
-> 
->> No one else is ever going to use these vendor specific bindings, so
->> I'm sure no issues will arise. It also means that we have a fully
->> enabled driver which is capable of receiving a new configuration via
->> minor changes to the dts, which is important for the current (only)
->> user of this driver for an upcoming project.
-> 
-> So, this is pretty much what vendors always say about this stuff...
-
-I agree, but in this instance it really does stand to reason.
-
-1. No unified bindings currently exist.
-2. I don't have time to create them.
-3. It will probably take quite a bit of time for someone else to get round to creating them.
-4. The bindings I'm proposing are siloed by vendor and driver, so will cause no harm.
-5. I've already volunteered to move them over to the unified ones once created.
-6. These allow support for the driver to work with DT, at the moment it does not.
-
-Personally, I think there is more to be gained by applying the (working) vendor specific bindings to the vendor specific driver until some more consolidated ones appear.
-
-> Looking at what's specified in the platform data in the current kernel
-> it seems like there's a mixture of things in there that are board and
-> silicon specific.  We've got parameters like the the speed mode and
-> timeout which are reasonably board specific but we've also got things
-> like the FIFO sizes which shouldn't be at all board specific and slsu
-> which really looks like it's something that that the driver ought to be
-> able to figure out for itself.
-> 
-
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515 
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On Wed, Jul 18, 2012 at 12:40 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 00:09]:
+>> On Wed, Jul 18, 2012 at 12:29 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Javier Martinez Canillas <javier@dowhile0.org> [120716 23:56]:
+>> >> On Tue, Jul 17, 2012 at 8:45 AM, Shilimkar, Santosh
+>> >> <santosh.shilimkar@ti.com> wrote:
+>> >> > Hi,
+>> >> >
+>> >> > On Tue, Jul 17, 2012 at 6:00 AM, Javier Martinez Canillas
+>> >> > <javier@dowhile0.org> wrote:
+>> >> >> The OMAP MMC and OMAP High Speed MMC hosts now use entirely the DMA
+>> >> >> engine API instead of the previous private DMA API implementation.
+>> >> >>
+>> >> >> So, if the kernel is built with support for any of these hosts but it
+>> >> >> doesn't support DMA devices nor OMAP DMA support, it fails when trying
+>> >> >> to obtain a DMA channel which leads to the following error on an OMAP3
+>> >> >> IGEPv2 Rev.C board (and probably on most OMAP boards with MMC support):
+>> >> >>
+>> >> >> [    2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA engine channel 48
+>> >> >> [    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 62
+>> >> >>
+>> >> >> selecting automatically CONFIG_DMADEVICES and CONFIG_DMA_OMAP solves it.
+>> >> >>
+>> >> >> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>> >> >> ---
+>> >> > Considering, we are updating drivers to select the DMA engine, can you
+>> >> > also include
+>> >> > "drivers/spi/spi-omap2-mcspi.c" which is also updated for DMA engine.
+>> >> >
+>> >> > Regards
+>> >> > Santosh
+>> >>
+>> >> Hi Santosh,
+>> >>
+>> >> Ok, I'll send a v2 now which includes spi-omap2-mcspi then.
+>> >
+>> > I don't think we should do this, the drivers should work with and without
+>> > dma. This just needs to be added to the omap2plus_defconfig.
+>> >
+>> Well this was not decided based on any DMA CONFIG option before for
+>> the subject drivers. It is already by default enabled if the DMA is supported
+>> by the driver IP. There is a possibility to disable it from driver platform/dt
+>> data so that still remains.
+>
+> I think it should rather be that if the driver is broken and does not work
+> without DMA, it should have depends on CONFIG_DMA_OMAP.
+>
+I can confirm that omap MMC can't work without DMA; polled mode is not
+supported / implemented.
