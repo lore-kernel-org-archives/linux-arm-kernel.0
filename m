@@ -1,54 +1,209 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 18 Jul 2012 14:23:15 +0200
-Subject: [PATCH 4/4] ARM: LPC32xx: Add PWM to base dts file
-In-Reply-To: <1342613211-13190-5-git-send-email-stigge@antcom.de>
-References: <1342613211-13190-1-git-send-email-stigge@antcom.de>
- <1342613211-13190-5-git-send-email-stigge@antcom.de>
-Message-ID: <5006AAB3.4040307@antcom.de>
+From: sentientnz@yahoo.co.nz (Tony Prisk)
+Date: Wed, 18 Jul 2012 05:37:10 -0700 (PDT)
+Subject: [PATCHv2 1/1] ARM:vt8500: Convert to use .restart and remove
+ arch_reset()
+Message-ID: <1342615030.5079.YahooMailNeo@web140804.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2012 02:06 PM, Roland Stigge wrote:
-> From: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> 
-> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> ---
->  arch/arm/boot/dts/lpc32xx.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> --- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
-> +++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
-> @@ -278,6 +278,17 @@
->  				status = "disabled";
->  			};
->  
-> +			pwm1: pwm at 0x4005C000 {
-> +				compatible = "nxp,lpc3220-pwm";
-> +				reg = <0x4005C000 0x4>;
-> +				status = "disabled";
-> +			};
-> +
-> +			pwm2: pwm at 0x4005C004 {
-> +				compatible = "nxp,lpc3220-pwm";
-> +				reg = <0x4005C004 0x4>;
-> +				status = "disabled";
-> +			};
->  		};
->  	};
->  };
+Changed the existing board files to use .restart in there machine
+descriptions.
+Removed system.h as it only contained an inline for arch_reset()
 
-Sorry, grabbed old version of patch. Should have been:
+Added device tree support for the restart controller.
+Device tree support for vt8500 is still a work-in-progress.
 
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+?arch/arm/mach-vt8500/Makefile?????????????? |??? 2 +-
+?arch/arm/mach-vt8500/bv07.c???????????????? |??? 3 +
+?arch/arm/mach-vt8500/include/mach/restart.h |?? 17 +++++++
+?arch/arm/mach-vt8500/include/mach/system.h? |?? 13 -----
+?arch/arm/mach-vt8500/restart.c????????????? |?? 64 +++++++++++++++++++++++++++
+?arch/arm/mach-vt8500/wm8505_7in.c?????????? |??? 4 +-
+?6 files changed, 88 insertions(+), 15 deletions(-)
+?create mode 100644 arch/arm/mach-vt8500/include/mach/restart.h
+?delete mode 100644 arch/arm/mach-vt8500/include/mach/system.h
+?create mode 100644 arch/arm/mach-vt8500/restart.c
 
-			pwm: pwm at 4005C000 {
-				compatible = "nxp,lpc3220-pwm";
-				reg = <0x4005C000 0x8>;
-				status = "disabled";
-			};
-
-... because the driver now always registers the two channels together.
-
-Will push it this way.
-
-Roland
+diff --git a/arch/arm/mach-vt8500/Makefile b/arch/arm/mach-vt8500/Makefile
+index 81aedb7..54e6997 100644
+--- a/arch/arm/mach-vt8500/Makefile
++++ b/arch/arm/mach-vt8500/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += devices.o gpio.o irq.o timer.o
++obj-y += devices.o gpio.o irq.o timer.o restart.o
+?
+?obj-$(CONFIG_VTWM_VERSION_VT8500) += devices-vt8500.o
+?obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o
+diff --git a/arch/arm/mach-vt8500/bv07.c b/arch/arm/mach-vt8500/bv07.c
+index a464c75..f9fbeb2 100644
+--- a/arch/arm/mach-vt8500/bv07.c
++++ b/arch/arm/mach-vt8500/bv07.c
+@@ -23,6 +23,7 @@
+?
+?#include <asm/mach-types.h>
+?#include <asm/mach/arch.h>
++#include <mach/restart.h>
+?
+?#include "devices.h"
+?
+@@ -62,6 +63,7 @@ void __init bv07_init(void)
+???? else
+???? ??? printk(KERN_ERR "PMC Hibernation register could not be remapped, not enabling power off!\n");
+?
++??? wmt_setup_restart();
+???? vt8500_set_resources();
+???? platform_add_devices(devices, ARRAY_SIZE(devices));
+???? vt8500_gpio_init();
+@@ -69,6 +71,7 @@ void __init bv07_init(void)
+?
+?MACHINE_START(BV07, "Benign BV07 Mini Netbook")
+???? .atag_offset??? = 0x100,
++??? .restart??? = wmt_restart,
+???? .reserve??? = vt8500_reserve_mem,
+???? .map_io??? ??? = vt8500_map_io,
+???? .init_irq??? = vt8500_init_irq,
+diff --git a/arch/arm/mach-vt8500/include/mach/restart.h b/arch/arm/mach-vt8500/include/mach/restart.h
+new file mode 100644
+index 0000000..89f9b78
+--- /dev/null
++++ b/arch/arm/mach-vt8500/include/mach/restart.h
+@@ -0,0 +1,17 @@
++/* linux/arch/arm/mach-vt8500/restart.h
++ *
++ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.? See the
++ * GNU General Public License for more details.
++ *
++ */
++
++void wmt_setup_restart(void);
++void wmt_restart(char mode, const char *cmd);
+diff --git a/arch/arm/mach-vt8500/include/mach/system.h b/arch/arm/mach-vt8500/include/mach/system.h
+deleted file mode 100644
+index 58fa801..0000000
+--- a/arch/arm/mach-vt8500/include/mach/system.h
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/*
+- * arch/arm/mach-vt8500/include/mach/system.h
+- *
+- */
+-#include <asm/io.h>
+-
+-/* PM Software Reset request register */
+-#define VT8500_PMSR_VIRT??? 0xf8130060
+-
+-static inline void arch_reset(char mode, const char *cmd)
+-{
+-??? writel(1, VT8500_PMSR_VIRT);
+-}
+diff --git a/arch/arm/mach-vt8500/restart.c b/arch/arm/mach-vt8500/restart.c
+new file mode 100644
+index 0000000..9134aea
+--- /dev/null
++++ b/arch/arm/mach-vt8500/restart.c
+@@ -0,0 +1,64 @@
++/* linux/arch/arm/mach-vt8500/restart.c
++ *
++ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.? See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <asm/io.h>
++#include <linux/ioport.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++/* PM Software Reset request register */
++#define LEGACY_PMSR_REG??? ??? 0xD8130060
++#define WMT_PRIZM_PMSR_REG??? 0x60
++
++static void __iomem *wmt_restart_reg;
++
++void wmt_setup_restart(void)
++{
++??? struct device_node *np;
++??? void __iomem *pmc_base;
++
++??? /*
++??? ?* Check if Power Mgmt Controller node is present in device tree. If no
++??? ?* device tree node, use the legacy PMSR value (valid for all current
++??? ?* SoCs).
++??? ?*/
++??? np = of_find_compatible_node(NULL, NULL, "wmt,prizm-pmc");
++??? if (np) {
++??? ??? pmc_base = of_iomap(np, 0);
++
++??? ??? if (!pmc_base)
++??? ??? ??? pr_err("%s:of_iomap(pmc) failed\n", __func__);
++
++??? ??? of_node_put(np);
++
++??? ??? wmt_restart_reg = (void *)((u32)(pmc_base) + WMT_PRIZM_PMSR_REG);
++??? } else {
++??? ??? if (!request_mem_region(LEGACY_PMSR_REG, 4, NULL)) {
++??? ??? ??? pr_err("%s:request_mem_region(rst) failed\n", __func__);
++??? ??? ??? return;
++??? ??? }
++
++??? ??? wmt_restart_reg = ioremap(LEGACY_PMSR_REG, 4);
++??? ??? if (!wmt_restart_reg) {
++??? ??? ??? pr_err("%s:ioremap(rstc) failed\n", __func__);
++??? ??? ??? return;
++??? ??? }
++??? }
++}
++
++void wmt_restart(char mode, const char *cmd)
++{
++??? if (wmt_restart_reg)
++??? ??? writel(1, wmt_restart_reg);
++}
+diff --git a/arch/arm/mach-vt8500/wm8505_7in.c b/arch/arm/mach-vt8500/wm8505_7in.c
+index cf910a9..db19886 100644
+--- a/arch/arm/mach-vt8500/wm8505_7in.c
++++ b/arch/arm/mach-vt8500/wm8505_7in.c
+@@ -23,6 +23,7 @@
+?
+?#include <asm/mach-types.h>
+?#include <asm/mach/arch.h>
++#include <mach/restart.h>
+?
+?#include "devices.h"
+?
+@@ -61,7 +62,7 @@ void __init wm8505_7in_init(void)
+???? ??? pm_power_off = &vt8500_power_off;
+???? else
+???? ??? printk(KERN_ERR "PMC Hibernation register could not be remapped, not enabling power off!\n");
+-
++??? wmt_setup_restart();
+???? wm8505_set_resources();
+???? platform_add_devices(devices, ARRAY_SIZE(devices));
+???? vt8500_gpio_init();
+@@ -69,6 +70,7 @@ void __init wm8505_7in_init(void)
+?
+?MACHINE_START(WM8505_7IN_NETBOOK, "WM8505 7-inch generic netbook")
+???? .atag_offset??? = 0x100,
++??? .restart??? = wmt_restart,
+???? .reserve??? = wm8505_reserve_mem,
+???? .map_io??? ??? = wm8505_map_io,
+???? .init_irq??? = wm8505_init_irq,
+-- 
+1.7.2.5
