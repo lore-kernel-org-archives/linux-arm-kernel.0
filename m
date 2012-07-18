@@ -1,88 +1,90 @@
 From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Wed, 18 Jul 2012 11:27:28 +0530
-Subject: [PATCH V2 2/7] ARM: EXYNOS5: add machine specific support for
- backlight
+Date: Wed, 18 Jul 2012 11:27:31 +0530
+Subject: [PATCH V2 5/7] ARM: EXYNOS: add device tree based discovery support
+ for FIMD
 In-Reply-To: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
 References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <1342591053-7092-3-git-send-email-l.krishna@samsung.com>
+Message-ID: <1342591053-7092-6-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds machine specific support for LCD backlight for SMDK board based
-on Exynos5
+This patch adds support for device tree based discovery for Samsung's
+display controller. Adds DRM-Fimd plat data for smdk5250
+evt1 to the corresponding dts file
 
 Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig           |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c |   27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   16 ++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |    7 +++++++
+ arch/arm/mach-exynos/include/mach/map.h   |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c    |    2 ++
+ 4 files changed, 26 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e698ca0..f0f41b7 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -416,6 +416,7 @@ config MACH_EXYNOS5_DT
- 	select SOC_EXYNOS5250
- 	select USE_OF
- 	select ARM_AMBA
-+	select SAMSUNG_DEV_BACKLIGHT
- 	help
- 	  Machine support for Samsung Exynos4 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the EXYNOS4 SoC based board.
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 8a5e348..c8d32f5 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -109,4 +109,20 @@
+ 	spi_2: spi at 12d40000 {
+ 		status = "disabled";
+ 	};
++
++	lcd_fimd0: lcd_panel0 {
++			lcd-htiming = <4 4 4 1280>;
++			lcd-vtiming = <4 4 4 800>;
++			supports-mipi-panel;
++	};
++
++	fimd {
++		samsung,fimd-display = <&lcd_fimd0>;
++		samsung,fimd-vidout-rgb;
++		samsung,fimd-inv-vclk;
++		samsung,fimd-frame-rate = <60>;
++		samsung,default-window = <0>;
++		samsung,fimd-win-bpp = <32>;
++	};
++
+ };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index a3a2eb2..3a67092 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -460,4 +460,11 @@
+ 			#gpio-cells = <4>;
+ 		};
+ 	};
++
++	fimd {
++		compatible = "samsung,exynos5-drm";
++		interrupt-parent = <&combiner>;
++		reg = <0x14400000 0x40000>;
++		interrupts = <18 5>, <18 4>, <18 6>;
++	};
+ };
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index c72b675..f027da2 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -170,6 +170,7 @@
+ #define EXYNOS4_PA_MIPI_CSIS1		0x11890000
+ 
+ #define EXYNOS4_PA_FIMD0		0x11C00000
++#define EXYNOS5_PA_FIMD1		0x14400000
+ 
+ #define EXYNOS4_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
+ #define EXYNOS4_PA_DWMCI		0x12550000
 diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index ef770bc..e7113cc 100644
+index 99f2b24..2107e01 100644
 --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
 +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -11,6 +11,8 @@
+@@ -158,6 +158,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
++	OF_DEV_AUXDATA("samsung,exynos5-drm", EXYNOS5_PA_FIMD1,
++				"exynos5-fb", NULL),
+ 	{},
+ };
  
- #include <linux/of_platform.h>
- #include <linux/serial_core.h>
-+#include <linux/pwm_backlight.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
-@@ -18,9 +20,33 @@
- 
- #include <plat/cpu.h>
- #include <plat/regs-serial.h>
-+#include <plat/backlight.h>
-+#include <plat/gpio-cfg.h>
- 
- #include "common.h"
- 
-+static int smdk5250_bl_notify(struct device *unused, int brightness)
-+{
-+	/* manage lcd_bl_en signal */
-+	if (brightness)
-+		gpio_set_value(EXYNOS5_GPX3(0), 1);
-+	else
-+		gpio_set_value(EXYNOS5_GPX3(0), 0);
-+
-+	return brightness;
-+}
-+
-+/* LCD Backlight data */
-+static struct samsung_bl_gpio_info smdk5250_bl_gpio_info = {
-+	.no	= EXYNOS5_GPB2(0),
-+	.func	= S3C_GPIO_SFN(2),
-+};
-+
-+static struct platform_pwm_backlight_data smdk5250_bl_data = {
-+	.pwm_period_ns	= 1000000,
-+	.notify		= smdk5250_bl_notify,
-+};
-+
- /*
-  * The following lookup table is used to override device names when devices
-  * are registered from device tree. This is temporarily added to enable
-@@ -67,6 +93,7 @@ static void __init exynos5250_dt_map_io(void)
- 
- static void __init exynos5250_dt_machine_init(void)
- {
-+	samsung_bl_set(&smdk5250_bl_gpio_info, &smdk5250_bl_data);
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 				exynos5250_auxdata_lookup, NULL);
- }
 -- 
 1.7.0.4
