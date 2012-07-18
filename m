@@ -1,10 +1,11 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 18 Jul 2012 08:45:57 +0200
-Subject: [PATCH V2 3/7] ARM: EXYNOS5: add machine specific support for LCD
-In-Reply-To: <1342591053-7092-4-git-send-email-l.krishna@samsung.com>
+Date: Wed, 18 Jul 2012 08:51:14 +0200
+Subject: [PATCH V2 1/7] ARM: SAMSUNG: add additional registers and SFR
+ definitions for writeback
+In-Reply-To: <1342591053-7092-2-git-send-email-l.krishna@samsung.com>
 References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1342591053-7092-4-git-send-email-l.krishna@samsung.com>
-Message-ID: <009b01cd64b1$0019eb20$004dc160$%szyprowski@samsung.com>
+ <1342591053-7092-2-git-send-email-l.krishna@samsung.com>
+Message-ID: <009c01cd64b1$bd3a8390$37af8ab0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,116 +13,191 @@ Hello,
 
 On Wednesday, July 18, 2012 7:57 AM Leela Krishna Amudala wrote:
 
-> This patch adds machine specific support for LCD controller like setting power to LCD
-> and adding LCD platform device.
+> This patch updates the register address offsets and adds SFR definitions
+> for writeback for Samsung's V8 display controller.
 > 
-> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
 > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 > ---
->  arch/arm/mach-exynos/mach-exynos5-dt.c |   56 ++++++++++++++++++++++++++++++++
->  1 files changed, 56 insertions(+), 0 deletions(-)
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   10 ++++
+>  arch/arm/plat-samsung/include/plat/regs-fb.h    |   51 +++++++++++++++++++++++
+>  drivers/video/Kconfig                           |    6 +++
+>  3 files changed, 67 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index e7113cc..02a0e68 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -13,6 +13,7 @@
->  #include <linux/serial_core.h>
->  #include <linux/pwm_backlight.h>
->  #include <linux/gpio.h>
-> +#include <linux/delay.h>
+> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h b/arch/arm/plat-
+> samsung/include/plat/regs-fb-v4.h
+> index 4c3647f..1639c17 100644
+> --- a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+> +++ b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+> @@ -30,9 +30,16 @@
+>  #define VIDCON1_FSTATUS_EVEN	(1 << 15)
 > 
->  #include <asm/mach/arch.h>
->  #include <asm/hardware/gic.h>
-> @@ -24,6 +25,7 @@
->  #include <plat/gpio-cfg.h>
+>  /* Video timing controls */
+> +#ifdef CONFIG_FB_EXYNOS_FIMD_V8
+> +#define VIDTCON0                                (0x20010)
+> +#define VIDTCON1                                (0x20014)
+> +#define VIDTCON3                                (0x2001C)
+> +#else
+>  #define VIDTCON0				(0x10)
+>  #define VIDTCON1				(0x14)
+>  #define VIDTCON2				(0x18)
+> +#define VIDTCON3				(0x1C)
+> +#endif
 > 
->  #include "common.h"
-> +#include <video/platform_lcd.h>
+>  /* Window position controls */
 > 
->  static int smdk5250_bl_notify(struct device *unused, int brightness)
->  {
-> @@ -47,6 +49,55 @@ static struct platform_pwm_backlight_data smdk5250_bl_data = {
->  	.notify		= smdk5250_bl_notify,
->  };
+> @@ -43,9 +50,12 @@
+>  #define VIDOSD_BASE				(0x40)
 > 
-> +static void lcd_set_power(struct plat_lcd_data *pd,
-> +			unsigned int power)
-> +{
-> +
-> +	/* reset */
-> +	gpio_request_one(EXYNOS5_GPX1(5), GPIOF_OUT_INIT_HIGH, "GPX1");
-> +
-> +	mdelay(20);
-> +	if (power) {
-> +		/* fire nRESET on power up */
-> +		gpio_set_value(EXYNOS5_GPX1(5), 0);
-> +		mdelay(20);
-> +		gpio_set_value(EXYNOS5_GPX1(5), 1);
-> +		mdelay(20);
-> +		gpio_free(EXYNOS5_GPX1(5));
-> +	} else {
-> +		/* fire nRESET on power off */
-> +		gpio_set_value(EXYNOS5_GPX1(5), 0);
-> +		mdelay(20);
-> +		gpio_set_value(EXYNOS5_GPX1(5), 1);
-> +		mdelay(20);
-> +		gpio_free(EXYNOS5_GPX1(5));
-> +	}
-> +	mdelay(20);
-> +
-> +	/*
-> +	 * Request lcd_bl_en GPIO for smdk5250_bl_notify().
-> +	 * TODO: Fix this so we are not at risk of requesting the GPIO
-> +	 * multiple times, this should be done with device tree, and
-> +	 * likely integrated into the plat-samsung/dev-backlight.c init.
-> +	 */
-> +	gpio_request_one(EXYNOS5_GPX3(0), GPIOF_OUT_INIT_LOW, "GPX3");
-> +}
-> +
-> +static int smdk5250_match_fb(struct plat_lcd_data *pd, struct fb_info *info)
-> +{
-> +	/* Don't call .set_power callback while unblanking */
-> +	return 0;
-> +}
-> +
-> +static struct plat_lcd_data smdk5250_lcd_data = {
-> +	.set_power	= lcd_set_power,
-> +	.match_fb	= smdk5250_match_fb,
-> +};
-> +
-> +static struct platform_device smdk5250_lcd = {
-> +	.name			= "platform-lcd",
-> +	.dev.platform_data	= &smdk5250_lcd_data,
-> +};
->  /*
->   * The following lookup table is used to override device names when devices
->   * are registered from device tree. This is temporarily added to enable
-> @@ -85,6 +136,10 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst
-> = {
->  	{},
->  };
+>  #define VIDINTCON0				(0x130)
+> +#define VIDINTCON1                              (0x134)
 > 
-> +static struct platform_device *smdk5250_devices[] __initdata = {
-> +	&smdk5250_lcd, /* for platform_lcd device */
-> +};
-> +
->  static void __init exynos5250_dt_map_io(void)
->  {
->  	exynos_init_io(NULL, 0);
-> @@ -96,6 +151,7 @@ static void __init exynos5250_dt_machine_init(void)
->  	samsung_bl_set(&smdk5250_bl_gpio_info, &smdk5250_bl_data);
->  	of_platform_populate(NULL, of_default_bus_match_table,
->  				exynos5250_auxdata_lookup, NULL);
-> +	platform_add_devices(smdk5250_devices, ARRAY_SIZE(smdk5250_devices));
->  }
+>  /* WINCONx */
 > 
->  static char const *exynos5250_dt_compat[] __initdata = {
+> +#define WINCONx_CSC_CON_EQ709                   (1 << 28)
+> +#define WINCONx_CSC_CON_EQ601                   (0 << 28)
+>  #define WINCONx_CSCWIDTH_MASK			(0x3 << 26)
+>  #define WINCONx_CSCWIDTH_SHIFT			(26)
+>  #define WINCONx_CSCWIDTH_WIDE			(0x0 << 26)
+> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-
+> samsung/include/plat/regs-fb.h
+> index 9a78012..6d2ee16 100644
+> --- a/arch/arm/plat-samsung/include/plat/regs-fb.h
+> +++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
+> @@ -32,12 +32,28 @@
+> 
+>  #define VIDCON0					(0x00)
+>  #define VIDCON0_INTERLACE			(1 << 29)
+> +
+> +#ifdef CONFIG_FB_EXYNOS_FIMD_V8
+> +#define VIDOUT_CON				(0x20000)
+> +#define VIDOUT_CON_VIDOUT_UP_MASK		(0x1 << 16)
+> +#define VIDOUT_CON_VIDOUT_UP_SHIFT		(16)
+> +#define VIDOUT_CON_VIDOUT_UP_ALWAYS		(0x0 << 16)
+> +#define VIDOUT_CON_VIDOUT_UP_START_FRAME	(0x1 << 16)
+> +#define VIDOUT_CON_VIDOUT_F_MASK		(0x7 << 8)
+> +#define VIDOUT_CON_VIDOUT_F_SHIFT		(8)
+> +#define VIDOUT_CON_VIDOUT_F_RGB			(0x0 << 8)
+> +#define VIDOUT_CON_VIDOUT_F_I80_LDI0		(0x2 << 8)
+> +#define VIDOUT_CON_VIDOUT_F_I80_LDI1		(0x3 << 8)
+> +#define VIDOUT_CON_VIDOUT_F_WB			(0x4 << 8)
+> +#endif
+> +
+>  #define VIDCON0_VIDOUT_MASK			(0x3 << 26)
+>  #define VIDCON0_VIDOUT_SHIFT			(26)
+>  #define VIDCON0_VIDOUT_RGB			(0x0 << 26)
+>  #define VIDCON0_VIDOUT_TV			(0x1 << 26)
+>  #define VIDCON0_VIDOUT_I80_LDI0			(0x2 << 26)
+>  #define VIDCON0_VIDOUT_I80_LDI1			(0x3 << 26)
+> +#define VIDCON0_VIDOUT_WB                       (0x4 << 26)
+> 
+>  #define VIDCON0_L1_DATA_MASK			(0x7 << 23)
+>  #define VIDCON0_L1_DATA_SHIFT			(23)
+> @@ -81,7 +97,13 @@
+>  #define VIDCON0_ENVID				(1 << 1)
+>  #define VIDCON0_ENVID_F				(1 << 0)
+> 
+> +#ifdef CONFIG_FB_EXYNOS_FIMD_V8
+> +#define VIDOUT_CON                              (0x20000)
+> +#define VIDCON1                                 (0x20004)
+> +#else
+>  #define VIDCON1					(0x04)
+> +#endif
+> +
+>  #define VIDCON1_LINECNT_MASK			(0x7ff << 16)
+>  #define VIDCON1_LINECNT_SHIFT			(16)
+>  #define VIDCON1_LINECNT_GET(_v)			(((_v) >> 16) & 0x7ff)
+> @@ -111,6 +133,14 @@
+>  #define VIDCON2_TVFMTSEL1_RGB			(0x0 << 12)
+>  #define VIDCON2_TVFMTSEL1_YUV422		(0x1 << 12)
+>  #define VIDCON2_TVFMTSEL1_YUV444		(0x2 << 12)
+> +#define VIDCON2_TVFMTSEL1_SHIFT			(12)
+> +#define VIDCON2_TVFMTSEL_SW			(1 << 14)
+> +#define VIDCON2_TVFORMATSEL_YUV444		(0x2 << 12)
+> +
+> +#define VIDCON2_TVFMTSEL1_MASK			(0x3 << 12)
+> +#define VIDCON2_TVFMTSEL1_RGB			(0x0 << 12)
+> +#define VIDCON2_TVFMTSEL1_YUV422		(0x1 << 12)
+> +#define VIDCON2_TVFMTSEL1_YUV444		(0x2 << 12)
+> 
+>  #define VIDCON2_ORGYCbCr			(1 << 8)
+>  #define VIDCON2_YUVORDCrCb			(1 << 7)
+> @@ -165,8 +195,15 @@
+>  #define VIDTCON1_HSPW_SHIFT			(0)
+>  #define VIDTCON1_HSPW_LIMIT			(0xff)
+>  #define VIDTCON1_HSPW(_x)			((_x) << 0)
+> +#define VIDCON1_VCLK_MASK                       (0x3 << 9)
+> +#define VIDCON1_VCLK_HOLD                       (0x0 << 9)
+> +#define VIDCON1_VCLK_RUN                        (0x1 << 9)
+> 
+> +#ifdef CONFIG_FB_EXYNOS_FIMD_V8
+> +#define VIDTCON2				(0x20018)
+> +#else
+>  #define VIDTCON2				(0x18)
+> +#endif
+>  #define VIDTCON2_LINEVAL_E(_x)			((((_x) & 0x800) >> 11) << 23)
+>  #define VIDTCON2_LINEVAL_MASK			(0x7ff << 11)
+>  #define VIDTCON2_LINEVAL_SHIFT			(11)
+> @@ -186,6 +223,9 @@
+>  #define WINCONx_BYTSWP				(1 << 17)
+>  #define WINCONx_HAWSWP				(1 << 16)
+>  #define WINCONx_WSWP				(1 << 15)
+> +#define WINCONx_ENLOCAL_MASK			(0xf << 15)
+> +#define WINCONx_INRGB_RGB			(0 << 13)
+> +#define WINCONx_INRGB_YCBCR			(1 << 13)
+>  #define WINCONx_BURSTLEN_MASK			(0x3 << 9)
+>  #define WINCONx_BURSTLEN_SHIFT			(9)
+>  #define WINCONx_BURSTLEN_16WORD			(0x0 << 9)
+> @@ -205,6 +245,7 @@
+>  #define WINCON0_BPPMODE_24BPP_888		(0xb << 2)
+> 
+>  #define WINCON1_BLD_PIX				(1 << 6)
+> +#define WINCON1_BLD_PLANE			(0 << 6)
+> 
+>  #define WINCON1_ALPHA_SEL			(1 << 1)
+>  #define WINCON1_BPPMODE_MASK			(0xf << 2)
+> @@ -395,9 +436,19 @@
+>  #define WPALCON_W0PAL_16BPP_A555		(0x5 << 0)
+>  #define WPALCON_W0PAL_16BPP_565			(0x6 << 0)
+> 
+> +/* Clock gate mode control */
+> +#define REG_CLKGATE_MODE			(0x1b0)
+> +#define REG_CLKGATE_MODE_AUTO_CLOCK_GATE	(0 << 0)
+> +#define REG_CLKGATE_MODE_NON_CLOCK_GATE		(1 << 0)
+> +
+>  /* Blending equation control */
+>  #define BLENDCON				(0x260)
+>  #define BLENDCON_NEW_MASK			(1 << 0)
+>  #define BLENDCON_NEW_8BIT_ALPHA_VALUE		(1 << 0)
+>  #define BLENDCON_NEW_4BIT_ALPHA_VALUE		(0 << 0)
+> 
+> +/* Window alpha control */
+> +#define VIDW0ALPHA0				(0x200)
+> +#define VIDW0ALPHA1				(0x204)
+> +#define DPCLKCON				(0x27c)
+> +#define DPCLKCON_ENABLE				(1 << 1)
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 0217f74..f81bf55 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -2053,6 +2053,12 @@ config FB_S3C
+> 
+>  	  Currently the support is only for the S3C6400 and S3C6410 SoCs.
+> 
+> +config FB_EXYNOS_FIMD_V8
+> +	bool "register extensions for FIMD version 8"
+> +	depends on ARCH_EXYNOS5
+> +	---help---
+> +	This uses register extensions for FIMD version 8
+> +
+>  config FB_S3C_DEBUG_REGWRITE
+>         bool "Debug register writes"
+>         depends on FB_S3C
 
-Sorry, but this patch looks completely weird to me. exynos5-dt machine is aimed to 
-operate on ANY Exynos5 based board with proper device tree bindings, not only SMDK5250.
-Please add DT support to platform lcd driver and create required bindings for it
-instead of hardcoding the platform data and gpio numbers in mach-exynos5-dt.c
+Do we really need these defines in arch/arm/plat-samsung/include/plat/regs-fb* ? 
+IMHO they should be moved from arch/arm to drivers/video to live together with the driver.
+They are not a part of core platform code. I thought that there have been some patches 
+cleaning up regs-fb mess a long time ago, but it looks they didn't get their way to 
+mainline.
 
 Best regards
 -- 
