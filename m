@@ -1,21 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 18 Jul 2012 09:45:00 -0700 (PDT)
-Subject: [net-next PATCH v7] net: ethernet: davinci_emac: add OF support
-In-Reply-To: <1342521264-18466-1-git-send-email-agust@denx.de>
-References: <1342521264-18466-1-git-send-email-agust@denx.de>
-Message-ID: <20120718.094500.2234614298478867072.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Jul 2012 16:52:27 +0000
+Subject: [PATCHv3 1/1] ARM:vt8500: Convert to use .restart and remove
+ arch_reset()
+In-Reply-To: <1342619015.49231.YahooMailNeo@web140803.mail.bf1.yahoo.com>
+References: <1342615030.5079.YahooMailNeo@web140804.mail.bf1.yahoo.com>
+ <201207181259.21669.arnd@arndb.de>
+ <1342619015.49231.YahooMailNeo@web140803.mail.bf1.yahoo.com>
+Message-ID: <201207181652.28240.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anatolij Gustschin <agust@denx.de>
-Date: Tue, 17 Jul 2012 12:34:24 +0200
-
-> From: Heiko Schocher <hs@denx.de>
+On Wednesday 18 July 2012, Tony Prisk wrote:
+> Removed system.h as it only contained an inline for arch_reset()
+> Changed the existing board files to use .restart in machine descriptions.
 > 
-> add OF support for the davinci_emac driver.
+> Added device tree support for the restart controller.
+> Device tree support for mach-vt8500 is still a work-in-progress.
 > 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> Change History
+> v3: style changes.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-Applied.
+Applied the new version now, thanks a lot!
+
+	Arnd
