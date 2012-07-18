@@ -1,55 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Jul 2012 16:00:22 +0200
-Subject: i.MX27: gpio device tree problems.
-In-Reply-To: <CACKLOr3TQXHekBM76LBL0AczUQrYTDxm6z5YWSdrbu5ug6EpTg@mail.gmail.com>
-References: <CACKLOr3TQXHekBM76LBL0AczUQrYTDxm6z5YWSdrbu5ug6EpTg@mail.gmail.com>
-Message-ID: <20120718140022.GI30009@pengutronix.de>
+From: knut.wohlrab@de.bosch.com (Knut Wohlrab)
+Date: Wed, 18 Jul 2012 16:11:25 +0200
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>
+References: <5006571A.7060103@de.bosch.com>
+ <CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>
+ <50068696.8070408@de.bosch.com>
+ <CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>
+Message-ID: <5006C40D.300@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 03:03:41PM +0200, javier Martin wrote:
-> Hi,
-> we are trying to port our Visstrim SM10 [1] to device tree and we've
-> found some problems related to gpios in the process:
-> 
-> 1.- IRQs don't work properly since the value of 'pdev->id' when using
-> device tree is -1, so 'irq_set_chained_handler()' never gets called
-> [2]
+On 07/18/2012 03:47 PM, Jassi Brar wrote:
+> On 18 July 2012 15:19, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
+>
+>> If a SD card is inserted at boot time, its "mmcblk0", the embedded
+>> MMC (eMMC) device "mmcblk1".  This makes it difficult to give the kernel the
+>> correct device for the eMMC root file system ("root=/dev/mmcblk?p1 ...").
+>>
+> How about  root=UUID=<eMMC-partition>  ?
+Because we are talking about an embedded device, it is very difficult to 
+get a UUID of a eMMC partition into kernel command line with U-Boot. 
+Handling of UUID is also a big effort at board manufacturing.
 
-This should work since:
+Startup speed is very important for us. Searching for UUID on several 
+MMC/SD devices will significant slow down the boot process.
 
-33a4e98 gpio/mxc: make irqs work for fsl,imx21-gpio devices
+This problem can occur on many devices with embedded MMC and removable 
+SD, e.g. smart phones. So I think we should find an solution to define 
+MMC scan order or device number/name in a device tree.
 
-> 2.- When using device tree GPIO numbers are allocated dynamically
-> using gpiolib [3]. This leads to different GPIO numbers being used
-> compared to the version without device tree. Since GPIOs are exposed
-> to the user space by gpilib using sysfs this breaks compatibility with
-> current user applications.
-> 
-> Here is an example:
-> 
-> Version without device tree:
-> gpiochip_add: registered GPIOs 0 to 31 on device: imx21-gpio.0
-> gpiochip_add: registered GPIOs 32 to 63 on device: imx21-gpio.1
-> gpiochip_add: registered GPIOs 64 to 95 on device: imx21-gpio.2
-> gpiochip_add: registered GPIOs 96 to 127 on device: imx21-gpio.3
-> gpiochip_add: registered GPIOs 128 to 159 on device: imx21-gpio.4
-> gpiochip_add: registered GPIOs 160 to 191 on device: imx21-gpio.5
-> 
-> Version with device tree:
-> gpiochip_add: registered GPIOs 224 to 255 on device: 10015000.gpio
-> gpiochip_add: registered GPIOs 192 to 223 on device: 10015100.gpio
-> gpiochip_add: registered GPIOs 160 to 191 on device: 10015200.gpio
-> gpiochip_add: registered GPIOs 128 to 159 on device: 10015300.gpio
-> gpiochip_add: registered GPIOs 96 to 127 on device: 10015400.gpio
-> gpiochip_add: registered GPIOs 64 to 95 on device: 10015500.gpio
+Thanks and regards
 
-Known problem, I have no idea how to solve this.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Knut
