@@ -1,49 +1,35 @@
-From: sedat.dilek@gmail.com (Sedat Dilek)
-Date: Wed, 18 Jul 2012 19:54:46 +0200
-Subject: linux-next: Tree for July 17 (mfd: AB3100 - ab3100_probe:
- undefined reference to `rand_initialize_irq')
-In-Reply-To: <CACRpkdbAnBza0Nd4Qw_LinRDa4XVuzUdJFX==YeML2z7H6gzwg@mail.gmail.com>
-References: <CA+icZUXjc+13YjoJ6FjDFboX20j3mqHNtvV2Av2-H0My8V2Mgg@mail.gmail.com>
- <CA+icZUW4gNqspcJ1sjBD-3GCVee2VWVV5NPAr6Eo-aZHjp3y+Q@mail.gmail.com>
- <CA+icZUW+Gp9HK-6dzHjtTwSc9RaLD3sV+WPMM-vO3A6fj6frwQ@mail.gmail.com>
- <CACRpkdbAnBza0Nd4Qw_LinRDa4XVuzUdJFX==YeML2z7H6gzwg@mail.gmail.com>
-Message-ID: <CA+icZUWzS==NVNstc3RUfKe-=4UVtAza36LuFRuAp-zeX=5WyA@mail.gmail.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 18 Jul 2012 12:47:12 -0600
+Subject: [RFC PATCHv4 0/1] arm: socfpga: Add initial support for Altera's
+ SOCFPGA HW
+Message-ID: <1342637233-13965-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 8:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jul 17, 2012 at 12:39 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
->> On Tue, Jul 17, 2012 at 12:21 PM, Sedat Dilek <sedat.dilek@gmail.com> wrote:
->>> ...looks like AB3100 is the *only* driver still using rand_initialize_irq()...
->>>
->>> drivers/mfd/ab3100-core.c:939:  rand_initialize_irq(client->irq);
->>>
->>> ...but why has random.h still this...?
->>>
->>> include/linux/random.h:51:extern void rand_initialize_irq(int irq);
->>>
->>> Just thinking "loud"...
->>>
->>> - Sedat -
->>
->> Is this attached patch OK, Ted?
->
-> You're just deleting a line from the AB3100 driver, so I guess you're
-> regressing the system since that IRQ will no longer contribute
-> to the entropy pool?
->
-> How do we simultaneously make sure that this IRQ is still
-> contributing to the entropy?
->
+From: Dinh Nguyen <dinguyen@altera.com>
 
-For the sake of completeness:
-* Ted explained in his answer in [1].
-* Just FYI: [2] has these changes merged into the original commit.
+This patch add minimal support for Altera's SOCFPGA hardward.
 
-- Sedat -
+Changes since v3:
+- Condensed to 1 patch per Pavel Machek
+- Added only root clocks(fixed-rate) definitions in drivers/clk/socfpga
+- Update dtsi file per Thomas Petazzoni's recommendation
+- Add extern sys_timer dw_apb_timer declaration in include/linux/dw_apb_timer.h
 
-[1] http://marc.info/?l=linux-next&m=134256445707799&w=2
-[2] http://git.kernel.org/?p=linux/kernel/git/tytso/random.git;a=commitdiff;h=627574db8b21c51217c683909458500916e64963
+Changes since v2:
+- Make use of COMMON_CLK - socfpga folder under drivers/clk
+- Add maintainer entry for drivrs/clk/socfpga
+- Incorporated changes suggestd by Thomas Petazzoni, Arnd Bergmann,
+and Rob Herring
+- Added Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
-> Yours,
-> Linus Walleij
+Changes since v1:
+- Incorporate changes suggested by Pavel Machek, Thommas Petazzoni,
+  Arnd Bergmann, and Rob Herring
+- Reduce the patch to a make as much use of DTS as possible
+
+Dinh Nguyen (1):
+  ARM: socfpga: initial support for Altera's SOCFPGA platform
+
+-- 
+1.7.9.5
