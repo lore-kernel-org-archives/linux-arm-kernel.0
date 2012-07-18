@@ -1,40 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Jul 2012 11:16:13 +0100
-Subject: Boot breaks in -next from LEGACY to LINEAR conversion
-In-Reply-To: <20120718005230.GA15680@linux-sh.org>
-References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
- <20120718005230.GA15680@linux-sh.org>
-Message-ID: <20120718101612.GE22739@opensource.wolfsonmicro.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 18 Jul 2012 12:16:02 +0200
+Subject: [PATCH v2] can: flexcan: add 2nd clock to support imx53 and newer
+In-Reply-To: <50068A54.80705@gmail.com>
+References: <1342601282-1208-1-git-send-email-mkl@pengutronix.de>
+ <50068A54.80705@gmail.com>
+Message-ID: <50068CE2.9090408@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 09:52:30AM +0900, Paul Mundt wrote:
-> On Tue, Jul 17, 2012 at 07:57:49PM +0100, Mark Brown wrote:
+On 07/18/2012 12:05 PM, Hui Wang wrote:
+> Marc Kleine-Budde wrote:
+>> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>
+>> This patch adds support for a second clock to the flexcan driver. On
+>> modern freescale ARM cores like the imx53 and imx6q two clocks ("ipg"
+>> and "per") must be enabled in order to access the CAN core.
+>>
+>> In the original driver, the clock was requested without specifying the
+>> connection id, further all mainline ARM archs with flexcan support
+>> (imx28, imx25, imx35) register their flexcan clock without a
+>> connection id, too.
+>>
+>> This patch first renames the existing clk variable to clk_ipg and
+>> converts it to devm for easier error handling. The connection id "ipg"
+>> is added to the devm_clk_get() call. Then a second clock "per" is
+>> requested. As all archs don't specify a connection id, both clk_get
+>> return the same clock. This ensures compatibility to existing flexcan
+>> support and adds support for imx53 at the same time.
+>>
+>> After this patch hits mainline, the archs may give their existing
+>> flexcan clock the "ipg" connection id and implement a dummy "per"
+>> clock.
+>>
+>> This patch has been tested on imx28 (unmodified clk tree) and on imx53
+>> with a seperate "ipg" and "per" clock.
+>>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Hui Wang <jason77.wang@gmail.com>
+>>   
+> Acked-by: Hui Wang <jason77.wang@gmail.com>
 
-> > -next fails to boot for me today on my s3c64xx based systems.  Walking
-> > back to the last time I tried and bisecting likely branches I find that
-> > commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
-> > that introduces the build break.  Unfortunately the boot fails before I
-> > get a console which makes diagnosis somewhat more tricky than would be
-> > ideal.  Any ideas?
+tnx, Marc
 
-> Does http://www.spinics.net/lists/linux-sh/msg11995.html fix it for you?
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-> I did Cc you on the legacy -> linear thread, but perhaps you missed it.
-
-I do remember seeing it, it's a big part of how I isolated that this
-patch series was the issue.  To be honest I hadn't got terribly far with
-the diagnosis of what the actual breakage is, it took a while to isolate
-as it had been a little while since I'd rebased through onto -next and
-there's no diagnostics at all from the system when it fails.
-
-I tried applying the patch but the underlying code has changed a lot so
-patch gets upset, I'll try to find time to resolve them but can't
-guarantee when as things are especially hectic right now.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/28ea8fb1/attachment.sig>
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/209e6a46/attachment.sig>
