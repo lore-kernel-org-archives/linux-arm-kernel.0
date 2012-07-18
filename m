@@ -1,47 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jul 2012 11:43:45 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-In-Reply-To: <20120718103311.GG22739@opensource.wolfsonmicro.com>
-References: <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
- <20120717133550.GC4477@opensource.wolfsonmicro.com>
- <50057058.2060002@linaro.org>
- <20120717142222.GE4477@opensource.wolfsonmicro.com>
- <50057C1A.80606@linaro.org>
- <20120717152001.GF4477@opensource.wolfsonmicro.com>
- <20120718053341.GA4009@S2100-06.ap.freescale.net>
- <20120718095937.GB22739@opensource.wolfsonmicro.com>
- <50069006.8050301@linaro.org>
- <20120718103311.GG22739@opensource.wolfsonmicro.com>
-Message-ID: <50069361.1080509@linaro.org>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 18 Jul 2012 13:40:53 +0300
+Subject: [PATCH 1/5] ubi: introduce ubi->bad_peb_limit
+In-Reply-To: <1341389164-24409-2-git-send-email-shmulik.ladkani@gmail.com>
+References: <1341389164-24409-1-git-send-email-shmulik.ladkani@gmail.com>
+ <1341389164-24409-2-git-send-email-shmulik.ladkani@gmail.com>
+Message-ID: <1342608053.7530.11.camel@brekeke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/12 11:33, Mark Brown wrote:
-> On Wed, Jul 18, 2012 at 11:29:26AM +0100, Lee Jones wrote:
->> On 18/07/12 10:59, Mark Brown wrote:
->
->>> It's not the using device tree bit that creates concern for me here,
->>> it's the fact that the board and silicon aren't being separated.
->
->> What's the difference?
->
->>> +- db8500.dtsi       // silicon
->>> \	
->>> +-- snowball.dts    // board
->
-> I have glanced at some of this stuff in the past, thanks.  Now think how
-> that's working for people when they put the configuration for the
-> silicon in the same DT node as the configuration for the board...
+On Wed, 2012-07-04 at 11:06 +0300, Shmulik Ladkani wrote:
+> Introduce 'ubi->bad_peb_limit', which specifies an upper limit of PEBs
+> ubi expects to go bad.
+> Currently, it is initialized to a fixed percentage of total PEBs in the
+> ubi device (configurable via CONFIG_MTD_UBI_BEB_LIMIT).
+> 
+> The 'bad_peb_limit' is intended to be used for calculating the amount of
+> PEBs ubi needs to reserve for bad eraseblock handling.
+> 
+> Signed-off-by: Shmulik Ladkani <shmulik.ladkani@gmail.com>
+> ---
+>  arch/arm/configs/sam9_l9260_defconfig |    1 +
 
-Granted, ideally the configuration and silicon description should be 
-separated. I don't know that is the case for us yet however. That is 
-something I'll enforce when we have a new dts file, which will be coming 
-very soon.
+I've also amended the Kconfig text a tiny bit and dropped the defconfig
+changes - let's have them separately as a single patch at the end of the
+series.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/544983b4/attachment.sig>
