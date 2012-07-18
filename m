@@ -1,51 +1,51 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Wed, 18 Jul 2012 08:51:02 +0100
-Subject: Device tree.
-In-Reply-To: <alpine.LFD.2.02.1207171712070.9293@xanadu.home>
-References: <500552C9.4090107@codethink.co.uk> <50056E22.5040308@gmail.com>
- <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk>
- <13863985.aH2icoQzEI@flexo> <50057CD2.2060001@codethink.co.uk>
- <alpine.LFD.2.02.1207171712070.9293@xanadu.home>
-Message-ID: <50066AE6.6000002@codethink.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Jul 2012 23:59:51 -0700
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
+References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
+ <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
+ <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
+Message-ID: <20120718065951.GH6522@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/12 22:18, Nicolas Pitre wrote:
+* Javier Martinez Canillas <javier@dowhile0.org> [120716 23:56]:
+> On Tue, Jul 17, 2012 at 8:45 AM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+> > Hi,
+> >
+> > On Tue, Jul 17, 2012 at 6:00 AM, Javier Martinez Canillas
+> > <javier@dowhile0.org> wrote:
+> >> The OMAP MMC and OMAP High Speed MMC hosts now use entirely the DMA
+> >> engine API instead of the previous private DMA API implementation.
+> >>
+> >> So, if the kernel is built with support for any of these hosts but it
+> >> doesn't support DMA devices nor OMAP DMA support, it fails when trying
+> >> to obtain a DMA channel which leads to the following error on an OMAP3
+> >> IGEPv2 Rev.C board (and probably on most OMAP boards with MMC support):
+> >>
+> >> [    2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA engine channel 48
+> >> [    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 62
+> >>
+> >> selecting automatically CONFIG_DMADEVICES and CONFIG_DMA_OMAP solves it.
+> >>
+> >> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> >> ---
+> > Considering, we are updating drivers to select the DMA engine, can you
+> > also include
+> > "drivers/spi/spi-omap2-mcspi.c" which is also updated for DMA engine.
+> >
+> > Regards
+> > Santosh
+> 
+> Hi Santosh,
+> 
+> Ok, I'll send a v2 now which includes spi-omap2-mcspi then.
 
-> That pain is the only leverage  we have to have you fix the bootloader
- > somehow.
+I don't think we should do this, the drivers should work with and without
+dma. This just needs to be added to the omap2plus_defconfig.
 
-Yes, because this tactic has worked just great historically...
+Regards,
 
-Other than chainbooting /another/ bootloader, how do you propose people 
-fix this issue? Not everyone has a co-operative vendor.
-
-> If you prefer or have to bodge  around it then you keep the
- > hack for yourself.
-
-And for those of us where this is not an option?
-
-> We want people to get into the  habit of building and distributing a
- > generic kernel image.
-
-Which is all lovely, but sometimes simply not appropriate.
-
-> Appending a dtb to zImage  and/or wrapping it
- > into a uImage should be considered installation steps which are best
- > done outside of the kernel build system. And they are quite trivial
- > to do as well.
-
-Then perhaps the 'hack' to allow appending should be removed from the 
-kernel, too, by the same logic - after all, its only 'enabling' people 
-to cling to ancient bootloaders...
-
-Honestly, all the fuss about "R2 + ATAGS must be the only way", and now 
-we can pass in data in non-ATAG form, via appending to the kernel image, 
-at whatever random location that might wind up being.
-
-Either ATAGs the only way, or they aren't. If appending to zImage is 
-'way 2' then it should be possible to choose what gets appended at build 
-time. If not, the option has no business being in the kernel at all. Do 
-it properly or not at all.
-
-Whats the point in make uImage if you cant use it?
+Tony
