@@ -1,130 +1,40 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 18 Jul 2012 12:13:16 +0200
-Subject: [RFC PATCHv3 2/2] ARM: socfpga: Add DTS bindings for Altera's
- SOCFPGA
-In-Reply-To: <20120718091617.572070c2@skate>
-References: <1342572656-5205-1-git-send-email-dinguyen@altera.com>
- <1342572656-5205-3-git-send-email-dinguyen@altera.com>
- <20120718091617.572070c2@skate>
-Message-ID: <20120718101316.GB7607@elf.ucw.cz>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 18 Jul 2012 11:16:13 +0100
+Subject: Boot breaks in -next from LEGACY to LINEAR conversion
+In-Reply-To: <20120718005230.GA15680@linux-sh.org>
+References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
+ <20120718005230.GA15680@linux-sh.org>
+Message-ID: <20120718101612.GE22739@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Jul 18, 2012 at 09:52:30AM +0900, Paul Mundt wrote:
+> On Tue, Jul 17, 2012 at 07:57:49PM +0100, Mark Brown wrote:
 
-> > +	soc {
-> > +		amba {
-> > +			compatible = "arm,amba-bus";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			ranges;
-> > +
-> > +			pdma: pdma at ffe01000 {
-> > +				compatible = "arm,pl330", "arm,primecell";
-> > +				reg = <0xffe01000 0x1000>;
-> > +				interrupts = <0 180 4>;
-> > +			};
-> > +		};
-> > +
-> > +		apb_periphs {
-> > +			compatible = "simple-bus";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			ranges;
-> > +
-> > +			gmac0: stmmac at ff700000 {
-> > +				compatible = "st,spear600-gmac";
-> > +				reg = <0xff700000 0x2000>;
-> > +				interrupts = <0 115 4>;
-> > +				interrupt-names = "macirq";
-> > +				mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
-> > +				phy-mode = "gmii";
-> > +			};
-> > +		};
-> 
-> Are the pdma and gmac0 really specific to the cyclone board? Aren't
-> they similar to the uarts and timers in that they are part of the SoC
-> itself?
+> > -next fails to boot for me today on my s3c64xx based systems.  Walking
+> > back to the last time I tried and bisecting likely branches I find that
+> > commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
+> > that introduces the build break.  Unfortunately the boot fails before I
+> > get a console which makes diagnosis somewhat more tricky than would be
+> > ideal.  Any ideas?
 
-I guess they are not. I'm not dts expert, but would something like
-this be suitable? It boots :-). 
+> Does http://www.spinics.net/lists/linux-sh/msg11995.html fix it for you?
 
-									Pavel
+> I did Cc you on the legacy -> linear thread, but perhaps you missed it.
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 903d4bb..ee13a3e 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -115,5 +115,27 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 		};
-+
-+		gmac0: stmmac at ff700000 {
-+			compatible = "st,spear600-gmac";
-+			reg = <0xff700000 0x2000>;
-+			interrupts = <0 115 4>;
-+			interrupt-names = "macirq";
-+			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
-+			phy-mode = "gmii";
-+		};
-+
-+		amba {
-+			compatible = "arm,amba-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			pdma: pdma at ffe01000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0xffe01000 0x1000>;
-+				interrupts = <0 180 4>;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index 3433ee3..683d035 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -37,35 +37,4 @@
- 		device_type = "memory";
- 		reg = <0x0 0x10000000>; /* 256MB */
- 	};
--
--	soc {
--		amba {
--			compatible = "arm,amba-bus";
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
--
--			pdma: pdma at ffe01000 {
--				compatible = "arm,pl330", "arm,primecell";
--				reg = <0xffe01000 0x1000>;
--				interrupts = <0 180 4>;
--			};
--		};
--
--		apb_periphs {
--			compatible = "simple-bus";
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
--
--			gmac0: stmmac at ff700000 {
--				compatible = "st,spear600-gmac";
--				reg = <0xff700000 0x2000>;
--				interrupts = <0 115 4>;
--				interrupt-names = "macirq";
--				mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
--				phy-mode = "gmii";
--			};
--		};
--	};
- };
+I do remember seeing it, it's a big part of how I isolated that this
+patch series was the issue.  To be honest I hadn't got terribly far with
+the diagnosis of what the actual breakage is, it took a while to isolate
+as it had been a little while since I'd rebased through onto -next and
+there's no diagnostics at all from the system when it fails.
 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I tried applying the patch but the underlying code has changed a lot so
+patch gets upset, I'll try to find time to resolve them but can't
+guarantee when as things are especially hectic right now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/28ea8fb1/attachment.sig>
