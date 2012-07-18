@@ -1,31 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Jul 2012 10:40:43 +0200
-Subject: [PATCH 05/10] mmc: spi: Pull out the SSP clock configuration
- function
-In-Reply-To: <20120718080755.cf7d4ac2e423278ce12843e6@kinali.ch>
-References: <1342440597-8395-1-git-send-email-marex@denx.de>
- <201207172348.34919.marex@denx.de>
- <20120718080755.cf7d4ac2e423278ce12843e6@kinali.ch>
-Message-ID: <201207181040.43467.marex@denx.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 18 Jul 2012 03:17:34 -0600 (MDT)
+Subject: [PATCHv6 2/7] ARM: OMAP4460: Workaround for ROM bug because of
+ CA9 r2pX GIC control register change.
+In-Reply-To: <1339428387-4800-3-git-send-email-t-kristo@ti.com>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-3-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1207180314250.28834@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Attila Kinali,
+Hi
 
-> Good morning Marek,
-> 
-> On Tue, 17 Jul 2012 23:48:34 +0200
-> 
-> Marek Vasut <marex@denx.de> wrote:
-> > > There is a EXPORT_SYMBOL_GPL(mxs_ssp_set_clk_rate); missing here.
-> > 
-> > What for?
-> 
-> To be able to compile mxs-mmc as a module
+one trivial comment
 
-Argh, good point.
+On Mon, 11 Jun 2012, Tero Kristo wrote:
 
-> 			Attila Kinali
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index 46ab9d9..8d7de4f 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -88,6 +88,8 @@ extern void enable_omap3630_toggle_l2_on_restore(void);
+>  static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+>  #endif		/* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
+>  
+> +#define PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx	(1 << 0)
 
-Best regards,
-Marek Vasut
+"xxx" isn't unique, nor is it descriptive :-)  
+
+Looking@the mail threads on this one, it sounds like there may not be a 
+public erratum number associated with this.  If there is, the 'xxx' should 
+be replaced with the number.  If there isn't, then it would be good to 
+make up something short, like "GICD" to replace the "xxx".
+
+
+- Paul
