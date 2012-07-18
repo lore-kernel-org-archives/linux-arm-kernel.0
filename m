@@ -1,56 +1,329 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Jul 2012 12:12:26 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <50066739.4010206@linaro.org>
-References: <50066739.4010206@linaro.org>
-Message-ID: <20120718111226.GH22739@opensource.wolfsonmicro.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 18 Jul 2012 19:19:17 +0800
+Subject: [PATCH v2 1/2] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120718105204.GF30009@pengutronix.de>
+References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
+ <1342607348-8587-2-git-send-email-richard.zhao@freescale.com>
+ <20120718105204.GF30009@pengutronix.de>
+Message-ID: <20120718111916.GL21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 08:35:21AM +0100, Lee Jones wrote:
+On Wed, Jul 18, 2012 at 12:52:04PM +0200, Sascha Hauer wrote:
+> On Wed, Jul 18, 2012 at 06:29:06PM +0800, Richard Zhao wrote:
+> > i.MX usb controllers shares non-core registers, which may include
+> > SoC specific controls. We take it as a usbmisc device and usbmisc
+> > driver set operations needed by ci13xxx_imx driver.
+> > 
+> > For example, Sabrelite board has bad over-current design, we can
+> > usbmisc to disable over-current detect.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 +
+> >  .../devicetree/bindings/usb/usbmisc-imx.txt        |   12 ++
+> >  drivers/usb/chipidea/Makefile                      |    2 +-
+> >  drivers/usb/chipidea/ci13xxx_imx.c                 |   23 +++
+> >  drivers/usb/chipidea/usbmisc_imx6q.c               |  161 ++++++++++++++++++++
+> >  5 files changed, 199 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> >  create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > index 2c29041..06105ce 100644
+> > --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > @@ -8,6 +8,7 @@ Required properties:
+> >  Optional properties:
+> >  - fsl,usbphy: phandler of usb phy that connects to the only one port
+> >  - vbus-supply: regulator for vbus
+> > +- disable-over-current: disable over current detect
+> >  
+> >  Examples:
+> >  usb at 02184000 { /* USB OTG */
+> > @@ -15,4 +16,5 @@ usb at 02184000 { /* USB OTG */
+> >  	reg = <0x02184000 0x200>;
+> >  	interrupts = <0 43 0x04>;
+> >  	fsl,usbphy = <&usbphy1>;
+> > +	disable-over-current;
+> >  };
+> > diff --git a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> > new file mode 100644
+> > index 0000000..4fa500d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> > @@ -0,0 +1,12 @@
+> > +* Freescale i.MX non-core registers
+> > +
+> > +Required properties:
+> > +- compatible: Should be one of below:
+> > +	"fsl,imx6q-usbmisc" for imx6q
+> > +- reg: Should contain registers location and length
+> > +
+> > +Examples:
+> > +usbmisc at 02184800 {
+> > +	compatible = "fsl,imx6q-usbmisc";
+> > +	reg = <0x02184800 0x200>;
+> > +};
+> > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> > index 5c66d9c..57e510f 100644
+> > --- a/drivers/usb/chipidea/Makefile
+> > +++ b/drivers/usb/chipidea/Makefile
+> > @@ -15,5 +15,5 @@ ifneq ($(CONFIG_PCI),)
+> >  endif
+> >  
+> >  ifneq ($(CONFIG_OF_DEVICE),)
+> > -	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
+> > +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o usbmisc_imx6q.o
+> >  endif
+> > diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> > index ef60d06..e790c0e 100644
+> > --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> > +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/regulator/consumer.h>
+> >  
+> >  #include "ci.h"
+> > +#include "ci13xxx_imx.h"
+> >  
+> >  #define pdev_to_phy(pdev) \
+> >  	((struct usb_phy *)platform_get_drvdata(pdev))
+> > @@ -34,6 +35,25 @@ struct ci13xxx_imx_data {
+> >  	struct regulator *reg_vbus;
+> >  };
+> >  
+> > +static const struct usbmisc_ops *usbmisc_ops;
+> > +
+> > +int usbmisc_set_ops(const struct usbmisc_ops *ops)
+> > +{
+> > +	if (usbmisc_ops)
+> > +		return -EBUSY;
+> > +
+> > +	usbmisc_ops = ops;
+> > +
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(usbmisc_set_ops);
+> > +
+> > +void usbmisc_unset_ops(const struct usbmisc_ops *ops)
+> > +{
+> > +	usbmisc_ops = NULL;
+> > +}
+> > +EXPORT_SYMBOL_GPL(usbmisc_unset_ops);
+> > +
+> >  static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
+> >  	.name			= "ci13xxx_imx",
+> >  	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+> > @@ -120,6 +140,9 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+> >  		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> >  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
+> >  	}
+> > +
+> > +	usbmisc_ops->init(&pdev->dev);
+> 
+> usbmisc_ops can be NULL and also can return an error.
+Yes. And I find it can not work when usbmisc is module.
+> 
+> > +
+> >  	plat_ci = ci13xxx_add_device(&pdev->dev,
+> >  				pdev->resource, pdev->num_resources,
+> >  				&ci13xxx_imx_platdata);
+> > diff --git a/drivers/usb/chipidea/usbmisc_imx6q.c b/drivers/usb/chipidea/usbmisc_imx6q.c
+> > new file mode 100644
+> > index 0000000..9f69a8c
+> > --- /dev/null
+> > +++ b/drivers/usb/chipidea/usbmisc_imx6q.c
+> > @@ -0,0 +1,161 @@
+> > +/*
+> > + * Copyright 2012 Freescale Semiconductor, Inc.
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include "ci13xxx_imx.h"
+> > +
+> > +#define USB_DEV_MAX 4
+> > +
+> > +#define BM_OVER_CUR_DIS		BIT(7)
+> > +
+> > +struct imx6q_usbmisc {
+> > +	void __iomem *base;
+> > +	struct clk *clk;
+> > +	struct device *usb_dev[USB_DEV_MAX];
+> > +	spinlock_t lock;
+> > +
+> > +	int disable_oc:USB_DEV_MAX;
+> > +};
+> 
+> Please add a per-port struct instead of adding multiple arrays into
+> struct imx6q_usbmisc.
+ok
 
-Fix your mailer to word wrap within paragraphs.  I've reformatted your
-mail for legibility.
+> 
+> Also, I think this per port struct shouldn't be imx6q specific. Then
+> we could add generic code parsing the oftree flags into the port
+> specific struct and have SoC specific code which translates this struct
+> into the acual register settings.
+hmm... I thought only ops is generic. The code is SoC specific, I doubt
+do we really need to take the properties as generic?
+> 
+> > +
+> > +static struct imx6q_usbmisc *usbmisc;
+> > +
+> > +static int get_index(struct device *dev)
+> > +{
+> > +	int i, id = -1;
+> > +
+> > +	for (i = 0; i < USB_DEV_MAX; i ++) {
+> > +		if (usbmisc->usb_dev[i] == dev) {
+> > +			id = i;
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	if (id != -1)
+> > +		return id;
+> > +
+> > +	id = of_alias_get_id(dev->of_node, "usb");
+> > +	if (id < 0)
+> > +		dev_err(dev, "failed to get alias id, errno %d\n", id);
+> > +	return id;
+> > +}
+> > +
+> > +static int usbmisc_imx6q_init(struct device *usb_dev)
+> > +{
+> > +
+> > +	int id;
+> > +	u32 reg;
+> > +	struct device_node *usb_np;
+> > +	unsigned long flags;
+> > +
+> > +	id = get_index(usb_dev);
+> > +	if (id < 0)
+> > +		return id;
+> > +
+> > +	usb_np = usb_dev->of_node;
+> > +	if (of_find_property(usb_np, "disable-over-current", NULL)) {
+> > +		spin_lock_irqsave(&usbmisc->lock, flags);
+> > +		usbmisc->disable_oc |= BIT(id);
+> > +		reg = readl(usbmisc->base + id * 4);
+> > +		writel(reg | BM_OVER_CUR_DIS, usbmisc->base + id * 4);
+> > +		spin_unlock_irqrestore(&usbmisc->lock, flags);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct usbmisc_ops imx6q_usbmisc_ops = {
+> > +	.init = usbmisc_imx6q_init,
+> > +};
+> > +
+> > +static const struct of_device_id usbmisc_imx6q_dt_ids[] = {
+> > +	{ .compatible = "fsl,imx6q-usbmisc"},
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static int __devinit usbmisc_imx6q_probe(struct platform_device *pdev)
+> > +{
+> > +	struct resource	*res;
+> > +	struct imx6q_usbmisc *data;
+> > +	int ret;
+> > +
+> > +	if (usbmisc)
+> > +		return -EBUSY;
+> > +
+> > +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> > +	if (!data)
+> > +		return -ENOMEM;
+> > +
+> > +	spin_lock_init(&data->lock);
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	data->base = devm_request_and_ioremap(&pdev->dev, res);
+> > +	if (!data->base)
+> > +		return -EADDRNOTAVAIL;
+> > +
+> > +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> > +	if (IS_ERR(data->clk)) {
+> > +		dev_err(&pdev->dev,
+> > +			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+> > +		return PTR_ERR(data->clk);
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(data->clk);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev,
+> > +			"clk_prepare_enable failed, err=%d\n", ret);
+> > +		return ret;
+> > +	}
+> 
+> the clk devm ops do not disable the clock, you still have to do this in
+> your error path.
+Thanks.
 
-> I agree, but in this instance it really does stand to reason.
-
-> 1. No unified bindings currently exist.
-> 2. I don't have time to create them.
-> 3. It will probably take quite a bit of time for someone else to get
->    round to creating them.
-> 4. The bindings I'm proposing are siloed by vendor and driver, so will
->    cause no harm.
-
-Right, this is just a restatement of the standard vendor line.
-
-If the issue is purely about having generic bindings quite frankly it's
-very hard to see how it could take much time or effort to handle the
-generic bits for I2C, it's basically just the maximum bus frequency and
-possibly also the various fast modes (though to a good approximation it
-seems reasonable to just infer them from the bus frequency and then see
-if we need any more).  One thing I frequently find is that people say
-any sort of generic work is hard without explaining why, if there are
-complex issues that's one thing but that's often not the case.
-
-BTW, looking at the platform data again it seems like i2c_freq_mode it
-seems very odd that it's driver specific?
-
-> 5. I've already volunteered to move them over to the unified ones once
->    created.
-> 6. These allow support for the driver to work with DT, at the moment
->    it does not.
-
-> Personally, I think there is more to be gained by applying the
-> (working) vendor specific bindings to the vendor specific driver until
-> some more consolidated ones appear.
-
-Again, vendors always make great promises about how they're going to
-keep everything up to date...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/bfba9471/attachment.sig>
+Richard
+> 
+> > +
+> > +	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	usbmisc = data;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __devexit usbmisc_imx6q_remove(struct platform_device *pdev)
+> > +{
+> > +	usbmisc_unset_ops(&imx6q_usbmisc_ops);
+> > +	clk_disable_unprepare(usbmisc->clk);
+> > +	return 0;
+> > +}
+> > +
+> > +static struct platform_driver usbmisc_imx6q_driver = {
+> > +	.probe = usbmisc_imx6q_probe,
+> > +	.remove = __devexit_p(usbmisc_imx6q_remove),
+> > +	.driver = {
+> > +		.name = "usbmisc_imx6q",
+> > +		.owner = THIS_MODULE,
+> > +		.of_match_table = usbmisc_imx6q_dt_ids,
+> > +	 },
+> > +};
+> > +
+> > +static int __init usbmisc_imx6q_drv_init(void)
+> > +{
+> > +	return platform_driver_register(&usbmisc_imx6q_driver);
+> > +}
+> > +subsys_initcall(usbmisc_imx6q_drv_init);
+> > +
+> > +static void __exit usbmisc_imx6q_drv_exit(void)
+> > +{
+> > +	platform_driver_unregister(&usbmisc_imx6q_driver);
+> > +}
+> > +module_exit(usbmisc_imx6q_drv_exit);
+> > +MODULE_ALIAS("platform:usbmisc-imx6q"); MODULE_LICENSE("GPL v2");
+> > +MODULE_DESCRIPTION("i.MX6Q non-core usb register handling");
+> > +MODULE_AUTHOR("Richard Zhao <richard.zhao@freescale.com>");
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
+> > 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
