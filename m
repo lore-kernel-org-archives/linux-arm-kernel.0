@@ -1,31 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Jul 2012 00:20:53 -0700
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: set GPIO mode for mux
- mcspi1_cs2 pin
-In-Reply-To: <CABxcv=miEavW5Qf-Y+S4Nph+ah5gQ6QDpt-T44tdHLBxcP8pqQ@mail.gmail.com>
-References: <1341885452-5372-1-git-send-email-javier@dowhile0.org>
- <CAFqH_511c6CyAYnbtU0ECZwzRNwJEdTqtcZ63nODCYZU4GC0aA@mail.gmail.com>
- <CABxcv=miEavW5Qf-Y+S4Nph+ah5gQ6QDpt-T44tdHLBxcP8pqQ@mail.gmail.com>
-Message-ID: <20120718072052.GK6522@atomide.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 18 Jul 2012 12:53:18 +0530
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <5006571A.7060103@de.bosch.com>
+References: <5006571A.7060103@de.bosch.com>
+Message-ID: <CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [120717 00:16]:
-> 
-> Hi Tony,
-> 
-> Just pinging to see if you have further comments on this patch or if
-> it can be applied. It solves a bug on IGEPv2 boards.
-> 
-> I know the trend is to move away from board code. I'll start working
-> on an device tree for the IGEPv2 but it will take some time until is
-> ready (and I'm not sure if all the OMAP3 support is already present on
-> DT).
-> 
-> So could you please take bug fixes for the board code in the meantime?
-
-Yes seems like something for the v3.6-rc series.
-
-Regards,
-
-Tony
+On 18 July 2012 11:56, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>
+> Similar to [1] we have a device which has two mmc block devices connected:
+> One external removable and a second internal hard wired one. Depending on
+> the availability of the external removable mmc card at boot time, the
+> internal hard wired device becomes mmcblk1 (external mmc card available ==
+> mmcblk0) or mmcblk0 if the external one is not there. This order is given by
+> the hardware.
+>
+> With older, non-DT kernels, we used the hack from [2] to control the
+> initialization order and force the internal hard wired device to mmcblk0.
+>
+> Now, we are switching to a newer, DT based kernel. With a DT based kernel
+> this hack doesn't seem to work an more.
+>
+> Any idea how we could influence the initialization order of the mmc block
+> devices using a DT based kernel? Ensuring that the internal, hard wired mmc
+> card is always mapped to mmcblk0?
+>
+Doesn't it work by simply by moving the "internal" element before
+"external" in the array 'struct twl4030_hsmmc_info mmc[]' ?
