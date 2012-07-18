@@ -1,57 +1,38 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Jul 2012 12:15:02 +0300
-Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per
- hwmod/module context lost count
-In-Reply-To: <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
-References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
- <1339428387-4800-5-git-send-email-t-kristo@ti.com>
- <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
-Message-ID: <1342602902.4672.91.camel@sokoban>
+Date: Wed, 18 Jul 2012 12:16:08 +0300
+Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for
+ preventing autodep delete
+In-Reply-To: <50067C0D.2040508@ti.com>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-8-git-send-email-t-kristo@ti.com>
+ <5003F453.9020903@ti.com> <1342536971.4672.82.camel@sokoban>
+ <50066284.1030903@ti.com> <1342598720.4672.83.camel@sokoban>
+ <50067C0D.2040508@ti.com>
+Message-ID: <1342602968.4672.92.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-07-17 at 02:59 -0500, Menon, Nishanth wrote:
-> Couple of minor comments:
-> On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> [...]
-> >  /**
-> > + * _omap4_update_context_lost - increment hwmod context loss counter if
-> > + * hwmod context was lost, and clear hardware context loss reg
-> > + * @oh: hwmod to check for context loss
-> > + *
-> > + * If the PRCM indicates that the hwmod @oh lost context, increment
-> > + * our in-memory context loss counter, and clear the RM_*_CONTEXT
-> > + * bits. No return value.
-> > + */
-> > +static void _omap4_update_context_lost(struct omap_hwmod *oh)
-> > +{
-> > +       u32 r;
-> > +
-> > +       if (oh->prcm.omap4.context_offs == USHRT_MAX)
-> > +               return;
-> would'nt it be better to return a dummy incremental counter instead of
-> returning no context loss (count = 0)?
-
-I guess you are right, this way we may have some extra context restores
-for modules which don't have context offs defined, rather than not
-restoring them at all. Only thing I can think might prevent this is if
-there are modules that never lose context but don't have context
-register? How about omap5+?
-
+On Wed, 2012-07-18 at 14:34 +0530, Rajendra Nayak wrote:
+> On Wednesday 18 July 2012 01:35 PM, Tero Kristo wrote:
+> > On Wed, 2012-07-18 at 12:45 +0530, Rajendra Nayak wrote:
+> >> On Tuesday 17 July 2012 08:26 PM, Tero Kristo wrote:
+> >>> Anyway, it also looks like this fix is no longer needed with the latest
+> >>> kernel, something has changed with the gpio code / or latencies and it
+> >>> doesn't crash anymore. Thus, it looks like patches 7&   8 can be dropped
+> >>> from this set for now. This is the behavior with beagleboard at least,
+> >>> if someone can verify this with some other omap3 hw that would be nice.
+> >>
+> >> I can test it on a omap3 SDP. What do you want me to test?
+> >
+> > Just try suspend + cpuidle with and without off-mode enabled and see if
+> > there are any problems. I've usually seen problems with off-mode myself.
 > 
-> > +
-> > +       r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
-> > +                                       oh->clkdm->pwrdm.ptr->prcm_offs,
-> > +                                       oh->prcm.omap4.context_offs);
-> > +
-> > +       if (!r)
-> > +               return;
-> > +
-> > +       oh->prcm.omap4.context_lost_counter++;
-> need to be careful about counter overflow.
+> So I just knocked off the last 2 patches from 'mainline-3.5-rc6-pwrdm-
+> changes-v4' and tested on my 3430 SDP.
+> 
+> I was able to hit RET and OFF in both suspend and cpuidle. Did not see
+> any issues.
 
-Well, this code can't do much for that even if it overflows... the type
-for the context_lost_counter is unsigned though, maybe it should be
-expanded if you are worried...?
+Okay thanks, so it looks pretty safe then.
 
 -Tero
