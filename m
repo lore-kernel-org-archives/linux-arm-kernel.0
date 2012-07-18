@@ -1,74 +1,30 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 17 Jul 2012 16:27:51 -0700
-Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
-Message-ID: <1342567672-29071-1-git-send-email-ccross@android.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 17 Jul 2012 18:50:54 -0600
+Subject: [RFC PATCHv3 0/2] arm: socfpga: Add initial support for Altera's
+ SOCFPGA HW
+Message-ID: <1342572656-5205-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many clocks that are used to provide sched_clock will reset during
-suspend.  If read_sched_clock returns 0 after suspend, sched_clock will
-appear to jump forward.  This patch resets cd.epoch_cyc to the current
-value of read_sched_clock during resume, which causes sched_clock() just
-after suspend to return the same value as sched_clock() just before
-suspend.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-In addition, during the window where epoch_ns has been updated before
-suspend, but epoch_cyc has not been updated after suspend, it is unknown
-whether the clock has reset or not, and sched_clock() could return a
-bogus value.  Add a suspended flag, and return the pre-suspend epoch_ns
-value during this period.
+This patch series add minimal support for Altera's SOCFPGA hardward.
 
-This will have a side effect of causing SoCs that have clocks that
-continue to count in suspend to appear to stop counting, reporting the
-same sched_clock() value before and after suspend.
+Changes since v2:
+- Make use of COMMON_CLK - socfpga folder under drivers/clk
+- Add maintainer entry for drivers/clk/socfpga
+- Incorporated changes suggestd by Thomas Petazzoni, Arnd Bergmann,
+and Rob Herring
+- Added Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/kernel/sched_clock.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+Changes since v1:
+- Incorporate changes suggested by Pavel Machek, Thommas Petazzoni,
+  Arnd Bergmann, and Rob Herring
+- Reduce the patch to a make as much use of DTS as possible
 
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 27d186a..46c7d32 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -21,6 +21,7 @@ struct clock_data {
- 	u32 epoch_cyc_copy;
- 	u32 mult;
- 	u32 shift;
-+	bool suspended;
- };
- 
- static void sched_clock_poll(unsigned long wrap_ticks);
-@@ -49,6 +50,9 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
- 	u64 epoch_ns;
- 	u32 epoch_cyc;
- 
-+	if (cd.suspended)
-+		return cd.epoch_ns;
-+
- 	/*
- 	 * Load the epoch_cyc and epoch_ns atomically.  We do this by
- 	 * ensuring that we always write epoch_cyc, epoch_ns and
-@@ -169,11 +173,20 @@ void __init sched_clock_postinit(void)
- static int sched_clock_suspend(void)
- {
- 	sched_clock_poll(sched_clock_timer.data);
-+	cd.suspended = true;
- 	return 0;
- }
- 
-+static void sched_clock_resume(void)
-+{
-+	cd.epoch_cyc = read_sched_clock();
-+	cd.epoch_cyc_copy = cd.epoch_cyc;
-+	cd.suspended = false;
-+}
-+
- static struct syscore_ops sched_clock_ops = {
- 	.suspend = sched_clock_suspend,
-+	.resume = sched_clock_resume,
- };
- 
- static int __init sched_clock_syscore_init(void)
+Dinh Nguyen (2):
+  ARM: socfpga: initial support for Altera's SOCFPGA platform
+  ARM: socfpga: Add DTS bindings for Altera's SOCFPGA
+
 -- 
-1.7.7.3
+1.7.9.5
