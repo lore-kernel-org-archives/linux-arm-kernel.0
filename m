@@ -1,50 +1,55 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 18 Jul 2012 21:49:34 +0800
-Subject: [PATCH v2 1/2] USB: chipidea: add imx usbmisc support
-In-Reply-To: <5006BD64.8020403@pengutronix.de>
-References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
- <1342607348-8587-2-git-send-email-richard.zhao@freescale.com>
- <20120718105204.GF30009@pengutronix.de>
- <20120718111916.GL21635@b20223-02.ap.freescale.net>
- <20120718133938.GA2198@richard-laptop>
- <5006BD64.8020403@pengutronix.de>
-Message-ID: <20120718134932.GB2198@richard-laptop>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Jul 2012 16:00:22 +0200
+Subject: i.MX27: gpio device tree problems.
+In-Reply-To: <CACKLOr3TQXHekBM76LBL0AczUQrYTDxm6z5YWSdrbu5ug6EpTg@mail.gmail.com>
+References: <CACKLOr3TQXHekBM76LBL0AczUQrYTDxm6z5YWSdrbu5ug6EpTg@mail.gmail.com>
+Message-ID: <20120718140022.GI30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 03:43:00PM +0200, Marc Kleine-Budde wrote:
-> On 07/18/2012 03:39 PM, Richard Zhao wrote:
-> > [snip]
-> >>>>  static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
-> >>>>  	.name			= "ci13xxx_imx",
-> >>>>  	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
-> >>>> @@ -120,6 +140,9 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
-> >>>>  		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-> >>>>  		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
-> >>>>  	}
-> >>>> +
-> >>>> +	usbmisc_ops->init(&pdev->dev);
-> >>>
-> >>> usbmisc_ops can be NULL and also can return an error.
-> >> Yes. And I find it can not work when usbmisc is module.
-> > It's hard to resolve module dependency. How about build all imx related
-> > things into a single module? ci13xxx_imx module init will call
-> > usbmisc_imx6q_drv_init, usbmisc_imx53_drv_init etc.
+On Wed, Jul 18, 2012 at 03:03:41PM +0200, javier Martin wrote:
+> Hi,
+> we are trying to port our Visstrim SM10 [1] to device tree and we've
+> found some problems related to gpios in the process:
 > 
-> Why not call a single imx_usbmisc_init. The usbmisc can call the correct
-> function inside. The right init function can be selected via the
-> compatible in the device tree.
-Different SoC has different usbmisc driver and I have to register the
-driver. A single imx_usbmisc_init shows nothing different. It doesn't
-know what driver to register. Hope I got what you meant.
+> 1.- IRQs don't work properly since the value of 'pdev->id' when using
+> device tree is -1, so 'irq_set_chained_handler()' never gets called
+> [2]
 
-Thanks
-Richard
+This should work since:
+
+33a4e98 gpio/mxc: make irqs work for fsl,imx21-gpio devices
+
+> 2.- When using device tree GPIO numbers are allocated dynamically
+> using gpiolib [3]. This leads to different GPIO numbers being used
+> compared to the version without device tree. Since GPIOs are exposed
+> to the user space by gpilib using sysfs this breaks compatibility with
+> current user applications.
 > 
-> Marc
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> Here is an example:
 > 
+> Version without device tree:
+> gpiochip_add: registered GPIOs 0 to 31 on device: imx21-gpio.0
+> gpiochip_add: registered GPIOs 32 to 63 on device: imx21-gpio.1
+> gpiochip_add: registered GPIOs 64 to 95 on device: imx21-gpio.2
+> gpiochip_add: registered GPIOs 96 to 127 on device: imx21-gpio.3
+> gpiochip_add: registered GPIOs 128 to 159 on device: imx21-gpio.4
+> gpiochip_add: registered GPIOs 160 to 191 on device: imx21-gpio.5
+> 
+> Version with device tree:
+> gpiochip_add: registered GPIOs 224 to 255 on device: 10015000.gpio
+> gpiochip_add: registered GPIOs 192 to 223 on device: 10015100.gpio
+> gpiochip_add: registered GPIOs 160 to 191 on device: 10015200.gpio
+> gpiochip_add: registered GPIOs 128 to 159 on device: 10015300.gpio
+> gpiochip_add: registered GPIOs 96 to 127 on device: 10015400.gpio
+> gpiochip_add: registered GPIOs 64 to 95 on device: 10015500.gpio
+
+Known problem, I have no idea how to solve this.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
