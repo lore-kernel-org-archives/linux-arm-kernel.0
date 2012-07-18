@@ -1,230 +1,244 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Jul 2012 23:15:28 +0530
-Subject: [PATCH v5 6/7] ARM: mtd: nand: davinci: add OF support for davinci
- nand controller
-In-Reply-To: <1338373143-7467-7-git-send-email-hs@denx.de>
-References: <1338373143-7467-1-git-send-email-hs@denx.de>
- <1338373143-7467-7-git-send-email-hs@denx.de>
-Message-ID: <5006F638.2000301@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Jul 2012 18:52:33 +0100
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
+ implementation to be selected
+In-Reply-To: <5005176C.6050904@renesas.com>
+References: <20120712084432.GA2816@mudshark.cambridge.arm.com>
+ <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
+ <4FFF8509.2050302@renesas.com>
+ <20120713085746.GA18079@mudshark.cambridge.arm.com>
+ <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
+ <20120713111337.GH18079@mudshark.cambridge.arm.com>
+ <5004D78E.4050606@renesas.com>
+ <CAMQu2gx9EU4GZ634RKiwD+sg0MoO-FAqc-pPU+HkryX8rXVBjA@mail.gmail.com>
+ <5005176C.6050904@renesas.com>
+Message-ID: <20120718175233.GB16928@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hello,
 
-On 5/30/2012 3:49 PM, Heiko Schocher wrote:
-> add OF support for the davinci nand controller.
+On Tue, Jul 17, 2012 at 08:42:36AM +0100, Shinya Kuribayashi wrote:
+> On 7/17/2012 3:11 PM, Shilimkar, Santosh wrote:
+> > Looks like you have a working patch for the clock detection. Will
+> > you able to post that patch so that this long pending calibration
+> > for secondary CPUs gets optimized.
 > 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-mtd at lists.infradead.org
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Scott Wood <scottwood@freescale.com>
+> Something like this should work (not even build tested, can be applied
+> on top of Will's v2 patchset):
+
+[...]
+
+> And change your ->timer() func (called via time_init) to make use of it:
 > 
-> ---
-> - changes for v2:
->   - add comments from Scott Wood:
->     - add "ti,davinci-" prefix
->     - Dashes are preferred to underscores
->     - rename "nandflash" to "nand"
->     - introduce new "ti,davinci" specific properties for setting
->       up ecc_mode, ecc_bits, options and bbt options, instead
->       using linux defines
->     - readme fixes
-> - no changes for v3
-> - changes for v4
->   remove "pinmux-handle" property as discussed here:
->   http://www.spinics.net/lists/arm-kernel/msg175701.html
->   with Nori Sekhar
-> - no changes for v5
+>         unsigned long freq;
 > 
->  .../devicetree/bindings/arm/davinci/nand.txt       |   72 ++++++++++++++++++
->  drivers/mtd/nand/davinci_nand.c                    |   80 +++++++++++++++++++-
->  2 files changed, 151 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
+>         /* For UP/SMP systems */
+>         freq = get_CPU_frequency();
+>         calibrate_delay_early(freq);
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/nand.txt b/Documentation/devicetree/bindings/arm/davinci/nand.txt
-> new file mode 100644
-> index 0000000..5afe4a6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/nand.txt
-> @@ -0,0 +1,72 @@
-> +* Texas Instruments Davinci NAND
-> +
-> +This file provides information, what the device node for the
-> +davinci nand interface contain.
-> +
-> +Required properties:
-> +- compatible: "ti,davinci-nand";
-> +- reg : contain 2 offset/length values:
-> +        - offset and length for the access window
-> +        - offset and length for accessing the aemif control registers
-> +- ti,davinci-chipselect: Indicates on the davinci_nand driver which
-> +                         chipselect is used for accessing the nand.
-> +
-> +Recommended properties :
-> +- ti,davinci-mask-ale: mask for ale
-> +- ti,davinci-mask-cle: mask for cle
-> +- ti,davinci-mask-chipsel: mask for chipselect
-> +- ti,davinci-ecc-mode: ECC mode valid values for davinci driver:
-> +		- "none"
-> +		- "soft"
-> +		- "hw"
-> +- ti,davinci-ecc-bits: used ECC bits, currently supported 1 or 4.
-> +- ti,davinci-nand-buswidth: buswidth 8 or 16
-> +- ti,davinci-nand-use-bbt: use flash based bad block table support.
-> +
-> +Optional properties:
-> +- timing-handle: contains a handle to setup aemif timing.
-> +
-> +Example (enbw_cmc board):
-> +aemif at 60000000 {
-> +	compatible = "ti,davinci-aemif";
-> +	#address-cells = <2>;
-> +	#size-cells = <1>;
-> +	reg = <0x68000000 0x80000>;
-> +	ranges = <2 0 0x60000000 0x02000000
-> +		  3 0 0x62000000 0x02000000
-> +		  4 0 0x64000000 0x02000000
-> +		  5 0 0x66000000 0x02000000
-> +		  6 0 0x68000000 0x02000000>;
-> +	nand_cs: cs3 at 68000000 {
-> +		compatible = "ti,davinci-cs";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		/* all timings in nanoseconds */
-> +		cs = <3>;
-> +		asize = <0>;
-> +		ta = <0>;
-> +		rhold = <7>;
-> +		rstrobe = <42>;
-> +		rsetup = <7>;
-> +		whold = <7>;
-> +		wstrobe = <14>;
-> +		wsetup = <7>;
-> +		ew = <0>;
-> +		ss = <0>;
-> +	};
-> +	nand at 3,0 {
-> +		compatible = "ti,davinci-nand";
-> +		reg = <3 0x0 0x807ff
-> +			6 0x0 0x8000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ti,davinci-chipselect = <1>;
-> +		ti,davinci-mask-ale = <0>;
-> +		ti,davinci-mask-cle = <0>;
-> +		ti,davinci-mask-chipsel = <0>;
-> +		ti,davinci-ecc-mode = "hw";
-> +		ti,davinci-ecc-bits = <4>;
-> +		ti,davinci-nand-use-bbt;
-> +		timing-handle = <&nand_cs>;
-> +	};
-> +};
-> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-> index d94b03c..67bdd29 100644
-> --- a/drivers/mtd/nand/davinci_nand.c
-> +++ b/drivers/mtd/nand/davinci_nand.c
-> @@ -33,9 +33,12 @@
->  #include <linux/mtd/nand.h>
->  #include <linux/mtd/partitions.h>
->  #include <linux/slab.h>
-> +#include <linux/of_i2c.h>
+> #ifdef CONFIG_SMP
+>         /* For SMP systems */
+>         freq = get_Timer_frequency();
+>         init_current_timer_delay(freq);
+> #endif
 
-This include is not required.
+Since this seems to be gaining some traction on platforms without the
+architected timers, Jonny and I have put together a simple registration
+mechanism for the delay timer to avoid people calling init_current_timer_delay
+(and defining the global read_current_timer symbol).
 
-> +#include <linux/of_device.h>
->  
->  #include <mach/nand.h>
->  #include <mach/aemif.h>
-> +#include <mach/mux.h>
+The patch is sitting in my delay branch, but I've also included it below.
+Please give it a go and let us know what you think.
 
-This too.
+Cheers,
 
->  
->  /*
->   * This is a device driver for the NAND flash controller found on the
-> @@ -518,9 +521,81 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
->  	},
->  };
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id davinci_nand_of_match[] = {
-> +	{.compatible = "ti,davinci-nand", },
-> +	{},
-> +}
-> +MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
-> +
-> +static struct davinci_nand_pdata
-> +	*nand_davinci_get_pdata(struct platform_device *pdev)
-> +{
-> +	if ((pdev->dev.platform_data == NULL) &&
-> +		(pdev->dev.of_node)) {
+Will
 
-You can simplify this and also avoid breaking the statement.
+---8<---
 
-	if (!pdev->dev.platform_data && pdev->dev.of_node) {
+>From 8ea28b6f7acad17b9952f8eb533f2887504b462d Mon Sep 17 00:00:00 2001
+From: Jonathan Austin <Jonathan.Austin@arm.com>
+Date: Wed, 18 Jul 2012 15:24:53 +0100
+Subject: [PATCH] ARM: delay: add registration mechanism for delay timer sources
 
+The current timer-based delay loop relies on the architected timer to
+initiate the switch away from the polling-based implementation. This is
+unfortunate for platforms without the architected timers but with a
+suitable delay source (that is, constant frequency, always powered-up
+and ticking as long as the CPUs are online).
 
-> +		struct device_node *tmp_np;
-> +		struct davinci_nand_pdata *pdata;
-> +		const char *mode;
-> +		u32 prop;
-> +		int len;
-> +
-> +		pdata =  kzalloc(sizeof(struct davinci_nand_pdata),
-> +				GFP_KERNEL);
+This patch introduces a registration mechanism for the delay timer
+(which provides an unconditional read_current_timer implementation) and
+updates the architected timer code to use the new interface.
 
-I don't see this getting freed anywhere. You wanted to use devm_kzalloc()?
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h |    1 -
+ arch/arm/include/asm/delay.h      |    9 +++++++++
+ arch/arm/include/asm/timex.h      |    6 ------
+ arch/arm/kernel/arch_timer.c      |   12 +++++++-----
+ arch/arm/lib/delay.c              |   30 +++++++++++++++++++++---------
+ 5 files changed, 37 insertions(+), 21 deletions(-)
 
-> +		pdev->dev.platform_data = pdata;
-> +		if (!pdata)
-> +			return NULL;
-> +		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"ti,davinci-chipselect", &prop))
-> +			pdev->id = prop;
-> +		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"ti,davinci-mask-ale", &prop))
-> +			pdata->mask_ale = prop;
-> +		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"ti,davinci-mask-cle", &prop))
-> +			pdata->mask_cle = prop;
-> +		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"ti,davinci-mask-chipsel", &prop))
-> +			pdata->mask_chipsel = prop;
-> +		if (!of_property_read_string(pdev->dev.of_node,
-> +			"ti,davinci-ecc-mode", &mode)) {
-> +			if (!strncmp("none", mode, 4))
-> +				pdata->ecc_mode = NAND_ECC_NONE;
-> +			if (!strncmp("soft", mode, 4))
-> +				pdata->ecc_mode = NAND_ECC_SOFT;
-> +			if (!strncmp("hw", mode, 2))
-> +				pdata->ecc_mode = NAND_ECC_HW;
-> +		}
-> +		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"ti,davinci-ecc-bits", &prop))
-> +			pdata->ecc_bits = prop;
-> +		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"ti,davinci-nand-buswidth", &prop))
-> +			if (prop == 16)
-> +				pdata->options |= NAND_BUSWIDTH_16;
-> +		if (of_find_property(pdev->dev.of_node,
-> +			"ti,davinci-nand-use-bbt", &len))
-> +			pdata->bbt_options = NAND_BBT_USE_FLASH;
-> +
-
-> +		tmp_np = of_parse_phandle(pdev->dev.of_node,
-> +				"timing-handle", 0);
-> +		if (tmp_np)
-> +			davinci_aemif_setup_timing_of(tmp_np);
-
-Since the aemif driver conversion to DT needs to be looked at along with
-its movement to drivers/ folder, is it possible to drop the AEMIF timing
-specific bindings from the patch and only keep the NAND specific ones?
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 62e7547..88401c2 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -4,7 +4,6 @@
+ #include <asm/errno.h>
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER
+-#define ARCH_HAS_READ_CURRENT_TIMER
+ int arch_timer_of_register(void);
+ int arch_timer_sched_clock_init(void);
+ #else
+diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+index dc61451..17deac7 100644
+--- a/arch/arm/include/asm/delay.h
++++ b/arch/arm/include/asm/delay.h
+@@ -15,6 +15,11 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++struct delay_timer {
++	int (*read_current_timer)(unsigned long *timer_val);
++	unsigned long freq;
++};
++
+ extern struct arm_delay_ops {
+ 	void (*delay)(unsigned long);
+ 	void (*const_udelay)(unsigned long);
+@@ -56,6 +61,10 @@ extern void __loop_delay(unsigned long loops);
+ extern void __loop_udelay(unsigned long usecs);
+ extern void __loop_const_udelay(unsigned long);
+ 
++/* Delay-loop timer registration. */
++#define ARCH_HAS_READ_CURRENT_TIMER
++extern void register_current_timer_delay(struct delay_timer *timer);
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* defined(_ARM_DELAY_H) */
+diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
+index ce11944..9acc135 100644
+--- a/arch/arm/include/asm/timex.h
++++ b/arch/arm/include/asm/timex.h
+@@ -12,15 +12,9 @@
+ #ifndef _ASMARM_TIMEX_H
+ #define _ASMARM_TIMEX_H
+ 
+-#include <asm/arch_timer.h>
+ #include <mach/timex.h>
+ 
+ typedef unsigned long cycles_t;
+-
+-#ifdef ARCH_HAS_READ_CURRENT_TIMER
+ #define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
+-#else
+-#define get_cycles()	(0)
+-#endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index 675cee0..b624523 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -21,6 +21,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/delay.h>
+ #include <asm/localtimer.h>
+ #include <asm/arch_timer.h>
+ #include <asm/system_info.h>
+@@ -31,8 +32,7 @@ static int arch_timer_ppi;
+ static int arch_timer_ppi2;
+ 
+ static struct clock_event_device __percpu **arch_timer_evt;
+-
+-extern void init_current_timer_delay(unsigned long freq);
++static struct delay_timer arch_delay_timer;
+ 
+ /*
+  * Architected system timer support.
+@@ -225,7 +225,7 @@ static cycle_t arch_counter_read(struct clocksource *cs)
+ 	return arch_counter_get_cntpct();
+ }
+ 
+-int read_current_timer(unsigned long *timer_val)
++static int arch_timer_read_current_timer(unsigned long *timer_val)
+ {
+ 	if (!arch_timer_rate)
+ 		return -ENXIO;
+@@ -302,11 +302,13 @@ static int __init arch_timer_register(void)
+ 		arch_timer_global_evt.cpumask = cpumask_of(0);
+ 		err = arch_timer_setup(&arch_timer_global_evt);
+ 	}
+-
+ 	if (err)
+ 		goto out_free_irq;
+ 
+-	init_current_timer_delay(arch_timer_rate);
++	/* Use the architected timer for the delay loop. */
++	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
++	arch_delay_timer.freq = arch_timer_rate;
++	register_current_timer_delay(&arch_delay_timer);
+ 	return 0;
+ 
+ out_free_irq:
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 395d5fb..1b51570 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -34,7 +34,14 @@ struct arm_delay_ops arm_delay_ops = {
+ 	.udelay		= __loop_udelay,
+ };
+ 
+-#ifdef ARCH_HAS_READ_CURRENT_TIMER
++static struct delay_timer *delay_timer;
++static bool delay_calibrated;
++
++int read_current_timer(unsigned long *timer_val)
++{
++	return delay_timer ? delay_timer->read_current_timer(timer_val) : -ENXIO;
++}
++
+ static void __timer_delay(unsigned long cycles)
+ {
+ 	cycles_t start = get_cycles();
+@@ -55,18 +62,23 @@ static void __timer_udelay(unsigned long usecs)
+ 	__timer_const_udelay(usecs * UDELAY_MULT);
+ }
+ 
+-void __init init_current_timer_delay(unsigned long freq)
++void __init register_current_timer_delay(struct delay_timer *timer)
+ {
+-	pr_info("Switching to timer-based delay loop\n");
+-	lpj_fine			= freq / HZ;
+-	loops_per_jiffy			= lpj_fine;
+-	arm_delay_ops.delay		= __timer_delay;
+-	arm_delay_ops.const_udelay	= __timer_const_udelay;
+-	arm_delay_ops.udelay		= __timer_udelay;
++	if (!delay_calibrated) {
++		pr_info("Switching to timer-based delay loop\n");
++		delay_timer			= timer;
++		lpj_fine			= timer->freq / HZ;
++		loops_per_jiffy			= lpj_fine;
++		arm_delay_ops.delay		= __timer_delay;
++		arm_delay_ops.const_udelay	= __timer_const_udelay;
++		arm_delay_ops.udelay		= __timer_udelay;
++	} else {
++		pr_info("Ignoring late registration of read_current_timer delay\n");
++	}
+ }
+ 
+ unsigned long __cpuinit calibrate_delay_is_known(void)
+ {
++	delay_calibrated = true;
+ 	return lpj_fine;
+ }
+-#endif
+-- 
+1.7.4.1
