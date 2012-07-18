@@ -1,29 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Jul 2012 19:28:15 +0000
-Subject: [PATCH v4] arm: socfpga: Add initial support for Altera's SOCFPGA
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 18 Jul 2012 16:07:17 -0600
+Subject: [RFC PATCHv5] arm: socfpga: Add initial support for Altera's SOCFPGA
  HW
-In-Reply-To: <1342637611.13680.2.camel@dinh-ubuntu>
-References: <20120718102507.GA11993@elf.ucw.cz>
- <201207181242.44326.arnd@arndb.de> <1342637611.13680.2.camel@dinh-ubuntu>
-Message-ID: <201207181928.15404.arnd@arndb.de>
+Message-ID: <1342649238-1044-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 July 2012, Dinh.Nguyen wrote:
-> > For instance, this could be
-> > 
-> >       compatible = "altr,socfpga-stmmac", "st,stmmac-v12.3.45", "st,stmmac";
-> > 
-> > Looking at the driver, it seems that this should actually not be called
-> > stmmac in the devicetree but rather dwmac, so better make it
-> > 
-> >       compatible = "altr,socfpga-stmmac", "snps,dwmac-4.567", "snps,dwmac";
-> > 
-> 
-> Is there already work to update the bindings to reflect this change in
-> stmmac driver? Or could I help with setting up some patches for it?
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Please send a patch to update the bindings and the driver
-to the netdev mailing list.
+This patch adds minimal support for Altera's SOCFPGA hardware.
 
-	Arnd
+Changes since v4:
+- Removed common.h
+
+Changes since v3:
+- Condensed to 1 patch per Pavel Machek
+- Added only root clocks(fixed-rate) definitions in drivers/clk/socfpga
+- Update dtsi file per Thomas Petazzoni's recommendation
+- Add extern sys_timer dw_apb_timer declaration in include/linux/dw_apb_timer.h
+
+Changes since v2:
+- Make use of COMMON_CLK - socfpga folder under drivers/clk
+- Add maintainer entry for drivrs/clk/socfpga
+- Incorporated changes suggestd by Thomas Petazzoni, Arnd Bergmann,
+and Rob Herring
+- Added Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+
+Changes since v1:
+- Incorporate changes suggested by Pavel Machek, Thommas Petazzoni,
+  Arnd Bergmann, and Rob Herring
+- Reduce the patch to a make as much use of DTS as possible
+
+Dinh Nguyen (1):
+  ARM: socfpga: initial support for Altera's SOCFPGA platform
+
+-- 
+1.7.9.5
