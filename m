@@ -1,40 +1,57 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 18 Jul 2012 10:27:03 -0600
-Subject: Boot breaks in -next from LEGACY to LINEAR conversion
-In-Reply-To: <20120718161023.GE4495@opensource.wolfsonmicro.com>
-References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
- <20120718161023.GE4495@opensource.wolfsonmicro.com>
-Message-ID: <CACxGe6tSWGOFs=FgUc8UADmnMM-kGCdwXj9hM2cAep_LKp4M-Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 18 Jul 2012 22:01:20 +0530
+Subject: IRQ and FIQ disabling during sleep states.
+In-Reply-To: <CAMXH7KG_Q50AEkwm1B7YuhN2iy287BbMg8PB1EvBgNmBFCEvOw@mail.gmail.com>
+References: <20120711123020.GW2416@tbergstrom-lnx.Nvidia.com>
+ <4FFEF5DA.8000505@linaro.org>
+ <CAMXH7KG_Q50AEkwm1B7YuhN2iy287BbMg8PB1EvBgNmBFCEvOw@mail.gmail.com>
+Message-ID: <CAMQu2gyPkYz-=dyrRJGW_5QV+6rPj7bFZyqS2Mwt4tUEU-M+0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 10:10 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jul 17, 2012 at 07:57:49PM +0100, Mark Brown wrote:
->> -next fails to boot for me today on my s3c64xx based systems.  Walking
->> back to the last time I tried and bisecting likely branches I find that
->> commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
->> that introduces the build break.  Unfortunately the boot fails before I
->> get a console which makes diagnosis somewhat more tricky than would be
->> ideal.  Any ideas?
+On Wed, Jul 18, 2012 at 9:49 PM, Rob Lee <rob.lee@linaro.org> wrote:
+> Hello Peter and Daniel,
 >
-> Further data: the irq_domain_associate_many() calls that we're now doing
-> are also causing WARN_ON()s to go off during boot after commit 98aa46
-> (irqdomain: Support for static IRQ mapping and association) causing
-> breakage for my interrupt using MFDs.
+> On Thu, Jul 12, 2012 at 11:05 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 07/11/2012 02:30 PM, Peter De Schrijver wrote:
+>>> Hi,
+>>>
+>>> I noticed several platforms exhibit different behaviour wrt disabling IRQ or
+>>> FIQ when entering a CPU idle state. Tegra for example disables both FIQ and
+>>> IRQ when entering CPU clockstop, but OMAP seems to only disable FIQs? Also
+>>> the generic cpuidle_wrap_enter() function, enables IRQs after return from
+>>> the idle state, but doesn't disable them.
+>>>
+>>> Some questions:
+>>>
+>>> 1) I assume we need to disable IRQ/FIQ to not confuse the cpuidle code due to
+>>>    late interrupts?
 >
-> I don't really have time to investigate now but backing out that commit
-> seems to make things much happier, I suspect there's some collision with
-> IRQs allocated statically by the platform but I don't immediately see
-> what's new here.
+> Part of the a cpuidle irq and time keeping consolidation and cleanup
+> patch that went in a while back removed all the irq disable calls from
+> arm platform code as they are they are already disabled at the
+> arch/arm level in kernel/process.c before calling cpu_idle_call.  I
+> meant to remove these redundant platform calls for all ARM platforms
+> but it's possible I missed one for Tegra if its platform irq disable
+> still exists.
+>
+>>> 2) What prevents us from unifying this?
+> It may be good to also disable the FIQ's at the same time as IRQ's in
+> arch/arm/kernel/process.c.  I had made some mention of also global
+> disabling FIQs in my initial RFC submission and you can see the
+> responses here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/076036.html
+> Given the response, I didn't pursue making any changes to FIQ
+> disabling.  But if would have suggested doing so at same location as
+> irq's are being disabled for ARM, perhaps it would have been better
+> received.  Now that many arm systems are using FIQs for handling
+> interrupts in the secure trust zone world, that may change things as
+> well.
+>
+Actually the FIQ disable on OMAP is bogus and can be cleaned up.
+When FIQ is really used, it is used in secure world and it has banked
+register so the kernel FIQ disable doesn't help anyways.
 
-I had seen that on my end too, but I thought I had fixed it...  I
-guess not (or this is a similar type of failure).  I'll investigate.
-
-g.
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Regards
+Santosh
