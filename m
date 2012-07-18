@@ -1,37 +1,70 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 18 Jul 2012 14:34:13 +0530
-Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for preventing
- autodep delete
-In-Reply-To: <1342598720.4672.83.camel@sokoban>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>	
- <1342189185-5306-8-git-send-email-t-kristo@ti.com>	 <5003F453.9020903@ti.com>
- <1342536971.4672.82.camel@sokoban>	 <50066284.1030903@ti.com>
- <1342598720.4672.83.camel@sokoban>
-Message-ID: <50067C0D.2040508@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 18 Jul 2012 11:05:23 +0200
+Subject: [PATCH] can: flexcan: add 2nd clock to support imx53 and newer
+In-Reply-To: <500675C2.9090303@pengutronix.de>
+References: <1342562748-24701-1-git-send-email-mkl@pengutronix.de>
+ <50061B86.7080200@gmail.com> <500675C2.9090303@pengutronix.de>
+Message-ID: <20486.31827.477680.302450@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 July 2012 01:35 PM, Tero Kristo wrote:
-> On Wed, 2012-07-18 at 12:45 +0530, Rajendra Nayak wrote:
->> On Tuesday 17 July 2012 08:26 PM, Tero Kristo wrote:
->>> Anyway, it also looks like this fix is no longer needed with the latest
->>> kernel, something has changed with the gpio code / or latencies and it
->>> doesn't crash anymore. Thus, it looks like patches 7&   8 can be dropped
->>> from this set for now. This is the behavior with beagleboard at least,
->>> if someone can verify this with some other omap3 hw that would be nice.
->>
->> I can test it on a omap3 SDP. What do you want me to test?
->
-> Just try suspend + cpuidle with and without off-mode enabled and see if
-> there are any problems. I've usually seen problems with off-mode myself.
+Hi,
 
-So I just knocked off the last 2 patches from 'mainline-3.5-rc6-pwrdm-
-changes-v4' and tested on my 3430 SDP.
+Marc Kleine-Budde writes:
+> On 07/18/2012 04:12 AM, Hui Wang wrote:
+> > Marc Kleine-Budde wrote:
+> >> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> >>
+> >> This patch add support for a second clock to the flexcan driver. On
+> >> modern
+> >> freescale ARM cores like the imx53 and imx6q two clocks ("ipg" and "per")
+> >> must be enabled in order to access the CAN core.
+> >> -        clock_freq = clk_get_rate(clk);
+> >>      }
+> >>  
+> >>      mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >> @@ -1039,7 +1052,8 @@ static int __devinit flexcan_probe(struct
+> >> platform_device *pdev)
+> >>          CAN_CTRLMODE_BERR_REPORTING;
+> >>      priv->base = base;
+> >>      priv->dev = dev;
+> >> -    priv->clk = clk;
+> >> +    priv->clk_ipg = clk_ipg;
+> >> +    priv->clk_per = clk_per;
+> >>      priv->pdata = pdev->dev.platform_data;
+> >>      priv->devtype_data = devtype_data;
+> >>  
+> >> @@ -1067,9 +1081,11 @@ static int __devinit flexcan_probe(struct
+> >> platform_device *pdev)
+> >>   failed_map:
+> >>      release_mem_region(mem->start, mem_size);
+> >>   failed_get:
+> >> -    if (clk)
+> >> -        clk_put(clk);
+> >>   failed_clock:
+> >> +    if (clk_per)
+> >>   
+> > Use if (!IS_ERR(clk_per))
+> 
+> Yes, good catch.
+> 
+> Is it allowed to call clk_put with a NULL pointer? Both clocks can be
+> NULL, if the frequency is defined via the device tree, this is case for
+> powerpc.
+> 
+This has been discussed here already several times. Everything
+returned by clk_get() that does not satisfy the IS_ERR() check, is a
+valid clk cookie and can be used for the clk API calls.
 
-I was able to hit RET and OFF in both suspend and cpuidle. Did not see
-any issues.
 
->
-> -Tero
->
->
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
