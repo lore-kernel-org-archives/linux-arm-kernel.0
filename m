@@ -1,33 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Jul 2012 21:36:26 +0800
-Subject: [PATCH 5/7] ARM: mxs: convert tx28 board to device tree
-In-Reply-To: <20483.48320.888197.282702@ipc1.ka-ro>
-References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
- <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
- <20474.55029.733084.749955@ipc1.ka-ro>
- <20120713071415.GA10602@S2100-06.ap.freescale.net>
- <20479.59525.385001.544046@ipc1.ka-ro>
- <20120715144935.GB2429@S2100-06.ap.freescale.net>
- <20120715150003.GD2429@S2100-06.ap.freescale.net>
- <20483.48320.888197.282702@ipc1.ka-ro>
-Message-ID: <20120718133624.GA30219@S2100-06.ap.freescale.net>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 18 Jul 2012 16:12:57 +0300
+Subject: [PATCH v4 1/2] ARM: imx6q: add clocks for gpmi-nand
+In-Reply-To: <1341279572-6098-2-git-send-email-shijie8@gmail.com>
+References: <1341279572-6098-1-git-send-email-shijie8@gmail.com>
+ <1341279572-6098-2-git-send-email-shijie8@gmail.com>
+Message-ID: <1342617177.7530.24.camel@brekeke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2012 at 09:03:28AM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Mon, 2012-07-02 at 21:39 -0400, Huang Shijie wrote:
+> Add clocks for gpmi-nand.
 > 
-> Shawn Guo writes:
-> > On Sun, Jul 15, 2012 at 10:49:35PM +0800, Shawn Guo wrote:
-> > > below.  But does that mean ethernet PHY does not work even on non-DT
-> > > kernel right now?
-> > > 
-> > So I guess you need something like c46d291 (ARM: apx4devkit: fix FEC
-> > enabling PHY clock) for TX28 too.
-> > 
-> That's already in place.
-> 
-Are you using and talking about the branch I prepared for you?
-I haven't seen it there.
+> Signed-off-by: Huang Shijie <shijie8@gmail.com>
 
-Shawn
+Pushed both to l2-mtd.git, thanks!
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/fd8884b2/attachment.sig>
