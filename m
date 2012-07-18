@@ -1,40 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Jul 2012 11:33:12 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the
- i2c-embedded tree
-In-Reply-To: <50069006.8050301@linaro.org>
-References: <20120717130650.GB27595@sirena.org.uk> <500568D9.10805@linaro.org>
- <20120717133550.GC4477@opensource.wolfsonmicro.com>
- <50057058.2060002@linaro.org>
- <20120717142222.GE4477@opensource.wolfsonmicro.com>
- <50057C1A.80606@linaro.org>
- <20120717152001.GF4477@opensource.wolfsonmicro.com>
- <20120718053341.GA4009@S2100-06.ap.freescale.net>
- <20120718095937.GB22739@opensource.wolfsonmicro.com>
- <50069006.8050301@linaro.org>
-Message-ID: <20120718103311.GG22739@opensource.wolfsonmicro.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 18 Jul 2012 12:35:31 +0200
+Subject: [RFC PATCHv2 0/2]arm: socfpga: Add initial support for Altera's
+ SOCFPGA HW
+In-Reply-To: <1342543585.13530.3.camel@dinh-ubuntu>
+References: <1342113976-27140-1-git-send-email-dinguyen@altera.com>
+ <20120716213752.GA28680@elf.ucw.cz>
+ <201207171543.42889.arnd@arndb.de>
+ <1342543585.13530.3.camel@dinh-ubuntu>
+Message-ID: <20120718103531.GA12078@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 11:29:26AM +0100, Lee Jones wrote:
-> On 18/07/12 10:59, Mark Brown wrote:
+Hi!
 
-> >It's not the using device tree bit that creates concern for me here,
-> >it's the fact that the board and silicon aren't being separated.
+> > > Arnd, do you think this is good enough to go to the next tree? It
+> > > is new architecture, it should not break anything, I believe we
+> > > addressed all the issues raised in the review, and noone is reporting
+> > > new ones.
+> > > 
+> > > Plus, if we could make initial support into 3.6, that would be very
+> > > nice :-).
+> > 
+> > I think we can make it for v3.6, but it's very late for that and I
+> > haven't looked at it enough in the past. I have a few small
+> > comments, so if you can address them quickly we can take it.
+> 
+> Hi Arnd. Thanks, please fire away your comments.
 
-> What's the difference?
+Arnd wanted quick reactions, so I took liberty of creating
+PATCHv4. (You are marked in From: so you'll still get the credit
+:-). I hope that is not a big problem.
 
-> >+- db8500.dtsi       // silicon
-> >\	
-> > +-- snowball.dts    // board
+I'm now pushing for-altera-0718 with the PATCHv4 (+ .config file).
 
-I have glanced at some of this stuff in the past, thanks.  Now think how
-that's working for people when they put the configuration for the
-silicon in the same DT node as the configuration for the board...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120718/7dd4a279/attachment-0001.sig>
+Now, I guess at this point it would be useful to make our repository
+public? 
+
+(Oh, and cross the fingers for us so that it finally gets merged :-).
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
