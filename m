@@ -1,33 +1,79 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 19 Jul 2012 15:48:06 +0900
-Subject: [PATCH] ARM: S3C64XX: Mark most Cragganmore initdata devinitdata
-In-Reply-To: <1341245579-29007-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1341245579-29007-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <184601cd657a$73c1f940$5b45ebc0$%kim@samsung.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 19 Jul 2012 01:57:42 -0500
+Subject: [PATCH 5/8] ARM: OMAP2+: PM: introduce power domains achievable
+ functional states
+In-Reply-To: <CAORVsuXbvkWHLm9mK3EgKSKFo400VoR6QSZbrS8hu1u8cV3e3A@mail.gmail.com>
+References: <1339685591-11177-1-git-send-email-j-pihet@ti.com>
+ <1339685591-11177-6-git-send-email-j-pihet@ti.com>
+ <CAORVsuXbvkWHLm9mK3EgKSKFo400VoR6QSZbrS8hu1u8cV3e3A@mail.gmail.com>
+Message-ID: <CAOMWX4ftVew2OxR=4AziK_emgtr7aT6Yr7vkKze0Gyn6w=8hTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> With the greater use of deferred probes we need to be more sure that
-> initdata is actually used only at system init rather than being used
-> by devices when they probe (which could happen after the main kernel
-> init has completed and is much more likely to now).
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |   68
-++++++++++++++++-------------
-> ----
->  1 file changed, 34 insertions(+), 34 deletions(-)
-> 
-[...]
+On Fri, Jun 15, 2012 at 6:28 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+>
+> "
+> 1. The while loops need optimization. - This can definitely be
+> simplified and made non-risky; this also needs some more error
+> handling
+If you are interested using something like the following
+static int _match_pwrst(u32 pwrsts, u8 pwrst, u8 default_pwrst)
+{
+       bool found = true;
+       int new_pwrst = pwrst;
 
-Looks OK, applied.
-Thanks.
+       /* Search down */
+       while (!(pwrsts & (1 << new_pwrst))) {
+               if (new_pwrst == PWRDM_POWER_OFF) {
+                       found = false;
+                       break;
+               }
+               new_pwrst--;
+       }
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+       if (found)
+               goto done;
+
+       /* Search up */
+       new_pwrst = pwrst;
+       while (!(pwrsts & (1 << new_pwrst))) {
+               if (new_pwrst == default_pwrst)
+                       break;
+               new_pwrst++;
+       }
+done:
+       return new_pwrst;
+}
+
+
+new_pwrst = _match_pwrst(pwrdm->pwrsts, pwrst,
+                         PWRDM_POWER_ON);
+new_logic = _match_pwrst(pwrdm->pwrsts_logic_ret, logic,
+                         PWRDM_POWER_RET);
+to achieve the same code..
+> 2. About the power domains state machine: you have only one power
+> state to move in and out of: it is called ON. If you do ON->CSWR->ON
+> etc. attempting to program ON->CSWR->OSWR is NOT supported in OMAP and
+> is an invitation for production team to sit and debug for a while
+> before finding the use of invalid power states
+> "
+>
+> Point 2 is a good point. The solution would be to implement a state
+> machine in this function and/or omap_set_pwrdm_state, possibly using a
+> platform specific handling function.
+
+Point 2 is not completely accurate -> Lower pwr state transitions can
+indeed and is indeed
+supported on OMAP4+. CSWR->OSWR->OFF is possible and omap_setpwrdm_state does
+indeed handle this. however going to OSWR->CSWR is possible only by
+OSWR->ON->CSWR.
+this is again supported in code, however, in practice, we have found
+that certain IP blocks(in
+personal experience, it was DSS) need IP specific additional work
+which is not easily doable..
+so when we come out of suspend state, if the IP block has achieved a
+lower powerstate than
+what was programmed, we just leave it as is.
+
+Regards,
+Nishanth Menon
