@@ -1,36 +1,154 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 19 Jul 2012 15:02:00 -0700
-Subject: [PATCH 4/4] ARM: clps711x: Added simple clkdev framework
-In-Reply-To: <201207172033.10302.arnd@arndb.de>
-References: <1342462908-18547-1-git-send-email-shc_work@mail.ru>
- <1342462908-18547-4-git-send-email-shc_work@mail.ru>
- <201207172033.10302.arnd@arndb.de>
-Message-ID: <CAJOA=zMB83pT1ESnHBgAZotn4cVysP6pKWDXOoRp-sMNMjGkVg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 20 Jul 2012 07:12:08 +0900
+Subject: [GIT PULL] Samsung DT for v3.6
+In-Reply-To: <201207172117.48095.arnd@arndb.de>
+References: <143401cd639e$474af610$d5e0e230$%kim@samsung.com>
+ <201207172117.48095.arnd@arndb.de>
+Message-ID: <194d01cd65fb$89d29b50$9d77d1f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 1:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 16 July 2012, Alexander Shiyan wrote:
->> Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
->> This patch adds simple clkdev framework for handling all possible CPU rates.
->>
->> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->
-> +Mike Turquette
->
-> We just had the exact same discussion about a new clock implementation for
-> mcs814x and for the socfpga port. My feeling is that it makes no sense
-> to keep adding new private implementations of the API as we're trying
-> to get rid of the existing ones and replace them with the common code.
->
-> If I understand this correctly, you should be using DEFINE_CLK_FIXED_RATE
-> and DEFINE_CLK_DIVIDER etc to define the initial clocks and the lookup
-> table, and possibly move all of that to drivers/clk.
->
+Arnd Bergmann wrote:
+> 
+> On Monday 16 July 2012, Kukjin Kim wrote:
+> > Please pull support samsung spi device tree for v3.6 from:
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next/dt-samsung
+> >
+> > It is for supporting spi dt for exynos4210 and exynos5250, and got the
+> ack
+> > from Grant Likely for spi driver.
+> >
+> > Note: Since this is including spi driver changes, so it was made based
+> on
+> > next/devel-dma-ops which touches same file, Samsung spi driver for
+> avoiding
+> > bad conflicts.
+> >
+> > If any problems, please kindly let me know.
+> 
+> Applied to next/dt branch. I'm not so happy about new dma channel
+> properties getting added to additional bindings. I guess I should
+> have complained earlier about these, so I'm keeping the changes
+> but I've added the patch below to make it clear that they will
+> have to change after we have agreed with Vinod and Jon on how
+> they should be represented.
+> 
+Yeah, I agree. 
 
-Arnd is correct.  Let's go ahead and move everything over to the
-common clk framework.  These patches will have to wait for 3.7
-anyways, so there is plenty of time to port it over.
+> 	Arnd
+> 
+> Subject: [PATCH] ARM: EXYNOS: mark the DMA channel binding for SPI as
+> preliminary
+> 
+> Bindings for DMA channels are still under discussion and will
+> change once this has been resolved. Therefore we mark them
+> the newly added ones as preliminary. Let's hope nobody starts
+> relying on them...
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Regards,
-Mike
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> index 59bfc4f..a15ffed 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> @@ -18,6 +18,9 @@ Required SoC Specific Properties:
+>  - interrupts: The interrupt number to the cpu. The interrupt specifier
+> format
+>    depends on the interrupt controller.
+> 
+> +[PRELIMINARY: the dma channel allocation will change once there are
+> +official DMA bindings]
+> +
+>  - tx-dma-channel: The dma channel specifier for tx operations. The format
+> of
+>    the dma specifier depends on the dma controller.
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> b/arch/arm/boot/dts/exynos4210.dtsi
+> index 6904d9d..02891fe 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -168,8 +168,8 @@
+>  		compatible = "samsung,exynos4210-spi";
+>  		reg = <0x13920000 0x100>;
+>  		interrupts = <0 66 0>;
+> -		tx-dma-channel = <&pdma0 7>;
+> -		rx-dma-channel = <&pdma0 6>;
+> +		tx-dma-channel = <&pdma0 7>; /* preliminary */
+> +		rx-dma-channel = <&pdma0 6>; /* preliminary */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  	};
+> @@ -178,8 +178,8 @@
+>  		compatible = "samsung,exynos4210-spi";
+>  		reg = <0x13930000 0x100>;
+>  		interrupts = <0 67 0>;
+> -		tx-dma-channel = <&pdma1 7>;
+> -		rx-dma-channel = <&pdma1 6>;
+> +		tx-dma-channel = <&pdma1 7>; /* preliminary */
+> +		rx-dma-channel = <&pdma1 6>; /* preliminary */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  	};
+> @@ -188,8 +188,8 @@
+>  		compatible = "samsung,exynos4210-spi";
+>  		reg = <0x13940000 0x100>;
+>  		interrupts = <0 68 0>;
+> -		tx-dma-channel = <&pdma0 9>;
+> -		rx-dma-channel = <&pdma0 8>;
+> +		tx-dma-channel = <&pdma0 9>; /* preliminary */
+> +		rx-dma-channel = <&pdma0 8>; /* preliminary */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  	};
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index a3a2eb2..004aaa8 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -156,8 +156,8 @@
+>  		compatible = "samsung,exynos4210-spi";
+>  		reg = <0x12d20000 0x100>;
+>  		interrupts = <0 66 0>;
+> -		tx-dma-channel = <&pdma0 5>;
+> -		rx-dma-channel = <&pdma0 4>;
+> +		tx-dma-channel = <&pdma0 5>; /* preliminary */
+> +		rx-dma-channel = <&pdma0 4>; /* preliminary */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  	};
+> @@ -166,8 +166,8 @@
+>  		compatible = "samsung,exynos4210-spi";
+>  		reg = <0x12d30000 0x100>;
+>  		interrupts = <0 67 0>;
+> -		tx-dma-channel = <&pdma1 5>;
+> -		rx-dma-channel = <&pdma1 4>;
+> +		tx-dma-channel = <&pdma1 5>; /* preliminary */
+> +		rx-dma-channel = <&pdma1 4>; /* preliminary */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  	};
+> @@ -176,8 +176,8 @@
+>  		compatible = "samsung,exynos4210-spi";
+>  		reg = <0x12d40000 0x100>;
+>  		interrupts = <0 68 0>;
+> -		tx-dma-channel = <&pdma0 7>;
+> -		rx-dma-channel = <&pdma0 6>;
+> +		tx-dma-channel = <&pdma0 7>; /* preliminary */
+> +		rx-dma-channel = <&pdma0 6>; /* preliminary */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  	};
