@@ -1,26 +1,30 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 19 Jul 2012 10:02:08 +0800
-Subject: [PATCH v2 2/2] ARM: dts: imx6q-sabrelite: add usbmisc device
-In-Reply-To: <20120718150036.GD30219@S2100-06.ap.freescale.net>
-References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
- <1342607348-8587-3-git-send-email-richard.zhao@freescale.com>
- <20120718150036.GD30219@S2100-06.ap.freescale.net>
-Message-ID: <20120719020207.GN21635@b20223-02.ap.freescale.net>
+Date: Thu, 19 Jul 2012 10:05:54 +0800
+Subject: [PATCH 00/12] chipidea/imx: add otg support and some bug fix
+In-Reply-To: <20120717004057.GA25562@kroah.com>
+References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
+ <20120717004057.GA25562@kroah.com>
+Message-ID: <20120719020553.GO21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 11:00:38PM +0800, Shawn Guo wrote:
-> On Wed, Jul 18, 2012 at 06:29:07PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
-> >  arch/arm/boot/dts/imx6q.dtsi          |   19 +++++++++++++++----
-> >  arch/arm/mach-imx/clk-imx6q.c         |    1 +
+On Mon, Jul 16, 2012 at 05:40:57PM -0700, Greg KH wrote:
+> On Thu, Jul 12, 2012 at 03:01:40PM +0800, Richard Zhao wrote:
+> > The patch set is tested on imx6q_sabrelite board.
+> > 
+> > The patch can also be found at
+> > https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+> > 
+> > For test which merged platform patches:
+> > https://github.com/riczhao/kernel-imx/commits/topics/usb-test
+> > 
+> > It's better apply after patch I sent out:
+> > usb: chipidea: cleanup dma_pool if udc_start() fails
 > 
-> It seems that the patch is meant to have dts changes only by reading
-> the subject.  So it might be good to get clk-imx6q.c out of here.
-Thanks. It'll be divided into two.
-
-Richard
+> I need acks from Alexander before I can accept any of these.
+ping Alexander ...
 > 
-> Shawn
+> thanks,
+> 
+> greg k-h
+> 
