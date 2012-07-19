@@ -1,64 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Jul 2012 08:15:40 +0000
-Subject: [RFC PATCHv5] arm: socfpga: Add initial support for Altera's
- SOCFPGA HW
-In-Reply-To: <1342649238-1044-1-git-send-email-dinguyen@altera.com>
-References: <1342649238-1044-1-git-send-email-dinguyen@altera.com>
-Message-ID: <201207190815.40871.arnd@arndb.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 19 Jul 2012 16:56:42 +0800
+Subject: [PATCH] pinctrl: mxs: register driver at postcore_initcall time
+In-Reply-To: <1342687270-32600-1-git-send-email-shawn.guo@linaro.org>
+References: <1342687270-32600-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120719085641.GQ21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 July 2012, dinguyen at altera.com wrote:
-> @@ -49,7 +49,9 @@ static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
->          * are provided. All other properties should be added
->          * once needed on other platforms.
->          */
-> -       if (of_device_is_compatible(np, "st,spear600-gmac")) {
-> +       if (of_device_is_compatible(np, "st,spear600-gmac") ||
-> +               of_device_is_compatible(np, "snps,dwmac-3.70a") ||
-> +               of_device_is_compatible(np, "snps,dwmac")) {
->                 plat->has_gmac = 1;
->                 plat->pmt = 1;
->         }
+On Thu, Jul 19, 2012 at 04:41:10PM +0800, Shawn Guo wrote:
+> It's not so usual, but there are still some cases which require pinctrl
+> driver function at arch_initcall time.  So register imx23 and imx28
+> pinctrl driver at postcore_initcall time.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Reviewed-by: Richard Zhao <richard.zhao@freescale.com>
 
-My guess from looking at the driver is that the "pmt" flag is not
-set on all versions, but is on 3.50 or higher, so I would make it
+Other imx pinctrl drivers need such change too.
 
-       if (of_device_is_compatible(np, "st,spear600-gmac") ||
-           of_device_is_compatible(np, "snps,dwmac-3.70a"))
-		plat->pmt = 1;
-
-I'm also guessing that the availability of the gmac is not a property
-of the dwmac version but of the way the dwmac macro is used, so that
-should probably be instead
-
-       if (of_device_is_compatible(np, "st,spear600-gmac") ||
-           of_device_is_compatible(np, "altr,socfpga-stmmac"))
-		plat->has_gmac = 1;
-
-For a device that just claims compatibility with "snps,dwmac" but
-no specific version, it probably makes more sense to assume that
-those features are not available.
-
-Rather than checking the version here, we can also add an empty property
-"snps,gmac" or similar to show the presence of the gmac in the device
-tree.
-
-The other alternative that I've brought up with Deepak and Vipul from ST
-is to add a template for each version of the dwmac so you don't have
-to check the specific compatible string separately for each property.
-
-> @@ -250,7 +252,9 @@ static const struct dev_pm_ops stmmac_pltfr_pm_ops;
->  #endif /* CONFIG_PM */
+Richard
+> ---
+> Hi Linus,
+> 
+> Not sure if it's late for 3.6.  But if possible, please help send it
+> for 3.6.  I need this patch to remove mxs board files after v3.6-rc1
+> comes out.
+> 
+> Regards,
+> Shawn
+> 
+>  drivers/pinctrl/pinctrl-imx23.c |    2 +-
+>  drivers/pinctrl/pinctrl-imx28.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-imx23.c b/drivers/pinctrl/pinctrl-imx23.c
+> index 75d3eff..3674d87 100644
+> --- a/drivers/pinctrl/pinctrl-imx23.c
+> +++ b/drivers/pinctrl/pinctrl-imx23.c
+> @@ -292,7 +292,7 @@ static int __init imx23_pinctrl_init(void)
+>  {
+>  	return platform_driver_register(&imx23_pinctrl_driver);
+>  }
+> -arch_initcall(imx23_pinctrl_init);
+> +postcore_initcall(imx23_pinctrl_init);
 >  
->  static const struct of_device_id stmmac_dt_ids[] = {
-> -       { .compatible = "st,spear600-gmac", },
-> +       { .compatible = "st,spear600-gmac"},
-> +       { .compatible = "snps,dwmac-3.70a"},
-> +       { .compatible = "snps,dwmac"},
->         { /* sentinel */ }
->  };
-
-Yes, this looks good.
-
-	Arnd
+>  static void __exit imx23_pinctrl_exit(void)
+>  {
+> diff --git a/drivers/pinctrl/pinctrl-imx28.c b/drivers/pinctrl/pinctrl-imx28.c
+> index b973026..0f5b212 100644
+> --- a/drivers/pinctrl/pinctrl-imx28.c
+> +++ b/drivers/pinctrl/pinctrl-imx28.c
+> @@ -408,7 +408,7 @@ static int __init imx28_pinctrl_init(void)
+>  {
+>  	return platform_driver_register(&imx28_pinctrl_driver);
+>  }
+> -arch_initcall(imx28_pinctrl_init);
+> +postcore_initcall(imx28_pinctrl_init);
+>  
+>  static void __exit imx28_pinctrl_exit(void)
+>  {
+> -- 
+> 1.7.5.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
