@@ -1,68 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Jul 2012 04:52:16 -0700
-Subject: [PATCH] ARM: OMAP3: clockdomain: fix accidental duplicate
- registration
-In-Reply-To: <alpine.DEB.2.00.1207180341001.16772@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1207120448120.25585@utopia.booyaka.com>
- <87394wg97u.fsf@ti.com> <20120713064713.GI1122@atomide.com>
- <20120714085257.GB6522@atomide.com>
- <alpine.DEB.2.00.1207141150340.3876@utopia.booyaka.com>
- <20120716083609.GG6522@atomide.com>
- <alpine.DEB.2.00.1207180341001.16772@utopia.booyaka.com>
-Message-ID: <20120719115216.GP6522@atomide.com>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Thu, 19 Jul 2012 17:38:48 +0530
+Subject: [RFC][PATCH v2 1/1] ARM: OMAP2+: PM: Register suspend ops even in the
+ presence of DT blob
+Message-ID: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120718 02:58]:
-> Hi
-> 
-> On Mon, 16 Jul 2012, Tony Lindgren wrote:
-> 
-> > Hmm well it seems that we should apply this fix into arm-soc next/cleanup
-> > branch if that's where the mismerge happened? It seems the same mismerge
-> > is there even without 16e5e2c4?
-> 
-> The arm-soc next/cleanup copy of mach-omap2/clockdomains3xxx_data.c is 
-> correct.  The problem that my patch was designed to fix doesn't exist in 
-> that version of the file (868c157df9721675c19729eed2c96bac6c3f1d01).
+As per the comment in omap2_common_late_init() looks like the
+original intent of the DT check was to treat only the PMIC
+and SR initialization differently. Recent changes to consolidate
+the suspend-resume code across OMAP3/4 resulted into the
+registration of suspend ops also being dependent on the check
+for DT blob. Since the suspend-resume operation should not
+really be dependent on the usage of DT remove this dependency
+by wrapping the PMIC and SR init under the DT check.
 
-OK
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+v2->v1
+ - As suggested by Paul, Instead of moving around the suspend ops
+   registration just wrap the PMIC and SR init under the DT check.
+ - Fixed up Kevin's email address :\
+
+ arch/arm/mach-omap2/pm.c |   21 ++++++++++-----------
+ 1 files changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 9cb5ced..46848f7 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -302,19 +302,18 @@ int __init omap2_common_pm_late_init(void)
+ 	 * a completely different mechanism.
+ 	 * Disable this part if a DT blob is available.
+ 	 */
+-	if (of_have_populated_dt())
+-		return 0;
++	if (!of_have_populated_dt()) {
++		/* Init the voltage layer */
++		omap_pmic_late_init();
++		omap_voltage_late_init();
  
-> > You patch applies into arm-soc next/cleanup with fuzz:
-> > 
-> > patching file arch/arm/mach-omap2/clockdomain.c
-> > patching file arch/arm/mach-omap2/clockdomain.h
-> > Hunk #1 succeeded at 82 (offset -4 lines).
-> > patching file arch/arm/mach-omap2/clockdomains3xxx_data.c
-> > Hunk #1 succeeded at 347 with fuzz 2 (offset -107 lines).
-> > 
-> > So that's why I'm wondering if it needs some changes.
-> 
-> OK, I understand why you're asking.  
-> 
-> I went back and researched it.  The patch that I sent is only needed 
-> because the conflict resolution in merge commit 
-> 3dd50d0545bd5a8ad83d4339f07935cd3e883271 ("Merge tag 
-> 'omap-cleanup-for-v3.6' into tmp-merge") adds &mpu_3xxx_clkdm back into 
-> the clockdomains_common list.  The previous commit on that file 
-> 16e5e2c471ab889f838bfe1c44032d0481c115e1 removed &mpu_3xxx_clkdm from the 
-> common list, because the AM35xx chips needed to use a different MPU 
-> clockdomain structure from the OMAP3xxx chips.
-> 
-> Or, put differently: Before 16e5e2c471ab889f838bfe1c44032d0481c115e1, it 
-> was correct to have &mpu_3xxx_clkdm in the common list.  That's 
-> what's in arm-soc next/cleanup and that data is correct.
-> 
-> After 16e5e2c471ab889f838bfe1c44032d0481c115e1, it's incorrect to have 
-> &mpu_3xxx_clkdm in the common list.
-> 
-> Hope this isn't even more confusing :-)
-
-Well I'm still a bit confused :)
-
-Which branch in arm-soc tree should this fix be applied then?
-Or do we actually need two fixes into arm-soc tree?
-
-Regards,
-
-Tony
+-	/* Init the voltage layer */
+-	omap_pmic_late_init();
+-	omap_voltage_late_init();
++		/* Initialize the voltages */
++		omap3_init_voltages();
++		omap4_init_voltages();
+ 
+-	/* Initialize the voltages */
+-	omap3_init_voltages();
+-	omap4_init_voltages();
+-
+-	/* Smartreflex device init */
+-	omap_devinit_smartreflex();
++		/* Smartreflex device init */
++		omap_devinit_smartreflex();
++	}
+ 
+ #ifdef CONFIG_SUSPEND
+ 	suspend_set_ops(&omap_pm_ops);
+-- 
+1.7.0.4
