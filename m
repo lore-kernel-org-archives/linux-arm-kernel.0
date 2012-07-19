@@ -1,71 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Jul 2012 21:26:31 +0200
-Subject: [PATCH] IIO: Add basic MXS LRADC driver
-In-Reply-To: <50081AC0.10703@metafoo.de>
-References: <1341368129-20468-1-git-send-email-marex@denx.de>
- <201207191623.14492.marex@denx.de> <50081AC0.10703@metafoo.de>
-Message-ID: <201207192126.31772.marex@denx.de>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Thu, 19 Jul 2012 13:20:37 -0700
+Subject: [PATCH 2/2] arm: omap3: am35x: Disable hlt when using Davinci EMAC
+In-Reply-To: <alpine.DEB.2.00.1207191317510.14390@utopia.booyaka.com>
+References: <1336770778-23044-1-git-send-email-mgreer@animalcreek.com>
+ <1336770778-23044-3-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1207171814100.28834@utopia.booyaka.com>
+ <20120718213246.GD27904@animalcreek.com>
+ <alpine.DEB.2.00.1207181723120.19048@utopia.booyaka.com>
+ <20120719182602.GB24076@animalcreek.com>
+ <alpine.DEB.2.00.1207191317510.14390@utopia.booyaka.com>
+Message-ID: <20120719202037.GB5264@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lars-Peter Clausen,
-
-> On 07/19/2012 04:23 PM, Marek Vasut wrote:
-> > Dear Lars-Peter Clausen,
-> > 
-> > Sorry for my late reply, got busy with other crazy stuff.
-> > 
-> > [...]
-> > 
-> >>>> Is there any reason not to use the mxs_lradc struct directly has the
-> >>>> iio data?
-> >>> 
-> >>> I explained it below in the patch. I hope we'll eventually support the
-> >>> delay triggers, which will need 4 separate IIO devices. And this is
-> >>> where this structure will be augmented by other components.
-> >> 
-> >> Ok I saw the comment, but it wasn't obvious to me that delay channels
-> >> will require multiple IIO devices. Might make sense to state this
-> >> explicitly.
-> > 
-> > Fixed.
-> > 
-> >>>>> [...]
-> >>>>> 
-> >>>>> +
-> >>>>> +/*
-> >>>>> + * Channel management
-> >>>>> + *
-> >>>>> + * This involves crazy mapping between 8 virtual channels the CTRL4
-> >>>>> register + * can harbor and 16 channels total this hardware supports.
-> >>>>> + */
-> >>>> 
-> >>>> I suppose this means only a maximum 8 channels can be active at a
-> >>>> time. I've recently posted a patch which makes it easy to implement
-> >>>> such a restriction.
-> >>>> http://www.spinics.net/lists/linux-iio/msg05936.html and
-> >>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
-> >>>> validate callback implementation. In your case you'd check for
-> >>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
-> >>> 
-> >>> This is good. When do you expect this to hit linux-next possibly? Or at
-> >>> least linux-iio?
-> >> 
-> >> soon, hopefully.
-> > 
-> > So I checked this, not sure how it'll help me though.
+On Thu, Jul 19, 2012 at 01:19:13PM -0600, Paul Walmsley wrote:
+> On Thu, 19 Jul 2012, Mark A. Greer wrote:
 > 
-> Right now with your driver you can enable any combination of channels. If
-> more than 8 channels are enabled and you start sampling it will fail, since
-> not all channels can be mapped. With those patch you can implement a
-> validate callback and check for bitmap_weight(scan_mask) <= 8. This will
-> ensure that it is not possible to select more than 8 channels at once,
-> which again means that starting sampling can't fail of this.
+> > ...and, unfortunately, it didnt' work in either case.
+> 
+> OK thanks for the tests.  Is the EMAC/MDIO really active and asserting 
+> interrupts while all this is happening?
 
-Ok, I fixed this one. One last thing that I don't really understand is this. I 
-run generic_buffer.c to source samples from the LRADC. Is there any way to 
-continuously sample them? Because right now, I get one sample and that's it, no 
-more samples happen later on (I can 0 data in subsequent read() call).
+I should be active but I have not way to tell for sure.
 
-Best regards,
-Marek Vasut
+> Or has that driver called 
+> pm_runtime_put*(), and so the EMAC/MDIO isn't waking up? 
+
+pm_runtime_get has definitely been called and pm_runtime_put
+has definitely _not_ been called.
+
+Mark
