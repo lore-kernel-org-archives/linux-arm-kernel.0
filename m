@@ -1,52 +1,51 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Jul 2012 16:26:20 +0300
-Subject: [PATCHv7 00/12] ARM: OMAP4: core retention support
-Message-ID: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+Date: Thu, 19 Jul 2012 16:26:21 +0300
+Subject: [PATCHv7 01/12] ARM: OMAP4: PM: add errata support
+In-Reply-To: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1342704392-23657-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Added similar PM errata flag support as omap3 has. This should be used
+in similar manner, set the flags during init time, and check the flag
+values during runtime.
 
-Changes compared to previous version:
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/pm.h     |    7 +++++++
+ arch/arm/mach-omap2/pm44xx.c |    1 +
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-- ported on top of 3.5-rc7
-- patch 3: added a few modules here not having context_offs
-- patch 8: NEW:
-  * ROM code on EMU / HS devices seem to wipe the contents of
-    L4PER_PWRSTCTRL register, thus this patch adds an errata +
-    save and restore for this register, this was noticed while
-    testing cpu_idle on EMU device
-- patch 9: NEW:
-  * sl2if hwmod is still blocking core retention on omap4, this
-    patch comments it out similarly to aess / usb_host_fs
-- patch 10: NEW:
-  * adds support for lostcontext_mask, this is needed by l4_abe / aess
-    hwmods as they will share context register, but use different bits
-    within it
-- patch 11: NEW:
-  * adds the hwmod data for sharing context register for l4_abe / aess
-- patch 12: NEW:
-  * context lost counter logic update for modules that don't have
-    context register
-
-Some of the NEW patches (10..12) are result of comments received on
-l-o list, and can be merged with other patches in the set if they are seen
-acceptable. Core retention works without these patches fine, but they
-address some corner cases.
-
-Tested with omap4460 GP panda + omap4430 EMU blaze, with both suspend +
-cpu_idle. cpu_idle + uart autosuspend seems to have an issue with
-omap4 currently that it loses some of the characters at the end of
-a print, should be fixed on uart driver level. Made a quick hack myself
-for this by modifying the serial_omap_tx_empty() to not use pm_runtime_put
-but pm_runtime_put_autosuspend at end, but this might not be the right
-way to fix this.
-
-Working test tree available also:
-git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-branch: mainline-3.5-rc7-omap4-ret-v7
-
-Branch contains also func pwrst code from Jean + io_chain set + one
-timekeeping patch from mainline tip to make suspend work properly.
-
--Tero
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 7856489..46ab9d9 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -88,6 +88,13 @@ extern void enable_omap3630_toggle_l2_on_restore(void);
+ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+ #endif		/* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
+ 
++#if defined(CONFIG_ARCH_OMAP4)
++extern u16 pm44xx_errata;
++#define IS_PM44XX_ERRATUM(id)		(pm44xx_errata & (id))
++#else
++#define IS_PM44XX_ERRATUM(id)		0
++#endif
++
+ #ifdef CONFIG_OMAP_SMARTREFLEX
+ extern int omap_devinit_smartreflex(void);
+ extern void omap_enable_smartreflex_on_init(void);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index c234733..3a484b1 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -33,6 +33,7 @@ struct power_state {
+ };
+ 
+ static LIST_HEAD(pwrst_list);
++u16 pm44xx_errata;
+ 
+ #ifdef CONFIG_SUSPEND
+ static int omap4_pm_suspend(void)
+-- 
+1.7.4.1
