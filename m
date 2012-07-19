@@ -1,26 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Jul 2012 11:16:26 +0000
-Subject: [PATCH 1/1] Add Wondermedia Technologies (wmt) to
- docs/devicetree/vendor-bindings.txt
-In-Reply-To: <76F764B079F92A4E843589C893D0A022C381059B@SERVER.prisktech.co.nz>
-References: <76F764B079F92A4E843589C893D0A022C380F1D4@SERVER.prisktech.co.nz>
- <CABjd4Yyk6XR6RizgcpjCdi2N_+Z2EzTtezbkN9V7r4bAXXjhqA@mail.gmail.com>
- <76F764B079F92A4E843589C893D0A022C381059B@SERVER.prisktech.co.nz>
-Message-ID: <201207191116.27273.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Jul 2012 04:31:17 -0700
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <CAAwP0s1UB_Q33KhXp_gvKfTMHRiBaH60HmXsMKxVkAxT1byctg@mail.gmail.com>
+References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
+ <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
+ <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
+ <20120718065951.GH6522@atomide.com>
+ <CAAwP0s1UB_Q33KhXp_gvKfTMHRiBaH60HmXsMKxVkAxT1byctg@mail.gmail.com>
+Message-ID: <20120719113116.GM6522@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 July 2012, Tony Prisk wrote:
-> Given that there have been no replies to this thread, and the restart patch has
-> now been accepted using 'wmt' as the vendor namespace - would it be safe to
-> assume we should formalize this in the vendor-bindings.txt?
+* Javier Martinez Canillas <martinez.javier@gmail.com> [120718 01:31]:
+> That was my first approach in fact, I sent this patch:
+> https://patchwork.kernel.org/patch/1198401/
 > 
-> I'd like to try and have basic device tree support added for the next merge
-> window (or this one if it all goes well :) ), but it relies on the vendor binding being
-> formalized.
+> But then was told by Kevin Hilman that the right solution was to do
+> the select on the drives to fix not only omap2plus_defconfig but any
+> config.
+> So I sent this patch and Santosh agrees with Kevin.
+> 
+> I don't really know the hardware nor the driver well enough to have a
+> strong position on this.
 
-What about devices that come from via though? Anything that first showed up
-in vt8500 or earlier should probably get a prefix identifying VIA rather
-than WonderMedia.
+Ideally we would not select it or have depends on it. DMA channels
+can run out, and drivers need to work also without DMA. For doing
+distro kernels, building everything as modules should be an option
+rather than forcing to build in all kinds of code.
 
-	Arnd
+Regards,
+
+Tony
