@@ -1,54 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Jul 2012 19:04:30 +0200
-Subject: MX28 poweroff issue
-In-Reply-To: <20470.38021.796461.625280@ipc1.ka-ro>
-References: <201207040030.36713.marex@denx.de>
- <20120705201002.GB31508@n2100.arm.linux.org.uk>
- <20470.38021.796461.625280@ipc1.ka-ro>
-Message-ID: <201207191904.31000.marex@denx.de>
+From: attila@kinali.ch (Attila Kinali)
+Date: Thu, 19 Jul 2012 19:28:14 +0200
+Subject: commit 91013923c712e1c:
+ "irqdomain: Replace LEGACY mapping with LINEAR" breaks console on ARM
+ i.mx23
+Message-ID: <20120719192814.75ea8beb784bdf8bb32c510c@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lothar Wa?mann,
+Hi,
 
-> Hi,
-> 
-> Russell King - ARM Linux writes:
-> > On Fri, Jul 06, 2012 at 12:08:58AM +0800, Shawn Guo wrote:
-> > > On Wed, Jul 04, 2012 at 04:19:44PM +0100, Russell King - ARM Linux wrote:
-> > > > If it's specific to mx28 and mx23 and nothing else, the cause needs
-> > > > to be found.  Maybe we need it tested on other (non-MX) platforms
-> > > > too?
-> > > 
-> > > Though people reported that imx27 does not have the problem, I'm not
-> > > so sure about it's a mach-mxs (mx23 and mx28) specific issue.  I have
-> > > not figured it out why imx27 does not run into it, but I got some
-> > > finding here.
-> > > 
-> > > Let's look at the dump again.
-> > > 
-> > > [   59.840000] System halted.
-> > > [   84.100000] BUG: soft lockup - CPU#0 stuck for 23s! [halt:584]
-> > > ...
-> > > [   84.100000] [<c0070cd4>] (watchdog_timer_fn+0x114/0x14c) from
-> > > [<c004052c>] (__run_hrtimer+0x7c/0x1ec)
-> > > 
-> > > It reports the issue eventually in function watchdog_timer_fn
-> > 
-> > > (kernel/watchdog.c):
-> > Yes, the general idea is that if the timer is running, and the watchdog
-> > is running, and it detects that it's event thread doesn't occasionally
-> > run, it will report a lockup.
-> > 
-> > As other platforms seem to not exhibit the problem when we halt, and
-> > endlessly spin with IRQs enabled, the question needs to be asked: what
-> > is different with MX23/MX28 and why is it different.
-> 
-> I could reproduce this on an i.MX53 (TX53) platform too. Maybe the
-> softlockup watchdog was not enabled on those platforms which didn't
-> show this behaviour.
+I'm working on an embedded system based on a Freescale ARM9 processor i.mx23.
 
-So what's the result, where did this discussion lead to?
+While trying linux-next i stumpled over my login prompt getting broken.
+What exactly happens is that the kernel boots normally, but when my
+login prompt should appear it suddenly stops. I bisected it back to 
+the commit 91013923c712e1c4b9b343f0ee4a86ce72b1b630
+irqdomain: Replace LEGACY mapping with LINEAR
 
-Best regards,
-Marek Vasut
+Reverting this and the three commits that directly depend on it (see below)
+everything seems to work fine again
+
+commit 91013923c712e1c4b9b343f0ee4a86ce72b1b630
+    irqdomain: Replace LEGACY mapping with LINEAR
+commit 79f3a92c6f1dcbd9aef748252962ec28dab130b8
+    irqdomain: Reserve IRQs for legacy domain
+commit 1fa5b2108e41a2c6be8f22c4d453fa97e1509f07
+    irqdomain: merge linear and tree reverse mappings.
+
+
+				Attila Kinali
+
+-- 
+It is upon moral qualities that a society is ultimately founded. All 
+the prosperity and technological sophistication in the world is of no 
+use without that foundation.
+                 -- Miss Matheson, The Diamond Age, Neil Stephenson
