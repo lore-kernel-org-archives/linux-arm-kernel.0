@@ -1,174 +1,153 @@
-From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
-Date: Thu, 19 Jul 2012 13:21:12 +0000
-Subject: [PATCH v4 09/11] drivers: usb: musb: Add device tree support
- for omap musb glue
-In-Reply-To: <1342607922-11554-10-git-send-email-kishon@ti.com>
-References: <1342607922-11554-1-git-send-email-kishon@ti.com>
- <1342607922-11554-10-git-send-email-kishon@ti.com>
-Message-ID: <47CEF8C4B26E8C44B22B028A650E0EA93EADE11A@DBDE01.ent.ti.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Thu, 19 Jul 2012 18:51:48 +0530
+Subject: [PATCH V2 3/7] ARM: EXYNOS5: add machine specific support for LCD
+In-Reply-To: <009b01cd64b1$0019eb20$004dc160$%szyprowski@samsung.com>
+References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
+ <1342591053-7092-4-git-send-email-l.krishna@samsung.com>
+ <009b01cd64b1$0019eb20$004dc160$%szyprowski@samsung.com>
+Message-ID: <CAL1wa8c1Ty2xz7qsTWixTqvmHc1LC+nEahd7wUgQEHWUPHY9UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/usb/omap-usb.txt |   34 ++++++++++++-
->  drivers/usb/musb/omap2430.c                        |   55
-> ++++++++++++++++++++
->  2 files changed, 88 insertions(+), 1 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
-> b/Documentation/devicetree/bindings/usb/omap-usb.txt
-> index 80a28c9..39cdffb 100644
-> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
-> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-> @@ -1,4 +1,4 @@
-> -OMAP USB PHY
-> +OMAP USB PHY AND GLUE
-> 
->  OMAP USB2 PHY
-> 
-> @@ -14,3 +14,35 @@ usb2phy at 0x4a0ad080 {
->  	compatible = "ti,omap-usb2";
->  	reg = <0x4a0ad080 0x58>;
->  };
-> +
-> +OMAP MUSB GLUE
-> + - compatible : Should be "ti,musb-omap2430"
-> + - ti,hwmods : must be "usb_otg_hs"
-> + - multipoint : Should be "1" indicating the musb controller supports
-> +   multipoint. This is a MUSB configuration-specific setting.
-> + - num_eps : Specifies the number of endpoints. This is also a
-> +   MUSB configuration-specific setting. Should be set to "16"
-> + - ram_bits : Specifies the ram address size. Should be set to "12"
-> + - interface_type : This is a board specific setting to describe the type
-> of
-> +   interface between the controller and the phy. It should be "0" or "1"
-> +   specifying ULPI and UTMI respectively.
-> + - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
-> +   represents PERIPHERAL.
-> + - power : Should be "50". This signifies the controller can supply upto
-> +   100mA when operating in host mode.
-> +
-> +SOC specific device node entry
-> +usb_otg_hs: usb_otg_hs at 4a0ab000 {
-> +	compatible = "ti,musb-omap2430";
-> +	ti,hwmods = "usb_otg_hs";
-> +	multipoint = <1>;
-> +	num_eps = <16>;
-> +	ram_bits = <12>;
-> +};
-> +
-> +Board specific device node entry
-> +&usb_otg_hs {
-> +	interface_type = <1>;
-> +	mode = <3>;
-> +	power = <50>;
-> +};
-> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> index addbebf..331e477 100644
-> --- a/drivers/usb/musb/omap2430.c
-> +++ b/drivers/usb/musb/omap2430.c
-> @@ -30,6 +30,7 @@
->  #include <linux/init.h>
->  #include <linux/list.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/pm_runtime.h>
-> @@ -469,8 +470,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
->  static int __devinit omap2430_probe(struct platform_device *pdev)
->  {
->  	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
-> +	struct omap_musb_board_data	*data;
->  	struct platform_device		*musb;
->  	struct omap2430_glue		*glue;
-> +	struct device_node		*np = pdev->dev.of_node;
-> +	struct musb_hdrc_config		*config;
->  	struct resource			*res;
->  	int				ret = -ENOMEM;
-> 
-> @@ -500,6 +504,43 @@ static int __devinit omap2430_probe(struct
-> platform_device *pdev)
->  	if (glue->control_otghs == NULL)
->  		dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
-> 
-> +	if (np) {
-> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +		if (!pdata) {
-> +			dev_err(&pdev->dev,
-> +				"failed to allocate musb platfrom data\n");
-> +			ret = -ENOMEM;
-> +			goto err1;
-> +		}
-> +
-> +		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +		if (!data) {
-> +			dev_err(&pdev->dev,
-> +					"failed to allocate musb board data\n");
-> +			ret = -ENOMEM;
-> +			goto err1;
-> +		}
-> +
-> +		config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
-> +		if (!data) {
-> +			dev_err(&pdev->dev,
-> +				"failed to allocate musb hdrc config\n");
-> +			goto err1;
-> +		}
-> +
-> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
-> +		of_property_read_u32(np, "interface_type",
-> +						(u32 *)&data->interface_type);
-> +		of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
-> +		of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
-> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
+Hello Marek,
 
-pdata->mode is already read so above should be removed.
+On Wed, Jul 18, 2012 at 12:15 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> On Wednesday, July 18, 2012 7:57 AM Leela Krishna Amudala wrote:
+>
+>> This patch adds machine specific support for LCD controller like setting power to LCD
+>> and adding LCD platform device.
+>>
+>> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
+>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/mach-exynos5-dt.c |   56 ++++++++++++++++++++++++++++++++
+>>  1 files changed, 56 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> index e7113cc..02a0e68 100644
+>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> @@ -13,6 +13,7 @@
+>>  #include <linux/serial_core.h>
+>>  #include <linux/pwm_backlight.h>
+>>  #include <linux/gpio.h>
+>> +#include <linux/delay.h>
+>>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/hardware/gic.h>
+>> @@ -24,6 +25,7 @@
+>>  #include <plat/gpio-cfg.h>
+>>
+>>  #include "common.h"
+>> +#include <video/platform_lcd.h>
+>>
+>>  static int smdk5250_bl_notify(struct device *unused, int brightness)
+>>  {
+>> @@ -47,6 +49,55 @@ static struct platform_pwm_backlight_data smdk5250_bl_data = {
+>>       .notify         = smdk5250_bl_notify,
+>>  };
+>>
+>> +static void lcd_set_power(struct plat_lcd_data *pd,
+>> +                     unsigned int power)
+>> +{
+>> +
+>> +     /* reset */
+>> +     gpio_request_one(EXYNOS5_GPX1(5), GPIOF_OUT_INIT_HIGH, "GPX1");
+>> +
+>> +     mdelay(20);
+>> +     if (power) {
+>> +             /* fire nRESET on power up */
+>> +             gpio_set_value(EXYNOS5_GPX1(5), 0);
+>> +             mdelay(20);
+>> +             gpio_set_value(EXYNOS5_GPX1(5), 1);
+>> +             mdelay(20);
+>> +             gpio_free(EXYNOS5_GPX1(5));
+>> +     } else {
+>> +             /* fire nRESET on power off */
+>> +             gpio_set_value(EXYNOS5_GPX1(5), 0);
+>> +             mdelay(20);
+>> +             gpio_set_value(EXYNOS5_GPX1(5), 1);
+>> +             mdelay(20);
+>> +             gpio_free(EXYNOS5_GPX1(5));
+>> +     }
+>> +     mdelay(20);
+>> +
+>> +     /*
+>> +      * Request lcd_bl_en GPIO for smdk5250_bl_notify().
+>> +      * TODO: Fix this so we are not at risk of requesting the GPIO
+>> +      * multiple times, this should be done with device tree, and
+>> +      * likely integrated into the plat-samsung/dev-backlight.c init.
+>> +      */
+>> +     gpio_request_one(EXYNOS5_GPX3(0), GPIOF_OUT_INIT_LOW, "GPX3");
+>> +}
+>> +
+>> +static int smdk5250_match_fb(struct plat_lcd_data *pd, struct fb_info *info)
+>> +{
+>> +     /* Don't call .set_power callback while unblanking */
+>> +     return 0;
+>> +}
+>> +
+>> +static struct plat_lcd_data smdk5250_lcd_data = {
+>> +     .set_power      = lcd_set_power,
+>> +     .match_fb       = smdk5250_match_fb,
+>> +};
+>> +
+>> +static struct platform_device smdk5250_lcd = {
+>> +     .name                   = "platform-lcd",
+>> +     .dev.platform_data      = &smdk5250_lcd_data,
+>> +};
+>>  /*
+>>   * The following lookup table is used to override device names when devices
+>>   * are registered from device tree. This is temporarily added to enable
+>> @@ -85,6 +136,10 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst
+>> = {
+>>       {},
+>>  };
+>>
+>> +static struct platform_device *smdk5250_devices[] __initdata = {
+>> +     &smdk5250_lcd, /* for platform_lcd device */
+>> +};
+>> +
+>>  static void __init exynos5250_dt_map_io(void)
+>>  {
+>>       exynos_init_io(NULL, 0);
+>> @@ -96,6 +151,7 @@ static void __init exynos5250_dt_machine_init(void)
+>>       samsung_bl_set(&smdk5250_bl_gpio_info, &smdk5250_bl_data);
+>>       of_platform_populate(NULL, of_default_bus_match_table,
+>>                               exynos5250_auxdata_lookup, NULL);
+>> +     platform_add_devices(smdk5250_devices, ARRAY_SIZE(smdk5250_devices));
+>>  }
+>>
+>>  static char const *exynos5250_dt_compat[] __initdata = {
+>
+> Sorry, but this patch looks completely weird to me. exynos5-dt machine is aimed to
+> operate on ANY Exynos5 based board with proper device tree bindings, not only SMDK5250.
+> Please add DT support to platform lcd driver and create required bindings for it
+> instead of hardcoding the platform data and gpio numbers in mach-exynos5-dt.c
+>
 
-Ajay
-> +		of_property_read_u32(np, "power", (u32 *)&pdata->power);
-> +		config->multipoint = of_property_read_bool(np, "multipoint");
-> +
-> +		pdata->board_data	= data;
-> +		pdata->config		= config;
-> +	}
-> +
->  	pdata->platform_ops		= &omap2430_ops;
-> 
->  	platform_set_drvdata(pdev, glue);
-> @@ -597,12 +638,26 @@ static struct dev_pm_ops omap2430_pm_ops = {
->  #define DEV_PM_OPS	NULL
->  #endif
-> 
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id omap2430_id_table[] = {
-> +	{
-> +		.compatible = "ti,omap4-musb"
-> +	},
-> +	{
-> +		.compatible = "ti,omap3-musb"
-> +	},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, omap2430_id_table);
-> +#endif
-> +
->  static struct platform_driver omap2430_driver = {
->  	.probe		= omap2430_probe,
->  	.remove		= __devexit_p(omap2430_remove),
->  	.driver		= {
->  		.name	= "musb-omap2430",
->  		.pm	= DEV_PM_OPS,
-> +		.of_match_table = of_match_ptr(omap2430_id_table),
->  	},
->  };
-> 
+Yes true, that GPIO numbers will vary for boards.
+Can you please confirm that platform lcd driver means the core
+"drivers/video/backlight/platform_lcd.c" file.
+But platform lcd driver is used by other(non samsung) platforms also.
+So, If I add the DT suppot to that file, I have to test the changes on
+other platforms also.
+Can you please kindly suggest me some other way to overcome this situation.
+
+Best Wishes,
+Leela Krishna Amudala.
+
+> Best regards
 > --
-> 1.7.5.4
-> 
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
