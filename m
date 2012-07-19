@@ -1,62 +1,88 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 19 Jul 2012 20:07:50 +0530
-Subject: [PATCHv5 00/18] I2C big cleanup
-Message-ID: <1342708688-2342-1-git-send-email-shubhrajyoti@ti.com>
+Date: Thu, 19 Jul 2012 20:08:05 +0530
+Subject: [PATCHv5 15/18] i2c: omap: simplify IRQ exit path
+In-Reply-To: <1342708688-2342-1-git-send-email-shubhrajyoti@ti.com>
+References: <1342708688-2342-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1342708688-2342-16-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-       - removed tabification on patch 6/17
-       - removed dev_err() which was introduced on patch 09/17
-Changes since v2:
-        - do not set full fifo depth in the RDR interrupt.
-        - some changelog updates.
-        - rebase to the Wolfram's tree.
-Changes since v3:
-        - Remove a redundant read of status register
-        - Read the dev->buf_len variable instead of the register
-        as the information of the remaining bytes is there.
-Changes since v4:
-	- Ack the arbitration lost.
-	- Rebase to the i2c-embedded/for-next branch.
+From: Felipe Balbi <balbi@ti.com>
 
-Tested on omap4sdp and 3430sdp.
-Functional testing.
-Also did suspend resume test.
+instead of having multiple return points, use
+a goto statement to make that clearer.
 
-This applies on Wolfram's i2c-embedded/for-next branch
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   20 ++++++++------------
+ 1 files changed, 8 insertions(+), 12 deletions(-)
 
-Previous disscurssion
-http://www.spinics.net/lists/linux-omap/msg73235.html
-
-are available in the git repository at:
-  git://gitorious.org/linus-tree/linus-tree.git for_next/i2c/big_cleanup
-
-
-Felipe Balbi (17):
-  i2c: omap: switch to devm_* API
-  i2c: omap: simplify num_bytes handling
-  i2c: omap: decrease indentation level on data handling
-  i2c: omap: add blank lines
-  i2c: omap: simplify omap_i2c_ack_stat()
-  i2c: omap: split out [XR]DR and [XR]RDY
-  i2c: omap: improve i462 errata handling
-  i2c: omap: re-factor receive/transmit data loop
-  i2c: omap: switch over to do {} while loop
-  i2c: omap: ack IRQ in parts
-  i2c: omap: switch to platform_get_irq()
-  i2c: omap: bus: add a receiver flag
-  i2c: omap: simplify errata check
-  i2c: omap: always return IRQ_HANDLED
-  i2c: omap: simplify IRQ exit path
-  i2c: omap: resize fifos before each message
-  i2c: omap: get rid of the "complete" label
-
-Shubhrajyoti D (1):
-  i2c: omap: remove redundant status read
-
- drivers/i2c/busses/i2c-omap.c |  392 ++++++++++++++++++++++++-----------------
- 1 files changed, 228 insertions(+), 164 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 6847a98..3f50021 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -850,24 +850,21 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
+ 		if (count++ == 100) {
+ 			dev_warn(dev->dev, "Too much work in one IRQ\n");
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ complete:
+ 		if (stat & OMAP_I2C_STAT_NACK) {
+ 			err |= OMAP_I2C_STAT_NACK;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_AL) {
+ 			dev_err(dev->dev, "Arbitration lost\n");
+ 			err |= OMAP_I2C_STAT_AL;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		/*
+@@ -880,8 +877,7 @@ complete:
+ 						OMAP_I2C_STAT_XRDY |
+ 						OMAP_I2C_STAT_XDR |
+ 						OMAP_I2C_STAT_ARDY));
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_RDR) {
+@@ -946,19 +942,19 @@ complete:
+ 			dev_err(dev->dev, "Receive overrun\n");
+ 			err |= OMAP_I2C_STAT_ROVR;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_XUDF) {
+ 			dev_err(dev->dev, "Transmit underflow\n");
+ 			err |= OMAP_I2C_STAT_XUDF;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 	} while (stat);
+ 
++out:
++	omap_i2c_complete_cmd(dev, err);
+ 	return IRQ_HANDLED;
+ }
+ 
 -- 
 1.7.5.4
