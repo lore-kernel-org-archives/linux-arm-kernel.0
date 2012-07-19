@@ -1,18 +1,39 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 20 Jul 2012 07:42:37 +0900
-Subject: [GIT PULL] Samsung board-3 for v3.6
-Message-ID: <195101cd65ff$cc0a8600$641f9200$%kim@samsung.com>
+Date: Fri, 20 Jul 2012 07:47:34 +0900
+Subject: [PATCH v3 0/6] mmc: dw_mmc: add support for device tree based
+ instantiation
+In-Reply-To: <CAJuYYwQBgpJ1wiS3fSDS2cMi6kanuO47rc8SmniAqjRPuBGJHg@mail.gmail.com>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+ <5008279B.4000001@samsung.com>
+ <CAJuYYwQBgpJ1wiS3fSDS2cMi6kanuO47rc8SmniAqjRPuBGJHg@mail.gmail.com>
+Message-ID: <195201cd6600$7cb089f0$76119dd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+Thomas Abraham wrote:
+> 
+> On 19 July 2012 20:58, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> > Hi Thomas,
+> >
+> > I think not good that added the samsung specific code into dw_mmc-
+> pltfm.c
+> > How about separating to dw-mmc-exynos.c?
+> 
+> I am not sure of this. The only samsung specific code in
+> dw_mmc-pltfm.c file is the data for of_device_id instances. The clock
+> lookup added into this file in the 3rd patch does not cause any harm
+> on non-samsung SoC's which might not define those clocks (on clock
+> lookup failure, there are only warning printed, the driver's probe
+> does not fail.
+> 
+I agree with Thomas' opinion, in addition, the dw_mmc-pltfm.c file can
+support that, so adding dw-mmc-exynos.c is not needed now.
 
-Please pull 3rd updates for samsung stuff v3.6 from:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git next/board-samsung-3
-
-It is including several changes for samsung boards.
-
-If any problems, please kindly let me know.
+> I would prefer not to add separate file for Exynos SoC's for now.
+> Splitting into different files will need to defined new callbacks
+> which I fell is not really required.
+> 
+Yes.
 
 Thanks.
 
@@ -21,37 +42,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 23c7301d74ac2d80d0dafd6f84a6d11a0fc15ce5:
-
-  Merge branch 'next/board-samsung-2' into next/board-samsung-3 (2012-07-19 14:29:30 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git next/board-samsung-3
-
-Kukjin Kim (1):
-      ARM: SAMSUNG: no need to set the value for clk_xusbxti when it is 24Mhz
-
-Mark Brown (2):
-      ARM: S3C64XX: Clean up after SPI driver platform data updates
-      ARM: S3C64XX: Mark most Cragganmore initdata devinitdata
-
-Ricardo Salveti de Araujo (1):
-      ARM: EXYNOS: Add leds status1 and status2 on Origen board
-
-Sachin Kamat (2):
-      ARM: EXYNOS: Add DRM device to SMDK4X12 board
-      ARM: EXYNOS: Add missing .reserve field to SMDKC210
-
- arch/arm/mach-exynos/Kconfig                 |    1 +
- arch/arm/mach-exynos/mach-nuri.c             |    3 +-
- arch/arm/mach-exynos/mach-origen.c           |   33 ++++++++++++-
- arch/arm/mach-exynos/mach-smdk4x12.c         |   32 +++++++++++-
- arch/arm/mach-exynos/mach-smdkv310.c         |    4 +-
- arch/arm/mach-exynos/mach-universal_c210.c   |    3 +-
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 -
- arch/arm/mach-s3c64xx/mach-crag6410.c        |   68 +++++++++++++-------------
- arch/arm/mach-s5pv210/mach-goni.c            |    4 +-
- arch/arm/mach-s5pv210/mach-smdkv210.c        |    3 +-
- 10 files changed, 102 insertions(+), 50 deletions(-)
