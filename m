@@ -1,50 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Jul 2012 04:40:02 -0700
-Subject: [PATCH 1/1] ARM: OMAP2+: omap2plus_defconfig: enable OMAP DMA
- engine support
-In-Reply-To: <CABxcv=nbUOKKhJxTG302fX=UzHsX3mN=R2nEi88VZM61ka11Vg@mail.gmail.com>
-References: <1342321398-11009-1-git-send-email-javier@dowhile0.org>
- <87bojfeikj.fsf@ti.com>
- <CABxcv=nbUOKKhJxTG302fX=UzHsX3mN=R2nEi88VZM61ka11Vg@mail.gmail.com>
-Message-ID: <20120719114001.GO6522@atomide.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 19 Jul 2012 14:44:27 +0300
+Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per
+ hwmod/module context lost count
+In-Reply-To: <CAMQu2gy8i1Fx82Omg8OuSk2gb6ySqMspap4_w7zf1V5BUaYKTQ@mail.gmail.com>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-5-git-send-email-t-kristo@ti.com>
+ <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
+ <1342602902.4672.91.camel@sokoban>
+ <CAOMWX4dWnJSOwLVvrAfMd7a9eKE97ywR0TrS6imHFA67V5QZag@mail.gmail.com>
+ <1342691380.4672.123.camel@sokoban>
+ <CAMQu2gy8i1Fx82Omg8OuSk2gb6ySqMspap4_w7zf1V5BUaYKTQ@mail.gmail.com>
+Message-ID: <1342698267.4672.126.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [120716 16:33]:
-> On Mon, Jul 16, 2012 at 7:12 PM, Kevin Hilman <khilman@ti.com> wrote:
-> > Javier Martinez Canillas <javier@dowhile0.org> writes:
+On Thu, 2012-07-19 at 16:05 +0530, Shilimkar, Santosh wrote:
+> On Thu, Jul 19, 2012 at 3:19 PM, Tero Kristo <t-kristo@ti.com> wrote:
 > >
-> >> commit 13f30fc893e4610f67dd7a8b0b67aec02eac1775
-> >> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> Date:   Sat Apr 21 22:41:10 2012 +0100
-> >>
-> >>     mmc: omap: remove private DMA API implementation
-> >>
-> >> removed the private DMA API implementation from the OMAP mmc host to
-> >> make it use exclusively the DMA engine API.
-> >>
-> >> Unfortunately the omap2plus_defconfig doesn't enable this feature
-> >> leading to the following error on an IGEPv2 Rev.C (and probably on most
-> >> boards with MMC support):
+> > On Thu, 2012-07-19 at 00:55 -0500, Menon, Nishanth wrote:
+> > > On Wed, Jul 18, 2012 at 4:15 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> > > >
+> > > > On Tue, 2012-07-17 at 02:59 -0500, Menon, Nishanth wrote:
+> > > > > Couple of minor comments:
+> > > > > On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com>
+> > > > > wrote:
+> > > > > [...]
+> > > > > >  /**
+> > > > > > + * _omap4_update_context_lost - increment hwmod context loss
+> > > > > > counter
+> > > > > > if
+> > > > > > + * hwmod context was lost, and clear hardware context loss reg
+> > > > > > + * @oh: hwmod to check for context loss
+> > > > > > + *
+> > > > > > + * If the PRCM indicates that the hwmod @oh lost context,
+> > > > > > increment
+> > > > > > + * our in-memory context loss counter, and clear the RM_*_CONTEXT
+> > > > > > + * bits. No return value.
+> > > > > > + */
+> > > > > > +static void _omap4_update_context_lost(struct omap_hwmod *oh)
+> > > > > > +{
+> > > > > > +       u32 r;
+> > > > > > +
+> > > > > > +       if (oh->prcm.omap4.context_offs == USHRT_MAX)
+> > > > > > +               return;
+> > > > > would'nt it be better to return a dummy incremental counter instead
+> > > > > of
+> > > > > returning no context loss (count = 0)?
+> > > >
+> > > > I guess you are right, this way we may have some extra context
+> > > > restores
+> > > > for modules which don't have context offs defined, rather than not
+> > > > restoring them at all. Only thing I can think might prevent this is if
+> > > > there are modules that never lose context but don't have context
+> > > > register? How about omap5+?
+> > >
+> > > there has been an interesting debate ongoing with HWAUTO and context
+> > > loss count handling -> since we update only on _enable, this might
+> > > actually be interesting to consider:
+> > > enable
+> > > idle
+> > > un_idle (lost context)
+> > > read counter -> no update
+> > >
+> > > Now to handle modules that never loose context - they have to be in
+> > > wakeup domain.. should we consider a flag for those? would'nt matter
+> > > o5 or not, context is still the same.. this issue could be resolved if
+> > > counter update is done even when a check is done.
 > >
-> > Personally, I'd rather see this fixed by having the drivers that depend
-> > on DMA engine 'select DMADEVICES'.  That way, any defconfig will work
-> > correctly instead of just omap2plus_defconfig.
+> > Yea, that would be an option. I think I'll add a flag for not losing
+> > context ever.
 > >
-> > Kevin
-> >
-> 
-> Hi Kevin,
-> 
-> Thanks a lot for your feedback. I'll do what you suggest and send a v2
-> of the patch.
+> You just access the module power domain from hwmod and then
+> you already know whether it is AON or not. The flag idea
+> was discussed in context of [1]. See if you can re-use that same idea.
 
-I'd rather see the drivers fixed to work with and without DMA as the
-channels can run out. Also forcing the select is not good for distro kernels.
+That looks better still, thanks for the tip.
 
-I'll apply this fix into l-o master branch while we're discussing the
-issue.
-
-Regards,
-
-Tony
+-Tero
