@@ -1,77 +1,57 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Jul 2012 16:26:30 +0300
-Subject: [PATCHv7 10/12] ARM: OMAP4: HWMOD: add support for lostcontext_mask
+Date: Thu, 19 Jul 2012 16:26:32 +0300
+Subject: [PATCHv7 12/12] ARM: OMAP4: hwmod: update context lost counter logic
+ for hwmods without context reg
 In-Reply-To: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
 References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1342704392-23657-11-git-send-email-t-kristo@ti.com>
+Message-ID: <1342704392-23657-13-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently hwmod only provides the offset for the context lose register,
-and if we attempt to share the same register between two or more hwmods,
-the resulting context loss counts get wrong. Thus, we need a way to
-specify which bits are used for the context loss information for each.
-This is accomplished by adding a new field to the omap4 prcm struct,
-'lostcontext_mask', which specifies a bit-mask to use for filtering
-the register. Only the specified bits are read and cleared by the
-context lose counter update code. If a hwmod doesn't specify
-'lostcontext_mask' (default behavior), the whole contents of the
-context register are used without any filtering.
+With this patch, the hwmods that don't have context register, will now
+increment their context lost counter always unless they belong to an
+always on powerdomain which never loses context. The always on pwrdm
+type is checked by looking at the the powerdomain registered for the
+hwmod, and seeing if it only has ON within its valid powerstates.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |    8 ++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   21 ++++++++++++++++++++-
+ 1 files changed, 20 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index a60dfd2..3ebf93e 100644
+index 3ebf93e..daf5322 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1810,11 +1810,19 @@ static void _omap4_update_context_lost(struct omap_hwmod *oh)
- 					oh->clkdm->pwrdm.ptr->prcm_offs,
- 					oh->prcm.omap4.context_offs);
- 
-+	/*
-+	 * If lostcontext_mask is defined, only check these bits for
-+	 * losing context. Otherwise check whole register.
-+	 */
-+	if (oh->prcm.omap4.lostcontext_mask)
-+		r &= oh->prcm.omap4.lostcontext_mask;
+@@ -1802,9 +1802,28 @@ static void _reconfigure_io_chain(void)
+ static void _omap4_update_context_lost(struct omap_hwmod *oh)
+ {
+ 	u32 r;
++	struct powerdomain *pwrdm;
 +
- 	if (!r)
++	/* Special handling if we have not defined context register */
++	if (oh->prcm.omap4.context_offs == USHRT_MAX) {
++		/* Get powerdomain pointer for this hwmod */
++		if (oh->clkdm)
++			pwrdm = oh->clkdm->pwrdm.ptr;
++		else
++			pwrdm = NULL;
+ 
+-	if (oh->prcm.omap4.context_offs == USHRT_MAX)
++		/*
++		 * If our powerdomain is of 'always on' type (i.e.
++		 * available powerstates == PWRSTS_ON), don't increment
++		 * context lost and return
++		 */
++		if (pwrdm && pwrdm->pwrsts == PWRSTS_ON)
++			return;
++
++		/* Otherwise, increase context lost counter and return */
++		oh->prcm.omap4.context_lost_counter++;
  		return;
++	}
  
- 	oh->prcm.omap4.context_lost_counter++;
- 
-+	/* Clear selected bits */
- 	omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
- 				     oh->clkdm->pwrdm.ptr->prcm_offs,
- 				     oh->prcm.omap4.context_offs);
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 75d59f5..ebe3048 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -375,14 +375,20 @@ struct omap_hwmod_omap2_prcm {
-  * @clkctrl_offs: offset of the PRCM clock control register
-  * @rstctrl_offs: offset of the XXX_RSTCTRL register located in the PRM
-  * @context_offs: offset of the RM_*_CONTEXT register
-+ * @lostcontext_mask: bitmask for selecting bits from RM_*_CONTEXT register
-  * @submodule_wkdep_bit: bit shift of the WKDEP range
-  * @modulemode: allowable modulemodes
-  * @context_lost_counter: Count of module level context lost
-+ *
-+ * If @lostcontext_mask is not defined, context loss check code uses
-+ * whole register without masking. @lostcontext_mask should only be defined
-+ * in cases where @context_offs register is shared by two or more hwmods.
-  */
- struct omap_hwmod_omap4_prcm {
- 	u16		clkctrl_offs;
- 	u16		rstctrl_offs;
- 	u16		context_offs;
-+	u32		lostcontext_mask;
- 	u8		submodule_wkdep_bit;
- 	u8		modulemode;
- 	unsigned	context_lost_counter;
+ 	r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
+ 					oh->clkdm->pwrdm.ptr->prcm_offs,
 -- 
 1.7.4.1
