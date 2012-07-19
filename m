@@ -1,90 +1,54 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Thu, 19 Jul 2012 09:43:33 +0900
-Subject: [PATCH] video: ld9040: support early fb event of fb_blank()
-In-Reply-To: <500757AE.3010202@samsung.com>
-References: <500757AE.3010202@samsung.com>
-Message-ID: <50075835.2040703@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 18 Jul 2012 21:41:06 -0400 (EDT)
+Subject: [PATCH v9 1/9] clocksource: time-armada-370-xp: Marvell Armada
+ 370/XP SoC timer driver
+In-Reply-To: <50074B32.8090607@us.ibm.com>
+References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1341588221-3822-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50074B32.8090607@us.ibm.com>
+Message-ID: <alpine.LFD.2.02.1207182120180.9293@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports early fb event of fb_blank().
+On Wed, 18 Jul 2012, John Stultz wrote:
 
-- In case of lcd power off : call early_set_power() interface and lcd
-power is off. And then framebuffer is blanked.
+> I'm also not a huge fan of adding clockevent drivers to drivers/clocksource/.
+> 
+> Further, LinusW and I have different opinions on this (and its not that huge
+> of an issue), but I'd really prefer to see additions to drivers/clocksource be
+> only for clocksources that are likely to be shared *between architectures*.
 
-- In case of lcd power on : First, framebuffer is unblanked, and then
-call set_power() interface to turn lcd on.
+This is contrary to the push we've made for about 2 years now. We 
+decided it is more beneficial to gather drivers according to their 
+purpose and not according to the architecture they belong to.  The 
+reason is that it is far easier to abstract common functionality if 
+those drivers are close by.
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/video/backlight/ld9040.c |   36 +++++++++++++++++++++++++++++++++++-
- 1 files changed, 35 insertions(+), 1 deletions(-)
+> Similarly, I'd prefer architecture specific clocksources (like TSC on x86,
+> timebase on ppc, etc) stay in the arch subdir, just so theirs a clear
+> ownership of the driver (ie: if in 10 years specific hw support is dropped
+> from the arch directory, we don't end up with zombie drivers that live on
+> because generic driver maintainers don't know what hardware they're actually
+> connected to).
 
-diff --git a/drivers/video/backlight/ld9040.c b/drivers/video/backlight/ld9040.c
-index efd352b..221c843 100644
---- a/drivers/video/backlight/ld9040.c
-+++ b/drivers/video/backlight/ld9040.c
-@@ -642,17 +642,50 @@ static int ld9040_power(struct ld9040 *lcd, int power)
- 	return ret;
- }
- 
-+static int ld9040_early_set_power(struct lcd_device *ld, int power)
-+{
-+	struct ld9040 *lcd = lcd_get_data(ld);
-+	int ret = 0;
-+
-+	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
-+		power != FB_BLANK_NORMAL) {
-+		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
-+
-+		return -EINVAL;
-+	}
-+
-+	if (!power_is_on(power) && power_is_on(lcd->power)) {
-+		ret = ld9040_power(lcd, power);
-+		if (!ret)
-+			lcd->power = power;
-+	}
-+
-+	return ret;
-+}
-+
- static int ld9040_set_power(struct lcd_device *ld, int power)
- {
- 	struct ld9040 *lcd = lcd_get_data(ld);
-+	struct backlight_device *bd = lcd->bd;
-+	int ret = 0;
- 
- 	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
- 		power != FB_BLANK_NORMAL) {
- 		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
-+
- 		return -EINVAL;
- 	}
- 
--	return ld9040_power(lcd, power);
-+	if (power_is_on(power) && !power_is_on(lcd->power)) {
-+		ret = ld9040_power(lcd, power);
-+		if (!ret)
-+			lcd->power = power;
-+
-+		ld9040_gamma_ctl(lcd, bd->props.brightness);
-+	} else
-+		ld9040_early_set_power(ld, power);
-+
-+	return ret;
- }
- 
- static int ld9040_get_power(struct lcd_device *ld)
-@@ -689,6 +722,7 @@ static int ld9040_set_brightness(struct backlight_device *bd)
- }
- 
- static struct lcd_ops ld9040_lcd_ops = {
-+	.early_set_power = ld9040_early_set_power,
- 	.set_power = ld9040_set_power,
- 	.get_power = ld9040_get_power,
- };
--- 
-1.7.4.1
+The same argument was said about cpufreq drivers, and cpuidle drivers, 
+and IRQ controller drivers, etc.  They ended up in a common directory 
+anyway.  In the end this helps generic driver maintainers because you 
+don't end up with the same infrastructure copied over and over, each 
+time with slight alteration, making any common API maintenance a 
+nightmare.
+
+Zombie drivers shouldn't be a huge issue when no one selects their 
+kconfig symbol.  On the other hand, drivers burried under various 
+architecture directories are hard to maintain and abstract (ask tglx 
+about his IRQ driver changes).
+
+> (But I'm somewhat flexible on this last point, as long as there really is a
+> chance it might be shared at some point)
+
+I think that common purpose is more important a criteria than 
+sharability.  It's hard to say in advance if a piece of code might be 
+shared or not.  On the other hand, its purpose should be rather clear.
+
+
+Nicolas
