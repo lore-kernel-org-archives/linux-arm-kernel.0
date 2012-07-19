@@ -1,92 +1,50 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jul 2012 23:54:39 +0800
-Subject: [PATCH 1/3] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
-In-Reply-To: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1342713281-31114-2-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 19 Jul 2012 23:54:38 +0800
+Subject: [PATCH 0/3] Add a generic cpufreq-cpu0 driver
+Message-ID: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhao <richard.zhao@linaro.org>
+This is a continuous effort of Richard's work [1].  But that generic
+cpufreq driver has been rewritten with taking omap-cpufreq.c as the
+reference to adopt OPP library.
 
-If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
-arch has different per-cpu loops_per_jiffy definition.
+Same as Richard's patch, the driver has no intention to support the
+multi-core systems that frequency and voltage can be scaled
+independently on different CPUs.  Instead, it aims at uniprocessor (UP)
+and those symmetric multiprocessor (SMP) systems which share clock and
+voltage across all CPUs.
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+I have seen patch from Mike changing omap-cpufreq driver to scale
+regulator from clk notifier.  We can definitely make the same move
+for cpufreq-cpu0 later when the patch gets accepted.
+
+Regards,
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.kernel.cpufreq/7688/focus=7688
+
 ---
- arch/arm/kernel/smp.c |   54 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 54 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2c7217d..83412d2 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -25,6 +25,7 @@
- #include <linux/percpu.h>
- #include <linux/clockchips.h>
- #include <linux/completion.h>
-+#include <linux/cpufreq.h>
- 
- #include <linux/atomic.h>
- #include <asm/cacheflush.h>
-@@ -583,3 +584,56 @@ int setup_profiling_timer(unsigned int multiplier)
- {
- 	return -EINVAL;
- }
-+
-+#ifdef CONFIG_CPU_FREQ
-+
-+static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
-+static DEFINE_PER_CPU(unsigned long, l_p_j_ref_freq);
-+static unsigned long global_l_p_j_ref;
-+static unsigned long global_l_p_j_ref_freq;
-+
-+static int cpufreq_callback(struct notifier_block *nb,
-+					unsigned long val, void *data)
-+{
-+	struct cpufreq_freqs *freq = data;
-+	int cpu = freq->cpu;
-+
-+	if (freq->flags & CPUFREQ_CONST_LOOPS)
-+		return NOTIFY_OK;
-+
-+	if (!per_cpu(l_p_j_ref, cpu)) {
-+		per_cpu(l_p_j_ref, cpu) =
-+			per_cpu(cpu_data, cpu).loops_per_jiffy;
-+		per_cpu(l_p_j_ref_freq, cpu) = freq->old;
-+		if (!global_l_p_j_ref) {
-+			global_l_p_j_ref = loops_per_jiffy;
-+			global_l_p_j_ref_freq = freq->old;
-+		}
-+	}
-+
-+	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
-+	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
-+	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
-+		loops_per_jiffy = cpufreq_scale(global_l_p_j_ref,
-+						global_l_p_j_ref_freq,
-+						freq->new);
-+		per_cpu(cpu_data, cpu).loops_per_jiffy =
-+			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
-+					per_cpu(l_p_j_ref_freq, cpu),
-+					freq->new);
-+	}
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block cpufreq_notifier = {
-+	.notifier_call  = cpufreq_callback,
-+};
-+
-+static int __init register_cpufreq_notifier(void)
-+{
-+	return cpufreq_register_notifier(&cpufreq_notifier,
-+						CPUFREQ_TRANSITION_NOTIFIER);
-+}
-+core_initcall(register_cpufreq_notifier);
-+
-+#endif
+Richard Zhao (1):
+  ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
+
+Shawn Guo (2):
+  PM / OPP: Initialize OPP table from device tree
+  cpufreq: Add a generic cpufreq-cpu0 driver
+
+ .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   58 +++++
+ Documentation/devicetree/bindings/power/opp.txt    |   29 +++
+ arch/arm/kernel/smp.c                              |   54 +++++
+ drivers/base/power/opp.c                           |   66 ++++++
+ drivers/cpufreq/Kconfig                            |   11 +
+ drivers/cpufreq/Makefile                           |    2 +
+ drivers/cpufreq/cpufreq-cpu0.c                     |  235 ++++++++++++++++++++
+ include/linux/opp.h                                |    4 +
+ 8 files changed, 459 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+ create mode 100644 Documentation/devicetree/bindings/power/opp.txt
+ create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
+
 -- 
 1.7.5.4
