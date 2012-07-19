@@ -1,38 +1,21 @@
-From: ubizjak@gmail.com (Uros Bizjak)
-Date: Thu, 19 Jul 2012 15:03:50 +0200
-Subject: [PATCH] ARM: mm: avoid attempting to flush the gate_vma with VIVT
- caches
-In-Reply-To: <20120719122814.GE29153@mudshark.cambridge.arm.com>
-References: <1342455826-9425-1-git-send-email-will.deacon@arm.com>
- <20120719122814.GE29153@mudshark.cambridge.arm.com>
-Message-ID: <CAFULd4a9YDrKpFavi-q+E+BAHTz3vyGDYGtA3JWGvncibWyFyw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Jul 2012 13:13:45 +0000
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <5006571A.7060103@de.bosch.com>
+References: <5006571A.7060103@de.bosch.com>
+Message-ID: <201207191313.46178.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2012 at 2:28 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Wednesday 18 July 2012, Dirk Behme wrote:
+> Any idea how we could influence the initialization order of the mmc 
+> block devices using a DT based kernel? Ensuring that the internal, hard 
+> wired mmc card is always mapped to mmcblk0?
 
-> On Mon, Jul 16, 2012 at 05:23:46PM +0100, Will Deacon wrote:
->> The vivt_flush_cache_{range,page} functions check that the mm_struct
->> of the VMA being flushed has been active on the current CPU before
->> performing the cache maintenance.
->>
->> The gate_vma has a NULL mm_struct pointer and, as such, will cause a
->> kernel fault if we try to flush it with the above operations. This
->> happens during ELF core dumps, which include the gate_vma as it may be
->> useful for debugging purposes.
->>
->> This patch adds checks to the VIVT cache flushing functions so that VMAs
->> with a NULL mm_struct are ignored.
->
-> Would one of you be able to test this patch please? I've not managed to
-> trigger the bug you reported on my boards, so it would be useful to know
-> whether or not this patch solves the problem for you.
+I think the best solution would be to parse the "/aliases" device node
+and look for an "mmc0" or "mmc1" property with a phandle to the respective
+device. That's how we sort the serial ports. We have the of_alias_get_id()
+function to pick out a node from there, so it should be possible to use
+that in the mmc core similar to how we use it in the uart drivers.
 
-Patched kernel works as expected. Also, backport to 3.4 (where
-original problem was triggered) works OK, so I'd suggest to backport
-this patch to 3.4.
-
-Tested-by: Uros Bizjak <ubizjak@gmail.com>
-
-Thanks,
-Uros.
+	Arnd
