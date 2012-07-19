@@ -1,54 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 18 Jul 2012 21:41:06 -0400 (EDT)
-Subject: [PATCH v9 1/9] clocksource: time-armada-370-xp: Marvell Armada
- 370/XP SoC timer driver
-In-Reply-To: <50074B32.8090607@us.ibm.com>
-References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1341588221-3822-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50074B32.8090607@us.ibm.com>
-Message-ID: <alpine.LFD.2.02.1207182120180.9293@xanadu.home>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 19 Jul 2012 10:02:08 +0800
+Subject: [PATCH v2 2/2] ARM: dts: imx6q-sabrelite: add usbmisc device
+In-Reply-To: <20120718150036.GD30219@S2100-06.ap.freescale.net>
+References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
+ <1342607348-8587-3-git-send-email-richard.zhao@freescale.com>
+ <20120718150036.GD30219@S2100-06.ap.freescale.net>
+Message-ID: <20120719020207.GN21635@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jul 2012, John Stultz wrote:
-
-> I'm also not a huge fan of adding clockevent drivers to drivers/clocksource/.
+On Wed, Jul 18, 2012 at 11:00:38PM +0800, Shawn Guo wrote:
+> On Wed, Jul 18, 2012 at 06:29:07PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
+> >  arch/arm/boot/dts/imx6q.dtsi          |   19 +++++++++++++++----
+> >  arch/arm/mach-imx/clk-imx6q.c         |    1 +
 > 
-> Further, LinusW and I have different opinions on this (and its not that huge
-> of an issue), but I'd really prefer to see additions to drivers/clocksource be
-> only for clocksources that are likely to be shared *between architectures*.
+> It seems that the patch is meant to have dts changes only by reading
+> the subject.  So it might be good to get clk-imx6q.c out of here.
+Thanks. It'll be divided into two.
 
-This is contrary to the push we've made for about 2 years now. We 
-decided it is more beneficial to gather drivers according to their 
-purpose and not according to the architecture they belong to.  The 
-reason is that it is far easier to abstract common functionality if 
-those drivers are close by.
-
-> Similarly, I'd prefer architecture specific clocksources (like TSC on x86,
-> timebase on ppc, etc) stay in the arch subdir, just so theirs a clear
-> ownership of the driver (ie: if in 10 years specific hw support is dropped
-> from the arch directory, we don't end up with zombie drivers that live on
-> because generic driver maintainers don't know what hardware they're actually
-> connected to).
-
-The same argument was said about cpufreq drivers, and cpuidle drivers, 
-and IRQ controller drivers, etc.  They ended up in a common directory 
-anyway.  In the end this helps generic driver maintainers because you 
-don't end up with the same infrastructure copied over and over, each 
-time with slight alteration, making any common API maintenance a 
-nightmare.
-
-Zombie drivers shouldn't be a huge issue when no one selects their 
-kconfig symbol.  On the other hand, drivers burried under various 
-architecture directories are hard to maintain and abstract (ask tglx 
-about his IRQ driver changes).
-
-> (But I'm somewhat flexible on this last point, as long as there really is a
-> chance it might be shared at some point)
-
-I think that common purpose is more important a criteria than 
-sharability.  It's hard to say in advance if a piece of code might be 
-shared or not.  On the other hand, its purpose should be rather clear.
-
-
-Nicolas
+Richard
+> 
+> Shawn
