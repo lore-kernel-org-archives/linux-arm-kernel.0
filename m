@@ -1,128 +1,43 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Thu, 19 Jul 2012 19:27:25 +0900
-Subject: [PATCH 3/9] mmc: dw_mmc: lookup for optional biu and ciu clocks
-In-Reply-To: <1342521538-12790-1-git-send-email-thomas.abraham@linaro.org>
-References: <CAGxe1ZGMvrec-nEYdZJ84Hub0fByYvnkCY_dRq2k489gCRSxQg@mail.gmail.com>
- <1342521538-12790-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <004201cd6599$17401610$45c04230$%jun@samsung.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 19 Jul 2012 05:27:36 -0500
+Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per hwmod/module
+ context lost count
+In-Reply-To: <1342691380.4672.123.camel@sokoban>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-5-git-send-email-t-kristo@ti.com>
+ <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
+ <1342602902.4672.91.camel@sokoban>
+ <CAOMWX4dWnJSOwLVvrAfMd7a9eKE97ywR0TrS6imHFA67V5QZag@mail.gmail.com>
+ <1342691380.4672.123.camel@sokoban>
+Message-ID: <CAOMWX4d9wBS2dx_6S9ouMagUPnAr3q8TYXpGq52nREfGHxVEUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-July 17, 2012, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> Some platforms allow for clock gating and control of bus interface unit clock
-> and card interface unit clock. Add support for clock lookup of optional biu
-> and ciu clocks for clock gating and clock speed determination.
-> 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/mmc/host/dw_mmc.c  |   39 ++++++++++++++++++++++++++++++++++++---
->  include/linux/mmc/dw_mmc.h |    4 ++++
->  2 files changed, 40 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index cd58063..ebd22d8 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1953,13 +1953,30 @@ int dw_mci_probe(struct dw_mci *host)
->  		return -ENODEV;
->  	}
-> 
-> -	if (!host->pdata->bus_hz) {
-> +	host->biu_clk = clk_get(host->dev, "biu");
-> +	if (IS_ERR(host->biu_clk))
-> +		dev_dbg(host->dev, "biu clock not available\n");
-> +	else
-> +		clk_prepare_enable(host->biu_clk);
-> +
-> +	host->ciu_clk = clk_get(host->dev, "ciu");
-> +	if (IS_ERR(host->ciu_clk))
-> +		dev_dbg(host->dev, "ciu clock not available\n");
-> +	else
-> +		clk_prepare_enable(host->ciu_clk);
-> +
-> +	if (IS_ERR(host->ciu_clk))
-> +		host->bus_hz = host->pdata->bus_hz;
-> +	else
-> +		host->bus_hz = clk_get_rate(host->ciu_clk);
-I have posted similar patch some time back.
-bus_hz represents input rate for cclk_in of mshc.
-Host of samsung soc doesn't use input clock from system directly.
-As you have introduced CLKSEL in your another patch, input clock can be changed prior to cclk_in.
-For non-samsung  host, we don't need to consider this with generic way?
+On Thu, Jul 19, 2012 at 4:49 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>
+> Zero doesn't mean no context loss. If counter was previous MAX_INT, if
+> it goes to zero it is still a context loss, as the counter value
+> differs. Drivers do check against diff in the context loss counter, and
+> if there is one, they do restore which is the right way to handle it. No
+> need to unnecessarily make this more complicated than it is.
 
-Thanks,
-Seungwon Jeon
+so we flip the responsibility of overflow to drivers. considering a
+similar scenario of jiffies
+/*
+ *      These inlines deal with timer wrapping correctly. You are
+ *      strongly encouraged to use them
+ *      1. Because people otherwise forget
+ *      2. Because if the timer wrap changes in future you won't have to
+ *         alter your driver code.
+ *
+ * time_after(a,b) returns true if the time a is after time b.
+...
+*/
+from past experience, it is highly possible that drivers never get
+this right. if the intent is just to let the drivers know context was
+lost, why not go back to the alternate possibility of a bool
+lost_context which tells the driver if it lost context since it last
+called the lost_context api.
 
-> +
-> +	if (!host->bus_hz) {
->  		dev_err(host->dev,
->  			"Platform data must supply bus speed\n");
-> -		return -ENODEV;
-> +		ret = -ENODEV;
-> +		goto err_clk;
->  	}
-> 
-> -	host->bus_hz = host->pdata->bus_hz;
->  	host->quirks = host->pdata->quirks;
-> 
->  	spin_lock_init(&host->lock);
-> @@ -2109,6 +2126,16 @@ err_dmaunmap:
->  		regulator_disable(host->vmmc);
->  		regulator_put(host->vmmc);
->  	}
-> +
-> +err_clk:
-> +	if (!IS_ERR(host->ciu_clk)) {
-> +		clk_disable_unprepare(host->ciu_clk);
-> +		clk_put(host->ciu_clk);
-> +	}
-> +	if (!IS_ERR(host->biu_clk)) {
-> +		clk_disable_unprepare(host->biu_clk);
-> +		clk_put(host->biu_clk);
-> +	}
->  	return ret;
->  }
->  EXPORT_SYMBOL(dw_mci_probe);
-> @@ -2142,6 +2169,12 @@ void dw_mci_remove(struct dw_mci *host)
->  		regulator_put(host->vmmc);
->  	}
-> 
-> +	if (!IS_ERR(host->ciu_clk))
-> +		clk_disable_unprepare(host->ciu_clk);
-> +	if (!IS_ERR(host->biu_clk))
-> +		clk_disable_unprepare(host->biu_clk);
-> +	clk_put(host->ciu_clk);
-> +	clk_put(host->biu_clk);
->  }
->  EXPORT_SYMBOL(dw_mci_remove);
-> 
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index a37a573..787ad56 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -78,6 +78,8 @@ struct mmc_data;
->   * @data_offset: Set the offset of DATA register according to VERID.
->   * @dev: Device associated with the MMC controller.
->   * @pdata: Platform data associated with the MMC controller.
-> + * @biu_clk: Pointer to bus interface unit clock instance.
-> + * @ciu_clk: Pointer to card interface unit clock instance.
->   * @slot: Slots sharing this MMC controller.
->   * @fifo_depth: depth of FIFO.
->   * @data_shift: log2 of FIFO item size.
-> @@ -158,6 +160,8 @@ struct dw_mci {
->  	u16			data_offset;
->  	struct device		*dev;
->  	struct dw_mci_board	*pdata;
-> +	struct clk		*biu_clk;
-> +	struct clk		*ciu_clk;
->  	struct dw_mci_slot	*slot[MAX_MCI_SLOTS];
-> 
->  	/* FIFO push and pull */
-> --
-> 1.6.6.rc2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Nishanth Menon
