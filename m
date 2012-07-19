@@ -1,53 +1,120 @@
-From: johnstul@us.ibm.com (John Stultz)
-Date: Wed, 18 Jul 2012 20:57:32 -0700
-Subject: [PATCH v9 1/9] clocksource: time-armada-370-xp: Marvell Armada
- 370/XP SoC timer driver
-In-Reply-To: <alpine.LFD.2.02.1207182120180.9293@xanadu.home>
-References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1341588221-3822-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50074B32.8090607@us.ibm.com>
- <alpine.LFD.2.02.1207182120180.9293@xanadu.home>
-Message-ID: <500785AC.4000404@us.ibm.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 19 Jul 2012 09:36:32 +0530
+Subject: [PATCH 3/8] ARM: EXYNOS5: Add OHCI device from device tree
+In-Reply-To: <1342619128-25013-4-git-send-email-gautam.vivek@samsung.com>
+References: <1342619128-25013-1-git-send-email-gautam.vivek@samsung.com>
+ <1342619128-25013-4-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAK9yfHwftrm+M+r8iP5g45EaSOQLMarGk4LhOrUvGt4OKsO6yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2012 06:41 PM, Nicolas Pitre wrote:
-> On Wed, 18 Jul 2012, John Stultz wrote:
+On 18/07/2012, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> From: Ajay Kumar <ajaykumar.rs@samsung.com>
 >
->> I'm also not a huge fan of adding clockevent drivers to drivers/clocksource/.
->>
->> Further, LinusW and I have different opinions on this (and its not that huge
->> of an issue), but I'd really prefer to see additions to drivers/clocksource be
->> only for clocksources that are likely to be shared *between architectures*.
-> This is contrary to the push we've made for about 2 years now. We
-> decided it is more beneficial to gather drivers according to their
-> purpose and not according to the architecture they belong to.  The
-> reason is that it is far easier to abstract common functionality if
-> those drivers are close by.
+> This patch adds OHCI device from device tree for exynos5
+> and adds platform data.
 >
->> Similarly, I'd prefer architecture specific clocksources (like TSC on x86,
->> timebase on ppc, etc) stay in the arch subdir, just so theirs a clear
->> ownership of the driver (ie: if in 10 years specific hw support is dropped
->> from the arch directory, we don't end up with zombie drivers that live on
->> because generic driver maintainers don't know what hardware they're actually
->> connected to).
-> The same argument was said about cpufreq drivers, and cpuidle drivers,
-> and IRQ controller drivers, etc.  They ended up in a common directory
-> anyway.  In the end this helps generic driver maintainers because you
-> don't end up with the same infrastructure copied over and over, each
-> time with slight alteration, making any common API maintenance a
-> nightmare.
->
-> Zombie drivers shouldn't be a huge issue when no one selects their
-> kconfig symbol.  On the other hand, drivers burried under various
-> architecture directories are hard to maintain and abstract (ask tglx
-> about his IRQ driver changes).
->
->> (But I'm somewhat flexible on this last point, as long as there really is a
->> chance it might be shared at some point)
-> I think that common purpose is more important a criteria than
-> sharability.  It's hard to say in advance if a piece of code might be
-> shared or not.  On the other hand, its purpose should be rather clear.
+> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 
-Alright, alright,  I'll just grumble along with it then. :)
--john
+This patch seems to be from Ajay Kumar, but his signed-off is missing.
+
+>
+> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> new file mode 100644
+> index 0000000..63b80b9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> @@ -0,0 +1,19 @@
+> +Samsung Exynos SoC USB controller
+> +
+> +The device node for USB controller for Samsung SOC have
+> +following properties
+> +
+> +OHCI
+> +Required properties:
+> + - compatible: should be "samsung,exynos-ohci" for USB 2.0
+> +   OHCI companion controller in host mode.
+> + - reg: physical base address of the controller and length
+> +   of memory mapped.
+> + - interrupts: interrupt number to the cpu.
+> +
+> +ohci {
+> +	compatible = "samsung,exynos-ohci";
+> +	reg = <0x12120000 0x100>;
+> +	interrupts = <0 71 0>;
+> +};
+> +
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index a3a2eb2..3c73d15 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -58,6 +58,12 @@
+>  		interrupts = <0 42 0>;
+>  	};
+>
+> +	ohci {
+> +		compatible = "samsung,exynos-ohci";
+> +		reg = <0x12120000 0x100>;
+> +		interrupts = <0 71 0>;
+> +	};
+> +
+>  	rtc {
+>  		compatible = "samsung,s3c6410-rtc";
+>  		reg = <0x101E0000 0x100>;
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index ef770bc..39a4b34 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -15,12 +15,19 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/hardware/gic.h>
+>  #include <mach/map.h>
+> +#include <mach/ohci.h>
+>
+>  #include <plat/cpu.h>
+>  #include <plat/regs-serial.h>
+> +#include <plat/usb-phy.h>
+>
+>  #include "common.h"
+>
+> +static struct exynos4_ohci_platdata smdk5250_ohci_pdata = {
+> +	.phy_init = s5p_usb_phy_init,
+> +	.phy_exit = s5p_usb_phy_exit,
+> +};
+> +
+>  /*
+>   * The following lookup table is used to override device names when
+> devices
+>   * are registered from device tree. This is temporarily added to enable
+> @@ -56,6 +63,8 @@ static const struct of_dev_auxdata
+> exynos5250_auxdata_lookup[] __initconst = {
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos-ohci", 0x12120000,
+
+A macro would make it more readable instead of this magic number?
+
+
+> +				"exynos-ohci", &smdk5250_ohci_pdata),
+>  	{},
+>  };
+>
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+
+-- 
+With warm regards,
+Sachin
