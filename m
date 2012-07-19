@@ -1,120 +1,49 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 19 Jul 2012 09:36:32 +0530
-Subject: [PATCH 3/8] ARM: EXYNOS5: Add OHCI device from device tree
-In-Reply-To: <1342619128-25013-4-git-send-email-gautam.vivek@samsung.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Thu, 19 Jul 2012 09:53:45 +0530
+Subject: [PATCH 1/8] EXYNOS4: USB: Generalising setup-usb-phy driver for
+ exynos
+In-Reply-To: <1342619128-25013-2-git-send-email-gautam.vivek@samsung.com>
 References: <1342619128-25013-1-git-send-email-gautam.vivek@samsung.com>
- <1342619128-25013-4-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <CAK9yfHwftrm+M+r8iP5g45EaSOQLMarGk4LhOrUvGt4OKsO6yw@mail.gmail.com>
+ <1342619128-25013-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CADTbHxqFR2etsoqAQDU8UafpPwKFMsCRT1Vkrg8un52PYXnRbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2012, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> From: Ajay Kumar <ajaykumar.rs@samsung.com>
+Hi,
+
+On Wed, Jul 18, 2012 at 7:15 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> This patch updates the setup-usb-phy in order to accomodate
+> exynos5 support later.
 >
-> This patch adds OHCI device from device tree for exynos5
-> and adds platform data.
->
-> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-
-This patch seems to be from Ajay Kumar, but his signed-off is missing.
-
 >
-> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-> b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-> new file mode 100644
-> index 0000000..63b80b9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-> @@ -0,0 +1,19 @@
-> +Samsung Exynos SoC USB controller
+> diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
+> index b81cc56..bfc1367 100644
+> --- a/arch/arm/mach-exynos/setup-usb-phy.c
+> +++ b/arch/arm/mach-exynos/setup-usb-phy.c
+> @@ -26,10 +26,31 @@ static int exynos4_usb_host_phy_is_on(void)
+>         return (readl(EXYNOS4_PHYPWR) & PHY1_STD_ANALOG_POWERDOWN) ? 0 : 1;
+>  }
+>
+> -static void exynos4210_usb_phy_clkset(struct platform_device *pdev)
+> +struct clk *exynos_usb_clock_enable(struct platform_device *pdev)
+
+You might want to make it static struct clk * ?
+
+> +{
+> +       struct clk *usb_clk = NULL;
+> +       int err = 0;
 > +
-> +The device node for USB controller for Samsung SOC have
-> +following properties
-> +
-> +OHCI
-> +Required properties:
-> + - compatible: should be "samsung,exynos-ohci" for USB 2.0
-> +   OHCI companion controller in host mode.
-> + - reg: physical base address of the controller and length
-> +   of memory mapped.
-> + - interrupts: interrupt number to the cpu.
-> +
-> +ohci {
-> +	compatible = "samsung,exynos-ohci";
-> +	reg = <0x12120000 0x100>;
-> +	interrupts = <0 71 0>;
-> +};
-> +
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index a3a2eb2..3c73d15 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -58,6 +58,12 @@
->  		interrupts = <0 42 0>;
->  	};
->
-> +	ohci {
-> +		compatible = "samsung,exynos-ohci";
-> +		reg = <0x12120000 0x100>;
-> +		interrupts = <0 71 0>;
-> +	};
-> +
->  	rtc {
->  		compatible = "samsung,s3c6410-rtc";
->  		reg = <0x101E0000 0x100>;
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index ef770bc..39a4b34 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -15,12 +15,19 @@
->  #include <asm/mach/arch.h>
->  #include <asm/hardware/gic.h>
->  #include <mach/map.h>
-> +#include <mach/ohci.h>
->
->  #include <plat/cpu.h>
->  #include <plat/regs-serial.h>
-> +#include <plat/usb-phy.h>
->
->  #include "common.h"
->
-> +static struct exynos4_ohci_platdata smdk5250_ohci_pdata = {
-> +	.phy_init = s5p_usb_phy_init,
-> +	.phy_exit = s5p_usb_phy_exit,
-> +};
-> +
->  /*
->   * The following lookup table is used to override device names when
-> devices
->   * are registered from device tree. This is temporarily added to enable
-> @@ -56,6 +63,8 @@ static const struct of_dev_auxdata
-> exynos5250_auxdata_lookup[] __initconst = {
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos-ohci", 0x12120000,
+> +       if (!usb_clk) {
 
-A macro would make it more readable instead of this magic number?
+What is the purpose of this condition check? usb_clk will always be
+NULL here, right?
 
+> +               usb_clk = clk_get(&pdev->dev, "otg");
+> +               if (IS_ERR(usb_clk)) {
+> +                       dev_err(&pdev->dev, "Failed to get otg clock\n");
+> +                       return NULL;
+> +               }
 
-> +				"exynos-ohci", &smdk5250_ohci_pdata),
->  	{},
->  };
->
-> --
-> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
--- 
-With warm regards,
-Sachin
+Regards,
+Pankaj Jangra
