@@ -1,58 +1,54 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 19 Jul 2012 10:28:56 +0200
-Subject: [PATCH] usb: chipidea: ci13xxx-imx: remove global struct
-In-Reply-To: <20120718233107.GA32622@pengutronix.de>
-References: <20120718233107.GA32622@pengutronix.de>
-Message-ID: <20120719082856.GB11782@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Jul 2012 16:41:10 +0800
+Subject: [PATCH] pinctrl: mxs: register driver at postcore_initcall time
+Message-ID: <1342687270-32600-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2012 at 01:31:07AM +0200, Michael Grzeschik wrote:
-> This patch removes the limitation of having only one
-> instance of the ci13xxx-imx. Each instance of the ci13xxx-imx
-> could have different flags to be configured with, so we also
-> move this settings to the devicetree properties.
-> 
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +++++
+It's not so usual, but there are still some cases which require pinctrl
+driver function at arch_initcall time.  So register imx23 and imx28
+pinctrl driver at postcore_initcall time.
 
-New bindings should always have devicetree-discuss in CC.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Hi Linus,
 
->  drivers/usb/chipidea/ci13xxx_imx.c                 |   25 +++++++++++---------
->  drivers/usb/chipidea/core.c                        |   11 +++++++++
->  include/linux/usb/chipidea.h                       |    3 +++
->  4 files changed, 34 insertions(+), 11 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index 2c29041..5485eb9 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -8,6 +8,9 @@ Required properties:
->  Optional properties:
->  - fsl,usbphy: phandler of usb phy that connects to the only one port
->  - vbus-supply: regulator for vbus
-> +- require-transceiver: enable the flag in the driver
-> +- pullup-on-vbus: enable the flag in the driver
-> +- disable-streaming: enable the flag in the driver
-
-NACK to the bindings. You are mapping platform data 1:1 which is nearly
-always wrong. Having a quick look in the current devicetree bindings for
-USB shows that there is a transceiver property. So, the the
-(non-)presence of that property should make "require-transceiver"
-superfluous? Also, is "disable-streaming" a description of the hardware?
+Not sure if it's late for 3.6.  But if possible, please help send it
+for 3.6.  I need this patch to remove mxs board files after v3.6-rc1
+comes out.
 
 Regards,
+Shawn
 
-   Wolfram
+ drivers/pinctrl/pinctrl-imx23.c |    2 +-
+ drivers/pinctrl/pinctrl-imx28.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/pinctrl/pinctrl-imx23.c b/drivers/pinctrl/pinctrl-imx23.c
+index 75d3eff..3674d87 100644
+--- a/drivers/pinctrl/pinctrl-imx23.c
++++ b/drivers/pinctrl/pinctrl-imx23.c
+@@ -292,7 +292,7 @@ static int __init imx23_pinctrl_init(void)
+ {
+ 	return platform_driver_register(&imx23_pinctrl_driver);
+ }
+-arch_initcall(imx23_pinctrl_init);
++postcore_initcall(imx23_pinctrl_init);
+ 
+ static void __exit imx23_pinctrl_exit(void)
+ {
+diff --git a/drivers/pinctrl/pinctrl-imx28.c b/drivers/pinctrl/pinctrl-imx28.c
+index b973026..0f5b212 100644
+--- a/drivers/pinctrl/pinctrl-imx28.c
++++ b/drivers/pinctrl/pinctrl-imx28.c
+@@ -408,7 +408,7 @@ static int __init imx28_pinctrl_init(void)
+ {
+ 	return platform_driver_register(&imx28_pinctrl_driver);
+ }
+-arch_initcall(imx28_pinctrl_init);
++postcore_initcall(imx28_pinctrl_init);
+ 
+ static void __exit imx28_pinctrl_exit(void)
+ {
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120719/ad284a49/attachment.sig>
+1.7.5.4
