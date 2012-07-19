@@ -1,69 +1,65 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 19 Jul 2012 20:07:59 +0530
-Subject: [PATCHv5 09/18] i2c: omap: switch over to do {} while loop
+Date: Thu, 19 Jul 2012 20:08:01 +0530
+Subject: [PATCHv5 11/18] i2c: omap: switch to platform_get_irq()
 In-Reply-To: <1342708688-2342-1-git-send-email-shubhrajyoti@ti.com>
 References: <1342708688-2342-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1342708688-2342-10-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1342708688-2342-12-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-this will make sure that we execute at least once.
-No functional changes otherwise.
+that's a nice helper from drivers core which
+will give us the exact IRQ number, instead
+of a pointer to an IRQ resource.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   20 ++++++++++++++------
- 1 files changed, 14 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 700f018..78fc274 100644
+index 62ad126..71047dd 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -824,20 +824,28 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 	struct omap_i2c_dev *dev = dev_id;
- 	u16 bits;
- 	u16 stat;
--	int err, count = 0;
-+	int err = 0, count = 0;
+@@ -990,11 +990,12 @@ omap_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev;
+ 	struct i2c_adapter	*adap;
+-	struct resource		*mem, *irq;
++	struct resource		*mem;
+ 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+ 	struct device_node	*node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
+ 	irq_handler_t isr;
++	int irq;
+ 	int r;
  
- 	if (pm_runtime_suspended(dev->dev))
- 		return IRQ_NONE;
- 
--	bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
--	while ((stat = (omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG))) & bits) {
-+	do {
-+		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
-+		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-+		stat &= bits;
+ 	/* NOTE: driver uses the static register mapping */
+@@ -1003,10 +1004,11 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "no mem resource?\n");
+ 		return -ENODEV;
+ 	}
+-	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+-	if (!irq) {
 +
-+		if (!stat) {
-+			/* my work here is done */
-+			return IRQ_HANDLED;
-+		}
-+
- 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
- 		if (count++ == 100) {
- 			dev_warn(dev->dev, "Too much work in one IRQ\n");
--			break;
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
+ 		dev_err(&pdev->dev, "no irq resource?\n");
+-		return -ENODEV;
++		return irq;
+ 	}
  
--		err = 0;
- complete:
- 		/*
- 		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
-@@ -937,7 +945,7 @@ complete:
- 			dev_err(dev->dev, "Transmit underflow\n");
- 			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
- 		}
--	}
-+	} while (stat);
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
+@@ -1040,7 +1042,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	}
  
- 	return count ? IRQ_HANDLED : IRQ_NONE;
- }
+ 	dev->dev = &pdev->dev;
+-	dev->irq = irq->start;
++	dev->irq = irq;
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 	init_completion(&dev->cmd_complete);
 -- 
 1.7.5.4
