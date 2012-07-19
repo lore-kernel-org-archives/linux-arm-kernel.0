@@ -1,116 +1,113 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 19 Jul 2012 00:55:05 -0500
-Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per hwmod/module
- context lost count
-In-Reply-To: <1342602902.4672.91.camel@sokoban>
-References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
- <1339428387-4800-5-git-send-email-t-kristo@ti.com>
- <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
- <1342602902.4672.91.camel@sokoban>
-Message-ID: <CAOMWX4dWnJSOwLVvrAfMd7a9eKE97ywR0TrS6imHFA67V5QZag@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 19 Jul 2012 07:58:41 +0200
+Subject: [PATCH 5/7] ARM: mxs: convert tx28 board to device tree
+In-Reply-To: <20120718133624.GA30219@S2100-06.ap.freescale.net>
+References: <1341814496-17487-1-git-send-email-shawn.guo@linaro.org>
+ <1341814496-17487-6-git-send-email-shawn.guo@linaro.org>
+ <20474.55029.733084.749955@ipc1.ka-ro>
+ <20120713071415.GA10602@S2100-06.ap.freescale.net>
+ <20479.59525.385001.544046@ipc1.ka-ro>
+ <20120715144935.GB2429@S2100-06.ap.freescale.net>
+ <20120715150003.GD2429@S2100-06.ap.freescale.net>
+ <20483.48320.888197.282702@ipc1.ka-ro>
+ <20120718133624.GA30219@S2100-06.ap.freescale.net>
+Message-ID: <20487.41489.261103.678515@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 4:15 AM, Tero Kristo <t-kristo@ti.com> wrote:
->
-> On Tue, 2012-07-17 at 02:59 -0500, Menon, Nishanth wrote:
-> > Couple of minor comments:
-> > On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> > [...]
-> > >  /**
-> > > + * _omap4_update_context_lost - increment hwmod context loss counter
-> > > if
-> > > + * hwmod context was lost, and clear hardware context loss reg
-> > > + * @oh: hwmod to check for context loss
-> > > + *
-> > > + * If the PRCM indicates that the hwmod @oh lost context, increment
-> > > + * our in-memory context loss counter, and clear the RM_*_CONTEXT
-> > > + * bits. No return value.
-> > > + */
-> > > +static void _omap4_update_context_lost(struct omap_hwmod *oh)
-> > > +{
-> > > +       u32 r;
-> > > +
-> > > +       if (oh->prcm.omap4.context_offs == USHRT_MAX)
-> > > +               return;
-> > would'nt it be better to return a dummy incremental counter instead of
-> > returning no context loss (count = 0)?
->
-> I guess you are right, this way we may have some extra context restores
-> for modules which don't have context offs defined, rather than not
-> restoring them at all. Only thing I can think might prevent this is if
-> there are modules that never lose context but don't have context
-> register? How about omap5+?
+Hi,
 
-there has been an interesting debate ongoing with HWAUTO and context
-loss count handling -> since we update only on _enable, this might
-actually be interesting to consider:
-enable
-idle
-un_idle (lost context)
-read counter -> no update
+> On Mon, Jul 16, 2012 at 09:03:28AM +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Shawn Guo writes:
+> > > On Sun, Jul 15, 2012 at 10:49:35PM +0800, Shawn Guo wrote:
+> > > > below.  But does that mean ethernet PHY does not work even on non-DT
+> > > > kernel right now?
+> > > > 
+> > > So I guess you need something like c46d291 (ARM: apx4devkit: fix FEC
+> > > enabling PHY clock) for TX28 too.
+> > > 
+> > That's already in place.
+> > 
+> Are you using and talking about the branch I prepared for you?
+> I haven't seen it there.
+> 
+I'm using:
+git-remote -v
+|origin  git://git.linaro.org/people/shawnguo/linux-2.6.git (fetch)
+|origin  git://git.linaro.org/people/shawnguo/linux-2.6.git (push)
 
-Now to handle modules that never loose context - they have to be in
-wakeup domain.. should we consider a flag for those? would'nt matter
-o5 or not, context is still the same.. this issue could be resolved if
-counter update is done even when a check is done.
+ git-branch -a
+|  mxs/dt/others
+|* tx28
+|  remotes/origin/HEAD -> origin/master
+|  remotes/origin/clk/mxs-for-3.6
+|  remotes/origin/imx/cleanup-for-3.6
+|  remotes/origin/imx/dt-for-3.6
+|  remotes/origin/imx/irqdomain
+|  remotes/origin/imx/sparse-irq
+|  remotes/origin/master
+|  remotes/origin/mxs/defconfig-for-3.6
+|  remotes/origin/mxs/dt-for-3.6
+|  remotes/origin/mxs/dt/others
+|  remotes/origin/mxs/dt/tx28
+|  remotes/origin/mxs/fixes-for-3.5
+|  remotes/origin/mxs/fixes-for-3.6
+|  remotes/origin/mxs/test
+where 'tx28' is checked out from remotes/origin/mxs/dt/tx28.
 
+git-show c46d291
+commit c46d2916f6c03d3c8a2c38148af2e45cdadaf61f
+Author: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+Date:   Thu Jul 5 10:31:36 2012 +0300
 
-> >
-> > > +
-> > > +       r =
-> > > omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
-> > > +
-> > > oh->clkdm->pwrdm.ptr->prcm_offs,
-> > > +                                       oh->prcm.omap4.context_offs);
-> > > +
-> > > +       if (!r)
-> > > +               return;
-> > > +
-> > > +       oh->prcm.omap4.context_lost_counter++;
-> > need to be careful about counter overflow.
->
-> Well, this code can't do much for that even if it overflows... the type
-> for the context_lost_counter is unsigned though, maybe it should be
-> expanded if you are worried...?
+    ARM: apx4devkit: fix FEC enabling PHY clock
+    
+    Ethernet stopped to work after mxs clk framework change.
+    
+    Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-it can hit 0 with overflow(no context loss). that will not be good, right?
-
-How about something like:
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index eac813a..5fb9572 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1606,6 +1606,18 @@ static void _reconfigure_io_chain(void)
-        spin_unlock_irqrestore(&io_chain_lock, flags);
+diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+index 5e90b9d..f5f0617 100644
+--- a/arch/arm/mach-mxs/mach-apx4devkit.c
++++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+@@ -205,6 +205,16 @@ static int apx4devkit_phy_fixup(struct phy_device *phy)
+        return 0;
  }
-
-+static inline void _omap4_inc_context_loss(unsigned int *v)
+ 
++static void __init apx4devkit_fec_phy_clk_enable(void)
 +{
++       struct clk *clk;
 +
-+       /*
-+        * Context loss count has to be a non-negative value.
-+        * Clear the sign bit to get a value range from 1 to
-+        * INT_MAX.
-+        */
-+       *v = (*v + 1) & INT_MAX;
-+       *v = *v ? *v : 1;
++       /* Enable fec phy clock */
++       clk = clk_get_sys("enet_out", NULL);
++       if (!IS_ERR(clk))
++               clk_prepare_enable(clk);
 +}
 +
- /**
-  * _omap4_update_context_lost - increment hwmod context loss counter if
-  * hwmod context was lost, and clear hardware context loss reg
-@@ -1629,7 +1641,7 @@ static void _omap4_update_context_lost(struct
-omap_hwmod *oh)
-        if (!r)
-                return;
+ static void __init apx4devkit_init(void)
+ {
+        mx28_soc_init();
+@@ -225,6 +235,7 @@ static void __init apx4devkit_init(void)
+        phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
+                        apx4devkit_phy_fixup);
+ 
++       apx4devkit_fec_phy_clk_enable();
+        mx28_add_fec(0, &mx28_fec_pdata);
+ 
+        mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
 
--       oh->prcm.omap4.context_lost_counter++;
-+       _omap4_inc_context_loss(&oh->prcm.omap4.context_lost_counter);
 
-        omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
-                                     oh->clkdm->pwrdm.ptr->prcm_offs,
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Regards,
-Nishanth Menon
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
