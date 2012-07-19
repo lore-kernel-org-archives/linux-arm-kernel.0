@@ -1,42 +1,38 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 19 Jul 2012 11:26:02 -0700
-Subject: [PATCH 2/2] arm: omap3: am35x: Disable hlt when using Davinci EMAC
-In-Reply-To: <alpine.DEB.2.00.1207181723120.19048@utopia.booyaka.com>
-References: <1336770778-23044-1-git-send-email-mgreer@animalcreek.com>
- <1336770778-23044-3-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1207171814100.28834@utopia.booyaka.com>
- <20120718213246.GD27904@animalcreek.com>
- <alpine.DEB.2.00.1207181723120.19048@utopia.booyaka.com>
-Message-ID: <20120719182602.GB24076@animalcreek.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 19 Jul 2012 20:39:39 +0200
+Subject: [PATCH 0/3] Add a generic cpufreq-cpu0 driver
+In-Reply-To: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201207192039.40213.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 05:25:16PM -0600, Paul Walmsley wrote:
-> On Wed, 18 Jul 2012, Mark A. Greer wrote:
+Hi,
+
+On Thursday, July 19, 2012, Shawn Guo wrote:
+> This is a continuous effort of Richard's work [1].  But that generic
+> cpufreq driver has been rewritten with taking omap-cpufreq.c as the
+> reference to adopt OPP library.
 > 
-> > On Tue, Jul 17, 2012 at 09:54:53PM -0600, Paul Walmsley wrote:
-> > 
-> > > Want to try something like this?  It's your patch but modified to not use 
-> > > disable/enable_hlt().  If it doesn't work in your test case, maybe 
-> > > try uncommenting that second set of deny_idle / allow_idle ...
-> > 
-> > I tested the modified patch (to get it to compile) below.
+> Same as Richard's patch, the driver has no intention to support the
+> multi-core systems that frequency and voltage can be scaled
+> independently on different CPUs.  Instead, it aims at uniprocessor (UP)
+> and those symmetric multiprocessor (SMP) systems which share clock and
+> voltage across all CPUs.
 > 
-> Doh, sorry about that. 
-
-No worries.
-
-> > It did not work with or without the core_dpll_ck deny_idle/allow_idle
-> > commented out.
+> I have seen patch from Mike changing omap-cpufreq driver to scale
+> regulator from clk notifier.  We can definitely make the same move
+> for cpufreq-cpu0 later when the patch gets accepted.
 > 
-> Here's a version with some of the CPUIdle states restricted.  Maybe try 
-> this one if you're using CPUIdle?
+> Regards,
+> Shawn
+> 
+> [1] http://thread.gmane.org/gmane.linux.kernel.cpufreq/7688/focus=7688
 
-I wasn't but I tried this lastest patch with and without CPUidle...
+It is too late to consider your patches for inclusion into v3.6, so I'm
+regarding them as RFC at this point.
 
-> If it happens to work, it would also be interesting to know if it works 
-> with the CORE DPLL part commented out.
+Please resubmit after v3.6-rc1 has been released.
 
-...and, unfortunately, it didnt' work in either case.
-
-Mark
+Thanks,
+Rafael
