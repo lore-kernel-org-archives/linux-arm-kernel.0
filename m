@@ -1,62 +1,137 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 19 Jul 2012 16:33:36 +0200
-Subject: [PATCH] IIO: Add basic MXS LRADC driver
-In-Reply-To: <201207191623.14492.marex@denx.de>
-References: <1341368129-20468-1-git-send-email-marex@denx.de>
- <201207050148.27289.marex@denx.de> <4FF55149.2080801@metafoo.de>
- <201207191623.14492.marex@denx.de>
-Message-ID: <50081AC0.10703@metafoo.de>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Thu, 19 Jul 2012 20:18:27 +0530
+Subject: [PATCH v4 09/11] drivers: usb: musb: Add device tree support for
+ omap musb glue
+In-Reply-To: <47CEF8C4B26E8C44B22B028A650E0EA93EADE11A@DBDE01.ent.ti.com>
+References: <1342607922-11554-1-git-send-email-kishon@ti.com>
+ <1342607922-11554-10-git-send-email-kishon@ti.com>
+ <47CEF8C4B26E8C44B22B028A650E0EA93EADE11A@DBDE01.ent.ti.com>
+Message-ID: <CAAe_U6+_-0HC-_TEDnOT2jPCRtH=6FHjZdTmmomTSmJOEk7kGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2012 04:23 PM, Marek Vasut wrote:
-> Dear Lars-Peter Clausen,
-> 
-> Sorry for my late reply, got busy with other crazy stuff.
-> 
-> [...]
-> 
->>>> Is there any reason not to use the mxs_lradc struct directly has the iio
->>>> data?
->>>
->>> I explained it below in the patch. I hope we'll eventually support the
->>> delay triggers, which will need 4 separate IIO devices. And this is
->>> where this structure will be augmented by other components.
->>
->> Ok I saw the comment, but it wasn't obvious to me that delay channels will
->> require multiple IIO devices. Might make sense to state this explicitly.
-> 
-> Fixed.
-> 
->>>>> [...]
->>>>>
->>>>> +
->>>>> +/*
->>>>> + * Channel management
->>>>> + *
->>>>> + * This involves crazy mapping between 8 virtual channels the CTRL4
->>>>> register + * can harbor and 16 channels total this hardware supports.
->>>>> + */
->>>>
->>>> I suppose this means only a maximum 8 channels can be active at a time.
->>>> I've recently posted a patch which makes it easy to implement such a
->>>> restriction. http://www.spinics.net/lists/linux-iio/msg05936.html and
->>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
->>>> validate callback implementation. In your case you'd check for
->>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
->>>
->>> This is good. When do you expect this to hit linux-next possibly? Or at
->>> least linux-iio?
->>
->> soon, hopefully.
-> 
-> So I checked this, not sure how it'll help me though.
+Hi,
 
-Right now with your driver you can enable any combination of channels. If
-more than 8 channels are enabled and you start sampling it will fail, since
-not all channels can be mapped. With those patch you can implement a
-validate callback and check for bitmap_weight(scan_mask) <= 8. This will
-ensure that it is not possible to select more than 8 channels@once, which
-again means that starting sampling can't fail of this.
+On Thu, Jul 19, 2012 at 6:51 PM, Gupta, Ajay Kumar <ajay.gupta@ti.com> wrote:
+> Hi,
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/omap-usb.txt |   34 ++++++++++++-
+>>  drivers/usb/musb/omap2430.c                        |   55
+>> ++++++++++++++++++++
+>>  2 files changed, 88 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
+>> b/Documentation/devicetree/bindings/usb/omap-usb.txt
+>> index 80a28c9..39cdffb 100644
+>> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
+>> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+>> @@ -1,4 +1,4 @@
+>> -OMAP USB PHY
+>> +OMAP USB PHY AND GLUE
+>>
+>>  OMAP USB2 PHY
+>>
+>> @@ -14,3 +14,35 @@ usb2phy at 0x4a0ad080 {
+>>       compatible = "ti,omap-usb2";
+>>       reg = <0x4a0ad080 0x58>;
+>>  };
+>> +
+>> +OMAP MUSB GLUE
+>> + - compatible : Should be "ti,musb-omap2430"
+>> + - ti,hwmods : must be "usb_otg_hs"
+>> + - multipoint : Should be "1" indicating the musb controller supports
+>> +   multipoint. This is a MUSB configuration-specific setting.
+>> + - num_eps : Specifies the number of endpoints. This is also a
+>> +   MUSB configuration-specific setting. Should be set to "16"
+>> + - ram_bits : Specifies the ram address size. Should be set to "12"
+>> + - interface_type : This is a board specific setting to describe the type
+>> of
+>> +   interface between the controller and the phy. It should be "0" or "1"
+>> +   specifying ULPI and UTMI respectively.
+>> + - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
+>> +   represents PERIPHERAL.
+>> + - power : Should be "50". This signifies the controller can supply upto
+>> +   100mA when operating in host mode.
+>> +
+>> +SOC specific device node entry
+>> +usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>> +     compatible = "ti,musb-omap2430";
+>> +     ti,hwmods = "usb_otg_hs";
+>> +     multipoint = <1>;
+>> +     num_eps = <16>;
+>> +     ram_bits = <12>;
+>> +};
+>> +
+>> +Board specific device node entry
+>> +&usb_otg_hs {
+>> +     interface_type = <1>;
+>> +     mode = <3>;
+>> +     power = <50>;
+>> +};
+>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>> index addbebf..331e477 100644
+>> --- a/drivers/usb/musb/omap2430.c
+>> +++ b/drivers/usb/musb/omap2430.c
+>> @@ -30,6 +30,7 @@
+>>  #include <linux/init.h>
+>>  #include <linux/list.h>
+>>  #include <linux/io.h>
+>> +#include <linux/of.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/dma-mapping.h>
+>>  #include <linux/pm_runtime.h>
+>> @@ -469,8 +470,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+>>  static int __devinit omap2430_probe(struct platform_device *pdev)
+>>  {
+>>       struct musb_hdrc_platform_data  *pdata = pdev->dev.platform_data;
+>> +     struct omap_musb_board_data     *data;
+>>       struct platform_device          *musb;
+>>       struct omap2430_glue            *glue;
+>> +     struct device_node              *np = pdev->dev.of_node;
+>> +     struct musb_hdrc_config         *config;
+>>       struct resource                 *res;
+>>       int                             ret = -ENOMEM;
+>>
+>> @@ -500,6 +504,43 @@ static int __devinit omap2430_probe(struct
+>> platform_device *pdev)
+>>       if (glue->control_otghs == NULL)
+>>               dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
+>>
+>> +     if (np) {
+>> +             pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+>> +             if (!pdata) {
+>> +                     dev_err(&pdev->dev,
+>> +                             "failed to allocate musb platfrom data\n");
+>> +                     ret = -ENOMEM;
+>> +                     goto err1;
+>> +             }
+>> +
+>> +             data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +             if (!data) {
+>> +                     dev_err(&pdev->dev,
+>> +                                     "failed to allocate musb board data\n");
+>> +                     ret = -ENOMEM;
+>> +                     goto err1;
+>> +             }
+>> +
+>> +             config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
+>> +             if (!data) {
+>> +                     dev_err(&pdev->dev,
+>> +                             "failed to allocate musb hdrc config\n");
+>> +                     goto err1;
+>> +             }
+>> +
+>> +             of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
+>> +             of_property_read_u32(np, "interface_type",
+>> +                                             (u32 *)&data->interface_type);
+>> +             of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
+>> +             of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
+>> +             of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
+>
+> pdata->mode is already read so above should be removed.
 
-- Lars
+Ok.
+
+Thanks
+Kishon
