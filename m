@@ -1,31 +1,90 @@
-From: johnstul@us.ibm.com (John Stultz)
-Date: Wed, 18 Jul 2012 16:51:23 -0700
-Subject: [PATCH v9 1/9] clocksource: time-armada-370-xp: Marvell Armada
- 370/XP SoC timer driver
-In-Reply-To: <50074B32.8090607@us.ibm.com>
-References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1341588221-3822-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50074B32.8090607@us.ibm.com>
-Message-ID: <50074BFB.1060708@us.ibm.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Thu, 19 Jul 2012 09:43:33 +0900
+Subject: [PATCH] video: ld9040: support early fb event of fb_blank()
+In-Reply-To: <500757AE.3010202@samsung.com>
+References: <500757AE.3010202@samsung.com>
+Message-ID: <50075835.2040703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2012 04:48 PM, John Stultz wrote:
-> On 07/06/2012 08:23 AM, Thomas Petazzoni wrote:
->> From: Gregory Clement <gregory.clement@free-electrons.com>
->>
->> Timer 0 is used as free-running clocksource, while timer 1 is used as
->> clock_event_device.
->
-> I don't see the any clocksource in this patch.  Why is this tagged 
-> clocksource?
+This patch supports early fb event of fb_blank().
 
-Whoops. Now of course I see the clocksource_mmio_init().  Hrmm..
+- In case of lcd power off : call early_set_power() interface and lcd
+power is off. And then framebuffer is blanked.
 
-> I'm also not a huge fan of adding clockevent drivers to 
-> drivers/clocksource/.
+- In case of lcd power on : First, framebuffer is unblanked, and then
+call set_power() interface to turn lcd on.
 
-Still have mixed feelings on this point.
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/video/backlight/ld9040.c |   36 +++++++++++++++++++++++++++++++++++-
+ 1 files changed, 35 insertions(+), 1 deletions(-)
 
-thanks
--john
+diff --git a/drivers/video/backlight/ld9040.c b/drivers/video/backlight/ld9040.c
+index efd352b..221c843 100644
+--- a/drivers/video/backlight/ld9040.c
++++ b/drivers/video/backlight/ld9040.c
+@@ -642,17 +642,50 @@ static int ld9040_power(struct ld9040 *lcd, int power)
+ 	return ret;
+ }
+ 
++static int ld9040_early_set_power(struct lcd_device *ld, int power)
++{
++	struct ld9040 *lcd = lcd_get_data(ld);
++	int ret = 0;
++
++	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
++		power != FB_BLANK_NORMAL) {
++		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
++
++		return -EINVAL;
++	}
++
++	if (!power_is_on(power) && power_is_on(lcd->power)) {
++		ret = ld9040_power(lcd, power);
++		if (!ret)
++			lcd->power = power;
++	}
++
++	return ret;
++}
++
+ static int ld9040_set_power(struct lcd_device *ld, int power)
+ {
+ 	struct ld9040 *lcd = lcd_get_data(ld);
++	struct backlight_device *bd = lcd->bd;
++	int ret = 0;
+ 
+ 	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
+ 		power != FB_BLANK_NORMAL) {
+ 		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
++
+ 		return -EINVAL;
+ 	}
+ 
+-	return ld9040_power(lcd, power);
++	if (power_is_on(power) && !power_is_on(lcd->power)) {
++		ret = ld9040_power(lcd, power);
++		if (!ret)
++			lcd->power = power;
++
++		ld9040_gamma_ctl(lcd, bd->props.brightness);
++	} else
++		ld9040_early_set_power(ld, power);
++
++	return ret;
+ }
+ 
+ static int ld9040_get_power(struct lcd_device *ld)
+@@ -689,6 +722,7 @@ static int ld9040_set_brightness(struct backlight_device *bd)
+ }
+ 
+ static struct lcd_ops ld9040_lcd_ops = {
++	.early_set_power = ld9040_early_set_power,
+ 	.set_power = ld9040_set_power,
+ 	.get_power = ld9040_get_power,
+ };
+-- 
+1.7.4.1
