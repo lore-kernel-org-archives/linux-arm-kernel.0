@@ -1,136 +1,182 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Thu, 19 Jul 2012 10:07:01 +0100
-Subject: Device tree.
-In-Reply-To: <alpine.LFD.2.02.1207180929230.9293@xanadu.home>
-References: <500552C9.4090107@codethink.co.uk> <50056E22.5040308@gmail.com>
- <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk>
- <13863985.aH2icoQzEI@flexo> <50057CD2.2060001@codethink.co.uk>
- <alpine.LFD.2.02.1207171712070.9293@xanadu.home>
- <50066AE6.6000002@codethink.co.uk>
- <alpine.LFD.2.02.1207180929230.9293@xanadu.home>
-Message-ID: <5007CE35.8060705@codethink.co.uk>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 19 Jul 2012 04:12:14 -0500
+Subject: [PATCH 01/10] ARM: OMAP2+: PM QoS: control the power domains next
+ state from the constraints
+In-Reply-To: <1339686361-11526-2-git-send-email-j-pihet@ti.com>
+References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
+ <1339686361-11526-2-git-send-email-j-pihet@ti.com>
+Message-ID: <CAOMWX4f3zEar1riDYEHNXMijsVXD_yESeYLTuHSA_abJTSy2CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/12 14:42, Nicolas Pitre wrote
+On Thu, Jun 14, 2012 at 10:05 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+Minor comment follows:
+[...]
+> +/**
+> + * _pwrdm_wakeuplat_update_pwrst - Update power domain power state if needed
+> + * @pwrdm: struct powerdomain * to which requesting device belongs to.
+> + * @min_latency: the allowed wake-up latency for the given power domain. A
+> + *  value of PM_QOS_DEV_LAT_DEFAULT_VALUE means 'no constraint' on the pwrdm.
+> + *
+> + * Finds the power domain next power state that fulfills the constraint.
+> + * Programs a new target state if it is different from current power state.
+> + * The power domains get the next power state programmed directly in the
+> + * registers.
+> + *
+> + * Returns 0 in case of success, -EINVAL in case of invalid parameters,
+> + * or the return value from omap_set_pwrdm_state.
+> + */
+> +static int _pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm,
+> +                                        long min_latency)
+> +{
+> +       int ret = 0, state, new_state = PWRDM_FUNC_PWRST_ON;
+> +
+> +       if (!pwrdm) {
+> +               WARN(1, "powerdomain: %s: invalid parameter(s)", __func__);
+> +               return -EINVAL;
+> +       }
+_pwrdm_wakeuplat_update_pwrst is an helper function, we check pwrdm to
+be valid here,
+however,
 
-TL;DR: Summary
+[...]
+>  /* Public functions */
 
-* make uImage is *broken* with CONFIG_ARM_APPENDED_DTB
-* Trimmed down single-configuration kernels have merit. forcing
-   .dtb to be passed from the bootloader
-   - Increases bootloader complexity
-     - and we know bootloaders suck and can be hard (if not impossible)
-       to replace.
-   - buys you nothing.
-* Three other architectures support
-   'make <image>.<embedded_dtb>'
-* Old bootloaders cant always be replaced (ROM) or chainload (lack
-   of flash) a newer one.
-* No way to pass a .dtb address on the kernel commandline (where
-   the bootloader cant pass it in a register, but can load arbitrary data
-   into RAM, which most u-boot versions can.)
+>  /**
+> + * pwrdm_wakeuplat_update_constraint - Set or update a powerdomain wakeup
+> + *  latency constraint and apply it
+> + * @pwrdm: struct powerdomain * which the constraint applies to
+> + * @cookie: constraint identifier, used for tracking
+> + * @min_latency: minimum wakeup latency constraint (in microseconds) for
+> + *  the given pwrdm
+> + *
+> + * Tracks the constraints by @cookie.
+> + * Constraint set/update: Adds a new entry to powerdomain's wake-up latency
+> + * constraint list. If the constraint identifier already exists in the list,
+> + * the old value is overwritten.
+> + *
+> + * Applies the aggregated constraint value for the given pwrdm by calling
+> + * _pwrdm_wakeuplat_update_pwrst.
+> + *
+> + * Returns 0 upon success, -ENOMEM in case of memory shortage, -EINVAL in
+> + * case of invalid latency value, or the return value from
+> + * _pwrdm_wakeuplat_update_pwrst.
+> + *
+> + * The caller must check the validity of the parameters.
+> + */
+> +int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
+> +                                     long min_latency)
+> +{
+> +       struct pwrdm_wkup_constraints_entry *tmp_user, *new_user, *user = NULL;
+> +       long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
+> +       int free_new_user = 0;
+> +
+> +       pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p, min_latency=%ld\n",
+> +                __func__, pwrdm->name, cookie, min_latency);
+here,
 
-Conclusion:
+> +
+> +       if (min_latency <= PM_QOS_DEV_LAT_DEFAULT_VALUE) {
+> +               pr_warn("%s: min_latency >= PM_QOS_DEV_LAT_DEFAULT_VALUE\n",
+> +                       __func__);
+> +               return -EINVAL;
+> +       }
+> +
+> +       /* Allocate a new entry for insertion in the list */
+> +       new_user = kzalloc(sizeof(struct pwrdm_wkup_constraints_entry),
+> +                          GFP_KERNEL);
+> +       if (!new_user) {
+> +               pr_err("%s: FATAL ERROR: kzalloc failed\n", __func__);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       mutex_lock(&pwrdm->wkup_lat_plist_lock);
+here,
 
-There are three 'real' solutions, IMO.
-1) Copy the other arches, and have make <image>.<embedded_dtb>
-   - dtb could be properly embedded, linked into the kernel image.
-   - makes for a consistent way of building images across more archs.
-   - allows for simpler bootloaders.
+> +
+> +       /* Check if there already is a constraint for cookie */
+> +       plist_for_each_entry(tmp_user, &pwrdm->wkup_lat_plist_head, node) {
+> +               if (tmp_user->cookie == cookie) {
+> +                       user = tmp_user;
+> +                       break;
+> +               }
+> +       }
+here,
 
-2) Display a warning when building a uImage with
-CONFIG_ARM_APPENDED_DTB, because that simply wont work the way
-things are now.
-   - Doesn't really fix anything, but at least it helps people see why
-     its not working...
+> +
+> +       /* If nothing to update, job done */
+> +       if (user && (user->node.prio == min_latency))
+> +               goto out;
+> +
+> +       if (!user) {
+> +               /* Add new entry to the list */
+> +               user = new_user;
+> +               user->cookie = cookie;
+> +       } else {
+> +               /* Update existing entry */
+> +               plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
+here
+> +               free_new_user = 1;
+> +       }
+> +
+> +       plist_node_init(&user->node, min_latency);
+> +       plist_add(&user->node, &pwrdm->wkup_lat_plist_head);
+here
+> +
+> +       /* Find the aggregated constraint value from the list */
+> +       if (!plist_head_empty(&pwrdm->wkup_lat_plist_head))
+...
+> +               value = plist_first(&pwrdm->wkup_lat_plist_head)->prio;
+...
 
-3) Add an option to specify the address of a .dtb file in RAM via
-the kernel commandline.
-  - removes the need for appending .dtb files to the kernel
-  - still requires the bootloader to grok .dtb
+> +
+> +       mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+...
+> +
+> +       /* Free the newly allocated entry if not in use */
+> +       if (free_new_user)
+> +               kfree(new_user);
+> +
+> +       /* Apply the constraint to the pwrdm */
+> +       pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
+> +                __func__, pwrdm->name, value);
+...
+> +       return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
+we have already crashed before we do a WARN in helper.
 
- >> Yes, because this tactic has worked just great historically...
- >
- > It certainly did.  Look at the latest u-Boot which 1) has support
- > for device tree on ARM, and 2) has support to boot a zImage
- > directly. And some people were able to modify their old u-Boot as
- > well because of this policy.
+> +
+> +out:
+> +       mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+> +       return 0;
+> +}
+> +
+> +/**
+> + * pwrdm_wakeuplat_remove_constraint - Release a powerdomain wakeup latency
+> + *  constraint and apply it
+> + * @pwrdm: struct powerdomain * which the constraint applies to
+> + * @cookie: constraint identifier, used for tracking
+> + *
+> + * Tracks the constraints by @cookie.
+> + * Constraint removal: Removes the identifier's entry from powerdomain's
+> + * wakeup latency constraint list.
+> + *
+> + * Applies the aggregated constraint value for the given pwrdm by calling
+> + * _pwrdm_wakeuplat_update_pwrst.
+> + *
+> + * Returns 0 upon success, -EINVAL in case the constraint to remove is not
+> + * existing, or the return value from _pwrdm_wakeuplat_update_pwrst.
+> + *
+> + * The caller must check the validity of the parameters.
+> + */
+> +int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie)
+> +{
+> +       struct pwrdm_wkup_constraints_entry *tmp_user, *user = NULL;
+> +       long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
+> +
+> +       pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p\n",
+> +                __func__, pwrdm->name, cookie);
+... same story here as well.. and so on..
 
-I don't agree. u-boot has always been the weirdo that didnt just use a
-zImage. Its taken *years* for that to change, and its not like uImages
-were /ever/ easier to work with. I'd say the very presence of
-'make uImage' slowed that change to a near halt.
 
- >> Other than chainbooting /another/ bootloader, how do you propose
- >> people fix this issue? Not everyone has a co-operative vendor.
- >
- > Ask your vendor harder.  They would care even less if the kernel was
- > more accommodating.
-
-They don't care anyway - vendors never have. They just ship some
-cruddy bootloader and let the clients fix it all up after its run. There are
-more than a few boards out there that boot a u-boot from another
-u-boot. Theres at least one that runs through *three* u-boots before
-getting to a kernel...
-
- >> And for those of us where this is not an option?
- >
- > This is always an option to you.  You have the patch already, it
- > doesn't necessarily have to live in mainline.
-
-I mean't *changing u-boot* is often not an option. Sometimes, neither
-is chainbooting (limited flash).
-
- >> Which is all lovely, but sometimes simply not appropriate.
- >
- > Please deal with it.  Going the other way isn't appropriate for
- > mainline either.
-
-Being able to make one zImage for lots of devices is a Good Thing.
-
-Being able to pair an image down for just one device is *also* a
-Good Thing.
-
-**This isn't either/or**  In the 'one device' case, having the .dtb
-appended can be useful. Having it passed in seperately is actually
-fairly pointless, merely adding to the bootloader complexity.
-
-Also, completely missing, AFAICT, is the option to pass the address
-of a .dtb preloaded in RAM on the kernel commandline - which would
-at least mean that people with crap u-boots could copy a .dtb to RAM
-  and then point the kernel at it. (this was actually the first thing I 
-tried,
-until I realised that there is no option (that I can find) for that.)
-
- > Absolutely.  But it is there now and that's the extent of what
- > mainline is providing in terms of accommodation.
-
-I really don't see why. We're talking about a couple of lines of patch.
-If you're going to allow appending at all, you might as well let people
-specify the file to append...
-
-The way it is now, building uImages with 'make uImage' is
-*actually broken*, if you want an appended DT.
-
- >> Whats the point in make uImage if you cant use it?
- >
- > I advocated its removal for quite a long time now.  But it is still
- > there which is also a compromise.  This way, people with ancient
- > target which are not DT enabled aren't affected.
-
-What about those of us with a DT target and a crap bootloader? Or
-Those who want a one-device image?
-
-DT wont magically make drivers available for some other device, no
-matter how hard you describe them in the .dts file, so 'one device'
-images are still going to be pretty useless in the case of someone
-trying to boot some other board with them.
-
-If zImage is the one true way, thats fine - and I actually would prefer
-that, I think uImages are stupid.
-
-But - since its not the only way, it'd be sensible if the 'other way'
-actually worked, or was officially made an out of tree option (thus
-making it work again because you can concat. the .dtb file prior to
-making the uImage.)
+Regards,
+Nishanth Menon
