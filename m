@@ -1,54 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jul 2012 16:41:10 +0800
-Subject: [PATCH] pinctrl: mxs: register driver at postcore_initcall time
-Message-ID: <1342687270-32600-1-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Jul 2012 08:55:07 +0000
+Subject: [RFC PATCHv5] ARM: socfpga: initial support for Altera's SOCFPGA
+ platform
+In-Reply-To: <20120719093231.72f2871d@skate>
+References: <1342649238-1044-1-git-send-email-dinguyen@altera.com>
+ <1342649238-1044-2-git-send-email-dinguyen@altera.com>
+ <20120719093231.72f2871d@skate>
+Message-ID: <201207190855.08225.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not so usual, but there are still some cases which require pinctrl
-driver function at arch_initcall time.  So register imx23 and imx28
-pinctrl driver at postcore_initcall time.
+On Thursday 19 July 2012, Thomas Petazzoni wrote:
+> Le Wed, 18 Jul 2012 16:07:18 -0600,
+> <dinguyen@altera.com> a ?crit :
+> 
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Adding core definitions for Altera's SOCFPGA ARM platform.
+> > Mininum support for Altera's SOCFPGA Cyclone 5 hardware.
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Reviewed-by: Pavel Machek <pavel@denx.de>
+> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Hi Linus,
+Thanks everyone!
 
-Not sure if it's late for 3.6.  But if possible, please help send it
-for 3.6.  I need this patch to remove mxs board files after v3.6-rc1
-comes out.
+I've applied it to the next/newsoc branch now.
+I fixed up a little whitespace damage in the dts file that git-am
+complained about, and I put the arch/arm/Makefile entry into
+alphabetical order again before applying.
 
-Regards,
-Shawn
-
- drivers/pinctrl/pinctrl-imx23.c |    2 +-
- drivers/pinctrl/pinctrl-imx28.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-imx23.c b/drivers/pinctrl/pinctrl-imx23.c
-index 75d3eff..3674d87 100644
---- a/drivers/pinctrl/pinctrl-imx23.c
-+++ b/drivers/pinctrl/pinctrl-imx23.c
-@@ -292,7 +292,7 @@ static int __init imx23_pinctrl_init(void)
- {
- 	return platform_driver_register(&imx23_pinctrl_driver);
- }
--arch_initcall(imx23_pinctrl_init);
-+postcore_initcall(imx23_pinctrl_init);
- 
- static void __exit imx23_pinctrl_exit(void)
- {
-diff --git a/drivers/pinctrl/pinctrl-imx28.c b/drivers/pinctrl/pinctrl-imx28.c
-index b973026..0f5b212 100644
---- a/drivers/pinctrl/pinctrl-imx28.c
-+++ b/drivers/pinctrl/pinctrl-imx28.c
-@@ -408,7 +408,7 @@ static int __init imx28_pinctrl_init(void)
- {
- 	return platform_driver_register(&imx28_pinctrl_driver);
- }
--arch_initcall(imx28_pinctrl_init);
-+postcore_initcall(imx28_pinctrl_init);
- 
- static void __exit imx28_pinctrl_exit(void)
- {
--- 
-1.7.5.4
+	Arnd
