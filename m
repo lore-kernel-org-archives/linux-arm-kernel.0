@@ -1,38 +1,145 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Jul 2012 04:32:47 -0700
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <CAMQu2gy+uXJFfmOwLX=YH41pr-N+T28-1wLo5rXEaj9MGffHPw@mail.gmail.com>
-References: <20120718065951.GH6522@atomide.com>
- <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
- <20120718071039.GI6522@atomide.com>
- <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
- <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
- <CAMQu2gxLwGACAT-r6=L9DKB=3fTNaEJ4woZOb4zttJ8qTTJmFA@mail.gmail.com>
- <CAAwP0s2apfBHLKHtzvwqb2KPCMNhEXMe5R9792bO7FhfY5Y+uQ@mail.gmail.com>
- <CANfBPZ_N4ZK5PgFQLHWMwsG60tb-FPTjeieTJ92rBUNgONAxAw@mail.gmail.com>
- <CAMQu2gy+uXJFfmOwLX=YH41pr-N+T28-1wLo5rXEaj9MGffHPw@mail.gmail.com>
-Message-ID: <20120719113246.GN6522@atomide.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Thu, 19 Jul 2012 17:04:15 +0530
+Subject: [PATCHv6] arm/dts: omap4-sdp: Add keypad data
+In-Reply-To: <1342191422-8235-1-git-send-email-sourav.poddar@ti.com>
+References: <1342191422-8235-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <CAAe_U6LXB0EdBqG+=W+zKjtZ1av-UWpxJDZSrSOcb4_fNp9gDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 02:49]:
-> 
-> "The patch simply make them depend on DMA_OMAP since DMA_OMAP
-> will select DMA_ENGINE automatically"
-> 
-> This won't be true if the DMA selection are not done
-> at ARCH_OMAP level as discussed in this thread.
-> 
-> Having said that, I think Russell and Tony need to
-> take call on how this needs to be handled.
+Hi,
 
-As the DMA channels can run out, drivers should also work
-without DMA. And building everything as modules should be
-possible for the distro kernels.
+On Fri, Jul 13, 2012 at 8:27 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
+> Add keypad data node in omap4 device tree file.
+> Also fill the device tree binding parameters
+> with the required value in "omap4-sdp" dts file.
+>
+> Tested on omap4430 sdp with 3.5-rc6 kernel.
+>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+> This patch[1] was initially posted as a series.
+> The first patch[2] of the series is taken into
+> dmitry's input tree.
+> So, posting this as a independent patch .
+>
+> [1]: https://lkml.org/lkml/2012/6/8/239
+> [2]: https://lkml.org/lkml/2012/6/1/75
+>
+> Changes since v5:
+> Few key mappings were missed, added "linux, keymap"
+> data for those key mappings.
+>
+>  arch/arm/boot/dts/omap4-sdp.dts |   70 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi    |    5 +++
+>  2 files changed, 75 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index d08c4d1..53ded54 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -70,6 +70,76 @@
+>                         gpios = <&gpio5 11 0>; /* 139 */
+>                 };
+>         };
+> +
+> +       keypad at 4a31c000 {
 
-So I'd rather not have either select or depends and have
-the drivers fixed.
+I think you should drop the address in node name since it does not
+have a <reg> property.
 
-Tony
+> +               keypad,num-rows = <8>;
+> +               keypad,num-columns = <8>;
+> +               linux,keymap = < 0x00000012
+> +                       0x00010013
+> +                       0x00020014
+> +                       0x00030066
+> +                       0x0004003f
+> +                       0x000500f0
+> +                       0x00060017
+> +                       0x0007002a
+> +                       0x01000020
+> +                       0x01010021
+> +                       0x01020022
+> +                       0x010300e7
+> +                       0x01040040
+> +                       0x010500f0
+> +                       0x01060025
+> +                       0x0107001c
+> +                       0x0200002d
+> +                       0x0201002e
+> +                       0x0202002f
+> +                       0x0203006b
+> +                       0x02040041
+> +                       0x020500f0
+> +                       0x02060034
+> +                       0x0207003a
+> +                       0x0300002c
+> +                       0x0301004e
+> +                       0x03020030
+> +                       0x0303003b
+> +                       0x03040042
+> +                       0x030500f0
+> +                       0x03060018
+> +                       0x03070039
+> +                       0x04000011
+> +                       0x04010015
+> +                       0x04020016
+> +                       0x0403003c
+> +                       0x04040073
+> +                       0x040500f0
+> +                       0x04060026
+> +                       0x04070069
+> +                       0x0500001f
+> +                       0x05010023
+> +                       0x05020024
+> +                       0x0503003d
+> +                       0x05040043
+> +                       0x05050072
+> +                       0x05060032
+> +                       0x0507006a
+> +                       0x06000010
+> +                       0x0601001e
+> +                       0x06020031
+> +                       0x0603009e
+> +                       0x0604000e
+> +                       0x060500f0
+> +                       0x06060019
+> +                       0x06070067
+> +                       0x07000094
+> +                       0x07010095
+> +                       0x070200ca
+> +                       0x070300cb
+> +                       0x0704003e
+> +                       0x070500f0
+> +                       0x07060160
+> +                       0x0707006c >;
+> +               linux,input-no-autorepeat;
+> +       };
+>  };
+>
+>  &i2c1 {
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 359c497..11b72d2 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -273,4 +273,9 @@
+>                         ti,needs-special-reset;
+>                 };
+>         };
+> +
+> +       keypad at 4a31c000 {
+same comment here.
+
+> +               compatible = "ti,omap4-keypad";
+> +               ti,hwmods = "kbd";
+> +       };
+>  };
+
+Thanks
+Kishon
