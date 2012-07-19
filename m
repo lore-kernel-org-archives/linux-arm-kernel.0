@@ -1,182 +1,71 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 19 Jul 2012 04:12:14 -0500
-Subject: [PATCH 01/10] ARM: OMAP2+: PM QoS: control the power domains next
- state from the constraints
-In-Reply-To: <1339686361-11526-2-git-send-email-j-pihet@ti.com>
-References: <1339686361-11526-1-git-send-email-j-pihet@ti.com>
- <1339686361-11526-2-git-send-email-j-pihet@ti.com>
-Message-ID: <CAOMWX4f3zEar1riDYEHNXMijsVXD_yESeYLTuHSA_abJTSy2CQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 19 Jul 2012 11:13:29 +0200
+Subject: Linux ARM with XZ compression issue
+In-Reply-To: <CAJfuBxxpGqBeD1O3QfXLhHmMGBEFvy5XZOFLH6Xww33Y+7P_Ow@mail.gmail.com>
+References: <201207181634.58089.marex@denx.de>
+ <201207190024.50846.marex@denx.de>
+ <CAJfuBxxpGqBeD1O3QfXLhHmMGBEFvy5XZOFLH6Xww33Y+7P_Ow@mail.gmail.com>
+Message-ID: <201207191113.29529.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 10:05 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-Minor comment follows:
-[...]
-> +/**
-> + * _pwrdm_wakeuplat_update_pwrst - Update power domain power state if needed
-> + * @pwrdm: struct powerdomain * to which requesting device belongs to.
-> + * @min_latency: the allowed wake-up latency for the given power domain. A
-> + *  value of PM_QOS_DEV_LAT_DEFAULT_VALUE means 'no constraint' on the pwrdm.
-> + *
-> + * Finds the power domain next power state that fulfills the constraint.
-> + * Programs a new target state if it is different from current power state.
-> + * The power domains get the next power state programmed directly in the
-> + * registers.
-> + *
-> + * Returns 0 in case of success, -EINVAL in case of invalid parameters,
-> + * or the return value from omap_set_pwrdm_state.
-> + */
-> +static int _pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm,
-> +                                        long min_latency)
-> +{
-> +       int ret = 0, state, new_state = PWRDM_FUNC_PWRST_ON;
-> +
-> +       if (!pwrdm) {
-> +               WARN(1, "powerdomain: %s: invalid parameter(s)", __func__);
-> +               return -EINVAL;
-> +       }
-_pwrdm_wakeuplat_update_pwrst is an helper function, we check pwrdm to
-be valid here,
-however,
+Dear Jim Cromie,
+
+Note, try keeping the CC list please
+
+> hi again,
+> 
+> On Wed, Jul 18, 2012 at 4:24 PM, Marek Vasut <marex@denx.de> wrote:
+> > Dear Jim Cromie,
+> > 
+> >> hi Marek,
+> >> 
+> >> Surprising problem - is strstr the only one missing ?
+> > 
+> > I think so.
+> > 
+> >> Its only used in the stub fn, so you could cheat and
+> >> just return 0, or warn less discriminately and return 0.
+> >> Obviously, that wouldnt be acceptable for mainline.
+> > 
+> > Correct, so I'm looking for proper solution.
+> 
+> Ok.  I think youre on the right track - ie adding the fn.
+> 
+> just one more thought -
+> add a strcmp call into the func, see if it compiles or breaks
+> the same way.  If it breaks, theres a larger build issue,
+> and Im not sure how LKML would react.
+
+Hm, looks like strcmp is also missing, even though it's declared in
+
+arch/arm/boot/compressed/string.c
+
+> >> What happens if you build with compression other than XZ ?
+> > 
+> > LZMA is good, GZ as well.
+> 
+> ok, thats good -
+> It suggests the problem is quite localized.
+> 
+> I suppose strcmp could still be missing,
+> and possibly more likely, since the issue is so localized,
+> and not exposed by other builds in other arches.
+> 
+> Do you already know where strstr should be added ?
+
+arch/arm/boot/compressed/string.c I believe.
+
+> Im asking cuz Im completely unfamiliar with arm,
+> but did recently buy a raspberry-PI, so I'll be starting
+> to hack on that eventually :-)
+> 
+> >> is it specific to XZ as you said, or a more general problem ?
+> > 
+> > Specific to XZ.
+> > 
 
 [...]
->  /* Public functions */
 
->  /**
-> + * pwrdm_wakeuplat_update_constraint - Set or update a powerdomain wakeup
-> + *  latency constraint and apply it
-> + * @pwrdm: struct powerdomain * which the constraint applies to
-> + * @cookie: constraint identifier, used for tracking
-> + * @min_latency: minimum wakeup latency constraint (in microseconds) for
-> + *  the given pwrdm
-> + *
-> + * Tracks the constraints by @cookie.
-> + * Constraint set/update: Adds a new entry to powerdomain's wake-up latency
-> + * constraint list. If the constraint identifier already exists in the list,
-> + * the old value is overwritten.
-> + *
-> + * Applies the aggregated constraint value for the given pwrdm by calling
-> + * _pwrdm_wakeuplat_update_pwrst.
-> + *
-> + * Returns 0 upon success, -ENOMEM in case of memory shortage, -EINVAL in
-> + * case of invalid latency value, or the return value from
-> + * _pwrdm_wakeuplat_update_pwrst.
-> + *
-> + * The caller must check the validity of the parameters.
-> + */
-> +int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
-> +                                     long min_latency)
-> +{
-> +       struct pwrdm_wkup_constraints_entry *tmp_user, *new_user, *user = NULL;
-> +       long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
-> +       int free_new_user = 0;
-> +
-> +       pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p, min_latency=%ld\n",
-> +                __func__, pwrdm->name, cookie, min_latency);
-here,
-
-> +
-> +       if (min_latency <= PM_QOS_DEV_LAT_DEFAULT_VALUE) {
-> +               pr_warn("%s: min_latency >= PM_QOS_DEV_LAT_DEFAULT_VALUE\n",
-> +                       __func__);
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* Allocate a new entry for insertion in the list */
-> +       new_user = kzalloc(sizeof(struct pwrdm_wkup_constraints_entry),
-> +                          GFP_KERNEL);
-> +       if (!new_user) {
-> +               pr_err("%s: FATAL ERROR: kzalloc failed\n", __func__);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       mutex_lock(&pwrdm->wkup_lat_plist_lock);
-here,
-
-> +
-> +       /* Check if there already is a constraint for cookie */
-> +       plist_for_each_entry(tmp_user, &pwrdm->wkup_lat_plist_head, node) {
-> +               if (tmp_user->cookie == cookie) {
-> +                       user = tmp_user;
-> +                       break;
-> +               }
-> +       }
-here,
-
-> +
-> +       /* If nothing to update, job done */
-> +       if (user && (user->node.prio == min_latency))
-> +               goto out;
-> +
-> +       if (!user) {
-> +               /* Add new entry to the list */
-> +               user = new_user;
-> +               user->cookie = cookie;
-> +       } else {
-> +               /* Update existing entry */
-> +               plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
-here
-> +               free_new_user = 1;
-> +       }
-> +
-> +       plist_node_init(&user->node, min_latency);
-> +       plist_add(&user->node, &pwrdm->wkup_lat_plist_head);
-here
-> +
-> +       /* Find the aggregated constraint value from the list */
-> +       if (!plist_head_empty(&pwrdm->wkup_lat_plist_head))
-...
-> +               value = plist_first(&pwrdm->wkup_lat_plist_head)->prio;
-...
-
-> +
-> +       mutex_unlock(&pwrdm->wkup_lat_plist_lock);
-...
-> +
-> +       /* Free the newly allocated entry if not in use */
-> +       if (free_new_user)
-> +               kfree(new_user);
-> +
-> +       /* Apply the constraint to the pwrdm */
-> +       pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
-> +                __func__, pwrdm->name, value);
-...
-> +       return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
-we have already crashed before we do a WARN in helper.
-
-> +
-> +out:
-> +       mutex_unlock(&pwrdm->wkup_lat_plist_lock);
-> +       return 0;
-> +}
-> +
-> +/**
-> + * pwrdm_wakeuplat_remove_constraint - Release a powerdomain wakeup latency
-> + *  constraint and apply it
-> + * @pwrdm: struct powerdomain * which the constraint applies to
-> + * @cookie: constraint identifier, used for tracking
-> + *
-> + * Tracks the constraints by @cookie.
-> + * Constraint removal: Removes the identifier's entry from powerdomain's
-> + * wakeup latency constraint list.
-> + *
-> + * Applies the aggregated constraint value for the given pwrdm by calling
-> + * _pwrdm_wakeuplat_update_pwrst.
-> + *
-> + * Returns 0 upon success, -EINVAL in case the constraint to remove is not
-> + * existing, or the return value from _pwrdm_wakeuplat_update_pwrst.
-> + *
-> + * The caller must check the validity of the parameters.
-> + */
-> +int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie)
-> +{
-> +       struct pwrdm_wkup_constraints_entry *tmp_user, *user = NULL;
-> +       long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
-> +
-> +       pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p\n",
-> +                __func__, pwrdm->name, cookie);
-... same story here as well.. and so on..
-
-
-Regards,
-Nishanth Menon
+Best regards,
+Marek Vasut
