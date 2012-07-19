@@ -1,115 +1,38 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 19 Jul 2012 10:15:23 +0800
-Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <50055AD9.6030807@de.bosch.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
- <50055AD9.6030807@de.bosch.com>
-Message-ID: <20120719021522.GP21635@b20223-02.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 19 Jul 2012 11:11:55 +0800
+Subject: [PATCH 0/3 V2] Initial PXA DT bindings
+In-Reply-To: <5005C39A.5000903@gmail.com>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+ <201207171403.43689.arnd@arndb.de> <50057AE8.5000806@gmail.com>
+ <201207171531.23052.arnd@arndb.de>
+ <CAMPhdO-U-yfCcaOYGPWTeac5EpJBEEHgZOXg9U2zdjB1ST6e6g@mail.gmail.com>
+ <5005C39A.5000903@gmail.com>
+Message-ID: <CAN1soZw6MNG5ckT+8CHpkgB7j8FF512kuKa3rrWcx_iFbB55Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 02:30:17PM +0200, Dirk Behme wrote:
-> On 13.06.2012 14:34, Richard Zhao wrote:
-> >Sometimes, boards have gpios that don't own by any driver or owner
-> >by a generic driver that don't like hacks. Such gpios is normally
-> >output and need setup once on boot. So I introduce the config-on-boot
-> >gpios.
-> >
-> >Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> >Cc: Shawn Guo <shawn.guo@linaro.org>
-> >Cc: Rob Herring <rob.herring@calxeda.com>
-> >Cc: Grant Likely <grant.likely@secretlab.ca>
-> >---
-> > .../devicetree/bindings/arm/config-on-boot.txt     |   12 +++++++
-> > arch/arm/boot/dts/imx6q-sabrelite.dts              |    7 ++++
-> > arch/arm/mach-imx/mach-imx6q.c                     |   35 ++++++++++++++++++++
-> > 3 files changed, 54 insertions(+)
-> > create mode 100644 Documentation/devicetree/bindings/arm/config-on-boot.txt
-> >
-> >diff --git a/Documentation/devicetree/bindings/arm/config-on-boot.txt b/Documentation/devicetree/bindings/arm/config-on-boot.txt
-> >new file mode 100644
-> >index 0000000..f98ed74
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/arm/config-on-boot.txt
-> >@@ -0,0 +1,12 @@
-> >+* Configure on Boot
-> >+
-> >+Node name: config-on-boot
-> >+  It must be in root node. config-on-boot means to describe settings that needs
-> >+  to be set one time on boot but aren't owned by any driver, or the owned driver
-> >+  is too generic to handle such settings. For example, usb hub uses generic
-> >+  driver in usb core code, a on-board usb may need deassert reset pin.
-> >+
-> >+Optional properties:
-> >+- output-gpios: Output gpio array that needs to set.
-> >+- output-gpio-values: This property is required if output-gpios is set.
-> >+  The value is a array of 0 or 1. Total count eaquals the number of gpios.
-> >diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> >index e0ec929..1dd2261 100644
-> >--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> >+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> >@@ -17,6 +17,13 @@
-> > 	model = "Freescale i.MX6 Quad SABRE Lite Board";
-> > 	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
-> >+	config-on-boot {
-> >+		output-gpios = <
-> >+				&gpio3 22 0>;	/* vbus reset */
-> >+		output-gpio-values = <
-> >+				1>;		/* vbus reset */
-> >+	};
-> >+
-> > 	memory {
-> > 		reg = <0x10000000 0x40000000>;
-> > 	};
-> >diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> >index b47e98b..577cf19 100644
-> >--- a/arch/arm/mach-imx/mach-imx6q.c
-> >+++ b/arch/arm/mach-imx/mach-imx6q.c
-> >@@ -19,6 +19,7 @@
-> > #include <linux/irqdomain.h>
-> > #include <linux/of.h>
-> > #include <linux/of_address.h>
-> >+#include <linux/of_gpio.h>
-> > #include <linux/of_irq.h>
-> > #include <linux/of_platform.h>
-> > #include <linux/pinctrl/machine.h>
-> >@@ -113,6 +114,38 @@ static void __init imx6q_sabrelite_init(void)
-> > 	imx6q_sabrelite_cko1_setup();
-> > }
-> >+static void __init imx6q_config_on_boot(void)
-> >+{
-> >+	struct device_node *np;
-> >+	struct property *pp;
-> >+	int cnt, len, i;
-> >+	int gpio;
-> >+
-> >+	np = of_find_node_by_path("/config-on-boot");
-> >+	if (!np)
-> >+		return;
-> >+	cnt = of_gpio_named_count(np, "output-gpios");
-> >+	pp = of_find_property(np, "output-gpio-values", &len);
-> >+	if (!pp || cnt != len / sizeof(u32)) {
-> >+		pr_err("Invalid config-on-boot gpios!\n");
-> >+		of_node_put(np);
-> >+		return;
-> >+	}
-> >+	for (i = 0; i < cnt; i++) {
-> >+		gpio = of_get_named_gpio(np, "output-gpios", i);
-> >+		if (gpio_is_valid(gpio))
-> >+			gpio_request_one(gpio, GPIOF_OUT_INIT_HIGH,
-> >+					"config-on-boot");
-> 
-> While trying to use this code: Is there a special reason why all
-> pins are set to HIGH here? The contents of 'output-gpio-values' seem
-> to be ignored?
-It may be bug here. The patch is rejected. imx6_sabrelite happens work
-by default value. So I won't follow it any more.
-
-Thanks
-Richard
-> 
-> Best regards
-> 
-> Dirk
-> 
+On Wed, Jul 18, 2012 at 3:57 AM, Daniel Mack <zonque@gmail.com> wrote:
+> On 17.07.2012 20:04, Eric Miao wrote:
+>> On Tue, Jul 17, 2012 at 11:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Tuesday 17 July 2012, Daniel Mack wrote:
+>>>>> Of course if Marek is interested in picking up where he left, that
+>>>>> would also be appreciated.
+>>>>
+>>>> What about just taking them as they are? I believe Marek tested them
+>>>> back in the days when he submitted.
+>>>
+>>> The patches are 9 months old now, which means the probably don't apply
+>>> any more. If you send us a version that applies and builds on v3.5-rc7
+>>> and the maintainers don't object, we can definitely take them.
+>>
+>> As Haojian is currently working on the support for MMP series,
+>
+> I've seen that. The code looks very clean in that area.
+>
+>> I'm not
+>> sure if he has any update on the PXA side?
+>
+> If not, I would use the mmp code as reference. Just let me know :)
+>
+>
+Thanks. I'll wait your new patches. :)
