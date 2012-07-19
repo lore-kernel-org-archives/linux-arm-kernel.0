@@ -1,133 +1,41 @@
-From: rob.clark@linaro.org (Rob Clark)
-Date: Thu, 19 Jul 2012 11:23:34 -0500
-Subject: [PATCH 2/2] dma-buf: add helpers for attacher dma-parms
-In-Reply-To: <1342715014-5316-1-git-send-email-rob.clark@linaro.org>
-References: <1342715014-5316-1-git-send-email-rob.clark@linaro.org>
-Message-ID: <1342715014-5316-3-git-send-email-rob.clark@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jul 2012 17:37:12 +0100
+Subject: [PATCH] ARM: mm: avoid attempting to flush the gate_vma with
+ VIVT caches
+In-Reply-To: <CAFULd4a9YDrKpFavi-q+E+BAHTz3vyGDYGtA3JWGvncibWyFyw@mail.gmail.com>
+References: <1342455826-9425-1-git-send-email-will.deacon@arm.com>
+ <20120719122814.GE29153@mudshark.cambridge.arm.com>
+ <CAFULd4a9YDrKpFavi-q+E+BAHTz3vyGDYGtA3JWGvncibWyFyw@mail.gmail.com>
+Message-ID: <20120719163711.GG29153@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Clark <rob@ti.com>
+On Thu, Jul 19, 2012 at 02:03:50PM +0100, Uros Bizjak wrote:
+> On Thu, Jul 19, 2012 at 2:28 PM, Will Deacon <will.deacon@arm.com> wrote:
+> 
+> > On Mon, Jul 16, 2012 at 05:23:46PM +0100, Will Deacon wrote:
+> >> The vivt_flush_cache_{range,page} functions check that the mm_struct
+> >> of the VMA being flushed has been active on the current CPU before
+> >> performing the cache maintenance.
+> >>
+> >> The gate_vma has a NULL mm_struct pointer and, as such, will cause a
+> >> kernel fault if we try to flush it with the above operations. This
+> >> happens during ELF core dumps, which include the gate_vma as it may be
+> >> useful for debugging purposes.
+> >>
+> >> This patch adds checks to the VIVT cache flushing functions so that VMAs
+> >> with a NULL mm_struct are ignored.
+> >
+> > Would one of you be able to test this patch please? I've not managed to
+> > trigger the bug you reported on my boards, so it would be useful to know
+> > whether or not this patch solves the problem for you.
+> 
+> Patched kernel works as expected. Also, backport to 3.4 (where
+> original problem was triggered) works OK, so I'd suggest to backport
+> this patch to 3.4.
+> 
+> Tested-by: Uros Bizjak <ubizjak@gmail.com>
 
-Add some helpers to iterate through all attachers and get the most
-restrictive segment size/count/boundary.
+Thanks Uros, I'll add that and CC stable on the patch too.
 
-Signed-off-by: Rob Clark <rob@ti.com>
----
- drivers/base/dma-buf.c  |   63 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/dma-buf.h |   19 ++++++++++++++
- 2 files changed, 82 insertions(+)
-
-diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
-index 24e88fe..757ee20 100644
---- a/drivers/base/dma-buf.c
-+++ b/drivers/base/dma-buf.c
-@@ -192,6 +192,69 @@ void dma_buf_put(struct dma_buf *dmabuf)
- EXPORT_SYMBOL_GPL(dma_buf_put);
- 
- /**
-+ * dma_buf_max_seg_size - helper for exporters to get the minimum of
-+ * all attached device's max segment size
-+ */
-+unsigned int dma_buf_max_seg_size(struct dma_buf *dmabuf)
-+{
-+	struct dma_buf_attachment *attach;
-+	unsigned int max = (unsigned int)-1;
-+
-+	if (WARN_ON(!dmabuf))
-+		return 0;
-+
-+	mutex_lock(&dmabuf->lock);
-+	list_for_each_entry(attach, &dmabuf->attachments, node)
-+		max = min(max, dma_get_max_seg_size(attach->dev));
-+	mutex_unlock(&dmabuf->lock);
-+
-+	return max;
-+}
-+EXPORT_SYMBOL_GPL(dma_buf_max_seg_size);
-+
-+/**
-+ * dma_buf_max_seg_count - helper for exporters to get the minimum of
-+ * all attached device's max segment count
-+ */
-+unsigned int dma_buf_max_seg_count(struct dma_buf *dmabuf)
-+{
-+	struct dma_buf_attachment *attach;
-+	unsigned int max = (unsigned int)-1;
-+
-+	if (WARN_ON(!dmabuf))
-+		return 0;
-+
-+	mutex_lock(&dmabuf->lock);
-+	list_for_each_entry(attach, &dmabuf->attachments, node)
-+		max = min(max, dma_get_max_seg_count(attach->dev));
-+	mutex_unlock(&dmabuf->lock);
-+
-+	return max;
-+}
-+EXPORT_SYMBOL_GPL(dma_buf_max_seg_count);
-+
-+/**
-+ * dma_buf_get_seg_boundary - helper for exporters to get the most
-+ * restrictive segment alignment of all the attached devices
-+ */
-+unsigned int dma_buf_get_seg_boundary(struct dma_buf *dmabuf)
-+{
-+	struct dma_buf_attachment *attach;
-+	unsigned int mask = (unsigned int)-1;
-+
-+	if (WARN_ON(!dmabuf))
-+		return 0;
-+
-+	mutex_lock(&dmabuf->lock);
-+	list_for_each_entry(attach, &dmabuf->attachments, node)
-+		mask &= dma_get_seg_boundary(attach->dev);
-+	mutex_unlock(&dmabuf->lock);
-+
-+	return mask;
-+}
-+EXPORT_SYMBOL_GPL(dma_buf_get_seg_boundary);
-+
-+/**
-  * dma_buf_attach - Add the device to dma_buf's attachments list; optionally,
-  * calls attach() of dma_buf_ops to allow device-specific attach functionality
-  * @dmabuf:	[in]	buffer to attach device to.
-diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
-index eb48f38..9533b9b 100644
---- a/include/linux/dma-buf.h
-+++ b/include/linux/dma-buf.h
-@@ -167,6 +167,10 @@ int dma_buf_fd(struct dma_buf *dmabuf, int flags);
- struct dma_buf *dma_buf_get(int fd);
- void dma_buf_put(struct dma_buf *dmabuf);
- 
-+unsigned int dma_buf_max_seg_size(struct dma_buf *dmabuf);
-+unsigned int dma_buf_max_seg_count(struct dma_buf *dmabuf);
-+unsigned int dma_buf_get_seg_boundary(struct dma_buf *dmabuf);
-+
- struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *,
- 					enum dma_data_direction);
- void dma_buf_unmap_attachment(struct dma_buf_attachment *, struct sg_table *,
-@@ -220,6 +224,21 @@ static inline void dma_buf_put(struct dma_buf *dmabuf)
- 	return;
- }
- 
-+static inline unsigned int dma_buf_max_seg_size(struct dma_buf *dmabuf)
-+{
-+	return 0;
-+}
-+
-+static inline unsigned int dma_buf_max_seg_count(struct dma_buf *dmabuf)
-+{
-+	return 0;
-+}
-+
-+static inline unsigned int dma_buf_get_seg_boundary(struct dma_buf *dmabuf)
-+{
-+	return 0;
-+}
-+
- static inline struct sg_table *dma_buf_map_attachment(
- 	struct dma_buf_attachment *attach, enum dma_data_direction write)
- {
--- 
-1.7.9.5
+Will
