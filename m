@@ -1,70 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Jul 2012 15:22:23 +0000
-Subject: [RFC PATCH v2] ARM: Make a compile firmware conditionally
-In-Reply-To: <20120716022956.GA619@july>
-References: <20120716022956.GA619@july>
-Message-ID: <201207191522.24047.arnd@arndb.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 Jul 2012 23:27:40 +0200
+Subject: [PATCH] arm,unicore32: Remove obsolete "select MISC_DEVICES"
+Message-ID: <1342733260-10737-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 July 2012, Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Some boards can use the firmware at trustzone but others can't use this.
-> However we need to build it simultaneously. To address this issue,
-> introduce arm firmware support and use it at each board files.
-> 
-> e.g., In boot_secondary at mach-exynos/platsmp.c
-> 
->         __raw_writel(virt_to_phys(exynos4_secondary_startup),
->                 CPU1_BOOT_REG);
-> 
->         if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
->                 /* Call Exynos specific smc call */
-> 		firmware_ops.cpu_boot(cpu);
->         }
-> 
->         gic_raise_softirq(cpumask_of(cpu), 1);
-> 
->         if (pen_release == -1)
-> 
-> Now smp_ops is not yet merged, now just call the firmware_init at init_early
->  at board file
-> 
-> e.g., exynos4412 based board 
-> 
-> static void __init board_init_early(void)
-> {
-> 	exynos_firmware_init();
-> }
-> 
-> TODO
-> 	1. DT support.
-> 	2. call firmware init by smp_ops.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Obsoleted since commit 7c5763b8453a94871d356f20df30f350f8631e8b ("drivers:
+misc: Remove MISC_DEVICES config option")
 
-Yes, this all looks reasonable to me. One possible idea though:
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+ arch/arm/mach-davinci/Kconfig |    6 ------
+ arch/unicore32/Kconfig        |    1 -
+ 2 files changed, 0 insertions(+), 7 deletions(-)
 
-> +
-> +int __init exynos_firmware_init(void)
-> +{
-> +	firmware_ops.do_idle = exynos_do_idle;
-> +	firmware_ops.cpu_boot = exynos_cpu_boot;
-> +	return 0;
-> +}
-
-Instead of initializing each field separately, how about copying
-the entire data structure and do
-
-static struct firmware_ops exynos_firmware_ops __initdata = {
-	.do_idle = exynos_do_idle,
-	.cpu_boot = exynos_cpu_boot,
-};
-
-void __init exynos_firmware_init(void)
-{
-	firmware_ops = exynos_firmware_ops;
-}
-
-	Arnd
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 32d837d..0e5f0a1 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -61,7 +61,6 @@ config MACH_DAVINCI_EVM
+ 	bool "TI DM644x EVM"
+ 	default ARCH_DAVINCI_DM644x
+ 	depends on ARCH_DAVINCI_DM644x
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 	select I2C
+ 	help
+@@ -71,7 +70,6 @@ config MACH_DAVINCI_EVM
+ config MACH_SFFSDR
+ 	bool "Lyrtech SFFSDR"
+ 	depends on ARCH_DAVINCI_DM644x
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 	select I2C
+ 	help
+@@ -105,7 +103,6 @@ config MACH_DAVINCI_DM6467_EVM
+ 	default ARCH_DAVINCI_DM646x
+ 	depends on ARCH_DAVINCI_DM646x
+ 	select MACH_DAVINCI_DM6467TEVM
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 	select I2C
+ 	help
+@@ -119,7 +116,6 @@ config MACH_DAVINCI_DM365_EVM
+ 	bool "TI DM365 EVM"
+ 	default ARCH_DAVINCI_DM365
+ 	depends on ARCH_DAVINCI_DM365
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 	select I2C
+ 	help
+@@ -131,7 +127,6 @@ config MACH_DAVINCI_DA830_EVM
+ 	default ARCH_DAVINCI_DA830
+ 	depends on ARCH_DAVINCI_DA830
+ 	select GPIO_PCF857X
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 	select I2C
+ 	help
+@@ -218,7 +213,6 @@ config MACH_TNETV107X
+ config MACH_MITYOMAPL138
+ 	bool "Critical Link MityDSP-L138/MityARM-1808 SoM"
+ 	depends on ARCH_DAVINCI_DA850
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 	select I2C
+ 	help
+diff --git a/arch/unicore32/Kconfig b/arch/unicore32/Kconfig
+index 03c9ff8..b0a4743 100644
+--- a/arch/unicore32/Kconfig
++++ b/arch/unicore32/Kconfig
+@@ -238,7 +238,6 @@ config I2C_BATTERY_BQ27200
+ config I2C_EEPROM_AT24
+ 	tristate "I2C EEPROMs AT24 support"
+ 	select I2C_PUV3
+-	select MISC_DEVICES
+ 	select EEPROM_AT24
+ 
+ config LCD_BACKLIGHT
+-- 
+1.7.0.4
