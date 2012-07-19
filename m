@@ -1,54 +1,68 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 19 Jul 2012 14:51:12 +0000
-Subject: [PATCH 1/2] ARM: vt8500: Update vt8500-ehci driver to support
- device tree.
-In-Reply-To: <CABjd4YxfynH5f0dTwOh3EpiNr2vLq_2yJqys=Ztm_XV2oY4nsw@mail.gmail.com>
-References: <1342704684-4858-1-git-send-email-linux@prisktech.co.nz>,
- <CABjd4YxfynH5f0dTwOh3EpiNr2vLq_2yJqys=Ztm_XV2oY4nsw@mail.gmail.com>
-Message-ID: <76F764B079F92A4E843589C893D0A022C3812198@SERVER.prisktech.co.nz>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 19 Jul 2012 17:15:53 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <50081AC0.10703@metafoo.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <201207191623.14492.marex@denx.de> <50081AC0.10703@metafoo.de>
+Message-ID: <201207191715.54065.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexey Charkov [alchark at gmail.com]
-Sent: 20 July 2012 02:45
-To: vt8500-wm8505-linux-kernel at googlegroups.com
-Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org; devicetree-discuss at lists.ozlabs.org; Tony Prisk
-Subject: Re: [PATCH 1/2] ARM: vt8500: Update vt8500-ehci driver to support device tree.
+Dear Lars-Peter Clausen,
 
-2012/7/19 Tony Prisk <linux@prisktech.co.nz>:
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
->  drivers/usb/host/ehci-vt8500.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
+> On 07/19/2012 04:23 PM, Marek Vasut wrote:
+> > Dear Lars-Peter Clausen,
+> > 
+> > Sorry for my late reply, got busy with other crazy stuff.
+> > 
+> > [...]
+> > 
+> >>>> Is there any reason not to use the mxs_lradc struct directly has the
+> >>>> iio data?
+> >>> 
+> >>> I explained it below in the patch. I hope we'll eventually support the
+> >>> delay triggers, which will need 4 separate IIO devices. And this is
+> >>> where this structure will be augmented by other components.
+> >> 
+> >> Ok I saw the comment, but it wasn't obvious to me that delay channels
+> >> will require multiple IIO devices. Might make sense to state this
+> >> explicitly.
+> > 
+> > Fixed.
+> > 
+> >>>>> [...]
+> >>>>> 
+> >>>>> +
+> >>>>> +/*
+> >>>>> + * Channel management
+> >>>>> + *
+> >>>>> + * This involves crazy mapping between 8 virtual channels the CTRL4
+> >>>>> register + * can harbor and 16 channels total this hardware supports.
+> >>>>> + */
+> >>>> 
+> >>>> I suppose this means only a maximum 8 channels can be active at a
+> >>>> time. I've recently posted a patch which makes it easy to implement
+> >>>> such a restriction.
+> >>>> http://www.spinics.net/lists/linux-iio/msg05936.html and
+> >>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
+> >>>> validate callback implementation. In your case you'd check for
+> >>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
+> >>> 
+> >>> This is good. When do you expect this to hit linux-next possibly? Or at
+> >>> least linux-iio?
+> >> 
+> >> soon, hopefully.
+> > 
+> > So I checked this, not sure how it'll help me though.
+> 
+> Right now with your driver you can enable any combination of channels. If
+> more than 8 channels are enabled and you start sampling it will fail, since
+> not all channels can be mapped. With those patch you can implement a
+> validate callback and check for bitmap_weight(scan_mask) <= 8. This will
+> ensure that it is not possible to select more than 8 channels at once,
+> which again means that starting sampling can't fail of this.
 
-Have you tried to use ehci-platform on VIA/WMT devices? If it works
-(which I would expect), I believe it's better to include OF support
-into ehci-platform and drop ehci-vt8500 completely after existing
-boards are converted to Device Tree. When writing ehci-vt8500, I
-mostly only copied stuff from the PCI version and made it initialize
-from the platform bus (nothing specific to vt8500).
+Thanks, got it !
 
-Thanks,
-Alexey
-
-
------
-Alexey,
-
-The biggest problem I have at the moment is that its very hard to test anything
-as I only have a WM8650 which isn't supported in mainline.
-
-I think I have a local copy of 'our' repo on my laptop - If I do, I'll try changing the
-platform_device to use ehci_platform and see if it works.
-
-Arnd,
-
-There isn't any reason why it couldn't be uhci_of. I was simply trying to preserve
-our existing platform support without having to introduce more patches for the
-board files. The existing uhci-grlib is probably a better candidate though as I noticed
-its been updated to support OF since I wrote this driver, and this driver is based off
-that one.
-
-Regards
-
-Tony P
+Best regards,
+Marek Vasut
