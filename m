@@ -1,88 +1,113 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Thu, 19 Jul 2012 21:30:57 +0100
-Subject: [PATCH 1/4] ARM: Kirkwood: Describe DNS325 temperature sensor in DT.
+Date: Thu, 19 Jul 2012 21:31:00 +0100
+Subject: [PATCH 4/4] ARM: Kirkwood: Describe DNS32? gpio-keys in DT.
 In-Reply-To: <1342729860-14647-1-git-send-email-jm@lentin.co.uk>
 References: <y>
  <1342729860-14647-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1342729860-14647-2-git-send-email-jm@lentin.co.uk>
+Message-ID: <1342729860-14647-5-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+Move description of GPIO keys on both the DNS320 and DNS325 into DT.
 
-Now that we have I2C support in DT, describe the LM75 in
-the DT file for the DNS325.
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 ---
- arch/arm/boot/dts/kirkwood-dns325.dts |    8 ++++++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   15 ++-------------
- 2 files changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi |   21 +++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dnskw.c  |   37 ---------------------------------
+ 2 files changed, 21 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
-index 10bc819..e040d6c 100644
---- a/arch/arm/boot/dts/kirkwood-dns325.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns325.dts
-@@ -16,6 +16,14 @@
- 	};
+diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+index 067672c..2bad626 100644
+--- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
++++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+@@ -4,6 +4,27 @@
+ 	model = "D-Link DNS NASes (kirkwood-based)";
+ 	compatible = "dlink,dns-kirkwood", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
  
- 	ocp at f1000000 {
-+		i2c at 11000 {
-+			status = "okay";
-+
-+			lm75: lm75 at 48 {
-+				compatible = "national,lm75";
-+				reg = <0x48>;
-+			};
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button at 1 {
++			label = "Power button";
++			linux,code = <116>;
++			gpios = <&gpio1 2 1>;
 +		};
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
++		button at 2 {
++			label = "USB unmount button";
++			linux,code = <161>;
++			gpios = <&gpio1 15 1>;
++		};
++		button at 3 {
++			label = "Reset button";
++			linux,code = <0x198>;
++			gpios = <&gpio1 16 1>;
++		};
++	};
++
+ 	ocp at f1000000 {
+ 		sata at 80000 {
  			status = "okay";
 diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 179f4b3..1c97efa 100644
+index aac9c90..4ab3506 100644
 --- a/arch/arm/mach-kirkwood/board-dnskw.c
 +++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -14,7 +14,6 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/i2c.h>
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
+@@ -19,7 +19,6 @@
  #include <linux/of.h>
-@@ -153,13 +152,6 @@ static struct platform_device dns320_led_device = {
- 	},
+ #include <linux/gpio.h>
+ #include <linux/input.h>
+-#include <linux/gpio_keys.h>
+ #include <linux/gpio-fan.h>
+ #include <linux/leds.h>
+ #include <asm/mach-types.h>
+@@ -68,41 +67,6 @@ static unsigned int dnskw_mpp_config[] __initdata = {
+ 	0
  };
  
--static struct i2c_board_info dns325_i2c_board_info[] __initdata = {
+-static struct gpio_keys_button dnskw_button_pins[] = {
 -	{
--		I2C_BOARD_INFO("lm75", 0x48),
+-		.code		= KEY_POWER,
+-		.gpio		= 34,
+-		.desc		= "Power button",
+-		.active_low	= 1,
 -	},
--	/* Something at 0x0c also */
+-	{
+-		.code		= KEY_EJECTCD,
+-		.gpio		= 47,
+-		.desc		= "USB unmount button",
+-		.active_low	= 1,
+-	},
+-	{
+-		.code		= KEY_RESTART,
+-		.gpio		= 48,
+-		.desc		= "Reset button",
+-		.active_low	= 1,
+-	},
 -};
 -
- static struct gpio_keys_button dnskw_button_pins[] = {
- 	{
- 		.code		= KEY_POWER,
-@@ -241,17 +233,14 @@ void __init dnskw_init(void)
- 
+-static struct gpio_keys_platform_data dnskw_button_data = {
+-	.buttons	= dnskw_button_pins,
+-	.nbuttons	= ARRAY_SIZE(dnskw_button_pins),
+-};
+-
+-static struct platform_device dnskw_button_device = {
+-	.name		= "gpio-keys",
+-	.id		= -1,
+-	.num_resources	= 0,
+-	.dev		= {
+-		.platform_data	= &dnskw_button_data,
+-	}
+-};
+-
+ /* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
+ static struct gpio_fan_speed dnskw_fan_speed[] = {
+ 	{    0,  0 },
+@@ -150,7 +114,6 @@ void __init dnskw_init(void)
  	kirkwood_ehci_init();
  	kirkwood_ge00_init(&dnskw_ge00_data);
--	kirkwood_i2c_init();
  
- 	platform_device_register(&dnskw_button_device);
+-	platform_device_register(&dnskw_button_device);
  	platform_device_register(&dnskw_fan_device);
- 
--	if (of_machine_is_compatible("dlink,dns-325")) {
--		i2c_register_board_info(0, dns325_i2c_board_info,
--					ARRAY_SIZE(dns325_i2c_board_info));
-+	if (of_machine_is_compatible("dlink,dns-325"))
- 		platform_device_register(&dns325_led_device);
- 
--	} else if (of_machine_is_compatible("dlink,dns-320"))
-+	else if (of_machine_is_compatible("dlink,dns-320"))
- 		platform_device_register(&dns320_led_device);
  
  	/* Register power-off GPIO. */
 -- 
