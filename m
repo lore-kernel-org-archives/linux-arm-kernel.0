@@ -1,50 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jul 2012 23:54:38 +0800
-Subject: [PATCH 0/3] Add a generic cpufreq-cpu0 driver
-Message-ID: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 20 Jul 2012 00:00:58 +0800
+Subject: [PATCH] PM / OPP: Initialize OPP table from device tree
+In-Reply-To: <201207182136.43507.rjw@sisk.pl>
+References: <1342630669-27546-1-git-send-email-shawn.guo@linaro.org>
+ <201207182136.43507.rjw@sisk.pl>
+Message-ID: <20120719160055.GA30461@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a continuous effort of Richard's work [1].  But that generic
-cpufreq driver has been rewritten with taking omap-cpufreq.c as the
-reference to adopt OPP library.
+Hi Rafael,
 
-Same as Richard's patch, the driver has no intention to support the
-multi-core systems that frequency and voltage can be scaled
-independently on different CPUs.  Instead, it aims at uniprocessor (UP)
-and those symmetric multiprocessor (SMP) systems which share clock and
-voltage across all CPUs.
+On Wed, Jul 18, 2012 at 09:36:43PM +0200, Rafael J. Wysocki wrote:
+> On Wednesday, July 18, 2012, Shawn Guo wrote:
+> > With a lot of devices booting from device tree nowadays, it requires
+> > that OPP table can be initialized from device tree.  The patch adds
+> > a helper function of_init_opp_table together with a binding doc for
+> > that purpose.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> While I can take it, I'm not going to include it into my v3.6 pull request.
+> 
+> If no one has objections, it will show up in linux-next after v3.6-rc1.
+> 
+I have a cpufreq patch depending on this one.  Since you are maintaining
+cpufreq too, I just had them be a series below and sent them all to you.
 
-I have seen patch from Mike changing omap-cpufreq driver to scale
-regulator from clk notifier.  We can definitely make the same move
-for cpufreq-cpu0 later when the patch gets accepted.
+  [PATCH 0/3] Add a generic cpufreq-cpu0 driver
 
 Regards,
 Shawn
-
-[1] http://thread.gmane.org/gmane.linux.kernel.cpufreq/7688/focus=7688
-
----
-
-Richard Zhao (1):
-  ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
-
-Shawn Guo (2):
-  PM / OPP: Initialize OPP table from device tree
-  cpufreq: Add a generic cpufreq-cpu0 driver
-
- .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   58 +++++
- Documentation/devicetree/bindings/power/opp.txt    |   29 +++
- arch/arm/kernel/smp.c                              |   54 +++++
- drivers/base/power/opp.c                           |   66 ++++++
- drivers/cpufreq/Kconfig                            |   11 +
- drivers/cpufreq/Makefile                           |    2 +
- drivers/cpufreq/cpufreq-cpu0.c                     |  235 ++++++++++++++++++++
- include/linux/opp.h                                |    4 +
- 8 files changed, 459 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
- create mode 100644 Documentation/devicetree/bindings/power/opp.txt
- create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
-
--- 
-1.7.5.4
