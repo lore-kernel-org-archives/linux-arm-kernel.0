@@ -1,68 +1,174 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Thu, 19 Jul 2012 15:20:56 +0200
-Subject: [PATCH] usb: chipidea: ci13xxx-imx: remove global struct
-In-Reply-To: <20120719082856.GB11782@pengutronix.de>
-References: <20120718233107.GA32622@pengutronix.de>
- <20120719082856.GB11782@pengutronix.de>
-Message-ID: <20120719132056.GB7630@pengutronix.de>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Thu, 19 Jul 2012 13:21:12 +0000
+Subject: [PATCH v4 09/11] drivers: usb: musb: Add device tree support
+ for omap musb glue
+In-Reply-To: <1342607922-11554-10-git-send-email-kishon@ti.com>
+References: <1342607922-11554-1-git-send-email-kishon@ti.com>
+ <1342607922-11554-10-git-send-email-kishon@ti.com>
+Message-ID: <47CEF8C4B26E8C44B22B028A650E0EA93EADE11A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-On Thu, Jul 19, 2012 at 10:28:56AM +0200, Wolfram Sang wrote:
-> On Thu, Jul 19, 2012 at 01:31:07AM +0200, Michael Grzeschik wrote:
-> > This patch removes the limitation of having only one
-> > instance of the ci13xxx-imx. Each instance of the ci13xxx-imx
-> > could have different flags to be configured with, so we also
-> > move this settings to the devicetree properties.
-> > 
-> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +++++
+Hi,
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |   34 ++++++++++++-
+>  drivers/usb/musb/omap2430.c                        |   55
+> ++++++++++++++++++++
+>  2 files changed, 88 insertions(+), 1 deletions(-)
 > 
-> New bindings should always have devicetree-discuss in CC.
-
-Right.
-
+> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
+> b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> index 80a28c9..39cdffb 100644
+> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
+> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> @@ -1,4 +1,4 @@
+> -OMAP USB PHY
+> +OMAP USB PHY AND GLUE
 > 
-> >  drivers/usb/chipidea/ci13xxx_imx.c                 |   25 +++++++++++---------
-> >  drivers/usb/chipidea/core.c                        |   11 +++++++++
-> >  include/linux/usb/chipidea.h                       |    3 +++
-> >  4 files changed, 34 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > index 2c29041..5485eb9 100644
-> > --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > @@ -8,6 +8,9 @@ Required properties:
-> >  Optional properties:
-> >  - fsl,usbphy: phandler of usb phy that connects to the only one port
-> >  - vbus-supply: regulator for vbus
-> > +- require-transceiver: enable the flag in the driver
-> > +- pullup-on-vbus: enable the flag in the driver
-> > +- disable-streaming: enable the flag in the driver
+>  OMAP USB2 PHY
 > 
-> NACK to the bindings. You are mapping platform data 1:1 which is nearly
-> always wrong. Having a quick look in the current devicetree bindings for
-> USB shows that there is a transceiver property. So, the the
-> (non-)presence of that property should make "require-transceiver"
-> superfluous? Also, is "disable-streaming" a description of the hardware?
+> @@ -14,3 +14,35 @@ usb2phy at 0x4a0ad080 {
+>  	compatible = "ti,omap-usb2";
+>  	reg = <0x4a0ad080 0x58>;
+>  };
+> +
+> +OMAP MUSB GLUE
+> + - compatible : Should be "ti,musb-omap2430"
+> + - ti,hwmods : must be "usb_otg_hs"
+> + - multipoint : Should be "1" indicating the musb controller supports
+> +   multipoint. This is a MUSB configuration-specific setting.
+> + - num_eps : Specifies the number of endpoints. This is also a
+> +   MUSB configuration-specific setting. Should be set to "16"
+> + - ram_bits : Specifies the ram address size. Should be set to "12"
+> + - interface_type : This is a board specific setting to describe the type
+> of
+> +   interface between the controller and the phy. It should be "0" or "1"
+> +   specifying ULPI and UTMI respectively.
+> + - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
+> +   represents PERIPHERAL.
+> + - power : Should be "50". This signifies the controller can supply upto
+> +   100mA when operating in host mode.
+> +
+> +SOC specific device node entry
+> +usb_otg_hs: usb_otg_hs at 4a0ab000 {
+> +	compatible = "ti,musb-omap2430";
+> +	ti,hwmods = "usb_otg_hs";
+> +	multipoint = <1>;
+> +	num_eps = <16>;
+> +	ram_bits = <12>;
+> +};
+> +
+> +Board specific device node entry
+> +&usb_otg_hs {
+> +	interface_type = <1>;
+> +	mode = <3>;
+> +	power = <50>;
+> +};
+> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+> index addbebf..331e477 100644
+> --- a/drivers/usb/musb/omap2430.c
+> +++ b/drivers/usb/musb/omap2430.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/init.h>
+>  #include <linux/list.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/pm_runtime.h>
+> @@ -469,8 +470,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+>  static int __devinit omap2430_probe(struct platform_device *pdev)
+>  {
+>  	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
+> +	struct omap_musb_board_data	*data;
+>  	struct platform_device		*musb;
+>  	struct omap2430_glue		*glue;
+> +	struct device_node		*np = pdev->dev.of_node;
+> +	struct musb_hdrc_config		*config;
+>  	struct resource			*res;
+>  	int				ret = -ENOMEM;
+> 
+> @@ -500,6 +504,43 @@ static int __devinit omap2430_probe(struct
+> platform_device *pdev)
+>  	if (glue->control_otghs == NULL)
+>  		dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
+> 
+> +	if (np) {
+> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +		if (!pdata) {
+> +			dev_err(&pdev->dev,
+> +				"failed to allocate musb platfrom data\n");
+> +			ret = -ENOMEM;
+> +			goto err1;
+> +		}
+> +
+> +		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +		if (!data) {
+> +			dev_err(&pdev->dev,
+> +					"failed to allocate musb board data\n");
+> +			ret = -ENOMEM;
+> +			goto err1;
+> +		}
+> +
+> +		config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
+> +		if (!data) {
+> +			dev_err(&pdev->dev,
+> +				"failed to allocate musb hdrc config\n");
+> +			goto err1;
+> +		}
+> +
+> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
+> +		of_property_read_u32(np, "interface_type",
+> +						(u32 *)&data->interface_type);
+> +		of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
+> +		of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
+> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
 
-You are right it probably needs more investigation to decide which
-condition leads to which flags. Its probably not the best thing to move
-everything out to device tree.
+pdata->mode is already read so above should be removed.
 
-Actually i am touching two thing at a time in this patch, removing the
-static struct and setting the flags by oftree. I will resend this patch,
-together with other work, and will just leave the flags as currently
-set.
-
-Regards,
-Michael
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ajay
+> +		of_property_read_u32(np, "power", (u32 *)&pdata->power);
+> +		config->multipoint = of_property_read_bool(np, "multipoint");
+> +
+> +		pdata->board_data	= data;
+> +		pdata->config		= config;
+> +	}
+> +
+>  	pdata->platform_ops		= &omap2430_ops;
+> 
+>  	platform_set_drvdata(pdev, glue);
+> @@ -597,12 +638,26 @@ static struct dev_pm_ops omap2430_pm_ops = {
+>  #define DEV_PM_OPS	NULL
+>  #endif
+> 
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id omap2430_id_table[] = {
+> +	{
+> +		.compatible = "ti,omap4-musb"
+> +	},
+> +	{
+> +		.compatible = "ti,omap3-musb"
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, omap2430_id_table);
+> +#endif
+> +
+>  static struct platform_driver omap2430_driver = {
+>  	.probe		= omap2430_probe,
+>  	.remove		= __devexit_p(omap2430_remove),
+>  	.driver		= {
+>  		.name	= "musb-omap2430",
+>  		.pm	= DEV_PM_OPS,
+> +		.of_match_table = of_match_ptr(omap2430_id_table),
+>  	},
+>  };
+> 
+> --
+> 1.7.5.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
