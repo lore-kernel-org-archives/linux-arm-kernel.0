@@ -1,79 +1,62 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Thu, 19 Jul 2012 16:19:52 +0100
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <20120718175233.GB16928@mudshark.cambridge.arm.com>
-References: <20120712084432.GA2816@mudshark.cambridge.arm.com>
- <4FFE9A69.3060301@renesas.com> <4FFEFDE3.5000403@codeaurora.org>
- <4FFF8509.2050302@renesas.com>
- <20120713085746.GA18079@mudshark.cambridge.arm.com>
- <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
- <20120713111337.GH18079@mudshark.cambridge.arm.com>
- <5004D78E.4050606@renesas.com>
- <CAMQu2gx9EU4GZ634RKiwD+sg0MoO-FAqc-pPU+HkryX8rXVBjA@mail.gmail.com>
- <5005176C.6050904@renesas.com>
- <20120718175233.GB16928@mudshark.cambridge.arm.com>
-Message-ID: <50082598.5090706@arm.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 20 Jul 2012 00:28:27 +0900
+Subject: [PATCH v3 0/6] mmc: dw_mmc: add support for device tree based
+ instantiation
+In-Reply-To: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <5008279B.4000001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Thomas,
 
-On 18/07/12 18:52, Will Deacon wrote:
+I think not good that added the samsung specific code into dw_mmc-pltfm.c
+How about separating to dw-mmc-exynos.c?
 
-> Hello,
-> On Tue, Jul 17, 2012 at 08:42:36AM +0100, Shinya Kuribayashi wrote:
->> On 7/17/2012 3:11 PM, Shilimkar, Santosh wrote:
->>> Looks like you have a working patch for the clock detection. Will
->>> you able to post that patch so that this long pending calibration
->>> for secondary CPUs gets optimized.
->>
->> Something like this should work (not even build tested, can be applied
->> on top of Will's v2 patchset):
+Best Regards,
+Jaehoon Chung
+
+On 07/12/2012 09:54 PM, Thomas Abraham wrote:
+> This patch series adds device tree support for Synopsis Designware Mobile
+> Storage Host Controller.
 > 
-> [...]
+> The first patch converts the copy of controller device instance into a
+> reference. This is need to allow device resource management api to correctly
+> manage the resources allocated by the driver. The second patch fixes the
+> incorrect abort of the probe in case a slot initialization fails. This is
+> fixed by allowing as many slots to be initialized successfully and failing
+> only if there are no slots that were initialized.
 > 
->> And change your ->timer() func (called via time_init) to make use of it:
->>
->>         unsigned long freq;
->>
->>         /* For UP/SMP systems */
->>         freq = get_CPU_frequency();
->>         calibrate_delay_early(freq);
->>
->> #ifdef CONFIG_SMP
->>         /* For SMP systems */
->>         freq = get_Timer_frequency();
->>         init_current_timer_delay(freq);
->> #endif
+> The third patch adds clock lookup in the driver and this is optional. Platforms
+> that do not need any clock gating and control for the dw_mmc controllers will
+> not be affected with this change. The fourth patch adds a quirk to notify the
+> controller about the absence of the write protect line.
 > 
-> Since this seems to be gaining some traction on platforms without the
-> architected timers, Jonny and I have put together a simple registration
-> mechanism for the delay timer to avoid people calling init_current_timer_delay
-> (and defining the global read_current_timer symbol).
-
-
-We should probably also ignore and additional registration calls, not just
-those made after the delay loop has been calibrated...
-
-Something like the patch below should do the trick.
-
-Jonny
-
------8<------
-
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 1b51570..fff305b 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -72,8 +72,9 @@ void __init register_current_timer_delay(struct delay_timer *timer)
-                arm_delay_ops.delay             = __timer_delay;
-                arm_delay_ops.const_udelay      = __timer_const_udelay;
-                arm_delay_ops.udelay            = __timer_udelay;
-+               delay_calibrated                = true;
-        } else {
--               pr_info("Ignoring late registration of read_current_timer delay\n");
-+               pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
-        }
- }
- 
+> The fifth patch adds device tree based discovery support for the dw_mmc driver.
+> The sixth patch add Samsung Exynos5250 specific extentions to the driver.
+> 
+> This patchset is based on Samsung kernel tree's for-next branch with the
+> mmc tree's mmc-next branch merged.
+> 
+> Thomas Abraham (6):
+>   mmc: dw_mmc: convert copy of struct device in struct dw_mci to a reference
+>   mmc: dw_mmc: allow probe to succeed even if one slot is initialized
+>   mmc: dw_mmc: lookup for optional biu and ciu clocks
+>   mmc: dw_mmc: add quirk to indicate missing write protect line
+>   mmc: dw_mmc: add device tree support
+>   mmc: dw_mmc: add samsung exynos5250 specific extentions
+> 
+>  .../devicetree/bindings/mmc/synposis-dw-mshc.txt   |  144 ++++++++
+>  drivers/mmc/host/dw_mmc-pci.c                      |    2 +-
+>  drivers/mmc/host/dw_mmc-pltfm.c                    |   41 +++-
+>  drivers/mmc/host/dw_mmc.c                          |  364 +++++++++++++++++---
+>  drivers/mmc/host/dw_mmc.h                          |   23 ++
+>  include/linux/mmc/dw_mmc.h                         |   17 +-
+>  6 files changed, 538 insertions(+), 53 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
