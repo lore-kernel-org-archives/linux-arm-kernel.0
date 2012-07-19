@@ -1,51 +1,116 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 19 Jul 2012 15:28:12 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-Message-ID: <20120719152812.21ae228fd32fcc4a8ae651c1@canb.auug.org.au>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 19 Jul 2012 00:55:05 -0500
+Subject: [PATCHv6 4/7] ARM: OMAP: hwmod: Add support for per hwmod/module
+ context lost count
+In-Reply-To: <1342602902.4672.91.camel@sokoban>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+ <1339428387-4800-5-git-send-email-t-kristo@ti.com>
+ <CAOMWX4fecw5A0BhDG-swVubKtxTEKdNpcODOh7=uFBFbSAnbgw@mail.gmail.com>
+ <1342602902.4672.91.camel@sokoban>
+Message-ID: <CAOMWX4dWnJSOwLVvrAfMd7a9eKE97ywR0TrS6imHFA67V5QZag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Jul 18, 2012 at 4:15 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>
+> On Tue, 2012-07-17 at 02:59 -0500, Menon, Nishanth wrote:
+> > Couple of minor comments:
+> > On Mon, Jun 11, 2012 at 10:26 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> > [...]
+> > >  /**
+> > > + * _omap4_update_context_lost - increment hwmod context loss counter
+> > > if
+> > > + * hwmod context was lost, and clear hardware context loss reg
+> > > + * @oh: hwmod to check for context loss
+> > > + *
+> > > + * If the PRCM indicates that the hwmod @oh lost context, increment
+> > > + * our in-memory context loss counter, and clear the RM_*_CONTEXT
+> > > + * bits. No return value.
+> > > + */
+> > > +static void _omap4_update_context_lost(struct omap_hwmod *oh)
+> > > +{
+> > > +       u32 r;
+> > > +
+> > > +       if (oh->prcm.omap4.context_offs == USHRT_MAX)
+> > > +               return;
+> > would'nt it be better to return a dummy incremental counter instead of
+> > returning no context loss (count = 0)?
+>
+> I guess you are right, this way we may have some extra context restores
+> for modules which don't have context offs defined, rather than not
+> restoring them at all. Only thing I can think might prevent this is if
+> there are modules that never lose context but don't have context
+> register? How about omap5+?
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/i2c/busses/i2c-nomadik.c between commit 235602146ec9
-("i2c-nomadik: turn the platform driver to an amba driver") from the
-i2c-embedded tree and commit 98582d9562b4 ("ARM: ux500: Remove unused i2c
-platform_data initialisation code") from the arm-soc tree.
+there has been an interesting debate ongoing with HWAUTO and context
+loss count handling -> since we update only on _enable, this might
+actually be interesting to consider:
+enable
+idle
+un_idle (lost context)
+read counter -> no update
 
-Just context changes.  I fixed it up (see below) and can carry the fix as
-necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Now to handle modules that never loose context - they have to be in
+wakeup domain.. should we consider a flag for those? would'nt matter
+o5 or not, context is still the same.. this issue could be resolved if
+counter update is done even when a check is done.
 
-diff --cc drivers/i2c/busses/i2c-nomadik.c
-index e6b93f3,a92440d..0000000
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@@ -969,12 -965,12 +969,11 @@@ static int nmk_i2c_probe(struct amba_de
-  	adap->owner	= THIS_MODULE;
-  	adap->class	= I2C_CLASS_HWMON | I2C_CLASS_SPD;
-  	adap->algo	= &nmk_i2c_algo;
-- 	adap->timeout	= pdata->timeout ? msecs_to_jiffies(pdata->timeout) :
-- 		msecs_to_jiffies(20000);
-+ 	adap->timeout	= msecs_to_jiffies(pdata->timeout);
- +	adap->nr = atomic_read(&adapter_id);
-  	snprintf(adap->name, sizeof(adap->name),
- -		 "Nomadik I2C%d at %lx", pdev->id, (unsigned long)res->start);
- -
- -	/* fetch the controller id */
- -	adap->nr	= pdev->id;
- +		 "Nomadik I2C%d at %pR", adap->nr, &adev->res);
- +	atomic_inc(&adapter_id);
-  
-  	/* fetch the controller configuration from machine */
-  	dev->cfg.clk_freq = pdata->clk_freq;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120719/3098704a/attachment.sig>
+
+> >
+> > > +
+> > > +       r =
+> > > omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
+> > > +
+> > > oh->clkdm->pwrdm.ptr->prcm_offs,
+> > > +                                       oh->prcm.omap4.context_offs);
+> > > +
+> > > +       if (!r)
+> > > +               return;
+> > > +
+> > > +       oh->prcm.omap4.context_lost_counter++;
+> > need to be careful about counter overflow.
+>
+> Well, this code can't do much for that even if it overflows... the type
+> for the context_lost_counter is unsigned though, maybe it should be
+> expanded if you are worried...?
+
+it can hit 0 with overflow(no context loss). that will not be good, right?
+
+How about something like:
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index eac813a..5fb9572 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1606,6 +1606,18 @@ static void _reconfigure_io_chain(void)
+        spin_unlock_irqrestore(&io_chain_lock, flags);
+ }
+
++static inline void _omap4_inc_context_loss(unsigned int *v)
++{
++
++       /*
++        * Context loss count has to be a non-negative value.
++        * Clear the sign bit to get a value range from 1 to
++        * INT_MAX.
++        */
++       *v = (*v + 1) & INT_MAX;
++       *v = *v ? *v : 1;
++}
++
+ /**
+  * _omap4_update_context_lost - increment hwmod context loss counter if
+  * hwmod context was lost, and clear hardware context loss reg
+@@ -1629,7 +1641,7 @@ static void _omap4_update_context_lost(struct
+omap_hwmod *oh)
+        if (!r)
+                return;
+
+-       oh->prcm.omap4.context_lost_counter++;
++       _omap4_inc_context_loss(&oh->prcm.omap4.context_lost_counter);
+
+        omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
+                                     oh->clkdm->pwrdm.ptr->prcm_offs,
+
+Regards,
+Nishanth Menon
