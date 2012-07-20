@@ -1,75 +1,99 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jul 2012 19:35:46 +0200
-Subject: [PATCH 11/16] ARM: Kirkwood: Describe iConnects temperature sensor in
- DT.
+Date: Fri, 20 Jul 2012 19:35:47 +0200
+Subject: [PATCH 12/16] ARM: Kirkwood: Describe Dreamplug LEDs in DT.
 In-Reply-To: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
 References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1342805751-18048-12-git-send-email-andrew@lunn.ch>
+Message-ID: <1342805751-18048-13-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have I2C support in DT, describe the LM63 in
-the DT file for the iConnect.
-
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-iconnect.dts |    8 ++++++++
- arch/arm/mach-kirkwood/board-iconnect.c |   10 ----------
- 2 files changed, 8 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   16 ++++++++++++++
+ arch/arm/mach-kirkwood/board-dreamplug.c |   34 ------------------------------
+ 2 files changed, 16 insertions(+), 34 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 1ba75d4..a7dd07b 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -18,6 +18,14 @@
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 24de2b5..77fec4e 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -55,4 +55,20 @@
+ 		};
  	};
  
- 	ocp at f1000000 {
-+		i2c at 11000 {
-+			status = "okay";
++	gpio-leds {
++		compatible = "gpio-leds";
 +
-+			lm63: lm63 at 4c {
-+				compatible = "national,lm63";
-+				reg = <0x4c>;
-+			};
++		bluetooth {
++			label = "dreamplug:blue:bluetooth";
++			gpios = <&gpio1 15 1>;
 +		};
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
- 			status = "ok";
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-index b0d3cc4..df043aa 100644
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ b/arch/arm/mach-kirkwood/board-iconnect.c
-@@ -20,7 +20,6 @@
- #include <linux/mv643xx_eth.h>
++		wifi {
++			label = "dreamplug:green:wifi";
++			gpios = <&gpio1 16 1>;
++		};
++		wifi-ap {
++			label = "dreamplug:green:wifi_ap";
++			gpios = <&gpio1 17 1>;
++		};
++	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index e494393..aeb234d 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -22,7 +22,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
  #include <linux/gpio.h>
- #include <linux/leds.h>
--#include <linux/i2c.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
- #include <asm/mach/arch.h>
-@@ -90,12 +89,6 @@ static unsigned int iconnect_mpp_config[] __initdata = {
- 	0
+-#include <linux/leds.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
+@@ -47,37 +46,6 @@ static struct mvsdio_platform_data dreamplug_mvsdio_data = {
+ 	/* unfortunately the CD signal has not been connected */
  };
  
--static struct i2c_board_info __initdata iconnect_board_info[] = {
+-static struct gpio_led dreamplug_led_pins[] = {
 -	{
--		I2C_BOARD_INFO("lm63", 0x4c),
+-		.name			= "dreamplug:blue:bluetooth",
+-		.gpio			= 47,
+-		.active_low		= 1,
+-	},
+-	{
+-		.name			= "dreamplug:green:wifi",
+-		.gpio			= 48,
+-		.active_low		= 1,
+-	},
+-	{
+-		.name			= "dreamplug:green:wifi_ap",
+-		.gpio			= 49,
+-		.active_low		= 1,
 -	},
 -};
 -
- static struct mtd_partition iconnect_nand_parts[] = {
- 	{
- 		.name = "flash",
-@@ -142,9 +135,6 @@ void __init iconnect_init(void)
- {
- 	kirkwood_mpp_conf(iconnect_mpp_config);
- 	kirkwood_nand_init(ARRAY_AND_SIZE(iconnect_nand_parts), 25);
--	kirkwood_i2c_init();
--	i2c_register_board_info(0, iconnect_board_info,
--		ARRAY_SIZE(iconnect_board_info));
- 
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&iconnect_ge00_data);
+-static struct gpio_led_platform_data dreamplug_led_data = {
+-	.leds		= dreamplug_led_pins,
+-	.num_leds	= ARRAY_SIZE(dreamplug_led_pins),
+-};
+-
+-static struct platform_device dreamplug_leds = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data	= &dreamplug_led_data,
+-	}
+-};
+-
+ static unsigned int dreamplug_mpp_config[] __initdata = {
+ 	MPP0_SPI_SCn,
+ 	MPP1_SPI_MOSI,
+@@ -100,6 +68,4 @@ void __init dreamplug_init(void)
+ 	kirkwood_ge00_init(&dreamplug_ge00_data);
+ 	kirkwood_ge01_init(&dreamplug_ge01_data);
+ 	kirkwood_sdio_init(&dreamplug_mvsdio_data);
+-
+-	platform_device_register(&dreamplug_leds);
+ }
 -- 
 1.7.10
