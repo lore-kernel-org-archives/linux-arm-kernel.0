@@ -1,102 +1,74 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 20 Jul 2012 12:00:15 +0200
-Subject: [PATCH V2 1/7] ARM: SAMSUNG: add additional registers and SFR
- definitions for writeback
-In-Reply-To: <CAL1wa8dyLjC8BZBc0wBnjP=a2Yo5XDQq1Kfq9yw35_e8wxp0bw@mail.gmail.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1429943.UqWt7uDBOU@flatron>
- <CAL1wa8cCq-w8w-d-Z7rqRfA9yrfPvxQjxFn9b475A-D=J8d3Ew@mail.gmail.com>
- <4240594.0SndFBiAl5@flatron>
- <000a01cd661e$4e1e19e0$ea5a4da0$%han@samsung.com>
- <CAL1wa8dyLjC8BZBc0wBnjP=a2Yo5XDQq1Kfq9yw35_e8wxp0bw@mail.gmail.com>
-Message-ID: <50092C2F.9010304@gmail.com>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Fri, 20 Jul 2012 15:31:56 +0530
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <CANfBPZ_rS230ziPFTDVUdad_oCHNapLKpdrKst_6RxLDqixm4A@mail.gmail.com>
+References: <20120718065951.GH6522@atomide.com>
+ <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
+ <20120718071039.GI6522@atomide.com>
+ <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
+ <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
+ <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
+ <CAMQu2gxLwGACAT-r6=L9DKB=3fTNaEJ4woZOb4zttJ8qTTJmFA@mail.gmail.com>
+ <CAAwP0s2apfBHLKHtzvwqb2KPCMNhEXMe5R9792bO7FhfY5Y+uQ@mail.gmail.com>
+ <CANfBPZ_N4ZK5PgFQLHWMwsG60tb-FPTjeieTJ92rBUNgONAxAw@mail.gmail.com>
+ <CAMQu2gy+uXJFfmOwLX=YH41pr-N+T28-1wLo5rXEaj9MGffHPw@mail.gmail.com>
+ <20120719113246.GN6522@atomide.com>
+ <CANfBPZ_rS230ziPFTDVUdad_oCHNapLKpdrKst_6RxLDqixm4A@mail.gmail.com>
+Message-ID: <CANfBPZ_tqMA9NjFOqN7M1WtMLw8a=kB0ZyyyvRvNCgOm9QLEjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2012 04:59 AM, Leela Krishna Amudala wrote:
->>>>>> --- a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->>>>>> +++ b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->>>>>> @@ -30,9 +30,16 @@
->>>>>>
->>>>>>   #define VIDCON1_FSTATUS_EVEN (1<<  15)
->>>>>>
->>>>>>   /* Video timing controls */
->>>>>>
->>>>>> +#ifdef CONFIG_FB_EXYNOS_FIMD_V8
->>>>>> +#define VIDTCON0                                (0x20010)
->>>>>> +#define VIDTCON1                                (0x20014)
->>>>>> +#define VIDTCON3                                (0x2001C)
->>>>>> +#else
->>>>>>
->>>>>>   #define VIDTCON0                             (0x10)
->>>>>>   #define VIDTCON1                             (0x14)
->>>>>>   #define VIDTCON2                             (0x18)
->>>>>>
->>>>>> +#define VIDTCON3                             (0x1C)
->>>>>> +#endif
->>>>>
->>>>> Wouldn't it break s3c-fb on SoCs with earlier FIMD versions with
->>>>> CONFIG_FB_EXYNOS_FIMD_V8 selected? We are aiming at multi-platform ARM
->>>>> kernels, aren't we (i.e support of both V8 and earlier FIMD in one
->>>>> kernel)?
->>>> Exynos5 has FIMD_V8 and other SoCs has older FIMD versions.
->>>> As address offsets for certain registers has changed in FIMD_V8, we
->>>> introduced these defines.
->>>> So we have to select CONFIG_FB_EXYNOS_FIMD_V8 in case of Exynos5 SoC,
->>>> and deselect for other SoCs.
+On Fri, Jul 20, 2012 at 2:58 PM, S, Venkatraman <svenkatr@ti.com> wrote:
+> On Thu, Jul 19, 2012 at 5:02 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 02:49]:
 >>>
->>> Yes, I'm aware of different FIMD versions in different SoCs. My point is
->>> that it shouldn't be necessary to deselect CONFIG_FB_EXYNOS_FIMD_V8 to
->>> support other SoCs than Exynos5, i.e. additional config options should be
->>> incremental - should not break other setups. Ideally there should not be
->>> any new config option for FIMD v8.
+>>> "The patch simply make them depend on DMA_OMAP since DMA_OMAP
+>>> will select DMA_ENGINE automatically"
 >>>
->>> The detection of FIMD version and selection of appropriate register offsets
->>> should be done in the driver at runtime, based for example on
->>> platform_device_id (see the s3c-fb driver and usage of s3c_fb_driverdata
->>> and s3c_fb_win_variant structs).
+>>> This won't be true if the DMA selection are not done
+>>> at ARCH_OMAP level as discussed in this thread.
+>>>
+>>> Having said that, I think Russell and Tony need to
+>>> take call on how this needs to be handled.
 >>
->> I could not agree with Tomasz Figa more.
->> FIMD register offset should be selected at runtime.
+>> As the DMA channels can run out, drivers should also work
+>> without DMA. And building everything as modules should be
+>> possible for the distro kernels.
 >>
->> Leela Krishna Amudala,
->> Please, don't use ugly "#ifdef".
+>> So I'd rather not have either select or depends and have
+>> the drivers fixed.
 >>
->> Best regards,
->> Jingoo Han
->>
-> 
-> Yes, Each SoC having its own defconfigs (eg: exynos4_defconfig,
-> exynos5_defconfig etc.,)
-> So, CONFIG_FB_EXYNOS_FIMD_V8 will be added into exynos5_defconfig and
-> it won't affect the other SoCs.
+>
+> Ok - I'll work on getting polling mode to work, but as you know it's
+> not the mode to get the best performance out of the device.
+> I see that you've also merged the changes to omap2plus_defconfig, which should
+> get MMC working as before DMA Engine conversion.
+>
+> There's a small patch needed to omap_hsmmc to return a non-zero error code
+> during the probe error path. This will atleast make probe failure
+> explicit when DMA
+> is not available.
+>
+> Let me know if you want me to post it separately as a patch..
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 2338703..892a046 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1773,7 +1773,7 @@ static int __devinit omap_hsmmc_probe(struct
+> platform_device *pdev)
+>         struct mmc_host *mmc;
+>         struct omap_hsmmc_host *host = NULL;
+>         struct resource *res;
+> -       int ret, irq;
+> +       int ret = -ENXIO, irq;
+>         const struct of_device_id *match;
+>         dma_cap_mask_t mask;
+>         unsigned tx_req, rx_req;
 
-NACK.
+Please ignore this patch. The correct one was posted by Kevin last week [1].
+An additional patch is needed on top of that to fix other error paths, I'll
+send both now.
 
-As others explained, and you don't seem to understand or you are stubborn 
-enough not to change your approach, resolving hardware differences at
-compile time only is not acceptable, especially that Exynos SoCs are
-going to be DT only platforms. We shouldn't be short-sighted like this.
-
-Especially that the problem is relatively easy to solve at run-time, just 
-add EXYNOS5_* register address definitions and create separate functions 
-at the driver(s) touching those registers that changed on Exynos5.
-
-Or parametrize existing ones with an offset that would be stored in driver 
-data passed trough struct platform_device_id::driver_data.
-
-@Jingoo: BTW, shouldn't we have 
-
-plat-samsung/include/plat/regs-fb.h
-plat-samsung/include/plat/regs-fb-v4.h
-
-merged into one file and moved under include/video/ ?
-
-For example include/video/s3c-fb.h, and board files could also include
-that header. We have FIMD variant structures anyway, so why do we still
-need multiple headers ?
-
---
-
-Regards,
-Sylwester
+[1] http://marc.info/?l=linux-omap&m=134196391719430&w=2
