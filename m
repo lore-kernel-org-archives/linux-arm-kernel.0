@@ -1,170 +1,50 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 20 Jul 2012 09:30:50 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201207171924.33756.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206271520.49276.arnd@arndb.de> <1342161907.1726.26.camel@vkoul-udesk3>
- <201207171924.33756.arnd@arndb.de>
-Message-ID: <1342756850.1726.74.camel@vkoul-udesk3>
+From: johnhlinn@gmail.com (John Linn)
+Date: Thu, 19 Jul 2012 21:10:39 -0700
+Subject: are there PHYS_OFFSET alignment requirements for ARM Linux?
+In-Reply-To: <alpine.LFD.2.02.1207191501330.9293@xanadu.home>
+References: <CAB9O=CN_aDFTb7GVv++bMXPYS_RjEZe3NUeZY5uX1+mebTVKcA@mail.gmail.com>
+ <alpine.LFD.2.02.1207191501330.9293@xanadu.home>
+Message-ID: <CAB9O=CMKBSxYHvoqZKKDx=6H_NhLiQrPxU550A0Ny5i+YUCv3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-07-17 at 19:24 +0000, Arnd Bergmann wrote:
-> On Friday 13 July 2012, Vinod Koul wrote:
-> > > Do you mean there must be a global table, or are you ok with putting
-> > > the information about a channel into the device that uses the channel,
-> > > as we do for most other subsystems (IRQ, GPIO, pinctrl, ...).
-> > > If not, what is the problem with that approach?
-> > 
-> > Today, we simple ask, "give me dma channel with DMA_SLAVE capability".
-> > 
-> > If we change it to "give me dma channel which suits my need" and have
-> > additional information in dmaengine to handle this request effectively.
-> > 
-> > What that would mean is
-> > a) DMA channel either knows which channel to provide, Or
-> > b) Additional arguments provided to dmaengine API to help it find out
-> > which channel to provide.
-> > 
-> > It would be good to have client ask for a specific channel. But in order
-> > to build generic clients, we face a problem that clients may not know
-> > how they mapped to dmac by SoC designer. Or the mux maybe entirely
-> > flexible on which channel.
-> > 
-> > If we add this as DT property (which I assume should be platform
-> > specific), then client will know which channel to request.
-> > It can have two levels, dmac and channel. In case mux is flexible enough
-> > then client gets a channel and program the mux for this mapping.
-> > 
-> > I think this is the most simplistic solution I have for this, thoughts?
-> 
-> I think we're basically on the same page. Let's see if I have covered
-> all the cases we discussed so far. I've tried to update the binding that
-> Jon sent out initially with everything we've discussed, so please review
-> this to see if I understood you correctly.
-I think this looks fine to me. Few comments below on client side
-> 
-> 	Arnd
-> 
-> 
-> * Generic DMA Controller and DMA request bindings
-> 
-> Generic binding to provide a way for a driver using DMA Engine to retrieve the
-> DMA request or channel information that goes from a hardware device to a DMA
-> controller.
-> 
-> * DMA controller
-> 
-> Required property:
->     - #dma-cells: Number elements to describe DMA channel information. Must be
->                   at least 2, allowing a phandle and a flags cell, but usually
-> 		  is larger so a client can also specify a request or channel
->                   number and/or some configuration.
-> 
-> Optional properties:
->     - #dma-channels: Number of DMA channels supported by the controller.
->     - #dma-requests: Number of DMA requests signals supported by the controller.
-> 
-> Example:
-> 
->        sdma: dmaengine at 48000000 {
->                compatible = "ti,omap4-sdma"
->                reg = <0x48000000 0x1000>;
->                interrupts = <4>;
->                #dma-cells = <3>;
->                #dma-channels = <32>;
->                #dma-requests = <127>;
->        };
-> 
-> 
-> * DMA client
-> 
-> Client drivers should specify the DMA property using a phandle to the controller
-> followed by the number of DMA request/channel and the transfer type of the
-> channel (eg. device-to-memory, memory-to-device, memory-to-memory, etc).
-> 
-> Required property:
->     dmas: list of one or more dma specifiers, each consisting of
->      - phandle pointing to dma controller node
->      - flags word, a bit map that can hold these flags
->        * 0x00000001 channel can be used for transfer from device
->        * 0x00000002 channel can be user for transfer to device
-Is this for identifying which channel is for TX and RX? If not I am not
-sure I understood it well
+On Thu, Jul 19, 2012 at 12:07 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 18 Jul 2012, John Linn wrote:
+>
+>> I have seen some mention of 2 MB alignment requirements, but it's not
+>> clear to me if that's true or not (looks old)?
+>>
+>> My apologies if it's obvious somewhere, but are there any alignment
+>> requirements?
+>
+> There is a 2MB alignment requirement on PHYS_OFFSET.  You may play
+> tricks with memory reservation if a smaller offset is required, but I'd
+> recommend against that.  Even 2MB is too small an alignment if you want
+> to have CONFIG_ARM_PATCH_PHYS_VIRT=y (the default) which requires a 16MB
+> alignment.
+>
 
->      - zero or more cells in a format specific to the the dma controller
->        node listed in the phandle. This typically contains a dma request
->        line number or a channel number, but can contain any data that
->        is used required for configuring a channel.
-> 
-> Optional property:
->     dma-names: when present, this shall contain one identifier string
->     for each dma specifier in the dmas property. The specific strings
->     that can be used are defined in the binding of the DMA client
->     device. When multiple dma specifiers can be used as alternatives,
->     the dma-names for those dma specifiers must be identical.
-> 
-> Any dma specifiers that have identical flags and identical dma-names
-> (if present) shall refer to different dma controllers that can be
-> used as alternatives, e.g. when a request line is connected to
-> multiple dma controllers. If multiple dma specifiers are listed that
-> have the same flags but refer to different functional channels,
-> the dma-names property must be used to distinguish them.
-> 
-> Examples:
-> 
-> 1. One DMA write channel, one DMA read/write channel:
-> 
->        i2c1: i2c at 1 {
->                ...
->                dmas = <&sdma 2 1 &sdma 3 2>;
->                ...
->        };
-> 
-> 2. A single read-write channel with two alternative dma controllers
->    providing it:
-> 
-> 	dmas = <&dma0 3 5
-> 		&dma1 3 7
-> 		&dma2 3 2>;
-> 
-> 3. A device with three channels, one of which has two alternatives:
-> 
-> 	dmas = <&dma0 1 4 /* data read */
-> 		&dma0 2 6 /* data write */
-> 		&dma1 1 0 /* error read */
-> 		&dma2 1 0>; /* alternative error read */
-> 	dma-names = "data", "data", "error", "error";
-> 
-> 4. A dma controller requiring complex configuration:
-> 
->        dma: dmaengine at 48000000 {
->                compatible = "foo,foo-sdma"
->                reg = <0x48000000 0x1000>;
->                interrupts = <4>;
->                #dma-cells = <6>; /* phandle, flag, request, channel,
-> 					 input-width, output-width */
-Why would we want the widths to be here?
-Assuming a DMA from System memory to a peripheral, source width should
-be system memory width and destination the peripheral width. IMO these
-should not be in dma property even if we need these
->                #dma-channels = <32>;
->                #dma-requests = <127>;
->        };
-> 
->        mmc at 49000000 {
-> 		...
-> 		dmas = <&dma 1	/* read */
-> 			2	/* request line */
-> 			5       /* channel */
-> 			16	/* 16 bit bus width on read */
-> 			8>	/* 8 bit bus width on write */
-> 		       <&dma 2	/* write */
-> 			3	/* request line */
-> 			6       /* channel */
-> 			8	/* 8 bit bus width on read */
-> 			16>	/* 16 bit bus width on write */
->From this looks like flag is for TX/RX, so maybe i read correct :)
+Thanks, it wasn't clear to me. If it's documented somewhere it would
+be great to know where I overlooked it.
 
--- 
-~Vinod
+> It is very exceptional to see systems where RAM is not aligned to a much
+> bigger boundary.  Why would you need a 2MB alignment?
+
+Our DDR can be from anywhere from 0 to 1 GB address. Our platform
+can't DMA to the lower 1MB and we have on chip memory (OCM) at 0.
+
+We are currently starting DDR at 0, taking care of the DMA issue in
+the kernel (kind of a pain) and moving OCM to higher address, but we'd
+like to simplify our memory map so moving the start address of DDR to
+1MB (or 2) would do that we were thinking.
+
+I tested it at 1MB and it seemed fine with some simple boot testing,
+but nothing exhaustive.  Sounds like a 2MB (rather than 1 MB) start
+address would be wise.
+
+Thanks,
+John
+
+>
+>
+> Nicolas
