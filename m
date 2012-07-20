@@ -1,198 +1,75 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jul 2012 19:35:43 +0200
-Subject: [PATCH 8/16] ARM: Kirkwood: Use DT to configure SATA device.
+Date: Fri, 20 Jul 2012 19:35:46 +0200
+Subject: [PATCH 11/16] ARM: Kirkwood: Describe iConnects temperature sensor in
+ DT.
 In-Reply-To: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
 References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1342805751-18048-9-git-send-email-andrew@lunn.ch>
+Message-ID: <1342805751-18048-12-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert boards using DT, but the old way of configuring SATA to now
-use properties in there DT file.
+Now that we have I2C support in DT, describe the LM63 in
+the DT file for the iConnect.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-dns320.dts    |    5 +++++
- arch/arm/boot/dts/kirkwood-dns325.dts    |    5 +++++
- arch/arm/boot/dts/kirkwood-dreamplug.dts |    5 +++++
- arch/arm/boot/dts/kirkwood-ib62x0.dts    |    5 +++++
- arch/arm/boot/dts/kirkwood-ts219.dtsi    |    4 ++++
- arch/arm/mach-kirkwood/board-dnskw.c     |    5 -----
- arch/arm/mach-kirkwood/board-dreamplug.c |    5 -----
- arch/arm/mach-kirkwood/board-ib62x0.c    |    5 -----
- arch/arm/mach-kirkwood/board-ts219.c     |    5 -----
- 9 files changed, 24 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/kirkwood-iconnect.dts |    8 ++++++++
+ arch/arm/mach-kirkwood/board-iconnect.c |   10 ----------
+ 2 files changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
-index dc09a73..f2a9808 100644
---- a/arch/arm/boot/dts/kirkwood-dns320.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns320.dts
-@@ -26,6 +26,11 @@
- 			status = "okay";
- 		};
- 
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
- 		nand at 3000000 {
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
-index c2a5562..10bc819 100644
---- a/arch/arm/boot/dts/kirkwood-dns325.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns325.dts
-@@ -21,6 +21,11 @@
- 			status = "okay";
- 		};
- 
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
- 		nand at 3000000 {
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index d74d1ae..24de2b5 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -48,6 +48,11 @@
- 				};
- 			};
- 		};
-+
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <1>;
-+		};
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index 1ba75d4..a7dd07b 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -18,6 +18,14 @@
  	};
  
- };
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index ada0f0c..f8e2bc6 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -21,6 +21,11 @@
- 			status = "okay";
- 		};
- 
-+		sata at 80000 {
+ 	ocp at f1000000 {
++		i2c at 11000 {
 +			status = "okay";
-+			nr-ports = <2>;
-+		};
 +
- 		nand at 3000000 {
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-index 7b3f961..b4a789a 100644
---- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -70,5 +70,9 @@
- 				};
- 			};
- 		};
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
++			lm63: lm63 at 4c {
++				compatible = "national,lm63";
++				reg = <0x4c>;
++			};
 +		};
- 	};
- };
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 58c2d68..179f4b3 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -35,10 +35,6 @@ static struct mv643xx_eth_platform_data dnskw_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+ 			status = "ok";
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index b0d3cc4..df043aa 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -20,7 +20,6 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
+-#include <linux/i2c.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <asm/mach/arch.h>
+@@ -90,12 +89,6 @@ static unsigned int iconnect_mpp_config[] __initdata = {
+ 	0
  };
  
--static struct mv_sata_platform_data dnskw_sata_data = {
--	.n_ports	= 2,
+-static struct i2c_board_info __initdata iconnect_board_info[] = {
+-	{
+-		I2C_BOARD_INFO("lm63", 0x4c),
+-	},
 -};
 -
- static unsigned int dnskw_mpp_config[] __initdata = {
- 	MPP13_UART1_TXD,	/* Custom ... */
- 	MPP14_UART1_RXD,	/* ... Controller (DNS-320 only) */
-@@ -245,7 +241,6 @@ void __init dnskw_init(void)
+ static struct mtd_partition iconnect_nand_parts[] = {
+ 	{
+ 		.name = "flash",
+@@ -142,9 +135,6 @@ void __init iconnect_init(void)
+ {
+ 	kirkwood_mpp_conf(iconnect_mpp_config);
+ 	kirkwood_nand_init(ARRAY_AND_SIZE(iconnect_nand_parts), 25);
+-	kirkwood_i2c_init();
+-	i2c_register_board_info(0, iconnect_board_info,
+-		ARRAY_SIZE(iconnect_board_info));
  
  	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
--	kirkwood_sata_init(&dnskw_sata_data);
- 	kirkwood_i2c_init();
- 
- 	platform_device_register(&dnskw_button_device);
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-index eb0e4d5..e494393 100644
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ b/arch/arm/mach-kirkwood/board-dreamplug.c
-@@ -43,10 +43,6 @@ static struct mv643xx_eth_platform_data dreamplug_ge01_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
- };
- 
--static struct mv_sata_platform_data dreamplug_sata_data = {
--	.n_ports	= 1,
--};
--
- static struct mvsdio_platform_data dreamplug_mvsdio_data = {
- 	/* unfortunately the CD signal has not been connected */
- };
-@@ -103,7 +99,6 @@ void __init dreamplug_init(void)
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dreamplug_ge00_data);
- 	kirkwood_ge01_init(&dreamplug_ge01_data);
--	kirkwood_sata_init(&dreamplug_sata_data);
- 	kirkwood_sdio_init(&dreamplug_mvsdio_data);
- 
- 	platform_device_register(&dreamplug_leds);
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-index eddf1df..56d198e 100644
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ b/arch/arm/mach-kirkwood/board-ib62x0.c
-@@ -33,10 +33,6 @@ static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
- 
--static struct mv_sata_platform_data ib62x0_sata_data = {
--	.n_ports	= 2,
--};
--
- static unsigned int ib62x0_mpp_config[] __initdata = {
- 	MPP0_NF_IO2,
- 	MPP1_NF_IO3,
-@@ -132,7 +128,6 @@ void __init ib62x0_init(void)
- 
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&ib62x0_ge00_data);
--	kirkwood_sata_init(&ib62x0_sata_data);
- 	platform_device_register(&ib62x0_led_device);
- 	platform_device_register(&ib62x0_button_device);
- 	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-index 00b79ea..1750e68 100644
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ b/arch/arm/mach-kirkwood/board-ts219.c
-@@ -33,10 +33,6 @@ static struct mv643xx_eth_platform_data qnap_ts219_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
- 
--static struct mv_sata_platform_data qnap_ts219_sata_data = {
--	.n_ports	= 2,
--};
--
- static unsigned int qnap_ts219_mpp_config[] __initdata = {
- 	MPP0_SPI_SCn,
- 	MPP1_SPI_MOSI,
-@@ -70,7 +66,6 @@ void __init qnap_dt_ts219_init(void)
- 		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
- 
- 	kirkwood_ge00_init(&qnap_ts219_ge00_data);
--	kirkwood_sata_init(&qnap_ts219_sata_data);
- 	kirkwood_ehci_init();
- 
- 	pm_power_off = qnap_tsx1x_power_off;
+ 	kirkwood_ge00_init(&iconnect_ge00_data);
 -- 
 1.7.10
