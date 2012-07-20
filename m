@@ -1,87 +1,41 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 20 Jul 2012 11:34:43 +0530
-Subject: [RFC 3/4] ARM: OMAP: powerdomain: Add .power_on/.power_down hooks for
- powerdomains
-In-Reply-To: <1342764284-8143-1-git-send-email-rnayak@ti.com>
-References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
-Message-ID: <1342764284-8143-4-git-send-email-rnayak@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 20 Jul 2012 14:07:42 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Core updates
+Message-ID: <50094A0E.4070006@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With usecounting added to Powerdomains, its now possible to track Powerdomain
-transitions, including when a Powerdomain is turned on and turned down.
-Add support for hooking up callbacks for such events, which can be used to
-do things like context save/restore etc. which today is mostly stuffed within
-CPUidle and Suspend code.
+Hi Arnd and Olof,
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/powerdomain.c |   12 +++++++++++-
- arch/arm/mach-omap2/powerdomain.h |    4 ++++
- 2 files changed, 15 insertions(+), 1 deletions(-)
+this LPC32xx core update (branch lpc32xx/core2) builds upon the
+previously provided lpc32xx/core-fixes. Basically including PWM support
+(for the PWM driver from Alexandre already in the pwm tree), and
+CPU ID.
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index f435819..d2c096c 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -992,10 +992,16 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
-  */
- void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
- {
-+	int prev_state;
-+
- 	if (!pwrdm)
- 		return;
- 
- 	if (atomic_inc_return(&pwrdm->usecount) == 1) {
-+		if (pwrdm->power_on) {
-+			prev_state = pwrdm_read_prev_pwrst(pwrdm);
-+			pwrdm->power_on(pwrdm, prev_state);
-+		}
- 		pwrdm_post_transition(pwrdm);
- 		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
- 	}
-@@ -1010,7 +1016,7 @@ void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
-  */
- void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
- {
--	int val;
-+	int val, next_state;
- 
- 	if (!pwrdm)
- 		return;
-@@ -1020,6 +1026,10 @@ void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
- 	if (!val) {
- 		voltdm_pwrdm_disable(pwrdm->voltdm.ptr);
- 		pwrdm_pre_transition(pwrdm);
-+		if (pwrdm->power_down) {
-+			next_state = pwrdm_read_next_pwrst(pwrdm);
-+			pwrdm->power_down(pwrdm, next_state);
-+		}
- 	}
- 
- 	BUG_ON(val < 0);
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 52a99cf..a6e09cf 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -92,6 +92,8 @@ struct powerdomain;
-  * @pwrdm_clkdms: Clockdomains in this powerdomain
-  * @node: list_head linking all powerdomains
-  * @voltdm_node: list_head linking all powerdomains in a voltagedomain
-+ * @power_on: callback function before powerdomain is turned on
-+ * @power_down: callback function after powerdomain is turned down
-  * @state:
-  * @state_counter:
-  * @timer:
-@@ -121,6 +123,8 @@ struct powerdomain {
- 	unsigned ret_logic_off_counter;
- 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
- 	atomic_t usecount;
-+	int (*power_on)(struct powerdomain *pwrdm, int prev_state);
-+	int (*power_down)(struct powerdomain *pwrdm, int next_state);
- 
- #ifdef CONFIG_PM_DEBUG
- 	s64 timer;
--- 
-1.7.1
+Thanks,
+
+Roland
+
+
+The following changes since commit 8ba85f8bffdfbac98dac8630406f7d020103db70:
+
+  ARM: LPC32xx: Adjust to pl08x DMA interface changes (2012-07-12 14:25:37 +0200)
+
+are available in the git repository at:
+
+  git://git.antcom.de/linux-2.6.git lpc32xx/core2
+
+for you to fetch changes up to c49a18308669a7c1bd61ddd4f575a88d49b0b852:
+
+  ARM: LPC32xx: Add PWM support (2012-07-20 14:01:51 +0200)
+
+----------------------------------------------------------------
+Alexandre Pereira da Silva (3):
+      ARM: LPC32xx: Set system serial based on cpu unique id
+      ARM: LPC32xx: Add PWM clock
+      ARM: LPC32xx: Add PWM support
+
+ arch/arm/Kconfig               |    1 +
+ arch/arm/mach-lpc32xx/clock.c  |   14 ++++++++++++++
+ arch/arm/mach-lpc32xx/common.c |   10 ++++++++--
+ 3 files changed, 23 insertions(+), 2 deletions(-)
