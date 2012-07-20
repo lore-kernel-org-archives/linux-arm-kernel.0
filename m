@@ -1,74 +1,27 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Fri, 20 Jul 2012 15:31:56 +0530
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <CANfBPZ_rS230ziPFTDVUdad_oCHNapLKpdrKst_6RxLDqixm4A@mail.gmail.com>
-References: <20120718065951.GH6522@atomide.com>
- <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
- <20120718071039.GI6522@atomide.com>
- <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
- <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
- <CAMQu2gxLwGACAT-r6=L9DKB=3fTNaEJ4woZOb4zttJ8qTTJmFA@mail.gmail.com>
- <CAAwP0s2apfBHLKHtzvwqb2KPCMNhEXMe5R9792bO7FhfY5Y+uQ@mail.gmail.com>
- <CANfBPZ_N4ZK5PgFQLHWMwsG60tb-FPTjeieTJ92rBUNgONAxAw@mail.gmail.com>
- <CAMQu2gy+uXJFfmOwLX=YH41pr-N+T28-1wLo5rXEaj9MGffHPw@mail.gmail.com>
- <20120719113246.GN6522@atomide.com>
- <CANfBPZ_rS230ziPFTDVUdad_oCHNapLKpdrKst_6RxLDqixm4A@mail.gmail.com>
-Message-ID: <CANfBPZ_tqMA9NjFOqN7M1WtMLw8a=kB0ZyyyvRvNCgOm9QLEjw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Jul 2012 11:01:13 +0100
+Subject: [PATCH RESEND 2/4] ARM: OMAP2+: AM33XX: Add tps65217 device tree
+ data
+In-Reply-To: <1342766789-28148-3-git-send-email-anilkumar@ti.com>
+References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
+ <1342766789-28148-3-git-send-email-anilkumar@ti.com>
+Message-ID: <20120720100113.GR4495@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 2:58 PM, S, Venkatraman <svenkatr@ti.com> wrote:
-> On Thu, Jul 19, 2012 at 5:02 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 02:49]:
->>>
->>> "The patch simply make them depend on DMA_OMAP since DMA_OMAP
->>> will select DMA_ENGINE automatically"
->>>
->>> This won't be true if the DMA selection are not done
->>> at ARCH_OMAP level as discussed in this thread.
->>>
->>> Having said that, I think Russell and Tony need to
->>> take call on how this needs to be handled.
->>
->> As the DMA channels can run out, drivers should also work
->> without DMA. And building everything as modules should be
->> possible for the distro kernels.
->>
->> So I'd rather not have either select or depends and have
->> the drivers fixed.
->>
->
-> Ok - I'll work on getting polling mode to work, but as you know it's
-> not the mode to get the best performance out of the device.
-> I see that you've also merged the changes to omap2plus_defconfig, which should
-> get MMC working as before DMA Engine conversion.
->
-> There's a small patch needed to omap_hsmmc to return a non-zero error code
-> during the probe error path. This will atleast make probe failure
-> explicit when DMA
-> is not available.
->
-> Let me know if you want me to post it separately as a patch..
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 2338703..892a046 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1773,7 +1773,7 @@ static int __devinit omap_hsmmc_probe(struct
-> platform_device *pdev)
->         struct mmc_host *mmc;
->         struct omap_hsmmc_host *host = NULL;
->         struct resource *res;
-> -       int ret, irq;
-> +       int ret = -ENXIO, irq;
->         const struct of_device_id *match;
->         dma_cap_mask_t mask;
->         unsigned tx_req, rx_req;
+On Fri, Jul 20, 2012 at 12:16:27PM +0530, AnilKumar Ch wrote:
 
-Please ignore this patch. The correct one was posted by Kevin last week [1].
-An additional patch is needed on top of that to fix other error paths, I'll
-send both now.
+> +		dcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+> +			regulator-compatible = "dcdc1";
+> +			regulator-min-microvolt = <900000>;
+> +			regulator-max-microvolt = <1800000>;
 
-[1] http://marc.info/?l=linux-omap&m=134196391719430&w=2
+Same issue here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120720/fa4d5480/attachment.sig>
