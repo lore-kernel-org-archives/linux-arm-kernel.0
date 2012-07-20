@@ -1,9 +1,9 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 20 Jul 2012 16:43:49 +0300
+Date: Fri, 20 Jul 2012 16:44:41 +0300
 Subject: [PATCH] clk: fix return value check in clk_get
 In-Reply-To: <1342791397-11732-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1342791397-11732-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20120720134349.GC9437@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20120720134441.GD9437@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
