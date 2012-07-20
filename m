@@ -1,76 +1,138 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 20 Jul 2012 11:29:39 -0700
-Subject: [PATCH 4/4] ARM: clps711x: Added simple clkdev framework
-In-Reply-To: <1342808640.380063699@f242.mail.ru>
-References: <1342807362.877202427@f305.mail.ru>
- <1342805080.993377715@f259.mail.ru>
- <CAJOAzMnfk6drJrxb9tB48Ok8waocLitEYCTYKrVhbY3EpnLeg@mail.gmail.com>
- <1342808640.380063699@f242.mail.ru>
-Message-ID: <CAJOA=zPwEqGUDEp2bz9ki384BaSTyK+4953yHWJXyeCQ0jos3g@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 20 Jul 2012 13:30:24 -0700
+Subject: [PATCH][RFC] arm: dma-mapping: Add support for allocating/mapping
+ cached buffers
+In-Reply-To: <009901cd63e1$2d6445b0$882cd110$%szyprowski@samsung.com>
+References: <1342202506-12449-1-git-send-email-lauraa@codeaurora.org>
+ <1342202506-12449-2-git-send-email-lauraa@codeaurora.org>
+ <009901cd63e1$2d6445b0$882cd110$%szyprowski@samsung.com>
+Message-ID: <5009BFE0.5050501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 11:24 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Hello.
+On 7/16/2012 10:58 PM, Marek Szyprowski wrote:
+> Hi Laura,
 >
-> Fri, 20 Jul 2012 11:12:23 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
->> On Fri, Jul 20, 2012 at 11:02 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
->> > Fri, 20 Jul 2012 10:41:59 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
->> >> On Fri, Jul 20, 2012 at 10:24 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
->> >> > Thu, 19 Jul 2012 15:02:00 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
->> >> >> On Tue, Jul 17, 2012 at 1:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> >> > On Monday 16 July 2012, Alexander Shiyan wrote:
->> >> >> >> Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
->> >> >> >> This patch adds simple clkdev framework for handling all possible CPU rates.
->> >> >> >> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->> >> >> > We just had the exact same discussion about a new clock implementation for
->> >> >> > mcs814x and for the socfpga port. My feeling is that it makes no sense
->> >> >> > to keep adding new private implementations of the API as we're trying
->> >> >> > to get rid of the existing ones and replace them with the common code.
->> >> >> >
->> >> >> > If I understand this correctly, you should be using DEFINE_CLK_FIXED_RATE
->> >> >> > and DEFINE_CLK_DIVIDER etc to define the initial clocks and the lookup
->> >> >> > table, and possibly move all of that to drivers/clk.
->> >> >>
->> >> >> Arnd is correct.  Let's go ahead and move everything over to the
->> >> >> common clk framework.  These patches will have to wait for 3.7
->> >> >> anyways, so there is plenty of time to port it over.
->> >> >
->> >> > OK, I keep this patch and will be create new one, for review, but as I say before,
->> >> > COMMON_CLOCK framework is too overloaded because clps711x-target CPU
->> >> > has no enable/disable and change rate functional for clocks. We only can
->> >> > determine CPU speed from fuses and recalculate some values for system
->> >> > timer and UART.
->> >>
->> >> It might be worthwhile to implement something like
->> >> drivers/clk/clk-dummy.c which provides no real clk_ops, but
->> >> initializes parents and rates at clk_register-timer.  I haven't looked
->> >> at your patch yet to know if such an idea is applicable or not, but I
->> >> doubt you are the only platform which has "noop" clocks, so it might
->> >> be nice to expose a standard clock type for this.
->> >> What do you think?
->> >
->> > If I understand correctly, FIXED_CLK have to deal with it.
->> > Why need one more class?
->>
->> Ah, I thought that maybe you would have to dynamically detect parents
->> as well.  Also fixed clk expects to have the rate passed into it, so
->> if you need to read some registers to determine rate then that will be
->> something new.
->>
->> If you don't have mux clocks and you know you rate already (in
->> software) then fixed clk is fine for you.
+> On Friday, July 13, 2012 8:02 PM Laura Abbott wrote:
 >
-> The multiplexer is really there, but it is determined at boot time.
-> It can not be changed during operation.
-> I just wanted to say that the use of a large class for such simple operations
-> does not make much sense. But if we need to bring everything to the same
-> class, I will write a second version of the patch, it is not difficult.
+>> There are currently no dma allocation APIs that support cached
+>> buffers. For some use cases, caching provides a signficiant
+>> performance boost that beats write-combining regions. Add
+>> apis to allocate and map a cached DMA region.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>
+> I agree that there is a need for cached contiguous memory blocks. I see that your patch
+> is based on some older version of CMA/dma-mapping code. In v3.5-rc1 CMA has been merged
+> to mainline kernel together with DMA-mapping redesign patches, so an attribute approach
+> can be used instead of adding new functions to the API. My original idea was to utilize
+> the dma_alloc_nonconsistent() call and DMA_ATTR_NONCONSISTENT for allocating/mapping
+> cached contiguous buffers, but I didn't have enough time for completing this work.
+>
+> The main missing piece is the API for managing cache synchronization on such buffers.
+> There is a dma_cache_synch() functions but it is broken from the API point of view. To
+> replace it with something better, some additional work is needed for all drivers which
+> already use it. Also some work in needed for cleanup dma_alloc_nonconsistent()
+> implementations for all the architectures using dma_map_ops approach. All this is on my
+> TODO list, but I currently I'm really busy with other tasks related to CMA (mainly
+> bugfixes for some special use-cases).
+>
 
-There are benefits to using the common struct clk, including
-multi-platform boot (single zImage), and also clock tree
-"connectivity" with other devices that may use the new common struct
-clk more extensively.
+In what is the dma_cache_sync API broken? Just curious at this point.
 
 Thanks,
-Mike
+Laura
+
+>> ---
+>>   arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++++++
+>>   arch/arm/mm/dma-mapping.c          |   21 +++++++++++++++++++++
+>>   2 files changed, 42 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+>> index dc988ff..1565403 100644
+>> --- a/arch/arm/include/asm/dma-mapping.h
+>> +++ b/arch/arm/include/asm/dma-mapping.h
+>> @@ -239,12 +239,33 @@ int dma_mmap_coherent(struct device *, struct vm_area_struct *,
+>>   extern void *dma_alloc_writecombine(struct device *, size_t, dma_addr_t *,
+>>   		gfp_t);
+>>
+>> +/**
+>> + * dma_alloc_cached - allocate cached memory for DMA
+>> + * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>> + * @size: required memory size
+>> + * @handle: bus-specific DMA address
+>> + *
+>> + * Allocate some cached memory for a device for
+>> + * performing DMA.  This function allocates pages, and will
+>> + * return the CPU-viewed address, and sets @handle to be the
+>> + * device-viewed address.
+>> + */
+>> +extern void *dma_alloc_cached(struct device *, size_t, dma_addr_t *,
+>> +		gfp_t);
+>> +
+>>   #define dma_free_writecombine(dev,size,cpu_addr,handle) \
+>>   	dma_free_coherent(dev,size,cpu_addr,handle)
+>>
+>> +#define dma_free_cached(dev,size,cpu_addr,handle) \
+>> +	dma_free_coherent(dev,size,cpu_addr,handle)
+>> +
+>>   int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
+>>   		void *, dma_addr_t, size_t);
+>>
+>> +
+>> +int dma_mmap_cached(struct device *, struct vm_area_struct *,
+>> +		void *, dma_addr_t, size_t);
+>> +
+>>   /*
+>>    * This can be called during boot to increase the size of the consistent
+>>    * DMA region above it's default value of 2MB. It must be called before the
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index b1911c4..f396ddc 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -633,6 +633,20 @@ dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t
+>> *handle, gfp_
+>>   }
+>>   EXPORT_SYMBOL(dma_alloc_writecombine);
+>>
+>> +/*
+>> + * Allocate a cached DMA region
+>> + */
+>> +void *
+>> +dma_alloc_cached(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+>> +{
+>> +	return __dma_alloc(dev, size, handle, gfp,
+>> +			   pgprot_kernel,
+>> +			   __builtin_return_address(0));
+>> +}
+>> +EXPORT_SYMBOL(dma_alloc_cached);
+>> +
+>> +
+>> +
+>>   static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>>   		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>>   {
+>> @@ -664,6 +678,13 @@ int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
+>>   }
+>>   EXPORT_SYMBOL(dma_mmap_writecombine);
+>>
+>> +int dma_mmap_cached(struct device *dev, struct vm_area_struct *vma,
+>> +			  void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>> +{
+>> +	return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
+>> +}
+>> +EXPORT_SYMBOL(dma_mmap_cached);
+>> +
+>>
+>>   /*
+>>    * Free a buffer as defined by the above mapping.
+>> --
+>> 1.7.8.3
+>
+> Best regards
+>
+
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
