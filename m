@@ -1,61 +1,106 @@
-From: sentientnz@yahoo.co.nz (Tony Prisk)
-Date: Tue, 17 Jul 2012 06:47:21 -0700 (PDT)
-Subject: [PATCH 1/1] Add Wondermedia Technologies (wmt) to
- docs/devicetree/vendor-bindings.txt
-In-Reply-To: <201207171250.32265.arnd@arndb.de>
-References: <76F764B079F92A4E843589C893D0A022C380F1D4@SERVER.prisktech.co.nz>
- <201207171250.32265.arnd@arndb.de>
-Message-ID: <1342532841.54512.YahooMailNeo@web140804.mail.bf1.yahoo.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 20 Jul 2012 11:34:41 +0530
+Subject: [RFC 1/4] ARM: OMAP3: cpuidle: Remove unused MPU OSWR support code
+In-Reply-To: <1342764284-8143-1-git-send-email-rnayak@ti.com>
+References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
+Message-ID: <1342764284-8143-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+We do not support MPU OSWR on OMAP3. Get rid of the complex/multiple
+save_state handling in omap_sram_idle() and just use 2 save_state
+definitions
 
-I don't know what has happened with the patch(es).
-I used git format-patch to export them. I had to copy them to another PC to send the emails, so perhaps that's the problem.
+save_state = 1, all logic and memory lost, MPU hits OFF
+save_state = 0, nothing lost, MPU hits CSWR or shallower state
 
-Re: 'wmt' - as Alexey mentioned, this is the name the vendor uses in their own sources so it seemed like the obvious choice. I will post on devicetree-discuss and see what they think.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c    |   35 +++++++++--------------------------
+ arch/arm/mach-omap2/sleep34xx.S |    4 +---
+ 2 files changed, 10 insertions(+), 29 deletions(-)
 
-Regard,
-Tony P
-
-
-
-________________________________
- From: Arnd Bergmann <arnd@arndb.de>
-To: Tony Prisk <linux@prisktech.co.nz> 
-Cc: "vt8500-wm8505-linux-kernel at googlegroups.com" <vt8500-wm8505-linux-kernel@googlegroups.com>; devicetree-discuss at lists.ozlabs.org; Russell King <linux@arm.linux.org.uk>; "linux-kernel at vger.kernel.org" <linux-kernel@vger.kernel.org>; "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org> 
-Sent: Wednesday, 18 July 2012 12:50 AM
-Subject: Re: [PATCH 1/1] Add Wondermedia Technologies (wmt) to docs/devicetree/vendor-bindings.txt
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 7c7b173..8d96b1f 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -256,19 +256,16 @@ static void omap34xx_save_context(u32 *save)
  
-On Tuesday 17 July 2012, Tony Prisk wrote:
-> From 756ae5c2f475d679649adff99058679b651af8d9 Mon Sep 17 00:00:00 2001
-> From: Tony Prisk <linux@prisktech.co.nz>
-> Date: Tue, 17 Jul 2012 19:09:31 +1200
-> Subject: [PATCH] Add Wondermedia Technologies (wmt) to vendor-prefixes.txt
->? Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-
-Something went wrong with exporting the patch. You probably used git-show
-rather than git-format-patch, so you got the wrong headers.
-
-It would also be helpful to describe why the specific string is used here.
-Normally we use the stock ticker symbol and "wmt" refers to Wal-Mart,
-which would be unlikely but not impossible to produce their own hardware
-in the future. The same thing applies to "via", which is VIACOM. The symbol
-for VIA technologies is "2388.TW", but that is not particularly descriptive
-or well-known.
-
-Maybe someone on the devicetree-discuss mailing list has a better
-suggestion. I think using "via" is probably the best compromise, as
-it's a well-known name and most of the components of the wondermedia
-chips were first made by VIA anyway.
-
-??? Arnd
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120717/20b07317/attachment.html>
+ static int omap34xx_do_sram_idle(unsigned long save_state)
+ {
++	/*
++	 * save_state = 1 indicates all logic and memory/cache lost
++	 * save_state = 0 indicates nothing lost
++	 */
+ 	omap34xx_cpu_suspend(save_state);
+ 	return 0;
+ }
+ 
+ void omap_sram_idle(void)
+ {
+-	/* Variable to tell what needs to be saved and restored
+-	 * in omap_sram_idle*/
+-	/* save_state = 0 => Nothing to save and restored */
+-	/* save_state = 1 => Only L1 and logic lost */
+-	/* save_state = 2 => Only L2 lost */
+-	/* save_state = 3 => L1, L2 and logic lost */
+-	int save_state = 0;
+ 	int mpu_next_state = PWRDM_POWER_ON;
+ 	int per_next_state = PWRDM_POWER_ON;
+ 	int core_next_state = PWRDM_POWER_ON;
+@@ -277,20 +274,6 @@ void omap_sram_idle(void)
+ 	u32 sdrc_pwr = 0;
+ 
+ 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+-	switch (mpu_next_state) {
+-	case PWRDM_POWER_ON:
+-	case PWRDM_POWER_RET:
+-		/* No need to save context */
+-		save_state = 0;
+-		break;
+-	case PWRDM_POWER_OFF:
+-		save_state = 3;
+-		break;
+-	default:
+-		/* Invalid state */
+-		pr_err("Invalid mpu state in sram_idle\n");
+-		return;
+-	}
+ 
+ 	/* NEON control */
+ 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
+@@ -342,12 +325,12 @@ void omap_sram_idle(void)
+ 	 * get saved. The rest is placed on the stack, and restored
+ 	 * from there before resuming.
+ 	 */
+-	if (save_state)
++	if (mpu_next_state == PWRDM_POWER_OFF) {
+ 		omap34xx_save_context(omap3_arm_context);
+-	if (save_state == 1 || save_state == 3)
+-		cpu_suspend(save_state, omap34xx_do_sram_idle);
+-	else
+-		omap34xx_do_sram_idle(save_state);
++		cpu_suspend(1, omap34xx_do_sram_idle);
++	} else {
++		omap34xx_do_sram_idle(0);
++	}
+ 
+ 	/* Restore normal SDRC POWER settings */
+ 	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 1f62f23..a4d04a4 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -157,9 +157,7 @@ ENTRY(omap34xx_cpu_suspend)
+ 	/*
+ 	 * r0 contains information about saving context:
+ 	 *   0 - No context lost
+-	 *   1 - Only L1 and logic lost
+-	 *   2 - Only L2 lost (Even L1 is retained we clean it along with L2)
+-	 *   3 - Both L1 and L2 lost and logic lost
++	 *   1 - Both L1 and L2 lost and logic lost
+ 	 */
+ 
+ 	/*
+-- 
+1.7.1
