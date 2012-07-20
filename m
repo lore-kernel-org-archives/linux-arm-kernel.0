@@ -1,38 +1,68 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 Jul 2012 22:30:11 -0600
-Subject: Boot breaks in -next from LEGACY to LINEAR conversion
-In-Reply-To: <20120718161023.GE4495@opensource.wolfsonmicro.com>
-References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
- <20120718161023.GE4495@opensource.wolfsonmicro.com>
-Message-ID: <CACxGe6utvV6XbJEck_UuVJxsqckPFZXG3psEgeQ1vZSBGAwm9Q@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 20 Jul 2012 10:09:43 +0530
+Subject: [RFC][PATCH v2 1/1] ARM: OMAP2+: PM: Register suspend ops even
+ in the presence of DT blob
+In-Reply-To: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <5008E10F.4080706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 10:10 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jul 17, 2012 at 07:57:49PM +0100, Mark Brown wrote:
->> -next fails to boot for me today on my s3c64xx based systems.  Walking
->> back to the last time I tried and bisecting likely branches I find that
->> commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
->> that introduces the build break.  Unfortunately the boot fails before I
->> get a console which makes diagnosis somewhat more tricky than would be
->> ideal.  Any ideas?
+On Thursday 19 July 2012 05:38 PM, Vaibhav Bedia wrote:
+> As per the comment in omap2_common_late_init() looks like the
+> original intent of the DT check was to treat only the PMIC
+> and SR initialization differently. Recent changes to consolidate
+> the suspend-resume code across OMAP3/4 resulted into the
+> registration of suspend ops also being dependent on the check
+> for DT blob. Since the suspend-resume operation should not
+> really be dependent on the usage of DT remove this dependency
+> by wrapping the PMIC and SR init under the DT check.
+
+So I am guessing you also tested suspend/resume on your hardware
+with this patch, when booting with a DT blob, and it passed.
+
 >
-> Further data: the irq_domain_associate_many() calls that we're now doing
-> are also causing WARN_ON()s to go off during boot after commit 98aa46
-> (irqdomain: Support for static IRQ mapping and association) causing
-> breakage for my interrupt using MFDs.
-
-Okay, I've got a theory about what the issue is now. The .map()
-callback is failing (returning non-zero) for one of the hwirqs. The
-new code is stricter about associations, and actually unwinds the
-associations if one of them fails. The old legacy code simply called
-all the .map() hooks blindly without any error checking. Can you send
-me the kernel log after backing out those changes.
-
-The other possibility is that irqs aren't being reserved correctly.
-Seeing the backtrace will tell me which issue it is.
-
-In the mean time I've backed out the top three commits from irqdomain/next.
-
-g.
+> Signed-off-by: Vaibhav Bedia<vaibhav.bedia@ti.com>
+> ---
+> v2->v1
+>   - As suggested by Paul, Instead of moving around the suspend ops
+>     registration just wrap the PMIC and SR init under the DT check.
+>   - Fixed up Kevin's email address :\
+>
+>   arch/arm/mach-omap2/pm.c |   21 ++++++++++-----------
+>   1 files changed, 10 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index 9cb5ced..46848f7 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -302,19 +302,18 @@ int __init omap2_common_pm_late_init(void)
+>   	 * a completely different mechanism.
+>   	 * Disable this part if a DT blob is available.
+>   	 */
+> -	if (of_have_populated_dt())
+> -		return 0;
+> +	if (!of_have_populated_dt()) {
+> +		/* Init the voltage layer */
+> +		omap_pmic_late_init();
+> +		omap_voltage_late_init();
+>
+> -	/* Init the voltage layer */
+> -	omap_pmic_late_init();
+> -	omap_voltage_late_init();
+> +		/* Initialize the voltages */
+> +		omap3_init_voltages();
+> +		omap4_init_voltages();
+>
+> -	/* Initialize the voltages */
+> -	omap3_init_voltages();
+> -	omap4_init_voltages();
+> -
+> -	/* Smartreflex device init */
+> -	omap_devinit_smartreflex();
+> +		/* Smartreflex device init */
+> +		omap_devinit_smartreflex();
+> +	}
+>
+>   #ifdef CONFIG_SUSPEND
+>   	suspend_set_ops(&omap_pm_ops);
