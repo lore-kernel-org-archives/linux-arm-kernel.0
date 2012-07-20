@@ -1,212 +1,119 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jul 2012 13:17:00 +0200
-Subject: [PATCHv3] I2C: MV64XXX: Add Device Tree support
-In-Reply-To: <20120720103513.GA5971@pengutronix.de>
-References: <1342430205-13702-1-git-send-email-andrew@lunn.ch>
- <1342430205-13702-2-git-send-email-andrew@lunn.ch>
- <20120720103513.GA5971@pengutronix.de>
-Message-ID: <20120720111700.GA14580@lunn.ch>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 20 Jul 2012 13:19:23 +0200 (CEST)
+Subject: [PATCH] [v3] i.MX27: Fix emma-prp clocks in mx2_camera.c
+In-Reply-To: <CACKLOr0hfbv4qnp79XyXzNCE=oXS+7JA31knoXjGU+STG9Fxfg@mail.gmail.com>
+References: <1341572162-29126-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120709072809.GP30009@pengutronix.de>
+ <CACKLOr25yb1Cx4XNriyPceBcqmc5T4jDpJXFpve9JCXpP7iMLg@mail.gmail.com>
+ <20120709074337.GT30009@pengutronix.de>
+ <CACKLOr05W5N4n9TSKdaCP-6-j+zDSr=aNG4QoTMVWXTrM30x7Q@mail.gmail.com>
+ <20120709080703.GU30009@pengutronix.de>
+ <CACKLOr0hfbv4qnp79XyXzNCE=oXS+7JA31knoXjGU+STG9Fxfg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1207201247500.27906@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 12:35:13PM +0200, Wolfram Sang wrote:
-> Hi Andrew,
-> 
-> On Mon, Jul 16, 2012 at 11:16:45AM +0200, Andrew Lunn wrote:
-> > Extends the driver to get properties from device tree. Rather than
-> > pass the N & M factors in DT, use the more standard clock-frequency
-> > property. Calculate N & M at run time. In order to do this, we need to
-> 
-> Thanks.
-> 
-> > know tclk. So the driver uses clk_get() etc in order to get the clock
-> > and clk_get_rate() to determine the tclk rate. Not all platforms
-> > however have CLK, so some #ifdefery is needed to ensure the driver
-> > still compiles when CLK is not available.
-> > 
-> > Also extend the kirkwood DT support to supply the needed properties. A
-> > default clock-frequency is 400KHz, which some platforms might need to
-> > override to 100KHz if they have devices which do not support fast
-> > mode.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-> 
-> Has Sebastian acked THIS patch? Didn't saw such a mail? If it was a
-> previous patch which he acked, I'd like it to be resent, since the
-> divider calculation is new.
+Hi Javier
 
-Yes and the version that came after it, fixing the timeout code, which
-at your request i will rip out. It has also been tested by a couple of
-other people on different kirkwood boards.
+Thanks for the patch
 
-> > v2: Removed duplicate interrupt in DT.
-> > v3: Use clock-frequency property, instead of explicit n & m baud factors.
-> > 
-> > i2c fix.
-> > ---
-> >  Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   21 +++-
-> >  arch/arm/boot/dts/kirkwood.dtsi                    |   11 ++
-> >  arch/arm/mach-kirkwood/board-dt.c                  |    2 +
-> >  arch/arm/mach-kirkwood/common.c                    |    2 +
-> >  arch/arm/plat-orion/common.c                       |    1 +
-> >  drivers/i2c/busses/i2c-mv64xxx.c                   |  107 +++++++++++++++++++-
+On Mon, 9 Jul 2012, javier Martin wrote:
+
+> On 9 July 2012 10:07, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Mon, Jul 09, 2012 at 09:46:03AM +0200, javier Martin wrote:
+> >> On 9 July 2012 09:43, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> > On Mon, Jul 09, 2012 at 09:37:25AM +0200, javier Martin wrote:
+> >> >> On 9 July 2012 09:28, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> >> > On Fri, Jul 06, 2012 at 12:56:02PM +0200, Javier Martin wrote:
+> >> >> >> This driver wasn't converted to the new clock changes
+> >> >> >> (clk_prepare_enable/clk_disable_unprepare). Also naming
+> >> >> >> of emma-prp related clocks for the i.MX27 was not correct.
+> >> >> >> ---
+> >> >> >> Enable clocks only for i.MX27.
+> >> >> >>
+> >> >> >
+> >> >> > Indeed,
+> >> >> >
+> >> >> >>
+> >> >> >> -     pcdev->clk_csi = clk_get(&pdev->dev, NULL);
+> >> >> >> -     if (IS_ERR(pcdev->clk_csi)) {
+> >> >> >> -             dev_err(&pdev->dev, "Could not get csi clock\n");
+> >> >> >> -             err = PTR_ERR(pcdev->clk_csi);
+> >> >> >> -             goto exit_kfree;
+> >> >> >> +     if (cpu_is_mx27()) {
+> >> >> >> +             pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
+> >> >> >> +             if (IS_ERR(pcdev->clk_csi)) {
+> >> >> >> +                     dev_err(&pdev->dev, "Could not get csi clock\n");
+> >> >> >> +                     err = PTR_ERR(pcdev->clk_csi);
+> >> >> >> +                     goto exit_kfree;
+> >> >> >> +             }
+> >> >> >
+> >> >> > but why? Now the i.MX25 won't get a clock anymore.
+> >> >>
+> >> >> What are the clocks needed by i.MX25? csi only?
+> >> >>
+> >> >> By the way, is anybody using this driver with i.MX25?
+> >> >
+> >> > It seems Baruch (added to Cc) has used it on an i.MX25.
+> >>
+> >> Baruch,
+> >> could you tell us what are the clocks needed by i.MX25?
+> >
+> > I just had a look and the i.MX25 it needs three clocks: ipg, ahb and
+> > peripheral clock. So this is broken anyway and should probably be fixed
+> > seperately, that is:
+> >
+> > - provide dummy clocks for the csi clocks on i.MX27
+> > - clk_get ipg, ahb and peripheral clocks on all SoCs
+> > - clk_get emma clocks on i.MX27 only
+> >
+> > As said, this is a separate topic, so your original patch should be fine
+> > for now.
+
+Well, sorry, but I don't think I can share this.
+
+1. it touches two areas - arch/ and drivers/ which isn?t a good thing and 
+   should be avoided wherever possible
+2. it addresses several problems: (a) missing name for "ahb" camera clock, 
+   (b) wrong device and connection names for emma clocks, (c) missing 
+   _(un)prepare suffixes in clock API
+3. it makes a possibly broken i.MX25 even more broken
+
+IIUC, mx2-camera is broken on i.MX27 in current next because of wrong 
+clock entries, right? So, we don't have to be bothered not to break 
+bisection - it is already broken. Then we can clean up the problems 
+separately under arch/ and drivers/.
+
+So, would it be possible to split this into 3 parts:
+
+(a) arch - fix clocks
+(b) media - fix clocks on i.MX27 _without_ breaking it even further on 
+    i.MX25. If we think i.MX25 support is already broken, let's schedule 
+    its removal and remove properly, or add BROKEN to Kconfig, when built 
+    on i.MX25. In your patch this would mean just adding an "else" to your 
+    "if (cpu_is_mx27())" statement and moving the current clk_get() there
+(c) add _(un)prepare.
+
+Since these are fixes, I won't wait too long for these. If you don't 
+resubmit them today, they'll go in after 3.6-rc1.
+
+Thanks
+Guennadi
+
+> OK, thanks for your interest.
 > 
-> As said in another mail, please split up arch/arm and i2c-stuff.
-
-Sure, no problem. 
-
+> Regards.
+> -- 
+> Javier Martin
+> Vista Silicon S.L.
+> CDTUC - FASE C - Oficina S-345
+> Avda de los Castros s/n
+> 39005- Santander. Cantabria. Spain
+> +34 942 25 32 60
+> www.vista-silicon.com
 > 
-> > +Required properties :
-> > +
-> > + - reg             : Offset and length of the register set for the device
-> > + - compatible      : Should be "marvell,mv64xxx-i2c"
-> > + - interrupts      : Te interrupt number
-> > + - clock-frequency : Desired I2C bus clock frequency in Hz.
-> > + - timeout-ms      : How long to wait for a transaction to complete
-> 
-> If you don't really need "timeout-ms", I'd ask you to drop it.
 
-I can hard code it to 1 second. This should have no impact on any
-plat-orion boards, since they all use 1 second.
-
-> > +#ifdef CONFIG_OF
-> 
-> Hooray, we have one big CONFIG_OF block, so we could move other stuff
-> here? See below.
-> 
-> > +static int __devinit
-> > +calc_freq(const int tclk, const int n, const int m)
-> > +{
-> > +	return tclk / (10 * (m + 1) * (2 << n));
-> > +}
-> > +
-> > +static bool __devinit
-> > +find_baud_factors(const int req_freq, const int tclk, int *best_n, int *best_m)
-> > +{
-> > +	int freq, delta, best_delta = INT_MAX;
-> > +	int m, n;
-> > +
-> > +	for (n = 0; n <= 7; n++)
-> > +		for (m = 0; m <= 15; m++) {
-> > +			freq = calc_freq(tclk, n, m);
-> > +			delta = req_freq - freq;
-> > +			if (delta >= 0 && delta < best_delta) {
-> > +				*best_m = m;
-> > +				*best_n = n;
-> > +				best_delta = delta;
-> > +			}
-> > +			if (best_delta == 0)
-> > +				return true;
-> > +		}
-> > +	if (best_delta == INT_MAX)
-> > +		return false;
-> > +	return true;
-> > +}
-> > +#endif
-> >  static int __devinit
-> >  mv64xxx_i2c_probe(struct platform_device *pd)
-> >  {
-> > @@ -528,7 +564,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
-> >  	struct mv64xxx_i2c_pdata	*pdata = pd->dev.platform_data;
-> >  	int	rc;
-> >  
-> > -	if ((pd->id != 0) || !pdata)
-> > +	if ((!pdata && !pd->dev.of_node) || (pdata && (pd->id != 0)))
-> >  		return -ENODEV;
-> 
-> (extra points if you rebase your patch on top of this patch
-> d61a9095155e832287552a9e565b8756ee293c46 from my next tree:
-> git://git.pengutronix.de/git/wsa/linux.git i2c-embedded/for-next)
-
-Yes, i know of this patch from Florian Fainelli. I was planning on
-warning you about the merge conflict, but maybe i will try for the
-rebase.
-
-> >  	drv_data = kzalloc(sizeof(struct mv64xxx_i2c_data), GFP_KERNEL);
-> > @@ -546,19 +582,64 @@ mv64xxx_i2c_probe(struct platform_device *pd)
-> >  	init_waitqueue_head(&drv_data->waitq);
-> >  	spin_lock_init(&drv_data->lock);
-> >  
-> > -	drv_data->freq_m = pdata->freq_m;
-> > -	drv_data->freq_n = pdata->freq_n;
-> > -	drv_data->irq = platform_get_irq(pd, 0);
-> > +#if defined(CONFIG_HAVE_CLK)
-> > +	/* Not all platforms have a clk */
-> > +	drv_data->clk = clk_get(&pd->dev, NULL);
-> > +	if (!IS_ERR(drv_data->clk)) {
-> > +		clk_prepare(drv_data->clk);
-> > +		clk_enable(drv_data->clk);
-> > +	}
-> 
-> Call this code only when CONFIG_OF?
-
-Nope. There are lots of kirkwood boards who need to turn this clock
-on, but are not yet converted to DT. I suspect Dove is similar. I also
-don't particularly like all this #ifdefery, but there is not much i
-can do about it :-(
-
-> 
-> > +#endif
-> > +	if (pdata) {
-> > +		drv_data->freq_m = pdata->freq_m;
-> > +		drv_data->freq_n = pdata->freq_n;
-> > +		drv_data->irq = platform_get_irq(pd, 0);
-> > +	}
-> > +#ifdef CONFIG_OF
-> > +	if (pd->dev.of_node) {
-> 
-> Move this stuff into a seperate function and put it into the big
-> CONFIG_OF block? That should make the code a lot more readable?
-
-O.K.
- 
-> > +		int bus_freq;
-> > +		int tclk;
-> > +		/* CLK is mandatory when using DT to describe the i2c
-> > +		 * bus. We need to know tclk in order to calculate bus
-> > +		 * clock factors. */
-> > +#if defined(CONFIG_HAVE_CLK)
-> > +		if (IS_ERR(drv_data->clk)) {
-> > +			rc = -ENODEV;
-> > +			goto exit_unmap_regs;
-> > +		}
-> > +		tclk = clk_get_rate(drv_data->clk);
-> > +		of_property_read_u32(pd->dev.of_node, "clock-frequency",
-> > +				     &bus_freq);
-> > +		if (!find_baud_factors(bus_freq, tclk,
-> > +				       &drv_data->freq_n, &drv_data->freq_m)) {
-> > +			rc = -EINVAL;
-> > +			goto exit_unmap_regs;
-> > +		}
-> > +		drv_data->irq = irq_of_parse_and_map(pd->dev.of_node, 0);
-> > +#else
-> > +		/* Have OF but no CLK */
-> > +		rc = -ENODEV;
-> > +		goto exit_unmap_regs;
-> > +#endif
-> > +	}
-> > +#endif
-> >  	if (drv_data->irq < 0) {
-> >  		rc = -ENXIO;
-> >  		goto exit_unmap_regs;
-> >  	}
-> > +
-> >  	drv_data->adapter.dev.parent = &pd->dev;
-> >  	drv_data->adapter.algo = &mv64xxx_i2c_algo;
-> >  	drv_data->adapter.owner = THIS_MODULE;
-> >  	drv_data->adapter.class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
-> > -	drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
-> > +	if (pd->dev.of_node)
-> > +		drv_data->adapter.timeout = msecs_to_jiffies(
-> > +			of_property_read_u32(pd->dev.of_node, "timeout-ms",
-> > +					     &drv_data->freq_n));
-> > +	else
-> > +		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
-> 
-> This should also go into the new function.
-
-Actually, its totally broken, and is what i will replace with a hard
-coded value...
-
-      Andrew
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
