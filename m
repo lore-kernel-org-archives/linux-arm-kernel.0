@@ -1,69 +1,36 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 20 Jul 2012 13:30:48 +0200
-Subject: Devicetree: Initialization order of mmc block devices?
-In-Reply-To: <CAJe_Zhcyug17ZnKtmKnVhHT=Mm1PKdE68f21WWkUVtfCwNxSwg@mail.gmail.com>
-References: <5006571A.7060103@de.bosch.com>	<CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>	<50068696.8070408@de.bosch.com>	<CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>	<5006C40D.300@de.bosch.com>
- <CAJe_Zhcyug17ZnKtmKnVhHT=Mm1PKdE68f21WWkUVtfCwNxSwg@mail.gmail.com>
-Message-ID: <50094168.2090900@de.bosch.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Jul 2012 12:38:06 +0100
+Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device tree
+ data
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
+References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
+ <1342766789-28148-2-git-send-email-anilkumar@ti.com>
+ <20120720095935.GQ4495@opensource.wolfsonmicro.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
+Message-ID: <20120720113806.GW4495@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.07.2012 22:45, Jassi Brar wrote:
-> On 18 July 2012 19:41, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
->> On 07/18/2012 03:47 PM, Jassi Brar wrote:
->>> On 18 July 2012 15:19, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
->>>
->>>> If a SD card is inserted at boot time, its "mmcblk0", the embedded
->>>> MMC (eMMC) device "mmcblk1".  This makes it difficult to give the kernel
->>>> the
->>>> correct device for the eMMC root file system ("root=/dev/mmcblk?p1 ...").
->>>>
->>> How about  root=UUID=<eMMC-partition>  ?
->> Because we are talking about an embedded device, it is very difficult to get
->> a UUID of a eMMC partition into kernel command line with U-Boot. Handling of
->> UUID is also a big effort at board manufacturing.
->>
-> I don't realize how bad is it if a common UUID is used on each cloned
-> eMMC(non-removable) of every instance of a device. But of course only
-> you know what's best for your product.
-> 
->> This problem can occur on many devices with embedded MMC and removable SD,
->> e.g. smart phones. So I think we should find an solution to define MMC scan
->> order or device number/name in a device tree.
->>
-> I assume your issue is that due to async nature of mmc scanning, the
-> eMMC is detected later than external card, despite being the probe for
-> eMMC's slot initiated first ?
-> If so, we can do by simply associating 'N' of 'mmcblkN' with the slot
-> index i.e, mmc_host.index (instead of mmc_blk_data.name_idx). Which is
-> always in the order of probe calling. And we don't need to modify, or
-> expect more of, DT for that.
+On Fri, Jul 20, 2012 at 11:27:36AM +0000, AnilKumar, Chimata wrote:
+> On Fri, Jul 20, 2012 at 15:29:36, Mark Brown wrote:
 
-Do you mean something like
+> > Every regulator here has a rather large voltage range specified with no
+> > consumers added.  Are you sure these voltage ranges make sense in your
+> > design and you've not just cut'n'pasted the entire voltage range that
+> > your regulator supports without reference to what your board can do?
 
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -1536,7 +1536,7 @@ static struct mmc_blk_data 
-*mmc_blk_alloc_req(struct mmc_card *card,
-          */
+> tps65217.dtsi is a generic file to be used by the SoCs so these constraints
+> were taken from the regulator itself. SoC specific limits can be added in
+> SoC specific .dts file to tighten the constraints to require limit. I have
+> tested the driver with this approach.
 
-         snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
--                "mmcblk%d%s", md->name_idx, subname ? subname : "");
-+                "mmcblk%d%s", card->host->index, subname ? subname : "");
-
-         blk_queue_logical_block_size(md->queue.queue, 512);
-         set_capacity(md->disk, size);
-
-?
-
-A first quick test looks promising. We will go on testing this.
-
-> Though I suspect there must be some
-> serious reason why it's not already done that way.
-
-Anybody with an idea? Any serious reason?
-
-Many thanks and best regards
-
-Dirk
+No, this is not a sane approach.  You've no idea if any of these
+settings are safe or sane for the board.  Boards should enable things
+they know are safe, not remove those they know are broken.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120720/91ea542e/attachment.sig>
