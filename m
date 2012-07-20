@@ -1,23 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Jul 2012 21:15:55 +0800
-Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <d9889f8c-cebd-482d-af5c-c9e207c3dfae@email.android.com>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
- <d9889f8c-cebd-482d-af5c-c9e207c3dfae@email.android.com>
-Message-ID: <20120720131554.GB32263@S2101-09.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Jul 2012 18:52:20 +0530
+Subject: [PATCH] net: ethernet: davinci_emac: add pm_runtime support
+In-Reply-To: <1342736577-30477-1-git-send-email-mgreer@animalcreek.com>
+References: <1342736577-30477-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <50095B8C.3050502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 08:51:17PM +0800, Richard Zhao wrote:
-> Hi, Shawn,
-> 
-> I find you create a new driver rather than work on my generic cpufreq driver based on clk and regulator.
-> Is there any reason besides adding opp support?
-> 
-Adopting OPP support forces me to look at omap-cpufreq driver, hence
-makes me create a new driver by referencing to omap-cpufreq.
++ Dave Miller and DaVinci list
 
--- 
-Regards,
-Shawn
+Hi Mark,
+
+On 7/20/2012 3:52 AM, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> Add pm_runtime support to the TI Davinci EMAC driver.
+> 
+> CC: Sekhar Nori <nsekhar@ti.com>
+> CC: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+
+Tested on AM18x EVM using NFS root and suspend-to-RAM.
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+> ---
+> 
+> a) This patch depends on a patch by Kevin Hilman that has been
+>    accepted for 3.6 and is waiting in arm-soc/for-next:
+>    ce9dcb8784611c50974d1c6b600c71f5c0a29308
+>    (ARM: davinci: add runtime PM support for clock management)
+
+Since the patch does not have any dependency as far as applying it is
+concerned, I guess it can be queued through the network tree.
+
+> 
+> b) Applies on top of current k.o. master:
+>    3e4b9459fb0e149c6b74c9e89399a8fc39a92b44
+>    (Merge tag 'md-3.5-fixes' of git://neil.brown.name/md)
+
+The patch will have to apply to net-next if it goes through the net tree.
+
+Thanks,
+Sekhar
