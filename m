@@ -1,78 +1,30 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 20 Jul 2012 16:11:47 +0200
-Subject: [PATCH] IIO: Add basic MXS LRADC driver
-In-Reply-To: <201207192126.31772.marex@denx.de>
-References: <1341368129-20468-1-git-send-email-marex@denx.de>
- <201207191623.14492.marex@denx.de> <50081AC0.10703@metafoo.de>
- <201207192126.31772.marex@denx.de>
-Message-ID: <50096723.2070409@metafoo.de>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Fri, 20 Jul 2012 15:21:17 +0100
+Subject: [PATCH v9] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <201207101401.30607.arnd@arndb.de>
+References: <1341588221-3822-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201207101203.30984.arnd@arndb.de> <4FFC1DA5.6050805@free-electrons.com>
+ <201207101401.30607.arnd@arndb.de>
+Message-ID: <5009695D.6030005@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2012 09:26 PM, Marek Vasut wrote:
-> Dear Lars-Peter Clausen,
-> 
->> On 07/19/2012 04:23 PM, Marek Vasut wrote:
->>> Dear Lars-Peter Clausen,
->>>
->>> Sorry for my late reply, got busy with other crazy stuff.
->>>
->>> [...]
->>>
->>>>>> Is there any reason not to use the mxs_lradc struct directly has the
->>>>>> iio data?
->>>>>
->>>>> I explained it below in the patch. I hope we'll eventually support the
->>>>> delay triggers, which will need 4 separate IIO devices. And this is
->>>>> where this structure will be augmented by other components.
->>>>
->>>> Ok I saw the comment, but it wasn't obvious to me that delay channels
->>>> will require multiple IIO devices. Might make sense to state this
->>>> explicitly.
->>>
->>> Fixed.
->>>
->>>>>>> [...]
->>>>>>>
->>>>>>> +
->>>>>>> +/*
->>>>>>> + * Channel management
->>>>>>> + *
->>>>>>> + * This involves crazy mapping between 8 virtual channels the CTRL4
->>>>>>> register + * can harbor and 16 channels total this hardware supports.
->>>>>>> + */
->>>>>>
->>>>>> I suppose this means only a maximum 8 channels can be active at a
->>>>>> time. I've recently posted a patch which makes it easy to implement
->>>>>> such a restriction.
->>>>>> http://www.spinics.net/lists/linux-iio/msg05936.html and
->>>>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
->>>>>> validate callback implementation. In your case you'd check for
->>>>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
->>>>>
->>>>> This is good. When do you expect this to hit linux-next possibly? Or at
->>>>> least linux-iio?
->>>>
->>>> soon, hopefully.
->>>
->>> So I checked this, not sure how it'll help me though.
->>
->> Right now with your driver you can enable any combination of channels. If
->> more than 8 channels are enabled and you start sampling it will fail, since
->> not all channels can be mapped. With those patch you can implement a
->> validate callback and check for bitmap_weight(scan_mask) <= 8. This will
->> ensure that it is not possible to select more than 8 channels at once,
->> which again means that starting sampling can't fail of this.
-> 
-> Ok, I fixed this one. One last thing that I don't really understand is this. I 
-> run generic_buffer.c to source samples from the LRADC. Is there any way to 
-> continuously sample them? Because right now, I get one sample and that's it, no 
-> more samples happen later on (I can 0 data in subsequent read() call).
-> 
+On 10/07/12 15:01, Arnd Bergmann wrote:
 
-I'd consider that a bug in your driver ;)
-The intend with IIO is that once you start sampling by enabling the buffer
-you get a continuous data stream until sampling is stopped and this works
-fine with other drivers.
+> I've pulled it now, but I would  generally prefer if you use "git
+ > request-pull" to generate the pull request, and use a signed tag as
+ > the reference so you can include the series description in the tag.
 
-- Lars
+Arnd: Are you the go-to guy for all this stuff?
+
+I just got SATA working on my ArmadaXP here, and I'd like to send
+patches.
+
+I'd like to rebase against whatever tree is taking this stuff upstream :)
+
+Who is working on what on these boards?
+
+I'm working on ethernet support for the 370/XP now.
+
+-Ian
