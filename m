@@ -1,37 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 21 Jul 2012 16:37:09 +0800
-Subject: [alsa-devel] [PATCH 3/4] ASoC: sgtl5000: remove unneeded
- snd_soc_dapm_new_widgets in probe
-In-Reply-To: <1342776027-31758-4-git-send-email-b29396@freescale.com>
-References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
- <1342776027-31758-4-git-send-email-b29396@freescale.com>
-Message-ID: <20120721083707.GD923@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Jul 2012 22:19:40 +0000
+Subject: [GIT PULL] ARM: LPC32xx: Core updates
+In-Reply-To: <50094A0E.4070006@antcom.de>
+References: <50094A0E.4070006@antcom.de>
+Message-ID: <201207202219.40319.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 05:20:26PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+On Friday 20 July 2012, Roland Stigge wrote:
+> Hi Arnd and Olof,
 > 
-> There's a driver bug that sgtl5000 dapm widget kcontrols do not work.
-> e.g. can not select capture mux with amixer tool(no error info prompted).
-> 
-> The root cause is that we still call snd_soc_dapm_new_widgets in
-> codec driver probe function afer converting to table based widgets.
-> This will cause the card dapm widgets are instantiated before the
-> dapm_routes are registered.
-> Then, no available dapm widget pathes can be found during instantiation
-> which finally will cause soc_dapm_mux_update_power to fail(can not find
-> correct path with kcontrol) in snd_soc_dapm_put_enum_double function.
-> 
-> Here we remove the unneeded snd_soc_dapm_new_widgets in codec probe
-> and let the soc core to handle the register sequence properly.
-> Then we can fix above issue.
-> 
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+> this LPC32xx core update (branch lpc32xx/core2) builds upon the
+> previously provided lpc32xx/core-fixes. Basically including PWM support
+> (for the PWM driver from Alexandre already in the pwm tree), and
+> CPU ID.
 
-On imx53-qsb board:
+Pulled both branches into the sames ones as earlier respective ones.
+Note that you don't actually have to start a new branch when you
+add patches for the same topic, you can just add stuff on top,
+whichever works best for you.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+It would be nice if you can start sending tags rather than branches,
+because that lets you put the changeset text right into the tag
+so I don't have to copy it into the merge text manually.
+
+	Arnd
