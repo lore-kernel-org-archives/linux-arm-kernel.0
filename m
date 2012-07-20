@@ -1,66 +1,56 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Fri, 20 Jul 2012 14:58:10 +0530
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <20120719113246.GN6522@atomide.com>
-References: <20120718065951.GH6522@atomide.com>
- <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
- <20120718071039.GI6522@atomide.com>
- <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
- <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
- <CAMQu2gxLwGACAT-r6=L9DKB=3fTNaEJ4woZOb4zttJ8qTTJmFA@mail.gmail.com>
- <CAAwP0s2apfBHLKHtzvwqb2KPCMNhEXMe5R9792bO7FhfY5Y+uQ@mail.gmail.com>
- <CANfBPZ_N4ZK5PgFQLHWMwsG60tb-FPTjeieTJ92rBUNgONAxAw@mail.gmail.com>
- <CAMQu2gy+uXJFfmOwLX=YH41pr-N+T28-1wLo5rXEaj9MGffHPw@mail.gmail.com>
- <20120719113246.GN6522@atomide.com>
-Message-ID: <CANfBPZ_rS230ziPFTDVUdad_oCHNapLKpdrKst_6RxLDqixm4A@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 20 Jul 2012 17:20:25 +0800
+Subject: [PATCH 2/4] ASoC: mxs-saif: set a base clock rate for EXTMASTER mode
+ work
+In-Reply-To: <1342776027-31758-1-git-send-email-b29396@freescale.com>
+References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
+Message-ID: <1342776027-31758-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2012 at 5:02 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 02:49]:
->>
->> "The patch simply make them depend on DMA_OMAP since DMA_OMAP
->> will select DMA_ENGINE automatically"
->>
->> This won't be true if the DMA selection are not done
->> at ARCH_OMAP level as discussed in this thread.
->>
->> Having said that, I think Russell and Tony need to
->> take call on how this needs to be handled.
->
-> As the DMA channels can run out, drivers should also work
-> without DMA. And building everything as modules should be
-> possible for the distro kernels.
->
-> So I'd rather not have either select or depends and have
-> the drivers fixed.
->
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Ok - I'll work on getting polling mode to work, but as you know it's
-not the mode to get the best performance out of the device.
-I see that you've also merged the changes to omap2plus_defconfig, which should
-get MMC working as before DMA Engine conversion.
+Set an initial clock rate for the saif internal logic to work
+properly. This is important when working in EXTMASTER mode that
+uses the other saif's BITCLK&LRCLK but it still needs a basic
+clock which should be fast enough for the internal logic.
 
-There's a small patch needed to omap_hsmmc to return a non-zero error code
-during the probe error path. This will atleast make probe failure
-explicit when DMA
-is not available.
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ sound/soc/mxs/mxs-saif.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
-Let me know if you want me to post it separately as a patch..
-
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 2338703..892a046 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1773,7 +1773,7 @@ static int __devinit omap_hsmmc_probe(struct
-platform_device *pdev)
-        struct mmc_host *mmc;
-        struct omap_hsmmc_host *host = NULL;
-        struct resource *res;
--       int ret, irq;
-+       int ret = -ENXIO, irq;
-        const struct of_device_id *match;
-        dma_cap_mask_t mask;
-        unsigned tx_req, rx_req;
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index fdbb36a..b303071 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -427,8 +427,22 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	/* prepare clk in hw_param, enable in trigger */
+ 	clk_prepare(saif->clk);
+-	if (saif != master_saif)
++	if (saif != master_saif) {
++		/*
++		* Set an initial clock rate for the saif internal logic to work
++		* properly. This is important when working in EXTMASTER mode
++		* that uses the other saif's BITCLK&LRCLK but it still needs a
++		* basic clock which should be fast enough for the internal
++		* logic.
++		*/
++		clk_enable(saif->clk);
++		ret = clk_set_rate(saif->clk, 24000000);
++		clk_disable(saif->clk);
++		if (ret)
++			return ret;
++
+ 		clk_prepare(master_saif->clk);
++	}
+ 
+ 	scr = __raw_readl(saif->base + SAIF_CTRL);
+ 
+-- 
+1.7.0.4
