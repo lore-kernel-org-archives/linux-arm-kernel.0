@@ -1,35 +1,77 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 20 Jul 2012 05:01:34 +0000
-Subject: [RFC][PATCH v2 1/1] ARM: OMAP2+: PM: Register suspend ops even
- in the presence of DT blob
-In-Reply-To: <5008E10F.4080706@ti.com>
-References: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
- <5008E10F.4080706@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB14B1E@DBDE01.ent.ti.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 20 Jul 2012 14:06:05 +0900
+Subject: [RFC PATCH v2] ARM: Make a compile firmware conditionally
+In-Reply-To: <201207191522.24047.arnd@arndb.de>
+References: <20120716022956.GA619@july>
+	<201207191522.24047.arnd@arndb.de>
+Message-ID: <CAH9JG2UYaebE7wXw05MWbw1U5dk5-wzrMNBp13691wi21yXwew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 10:09:43, Nayak, Rajendra wrote:
-> On Thursday 19 July 2012 05:38 PM, Vaibhav Bedia wrote:
-> > As per the comment in omap2_common_late_init() looks like the
-> > original intent of the DT check was to treat only the PMIC
-> > and SR initialization differently. Recent changes to consolidate
-> > the suspend-resume code across OMAP3/4 resulted into the
-> > registration of suspend ops also being dependent on the check
-> > for DT blob. Since the suspend-resume operation should not
-> > really be dependent on the usage of DT remove this dependency
-> > by wrapping the PMIC and SR init under the DT check.
-> 
-> So I am guessing you also tested suspend/resume on your hardware
-> with this patch, when booting with a DT blob, and it passed.
-> 
+On 7/20/12, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 16 July 2012, Kyungmin Park wrote:
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> Some boards can use the firmware at trustzone but others can't use this.
+>> However we need to build it simultaneously. To address this issue,
+>> introduce arm firmware support and use it at each board files.
+>>
+>> e.g., In boot_secondary at mach-exynos/platsmp.c
+>>
+>>         __raw_writel(virt_to_phys(exynos4_secondary_startup),
+>>                 CPU1_BOOT_REG);
+>>
+>>         if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
+>>                 /* Call Exynos specific smc call */
+>> 		firmware_ops.cpu_boot(cpu);
+>>         }
+>>
+>>         gic_raise_softirq(cpumask_of(cpu), 1);
+>>
+>>         if (pen_release == -1)
+>>
+>> Now smp_ops is not yet merged, now just call the firmware_init at
+>> init_early
+>>  at board file
+>>
+>> e.g., exynos4412 based board
+>>
+>> static void __init board_init_early(void)
+>> {
+>> 	exynos_firmware_init();
+>> }
+>>
+>> TODO
+>> 	1. DT support.
+>> 	2. call firmware init by smp_ops.
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> Yes, this all looks reasonable to me. One possible idea though:
+Thanks, I'll split the patches into generic firmware patch and exynos
+specific patch.
+>
+>> +
+>> +int __init exynos_firmware_init(void)
+>> +{
+>> +	firmware_ops.do_idle = exynos_do_idle;
+>> +	firmware_ops.cpu_boot = exynos_cpu_boot;
+>> +	return 0;
+>> +}
+>
+> Instead of initializing each field separately, how about copying
+> the entire data structure and do
+>
+> static struct firmware_ops exynos_firmware_ops __initdata = {
+> 	.do_idle = exynos_do_idle,
+> 	.cpu_boot = exynos_cpu_boot,
+> };
+>
+> void __init exynos_firmware_init(void)
+> {
+> 	firmware_ops = exynos_firmware_ops;
+> }
+No problem. I'll update it.
 
-I am getting there ;)
-
-I am in the process of getting a real suspend/resume functional. As part
-of this I was just flow flushing the whole suspend process in the mainline
-kernel by putting in a dummy implementation for the .enter op and found that
-this change was needed.
-
-Regards,
-Vaibhav
+Thank you,
+Kyungmin Park
