@@ -1,37 +1,30 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 20 Jul 2012 16:44:41 +0300
-Subject: [PATCH] clk: fix return value check in clk_get
-In-Reply-To: <1342791397-11732-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1342791397-11732-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20120720134441.GD9437@tbergstrom-lnx.Nvidia.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 20 Jul 2012 16:09:14 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201207200418.41554.marex@denx.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <50081AC0.10703@metafoo.de> <201207192126.31772.marex@denx.de>
+ <201207200418.41554.marex@denx.de>
+Message-ID: <5009668A.7090502@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 03:36:37PM +0200, Peter De Schrijver wrote:
-> of_clk_get_by_name returns an ERR_PTR on failure. Hence we should use IS_ERR()
-> and not just check for a non NULL value.
+On 07/20/2012 04:18 AM, Marek Vasut wrote:
+>> Dear Lars-Peter Clausen,
+
+> [...]
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
->  drivers/clk/clkdev.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 8f87b0f..d423c9b 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -157,7 +157,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->  
->  	if (dev) {
->  		clk = of_clk_get_by_name(dev->of_node, con_id);
-> -		if (clk && __clk_get(clk))
-> +		if (!IS_ERR(clk) && __clk_get(clk))
->  			return clk;
->  	}
+> One more thing I'm curious about. There's another ADC block on the CPU, called 
+> HSADC (high-speed ADC). It can sample even up to 2Msamples/s. If I were to, say 
+> -- sample at 100kHz and be able to DMA the results into memory -- is there any 
+> way to push such results into userland somehow? Or how to operate such fast 
+> beast?
 
-http://www.spinics.net/lists/arm-kernel/msg184794.html introduces this
-behaviour of of_clk_get_by_name()
+Proper support for high speed sampling is still something that's missing
+from IIO. You can't mmap your buffers, you can't splice a IIO data stream to
+another file descriptor, there is no support for zero copy. So your
+bottleneck will become that you have to copy lots of data around. But it is
+certainly something that will be added at some point. So implementing the
+driver as a IIO driver is definitely the right direction.
 
-Cheers,
-
-Peter.
+- Lars
