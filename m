@@ -1,124 +1,31 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 20 Jul 2012 17:24:19 +0900
-Subject: [PATCH v3] ARM: Make a compile firmware conditionally
-Message-ID: <20120720082419.GA9394@july>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 20 Jul 2012 13:57:52 +0530
+Subject: [PATCH 1/3] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <20120720075652.GA31866@S2101-09.ap.freescale.net>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-2-git-send-email-shawn.guo@linaro.org>
+ <CAMQu2gz3XXQdG3T=jSboZ8cW-gKO33k7+OUPaQpjpUcnitk_RA@mail.gmail.com>
+ <20120720075652.GA31866@S2101-09.ap.freescale.net>
+Message-ID: <CAMQu2gzB65dQfx6pYc=Z0KD2NYJ1zdrAgQcS_ctE9chYjQH8bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
-
-Some boards can use the firmware at trustzone but others can't use this.
-However we need to build it simultaneously. To address this issue,
-introduce arm firmware support and use it at each board files.
-
-e.g., In boot_secondary at mach-exynos/platsmp.c
-
-        __raw_writel(virt_to_phys(exynos4_secondary_startup),
-                CPU1_BOOT_REG);
-
-        if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
-                /* Call Exynos specific smc call */
-                firmware_ops.cpu_boot(cpu);
-        }
-
-        gic_raise_softirq(cpumask_of(cpu), 1);
-
-        if (pen_release == -1)
-
-Now smp_ops is not yet merged, now just call the firmware_init at init_early
- at board file
-
-e.g., exynos4412 based board
-
-static void __init board_init_early(void)
-{
-        exynos_firmware_init();
-}
-
-TODO
-        1. DT support.
-        2. call firmware init by smp_ops.
-
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-index 283fa1d..5b097ca 100644
---- a/arch/arm/common/Kconfig
-+++ b/arch/arm/common/Kconfig
-@@ -21,6 +21,9 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
- 
-+config ARM_FIRMWARE
-+	bool
-+
- config ICST
- 	bool
- 
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index e8a4e58..4af6568 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -4,6 +4,7 @@
- 
- obj-$(CONFIG_ARM_GIC)		+= gic.o
- obj-$(CONFIG_ARM_VIC)		+= vic.o
-+obj-$(CONFIG_ARM_FIRMWARE)	+= firmware.o
- obj-$(CONFIG_ICST)		+= icst.o
- obj-$(CONFIG_SA1111)		+= sa1111.o
- obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
-diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
-new file mode 100644
-index 0000000..ffb6822
---- /dev/null
-+++ b/arch/arm/common/firmware.c
-@@ -0,0 +1,23 @@
-+/*
-+ *  Copyright (C) 2012 Samsung Electronics.
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+
-+#include <asm/firmware.h>
-+
-+static void cpu_boot(int cpu)
-+{
-+	/* Do nothing */
-+}
-+
-+struct firmware_ops firmware_ops = {
-+	.do_idle		= cpu_do_idle,
-+	.cpu_boot		= cpu_boot,
-+};
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-new file mode 100644
-index 0000000..c8c28bf
---- /dev/null
-+++ b/arch/arm/include/asm/firmware.h
-@@ -0,0 +1,20 @@
-+/*
-+ *  Copyright (C) 2012 Samsung Electronics.
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARM_FIRMWARE_H
-+#define __ASM_ARM_FIRMWARE_H
-+
-+struct firmware_ops {
-+	int	(*do_idle)(void);
-+	void	(*cpu_boot)(int cpu);
-+};
-+
-+extern struct firmware_ops firmware_ops;
-+
-+#endif
+n Fri, Jul 20, 2012 at 1:26 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Fri, Jul 20, 2012 at 12:06:50PM +0530, Shilimkar, Santosh wrote:
+>> On Thu, Jul 19, 2012 at 9:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> >
+>> > From: Richard Zhao <richard.zhao@linaro.org>
+>> >
+>> > If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
+>> > arch has different per-cpu loops_per_jiffy definition.
+>> >
+>> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+>> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > ---
+>> Nice. Avoids other driver duplicating this code.
+>> May be you can keep Richard's credit in commit too.
+>>
+> It's all Richard's credit in the commit.
+>
+Sorry.... I missed that :-(
