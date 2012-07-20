@@ -1,373 +1,395 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 20 Jul 2012 12:35:13 +0200
-Subject: [PATCHv3] I2C: MV64XXX: Add Device Tree support
-In-Reply-To: <1342430205-13702-2-git-send-email-andrew@lunn.ch>
-References: <1342430205-13702-1-git-send-email-andrew@lunn.ch>
- <1342430205-13702-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20120720103513.GA5971@pengutronix.de>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Fri, 20 Jul 2012 19:38:58 +0900
+Subject: [PATCH v3 6/6] mmc: dw_mmc: add samsung exynos5250 specific
+ extentions
+In-Reply-To: <CAJuYYwRKRrNgDKw8ZmHbsejO4yxUC0VXjEyfh-WtKNO5qVXukg@mail.gmail.com>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+ <1342097668-25243-7-git-send-email-thomas.abraham@linaro.org>
+ <002901cd6561$bb6dc9e0$32495da0$%jun@samsung.com>
+ <CAJuYYwRKRrNgDKw8ZmHbsejO4yxUC0VXjEyfh-WtKNO5qVXukg@mail.gmail.com>
+Message-ID: <001101cd6663$deb769d0$9c263d70$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Mon, Jul 16, 2012 at 11:16:45AM +0200, Andrew Lunn wrote:
-> Extends the driver to get properties from device tree. Rather than
-> pass the N & M factors in DT, use the more standard clock-frequency
-> property. Calculate N & M at run time. In order to do this, we need to
-
-Thanks.
-
-> know tclk. So the driver uses clk_get() etc in order to get the clock
-> and clk_get_rate() to determine the tclk rate. Not all platforms
-> however have CLK, so some #ifdefery is needed to ensure the driver
-> still compiles when CLK is not available.
+July 20, 2012, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> On 19 July 2012 09:21, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> > Hi,
+> >
+> > This version does not seems to consider previous reviews fully.
+> > Could you check the comments below?
 > 
-> Also extend the kirkwood DT support to supply the needed properties. A
-> default clock-frequency is 400KHz, which some platforms might need to
-> override to 100KHz if they have devices which do not support fast
-> mode.
+> I did try to address all the comments. I will check again and resubmit
+> if I have missed anything.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-
-Has Sebastian acked THIS patch? Didn't saw such a mail? If it was a
-previous patch which he acked, I'd like it to be resent, since the
-divider calculation is new.
-
-> ---
-> v2: Removed duplicate interrupt in DT.
-> v3: Use clock-frequency property, instead of explicit n & m baud factors.
+> >
+> > July 12, 2012, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> >> The instantiation of the Synopsis Designware controller on Exynos5250
+> >> include extension for SDR and DDR specific tx/rx phase shift timing
+> >> and CIU internal divider. In addition to that, the option to skip the
+> >> command hold stage is also introduced. Add support for these Exynos5250
+> >> specfic extenstions.
+> >>
+> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> >> ---
+> >>  .../devicetree/bindings/mmc/synposis-dw-mshc.txt   |   38 ++++++++++++++++++-
+> >>  drivers/mmc/host/dw_mmc-pltfm.c                    |   15 +++++++
+> >>  drivers/mmc/host/dw_mmc.c                          |   40 +++++++++++++++++++-
+> >>  drivers/mmc/host/dw_mmc.h                          |   14 +++++++
+> >>  include/linux/mmc/dw_mmc.h                         |    6 +++
+> >>  5 files changed, 110 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+> >> b/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+> >> index 3acd6c9..69d78c1 100644
+> >> --- a/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+> >> +++ b/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
+> >> @@ -7,6 +7,8 @@ Required Properties:
+> >>
+> >>  * compatible: should be one of the following
+> >>       - snps,dw-mshc: for controllers compliant with synopsis dw-mshc.
+> >> +     - samsung,exynos5250-dw-mshc: for controllers with Samsung
+> >> +       Exynos5250 specific extentions.
+> >>
+> >>  * reg: physical base address of the dw-mshc controller and size of its memory
+> >>    region.
+> >> @@ -74,13 +76,45 @@ Aliases:
+> >>    the following format 'mshc{n}' where n is a unique number for the alias.
+> >>
+> >>
+> >> +Samsung Exynos4/5 specific properties:
+> >> +
+> >> +Some of the variants of Exynos4 (such as Exynos4412) and Exynos5 SoC's
+> >> +includes few extensions to the Synopsis Designware Mobile Storage Host
+> >> +Controller. The following properties are used to describe those extensions.
+> >> +
+> >> +* samsung,dw-mshc-sdr-timing: Specifies the value of CUI clock divider, CIU
+> >> +  clock phase shift value in transmit mode and CIU clock phase shift value in
+> >> +  receive mode for single data rate mode operation. Refer notes of the valid
+> >> +  values below.
+> >> +
+> >> +* samsung,dw-mshc-ddr-timing: Specifies the value of CUI clock divider, CIU
+> >> +  clock phase shift value in transmit mode and CIU clock phase shift value in
+> >> +  receive mode for double data rate mode operation. Refer notes of the valid
+> >> +  values below. The order of the cells should be
+> >> +
+> >> +    - First Cell:    CIU clock divider value (applicable only for Exynos5
+> >> +                     SoC's, should be zero for Exynos4 SoC's)
+> >> +    - Second Cell:   CIU clock phase shift value for tx mode.
+> >> +    - Third Cell:    CIU clock phase shift value for rx mode.
+> >> +
+> >> +  Valid values for SDR and DDR CIU clock timing for Exynos5250:
+> >> +
+> >> +    - valid values for CIU clock divider, tx phase shift and rx phase shift
+> >> +      is 0 to 7.
+> >> +
+> >> +    - When CIU clock divider value is set to 3, all possible 8 phase shift
+> >> +      values can be used.
+> >> +
+> >> +    - If CIU clock divider value is 0 (that is divide by 1), both tx and rx
+> >> +      phase shift clocks should be 0.
+> >> +
+> >>  Example:
+> >>
+> >>    The MSHC controller node can be split into two portions, SoC specific and
+> >>    board specific portions as listed below.
+> >>
+> >>       dwmmc0 at 12200000 {
+> >> -             compatible = "snps,dw-mshc";
+> >> +             compatible = "samsung,exynos5250-dw-mshc";
+> >>               reg = <0x12200000 0x1000>;
+> >>               interrupts = <0 75 0>;
+> >>               #address-cells = <1>;
+> >> @@ -94,6 +128,8 @@ Example:
+> >>               no-write-protect;
+> >>               fifo-depth = <0x80>;
+> >>               card-detect-delay = <200>;
+> >> +             samsung,dw-mshc-sdr-timing = <2 3 3>;
+> >> +             samsung,dw-mshc-ddr-timing = <1 2 3>;
+> >>
+> >>               slot at 0 {
+> >>                       reg = <0>;
+> >> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+> >> index 8d24f6d..900f412 100644
+> >> --- a/drivers/mmc/host/dw_mmc-pltfm.c
+> >> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
+> >> @@ -27,9 +27,24 @@ static struct dw_mci_drv_data synopsis_drv_data = {
+> >>       .ctrl_type      = DW_MCI_TYPE_SYNOPSIS,
+> >>  };
+> >>
+> >> +static unsigned long exynos5250_dwmmc_caps[4] = {
+> >> +     MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
+> >> +             MMC_CAP_8_BIT_DATA | MMC_CAP_CMD23,
+> >> +     MMC_CAP_CMD23,
+> >> +     MMC_CAP_CMD23,
+> >> +     MMC_CAP_CMD23,
+> >> +};
+> >> +
+> > Kyungmin Park has already pointed .
+> > It's not still proper place for board specific caps.
+> > If I'm incorrect, please let me know.
+> > And why MMC_CAP_CMD23 is default caps for all channel of hosts?
 > 
-> i2c fix.
-> ---
->  Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   21 +++-
->  arch/arm/boot/dts/kirkwood.dtsi                    |   11 ++
->  arch/arm/mach-kirkwood/board-dt.c                  |    2 +
->  arch/arm/mach-kirkwood/common.c                    |    2 +
->  arch/arm/plat-orion/common.c                       |    1 +
->  drivers/i2c/busses/i2c-mv64xxx.c                   |  107 +++++++++++++++++++-
+> The cap listed above are specifying controller capabilities for dw-mmc
+> controllers on Exynos5 SoC. They are not board specific caps. All the
+> Exynos5 dw-mmc controllers can support MMC_CAP_CMD23 cap and hence, it
+> has been listed for all the controllers. Please let me know if you
+> feel there is any change required here.
+MMC_CAP_8_BIT_DATA could be dependent on board.
+I agree about MMC_CAP_CMD23.
+Additionally, MMC_CAP_CMD23 is applied for dw-mmc host driver without regard to Exynos5.
 
-As said in another mail, please split up arch/arm and i2c-stuff.
-
->  6 files changed, 138 insertions(+), 6 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> index b891ee2..885f340 100644
-> --- a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> +++ b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> @@ -1,4 +1,4 @@
-> -* I2C
-> +* Marvell MMP I2C controller
->  
->  Required properties :
->  
-> @@ -32,3 +32,22 @@ Examples:
->  		interrupts = <58>;
->  	};
->  
-> +* Marvell MV64XXX I2C controller
-> +
-> +Required properties :
-> +
-> + - reg             : Offset and length of the register set for the device
-> + - compatible      : Should be "marvell,mv64xxx-i2c"
-> + - interrupts      : Te interrupt number
-> + - clock-frequency : Desired I2C bus clock frequency in Hz.
-> + - timeout-ms      : How long to wait for a transaction to complete
-
-If you don't really need "timeout-ms", I'd ask you to drop it. I haven't
-made up my mind how to handle those timeouts yet. They should be
-per-slave and not per-bus, but the core cannot handle this yet. And even
-though I am tempted to accept a per-bus-timeout, getting the binding
-right is not something we can come up with before the next merge window.
-I am suspecting a default value could do for now?
-
-> +
-> +Examples:
-> +
-> +	i2c at 11000 {
-> +		compatible = "marvell,mv64xxx-i2c";
-> +		reg = <0x11000 0x20>;
-> +		interrupts = <29>;
-> +		clock-frequency = <100000>;
-> +		timeout-ms = <1000>;
-> +	};
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index a3350fd..bc57d81 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -82,5 +82,16 @@
->  			/* set partition map and/or chip-delay in board dts */
->  			status = "disabled";
->  		};
-> +
-> +		i2c at 11000 {
-> +			compatible = "marvell,mv64xxx-i2c";
-> +			reg = <0x11000 0x20>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			interrupts = <29>;
-> +			clock-frequency = <400000>;
-> +			timeout-ms = <1000>;
-> +			status = "disable";
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 8f8da5d..24c8fdd 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -28,6 +28,8 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
->  
->  struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
-> +	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
-> +		       NULL),
->  	{},
->  };
->  
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index f261cd2..078d9c6 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -17,6 +17,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/clk-provider.h>
->  #include <linux/spinlock.h>
-> +#include <linux/mv643xx_i2c.h>
->  #include <net/dsa.h>
->  #include <asm/page.h>
->  #include <asm/timex.h>
-> @@ -241,6 +242,7 @@ void __init kirkwood_clk_init(void)
->  	orion_clkdev_add("0", "pcie", pex0);
->  	orion_clkdev_add("1", "pcie", pex1);
->  	orion_clkdev_add(NULL, "kirkwood-i2s", audio);
-> +	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", runit);
->  }
->  
->  /*****************************************************************************
-> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> index c179378..d245a87 100644
-> --- a/arch/arm/plat-orion/common.c
-> +++ b/arch/arm/plat-orion/common.c
-> @@ -47,6 +47,7 @@ void __init orion_clkdev_init(struct clk *tclk)
->  	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".2", tclk);
->  	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".3", tclk);
->  	orion_clkdev_add(NULL, "orion_wdt", tclk);
-> +	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", tclk);
->  }
->  
->  /* Fill in the resources structure and link it into the platform
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 4f44a33..e97246b 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -18,6 +18,11 @@
->  #include <linux/mv643xx_i2c.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_i2c.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
->  
->  /* Register defines */
->  #define	MV64XXX_I2C_REG_SLAVE_ADDR			0x00
-> @@ -98,6 +103,7 @@ struct mv64xxx_i2c_data {
->  	int			rc;
->  	u32			freq_m;
->  	u32			freq_n;
-> +	struct clk              *clk;
->  	wait_queue_head_t	waitq;
->  	spinlock_t		lock;
->  	struct i2c_msg		*msg;
-> @@ -521,6 +527,36 @@ mv64xxx_i2c_unmap_regs(struct mv64xxx_i2c_data *drv_data)
->  	drv_data->reg_base_p = 0;
->  }
->  
-> +#ifdef CONFIG_OF
-
-Hooray, we have one big CONFIG_OF block, so we could move other stuff
-here? See below.
-
-> +static int __devinit
-> +calc_freq(const int tclk, const int n, const int m)
-> +{
-> +	return tclk / (10 * (m + 1) * (2 << n));
-> +}
-> +
-> +static bool __devinit
-> +find_baud_factors(const int req_freq, const int tclk, int *best_n, int *best_m)
-> +{
-> +	int freq, delta, best_delta = INT_MAX;
-> +	int m, n;
-> +
-> +	for (n = 0; n <= 7; n++)
-> +		for (m = 0; m <= 15; m++) {
-> +			freq = calc_freq(tclk, n, m);
-> +			delta = req_freq - freq;
-> +			if (delta >= 0 && delta < best_delta) {
-> +				*best_m = m;
-> +				*best_n = n;
-> +				best_delta = delta;
-> +			}
-> +			if (best_delta == 0)
-> +				return true;
-> +		}
-> +	if (best_delta == INT_MAX)
-> +		return false;
-> +	return true;
-> +}
-> +#endif
->  static int __devinit
->  mv64xxx_i2c_probe(struct platform_device *pd)
->  {
-> @@ -528,7 +564,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  	struct mv64xxx_i2c_pdata	*pdata = pd->dev.platform_data;
->  	int	rc;
->  
-> -	if ((pd->id != 0) || !pdata)
-> +	if ((!pdata && !pd->dev.of_node) || (pdata && (pd->id != 0)))
->  		return -ENODEV;
-
-(extra points if you rebase your patch on top of this patch
-d61a9095155e832287552a9e565b8756ee293c46 from my next tree:
-git://git.pengutronix.de/git/wsa/linux.git i2c-embedded/for-next)
-
->  
->  	drv_data = kzalloc(sizeof(struct mv64xxx_i2c_data), GFP_KERNEL);
-> @@ -546,19 +582,64 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  	init_waitqueue_head(&drv_data->waitq);
->  	spin_lock_init(&drv_data->lock);
->  
-> -	drv_data->freq_m = pdata->freq_m;
-> -	drv_data->freq_n = pdata->freq_n;
-> -	drv_data->irq = platform_get_irq(pd, 0);
-> +#if defined(CONFIG_HAVE_CLK)
-> +	/* Not all platforms have a clk */
-> +	drv_data->clk = clk_get(&pd->dev, NULL);
-> +	if (!IS_ERR(drv_data->clk)) {
-> +		clk_prepare(drv_data->clk);
-> +		clk_enable(drv_data->clk);
-> +	}
-
-Call this code only when CONFIG_OF?
-
-> +#endif
-> +	if (pdata) {
-> +		drv_data->freq_m = pdata->freq_m;
-> +		drv_data->freq_n = pdata->freq_n;
-> +		drv_data->irq = platform_get_irq(pd, 0);
-> +	}
-> +#ifdef CONFIG_OF
-> +	if (pd->dev.of_node) {
-
-Move this stuff into a seperate function and put it into the big
-CONFIG_OF block? That should make the code a lot more readable?
-
-> +		int bus_freq;
-> +		int tclk;
-> +		/* CLK is mandatory when using DT to describe the i2c
-> +		 * bus. We need to know tclk in order to calculate bus
-> +		 * clock factors. */
-> +#if defined(CONFIG_HAVE_CLK)
-> +		if (IS_ERR(drv_data->clk)) {
-> +			rc = -ENODEV;
-> +			goto exit_unmap_regs;
-> +		}
-> +		tclk = clk_get_rate(drv_data->clk);
-> +		of_property_read_u32(pd->dev.of_node, "clock-frequency",
-> +				     &bus_freq);
-> +		if (!find_baud_factors(bus_freq, tclk,
-> +				       &drv_data->freq_n, &drv_data->freq_m)) {
-> +			rc = -EINVAL;
-> +			goto exit_unmap_regs;
-> +		}
-> +		drv_data->irq = irq_of_parse_and_map(pd->dev.of_node, 0);
-> +#else
-> +		/* Have OF but no CLK */
-> +		rc = -ENODEV;
-> +		goto exit_unmap_regs;
-> +#endif
-> +	}
-> +#endif
->  	if (drv_data->irq < 0) {
->  		rc = -ENXIO;
->  		goto exit_unmap_regs;
->  	}
-> +
->  	drv_data->adapter.dev.parent = &pd->dev;
->  	drv_data->adapter.algo = &mv64xxx_i2c_algo;
->  	drv_data->adapter.owner = THIS_MODULE;
->  	drv_data->adapter.class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
-> -	drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
-> +	if (pd->dev.of_node)
-> +		drv_data->adapter.timeout = msecs_to_jiffies(
-> +			of_property_read_u32(pd->dev.of_node, "timeout-ms",
-> +					     &drv_data->freq_n));
-> +	else
-> +		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
-
-This should also go into the new function.
-
->  	drv_data->adapter.nr = pd->id;
-> +	drv_data->adapter.dev.of_node = pd->dev.of_node;
->  	platform_set_drvdata(pd, drv_data);
->  	i2c_set_adapdata(&drv_data->adapter, drv_data);
->  
-> @@ -577,6 +658,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  		goto exit_free_irq;
->  	}
->  
-> +	of_i2c_register_devices(&drv_data->adapter);
-> +
->  	return 0;
->  
->  	exit_free_irq:
-> @@ -597,17 +680,31 @@ mv64xxx_i2c_remove(struct platform_device *dev)
->  	rc = i2c_del_adapter(&drv_data->adapter);
->  	free_irq(drv_data->irq, drv_data);
->  	mv64xxx_i2c_unmap_regs(drv_data);
-> +#if defined(CONFIG_HAVE_CLK)
-> +	/* Not all platforms have a clk */
-> +	if (!IS_ERR(drv_data->clk)) {
-> +		clk_disable(drv_data->clk);
-> +		clk_unprepare(drv_data->clk);
-> +	}
-> +#endif
->  	kfree(drv_data);
->  
->  	return rc;
->  }
->  
-> +static const struct of_device_id mv64xxx_i2c_of_match_table[] __devinitdata = {
-> +	{ .compatible = "marvell,mv64xxx-i2c", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
-> +
->  static struct platform_driver mv64xxx_i2c_driver = {
->  	.probe	= mv64xxx_i2c_probe,
->  	.remove	= __devexit_p(mv64xxx_i2c_remove),
->  	.driver	= {
->  		.owner	= THIS_MODULE,
->  		.name	= MV64XXX_I2C_CTLR_NAME,
-> +		.of_match_table = of_match_ptr(mv64xxx_i2c_of_match_table),
->  	},
->  };
->  
-> -- 
-> 1.7.10
+> >
+> >> +static struct dw_mci_drv_data exynos5250_drv_data = {
+> >> +     .ctrl_type      = DW_MCI_TYPE_EXYNOS5250,
+> >> +     .caps           = exynos5250_dwmmc_caps,
+> >> +};
+> >> +
+> >>  static const struct of_device_id dw_mci_pltfm_match[] = {
+> >>       { .compatible = "snps,dw-mshc",
+> >>                       .data = (void *)&synopsis_drv_data, },
+> >> +     { .compatible = "samsung,exynos5250-dw-mshc",
+> >> +                     .data = (void *)&exynos5250_drv_data, },
+> >>       {},
+> >>  };
+> >>  MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
+> >> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> >> index 3bc276d..bbf1209 100644
+> >> --- a/drivers/mmc/host/dw_mmc.c
+> >> +++ b/drivers/mmc/host/dw_mmc.c
+> >> @@ -236,6 +236,7 @@ static void dw_mci_set_timeout(struct dw_mci *host)
+> >>  static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
+> >>  {
+> >>       struct mmc_data *data;
+> >> +     struct dw_mci_slot *slot = mmc_priv(mmc);
+> >>       u32 cmdr;
+> >>       cmd->error = -EINPROGRESS;
+> >>
+> >> @@ -265,6 +266,17 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command
+> *cmd)
+> >>                       cmdr |= SDMMC_CMD_DAT_WR;
+> >>       }
+> >>
+> >> +     /*
+> >> +      * Samsung Exynos5250 extends the use of CMD register with the use of
+> >> +      * bit 29 (which is reserved on standard MSHC controllers) for
+> >> +      * optionally bypassing the HOLD register for command and data. The
+> >> +      * HOLD register should be bypassed in case there is no phase shift
+> >> +      * applied on CMD/DATA that is sent to the card.
+> >> +      */
+> >> +     if (slot->host->drv_data->ctrl_type == DW_MCI_TYPE_EXYNOS5250)
+> >> +             if (SDMMC_CLKSEL_GET_SELCLK_DRV(mci_readl(slot->host, CLKSEL)))
+> >> +                     cmdr |= SDMMC_CMD_USE_HOLD_REG;
+> >> +
+> >>       return cmdr;
+> >>  }
+> >>
+> >> @@ -802,10 +814,19 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >>       regs = mci_readl(slot->host, UHS_REG);
+> >>
+> >>       /* DDR mode set */
+> >> -     if (ios->timing == MMC_TIMING_UHS_DDR50)
+> >> +     if (ios->timing == MMC_TIMING_UHS_DDR50) {
+> >>               regs |= (0x1 << slot->id) << 16;
+> >> -     else
+> >> +             mci_writel(slot->host, CLKSEL, slot->host->ddr_timing);
+> >> +     } else {
+> >>               regs &= ~(0x1 << slot->id) << 16;
+> >> +             mci_writel(slot->host, CLKSEL, slot->host->sdr_timing);
+> >> +     }
+> >> +
+> >> +     if (slot->host->drv_data->ctrl_type == DW_MCI_TYPE_EXYNOS5250) {
+> >> +             slot->host->bus_hz = clk_get_rate(slot->host->ciu_clk);
+> >> +             slot->host->bus_hz /= SDMMC_CLKSEL_GET_DIVRATIO(
+> >> +                                     mci_readl(slot->host, CLKSEL));
+> >> +     }
+> > As you know, CLKSEL is specific for Samsung soc.
+> > 0x09C(CLKSEL)  is reserved area in Synopsys memory map.
+> > In case of non-samsung-soc, we cannot ensure this usage.
+> > In previous version, I have suggested separating the variant into another file.
 > 
+> There is a check for type of SoC before using 0x9C as CLKSEL register.
+Do you mean checking DW_MCI_TYPE_EXYNOS5250?
+But Above two case(ddr_timing/sdr_timing), CLKSEL can be accessed on other soc's.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120720/2e239bae/attachment-0001.sig>
+> Other implementations of dw-mmc might define custom register at 0x9C
+Even so, register field can be different with Samsung soc.
+
+> but this will code will not execute on other SoC's and will not break
+> anything on other implementations. Regarding spliting this Exynos
+> specific code into another file, I prefer not to do it for now.
+> Spliting the code means adding new definitions of callback functions
+> which I am not sure is really required. The present code is fairly
+> simple one.
+Yes, callback functions might be needed to accommodate various implementation
+of host controller. It would be better to prepare this for other variant next.
+
+> 
+> >
+> >>
+> >>       mci_writel(slot->host, UHS_REG, regs);
+> >>
+> >> @@ -2086,6 +2107,7 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+> >>       struct dw_mci_board *pdata;
+> >>       struct device *dev = host->dev;
+> >>       struct device_node *np = dev->of_node;
+> >> +     u32 timing[3];
+> >>       int idx, cnt;
+> >>
+> >>       pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+> >> @@ -2108,6 +2130,20 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+> >>               if (of_get_property(np, of_quriks[idx].quirk, NULL))
+> >>                       pdata->quirks |= of_quriks[idx].id;
+> >>
+> >> +     if (of_property_read_u32_array(dev->of_node,
+> >> +                     "samsung,dw-mshc-sdr-timing", timing, 3))
+> >> +             host->sdr_timing = DW_MCI_DEF_SDR_TIMING;
+> > Host of non-samsung will reach here.
+> > host->sdr_timing is needed for this host? host->ddr_timing is the same.
+> 
+> Yes, but non-samsung hosts will not have have this property into their
+> dts file. So the code within the condition will not execute on
+> non-samsung hosts. SDR and DDR timing are required for Exynos5 SoC.
+Yes, these are required only for Exynos Soc. 
+Non-samsung host will have default value here, but it seems to be meaningless.
+
+> 
+> >
+> >> +     else
+> >> +             host->sdr_timing = SDMMC_CLKSEL_TIMING(timing[0],
+> >> +                                     timing[1], timing[2]);
+> >> +
+> >> +     if (of_property_read_u32_array(dev->of_node,
+> >> +                     "samsung,dw-mshc-ddr-timing", timing, 3))
+> >> +             host->ddr_timing = DW_MCI_DEF_DDR_TIMING;
+> >> +     else
+> >> +             host->ddr_timing = SDMMC_CLKSEL_TIMING(timing[0],
+> >> +                                     timing[1], timing[2]);
+> >> +
+> >>       if (of_property_read_u32(np, "fifo-depth", &pdata->fifo_depth))
+> >>               dev_info(dev, "fifo-depth property not found, using "
+> >>                               "value of FIFOTH register as default\n");
+> >> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> >> index 1ecaa02..6c17282 100644
+> >> --- a/drivers/mmc/host/dw_mmc.h
+> >> +++ b/drivers/mmc/host/dw_mmc.h
+> >> @@ -53,6 +53,7 @@
+> >>  #define SDMMC_IDINTEN                0x090
+> >>  #define SDMMC_DSCADDR                0x094
+> >>  #define SDMMC_BUFADDR                0x098
+> >> +#define SDMMC_CLKSEL         0x09C /* specific to Samsung Exynos5250 */
+> >>  #define SDMMC_DATA(x)                (x)
+> >>
+> >>  /*
+> >> @@ -111,6 +112,7 @@
+> >>  #define SDMMC_INT_ERROR                      0xbfc2
+> >>  /* Command register defines */
+> >>  #define SDMMC_CMD_START                      BIT(31)
+> >> +#define SDMMC_CMD_USE_HOLD_REG               BIT(29)
+> >>  #define SDMMC_CMD_CCS_EXP            BIT(23)
+> >>  #define SDMMC_CMD_CEATA_RD           BIT(22)
+> >>  #define SDMMC_CMD_UPD_CLK            BIT(21)
+> >> @@ -142,6 +144,17 @@
+> >>  /* Version ID register define */
+> >>  #define SDMMC_GET_VERID(x)           ((x) & 0xFFFF)
+> >>
+> >> +#define DW_MCI_DEF_SDR_TIMING                0x03030002
+> >> +#define DW_MCI_DEF_DDR_TIMING                0x03020001
+> > What is the basis for these timing?
+> > These values is board-specific.
+One missed comment?
+
+> >
+> >> +#define SDMMC_CLKSEL_CCLK_SAMPLE(x)  (((x) & 3) << 0)
+> >> +#define SDMMC_CLKSEL_CCLK_DRIVE(x)   (((x) & 3) << 16)
+> >> +#define SDMMC_CLKSEL_CCLK_DIVIDER(x) (((x) & 3) << 24)
+> > If it's for exynos5, it will be 7 not 3.
+> 
+> Yes, I missed that. Thanks. I will fix this.
+> 
+> >
+> >> +#define SDMMC_CLKSEL_TIMING(x, y, z) (SDMMC_CLKSEL_CCLK_SAMPLE(x) |  \
+> >> +                                     SDMMC_CLKSEL_CCLK_DRIVE(y) |    \
+> >> +                                     SDMMC_CLKSEL_CCLK_DIVIDER(z))
+> >> +#define SDMMC_CLKSEL_GET_DIVRATIO(x) ((((x) >> 24) & 0x7) + 1)
+> >> +#define SDMMC_CLKSEL_GET_SELCLK_DRV(x)       (((x) >> 16) & 0x7)
+> >> +
+> > Is this patch considered only for exynos5250?
+> > In case of exynos4210, the number of bits is different.
+> > If upper macros is backward-compatible, it would be better.
+> 
+> These consider the Exynos4210 and Exynos4412 implementations as well.
+> The device tree documentation clearly states that the possible values
+> for each of the dividers. For Exynos4 SoC's, the divider value is
+> between 1 to 4 (or 0 to 3). So a bit mask of 7 is backward compatilble
+> for Exynos4.
+Bit width is 2 for selclk_drv in exynos4210.
+So bit mask of 3 is proper.
+
+Let me clear it about divider value.
+In case of Exynos4 SoC's, divider value(DIVRATIO) is reserved and host doesn't modify.
+But value is fixed internally like following.
+Exynos4210 : 2
+Exynos4412 : 4
+
+Thanks,
+Seungwon Jeon
+
+> 
+> Thanks for your review and comments on this patch.
+> 
+> Regards,
+> Thomas.
+> 
+> >
+> > Best regards,
+> > Seungwon Jeon
+> >
+> >>  /* Register access macros */
+> >>  #define mci_readl(dev, reg)                  \
+> >>       __raw_readl((dev)->regs + SDMMC_##reg)
+> >> @@ -184,6 +197,7 @@ extern int dw_mci_resume(struct dw_mci *host);
+> >>
+> >>  /* Variations in the dw_mci controller */
+> >>  #define DW_MCI_TYPE_SYNOPSIS         0
+> >> +#define DW_MCI_TYPE_EXYNOS5250               1 /* Samsung Exynos5250 Extensions */
+> >>
+> >>  /* dw_mci platform driver data */
+> >>  struct dw_mci_drv_data {
+> >> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> >> index ae45e4f..32c778f 100644
+> >> --- a/include/linux/mmc/dw_mmc.h
+> >> +++ b/include/linux/mmc/dw_mmc.h
+> >> @@ -82,6 +82,8 @@ struct mmc_data;
+> >>   * @biu_clk: Pointer to bus interface unit clock instance.
+> >>   * @ciu_clk: Pointer to card interface unit clock instance.
+> >>   * @slot: Slots sharing this MMC controller.
+> >> + * @sdr_timing: Clock phase shifting for driving and sampling in sdr mode
+> >> + * @ddr_timing: Clock phase shifting for driving and sampling in ddr mode
+> >>   * @fifo_depth: depth of FIFO.
+> >>   * @data_shift: log2 of FIFO item size.
+> >>   * @part_buf_start: Start index in part_buf.
+> >> @@ -166,6 +168,10 @@ struct dw_mci {
+> >>       struct clk              *ciu_clk;
+> >>       struct dw_mci_slot      *slot[MAX_MCI_SLOTS];
+> >>
+> >> +     /* Phase Shift Value (for exynos5250 variant) */
+> >> +     u32                     sdr_timing;
+> >> +     u32                     ddr_timing;
+> >> +
+> >>       /* FIFO push and pull */
+> >>       int                     fifo_depth;
+> >>       int                     data_shift;
+> >> --
+> >> 1.6.6.rc2
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
