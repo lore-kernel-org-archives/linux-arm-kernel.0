@@ -1,51 +1,27 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Fri, 20 Jul 2012 04:04:19 -0500
-Subject: [PATCH 2/3] PM / OPP: Initialize OPP table from device tree
-In-Reply-To: <20120720084655.GB31866@S2101-09.ap.freescale.net>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-3-git-send-email-shawn.guo@linaro.org>
- <CAOMWX4fq8aWpRgtBj+5FgqhMus=zJL3Ubqe9pwiz-Y3a6V3svg@mail.gmail.com>
- <20120720084655.GB31866@S2101-09.ap.freescale.net>
-Message-ID: <CAOMWX4eAUH1LSshfaZnc2Pj5r39e9v5axTVFa37U0xEP66uczg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Jul 2012 09:05:49 +0000
+Subject: [GIT PULL] Samsung cleanup-2 for v3.6
+In-Reply-To: <194e01cd65fc$ce163be0$6a42b3a0$%kim@samsung.com>
+References: <142c01cd639c$2f081800$8d184800$%kim@samsung.com>
+ <201207172058.28993.arnd@arndb.de>
+ <194e01cd65fc$ce163be0$6a42b3a0$%kim@samsung.com>
+Message-ID: <201207200905.50396.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 3:46 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->
->> > +       ret = of_property_read_u32_array(np, propname, opp, nr);
->> > +       if (ret) {
->> > +               dev_err(dev, "%s: Unable to read OPPs\n", __func__);
->> > +               goto out;
->> > +       }
->> > +
->> > +       nr /= 3;
->> > +       for (i = 0; i < nr; i++) {
->> > +               /*
->> > +                * Each OPP is a set of tuples consisting of frequency,
->> > +                * voltage and availability like <freq-kHz vol-uV enable>.
->> > +                */
->> > +               u32 *val = opp + i * 3;
->> > +
->> > +               val[0] *= 1000;
->> > +               ret = opp_add(dev, val[0], val[1]);
->> > +               if (ret) {
->> > +                       dev_warn(dev, "%s: Failed to add OPP %d: %d\n",
->> > +                                __func__, val[0], ret);
->> > +                       continue;
->> > +               }
->> > +
->> > +               if (!val[2]) {
->> > +                       ret = opp_disable(dev, val[0]);
->> Since we are updating the table out of context of the SoC users,
->> consider what might happen if someone where to operate on the OPP
->> after opp_add, but before opp_disable?
->
-> I would take this as another comment reminding me to remove the
-> enabling/availability tuple from the binding.  Will do it in the
-> next version.
-I am not completely convinced that dropping the flag would be the best approach
-on a long run, but might be a good starting point while we meet current reqs and
-as a need arises, could increase the scope. Thanks once again for doing this.
+On Thursday 19 July 2012, Kukjin Kim wrote:
+> > 2. If you can, please use signed tags for your pull requests rather
+> > than branch names. A signed tag means that you can write the text
+> > for the merge changeset yourself so I don't have to do the description.
+> > Ideally the signing key should have signatures from other people in the
+> > keyring so everybody can check the authenticity of the request, but
+> > just having the changelog there also helps.
+> > 
+> OK, I see. I will try to use it as per your suggestion. But I'm not familiar
+> with that now. So if you don't mind I'd like to send signed tag from next
+> merge window :-)
 
-Regards,
-Nishanth Menon
+No problem. It's not a big difference to me anyway. I suppose by then we will
+also have had the chance for keysigning at the ARM mini summit.
+
+	Arnd
