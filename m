@@ -1,33 +1,78 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 20 Jul 2012 03:53:35 +0200
-Subject: MX28 poweroff issue
-In-Reply-To: <20120720004839.GC31620@S2101-09.ap.freescale.net>
-References: <201207040030.36713.marex@denx.de>
- <201207191904.31000.marex@denx.de>
- <20120720004839.GC31620@S2101-09.ap.freescale.net>
-Message-ID: <201207200353.35682.marex@denx.de>
+Date: Fri, 20 Jul 2012 04:18:41 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201207192126.31772.marex@denx.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <50081AC0.10703@metafoo.de> <201207192126.31772.marex@denx.de>
+Message-ID: <201207200418.41554.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Dear Lars-Peter Clausen,
 
-> On Thu, Jul 19, 2012 at 07:04:30PM +0200, Marek Vasut wrote:
-> > > I could reproduce this on an i.MX53 (TX53) platform too. Maybe the
-> > > softlockup watchdog was not enabled on those platforms which didn't
-> > > show this behaviour.
+> > On 07/19/2012 04:23 PM, Marek Vasut wrote:
+> > > Dear Lars-Peter Clausen,
+> > > 
+> > > Sorry for my late reply, got busy with other crazy stuff.
+> > > 
+> > > [...]
+> > > 
+> > >>>> Is there any reason not to use the mxs_lradc struct directly has the
+> > >>>> iio data?
+> > >>> 
+> > >>> I explained it below in the patch. I hope we'll eventually support
+> > >>> the delay triggers, which will need 4 separate IIO devices. And this
+> > >>> is where this structure will be augmented by other components.
+> > >> 
+> > >> Ok I saw the comment, but it wasn't obvious to me that delay channels
+> > >> will require multiple IIO devices. Might make sense to state this
+> > >> explicitly.
+> > > 
+> > > Fixed.
+> > > 
+> > >>>>> [...]
+> > >>>>> 
+> > >>>>> +
+> > >>>>> +/*
+> > >>>>> + * Channel management
+> > >>>>> + *
+> > >>>>> + * This involves crazy mapping between 8 virtual channels the
+> > >>>>> CTRL4 register + * can harbor and 16 channels total this hardware
+> > >>>>> supports. + */
+> > >>>> 
+> > >>>> I suppose this means only a maximum 8 channels can be active at a
+> > >>>> time. I've recently posted a patch which makes it easy to implement
+> > >>>> such a restriction.
+> > >>>> http://www.spinics.net/lists/linux-iio/msg05936.html and
+> > >>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
+> > >>>> validate callback implementation. In your case you'd check for
+> > >>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
+> > >>> 
+> > >>> This is good. When do you expect this to hit linux-next possibly? Or
+> > >>> at least linux-iio?
+> > >> 
+> > >> soon, hopefully.
+> > > 
+> > > So I checked this, not sure how it'll help me though.
 > > 
-> > So what's the result, where did this discussion lead to?
+> > Right now with your driver you can enable any combination of channels. If
+> > more than 8 channels are enabled and you start sampling it will fail,
+> > since not all channels can be mapped. With those patch you can implement
+> > a validate callback and check for bitmap_weight(scan_mask) <= 8. This
+> > will ensure that it is not possible to select more than 8 channels at
+> > once, which again means that starting sampling can't fail of this.
 > 
-> I have submitted a fix into Russell's patch system.  We will know
-> his take soon next week when he gets back from his vacation.
+> Ok, I fixed this one. One last thing that I don't really understand is
+> this. I run generic_buffer.c to source samples from the LRADC. Is there
+> any way to continuously sample them? Because right now, I get one sample
+> and that's it, no more samples happen later on (I can 0 data in subsequent
+> read() call).
 
-Ah ok, thanks!
-
-> 
-> Regards,
-> Shawn
-> 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/176127
+One more thing I'm curious about. There's another ADC block on the CPU, called 
+HSADC (high-speed ADC). It can sample even up to 2Msamples/s. If I were to, say 
+-- sample at 100kHz and be able to DMA the results into memory -- is there any 
+way to push such results into userland somehow? Or how to operate such fast 
+beast?
 
 Best regards,
 Marek Vasut
