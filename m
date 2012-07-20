@@ -1,100 +1,35 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Fri, 20 Jul 2012 16:39:21 +0900
-Subject: [PATCH V2 5/7] ARM: EXYNOS: add device tree based discovery
- support for FIMD
-In-Reply-To: <1342591053-7092-6-git-send-email-l.krishna@samsung.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1342591053-7092-6-git-send-email-l.krishna@samsung.com>
-Message-ID: <50090B29.4060809@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Jul 2012 15:56:54 +0800
+Subject: [PATCH 1/3] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <CAMQu2gz3XXQdG3T=jSboZ8cW-gKO33k7+OUPaQpjpUcnitk_RA@mail.gmail.com>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-2-git-send-email-shawn.guo@linaro.org>
+ <CAMQu2gz3XXQdG3T=jSboZ8cW-gKO33k7+OUPaQpjpUcnitk_RA@mail.gmail.com>
+Message-ID: <20120720075652.GA31866@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2012 02:57 PM, Leela Krishna Amudala wrote:
-> This patch adds support for device tree based discovery for Samsung's
-> display controller. Adds DRM-Fimd plat data for smdk5250
-> evt1 to the corresponding dts file
->
-> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5250-smdk5250.dts |   16 ++++++++++++++++
->   arch/arm/boot/dts/exynos5250.dtsi         |    7 +++++++
+On Fri, Jul 20, 2012 at 12:06:50PM +0530, Shilimkar, Santosh wrote:
+> On Thu, Jul 19, 2012 at 9:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> >
+> > From: Richard Zhao <richard.zhao@linaro.org>
+> >
+> > If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
+> > arch has different per-cpu loops_per_jiffy definition.
+> >
+> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> Nice. Avoids other driver duplicating this code.
+> May be you can keep Richard's credit in commit too.
+> 
+It's all Richard's credit in the commit.
 
-Please make separated patches for exynos5250.dtsi and
-exynos5250-smdk5250.dts.
-
->   arch/arm/mach-exynos/include/mach/map.h   |    1 +
->   arch/arm/mach-exynos/mach-exynos5-dt.c    |    2 ++
->   4 files changed, 26 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 8a5e348..c8d32f5 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -109,4 +109,20 @@
->   	spi_2: spi at 12d40000 {
->   		status = "disabled";
->   	};
-> +
-> +	lcd_fimd0: lcd_panel0 {
-> +			lcd-htiming = <4 4 4 1280>;
-> +			lcd-vtiming = <4 4 4 800>;
-> +			supports-mipi-panel;
-> +	};
-> +
-> +	fimd {
-> +		samsung,fimd-display = <&lcd_fimd0>;
-> +		samsung,fimd-vidout-rgb;
-> +		samsung,fimd-inv-vclk;
-> +		samsung,fimd-frame-rate = <60>;
-> +		samsung,default-window = <0>;
-> +		samsung,fimd-win-bpp = <32>;
-> +	};
-> +
->   };
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index a3a2eb2..3a67092 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -460,4 +460,11 @@
->   			#gpio-cells = <4>;
->   		};
->   	};
-> +
-> +	fimd {
-> +		compatible = "samsung,exynos5-drm";
-> +		interrupt-parent = <&combiner>;
-> +		reg = <0x14400000 0x40000>;
-> +		interrupts = <18 5>, <18 4>, <18 6>;
-> +	};
->   };
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-> index c72b675..f027da2 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -170,6 +170,7 @@
->   #define EXYNOS4_PA_MIPI_CSIS1		0x11890000
->   
->   #define EXYNOS4_PA_FIMD0		0x11C00000
-> +#define EXYNOS5_PA_FIMD1		0x14400000
-
-Is FIMD1 name right? I know exynos5250 has one FIMD, so use FIMD
-postfix.
-
->   
->   #define EXYNOS4_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
->   #define EXYNOS4_PA_DWMCI		0x12550000
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index 99f2b24..2107e01 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -158,6 +158,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
->   	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
->   	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
->   	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos5-drm", EXYNOS5_PA_FIMD1,
-> +				"exynos5-fb", NULL),
->   	{},
->   };
->   
+> FWIW, Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
 Thanks.
+
+-- 
+Regards,
+Shawn
