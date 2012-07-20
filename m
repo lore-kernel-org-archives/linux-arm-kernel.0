@@ -1,40 +1,23 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 19 Jul 2012 17:30:12 -0600 (MDT)
-Subject: [PATCHv7 07/12] ARM: OMAP4: PM: put all domains to OSWR during
- suspend
-In-Reply-To: <1342711907.4672.153.camel@sokoban>
-References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
- <1342704392-23657-8-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1207190842310.432@utopia.booyaka.com>
- <1342711907.4672.153.camel@sokoban>
-Message-ID: <alpine.DEB.2.00.1207191726090.14390@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Jul 2012 08:29:51 +0800
+Subject: [PATCH 0/3] Add a generic cpufreq-cpu0 driver
+In-Reply-To: <201207192039.40213.rjw@sisk.pl>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <201207192039.40213.rjw@sisk.pl>
+Message-ID: <20120720002949.GA31620@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Thu, 19 Jul 2012, Tero Kristo wrote:
-
-> Subject: [PATCHv7 07/12] ARM: OMAP4: PM: put all domains to OSWR during
-> suspend
+On Thu, Jul 19, 2012 at 08:39:39PM +0200, Rafael J. Wysocki wrote:
+> It is too late to consider your patches for inclusion into v3.6, so I'm
+> regarding them as RFC at this point.
 > 
-> Currently OMAP4 suspend puts all power domains to CSWR. OSWR is a deeper
-> state that saves more power, but has higher latencies also. As suspend
-> is considered a high-latency operation, OSWR is appropriate here.
+Yes, it's on the review stage, and 3.7 is the target.
+
+> Please resubmit after v3.6-rc1 has been released.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
-> 
-> I'll update this to next rev if one is requested.
+Will do.
 
-No need, I'll add it in the local copy here.
-
-> (Kind of hoping this set would be reaching maturity already.)
-
-It kind of looks to me like there are two or three separate sets within 
-the series.  My feeling is that Kevin should take the first two, then I 
-should take the rest other than 6 and 7.  Then once those are queued, 
-we can pull in 6 and 7.  Does that make sense to you?
-
-
-- Paul
+-- 
+Regards,
+Shawn
