@@ -1,34 +1,23 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Fri, 20 Jul 2012 16:35:41 +0100
-Subject: SATA working on 370/XP, Ethernet next...
-In-Reply-To: <20120720144133.GA15606@lunn.ch>
-References: <20120720144133.GA15606@lunn.ch>
-Message-ID: <50097ACD.9@codethink.co.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 20 Jul 2012 17:40:00 +0200 (CEST)
+Subject: mx1: compilation broken
+Message-ID: <Pine.LNX.4.64.1207201734580.5505@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/12 15:41, Andrew Lunn wrote:
-> Hi Ian
-Hi!
+Hi all
 
-Good to hear you got SATA working. What was wrong?
+mx1 camera compilation broken in current media-next 
+(git://linuxtv.org/media_tree.git staging/for_v3.6):
 
+In file included from linux/drivers/media/video/mx1_camera.c:44:
+linux/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h:8: fatal error: mach/dma-v1.h: No such file or directory
 
+sorry, if this is already fixed in a more recent -next snapshot.
 
-Window setup was wrong - mostly just the function setting it up simply 
-not getting called.
-
-I suspect that this platform rather badly needs the clock stuff 
-implementing.
-
- > I'm interested in Ethernet. I assume it uses 
-drivers/net/ethernet/marvell/mv643xx_eth.c?
-
-AIUI, yes. I havent checked yet.
-
- > If so, your work should be applicable for all Orion devices, and i'm 
-happy to test on kirkwood.
-
-Cheers! :)
-
--Ian
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
