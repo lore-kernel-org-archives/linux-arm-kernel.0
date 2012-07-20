@@ -1,56 +1,33 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 20 Jul 2012 17:20:25 +0800
-Subject: [PATCH 2/4] ASoC: mxs-saif: set a base clock rate for EXTMASTER mode
- work
-In-Reply-To: <1342776027-31758-1-git-send-email-b29396@freescale.com>
-References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
-Message-ID: <1342776027-31758-3-git-send-email-b29396@freescale.com>
+Date: Fri, 20 Jul 2012 17:20:23 +0800
+Subject: [PATCH 0/4] ASoC: fix saif record unwork issue
+Message-ID: <1342776027-31758-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+This patch series mainly fixes the saif record unwork issue.
+The root cause consists of:
+1) clk_prepare and clk_enable un-balanced
+2) missed setting a proper initial clock rate for saif in dt
+3) sgtl5000 dapm widget kcontrol does not work
+   So can not test record on mx28evk.
+4) missed setting clkmux mode for saif in dt
 
-Set an initial clock rate for the saif internal logic to work
-properly. This is important when working in EXTMASTER mode that
-uses the other saif's BITCLK&LRCLK but it still needs a basic
-clock which should be fast enough for the internal logic.
+With this patch series it can fix sgtl5000 widget kcontrol unwork
+and saif record unwork issue.
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- sound/soc/mxs/mxs-saif.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
+BTW, just let people konw, i still met a few overruns during record,
+that's another issue and will be fixed in separte patches later.
 
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index fdbb36a..b303071 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -427,8 +427,22 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
- 
- 	/* prepare clk in hw_param, enable in trigger */
- 	clk_prepare(saif->clk);
--	if (saif != master_saif)
-+	if (saif != master_saif) {
-+		/*
-+		* Set an initial clock rate for the saif internal logic to work
-+		* properly. This is important when working in EXTMASTER mode
-+		* that uses the other saif's BITCLK&LRCLK but it still needs a
-+		* basic clock which should be fast enough for the internal
-+		* logic.
-+		*/
-+		clk_enable(saif->clk);
-+		ret = clk_set_rate(saif->clk, 24000000);
-+		clk_disable(saif->clk);
-+		if (ret)
-+			return ret;
-+
- 		clk_prepare(master_saif->clk);
-+	}
- 
- 	scr = __raw_readl(saif->base + SAIF_CTRL);
- 
--- 
-1.7.0.4
+Patch based on sound-2.6/for-3.6.
+
+Dong Aisheng (4):
+  ASoC: mxs-saif: fix clock prepare and enable unbalance issue
+  ASoC: mxs-saif: set a base clock rate for EXTMASTER mode work
+  ASoC: sgtl5000: remove unneeded snd_soc_dapm_new_widgets in probe
+  ARM: mx28evk: add missed clkmux select for saif
+
+ arch/arm/mach-mxs/mach-mxs.c |    3 +++
+ sound/soc/codecs/sgtl5000.c  |    2 --
+ sound/soc/mxs/mxs-saif.c     |   24 ++++++++++++++++++++++++
+ 3 files changed, 27 insertions(+), 2 deletions(-)
