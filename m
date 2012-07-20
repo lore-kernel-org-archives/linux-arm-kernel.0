@@ -1,64 +1,28 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 20 Jul 2012 05:43:27 +0000
-Subject: [RFC][PATCH v2 1/1] ARM: OMAP2+: PM: Register suspend ops even
- in the presence of DT blob
-In-Reply-To: <5008E8D5.3010007@ti.com>
-References: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
- <5008E10F.4080706@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EB14B1E@DBDE01.ent.ti.com>
- <5008E8D5.3010007@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB14BB0@DBDE01.ent.ti.com>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Fri, 20 Jul 2012 13:46:01 +0800
+Subject: [PATCH 0/3] dmaengine: add support mmp-pdma
+Message-ID: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 10:42:53, Nayak, Rajendra wrote:
-> On Friday 20 July 2012 10:31 AM, Bedia, Vaibhav wrote:
-> > On Fri, Jul 20, 2012 at 10:09:43, Nayak, Rajendra wrote:
-> >> On Thursday 19 July 2012 05:38 PM, Vaibhav Bedia wrote:
-> >>> As per the comment in omap2_common_late_init() looks like the
-> >>> original intent of the DT check was to treat only the PMIC
-> >>> and SR initialization differently. Recent changes to consolidate
-> >>> the suspend-resume code across OMAP3/4 resulted into the
-> >>> registration of suspend ops also being dependent on the check
-> >>> for DT blob. Since the suspend-resume operation should not
-> >>> really be dependent on the usage of DT remove this dependency
-> >>> by wrapping the PMIC and SR init under the DT check.
-> >>
-> >> So I am guessing you also tested suspend/resume on your hardware
-> >> with this patch, when booting with a DT blob, and it passed.
-> >>
-> >
-> > I am getting there ;)
-> >
-> > I am in the process of getting a real suspend/resume functional. As part
-> > of this I was just flow flushing the whole suspend process in the mainline
-> > kernel by putting in a dummy implementation for the .enter op and found that
-> > this change was needed.
-> 
-> Ok, good to know you are working on this. It might then make sense for
-> for you to also include this patch as part of that series?
-> It doesn't make much sense to register suspend ops which then break
-> suspend isn't it? Btw, whats the behavior on current mainline with
-> just this patch. Does it hang/crash or just prevent the system from
-> doing down?
-> 
+mmp-pdma is added under dmaengine framework.
+The final purpose is replacing arch/arm/plat-pxa/dma.c
 
-Ok. I can keep this patch as part of the suspend-resume support for AM33XX.
+Test on pxa910 with pxa3xx-nand and dmatest.ko
 
-With just this patch on top of the tree being maintained by Vaibhav Hiremath [1]
-I found a couple of issues that I am yet to fully root-cause.
+Zhangfei Gao (3):
+  dmaengine: mmp-pdma support
+  dmaengine: mmp_tdma: add dt support
+  dmatest: add dmaengine_slave_config for DMA_MEMCPY
 
-1. The PM_SUSPEND_PREPARE handler in drivers/mmc/core/core.c never returns unless
-the MMC_UNSAFE_RESUME config option is selected. This might be due to the suspend
-and resume in mmc_bus_ops being NULL in the case where the config option is not set.
-
-2. The suspend process hangs somewhere in the .suspend_noirq callback for the UART
-being used as the console when no_console_suspend is passed.
-
-I am yet to check the behavior on an OMAP3 EVM so right now I am not sure whether
-these are AM33XX specific issues. If you have any pointers that will greatly help.
-
-Regards,
-Vaibhav B.
-
-[1] https://github.com/hvaibhav/am335x-linux/tree/am335x-upstream-staging 
+ Documentation/devicetree/bindings/dma/mmp-dma.txt |   56 ++
+ drivers/dma/Kconfig                               |    7 +
+ drivers/dma/Makefile                              |    1 +
+ drivers/dma/dmatest.c                             |    4 +
+ drivers/dma/mmp_pdma.c                            |  877 +++++++++++++++++++++
+ drivers/dma/mmp_tdma.c                            |   51 +-
+ include/linux/platform_data/mmp_dma.h             |   25 +
+ 7 files changed, 1001 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+ create mode 100644 drivers/dma/mmp_pdma.c
+ create mode 100644 include/linux/platform_data/mmp_dma.h
