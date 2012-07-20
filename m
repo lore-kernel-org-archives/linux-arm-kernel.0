@@ -1,34 +1,41 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 20 Jul 2012 08:50:58 -0700
-Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <20120720123317.GA32263@S2101-09.ap.freescale.net>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
- <CAMQu2gw32LogXJJa+K5ZjmCZzBNK3FY2wYwZXU8fsftsVzEO2Q@mail.gmail.com>
- <20120720123317.GA32263@S2101-09.ap.freescale.net>
-Message-ID: <CAJOA=zMQKLTumW7Nx68+yxHC5Yk4QyiL2mf1+TSZfVOAtnXDWA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 20 Jul 2012 17:52:37 +0200
+Subject: SATA working on 370/XP, Ethernet next...
+In-Reply-To: <20120720144133.GA15606@lunn.ch>
+References: <20120720144133.GA15606@lunn.ch>
+Message-ID: <20120720175237.6a10eb83@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 5:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Fri, Jul 20, 2012 at 12:22:14PM +0530, Shilimkar, Santosh wrote:
->> This *_CPU0 doesn't seems to be appropriate since this infrastructure will be
->> used on SMP systems where CPUs shares clock/voltage rails. May be you can
->> get rid of that unless there is a strong need.
->>
-> All the resource handlers, clk, regulator, opp, DT node, are retrieved
-> from CPU0 device even for SMP.  I hope the naming of the driver could
-> tell:
->
-> - The driver supports UP
-> - The driver supports SMP where CPUs shares clock/voltage rails by
->   managing CPU0 (resource)
-> - The driver does not support SMP where individual CPU can scale
->   clock/voltage independently.
->
+Le Fri, 20 Jul 2012 16:41:33 +0200,
+Andrew Lunn <andrew@lunn.ch> a ?crit :
 
-How about cpufreq-single-thread.c and CONFIG_CPUFREQ_SINGLE_THREAD?
-That makes sense for both UP and SMP.
+> I'm interested in Ethernet. I assume it uses
+> drivers/net/ethernet/marvell/mv643xx_eth.c?
 
-Regards,
-Mike
+No, the network IP in the A370 and AXP is totally different and Marvell
+engineers think it needs a new driver, and I have been making internal
+reviews of their driver, but it needs more work before being ready for
+submission.
+
+A while ago, we had a discussion with Ben Dooks (from CodeThink) on
+whether a new driver was needed or not. Ben will correct me if I'm
+wrong, but he was suggesting that a new driver was not needed, but both
+Marvell engineers and my comparison of the datasheets between A370/AXP
+and older Marvell EBU SoCs clearly show that this IP has changed
+dramatically, and is even not the same IP as before.
+
+If needed, I can post the network driver code in a RFC state, but it is
+clearly not yet ready for inclusion.
+
+I would of course be happy to test SATA patches for the Armada XP. Ian,
+did you reuse the plat-orion/addr-map.c code to do the window setup?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
