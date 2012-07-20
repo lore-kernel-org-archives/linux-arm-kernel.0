@@ -1,88 +1,56 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 20 Jul 2012 17:24:29 +0530
-Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping from
- cpuidle
-In-Reply-To: <1342774283.4672.181.camel@sokoban>
-References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
- <1342764284-8143-3-git-send-email-rnayak@ti.com>
- <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>
- <5009120A.1060400@ti.com> <1342774283.4672.181.camel@sokoban>
-Message-ID: <CAMQu2gww9O-Kv6c1xFYWjj42vsoR4Ewrdzr+H7Da5RC79s_-Zw@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 20 Jul 2012 17:26:01 +0530
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <50094168.2090900@de.bosch.com>
+References: <5006571A.7060103@de.bosch.com>
+ <CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>
+ <50068696.8070408@de.bosch.com>
+ <CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>
+ <5006C40D.300@de.bosch.com>
+ <CAJe_Zhcyug17ZnKtmKnVhHT=Mm1PKdE68f21WWkUVtfCwNxSwg@mail.gmail.com>
+ <50094168.2090900@de.bosch.com>
+Message-ID: <CAJe_Zhfu-k0V7q527JSqdThn_c7WfNcaHmYOwBBaaRh+A=2hKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 2:21 PM, Tero Kristo <t-kristo@ti.com> wrote:
->
-> On Fri, 2012-07-20 at 13:38 +0530, Rajendra Nayak wrote:
-> > On Friday 20 July 2012 12:55 PM, Shilimkar, Santosh wrote:
-> > > On Fri, Jul 20, 2012 at 11:34 AM, Rajendra Nayak<rnayak@ti.com>
-> > > wrote:
-> > >> pwrdm_pre_transition()/pwrdm_post_transition() have always been high
-> > >> latency
-> > >> operations done within cpuidle to do Powerdomain level book-keeping
-> > >> to know
-> > >> what state transitions for different Powerdomains have been
-> > >> triggered.
-> > >> This is also useful to do a restore-on-demand in some cases when we
-> > >> know
-> > >> the context for the given Powerdomain was lost etc.
-> > >>
-> > >> Now that we have definitive entry/exit points (thanks to the
-> > >> Powerdomain
-> > >> level usecounting) for Powerdomain transitions, these book-keeping
-> > >> functions
-> > >> can very well be moved from within CPUidle into
-> > >> pwrdm_clkdm_enable()/pwrdm_
-> > >> clkdm_disable() functions.
-> > >>
-> > >> Also rename _pwrdm_pre/post_transition_cb() to
-> > >> pwrdm_pre/post_transition()
-> > >> and get rid of the original ones which iterate over all powerdomains.
-> > >>
-> > >> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> > >> ---
-> > >>   arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++--
-> > >>   arch/arm/mach-omap2/pm34xx.c              |    4 ++--
-> > >>   arch/arm/mach-omap2/powerdomain.c         |   28
-> > >> ++++++++--------------------
-> > >>   arch/arm/mach-omap2/powerdomain.h         |    4 ++--
-> > >>   4 files changed, 14 insertions(+), 26 deletions(-)
-> > >>
-> > >> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >> b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >> index 13670aa..ea19439 100644
-> > >> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >> @@ -255,7 +255,7 @@ int omap4_enter_lowpower(unsigned int cpu,
-> > >> unsigned int power_state)
-> > >>                  return -ENXIO;
-> > >>          }
-> > >>
-> > >> -       pwrdm_pre_transition();
-> > >> +       pwrdm_cpu_idle();
-> > >>
-> > > Glad to see this is getting optimized.
-> > > I haven't seen how "pwrdm_cpu_[idle/wakeup]()" is
-> > > implemented but will those work on SMP system ?
-> > > I mean OMAP4, any CPU can make this call ?
-> >
-> > Thats a good question. I think Tero did this so he can kick in
-> > voltage transitions at the right time in idle/suspend.
-> > Given that these deal with incrementing/decrementing the MPU and CORE
-> > pwrdm usecounts alone, maybe on OMAP4 (SMP systems) this needs to also
-> > increment/decrement the specific CPU usecounts on the CPUs these calls
-> > are made.
->
-> Yeah, you should keep the usecounts valid by each cpu separately calling
-> these functions. My current set only sets these usecounts based on cpu0
-> activity, as cpu1 is statically controlled through cpu online / offline.
-> Once per-cpu cpuidle is in, these should be changed so that each
-> individual cpu increases the usecounts when they are brought up,
-> decrease/increase during idle, and decrease when they are brought down.
-> The usecount should always reflect the number of CPUs active on MPU
-> domain.
->
-Sounds good to me !!
+On 20 July 2012 17:00, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> On 19.07.2012 22:45, Jassi Brar wrote:
 
-Regards
-santosh
+>>> This problem can occur on many devices with embedded MMC and removable
+>>> SD,
+>>> e.g. smart phones. So I think we should find an solution to define MMC
+>>> scan
+>>> order or device number/name in a device tree.
+>>>
+>> I assume your issue is that due to async nature of mmc scanning, the
+>> eMMC is detected later than external card, despite being the probe for
+>> eMMC's slot initiated first ?
+>> If so, we can do by simply associating 'N' of 'mmcblkN' with the slot
+>> index i.e, mmc_host.index (instead of mmc_blk_data.name_idx). Which is
+>> always in the order of probe calling. And we don't need to modify, or
+>> expect more of, DT for that.
+>
+>
+> Do you mean something like
+>
+> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+> --- a/drivers/mmc/card/block.c
+> +++ b/drivers/mmc/card/block.c
+> @@ -1536,7 +1536,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct
+> mmc_card *card,
+>          */
+>
+>         snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
+> -                "mmcblk%d%s", md->name_idx, subname ? subname : "");
+> +                "mmcblk%d%s", card->host->index, subname ? subname : "");
+>
+>         blk_queue_logical_block_size(md->queue.queue, 512);
+>         set_capacity(md->disk, size);
+>
+> ?
+>
+Exactly!
+It seems too trivial and default for the author to have missed it, so
+I suspect I am overlooking something yet again. I would dig email
+archives to know more about that naming convention before dare submit
+a patch :)
