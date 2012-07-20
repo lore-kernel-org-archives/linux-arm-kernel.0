@@ -1,27 +1,31 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 20 Jul 2012 14:30:05 -0700
-Subject: [PATCH] net: ethernet: davinci_emac: add pm_runtime support
-In-Reply-To: <20120720.112301.1733694549621760738.davem@davemloft.net>
-References: <1342736577-30477-1-git-send-email-mgreer@animalcreek.com>
- <20120720.112301.1733694549621760738.davem@davemloft.net>
-Message-ID: <20120720213005.GA22263@animalcreek.com>
+Date: Fri, 20 Jul 2012 14:41:27 -0700
+Subject: [PATCH 2/2] arm: omap3: am35x: Disable hlt when using Davinci EMAC
+In-Reply-To: <alpine.DEB.2.00.1207191649040.14390@utopia.booyaka.com>
+References: <1336770778-23044-1-git-send-email-mgreer@animalcreek.com>
+ <1336770778-23044-3-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1207171814100.28834@utopia.booyaka.com>
+ <20120718213246.GD27904@animalcreek.com>
+ <alpine.DEB.2.00.1207181723120.19048@utopia.booyaka.com>
+ <20120719182602.GB24076@animalcreek.com>
+ <alpine.DEB.2.00.1207191649040.14390@utopia.booyaka.com>
+Message-ID: <20120720214127.GB22263@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 11:23:01AM -0700, David Miller wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
-> Date: Thu, 19 Jul 2012 15:22:57 -0700
+On Thu, Jul 19, 2012 at 04:59:06PM -0600, Paul Walmsley wrote:
+> + Ilya
 > 
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > 
-> > Add pm_runtime support to the TI Davinci EMAC driver.
-> > 
-> > CC: Sekhar Nori <nsekhar@ti.com>
-> > CC: Kevin Hilman <khilman@ti.com>
-> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> Hi Mark
 > 
-> This patch doesn't apply at all to net-next
+> Maybe try something like this on top of the patch that disables the 
+> MPU DPLL autoidle?
+> 
+> I don't know what am35xx_enable_emac_int() is supposed to do.  It seems 
+> strange to clear the interrupt status bits when one is supposed to enable 
+> the interrupts.  Maybe Ilya can shed some light on it.
 
-My apologies.  I'll fix & resubmit in a bit.
+Just an FYI for anyone following this thread.  Paul has contacted me
+privately and said to not bother testing this patch.
 
 Mark
