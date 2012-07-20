@@ -1,67 +1,51 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 20 Jul 2012 14:33:28 +0530
-Subject: [RFC 0/4] OMAP Cpuidle/Suspend Cleanups
-In-Reply-To: <1342774773.4672.187.camel@sokoban>
-References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
- <1342774773.4672.187.camel@sokoban>
-Message-ID: <50091EE0.1020007@ti.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Fri, 20 Jul 2012 04:04:19 -0500
+Subject: [PATCH 2/3] PM / OPP: Initialize OPP table from device tree
+In-Reply-To: <20120720084655.GB31866@S2101-09.ap.freescale.net>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-3-git-send-email-shawn.guo@linaro.org>
+ <CAOMWX4fq8aWpRgtBj+5FgqhMus=zJL3Ubqe9pwiz-Y3a6V3svg@mail.gmail.com>
+ <20120720084655.GB31866@S2101-09.ap.freescale.net>
+Message-ID: <CAOMWX4eAUH1LSshfaZnc2Pj5r39e9v5axTVFa37U0xEP66uczg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 July 2012 02:29 PM, Tero Kristo wrote:
-> On Fri, 2012-07-20 at 11:34 +0530, Rajendra Nayak wrote:
->> Hi,
->>
->> Here are some CPUidle/Suspend cleanup patches done by adding
->> some more functionality in the OMAP Powerdomain framework.
->> They mostly cleanup OMAP3 but the same ideas can be used/
->> applied for OMAP4 and beyond.
->>
->> The series is based off Teros' series [1] to add usecounting
->> support within the OMAP Powerdomain framework.
->>
->> The patches are tested with RET/OFF in CPUidle and Suspend
->> on 3630 beagle Xm and 3430 SDP.
+On Fri, Jul 20, 2012 at 3:46 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 >
-> This set looks good to me, just requires careful testing that you don't
-> break anything as you are moving lots of stuff around. For debugging
-> purposes (maybe also permanently?), it might be good to keep some sort
-> of failsafe mechanism in place that prevents actual core / per off
-> transitions in case there is a problem with the usecounting, and you
-> accidentally hit core / per off even though the usecounting doesn't
-> expect it (some autoidle mechanism is overlooked for example.)
+>> > +       ret = of_property_read_u32_array(np, propname, opp, nr);
+>> > +       if (ret) {
+>> > +               dev_err(dev, "%s: Unable to read OPPs\n", __func__);
+>> > +               goto out;
+>> > +       }
+>> > +
+>> > +       nr /= 3;
+>> > +       for (i = 0; i < nr; i++) {
+>> > +               /*
+>> > +                * Each OPP is a set of tuples consisting of frequency,
+>> > +                * voltage and availability like <freq-kHz vol-uV enable>.
+>> > +                */
+>> > +               u32 *val = opp + i * 3;
+>> > +
+>> > +               val[0] *= 1000;
+>> > +               ret = opp_add(dev, val[0], val[1]);
+>> > +               if (ret) {
+>> > +                       dev_warn(dev, "%s: Failed to add OPP %d: %d\n",
+>> > +                                __func__, val[0], ret);
+>> > +                       continue;
+>> > +               }
+>> > +
+>> > +               if (!val[2]) {
+>> > +                       ret = opp_disable(dev, val[0]);
+>> Since we are updating the table out of context of the SoC users,
+>> consider what might happen if someone where to operate on the OPP
+>> after opp_add, but before opp_disable?
 >
-> Maybe add some caching for the programmed next state, and only program
-> the HW register once we get to the callbacks, and restore the next state
-> to ON after leaving...? This should get rid of any unexpected hangs.ly
+> I would take this as another comment reminding me to remove the
+> enabling/availability tuple from the binding.  Will do it in the
+> next version.
+I am not completely convinced that dropping the flag would be the best approach
+on a long run, but might be a good starting point while we meet current reqs and
+as a need arises, could increase the scope. Thanks once again for doing this.
 
-Thats exactly what I have been thinking too. The caching is turning out
-to be a little tricky though. But something like that would certainly be
-needed, and should also get rid of unwanted (multiple) target state
-programming.
-
->
-> -Tero
->
->>
->> regards,
->> Rajendra
->>
->> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg72163.html
->>
->> Rajendra Nayak (4):
->>    ARM: OMAP3: cpuidle: Remove unused MPU OSWR support code
->>    ARM: OMAP: PM: Get rid of Powerdomain book-keeping from cpuidle
->>    ARM: OMAP: powerdomain: Add .power_on/.power_down hooks for
->>      powerdomains
->>    ARM: OMAP3: PM: Use .power_on/.power_down to clean omap_sram_idle
->>
->>   arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 +-
->>   arch/arm/mach-omap2/pm34xx.c              |  158 ++++++++++++++---------------
->>   arch/arm/mach-omap2/powerdomain.c         |   40 ++++----
->>   arch/arm/mach-omap2/powerdomain.h         |    8 +-
->>   arch/arm/mach-omap2/sleep34xx.S           |    4 +-
->>   5 files changed, 104 insertions(+), 110 deletions(-)
->>
->
->
+Regards,
+Nishanth Menon
