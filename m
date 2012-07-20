@@ -1,36 +1,146 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 20 Jul 2012 10:42:49 +0100
-Subject: Boot breaks in -next from LEGACY to LINEAR conversion
-In-Reply-To: <CACxGe6utvV6XbJEck_UuVJxsqckPFZXG3psEgeQ1vZSBGAwm9Q@mail.gmail.com>
-References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
- <20120718161023.GE4495@opensource.wolfsonmicro.com>
- <CACxGe6utvV6XbJEck_UuVJxsqckPFZXG3psEgeQ1vZSBGAwm9Q@mail.gmail.com>
-Message-ID: <20120720094248.GM4495@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 20 Jul 2012 10:42:56 +0100
+Subject: [PATCH v3] ARM: Make a compile firmware conditionally
+In-Reply-To: <20120720082419.GA9394@july>
+References: <20120720082419.GA9394@july>
+Message-ID: <20120720094255.GA2114@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2012 at 10:30:11PM -0600, Grant Likely wrote:
+On Fri, Jul 20, 2012 at 05:24:19PM +0900, Kyungmin Park wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Some boards can use the firmware at trustzone but others can't use this.
 
-> Okay, I've got a theory about what the issue is now. The .map()
-> callback is failing (returning non-zero) for one of the hwirqs. The
-> new code is stricter about associations, and actually unwinds the
-> associations if one of them fails. The old legacy code simply called
-> all the .map() hooks blindly without any error checking. Can you send
-> me the kernel log after backing out those changes.
+Note that this isn't just about TrustZone.  For example, firmware could
+be implemented in a hypervisor.
 
-Looks like the error checking is the issue.  Always knew that was a bad
-idea :)  I've just sent a patch to improve the diagnostics here which
-might help a bit, though I realise now with some of my debug I need to
-send a v2 :/ .
+> However we need to build it simultaneously. To address this issue,
+> introduce arm firmware support and use it at each board files.
+> 
+> e.g., In boot_secondary at mach-exynos/platsmp.c
+> 
+>         __raw_writel(virt_to_phys(exynos4_secondary_startup),
+>                 CPU1_BOOT_REG);
+> 
+>         if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
+>                 /* Call Exynos specific smc call */
+>                 firmware_ops.cpu_boot(cpu);
+>         }
+> 
+>         gic_raise_softirq(cpumask_of(cpu), 1);
+> 
+>         if (pen_release == -1)
+> 
+> Now smp_ops is not yet merged, now just call the firmware_init at init_early
+>  at board file
+> 
+> e.g., exynos4412 based board
+> 
+> static void __init board_init_early(void)
+> {
+>         exynos_firmware_init();
+> }
+> 
+> TODO
+>         1. DT support.
+>         2. call firmware init by smp_ops.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+> index 283fa1d..5b097ca 100644
+> --- a/arch/arm/common/Kconfig
+> +++ b/arch/arm/common/Kconfig
+> @@ -21,6 +21,9 @@ config ARM_VIC_NR
+>  	  The maximum number of VICs available in the system, for
+>  	  power management.
+>  
+> +config ARM_FIRMWARE
+> +	bool
+> +
+>  config ICST
+>  	bool
+>  
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index e8a4e58..4af6568 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -4,6 +4,7 @@
+>  
+>  obj-$(CONFIG_ARM_GIC)		+= gic.o
+>  obj-$(CONFIG_ARM_VIC)		+= vic.o
+> +obj-$(CONFIG_ARM_FIRMWARE)	+= firmware.o
+>  obj-$(CONFIG_ICST)		+= icst.o
+>  obj-$(CONFIG_SA1111)		+= sa1111.o
+>  obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
+> diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
+> new file mode 100644
+> index 0000000..ffb6822
+> --- /dev/null
+> +++ b/arch/arm/common/firmware.c
+> @@ -0,0 +1,23 @@
+> +/*
+> + *  Copyright (C) 2012 Samsung Electronics.
+> + *  Kyungmin Park <kyungmin.park@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/suspend.h>
+> +
+> +#include <asm/firmware.h>
+> +
+> +static void cpu_boot(int cpu)
+> +{
+> +	/* Do nothing */
+> +}
+> +
+> +struct firmware_ops firmware_ops = {
+> +	.do_idle		= cpu_do_idle,
+> +	.cpu_boot		= cpu_boot,
+> +};
+> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+> new file mode 100644
+> index 0000000..c8c28bf
+> --- /dev/null
+> +++ b/arch/arm/include/asm/firmware.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + *  Copyright (C) 2012 Samsung Electronics.
+> + *  Kyungmin Park <kyungmin.park@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_ARM_FIRMWARE_H
+> +#define __ASM_ARM_FIRMWARE_H
+> +
+> +struct firmware_ops {
+> +	int	(*do_idle)(void);
+> +	void	(*cpu_boot)(int cpu);
+> +};
+> +
+> +extern struct firmware_ops firmware_ops;
+> +
+> +#endif
 
-On my system there's only one mapping failed, but it's for one of the
-VIC mappings which is rather unfortunate.  The error is there because
-the VIC is returning -ENOTSUPP to skip invalid IRQs which doesn't
-immediately seem like an awful thing to do for generic code like this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120720/e8c18b18/attachment-0001.sig>
+Do you plan to have a registration interface for this?
+
+I imagine that struct firmware_ops will get extended over time, so
+it might contain many different function pointers.  Each board will
+probably only provide a subset of these, by sparsely populating its
+own struct firmware_ops (similarly to other existing registration
+interfaces).
+
+It may make sense to have a way to define default fallback actions for
+ops not defined by a particular board.  If CONFIG_ARM_FIRMWARE=n, we
+could use the fallbacks for everything.
+
+Cheers
+---Dave
