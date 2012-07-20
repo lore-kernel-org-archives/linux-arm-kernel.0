@@ -1,45 +1,161 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 20 Jul 2012 10:42:53 +0530
-Subject: [RFC][PATCH v2 1/1] ARM: OMAP2+: PM: Register suspend ops even
- in the presence of DT blob
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB14B1E@DBDE01.ent.ti.com>
-References: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
- <5008E10F.4080706@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EB14B1E@DBDE01.ent.ti.com>
-Message-ID: <5008E8D5.3010007@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 20 Jul 2012 11:07:29 +0530
+Subject: [PATCH v5 09/11] drivers: usb: musb: Add device tree support for omap
+ musb glue
+In-Reply-To: <1342762651-17094-1-git-send-email-kishon@ti.com>
+References: <1342762651-17094-1-git-send-email-kishon@ti.com>
+Message-ID: <1342762651-17094-10-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 July 2012 10:31 AM, Bedia, Vaibhav wrote:
-> On Fri, Jul 20, 2012 at 10:09:43, Nayak, Rajendra wrote:
->> On Thursday 19 July 2012 05:38 PM, Vaibhav Bedia wrote:
->>> As per the comment in omap2_common_late_init() looks like the
->>> original intent of the DT check was to treat only the PMIC
->>> and SR initialization differently. Recent changes to consolidate
->>> the suspend-resume code across OMAP3/4 resulted into the
->>> registration of suspend ops also being dependent on the check
->>> for DT blob. Since the suspend-resume operation should not
->>> really be dependent on the usage of DT remove this dependency
->>> by wrapping the PMIC and SR init under the DT check.
->>
->> So I am guessing you also tested suspend/resume on your hardware
->> with this patch, when booting with a DT blob, and it passed.
->>
->
-> I am getting there ;)
->
-> I am in the process of getting a real suspend/resume functional. As part
-> of this I was just flow flushing the whole suspend process in the mainline
-> kernel by putting in a dummy implementation for the .enter op and found that
-> this change was needed.
+Added device tree support for omap musb driver and updated the
+Documentation with device tree binding information.
 
-Ok, good to know you are working on this. It might then make sense for
-for you to also include this patch as part of that series?
-It doesn't make much sense to register suspend ops which then break
-suspend isn't it? Btw, whats the behavior on current mainline with
-just this patch. Does it hang/crash or just prevent the system from
-doing down?
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   34 +++++++++++-
+ drivers/usb/musb/omap2430.c                        |   54 ++++++++++++++++++++
+ 2 files changed, 87 insertions(+), 1 deletion(-)
 
->
-> Regards,
-> Vaibhav
+diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+index 80a28c9..39cdffb 100644
+--- a/Documentation/devicetree/bindings/usb/omap-usb.txt
++++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+@@ -1,4 +1,4 @@
+-OMAP USB PHY
++OMAP USB PHY AND GLUE
+ 
+ OMAP USB2 PHY
+ 
+@@ -14,3 +14,35 @@ usb2phy at 0x4a0ad080 {
+ 	compatible = "ti,omap-usb2";
+ 	reg = <0x4a0ad080 0x58>;
+ };
++
++OMAP MUSB GLUE
++ - compatible : Should be "ti,musb-omap2430"
++ - ti,hwmods : must be "usb_otg_hs"
++ - multipoint : Should be "1" indicating the musb controller supports
++   multipoint. This is a MUSB configuration-specific setting.
++ - num_eps : Specifies the number of endpoints. This is also a
++   MUSB configuration-specific setting. Should be set to "16"
++ - ram_bits : Specifies the ram address size. Should be set to "12"
++ - interface_type : This is a board specific setting to describe the type of
++   interface between the controller and the phy. It should be "0" or "1"
++   specifying ULPI and UTMI respectively.
++ - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
++   represents PERIPHERAL.
++ - power : Should be "50". This signifies the controller can supply upto
++   100mA when operating in host mode.
++
++SOC specific device node entry
++usb_otg_hs: usb_otg_hs at 4a0ab000 {
++	compatible = "ti,musb-omap2430";
++	ti,hwmods = "usb_otg_hs";
++	multipoint = <1>;
++	num_eps = <16>;
++	ram_bits = <12>;
++};
++
++Board specific device node entry
++&usb_otg_hs {
++	interface_type = <1>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+index addbebf..5db228f 100644
+--- a/drivers/usb/musb/omap2430.c
++++ b/drivers/usb/musb/omap2430.c
+@@ -30,6 +30,7 @@
+ #include <linux/init.h>
+ #include <linux/list.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/pm_runtime.h>
+@@ -469,8 +470,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+ static int __devinit omap2430_probe(struct platform_device *pdev)
+ {
+ 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
++	struct omap_musb_board_data	*data;
+ 	struct platform_device		*musb;
+ 	struct omap2430_glue		*glue;
++	struct device_node		*np = pdev->dev.of_node;
++	struct musb_hdrc_config		*config;
+ 	struct resource			*res;
+ 	int				ret = -ENOMEM;
+ 
+@@ -500,6 +504,42 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
+ 	if (glue->control_otghs == NULL)
+ 		dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
+ 
++	if (np) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata) {
++			dev_err(&pdev->dev,
++				"failed to allocate musb platfrom data\n");
++			ret = -ENOMEM;
++			goto err1;
++		}
++
++		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++		if (!data) {
++			dev_err(&pdev->dev,
++					"failed to allocate musb board data\n");
++			ret = -ENOMEM;
++			goto err1;
++		}
++
++		config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
++		if (!data) {
++			dev_err(&pdev->dev,
++				"failed to allocate musb hdrc config\n");
++			goto err1;
++		}
++
++		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
++		of_property_read_u32(np, "interface_type",
++						(u32 *)&data->interface_type);
++		of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
++		of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
++		of_property_read_u32(np, "power", (u32 *)&pdata->power);
++		config->multipoint = of_property_read_bool(np, "multipoint");
++
++		pdata->board_data	= data;
++		pdata->config		= config;
++	}
++
+ 	pdata->platform_ops		= &omap2430_ops;
+ 
+ 	platform_set_drvdata(pdev, glue);
+@@ -597,12 +637,26 @@ static struct dev_pm_ops omap2430_pm_ops = {
+ #define DEV_PM_OPS	NULL
+ #endif
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id omap2430_id_table[] = {
++	{
++		.compatible = "ti,omap4-musb"
++	},
++	{
++		.compatible = "ti,omap3-musb"
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, omap2430_id_table);
++#endif
++
+ static struct platform_driver omap2430_driver = {
+ 	.probe		= omap2430_probe,
+ 	.remove		= __devexit_p(omap2430_remove),
+ 	.driver		= {
+ 		.name	= "musb-omap2430",
+ 		.pm	= DEV_PM_OPS,
++		.of_match_table = of_match_ptr(omap2430_id_table),
+ 	},
+ };
+ 
+-- 
+1.7.9.5
