@@ -1,27 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jul 2012 09:05:49 +0000
-Subject: [GIT PULL] Samsung cleanup-2 for v3.6
-In-Reply-To: <194e01cd65fc$ce163be0$6a42b3a0$%kim@samsung.com>
-References: <142c01cd639c$2f081800$8d184800$%kim@samsung.com>
- <201207172058.28993.arnd@arndb.de>
- <194e01cd65fc$ce163be0$6a42b3a0$%kim@samsung.com>
-Message-ID: <201207200905.50396.arnd@arndb.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 20 Jul 2012 11:08:44 +0200
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201206271520.49276.arnd@arndb.de>
+ <1342161907.1726.26.camel@vkoul-udesk3>
+ <201207171924.33756.arnd@arndb.de>
+ <1342756850.1726.74.camel@vkoul-udesk3>
+Message-ID: <87y5meu7dv.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 July 2012, Kukjin Kim wrote:
-> > 2. If you can, please use signed tags for your pull requests rather
-> > than branch names. A signed tag means that you can write the text
-> > for the merge changeset yourself so I don't have to do the description.
-> > Ideally the signing key should have signatures from other people in the
-> > keyring so everybody can check the authenticity of the request, but
-> > just having the changelog there also helps.
-> > 
-> OK, I see. I will try to use it as per your suggestion. But I'm not familiar
-> with that now. So if you don't mind I'd like to send signed tag from next
-> merge window :-)
+Vinod Koul <vinod.koul@linux.intel.com> writes:
 
-No problem. It's not a big difference to me anyway. I suppose by then we will
-also have had the chance for keysigning at the ARM mini summit.
+>> 4. A dma controller requiring complex configuration:
+>> 
+>>        dma: dmaengine at 48000000 {
+>>                compatible = "foo,foo-sdma"
+>>                reg = <0x48000000 0x1000>;
+>>                interrupts = <4>;
+>>                #dma-cells = <6>; /* phandle, flag, request, channel,
+>> 					 input-width, output-width */
+> Why would we want the widths to be here?
+> Assuming a DMA from System memory to a peripheral, source width should
+> be system memory width and destination the peripheral width. IMO these
+> should not be in dma property even if we need these
+Hi Vinod,
 
-	Arnd
+I know at least one peripheral which accepts 2 widths, 8bit and 16bit, namely the
+M-Systems DiskOnChip G3 NAND chip.
+This device has to configured to choose either 8bit data bus access or 16bit
+data bus access.
+
+I'm just wondering if that usecase will fit in without the width information
+embedded, and how will the driver choose the width to use ?
+
+Cheers.
+
+--
+Robert
