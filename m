@@ -1,49 +1,28 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Jul 2012 11:37:06 +0300
-Subject: [PATCHv7 07/12] ARM: OMAP4: PM: put all domains to OSWR during
- suspend
-In-Reply-To: <alpine.DEB.2.00.1207191726090.14390@utopia.booyaka.com>
-References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
- <1342704392-23657-8-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1207190842310.432@utopia.booyaka.com>
- <1342711907.4672.153.camel@sokoban>
- <alpine.DEB.2.00.1207191726090.14390@utopia.booyaka.com>
-Message-ID: <1342773426.4672.173.camel@sokoban>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Fri, 20 Jul 2012 10:39:20 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201207200418.41554.marex@denx.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <50081AC0.10703@metafoo.de> <201207192126.31772.marex@denx.de>
+ <201207200418.41554.marex@denx.de>
+Message-ID: <20120720083920.GY12601@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-19 at 17:30 -0600, Paul Walmsley wrote:
-> Hi
-> 
-> On Thu, 19 Jul 2012, Tero Kristo wrote:
-> 
-> > Subject: [PATCHv7 07/12] ARM: OMAP4: PM: put all domains to OSWR during
-> > suspend
-> > 
-> > Currently OMAP4 suspend puts all power domains to CSWR. OSWR is a deeper
-> > state that saves more power, but has higher latencies also. As suspend
-> > is considered a high-latency operation, OSWR is appropriate here.
-> > 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> > 
-> > I'll update this to next rev if one is requested.
-> 
-> No need, I'll add it in the local copy here.
+On Fri, Jul 20, 2012 at 04:18:41AM +0200, Marek Vasut wrote:
+> One more thing I'm curious about. There's another ADC block on the
+> CPU, called HSADC (high-speed ADC). It can sample even up to
+> 2Msamples/s. If I were to, say -- sample at 100kHz and be able to DMA
+> the results into memory -- is there any way to push such results into
+> userland somehow? Or how to operate such fast beast?
 
-Thanks, thats what I thought. :)
+As this unit is mainly intended for things like laser / barcode
+scanners, wouldn't v2l2 be a good abstraction for it (with one line and
+N pixels)? Just an idea, didn't look too closely.
 
-> 
-> > (Kind of hoping this set would be reaching maturity already.)
-> 
-> It kind of looks to me like there are two or three separate sets within 
-> the series.  My feeling is that Kevin should take the first two, then I 
-> should take the rest other than 6 and 7.  Then once those are queued, 
-> we can pull in 6 and 7.  Does that make sense to you?
-
-Yea, that looks good to me. Patches up from 6+ should only be pulled
-once the pre-reqs for this set are in also (io-chain + Jean's func pwrst
-stuff.) I haven't actually tried these patches without the pre-reqs
-lately, but I think they should be fine.
-
--Tero
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
