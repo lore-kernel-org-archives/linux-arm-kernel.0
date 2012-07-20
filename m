@@ -1,38 +1,43 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 20 Jul 2012 21:24:40 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCA0LzRdIEFSTTogY2xwczcxMXg6IEFkZGVkIHNpbXBs?=
- =?UTF-8?B?ZSBjbGtkZXYgZnJhbWV3b3Jr?=
-In-Reply-To: <CAJOAzMB83pT1ESnHBgAZotn4cVysP6pKWDXOoRp-sMNMjGkVg@mail.gmail.com>
-References: <201207172033.10302.arnd@arndb.de>
- <1342462908-18547-1-git-send-email-shc_work@mail.ru>
- <CAJOAzMB83pT1ESnHBgAZotn4cVysP6pKWDXOoRp-sMNMjGkVg@mail.gmail.com>
-Message-ID: <1342805080.993377715@f259.mail.ru>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Jul 2012 19:35:35 +0200
+Subject: [PATCH 00/16] Orion DT conversions and fixes.
+Message-ID: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This is a collection of patches converting more drivers used by orion
+to DT. Then, where possible, convert platform code to use DT. Also
+a few fixes are mixed in.
 
-Thu, 19 Jul 2012 15:02:00 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
-> On Tue, Jul 17, 2012 at 1:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 16 July 2012, Alexander Shiyan wrote:
-> >> Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
-> >> This patch adds simple clkdev framework for handling all possible CPU rates.
-> >> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > We just had the exact same discussion about a new clock implementation for
-> > mcs814x and for the socfpga port. My feeling is that it makes no sense
-> > to keep adding new private implementations of the API as we're trying
-> > to get rid of the existing ones and replace them with the common code.
-> >
-> > If I understand this correctly, you should be using DEFINE_CLK_FIXED_RATE
-> > and DEFINE_CLK_DIVIDER etc to define the initial clocks and the lookup
-> > table, and possibly move all of that to drivers/clk.
-> 
-> Arnd is correct.  Let's go ahead and move everything over to the
-> common clk framework.  These patches will have to wait for 3.7
-> anyways, so there is plenty of time to port it over.
+- IRQ/GPIO/SPI/WDT/SATA have all been seen before and no changes made.
+- I2C has been split in two, with the driver parts now going via
+  i2c-embedded/for-next
+- gpio-key and gpio-led converted to DT equivalents.
+- Ensure runit clock always ticks is a rework of an earlier patch, now
+  including comments from Marvell engineers.
+- Replace mrvl with marvell implements the decision made here:
+  http://www.spinics.net/lists/arm-kernel/msg176524.html
 
-OK, I keep this patch and will be create new one, for review, but as I say before,
-COMMON_CLOCK framework is too overloaded because clps711x-target CPU
-has no enable/disable and change rate functional for clocks. We only can
-determine CPU speed from fuses and recalculate some values for system
-timer and UART.
+These patches, plus the I2C driver change and all the patches i've
+collected from others ready for submission to arm-soc/for-next can be
+found in:
+
+git://github.com/lunn/linux.git v3.5-rc7-for-next-v5 
+
+Andrew Lunn (16):
+  ARM: Orion: DT support for IRQ and GPIO Controllers
+  SPI: Refactor spi-orion to use SPI framework queue.
+  ARM: Kirkwood: Ensure runit clock always ticks.
+  ARM: Orion: Add arch support needed for I2C via DT.
+  Kirkwood: Add basic device tree support for QNAP TS219.
+  ARM: Orion: DTify the watchdog timer.
+  ATA: sata_mv: Add device tree support
+  ARM: Kirkwood: Use DT to configure SATA device.
+  ARM: Kirkwood: Describe DNS325 temperature sensor in DT.
+  ARM: Kirkwood: Describe IB62x0 gpio-keys in DT.
+  ARM: Kirkwood: Describe iConnects temperature sensor in DT.
+  ARM: Kirkwood: Describe Dreamplug LEDs in DT.
+  ARM: Kirkwood: Describe GoFlex Net LEDs and SATA in DT.
+  ARM: Kirkwood: Describe ib62x0 LEDs in DT.
+  ARM: Kirkwood: Describe iConnect LEDs in DT.
+  ARM: Kirkwood: Replace mrvl with marvell
