@@ -1,85 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 20 Jul 2012 17:12:52 +0200
-Subject: [PATCH] IIO: Add basic MXS LRADC driver
-In-Reply-To: <50096723.2070409@metafoo.de>
-References: <1341368129-20468-1-git-send-email-marex@denx.de>
- <201207192126.31772.marex@denx.de> <50096723.2070409@metafoo.de>
-Message-ID: <201207201712.52745.marex@denx.de>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Fri, 20 Jul 2012 17:24:37 +0200
+Subject: [PATCH] ARM: vt8500: Minor updates to platform drivers for
+ devicetree support
+In-Reply-To: <1342795183-7942-1-git-send-email-linux@prisktech.co.nz>
+References: <1342795183-7942-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CABjd4YwmtyiSU9x=jTLCjR7S67qeDQjrCRbXJydX9gGsj-ctMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lars-Peter Clausen,
+2012/7/20 Tony Prisk <linux@prisktech.co.nz>:
+> Updated the vt8500-rtc and vt8500-uart platform drivers for
+> devicetree support.
 
-> On 07/19/2012 09:26 PM, Marek Vasut wrote:
-> > Dear Lars-Peter Clausen,
-> > 
-> >> On 07/19/2012 04:23 PM, Marek Vasut wrote:
-> >>> Dear Lars-Peter Clausen,
-> >>> 
-> >>> Sorry for my late reply, got busy with other crazy stuff.
-> >>> 
-> >>> [...]
-> >>> 
-> >>>>>> Is there any reason not to use the mxs_lradc struct directly has the
-> >>>>>> iio data?
-> >>>>> 
-> >>>>> I explained it below in the patch. I hope we'll eventually support
-> >>>>> the delay triggers, which will need 4 separate IIO devices. And this
-> >>>>> is where this structure will be augmented by other components.
-> >>>> 
-> >>>> Ok I saw the comment, but it wasn't obvious to me that delay channels
-> >>>> will require multiple IIO devices. Might make sense to state this
-> >>>> explicitly.
-> >>> 
-> >>> Fixed.
-> >>> 
-> >>>>>>> [...]
-> >>>>>>> 
-> >>>>>>> +
-> >>>>>>> +/*
-> >>>>>>> + * Channel management
-> >>>>>>> + *
-> >>>>>>> + * This involves crazy mapping between 8 virtual channels the
-> >>>>>>> CTRL4 register + * can harbor and 16 channels total this hardware
-> >>>>>>> supports. + */
-> >>>>>> 
-> >>>>>> I suppose this means only a maximum 8 channels can be active at a
-> >>>>>> time. I've recently posted a patch which makes it easy to implement
-> >>>>>> such a restriction.
-> >>>>>> http://www.spinics.net/lists/linux-iio/msg05936.html and
-> >>>>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
-> >>>>>> validate callback implementation. In your case you'd check for
-> >>>>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
-> >>>>> 
-> >>>>> This is good. When do you expect this to hit linux-next possibly? Or
-> >>>>> at least linux-iio?
-> >>>> 
-> >>>> soon, hopefully.
-> >>> 
-> >>> So I checked this, not sure how it'll help me though.
-> >> 
-> >> Right now with your driver you can enable any combination of channels.
-> >> If more than 8 channels are enabled and you start sampling it will
-> >> fail, since not all channels can be mapped. With those patch you can
-> >> implement a validate callback and check for bitmap_weight(scan_mask) <=
-> >> 8. This will ensure that it is not possible to select more than 8
-> >> channels at once, which again means that starting sampling can't fail
-> >> of this.
-> > 
-> > Ok, I fixed this one. One last thing that I don't really understand is
-> > this. I run generic_buffer.c to source samples from the LRADC. Is there
-> > any way to continuously sample them? Because right now, I get one sample
-> > and that's it, no more samples happen later on (I can 0 data in
-> > subsequent read() call).
-> 
-> I'd consider that a bug in your driver ;)
-> The intend with IIO is that once you start sampling by enabling the buffer
-> you get a continuous data stream until sampling is stopped and this works
-> fine with other drivers.
+Shouldn't these go as separate patches? Note also that you haven't
+CC'd the relevant mailing lists on this one.
 
-Ah! Thanks, I'll poke into this.
+> diff --git a/Documentation/devicetree/bindings/rtc/vt8500-rtc.txt b/Documentation/devicetree/bindings/rtc/vt8500-rtc.txt
+> new file mode 100644
+> index 0000000..8cf6ce1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/vt8500-rtc.txt
+> @@ -0,0 +1,14 @@
+> +* SPEAr RTC
 
-> - Lars
+Looks like a copy-paste leftover.
 
-Best regards,
-Marek Vasut
+Thanks,
+Alexey
