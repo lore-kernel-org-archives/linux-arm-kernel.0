@@ -1,120 +1,295 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 20 Jul 2012 12:16:27 +0530
-Subject: [PATCH RESEND 2/4] ARM: OMAP2+: AM33XX: Add tps65217 device tree data
-In-Reply-To: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
-References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1342766789-28148-3-git-send-email-anilkumar@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 20 Jul 2012 12:22:14 +0530
+Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAMQu2gw32LogXJJa+K5ZjmCZzBNK3FY2wYwZXU8fsftsVzEO2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree data for tps65217 regulator by adding all the consumers
-necessary for AM335X-BeagleBone. The data will be map to a regulator
-constraints which is required for regulator set_voltage and get_voltage
-calls.
+Shawn,
 
-All tps65217 PMIC regulator constraints are placed in a seperate device
-tree include file (tps65217.dtsi).
+On Thu, Jul 19, 2012 at 9:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> It adds a generic cpufreq driver for CPU0 frequency management based on
+> clk, regulator, OPP and device tree support.  It can support both
+> uniprocessor (UP) and those symmetric multiprocessor (SMP) systems which
+> share clock and voltage across all CPUs.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
 
-This patch is tested by adding the I2C slave address of TPS65217
-pmic to am335x-bone.dts file (Not included in this, I2C slave
-addition patch will be submitted to linux-omap, where am335x-bone.dts
-binding file is available).
+[...]
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/tps65217.dtsi |   84 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 84 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/tps65217.dtsi
+> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> index e24a2a1..e77a1e0 100644
+> --- a/drivers/cpufreq/Kconfig
+> +++ b/drivers/cpufreq/Kconfig
+> @@ -179,6 +179,17 @@ config CPU_FREQ_GOV_CONSERVATIVE
+>
+>           If in doubt, say N.
+>
+> +config GENERIC_CPUFREQ_CPU0
+> +       bool "Generic cpufreq driver for CPU0"
+> +       depends on HAVE_CLK && REGULATOR && PM_OPP && OF
+> +       select CPU_FREQ_TABLE
+> +       help
+> +         This adds a generic cpufreq driver for CPU0 frequency management.
+> +         It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+> +         systems which share clock and voltage across all CPUs.
+> +
+> +         If in doubt, say N.
+> +
+This *_CPU0 doesn't seems to be appropriate since this infrastructure will be
+used on SMP systems where CPUs shares clock/voltage rails. May be you can
+get rid of that unless there is a strong need.
 
-diff --git a/arch/arm/boot/dts/tps65217.dtsi b/arch/arm/boot/dts/tps65217.dtsi
-new file mode 100644
-index 0000000..cbb9e5d
---- /dev/null
-+++ b/arch/arm/boot/dts/tps65217.dtsi
-@@ -0,0 +1,84 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Integrated Power Management Chip
-+ * http://www.ti.com/lit/ds/symlink/tps65217.pdf
-+ */
-+
-+&tps {
-+	compatible = "ti,tps65217";
-+
-+	regulators {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		dcdc1_reg: regulator at 0 {
-+			reg = <0>;
-+			regulator-compatible = "dcdc1";
-+			regulator-min-microvolt = <900000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		dcdc2_reg: regulator at 1 {
-+			reg = <1>;
-+			regulator-compatible = "dcdc2";
-+			regulator-min-microvolt = <900000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		dcdc3_reg: regulator at 2 {
-+			reg = <2>;
-+			regulator-compatible = "dcdc3";
-+			regulator-min-microvolt = <900000>;
-+			regulator-max-microvolt = <1500000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		ldo1_reg: regulator at 3 {
-+			reg = <3>;
-+			regulator-compatible = "ldo1";
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		ldo2_reg: regulator at 4 {
-+			reg = <4>;
-+			regulator-compatible = "ldo2";
-+			regulator-min-microvolt = <900000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		ldo3_reg: regulator at 5 {
-+			reg = <5>;
-+			regulator-compatible = "ldo3";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		ldo4_reg: regulator at 6 {
-+			reg = <6>;
-+			regulator-compatible = "ldo4";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+	};
-+};
--- 
-1.7.0.4
+[...]
+
+> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+> @@ -0,0 +1,235 @@
+> +/*
+> + * Copyright (C) 2012 Freescale Semiconductor, Inc.
+> + *
+> + * Reuse some codes from drivers/cpufreq/omap-cpufreq.c
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#define pr_fmt(fmt)    KBUILD_MODNAME ": " fmt
+> +
+> +#include <linux/clk.h>
+> +#include <linux/cpu.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/err.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/opp.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/slab.h>
+> +
+> +/* voltage tolerance in percentage */
+> +static unsigned int voltage_tolerance;
+> +
+> +static struct device *cpu_dev;
+> +static struct clk *cpu_clk;
+> +static struct regulator *cpu_reg;
+> +static struct cpufreq_frequency_table *freq_table;
+> +
+> +static int cpu0_verify_speed(struct cpufreq_policy *policy)
+> +{
+> +       return cpufreq_frequency_table_verify(policy, freq_table);
+> +}
+> +
+> +static unsigned int cpu0_get_speed(unsigned int cpu)
+> +{
+> +       return clk_get_rate(cpu_clk) / 1000;
+> +}
+> +
+> +static int cpu0_set_target(struct cpufreq_policy *policy,
+> +                          unsigned int target_freq, unsigned int relation)
+> +{
+> +       struct cpufreq_freqs freqs;
+> +       struct opp *opp;
+> +       unsigned long freq_Hz, volt = 0, volt_old = 0, tol = 0;
+> +       unsigned int index, cpu;
+> +       int ret = 0;
+> +
+> +       ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
+> +                                            relation, &index);
+> +       if (ret) {
+> +               pr_err("failed to match target freqency %d: %d\n",
+> +                      target_freq, ret);
+> +               return ret;
+> +       }
+> +
+> +       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+> +       if (freq_Hz < 0)
+> +               freq_Hz = freq_table[index].frequency * 1000;
+> +       freqs.new = freq_Hz / 1000;
+> +       freqs.old = clk_get_rate(cpu_clk) / 1000;
+> +
+> +       if (freqs.old == freqs.new)
+> +               return 0;
+> +
+> +       for_each_cpu(cpu, policy->cpus) {
+You need for_each_online_cpu() here o.w you will end up calling the
+notifier on CPU which is are hot-plugged out or not online yet.
+
+> +               freqs.cpu = cpu;
+> +               cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +       }
+> +
+> +       if (cpu_reg) {
+> +               opp = opp_find_freq_ceil(cpu_dev, &freq_Hz);
+> +               if (IS_ERR(opp)) {
+> +                       pr_err("failed to find OPP for %ld\n", freq_Hz);
+> +                       return PTR_ERR(opp);
+> +               }
+> +               volt = opp_get_voltage(opp);
+> +               tol = volt * voltage_tolerance / 100;
+> +               volt_old = regulator_get_voltage(cpu_reg);
+> +       }
+> +
+> +       pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
+> +                freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
+> +                freqs.new / 1000, volt ? volt / 1000 : -1);
+> +
+> +       /* scaling up?  scale voltage before frequency */
+> +       if (cpu_reg && freqs.new > freqs.old) {
+> +               if (regulator_set_voltage(cpu_reg, volt - tol, volt + tol)) {
+> +                       pr_warn("Unable to scale voltage up\n");
+> +                       freqs.new = freqs.old;
+> +                       goto done;
+Do you need a POST notifier in case of the failure ?
+
+> +               }
+> +       }
+> +
+> +       ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+> +
+> +       /* scaling down?  scale voltage after frequency */
+> +       if (cpu_reg && (freqs.new < freqs.old)) {
+> +               if (regulator_set_voltage(cpu_reg, volt - tol, volt + tol)) {
+> +                       pr_warn("Unable to scale voltage down\n");
+> +                       ret = clk_set_rate(cpu_clk, freqs.old * 1000);
+> +                       freqs.new = freqs.old;
+> +                       goto done;
+Here too.
+
+> +               }
+> +       }
+> +
+> +done:
+> +       for_each_cpu(cpu, policy->cpus) {
+Same as first comment.
+
+> +               freqs.cpu = cpu;
+> +               cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
+> +{
+> +       struct device_node *np;
+> +       int ret;
+> +
+> +       /* Initialize resources via CPU0 */
+> +       if (policy->cpu != 0)
+> +               return -EINVAL;
+> +
+> +       np = of_find_node_by_path("/cpus/cpu at 0");
+> +       if (!np) {
+> +               pr_err("failed to find cpu0 node\n");
+> +               return -ENOENT;
+> +       }
+> +
+> +       cpu_dev = get_cpu_device(0);
+> +       if (!cpu_dev) {
+> +               pr_err("failed to get cpu0 device\n");
+> +               ret = -ENODEV;
+> +               goto out_put_node;
+> +       }
+> +
+> +       cpu_dev->of_node = np;
+> +       ret = of_init_opp_table(cpu_dev);
+> +       if (ret) {
+> +               pr_err("failed to init OPP table\n");
+> +               goto out_put_node;
+> +       }
+> +
+> +       ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
+> +       if (ret) {
+> +               pr_err("failed to init cpufreq table\n");
+> +               goto out_put_node;
+> +       }
+> +
+> +       ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
+> +       if (ret) {
+> +               pr_err("invalid frequency table for cpu0\n");
+> +               goto out_free_table;
+> +       }
+> +
+> +       if (of_property_read_u32(np, "transition-latency",
+> +                                &policy->cpuinfo.transition_latency))
+> +               policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+> +
+> +       of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
+> +
+> +       cpu_clk = clk_get(cpu_dev, NULL);
+> +       if (IS_ERR(cpu_clk)) {
+> +               pr_err("failed to get cpu0 clock\n");
+> +               ret = PTR_ERR(cpu_clk);
+> +               goto out_free_table;
+> +       }
+> +       policy->cur = clk_get_rate(cpu_clk) / 1000;
+> +
+> +       cpu_reg = regulator_get(cpu_dev, "cpu0");
+> +       if (IS_ERR(cpu_reg)) {
+> +               pr_warn("failed to get cpu0 regulator\n");
+> +               cpu_reg = NULL;
+> +       }
+> +
+> +       /*
+> +        * The driver only supports the SMP configuartion where all processors
+> +        * share the clock and voltage and clock.  Use cpufreq affected_cpus
+> +        * interface to have all CPUs scaled together.
+> +        */
+> +       policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+> +       cpumask_setall(policy->cpus);
+> +
+> +       cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+> +
+> +       of_node_put(np);
+> +       return 0;
+> +
+> +out_free_table:
+> +       opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +out_put_node:
+> +       of_node_put(np);
+> +       return ret;
+> +}
+> +
+> +static int cpu0_cpufreq_exit(struct cpufreq_policy *policy)
+> +{
+> +       cpufreq_frequency_table_put_attr(policy->cpu);
+> +       regulator_put(cpu_reg);
+> +       clk_put(cpu_clk);
+> +       opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +
+> +       return 0;
+> +}
+> +
+> +static struct freq_attr *cpu0_cpufreq_attr[] = {
+> +       &cpufreq_freq_attr_scaling_available_freqs,
+> +       NULL,
+> +};
+> +
+> +static struct cpufreq_driver cpu0_cpufreq_driver = {
+> +       .flags = CPUFREQ_STICKY,
+> +       .verify = cpu0_verify_speed,
+> +       .target = cpu0_set_target,
+> +       .get = cpu0_get_speed,
+> +       .init = cpu0_cpufreq_init,
+> +       .exit = cpu0_cpufreq_exit,
+> +       .name = "generic_cpu0",
+> +       .attr = cpu0_cpufreq_attr,
+> +};
+> +
+> +static int __devinit cpu0_cpufreq_driver_init(void)
+> +{
+> +       return cpufreq_register_driver(&cpu0_cpufreq_driver);
+> +}
+> +late_initcall(cpu0_cpufreq_driver_init);
+
+Can you also add support to build this as loadable module ?
+
+Regards
+santosh
