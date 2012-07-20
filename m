@@ -1,115 +1,102 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jul 2012 19:35:41 +0200
-Subject: [PATCH 6/16] ARM: Orion: DTify the watchdog timer.
+Date: Fri, 20 Jul 2012 19:35:45 +0200
+Subject: [PATCH 10/16] ARM: Kirkwood: Describe IB62x0 gpio-keys in DT.
 In-Reply-To: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
 References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1342805751-18048-7-git-send-email-andrew@lunn.ch>
+Message-ID: <1342805751-18048-11-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree support to the Orion watchdog timer, and enable its
-use in the kirkwood devices using device tree.
+Now that the GPIO controllers have been converted over to DT,
+described the gpio-keys in DT.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
 Tested-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- Documentation/devicetree/bindings/watchdog/marvel.txt |   14 ++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                       |    6 ++++++
- arch/arm/mach-kirkwood/board-dt.c                     |    2 +-
- drivers/watchdog/orion_wdt.c                          |    8 ++++++++
- 4 files changed, 29 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
+ arch/arm/boot/dts/kirkwood-ib62x0.dts |   16 ++++++++++++++++
+ arch/arm/mach-kirkwood/board-ib62x0.c |   31 -------------------------------
+ 2 files changed, 16 insertions(+), 31 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-new file mode 100644
-index 0000000..0b2503a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-@@ -0,0 +1,14 @@
-+* Marvell Orion Watchdog Time
-+
-+Required Properties:
-+
-+- Compatibility : "marvell,orion-wdt"
-+- reg		: Address of the timer registers
-+
-+Example:
-+
-+	wdt at 20300 {
-+		compatible = "marvell,orion-wdt";
-+		reg = <0x20300 0x28>;
-+		status = "okay";
-+	};
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index e13d746..3e0e9b9 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -70,6 +70,12 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+index f8e2bc6..6726aa9 100644
+--- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
++++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+@@ -46,4 +46,20 @@
+ 
  		};
- 
-+		wdt at 20300 {
-+			compatible = "marvell,orion-wdt";
-+			reg = <0x20300 0x28>;
-+			status = "okay";
+ 	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button at 1 {
++			label = "USB Copy";
++			linux,code = <133>;
++			gpios = <&gpio0 29 1>;
 +		};
-+
- 		nand at 3000000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index b7cd6d2..73e75cf 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -30,6 +30,7 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
- 	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
- 		       NULL),
-+	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
- 	{},
++		button at 2 {
++			label = "Reset";
++			linux,code = <0x198>;
++			gpios = <&gpio0 28 1>;
++		};
++	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
+index 56d198e..f30065e 100644
+--- a/arch/arm/mach-kirkwood/board-ib62x0.c
++++ b/arch/arm/mach-kirkwood/board-ib62x0.c
+@@ -18,7 +18,6 @@
+ #include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+-#include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/leds.h>
+ #include <asm/mach-types.h>
+@@ -85,35 +84,6 @@ static struct platform_device ib62x0_led_device = {
+ 	}
  };
  
-@@ -55,7 +56,6 @@ static void __init kirkwood_dt_init(void)
- 	kirkwood_clk_init();
- 
- 	/* internal devices that every board has */
--	kirkwood_wdt_init();
- 	kirkwood_xor0_init();
- 	kirkwood_xor1_init();
- 	kirkwood_crypto_init();
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 0f57369..1531e02 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -25,6 +25,7 @@
- #include <linux/io.h>
- #include <linux/spinlock.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
- #include <mach/bridge-regs.h>
- 
- /*
-@@ -295,6 +296,12 @@ static void orion_wdt_shutdown(struct platform_device *pdev)
- 		orion_wdt_disable();
- }
- 
-+static const struct of_device_id orion_wdt_of_match_table[] __devinitdata = {
-+	{ .compatible = "marvell,orion-wdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
-+
- static struct platform_driver orion_wdt_driver = {
- 	.probe		= orion_wdt_probe,
- 	.remove		= __devexit_p(orion_wdt_remove),
-@@ -302,6 +309,7 @@ static struct platform_driver orion_wdt_driver = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "orion_wdt",
-+		.of_match_table = of_match_ptr(orion_wdt_of_match_table),
- 	},
- };
- 
+-static struct gpio_keys_button ib62x0_button_pins[] = {
+-	{
+-		.code		= KEY_COPY,
+-		.gpio		= 29,
+-		.desc		= "USB Copy",
+-		.active_low	= 1,
+-	},
+-	{
+-		.code		= KEY_RESTART,
+-		.gpio		= 28,
+-		.desc		= "Reset",
+-		.active_low	= 1,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data ib62x0_button_data = {
+-	.buttons	= ib62x0_button_pins,
+-	.nbuttons	= ARRAY_SIZE(ib62x0_button_pins),
+-};
+-
+-static struct platform_device ib62x0_button_device = {
+-	.name		= "gpio-keys",
+-	.id		= -1,
+-	.num_resources	= 0,
+-	.dev		= {
+-		.platform_data	= &ib62x0_button_data,
+-	}
+-};
+-
+ static void ib62x0_power_off(void)
+ {
+ 	gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
+@@ -129,7 +99,6 @@ void __init ib62x0_init(void)
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&ib62x0_ge00_data);
+ 	platform_device_register(&ib62x0_led_device);
+-	platform_device_register(&ib62x0_button_device);
+ 	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
+ 	    gpio_direction_output(IB62X0_GPIO_POWER_OFF, 0) == 0)
+ 		pm_power_off = ib62x0_power_off;
 -- 
 1.7.10
