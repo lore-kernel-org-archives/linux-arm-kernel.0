@@ -1,51 +1,77 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 20 Jul 2012 17:20:26 +0800
-Subject: [PATCH 3/4] ASoC: sgtl5000: remove unneeded snd_soc_dapm_new_widgets
- in probe
-In-Reply-To: <1342776027-31758-1-git-send-email-b29396@freescale.com>
-References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
-Message-ID: <1342776027-31758-4-git-send-email-b29396@freescale.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 20 Jul 2012 15:07:27 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201207200839.24259.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201207171924.33756.arnd@arndb.de> <1342756850.1726.74.camel@vkoul-udesk3>
+ <201207200839.24259.arnd@arndb.de>
+Message-ID: <1342777047.1726.435.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Fri, 2012-07-20 at 08:39 +0000, Arnd Bergmann wrote:
+> On Friday 20 July 2012, Vinod Koul wrote:
+> > > Required property:
+> > >     dmas: list of one or more dma specifiers, each consisting of
+> > >      - phandle pointing to dma controller node
+> > >      - flags word, a bit map that can hold these flags
+> > >        * 0x00000001 channel can be used for transfer from device
+> > >        * 0x00000002 channel can be user for transfer to device
+> >
+> > Is this for identifying which channel is for TX and RX? If not I am not
+> > sure I understood it well
+> 
+> Yes, but we can potentially add more flags here.
+> 
+> The argument we had when coming up with this was roughly:
+> 
+> * we need to identify which specifiers are referring to the same
+>   conceptual channel and can be used as alternatives
+> * this could be done just using the dma-names property, but making
+>   dma-names mandatory adds complexity for everyone.
+> * Most devices have just one or two channels, and if they have two,
+>   there is usually one input and one output.
+> 
+> => if the common dmaengine code can find out whether a channel is
+>   input or output without looking at the dmac driver specific configuration,
+>   we don't need to add dma-names in most cases, but just let the client
+>   driver ask for "give me a channel with these flags".
+No we don't export the direction of the channel and usually channel can
+be configured either way.
+But from a client POV it makes sense as with the given direction you
+would need a specific request line for a channel. So this is right.
+But direction is something I don't expect to be used for "give me a
+channel" 
 
-There's a driver bug that sgtl5000 dapm widget kcontrols do not work.
-e.g. can not select capture mux with amixer tool(no error info prompted).
+> > > 4. A dma controller requiring complex configuration:
+> > > 
+> > >        dma: dmaengine at 48000000 {
+> > >                compatible = "foo,foo-sdma"
+> > >                reg = <0x48000000 0x1000>;
+> > >                interrupts = <4>;
+> > >                #dma-cells = <6>; /* phandle, flag, request, channel,
+> > >                                        input-width, output-width */
+> >
+> > Why would we want the widths to be here?
+> > Assuming a DMA from System memory to a peripheral, source width should
+> > be system memory width and destination the peripheral width. IMO these
+> > should not be in dma property even if we need these
+> 
+> I was just trying to come up with an example of something we might put
+> into the additional configuration fields. This may or may not be a
+> realistic one, I have no idea. If you know something else that one
+> of the dma controllers might want to put in there, we should change the
+> example.
+> 
+> I took the example of data width from 'struct stedma40_chan_cfg', which
+> is used in some places to configure this from platform data. My
+> impression was that if we want to move that data from board files into
+> the device tree, it has to be here, but it can well be that there is
+> a better place for it, e.g. in the global (channel independent)
+> configuration of the dmac.
+> 
+> 	Arnd
 
-The root cause is that we still call snd_soc_dapm_new_widgets in
-codec driver probe function afer converting to table based widgets.
-This will cause the card dapm widgets are instantiated before the
-dapm_routes are registered.
-Then, no available dapm widget pathes can be found during instantiation
-which finally will cause soc_dapm_mux_update_power to fail(can not find
-correct path with kcontrol) in snd_soc_dapm_put_enum_double function.
 
-Here we remove the unneeded snd_soc_dapm_new_widgets in codec probe
-and let the soc core to handle the register sequence properly.
-Then we can fix above issue.
-
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- sound/soc/codecs/sgtl5000.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
-index 8af6a52..5c54b6f 100644
---- a/sound/soc/codecs/sgtl5000.c
-+++ b/sound/soc/codecs/sgtl5000.c
-@@ -1357,8 +1357,6 @@ static int sgtl5000_probe(struct snd_soc_codec *codec)
- 	if (ret)
- 		goto err;
- 
--	snd_soc_dapm_new_widgets(&codec->dapm);
--
- 	return 0;
- 
- err:
 -- 
-1.7.0.4
+~Vinod
