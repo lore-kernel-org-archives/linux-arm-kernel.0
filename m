@@ -1,201 +1,87 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 20 Jul 2012 11:34:44 +0530
-Subject: [RFC 4/4] ARM: OMAP3: PM: Use .power_on/.power_down to clean
- omap_sram_idle
+Date: Fri, 20 Jul 2012 11:34:43 +0530
+Subject: [RFC 3/4] ARM: OMAP: powerdomain: Add .power_on/.power_down hooks for
+ powerdomains
 In-Reply-To: <1342764284-8143-1-git-send-email-rnayak@ti.com>
 References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
-Message-ID: <1342764284-8143-5-git-send-email-rnayak@ti.com>
+Message-ID: <1342764284-8143-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With .power_on/.power_down hooks now available within the powerdomain
-framework, its possible to clean a lot of mpu/core power_on/power_down
-related code within omap_sram_idle into respective callbacks for these
-powerdomains.
-
-This should atleast also optimise the core domain context save
-in CPUidle when attempting deeper C states, to prevent a core
-domain context save when a device in core is still active.
-The current code in such cases does a blind context save and
-tries to put core domain down, even while devices are active.
+With usecounting added to Powerdomains, its now possible to track Powerdomain
+transitions, including when a Powerdomain is turned on and turned down.
+Add support for hooking up callbacks for such events, which can be used to
+do things like context save/restore etc. which today is mostly stuffed within
+CPUidle and Suspend code.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/pm34xx.c |  127 +++++++++++++++++++++++-------------------
- 1 files changed, 69 insertions(+), 58 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |   12 +++++++++++-
+ arch/arm/mach-omap2/powerdomain.h |    4 ++++
+ 2 files changed, 15 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 9bdf53c..f64bcc6 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -266,22 +266,16 @@ static int omap34xx_do_sram_idle(unsigned long save_state)
- 
- void omap_sram_idle(void)
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index f435819..d2c096c 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -992,10 +992,16 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
+  */
+ void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
  {
--	int mpu_next_state = PWRDM_POWER_ON;
--	int per_next_state = PWRDM_POWER_ON;
--	int core_next_state = PWRDM_POWER_ON;
-+	int mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
-+	int per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
-+	int core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
- 	int per_going_off;
--	int core_prev_state;
--	u32 sdrc_pwr = 0;
--
--	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
++	int prev_state;
++
+ 	if (!pwrdm)
+ 		return;
  
- 	/* NEON control */
- 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
- 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
+ 	if (atomic_inc_return(&pwrdm->usecount) == 1) {
++		if (pwrdm->power_on) {
++			prev_state = pwrdm_read_prev_pwrst(pwrdm);
++			pwrdm->power_on(pwrdm, prev_state);
++		}
+ 		pwrdm_post_transition(pwrdm);
+ 		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
+ 	}
+@@ -1010,7 +1016,7 @@ void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
+  */
+ void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
+ {
+-	int val;
++	int val, next_state;
  
- 	/* Enable IO-PAD and IO-CHAIN wakeups */
--	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
--	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
- 	if (omap3_has_io_wakeup() &&
- 	    (per_next_state < PWRDM_POWER_ON ||
- 	     core_next_state < PWRDM_POWER_ON)) {
-@@ -298,62 +292,15 @@ void omap_sram_idle(void)
- 		omap2_gpio_prepare_for_idle(per_going_off);
+ 	if (!pwrdm)
+ 		return;
+@@ -1020,6 +1026,10 @@ void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
+ 	if (!val) {
+ 		voltdm_pwrdm_disable(pwrdm->voltdm.ptr);
+ 		pwrdm_pre_transition(pwrdm);
++		if (pwrdm->power_down) {
++			next_state = pwrdm_read_next_pwrst(pwrdm);
++			pwrdm->power_down(pwrdm, next_state);
++		}
  	}
  
--	/* CORE */
--	if (core_next_state < PWRDM_POWER_ON) {
--		if (core_next_state == PWRDM_POWER_OFF) {
--			omap3_core_save_context();
--			omap3_cm_save_context();
--		}
--	}
--
--	omap3_intc_prepare_idle();
--
--	/*
--	 * On EMU/HS devices ROM code restores a SRDC value
--	 * from scratchpad which has automatic self refresh on timeout
--	 * of AUTO_CNT = 1 enabled. This takes care of erratum ID i443.
--	 * Hence store/restore the SDRC_POWER register here.
--	 */
--	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
--	    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
--	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
--	    core_next_state == PWRDM_POWER_OFF)
--		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
--
- 	/*
- 	 * omap3_arm_context is the location where some ARM context
- 	 * get saved. The rest is placed on the stack, and restored
- 	 * from there before resuming.
- 	 */
--	if (mpu_next_state == PWRDM_POWER_OFF) {
--		omap34xx_save_context(omap3_arm_context);
-+	if (mpu_next_state == PWRDM_POWER_OFF)
- 		cpu_suspend(1, omap34xx_do_sram_idle);
--	} else {
-+	else
- 		omap34xx_do_sram_idle(0);
--	}
--
--	/* Restore normal SDRC POWER settings */
--	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
--	    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
--	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
--	    core_next_state == PWRDM_POWER_OFF)
--		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
--
--	/* CORE */
--	if (core_next_state < PWRDM_POWER_ON) {
--		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
--		if (core_prev_state == PWRDM_POWER_OFF) {
--			omap3_core_restore_context();
--			omap3_cm_restore_context();
--			omap3_sram_restore_context();
--			omap2_sms_restore_context();
--		}
--		if (core_next_state == PWRDM_POWER_OFF)
--			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
--					       OMAP3430_GR_MOD,
--					       OMAP3_PRM_VOLTCTRL_OFFSET);
--	}
--	omap3_intc_resume_idle();
+ 	BUG_ON(val < 0);
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 52a99cf..a6e09cf 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -92,6 +92,8 @@ struct powerdomain;
+  * @pwrdm_clkdms: Clockdomains in this powerdomain
+  * @node: list_head linking all powerdomains
+  * @voltdm_node: list_head linking all powerdomains in a voltagedomain
++ * @power_on: callback function before powerdomain is turned on
++ * @power_down: callback function after powerdomain is turned down
+  * @state:
+  * @state_counter:
+  * @timer:
+@@ -121,6 +123,8 @@ struct powerdomain {
+ 	unsigned ret_logic_off_counter;
+ 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
+ 	atomic_t usecount;
++	int (*power_on)(struct powerdomain *pwrdm, int prev_state);
++	int (*power_down)(struct powerdomain *pwrdm, int next_state);
  
- 	pwrdm_cpu_wakeup();
- 
-@@ -374,6 +321,64 @@ void omap_sram_idle(void)
- 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
- }
- 
-+int mpu_power_down(struct powerdomain *pwrdm, int next_state)
-+{
-+	omap3_intc_prepare_idle();
-+	if (next_state == PWRDM_POWER_OFF)
-+		omap34xx_save_context(omap3_arm_context);
-+	return 0;
-+}
-+
-+int mpu_power_on(struct powerdomain *pwrdm, int prev_state)
-+{
-+	omap3_intc_resume_idle();
-+	return 0;
-+}
-+
-+u32 sdrc_pwr;
-+int core_attempted_state;
-+int core_power_down(struct powerdomain *pwrdm, int next_state)
-+{
-+	if (next_state == PWRDM_POWER_OFF) {
-+		omap3_core_save_context();
-+		omap3_cm_save_context();
-+
-+		/*
-+		 * On EMU/HS devices ROM code restores a SRDC value
-+		 * from scratchpad which has automatic self refresh on timeout
-+		 * of AUTO_CNT = 1 enabled. This takes care of erratum ID i443.
-+		 * Hence store/restore the SDRC_POWER register here.
-+		 */
-+		if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
-+		    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
-+		     omap_type() == OMAP2_DEVICE_TYPE_SEC))
-+			sdrc_pwr = sdrc_read_reg(SDRC_POWER);
-+	}
-+	core_attempted_state = next_state;
-+	return 0;
-+}
-+
-+int core_power_on(struct powerdomain *pwrdm, int prev_state)
-+{
-+	if (prev_state == PWRDM_POWER_OFF) {
-+		omap3_core_restore_context();
-+		omap3_cm_restore_context();
-+		omap3_sram_restore_context();
-+		omap2_sms_restore_context();
-+	}
-+	if (core_attempted_state == PWRDM_POWER_OFF) {
-+		/* Restore normal SDRC POWER settings */
-+		if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
-+		    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
-+		     omap_type() == OMAP2_DEVICE_TYPE_SEC))
-+			sdrc_write_reg(sdrc_pwr, SDRC_POWER);
-+		omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
-+				       OMAP3430_GR_MOD,
-+				       OMAP3_PRM_VOLTCTRL_OFFSET);
-+	}
-+	return 0;
-+}
-+
- static void omap3_pm_idle(void)
- {
- 	local_fiq_disable();
-@@ -734,6 +739,12 @@ int __init omap3_pm_init(void)
- 	core_pwrdm = pwrdm_lookup("core_pwrdm");
- 	cam_pwrdm = pwrdm_lookup("cam_pwrdm");
- 
-+	mpu_pwrdm->power_on = mpu_power_on;
-+	mpu_pwrdm->power_down = mpu_power_down;
-+
-+	core_pwrdm->power_on = core_power_on;
-+	core_pwrdm->power_down = core_power_down;
-+
- 	neon_clkdm = clkdm_lookup("neon_clkdm");
- 	mpu_clkdm = clkdm_lookup("mpu_clkdm");
- 
+ #ifdef CONFIG_PM_DEBUG
+ 	s64 timer;
 -- 
 1.7.1
