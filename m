@@ -1,102 +1,160 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jul 2012 19:35:45 +0200
-Subject: [PATCH 10/16] ARM: Kirkwood: Describe IB62x0 gpio-keys in DT.
+Date: Fri, 20 Jul 2012 19:35:42 +0200
+Subject: [PATCH 7/16] ATA: sata_mv: Add device tree support
 In-Reply-To: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
 References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1342805751-18048-11-git-send-email-andrew@lunn.ch>
+Message-ID: <1342805751-18048-8-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the GPIO controllers have been converted over to DT,
-described the gpio-keys in DT.
+Add support for instantiating this driver from device tree, and add
+the necassary DT information to the kirkwood.dtsi file.
+
+This is based on previous work by Michael Walle and Jason Cooper.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Simon Baatz <gmbnomis@gmail.com>
+Tested-by: Josh Coombs <josh.coombs@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-ib62x0.dts |   16 ++++++++++++++++
- arch/arm/mach-kirkwood/board-ib62x0.c |   31 -------------------------------
- 2 files changed, 16 insertions(+), 31 deletions(-)
+ Documentation/devicetree/bindings/ata/marvell.txt |   16 ++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                   |    7 ++++
+ arch/arm/mach-kirkwood/board-dt.c                 |    1 +
+ drivers/ata/sata_mv.c                             |   42 ++++++++++++++-------
+ 4 files changed, 53 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/marvell.txt
 
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index f8e2bc6..6726aa9 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -46,4 +46,20 @@
- 
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
+new file mode 100644
+index 0000000..b5cdd20
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/marvell.txt
+@@ -0,0 +1,16 @@
++* Marvell Orion SATA
 +
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		button at 1 {
-+			label = "USB Copy";
-+			linux,code = <133>;
-+			gpios = <&gpio0 29 1>;
++Required Properties:
++- compatibility : "marvell,orion-sata"
++- reg           : Address range of controller
++- interrupts    : Interrupt controller is using
++- nr-ports      : Number of SATA ports in use.
++
++Example:
++
++	sata at 80000 {
++		compatible = "marvell,orion-sata";
++		reg = <0x80000 0x5000>;
++		interrupts = <21>;
++		nr-ports = <2>;
++	}
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 3e0e9b9..fbb96ce 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -76,6 +76,13 @@
+ 			status = "okay";
+ 		};
+ 
++		sata at 80000 {
++			compatible = "marvell,orion-sata";
++			reg = <0x80000 0x5000>;
++			interrupts = <21>;
++			status = "disabled";
 +		};
-+		button at 2 {
-+			label = "Reset";
-+			linux,code = <0x198>;
-+			gpios = <&gpio0 28 1>;
-+		};
-+	};
- };
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-index 56d198e..f30065e 100644
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ b/arch/arm/mach-kirkwood/board-ib62x0.c
-@@ -18,7 +18,6 @@
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
--#include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/leds.h>
- #include <asm/mach-types.h>
-@@ -85,35 +84,6 @@ static struct platform_device ib62x0_led_device = {
- 	}
++
+ 		nand at 3000000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 73e75cf..d0ad250 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -31,6 +31,7 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
+ 		       NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
++	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+ 	{},
  };
  
--static struct gpio_keys_button ib62x0_button_pins[] = {
--	{
--		.code		= KEY_COPY,
--		.gpio		= 29,
--		.desc		= "USB Copy",
--		.active_low	= 1,
--	},
--	{
--		.code		= KEY_RESTART,
--		.gpio		= 28,
--		.desc		= "Reset",
--		.active_low	= 1,
--	},
--};
--
--static struct gpio_keys_platform_data ib62x0_button_data = {
--	.buttons	= ib62x0_button_pins,
--	.nbuttons	= ARRAY_SIZE(ib62x0_button_pins),
--};
--
--static struct platform_device ib62x0_button_device = {
--	.name		= "gpio-keys",
--	.id		= -1,
--	.num_resources	= 0,
--	.dev		= {
--		.platform_data	= &ib62x0_button_data,
--	}
--};
--
- static void ib62x0_power_off(void)
- {
- 	gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
-@@ -129,7 +99,6 @@ void __init ib62x0_init(void)
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&ib62x0_ge00_data);
- 	platform_device_register(&ib62x0_led_device);
--	platform_device_register(&ib62x0_button_device);
- 	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
- 	    gpio_direction_output(IB62X0_GPIO_POWER_OFF, 0) == 0)
- 		pm_power_off = ib62x0_power_off;
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 24712ad..311be18 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -65,6 +65,8 @@
+ #include <linux/mbus.h>
+ #include <linux/bitops.h>
+ #include <linux/gfp.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
+ #include <scsi/scsi_host.h>
+ #include <scsi/scsi_cmnd.h>
+ #include <scsi/scsi_device.h>
+@@ -4026,7 +4028,7 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 	struct ata_host *host;
+ 	struct mv_host_priv *hpriv;
+ 	struct resource *res;
+-	int n_ports = 0;
++	int n_ports = 0, irq = 0;
+ 	int rc;
+ #if defined(CONFIG_HAVE_CLK)
+ 	int port;
+@@ -4050,8 +4052,14 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 
+ 	/* allocate host */
+-	mv_platform_data = pdev->dev.platform_data;
+-	n_ports = mv_platform_data->n_ports;
++	if (pdev->dev.of_node) {
++		of_property_read_u32(pdev->dev.of_node, "nr-ports", &n_ports);
++		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
++	} else {
++		mv_platform_data = pdev->dev.platform_data;
++		n_ports = mv_platform_data->n_ports;
++		irq = platform_get_irq(pdev, 0);
++	}
+ 
+ 	host = ata_host_alloc_pinfo(&pdev->dev, ppi, n_ports);
+ 	hpriv = devm_kzalloc(&pdev->dev, sizeof(*hpriv), GFP_KERNEL);
+@@ -4109,8 +4117,7 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "slots %u ports %d\n",
+ 		 (unsigned)MV_MAX_Q_DEPTH, host->n_ports);
+ 
+-	rc = ata_host_activate(host, platform_get_irq(pdev, 0), mv_interrupt,
+-			       IRQF_SHARED, &mv6_sht);
++	rc = ata_host_activate(host, irq, mv_interrupt, IRQF_SHARED, &mv6_sht);
+ 	if (!rc)
+ 		return 0;
+ 
+@@ -4205,15 +4212,24 @@ static int mv_platform_resume(struct platform_device *pdev)
+ #define mv_platform_resume NULL
+ #endif
+ 
++#ifdef CONFIG_OF
++static struct of_device_id mv_sata_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,orion-sata", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mv_sata_dt_ids);
++#endif
++
+ static struct platform_driver mv_platform_driver = {
+-	.probe			= mv_platform_probe,
+-	.remove			= __devexit_p(mv_platform_remove),
+-	.suspend		= mv_platform_suspend,
+-	.resume			= mv_platform_resume,
+-	.driver			= {
+-				   .name = DRV_NAME,
+-				   .owner = THIS_MODULE,
+-				  },
++	.probe		= mv_platform_probe,
++	.remove		= __devexit_p(mv_platform_remove),
++	.suspend	= mv_platform_suspend,
++	.resume		= mv_platform_resume,
++	.driver		= {
++		.name = DRV_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(mv_sata_dt_ids),
++	},
+ };
+ 
+ 
 -- 
 1.7.10
