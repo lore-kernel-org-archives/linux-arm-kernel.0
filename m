@@ -1,28 +1,69 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 20 Jul 2012 13:32:45 +0200
-Subject: [PATCH] IIO: Add basic MXS LRADC driver
-In-Reply-To: <20120720083920.GY12601@pengutronix.de>
-References: <1341368129-20468-1-git-send-email-marex@denx.de>
- <201207200418.41554.marex@denx.de> <20120720083920.GY12601@pengutronix.de>
-Message-ID: <201207201332.46091.marex@denx.de>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 20 Jul 2012 13:30:48 +0200
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <CAJe_Zhcyug17ZnKtmKnVhHT=Mm1PKdE68f21WWkUVtfCwNxSwg@mail.gmail.com>
+References: <5006571A.7060103@de.bosch.com>	<CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>	<50068696.8070408@de.bosch.com>	<CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>	<5006C40D.300@de.bosch.com>
+ <CAJe_Zhcyug17ZnKtmKnVhHT=Mm1PKdE68f21WWkUVtfCwNxSwg@mail.gmail.com>
+Message-ID: <50094168.2090900@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Robert Schwebel,
-
-> On Fri, Jul 20, 2012 at 04:18:41AM +0200, Marek Vasut wrote:
-> > One more thing I'm curious about. There's another ADC block on the
-> > CPU, called HSADC (high-speed ADC). It can sample even up to
-> > 2Msamples/s. If I were to, say -- sample at 100kHz and be able to DMA
-> > the results into memory -- is there any way to push such results into
-> > userland somehow? Or how to operate such fast beast?
+On 19.07.2012 22:45, Jassi Brar wrote:
+> On 18 July 2012 19:41, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
+>> On 07/18/2012 03:47 PM, Jassi Brar wrote:
+>>> On 18 July 2012 15:19, Knut Wohlrab <knut.wohlrab@de.bosch.com> wrote:
+>>>
+>>>> If a SD card is inserted at boot time, its "mmcblk0", the embedded
+>>>> MMC (eMMC) device "mmcblk1".  This makes it difficult to give the kernel
+>>>> the
+>>>> correct device for the eMMC root file system ("root=/dev/mmcblk?p1 ...").
+>>>>
+>>> How about  root=UUID=<eMMC-partition>  ?
+>> Because we are talking about an embedded device, it is very difficult to get
+>> a UUID of a eMMC partition into kernel command line with U-Boot. Handling of
+>> UUID is also a big effort at board manufacturing.
+>>
+> I don't realize how bad is it if a common UUID is used on each cloned
+> eMMC(non-removable) of every instance of a device. But of course only
+> you know what's best for your product.
 > 
-> As this unit is mainly intended for things like laser / barcode
-> scanners, wouldn't v2l2 be a good abstraction for it (with one line and
-> N pixels)? Just an idea, didn't look too closely.
+>> This problem can occur on many devices with embedded MMC and removable SD,
+>> e.g. smart phones. So I think we should find an solution to define MMC scan
+>> order or device number/name in a device tree.
+>>
+> I assume your issue is that due to async nature of mmc scanning, the
+> eMMC is detected later than external card, despite being the probe for
+> eMMC's slot initiated first ?
+> If so, we can do by simply associating 'N' of 'mmcblkN' with the slot
+> index i.e, mmc_host.index (instead of mmc_blk_data.name_idx). Which is
+> always in the order of probe calling. And we don't need to modify, or
+> expect more of, DT for that.
 
-Considering it's not only for barcode scanners, but also some crazy sampling, I 
-won't go for v4l2
+Do you mean something like
 
-Best regards,
-Marek Vasut
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1536,7 +1536,7 @@ static struct mmc_blk_data 
+*mmc_blk_alloc_req(struct mmc_card *card,
+          */
+
+         snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
+-                "mmcblk%d%s", md->name_idx, subname ? subname : "");
++                "mmcblk%d%s", card->host->index, subname ? subname : "");
+
+         blk_queue_logical_block_size(md->queue.queue, 512);
+         set_capacity(md->disk, size);
+
+?
+
+A first quick test looks promising. We will go on testing this.
+
+> Though I suspect there must be some
+> serious reason why it's not already done that way.
+
+Anybody with an idea? Any serious reason?
+
+Many thanks and best regards
+
+Dirk
