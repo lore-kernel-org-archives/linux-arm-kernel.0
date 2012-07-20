@@ -1,45 +1,57 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 20 Jul 2012 11:27:36 +0000
-Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device
- tree data
-In-Reply-To: <20120720095935.GQ4495@opensource.wolfsonmicro.com>
-References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
- <1342766789-28148-2-git-send-email-anilkumar@ti.com>
- <20120720095935.GQ4495@opensource.wolfsonmicro.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 20 Jul 2012 13:31:02 +0200 (CEST)
+Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
+ MX2_CAMERA_PACK_DIR_MSB flags.
+In-Reply-To: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <Pine.LNX.4.64.1207201330240.27906@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, 12 Jul 2012, Javier Martin wrote:
 
-Thanks for the review.
-
-On Fri, Jul 20, 2012 at 15:29:36, Mark Brown wrote:
-> On Fri, Jul 20, 2012 at 12:16:26PM +0530, AnilKumar Ch wrote:
+> These flags are not used any longer and can be safely removed
+> since the following patch:
+> http://www.spinics.net/lists/linux-media/msg50165.html
 > 
-> > +		vio_reg: regulator at 1 {
-> > +			reg = <1>;
-> > +			regulator-compatible = "vio";
-> > +			regulator-min-microvolt = <1500000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +			regulator-always-on;
-> > +		};
-> 
-> Every regulator here has a rather large voltage range specified with no
-> consumers added.  Are you sure these voltage ranges make sense in your
-> design and you've not just cut'n'pasted the entire voltage range that
-> your regulator supports without reference to what your board can do?
-> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 
-tps65217.dtsi is a generic file to be used by the SoCs so these constraints
-were taken from the regulator itself. SoC specific limits can be added in
-SoC specific .dts file to tighten the constraints to require limit. I have
-tested the driver with this approach.
+For the ARM tree:
 
-Required consumers will be added while submitting the regulator dependent
-Consumers. One of the usecase I can specify here is MPU voltage control
-through DVFS framework. So if require, MPU consumer will be added along
-with the DVFS support.
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
 Thanks
-AnilKumar
+Guennadi
+
+> ---
+>  arch/arm/plat-mxc/include/mach/mx2_cam.h |    2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/mx2_cam.h b/arch/arm/plat-mxc/include/mach/mx2_cam.h
+> index 3c080a3..7ded6f1 100644
+> --- a/arch/arm/plat-mxc/include/mach/mx2_cam.h
+> +++ b/arch/arm/plat-mxc/include/mach/mx2_cam.h
+> @@ -23,7 +23,6 @@
+>  #ifndef __MACH_MX2_CAM_H_
+>  #define __MACH_MX2_CAM_H_
+>  
+> -#define MX2_CAMERA_SWAP16		(1 << 0)
+>  #define MX2_CAMERA_EXT_VSYNC		(1 << 1)
+>  #define MX2_CAMERA_CCIR			(1 << 2)
+>  #define MX2_CAMERA_CCIR_INTERLACE	(1 << 3)
+> @@ -31,7 +30,6 @@
+>  #define MX2_CAMERA_GATED_CLOCK		(1 << 5)
+>  #define MX2_CAMERA_INV_DATA		(1 << 6)
+>  #define MX2_CAMERA_PCLK_SAMPLE_RISING	(1 << 7)
+> -#define MX2_CAMERA_PACK_DIR_MSB		(1 << 8)
+>  
+>  /**
+>   * struct mx2_camera_platform_data - optional platform data for mx2_camera
+> -- 
+> 1.7.9.5
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
