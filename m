@@ -1,26 +1,76 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 20 Jul 2012 12:25:21 -0600 (MDT)
-Subject: [RFC 1/4] ARM: OMAP3: cpuidle: Remove unused MPU OSWR support code
-In-Reply-To: <1342764284-8143-2-git-send-email-rnayak@ti.com>
-References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
- <1342764284-8143-2-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1207201222250.14390@utopia.booyaka.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 20 Jul 2012 11:29:39 -0700
+Subject: [PATCH 4/4] ARM: clps711x: Added simple clkdev framework
+In-Reply-To: <1342808640.380063699@f242.mail.ru>
+References: <1342807362.877202427@f305.mail.ru>
+ <1342805080.993377715@f259.mail.ru>
+ <CAJOAzMnfk6drJrxb9tB48Ok8waocLitEYCTYKrVhbY3EpnLeg@mail.gmail.com>
+ <1342808640.380063699@f242.mail.ru>
+Message-ID: <CAJOA=zPwEqGUDEp2bz9ki384BaSTyK+4953yHWJXyeCQ0jos3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2012, Rajendra Nayak wrote:
+On Fri, Jul 20, 2012 at 11:24 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Hello.
+>
+> Fri, 20 Jul 2012 11:12:23 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
+>> On Fri, Jul 20, 2012 at 11:02 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+>> > Fri, 20 Jul 2012 10:41:59 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
+>> >> On Fri, Jul 20, 2012 at 10:24 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+>> >> > Thu, 19 Jul 2012 15:02:00 -0700 ?? "Turquette, Mike" <mturquette@ti.com>:
+>> >> >> On Tue, Jul 17, 2012 at 1:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> >> > On Monday 16 July 2012, Alexander Shiyan wrote:
+>> >> >> >> Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
+>> >> >> >> This patch adds simple clkdev framework for handling all possible CPU rates.
+>> >> >> >> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+>> >> >> > We just had the exact same discussion about a new clock implementation for
+>> >> >> > mcs814x and for the socfpga port. My feeling is that it makes no sense
+>> >> >> > to keep adding new private implementations of the API as we're trying
+>> >> >> > to get rid of the existing ones and replace them with the common code.
+>> >> >> >
+>> >> >> > If I understand this correctly, you should be using DEFINE_CLK_FIXED_RATE
+>> >> >> > and DEFINE_CLK_DIVIDER etc to define the initial clocks and the lookup
+>> >> >> > table, and possibly move all of that to drivers/clk.
+>> >> >>
+>> >> >> Arnd is correct.  Let's go ahead and move everything over to the
+>> >> >> common clk framework.  These patches will have to wait for 3.7
+>> >> >> anyways, so there is plenty of time to port it over.
+>> >> >
+>> >> > OK, I keep this patch and will be create new one, for review, but as I say before,
+>> >> > COMMON_CLOCK framework is too overloaded because clps711x-target CPU
+>> >> > has no enable/disable and change rate functional for clocks. We only can
+>> >> > determine CPU speed from fuses and recalculate some values for system
+>> >> > timer and UART.
+>> >>
+>> >> It might be worthwhile to implement something like
+>> >> drivers/clk/clk-dummy.c which provides no real clk_ops, but
+>> >> initializes parents and rates at clk_register-timer.  I haven't looked
+>> >> at your patch yet to know if such an idea is applicable or not, but I
+>> >> doubt you are the only platform which has "noop" clocks, so it might
+>> >> be nice to expose a standard clock type for this.
+>> >> What do you think?
+>> >
+>> > If I understand correctly, FIXED_CLK have to deal with it.
+>> > Why need one more class?
+>>
+>> Ah, I thought that maybe you would have to dynamically detect parents
+>> as well.  Also fixed clk expects to have the rate passed into it, so
+>> if you need to read some registers to determine rate then that will be
+>> something new.
+>>
+>> If you don't have mux clocks and you know you rate already (in
+>> software) then fixed clk is fine for you.
+>
+> The multiplexer is really there, but it is determined at boot time.
+> It can not be changed during operation.
+> I just wanted to say that the use of a large class for such simple operations
+> does not make much sense. But if we need to bring everything to the same
+> class, I will write a second version of the patch, it is not difficult.
 
-> We do not support MPU OSWR on OMAP3. Get rid of the complex/multiple
-> save_state handling in omap_sram_idle() and just use 2 save_state
-> definitions
-> 
-> save_state = 1, all logic and memory lost, MPU hits OFF
-> save_state = 0, nothing lost, MPU hits CSWR or shallower state
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+There are benefits to using the common struct clk, including
+multi-platform boot (single zImage), and also clock tree
+"connectivity" with other devices that may use the new common struct
+clk more extensively.
 
-The code is certainly simpler, but I recall seeing patchsets in the past 
-that implemented OSWR on OMAP3.  (Not sure which powerdomains it was 
-implemented for.)  Do you know what the status of those patchsets are?
-
-- Paul
+Thanks,
+Mike
