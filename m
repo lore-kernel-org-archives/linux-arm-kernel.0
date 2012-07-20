@@ -1,36 +1,88 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 20 Jul 2012 12:38:06 +0100
-Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device tree
- data
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
-References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
- <1342766789-28148-2-git-send-email-anilkumar@ti.com>
- <20120720095935.GQ4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
-Message-ID: <20120720113806.GW4495@opensource.wolfsonmicro.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 20 Jul 2012 17:24:29 +0530
+Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping from
+ cpuidle
+In-Reply-To: <1342774283.4672.181.camel@sokoban>
+References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
+ <1342764284-8143-3-git-send-email-rnayak@ti.com>
+ <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>
+ <5009120A.1060400@ti.com> <1342774283.4672.181.camel@sokoban>
+Message-ID: <CAMQu2gww9O-Kv6c1xFYWjj42vsoR4Ewrdzr+H7Da5RC79s_-Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 11:27:36AM +0000, AnilKumar, Chimata wrote:
-> On Fri, Jul 20, 2012 at 15:29:36, Mark Brown wrote:
+On Fri, Jul 20, 2012 at 2:21 PM, Tero Kristo <t-kristo@ti.com> wrote:
+>
+> On Fri, 2012-07-20 at 13:38 +0530, Rajendra Nayak wrote:
+> > On Friday 20 July 2012 12:55 PM, Shilimkar, Santosh wrote:
+> > > On Fri, Jul 20, 2012 at 11:34 AM, Rajendra Nayak<rnayak@ti.com>
+> > > wrote:
+> > >> pwrdm_pre_transition()/pwrdm_post_transition() have always been high
+> > >> latency
+> > >> operations done within cpuidle to do Powerdomain level book-keeping
+> > >> to know
+> > >> what state transitions for different Powerdomains have been
+> > >> triggered.
+> > >> This is also useful to do a restore-on-demand in some cases when we
+> > >> know
+> > >> the context for the given Powerdomain was lost etc.
+> > >>
+> > >> Now that we have definitive entry/exit points (thanks to the
+> > >> Powerdomain
+> > >> level usecounting) for Powerdomain transitions, these book-keeping
+> > >> functions
+> > >> can very well be moved from within CPUidle into
+> > >> pwrdm_clkdm_enable()/pwrdm_
+> > >> clkdm_disable() functions.
+> > >>
+> > >> Also rename _pwrdm_pre/post_transition_cb() to
+> > >> pwrdm_pre/post_transition()
+> > >> and get rid of the original ones which iterate over all powerdomains.
+> > >>
+> > >> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> > >> ---
+> > >>   arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++--
+> > >>   arch/arm/mach-omap2/pm34xx.c              |    4 ++--
+> > >>   arch/arm/mach-omap2/powerdomain.c         |   28
+> > >> ++++++++--------------------
+> > >>   arch/arm/mach-omap2/powerdomain.h         |    4 ++--
+> > >>   4 files changed, 14 insertions(+), 26 deletions(-)
+> > >>
+> > >> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >> b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >> index 13670aa..ea19439 100644
+> > >> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >> @@ -255,7 +255,7 @@ int omap4_enter_lowpower(unsigned int cpu,
+> > >> unsigned int power_state)
+> > >>                  return -ENXIO;
+> > >>          }
+> > >>
+> > >> -       pwrdm_pre_transition();
+> > >> +       pwrdm_cpu_idle();
+> > >>
+> > > Glad to see this is getting optimized.
+> > > I haven't seen how "pwrdm_cpu_[idle/wakeup]()" is
+> > > implemented but will those work on SMP system ?
+> > > I mean OMAP4, any CPU can make this call ?
+> >
+> > Thats a good question. I think Tero did this so he can kick in
+> > voltage transitions at the right time in idle/suspend.
+> > Given that these deal with incrementing/decrementing the MPU and CORE
+> > pwrdm usecounts alone, maybe on OMAP4 (SMP systems) this needs to also
+> > increment/decrement the specific CPU usecounts on the CPUs these calls
+> > are made.
+>
+> Yeah, you should keep the usecounts valid by each cpu separately calling
+> these functions. My current set only sets these usecounts based on cpu0
+> activity, as cpu1 is statically controlled through cpu online / offline.
+> Once per-cpu cpuidle is in, these should be changed so that each
+> individual cpu increases the usecounts when they are brought up,
+> decrease/increase during idle, and decrease when they are brought down.
+> The usecount should always reflect the number of CPUs active on MPU
+> domain.
+>
+Sounds good to me !!
 
-> > Every regulator here has a rather large voltage range specified with no
-> > consumers added.  Are you sure these voltage ranges make sense in your
-> > design and you've not just cut'n'pasted the entire voltage range that
-> > your regulator supports without reference to what your board can do?
-
-> tps65217.dtsi is a generic file to be used by the SoCs so these constraints
-> were taken from the regulator itself. SoC specific limits can be added in
-> SoC specific .dts file to tighten the constraints to require limit. I have
-> tested the driver with this approach.
-
-No, this is not a sane approach.  You've no idea if any of these
-settings are safe or sane for the board.  Boards should enable things
-they know are safe, not remove those they know are broken.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120720/91ea542e/attachment.sig>
+Regards
+santosh
