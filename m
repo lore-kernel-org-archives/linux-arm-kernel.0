@@ -1,24 +1,29 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 20 Jul 2012 17:20:24 +0800
-Subject: [PATCH 1/4] ASoC: mxs-saif: fix clock prepare and enable unbalance
- issue
+Date: Fri, 20 Jul 2012 17:20:26 +0800
+Subject: [PATCH 3/4] ASoC: sgtl5000: remove unneeded snd_soc_dapm_new_widgets
+ in probe
 In-Reply-To: <1342776027-31758-1-git-send-email-b29396@freescale.com>
 References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
-Message-ID: <1342776027-31758-2-git-send-email-b29396@freescale.com>
+Message-ID: <1342776027-31758-4-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Currently we directly call a clock_enable in trigger function without
-a clk_prepare as pair first.
-This will cause system hang immediately when run capture because
-the clock was not prepared(playback does not hang because the clock was
-prepared already by get_mclk before), a warning message in clock framework
-may cause a deadlock to reclaim clock lock (see: pl011_console_write).
+There's a driver bug that sgtl5000 dapm widget kcontrols do not work.
+e.g. can not select capture mux with amixer tool(no error info prompted).
 
-Here we prepare clock first in hw_param, then enable it in trigger
-function to guarantee the balance.
+The root cause is that we still call snd_soc_dapm_new_widgets in
+codec driver probe function afer converting to table based widgets.
+This will cause the card dapm widgets are instantiated before the
+dapm_routes are registered.
+Then, no available dapm widget pathes can be found during instantiation
+which finally will cause soc_dapm_mux_update_power to fail(can not find
+correct path with kcontrol) in snd_soc_dapm_put_enum_double function.
+
+Here we remove the unneeded snd_soc_dapm_new_widgets in codec probe
+and let the soc core to handle the register sequence properly.
+Then we can fix above issue.
 
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Liam Girdwood <lrg@ti.com>
@@ -26,39 +31,21 @@ Cc: Wolfram Sang <w.sang@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
- sound/soc/mxs/mxs-saif.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ sound/soc/codecs/sgtl5000.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index aba71bf..fdbb36a 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -394,9 +394,14 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
- 			     struct snd_soc_dai *cpu_dai)
- {
- 	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
-+	struct mxs_saif *master_saif;
- 	u32 scr, stat;
- 	int ret;
+diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+index 8af6a52..5c54b6f 100644
+--- a/sound/soc/codecs/sgtl5000.c
++++ b/sound/soc/codecs/sgtl5000.c
+@@ -1357,8 +1357,6 @@ static int sgtl5000_probe(struct snd_soc_codec *codec)
+ 	if (ret)
+ 		goto err;
  
-+	master_saif = mxs_saif_get_master(saif);
-+	if (!master_saif)
-+		return -EINVAL;
-+
- 	/* mclk should already be set */
- 	if (!saif->mclk && saif->mclk_in_use) {
- 		dev_err(cpu_dai->dev, "set mclk first\n");
-@@ -420,6 +425,11 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
+-	snd_soc_dapm_new_widgets(&codec->dapm);
+-
+ 	return 0;
  
-+	/* prepare clk in hw_param, enable in trigger */
-+	clk_prepare(saif->clk);
-+	if (saif != master_saif)
-+		clk_prepare(master_saif->clk);
-+
- 	scr = __raw_readl(saif->base + SAIF_CTRL);
- 
- 	scr &= ~BM_SAIF_CTRL_WORD_LENGTH;
+ err:
 -- 
 1.7.0.4
