@@ -1,301 +1,134 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 21 Jul 2012 00:29:33 +1200
-Subject: [PATCHv2 2/2] ARM: vt8500: Add support for UHCI companion controller
-In-Reply-To: <1342787373-2230-1-git-send-email-linux@prisktech.co.nz>
-References: <1342787373-2230-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1342787373-2230-2-git-send-email-linux@prisktech.co.nz>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Jul 2012 20:33:19 +0800
+Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <CAMQu2gw32LogXJJa+K5ZjmCZzBNK3FY2wYwZXU8fsftsVzEO2Q@mail.gmail.com>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+ <CAMQu2gw32LogXJJa+K5ZjmCZzBNK3FY2wYwZXU8fsftsVzEO2Q@mail.gmail.com>
+Message-ID: <20120720123317.GA32263@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for a generic non-pci UHCI companion controller.
-Existing board files for arch-vt8500 updated to include UHCI
-support.
+Thanks for the reviewing, Santosh.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- arch/arm/mach-vt8500/devices-vt8500.c |    5 +
- arch/arm/mach-vt8500/devices-wm8505.c |    4 +
- arch/arm/mach-vt8500/devices.c        |   11 +++
- arch/arm/mach-vt8500/devices.h        |    1 +
- drivers/usb/host/Kconfig              |   12 ++-
- drivers/usb/host/uhci-hcd.c           |    5 +
- drivers/usb/host/uhci-platform.c      |  157 +++++++++++++++++++++++++++++++++
- 7 files changed, 193 insertions(+), 2 deletions(-)
- create mode 100644 drivers/usb/host/uhci-platform.c
+On Fri, Jul 20, 2012 at 12:22:14PM +0530, Shilimkar, Santosh wrote:
+> > +config GENERIC_CPUFREQ_CPU0
+> > +       bool "Generic cpufreq driver for CPU0"
+> > +       depends on HAVE_CLK && REGULATOR && PM_OPP && OF
+> > +       select CPU_FREQ_TABLE
+> > +       help
+> > +         This adds a generic cpufreq driver for CPU0 frequency management.
+> > +         It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+> > +         systems which share clock and voltage across all CPUs.
+> > +
+> > +         If in doubt, say N.
+> > +
+> This *_CPU0 doesn't seems to be appropriate since this infrastructure will be
+> used on SMP systems where CPUs shares clock/voltage rails. May be you can
+> get rid of that unless there is a strong need.
+> 
+All the resource handlers, clk, regulator, opp, DT node, are retrieved
+from CPU0 device even for SMP.  I hope the naming of the driver could
+tell:
 
-diff --git a/arch/arm/mach-vt8500/devices-vt8500.c b/arch/arm/mach-vt8500/devices-vt8500.c
-index 19519ae..def7fe3 100644
---- a/arch/arm/mach-vt8500/devices-vt8500.c
-+++ b/arch/arm/mach-vt8500/devices-vt8500.c
-@@ -48,6 +48,11 @@ void __init vt8500_set_resources(void)
- 	tmp[1] = wmt_irq_res(IRQ_EHCI);
- 	wmt_res_add(&vt8500_device_ehci, tmp, 2);
- 
-+	/* vt8500 uses a single IRQ for both EHCI and UHCI controllers */
-+	tmp[0] = wmt_mmio_res(VT8500_UHCI_BASE, SZ_512);
-+	tmp[1] = wmt_irq_res(IRQ_EHCI);
-+	wmt_res_add(&vt8500_device_uhci, tmp, 2);
-+
- 	tmp[0] = wmt_mmio_res(VT8500_GEGEA_BASE, SZ_256);
- 	wmt_res_add(&vt8500_device_ge_rops, tmp, 1);
- 
-diff --git a/arch/arm/mach-vt8500/devices-wm8505.c b/arch/arm/mach-vt8500/devices-wm8505.c
-index db4594e..c810454 100644
---- a/arch/arm/mach-vt8500/devices-wm8505.c
-+++ b/arch/arm/mach-vt8500/devices-wm8505.c
-@@ -55,6 +55,10 @@ void __init wm8505_set_resources(void)
- 	tmp[1] = wmt_irq_res(IRQ_EHCI);
- 	wmt_res_add(&vt8500_device_ehci, tmp, 2);
- 
-+	tmp[0] = wmt_mmio_res(WM8505_UHCI_BASE, SZ_512);
-+	tmp[1] = wmt_irq_res(IRQ_UHCI);
-+	wmt_res_add(&vt8500_device_uhci, tmp, 2);
-+
- 	tmp[0] = wmt_mmio_res(WM8505_GEGEA_BASE, SZ_256);
- 	wmt_res_add(&vt8500_device_ge_rops, tmp, 1);
- 
-diff --git a/arch/arm/mach-vt8500/devices.c b/arch/arm/mach-vt8500/devices.c
-index 1fcdc36..46ff82d 100644
---- a/arch/arm/mach-vt8500/devices.c
-+++ b/arch/arm/mach-vt8500/devices.c
-@@ -204,6 +204,17 @@ struct platform_device vt8500_device_ehci = {
- 	},
- };
- 
-+static u64 uhci_dma_mask = DMA_BIT_MASK(32);
-+
-+struct platform_device vt8500_device_uhci = {
-+	.name		= "platform-uhci",
-+	.id		= 0,
-+	.dev		= {
-+		.dma_mask	= &uhci_dma_mask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+	},
-+};
-+
- struct platform_device vt8500_device_ge_rops = {
- 	.name		= "wmt_ge_rops",
- 	.id		= -1,
-diff --git a/arch/arm/mach-vt8500/devices.h b/arch/arm/mach-vt8500/devices.h
-index 188d4e1..0e6d9f9 100644
---- a/arch/arm/mach-vt8500/devices.h
-+++ b/arch/arm/mach-vt8500/devices.h
-@@ -81,6 +81,7 @@ extern struct platform_device vt8500_device_uart5;
- extern struct platform_device vt8500_device_lcdc;
- extern struct platform_device vt8500_device_wm8505_fb;
- extern struct platform_device vt8500_device_ehci;
-+extern struct platform_device vt8500_device_uhci;
- extern struct platform_device vt8500_device_ge_rops;
- extern struct platform_device vt8500_device_pwm;
- extern struct platform_device vt8500_device_pwmbl;
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 83e58df..3d153d0 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -450,7 +450,7 @@ config USB_OHCI_LITTLE_ENDIAN
- 
- config USB_UHCI_HCD
- 	tristate "UHCI HCD (most Intel and VIA) support"
--	depends on USB && (PCI || SPARC_LEON)
-+	depends on USB && (PCI || SPARC_LEON || ARCH_VT8500)
- 	---help---
- 	  The Universal Host Controller Interface is a standard by Intel for
- 	  accessing the USB hardware in the PC (which is also called the USB
-@@ -468,7 +468,15 @@ config USB_UHCI_HCD
- config USB_UHCI_SUPPORT_NON_PCI_HC
- 	bool
- 	depends on USB_UHCI_HCD
--	default y if SPARC_LEON
-+	default y if (SPARC_LEON || ARCH_VT8500)
-+
-+config USB_UHCI_PLATFORM
-+	bool "Generic UHCI Platform Driver support"
-+	depends on USB_UHCI_SUPPORT_NON_PCI_HC
-+	default y if ARCH_VT8500
-+	---help---
-+	  Enable support for generic UHCI platform devices that require no
-+	  additional configuration.
- 
- config USB_UHCI_BIG_ENDIAN_MMIO
- 	bool
-diff --git a/drivers/usb/host/uhci-hcd.c b/drivers/usb/host/uhci-hcd.c
-index e4db350..4b9e9ab 100644
---- a/drivers/usb/host/uhci-hcd.c
-+++ b/drivers/usb/host/uhci-hcd.c
-@@ -846,6 +846,11 @@ static const char hcd_name[] = "uhci_hcd";
- #define PLATFORM_DRIVER		uhci_grlib_driver
- #endif
- 
-+#ifdef CONFIG_USB_UHCI_PLATFORM
-+#include "uhci-platform.c"
-+#define PLATFORM_DRIVER		uhci_platform_driver
-+#endif
-+
- #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER)
- #error "missing bus glue for uhci-hcd"
- #endif
-diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
-new file mode 100644
-index 0000000..dafe42a
---- /dev/null
-+++ b/drivers/usb/host/uhci-platform.c
-@@ -0,0 +1,157 @@
-+/*
-+ * Generic UHCI HCD (Host Controller Driver) for Platform Devices
-+ *
-+ * Copyright (c) 2011 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * This file is based on uhci-grlib.c
-+ * (C) Copyright 2004-2007 Alan Stern, stern at rowland.harvard.edu
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+static int uhci_platform_init(struct usb_hcd *hcd)
-+{
-+	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-+
-+	uhci->rh_numports = uhci_count_ports(hcd);
-+
-+	/* Set up pointers to to generic functions */
-+	uhci->reset_hc = uhci_generic_reset_hc;
-+	uhci->check_and_reset_hc = uhci_generic_check_and_reset_hc;
-+
-+	/* No special actions need to be taken for the functions below */
-+	uhci->configure_hc = NULL;
-+	uhci->resume_detect_interrupts_are_broken = NULL;
-+	uhci->global_suspend_mode_is_broken = NULL;
-+
-+	/* Reset if the controller isn't already safely quiescent. */
-+	check_and_reset_hc(uhci);
-+	return 0;
-+}
-+
-+static const struct hc_driver uhci_platform_hc_driver = {
-+	.description =		hcd_name,
-+	.product_desc =		"Generic UHCI Host Controller",
-+	.hcd_priv_size =	sizeof(struct uhci_hcd),
-+
-+	/* Generic hardware linkage */
-+	.irq =			uhci_irq,
-+	.flags =		HCD_MEMORY | HCD_USB11,
-+
-+	/* Basic lifecycle operations */
-+	.reset =		uhci_platform_init,
-+	.start =		uhci_start,
-+#ifdef CONFIG_PM
-+	.pci_suspend =		NULL,
-+	.pci_resume =		NULL,
-+	.bus_suspend =		uhci_rh_suspend,
-+	.bus_resume =		uhci_rh_resume,
-+#endif
-+	.stop =			uhci_stop,
-+
-+	.urb_enqueue =		uhci_urb_enqueue,
-+	.urb_dequeue =		uhci_urb_dequeue,
-+
-+	.endpoint_disable =	uhci_hcd_endpoint_disable,
-+	.get_frame_number =	uhci_hcd_get_frame_number,
-+
-+	.hub_status_data =	uhci_hub_status_data,
-+	.hub_control =		uhci_hub_control,
-+};
-+
-+
-+static int __devinit uhci_hcd_platform_probe(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd;
-+	struct uhci_hcd	*uhci;
-+	struct resource *res;
-+	int ret;
-+
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
-+			pdev->name);
-+	if (!hcd)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	hcd->rsrc_start = res->start;
-+	hcd->rsrc_len = resource_size(res);
-+
-+	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-+		pr_err("%s: request_mem_region failed\n", __func__);
-+		ret = -EBUSY;
-+		goto err_rmr;
-+	}
-+
-+	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-+	if (!hcd->regs) {
-+		pr_err("%s: ioremap failed\n", __func__);
-+		ret = -ENOMEM;
-+		goto err_irq;
-+	}
-+	uhci = hcd_to_uhci(hcd);
-+
-+	uhci->regs = hcd->regs;
-+
-+	ret = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_DISABLED |
-+								IRQF_SHARED);
-+	if (ret)
-+		goto err_uhci;
-+
-+	return 0;
-+
-+err_uhci:
-+	iounmap(hcd->regs);
-+err_irq:
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+err_rmr:
-+	usb_put_hcd(hcd);
-+
-+	return ret;
-+}
-+
-+static int uhci_hcd_platform_remove(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+
-+	usb_remove_hcd(hcd);
-+	iounmap(hcd->regs);
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+	usb_put_hcd(hcd);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+/* Make sure the controller is quiescent and that we're not using it
-+ * any more.  This is mainly for the benefit of programs which, like kexec,
-+ * expect the hardware to be idle: not doing DMA or generating IRQs.
-+ *
-+ * This routine may be called in a damaged or failing kernel.  Hence we
-+ * do not acquire the spinlock before shutting down the controller.
-+ */
-+static void uhci_hcd_platform_shutdown(struct platform_device *op)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(&op->dev);
-+
-+	uhci_hc_died(hcd_to_uhci(hcd));
-+}
-+
-+static const struct of_device_id platform_uhci_ids[] = {
-+	{ .compatible = "of-uhci", },
-+	{}
-+};
-+
-+static struct platform_driver uhci_platform_driver = {
-+	.probe		= uhci_hcd_platform_probe,
-+	.remove		= uhci_hcd_platform_remove,
-+	.shutdown	= uhci_hcd_platform_shutdown,
-+	.driver = {
-+		.name = "platform-uhci",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(platform_uhci_ids),
-+	},
-+};
+- The driver supports UP
+- The driver supports SMP where CPUs shares clock/voltage rails by
+  managing CPU0 (resource)
+- The driver does not support SMP where individual CPU can scale
+  clock/voltage independently.
+
+I also thought about naming the driver cpufreq-coupled, but the name
+misses the implication of UP support somehow, so I chose cpufreq-cpu0.
+
+> > +static int cpu0_set_target(struct cpufreq_policy *policy,
+> > +                          unsigned int target_freq, unsigned int relation)
+> > +{
+> > +       struct cpufreq_freqs freqs;
+> > +       struct opp *opp;
+> > +       unsigned long freq_Hz, volt = 0, volt_old = 0, tol = 0;
+> > +       unsigned int index, cpu;
+> > +       int ret = 0;
+> > +
+> > +       ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
+> > +                                            relation, &index);
+> > +       if (ret) {
+> > +               pr_err("failed to match target freqency %d: %d\n",
+> > +                      target_freq, ret);
+> > +               return ret;
+> > +       }
+> > +
+> > +       freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+> > +       if (freq_Hz < 0)
+> > +               freq_Hz = freq_table[index].frequency * 1000;
+> > +       freqs.new = freq_Hz / 1000;
+> > +       freqs.old = clk_get_rate(cpu_clk) / 1000;
+> > +
+> > +       if (freqs.old == freqs.new)
+> > +               return 0;
+> > +
+> > +       for_each_cpu(cpu, policy->cpus) {
+> You need for_each_online_cpu() here o.w you will end up calling the
+> notifier on CPU which is are hot-plugged out or not online yet.
+> 
+Yes, that's sensible.  Since we have all the CPUs set in policy->cpus
+in this driver, we do not have to enumerate policy->cpus, and checking
+online CPUs should be better for the cases you mentioned.
+
+> > +               freqs.cpu = cpu;
+> > +               cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > +       }
+> > +
+> > +       if (cpu_reg) {
+> > +               opp = opp_find_freq_ceil(cpu_dev, &freq_Hz);
+> > +               if (IS_ERR(opp)) {
+> > +                       pr_err("failed to find OPP for %ld\n", freq_Hz);
+> > +                       return PTR_ERR(opp);
+> > +               }
+> > +               volt = opp_get_voltage(opp);
+> > +               tol = volt * voltage_tolerance / 100;
+> > +               volt_old = regulator_get_voltage(cpu_reg);
+> > +       }
+> > +
+> > +       pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
+> > +                freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
+> > +                freqs.new / 1000, volt ? volt / 1000 : -1);
+> > +
+> > +       /* scaling up?  scale voltage before frequency */
+> > +       if (cpu_reg && freqs.new > freqs.old) {
+> > +               if (regulator_set_voltage(cpu_reg, volt - tol, volt + tol)) {
+> > +                       pr_warn("Unable to scale voltage up\n");
+> > +                       freqs.new = freqs.old;
+> > +                       goto done;
+> Do you need a POST notifier in case of the failure ?
+> 
+Honestly, I'm not quite sure about that.  This is a piece of code
+reused from omap-cpufreq driver.  Looking at cpufreq_notify_transition,
+it seems to me that the POST notifier is not really necessary for
+failure case.
+
+> > +static struct cpufreq_driver cpu0_cpufreq_driver = {
+> > +       .flags = CPUFREQ_STICKY,
+> > +       .verify = cpu0_verify_speed,
+> > +       .target = cpu0_set_target,
+> > +       .get = cpu0_get_speed,
+> > +       .init = cpu0_cpufreq_init,
+> > +       .exit = cpu0_cpufreq_exit,
+> > +       .name = "generic_cpu0",
+> > +       .attr = cpu0_cpufreq_attr,
+> > +};
+> > +
+> > +static int __devinit cpu0_cpufreq_driver_init(void)
+> > +{
+> > +       return cpufreq_register_driver(&cpu0_cpufreq_driver);
+> > +}
+> > +late_initcall(cpu0_cpufreq_driver_init);
+> 
+> Can you also add support to build this as loadable module ?
+> 
+I'm just following the common pattern of ARM cpufreq drivers to have
+CPUFREQ_STICKY set in cpufreq_driver.flag and use "bool" for the driver
+Kconfig.  I'm not sure about the necessity of building this as a module.
+
 -- 
-1.7.2.5
+Regards,
+Shawn
