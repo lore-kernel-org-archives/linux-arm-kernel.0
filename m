@@ -1,30 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jul 2012 22:00:53 +0000
-Subject: [PATCH] ARM: vt8500: Minor updates to platform drivers for
- devicetree support
-In-Reply-To: <CABjd4YwmtyiSU9x=jTLCjR7S67qeDQjrCRbXJydX9gGsj-ctMA@mail.gmail.com>
-References: <1342795183-7942-1-git-send-email-linux@prisktech.co.nz>
- <CABjd4YwmtyiSU9x=jTLCjR7S67qeDQjrCRbXJydX9gGsj-ctMA@mail.gmail.com>
-Message-ID: <201207202200.54107.arnd@arndb.de>
+Date: Fri, 20 Jul 2012 22:10:28 +0000
+Subject: [PATCHv2 2/2] ARM: vt8500: Add support for UHCI companion
+ controller
+In-Reply-To: <1342787373-2230-2-git-send-email-linux@prisktech.co.nz>
+References: <1342787373-2230-1-git-send-email-linux@prisktech.co.nz>
+ <1342787373-2230-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <201207202210.28790.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 July 2012, Alexey Charkov wrote:
+On Friday 20 July 2012, Tony Prisk wrote:
+> Add support for a generic non-pci UHCI companion controller.
+> Existing board files for arch-vt8500 updated to include UHCI
+> support.
 > 
-> 2012/7/20 Tony Prisk <linux@prisktech.co.nz>:
-> > Updated the vt8500-rtc and vt8500-uart platform drivers for
-> > devicetree support.
-> 
-> Shouldn't these go as separate patches? Note also that you haven't
-> CC'd the relevant mailing lists on this one.
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-Yes, and also cc the respective maintainers. Same for the USB patch
-actually.
+Looks almost good, but 
 
-Anyway, here's my
+* please add a binding document
+* cc the maintainers and usb mailing list
+* the "of-uhci" string does not seem appropriate:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> +static const struct of_device_id platform_uhci_ids[] = {
+> +	{ .compatible = "of-uhci", },
+> +	{}
+> +};
 
-for the binding.
+The of- part is clearly meaningless in the binding that is about of
+devices. Using usb-uhci would be more appropriate I think, but maybe
+someone can come up with an even better name. Which consortium
+or company created uhci?
 
 	Arnd
