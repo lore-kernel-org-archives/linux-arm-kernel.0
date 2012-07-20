@@ -1,32 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 20 Jul 2012 13:00:01 +0530
-Subject: [RFC 4/4] ARM: OMAP3: PM: Use .power_on/.power_down to clean
- omap_sram_idle
-In-Reply-To: <1342764284-8143-5-git-send-email-rnayak@ti.com>
-References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
- <1342764284-8143-5-git-send-email-rnayak@ti.com>
-Message-ID: <CAMQu2gyk=h2Mt1RfJ83xSVN4dtTLt2Za15OEKBTq_4WaCOkGFA@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 20 Jul 2012 13:01:48 +0530
+Subject: [PATCH v2 2/2] arm/dts: Configure pinmuxs for user leds control on
+ Bone
+In-Reply-To: <1342769508-24810-1-git-send-email-anilkumar@ti.com>
+References: <1342769508-24810-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1342769508-24810-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 11:34 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> With .power_on/.power_down hooks now available within the powerdomain
-> framework, its possible to clean a lot of mpu/core power_on/power_down
-> related code within omap_sram_idle into respective callbacks for these
-> powerdomains.
->
-> This should atleast also optimise the core domain context save
-> in CPUidle when attempting deeper C states, to prevent a core
-> domain context save when a device in core is still active.
-> The current code in such cases does a blind context save and
-> tries to put core domain down, even while devices are active.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
-Looks more modular now. Thanks Rajendra and this series is
-a good step towards decoupling CORE IDLE with CPUIDLE.
+Adds GPIO pinctrl nodes to am3358_pinmux master node to control
+user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am335x-bone.dts |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-Regards
-Santosh
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index a4d4415..452ce3f 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -28,3 +28,18 @@
+ };
+ 
+ /include/ "tps65217.dtsi"
++
++&am3358_pinmux {
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&userled_pins>;
++
++	userled_pins: pinmux_userled_pins {
++		pinctrl-single,pins = <
++			0x54 0x7	/* gpmc_a5.gpio1_21, OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
++			0x58 0x17	/* gpmc_a6.gpio1_22, OMAP_PIN_OUTPUT_PULLUP | OMAP_MUX_MODE7 */
++			0x5C 0x7	/* gpmc_a7.gpio1_23, OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
++			0x60 0x17	/* gpmc_a8.gpio1_24, OMAP_PIN_OUTPUT_PULLUP | OMAP_MUX_MODE7 */
++		>;
++	};
++};
+-- 
+1.7.0.4
