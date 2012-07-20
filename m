@@ -1,50 +1,38 @@
-From: johnhlinn@gmail.com (John Linn)
-Date: Thu, 19 Jul 2012 21:10:39 -0700
-Subject: are there PHYS_OFFSET alignment requirements for ARM Linux?
-In-Reply-To: <alpine.LFD.2.02.1207191501330.9293@xanadu.home>
-References: <CAB9O=CN_aDFTb7GVv++bMXPYS_RjEZe3NUeZY5uX1+mebTVKcA@mail.gmail.com>
- <alpine.LFD.2.02.1207191501330.9293@xanadu.home>
-Message-ID: <CAB9O=CMKBSxYHvoqZKKDx=6H_NhLiQrPxU550A0Ny5i+YUCv3g@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 Jul 2012 22:30:11 -0600
+Subject: Boot breaks in -next from LEGACY to LINEAR conversion
+In-Reply-To: <20120718161023.GE4495@opensource.wolfsonmicro.com>
+References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
+ <20120718161023.GE4495@opensource.wolfsonmicro.com>
+Message-ID: <CACxGe6utvV6XbJEck_UuVJxsqckPFZXG3psEgeQ1vZSBGAwm9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2012 at 12:07 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 18 Jul 2012, John Linn wrote:
+On Wed, Jul 18, 2012 at 10:10 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Jul 17, 2012 at 07:57:49PM +0100, Mark Brown wrote:
+>> -next fails to boot for me today on my s3c64xx based systems.  Walking
+>> back to the last time I tried and bisecting likely branches I find that
+>> commit 910139 (irqdomain: Replace LEGACY mapping with LINEAR) is the one
+>> that introduces the build break.  Unfortunately the boot fails before I
+>> get a console which makes diagnosis somewhat more tricky than would be
+>> ideal.  Any ideas?
 >
->> I have seen some mention of 2 MB alignment requirements, but it's not
->> clear to me if that's true or not (looks old)?
->>
->> My apologies if it's obvious somewhere, but are there any alignment
->> requirements?
->
-> There is a 2MB alignment requirement on PHYS_OFFSET.  You may play
-> tricks with memory reservation if a smaller offset is required, but I'd
-> recommend against that.  Even 2MB is too small an alignment if you want
-> to have CONFIG_ARM_PATCH_PHYS_VIRT=y (the default) which requires a 16MB
-> alignment.
->
+> Further data: the irq_domain_associate_many() calls that we're now doing
+> are also causing WARN_ON()s to go off during boot after commit 98aa46
+> (irqdomain: Support for static IRQ mapping and association) causing
+> breakage for my interrupt using MFDs.
 
-Thanks, it wasn't clear to me. If it's documented somewhere it would
-be great to know where I overlooked it.
+Okay, I've got a theory about what the issue is now. The .map()
+callback is failing (returning non-zero) for one of the hwirqs. The
+new code is stricter about associations, and actually unwinds the
+associations if one of them fails. The old legacy code simply called
+all the .map() hooks blindly without any error checking. Can you send
+me the kernel log after backing out those changes.
 
-> It is very exceptional to see systems where RAM is not aligned to a much
-> bigger boundary.  Why would you need a 2MB alignment?
+The other possibility is that irqs aren't being reserved correctly.
+Seeing the backtrace will tell me which issue it is.
 
-Our DDR can be from anywhere from 0 to 1 GB address. Our platform
-can't DMA to the lower 1MB and we have on chip memory (OCM) at 0.
+In the mean time I've backed out the top three commits from irqdomain/next.
 
-We are currently starting DDR at 0, taking care of the DMA issue in
-the kernel (kind of a pain) and moving OCM to higher address, but we'd
-like to simplify our memory map so moving the start address of DDR to
-1MB (or 2) would do that we were thinking.
-
-I tested it at 1MB and it seemed fine with some simple boot testing,
-but nothing exhaustive.  Sounds like a 2MB (rather than 1 MB) start
-address would be wise.
-
-Thanks,
-John
-
->
->
-> Nicolas
+g.
