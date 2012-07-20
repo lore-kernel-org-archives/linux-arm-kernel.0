@@ -1,35 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Jul 2012 15:56:54 +0800
-Subject: [PATCH 1/3] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
-In-Reply-To: <CAMQu2gz3XXQdG3T=jSboZ8cW-gKO33k7+OUPaQpjpUcnitk_RA@mail.gmail.com>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-2-git-send-email-shawn.guo@linaro.org>
- <CAMQu2gz3XXQdG3T=jSboZ8cW-gKO33k7+OUPaQpjpUcnitk_RA@mail.gmail.com>
-Message-ID: <20120720075652.GA31866@S2101-09.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 20 Jul 2012 13:38:42 +0530
+Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping
+ from cpuidle
+In-Reply-To: <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>
+References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
+ <1342764284-8143-3-git-send-email-rnayak@ti.com>
+ <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>
+Message-ID: <5009120A.1060400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 12:06:50PM +0530, Shilimkar, Santosh wrote:
-> On Thu, Jul 19, 2012 at 9:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> >
-> > From: Richard Zhao <richard.zhao@linaro.org>
-> >
-> > If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
-> > arch has different per-cpu loops_per_jiffy definition.
-> >
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> Nice. Avoids other driver duplicating this code.
-> May be you can keep Richard's credit in commit too.
-> 
-It's all Richard's credit in the commit.
+On Friday 20 July 2012 12:55 PM, Shilimkar, Santosh wrote:
+> On Fri, Jul 20, 2012 at 11:34 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
+>> pwrdm_pre_transition()/pwrdm_post_transition() have always been high latency
+>> operations done within cpuidle to do Powerdomain level book-keeping to know
+>> what state transitions for different Powerdomains have been triggered.
+>> This is also useful to do a restore-on-demand in some cases when we know
+>> the context for the given Powerdomain was lost etc.
+>>
+>> Now that we have definitive entry/exit points (thanks to the Powerdomain
+>> level usecounting) for Powerdomain transitions, these book-keeping functions
+>> can very well be moved from within CPUidle into pwrdm_clkdm_enable()/pwrdm_
+>> clkdm_disable() functions.
+>>
+>> Also rename _pwrdm_pre/post_transition_cb() to pwrdm_pre/post_transition()
+>> and get rid of the original ones which iterate over all powerdomains.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++--
+>>   arch/arm/mach-omap2/pm34xx.c              |    4 ++--
+>>   arch/arm/mach-omap2/powerdomain.c         |   28 ++++++++--------------------
+>>   arch/arm/mach-omap2/powerdomain.h         |    4 ++--
+>>   4 files changed, 14 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+>> index 13670aa..ea19439 100644
+>> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+>> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+>> @@ -255,7 +255,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+>>                  return -ENXIO;
+>>          }
+>>
+>> -       pwrdm_pre_transition();
+>> +       pwrdm_cpu_idle();
+>>
+> Glad to see this is getting optimized.
+> I haven't seen how "pwrdm_cpu_[idle/wakeup]()" is
+> implemented but will those work on SMP system ?
+> I mean OMAP4, any CPU can make this call ?
 
-> FWIW, Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thats a good question. I think Tero did this so he can kick in
+voltage transitions at the right time in idle/suspend.
+Given that these deal with incrementing/decrementing the MPU and CORE
+pwrdm usecounts alone, maybe on OMAP4 (SMP systems) this needs to also
+increment/decrement the specific CPU usecounts on the CPUs these calls
+are made.
 
-Thanks.
-
--- 
-Regards,
-Shawn
+>
+> Regards
+> Santosh
