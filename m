@@ -1,35 +1,46 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 20 Jul 2012 14:08:42 +0200
-Subject: [GIT PULL] ARM: LPC32xx: DTS file updates
-Message-ID: <50094A4A.8090303@antcom.de>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Fri, 20 Jul 2012 14:20:48 +0200
+Subject: [PATCH v2] da8xx-fb: add missing FB_BLANK operations
+In-Reply-To: <1341583288-30281-1-git-send-email-yegorslists@googlemail.com>
+References: <1341583288-30281-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <CAGm1_kujjERaF5K048w-YM_iKWDGn12TBhjLs_XKytitrn3jcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Fri, Jul 6, 2012 at 4:01 PM,  <yegorslists@googlemail.com> wrote:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+>
+> add FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND and FB_BLANK_HSYNC_SUSPEND
+> modes (copy drivers/video/omap2/omapfb/omapfb-main.c implementation).
+> Otherwise X-server will complain about invalid parameter.
+>
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> ---
+> v2: add linux-fbdev as recipient
+>
+>  drivers/video/da8xx-fb.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+> index 47118c7..8d745bf 100644
+> --- a/drivers/video/da8xx-fb.c
+> +++ b/drivers/video/da8xx-fb.c
+> @@ -1026,6 +1026,9 @@ static int cfb_blank(int blank, struct fb_info *info)
+>
+>                 lcd_enable_raster();
+>                 break;
+> +       case FB_BLANK_NORMAL:
+> +       case FB_BLANK_VSYNC_SUSPEND:
+> +       case FB_BLANK_HSYNC_SUSPEND:
+>         case FB_BLANK_POWERDOWN:
+>                 if (par->panel_power_ctrl)
+>                         par->panel_power_ctrl(0);
+> --
+> 1.7.7
+>
 
-this is a late addition to LPC32xx DTS files for v3.6. Branch lpc32xx/dts2,
-building upon previously posted lpc32xx/dts.
+Were is possible to get this patch into 3.6?
 
-Thanks,
+Thanks.
 
-Roland
-
-
-The following changes since commit 7bb71a6c3241b8e20b54fe9978cc9af5eddfd428:
-
-  ARM: LPC32xx: Update DTS file for EA3250 board (2012-07-01 21:04:17 +0200)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/dts2
-
-for you to fetch changes up to de639854441af37fc88a72daab5842045d518944:
-
-  ARM: LPC32xx: Add PWM to base dts file (2012-07-20 13:33:09 +0200)
-
-----------------------------------------------------------------
-Alexandre Pereira da Silva (1):
-      ARM: LPC32xx: Add PWM to base dts file
-
- arch/arm/boot/dts/lpc32xx.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+Yegor
