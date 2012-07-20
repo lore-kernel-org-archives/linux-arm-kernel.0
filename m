@@ -1,119 +1,45 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 20 Jul 2012 13:19:23 +0200 (CEST)
-Subject: [PATCH] [v3] i.MX27: Fix emma-prp clocks in mx2_camera.c
-In-Reply-To: <CACKLOr0hfbv4qnp79XyXzNCE=oXS+7JA31knoXjGU+STG9Fxfg@mail.gmail.com>
-References: <1341572162-29126-1-git-send-email-javier.martin@vista-silicon.com>
- <20120709072809.GP30009@pengutronix.de>
- <CACKLOr25yb1Cx4XNriyPceBcqmc5T4jDpJXFpve9JCXpP7iMLg@mail.gmail.com>
- <20120709074337.GT30009@pengutronix.de>
- <CACKLOr05W5N4n9TSKdaCP-6-j+zDSr=aNG4QoTMVWXTrM30x7Q@mail.gmail.com>
- <20120709080703.GU30009@pengutronix.de>
- <CACKLOr0hfbv4qnp79XyXzNCE=oXS+7JA31knoXjGU+STG9Fxfg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1207201247500.27906@axis700.grange>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 20 Jul 2012 11:27:36 +0000
+Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device
+ tree data
+In-Reply-To: <20120720095935.GQ4495@opensource.wolfsonmicro.com>
+References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
+ <1342766789-28148-2-git-send-email-anilkumar@ti.com>
+ <20120720095935.GQ4495@opensource.wolfsonmicro.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier
+Hi Mark,
 
-Thanks for the patch
+Thanks for the review.
 
-On Mon, 9 Jul 2012, javier Martin wrote:
+On Fri, Jul 20, 2012 at 15:29:36, Mark Brown wrote:
+> On Fri, Jul 20, 2012 at 12:16:26PM +0530, AnilKumar Ch wrote:
+> 
+> > +		vio_reg: regulator at 1 {
+> > +			reg = <1>;
+> > +			regulator-compatible = "vio";
+> > +			regulator-min-microvolt = <1500000>;
+> > +			regulator-max-microvolt = <3300000>;
+> > +			regulator-always-on;
+> > +		};
+> 
+> Every regulator here has a rather large voltage range specified with no
+> consumers added.  Are you sure these voltage ranges make sense in your
+> design and you've not just cut'n'pasted the entire voltage range that
+> your regulator supports without reference to what your board can do?
+> 
 
-> On 9 July 2012 10:07, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Mon, Jul 09, 2012 at 09:46:03AM +0200, javier Martin wrote:
-> >> On 9 July 2012 09:43, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> > On Mon, Jul 09, 2012 at 09:37:25AM +0200, javier Martin wrote:
-> >> >> On 9 July 2012 09:28, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> >> > On Fri, Jul 06, 2012 at 12:56:02PM +0200, Javier Martin wrote:
-> >> >> >> This driver wasn't converted to the new clock changes
-> >> >> >> (clk_prepare_enable/clk_disable_unprepare). Also naming
-> >> >> >> of emma-prp related clocks for the i.MX27 was not correct.
-> >> >> >> ---
-> >> >> >> Enable clocks only for i.MX27.
-> >> >> >>
-> >> >> >
-> >> >> > Indeed,
-> >> >> >
-> >> >> >>
-> >> >> >> -     pcdev->clk_csi = clk_get(&pdev->dev, NULL);
-> >> >> >> -     if (IS_ERR(pcdev->clk_csi)) {
-> >> >> >> -             dev_err(&pdev->dev, "Could not get csi clock\n");
-> >> >> >> -             err = PTR_ERR(pcdev->clk_csi);
-> >> >> >> -             goto exit_kfree;
-> >> >> >> +     if (cpu_is_mx27()) {
-> >> >> >> +             pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
-> >> >> >> +             if (IS_ERR(pcdev->clk_csi)) {
-> >> >> >> +                     dev_err(&pdev->dev, "Could not get csi clock\n");
-> >> >> >> +                     err = PTR_ERR(pcdev->clk_csi);
-> >> >> >> +                     goto exit_kfree;
-> >> >> >> +             }
-> >> >> >
-> >> >> > but why? Now the i.MX25 won't get a clock anymore.
-> >> >>
-> >> >> What are the clocks needed by i.MX25? csi only?
-> >> >>
-> >> >> By the way, is anybody using this driver with i.MX25?
-> >> >
-> >> > It seems Baruch (added to Cc) has used it on an i.MX25.
-> >>
-> >> Baruch,
-> >> could you tell us what are the clocks needed by i.MX25?
-> >
-> > I just had a look and the i.MX25 it needs three clocks: ipg, ahb and
-> > peripheral clock. So this is broken anyway and should probably be fixed
-> > seperately, that is:
-> >
-> > - provide dummy clocks for the csi clocks on i.MX27
-> > - clk_get ipg, ahb and peripheral clocks on all SoCs
-> > - clk_get emma clocks on i.MX27 only
-> >
-> > As said, this is a separate topic, so your original patch should be fine
-> > for now.
+tps65217.dtsi is a generic file to be used by the SoCs so these constraints
+were taken from the regulator itself. SoC specific limits can be added in
+SoC specific .dts file to tighten the constraints to require limit. I have
+tested the driver with this approach.
 
-Well, sorry, but I don't think I can share this.
-
-1. it touches two areas - arch/ and drivers/ which isn?t a good thing and 
-   should be avoided wherever possible
-2. it addresses several problems: (a) missing name for "ahb" camera clock, 
-   (b) wrong device and connection names for emma clocks, (c) missing 
-   _(un)prepare suffixes in clock API
-3. it makes a possibly broken i.MX25 even more broken
-
-IIUC, mx2-camera is broken on i.MX27 in current next because of wrong 
-clock entries, right? So, we don't have to be bothered not to break 
-bisection - it is already broken. Then we can clean up the problems 
-separately under arch/ and drivers/.
-
-So, would it be possible to split this into 3 parts:
-
-(a) arch - fix clocks
-(b) media - fix clocks on i.MX27 _without_ breaking it even further on 
-    i.MX25. If we think i.MX25 support is already broken, let's schedule 
-    its removal and remove properly, or add BROKEN to Kconfig, when built 
-    on i.MX25. In your patch this would mean just adding an "else" to your 
-    "if (cpu_is_mx27())" statement and moving the current clk_get() there
-(c) add _(un)prepare.
-
-Since these are fixes, I won't wait too long for these. If you don't 
-resubmit them today, they'll go in after 3.6-rc1.
+Required consumers will be added while submitting the regulator dependent
+Consumers. One of the usecase I can specify here is MPU voltage control
+through DVFS framework. So if require, MPU consumer will be added along
+with the DVFS support.
 
 Thanks
-Guennadi
-
-> OK, thanks for your interest.
-> 
-> Regards.
-> -- 
-> Javier Martin
-> Vista Silicon S.L.
-> CDTUC - FASE C - Oficina S-345
-> Avda de los Castros s/n
-> 39005- Santander. Cantabria. Spain
-> +34 942 25 32 60
-> www.vista-silicon.com
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+AnilKumar
