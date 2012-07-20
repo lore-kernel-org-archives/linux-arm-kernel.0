@@ -1,54 +1,85 @@
-From: prabhakar.lad@ti.com (Prabhakar Lad)
-Date: Fri, 20 Jul 2012 20:11:31 +0530
-Subject: [PATCH] ARM: dm644x: fix clock setting and add vpss clock in VPSS
- driver
-Message-ID: <1342795291-17847-1-git-send-email-prabhakar.lad@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 20 Jul 2012 17:12:52 +0200
+Subject: [PATCH] IIO: Add basic MXS LRADC driver
+In-Reply-To: <50096723.2070409@metafoo.de>
+References: <1341368129-20468-1-git-send-email-marex@denx.de>
+ <201207192126.31772.marex@denx.de> <50096723.2070409@metafoo.de>
+Message-ID: <201207201712.52745.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.lad@ti.com>
+Dear Lars-Peter Clausen,
 
-fix clock setting for 480p and 576p. adjust appropriately
-without this patch we get out of range signal for this
-format. Add master and slave clock for VPSS driver
-which allows capture and display to independently work.
+> On 07/19/2012 09:26 PM, Marek Vasut wrote:
+> > Dear Lars-Peter Clausen,
+> > 
+> >> On 07/19/2012 04:23 PM, Marek Vasut wrote:
+> >>> Dear Lars-Peter Clausen,
+> >>> 
+> >>> Sorry for my late reply, got busy with other crazy stuff.
+> >>> 
+> >>> [...]
+> >>> 
+> >>>>>> Is there any reason not to use the mxs_lradc struct directly has the
+> >>>>>> iio data?
+> >>>>> 
+> >>>>> I explained it below in the patch. I hope we'll eventually support
+> >>>>> the delay triggers, which will need 4 separate IIO devices. And this
+> >>>>> is where this structure will be augmented by other components.
+> >>>> 
+> >>>> Ok I saw the comment, but it wasn't obvious to me that delay channels
+> >>>> will require multiple IIO devices. Might make sense to state this
+> >>>> explicitly.
+> >>> 
+> >>> Fixed.
+> >>> 
+> >>>>>>> [...]
+> >>>>>>> 
+> >>>>>>> +
+> >>>>>>> +/*
+> >>>>>>> + * Channel management
+> >>>>>>> + *
+> >>>>>>> + * This involves crazy mapping between 8 virtual channels the
+> >>>>>>> CTRL4 register + * can harbor and 16 channels total this hardware
+> >>>>>>> supports. + */
+> >>>>>> 
+> >>>>>> I suppose this means only a maximum 8 channels can be active at a
+> >>>>>> time. I've recently posted a patch which makes it easy to implement
+> >>>>>> such a restriction.
+> >>>>>> http://www.spinics.net/lists/linux-iio/msg05936.html and
+> >>>>>> http://www.spinics.net/lists/linux-iio/msg05935.html for an example
+> >>>>>> validate callback implementation. In your case you'd check for
+> >>>>>> bitmap_weight(...) <= 8. Those patches are not yet in IIO though.
+> >>>>> 
+> >>>>> This is good. When do you expect this to hit linux-next possibly? Or
+> >>>>> at least linux-iio?
+> >>>> 
+> >>>> soon, hopefully.
+> >>> 
+> >>> So I checked this, not sure how it'll help me though.
+> >> 
+> >> Right now with your driver you can enable any combination of channels.
+> >> If more than 8 channels are enabled and you start sampling it will
+> >> fail, since not all channels can be mapped. With those patch you can
+> >> implement a validate callback and check for bitmap_weight(scan_mask) <=
+> >> 8. This will ensure that it is not possible to select more than 8
+> >> channels at once, which again means that starting sampling can't fail
+> >> of this.
+> > 
+> > Ok, I fixed this one. One last thing that I don't really understand is
+> > this. I run generic_buffer.c to source samples from the LRADC. Is there
+> > any way to continuously sample them? Because right now, I get one sample
+> > and that's it, no more samples happen later on (I can 0 data in
+> > subsequent read() call).
+> 
+> I'd consider that a bug in your driver ;)
+> The intend with IIO is that once you start sampling by enabling the buffer
+> you get a continuous data stream until sampling is stopped and this works
+> fine with other drivers.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
----
- arch/arm/mach-davinci/dm644x.c |   12 +++++++++---
- 1 files changed, 9 insertions(+), 3 deletions(-)
+Ah! Thanks, I'll poke into this.
 
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 20b7f15..952f6ac 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -801,8 +801,7 @@ static int dm644x_venc_setup_clock(enum vpbe_enc_timings_type type,
- 		switch (mode) {
- 		case V4L2_DV_480P59_94:
- 		case V4L2_DV_576P50:
--			v |= DM644X_VPSS_MUXSEL_PLL2_MODE |
--			     DM644X_VPSS_DACCLKEN;
-+			v |= DM644X_VPSS_DACCLKEN;
- 			writel(v, DAVINCI_SYSMOD_VIRT(SYSMOD_VPSS_CLKCTL));
- 			break;
- 		case V4L2_DV_720P60:
-@@ -1005,8 +1004,15 @@ void __init dm644x_init(void)
- int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
- 				struct vpbe_config *vpbe_cfg)
- {
--	if (vpfe_cfg || vpbe_cfg)
-+	if (vpfe_cfg || vpbe_cfg) {
-+		/* Add vpss clock aliases */
-+		clk_add_alias("master", dm644x_vpss_device.name,
-+			      "vpss_master", NULL);
-+		clk_add_alias("slave", dm644x_vpss_device.name,
-+			      "vpss_slave", NULL);
-+
- 		platform_device_register(&dm644x_vpss_device);
-+	}
- 
- 	if (vpfe_cfg) {
- 		dm644x_vpfe_dev.dev.platform_data = vpfe_cfg;
--- 
-1.7.0.4
+> - Lars
+
+Best regards,
+Marek Vasut
