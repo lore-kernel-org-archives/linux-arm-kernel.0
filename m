@@ -1,46 +1,36 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 20 Jul 2012 15:11:25 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <87y5meu7dv.fsf@free.fr>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206271520.49276.arnd@arndb.de> <1342161907.1726.26.camel@vkoul-udesk3>
- <201207171924.33756.arnd@arndb.de> <1342756850.1726.74.camel@vkoul-udesk3>
- <87y5meu7dv.fsf@free.fr>
-Message-ID: <1342777285.1726.444.camel@vkoul-udesk3>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Jul 2012 10:42:49 +0100
+Subject: Boot breaks in -next from LEGACY to LINEAR conversion
+In-Reply-To: <CACxGe6utvV6XbJEck_UuVJxsqckPFZXG3psEgeQ1vZSBGAwm9Q@mail.gmail.com>
+References: <20120717185749.GJ4477@opensource.wolfsonmicro.com>
+ <20120718161023.GE4495@opensource.wolfsonmicro.com>
+ <CACxGe6utvV6XbJEck_UuVJxsqckPFZXG3psEgeQ1vZSBGAwm9Q@mail.gmail.com>
+Message-ID: <20120720094248.GM4495@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-20 at 11:08 +0200, Robert Jarzmik wrote:
-> Vinod Koul <vinod.koul@linux.intel.com> writes:
-> 
-> >> 4. A dma controller requiring complex configuration:
-> >> 
-> >>        dma: dmaengine at 48000000 {
-> >>                compatible = "foo,foo-sdma"
-> >>                reg = <0x48000000 0x1000>;
-> >>                interrupts = <4>;
-> >>                #dma-cells = <6>; /* phandle, flag, request, channel,
-> >> 					 input-width, output-width */
-> > Why would we want the widths to be here?
-> > Assuming a DMA from System memory to a peripheral, source width should
-> > be system memory width and destination the peripheral width. IMO these
-> > should not be in dma property even if we need these
-> Hi Vinod,
-> 
-> I know at least one peripheral which accepts 2 widths, 8bit and 16bit, namely the
-> M-Systems DiskOnChip G3 NAND chip.
-> This device has to configured to choose either 8bit data bus access or 16bit
-> data bus access.
-That would be configured by the client (peripheral) driver and passed to
-dmaengine driver using the slave config. The point is that it has
-nothing to do with dma.
+On Thu, Jul 19, 2012 at 10:30:11PM -0600, Grant Likely wrote:
 
-> 
-> I'm just wondering if that usecase will fit in without the width information
-> embedded, and how will the driver choose the width to use ?
-It you need, this should be the client property and passed as argument
-to dma, not a dma property :)
+> Okay, I've got a theory about what the issue is now. The .map()
+> callback is failing (returning non-zero) for one of the hwirqs. The
+> new code is stricter about associations, and actually unwinds the
+> associations if one of them fails. The old legacy code simply called
+> all the .map() hooks blindly without any error checking. Can you send
+> me the kernel log after backing out those changes.
 
+Looks like the error checking is the issue.  Always knew that was a bad
+idea :)  I've just sent a patch to improve the diagnostics here which
+might help a bit, though I realise now with some of my debug I need to
+send a v2 :/ .
 
--- 
-~Vinod
+On my system there's only one mapping failed, but it's for one of the
+VIC mappings which is rather unfortunate.  The error is there because
+the VIC is returning -ENOTSUPP to skip invalid IRQs which doesn't
+immediately seem like an awful thing to do for generic code like this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120720/e8c18b18/attachment-0001.sig>
