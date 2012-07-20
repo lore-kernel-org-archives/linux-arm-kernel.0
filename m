@@ -1,68 +1,30 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 20 Jul 2012 10:09:43 +0530
-Subject: [RFC][PATCH v2 1/1] ARM: OMAP2+: PM: Register suspend ops even
- in the presence of DT blob
-In-Reply-To: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
-References: <1342699728-19831-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <5008E10F.4080706@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 Jul 2012 22:47:54 -0600
+Subject: commit 91013923c712e1c: "irqdomain: Replace LEGACY mapping with
+ LINEAR" breaks console on ARM i.mx23
+In-Reply-To: <20120719192814.75ea8beb784bdf8bb32c510c@kinali.ch>
+References: <20120719192814.75ea8beb784bdf8bb32c510c@kinali.ch>
+Message-ID: <CACxGe6uLJqimjFg+E82+FZMDMmQrdfzzRqYvQWikej2sM=R_ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 July 2012 05:38 PM, Vaibhav Bedia wrote:
-> As per the comment in omap2_common_late_init() looks like the
-> original intent of the DT check was to treat only the PMIC
-> and SR initialization differently. Recent changes to consolidate
-> the suspend-resume code across OMAP3/4 resulted into the
-> registration of suspend ops also being dependent on the check
-> for DT blob. Since the suspend-resume operation should not
-> really be dependent on the usage of DT remove this dependency
-> by wrapping the PMIC and SR init under the DT check.
+On Thu, Jul 19, 2012 at 11:28 AM, Attila Kinali <attila@kinali.ch> wrote:
+> Hi,
+>
+> I'm working on an embedded system based on a Freescale ARM9 processor i.mx23.
+>
+> While trying linux-next i stumpled over my login prompt getting broken.
+> What exactly happens is that the kernel boots normally, but when my
+> login prompt should appear it suddenly stops. I bisected it back to
+> the commit 91013923c712e1c4b9b343f0ee4a86ce72b1b630
+> irqdomain: Replace LEGACY mapping with LINEAR
+>
+> Reverting this and the three commits that directly depend on it (see below)
+> everything seems to work fine again
 
-So I am guessing you also tested suspend/resume on your hardware
-with this patch, when booting with a DT blob, and it passed.
+Hi Attila,
 
->
-> Signed-off-by: Vaibhav Bedia<vaibhav.bedia@ti.com>
-> ---
-> v2->v1
->   - As suggested by Paul, Instead of moving around the suspend ops
->     registration just wrap the PMIC and SR init under the DT check.
->   - Fixed up Kevin's email address :\
->
->   arch/arm/mach-omap2/pm.c |   21 ++++++++++-----------
->   1 files changed, 10 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 9cb5ced..46848f7 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -302,19 +302,18 @@ int __init omap2_common_pm_late_init(void)
->   	 * a completely different mechanism.
->   	 * Disable this part if a DT blob is available.
->   	 */
-> -	if (of_have_populated_dt())
-> -		return 0;
-> +	if (!of_have_populated_dt()) {
-> +		/* Init the voltage layer */
-> +		omap_pmic_late_init();
-> +		omap_voltage_late_init();
->
-> -	/* Init the voltage layer */
-> -	omap_pmic_late_init();
-> -	omap_voltage_late_init();
-> +		/* Initialize the voltages */
-> +		omap3_init_voltages();
-> +		omap4_init_voltages();
->
-> -	/* Initialize the voltages */
-> -	omap3_init_voltages();
-> -	omap4_init_voltages();
-> -
-> -	/* Smartreflex device init */
-> -	omap_devinit_smartreflex();
-> +		/* Smartreflex device init */
-> +		omap_devinit_smartreflex();
-> +	}
->
->   #ifdef CONFIG_SUSPEND
->   	suspend_set_ops(&omap_pm_ops);
+Can you please send me your boot log /after/ removing these three patches?
+
+Thanks,
+g.
