@@ -1,45 +1,66 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 20 Jul 2012 18:52:20 +0530
-Subject: [PATCH] net: ethernet: davinci_emac: add pm_runtime support
-In-Reply-To: <1342736577-30477-1-git-send-email-mgreer@animalcreek.com>
-References: <1342736577-30477-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <50095B8C.3050502@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Jul 2012 16:25:35 +0300
+Subject: [PATCHv7 08/12] ARM: OMAP4430: PM: Work-around for ROM code
+ BUG of PER pwrst ctrl
+In-Reply-To: <alpine.DEB.2.00.1207191717220.14390@utopia.booyaka.com>
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+ <1342704392-23657-9-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1207191717220.14390@utopia.booyaka.com>
+Message-ID: <1342790735.4672.189.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Dave Miller and DaVinci list
-
-Hi Mark,
-
-On 7/20/2012 3:52 AM, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Thu, 2012-07-19 at 17:21 -0600, Paul Walmsley wrote:
+> Hi
 > 
-> Add pm_runtime support to the TI Davinci EMAC driver.
+> On Thu, 19 Jul 2012, Tero Kristo wrote:
 > 
-> CC: Sekhar Nori <nsekhar@ti.com>
-> CC: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-
-Tested on AM18x EVM using NFS root and suspend-to-RAM.
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-> ---
+> > On OMAP4430 HS / EMU chips, ROM code appears to re-configure L4PER domain
+> > next powerstate during wakeup from OSWR / OFF, programming it to ON.
+> > This will prevent successive entries to cpuidle retention / off, until
+> > kernel decices to change the L4PER target state, which can be delayed
+> > for a very long time as kernel is lazy programming the target state.
+> > 
+> > This patch fixes the issue within the low power OSWR / OFF mode code, so
+> > that this register is saved / restored across MPU OSWR / OFF state.
+> > 
+> > This problem seems to only occur with OMAP4430 HS/EMU, it does not impact
+> > OMAP4460+ or GP devices.
+> > 
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   39 ++++++++++++++++++++++++++++-
+> >  arch/arm/mach-omap2/pm.h                  |    1 +
+> >  arch/arm/mach-omap2/pm44xx.c              |   10 +++++++
+> >  3 files changed, 49 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > index 0e5f81b..963a61b 100644
+> > --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
 > 
-> a) This patch depends on a patch by Kevin Hilman that has been
->    accepted for 3.6 and is waiting in arm-soc/for-next:
->    ce9dcb8784611c50974d1c6b600c71f5c0a29308
->    (ARM: davinci: add runtime PM support for clock management)
-
-Since the patch does not have any dependency as far as applying it is
-concerned, I guess it can be queued through the network tree.
-
+> ...
 > 
-> b) Applies on top of current k.o. master:
->    3e4b9459fb0e149c6b74c9e89399a8fc39a92b44
->    (Merge tag 'md-3.5-fixes' of git://neil.brown.name/md)
+> > @@ -215,6 +225,28 @@ static void save_l2x0_context(void)
+> >  {}
+> >  #endif
+> >  
+> > +static inline void save_l4per_regs(void)
+> > +{
+> > +	int i;
+> > +
+> > +	if (!IS_PM44XX_ERRATUM(PM_OMAP4_ROM_L4PER_ERRATUM_PWSTCT))
+> > +		return;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(l4per_reg); i++)
+> > +		l4per_reg[i].val = __raw_readl(l4per_reg[i].addr);
+> 
+> This is accessing the system PRM registers directly.  We're trying to 
+> remove these raw register accesses from non-PRM code because a PRM driver 
+> is in the works.  Please move this to prm44xx.c or prminst44xx.c and 
+> implement a higher-level interface that omap-mpuss-lowpower.c can call.
 
-The patch will have to apply to net-next if it goes through the net tree.
+It looks like this can be dropped out for now completely, I guess I had
+a broken PPA on my board which was causing this problem.
 
-Thanks,
-Sekhar
+-Tero
