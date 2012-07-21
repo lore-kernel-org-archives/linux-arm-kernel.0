@@ -1,56 +1,59 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 21 Jul 2012 20:33:57 +0900
-Subject: [GIT PULL] Samsung cleanup-2 for v3.6
-In-Reply-To: <201207200905.50396.arnd@arndb.de>
-References: <142c01cd639c$2f081800$8d184800$%kim@samsung.com>
- <201207172058.28993.arnd@arndb.de>
- <194e01cd65fc$ce163be0$6a42b3a0$%kim@samsung.com>
- <201207200905.50396.arnd@arndb.de>
-Message-ID: <1b7801cd6734$b7625e90$26271bb0$%kim@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 21 Jul 2012 14:44:06 +0200
+Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <20120715081715.GA2429@S2100-06.ap.freescale.net>
+References: <1341850974-11977-1-git-send-email-marex@denx.de>
+ <1341850974-11977-2-git-send-email-marex@denx.de>
+ <20120713082249.GF32184@pengutronix.de>
+ <20120715081715.GA2429@S2100-06.ap.freescale.net>
+Message-ID: <20120721124406.GA9946@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Sun, Jul 15, 2012 at 04:17:16PM +0800, Shawn Guo wrote:
+> On Fri, Jul 13, 2012 at 10:22:49AM +0200, Wolfram Sang wrote:
+> > > +	/*
+> > > +	 * TODO: This is a temporary solution and should be changed
+> > > +	 * to use generic DMA binding later when the helpers get in.
+> > > +	 */
+> > 
+> > @Shawn: Any idea when this is going to happen? And why do we need this?
 > 
-> On Thursday 19 July 2012, Kukjin Kim wrote:
-> > > 2. If you can, please use signed tags for your pull requests rather
-> > > than branch names. A signed tag means that you can write the text
-> > > for the merge changeset yourself so I don't have to do the
-description.
-> > > Ideally the signing key should have signatures from other people in
-> the
-> > > keyring so everybody can check the authenticity of the request, but
-> > > just having the changelog there also helps.
-> > >
-> > OK, I see. I will try to use it as per your suggestion. But I'm not
-> familiar
-> > with that now. So if you don't mind I'd like to send signed tag from
-> next
-> > merge window :-)
-> 
-> No problem. It's not a big difference to me anyway. I suppose by then we
-> will
-> also have had the chance for keysigning at the ARM mini summit.
-> 
-Great, thanks.
+> See thread [1] for current statues.  I'm not sure when it's going to
+> happen though.
 
-BTW, maybe you missed following pull-request from me?
+Phew, [1] is a bit too much too read. I will just assume there are still
+issues.
 
-Samsung devel-2:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/110336.html
+> > AFAICT it will be always channel 6/7 on mx28?
+> > 
+> Yes, but it might be a different channel on mx23.  Just like we define
+> IO region and interrupt number in device tree, dma channel is just
+> another resource of hardware block that we choose to define in device
+> tree.
 
-Samsung devel-spi:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/110337.html
+What makes me wonder now that I come to think of it (not necessarily a
+question for Shawn but to all):
 
-Samsung board-3:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/110338.html
+If I have an I2C slave with an interrupt line tied to something, GPIO or
+external IRQ from the SoC, it makes perfect sense to define that in the
+devicetree.
 
-If any problems, please kindly let me know.
+Yet, if I know the compatible property for the mxs I2C driver, and also
+know the CPU type (be it MX23 or MX28), I can deduce from that a lot of
+information, including DMA channel. That is fix. Why encode it?
 
-Thanks.
+Regards,
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120721/bd4e8ae8/attachment.sig>
