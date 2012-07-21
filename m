@@ -1,42 +1,36 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 20 Jul 2012 17:24:56 -0500
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <20120713140021.GS18079@mudshark.cambridge.arm.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com> <20120713140021.GS18079@mudshark.cambridge.arm.com>
-Message-ID: <5009DAB8.7090001@ti.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 20 Jul 2012 18:12:40 -0700
+Subject: [PATCH 1/2] net: ethernet: davinci_emac: Remove unnecessary #include
+Message-ID: <1342833161-3314-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-On 07/13/2012 09:00 AM, Will Deacon wrote:
-> Jon,
-> 
-> [cutting out realms of context!]
-> 
-> On Fri, Jul 13, 2012 at 02:54:59PM +0100, Jon Hunter wrote:
->> Another proposal I also thought of is re-working the flags to describe
->> the HW mode to be used when turning on the CLKDM, when the CLKDM is
->> active and when the CLKDM is shut down. So instead of saying what modes
->> the CLKDM supports, specify what modes should be used for pre-ON (i.e.
->> turn ON), ON and OFF. Right now software is trying to decide for us by
->> what is available (which is ideal) but makes working around such nuances
->> a little more painful.
->>
->> By the way, I did do some testing on OMAP3, but I don't recall now
->> whether I was having such problems with OMAP3. I need to go back and
->> test perf again on OMAP3 to see if such a flag is needed.
-> 
-> If you do test on OMAP3, please kill the OMAP3_EMU option as I think this
-> has the effect of keeping the EMU power domain up via the etm code (look at
-> etb_probe).
+The '#include <mach/mux.h>' line in davinci_emac.c
+causes a compile error because that header file
+isn't found.  It turns out that the #include isn't
+needed because the driver isn't (and shoudn't be)
+touching the mux anyway, so remove it.
 
-You are right. Removing that options breaks PMU on OMAP3. I need to add
-hwmod support for the debugss on OMAP3.
+CC: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ drivers/net/ethernet/ti/davinci_emac.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Cheers
-Jon
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index b298ab0..1a9c43f 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -63,8 +63,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_net.h>
+ 
+-#include <mach/mux.h>
+-
+ #include <asm/irq.h>
+ #include <asm/page.h>
+ 
+-- 
+1.7.11.2
