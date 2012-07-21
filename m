@@ -1,141 +1,115 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Sat, 21 Jul 2012 16:02:07 +0530
-Subject: [PATCH 6/8 v2] ARM: EXYNOS5: Add machine data for USB3.0
+Date: Sat, 21 Jul 2012 16:02:05 +0530
+Subject: [PATCH 4/8 v2] ARM: EXYNOS5: Add EHCI device from device tree
 In-Reply-To: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
 References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1342866729-30460-7-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1342866729-30460-5-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock definitions and address mapping of PHY
-for USB3.0 in exynos5
+This patch adds EHCI device from device tree for exynos5
+and adds platform data.
 
 Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos5.c         |   24 ++++++++++++++++++++++++
- arch/arm/mach-exynos/common.c                |    5 +++++
- arch/arm/mach-exynos/include/mach/map.h      |    1 +
- arch/arm/mach-exynos/include/mach/regs-pmu.h |    4 ++++
- arch/arm/plat-samsung/include/plat/map-s5p.h |    2 ++
- drivers/usb/Kconfig                          |    1 +
- 6 files changed, 37 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/usb/exynos-usb.txt         |   22 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
+ arch/arm/boot/dts/exynos5250.dtsi                  |    6 +++++
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    8 +++++++
+ 4 files changed, 40 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index 774533c..af1b917 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -668,6 +668,11 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.enable		= exynos5_clk_ip_fsys_ctrl ,
- 		.ctrlbit	= (1 << 18),
- 	}, {
-+		.name		= "usbdrd30",
-+		.parent		= &exynos5_clk_aclk_200.clk,
-+		.enable		= exynos5_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 19),
-+	}, {
- 		.name		= "usbotg",
- 		.enable		= exynos5_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 7),
-@@ -909,6 +914,16 @@ struct clksrc_sources exynos5_clkset_group = {
- 	.nr_sources	= ARRAY_SIZE(exynos5_clkset_group_list),
+diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+index 63b80b9..45dadca 100644
+--- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
++++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+@@ -17,3 +17,25 @@ ohci {
+ 	interrupts = <0 71 0>;
  };
  
-+struct clk *exynos5_clkset_usbdrd30_list[] = {
-+	[0] = &exynos5_clk_mout_mpll.clk,
-+	[1] = &exynos5_clk_mout_cpll.clk,
++EHCI
++Required properties:
++ - compatible:	should be "samsung,exynos-ehci" for USB 2.0
++   EHCI controller in host mode.
++ - reg: physical base address of the controller and length
++   of memory mapped.
++ - interrupts: interrupt number to the cpu.
++
++Optional properties:
++ - samsung,vbus-gpio:  if present, specifies the GPIO
++   that needs to be pulled up for the bus to be powered.
++
++ehci {
++	compatible = "samsung,exynos-ehci";
++	reg = <0x12110000 0x100>;
++	interrupts = <0 71 0>;
 +};
 +
-+struct clksrc_sources exynos5_clkset_usbdrd30 = {
-+	.sources        = exynos5_clkset_usbdrd30_list,
-+	.nr_sources     = ARRAY_SIZE(exynos5_clkset_usbdrd30_list),
++ehci {
++	samsung,vbus-gpio = <&gpx2 6 1 3 3>;
 +};
 +
- /* Possible clock sources for aclk_266_gscl_sub Mux */
- static struct clk *clk_src_gscl_266_list[] = {
- 	[0] = &clk_ext_xtal_mux,
-@@ -1199,6 +1214,15 @@ static struct clksrc_clk exynos5_clksrcs[] = {
- 			.parent		= &exynos5_clk_mout_cpll.clk,
- 		},
- 		.reg_div = { .reg = EXYNOS5_CLKDIV_GEN, .shift = 4, .size = 3 },
-+	}, {
-+		.clk    = {
-+			.name           = "sclk_usbdrd30",
-+			.enable         = exynos5_clksrc_mask_fsys_ctrl,
-+			.ctrlbit        = (1 << 28),
-+		},
-+		.sources = &exynos5_clkset_usbdrd30,
-+		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 28, .size = 1 },
-+		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 24, .size = 4 },
- 	},
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 8a5e348..bf18286 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -109,4 +109,8 @@
+ 	spi_2: spi at 12d40000 {
+ 		status = "disabled";
+ 	};
++
++	ehci {
++		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 3c73d15..988f52a 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -64,6 +64,12 @@
+ 		interrupts = <0 71 0>;
+ 	};
+ 
++	ehci {
++		compatible = "samsung,exynos-ehci";
++		reg = <0x12110000 0x100>;
++		interrupts = <0 71 0>;
++	};
++
+ 	rtc {
+ 		compatible = "samsung,s3c6410-rtc";
+ 		reg = <0x101E0000 0x100>;
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index 39a4b34..0cc626e 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -20,6 +20,7 @@
+ #include <plat/cpu.h>
+ #include <plat/regs-serial.h>
+ #include <plat/usb-phy.h>
++#include <plat/ehci.h>
+ 
+ #include "common.h"
+ 
+@@ -28,6 +29,11 @@ static struct exynos4_ohci_platdata smdk5250_ohci_pdata = {
+ 	.phy_exit = s5p_usb_phy_exit,
  };
  
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 92d5e61..c17f1df 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -280,6 +280,11 @@ static struct map_desc exynos5_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_USB_PHY),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
-+	}, {
-+		.virtual        = (unsigned long)S5P_VA_DRD_PHY,
-+		.pfn            = __phys_to_pfn(EXYNOS5_PA_DRD_PHY),
-+		.length         = SZ_4K,
-+		.type           = MT_DEVICE,
- 	},
++static struct s5p_ehci_platdata smdk5250_ehci_pdata = {
++	.phy_init = s5p_usb_phy_init,
++	.phy_exit = s5p_usb_phy_exit,
++};
++
+ /*
+  * The following lookup table is used to override device names when devices
+  * are registered from device tree. This is temporarily added to enable
+@@ -65,6 +71,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
+ 	OF_DEV_AUXDATA("samsung,exynos-ohci", 0x12120000,
+ 				"exynos-ohci", &smdk5250_ohci_pdata),
++	OF_DEV_AUXDATA("samsung,exynos-ehci", 0x12110000,
++				"s5p-ehci", &smdk5250_ehci_pdata),
+ 	{},
  };
  
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 331ae57..b95b245 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -193,6 +193,7 @@
- #define EXYNOS5_PA_UART			0x12C00000
- 
- #define EXYNOS5_PA_USB_PHY		0x12130000
-+#define EXYNOS5_PA_DRD_PHY		0x12100000
- 
- #define EXYNOS4_PA_VP			0x12C00000
- #define EXYNOS4_PA_MIXER		0x12C10000
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index d4e392b..67132b4 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -39,6 +39,10 @@
- #define S5P_HDMI_PHY_CONTROL			S5P_PMUREG(0x0700)
- #define S5P_HDMI_PHY_ENABLE			(1 << 0)
- 
-+/* only for EXYNOS5250*/
-+#define S5P_USBDRD_PHY_CONTROL			S5P_PMUREG(0x0704)
-+#define S5P_USBDRD_PHY_ENABLE			(1 << 0)
-+
- #define S5P_DAC_PHY_CONTROL			S5P_PMUREG(0x070C)
- #define S5P_DAC_PHY_ENABLE			(1 << 0)
- 
-diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
-index c2d7bda..836863a 100644
---- a/arch/arm/plat-samsung/include/plat/map-s5p.h
-+++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
-@@ -40,6 +40,8 @@
- #define S5P_VA_GIC_CPU		S3C_ADDR(0x02810000)
- #define S5P_VA_GIC_DIST		S3C_ADDR(0x02820000)
- 
-+#define S5P_VA_DRD_PHY		S3C_ADDR(0x03000000)
-+
- #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
- #define VA_VIC0			VA_VIC(0)
- #define VA_VIC1			VA_VIC(1)
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index a7773a3..e9cbe34 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -53,6 +53,7 @@ config USB_ARCH_HAS_EHCI
- # some non-PCI HCDs implement xHCI
- config USB_ARCH_HAS_XHCI
- 	boolean
-+	default y if ARCH_EXYNOS5
- 	default PCI
- 
- menuconfig USB_SUPPORT
 -- 
 1.7.0.4
