@@ -1,58 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 21 Jul 2012 16:11:58 +0200
-Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <20120721124406.GA9946@pengutronix.de>
-References: <1341850974-11977-1-git-send-email-marex@denx.de>
- <20120715081715.GA2429@S2100-06.ap.freescale.net>
- <20120721124406.GA9946@pengutronix.de>
-Message-ID: <201207211611.58956.marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 21 Jul 2012 15:31:22 +0100
+Subject: [PATCH v2 05/15] ARM: integrator: use fixed PCI i/o mapping
+In-Reply-To: <5005A8A4.6040608@gmail.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <1342231451-28861-6-git-send-email-robherring2@gmail.com>
+ <CACRpkda_to3CzfhvOh-NDx_7Qz+Reg6m1k+uH2stRFy8KSqQmQ@mail.gmail.com>
+ <20120717170413.GG14624@mudshark.cambridge.arm.com>
+ <5005A8A4.6040608@gmail.com>
+Message-ID: <20120721143122.GA26790@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+Hi Rob,
 
-> On Sun, Jul 15, 2012 at 04:17:16PM +0800, Shawn Guo wrote:
-> > On Fri, Jul 13, 2012 at 10:22:49AM +0200, Wolfram Sang wrote:
-> > > > +	/*
-> > > > +	 * TODO: This is a temporary solution and should be changed
-> > > > +	 * to use generic DMA binding later when the helpers get in.
-> > > > +	 */
-> > > 
-> > > @Shawn: Any idea when this is going to happen? And why do we need this?
+On Tue, Jul 17, 2012 at 07:02:12PM +0100, Rob Herring wrote:
+> On 07/17/2012 12:04 PM, Will Deacon wrote:
+> > On Sat, Jul 14, 2012 at 10:49:47PM +0100, Linus Walleij wrote:
+> >> I think the PCI bus on my Integrator/AP is tilted and not suitable
+> >> for tests. But IIRC Will Deacon actually has one of these machines
+> >> and managed to get ethernet going on it. Maybe he can even test
+> >> this patch?
 > > 
-> > See thread [1] for current statues.  I'm not sure when it's going to
-> > happen though.
-> 
-> Phew, [1] is a bit too much too read. I will just assume there are still
-> issues.
-> 
-> > > AFAICT it will be always channel 6/7 on mx28?
+> > I can try digging out my integrator at the weekend if you like. Are these
+> > patches sitting in a branch anywhere that I can grab?
 > > 
-> > Yes, but it might be a different channel on mx23.  Just like we define
-> > IO region and interrupt number in device tree, dma channel is just
-> > another resource of hardware block that we choose to define in device
-> > tree.
 > 
-> What makes me wonder now that I come to think of it (not necessarily a
-> question for Shawn but to all):
-> 
-> If I have an I2C slave with an interrupt line tied to something, GPIO or
-> external IRQ from the SoC, it makes perfect sense to define that in the
-> devicetree.
-> 
-> Yet, if I know the compatible property for the mxs I2C driver, and also
-> know the CPU type (be it MX23 or MX28), I can deduce from that a lot of
-> information, including DMA channel. That is fix. Why encode it?
+> git://sources.calxeda.com/kernel/linux.git io-cleanup-pci
 
-You know the compatible and the "fallback compatible". From the later one, you 
-can deduce nothing if that happens to kick in.
+I dusted off the integrator, but I'm failing to boot at all if I build from
+that branch:
 
-btw. the PIO discussion on DT discuss is completely ignored. How shall we 
-proceed, this driver is stalled for too long.
+	Uncompressing Linux... done, booting the kernel.
+	<silence>
 
-> Regards,
-> 
->    Wolfram
+Using the same .config, I can boot v3.5-rc7 just fine (I even rebased your
+branch onto that in case something had been fixed in mainline, but it made
+no difference).
 
-Best regards,
-Marek Vasut
+Will
