@@ -1,38 +1,30 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 21 Jul 2012 14:38:13 +0800
-Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <CAMQu2gy4p+rL-sDAsGCnqSn_2eXwSqf---OS0BSXuDoacjd6_g@mail.gmail.com>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
- <CAMQu2gw32LogXJJa+K5ZjmCZzBNK3FY2wYwZXU8fsftsVzEO2Q@mail.gmail.com>
- <20120720123317.GA32263@S2101-09.ap.freescale.net>
- <CAJOA=zMQKLTumW7Nx68+yxHC5Yk4QyiL2mf1+TSZfVOAtnXDWA@mail.gmail.com>
- <CAMQu2gy4p+rL-sDAsGCnqSn_2eXwSqf---OS0BSXuDoacjd6_g@mail.gmail.com>
-Message-ID: <20120721063811.GA619@S2101-09.ap.freescale.net>
+Date: Sat, 21 Jul 2012 15:03:49 +0800
+Subject: [alsa-devel] [PATCH 1/4] ASoC: mxs-saif: fix clock prepare and
+ enable unbalance issue
+In-Reply-To: <1342776027-31758-2-git-send-email-b29396@freescale.com>
+References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
+ <1342776027-31758-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120721070346.GA923@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2012 at 10:34:29AM +0530, Shilimkar, Santosh wrote:
-> On Fri, Jul 20, 2012 at 9:20 PM, Turquette, Mike <mturquette@ti.com> wrote:
-> > How about cpufreq-single-thread.c and CONFIG_CPUFREQ_SINGLE_THREAD?
-> > That makes sense for both UP and SMP.
-> >
-> Indeed. This sounds more appropriate and also reflects what actually happens
-> with a UP or shared clock SMP case.
+On Fri, Jul 20, 2012 at 05:20:24PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-While I agree with this observation, the suggested naming does not
-reflect the rationale of CPU0 though, which is really important for
-driver to work, and is exactly the thing I like about *_CPU0 naming.
+> Currently we directly call a clock_enable in trigger function without
+> a clk_prepare as pair first.
+> This will cause system hang immediately when run capture because
+> the clock was not prepared(playback does not hang because the clock was
+> prepared already by get_mclk before), a warning message in clock framework
+> may cause a deadlock to reclaim clock lock (see: pl011_console_write).
+> 
+> Here we prepare clock first in hw_param, then enable it in trigger
+> function to guarantee the balance.
+> 
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-The driver needs the following stuff around CPU0 to be functional.
-
-- Device tree node /cpus/cpu at 0
-- clk lookup with dev_id being "cpu0"
-- regulator with id being "cpu0"
-
-I think the *_CPU0 naming does a better job on emphasising those in the
-first place.
-
--- 
-Regards,
-Shawn
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
