@@ -1,35 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jul 2012 22:10:28 +0000
-Subject: [PATCHv2 2/2] ARM: vt8500: Add support for UHCI companion
- controller
-In-Reply-To: <1342787373-2230-2-git-send-email-linux@prisktech.co.nz>
-References: <1342787373-2230-1-git-send-email-linux@prisktech.co.nz>
- <1342787373-2230-2-git-send-email-linux@prisktech.co.nz>
-Message-ID: <201207202210.28790.arnd@arndb.de>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Sat, 21 Jul 2012 16:02:03 +0530
+Subject: [PATCH 2/8 v2] ARM: EXYNOS5: Add machine data for USB 2.0
+In-Reply-To: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
+References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1342866729-30460-3-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 July 2012, Tony Prisk wrote:
-> Add support for a generic non-pci UHCI companion controller.
-> Existing board files for arch-vt8500 updated to include UHCI
-> support.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+From: Ajay Kumar <ajaykumar.rs@samsung.com>
 
-Looks almost good, but 
+This patch adds address mapping of USB 2.0 PHY for exynos5
 
-* please add a binding document
-* cc the maintainers and usb mailing list
-* the "of-uhci" string does not seem appropriate:
+Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
+ arch/arm/mach-exynos/common.c           |    5 +++++
+ arch/arm/mach-exynos/include/mach/map.h |    2 ++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
 
-> +static const struct of_device_id platform_uhci_ids[] = {
-> +	{ .compatible = "of-uhci", },
-> +	{}
-> +};
-
-The of- part is clearly meaningless in the binding that is about of
-devices. Using usb-uhci would be more appropriate I think, but maybe
-someone can come up with an even better name. Which consortium
-or company created uhci?
-
-	Arnd
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 4eb39cd..92d5e61 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -275,6 +275,11 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_USB_PHY),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index c72b675..331ae57 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -192,6 +192,8 @@
+ #define EXYNOS4_PA_UART			0x13800000
+ #define EXYNOS5_PA_UART			0x12C00000
+ 
++#define EXYNOS5_PA_USB_PHY		0x12130000
++
+ #define EXYNOS4_PA_VP			0x12C00000
+ #define EXYNOS4_PA_MIXER		0x12C10000
+ #define EXYNOS4_PA_SDO			0x12C20000
+-- 
+1.7.0.4
