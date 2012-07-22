@@ -1,28 +1,31 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 22 Jul 2012 16:43:19 +0300
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 22 Jul 2012 16:04:10 +0200
 Subject: [PATCH 1/7] stddev: make it selectable via Kconfig
-In-Reply-To: <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
+In-Reply-To: <20120722155013.417c9694@skate>
 References: <20120722130301.GI22657@game.jcrosoft.org>
  <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120722134318.GC27186@sapphire.tkos.co.il>
+ <20120722155013.417c9694@skate>
+Message-ID: <20120722140410.GD2629@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
-
-On Sun, Jul 22, 2012 at 03:18:56PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> enable is by default for simple and hush
-> we do not need to NO_SHELL
+On 15:50 Sun 22 Jul     , Thomas Petazzoni wrote:
+> Le Sun, 22 Jul 2012 15:18:56 +0200,
+> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
 > 
-> this allow to save 1KiB
+> > enable is by default for simple and hush
+> > we do not need to NO_SHELL
+> > 
+> > this allow to save 1KiB
+> > 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > ---
+> >  commands/Makefile |    2 +-
+> >  common/Kconfig    |    5 +++++
+> >  2 files changed, 6 insertions(+), 1 deletion(-)
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Hum, I guess this should have been sent to the barebox@ mailing list,
+> rather than the linux-arm-kernel@ mailing list, no?
+yeap I send it to the wrong ml
 
-Wrong list. This series was intended for the Barebox list.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Best Regards,
