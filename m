@@ -1,62 +1,44 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 22 Jul 2012 15:18:56 +0200
-Subject: [PATCH 1/7] stddev: make it selectable via Kconfig
-In-Reply-To: <20120722130301.GI22657@game.jcrosoft.org>
+Date: Sun, 22 Jul 2012 15:19:00 +0200
+Subject: [PATCH 5/7] ARM: add early malloc support needed by the decompressor
+In-Reply-To: <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120722130301.GI22657@game.jcrosoft.org>
-Message-ID: <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
+ <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1342963142-30339-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable is by default for simple and hush
-we do not need to NO_SHELL
-
-this allow to save 1KiB
+This is not needed by lzo but by gunzip, xz and others.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- commands/Makefile |    2 +-
- common/Kconfig    |    5 +++++
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/cpu/start.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/commands/Makefile b/commands/Makefile
-index 54191b4..e9157bf 100644
---- a/commands/Makefile
-+++ b/commands/Makefile
-@@ -1,4 +1,4 @@
--obj-y				+= stddev.o
-+obj-$(CONFIG_STDDEV)		+= stddev.o
- obj-$(CONFIG_CMD_BOOTM)		+= bootm.o
- obj-$(CONFIG_CMD_UIMAGE)	+= uimage.o
- obj-$(CONFIG_CMD_LINUX16)	+= linux16.o
-diff --git a/common/Kconfig b/common/Kconfig
-index 1c996aa..c6f1afa 100644
---- a/common/Kconfig
-+++ b/common/Kconfig
-@@ -50,6 +50,9 @@ config BINFMT
- config GLOBALVAR
- 	bool
+diff --git a/arch/arm/cpu/start.c b/arch/arm/cpu/start.c
+index 18c5c83..8ab6fdc 100644
+--- a/arch/arm/cpu/start.c
++++ b/arch/arm/cpu/start.c
+@@ -28,6 +28,9 @@
+ #include <asm-generic/memory_layout.h>
+ #include <asm/sections.h>
  
-+config STDDEV
-+	bool
++unsigned long free_mem_ptr;
++unsigned long free_mem_end_ptr;
 +
- menu "General Settings              "
+ #ifdef CONFIG_IMAGE_COMPRESSION
+ void __naked __section(.text_head_entry) compressed_start(void)
+ {
+@@ -158,6 +161,10 @@ void __naked __section(.text_ll_return) board_init_lowlevel_return(void)
+ 	/* clear bss */
+ 	memset(__bss_start, 0, __bss_stop - __bss_start);
  
- config LOCALVERSION
-@@ -295,6 +298,7 @@ choice
- 		select COMMAND_SUPPORT
- 		select PARAMETER
- 		select BINFMT
-+		select STDDEV
- 		help
- 		  Enable hush support. This is the most advanced shell available
- 		  for barebox.
-@@ -304,6 +308,7 @@ choice
- 		select ENVIRONMENT_VARIABLES
- 		select COMMAND_SUPPORT
- 		select PARAMETER
-+		select STDDEV
- 		help
- 		  simple shell. No if/then, no return values from commands, no loops
++	/* set 128 KiB before the STACK_BASE - 16 address for early malloc */
++	free_mem_ptr = STACK_BASE - 0x20000 - 16;
++	free_mem_end_ptr = STACK_BASE - 16;
++
+ 	/* flush I-cache before jumping to the copied binary */
+ 	__asm__ __volatile__("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
  
 -- 
 1.7.10
