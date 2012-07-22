@@ -1,44 +1,95 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 22 Jul 2012 15:19:00 +0200
-Subject: [PATCH 5/7] ARM: add early malloc support needed by the decompressor
+Date: Sun, 22 Jul 2012 15:18:59 +0200
+Subject: [PATCH 4/7] decompressor: import malloc/free implementation for linux
+ 3.4
 In-Reply-To: <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120722130301.GI22657@game.jcrosoft.org>
  <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1342963142-30339-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1342963142-30339-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not needed by lzo but by gunzip, xz and others.
+This is need for gunzip support
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/cpu/start.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+ include/linux/decompress/mm.h |   68 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+ create mode 100644 include/linux/decompress/mm.h
 
-diff --git a/arch/arm/cpu/start.c b/arch/arm/cpu/start.c
-index 18c5c83..8ab6fdc 100644
---- a/arch/arm/cpu/start.c
-+++ b/arch/arm/cpu/start.c
-@@ -28,6 +28,9 @@
- #include <asm-generic/memory_layout.h>
- #include <asm/sections.h>
- 
-+unsigned long free_mem_ptr;
-+unsigned long free_mem_end_ptr;
+diff --git a/include/linux/decompress/mm.h b/include/linux/decompress/mm.h
+new file mode 100644
+index 0000000..0c35411
+--- /dev/null
++++ b/include/linux/decompress/mm.h
+@@ -0,0 +1,68 @@
++/*
++ * linux/compr_mm.h
++ *
++ * Memory management for pre-boot and ramdisk uncompressors
++ *
++ * Authors: Alain Knaff <alain@knaff.lu>
++ *
++ */
 +
- #ifdef CONFIG_IMAGE_COMPRESSION
- void __naked __section(.text_head_entry) compressed_start(void)
- {
-@@ -158,6 +161,10 @@ void __naked __section(.text_ll_return) board_init_lowlevel_return(void)
- 	/* clear bss */
- 	memset(__bss_start, 0, __bss_stop - __bss_start);
- 
-+	/* set 128 KiB before the STACK_BASE - 16 address for early malloc */
-+	free_mem_ptr = STACK_BASE - 0x20000 - 16;
-+	free_mem_end_ptr = STACK_BASE - 16;
++#ifndef DECOMPR_MM_H
++#define DECOMPR_MM_H
 +
- 	/* flush I-cache before jumping to the copied binary */
- 	__asm__ __volatile__("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
- 
++#ifdef STATIC
++
++/* Code active when included from pre-boot environment: */
++
++/*
++ * Some architectures want to ensure there is no local data in their
++ * pre-boot environment, so that data can arbitrarily relocated (via
++ * GOT references).  This is achieved by defining STATIC_RW_DATA to
++ * be null.
++ */
++#ifndef STATIC_RW_DATA
++#define STATIC_RW_DATA static
++#endif
++
++/* A trivial malloc implementation, adapted from
++ *  malloc by Hannu Savolainen 1993 and Matthias Urlichs 1994
++ */
++STATIC_RW_DATA unsigned long malloc_ptr;
++STATIC_RW_DATA int malloc_count;
++
++static void *malloc(int size)
++{
++	void *p;
++
++	if (size < 0)
++		return NULL;
++	if (!malloc_ptr)
++		malloc_ptr = free_mem_ptr;
++
++	malloc_ptr = (malloc_ptr + 3) & ~3;     /* Align */
++
++	p = (void *)malloc_ptr;
++	malloc_ptr += size;
++
++	if (free_mem_end_ptr && malloc_ptr >= free_mem_end_ptr)
++		return NULL;
++
++	malloc_count++;
++	return p;
++}
++
++static void free(void *where)
++{
++	malloc_count--;
++	if (!malloc_count)
++		malloc_ptr = free_mem_ptr;
++}
++
++#define large_malloc(a) malloc(a)
++#define large_free(a) free(a)
++
++#define INIT
++
++#endif /* STATIC */
++
++#endif /* DECOMPR_MM_H */
 -- 
 1.7.10
