@@ -1,78 +1,62 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 22 Jul 2012 10:33:43 +0200
-Subject: [PATCH 2/2 V3] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <201207211754.29372.marex@denx.de>
-References: <1341850974-11977-1-git-send-email-marex@denx.de>
- <201207211611.58956.marex@denx.de>
- <20120721154153.GA25874@pengutronix.de>
- <201207211754.29372.marex@denx.de>
-Message-ID: <20120722083343.GA31508@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 22 Jul 2012 11:53:28 +0200
+Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
+In-Reply-To: <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
+References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
+ <1342805751-18048-3-git-send-email-andrew@lunn.ch>
+ <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
+Message-ID: <20120722095328.GB5423@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Even if the driver was matched because of an MX23-I2C "compatible"
-> > binding, both devicetree and runtime could provide data that it actually
-> > runs on MX28. That shouldn't be a problem.
+On Sun, Jul 22, 2012 at 09:22:09AM +0200, Linus Walleij wrote:
+> On Fri, Jul 20, 2012 at 7:35 PM, Andrew Lunn <andrew@lunn.ch> wrote:
 > 
-> You mean like ... cpu_is_mx28() ? We got rid of that in favor of DT.
-
-Might be. But the information is probably somewhere.
-
-> > IIRC I mentioned that a discussion about the bindings won't make the
-> > next merge window.
+> > Replace the deprecated master->transfer with transfer_one_message()
+> > and allow the SPI subsystem handle all the queuing of messages.
+> >
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
 > 
-> Yet another merge window, I have to mention. And only because very long pauses 
-> inbetween reviews and very minor nitpicks. I'm being annoyed by this patch so 
-> much I'm thinking of giving up on this. I wasted too much of my free time on 
-> this and the result is as is.
+> Send these with Mark Brown on the To: line right now, I think he's
+> busy collecting SPI patches for the next merge window.
 
-For you it might be a minor nitpick, for me (as a maintainer) it is not.
-You have to deal with just one binding, I have to deal with many. And
-since they have to be supported forever, this can easily mess up code
-and make the subsystem clumsy and whatnot.
+Hi Linus, Mark and now Arnd.
 
-> > That's why I proposed either module_parameter
-> 
-> Which I explained is not a way to go.
+I was planning sending all these via arm-soc. 
 
-That's why I called it inbetween solution so the patch could go in.
-It's fine if you don't like it, I prefer dropping the binding as well.
+This patch is part of a bigger collection of Orion changes. The rest
+are contributions from others which have already been ack-by, etc, on
+the lists.
 
-> > or
-> > dropping the binding entirely as possible inbetween options.
-> 
-> Which is not an option either.
+Somewhere near the beginning of this series is:
 
-It would enable you to add the binding as an out-of-tree patch.
+4385fbf SPI: Refactor spi-orion to use SPI framework queue.
+d9d8293 spi-orion: remove uneeded spi_info
+ee13b49 spi-orion: add device tree binding
+76f0b84 ARM: kirkwood: use devicetree for SPI on dreamplug
+05f504f ARM: kirkwood: use devicetree for orion-spi
 
-> And this discussion is only further stalling the 
-> patch.
+You can see the chain of dependencies here. So at minimum i would need
+to send the first three via Mark. I then need to cross my fingers and
+hope he really picks them up, because without them, we are going to
+have a number of boards which fail to find their root file system on
+an SPI flash.
 
+Now, maybe i've done all this wrong, since i'm a newbie to collecting
+patches together for submission upstream....
 
-> We're adding fsl,something properties all over the DT all the time, yet this one 
-> is of concern?
+You can see the complete set of patches here:
 
-Yes. Adding all these properties is IMO not the right way, and I have
-the impression they often came in because of time pressure like this. If
-I think it is wrong for the kernel, I have to reject a patch unless I am
-convinced otherwise. Which did not happen yet; as you found out
-discussions on devicetree-discuss are slow. Might be another indication
-that devictree things happen too much at the time currently. This is not
-specific to your patch, there are more which need discussion or had to
-be reworked.
+git://github.com/lunn/linux.git v3.5-rc7-for-next-v5
 
-Regards,
+There is one exception and that is the very first patch:
 
-   Wolfram
+I2C: MV64XXX: Add Device Tree support 
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120722/ce0a1af1/attachment.sig>
+which Wolfram Sang insists goes via him. I see this less critical. If
+for some reason it does not make it in, all it means is temperature
+sensors and RTCs are missing, but at least the boards still boot.
+
+	Andrew
