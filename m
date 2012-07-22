@@ -1,48 +1,48 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 22 Jul 2012 20:48:19 +0100
-Subject: [PATCH] IIO: Add basic MXS LRADC driver
-In-Reply-To: <5009668A.7090502@metafoo.de>
-References: <1341368129-20468-1-git-send-email-marex@denx.de>
- <50081AC0.10703@metafoo.de> <201207192126.31772.marex@denx.de>
- <201207200418.41554.marex@denx.de> <5009668A.7090502@metafoo.de>
-Message-ID: <500C5903.1090601@kernel.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sun, 22 Jul 2012 23:48:17 +0200
+Subject: [PATCH] ARM: mxs: enable ocotp on imx23 and imx28
+Message-ID: <1342993697-25875-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2012 03:09 PM, Lars-Peter Clausen wrote:
-> On 07/20/2012 04:18 AM, Marek Vasut wrote:
->>> Dear Lars-Peter Clausen,
-> 
->> [...]
->>
->> One more thing I'm curious about. There's another ADC block on the CPU, called 
->> HSADC (high-speed ADC). It can sample even up to 2Msamples/s. If I were to, say 
->> -- sample at 100kHz and be able to DMA the results into memory -- is there any 
->> way to push such results into userland somehow? Or how to operate such fast 
->> beast?
-> 
-> Proper support for high speed sampling is still something that's missing
-> from IIO. You can't mmap your buffers, you can't splice a IIO data stream to
-> another file descriptor, there is no support for zero copy. So your
-> bottleneck will become that you have to copy lots of data around. But it is
-> certainly something that will be added at some point. So implementing the
-> driver as a IIO driver is definitely the right direction.
+This patch adds ocotp support to imx23 and imx28, a dt-only kernel fails
+to link with this error message otherwise:
 
-Lars has pretty much covered it.  A long time back I had a cunning plan
-to wait for the tracing frameworks to agree on a one true ring buffer
-then leverage that work to get us everything we could want.
+arch/arm/mach-mxs/mach-mxs.c:169: undefined reference to `mxs_get_ocotp'
 
-Some of those buffers are extremely fast versatile and do fun things like
-splicing.  Also we have very little chance of introducing yet another complex
-buffer implementation to the kernel (which incidentally  is why we are ditching
-sw_ring - other than it being rubbish ;)  There were various articles on lwn
-about this work, but I haven't heard anything recently.  If anyone does
-want (and crucially have time) to look into high performance (and large) buffer
-options, that would be excellent!  It is definitely something we want to have.
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+Hello Shawn,
 
-Jonathan
+this applies to your "mxs/dt-for-3.6" tree. According to the datasheet
+both processors have a ocotp unit. Hope it alright to select the OCOTP
+on both imx23 and imx28.
 
+regards, Marc
 
-> 
-> - Lars
-> 
+ arch/arm/mach-mxs/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index ccdf83b..9dd743e 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -10,6 +10,7 @@ config SOC_IMX23
+ 	select ARM_AMBA
+ 	select CPU_ARM926T
+ 	select HAVE_PWM
++	select MXS_OCOTP
+ 	select PINCTRL_IMX23
+ 
+ config SOC_IMX28
+@@ -18,6 +19,7 @@ config SOC_IMX28
+ 	select CPU_ARM926T
+ 	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_PWM
++	select MXS_OCOTP
+ 	select PINCTRL_IMX28
+ 
+ comment "MXS platforms:"
+-- 
+1.7.10.4
