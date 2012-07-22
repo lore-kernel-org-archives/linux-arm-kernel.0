@@ -1,35 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 22 Jul 2012 21:32:43 +0200
-Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
-In-Reply-To: <20120722190700.GD4557@opensource.wolfsonmicro.com>
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-3-git-send-email-andrew@lunn.ch>
- <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
- <20120722095328.GB5423@lunn.ch>
- <20120722190700.GD4557@opensource.wolfsonmicro.com>
-Message-ID: <20120722193243.GF5423@lunn.ch>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 22 Jul 2012 12:46:57 -0700 (PDT)
+Subject: [PATCH v3 0/2] net: ethernet: davinci_emac: fixups + pm_runtime
+In-Reply-To: <1342833562-3435-1-git-send-email-mgreer@animalcreek.com>
+References: <1342833562-3435-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <20120722.124657.1259861132979869204.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2012 at 08:07:01PM +0100, Mark Brown wrote:
-> On Sun, Jul 22, 2012 at 11:53:28AM +0200, Andrew Lunn wrote:
+From: "Mark A. Greer" <mgreer@animalcreek.com>
+Date: Fri, 20 Jul 2012 18:19:20 -0700
+
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 > 
-> > You can see the chain of dependencies here. So at minimum i would need
-> > to send the first three via Mark. I then need to cross my fingers and
-> > hope he really picks them up, because without them, we are going to
-> > have a number of boards which fail to find their root file system on
-> > an SPI flash.
+> This series fixes a compile error in, and adds pm_runtime support
+> to, the davinci_emac driver.
 > 
-> Well, I'd like to think that generally I'm reasonably responsive to
-> patch submissions 
+> To test on a davinci platform, you will need another patch just
+> submitted to netdev:
+> 
+> 	http://marc.info/?l=linux-netdev&m=134282758408187&w=2
+> 
+> Mark A. Greer (2):
+>   net: ethernet: davinci_emac: Remove unnecessary #include
+>   net: ethernet: davinci_emac: add pm_runtime support
 
-Well, this particular patch was first submitted May 19th and Ack-by
-Linus on May 14th.
-
-http://comments.gmane.org/gmane.linux.kernel.spi.devel/9937
-
-It was reposted 10 Jun and Acked-by again in Jun 10 by Linus.
-
-It was also reposted July 3.
-
-   Andrew
+All applied to net-next, thanks.
