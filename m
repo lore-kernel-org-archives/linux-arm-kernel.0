@@ -1,62 +1,75 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 22 Jul 2012 11:53:28 +0200
-Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
-In-Reply-To: <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-3-git-send-email-andrew@lunn.ch>
- <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
-Message-ID: <20120722095328.GB5423@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 Jul 2012 10:01:43 +0000
+Subject: arm-allnoconfig error: '__LINUX_ARM_ARCH__' undeclared
+In-Reply-To: <20120722024313.GD8279@localhost>
+References: <20120722024313.GD8279@localhost>
+Message-ID: <201207221001.43528.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2012 at 09:22:09AM +0200, Linus Walleij wrote:
-> On Fri, Jul 20, 2012 at 7:35 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+On Sunday 22 July 2012, Fengguang Wu wrote:
+> Kernel build failed on arm-allnoconfig:
 > 
-> > Replace the deprecated master->transfer with transfer_one_message()
-> > and allow the SPI subsystem handle all the queuing of messages.
-> >
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
+> include/linux/math64.h:55:15: error: '__LINUX_ARM_ARCH__' undeclared (first use in this function)
+> arch/arm/include/asm/glue-cache.h:129:2: error: #error Unknown cache maintenance model
+> arch/arm/include/asm/glue-df.h:99:2: error: #error Unknown data abort handler type
+> arch/arm/include/asm/glue-pf.h:54:2: error: #error Unknown prefetch abort handler type
 > 
-> Send these with Mark Brown on the To: line right now, I think he's
-> busy collecting SPI patches for the next merge window.
+> Do you think this allnoconfig test meaningful at all?
 
-Hi Linus, Mark and now Arnd.
+The allno/mod/yesconfig tests on ARM are somewhat limited in their
+usefulness at the moment because they always pick the same platform
+type (versatile) and don't really cover the cases that most people
+are interested in.
 
-I was planning sending all these via arm-soc. 
+The particular problem with allnoconfig is that the logic to determine
+the architecture level depends on at least one platform being selected,
+and there are also problems with nommu kernels that tend to not work
+if certain other options are not set correctly. 
 
-This patch is part of a bigger collection of Orion changes. The rest
-are contributions from others which have already been ack-by, etc, on
-the lists.
+We can make the nommu case go away if we make hide the option for
+non-expert configurations including allnoconfig. I suggested adding
+some logic to all the subarch Kconfig files that forces at least
+one of the boards to be enabled like the patch below, but a number
+of people didn't like it.
 
-Somewhere near the beginning of this series is:
+For reference, here is what I would use in order to get 'make
+allnoconfig' to work on ARM. My impression is at the moment that
+we should make a more serious attempt at fixing all the possible
+configurations when we get to 'multiplatform' configurations,
+because that will be more interesting than doing it just for
+the versatile platform.
 
-4385fbf SPI: Refactor spi-orion to use SPI framework queue.
-d9d8293 spi-orion: remove uneeded spi_info
-ee13b49 spi-orion: add device tree binding
-76f0b84 ARM: kirkwood: use devicetree for SPI on dreamplug
-05f504f ARM: kirkwood: use devicetree for orion-spi
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-You can see the chain of dependencies here. So at minimum i would need
-to send the first three via Mark. I then need to cross my fingers and
-hope he really picks them up, because without them, we are going to
-have a number of boards which fail to find their root file system on
-an SPI flash.
-
-Now, maybe i've done all this wrong, since i'm a newbie to collecting
-patches together for submission upstream....
-
-You can see the complete set of patches here:
-
-git://github.com/lunn/linux.git v3.5-rc7-for-next-v5
-
-There is one exception and that is the very first patch:
-
-I2C: MV64XXX: Add Device Tree support 
-
-which Wolfram Sang insists goes via him. I see this less critical. If
-for some reason it does not make it in, all it means is temperature
-sensors and RTCs are missing, but at least the boards still boot.
-
-	Andrew
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a306d6d..e43e743 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -236,7 +236,7 @@ source "kernel/Kconfig.freezer"
+ menu "System Type"
+ 
+ config MMU
+-	bool "MMU-based Paged Memory Management Support"
++	bool "MMU-based Paged Memory Management Support" if EXPERT
+ 	default y
+ 	help
+ 	  Select if you want MMU-based virtualised addressing space
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+index c1f38f6..455f20a 100644
+--- a/arch/arm/mach-versatile/Kconfig
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -25,4 +25,13 @@ config MACH_VERSATILE_DT
+ 	  Include support for the ARM(R) Versatile/PB platform,
+ 	  using the device tree for discovery
+ 
++config MACH_VERSATILE_AUTO
++	def_bool y
++	depends on !ARCH_VERSATILE_PB
++	depends on !MACH_VERSATILE_AB
++	select MACH_VERSATILE_DT
++	help
++	  We autoselect MACH_VERSATILE_DT if both PB and AB are
++	  disabled, to ensure that at least one platform is enabled.
++
+ endmenu
