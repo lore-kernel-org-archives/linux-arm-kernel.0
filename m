@@ -1,157 +1,278 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 22 Jul 2012 15:18:58 +0200
-Subject: [PATCH 3/7] compressed image: factorise compressor type
+Date: Sun, 22 Jul 2012 15:19:01 +0200
+Subject: [PATCH 6/7] compressed: allow to link only what is needed
 In-Reply-To: <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120722130301.GI22657@game.jcrosoft.org>
  <1342963142-30339-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1342963142-30339-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1342963142-30339-6-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will simplify to support of multi compressor support such as gzip, lzma,
-xz.
+Today we link to whole barebox and rely on gcc to cleanup via it's garbage
+collector.
+
+Now we specify only what is needed and introduce a new directory with source
+only related to the compressed target.
+
+The architecture will have to specify the needed file for the link via comp-arch-y.
+
+Import string functions from linux 3.4 (arch/arm/boot/compressed/string.c) and
+implement a dummy panic.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- Makefile                   |   12 +++++++-----
- arch/arm/cpu/start.c       |    9 ++++++---
- arch/arm/lib/Makefile      |    2 +-
- arch/arm/lib/barebox.lds.S |    2 +-
- common/Kconfig             |   17 ++++++++++++++---
- 5 files changed, 29 insertions(+), 13 deletions(-)
+ Makefile            |   16 ++++---
+ arch/arm/Makefile   |    7 +++
+ compressed/Makefile |    5 ++
+ compressed/misc.c   |   10 ++++
+ compressed/string.c |  127 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 159 insertions(+), 6 deletions(-)
+ create mode 100644 compressed/Makefile
+ create mode 100644 compressed/misc.c
+ create mode 100644 compressed/string.c
 
 diff --git a/Makefile b/Makefile
-index e0a3c07..0b3da03 100644
+index 0b3da03..d6a3ae5 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -715,20 +715,22 @@ barebox-uncompressed: $(barebox-lds) $(barebox-head) $(barebox-common) $(kallsym
- barebox-uncompressed.bin: barebox-uncompressed
- 	$(call if_changed,objcopy)
+@@ -412,6 +412,7 @@ scripts: scripts_basic include/config/auto.conf
  
-+suffix_$(CONFIG_IMAGE_COMPRESSION_LZO)	= lzo
-+
- barebox-uncompressed.bin.lzo: barebox-uncompressed.bin
- 	@echo "  LZO    " $@
- 	$(Q)lzop -f -9 -o $@ barebox-uncompressed.bin
+ # Objects we will link into barebox / subdirs we need to visit
+ common-y		:= common/ drivers/ commands/ lib/ crypto/ net/ fs/
++comp-y			:= compressed/
  
--piggy.lzo.o: barebox-uncompressed.bin.lzo $(src)/piggy.lzo.S
-+piggy.$(suffix_y).o: barebox-uncompressed.bin.$(suffix_y) $(src)/piggy.$(suffix_y).S
- 	@echo "  CC     " $@
--	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) -c $(src)/piggy.lzo.S -o $@
-+	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) -c $(src)/piggy.$(suffix_y).S -o $@
+ ifeq ($(dot-config),1)
+ # Read in config
+@@ -474,7 +475,7 @@ CFLAGS += $(call cc-option,-Wno-pointer-sign,)
+ # this default value
+ export KBUILD_IMAGE ?= barebox
  
--ifdef CONFIG_IMAGE_COMPRESSION_LZO
--barebox: piggy.lzo.o
-+ifdef CONFIG_IMAGE_COMPRESSION
-+barebox: piggy.$(suffix_y).o
- 	@echo "  LD     " $@
+-barebox-dirs	:= $(patsubst %/,%,$(filter %/, $(common-y)))
++barebox-dirs	:= $(patsubst %/,%,$(filter %/, $(common-y) $(comp-y)))
+ 
+ barebox-alldirs	:= $(sort $(barebox-dirs) $(patsubst %/,%,$(filter %/, \
+ 		     $(common-n) $(common-) \
+@@ -482,6 +483,8 @@ barebox-alldirs	:= $(sort $(barebox-dirs) $(patsubst %/,%,$(filter %/, \
+ 		     $(net-n)  $(net-)  $(libs-n)    $(libs-))))
+ 
+ common-y	:= $(patsubst %/, %/built-in.o, $(common-y))
++comp-y		:= $(patsubst %/, %/built-in.o, $(comp-y))
++comp-arch-y	:= $(patsubst %/, %/built-in.o, $(comp-arch-y))
+ 
+ # Build barebox
+ # ---------------------------------------------------------------------------
+@@ -509,8 +512,9 @@ common-y	:= $(patsubst %/, %/built-in.o, $(common-y))
+ #
+ # System.map is generated to document addresses of all kernel symbols
+ 
++barebox-comp := $(comp-y)
+ barebox-common := $(common-y)
+-barebox-all    := $(barebox-common)
++barebox-all    := $(barebox-common) $(barebox-comp)
+ barebox-lds    := $(lds-y)
+ barebox-compressed-lds    := $(lds-compressed-y)
+ 
+@@ -726,11 +730,11 @@ piggy.$(suffix_y).o: barebox-uncompressed.bin.$(suffix_y) $(src)/piggy.$(suffix_
+ 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) -c $(src)/piggy.$(suffix_y).S -o $@
+ 
+ ifdef CONFIG_IMAGE_COMPRESSION
+-barebox: piggy.$(suffix_y).o
+-	@echo "  LD     " $@
++barebox: piggy.$(suffix_y).o $(barebox-comp)
++	@echo "  LD     " $@ $(barebox-comp)
  	$(Q)$(LD) $(LDFLAGS) $(LDFLAGS_barebox) -o $@ \
  		-T $(barebox-compressed-lds) \
--		--start-group $(barebox-common) piggy.lzo.o --end-group
-+		--start-group $(barebox-common) piggy.$(suffix_y).o --end-group
+-		--start-group $(barebox-common) piggy.$(suffix_y).o --end-group
++		--start-group $(barebox-comp) $(comp-arch-y) piggy.$(suffix_y).o --end-group
  else
  barebox: $(barebox-lds) $(barebox-head) $(barebox-common) $(kallsyms.o) FORCE
  	$(call barebox-modpost)
-diff --git a/arch/arm/cpu/start.c b/arch/arm/cpu/start.c
-index 6743804..18c5c83 100644
---- a/arch/arm/cpu/start.c
-+++ b/arch/arm/cpu/start.c
-@@ -28,7 +28,7 @@
- #include <asm-generic/memory_layout.h>
- #include <asm/sections.h>
+@@ -743,7 +747,7 @@ barebox.srec: barebox
  
--#ifdef CONFIG_IMAGE_COMPRESSION_LZO
-+#ifdef CONFIG_IMAGE_COMPRESSION
- void __naked __section(.text_head_entry) compressed_start(void)
- {
- 	barebox_arm_head();
-@@ -101,7 +101,10 @@ extern void *input_data;
- extern void *input_data_end;
+ # The actual objects are generated when descending,
+ # make sure no implicit rule kicks in
+-$(sort $(barebox-head) $(barebox-common) ) $(barebox-lds): $(barebox-dirs) ;
++$(sort $(barebox-head) $(barebox-common) $(barebox-comp) ) $(barebox-lds): $(barebox-dirs) ;
  
- #define STATIC static
+ # Handle descending into subdirectories listed in $(barebox-dirs)
+ # Preset locale variables to speed up the build process. Limit locale
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a93c4d5..0c666dc 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -207,6 +207,13 @@ endif
+ common-y += $(BOARD) $(MACH)
+ common-y += arch/arm/lib/ arch/arm/cpu/
+ 
++# those file will not be recompibled
++# we assume they are already compiled
++# for the normal barebox
++comp-arch-y += arch/arm/lib/lib1funcs.o
++comp-arch-y += arch/arm/lib/div0.o
++comp-arch-y += arch/arm/cpu/start.o
 +
-+#ifdef CONFIG_IMAGE_COMPRESSION_LZO
- #include "../../../lib/decompress_unlzo.c"
-+#endif
+ lds-y	:= arch/arm/lib/barebox.lds
+ lds-compressed-y := arch/arm/lib/barebox-compressed.lds
  
- void barebox_uncompress(void *compressed_start, unsigned int len)
- {
-@@ -112,7 +115,7 @@ void barebox_uncompress(void *compressed_start, unsigned int len)
- 	else
- 		barebox = (void *)TEXT_BASE;
- 
--	decompress_unlzo((void *)compressed_start,
-+	decompress((void *)compressed_start,
- 			len,
- 			NULL, NULL,
- 			(void *)TEXT_BASE, NULL, NULL);
-@@ -158,7 +161,7 @@ void __naked __section(.text_ll_return) board_init_lowlevel_return(void)
- 	/* flush I-cache before jumping to the copied binary */
- 	__asm__ __volatile__("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
- 
--	if (IS_ENABLED(CONFIG_IMAGE_COMPRESSION_LZO)) {
-+	if (IS_ENABLED(CONFIG_IMAGE_COMPRESSION)) {
- 		compressed_start = (uint32_t)&input_data - offset;
- 		compressed_end = (uint32_t)&input_data_end - offset;
- 		len = compressed_end - compressed_start;
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index 044d3e6..1b6f7f4 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -21,4 +21,4 @@ obj-$(CONFIG_ARM_OPTIMZED_STRING_FUNCTIONS)	+= memset.o
- obj-$(CONFIG_ARM_UNWIND) += unwind.o
- obj-$(CONFIG_MODULES) += module.o
- extra-y += barebox.lds
--extra-$(CONFIG_IMAGE_COMPRESSION_LZO) += barebox-compressed.lds
-+extra-$(CONFIG_IMAGE_COMPRESSION) += barebox-compressed.lds
-diff --git a/arch/arm/lib/barebox.lds.S b/arch/arm/lib/barebox.lds.S
-index b415830..b22cf98 100644
---- a/arch/arm/lib/barebox.lds.S
-+++ b/arch/arm/lib/barebox.lds.S
-@@ -31,7 +31,7 @@ SECTIONS
- {
- 	. = TEXT_BASE;
- 
--#ifndef CONFIG_IMAGE_COMPRESSION_LZO
-+#ifndef CONFIG_IMAGE_COMPRESSION
- 	PRE_IMAGE
- #endif
- 	. = ALIGN(4);
-diff --git a/common/Kconfig b/common/Kconfig
-index c6f1afa..8437e1c 100644
---- a/common/Kconfig
-+++ b/common/Kconfig
-@@ -99,9 +99,20 @@ menu "memory layout                 "
- config HAVE_IMAGE_COMPRESSION
- 	bool
- 
-+config IMAGE_COMPRESSION
-+	bool "Compressed image"
+diff --git a/compressed/Makefile b/compressed/Makefile
+new file mode 100644
+index 0000000..720a0cb
+--- /dev/null
++++ b/compressed/Makefile
+@@ -0,0 +1,5 @@
++#
++# only unsed by the decompressor
++#
++obj-y += misc.o
++obj-y += string.o
+diff --git a/compressed/misc.c b/compressed/misc.c
+new file mode 100644
+index 0000000..7bb0f50
+--- /dev/null
++++ b/compressed/misc.c
+@@ -0,0 +1,10 @@
++#include <common.h>
++#include <init.h>
++#include <linux/types.h>
++#include <linux/string.h>
++#include <linux/ctype.h>
 +
-+if IMAGE_COMPRESSION
++void __noreturn panic(const char *fmt, ...)
++{
++	while(1);
++}
+diff --git a/compressed/string.c b/compressed/string.c
+new file mode 100644
+index 0000000..6787e82
+--- /dev/null
++++ b/compressed/string.c
+@@ -0,0 +1,127 @@
++/*
++ * arch/arm/boot/compressed/string.c
++ *
++ * Small subset of simple string routines
++ */
 +
-+choice
-+	prompt "Compression"
++#include <linux/types.h>
 +
- config IMAGE_COMPRESSION_LZO
--	depends on HAVE_IMAGE_COMPRESSION
--	bool "lzo compressed image"
-+	bool "lzo"
++void *memcpy(void *__dest, __const void *__src, size_t __n)
++{
++	int i = 0;
++	unsigned char *d = (unsigned char *)__dest, *s = (unsigned char *)__src;
 +
-+endchoice
++	for (i = __n >> 3; i > 0; i--) {
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++	}
 +
-+endif
- 
- config MMU
- 	bool "Enable MMU"
-@@ -185,7 +196,7 @@ config MALLOC_SIZE
- 	prompt "malloc area size"
- 
- config HEAD_TEXT_BASE
--	depends on MEMORY_LAYOUT_FIXED && IMAGE_COMPRESSION_LZO
-+	depends on MEMORY_LAYOUT_FIXED && IMAGE_COMPRESSION
- 	hex
- 	prompt "HEAD_TEXT_BASE"
- endmenu
++	if (__n & 1 << 2) {
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++	}
++
++	if (__n & 1 << 1) {
++		*d++ = *s++;
++		*d++ = *s++;
++	}
++
++	if (__n & 1)
++		*d++ = *s++;
++
++	return __dest;
++}
++
++void *memmove(void *__dest, __const void *__src, size_t count)
++{
++	unsigned char *d = __dest;
++	const unsigned char *s = __src;
++
++	if (__dest == __src)
++		return __dest;
++
++	if (__dest < __src)
++		return memcpy(__dest, __src, count);
++
++	while (count--)
++		d[count] = s[count];
++	return __dest;
++}
++
++size_t strlen(const char *s)
++{
++	const char *sc = s;
++
++	while (*sc != '\0')
++		sc++;
++	return sc - s;
++}
++
++int memcmp(const void *cs, const void *ct, size_t count)
++{
++	const unsigned char *su1 = cs, *su2 = ct, *end = su1 + count;
++	int res = 0;
++
++	while (su1 < end) {
++		res = *su1++ - *su2++;
++		if (res)
++			break;
++	}
++	return res;
++}
++
++int strcmp(const char *cs, const char *ct)
++{
++	unsigned char c1, c2;
++	int res = 0;
++
++	do {
++		c1 = *cs++;
++		c2 = *ct++;
++		res = c1 - c2;
++		if (res)
++			break;
++	} while (c1);
++	return res;
++}
++
++void *memchr(const void *s, int c, size_t count)
++{
++	const unsigned char *p = s;
++
++	while (count--)
++		if ((unsigned char)c == *p++)
++			return (void *)(p - 1);
++	return NULL;
++}
++
++char *strchr(const char *s, int c)
++{
++	while (*s != (char)c)
++		if (*s++ == '\0')
++			return NULL;
++	return (char *)s;
++}
++
++#undef memset
++
++void *memset(void *s, int c, size_t count)
++{
++	char *xs = s;
++	while (count--)
++		*xs++ = c;
++	return s;
++}
++
++void __memzero(void *s, size_t count)
++{
++	memset(s, 0, count);
++}
 -- 
 1.7.10
