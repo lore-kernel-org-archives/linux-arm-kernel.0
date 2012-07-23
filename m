@@ -1,15 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 23 Jul 2012 22:40:44 +0200
-Subject: [PATCH 02/10 RESEND] mmc: spi: Rename IMX2[38]_MMC to IMX2[38]_SSP
+Date: Mon, 23 Jul 2012 22:40:43 +0200
+Subject: [PATCH 01/10 RESEND] mmc: spi: Move SSP register definitions into
+ separate file
 In-Reply-To: <1343076052-27312-1-git-send-email-marex@denx.de>
 References: <1343076052-27312-1-git-send-email-marex@denx.de>
-Message-ID: <1343076052-27312-3-git-send-email-marex@denx.de>
+Message-ID: <1343076052-27312-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the SSP controller can act as both SPI and MMC host,
-renaming the enum to properly reflect the naming seems
-appropriate.
+Move the definitions into separate file so separate SPI driver can be
+implemented. The SSP controller in MXS can act both as a MMC host and
+as a SPI host.
 
 Based on previous attempt by:
 Fabio Estevam <fabio.estevam@freescale.com>
@@ -24,95 +25,233 @@ Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 CC: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/mmc/host/mxs-mmc.c  |   18 +++++++++---------
- include/linux/spi/mxs-spi.h |    8 ++++----
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/mmc/host/mxs-mmc.c  |   87 ++--------------------------------
+ include/linux/spi/mxs-spi.h |  109 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 112 insertions(+), 84 deletions(-)
+ create mode 100644 include/linux/spi/mxs-spi.h
 
 diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 26c95dc..e80c2b6 100644
+index a51f930..26c95dc 100644
 --- a/drivers/mmc/host/mxs-mmc.c
 +++ b/drivers/mmc/host/mxs-mmc.c
-@@ -78,7 +78,7 @@ struct mxs_mmc_host {
- 	enum dma_transfer_direction	slave_dirn;
- 	u32				ssp_pio_words[SSP_PIO_NUM];
+@@ -45,87 +45,10 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/stmp_device.h>
+ #include <linux/mmc/mxs-mmc.h>
++#include <linux/spi/mxs-spi.h>
  
--	enum mxs_mmc_id			devid;
-+	enum mxs_ssp_id			devid;
- 	unsigned char			bus_width;
- 	spinlock_t			lock;
- 	int				sdio_irq_en;
-@@ -601,22 +601,22 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
- 	return true;
- }
+ #define DRIVER_NAME	"mxs-mmc"
  
--static struct platform_device_id mxs_mmc_ids[] = {
-+static struct platform_device_id mxs_ssp_ids[] = {
- 	{
- 		.name = "imx23-mmc",
--		.driver_data = IMX23_MMC,
-+		.driver_data = IMX23_SSP,
- 	}, {
- 		.name = "imx28-mmc",
--		.driver_data = IMX28_MMC,
-+		.driver_data = IMX28_SSP,
- 	}, {
- 		/* sentinel */
- 	}
- };
--MODULE_DEVICE_TABLE(platform, mxs_mmc_ids);
-+MODULE_DEVICE_TABLE(platform, mxs_ssp_ids);
- 
- static const struct of_device_id mxs_mmc_dt_ids[] = {
--	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_MMC, },
--	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_MMC, },
-+	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_SSP, },
-+	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_SSP, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, mxs_mmc_dt_ids);
-@@ -655,7 +655,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	}
- 
- 	if (np) {
--		host->devid = (enum mxs_mmc_id) of_id->data;
-+		host->devid = (enum mxs_ssp_id) of_id->data;
- 		/*
- 		 * TODO: This is a temporary solution and should be changed
- 		 * to use generic DMA binding later when the helpers get in.
-@@ -829,7 +829,7 @@ static const struct dev_pm_ops mxs_mmc_pm_ops = {
- static struct platform_driver mxs_mmc_driver = {
- 	.probe		= mxs_mmc_probe,
- 	.remove		= mxs_mmc_remove,
--	.id_table	= mxs_mmc_ids,
-+	.id_table	= mxs_ssp_ids,
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-diff --git a/include/linux/spi/mxs-spi.h b/include/linux/spi/mxs-spi.h
-index b7ccd57..c08aef5 100644
---- a/include/linux/spi/mxs-spi.h
-+++ b/include/linux/spi/mxs-spi.h
-@@ -24,7 +24,7 @@
- #ifndef __LINUX_SPI_MXS_SPI_H__
- #define __LINUX_SPI_MXS_SPI_H__
- 
+-/* card detect polling timeout */
+-#define MXS_MMC_DETECT_TIMEOUT			(HZ/2)
+-
 -#define ssp_is_old(host)	((host)->devid == IMX23_MMC)
-+#define ssp_is_old(host)	((host)->devid == IMX23_SSP)
+-
+-/* SSP registers */
+-#define HW_SSP_CTRL0				0x000
+-#define  BM_SSP_CTRL0_RUN			(1 << 29)
+-#define  BM_SSP_CTRL0_SDIO_IRQ_CHECK		(1 << 28)
+-#define  BM_SSP_CTRL0_IGNORE_CRC		(1 << 26)
+-#define  BM_SSP_CTRL0_READ			(1 << 25)
+-#define  BM_SSP_CTRL0_DATA_XFER			(1 << 24)
+-#define  BP_SSP_CTRL0_BUS_WIDTH			(22)
+-#define  BM_SSP_CTRL0_BUS_WIDTH			(0x3 << 22)
+-#define  BM_SSP_CTRL0_WAIT_FOR_IRQ		(1 << 21)
+-#define  BM_SSP_CTRL0_LONG_RESP			(1 << 19)
+-#define  BM_SSP_CTRL0_GET_RESP			(1 << 17)
+-#define  BM_SSP_CTRL0_ENABLE			(1 << 16)
+-#define  BP_SSP_CTRL0_XFER_COUNT		(0)
+-#define  BM_SSP_CTRL0_XFER_COUNT		(0xffff)
+-#define HW_SSP_CMD0				0x010
+-#define  BM_SSP_CMD0_DBL_DATA_RATE_EN		(1 << 25)
+-#define  BM_SSP_CMD0_SLOW_CLKING_EN		(1 << 22)
+-#define  BM_SSP_CMD0_CONT_CLKING_EN		(1 << 21)
+-#define  BM_SSP_CMD0_APPEND_8CYC		(1 << 20)
+-#define  BP_SSP_CMD0_BLOCK_SIZE			(16)
+-#define  BM_SSP_CMD0_BLOCK_SIZE			(0xf << 16)
+-#define  BP_SSP_CMD0_BLOCK_COUNT		(8)
+-#define  BM_SSP_CMD0_BLOCK_COUNT		(0xff << 8)
+-#define  BP_SSP_CMD0_CMD			(0)
+-#define  BM_SSP_CMD0_CMD			(0xff)
+-#define HW_SSP_CMD1				0x020
+-#define HW_SSP_XFER_SIZE			0x030
+-#define HW_SSP_BLOCK_SIZE			0x040
+-#define  BP_SSP_BLOCK_SIZE_BLOCK_COUNT		(4)
+-#define  BM_SSP_BLOCK_SIZE_BLOCK_COUNT		(0xffffff << 4)
+-#define  BP_SSP_BLOCK_SIZE_BLOCK_SIZE		(0)
+-#define  BM_SSP_BLOCK_SIZE_BLOCK_SIZE		(0xf)
+-#define HW_SSP_TIMING(h)			(ssp_is_old(h) ? 0x050 : 0x070)
+-#define  BP_SSP_TIMING_TIMEOUT			(16)
+-#define  BM_SSP_TIMING_TIMEOUT			(0xffff << 16)
+-#define  BP_SSP_TIMING_CLOCK_DIVIDE		(8)
+-#define  BM_SSP_TIMING_CLOCK_DIVIDE		(0xff << 8)
+-#define  BP_SSP_TIMING_CLOCK_RATE		(0)
+-#define  BM_SSP_TIMING_CLOCK_RATE		(0xff)
+-#define HW_SSP_CTRL1(h)				(ssp_is_old(h) ? 0x060 : 0x080)
+-#define  BM_SSP_CTRL1_SDIO_IRQ			(1 << 31)
+-#define  BM_SSP_CTRL1_SDIO_IRQ_EN		(1 << 30)
+-#define  BM_SSP_CTRL1_RESP_ERR_IRQ		(1 << 29)
+-#define  BM_SSP_CTRL1_RESP_ERR_IRQ_EN		(1 << 28)
+-#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ		(1 << 27)
+-#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ_EN	(1 << 26)
+-#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ		(1 << 25)
+-#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ_EN	(1 << 24)
+-#define  BM_SSP_CTRL1_DATA_CRC_IRQ		(1 << 23)
+-#define  BM_SSP_CTRL1_DATA_CRC_IRQ_EN		(1 << 22)
+-#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ		(1 << 21)
+-#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ_EN	(1 << 20)
+-#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ		(1 << 17)
+-#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ_EN	(1 << 16)
+-#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ		(1 << 15)
+-#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ_EN	(1 << 14)
+-#define  BM_SSP_CTRL1_DMA_ENABLE		(1 << 13)
+-#define  BM_SSP_CTRL1_POLARITY			(1 << 9)
+-#define  BP_SSP_CTRL1_WORD_LENGTH		(4)
+-#define  BM_SSP_CTRL1_WORD_LENGTH		(0xf << 4)
+-#define  BP_SSP_CTRL1_SSP_MODE			(0)
+-#define  BM_SSP_CTRL1_SSP_MODE			(0xf)
+-#define HW_SSP_SDRESP0(h)			(ssp_is_old(h) ? 0x080 : 0x0a0)
+-#define HW_SSP_SDRESP1(h)			(ssp_is_old(h) ? 0x090 : 0x0b0)
+-#define HW_SSP_SDRESP2(h)			(ssp_is_old(h) ? 0x0a0 : 0x0c0)
+-#define HW_SSP_SDRESP3(h)			(ssp_is_old(h) ? 0x0b0 : 0x0d0)
+-#define HW_SSP_STATUS(h)			(ssp_is_old(h) ? 0x0c0 : 0x100)
+-#define  BM_SSP_STATUS_CARD_DETECT		(1 << 28)
+-#define  BM_SSP_STATUS_SDIO_IRQ			(1 << 17)
+-
+-#define BF_SSP(value, field)	(((value) << BP_SSP_##field) & BM_SSP_##field)
+-
+ #define MXS_MMC_IRQ_BITS	(BM_SSP_CTRL1_SDIO_IRQ		| \
+ 				 BM_SSP_CTRL1_RESP_ERR_IRQ	| \
+ 				 BM_SSP_CTRL1_RESP_TIMEOUT_IRQ	| \
+@@ -135,12 +58,8 @@
+ 				 BM_SSP_CTRL1_RECV_TIMEOUT_IRQ  | \
+ 				 BM_SSP_CTRL1_FIFO_OVERRUN_IRQ)
  
- /* SSP registers */
- #define HW_SSP_CTRL0				0x000
-@@ -101,9 +101,9 @@
- 
- #define SSP_PIO_NUM	3
- 
+-#define SSP_PIO_NUM	3
+-
 -enum mxs_mmc_id {
 -	IMX23_MMC,
 -	IMX28_MMC,
-+enum mxs_ssp_id {
-+	IMX23_SSP,
-+	IMX28_SSP,
- };
+-};
++/* card detect polling timeout */
++#define MXS_MMC_DETECT_TIMEOUT			(HZ/2)
  
- #endif	/* __LINUX_SPI_MXS_SPI_H__ */
+ struct mxs_mmc_host {
+ 	struct mmc_host			*mmc;
+diff --git a/include/linux/spi/mxs-spi.h b/include/linux/spi/mxs-spi.h
+new file mode 100644
+index 0000000..b7ccd57
+--- /dev/null
++++ b/include/linux/spi/mxs-spi.h
+@@ -0,0 +1,109 @@
++/*
++ * include/linux/spi/mxs-spi.h
++ *
++ * Freescale i.MX233/i.MX28 SPI controller register definition
++ *
++ * Copyright 2008 Embedded Alley Solutions, Inc.
++ * Copyright 2009-2011 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#ifndef __LINUX_SPI_MXS_SPI_H__
++#define __LINUX_SPI_MXS_SPI_H__
++
++#define ssp_is_old(host)	((host)->devid == IMX23_MMC)
++
++/* SSP registers */
++#define HW_SSP_CTRL0				0x000
++#define  BM_SSP_CTRL0_RUN			(1 << 29)
++#define  BM_SSP_CTRL0_SDIO_IRQ_CHECK		(1 << 28)
++#define  BM_SSP_CTRL0_IGNORE_CRC		(1 << 26)
++#define  BM_SSP_CTRL0_READ			(1 << 25)
++#define  BM_SSP_CTRL0_DATA_XFER			(1 << 24)
++#define  BP_SSP_CTRL0_BUS_WIDTH			22
++#define  BM_SSP_CTRL0_BUS_WIDTH			(0x3 << 22)
++#define  BM_SSP_CTRL0_WAIT_FOR_IRQ		(1 << 21)
++#define  BM_SSP_CTRL0_LONG_RESP			(1 << 19)
++#define  BM_SSP_CTRL0_GET_RESP			(1 << 17)
++#define  BM_SSP_CTRL0_ENABLE			(1 << 16)
++#define  BP_SSP_CTRL0_XFER_COUNT		0
++#define  BM_SSP_CTRL0_XFER_COUNT		0xffff
++#define HW_SSP_CMD0				0x010
++#define  BM_SSP_CMD0_DBL_DATA_RATE_EN		(1 << 25)
++#define  BM_SSP_CMD0_SLOW_CLKING_EN		(1 << 22)
++#define  BM_SSP_CMD0_CONT_CLKING_EN		(1 << 21)
++#define  BM_SSP_CMD0_APPEND_8CYC		(1 << 20)
++#define  BP_SSP_CMD0_BLOCK_SIZE			16
++#define  BM_SSP_CMD0_BLOCK_SIZE			(0xf << 16)
++#define  BP_SSP_CMD0_BLOCK_COUNT		8
++#define  BM_SSP_CMD0_BLOCK_COUNT		(0xff << 8)
++#define  BP_SSP_CMD0_CMD			0
++#define  BM_SSP_CMD0_CMD			0xff
++#define HW_SSP_CMD1				0x020
++#define HW_SSP_XFER_SIZE			0x030
++#define HW_SSP_BLOCK_SIZE			0x040
++#define  BP_SSP_BLOCK_SIZE_BLOCK_COUNT		4
++#define  BM_SSP_BLOCK_SIZE_BLOCK_COUNT		(0xffffff << 4)
++#define  BP_SSP_BLOCK_SIZE_BLOCK_SIZE		0
++#define  BM_SSP_BLOCK_SIZE_BLOCK_SIZE		0xf
++#define HW_SSP_TIMING(h)			(ssp_is_old(h) ? 0x050 : 0x070)
++#define  BP_SSP_TIMING_TIMEOUT			16
++#define  BM_SSP_TIMING_TIMEOUT			(0xffff << 16)
++#define  BP_SSP_TIMING_CLOCK_DIVIDE		8
++#define  BM_SSP_TIMING_CLOCK_DIVIDE		(0xff << 8)
++#define  BP_SSP_TIMING_CLOCK_RATE		0
++#define  BM_SSP_TIMING_CLOCK_RATE		0xff
++#define HW_SSP_CTRL1(h)				(ssp_is_old(h) ? 0x060 : 0x080)
++#define  BM_SSP_CTRL1_SDIO_IRQ			(1 << 31)
++#define  BM_SSP_CTRL1_SDIO_IRQ_EN		(1 << 30)
++#define  BM_SSP_CTRL1_RESP_ERR_IRQ		(1 << 29)
++#define  BM_SSP_CTRL1_RESP_ERR_IRQ_EN		(1 << 28)
++#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ		(1 << 27)
++#define  BM_SSP_CTRL1_RESP_TIMEOUT_IRQ_EN	(1 << 26)
++#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ		(1 << 25)
++#define  BM_SSP_CTRL1_DATA_TIMEOUT_IRQ_EN	(1 << 24)
++#define  BM_SSP_CTRL1_DATA_CRC_IRQ		(1 << 23)
++#define  BM_SSP_CTRL1_DATA_CRC_IRQ_EN		(1 << 22)
++#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ		(1 << 21)
++#define  BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ_EN	(1 << 20)
++#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ		(1 << 17)
++#define  BM_SSP_CTRL1_RECV_TIMEOUT_IRQ_EN	(1 << 16)
++#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ		(1 << 15)
++#define  BM_SSP_CTRL1_FIFO_OVERRUN_IRQ_EN	(1 << 14)
++#define  BM_SSP_CTRL1_DMA_ENABLE		(1 << 13)
++#define  BM_SSP_CTRL1_POLARITY			(1 << 9)
++#define  BP_SSP_CTRL1_WORD_LENGTH		4
++#define  BM_SSP_CTRL1_WORD_LENGTH		(0xf << 4)
++#define  BP_SSP_CTRL1_SSP_MODE			0
++#define  BM_SSP_CTRL1_SSP_MODE			0xf
++#define HW_SSP_SDRESP0(h)			(ssp_is_old(h) ? 0x080 : 0x0a0)
++#define HW_SSP_SDRESP1(h)			(ssp_is_old(h) ? 0x090 : 0x0b0)
++#define HW_SSP_SDRESP2(h)			(ssp_is_old(h) ? 0x0a0 : 0x0c0)
++#define HW_SSP_SDRESP3(h)			(ssp_is_old(h) ? 0x0b0 : 0x0d0)
++#define HW_SSP_STATUS(h)			(ssp_is_old(h) ? 0x0c0 : 0x100)
++#define  BM_SSP_STATUS_CARD_DETECT		(1 << 28)
++#define  BM_SSP_STATUS_SDIO_IRQ			(1 << 17)
++
++#define BF_SSP(value, field)	(((value) << BP_SSP_##field) & BM_SSP_##field)
++
++#define SSP_PIO_NUM	3
++
++enum mxs_mmc_id {
++	IMX23_MMC,
++	IMX28_MMC,
++};
++
++#endif	/* __LINUX_SPI_MXS_SPI_H__ */
 -- 
 1.7.10.4
