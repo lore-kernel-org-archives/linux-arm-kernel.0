@@ -1,53 +1,35 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Jul 2012 11:13:29 +0200
-Subject: [PATCH 24/25] macintosh/mediabay: make data used as
- *of_device_id.data const
+Date: Mon, 23 Jul 2012 11:13:09 +0200
+Subject: [PATCH 04/25] serial/mpc52xx_uart: add a const qualifier
 In-Reply-To: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1343034810-3386-25-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1343034810-3386-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+This prepares *of_device_id.data becoming const. Without this change
+the following warning would occur:
 
-[ukl: split Arnd's patch by driver]
+	drivers/tty/serial/mpc52xx_uart.c: In function 'mpc52xx_uart_of_enumerate':
+	drivers/tty/serial/mpc52xx_uart.c:1440:11: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/macintosh/mediabay.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/tty/serial/mpc52xx_uart.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/macintosh/mediabay.c b/drivers/macintosh/mediabay.c
-index 54bf584..3f8d032 100644
---- a/drivers/macintosh/mediabay.c
-+++ b/drivers/macintosh/mediabay.c
-@@ -669,7 +669,7 @@ static int media_bay_resume(struct macio_dev *mdev)
- 
- /* Definitions of "ops" structures.
-  */
--static struct mb_ops ohare_mb_ops = {
-+static const struct mb_ops ohare_mb_ops = {
- 	.name		= "Ohare",
- 	.content	= ohare_mb_content,
- 	.power		= ohare_mb_power,
-@@ -678,7 +678,7 @@ static struct mb_ops ohare_mb_ops = {
- 	.un_reset_ide	= ohare_mb_un_reset_ide,
+diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
+index bedac0d..b131f2d 100644
+--- a/drivers/tty/serial/mpc52xx_uart.c
++++ b/drivers/tty/serial/mpc52xx_uart.c
+@@ -598,7 +598,7 @@ static struct psc_ops mpc512x_psc_ops = {
  };
+ #endif
  
--static struct mb_ops heathrow_mb_ops = {
-+static const struct mb_ops heathrow_mb_ops = {
- 	.name		= "Heathrow",
- 	.content	= heathrow_mb_content,
- 	.power		= heathrow_mb_power,
-@@ -687,7 +687,7 @@ static struct mb_ops heathrow_mb_ops = {
- 	.un_reset_ide	= heathrow_mb_un_reset_ide,
- };
+-static struct psc_ops *psc_ops;
++static const struct psc_ops *psc_ops;
  
--static struct mb_ops keylargo_mb_ops = {
-+static const struct mb_ops keylargo_mb_ops = {
- 	.name		= "KeyLargo",
- 	.init		= keylargo_mb_init,
- 	.content	= keylargo_mb_content,
+ /* ======================================================================== */
+ /* UART operations                                                          */
 -- 
 1.7.10.4
