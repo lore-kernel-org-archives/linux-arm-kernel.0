@@ -1,31 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Jul 2012 16:54:43 +0200
-Subject: [PATCH -next] random: Remove remaining relicts of
- rand_initialize_irq()
-In-Reply-To: <20120717214219.GF6049@thunk.org>
-References: <1342524793-2522-1-git-send-email-sedat.dilek@gmail.com>
- <20120717171251.GD6049@thunk.org>
- <CACRpkdZe48FrDJx1p8ojfqwVBE95hSJipE8rViAi=E28uumYOQ@mail.gmail.com>
- <20120717214219.GF6049@thunk.org>
-Message-ID: <CACRpkdbgt9kNTbF6YfL1rEbwWLA85a6b4crsOzTfedM+3KJBbA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 23 Jul 2012 15:56:02 +0100
+Subject: Help request - ASoC recursion issue
+In-Reply-To: <500D649B.80704@linaro.org>
+References: <500D5A1F.9000808@linaro.org> <500D649B.80704@linaro.org>
+Message-ID: <500D6602.6070809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2012 at 11:42 PM, Theodore Ts'o <tytso@mit.edu> wrote:
-> On Tue, Jul 17, 2012 at 08:57:19PM +0200, Linus Walleij wrote:
->> So the IRQ will be auto-sampled now or something?
->>
->> Sorry for not quite following, which commit do I look at to
->> understand this now...
+On 23/07/12 15:50, Lee Jones wrote:
+>> I was wondering if I may bother you for some help. I've been having
+>> serious issues with testing the new mop500 sound system you have in your
+>> ASoC for-next branch. I've fixed a few issues and will be submitting
+>> patches shortly. The most serious issue I came across was with
+>> recursion.
 >
-> Yes, there was a huge discussion on LKML about two weeks ago.  The
-> key commit that will be going in during the next merge window is:
->
-> http://git.kernel.org/?p=linux/kernel/git/tytso/random.git;a=commitdiff;h=775f4b297b780601e61787b766f306ed3e1d23eb
+> It appears you can ignore this. I just tried another piece of hardware
+> and this problem doesn't arise, leading me to believe I have some kind
+> of eMMC corruption error going on with one of my boards.
 
-I get it now, after checking the commit and reading the LWN
-article. It's all looking good,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+FYI, just so you don't think I'm mad: http://paste.ubuntu.com/1106535/
 
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
