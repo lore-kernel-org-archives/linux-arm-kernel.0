@@ -1,29 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Jul 2012 11:32:50 -0700
-Subject: [Final call for participation] ARM mini-summit, San Diego, 27-29
- August
-In-Reply-To: <20120723093949.GC31521@mudshark.cambridge.arm.com>
-References: <20120723093949.GC31521@mudshark.cambridge.arm.com>
-Message-ID: <500D98D2.6000105@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 23 Jul 2012 12:38:33 -0600 (MDT)
+Subject: [PATCHv7 09/12] ARM: OMAP4: hwmod data: temporarily comment out
+ data for the sl2if IP block
+In-Reply-To: <1342704392-23657-10-git-send-email-t-kristo@ti.com>
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+ <1342704392-23657-10-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1207231236210.10781@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/12 02:39, Will Deacon wrote:
-> Hello again,
->
-> Last week, I sent an initial call for participation regarding the ARM
-> mini-summit that will be held at the end of next month:
->
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/110215.html
->
-> This is a gentle reminder that, if you would like to attend, please reply
-> ASAP since we are now moving into the stage of sending out invitations to
-> potential participants.
->
->
+Hi Tero
 
-I would like to attend if there are spots available.
+On Thu, 19 Jul 2012, Tero Kristo wrote:
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> The OMAP4 sl2if IP block requires some special programming for it to
+> enter idle. Without this programming, they will prevent the rest of
+> the chip from entering full chip idle.
+> 
+> This patch comments out the IP block data.
+> 
+> Later, once the appropriate support is available, this patch can be
+> reverted.
+> 
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+
+Originally I was hoping that we could apply a real fix for this one.  But 
+looking at the proposed alternative in the old SL2IF E-mail threads, I'm 
+still not convinced by what's proposed there.  So we'd better take this 
+one for the time being.
+
+Queued for 3.6-rc.
+
+- Paul
