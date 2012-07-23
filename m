@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jul 2012 20:33:20 -0000
-Subject: [GIT PULL 04/15] arm-soc: samsung dma changes
+Date: Mon, 23 Jul 2012 20:33:22 -0000
+Subject: [GIT PULL 07/15] arm-soc: timer updates
 In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
 References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <1343075561-17446-5-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,37 +13,62 @@ The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/dma
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/timer
 
-for you to fetch changes up to 31dfec74c0dc49521b2e17543ff9dd9dd0221702:
+for you to fetch changes up to 35bf8cc74b2b1dfad18df6d330b271e68ab6e3f5:
 
-  Merge branch 'next/devel-dma-ops' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/dma (2012-07-10 14:12:05 +0200)
-
-----------------------------------------------------------------
-
-arm-soc: samsung dma changes
-
-Some platforms are not yet converted to use the dmaengine framework,
-including some of the samsung SoCs. In the meantime, we treat this
-as platform code and merge the patches through the arm-soc tree.
+  Merge branch 'picoxcell/timer' into next/timer (2012-07-12 17:27:36 +0200)
 
 ----------------------------------------------------------------
 
-Arnd Bergmann (2):
-      Merge branch 'next/devel-dma-ops' of git://git.kernel.org/.../kgene/linux-samsung into next/dma
-      Merge branch 'next/dma' into for-next
+arm-soc: timer updates
 
-Boojin Kim (3):
-      ARM: SAMSUNG: Add config() function in DMA common operations
-      spi/s3c64xx: Add the use of DMA config operation
-      ASoC: follow the updated samsung DMA common operations
+This contains two branches dealing with timers, one for the picoxcell
+platform that is now using DT with the platform-independent
+dw_apb_timer driver. The other change is for the omap-specific
+dmtimer driver.
 
-Sachin Kamat (1):
-      ARM: SAMSUNG: Fix compiler warning in dma-ops.c file
+----------------------------------------------------------------
 
- arch/arm/plat-samsung/dma-ops.c              |   76 ++++++++++++++------------
- arch/arm/plat-samsung/include/plat/dma-ops.h |   20 ++++---
- arch/arm/plat-samsung/s3c-dma-ops.c          |   39 +++++++------
- drivers/spi/spi-s3c64xx.c                    |   33 ++++++-----
- sound/soc/samsung/dma.c                      |   18 +++---
- 5 files changed, 105 insertions(+), 81 deletions(-)
+Arnd Bergmann (3):
+      Merge tag 'omap-devel-dmtimer-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/timer
+      Merge branch 'picoxcell/timer' into next/timer
+      Merge branch 'next/timer' into for-next
+
+Dinh Nguyen (1):
+      clocksource: dw_apb_timer: Add common DTS glue for dw_apb_timer
+
+Jon Hunter (12):
+      ARM: OMAP: Remove unnecessary clk structure
+      ARM: OMAP2+: Remove unused max number of timers definition
+      ARM: OMAP2+: Add dmtimer platform function to reserve systimers
+      ARM: OMAP: Add DMTIMER capability variable to represent timer features
+      ARM: OMAP2+: HWMOD: Correct timer device attributes
+      ARM: OMAP2+: Fix external clock support for dmtimers
+      ARM: OMAP: Remove loses_context variable from timer platform data
+      ARM: OMAP: Remove timer function pointer for context loss counter
+      ARM: OMAP: Add flag to indicate if a timer needs a manual reset
+      ARM: OMAP1: Fix dmtimer support
+      ARM: OMAP2+: Move dmtimer clock set function to dmtimer driver
+      ARM: OMAP2+: Simplify dmtimer clock aliases
+
+ Documentation/devicetree/bindings/rtc/dw-apb.txt   |   25 +++++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-omap1/timer.c                        |    3 +-
+ arch/arm/mach-omap2/clock2420_data.c               |   39 +------
+ arch/arm/mach-omap2/clock2430_data.c               |   39 +------
+ arch/arm/mach-omap2/clock3xxx_data.c               |   26 +----
+ arch/arm/mach-omap2/clock44xx_data.c               |   34 +++---
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    8 --
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   10 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 --
+ arch/arm/mach-omap2/timer.c                        |   82 +--------------
+ arch/arm/mach-picoxcell/Makefile                   |    1 -
+ arch/arm/mach-picoxcell/common.c                   |    3 +-
+ arch/arm/mach-picoxcell/common.h                   |    2 +-
+ arch/arm/plat-omap/dmtimer.c                       |  111 +++++++++++++++-----
+ arch/arm/plat-omap/include/plat/dmtimer.h          |   22 +---
+ drivers/clocksource/Kconfig                        |    3 +
+ drivers/clocksource/Makefile                       |    1 +
+ .../clocksource/dw_apb_timer_of.c                  |   52 +++++----
+ 19 files changed, 182 insertions(+), 286 deletions(-)
