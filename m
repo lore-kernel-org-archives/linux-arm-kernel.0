@@ -1,39 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 23 Jul 2012 14:53:54 +0400
-Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
-In-Reply-To: <20120722193243.GF5423@lunn.ch>
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-3-git-send-email-andrew@lunn.ch>
- <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
- <20120722095328.GB5423@lunn.ch>
- <20120722190700.GD4557@opensource.wolfsonmicro.com>
- <20120722193243.GF5423@lunn.ch>
-Message-ID: <500D2D42.3000006@mvista.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Jul 2012 13:51:55 +0300
+Subject: [PATCH v2 1/2] USB: chipidea: add imx usbmisc support
+In-Reply-To: <500D19AA.8080006@pengutronix.de>
+References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
+ <1342607348-8587-2-git-send-email-richard.zhao@freescale.com>
+ <20120723091652.GK8265@arwen.pp.htv.fi>
+ <20120723092713.GS21635@b20223-02.ap.freescale.net>
+ <500D19AA.8080006@pengutronix.de>
+Message-ID: <20120723105153.GS8265@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Jul 23, 2012 at 11:30:18AM +0200, Marc Kleine-Budde wrote:
+> On 07/23/2012 11:27 AM, Richard Zhao wrote:
+> >> This patch looks like a recipe for disaster IMHO, but it's Alex's call.
+> > Well, if there's any better place to hold it, I'd like to move there.
+> > Another place is arch/arm/mach-imx. Sascha/Shawn who are maintainers of
+> > imx are also in cc list.
+> 
+> IMHO it's not about the place where the driver is located, it's about
+> the shortcomings Michael and Sascha mentioned.
 
-On 22-07-2012 23:32, Andrew Lunn wrote:
+exactly. It's not about where a file is placed or how it's called. It's
+how you decided to implement it. This will prevent a platform with
+multiple instances of the IP to be used, at least.
 
->>> You can see the chain of dependencies here. So at minimum i would need
->>> to send the first three via Mark. I then need to cross my fingers and
->>> hope he really picks them up, because without them, we are going to
->>> have a number of boards which fail to find their root file system on
->>> an SPI flash.
+Also, if that set of registers are shared, you ought to have a dedicated
+driver to handle mutual exclusion and so on. I don't know details about
+the i.MX platform, that really smells funny by looking at it.
 
->> Well, I'd like to think that generally I'm reasonably responsive to
->> patch submissions
-
-> Well, this particular patch was first submitted May 19th and Ack-by
-> Linus on May 14th.
-
-    It was acked even before submitted? ;-)
-
-> http://comments.gmane.org/gmane.linux.kernel.spi.devel/9937
-
-> It was reposted 10 Jun and Acked-by again in Jun 10 by Linus.
-
-> It was also reposted July 3.
-
-WBR, Sergei
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120723/4dc2b9c6/attachment.sig>
