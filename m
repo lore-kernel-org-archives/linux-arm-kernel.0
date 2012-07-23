@@ -1,32 +1,37 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Jul 2012 11:13:23 +0200
-Subject: [PATCH 18/25] can: mpc5xxx_can: make data in mpc5xxx_can_probe const
+Date: Mon, 23 Jul 2012 11:13:11 +0200
+Subject: [PATCH 06/25] misc/atmel_tc: make atmel_tc.tcb_config member point to
+ const data
 In-Reply-To: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1343034810-3386-19-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1343034810-3386-7-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Kleine-Budde <mkl@pengutronix.de>
+This prepares *of_device_id.data becoming const. Without this change
+the following warning would occur:
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+	drivers/misc/atmel_tclib.c: In function 'tc_probe':
+	drivers/misc/atmel_tclib.c:170: warning: assignment discards qualifiers from pointer target type
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/net/can/mscan/mpc5xxx_can.c |    2 +-
+ include/linux/atmel_tc.h |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-index 5caa572..06adf88 100644
---- a/drivers/net/can/mscan/mpc5xxx_can.c
-+++ b/drivers/net/can/mscan/mpc5xxx_can.c
-@@ -251,7 +251,7 @@ static struct of_device_id mpc5xxx_can_table[];
- static int __devinit mpc5xxx_can_probe(struct platform_device *ofdev)
- {
- 	const struct of_device_id *match;
--	struct mpc5xxx_can_data *data;
-+	const struct mpc5xxx_can_data *data;
- 	struct device_node *np = ofdev->dev.of_node;
- 	struct net_device *dev;
- 	struct mscan_priv *priv;
+diff --git a/include/linux/atmel_tc.h b/include/linux/atmel_tc.h
+index 1d14b1dc..89a931b 100644
+--- a/include/linux/atmel_tc.h
++++ b/include/linux/atmel_tc.h
+@@ -63,7 +63,7 @@ struct atmel_tc {
+ 	struct platform_device	*pdev;
+ 	struct resource		*iomem;
+ 	void __iomem		*regs;
+-	struct atmel_tcb_config	*tcb_config;
++	const struct atmel_tcb_config *tcb_config;
+ 	int			irq[3];
+ 	struct clk		*clk[3];
+ 	struct list_head	node;
 -- 
 1.7.10.4
