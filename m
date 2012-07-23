@@ -1,61 +1,208 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Mon, 23 Jul 2012 07:03:11 +0200
-Subject: Build error with [PATCH v10 3/4] drivers/i2c/busses/i2c-at91.c
-In-Reply-To: <CAFLc3bpiu4zEKwkA8QSH0ORQp+6frmMn2AUNeQ4rURCtxTOM5Q@mail.gmail.com>
-References: <CAFLc3brYJGkQoW5mGi9XaujNBMBdGX6RxfkNRbBZJQz_axz_Jg@mail.gmail.com>
- <EF2E73589CA71846A15D0B2CDF79505D090EA1AA99@wm021.weinmann.com>
- <CAFLc3bpiu4zEKwkA8QSH0ORQp+6frmMn2AUNeQ4rURCtxTOM5Q@mail.gmail.com>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EA8F0F8@wm021.weinmann.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 23 Jul 2012 11:47:19 +0530
+Subject: [PATCH v3 6/6] mmc: dw_mmc: add samsung exynos5250 specific
+ extentions
+In-Reply-To: <001101cd6663$deb769d0$9c263d70$%jun@samsung.com>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+ <1342097668-25243-7-git-send-email-thomas.abraham@linaro.org>
+ <002901cd6561$bb6dc9e0$32495da0$%jun@samsung.com>
+ <CAJuYYwRKRrNgDKw8ZmHbsejO4yxUC0VXjEyfh-WtKNO5qVXukg@mail.gmail.com>
+ <001101cd6663$deb769d0$9c263d70$%jun@samsung.com>
+Message-ID: <CAJuYYwR8rSaA_m2_8XSuQ9sR-VG4JEVo6ysZjWMFzaRSJmLivQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+On 20 July 2012 16:08, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> July 20, 2012, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> On 19 July 2012 09:21, Seungwon Jeon <tgih.jun@samsung.com> wrote:
 
-Stefano Salati wrote on 2012-07-21:
-> I did as you suggested, I manage to compile but get a waterfall of errors
-> while booting the image (file attached).
-> 
-> I applied all the patches (manually so to better understand what was being
-> done), apart from this one: https://lkml.org/lkml/2012/4/20/112
-> as the file I'd patch is completely different (apart from the fact that my
-> file is "at91sam9x5.c" I've checked also those you mention in the patch to
-> take inspiration and are completely different as well). I attached
-> at91sam9x5.c to explain better.
+[...]
 
-your at91sam9x5.c is quite out of date. If you can, you should use a more
-recent kernel. If not, try to add the following to the file:
+>> >> +static unsigned long exynos5250_dwmmc_caps[4] = {
+>> >> +     MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
+>> >> +             MMC_CAP_8_BIT_DATA | MMC_CAP_CMD23,
+>> >> +     MMC_CAP_CMD23,
+>> >> +     MMC_CAP_CMD23,
+>> >> +     MMC_CAP_CMD23,
+>> >> +};
+>> >> +
+>> > Kyungmin Park has already pointed .
+>> > It's not still proper place for board specific caps.
+>> > If I'm incorrect, please let me know.
+>> > And why MMC_CAP_CMD23 is default caps for all channel of hosts?
+>>
+>> The cap listed above are specifying controller capabilities for dw-mmc
+>> controllers on Exynos5 SoC. They are not board specific caps. All the
+>> Exynos5 dw-mmc controllers can support MMC_CAP_CMD23 cap and hence, it
+>> has been listed for all the controllers. Please let me know if you
+>> feel there is any change required here.
+> MMC_CAP_8_BIT_DATA could be dependent on board.
 
-+static struct clk_lookup periph_clocks_lookups[] = {
-+	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.0", &twi0_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.1", &twi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.2", &twi2_clk),
-+};
+A controller can have the MMC_CAP_8_BIT_DATA capability but the board
+will decide the bus-width. The bus-width is specified in the dts files
+of each board (or platform data). The bus-width for data transfer is
+then decided by the MMC core code based on the caps and the bus-width
+information. So MMC_CAP_8_BIT_DATA can be specified irrespective   of
+whether the board supports 8-bit or not.
 
-and in at91sam9x5_register_clocks():
+> I agree about MMC_CAP_CMD23.
+> Additionally, MMC_CAP_CMD23 is applied for dw-mmc host driver without regard to Exynos5.
 
-	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
-		clk_register(periph_clocks[i]);
+The caps listed in exynos5250_dwmmc_caps is applicable only for
+Exynos5 SoC's. Could you please let me know if there is anything
+incorrect here.
 
-+	clkdev_add_table(periph_clocks_lookups,
-+			 ARRAY_SIZE(periph_clocks_lookups));
+[...]
 
-	if (cpu_is_at91sam9g25()
-	|| cpu_is_at91sam9x25())
-		clk_register(&usart3_clk);
+>> >> +     if (slot->host->drv_data->ctrl_type == DW_MCI_TYPE_EXYNOS5250) {
+>> >> +             slot->host->bus_hz = clk_get_rate(slot->host->ciu_clk);
+>> >> +             slot->host->bus_hz /= SDMMC_CLKSEL_GET_DIVRATIO(
+>> >> +                                     mci_readl(slot->host, CLKSEL));
+>> >> +     }
+>> > As you know, CLKSEL is specific for Samsung soc.
+>> > 0x09C(CLKSEL)  is reserved area in Synopsys memory map.
+>> > In case of non-samsung-soc, we cannot ensure this usage.
+>> > In previous version, I have suggested separating the variant into another file.
+>>
+>> There is a check for type of SoC before using 0x9C as CLKSEL register.
+> Do you mean checking DW_MCI_TYPE_EXYNOS5250?
+> But Above two case(ddr_timing/sdr_timing), CLKSEL can be accessed on other soc's.
 
-For a recent kernel, it should be:
+The tests have only been completed on Exynos5250. I do not have boards
+for other Samsung SoC's which have a dw_mmc port connected and used on
+the board. When we have other platforms tested with this patchset, we
+can extend the 'if' check in the above code for other SoC's.
 
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 13c8cae..bfdd429 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -225,6 +225,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.0", &twi0_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.1", &twi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.2", &twi2_clk),
- 	CLKDEV_CON_ID("pioA", &pioAB_clk),
- 	CLKDEV_CON_ID("pioB", &pioAB_clk),
- 	CLKDEV_CON_ID("pioC", &pioCD_clk),
+>
+>> Other implementations of dw-mmc might define custom register at 0x9C
+> Even so, register field can be different with Samsung soc.
+
+Yes, with the correct checks for the type of SoC, differences in the
+usage of 0x9C register can be handled.
+
+>
+>> but this will code will not execute on other SoC's and will not break
+>> anything on other implementations. Regarding spliting this Exynos
+>> specific code into another file, I prefer not to do it for now.
+>> Spliting the code means adding new definitions of callback functions
+>> which I am not sure is really required. The present code is fairly
+>> simple one.
+> Yes, callback functions might be needed to accommodate various implementation
+> of host controller. It would be better to prepare this for other variant next.
+>
+
+Ok. I will relook at these patches and check if we really need split
+these changes into a separate exynos specific file. If I again feel
+that such a split is not required, I will reply back to you with
+justification.
+
+[...]
+
+>> >> +     if (of_property_read_u32_array(dev->of_node,
+>> >> +                     "samsung,dw-mshc-sdr-timing", timing, 3))
+>> >> +             host->sdr_timing = DW_MCI_DEF_SDR_TIMING;
+>> > Host of non-samsung will reach here.
+>> > host->sdr_timing is needed for this host? host->ddr_timing is the same.
+>>
+>> Yes, but non-samsung hosts will not have have this property into their
+>> dts file. So the code within the condition will not execute on
+>> non-samsung hosts. SDR and DDR timing are required for Exynos5 SoC.
+> Yes, these are required only for Exynos Soc.
+> Non-samsung host will have default value here, but it seems to be meaningless.
+
+Non-Samsung platforms will not have this property in their dts files.
+This property is required on only those platforms that want to define
+sdr and ddr timing values. It is not required on platforms that do no
+use it.
+
+>
+>>
+>> >
+>> >> +     else
+>> >> +             host->sdr_timing = SDMMC_CLKSEL_TIMING(timing[0],
+>> >> +                                     timing[1], timing[2]);
+>> >> +
+>> >> +     if (of_property_read_u32_array(dev->of_node,
+>> >> +                     "samsung,dw-mshc-ddr-timing", timing, 3))
+>> >> +             host->ddr_timing = DW_MCI_DEF_DDR_TIMING;
+>> >> +     else
+>> >> +             host->ddr_timing = SDMMC_CLKSEL_TIMING(timing[0],
+>> >> +                                     timing[1], timing[2]);
+>> >> +
+>> >>       if (of_property_read_u32(np, "fifo-depth", &pdata->fifo_depth))
+>> >>               dev_info(dev, "fifo-depth property not found, using "
+>> >>                               "value of FIFOTH register as default\n");
+>> >> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+>> >> index 1ecaa02..6c17282 100644
+>> >> --- a/drivers/mmc/host/dw_mmc.h
+>> >> +++ b/drivers/mmc/host/dw_mmc.h
+>> >> @@ -53,6 +53,7 @@
+>> >>  #define SDMMC_IDINTEN                0x090
+>> >>  #define SDMMC_DSCADDR                0x094
+>> >>  #define SDMMC_BUFADDR                0x098
+>> >> +#define SDMMC_CLKSEL         0x09C /* specific to Samsung Exynos5250 */
+>> >>  #define SDMMC_DATA(x)                (x)
+>> >>
+>> >>  /*
+>> >> @@ -111,6 +112,7 @@
+>> >>  #define SDMMC_INT_ERROR                      0xbfc2
+>> >>  /* Command register defines */
+>> >>  #define SDMMC_CMD_START                      BIT(31)
+>> >> +#define SDMMC_CMD_USE_HOLD_REG               BIT(29)
+>> >>  #define SDMMC_CMD_CCS_EXP            BIT(23)
+>> >>  #define SDMMC_CMD_CEATA_RD           BIT(22)
+>> >>  #define SDMMC_CMD_UPD_CLK            BIT(21)
+>> >> @@ -142,6 +144,17 @@
+>> >>  /* Version ID register define */
+>> >>  #define SDMMC_GET_VERID(x)           ((x) & 0xFFFF)
+>> >>
+>> >> +#define DW_MCI_DEF_SDR_TIMING                0x03030002
+>> >> +#define DW_MCI_DEF_DDR_TIMING                0x03020001
+>> > What is the basis for these timing?
+>> > These values is board-specific.
+> One missed comment?
+
+Yes, sorry, missed this last time. These are default values for SDR
+and DDR timing in case it is not specified in dts file. It may be
+better to make it mandatory to specify the SDR and DDR property in dts
+files (for Exynos5250) and remove this default values. Non-samsung
+platforms or platforms not using this property are unaffected by this.
+
+>
+>> >
+>> >> +#define SDMMC_CLKSEL_CCLK_SAMPLE(x)  (((x) & 3) << 0)
+>> >> +#define SDMMC_CLKSEL_CCLK_DRIVE(x)   (((x) & 3) << 16)
+>> >> +#define SDMMC_CLKSEL_CCLK_DIVIDER(x) (((x) & 3) << 24)
+>> > If it's for exynos5, it will be 7 not 3.
+>>
+>> Yes, I missed that. Thanks. I will fix this.
+>>
+>> >
+>> >> +#define SDMMC_CLKSEL_TIMING(x, y, z) (SDMMC_CLKSEL_CCLK_SAMPLE(x) |  \
+>> >> +                                     SDMMC_CLKSEL_CCLK_DRIVE(y) |    \
+>> >> +                                     SDMMC_CLKSEL_CCLK_DIVIDER(z))
+>> >> +#define SDMMC_CLKSEL_GET_DIVRATIO(x) ((((x) >> 24) & 0x7) + 1)
+>> >> +#define SDMMC_CLKSEL_GET_SELCLK_DRV(x)       (((x) >> 16) & 0x7)
+>> >> +
+>> > Is this patch considered only for exynos5250?
+>> > In case of exynos4210, the number of bits is different.
+>> > If upper macros is backward-compatible, it would be better.
+>>
+>> These consider the Exynos4210 and Exynos4412 implementations as well.
+>> The device tree documentation clearly states that the possible values
+>> for each of the dividers. For Exynos4 SoC's, the divider value is
+>> between 1 to 4 (or 0 to 3). So a bit mask of 7 is backward compatilble
+>> for Exynos4.
+> Bit width is 2 for selclk_drv in exynos4210.
+> So bit mask of 3 is proper.
+>
+> Let me clear it about divider value.
+> In case of Exynos4 SoC's, divider value(DIVRATIO) is reserved and host doesn't modify.
+> But value is fixed internally like following.
+> Exynos4210 : 2
+> Exynos4412 : 4
+
+Ok. I will relook into this. Thanks.
+
+Regards,
+Thomas.
