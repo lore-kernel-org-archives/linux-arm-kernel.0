@@ -1,37 +1,45 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Jul 2012 11:13:10 +0200
-Subject: [PATCH 05/25] ARM: cache-l2x0: add a const qualifier
+Date: Mon, 23 Jul 2012 11:13:16 +0200
+Subject: [PATCH 11/25] dmaengine: at_hdmac: add a few const qualifiers
 In-Reply-To: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1343034810-3386-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1343034810-3386-12-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prepares *of_device_id.data becoming const. Without this change the
-following warning would occur:
+This prepares *of_device_id.data becoming const. Without this change
+the following warning would occur:
 
-	arch/arm/mm/cache-l2x0.c: In function 'l2x0_of_init':
-	arch/arm/mm/cache-l2x0.c:573:7: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+	drivers/dma/at_hdmac.c: In function 'at_dma_get_driver_data':
+	drivers/dma/at_hdmac.c:1228: warning: return discards qualifiers from pointer target type
 
-though.
-
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mm/cache-l2x0.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/at_hdmac.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 2a8e380..577baf7 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -554,7 +554,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
- int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- {
- 	struct device_node *np;
--	struct l2x0_of_data *data;
-+	const struct l2x0_of_data *data;
- 	struct resource res;
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 7292aa8..7e9d265 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -1217,7 +1217,7 @@ static const struct platform_device_id atdma_devtypes[] = {
+ 	}
+ };
  
- 	np = of_find_matching_node(NULL, l2x0_ids);
+-static inline struct at_dma_platform_data * __init at_dma_get_driver_data(
++static inline const struct at_dma_platform_data * __init at_dma_get_driver_data(
+ 						struct platform_device *pdev)
+ {
+ 	if (pdev->dev.of_node) {
+@@ -1255,7 +1255,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 	int			irq;
+ 	int			err;
+ 	int			i;
+-	struct at_dma_platform_data *plat_dat;
++	const struct at_dma_platform_data *plat_dat;
+ 
+ 	/* setup platform data for each SoC */
+ 	dma_cap_set(DMA_MEMCPY, at91sam9rl_config.cap_mask);
 -- 
 1.7.10.4
