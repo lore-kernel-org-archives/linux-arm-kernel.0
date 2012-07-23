@@ -1,36 +1,53 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Jul 2012 11:13:08 +0200
-Subject: [PATCH 03/25] serial/imx: make imx_port.devdata member point to const
- data
+Date: Mon, 23 Jul 2012 11:13:29 +0200
+Subject: [PATCH 24/25] macintosh/mediabay: make data used as
+ *of_device_id.data const
 In-Reply-To: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1343034810-3386-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1343034810-3386-25-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prepares *of_device_id.data becoming const. Without this change the
-following warning would occur:
+From: Arnd Bergmann <arnd@arndb.de>
 
-	drivers/tty/serial/imx.c: In function 'serial_imx_probe_dt':
-	drivers/tty/serial/imx.c:1430:17: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+[ukl: split Arnd's patch by driver]
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/tty/serial/imx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/macintosh/mediabay.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 4ef7473..0af4eec 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -207,7 +207,7 @@ struct imx_port {
- 	unsigned short		trcv_delay; /* transceiver delay */
- 	struct clk		*clk_ipg;
- 	struct clk		*clk_per;
--	struct imx_uart_data	*devdata;
-+	const struct imx_uart_data *devdata;
+diff --git a/drivers/macintosh/mediabay.c b/drivers/macintosh/mediabay.c
+index 54bf584..3f8d032 100644
+--- a/drivers/macintosh/mediabay.c
++++ b/drivers/macintosh/mediabay.c
+@@ -669,7 +669,7 @@ static int media_bay_resume(struct macio_dev *mdev)
+ 
+ /* Definitions of "ops" structures.
+  */
+-static struct mb_ops ohare_mb_ops = {
++static const struct mb_ops ohare_mb_ops = {
+ 	.name		= "Ohare",
+ 	.content	= ohare_mb_content,
+ 	.power		= ohare_mb_power,
+@@ -678,7 +678,7 @@ static struct mb_ops ohare_mb_ops = {
+ 	.un_reset_ide	= ohare_mb_un_reset_ide,
  };
  
- struct imx_port_ucrs {
+-static struct mb_ops heathrow_mb_ops = {
++static const struct mb_ops heathrow_mb_ops = {
+ 	.name		= "Heathrow",
+ 	.content	= heathrow_mb_content,
+ 	.power		= heathrow_mb_power,
+@@ -687,7 +687,7 @@ static struct mb_ops heathrow_mb_ops = {
+ 	.un_reset_ide	= heathrow_mb_un_reset_ide,
+ };
+ 
+-static struct mb_ops keylargo_mb_ops = {
++static const struct mb_ops keylargo_mb_ops = {
+ 	.name		= "KeyLargo",
+ 	.init		= keylargo_mb_init,
+ 	.content	= keylargo_mb_content,
 -- 
 1.7.10.4
