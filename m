@@ -1,35 +1,103 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Jul 2012 11:13:20 +0200
-Subject: [PATCH 15/25] powerpc/fsl_msi: add a const qualifier
-In-Reply-To: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1343034810-3386-16-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon, 23 Jul 2012 11:13:05 +0200
+Subject: [PATCH v2 00/25] make *struct of_device_id.data const
+Message-ID: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prepares *of_device_id.data becoming const. Without this change
-the following warning would occur:
+Hello,
 
-	arch/powerpc/sysdev/fsl_msi.c: In function 'fsl_of_msi_probe':
-	arch/powerpc/sysdev/fsl_msi.c:379:11: error: assignment discards 'const' qualifier from pointer target type [-Werror]
+this is the 2nd version of this series whose goal is to make struct
+of_device_id.data const. Conceptually a driver must not modify the data
+contained there so making it const is the right thing.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/powerpc/sysdev/fsl_msi.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v1 of this series was sent with Message-id:
+1342182734-321-1-git-send-email-y. Changes since then are:
+ - powerpc fixes
+ - several new consts that were found by Arnd that are possible after
+   patch 19.
+   
+Arnd suggested to take this series via arm-soc late for 3.6 in one go
+because patch 19 depends on the former patches but is a precondition to
+the latter and it fixes a few warnings. So getting it in via the
+respective maintainer trees would need a much bigger coordination
+effort. That means I prefer getting Acks over you taking the patch.
 
-diff --git a/arch/powerpc/sysdev/fsl_msi.c b/arch/powerpc/sysdev/fsl_msi.c
-index 6e097de..a40acd6 100644
---- a/arch/powerpc/sysdev/fsl_msi.c
-+++ b/arch/powerpc/sysdev/fsl_msi.c
-@@ -368,7 +368,7 @@ static int __devinit fsl_of_msi_probe(struct platform_device *dev)
- 	int err, i, j, irq_index, count;
- 	int rc;
- 	const u32 *p;
--	struct fsl_msi_feature *features;
-+	const struct fsl_msi_feature *features;
- 	int len;
- 	u32 offset;
- 	static const u32 all_avail[] = { 0, NR_MSI_IRQS };
+Vinod Koul already took
+        dmaengine: at_hdmac: add a few const qualifiers
+that is in next-20120723 as 7fd63ccdad72 now. Vinod, I don't follow your
+pull requests, but assuming you didn't let it already pull for 3.6 I
+suggest you drop it from your queue and I just take your Ack.
+
+This series was build tested for arm (all defconfigs) and powerpc (all
+defconfigs and an allyesconfig) and grep didn't find more issues. As
+before it introduces a warning in drivers/regulator/twl-regulator.c.
+This driver does modify its .of_match_table when a device is bound which
+doesn't fits the concept of independant devices. Arnd noticed another
+new warning in drivers/scsi/qlogicpti.c that isn't that easy to resolve,
+because the pointer to (now) const data is passed as first argument to
+scsi_host_alloc. To fix that properly struct Scsi_Host.hostt needs to
+get a const, too. Alternatively I could introduce a cast removing the
+const, but I don't like that.
+
+This series is also available at:
+
+	git://git.pengutronix.de/git/ukl/linux.git ofdeviceiddata
+
+and I will modify it there for the Acks I'm getting.
+
+Arnd Bergmann (6):
+  watchdog/mpc8xxx: add a const qualifier
+  powerpc/fsl_msi: drop unneeded cast to non-const pointer
+  mfd/da9052: make i2c_device_id array const
+  i2c/mpc: make data used as *of_device_id.data const
+  macintosh/mediabay: make data used as *of_device_id.data const
+  can: mpc5xxx_can: make data used as *of_device_id.data const
+
+Marc Kleine-Budde (1):
+  can: mpc5xxx_can: make data in mpc5xxx_can_probe const
+
+Uwe Kleine-K?nig (18):
+  spi/imx: make spi_imx_data.devtype_data member point to const data
+  spi/spi-omap2-mcspi: add a const qualifier
+  serial/imx: make imx_port.devdata member point to const data
+  serial/mpc52xx_uart: add a const qualifier
+  ARM: cache-l2x0: add a const qualifier
+  misc/atmel_tc: make atmel_tc.tcb_config member point to const data
+  gpio/gpio-omap.c: add a const qualifier
+  gpio/mpc8xxx: add a const qualifier
+  i2c/i2c-omap: add a const qualifier
+  i2c/mpc: add a const qualifier
+  dmaengine: at_hdmac: add a few const qualifiers
+  mmc/omap_hsmmc: add a const qualifier
+  macintosh/mediabay: add a const qualifier
+  powerpc/83xx: add a const qualifier
+  powerpc/fsl_msi: add a const qualifier
+  powerpc/celleb_pci: add a const qualifier
+  of: add const to struct *of_device_id.data
+  gpio/gpio-omap: make platformdata used as *of_device_id.data const
+
+ arch/arm/mm/cache-l2x0.c                 |    2 +-
+ arch/powerpc/platforms/83xx/suspend.c    |    2 +-
+ arch/powerpc/platforms/cell/celleb_pci.c |    2 +-
+ arch/powerpc/sysdev/fsl_msi.c            |    8 ++++----
+ drivers/dma/at_hdmac.c                   |    4 ++--
+ drivers/gpio/gpio-mpc8xxx.c              |    2 +-
+ drivers/gpio/gpio-omap.c                 |    8 ++++----
+ drivers/i2c/busses/i2c-mpc.c             |   12 ++++++------
+ drivers/i2c/busses/i2c-omap.c            |    3 ++-
+ drivers/macintosh/mediabay.c             |    8 ++++----
+ drivers/mfd/da9052-i2c.c                 |    4 ++--
+ drivers/mmc/host/omap_hsmmc.c            |    2 +-
+ drivers/net/can/mscan/mpc5xxx_can.c      |    6 +++---
+ drivers/spi/spi-imx.c                    |    2 +-
+ drivers/spi/spi-omap2-mcspi.c            |    2 +-
+ drivers/tty/serial/imx.c                 |    2 +-
+ drivers/tty/serial/mpc52xx_uart.c        |    2 +-
+ drivers/watchdog/mpc8xxx_wdt.c           |    2 +-
+ include/linux/atmel_tc.h                 |    2 +-
+ include/linux/mod_devicetable.h          |    2 +-
+ 20 files changed, 39 insertions(+), 38 deletions(-)
+
 -- 
 1.7.10.4
