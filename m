@@ -1,39 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 22 Jul 2012 23:42:57 +0100
-Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
-In-Reply-To: <20120722193243.GF5423@lunn.ch>
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-3-git-send-email-andrew@lunn.ch>
- <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
- <20120722095328.GB5423@lunn.ch>
- <20120722190700.GD4557@opensource.wolfsonmicro.com>
- <20120722193243.GF5423@lunn.ch>
-Message-ID: <20120722224241.GH4557@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 22 Jul 2012 19:35:00 -0500
+Subject: [GIT PULL] io.h clean-up for PCI
+In-Reply-To: <50049285.1060100@gmail.com>
+References: <50049285.1060100@gmail.com>
+Message-ID: <500C9C34.2030404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2012 at 09:32:43PM +0200, Andrew Lunn wrote:
-> On Sun, Jul 22, 2012 at 08:07:01PM +0100, Mark Brown wrote:
+On 07/16/2012 05:15 PM, Rob Herring wrote:
+> Arnd,
+> 
+> Please pull io.h PCI clean-up series. As you suggested, lets get it in
+> next for test and decide later if to apply it for 3.6 or wait.
+> 
+> BTW, I'll have sporadic email access over the next 2 weeks.
+> 
 
-> > Well, I'd like to think that generally I'm reasonably responsive to
-> > patch submissions 
+I found a collision with EDAC enum mem_type and ARM struct mem_type definitions.
+It's caused from pulling in asm/mach/map.h into asm/mach/pci.h. I've reworked
+things which avoids the to avoid that. You want a rebased branch with the fix
+and other issues you found or just the following patch?
 
-> Well, this particular patch was first submitted May 19th and Ack-by
-> Linus on May 14th.
-
-> http://comments.gmane.org/gmane.linux.kernel.spi.devel/9937
-
-> It was reposted 10 Jun and Acked-by again in Jun 10 by Linus.
-
-> It was also reposted July 3.
-
-None of which were CCed to me; they were all before I started looking
-after SPI so that's not surprising but still the number of reposts is
-more a comment on why I'm helping out here than on what I said above.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120722/8e9b673e/attachment.sig>
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 188fd58..78d10a8 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -12,7 +12,6 @@
+ #define __ASM_MACH_PCI_H
+ 
+ #include <linux/ioport.h>
+-#include <asm/mach/map.h>
+ 
+ struct pci_sys_data;
+ struct pci_ops;
+@@ -63,6 +62,9 @@ void pci_common_init(struct hw_pci *);
+  * Setup fixed I/O mapping.
+  */
+ #if defined(CONFIG_PCI) && !defined(CONFIG_NEED_MACH_IO_H)
++extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
++				  void *caller);
++
+ /* Called from devicemaps_init before .map_io */
+ static inline void __init pci_reserve_io(void)
+ {
