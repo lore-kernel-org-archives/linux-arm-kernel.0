@@ -1,153 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jul 2012 20:33:02 -0000
-Subject: [GIT PULL 01/15] arm-soc: non-critical bug fixes
+Date: Mon, 23 Jul 2012 20:33:04 -0000
+Subject: [GIT PULL 06/15] arm-soc: spi updates
 In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
 References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <1343075561-17446-2-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+The following changes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
 
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+  Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/fixes-non-critical
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/spi
 
-for you to fetch changes up to 913bdf1217f40c5e68c6b09f299177e5cd9629bd:
+for you to fetch changes up to 85644d2a8893d72d1869c6347e791902dd414288:
 
-  Merge tag 'ep93xx-fixes-for-3.6' of git://github.com/RyanMallon/linux-ep93xx into next/fixes-non-critical (2012-07-18 18:56:34 +0200)
-
-----------------------------------------------------------------
-
-arm-soc: non-critical bug fixes
-
-These were submitted as bug fixes before v3.5 but not considered
-important enough to be included in it.
+  Merge branch 'next/devel-samsung-spi' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/spi (2012-07-21 23:12:15 +0200)
 
 ----------------------------------------------------------------
 
-Arnd Bergmann (6):
-      ARM: OMAP depends on MMU
-      Merge tag 'omap-fixes-non-critical-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
-      Merge branch 'mxs/fixes-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/fixes-non-critical
-      Merge tag 'davinci-v3.6-fixes' of git://gitorious.org/linux-davinci/linux-davinci into next/fixes-non-critical
-      Merge tag 'ep93xx-fixes-for-3.6' of git://github.com/RyanMallon/linux-ep93xx into next/fixes-non-critical
-      Merge branch 'next/fixes-non-critical' into for-next
+arm-soc: spi updates
 
-Brian Austin (1):
-      ARM: OMAP: beagle: Set USB Host Port 1 to OMAP_USBHS_PORT_MODE_UNUSED
+These changes conceptually belong into the spi tree, but we decided to
+put them into arm-soc to better deal with interdependencies with other
+platform specific patches that are already there.
 
-Daniel Lezcano (1):
-      ARM: OMAP3/4: consolidate cpuidle Makefile
+----------------------------------------------------------------
 
-Igor Grinberg (1):
-      ARM: OMAP: fix the ads7846 init code
+Arnd Bergmann (2):
+      Merge branch 'next/devel-samsung-spi' of git://git.kernel.org/.../kgene/linux-samsung into next/spi
+      Merge branch 'next/spi' into for-next
 
-Javier Martinez Canillas (1):
-      ARM: OMAP: omap2plus_defconfig: Enable EXT4 support
+Kukjin Kim (1):
+      Merge branch 'next/dt-samsung' into next/devel-samsung-spi
 
-Juan Gutierrez (2):
-      ARM: OMAP: enable mailbox irq per instance
-      ARM: OMAP4: fix irq and clock name for dsp-iommu
+Mark Brown (4):
+      spi/s3c64xx: Fix handling of errors in gpio_request()
+      spi/s3c64xx: Put the /CS GPIO into output mode
+      spi/s3c64xx: Convert to devm_request_and_ioremap()
+      spi/s3c64xx: Expand S3C64XX_SPI_{DE,}ACT macros at call sites
 
-Kevin Hilman (3):
-      ARM: OMAP2+: TWL: remove usage of pdata->irq_base/_end
-      mfd: twl: remove pdata->irq_base/_end, no more users
-      ARM: OMAP2+: fix CONFIG_CPU_IDLE dependency on CONFIG_PM
-
-Mark A. Greer (4):
-      ARM: OMAP3: PM: Only access IVA if one exists
-      ARM: OMAP AM35x: EMAC/MDIO integration: Add Davinci EMAC/MDIO hwmod support
-      ARM: OMAP AM35x: clockdomain data: Fix clockdomain dependencies
-      arm: omap3: am35x: Set proper powerdomain states
-
-Nishanth Menon (1):
-      ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after bad one
-
-Ohad Ben-Cohen (1):
-      ARM: OMAP4: hwspinlocks_init() should be static
-
-Paul Bolle (4):
-      ARM: OMAP7XX:  Remove omap730.h and omap850.h
-      ARM: OMAP: fix typos related to OMAP330
-      ARM: OMAP: remove unused cpu detection macros
-      ARM: mxs/tx28: fix odd include
-
-Paul Walmsley (4):
-      ARM: OMAP AM35xx: clock and hwmod data: fix AM35xx HSOTGUSB hwmod
-      ARM: OMAP AM35xx: clock and hwmod data: fix UART4 data
-      ARM: OMAP: AM35xx: fix UART4 softreset
-      Merge branches 'am35xx_hwmod_data_fixes_a_3.6', 'am35xx_emac_mdio_devel_3.6' and 'am35xx_prcm_data_devel_3.6' into am35xx_devel_3.6
-
-Peter Ujfalusi (1):
-      ARM: OMAP2: twl-common: Fix compiler warning
-
-Roland Stigge (1):
-      ARM: OMAP: Fix dts files w/ status property: "disable" -> "disabled"
-
-Sekhar Nori (1):
-      ARM: davinci: da8xx: fix interrupt handling
-
-Todor Colov (1):
-      arm: ep93xx: Enable i2c support for ep9302
-
-Tony Lindgren (5):
-      Merge branch 'for-tony' of git://git.kernel.org/.../ohad/linux into fixes-omap4-dsp
-      Merge branch 'fixes-omap4-dsp' into fixes-non-critical
-      Merge branch 'for_3.6/cleanup/pm' of git://git.kernel.org/.../khilman/linux-omap-pm into fixes-non-critical
-      Merge branch 'for_3.6/cleanup/twl-irq' of git://git.kernel.org/.../khilman/linux-omap-pm into fixes-non-critical
-      Merge tag 'omap-devel-d-for-3.6' of git://git.kernel.org/.../pjw/omap-pending into fixes-non-critical
-
-Tony Prisk (1):
-      ARM:vt8500: Convert to use .restart and remove arch_reset()
-
-Venkatraman S (1):
-      ARM: OMAP2+: fix naming collision of variable nr_irqs
-
- arch/arm/Kconfig                                 |    1 +
- arch/arm/boot/dts/omap3-beagle.dts               |    4 +-
- arch/arm/boot/dts/omap4-panda.dts                |    6 +-
- arch/arm/boot/dts/omap4-sdp.dts                  |    4 +-
- arch/arm/configs/omap2plus_defconfig             |    1 +
- arch/arm/mach-davinci/include/mach/entry-macro.S |    8 +-
- arch/arm/mach-ep93xx/edb93xx.c                   |    4 +-
- arch/arm/mach-mxs/module-tx28.c                  |    2 +-
- arch/arm/mach-omap2/Kconfig                      |    2 +
- arch/arm/mach-omap2/Makefile                     |    7 +-
- arch/arm/mach-omap2/am35xx-emac.c                |   90 +++++++------
- arch/arm/mach-omap2/board-2430sdp.c              |    3 -
- arch/arm/mach-omap2/board-omap3beagle.c          |    2 +-
- arch/arm/mach-omap2/board-omap3logic.c           |    3 -
- arch/arm/mach-omap2/clock3xxx_data.c             |   28 ++--
- arch/arm/mach-omap2/clockdomains3xxx_data.c      |  157 ++++++++++++++++++++--
- arch/arm/mach-omap2/cm-regbits-34xx.h            |    4 +-
- arch/arm/mach-omap2/common-board-devices.c       |   22 +--
- arch/arm/mach-omap2/cpuidle34xx.c                |    8 --
- arch/arm/mach-omap2/cpuidle44xx.c                |    8 --
- arch/arm/mach-omap2/include/mach/am35xx.h        |    2 +
- arch/arm/mach-omap2/irq.c                        |    8 +-
- arch/arm/mach-omap2/mailbox.c                    |    2 -
- arch/arm/mach-omap2/omap-iommu.c                 |    6 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c       |  143 ++++++++++++++++++--
- arch/arm/mach-omap2/opp.c                        |    3 +-
- arch/arm/mach-omap2/pm.h                         |   17 ++-
- arch/arm/mach-omap2/pm34xx.c                     |   15 ++-
- arch/arm/mach-omap2/powerdomains3xxx_data.c      |  139 +++++++++++++++++--
- arch/arm/mach-omap2/prcm-common.h                |    4 +-
- arch/arm/mach-omap2/prm_common.c                 |    8 +-
- arch/arm/mach-omap2/twl-common.c                 |   11 +-
- arch/arm/mach-vt8500/Makefile                    |    2 +-
- arch/arm/mach-vt8500/bv07.c                      |    3 +
- arch/arm/mach-vt8500/include/mach/restart.h      |   17 +++
- arch/arm/mach-vt8500/include/mach/system.h       |   13 --
- arch/arm/mach-vt8500/restart.c                   |   54 ++++++++
- arch/arm/mach-vt8500/wm8505_7in.c                |    4 +-
- arch/arm/plat-omap/include/plat/cpu.h            |   20 +--
- arch/arm/plat-omap/include/plat/mux.h            |    2 +-
- arch/arm/plat-omap/include/plat/omap730.h        |  102 --------------
- arch/arm/plat-omap/include/plat/omap850.h        |  102 --------------
- arch/arm/plat-omap/mailbox.c                     |   13 +-
- include/linux/i2c/twl.h                          |    1 -
- 44 files changed, 634 insertions(+), 421 deletions(-)
+ drivers/spi/spi-s3c64xx.c |   42 ++++++++++++------------------------------
+ 1 file changed, 12 insertions(+), 30 deletions(-)
