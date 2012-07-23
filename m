@@ -1,41 +1,48 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 23 Jul 2012 11:17:49 +0200
-Subject: [PATCH 18/25] can: mpc5xxx_can: make data in mpc5xxx_can_probe
- const
-In-Reply-To: <1343034810-3386-19-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon, 23 Jul 2012 11:20:25 +0200
+Subject: [PATCH 25/25] can: mpc5xxx_can: make data used as
+ *of_device_id.data const
+In-Reply-To: <1343034810-3386-26-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343034810-3386-19-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <500D16BD.2080900@pengutronix.de>
+ <1343034810-3386-26-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <500D1759.4040002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/23/2012 11:13 AM, Uwe Kleine-K?nig wrote:
-> From: Marc Kleine-Budde <mkl@pengutronix.de>
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> [ukl: split Arnd's patch by driver]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Note: this patch is already upstream in David Miller's net-next tree.
-0e84eb0 can: mpc5xxx_can: make data in mpc5xxx_can_probe const
+Marc
 
-cheers, Marc
 > ---
->  drivers/net/can/mscan/mpc5xxx_can.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/net/can/mscan/mpc5xxx_can.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 > diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-> index 5caa572..06adf88 100644
+> index 06adf88..8a8df82 100644
 > --- a/drivers/net/can/mscan/mpc5xxx_can.c
 > +++ b/drivers/net/can/mscan/mpc5xxx_can.c
-> @@ -251,7 +251,7 @@ static struct of_device_id mpc5xxx_can_table[];
->  static int __devinit mpc5xxx_can_probe(struct platform_device *ofdev)
->  {
->  	const struct of_device_id *match;
-> -	struct mpc5xxx_can_data *data;
-> +	const struct mpc5xxx_can_data *data;
->  	struct device_node *np = ofdev->dev.of_node;
->  	struct net_device *dev;
->  	struct mscan_priv *priv;
+> @@ -380,12 +380,12 @@ static int mpc5xxx_can_resume(struct platform_device *ofdev)
+>  }
+>  #endif
+>  
+> -static struct mpc5xxx_can_data __devinitdata mpc5200_can_data = {
+> +static const struct mpc5xxx_can_data __devinitdata mpc5200_can_data = {
+>  	.type = MSCAN_TYPE_MPC5200,
+>  	.get_clock = mpc52xx_can_get_clock,
+>  };
+>  
+> -static struct mpc5xxx_can_data __devinitdata mpc5121_can_data = {
+> +static const struct mpc5xxx_can_data __devinitdata mpc5121_can_data = {
+>  	.type = MSCAN_TYPE_MPC5121,
+>  	.get_clock = mpc512x_can_get_clock,
+>  };
 > 
 
 -- 
@@ -50,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 262 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120723/63d43310/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120723/afe9dcd6/attachment-0001.sig>
