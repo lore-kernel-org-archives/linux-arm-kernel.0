@@ -1,46 +1,40 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Jul 2012 12:59:45 +0200
-Subject: [PATCH] spi-orion: add device tree binding
-In-Reply-To: <20120723104333.GI4435@opensource.wolfsonmicro.com>
-References: <1342805751-18048-3-git-send-email-andrew@lunn.ch>
+Date: Mon, 23 Jul 2012 13:02:27 +0200
+Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
+In-Reply-To: <500D2D42.3000006@mvista.com>
+References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
+ <1342805751-18048-3-git-send-email-andrew@lunn.ch>
  <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
  <20120722095328.GB5423@lunn.ch>
  <20120722190700.GD4557@opensource.wolfsonmicro.com>
- <20120722193243.GF5423@lunn.ch>
- <20120722224241.GH4557@opensource.wolfsonmicro.com>
- <20120723072749.GA18778@lunn.ch>
- <20120723093747.GD4435@opensource.wolfsonmicro.com>
- <20120723100809.GC18778@lunn.ch>
- <20120723104333.GI4435@opensource.wolfsonmicro.com>
-Message-ID: <20120723105945.GH18778@lunn.ch>
+ <20120722193243.GF5423@lunn.ch> <500D2D42.3000006@mvista.com>
+Message-ID: <20120723110227.GI18778@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 11:43:34AM +0100, Mark Brown wrote:
-> On Mon, Jul 23, 2012 at 12:08:09PM +0200, Andrew Lunn wrote:
-> > From 528a19e9eda968cc673331d566cbfe20962d3b32 Mon Sep 17 00:00:00 2001
-> > From: Michael Walle <michael@walle.cc>
-> > Date: Wed, 6 Jun 2012 19:16:28 +0200
-> > Subject: [PATCHv3] spi-orion: add device tree binding
+On Mon, Jul 23, 2012 at 02:53:54PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> I really shouldn't need to remind you about the format for sending
-> patches :(
+> On 22-07-2012 23:32, Andrew Lunn wrote:
 > 
-> > +Optional properties:
-> > +- interrupts : Is currently not used.
+> >>>You can see the chain of dependencies here. So at minimum i would need
+> >>>to send the first three via Mark. I then need to cross my fingers and
+> >>>hope he really picks them up, because without them, we are going to
+> >>>have a number of boards which fail to find their root file system on
+> >>>an SPI flash.
 > 
-> Would it not be better to just omit this if it doesn't do anything and
-> doesn't have any semantics defined?
-
-I was specifically asked to include this, which is why it appeared in
-v2, not the first version. I forget who it was who asked for it, maybe
-Arnd Bergmann? I can dig through my email archive if you want to know.
-
+> >>Well, I'd like to think that generally I'm reasonably responsive to
+> >>patch submissions
 > 
-> I've applied this.  If you could send the other patches that'd be
-> helpful...
+> >Well, this particular patch was first submitted May 19th and Ack-by
+> >Linus on May 14th.
+> 
+>    It was acked even before submitted? ;-)
 
-O.K.
+I have my dates wrong. See:
 
-Thanks
-	Andrew
+http://comments.gmane.org/gmane.linux.kernel.spi.devel/9937
+
+First posted 9 May, acked 14th May.
+
+      Andrew
