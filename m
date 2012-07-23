@@ -1,56 +1,31 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 23 Jul 2012 10:57:35 +0900
-Subject: [PATCH v3 0/6] mmc: dw_mmc: add support for device tree based
- instantiation
-In-Reply-To: <195201cd6600$7cb089f0$76119dd0$%kim@samsung.com>
-References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
- <5008279B.4000001@samsung.com>
- <CAJuYYwQBgpJ1wiS3fSDS2cMi6kanuO47rc8SmniAqjRPuBGJHg@mail.gmail.com>
- <195201cd6600$7cb089f0$76119dd0$%kim@samsung.com>
-Message-ID: <500CAF8F.5040407@samsung.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Mon, 23 Jul 2012 11:25:30 +0900
+Subject: [PATCH] video: exynos mipi dsi: Fix mipi dsi regulators handling issue
+Message-ID: <500CB61A.6000106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2012 07:47 AM, Kukjin Kim wrote:
-> Thomas Abraham wrote:
->>
->> On 19 July 2012 20:58, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> Hi Thomas,
->>>
->>> I think not good that added the samsung specific code into dw_mmc-
->> pltfm.c
->>> How about separating to dw-mmc-exynos.c?
->>
->> I am not sure of this. The only samsung specific code in
->> dw_mmc-pltfm.c file is the data for of_device_id instances. The clock
->> lookup added into this file in the 3rd patch does not cause any harm
->> on non-samsung SoC's which might not define those clocks (on clock
->> lookup failure, there are only warning printed, the driver's probe
->> does not fail.
->>
-> I agree with Thomas' opinion, in addition, the dw_mmc-pltfm.c file can
-> support that, so adding dw-mmc-exynos.c is not needed now.
-> 
->> I would prefer not to add separate file for Exynos SoC's for now.
->> Splitting into different files will need to defined new callbacks
->> which I fell is not really required.
-Then where is the callback function located?
+When FB_BLANK_UNLANK event occured, exynos mipi dsi regulators have to turn on.
 
-Best Regards,
-Jaehoon Chung
->>
-> Yes.
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/video/exynos/exynos_mipi_dsi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+index 6c1f5c3..9390640 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi.c
++++ b/drivers/video/exynos/exynos_mipi_dsi.c
+@@ -154,7 +154,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+ 		if (client_drv && client_drv->power_on)
+ 			client_drv->power_on(client_dev, 1);
+ 
+-		exynos_mipi_regulator_disable(dsim);
++		exynos_mipi_regulator_enable(dsim);
+ 
+ 		/* enable MIPI-DSI PHY. */
+ 		if (dsim->pd->phy_enable)
+-- 
+1.7.4.1
