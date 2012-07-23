@@ -1,67 +1,74 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 23 Jul 2012 10:36:33 +0800
-Subject: [alsa-devel] [PATCH 4/4] ARM: mx28evk: add missed clkmux
- select for saif
-In-Reply-To: <20120721074002.GC923@S2101-09.ap.freescale.net>
-References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
- <1342776027-31758-5-git-send-email-b29396@freescale.com>
- <20120721074002.GC923@S2101-09.ap.freescale.net>
-Message-ID: <20120723023632.GA9427@shlinux2.ap.freescale.net>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Mon, 23 Jul 2012 13:27:34 +0900
+Subject: [PATCH] video: exynos: s6e8ax0: support early fb event of fb_blank()
+Message-ID: <500CD2B6.2080109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2012 at 03:40:04PM +0800, Shawn Guo wrote:
-> On Fri, Jul 20, 2012 at 05:20:27PM +0800, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > Added missed clkmux setting for mx28evk.
-> > 
-> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > Cc: Liam Girdwood <lrg@ti.com>
-> > Cc: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> >  arch/arm/mach-mxs/mach-mxs.c |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> > index 8cac94b..82f27a4 100644
-> > --- a/arch/arm/mach-mxs/mach-mxs.c
-> > +++ b/arch/arm/mach-mxs/mach-mxs.c
-> > @@ -21,6 +21,7 @@
-> >  #include <asm/mach/arch.h>
-> >  #include <asm/mach/time.h>
-> >  #include <mach/common.h>
-> > +#include <mach/digctl.h>
-> >  
-> >  static int __init mxs_icoll_add_irq_domain(struct device_node *np,
-> >  				struct device_node *interrupt_parent)
-> > @@ -79,6 +80,8 @@ static void __init imx28_evk_init(void)
-> >  	clk = clk_get_sys("enet_out", NULL);
-> >  	if (!IS_ERR(clk))
-> >  		clk_prepare_enable(clk);
-> > +
-> > +	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
-> 
-> Is this a board specific setup?  Or every single imx28 based board that
-> wants recording function is going to need this setup?
-> 
-Yes, this is a board specific setup, just as non-dt does currently.
-Different boards may have different setting.
+This patch supports early fb event of fb_blank().
 
-> BTW, the patch needs to get rebased on v3.6-rc1, where mach-mxs.c will
-> have some context update.
-> 
-I can do it.
-This patch series was made based on Mark's sound-2.6 tree.
-Do you want this one go through mxs tree and other three go through Mark's tree?
-I'm thinking maybe it would be better go through one tree(Mark's or Yours) since
-without this one the saif record still can not work.
-Maybe go through yours may save some conflicts.
+- In case of lcd power off : call early_set_power() interface and lcd
+power is off. And then framebuffer is blanked.
 
-Mark,
-What's your suggestion?
+- In case of lcd power on : First, framebuffer is unblanked, and then
+call set_power() interface to turn lcd on.
 
-Regards
-Dong Aisheng
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/video/exynos/s6e8ax0.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/video/exynos/s6e8ax0.c b/drivers/video/exynos/s6e8ax0.c
+index 05d080b..e51d024 100644
+--- a/drivers/video/exynos/s6e8ax0.c
++++ b/drivers/video/exynos/s6e8ax0.c
+@@ -663,6 +663,37 @@ static int s6e8ax0_gamma_ctrl(struct s6e8ax0 *lcd, int gamma)
+ 	return 0;
+ }
+ 
++static int s6e8aa0_early_set_power(struct lcd_device *ld, int power)
++{
++	struct s6e8ax0 *lcd = lcd_get_data(ld);
++	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
++	int ret = 0;
++
++	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
++			power != FB_BLANK_NORMAL) {
++		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
++		return -EINVAL;
++	}
++
++	if (lcd->power == power) {
++		dev_err(lcd->dev, "power mode is same as previous one.\n");
++		return -EINVAL;
++	}
++
++	if (ops->set_early_blank_mode) {
++		/* LCD power off */
++		if ((POWER_IS_OFF(power) && POWER_IS_ON(lcd->power))
++			|| (POWER_IS_ON(lcd->power) && POWER_IS_NRM(power))) {
++			ret = ops->set_early_blank_mode(lcd_to_master(lcd),
++							power);
++			if (!ret && lcd->power != power)
++				lcd->power = power;
++		}
++	}
++
++	return ret;
++}
++
+ static int s6e8ax0_set_power(struct lcd_device *ld, int power)
+ {
+ 	struct s6e8ax0 *lcd = lcd_get_data(ld);
+@@ -731,6 +762,7 @@ static int s6e8ax0_set_brightness(struct backlight_device *bd)
+ }
+ 
+ static struct lcd_ops s6e8ax0_lcd_ops = {
++	.early_set_power = s6e8aa0_early_set_power,
+ 	.set_power = s6e8ax0_set_power,
+ 	.get_power = s6e8ax0_get_power,
+ };
+-- 
+1.7.4.1
