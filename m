@@ -1,40 +1,46 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 23 Jul 2012 13:51:55 +0300
-Subject: [PATCH v2 1/2] USB: chipidea: add imx usbmisc support
-In-Reply-To: <500D19AA.8080006@pengutronix.de>
-References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
- <1342607348-8587-2-git-send-email-richard.zhao@freescale.com>
- <20120723091652.GK8265@arwen.pp.htv.fi>
- <20120723092713.GS21635@b20223-02.ap.freescale.net>
- <500D19AA.8080006@pengutronix.de>
-Message-ID: <20120723105153.GS8265@arwen.pp.htv.fi>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 23 Jul 2012 12:59:45 +0200
+Subject: [PATCH] spi-orion: add device tree binding
+In-Reply-To: <20120723104333.GI4435@opensource.wolfsonmicro.com>
+References: <1342805751-18048-3-git-send-email-andrew@lunn.ch>
+ <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
+ <20120722095328.GB5423@lunn.ch>
+ <20120722190700.GD4557@opensource.wolfsonmicro.com>
+ <20120722193243.GF5423@lunn.ch>
+ <20120722224241.GH4557@opensource.wolfsonmicro.com>
+ <20120723072749.GA18778@lunn.ch>
+ <20120723093747.GD4435@opensource.wolfsonmicro.com>
+ <20120723100809.GC18778@lunn.ch>
+ <20120723104333.GI4435@opensource.wolfsonmicro.com>
+Message-ID: <20120723105945.GH18778@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 11:30:18AM +0200, Marc Kleine-Budde wrote:
-> On 07/23/2012 11:27 AM, Richard Zhao wrote:
-> >> This patch looks like a recipe for disaster IMHO, but it's Alex's call.
-> > Well, if there's any better place to hold it, I'd like to move there.
-> > Another place is arch/arm/mach-imx. Sascha/Shawn who are maintainers of
-> > imx are also in cc list.
+On Mon, Jul 23, 2012 at 11:43:34AM +0100, Mark Brown wrote:
+> On Mon, Jul 23, 2012 at 12:08:09PM +0200, Andrew Lunn wrote:
+> > From 528a19e9eda968cc673331d566cbfe20962d3b32 Mon Sep 17 00:00:00 2001
+> > From: Michael Walle <michael@walle.cc>
+> > Date: Wed, 6 Jun 2012 19:16:28 +0200
+> > Subject: [PATCHv3] spi-orion: add device tree binding
 > 
-> IMHO it's not about the place where the driver is located, it's about
-> the shortcomings Michael and Sascha mentioned.
+> I really shouldn't need to remind you about the format for sending
+> patches :(
+> 
+> > +Optional properties:
+> > +- interrupts : Is currently not used.
+> 
+> Would it not be better to just omit this if it doesn't do anything and
+> doesn't have any semantics defined?
 
-exactly. It's not about where a file is placed or how it's called. It's
-how you decided to implement it. This will prevent a platform with
-multiple instances of the IP to be used, at least.
+I was specifically asked to include this, which is why it appeared in
+v2, not the first version. I forget who it was who asked for it, maybe
+Arnd Bergmann? I can dig through my email archive if you want to know.
 
-Also, if that set of registers are shared, you ought to have a dedicated
-driver to handle mutual exclusion and so on. I don't know details about
-the i.MX platform, that really smells funny by looking at it.
+> 
+> I've applied this.  If you could send the other patches that'd be
+> helpful...
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120723/4dc2b9c6/attachment.sig>
+O.K.
+
+Thanks
+	Andrew
