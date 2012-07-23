@@ -1,27 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Jul 2012 15:29:57 -0600
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201207171924.33756.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206271520.49276.arnd@arndb.de> <1342161907.1726.26.camel@vkoul-udesk3>
- <201207171924.33756.arnd@arndb.de>
-Message-ID: <500DC255.40900@wwwdotorg.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 24 Jul 2012 08:14:22 +0900
+Subject: [PATCH V2 6/7] ARM: EXYNOS5: Add the bus clock for FIMD
+In-Reply-To: <500D1F59.9030807@samsung.com>
+References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
+ <1342591053-7092-7-git-send-email-l.krishna@samsung.com>
+ <500D0C8B.3080007@samsung.com> <500D1F59.9030807@samsung.com>
+Message-ID: <000301cd6928$e5021660$af064320$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2012 01:24 PM, Arnd Bergmann wrote:
-...
-> I think we're basically on the same page. Let's see if I have covered
-> all the cases we discussed so far. I've tried to update the binding that
-> Jon sent out initially with everything we've discussed, so please review
-> this to see if I understood you correctly.
-...
-> * DMA client
-...
-> Examples:
-...
-> 3. A device with three channels, one of which has two alternatives:
+On Monday, July 23, 2012 6:55 PM, Joonyoung Shim wrote:
+> 
+> Hi, Jingoo.
+> 
+> On 07/23/2012 05:34 PM, Joonyoung Shim wrote:
+> > On 07/18/2012 02:57 PM, Leela Krishna Amudala wrote:
+> >> This patch adds the bus clock for FIMD and changes
+> >> the device name for lcd clock
+> >
+> > Please refer below patch for exynos4.
+> >
+> > http://lists.linaro.org/pipermail/linaro-dev/2011-December/008872.html
+> >
+> >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> >> ---
+> >>   arch/arm/mach-exynos/clock-exynos5.c |    7 ++++++-
+> >>   1 files changed, 6 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-exynos/clock-exynos5.c
+> >> b/arch/arm/mach-exynos/clock-exynos5.c
+> >> index 774533c..f001876 100644
+> >> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> >> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> >> @@ -634,6 +634,11 @@ static struct clk exynos5_init_clocks_off[] = {
+> >>           .enable        = exynos5_clk_ip_disp1_ctrl,
+> >>           .ctrlbit    = (1 << 3),
+> >>       }, {
+> >> +        .name           = "fimd",
+> >> +        .devname        = "exynos5-fb",
+> >> +        .enable         = exynos5_clk_ip_disp1_ctrl,
+> >> +        .ctrlbit        = (1 << 0),
+> >> +    }, {
+> 
+> With this patch, it causes below error at the DP driver because fimd
+> clock is disabled.
+> 
+> [    0.210000] exynos-dp exynos-dp: Timeout of video streamclk ok
+> [    0.210000] exynos-dp exynos-dp: unable to config video
+> [    0.210000] exynos-dp: probe of exynos-dp failed with error -110
+> 
+> I wonder fimd clock has any dependency with DP
 
-s/three/four/   s/one of which/both of which/
+FIMD pixel clock is necessary to enable DP.
 
-This binding doc seems reasonable to me.
+Best regards,
+Jingoo Han
+
+> 
+> Thanks.
