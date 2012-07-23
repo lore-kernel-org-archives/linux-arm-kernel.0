@@ -1,45 +1,84 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Jul 2012 14:48:20 +0100
-Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device tree
- data
-In-Reply-To: <20120723133400.GU4435@opensource.wolfsonmicro.com>
-References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
- <1342766789-28148-2-git-send-email-anilkumar@ti.com>
- <20120720095935.GQ4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
- <20120720113806.GW4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA01F1E@DBDE01.ent.ti.com>
- <20120723133400.GU4435@opensource.wolfsonmicro.com>
-Message-ID: <500D5624.4010505@linaro.org>
+Date: Mon, 23 Jul 2012 15:05:19 +0100
+Subject: Help request - ASoC recursion issue
+Message-ID: <500D5A1F.9000808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/07/12 14:34, Mark Brown wrote:
-> On Mon, Jul 23, 2012 at 01:23:50PM +0000, AnilKumar, Chimata wrote:
->
->> By the way, if we look at all the regulator added (DT supported) till now have
->> the similar problem.
->
->> arch/arm/boot/dts/imx6q.dtsi
->
-> This is fine - the SoC contains integrated regulators which supply other
-> bits of the Soc so we can be confident that the hookup is good just
-> based on the silicon.
->
->> arch/arm/boot/dts/twl4030.dtsi
->> arch/arm/boot/dts/twl6030.dtsi
->
-> These appear to have similar issues and should be fixed, at least as far
-> as the voltage ranges go.
->
->> arch/arm/boot/dts/db8500.dtsi
->
-> I'm not actually seeing anything terribly problematic here, though the
-> regulator-name properties should really be removed as they're fairly
-> useless and seem to be missing the point of having the property.
+Hi Mark,
 
-I've missed the context of the thread, so can't comment, but I'm happy 
-to remove the regulator-name properties from db8500.dts. Adding to my TODO.
+I was wondering if I may bother you for some help. I've been having 
+serious issues with testing the new mop500 sound system you have in your 
+ASoC for-next branch. I've fixed a few issues and will be submitting 
+patches shortly. The most serious issue I came across was with 
+recursion. Let me show you:
+
+So here we setup the power_check function pointer with 
+'dapm_supply_check_power()'.
+
+> static struct snd_soc_dapm_widget *
+> snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
+> 			 const struct snd_soc_dapm_widget *widget)
+> {
+<snip>
+> 	case snd_soc_dapm_regulator_supply:
+> 	case snd_soc_dapm_clock_supply:
+> 		w->power_check = dapm_supply_check_power;
+> 		break;
+<snip>
+> }
+
+Later we call 'dapm_widget_power_check()' which calls into the function 
+pointer we know to be 'dapm_supply_check_power()'.
+
+ > static int dapm_widget_power_check(struct snd_soc_dapm_widget *w)
+ > {
+ > 	if (w->power_checked)
+ > 		return w->new_power;
+ >
+ > 	if (w->force)
+ > 		w->new_power = 1;
+ > 	else
+ > 		w->new_power = w->power_check(w);
+ >
+ > 	w->power_checked = true;
+ >
+ > 	return w->new_power;
+ > }
+
+The problem seems to be that 'dapm_supply_check_power()' then calls back 
+into 'dapm_widget_power_check()'. Then round and round we go!
+
+> /* Check to see if a power supply is needed */
+> static int dapm_supply_check_power(struct snd_soc_dapm_widget *w)
+> {
+<snip>
+> 	/* Check if one of our outputs is connected */
+> 	list_for_each_entry(path, &w->sinks, list_source) {
+> 		DAPM_UPDATE_STAT(w, neighbour_checks);
+>
+> 		if (path->weak)
+> 			continue;
+>
+> 		if (path->connected &&
+> 		    !path->connected(path->source, path->sink))
+> 			continue;
+>
+> 		if (!path->sink)
+> 			continue;
+>
+> 		if (dapm_widget_power_check(path->sink))     /* <-- Doh! */
+> 			return 1;
+> 	}
+<snip>
+> }
+
+Can you shed some light on what the correct solution might be?
+
+Any help would be gratefully received.
+
+Kind regards,
+Lee
 
 -- 
 Lee Jones
