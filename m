@@ -1,39 +1,99 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 24 Jul 2012 04:19:37 +1200
-Subject: [PATCH] ARM: vt8500: Add maintainer for VT8500 architecture
-Message-ID: <1343060377-2606-1-git-send-email-linux@prisktech.co.nz>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Mon, 23 Jul 2012 16:36:46 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <500CEF97.4050207@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+ <4FF42761.2000701@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
+ <500CEF97.4050207@gmail.com>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a MAINTAINERS entry for mach-vt8500 and related files.
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-Acked-by: Alexey Charkov <alchark@gmail.com>
----
- MAINTAINERS |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index eb22272..e83a327 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1175,6 +1175,17 @@ S:	Maintained
- F:	arch/arm/mach-pxa/vpac270.c
- F:	arch/arm/mach-pxa/include/mach/vpac270.h
+> -----Original Message-----
+> From: Daniel Mack [mailto:zonque at gmail.com]
+> Sent: Monday, July 23, 2012 12:01 PM
+> To: N, Mugunthan V
+> Cc: Hiremath, Vaibhav; Paul Walmsley; Nori, Sekhar; Jason Kridner; Tony
+> Lindgren; Hilman, Kevin; Hernandez, Carlos; Maupin, Chase; linux-
+> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Kridner, Jason
+> Subject: Re: Current state of AM33xx patches
+> 
+> On 05.07.2012 19:45, N, Mugunthan V wrote:
+> >> -----Original Message-----
+> >> From: Daniel Mack [mailto:zonque at gmail.com]
+> >> Sent: Wednesday, July 04, 2012 4:52 PM
+> >> To: Hiremath, Vaibhav
+> >> Cc: Paul Walmsley; Nori, Sekhar; Jason Kridner; Tony Lindgren; Hilman,
+> >> Kevin; Hernandez, Carlos; Maupin, Chase; linux-omap at vger.kernel.org;
+> >> linux-arm-kernel at lists.infradead.org; Kridner, Jason; N, Mugunthan V
+> >> Subject: Re: Current state of AM33xx patches
+> >>
+> >> On 04.07.2012 12:50, Hiremath, Vaibhav wrote:
+> >>> On Wed, Jul 04, 2012 at 15:37:31, Paul Walmsley wrote:
+> >>>> On Sat, 30 Jun 2012, Daniel Mack wrote:
+> >>>>
+> >>>>> Ok, thanks for the explaining this. For now, I'll add hwmod stubs
+> for
+> >>>>> the components I need.
+> >>>>
+> >>>> Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod
+> >> data
+> >>>> for the AM33xx.  There might be some missing integration code to
+> build
+> >> the
+> >>>> devices for the newer IP blocks, though.
+> >>>>
+> >>>
+> >>> I would also be interested to know more here.
+> >>>
+> >>>
+> >>>>> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
+> >>>>
+> >>>> Mainline has:
+> >>>>
+> >>>> drivers/net/ethernet/ti/davinci_emac.c
+> >>>
+> >>> Not required for AM335X.
+> >>>
+> >>>> drivers/net/ethernet/ti/davinci_mdio.c
+> >>>>
+> >>>> Those might work for you.
+> >>>>
+> >>>
+> >>> Few more files,
+> >>>
+> >>> drivers/net/ethernet/ti/cpsw.c
+> >>> drivers/net/ethernet/ti/davinci_cpdma.c
+> >>>
+> >>>
+> >>> Wanted to highlight one point,
+> >>> You still have to add platform device code to get it working.
+> >>
+> >> Exactly. And a hwmod binding for DT. Do you have patches for that?
+> >>
+> >>
+> >> Daniel
+> >
+> > I am working on DT support for cpsw and will be submitting the patch by
+> > July 20, 2012
+> 
+> Just curious - have you made any progress on that yet?
+>
  
-+ARM/VT8500 ARM ARCHITECTURE
-+M:	Tony Prisk <linux@prisktech.co.nz>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-vt8500/
-+F:	drivers/video/vt8500lcdfb.*
-+F:	drivers/video/wm8505fb*
-+F:	drivers/video/wmt_ge_rops.*
-+F:	drivers/tty/serial/vt8500_serial.c
-+F:	drivers/rtc/rtc-vt8500-c
-+
- ARM/ZIPIT Z2 SUPPORT
- M:	Marek Vasut <marek.vasut@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.7.2.5
+I have got the runtime PM support accepted to net-next, will be working on 
+and submitting DT support by this week.
+
+Regards
+Mugunthan V N
