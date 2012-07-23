@@ -1,117 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jul 2012 20:33:05 -0000
-Subject: =?UTF-8?q?=5BGIT=20PULL=2015/15=5D=20arm-soc=3A=20clk=20changes?=
+Date: Mon, 23 Jul 2012 20:33:20 -0000
+Subject: [GIT PULL 04/15] arm-soc: samsung dma changes
 In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
 References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <1343075561-17446-16-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit fb584511c4664573097ece7df0de06ad00b713a2:
+The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
 
-  ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds (2012-07-09 01:44:11 -0700)
+  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/clk
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/dma
 
-for you to fetch changes up to 36c678f3c91ac92e9524abcf9b39f9f539d60279:
+for you to fetch changes up to 31dfec74c0dc49521b2e17543ff9dd9dd0221702:
 
-  Merge tag 'imx-clk' of git://git.pengutronix.de/git/imx/linux-2.6 into next/clk (2012-07-17 22:41:50 +0200)
-
-----------------------------------------------------------------
-
-arm-soc: clk changes
-
-Clock support is moving to the clk subsystem. These tegra, omap and imx
-changes are for code that is still platform specific and not (yet)
-part of that subsystem.
+  Merge branch 'next/devel-dma-ops' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/dma (2012-07-10 14:12:05 +0200)
 
 ----------------------------------------------------------------
 
-Alexander Shiyan (4):
-      ARM: i.MX5x clocks: Add EPIT support
-      ARM: i.MX5x clocks: Fix parent for PWM clocks
-      ARM: i.MX5x clocks: Fix GPT clocks
-      ARM: i.MX5x CSPI: Fixed clock name for CSPI
+arm-soc: samsung dma changes
 
-Arnd Bergmann (6):
-      Merge branch 'tegra/cleanup' into next/clk
-      Merge branch 'for-3.6/common-clk' of git://git.kernel.org/.../swarren/linux-tegra into next/clk
-      Merge branch 'omap/cleanup2' into next/clk
-      Merge tag 'omap-devel-am33xx-data-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/clk
-      Merge tag 'imx-clk' of git://git.pengutronix.de/git/imx/linux-2.6 into next/clk
-      Merge branch 'next/clk' into for-next
+Some platforms are not yet converted to use the dmaengine framework,
+including some of the samsung SoCs. In the meantime, we treat this
+as platform code and merge the patches through the arm-soc tree.
 
-Fabio Estevam (3):
-      ARM: clk-imx27: Fix rtc clock id
-      ARM: mx27: Reenable silicon version print
-      ARM: imx: clk-imx31: Fix clock id for rnga driver
+----------------------------------------------------------------
 
-Laxman Dewangan (1):
-      ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
+Arnd Bergmann (2):
+      Merge branch 'next/devel-dma-ops' of git://git.kernel.org/.../kgene/linux-samsung into next/dma
+      Merge branch 'next/dma' into for-next
 
-Paul Walmsley (1):
-      ARM: OMAP3+: clock: Move common clksel_rate & clock data to common file
+Boojin Kim (3):
+      ARM: SAMSUNG: Add config() function in DMA common operations
+      spi/s3c64xx: Add the use of DMA config operation
+      ASoC: follow the updated samsung DMA common operations
 
-Prashant Gaikwad (10):
-      ARM: tegra: add clk_prepare/clk_unprepare
-      i2c: tegra: Add clk_prepare/clk_unprepare
-      mmc: tegra: add clk_prepare/clk_unprepare
-      USB: ehci-tegra: add clk_prepare/clk_unprepare
-      Input: tegra-kbc - add clk_prepare/clk_unprepare
-      spi/tegra: add clk_prepare/clk_unprepare
-      staging: nvec: add clk_prepare/clk_unprepare
-      ASoC: tegra: add clk_prepare/clk_unprepare
-      crypto: add clk_prepare/clk_unprepare
-      ARM: tegra: Remove second instance of uart clk
+Sachin Kamat (1):
+      ARM: SAMSUNG: Fix compiler warning in dma-ops.c file
 
-Simon Que (1):
-      ARM: tegra: Fix PWM clock programming
-
-Thierry Reding (1):
-      ARM: tegra: Provide clock for only one PWM controller
-
-Tony Lindgren (1):
-      Merge tag 'omap-devel-e-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into devel-am33xx-data
-
-Uwe Kleine-K?nig (1):
-      ARM: imx: add missing item to the list of clock event modes
-
-Vaibhav Hiremath (1):
-      ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-
- arch/arm/mach-imx/clk-imx27.c                 |    4 +-
- arch/arm/mach-imx/clk-imx31.c                 |    4 +-
- arch/arm/mach-imx/clk-imx51-imx53.c           |   23 +-
- arch/arm/mach-omap2/Makefile                  |    1 +
- arch/arm/mach-omap2/clock.h                   |   14 +
- arch/arm/mach-omap2/clock33xx_data.c          | 1105 +++++++++++++++++++++++++
- arch/arm/mach-omap2/clock3xxx_data.c          |   20 +-
- arch/arm/mach-omap2/clock44xx_data.c          |   72 --
- arch/arm/mach-omap2/clock_common_data.c       |   77 ++
- arch/arm/mach-omap2/io.c                      |    2 +
- arch/arm/mach-tegra/cpu-tegra.c               |    6 +-
- arch/arm/mach-tegra/dma.c                     |    4 +-
- arch/arm/mach-tegra/pcie.c                    |    6 +-
- arch/arm/mach-tegra/powergate.c               |    4 +-
- arch/arm/mach-tegra/tegra2_clocks.c           |   58 +-
- arch/arm/mach-tegra/tegra30_clocks.c          |   28 +-
- arch/arm/mach-tegra/timer.c                   |    4 +-
- arch/arm/mach-tegra/usb_phy.c                 |   16 +-
- arch/arm/plat-mxc/devices/platform-spi_imx.c  |    2 +-
- arch/arm/plat-mxc/time.c                      |    3 +-
- arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
- drivers/crypto/tegra-aes.c                    |   12 +-
- drivers/i2c/busses/i2c-tegra.c                |   10 +-
- drivers/input/keyboard/tegra-kbc.c            |    4 +-
- drivers/mmc/host/sdhci-tegra.c                |    6 +-
- drivers/spi/spi-tegra.c                       |    4 +-
- drivers/staging/nvec/nvec.c                   |    8 +-
- drivers/usb/host/ehci-tegra.c                 |   20 +-
- sound/soc/tegra/tegra20_i2s.c                 |    4 +-
- sound/soc/tegra/tegra20_spdif.c               |    4 +-
- sound/soc/tegra/tegra30_ahub.c                |    8 +-
- sound/soc/tegra/tegra30_i2s.c                 |    4 +-
- sound/soc/tegra/tegra_asoc_utils.c            |   12 +-
- 33 files changed, 1347 insertions(+), 203 deletions(-)
+ arch/arm/plat-samsung/dma-ops.c              |   76 ++++++++++++++------------
+ arch/arm/plat-samsung/include/plat/dma-ops.h |   20 ++++---
+ arch/arm/plat-samsung/s3c-dma-ops.c          |   39 +++++++------
+ drivers/spi/spi-s3c64xx.c                    |   33 ++++++-----
+ sound/soc/samsung/dma.c                      |   18 +++---
+ 5 files changed, 105 insertions(+), 81 deletions(-)
