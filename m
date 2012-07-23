@@ -1,27 +1,39 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Mon, 23 Jul 2012 21:11:40 +0530
-Subject: [PATCH 12/25] mmc/omap_hsmmc: add a const qualifier
-In-Reply-To: <1343034810-3386-13-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343034810-3386-13-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CANfBPZ-5Jqy3CmUg7Oqt58ZQNa1LwwfSO6BAXk7Zxi0gpSKe+w@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 24 Jul 2012 04:19:37 +1200
+Subject: [PATCH] ARM: vt8500: Add maintainer for VT8500 architecture
+Message-ID: <1343060377-2606-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 2:43 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> This prepares *of_device_id.data becoming const. Without this change
-> the following warning would occur:
->
->         drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
->         drivers/mmc/host/omap_hsmmc.c:1808: warning: initialization discards qualifiers from pointer target type
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Add a MAINTAINERS entry for mach-vt8500 and related files.
 
-Acked-by: Venkatraman S <svenkatr@ti.com>
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Acked-by: Alexey Charkov <alchark@gmail.com>
+---
+ MAINTAINERS |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-
-> ---
->  drivers/mmc/host/omap_hsmmc.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
+diff --git a/MAINTAINERS b/MAINTAINERS
+index eb22272..e83a327 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1175,6 +1175,17 @@ S:	Maintained
+ F:	arch/arm/mach-pxa/vpac270.c
+ F:	arch/arm/mach-pxa/include/mach/vpac270.h
+ 
++ARM/VT8500 ARM ARCHITECTURE
++M:	Tony Prisk <linux@prisktech.co.nz>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-vt8500/
++F:	drivers/video/vt8500lcdfb.*
++F:	drivers/video/wm8505fb*
++F:	drivers/video/wmt_ge_rops.*
++F:	drivers/tty/serial/vt8500_serial.c
++F:	drivers/rtc/rtc-vt8500-c
++
+ ARM/ZIPIT Z2 SUPPORT
+ M:	Marek Vasut <marek.vasut@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.7.2.5
