@@ -1,103 +1,117 @@
 From: arnd@arndb.de (Arnd Bergmann)
 Date: Mon, 23 Jul 2012 20:33:05 -0000
-Subject: [GIT PULL 08/15] arm-soc: cleanups, part 2
+Subject: =?UTF-8?q?=5BGIT=20PULL=2015/15=5D=20arm-soc=3A=20clk=20changes?=
 In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
 References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <1343075561-17446-9-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-16-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+The following changes since commit fb584511c4664573097ece7df0de06ad00b713a2:
 
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+  ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds (2012-07-09 01:44:11 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/cleanup2
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/clk
 
-for you to fetch changes up to db3c47a3af96e8109b1bb114c32f0854259d5970:
+for you to fetch changes up to 36c678f3c91ac92e9524abcf9b39f9f539d60279:
 
-  Merge tag 'omap-cleanup-part2-for-v3.6' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/cleanup2 (2012-07-10 16:58:19 +0200)
-
-----------------------------------------------------------------
-
-arm-soc: cleanups, part 2
-
-These omap cleanups have dependencies on earlier omap branches that in
-turn depend on other cleanups, so they could not go into the same
-branch.
+  Merge tag 'imx-clk' of git://git.pengutronix.de/git/imx/linux-2.6 into next/clk (2012-07-17 22:41:50 +0200)
 
 ----------------------------------------------------------------
 
-Arnd Bergmann (2):
-      Merge tag 'omap-cleanup-part2-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup2
-      Merge branch 'next/cleanup2' into for-next
+arm-soc: clk changes
 
-Jon Hunter (2):
-      ARM: OMAP4: clockdomain/CM code: Update supported transition modes
-      ARM: OMAP2+: powerdomain code: Fix Wake-up power domain power status
+Clock support is moving to the clk subsystem. These tegra, omap and imx
+changes are for code that is still platform specific and not (yet)
+part of that subsystem.
 
-Kishon Vijay Abraham I (1):
-      ARM: OMAP2+: hwmod code: add support to set dmadisable in hwmod framework
+----------------------------------------------------------------
+
+Alexander Shiyan (4):
+      ARM: i.MX5x clocks: Add EPIT support
+      ARM: i.MX5x clocks: Fix parent for PWM clocks
+      ARM: i.MX5x clocks: Fix GPT clocks
+      ARM: i.MX5x CSPI: Fixed clock name for CSPI
+
+Arnd Bergmann (6):
+      Merge branch 'tegra/cleanup' into next/clk
+      Merge branch 'for-3.6/common-clk' of git://git.kernel.org/.../swarren/linux-tegra into next/clk
+      Merge branch 'omap/cleanup2' into next/clk
+      Merge tag 'omap-devel-am33xx-data-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/clk
+      Merge tag 'imx-clk' of git://git.pengutronix.de/git/imx/linux-2.6 into next/clk
+      Merge branch 'next/clk' into for-next
+
+Fabio Estevam (3):
+      ARM: clk-imx27: Fix rtc clock id
+      ARM: mx27: Reenable silicon version print
+      ARM: imx: clk-imx31: Fix clock id for rnga driver
+
+Laxman Dewangan (1):
+      ARM: tegra: dma: rename driver name for clock to "tegra-apbdma"
 
 Paul Walmsley (1):
-      Merge branches 'hwmod_am335x_support_3.6', 'clkdm_pwrdm_devel_a_3.6' and 'misc_devel_3.6' into omap_devel_f_3.6
+      ARM: OMAP3+: clock: Move common clksel_rate & clock data to common file
 
-R Sricharan (1):
-      ARM: OMAP2+: PRM/CM: Move the stubbed prm and cm functions to prcm.c file and make them __weak
+Prashant Gaikwad (10):
+      ARM: tegra: add clk_prepare/clk_unprepare
+      i2c: tegra: Add clk_prepare/clk_unprepare
+      mmc: tegra: add clk_prepare/clk_unprepare
+      USB: ehci-tegra: add clk_prepare/clk_unprepare
+      Input: tegra-kbc - add clk_prepare/clk_unprepare
+      spi/tegra: add clk_prepare/clk_unprepare
+      staging: nvec: add clk_prepare/clk_unprepare
+      ASoC: tegra: add clk_prepare/clk_unprepare
+      crypto: add clk_prepare/clk_unprepare
+      ARM: tegra: Remove second instance of uart clk
 
-Sakari Ailus (1):
-      ARM: OMAP3: control: add definition for CONTROL_CAMERA_PHY_CTRL
+Simon Que (1):
+      ARM: tegra: Fix PWM clock programming
 
-Santosh Shilimkar (1):
-      ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds
+Thierry Reding (1):
+      ARM: tegra: Provide clock for only one PWM controller
 
-Tarun Kanti DebBarma (3):
-      ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
-      ARM: OMAP: dmtimer: use devm_ API and do some cleanup in probe()
-      ARM: OMAP2+: dmtimer: cleanup fclk usage
+Tony Lindgren (1):
+      Merge tag 'omap-devel-e-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into devel-am33xx-data
 
-Tony Lindgren (3):
-      Merge tags 'omap-cleanup-for-v3.6', 'omap-devel-dmtimer-for-v3.6' and 'omap-devel-am33xx-for-v3.6' into devel-am33xx-part2
-      Merge tag 'omap-devel-f-for-3.6' of git://git.kernel.org/.../pjw/omap-pending into cleanup-part2
-      ARM: OMAP2+: Fix mismerge for omap_hwmod_get_main_clk() API
+Uwe Kleine-K?nig (1):
+      ARM: imx: add missing item to the list of clock event modes
 
-Vaibhav Hiremath (7):
-      ARM: OMAP2+: hwmod: Add new sysc_type3 into omap_hwmod required for am33xx
-      ARM: OMAP3/4: omap_hwmod: Add rstst_offs field to struct omap_hwmod_omap4_prcm
-      ARM: OMAP2+: All OMAP2PLUS uses omap-device.o target so add one entry
-      ARM: OMAP2+: Move omap3 dpll ops to dpll3xxx.c
-      ARM: OMAP2+: am33xx: Make am33xx as a separate class
-      ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
-      ARM: OMAP2+: Remove unnecessary ifdef around __omap2_set_globals
+Vaibhav Hiremath (1):
+      ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
 
-Vikram Pandita (1):
-      ARM: OMAP3+: dpll: optimize noncore dpll locking logic
-
- arch/arm/mach-omap2/Kconfig                  |   12 +++-
- arch/arm/mach-omap2/Makefile                 |    8 ++-
- arch/arm/mach-omap2/clock.c                  |   18 ------
- arch/arm/mach-omap2/clock3xxx_data.c         |    2 +-
- arch/arm/mach-omap2/clock44xx_data.c         |   22 ++++----
- arch/arm/mach-omap2/clockdomain44xx.c        |   10 +++-
- arch/arm/mach-omap2/cminst44xx.c             |   14 -----
- arch/arm/mach-omap2/cminst44xx.h             |   25 ---------
- arch/arm/mach-omap2/common.c                 |   10 +---
- arch/arm/mach-omap2/common.h                 |    5 ++
- arch/arm/mach-omap2/control.h                |    1 +
- arch/arm/mach-omap2/dpll3xxx.c               |   26 ++++++++-
- arch/arm/mach-omap2/id.c                     |    4 +-
- arch/arm/mach-omap2/omap_hwmod.c             |   76 ++++++++++++++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_common_data.c |   10 ++++
- arch/arm/mach-omap2/powerdomain.c            |    6 +-
- arch/arm/mach-omap2/prcm.c                   |   23 ++++++++
- arch/arm/mach-omap2/prm2xxx_3xxx.h           |   65 ----------------------
- arch/arm/mach-omap2/prm_common.c             |   62 +++++++++++++++++++++
- arch/arm/mach-omap2/timer.c                  |    3 +-
- arch/arm/plat-omap/Makefile                  |    4 +-
- arch/arm/plat-omap/dmtimer.c                 |   53 ++++++------------
- arch/arm/plat-omap/include/plat/cpu.h        |   17 +++---
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   19 +++++++
- arch/arm/plat-omap/include/plat/sdrc.h       |    2 +-
- arch/arm/plat-omap/sram.c                    |    6 +-
- 26 files changed, 296 insertions(+), 207 deletions(-)
+ arch/arm/mach-imx/clk-imx27.c                 |    4 +-
+ arch/arm/mach-imx/clk-imx31.c                 |    4 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c           |   23 +-
+ arch/arm/mach-omap2/Makefile                  |    1 +
+ arch/arm/mach-omap2/clock.h                   |   14 +
+ arch/arm/mach-omap2/clock33xx_data.c          | 1105 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock3xxx_data.c          |   20 +-
+ arch/arm/mach-omap2/clock44xx_data.c          |   72 --
+ arch/arm/mach-omap2/clock_common_data.c       |   77 ++
+ arch/arm/mach-omap2/io.c                      |    2 +
+ arch/arm/mach-tegra/cpu-tegra.c               |    6 +-
+ arch/arm/mach-tegra/dma.c                     |    4 +-
+ arch/arm/mach-tegra/pcie.c                    |    6 +-
+ arch/arm/mach-tegra/powergate.c               |    4 +-
+ arch/arm/mach-tegra/tegra2_clocks.c           |   58 +-
+ arch/arm/mach-tegra/tegra30_clocks.c          |   28 +-
+ arch/arm/mach-tegra/timer.c                   |    4 +-
+ arch/arm/mach-tegra/usb_phy.c                 |   16 +-
+ arch/arm/plat-mxc/devices/platform-spi_imx.c  |    2 +-
+ arch/arm/plat-mxc/time.c                      |    3 +-
+ arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
+ drivers/crypto/tegra-aes.c                    |   12 +-
+ drivers/i2c/busses/i2c-tegra.c                |   10 +-
+ drivers/input/keyboard/tegra-kbc.c            |    4 +-
+ drivers/mmc/host/sdhci-tegra.c                |    6 +-
+ drivers/spi/spi-tegra.c                       |    4 +-
+ drivers/staging/nvec/nvec.c                   |    8 +-
+ drivers/usb/host/ehci-tegra.c                 |   20 +-
+ sound/soc/tegra/tegra20_i2s.c                 |    4 +-
+ sound/soc/tegra/tegra20_spdif.c               |    4 +-
+ sound/soc/tegra/tegra30_ahub.c                |    8 +-
+ sound/soc/tegra/tegra30_i2s.c                 |    4 +-
+ sound/soc/tegra/tegra_asoc_utils.c            |   12 +-
+ 33 files changed, 1347 insertions(+), 203 deletions(-)
