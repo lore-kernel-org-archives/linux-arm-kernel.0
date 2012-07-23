@@ -1,45 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 22 Jul 2012 19:35:00 -0500
-Subject: [GIT PULL] io.h clean-up for PCI
-In-Reply-To: <50049285.1060100@gmail.com>
-References: <50049285.1060100@gmail.com>
-Message-ID: <500C9C34.2030404@gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 23 Jul 2012 10:57:35 +0900
+Subject: [PATCH v3 0/6] mmc: dw_mmc: add support for device tree based
+ instantiation
+In-Reply-To: <195201cd6600$7cb089f0$76119dd0$%kim@samsung.com>
+References: <1342097668-25243-1-git-send-email-thomas.abraham@linaro.org>
+ <5008279B.4000001@samsung.com>
+ <CAJuYYwQBgpJ1wiS3fSDS2cMi6kanuO47rc8SmniAqjRPuBGJHg@mail.gmail.com>
+ <195201cd6600$7cb089f0$76119dd0$%kim@samsung.com>
+Message-ID: <500CAF8F.5040407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2012 05:15 PM, Rob Herring wrote:
-> Arnd,
+On 07/20/2012 07:47 AM, Kukjin Kim wrote:
+> Thomas Abraham wrote:
+>>
+>> On 19 July 2012 20:58, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>> Hi Thomas,
+>>>
+>>> I think not good that added the samsung specific code into dw_mmc-
+>> pltfm.c
+>>> How about separating to dw-mmc-exynos.c?
+>>
+>> I am not sure of this. The only samsung specific code in
+>> dw_mmc-pltfm.c file is the data for of_device_id instances. The clock
+>> lookup added into this file in the 3rd patch does not cause any harm
+>> on non-samsung SoC's which might not define those clocks (on clock
+>> lookup failure, there are only warning printed, the driver's probe
+>> does not fail.
+>>
+> I agree with Thomas' opinion, in addition, the dw_mmc-pltfm.c file can
+> support that, so adding dw-mmc-exynos.c is not needed now.
 > 
-> Please pull io.h PCI clean-up series. As you suggested, lets get it in
-> next for test and decide later if to apply it for 3.6 or wait.
-> 
-> BTW, I'll have sporadic email access over the next 2 weeks.
-> 
+>> I would prefer not to add separate file for Exynos SoC's for now.
+>> Splitting into different files will need to defined new callbacks
+>> which I fell is not really required.
+Then where is the callback function located?
 
-I found a collision with EDAC enum mem_type and ARM struct mem_type definitions.
-It's caused from pulling in asm/mach/map.h into asm/mach/pci.h. I've reworked
-things which avoids the to avoid that. You want a rebased branch with the fix
-and other issues you found or just the following patch?
-
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 188fd58..78d10a8 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -12,7 +12,6 @@
- #define __ASM_MACH_PCI_H
- 
- #include <linux/ioport.h>
--#include <asm/mach/map.h>
- 
- struct pci_sys_data;
- struct pci_ops;
-@@ -63,6 +62,9 @@ void pci_common_init(struct hw_pci *);
-  * Setup fixed I/O mapping.
-  */
- #if defined(CONFIG_PCI) && !defined(CONFIG_NEED_MACH_IO_H)
-+extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
-+				  void *caller);
-+
- /* Called from devicemaps_init before .map_io */
- static inline void __init pci_reserve_io(void)
- {
+Best Regards,
+Jaehoon Chung
+>>
+> Yes.
+> 
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
