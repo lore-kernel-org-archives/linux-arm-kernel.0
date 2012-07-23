@@ -1,70 +1,45 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 23 Jul 2012 15:53:33 +0300
-Subject: [PATCH] ARM: OMAP2+: ads7846 init: fix fault caused by freeing
- pen-down GPIO
-In-Reply-To: <1342048700-15040-1-git-send-email-khilman@ti.com>
-References: <1342048700-15040-1-git-send-email-khilman@ti.com>
-Message-ID: <500D494D.8020606@compulab.co.il>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 23 Jul 2012 14:10:42 +0100
+Subject: Device tree.
+In-Reply-To: <alpine.LFD.2.02.1207191648080.9293@xanadu.home>
+References: <500552C9.4090107@codethink.co.uk> <50056E22.5040308@gmail.com>
+ <5b5e32ecde7b96d3af217054150eb43c@codethink.co.uk>
+ <13863985.aH2icoQzEI@flexo> <50057CD2.2060001@codethink.co.uk>
+ <alpine.LFD.2.02.1207171712070.9293@xanadu.home>
+ <50066AE6.6000002@codethink.co.uk>
+ <alpine.LFD.2.02.1207180929230.9293@xanadu.home>
+ <5007CE35.8060705@codethink.co.uk>
+ <alpine.LFD.2.02.1207191648080.9293@xanadu.home>
+Message-ID: <20120723131042.GD8302@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/12 02:18, Kevin Hilman wrote:
-> commit 97ee9f01d6 (ARM: OMAP: fix the ads7846 init code) mistakenly
-> frees the pen-down GPIO even though it will be used by the ads7846
-> driver.
+On Thu, Jul 19, 2012 at 05:32:09PM -0400, Nicolas Pitre wrote:
+> On Thu, 19 Jul 2012, Ian Molton wrote:
 
-But the driver requests the GPIO in ads7846_setup_pendown() method...
+> > * Old bootloaders cant always be replaced (ROM) or chainload (lack
+> >   of flash) a newer one.
 
-> 
-> Freeing a GPIO means that the GPIO bank containing that GPIO can be
-> runtime suspended if its the last/only GPIO being used in that bank.
-> If the GPIO bank is runtime suspended, any accesses to that bank will
-> cause faults.
+> Hence CONFIG_ARM_APPENDED_DTB.  And don't tell me that you have u-Boot 
+> in ROM, in which case uImage shouldn't matter.
 
-Unless, it is requested again, or am I missing something?
+For most of the boards I have it doesn't matter that the bootloader is
+in flash, there's no way I'm going to risk bricking the board by trying
+to replace the bootloader as I've got no way to recover the board if the
+bootloader fails.  There's also the fact that if the bootloader supplies
+the DT it can't boot kernels that don't understand DT as the machine ID
+is changed (which isn't enormously helpful).
 
-> 
-> Because the current code frees the GPIO, the ads7846 driver probe will
-> fault when it requests its IRQ line.
+> > If zImage is the one true way, thats fine - and I actually would prefer
+> > that, I think uImages are stupid.
 
-But it requests that GPIO... in ads7846_setup_pendown()
-prior to requesting the IRQ...
+> > But - since its not the only way, it'd be sensible if the 'other way'
+> > actually worked, or was officially made an out of tree option (thus
+> > making it work again because you can concat. the .dtb file prior to
+> > making the uImage.)
 
-> Because the IRQ is a GPIO line,
-> the request IRQ will trickle down into the OMAP GPIO layer:
-> gpio_irq_type() --> _set_gpio_triggering() which can fault if the
-> bank has been runtime suspended.
-> 
-> This is exctly what happens on Overo platforms (3530 Water, 3730 Overo
-> FireSTORM) since this is the only GPIO used in the bank.
-> 
-> To fix, don't free the GPIO at all since it is always in use.
-> 
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Tony, this applies on top of your current fixes-non-critical branch and
-> should probably go in to v3.5-rc since the patch which introduced the
-> problem did as well.
-> 
->  arch/arm/mach-omap2/common-board-devices.c |    3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-> index c187586..1ae6fd6 100644
-> --- a/arch/arm/mach-omap2/common-board-devices.c
-> +++ b/arch/arm/mach-omap2/common-board-devices.c
-> @@ -84,9 +84,6 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
->  		ads7846_config.gpio_pendown = gpio_pendown;
->  	}
->  
-> -	if (!board_pdata || (board_pdata && !board_pdata->get_pendown_state))
-> -		gpio_free(gpio_pendown);
-> -
->  	spi_register_board_info(&ads7846_spi_board_info, 1);
->  }
->  #else
+> Isn't that what I just showed above?
 
--- 
-Regards,
-Igor.
+It's possible to work with it, but then it's not clear to me why we have
+CONFIG_ARM_APPENDED_DTB at all since pretty much the same thing applies
+to non-DT cases.
