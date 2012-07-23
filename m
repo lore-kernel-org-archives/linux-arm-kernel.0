@@ -1,33 +1,169 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 31 Jul 2012 20:35:59 -0700
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120801035333.GB1672@S2100-06.ap.freescale.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <20120731205300.GA25721@roeck-us.net>
- <201208010431.04399.marex@denx.de>
- <20120801035333.GB1672@S2100-06.ap.freescale.net>
-Message-ID: <20120801033559.GB2323@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Jul 2012 20:33:22 -0000
+Subject: [GIT PULL 09/15] arm-soc: new SoC support
+In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
+References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 11:53:36AM +0800, Shawn Guo wrote:
-> On Wed, Aug 01, 2012 at 04:31:04AM +0200, Marek Vasut wrote:
-> > > Couple of reasons for asking: No other SPI master driver calls it in the
-> > > remove function (unless I missed it), most drivers don't call it in the
-> > > probe function error path, and if I call it in the remove function in a
-> > > SPI master driver I am working on, and load/unload the module several
-> > > times in a row, I get a nasty kernel crash.
-> > 
-> > It seems the spi_master class takes care of that kfree() in 
-> > spi.c:spi_master_release() . Good catch, thanks!
-> > 
-> I do not hardware setup to confirm that right away.  When
-> spi_master_release will be called exactly?  The time that
-> spi_master_put gets called?  I'm trying to understand if the kfree
-> is not needed only in remove function, or both probe and remove.
-> 
-I think the call to spi_master_put() triggers the call to spi_master_release().
-If so, kfree() would not be needed at all, and the documentation is wrong.
+The following changes since commit fb584511c4664573097ece7df0de06ad00b713a2:
 
-Thanks,
-Guenter
+  ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds (2012-07-09 01:44:11 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/newsoc
+
+for you to fetch changes up to 66314223aa5e862c9d1d068cb7186b4fd58ebeaa:
+
+  ARM: socfpga: initial support for Altera's SOCFPGA platform (2012-07-19 10:39:00 +0200)
+
+----------------------------------------------------------------
+arm-soc: new SoC support
+
+This adds support for three new SoC types:
+* The mvebu platform includes Marvell's Armada XP and Armada 370 chips,
+  made by the mvebu business unit inside of Marvell. Since the same
+  group also made the older but similar platforms we call "orion5x",
+  "kirkwood", "mv78xx0" and "dove", we plan to move all of them into
+  the mach-mvebu directory in the future.
+* socfpga is Altera's platform based on Cortex-A9 cores and a lot of
+  FPGA space. This is similar to the Xilinx zynq platform we already
+  support. The code is particularly clean, which is helped by the fact
+  that the hardware doesn't do much besides the parts that are
+  expected to get added in the FPGA.
+* The OMAP subarchitecture gains support for the latest generation,
+  the OMAP5 based on the new Cortex-A15 core. Support is rather
+  rudimentary for now, but will be extended in the future.
+
+----------------------------------------------------------------
+
+Arnd Bergmann (5):
+      Merge branch 'mvebu/newsoc' into next/newsoc
+      Merge branch 'omap/cleanup2' into next/newsoc
+      Merge branch 'devel-omap5' of git://git.kernel.org/.../tmlind/linux-omap into next/newsoc
+      Merge branch 'mvebu/newsoc' into next/newsoc
+      Merge branch 'next/newsoc' into for-next
+
+Ben Dooks (1):
+      ARM: mvebu: MPIC: read number of interrupts from control register
+
+Dinh Nguyen (1):
+      ARM: socfpga: initial support for Altera's SOCFPGA platform
+
+Gregory CLEMENT (4):
+      clocksource: time-armada-370-xp: Marvell Armada 370/XP SoC timer driver
+      arm: mach-mvebu: add source files
+      arm: mach-mvebu: add documentation for new device tree bindings
+      arm: mach-mvebu: add compilation/configuration change
+
+R Sricharan (11):
+      ARM: OMAP2+: Move stubbed secure_sram_reserve function to a common.c and call it __weak
+      ARM: OMAP: counter-32k: Select the CR register offset using the IP scheme
+      ARM: OMAP5: id: Add cpu id for ES versions
+      ARM: OMAP5: Add minimal support for OMAP5430 SOC
+      ARM: OMAP5: timer: Add clocksource, clockevent support
+      ARM: OMAP5: gpmc: Update gpmc_init()
+      ARM: OMAP5: l3: Add l3 error handler support for omap5
+      ARM: omap2+: board-generic: clean up the irq data from board file
+      ARM: OMAP5: board-generic: Add device tree support
+      arm/dts: OMAP5: Add omap5 dts files
+      ARM: OMAP5: Add the build support
+
+Santosh Shilimkar (2):
+      ARM: OMAP5: Add the WakeupGen IP updates
+      ARM: OMAP5: Add SMP support
+
+Tarun Kanti DebBarma (1):
+      ARM: Kconfig update to support additional GPIOs in OMAP5
+
+Thomas Petazzoni (5):
+      arm: mach-mvebu: add header
+      arm: mach-mvebu: add support for Armada 370 and Armada XP with DT
+      arm: mach-mvebu: add defconfig
+      arm: mach-mvebu: add entry to MAINTAINERS
+      arm: mvebu: generate DTBs for supported SoCs
+
+ .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   23 ++
+ .../bindings/arm/armada-370-xp-timer.txt           |   11 +
+ .../devicetree/bindings/arm/armada-370-xp.txt      |   24 +++
+ .../bindings/arm/mvebu-system-controller.txt       |   17 ++
+ .../devicetree/bindings/arm/omap/omap.txt          |    3 +
+ MAINTAINERS                                        |   18 ++
+ arch/arm/Kconfig                                   |   34 +++
+ arch/arm/Makefile                                  |    2 +
+ arch/arm/boot/dts/armada-370-db.dts                |   42 ++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   68 ++++++
+ arch/arm/boot/dts/armada-370.dtsi                  |   35 +++
+ arch/arm/boot/dts/armada-xp-db.dts                 |   50 +++++
+ arch/arm/boot/dts/armada-xp.dtsi                   |   55 +++++
+ arch/arm/boot/dts/omap5-evm.dts                    |   20 ++
+ arch/arm/boot/dts/omap5.dtsi                       |  184 ++++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |  147 +++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   34 +++
+ arch/arm/configs/mvebu_defconfig                   |   46 ++++
+ arch/arm/configs/omap2plus_defconfig               |    1 +
+ arch/arm/configs/socfpga_defconfig                 |   83 +++++++
+ arch/arm/mach-mvebu/Kconfig                        |   16 ++
+ arch/arm/mach-mvebu/Makefile                       |    2 +
+ arch/arm/mach-mvebu/Makefile.boot                  |    3 +
+ arch/arm/mach-mvebu/armada-370-xp.c                |   63 ++++++
+ arch/arm/mach-mvebu/common.h                       |   23 ++
+ arch/arm/mach-mvebu/include/mach/armada-370-xp.h   |   22 ++
+ arch/arm/mach-mvebu/include/mach/debug-macro.S     |   24 +++
+ arch/arm/mach-mvebu/include/mach/timex.h           |   13 ++
+ arch/arm/mach-mvebu/include/mach/uncompress.h      |   43 ++++
+ arch/arm/mach-mvebu/irq-armada-370-xp.c            |  133 ++++++++++++
+ arch/arm/mach-mvebu/system-controller.c            |  105 +++++++++
+ arch/arm/mach-omap2/Kconfig                        |    8 +-
+ arch/arm/mach-omap2/Makefile                       |   24 ++-
+ arch/arm/mach-omap2/board-generic.c                |   42 ++--
+ arch/arm/mach-omap2/common.c                       |   24 +++
+ arch/arm/mach-omap2/common.h                       |   19 +-
+ arch/arm/mach-omap2/control.h                      |    4 +
+ arch/arm/mach-omap2/devices.c                      |    2 +-
+ arch/arm/mach-omap2/gpmc.c                         |    3 +-
+ arch/arm/mach-omap2/id.c                           |   42 +++-
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |    8 +-
+ arch/arm/mach-omap2/include/mach/omap-wakeupgen.h  |    7 +
+ arch/arm/mach-omap2/io.c                           |   44 ++++
+ arch/arm/mach-omap2/iomap.h                        |   27 +++
+ arch/arm/mach-omap2/irq.c                          |   13 +-
+ arch/arm/mach-omap2/omap-headsmp.S                 |   21 ++
+ arch/arm/mach-omap2/omap-hotplug.c                 |   24 ++-
+ arch/arm/mach-omap2/omap-smp.c                     |   52 +++--
+ arch/arm/mach-omap2/omap-wakeupgen.c               |  114 +++++++---
+ arch/arm/mach-omap2/omap4-common.c                 |   14 ++
+ arch/arm/mach-omap2/omap4-sar-layout.h             |   12 +-
+ arch/arm/mach-omap2/omap_hwmod.c                   |    2 +-
+ arch/arm/mach-omap2/omap_l3_noc.h                  |   22 +-
+ arch/arm/mach-omap2/prcm-common.h                  |    2 +-
+ arch/arm/mach-omap2/prcm.c                         |    2 +-
+ arch/arm/mach-omap2/timer.c                        |    5 +
+ arch/arm/mach-socfpga/Makefile                     |    5 +
+ arch/arm/mach-socfpga/Makefile.boot                |    1 +
+ arch/arm/mach-socfpga/include/mach/debug-macro.S   |   16 ++
+ arch/arm/mach-socfpga/include/mach/timex.h         |   19 ++
+ arch/arm/mach-socfpga/include/mach/uncompress.h    |    9 +
+ arch/arm/mach-socfpga/socfpga.c                    |   62 ++++++
+ arch/arm/plat-omap/Kconfig                         |    4 +-
+ arch/arm/plat-omap/common.c                        |    9 +
+ arch/arm/plat-omap/counter_32k.c                   |   16 +-
+ arch/arm/plat-omap/include/plat/cpu.h              |   22 +-
+ arch/arm/plat-omap/include/plat/hardware.h         |    1 +
+ arch/arm/plat-omap/include/plat/multi.h            |    9 +
+ arch/arm/plat-omap/include/plat/omap-secure.h      |    5 -
+ arch/arm/plat-omap/include/plat/omap54xx.h         |   32 +++
+ arch/arm/plat-omap/include/plat/serial.h           |   10 +
+ arch/arm/plat-omap/include/plat/uncompress.h       |    6 +
+ arch/arm/plat-omap/sram.c                          |   11 +-
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/socfpga/Makefile                       |    1 +
+ drivers/clk/socfpga/clk.c                          |   51 +++++
+ drivers/clocksource/Kconfig                        |    3 +
+ drivers/clocksource/Makefile                       |    3 +-
+ drivers/clocksource/time-armada-370-xp.c           |  226 ++++++++++++++++++++
+ include/linux/dw_apb_timer.h                       |    1 +
+ include/linux/time-armada-370-xp.h                 |   18 ++
+ 81 files changed, 2323 insertions(+), 99 deletions(-)
