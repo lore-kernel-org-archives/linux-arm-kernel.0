@@ -1,99 +1,23 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Mon, 23 Jul 2012 16:36:46 +0000
-Subject: Current state of AM33xx patches
-In-Reply-To: <500CEF97.4050207@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
- <500CEF97.4050207@gmail.com>
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
+From: shubhrajyoti@ti.com (Datta, Shubhrajyoti)
+Date: Mon, 23 Jul 2012 22:57:48 +0530
+Subject: [PATCH 09/25] i2c/i2c-omap: add a const qualifier
+In-Reply-To: <1343034810-3386-10-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343034810-3386-10-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CANQgH-Yx_iA0ANSLGjzgttBAfDFTJFQqYdo2PpJvtGN8=rdTrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Daniel Mack [mailto:zonque at gmail.com]
-> Sent: Monday, July 23, 2012 12:01 PM
-> To: N, Mugunthan V
-> Cc: Hiremath, Vaibhav; Paul Walmsley; Nori, Sekhar; Jason Kridner; Tony
-> Lindgren; Hilman, Kevin; Hernandez, Carlos; Maupin, Chase; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Kridner, Jason
-> Subject: Re: Current state of AM33xx patches
-> 
-> On 05.07.2012 19:45, N, Mugunthan V wrote:
-> >> -----Original Message-----
-> >> From: Daniel Mack [mailto:zonque at gmail.com]
-> >> Sent: Wednesday, July 04, 2012 4:52 PM
-> >> To: Hiremath, Vaibhav
-> >> Cc: Paul Walmsley; Nori, Sekhar; Jason Kridner; Tony Lindgren; Hilman,
-> >> Kevin; Hernandez, Carlos; Maupin, Chase; linux-omap at vger.kernel.org;
-> >> linux-arm-kernel at lists.infradead.org; Kridner, Jason; N, Mugunthan V
-> >> Subject: Re: Current state of AM33xx patches
-> >>
-> >> On 04.07.2012 12:50, Hiremath, Vaibhav wrote:
-> >>> On Wed, Jul 04, 2012 at 15:37:31, Paul Walmsley wrote:
-> >>>> On Sat, 30 Jun 2012, Daniel Mack wrote:
-> >>>>
-> >>>>> Ok, thanks for the explaining this. For now, I'll add hwmod stubs
-> for
-> >>>>> the components I need.
-> >>>>
-> >>>> Hmm.  Which drivers are you working on?  Vaibhav Hiremath has hwmod
-> >> data
-> >>>> for the AM33xx.  There might be some missing integration code to
-> build
-> >> the
-> >>>> devices for the newer IP blocks, though.
-> >>>>
-> >>>
-> >>> I would also be interested to know more here.
-> >>>
-> >>>
-> >>>>> Btw, has anyone yet worked on getting the MDIO/EMAC driver merged?
-> >>>>
-> >>>> Mainline has:
-> >>>>
-> >>>> drivers/net/ethernet/ti/davinci_emac.c
-> >>>
-> >>> Not required for AM335X.
-> >>>
-> >>>> drivers/net/ethernet/ti/davinci_mdio.c
-> >>>>
-> >>>> Those might work for you.
-> >>>>
-> >>>
-> >>> Few more files,
-> >>>
-> >>> drivers/net/ethernet/ti/cpsw.c
-> >>> drivers/net/ethernet/ti/davinci_cpdma.c
-> >>>
-> >>>
-> >>> Wanted to highlight one point,
-> >>> You still have to add platform device code to get it working.
-> >>
-> >> Exactly. And a hwmod binding for DT. Do you have patches for that?
-> >>
-> >>
-> >> Daniel
-> >
-> > I am working on DT support for cpsw and will be submitting the patch by
-> > July 20, 2012
-> 
-> Just curious - have you made any progress on that yet?
+On Mon, Jul 23, 2012 at 2:43 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> This prepares *of_device_id.data becoming const. Without this change
+> the following warning would occur:
 >
- 
-I have got the runtime PM support accepted to net-next, will be working on 
-and submitting DT support by this week.
-
-Regards
-Mugunthan V N
+>         drivers/i2c/busses/i2c-omap.c: In function 'omap_i2c_probe':
+>         drivers/i2c/busses/i2c-omap.c:1025: warning: assignment discards qualifiers from pointer target type
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Reviewed-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
