@@ -1,36 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 23 Jul 2012 12:38:33 -0600 (MDT)
-Subject: [PATCHv7 09/12] ARM: OMAP4: hwmod data: temporarily comment out
- data for the sl2if IP block
-In-Reply-To: <1342704392-23657-10-git-send-email-t-kristo@ti.com>
-References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
- <1342704392-23657-10-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1207231236210.10781@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 23 Jul 2012 20:55:22 +0200
+Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <1342567672-29071-1-git-send-email-ccross@android.com>
+References: <1342567672-29071-1-git-send-email-ccross@android.com>
+Message-ID: <CACRpkdaHdCvx1HJNDsyJSZAN--sF+4-V1TbzXZL1v+7Asoe_oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero
+On Wed, Jul 18, 2012 at 1:27 AM, Colin Cross <ccross@android.com> wrote:
 
-On Thu, 19 Jul 2012, Tero Kristo wrote:
+> This will have a side effect of causing SoCs that have clocks that
+> continue to count in suspend to appear to stop counting, reporting the
+> same sched_clock() value before and after suspend.
 
-> The OMAP4 sl2if IP block requires some special programming for it to
-> enter idle. Without this programming, they will prevent the rest of
-> the chip from entering full chip idle.
-> 
-> This patch comments out the IP block data.
-> 
-> Later, once the appropriate support is available, this patch can be
-> reverted.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+So for our platform (ux500) that has a sched clock that *does*
+continue to run during suspend,
+drivers/clocksource/clksrc-dbx500-prcmu.c
+how do we opt out of this behaviour?
 
-Originally I was hoping that we could apply a real fix for this one.  But 
-looking at the proposed alternative in the old SL2IF E-mail threads, I'm 
-still not convinced by what's proposed there.  So we'd better take this 
-one for the time being.
+Since sched_clock is used for the debug prints, if we have a
+crash immediately after resume() it will appear to be at resume
+time in the log which kinda sucks. :-(
 
-Queued for 3.6-rc.
+Isn't the proper way to do this either:
 
-- Paul
+- Assign suspend/resume hooks to the sched_clock code in the
+  platform and let the code that reads the hardware clock deal with
+  this
+
+Or
+
+- If it absolutely needs to be in the core code, also have a bool
+  field indicating whether the clock is going to die during suspend
+  and add new registration functions for setting that sched_clock
+  type, e.g. setup_sched_clock_nonsuspendable()
+
+Yours,
+Linus Walleij
