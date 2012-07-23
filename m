@@ -1,74 +1,147 @@
 From: arnd@arndb.de (Arnd Bergmann)
 Date: Mon, 23 Jul 2012 20:33:22 -0000
-Subject: [GIT PULL 07/15] arm-soc: timer updates
+Subject: [GIT PULL 14/15] arm-soc: power management changes
 In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
 References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <1343075561-17446-8-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
+The following changes since commit 6b16351acbd415e66ba16bf7d473ece1574cf0bc:
 
-  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
+  Linux 3.5-rc4 (2012-06-24 12:53:04 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/timer
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/pm
 
-for you to fetch changes up to 35bf8cc74b2b1dfad18df6d330b271e68ab6e3f5:
+for you to fetch changes up to 6b21a9ce0402e0c5fd2adfa3d41328fdd8f55a9a:
 
-  Merge branch 'picoxcell/timer' into next/timer (2012-07-12 17:27:36 +0200)
+  Merge tag 'omap-devel-pm-for-v3.6' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/pm (2012-07-03 22:02:17 +0200)
 
 ----------------------------------------------------------------
 
-arm-soc: timer updates
+arm-soc: power management changes
 
-This contains two branches dealing with timers, one for the picoxcell
-platform that is now using DT with the platform-independent
-dw_apb_timer driver. The other change is for the omap-specific
-dmtimer driver.
+These are various power management related changes, mainly concerning
+cpuidle on i.MX and OMAP, as well as a the move of the omap smartreflex
+driver to live in the power subsystem.
 
 ----------------------------------------------------------------
 
 Arnd Bergmann (3):
-      Merge tag 'omap-devel-dmtimer-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/timer
-      Merge branch 'picoxcell/timer' into next/timer
-      Merge branch 'next/timer' into for-next
+      Merge tag 'omap-devel-driver-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+      Merge tag 'omap-devel-pm-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+      Merge branch 'next/pm' into for-next
 
-Dinh Nguyen (1):
-      clocksource: dw_apb_timer: Add common DTS glue for dw_apb_timer
+J Keerthy (1):
+      ARM: OMAP2+: Voltage: Move the omap_volt_data structure to plat
 
-Jon Hunter (12):
-      ARM: OMAP: Remove unnecessary clk structure
-      ARM: OMAP2+: Remove unused max number of timers definition
-      ARM: OMAP2+: Add dmtimer platform function to reserve systimers
-      ARM: OMAP: Add DMTIMER capability variable to represent timer features
-      ARM: OMAP2+: HWMOD: Correct timer device attributes
-      ARM: OMAP2+: Fix external clock support for dmtimers
-      ARM: OMAP: Remove loses_context variable from timer platform data
-      ARM: OMAP: Remove timer function pointer for context loss counter
-      ARM: OMAP: Add flag to indicate if a timer needs a manual reset
-      ARM: OMAP1: Fix dmtimer support
-      ARM: OMAP2+: Move dmtimer clock set function to dmtimer driver
-      ARM: OMAP2+: Simplify dmtimer clock aliases
+Jean Pihet (13):
+      ARM: OMAP2+: SmartReflex: move the smartreflex header to include/linux/power
+      ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
+      ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of voltage domains.
+      ARM: OMAP3: hwmod: rename the smartreflex entries
+      ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
+      ARM: OMAP2+: SmartReflex: Use per-OPP data structure
+      ARM: OMAP2+: SmartReflex: Create per-opp debugfs node for errminlimit
+      ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
+      ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+      ARM: OMAP3: PM: cpuidle: default to C1 in next_valid_state
+      ARM: OMAP3: PM: cpuidle: optimize the PER latency in C1 state
+      ARM: OMAP3: PM: cpuidle: optimize the clkdm idle latency in C1 state
+      ARM: OMAP2+: do not allow SmartReflex to be built as a module
 
- Documentation/devicetree/bindings/rtc/dw-apb.txt   |   25 +++++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/mach-omap1/timer.c                        |    3 +-
- arch/arm/mach-omap2/clock2420_data.c               |   39 +------
- arch/arm/mach-omap2/clock2430_data.c               |   39 +------
- arch/arm/mach-omap2/clock3xxx_data.c               |   26 +----
- arch/arm/mach-omap2/clock44xx_data.c               |   34 +++---
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    8 --
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   10 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 --
- arch/arm/mach-omap2/timer.c                        |   82 +--------------
- arch/arm/mach-picoxcell/Makefile                   |    1 -
- arch/arm/mach-picoxcell/common.c                   |    3 +-
- arch/arm/mach-picoxcell/common.h                   |    2 +-
- arch/arm/plat-omap/dmtimer.c                       |  111 +++++++++++++++-----
- arch/arm/plat-omap/include/plat/dmtimer.h          |   22 +---
- drivers/clocksource/Kconfig                        |    3 +
- drivers/clocksource/Makefile                       |    1 +
- .../clocksource/dw_apb_timer_of.c                  |   52 +++++----
- 19 files changed, 182 insertions(+), 286 deletions(-)
+Kevin Hilman (5):
+      ARM: OMAP2+: PRM: fix compile for OMAP4-only build
+      ARM: OMAP2+: powerdomain: allow pre/post transtion to be per pwrdm
+      ARM: OMAP3: PM: call pre/post transition per powerdomain
+      ARM: OMAP3: PM: cleanup cam_pwrdm leftovers
+      ARM: OMAP2+: PM: fix IRQ_NOAUTOEN removal by mis-merge
+
+Mohan V (1):
+      ARM: OMAP3: PM: correct enable/disable of daisy io chain
+
+Olof Johansson (1):
+      Merge branch 'imx/cpuidle' into next/pm
+
+Paul Walmsley (4):
+      W1: OMAP HDQ1W: allow driver to be built on all OMAP2+
+      W1: OMAP HDQ1W: use 32-bit register accesses
+      ARM: OMAP2+: HDQ1W: use omap_device
+      W1: OMAP HDQ1W: use runtime PM
+
+Rajendra Nayak (1):
+      ARM: OMAP4: PRM: Add IO Daisychain support
+
+Robert Lee (7):
+      ARM: imx: Modify IMX_IO_P2V macro
+      ARM: imx: Add comments to tzic_enable_waker()
+      ARM: imx: clean and consolidate imx5 suspend and idle code
+      ARM: imx: Enable imx53 low power idle
+      ARM: imx: Add common imx cpuidle init functionality.
+      ARM: imx: Add imx5 cpuidle
+      ARM: imx: Add imx6q cpuidle driver
+
+Tero Kristo (1):
+      ARM: OMAP3+: PRM: Enable IO wake up
+
+Tony Lindgren (5):
+      Merge tag 'omap-devel-b-for-3.6' of git://git.kernel.org/.../pjw/omap-pending into devel-driver
+      Merge tag 'omap-devel-c-for-3.6' of git://git.kernel.org/.../pjw/omap-pending into devel-pm
+      ARM: OMAP2: Use hwmod to initialize mmc for 2420
+      Merge branch 'for_3.6/pm/sr-move' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-driver
+      Merge branch 'for_3.6/pm/performance' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-pm
+
+Vishwanath BS (3):
+      ARM: OMAP3: PM: Move IO Daisychain function to omap3 prm file
+      ARM: OMAP3PLUS: hwmod: reconfigure IO Daisychain during hwmod mux
+      ARM: OMAP3: PM: Remove IO Daisychain control from cpuidle
+
+ arch/arm/mach-imx/clk-imx51-imx53.c                |    2 +-
+ arch/arm/mach-imx/imx53-dt.c                       |    1 +
+ arch/arm/mach-imx/mach-imx6q.c                     |   19 +++
+ arch/arm/mach-imx/mach-mx53_ard.c                  |    1 +
+ arch/arm/mach-imx/mach-mx53_evk.c                  |    1 +
+ arch/arm/mach-imx/mach-mx53_loco.c                 |    1 +
+ arch/arm/mach-imx/mach-mx53_smd.c                  |    1 +
+ arch/arm/mach-imx/mm-imx5.c                        |   26 +---
+ arch/arm/mach-imx/pm-imx5.c                        |  111 ++++++++++----
+ arch/arm/mach-omap2/Makefile                       |    5 +-
+ arch/arm/mach-omap2/cpuidle34xx.c                  |   71 ++++-----
+ arch/arm/mach-omap2/devices.c                      |  108 -------------
+ arch/arm/mach-omap2/hdq1w.c                        |   26 ++++
+ arch/arm/mach-omap2/msdi.c                         |   73 +++++++++
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c          |    4 +-
+ arch/arm/mach-omap2/omap_hwmod.c                   |   38 ++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   12 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    3 +-
+ arch/arm/mach-omap2/pm.h                           |    2 +-
+ arch/arm/mach-omap2/pm34xx.c                       |   63 ++------
+ arch/arm/mach-omap2/powerdomain.c                  |   16 +-
+ arch/arm/mach-omap2/powerdomain.h                  |    4 +-
+ arch/arm/mach-omap2/prcm-common.h                  |    8 +
+ arch/arm/mach-omap2/prm2xxx_3xxx.c                 |   48 ++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h                 |    2 +
+ arch/arm/mach-omap2/prm44xx.c                      |   63 +++++++-
+ arch/arm/mach-omap2/prm44xx.h                      |    2 +
+ arch/arm/mach-omap2/smartreflex-class3.c           |   29 ++--
+ arch/arm/mach-omap2/sr_device.c                    |   39 ++++-
+ arch/arm/mach-omap2/voltage.h                      |   21 +--
+ arch/arm/plat-mxc/Makefile                         |    1 +
+ arch/arm/plat-mxc/cpuidle.c                        |   80 ++++++++++
+ arch/arm/plat-mxc/include/mach/common.h            |    6 +-
+ arch/arm/plat-mxc/include/mach/cpuidle.h           |   22 +++
+ arch/arm/plat-mxc/include/mach/hardware.h          |   25 +--
+ arch/arm/plat-mxc/tzic.c                           |    4 +
+ arch/arm/plat-omap/Kconfig                         |   31 ++--
+ arch/arm/plat-omap/include/plat/voltage.h          |   21 ++-
+ drivers/power/Kconfig                              |    2 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/avs/Kconfig                          |   12 ++
+ drivers/power/avs/Makefile                         |    1 +
+ .../mach-omap2 => drivers/power/avs}/smartreflex.c |  161 ++++++++------------
+ drivers/w1/masters/Kconfig                         |    2 +-
+ drivers/w1/masters/omap_hdq.c                      |   86 +++--------
+ .../linux/power}/smartreflex.h                     |   74 +++++++--
+ 46 files changed, 808 insertions(+), 521 deletions(-)
