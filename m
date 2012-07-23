@@ -1,24 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Jul 2012 16:06:33 +0200
-Subject: [PATCH 2/2] SPI: Refactor spi-orion to use SPI framework queue.
-In-Reply-To: <20120723134929.GW4435@opensource.wolfsonmicro.com>
-References: <1343042216-4113-1-git-send-email-andrew@lunn.ch>
- <1343042216-4113-2-git-send-email-andrew@lunn.ch>
- <20120723134929.GW4435@opensource.wolfsonmicro.com>
-Message-ID: <20120723140633.GL18778@lunn.ch>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 23 Jul 2012 16:36:17 +0200
+Subject: [GIT PULL] Samsung devel-dma ops for v3.6
+In-Reply-To: <0e1301cd5f34$008fe1e0$01afa5a0$%kim@samsung.com>
+References: <0c5001cd5e41$87daa1b0$978fe510$%kim@samsung.com>
+ <201207101242.41867.arnd@arndb.de>
+ <0e1301cd5f34$008fe1e0$01afa5a0$%kim@samsung.com>
+Message-ID: <CAKnu2Mqf+_JwaZbpfPCJ1go1iTkPb3VLRwj=pFjcr1Apu0O8fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 02:49:29PM +0100, Mark Brown wrote:
-> On Mon, Jul 23, 2012 at 01:16:55PM +0200, Andrew Lunn wrote:
-> > Replace the deprecated master->transfer with transfer_one_message()
-> > and allow the SPI subsystem handle all the queuing of messages.
-> 
-> I'll apply this one but not for this merge window, it seems too big a
-> change for something that's not been in -next and it's not a fix.
+2012/7/11 Kukjin Kim <kgene.kim@samsung.com>:
 
-O.K.
+> Yeah, let me explain the status for Samsung SoCs' DMA. There are 3 different
+> DMA IPs, samsung specific s3c24xx dma, pl080 and pl330. As you know, pl330
+> already moved in drivers/dma for using common DMA engine and Alim is
+> re-working on pl080
+> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg10954.html
+> ) and let me check its progress. But s3c24xx dma is not ready yet.
 
-Thanks for committing the two other patch so late.
+I'm going to poke again on this. I think a bunch of changes to the PL080
+driver from Russell is going upstream this merge window and the S3C patch
+series need to be rebased onto that, but it should be pretty straight-forward.
 
-       Andrew
+Can we please have something moving the S3C over to dmaengine *early*
+next kernel cycle?
+
+Yours,
+Linus Walleij
