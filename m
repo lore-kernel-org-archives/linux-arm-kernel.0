@@ -1,45 +1,83 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Jul 2012 10:20:28 +0100
-Subject: [Call for participation] ARM mini-summit, San Diego, 27-29 August
-In-Reply-To: <20120719094322.GB29153@mudshark.cambridge.arm.com>
-References: <20120719094322.GB29153@mudshark.cambridge.arm.com>
-Message-ID: <500D175C.1030107@arm.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 23 Jul 2012 11:22:04 +0200
+Subject: [PATCH 1/2] PWM: ECAP: PWM driver support for ECAP APWM.
+In-Reply-To: <518397C60809E147AF5323E0420B992E3E971530@DBDE01.ent.ti.com>
+References: <1342172102-30363-1-git-send-email-avinashphilip@ti.com>
+ <1342172102-30363-2-git-send-email-avinashphilip@ti.com>
+ <20120723065235.GA23797@avionic-0098.mockup.avionic-design.de>
+ <518397C60809E147AF5323E0420B992E3E971530@DBDE01.ent.ti.com>
+Message-ID: <20120723092204.GA8607@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/12 10:43, Will Deacon wrote:
-
-Hi Will,
-
-> Due to popular demand, we will be hosting an ARM mini-summit co-located
-> with the Kernel Summit in San Diego at the end of next month:
+On Mon, Jul 23, 2012 at 09:10:09AM +0000, Philip, Avinash wrote:
+> On Mon, Jul 23, 2012 at 12:22:35, Thierry Reding wrote:
+> > On Fri, Jul 13, 2012 at 03:05:01PM +0530, Philip, Avinash wrote:
+> > > +	/*
+> > > +	 * Enable 'Free run Time stamp counter mode' to start counter
+> > > +	 * and  'APWM mode' to enable APWM output
+> > > +	 */
+> > > +	reg_val = readw(pc->mmio_base + ECCTL2);
+> > > +	reg_val |= ECCTL2_TSCTR_FREERUN | ECCTL2_APWM_MODE;
+> > 
+> > You already set the APWM_MODE bit in .config(), why is it needed here
+> > again? Seeing that .disable() clears the bit as well, perhaps leaving it
+> > clear in .config() is the better option.
 > 
->   https://events.linuxfoundation.org/events/linux-kernel-summit/
+> Clearing APWM mode in .disable() ensures PWM low output (i.e., PWM pin = low 
+> in idle state).
 > 
-> The discussion topics and schedule are still being decided but, since
-> there are a limited number of places available, we need to know who is
-> interested in attending as a matter of urgency. Some of you have already
-> expressed an interest on the ksummit-2012-discuss list, but I would ask
-> you please to confirm that you would still like to attend.
+> The Period & Compare registers are updated from Shadow registers (CAP1 & CAP2)
+> During PWM configuration. To enable loading from Shadow registers, APWM mode 
+> should be set.
+> The same is done in .config().
+
+My point was that if you do it in .enable(), then why do you still set
+it in .config()? Since the sequence is typically .config() followed by
+.enable(), setting the bit in both seems redundant. It should be enough
+to load the registers during .enable(), right?
+
+> > > +	pc->chip.dev = &pdev->dev;
+> > > +	pc->chip.ops = &ecap_pwm_ops;
+> > > +	pc->chip.base = -1;
+> > > +	pc->chip.npwm = 1;
+> > 
+> > The cover letter mentions that the AM335x has 3 instances of the ECAP.
+> > Is there any chance that they can be unified in one driver instance
+> > (i.e. .npwm = 3?).
 > 
-> Furthermore, if there is anything in particular that you would like to
-> discuss then please mention briefly what it is so that we can gauge the
-> sort of topics that people are most interested in.
-
-As mentioned earlier, I'd be glad to attend. Happy to discuss anything
-regarding the single zImage work and anything KVM (and more generally
-virtualisation) related.
-
-> I will send out another mail in due course, once the list of attendees
-> has been finalised. In the meantime, please reply to this mail if you
-> are keen and able to attend.
+> No. All instances have separate resources (clocks, memory ..).
 > 
-> Cheers,
+> > 
+> > > +
+> > > +	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ecap_reg");
+> > > +	if (r == NULL) {
+> > 
+> > You use "if (!ptr)" everywhere else, maybe you should make this
+> > consistent?
+> Ok
+> > Also the platform_get_resource_byname() is really only
+> > useful for devices that have several register regions associated with
+> > them. I don't know your hardware in detail, but I doubt that a PWM
+> > device has more than one register region.
 > 
-> Will (and the rest of the mini-summit organisers)
+> In fact PWM Module has 4 different register space (eCAP, eHRPWM, eQEP & 
+> Common Config space). So I need to use platform_get_resource_byname()
 
-Thanks for taking care of this!
+Above you say that all instances have separate resources, so how come
+you need to specify 4 register spaces? The eCAP registers should clearly
+be passed to the eCAP device, while the eHRPWM registers should go to
+the eHRPWM device.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+My point is that if you need to refer to the register region by name,
+then the driver should clearly be using more than a single region.
+Neither the eCAP nor eHRPWM do that.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120723/768d1fc6/attachment.sig>
