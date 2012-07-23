@@ -1,74 +1,61 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Mon, 23 Jul 2012 13:27:34 +0900
-Subject: [PATCH] video: exynos: s6e8ax0: support early fb event of fb_blank()
-Message-ID: <500CD2B6.2080109@samsung.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Mon, 23 Jul 2012 07:03:11 +0200
+Subject: Build error with [PATCH v10 3/4] drivers/i2c/busses/i2c-at91.c
+In-Reply-To: <CAFLc3bpiu4zEKwkA8QSH0ORQp+6frmMn2AUNeQ4rURCtxTOM5Q@mail.gmail.com>
+References: <CAFLc3brYJGkQoW5mGi9XaujNBMBdGX6RxfkNRbBZJQz_axz_Jg@mail.gmail.com>
+ <EF2E73589CA71846A15D0B2CDF79505D090EA1AA99@wm021.weinmann.com>
+ <CAFLc3bpiu4zEKwkA8QSH0ORQp+6frmMn2AUNeQ4rURCtxTOM5Q@mail.gmail.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EA8F0F8@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports early fb event of fb_blank().
+Hi Stefano,
 
-- In case of lcd power off : call early_set_power() interface and lcd
-power is off. And then framebuffer is blanked.
+Stefano Salati wrote on 2012-07-21:
+> I did as you suggested, I manage to compile but get a waterfall of errors
+> while booting the image (file attached).
+> 
+> I applied all the patches (manually so to better understand what was being
+> done), apart from this one: https://lkml.org/lkml/2012/4/20/112
+> as the file I'd patch is completely different (apart from the fact that my
+> file is "at91sam9x5.c" I've checked also those you mention in the patch to
+> take inspiration and are completely different as well). I attached
+> at91sam9x5.c to explain better.
 
-- In case of lcd power on : First, framebuffer is unblanked, and then
-call set_power() interface to turn lcd on.
+your at91sam9x5.c is quite out of date. If you can, you should use a more
+recent kernel. If not, try to add the following to the file:
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/video/exynos/s6e8ax0.c |   32 ++++++++++++++++++++++++++++++++
- 1 files changed, 32 insertions(+), 0 deletions(-)
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.0", &twi0_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.1", &twi1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.2", &twi2_clk),
++};
 
-diff --git a/drivers/video/exynos/s6e8ax0.c b/drivers/video/exynos/s6e8ax0.c
-index 05d080b..e51d024 100644
---- a/drivers/video/exynos/s6e8ax0.c
-+++ b/drivers/video/exynos/s6e8ax0.c
-@@ -663,6 +663,37 @@ static int s6e8ax0_gamma_ctrl(struct s6e8ax0 *lcd, int gamma)
- 	return 0;
- }
- 
-+static int s6e8aa0_early_set_power(struct lcd_device *ld, int power)
-+{
-+	struct s6e8ax0 *lcd = lcd_get_data(ld);
-+	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
-+	int ret = 0;
-+
-+	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
-+			power != FB_BLANK_NORMAL) {
-+		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (lcd->power == power) {
-+		dev_err(lcd->dev, "power mode is same as previous one.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (ops->set_early_blank_mode) {
-+		/* LCD power off */
-+		if ((POWER_IS_OFF(power) && POWER_IS_ON(lcd->power))
-+			|| (POWER_IS_ON(lcd->power) && POWER_IS_NRM(power))) {
-+			ret = ops->set_early_blank_mode(lcd_to_master(lcd),
-+							power);
-+			if (!ret && lcd->power != power)
-+				lcd->power = power;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
- static int s6e8ax0_set_power(struct lcd_device *ld, int power)
- {
- 	struct s6e8ax0 *lcd = lcd_get_data(ld);
-@@ -731,6 +762,7 @@ static int s6e8ax0_set_brightness(struct backlight_device *bd)
- }
- 
- static struct lcd_ops s6e8ax0_lcd_ops = {
-+	.early_set_power = s6e8aa0_early_set_power,
- 	.set_power = s6e8ax0_set_power,
- 	.get_power = s6e8ax0_get_power,
- };
--- 
-1.7.4.1
+and in at91sam9x5_register_clocks():
+
+	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+		clk_register(periph_clocks[i]);
+
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
+
+	if (cpu_is_at91sam9g25()
+	|| cpu_is_at91sam9x25())
+		clk_register(&usart3_clk);
+
+For a recent kernel, it should be:
+
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 13c8cae..bfdd429 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -225,6 +225,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.0", &twi0_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.1", &twi1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.2", &twi2_clk),
+ 	CLKDEV_CON_ID("pioA", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioB", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioCD_clk),
