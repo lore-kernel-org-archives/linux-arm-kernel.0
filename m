@@ -1,87 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Jul 2012 15:05:19 +0100
-Subject: Help request - ASoC recursion issue
-Message-ID: <500D5A1F.9000808@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 23 Jul 2012 09:05:57 -0500
+Subject: [PATCH v2 05/15] ARM: integrator: use fixed PCI i/o mapping
+In-Reply-To: <20120723121920.GE31521@mudshark.cambridge.arm.com>
+References: <1342231451-28861-1-git-send-email-robherring2@gmail.com>
+ <5005A8A4.6040608@gmail.com>
+ <20120721143122.GA26790@mudshark.cambridge.arm.com>
+ <201207212156.43941.arnd@arndb.de>
+ <CAL_JsqJmN3+1Gb5dF+9eL5c742_-mzg61VcvYhEQpabh5VE=kg@mail.gmail.com>
+ <20120722150811.GA29535@mudshark.cambridge.arm.com>
+ <CAL_JsqJsepaArV_otTXvt+inK+UtWVabZLkoDkgcVXOH=e58pA@mail.gmail.com>
+ <20120723121920.GE31521@mudshark.cambridge.arm.com>
+Message-ID: <500D5A45.9070404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 07/23/2012 07:19 AM, Will Deacon wrote:
+> On Sun, Jul 22, 2012 at 05:21:33PM +0100, Rob Herring wrote:
+>> On Jul 22, 2012 11:08 AM, "Will Deacon" <will.deacon at arm.com<mailto:will.deacon@arm.com>> wrote:
+>>> Now, the next line is usually when the VGA text console is poked. Sure
+>>> enough, disabling that (CONFIG_VGA_CONSOLE) is enough to boot with your
+>>> patches and PCI appears to work correctly (I can do basic networking).
+>>>
+>>> I guess there's some mapping race with the VGA code since vga_base =
+>>> PCI_MEMORY_VADDR, but you left the static mapping alone for that region,
+>>> so I'm not sure. Any ideas?
+>>
+>> Perhaps pcibios_min_io changing from 6000 to default of 1000 causes probing for vga?
+> 
+> I can try changing it back and see it makes a difference sometime this week.
+> It certainly smells like some probing is going on before the PCI stuff is up
+> and running and I suspect that the static mapping just leads to a hang rather
+> than an abort.
 
-I was wondering if I may bother you for some help. I've been having 
-serious issues with testing the new mop500 sound system you have in your 
-ASoC for-next branch. I've fixed a few issues and will be submitting 
-patches shortly. The most serious issue I came across was with 
-recursion. Let me show you:
+Now that I have looked at the code. I think it is simply vgacon is
+postcore_init and pci setup of the i/o mapping is in subsys_init. It
+curious that you don't get an abort and backtrace though.
 
-So here we setup the power_check function pointer with 
-'dapm_supply_check_power()'.
+vgacon is only enabled for footbridge and integrator. I guess the only
+way this worked before is if the bootloader has already setup the bus.
+So I can add back an early mapping function that these 2 platforms can
+call from .map_io. Something like this:
 
-> static struct snd_soc_dapm_widget *
-> snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
-> 			 const struct snd_soc_dapm_widget *widget)
-> {
-<snip>
-> 	case snd_soc_dapm_regulator_supply:
-> 	case snd_soc_dapm_clock_supply:
-> 		w->power_check = dapm_supply_check_power;
-> 		break;
-<snip>
-> }
+static inline void __init pci_map_io_early(unsigned long pfn)
+{
+	struct map_desc pci_io_desc = {
+		.virtual	= PCI_IO_VIRT_BASE,
+		.type		= MT_DEVICE,
+		.length		= SZ_64K,
+	};
+	
+	pci_io_desc.pfn = pfn;
+	create_mapping(&pci_io_desc);
+}
 
-Later we call 'dapm_widget_power_check()' which calls into the function 
-pointer we know to be 'dapm_supply_check_power()'.
-
- > static int dapm_widget_power_check(struct snd_soc_dapm_widget *w)
- > {
- > 	if (w->power_checked)
- > 		return w->new_power;
- >
- > 	if (w->force)
- > 		w->new_power = 1;
- > 	else
- > 		w->new_power = w->power_check(w);
- >
- > 	w->power_checked = true;
- >
- > 	return w->new_power;
- > }
-
-The problem seems to be that 'dapm_supply_check_power()' then calls back 
-into 'dapm_widget_power_check()'. Then round and round we go!
-
-> /* Check to see if a power supply is needed */
-> static int dapm_supply_check_power(struct snd_soc_dapm_widget *w)
-> {
-<snip>
-> 	/* Check if one of our outputs is connected */
-> 	list_for_each_entry(path, &w->sinks, list_source) {
-> 		DAPM_UPDATE_STAT(w, neighbour_checks);
->
-> 		if (path->weak)
-> 			continue;
->
-> 		if (path->connected &&
-> 		    !path->connected(path->source, path->sink))
-> 			continue;
->
-> 		if (!path->sink)
-> 			continue;
->
-> 		if (dapm_widget_power_check(path->sink))     /* <-- Doh! */
-> 			return 1;
-> 	}
-<snip>
-> }
-
-Can you shed some light on what the correct solution might be?
-
-Any help would be gratefully received.
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Rob
