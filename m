@@ -1,48 +1,315 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 23 Jul 2012 19:13:52 +0800
-Subject: [PATCH v2 1/2] USB: chipidea: add imx usbmisc support
-In-Reply-To: <20120723105153.GS8265@arwen.pp.htv.fi>
-References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
- <1342607348-8587-2-git-send-email-richard.zhao@freescale.com>
- <20120723091652.GK8265@arwen.pp.htv.fi>
- <20120723092713.GS21635@b20223-02.ap.freescale.net>
- <500D19AA.8080006@pengutronix.de>
- <20120723105153.GS8265@arwen.pp.htv.fi>
-Message-ID: <20120723111351.GT21635@b20223-02.ap.freescale.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 23 Jul 2012 13:16:55 +0200
+Subject: [PATCH 2/2] SPI: Refactor spi-orion to use SPI framework queue.
+In-Reply-To: <1343042216-4113-1-git-send-email-andrew@lunn.ch>
+References: <1343042216-4113-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1343042216-4113-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 01:51:55PM +0300, Felipe Balbi wrote:
-> On Mon, Jul 23, 2012 at 11:30:18AM +0200, Marc Kleine-Budde wrote:
-> > On 07/23/2012 11:27 AM, Richard Zhao wrote:
-> > >> This patch looks like a recipe for disaster IMHO, but it's Alex's call.
-> > > Well, if there's any better place to hold it, I'd like to move there.
-> > > Another place is arch/arm/mach-imx. Sascha/Shawn who are maintainers of
-> > > imx are also in cc list.
-> > 
-> > IMHO it's not about the place where the driver is located, it's about
-> > the shortcomings Michael and Sascha mentioned.
-Thanks, Marc.
-> 
-> exactly. It's not about where a file is placed or how it's called. It's
-> how you decided to implement it. This will prevent a platform with
-> multiple instances of the IP to be used, at least.
-To me, usbmisc on imx6 is just a set of non-core registers which is
-companion of Chipidea IP cores. All cores share the same usbmisc.
->From design perspective, ci13xxx_imx knows nothing about usbmisc. It
-just call the ops in proper occasion. usbmisc driver wrappers all
-SoC specific things.
-> 
-> Also, if that set of registers are shared, you ought to have a dedicated
-> driver to handle mutual exclusion and so on.
-Only usbmisc driver access the registers, but maybe called from
-different Chipidea devices. So it has a spinlock to protect register
-access.
-> I don't know details about
-> the i.MX platform, that really smells funny by looking at it.
+Replace the deprecated master->transfer with transfer_one_message()
+and allow the SPI subsystem handle all the queuing of messages.
 
-Thanks
-Richard
-> 
-> -- 
-> balbi
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
+---
+ drivers/spi/spi-orion.c |  209 ++++++++++++++---------------------------------
+ 1 file changed, 61 insertions(+), 148 deletions(-)
+
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 9b0cadd..b17c09c 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -36,12 +36,6 @@
+ #define ORION_SPI_CLK_PRESCALE_MASK	0x1F
+ 
+ struct orion_spi {
+-	struct work_struct	work;
+-
+-	/* Lock access to transfer list.	*/
+-	spinlock_t		lock;
+-
+-	struct list_head	msg_queue;
+ 	struct spi_master	*master;
+ 	void __iomem		*base;
+ 	unsigned int		max_speed;
+@@ -49,8 +43,6 @@ struct orion_spi {
+ 	struct clk              *clk;
+ };
+ 
+-static struct workqueue_struct *orion_spi_wq;
+-
+ static inline void __iomem *spi_reg(struct orion_spi *orion_spi, u32 reg)
+ {
+ 	return orion_spi->base + reg;
+@@ -277,73 +269,78 @@ out:
+ }
+ 
+ 
+-static void orion_spi_work(struct work_struct *work)
++static int orion_spi_transfer_one_message(struct spi_master *master,
++					   struct spi_message *m)
+ {
+-	struct orion_spi *orion_spi =
+-		container_of(work, struct orion_spi, work);
+-
+-	spin_lock_irq(&orion_spi->lock);
+-	while (!list_empty(&orion_spi->msg_queue)) {
+-		struct spi_message *m;
+-		struct spi_device *spi;
+-		struct spi_transfer *t = NULL;
+-		int par_override = 0;
+-		int status = 0;
+-		int cs_active = 0;
+-
+-		m = container_of(orion_spi->msg_queue.next, struct spi_message,
+-				 queue);
++	struct orion_spi *orion_spi = spi_master_get_devdata(master);
++	struct spi_device *spi = m->spi;
++	struct spi_transfer *t = NULL;
++	int par_override = 0;
++	int status = 0;
++	int cs_active = 0;
+ 
+-		list_del_init(&m->queue);
+-		spin_unlock_irq(&orion_spi->lock);
++	/* Load defaults */
++	status = orion_spi_setup_transfer(spi, NULL);
+ 
+-		spi = m->spi;
++	if (status < 0)
++		goto msg_done;
+ 
+-		/* Load defaults */
+-		status = orion_spi_setup_transfer(spi, NULL);
++	list_for_each_entry(t, &m->transfers, transfer_list) {
++		/* make sure buffer length is even when working in 16
++		 * bit mode*/
++		if ((t->bits_per_word == 16) && (t->len & 1)) {
++			dev_err(&spi->dev,
++				"message rejected : "
++				"odd data length %d while in 16 bit mode\n",
++				t->len);
++			status = -EIO;
++			goto msg_done;
++		}
+ 
+-		if (status < 0)
++		if (t->speed_hz && t->speed_hz < orion_spi->min_speed) {
++			dev_err(&spi->dev,
++				"message rejected : "
++				"device min speed (%d Hz) exceeds "
++				"required transfer speed (%d Hz)\n",
++				orion_spi->min_speed, t->speed_hz);
++			status = -EIO;
+ 			goto msg_done;
++		}
+ 
+-		list_for_each_entry(t, &m->transfers, transfer_list) {
+-			if (par_override || t->speed_hz || t->bits_per_word) {
+-				par_override = 1;
+-				status = orion_spi_setup_transfer(spi, t);
+-				if (status < 0)
+-					break;
+-				if (!t->speed_hz && !t->bits_per_word)
+-					par_override = 0;
+-			}
+-
+-			if (!cs_active) {
+-				orion_spi_set_cs(orion_spi, 1);
+-				cs_active = 1;
+-			}
+-
+-			if (t->len)
+-				m->actual_length +=
+-					orion_spi_write_read(spi, t);
+-
+-			if (t->delay_usecs)
+-				udelay(t->delay_usecs);
+-
+-			if (t->cs_change) {
+-				orion_spi_set_cs(orion_spi, 0);
+-				cs_active = 0;
+-			}
++		if (par_override || t->speed_hz || t->bits_per_word) {
++			par_override = 1;
++			status = orion_spi_setup_transfer(spi, t);
++			if (status < 0)
++				break;
++			if (!t->speed_hz && !t->bits_per_word)
++				par_override = 0;
+ 		}
+ 
+-msg_done:
+-		if (cs_active)
+-			orion_spi_set_cs(orion_spi, 0);
++		if (!cs_active) {
++			orion_spi_set_cs(orion_spi, 1);
++			cs_active = 1;
++		}
+ 
+-		m->status = status;
+-		m->complete(m->context);
++		if (t->len)
++			m->actual_length += orion_spi_write_read(spi, t);
+ 
+-		spin_lock_irq(&orion_spi->lock);
++		if (t->delay_usecs)
++			udelay(t->delay_usecs);
++
++		if (t->cs_change) {
++			orion_spi_set_cs(orion_spi, 0);
++			cs_active = 0;
++		}
+ 	}
+ 
+-	spin_unlock_irq(&orion_spi->lock);
++msg_done:
++	if (cs_active)
++		orion_spi_set_cs(orion_spi, 0);
++
++	m->status = status;
++	spi_finalize_current_message(master);
++
++	return 0;
+ }
+ 
+ static int __init orion_spi_reset(struct orion_spi *orion_spi)
+@@ -376,75 +373,6 @@ static int orion_spi_setup(struct spi_device *spi)
+ 	return 0;
+ }
+ 
+-static int orion_spi_transfer(struct spi_device *spi, struct spi_message *m)
+-{
+-	struct orion_spi *orion_spi;
+-	struct spi_transfer *t = NULL;
+-	unsigned long flags;
+-
+-	m->actual_length = 0;
+-	m->status = 0;
+-
+-	/* reject invalid messages and transfers */
+-	if (list_empty(&m->transfers) || !m->complete)
+-		return -EINVAL;
+-
+-	orion_spi = spi_master_get_devdata(spi->master);
+-
+-	list_for_each_entry(t, &m->transfers, transfer_list) {
+-		unsigned int bits_per_word = spi->bits_per_word;
+-
+-		if (t->tx_buf == NULL && t->rx_buf == NULL && t->len) {
+-			dev_err(&spi->dev,
+-				"message rejected : "
+-				"invalid transfer data buffers\n");
+-			goto msg_rejected;
+-		}
+-
+-		if (t->bits_per_word)
+-			bits_per_word = t->bits_per_word;
+-
+-		if ((bits_per_word != 8) && (bits_per_word != 16)) {
+-			dev_err(&spi->dev,
+-				"message rejected : "
+-				"invalid transfer bits_per_word (%d bits)\n",
+-				bits_per_word);
+-			goto msg_rejected;
+-		}
+-		/*make sure buffer length is even when working in 16 bit mode*/
+-		if ((t->bits_per_word == 16) && (t->len & 1)) {
+-			dev_err(&spi->dev,
+-				"message rejected : "
+-				"odd data length (%d) while in 16 bit mode\n",
+-				t->len);
+-			goto msg_rejected;
+-		}
+-
+-		if (t->speed_hz && t->speed_hz < orion_spi->min_speed) {
+-			dev_err(&spi->dev,
+-				"message rejected : "
+-				"device min speed (%d Hz) exceeds "
+-				"required transfer speed (%d Hz)\n",
+-				orion_spi->min_speed, t->speed_hz);
+-			goto msg_rejected;
+-		}
+-	}
+-
+-
+-	spin_lock_irqsave(&orion_spi->lock, flags);
+-	list_add_tail(&m->queue, &orion_spi->msg_queue);
+-	queue_work(orion_spi_wq, &orion_spi->work);
+-	spin_unlock_irqrestore(&orion_spi->lock, flags);
+-
+-	return 0;
+-msg_rejected:
+-	/* Message rejected and not queued */
+-	m->status = -EINVAL;
+-	if (m->complete)
+-		m->complete(m->context);
+-	return -EINVAL;
+-}
+-
+ static int __init orion_spi_probe(struct platform_device *pdev)
+ {
+ 	struct spi_master *master;
+@@ -474,7 +402,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 	master->mode_bits = 0;
+ 
+ 	master->setup = orion_spi_setup;
+-	master->transfer = orion_spi_transfer;
++	master->transfer_one_message = orion_spi_transfer_one_message;
+ 	master->num_chipselect = ORION_NUM_CHIPSELECTS;
+ 
+ 	dev_set_drvdata(&pdev->dev, master);
+@@ -507,11 +435,6 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 	}
+ 	spi->base = ioremap(r->start, SZ_1K);
+ 
+-	INIT_WORK(&spi->work, orion_spi_work);
+-
+-	spin_lock_init(&spi->lock);
+-	INIT_LIST_HEAD(&spi->msg_queue);
+-
+ 	if (orion_spi_reset(spi) < 0)
+ 		goto out_rel_mem;
+ 
+@@ -536,14 +459,12 @@ out:
+ static int __exit orion_spi_remove(struct platform_device *pdev)
+ {
+ 	struct spi_master *master;
+-	struct orion_spi *spi;
+ 	struct resource *r;
++	struct orion_spi *spi;
+ 
+ 	master = dev_get_drvdata(&pdev->dev);
+ 	spi = spi_master_get_devdata(master);
+ 
+-	cancel_work_sync(&spi->work);
+-
+ 	clk_disable_unprepare(spi->clk);
+ 	clk_put(spi->clk);
+ 
+@@ -574,21 +495,13 @@ static struct platform_driver orion_spi_driver = {
+ 
+ static int __init orion_spi_init(void)
+ {
+-	orion_spi_wq = create_singlethread_workqueue(
+-				orion_spi_driver.driver.name);
+-	if (orion_spi_wq == NULL)
+-		return -ENOMEM;
+-
+ 	return platform_driver_probe(&orion_spi_driver, orion_spi_probe);
+ }
+ module_init(orion_spi_init);
+ 
+ static void __exit orion_spi_exit(void)
+ {
+-	flush_workqueue(orion_spi_wq);
+ 	platform_driver_unregister(&orion_spi_driver);
+-
+-	destroy_workqueue(orion_spi_wq);
+ }
+ module_exit(orion_spi_exit);
+ 
+-- 
+1.7.10.4
