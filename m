@@ -1,46 +1,103 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jul 2012 20:33:04 -0000
-Subject: [GIT PULL 06/15] arm-soc: spi updates
+Date: Mon, 23 Jul 2012 20:33:05 -0000
+Subject: [GIT PULL 08/15] arm-soc: cleanups, part 2
 In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
 References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <1343075561-17446-7-git-send-email-arnd@arndb.de>
+Message-ID: <1343075561-17446-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
+The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
 
-  Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
+  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/spi
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/cleanup2
 
-for you to fetch changes up to 85644d2a8893d72d1869c6347e791902dd414288:
+for you to fetch changes up to db3c47a3af96e8109b1bb114c32f0854259d5970:
 
-  Merge branch 'next/devel-samsung-spi' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/spi (2012-07-21 23:12:15 +0200)
+  Merge tag 'omap-cleanup-part2-for-v3.6' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/cleanup2 (2012-07-10 16:58:19 +0200)
 
 ----------------------------------------------------------------
 
-arm-soc: spi updates
+arm-soc: cleanups, part 2
 
-These changes conceptually belong into the spi tree, but we decided to
-put them into arm-soc to better deal with interdependencies with other
-platform specific patches that are already there.
+These omap cleanups have dependencies on earlier omap branches that in
+turn depend on other cleanups, so they could not go into the same
+branch.
 
 ----------------------------------------------------------------
 
 Arnd Bergmann (2):
-      Merge branch 'next/devel-samsung-spi' of git://git.kernel.org/.../kgene/linux-samsung into next/spi
-      Merge branch 'next/spi' into for-next
+      Merge tag 'omap-cleanup-part2-for-v3.6' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup2
+      Merge branch 'next/cleanup2' into for-next
 
-Kukjin Kim (1):
-      Merge branch 'next/dt-samsung' into next/devel-samsung-spi
+Jon Hunter (2):
+      ARM: OMAP4: clockdomain/CM code: Update supported transition modes
+      ARM: OMAP2+: powerdomain code: Fix Wake-up power domain power status
 
-Mark Brown (4):
-      spi/s3c64xx: Fix handling of errors in gpio_request()
-      spi/s3c64xx: Put the /CS GPIO into output mode
-      spi/s3c64xx: Convert to devm_request_and_ioremap()
-      spi/s3c64xx: Expand S3C64XX_SPI_{DE,}ACT macros at call sites
+Kishon Vijay Abraham I (1):
+      ARM: OMAP2+: hwmod code: add support to set dmadisable in hwmod framework
 
- drivers/spi/spi-s3c64xx.c |   42 ++++++++++++------------------------------
- 1 file changed, 12 insertions(+), 30 deletions(-)
+Paul Walmsley (1):
+      Merge branches 'hwmod_am335x_support_3.6', 'clkdm_pwrdm_devel_a_3.6' and 'misc_devel_3.6' into omap_devel_f_3.6
+
+R Sricharan (1):
+      ARM: OMAP2+: PRM/CM: Move the stubbed prm and cm functions to prcm.c file and make them __weak
+
+Sakari Ailus (1):
+      ARM: OMAP3: control: add definition for CONTROL_CAMERA_PHY_CTRL
+
+Santosh Shilimkar (1):
+      ARM: OMAP: sdrc: Fix the build break for OMAP4 only builds
+
+Tarun Kanti DebBarma (3):
+      ARM: OMAP2+: hwmod: add omap_hwmod_get_main_clk() API
+      ARM: OMAP: dmtimer: use devm_ API and do some cleanup in probe()
+      ARM: OMAP2+: dmtimer: cleanup fclk usage
+
+Tony Lindgren (3):
+      Merge tags 'omap-cleanup-for-v3.6', 'omap-devel-dmtimer-for-v3.6' and 'omap-devel-am33xx-for-v3.6' into devel-am33xx-part2
+      Merge tag 'omap-devel-f-for-3.6' of git://git.kernel.org/.../pjw/omap-pending into cleanup-part2
+      ARM: OMAP2+: Fix mismerge for omap_hwmod_get_main_clk() API
+
+Vaibhav Hiremath (7):
+      ARM: OMAP2+: hwmod: Add new sysc_type3 into omap_hwmod required for am33xx
+      ARM: OMAP3/4: omap_hwmod: Add rstst_offs field to struct omap_hwmod_omap4_prcm
+      ARM: OMAP2+: All OMAP2PLUS uses omap-device.o target so add one entry
+      ARM: OMAP2+: Move omap3 dpll ops to dpll3xxx.c
+      ARM: OMAP2+: am33xx: Make am33xx as a separate class
+      ARM: OMAP2+: am33xx: Change cpu_is_am33xx to soc_is_am33xx
+      ARM: OMAP2+: Remove unnecessary ifdef around __omap2_set_globals
+
+Vikram Pandita (1):
+      ARM: OMAP3+: dpll: optimize noncore dpll locking logic
+
+ arch/arm/mach-omap2/Kconfig                  |   12 +++-
+ arch/arm/mach-omap2/Makefile                 |    8 ++-
+ arch/arm/mach-omap2/clock.c                  |   18 ------
+ arch/arm/mach-omap2/clock3xxx_data.c         |    2 +-
+ arch/arm/mach-omap2/clock44xx_data.c         |   22 ++++----
+ arch/arm/mach-omap2/clockdomain44xx.c        |   10 +++-
+ arch/arm/mach-omap2/cminst44xx.c             |   14 -----
+ arch/arm/mach-omap2/cminst44xx.h             |   25 ---------
+ arch/arm/mach-omap2/common.c                 |   10 +---
+ arch/arm/mach-omap2/common.h                 |    5 ++
+ arch/arm/mach-omap2/control.h                |    1 +
+ arch/arm/mach-omap2/dpll3xxx.c               |   26 ++++++++-
+ arch/arm/mach-omap2/id.c                     |    4 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |   76 ++++++++++++++++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_common_data.c |   10 ++++
+ arch/arm/mach-omap2/powerdomain.c            |    6 +-
+ arch/arm/mach-omap2/prcm.c                   |   23 ++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |   65 ----------------------
+ arch/arm/mach-omap2/prm_common.c             |   62 +++++++++++++++++++++
+ arch/arm/mach-omap2/timer.c                  |    3 +-
+ arch/arm/plat-omap/Makefile                  |    4 +-
+ arch/arm/plat-omap/dmtimer.c                 |   53 ++++++------------
+ arch/arm/plat-omap/include/plat/cpu.h        |   17 +++---
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   19 +++++++
+ arch/arm/plat-omap/include/plat/sdrc.h       |    2 +-
+ arch/arm/plat-omap/sram.c                    |    6 +-
+ 26 files changed, 296 insertions(+), 207 deletions(-)
