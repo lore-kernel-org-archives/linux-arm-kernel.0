@@ -1,46 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Jul 2012 09:27:49 +0200
-Subject: [PATCH 2/16] SPI: Refactor spi-orion to use SPI framework queue.
-In-Reply-To: <20120722224241.GH4557@opensource.wolfsonmicro.com>
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-3-git-send-email-andrew@lunn.ch>
- <CACRpkdYBJmh3+EVrPGb8L2TTWkJkeejfDZX1G0T1KoYY-YuBLg@mail.gmail.com>
- <20120722095328.GB5423@lunn.ch>
- <20120722190700.GD4557@opensource.wolfsonmicro.com>
- <20120722193243.GF5423@lunn.ch>
- <20120722224241.GH4557@opensource.wolfsonmicro.com>
-Message-ID: <20120723072749.GA18778@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 Jul 2012 04:28:58 -0300
+Subject: [PATCH] ARM: mxs: Adjust of_find_property()
+Message-ID: <1343028538-13891-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2012 at 11:42:57PM +0100, Mark Brown wrote:
-> On Sun, Jul 22, 2012 at 09:32:43PM +0200, Andrew Lunn wrote:
-> > On Sun, Jul 22, 2012 at 08:07:01PM +0100, Mark Brown wrote:
-> 
-> > > Well, I'd like to think that generally I'm reasonably responsive to
-> > > patch submissions 
-> 
-> > Well, this particular patch was first submitted May 19th and Ack-by
-> > Linus on May 14th.
-> 
-> > http://comments.gmane.org/gmane.linux.kernel.spi.devel/9937
-> 
-> > It was reposted 10 Jun and Acked-by again in Jun 10 by Linus.
-> 
-> > It was also reposted July 3.
-> 
-> None of which were CCed to me; they were all before I started looking
-> after SPI so that's not surprising but still the number of reposts is
-> more a comment on why I'm helping out here than on what I said above.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Hi Mark
+Since commit 475d00 (of: Improve prom_update_property() function) prom_update_property requires
+two arguments.
 
-O.K., fair enough.
+Fix this in order to get rid of the following build error:
 
-Will you accept any patches for this merge window? As you said, the DT
-enablement is low risk. It should be possible to separate this one
-patch from the other two.
+arch/arm/mach-mxs/mach-mxs.c:175:4: error: too many arguments to function 'prom_update_property'
 
-https://github.com/lunn/linux/commit/794e259e3e23f02250ac12c74dd507a4b340b257
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mxs/mach-mxs.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
 
-      Andrew
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 648bdd0..b70011d 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -162,7 +162,7 @@ enum mac_oui {
+ static void __init update_fec_mac_prop(enum mac_oui oui)
+ {
+ 	struct device_node *np, *from = NULL;
+-	struct property *oldmac, *newmac;
++	struct property *newmac;
+ 	const u32 *ocotp = mxs_get_ocotp();
+ 	u8 *macaddr;
+ 	u32 val;
+@@ -208,11 +208,7 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 		macaddr[4] = (val >> 8) & 0xff;
+ 		macaddr[5] = (val >> 0) & 0xff;
+ 
+-		oldmac = of_find_property(np, newmac->name, NULL);
+-		if (oldmac)
+-			prom_update_property(np, newmac, oldmac);
+-		else
+-			prom_add_property(np, newmac);
++		prom_add_property(np, newmac);
+ 	}
+ }
+ 
+-- 
+1.7.1
