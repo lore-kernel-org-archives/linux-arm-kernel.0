@@ -1,57 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Jul 2012 13:16:54 +0200
-Subject: [PATCH 1/2] spi-orion: remove uneeded spi_info
-Message-ID: <1343042216-4113-1-git-send-email-andrew@lunn.ch>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Jul 2012 14:21:06 +0300
+Subject: [PATCH v2 1/2] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120723111351.GT21635@b20223-02.ap.freescale.net>
+References: <1342607348-8587-1-git-send-email-richard.zhao@freescale.com>
+ <1342607348-8587-2-git-send-email-richard.zhao@freescale.com>
+ <20120723091652.GK8265@arwen.pp.htv.fi>
+ <20120723092713.GS21635@b20223-02.ap.freescale.net>
+ <500D19AA.8080006@pengutronix.de>
+ <20120723105153.GS8265@arwen.pp.htv.fi>
+ <20120723111351.GT21635@b20223-02.ap.freescale.net>
+Message-ID: <20120723112103.GW8265@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Walle <michael@walle.cc>
+On Mon, Jul 23, 2012 at 07:13:52PM +0800, Richard Zhao wrote:
+> On Mon, Jul 23, 2012 at 01:51:55PM +0300, Felipe Balbi wrote:
+> > On Mon, Jul 23, 2012 at 11:30:18AM +0200, Marc Kleine-Budde wrote:
+> > > On 07/23/2012 11:27 AM, Richard Zhao wrote:
+> > > >> This patch looks like a recipe for disaster IMHO, but it's Alex's call.
+> > > > Well, if there's any better place to hold it, I'd like to move there.
+> > > > Another place is arch/arm/mach-imx. Sascha/Shawn who are maintainers of
+> > > > imx are also in cc list.
+> > > 
+> > > IMHO it's not about the place where the driver is located, it's about
+> > > the shortcomings Michael and Sascha mentioned.
+> Thanks, Marc.
+> > 
+> > exactly. It's not about where a file is placed or how it's called. It's
+> > how you decided to implement it. This will prevent a platform with
+> > multiple instances of the IP to be used, at least.
+> To me, usbmisc on imx6 is just a set of non-core registers which is
+> companion of Chipidea IP cores. All cores share the same usbmisc.
+> From design perspective, ci13xxx_imx knows nothing about usbmisc. It
+> just call the ops in proper occasion. usbmisc driver wrappers all
+> SoC specific things.
 
-This was formerly used to store the tclk value. This is now discovered
-using the clk API, rather than pass it as platform data.
+but if all you need is to call and initialization function, why don't
+you just do it on probe() of that usbmisc stuff ? Is this usbmisc used
+only for this USB IP ?
 
-Signed-off-by: Michael Walle <michael@walle.cc>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
----
- drivers/spi/spi-orion.c |    5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 74312a8..9b0cadd 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -46,7 +46,6 @@ struct orion_spi {
- 	void __iomem		*base;
- 	unsigned int		max_speed;
- 	unsigned int		min_speed;
--	struct orion_spi_info	*spi_info;
- 	struct clk              *clk;
- };
- 
-@@ -451,14 +450,11 @@ static int __init orion_spi_probe(struct platform_device *pdev)
- 	struct spi_master *master;
- 	struct orion_spi *spi;
- 	struct resource *r;
--	struct orion_spi_info *spi_info;
- 	unsigned long tclk_hz;
- 	int status = 0;
- 	const u32 *iprop;
- 	int size;
- 
--	spi_info = pdev->dev.platform_data;
--
- 	master = spi_alloc_master(&pdev->dev, sizeof *spi);
- 	if (master == NULL) {
- 		dev_dbg(&pdev->dev, "master allocation failed\n");
-@@ -485,7 +481,6 @@ static int __init orion_spi_probe(struct platform_device *pdev)
- 
- 	spi = spi_master_get_devdata(master);
- 	spi->master = master;
--	spi->spi_info = spi_info;
- 
- 	spi->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(spi->clk)) {
 -- 
-1.7.10.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120723/32922d8b/attachment.sig>
