@@ -1,96 +1,160 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 01:10:26 -0000
-Subject: [RFC 10/23] ARM: mm: use physical addresses in highmem sanity checks
+Date: Tue, 24 Jul 2012 01:10:37 -0000
+Subject: [RFC 15/23] ARM: LPAE: allow proc override of TTB setup
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-11-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-16-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the highmem sanity checking code to use physical addresses
-instead.  This change eliminates the wrap-around problems associated with the
-original virtual address based checks, and this simplifies the code a bit.
+This patch allows ARM processor setup functions (*_setup in proc-*.S) to
+indicate that the page table has already been programmed.  This is
+done by setting r4 (page table pointer) to -1 before returning from the
+processor setup handler.
 
-The one constraint imposed here is that low physical memory must be mapped in
-a monotonically increasing fashion if there are multiple banks of memory,
-i.e., x < y must => pa(x) < pa(y).
+This capability is particularly needed on LPAE systems, where the translation
+table base needs to be programmed differently with 64-bit control
+register operations.
+
+Further, a few of the processors (arm1026, mohawk, xsc3) were programming the
+TTB twice.  This patch prevents the main head.S code from programming TTB the
+second time on these machines.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/mm/mmu.c |   22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ arch/arm/kernel/head.S       |   11 ++++++-----
+ arch/arm/mm/proc-arm1026.S   |    1 +
+ arch/arm/mm/proc-mohawk.S    |    1 +
+ arch/arm/mm/proc-v6.S        |    2 ++
+ arch/arm/mm/proc-v7-2level.S |    3 ++-
+ arch/arm/mm/proc-v7-3level.S |    1 +
+ arch/arm/mm/proc-v7.S        |    1 +
+ arch/arm/mm/proc-xsc3.S      |    1 +
+ 8 files changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 226985c..adaf8c3 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -901,6 +901,7 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
- void __init sanity_check_meminfo(void)
- {
- 	int i, j, highmem = 0;
-+	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 835898e..692e57f 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -411,17 +411,18 @@ __enable_mmu:
+ #ifdef CONFIG_CPU_ICACHE_DISABLE
+ 	bic	r0, r0, #CR_I
+ #endif
+-#ifdef CONFIG_ARM_LPAE
+-	mov	r5, #0
+-	mcrr	p15, 0, r4, r5, c2		@ load TTBR0
+-#else
++#ifndef CONFIG_ARM_LPAE
+ 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+ 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+-	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
+ #endif
++
++	@ has the processor setup already programmed the page table pointer?
++	adds	r5, r4, #1
++	beq	__turn_mmu_on			@ yes!
++	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
+ 	b	__turn_mmu_on
+ ENDPROC(__enable_mmu)
  
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
-@@ -910,8 +911,7 @@ void __init sanity_check_meminfo(void)
- 			highmem = 1;
+diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
+index fbc1d5f..c28070e 100644
+--- a/arch/arm/mm/proc-arm1026.S
++++ b/arch/arm/mm/proc-arm1026.S
+@@ -404,6 +404,7 @@ __arm1026_setup:
+ #ifdef CONFIG_MMU
+ 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
+ 	mcr	p15, 0, r4, c2, c0		@ load page table pointer
++	mvn	r4, #0				@ do not set page table pointer
+ #endif
+ #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+ 	mov	r0, #4				@ explicitly disable writeback
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index fbb2124..a26303c 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -390,6 +390,7 @@ __mohawk_setup:
+ 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs
+ 	orr	r4, r4, #0x18			@ cache the page table in L2
+ 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
++	mvn	r4, #0				@ do not set page table pointer
  
- #ifdef CONFIG_HIGHMEM
--		if (__va(bank->start) >= vmalloc_min ||
--		    __va(bank->start) < (void *)PAGE_OFFSET)
-+		if (bank->start >= vmalloc_limit)
- 			highmem = 1;
+ 	mov	r0, #0				@ don't allow CP access
+ 	mcr	p15, 0, r0, c15, c1, 0		@ write CP access register
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 566c658..872156e 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -210,7 +210,9 @@ __v6_setup:
+ 	ALT_UP(orr	r4, r4, #TTB_FLAGS_UP)
+ 	ALT_SMP(orr	r8, r8, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	r8, r8, #TTB_FLAGS_UP)
++	mcr	p15, 0, r4, c2, c0, 0		@ load TTB0
+ 	mcr	p15, 0, r8, c2, c0, 1		@ load TTB1
++	mvn	r4, #0				@ do not set page table pointer
+ #endif /* CONFIG_MMU */
+ 	adr	r5, v6_crval
+ 	ldmia	r5, {r5, r6}
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 3397803..cc78c0c 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -139,7 +139,7 @@ ENDPROC(cpu_v7_set_pte_ext)
  
- 		bank->highmem = highmem;
-@@ -920,8 +920,8 @@ void __init sanity_check_meminfo(void)
- 		 * Split those memory banks which are partially overlapping
- 		 * the vmalloc area greatly simplifying things later.
- 		 */
--		if (!highmem && __va(bank->start) < vmalloc_min &&
--		    bank->size > vmalloc_min - __va(bank->start)) {
-+		if (!highmem && bank->start < vmalloc_limit &&
-+		    bank->size > vmalloc_limit - bank->start) {
- 			if (meminfo.nr_banks >= NR_BANKS) {
- 				printk(KERN_CRIT "NR_BANKS too low, "
- 						 "ignoring high memory\n");
-@@ -930,12 +930,12 @@ void __init sanity_check_meminfo(void)
- 					(meminfo.nr_banks - i) * sizeof(*bank));
- 				meminfo.nr_banks++;
- 				i++;
--				bank[1].size -= vmalloc_min - __va(bank->start);
--				bank[1].start = __pa(vmalloc_min - 1) + 1;
-+				bank[1].size -= vmalloc_limit - bank->start;
-+				bank[1].start = vmalloc_limit;
- 				bank[1].highmem = highmem = 1;
- 				j++;
- 			}
--			bank->size = vmalloc_min - __va(bank->start);
-+			bank->size = vmalloc_limit - bank->start;
- 		}
- #else
- 		bank->highmem = highmem;
-@@ -955,8 +955,7 @@ void __init sanity_check_meminfo(void)
- 		 * Check whether this memory bank would entirely overlap
- 		 * the vmalloc area.
- 		 */
--		if (__va(bank->start) >= vmalloc_min ||
--		    __va(bank->start) < (void *)PAGE_OFFSET) {
-+		if (bank->start >= vmalloc_limit) {
- 			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
- 			       "(vmalloc region overlap).\n",
- 			       (unsigned long long)bank->start,
-@@ -968,9 +967,8 @@ void __init sanity_check_meminfo(void)
- 		 * Check whether this memory bank would partially overlap
- 		 * the vmalloc area.
- 		 */
--		if (__va(bank->start + bank->size) > vmalloc_min ||
--		    __va(bank->start + bank->size) < __va(bank->start)) {
--			unsigned long newsize = vmalloc_min - __va(bank->start);
-+		if (bank->start + bank->size > vmalloc_limit)
-+			unsigned long newsize = vmalloc_limit - bank->start;
- 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
- 			       "to -%.8llx (vmalloc region overlap).\n",
- 			       (unsigned long long)bank->start,
+ 	/*
+ 	 * Macro for setting up the TTBRx and TTBCR registers.
+-	 * - \ttb0 and \ttb1 updated with the corresponding flags.
++	 * - \ttbr0 and \ttbr1 updated with the corresponding flags.
+ 	 */
+ 	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
+ 	mcr	p15, 0, \zero, c2, c0, 2	@ TTB control register
+@@ -147,6 +147,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	ALT_UP(orr	\ttbr0, \ttbr0, #TTB_FLAGS_UP)
+ 	ALT_SMP(orr	\ttbr1, \ttbr1, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	\ttbr1, \ttbr1, #TTB_FLAGS_UP)
++	mcr	p15, 0, \ttbr0, c2, c0, 0	@ load TTB0
+ 	mcr	p15, 0, \ttbr1, c2, c0, 1	@ load TTB1
+ 	.endm
+ 
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 3b1a745..5e3bed1 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -124,6 +124,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
+ 	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
+ 	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
++	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
+ 	.endm
+ 
+ 	__CPUINIT
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index c2e2b66..8850194 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -250,6 +250,7 @@ __v7_setup:
+ #ifdef CONFIG_MMU
+ 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
+ 	v7_ttb_setup r10, r4, r8, r5		@ TTBCR, TTBRx setup
++	mvn	r4, #0				@ do not set page table pointer
+ 	ldr	r5, =PRRR			@ PRRR
+ 	ldr	r6, =NMRR			@ NMRR
+ 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
+diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+index b0d5786..db3836b 100644
+--- a/arch/arm/mm/proc-xsc3.S
++++ b/arch/arm/mm/proc-xsc3.S
+@@ -455,6 +455,7 @@ __xsc3_setup:
+ 	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
+ 	orr	r4, r4, #0x18			@ cache the page table in L2
+ 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
++	mvn	r4, #0				@ do not set page table pointer
+ 
+ 	mov	r0, #1 << 6			@ cp6 access for early sched_clock
+ 	mcr	p15, 0, r0, c15, c1, 0		@ write CP access register
 -- 
 1.7.9.5
