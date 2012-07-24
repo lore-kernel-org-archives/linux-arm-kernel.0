@@ -1,63 +1,55 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 10:59:17 -0400
-Subject: [RFC 23/23] ARM: keystone: add switch over to high physical
- address range
-In-Reply-To: <201207241439.25314.arnd@arndb.de>
-References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <1343092165-9470-24-git-send-email-cyril@ti.com>
- <201207241439.25314.arnd@arndb.de>
-Message-ID: <500EB845.3020600@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jul 2012 15:01:47 +0000
+Subject: [PATCH v2 00/25] make *struct of_device_id.data const
+In-Reply-To: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <201207241501.48302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/24/2012 10:39 AM, Arnd Bergmann wrote:
-> On Tuesday 24 July 2012, Cyril Chemparathy wrote:
->> Keystone platforms have their physical memory mapped at an address outside the
->> 32-bit physical range.  A Keystone machine with 16G of RAM would find its
->> memory at 0x0800000000 - 0x0bffffffff.
->>
->> For boot purposes, the interconnect supports a limited alias of some of this
->> memory within the 32-bit addressable space (0x80000000 - 0xffffffff).  This
->> aliasing is implemented in hardware, and is not intended to be used much
->> beyond boot.  For instance, DMA coherence does not work when running out of
->> this aliased address space.
->>
->> Therefore, we've taken the approach of booting out of the low physical address
->> range, and subsequently we switch over to the high range once we're safely
->> inside machine specific territory.  This patch implements this switch over
->> mechanism, which involves rewiring the TTBRs and page tables to point to the
->> new physical address space.
->>
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->
-> I think this needs some more explanations. Why is not not possible
-> to use this the larger area from the start when we first enable
-> paging?
+On Monday 23 July 2012, Uwe Kleine-K?nig wrote:
+> this is the 2nd version of this series whose goal is to make struct
+> of_device_id.data const. Conceptually a driver must not modify the data
+> contained there so making it const is the right thing.
+> 
+> v1 of this series was sent with Message-id:
+> 1342182734-321-1-git-send-email-y. Changes since then are:
+>  - powerpc fixes
+>  - several new consts that were found by Arnd that are possible after
+>    patch 19.
+>    
+> Arnd suggested to take this series via arm-soc late for 3.6 in one go
+> because patch 19 depends on the former patches but is a precondition to
+> the latter and it fixes a few warnings. So getting it in via the
+> respective maintainer trees would need a much bigger coordination
+> effort. That means I prefer getting Acks over you taking the patch.
+> 
+> Vinod Koul already took
+>         dmaengine: at_hdmac: add a few const qualifiers
+> that is in next-20120723 as 7fd63ccdad72 now. Vinod, I don't follow your
+> pull requests, but assuming you didn't let it already pull for 3.6 I
+> suggest you drop it from your queue and I just take your Ack.
+> 
+> This series was build tested for arm (all defconfigs) and powerpc (all
+> defconfigs and an allyesconfig) and grep didn't find more issues. As
+> before it introduces a warning in drivers/regulator/twl-regulator.c.
+> This driver does modify its .of_match_table when a device is bound which
+> doesn't fits the concept of independant devices. Arnd noticed another
+> new warning in drivers/scsi/qlogicpti.c that isn't that easy to resolve,
+> because the pointer to (now) const data is passed as first argument to
+> scsi_host_alloc. To fix that properly struct Scsi_Host.hostt needs to
+> get a const, too. Alternatively I could introduce a cast removing the
+> const, but I don't like that.
+> 
+> This series is also available at:
+> 
+>         git://git.pengutronix.de/git/ukl/linux.git ofdeviceiddata
+> 
+> and I will modify it there for the Acks I'm getting.
 
-By enable paging, I assume you refer to the head.S init.  For this the 
-boot code needs to get the "real physical address" from somewhere 
-instead of having to deduce it from the program counter.  We could do 
-this by parsing DTB in the decompressor, and passing in a 64-bit physmem 
-pointer into the kernel startup code.
+Pulled the entire series into arm-soc/late/warnings. Thanks everyone
+who provided Acks. I'll wait for a few more days to let this sit
+in linux-next and if nobody complains, Olof or I will forward it
+to Linus.
 
-We'd considered this approach (at least briefly), but then balked at (a) 
-having to change the entry conditions into head.S code, and (b) baking 
-in dependencies on the decompressor.
-
-> Also, the code does not really look platform specific, so I could
-> imagine that if you need it, other similar platforms will need the
-> same thing, and it should be put into common code and enabled
-> all the time when using LPAE.
->
-
-Absolutely agreed.  Vitaly and I have been trying to work it out this 
-way, and we hope to have something more common in the next version of 
-this series.
-
-> 	Arnd
->
-
--- 
-Thanks
-- Cyril
+	Arnd
