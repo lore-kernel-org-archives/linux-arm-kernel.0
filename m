@@ -1,31 +1,50 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 24 Jul 2012 16:54:27 +0400
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <500DC255.40900@wwwdotorg.org>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206271520.49276.arnd@arndb.de> <1342161907.1726.26.camel@vkoul-udesk3>
- <201207171924.33756.arnd@arndb.de> <500DC255.40900@wwwdotorg.org>
-Message-ID: <500E9B03.20706@mvista.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Jul 2012 08:25:37 -0500
+Subject: [GIT PULL] io.h clean-up for PCI
+In-Reply-To: <201207241243.55640.arnd@arndb.de>
+References: <50049285.1060100@gmail.com> <201207191412.00540.arnd@arndb.de>
+ <500E962D.2080104@gmail.com> <201207241243.55640.arnd@arndb.de>
+Message-ID: <500EA251.1090000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 07/24/2012 07:43 AM, Arnd Bergmann wrote:
+> On Tuesday 24 July 2012, Rob Herring wrote:
+>>> --- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+>>> +++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+>>> @@ -95,7 +95,6 @@ extern unsigned long get_iop_tick_rate(void);
+>>>  /* PCI-E ranges */
+>>>  #define IOP13XX_PCIE_LOWER_IO_PA              0xfffd0000UL
+>>>  #define IOP13XX_PCIE_LOWER_IO_BA              0x0UL  /* OIOTVR */
+>>> -#define IOP13XX_PCIE_LOWER_IO_BA              0x10000UL
+>>
+>> This means we have PCIE and PCIX buses both using i/o bus addresses
+>> starting at 0x0. We can't have that, right?
+>>
+>> The requested resource won't match either as the resource start address
+>> is bus_nr * 64K.
+> 
+> Well, this is the number that gets written into the outbound
+> translation window register, which has to be zero AFAICT.
+> 
+> The PCI device you plug into the bus will always see its io
+> ports as being between zero and 65536 -- the part that
+> stays at 0x10000UL is the offset address that we use in Linux
+> to give it a unique address in the virtual address space
+> window we use to cover all the io port ranges.
+> 
+> The io_offset still gets set to 0x10000, so this number always
+> gets added and subtracted when converting between Linux port
+> numbers and bus-specific port numbers.
 
-On 24-07-2012 1:29, Stephen Warren wrote:
+Okay, then this is probably something I need to fix.
 
->> I think we're basically on the same page. Let's see if I have covered
->> all the cases we discussed so far. I've tried to update the binding that
->> Jon sent out initially with everything we've discussed, so please review
->> this to see if I understood you correctly.
-> ...
->> * DMA client
-> ...
->> Examples:
-> ...
->> 3. A device with three channels, one of which has two alternatives:
+How is mem_offset supposed to be set? Generally memory is setup as cpu
+base paddr = pci mem addr, so mem_offset should be 0? But integrator is
+set to the cpu paddr, and it works.
 
-> s/three/four/   s/one of which/both of which/
+Rob
 
-    You can't say "both" of 4 channels, only "all". :-)
-
-WBR, Sergei
+> 
+> 	Arnd
+> 
