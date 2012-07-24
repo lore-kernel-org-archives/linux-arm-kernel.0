@@ -1,56 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Jul 2012 01:30:08 -0700
-Subject: [PATCH v2 2/2] arm/dts: Configure pinmuxs for user leds
- control on Bone
-In-Reply-To: <1342769508-24810-3-git-send-email-anilkumar@ti.com>
+Date: Tue, 24 Jul 2012 01:32:04 -0700
+Subject: [PATCH v2 1/2] arm/dts: Add AM33XX basic pinctrl support
+In-Reply-To: <1342769508-24810-2-git-send-email-anilkumar@ti.com>
 References: <1342769508-24810-1-git-send-email-anilkumar@ti.com>
- <1342769508-24810-3-git-send-email-anilkumar@ti.com>
-Message-ID: <20120724083007.GU6522@atomide.com>
+ <1342769508-24810-2-git-send-email-anilkumar@ti.com>
+Message-ID: <20120724083203.GV6522@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * AnilKumar Ch <anilkumar@ti.com> [120720 00:36]:
-> Adds GPIO pinctrl nodes to am3358_pinmux master node to control
-> user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
+> Add basic pinctrl support for AM33XX family of devices by adding DT
+> data to am33xx dtsi file. These patches are based on pinctrl-single
+> driver and tested on am335x-evm & am335x-bone devices.
 > 
 > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 > ---
->  arch/arm/boot/dts/am335x-bone.dts |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index a4d4415..452ce3f 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -28,3 +28,18 @@
->  };
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 59509c4..9b974dc 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -40,6 +40,15 @@
+>  		};
+>  	};
 >  
->  /include/ "tps65217.dtsi"
-> +
-> +&am3358_pinmux {
-> +
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&userled_pins>;
-> +
-> +	userled_pins: pinmux_userled_pins {
-> +		pinctrl-single,pins = <
-> +			0x54 0x7	/* gpmc_a5.gpio1_21, OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
-> +			0x58 0x17	/* gpmc_a6.gpio1_22, OMAP_PIN_OUTPUT_PULLUP | OMAP_MUX_MODE7 */
-> +			0x5C 0x7	/* gpmc_a7.gpio1_23, OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
-> +			0x60 0x17	/* gpmc_a8.gpio1_24, OMAP_PIN_OUTPUT_PULLUP | OMAP_MUX_MODE7 */
-> +		>;
+> +	am3358_pinmux: pinmux at 44E10800 {
+> +		compatible = "pinctrl-single";
+> +		reg = <0x44E10800 0x0338>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-single,register-width = <32>;
+> +		pinctrl-single,function-mask = <0x7F>;
 > +	};
-> +};
+> +
+>  	/*
+>  	 * XXX: Use a flat representation of the AM33XX interconnect.
+>  	 * The real AM33XX interconnect network is quite complex.Since
 
-Let's standardize on the following minimal commenting as those can be
-search and replaced the same way when we have preprocessing available:
-
-		pinctrl-single,pins = <
-			0x54 0x7	/* gpmc_a5.gpio1_21  OUTPUT | MODE7 */
-			0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-			0x5C 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-			0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-		>;
+Is there only one padconf domain on 33xx instead of separate core
+and wkup domains like omap3 and omap4 have?
 
 Regards,
 
