@@ -1,84 +1,96 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 01:10:23 -0000
-Subject: [RFC 18/23] ARM: add virt_to_idmap for interconnect aliasing
+Date: Tue, 24 Jul 2012 01:10:26 -0000
+Subject: [RFC 10/23] ARM: mm: use physical addresses in highmem sanity checks
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-19-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-11-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch modifies the highmem sanity checking code to use physical addresses
+instead.  This change eliminates the wrap-around problems associated with the
+original virtual address based checks, and this simplifies the code a bit.
 
-On some PAE systems (e.g. TI Keystone), memory is above the 32-bit addressible
-limit, and the interconnect provides an aliased view of parts of physical
-memory in the 32-bit addressible space.  This alias is strictly for boot time
-usage, and is not otherwise usable because of coherency limitations.
+The one constraint imposed here is that low physical memory must be mapped in
+a monotonically increasing fashion if there are multiple banks of memory,
+i.e., x < y must => pa(x) < pa(y).
 
-On such systems, the idmap mechanism needs to take this aliased mapping into
-account.  This patch introduces a virt_to_idmap() macro, which can be used on
-such sub-architectures to represent the interconnect supported boot time
-alias.  Most other systems would leave this macro untouched, i.e., do a simply
-virt_to_phys() and nothing more.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/include/asm/memory.h |    9 +++++++++
- arch/arm/kernel/smp.c         |    4 ++--
- arch/arm/mm/idmap.c           |    4 ++--
- 3 files changed, 13 insertions(+), 4 deletions(-)
+ arch/arm/mm/mmu.c |   22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index c330a23..b6b203c 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -235,6 +235,15 @@ static inline void *phys_to_virt(phys_addr_t x)
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 226985c..adaf8c3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -901,6 +901,7 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
+ void __init sanity_check_meminfo(void)
+ {
+ 	int i, j, highmem = 0;
++	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
  
- /*
-+ * These are for systems that have a hardware interconnect supported alias of
-+ * physical memory for idmap purposes.  Most cases should leave these
-+ * untouched.
-+ */
-+#ifndef virt_to_idmap
-+#define virt_to_idmap(x) virt_to_phys(x)
-+#endif
-+
-+/*
-  * Virtual <-> DMA view memory address translations
-  * Again, these are *only* valid on the kernel direct mapped RAM
-  * memory.  Use of these is *deprecated* (and that doesn't mean
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index e41e1be..cce630c 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -72,10 +72,10 @@ int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
+@@ -910,8 +911,7 @@ void __init sanity_check_meminfo(void)
+ 			highmem = 1;
  
--	pgdir = virt_to_phys(idmap_pgd);
-+	pgdir = virt_to_idmap(idmap_pgd);
- 	secondary_data.pgdir = pgdir >> ARCH_PGD_SHIFT;
+ #ifdef CONFIG_HIGHMEM
+-		if (__va(bank->start) >= vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET)
++		if (bank->start >= vmalloc_limit)
+ 			highmem = 1;
  
--	pgdir = virt_to_phys(swapper_pg_dir);
-+	pgdir = virt_to_idmap(swapper_pg_dir);
- 	secondary_data.swapper_pg_dir = pgdir >> ARCH_PGD_SHIFT;
- 
- 	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index ab88ed4..919cb6e 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -85,8 +85,8 @@ static int __init init_static_idmap(void)
- 		return -ENOMEM;
- 
- 	/* Add an identity mapping for the physical address of the section. */
--	idmap_start = virt_to_phys((void *)__idmap_text_start);
--	idmap_end = virt_to_phys((void *)__idmap_text_end);
-+	idmap_start = virt_to_idmap((void *)__idmap_text_start);
-+	idmap_end = virt_to_idmap((void *)__idmap_text_end);
- 
- 	pr_info("Setting up static identity map for 0x%llx - 0x%llx\n",
- 		(long long)idmap_start, (long long)idmap_end);
+ 		bank->highmem = highmem;
+@@ -920,8 +920,8 @@ void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (!highmem && __va(bank->start) < vmalloc_min &&
+-		    bank->size > vmalloc_min - __va(bank->start)) {
++		if (!highmem && bank->start < vmalloc_limit &&
++		    bank->size > vmalloc_limit - bank->start) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
+ 						 "ignoring high memory\n");
+@@ -930,12 +930,12 @@ void __init sanity_check_meminfo(void)
+ 					(meminfo.nr_banks - i) * sizeof(*bank));
+ 				meminfo.nr_banks++;
+ 				i++;
+-				bank[1].size -= vmalloc_min - __va(bank->start);
+-				bank[1].start = __pa(vmalloc_min - 1) + 1;
++				bank[1].size -= vmalloc_limit - bank->start;
++				bank[1].start = vmalloc_limit;
+ 				bank[1].highmem = highmem = 1;
+ 				j++;
+ 			}
+-			bank->size = vmalloc_min - __va(bank->start);
++			bank->size = vmalloc_limit - bank->start;
+ 		}
+ #else
+ 		bank->highmem = highmem;
+@@ -955,8 +955,7 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would entirely overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (__va(bank->start) >= vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET) {
++		if (bank->start >= vmalloc_limit) {
+ 			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+ 			       "(vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
+@@ -968,9 +967,8 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would partially overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (__va(bank->start + bank->size) > vmalloc_min ||
+-		    __va(bank->start + bank->size) < __va(bank->start)) {
+-			unsigned long newsize = vmalloc_min - __va(bank->start);
++		if (bank->start + bank->size > vmalloc_limit)
++			unsigned long newsize = vmalloc_limit - bank->start;
+ 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+ 			       "to -%.8llx (vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
 -- 
 1.7.9.5
