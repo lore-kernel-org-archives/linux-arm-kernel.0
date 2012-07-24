@@ -1,34 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jul 2012 19:27:50 +0000
-Subject: [PATCH] ARM: tegra: harmony: add regulator supply name and its
- input supply
-In-Reply-To: <1343147783-24948-1-git-send-email-swarren@wwwdotorg.org>
-References: <1343147783-24948-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201207241927.50579.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 24 Jul 2012 21:43:48 +0200
+Subject: [PATCH 09/10 RESEND] spi: Add SSP/SPI device tree documentation
+In-Reply-To: <500EE64B.8080103@mvista.com>
+References: <1343076052-27312-1-git-send-email-marex@denx.de>
+ <1343076052-27312-10-git-send-email-marex@denx.de>
+ <500EE64B.8080103@mvista.com>
+Message-ID: <201207242143.49038.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 July 2012, Stephen Warren wrote:
-> From: Laxman Dewangan <ldewangan@nvidia.com>
-> 
-> Name the regulator as per board schematics and adds its
-> supply name info in regulator data.
-> Add the always on fixed regulator to refer the battery supply.
-> 
-> Use this fixed regulator for input supply of some of PMIC
-> regulator
-> 
-> This patch was originally part of a 2-patch series. Patch 2 got applied
-> to the regulator tree as 7c7fac3 "regulator: tps6586x: add support for
-> input supply" without this patch. This broke regulator support on
-> Harmony.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> [swarren: added dependency info to commit description]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Dear Sergei Shtylyov,
 
-Applied to fixes branch.
+> Hello.
+> 
+> On 07/24/2012 12:40 AM, Marek Vasut wrote:
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Attila Kinali <attila@kinali.ch>
+> > Cc: Chris Ball <cjb@laptop.org>
+> > CC: Dong Aisheng <b29396@freescale.com>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > CC: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > 
+> >  Documentation/devicetree/bindings/spi/mxs-spi.txt |   18
+> >  ++++++++++++++++++ 1 file changed, 18 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/spi/mxs-spi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spi/mxs-spi.txt
+> > b/Documentation/devicetree/bindings/spi/mxs-spi.txt new file mode 100644
+> > index 0000000..f1263a9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/spi/mxs-spi.txt
+> > @@ -0,0 +1,18 @@
+> > +* Freescale MX233/MX28 SSP/SPI
+> > +
+> > +Required properties:
+> > +- compatible: Should be "fsl,<soc>-spi", where soc is "imx23" or "imx28"
+> > +- reg: Offset and length of the register set for the device
+> > +- interrupts: Should contain SSP interrupts (error irq first, dma irq
+> > second) +- fsl,ssp-dma-channel: APBX DMA channel for the SSP
+> > +
+> > +Example:
+> > +
+> > +ssp0: ssp at 80010000 {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <0>;
+> > +	compatible = "fsl,imx28-spi";
+> > +	reg = <0x80010000 2000>;
+> 
+>    Not 0x2000?
 
-thanks,
+This is actually not the first place I was curious about in the imx28 DTS ... 
+yes, the size is 0x2000, but "2000" as is is used in multiple places across 
+imx28. Shawn?
 
-	Arnd
+> WBR, Sergei
+
+Best regards,
+Marek Vasut
