@@ -1,77 +1,59 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 24 Jul 2012 14:07:43 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1342777047.1726.435.camel@vkoul-udesk3>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201207171924.33756.arnd@arndb.de> <1342756850.1726.74.camel@vkoul-udesk3>
- <201207200839.24259.arnd@arndb.de> <1342777047.1726.435.camel@vkoul-udesk3>
-Message-ID: <500EF27F.6050905@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Jul 2012 12:03:18 -0700
+Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
+In-Reply-To: <CAK9yfHwGU8EWsXoY9_gDn5=zyJhqtaZbKXzwyGais8u0iaL8xA@mail.gmail.com>
+References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
+ <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
+ <20120713144138.GB25264@roeck-us.net>
+ <CADGdYn5mrHVBEhYF-Zv1UJK1YtVNk=kBA98xOdWevRU+_tu6cg@mail.gmail.com>
+ <CAK9yfHwGU8EWsXoY9_gDn5=zyJhqtaZbKXzwyGais8u0iaL8xA@mail.gmail.com>
+Message-ID: <20120724190318.GA10922@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Tue, Jul 24, 2012 at 12:20:33PM +0530, Sachin Kamat wrote:
+> Hi Amit,
+> 
+> On 14 July 2012 12:55, amit kachhap <amit.kachhap@gmail.com> wrote:
+> > On Fri, Jul 13, 2012 at 8:11 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> >> On Fri, Jul 13, 2012 at 08:28:18PM +0900, Kukjin Kim wrote:
+> >>> Amit Daniel Kachhap wrote:
+> >>> >
+> >>> > These TMU enablement patches are needed for exynos4 and exynos5 TMU
+> >>> > driver patches sent earlier. The link for those are
+> >>> > http://www.spinics.net/lists/lm-sensors/msg35858.html.
+> >>> >
+> >>> How was going on above patches? I can't see them you said in linux-next now,
+> >>> it means if I apply this series in my tree, problem will be happened :(
+> >>>
+> >>> Note1: I've seen Rafael's updating exynos4_tmu patch which is using struct
+> >>> dev_pm_ops for pm and applied by Guenter.
+> >>>
+> >> If that is in the way, I can drop it, to be applied after the move. Let me know.
+> >> There is now another patch pending, to convert the driver to use devm_ functions.
+> >> Please let me know what you want me to do with it.
+> >>
+> > Hi Guenter,
+> >
+> > I rebased my V5 patch series with  hwmon-next branch so Rafael's pm
+> > changes are already included. Regarding the devm_ patch by sachin
+> > please hold it.
+> 
+> Guenter has already sent the pull request to Linus for v3.6 [1].
+> That does not include your patches. I do not understand why you want
+> to hold back my patch when you can rebase your series on top of it.
+> 
+> [1] https://lkml.org/lkml/2012/7/23/414
+> 
+Linus doesn't like rebases, especially not from one tree to another.
+As it is, it may even be that he rejects my pull request because I rebased
+to 3.5 before sending the pull request to him (I'll definitely not do that
+again).
 
-On 07/20/2012 04:37 AM, Vinod Koul wrote:
-> On Fri, 2012-07-20 at 08:39 +0000, Arnd Bergmann wrote:
->> On Friday 20 July 2012, Vinod Koul wrote:
->>>> Required property:
->>>>     dmas: list of one or more dma specifiers, each consisting of
->>>>      - phandle pointing to dma controller node
->>>>      - flags word, a bit map that can hold these flags
->>>>        * 0x00000001 channel can be used for transfer from device
->>>>        * 0x00000002 channel can be user for transfer to device
->>>
->>> Is this for identifying which channel is for TX and RX? If not I am not
->>> sure I understood it well
->>
->> Yes, but we can potentially add more flags here.
->>
->> The argument we had when coming up with this was roughly:
->>
->> * we need to identify which specifiers are referring to the same
->>   conceptual channel and can be used as alternatives
->> * this could be done just using the dma-names property, but making
->>   dma-names mandatory adds complexity for everyone.
->> * Most devices have just one or two channels, and if they have two,
->>   there is usually one input and one output.
->>
->> => if the common dmaengine code can find out whether a channel is
->>   input or output without looking at the dmac driver specific configuration,
->>   we don't need to add dma-names in most cases, but just let the client
->>   driver ask for "give me a channel with these flags".
-> No we don't export the direction of the channel and usually channel can
-> be configured either way.
+In addition, it may well be that some of your changes no longer apply
+after the driver moved to its new location. So it is overall safer to move
+the driver first, and convert it to devm_ functions afterwards.
 
-So yes I can see that a channel itself could be configured to support a
-given direction, but when we ask for a channel via dma_request_channel()
-we are going to get a channel that matches the criteria we pass using
-the filter parameter. So here the thinking was that "flags" is a filter
-parameter that the user could specify and one example being direction
-but it could be something else too.
+If anything, I should not have applied Rafael's patch to the driver either.
 
-> But from a client POV it makes sense as with the given direction you
-> would need a specific request line for a channel. So this is right.
-> But direction is something I don't expect to be used for "give me a
-> channel" 
-
-Ok. The thought was that the user would have the following means of
-requesting a channel ...
-
-1. By name
-2. By a filter parameter (flags)
-3. By name and a filter parameter
-
-So we would have the following APIs ...
-
-struct dma_chan
-*of_dma_request_channel(struct device_node *node, unsigned int flags);
-struct dma_chan
-*of_dma_request_named channel(struct device_node *node, char *name,
-unsigned int flags);
-
-In both of these the filter parameter flags is optional.
-
-Let me know your thoughts on this.
-
-Cheers
-Jon
+Guenter
