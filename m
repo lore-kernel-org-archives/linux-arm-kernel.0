@@ -1,33 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jul 2012 12:00:10 +0000
-Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
-In-Reply-To: <20120724081246.GS6522@atomide.com>
-References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
- <201207240751.39111.arnd@arndb.de> <20120724081246.GS6522@atomide.com>
-Message-ID: <201207241200.11190.arnd@arndb.de>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 24 Jul 2012 12:04:30 +0000
+Subject: [PATCH 2/6] ARM: davinci: remove rtc kicker release
+In-Reply-To: <500E82D4.9090702@mvista.com>
+References: <cover.1343046707.git.afzal@ti.com>
+ <f9e348c8cb7402b27b1a5633b06620266e369641.1343046707.git.afzal@ti.com>
+ <500E82D4.9090702@mvista.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9AD19E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 July 2012, Tony Lindgren wrote:
-> > I spent too much time fiddling with my scripts again in an attempt to
-> > get closer to the regular git-request-pull version. The older version
-> > got this right, but unfortunately I removed the part where I manually
-> > print the right pull address because that had caused other problems
-> > before.
+Hi Sergei,
+
+On Tue, Jul 24, 2012 at 16:41:16, Sergei Shtylyov wrote:
+
+> >   static struct platform_device da8xx_rtc_device = {
+> > -	.name           = "omap_rtc",
+> > +	.name           = "am1808-rtc",
 > 
-> FYI, this issue happens also with git request-pull if the tag has not
-> yet gotten mirrored but the branch is already mirrored.
+>     Why not "da8xx-rtc". Kick registers exist startting with 
+> DA830/OMAP-L137/AM1707, not only on AM1808.
 
-In this case it they were both there, but it picked up the branch
-anyway. I actually made sure that the tag description was included
-by git-request-pull, and the tag has a different name from the
-branch (no "next/" prefix), but the tool is not does not attempt
-to pick up the tag rather than the branch when both are available.
+I would prefer to keep da830-rtc, even though it is not strictly
+a requirement; "da830-rtc" could be used for DT case too (as in
+DT, wild card compatibles are not recommended), hence allowing
+us to have a uniform name for DT & non-DT case.
 
-Apparently, the problem is that it treats the branch "next/foo"
-as as exact match for a pull request on the "foo" tag even when
-that tag is present as "foo" on the server. If I either name the
-branch or the tag differently, or pass "tags/foo" as the
-argument to git-request-pull, it reports back the tag instead.
-
-	Arnd
+Regards
+Afzal
