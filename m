@@ -1,72 +1,62 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 24 Jul 2012 08:55:55 +0900
-Subject: [PATCH V2 6/7] ARM: EXYNOS5: Add the bus clock for FIMD
-In-Reply-To: <500DE22F.5010006@samsung.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1342591053-7092-7-git-send-email-l.krishna@samsung.com>
- <500D0C8B.3080007@samsung.com> <500D1F59.9030807@samsung.com>
- <000301cd6928$e5021660$af064320$%han@samsung.com>
- <500DE22F.5010006@samsung.com>
-Message-ID: <000601cd692e$b2ba7a70$182f6f50$%han@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Jul 2012 02:14:22 +0200
+Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <CAMbhsRR2-VjUeL2XPKubeaG=iLV5NE-i_sVYbuMAryXLxsbo1g@mail.gmail.com>
+References: <1342567672-29071-1-git-send-email-ccross@android.com>
+ <CACRpkdaHdCvx1HJNDsyJSZAN--sF+4-V1TbzXZL1v+7Asoe_oA@mail.gmail.com>
+ <CAMbhsRR2-VjUeL2XPKubeaG=iLV5NE-i_sVYbuMAryXLxsbo1g@mail.gmail.com>
+Message-ID: <CACRpkdYayLaKzUSq5V9N5sRkV74a+nZ1CbLJzRW7RP=pOU9bfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 24, 2012 8:46 AM, Joonyoung Shim Wrote:
-> 
-> On 07/24/2012 08:14 AM, Jingoo Han wrote:
-> > On Monday, July 23, 2012 6:55 PM, Joonyoung Shim wrote:
-> >> Hi, Jingoo.
-> >>
-> >> On 07/23/2012 05:34 PM, Joonyoung Shim wrote:
-> >>> On 07/18/2012 02:57 PM, Leela Krishna Amudala wrote:
-> >>>> This patch adds the bus clock for FIMD and changes
-> >>>> the device name for lcd clock
-> >>> Please refer below patch for exynos4.
-> >>>
-> >>> http://lists.linaro.org/pipermail/linaro-dev/2011-December/008872.html
-> >>>
-> >>>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> >>>> ---
-> >>>>    arch/arm/mach-exynos/clock-exynos5.c |    7 ++++++-
-> >>>>    1 files changed, 6 insertions(+), 1 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/mach-exynos/clock-exynos5.c
-> >>>> b/arch/arm/mach-exynos/clock-exynos5.c
-> >>>> index 774533c..f001876 100644
-> >>>> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> >>>> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> >>>> @@ -634,6 +634,11 @@ static struct clk exynos5_init_clocks_off[] = {
-> >>>>            .enable        = exynos5_clk_ip_disp1_ctrl,
-> >>>>            .ctrlbit    = (1 << 3),
-> >>>>        }, {
-> >>>> +        .name           = "fimd",
-> >>>> +        .devname        = "exynos5-fb",
-> >>>> +        .enable         = exynos5_clk_ip_disp1_ctrl,
-> >>>> +        .ctrlbit        = (1 << 0),
-> >>>> +    }, {
-> >> With this patch, it causes below error at the DP driver because fimd
-> >> clock is disabled.
-> >>
-> >> [    0.210000] exynos-dp exynos-dp: Timeout of video streamclk ok
-> >> [    0.210000] exynos-dp exynos-dp: unable to config video
-> >> [    0.210000] exynos-dp: probe of exynos-dp failed with error -110
-> >>
-> >> I wonder fimd clock has any dependency with DP
-> > FIMD pixel clock is necessary to enable DP.
-> 
-> So then, i think DP driver also should control FIMD pixel clock.
-> Do you have any patch or plan for it?
+On Mon, Jul 23, 2012 at 9:27 PM, Colin Cross <ccross@android.com> wrote:
+> On Mon, Jul 23, 2012 at 11:55 AM, Linus Walleij
 
-Um, I don't think so.
-Because, DP cannot work by itself.
-In order to use DP, FIMD should be enabled.
+> Does the clock you use for sched_clock continue to run in all suspend
+> modes? All the SoC's I've used only have a 32kHz clock in the deepest
+> suspend mode,
 
-If FIMD is enabled, FIMD pixel clock is enabled;
-therefore, DP driver does not need to control FIMD pixel clock.
+Yes, and yes it is 32kHz.
 
-In my opinion, adding config dependency would be better, such as FB_S3C or DRM_EXYNOS_FIMD.
+> which is not ideal for sched_clock.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Not that I know why scheduling with 32kHz is so bad compared to the
+default system scheduling granularity which is HZ if you don't have
+sched_clock() implemented.
+
+Since this seems to be such an important point, what makes you
+want MHz:es for scheduling granularity? To me the biggest impact
+is actually the granularity of the timestamps in the printk:s.
+
+(It's not that I doubt your needs, more curiosity.)
+
+>  For example, on
+> Tegra2 the faster 1MHz clock used for sched_clock resets in the
+> deepest suspend state (LP0) but not the shallowest suspend state
+> (LP2), and which suspend state the chip hits depends on which hardware
+> is active.  Opting out of this patch would cause Tegra's clock to
+> sometimes run in suspend, and sometimes not, which seems worse for
+> debugging than consistently not running in suspend.  I'd be surprised
+> if a similar situation didn't apply to your platform.
+
+Well being able to switch between different sched_clock() providers
+may be the ideal...
+
+>> - If it absolutely needs to be in the core code, also have a bool
+>>   field indicating whether the clock is going to die during suspend
+>>   and add new registration functions for setting that sched_clock
+>>   type, e.g. setup_sched_clock_nonsuspendable()
+>
+> Sounds reasonable if some platforms need the extra complexity.
+
+OK agreed.
+
+A connecting theme is that of being avle to flag clock sources as
+sched_clock providers. If all clocksources were tagged with
+rating, and only clocksources were used for sched_clock(), the
+kernel could select the highest-rated clock under all circumstances.
+
+But that's quite intrusive, more of an idea. :-P
+
+Yours,
+Linus Walleij
