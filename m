@@ -1,140 +1,37 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 24 Jul 2012 15:49:51 -0700
-Subject: [GIT PULL] clk: changes for v3.6
-Message-ID: <20120724224951.GB3220@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 24 Jul 2012 16:50:00 -0600
+Subject: [PATCH] ARM: tegra: turn on UART A clock at boot
+Message-ID: <1343170200-28228-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Stephen Warren <swarren@nvidia.com>
 
-Here is the new stuff for the common clk framework.  It is made up of
-roughly equal parts core framework enhancements, platform ports and new
-exciting Device Tree bindings.
+Some boards use UART D for the main serial console, and some use UART A.
+UART D's clock is listed in board-dt-tegra20.c's clock table, whereas
+UART A's clock is not. This causes the clock code to think UART A's
+clock is unsed. The common clock framework turns off unused clocks at
+boot time. This makes the kernel appear to hang. Add UART A's clock into
+the clock table to prevent this. Eventually, this requirement should be
+handled by the UART driver, and/or properties in a board-specific device
+tree file.
 
-Thanks much,
-Mike
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-
-The following changes since commit bd0a521e88aa7a06ae7aabaed7ae196ed4ad867a:
-
-  Linux 3.5-rc6 (2012-07-07 17:23:56 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/mturquette/linux.git tags/clk-for-linus
-
-for you to fetch changes up to 137f8a7213d80c1388ca48280c1ef0856b6fec30:
-
-  clk: fix compile for OF && !COMMON_CLK (2012-07-19 14:07:56 -0700)
-
-----------------------------------------------------------------
-The common clk framework changes for 3.6 include a small number of core
-framework improvments, platform ports and new DT bindings.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      clk: mxs: Fix the GPMI clock name
-
-Grant Likely (2):
-      clk: add DT clock binding support
-      clk: add DT fixed-clock binding support
-
-Huang Shijie (1):
-      clk: mxs: rename the gpmi clock for imx28
-
-Lauri Hintsala (1):
-      clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
-
-Linus Walleij (4):
-      ARM: u300: convert to common clock
-      ARM: integrator: put symbolic bus names on devices
-      clk: add versatile ICST307 driver
-      ARM: integrator: convert to common clock
-
-Mark Brown (2):
-      clk: Constify struct clk_init_data
-      clk: wm831x: Add initial WM831x clock driver
-
-Mike Turquette (2):
-      Merge branch 'clk/mxs-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into clk-3.6
-      Merge branch 'clk/mxs-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into clk-next
-
-Rajendra Nayak (4):
-      clk: Add support for power of two type dividers
-      clk: Add support for rate table based dividers
-      clk: Add CLK_IS_BASIC flag to identify basic clocks
-      clk: cache parent clocks only for muxes
-
-Richard Zhao (1):
-      clk: mxs: clk_register_clkdev mx28 usb clocks
-
-Rob Herring (3):
-      dt: add clock binding doc to primecell bindings
-      clk: add highbank clock support
-      clk: fix compile for OF && !COMMON_CLK
-
-Shawn Guo (2):
-      clk: mxs: add clkdev lookup for pwm
-      clk: fix clk_get on of_clk_get_by_name return check
-
- .../devicetree/bindings/arm/primecell.txt          |    6 +
- .../devicetree/bindings/clock/calxeda.txt          |   17 +
- .../devicetree/bindings/clock/clock-bindings.txt   |  117 ++
- .../devicetree/bindings/clock/fixed-clock.txt      |   21 +
- MAINTAINERS                                        |    1 +
- arch/arm/Kconfig                                   |   10 +-
- arch/arm/boot/dts/highbank.dts                     |   91 +-
- arch/arm/mach-highbank/Makefile                    |    2 +-
- arch/arm/mach-highbank/clock.c                     |   62 -
- arch/arm/mach-highbank/highbank.c                  |    7 +
- arch/arm/mach-integrator/core.c                    |   55 +-
- arch/arm/mach-integrator/include/mach/clkdev.h     |   26 -
- arch/arm/mach-integrator/integrator_ap.c           |    8 +-
- arch/arm/mach-integrator/integrator_cp.c           |   69 +-
- arch/arm/mach-u300/Makefile                        |    2 +-
- arch/arm/mach-u300/clock.c                         | 1504 --------------------
- arch/arm/mach-u300/clock.h                         |   50 -
- arch/arm/mach-u300/core.c                          |   21 +-
- arch/arm/mach-u300/timer.c                         |    2 +-
- arch/arm/plat-versatile/Kconfig                    |    3 +
- arch/arm/plat-versatile/Makefile                   |    2 +-
- drivers/clk/Kconfig                                |    7 +
- drivers/clk/Makefile                               |    8 +-
- drivers/clk/clk-divider.c                          |  189 ++-
- drivers/clk/clk-fixed-factor.c                     |    2 +-
- drivers/clk/clk-fixed-rate.c                       |   25 +-
- drivers/clk/clk-gate.c                             |    2 +-
- drivers/clk/clk-highbank.c                         |  346 +++++
- drivers/clk/clk-mux.c                              |    2 +-
- drivers/clk/clk-u300.c                             |  746 ++++++++++
- drivers/clk/clk-wm831x.c                           |  428 ++++++
- drivers/clk/clk.c                                  |  144 +-
- drivers/clk/clkdev.c                               |   77 +
- drivers/clk/mxs/clk-imx23.c                        |    3 +-
- drivers/clk/mxs/clk-imx28.c                        |   13 +-
- drivers/clk/versatile/Makefile                     |    3 +
- drivers/clk/versatile/clk-icst.c                   |  100 ++
- drivers/clk/versatile/clk-icst.h                   |   10 +
- drivers/clk/versatile/clk-integrator.c             |  111 ++
- include/linux/clk-private.h                        |   22 +-
- include/linux/clk-provider.h                       |   31 +-
- include/linux/clk.h                                |   20 +
- include/linux/platform_data/clk-integrator.h       |    1 +
- include/linux/platform_data/clk-u300.h             |    1 +
- 44 files changed, 2542 insertions(+), 1825 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/calxeda.txt
- create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
- create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
- delete mode 100644 arch/arm/mach-highbank/clock.c
- delete mode 100644 arch/arm/mach-integrator/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-u300/clock.c
- delete mode 100644 arch/arm/mach-u300/clock.h
- create mode 100644 drivers/clk/clk-highbank.c
- create mode 100644 drivers/clk/clk-u300.c
- create mode 100644 drivers/clk/clk-wm831x.c
- create mode 100644 drivers/clk/versatile/Makefile
- create mode 100644 drivers/clk/versatile/clk-icst.c
- create mode 100644 drivers/clk/versatile/clk-icst.h
- create mode 100644 drivers/clk/versatile/clk-integrator.c
- create mode 100644 include/linux/platform_data/clk-integrator.h
- create mode 100644 include/linux/platform_data/clk-u300.h
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 70a19a9..5daffd5 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -71,6 +71,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 
+ static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
++	{ "uarta",	"pll_p",	216000000,	true },
+ 	{ "uartd",	"pll_p",	216000000,	true },
+ 	{ "usbd",	"clk_m",	12000000,	false },
+ 	{ "usb2",	"clk_m",	12000000,	false },
+-- 
+1.7.0.4
