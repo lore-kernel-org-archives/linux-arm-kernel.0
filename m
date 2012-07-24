@@ -1,127 +1,71 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 24 Jul 2012 13:02:39 +0900
-Subject: [PATCH V2 6/7] ARM: EXYNOS5: Add the bus clock for FIMD
-In-Reply-To: <500E112F.3090202@samsung.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1342591053-7092-7-git-send-email-l.krishna@samsung.com>
- <500D0C8B.3080007@samsung.com> <500D1F59.9030807@samsung.com>
- <000301cd6928$e5021660$af064320$%han@samsung.com>
- <500DE22F.5010006@samsung.com>
- <000601cd692e$b2ba7a70$182f6f50$%han@samsung.com>
- <500E00A3.8080203@samsung.com>
- <000101cd6942$2badc960$83095c20$%han@samsung.com>
- <500E112F.3090202@samsung.com>
-Message-ID: <000501cd6951$2aa24f00$7fe6ed00$%han@samsung.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Tue, 24 Jul 2012 08:17:43 +0200
+Subject: [PATCH] arm: at91: do not use irq_find_mapping for linear domain
+Message-ID: <1343110663-14385-1-git-send-email-gilles.chanteperdrix@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 24, 2012 12:06 PM, Joonyoung Shim Wrote:
-> 
-> On 07/24/2012 11:15 AM, Jingoo Han wrote:
-> > On Tuesday, July 24, 2012 10:56 AM, Joonyoung Shim Wrote:
-> >> On 07/24/2012 08:55 AM, Jingoo Han wrote:
-> >>> On Tuesday, July 24, 2012 8:46 AM, Joonyoung Shim Wrote:
-> >>>> On 07/24/2012 08:14 AM, Jingoo Han wrote:
-> >>>>> On Monday, July 23, 2012 6:55 PM, Joonyoung Shim wrote:
-> >>>>>> Hi, Jingoo.
-> >>>>>>
-> >>>>>> On 07/23/2012 05:34 PM, Joonyoung Shim wrote:
-> >>>>>>> On 07/18/2012 02:57 PM, Leela Krishna Amudala wrote:
-> >>>>>>>> This patch adds the bus clock for FIMD and changes
-> >>>>>>>> the device name for lcd clock
-> >>>>>>> Please refer below patch for exynos4.
-> >>>>>>>
-> >>>>>>> http://lists.linaro.org/pipermail/linaro-dev/2011-December/008872.html
-> >>>>>>>
-> >>>>>>>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> >>>>>>>> ---
-> >>>>>>>>      arch/arm/mach-exynos/clock-exynos5.c |    7 ++++++-
-> >>>>>>>>      1 files changed, 6 insertions(+), 1 deletions(-)
-> >>>>>>>>
-> >>>>>>>> diff --git a/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>>>> b/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>>>> index 774533c..f001876 100644
-> >>>>>>>> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>>>> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>>>> @@ -634,6 +634,11 @@ static struct clk exynos5_init_clocks_off[] = {
-> >>>>>>>>              .enable        = exynos5_clk_ip_disp1_ctrl,
-> >>>>>>>>              .ctrlbit    = (1 << 3),
-> >>>>>>>>          }, {
-> >>>>>>>> +        .name           = "fimd",
-> >>>>>>>> +        .devname        = "exynos5-fb",
-> >>>>>>>> +        .enable         = exynos5_clk_ip_disp1_ctrl,
-> >>>>>>>> +        .ctrlbit        = (1 << 0),
-> >>>>>>>> +    }, {
-> >>>>>> With this patch, it causes below error at the DP driver because fimd
-> >>>>>> clock is disabled.
-> >>>>>>
-> >>>>>> [    0.210000] exynos-dp exynos-dp: Timeout of video streamclk ok
-> >>>>>> [    0.210000] exynos-dp exynos-dp: unable to config video
-> >>>>>> [    0.210000] exynos-dp: probe of exynos-dp failed with error -110
-> >>>>>>
-> >>>>>> I wonder fimd clock has any dependency with DP
-> >>>>> FIMD pixel clock is necessary to enable DP.
-> >>>> So then, i think DP driver also should control FIMD pixel clock.
-> >>>> Do you have any patch or plan for it?
-> >>> Um, I don't think so.
-> >>> Because, DP cannot work by itself.
-> >>> In order to use DP, FIMD should be enabled.
-> >>>
-> >>> If FIMD is enabled, FIMD pixel clock is enabled;
-> >>> therefore, DP driver does not need to control FIMD pixel clock.
-> >> Why does DP driver have FIMD driver dependency? Also for this, it needs
-> >> FIMD driver is probed earlier then DP driver.  We cannot decide driver
-> >> probe order if they are same level drivers and itself is weird
-> >> condition.  Although there is hardware dependency, DP and FIMD driver
-> >> don't have any code relations. They are each other drivers. But DP
-> >> needs FIMD pixel clock and because the clock can be control at the
-> >> several drivers and the clock framework exists for that, then i think
-> >> it's better DP driver also control FIMD pixel clock.
-> >>
-> >>> In my opinion, adding config dependency would be better, such as FB_S3C or DRM_EXYNOS_FIMD.
-> >> I think this is not solution. How do you ensure FIMD driver is probed
-> >> earlier than DP driver? Even if it's possible, when FIMD driver only
-> >> controls pixel clock, DP driver will execute any operations regardless
-> >> status of FIMD pixel clock, so if FIMD driver turns off pixel clock,
-> >> then DP will occur any error.
-> > late_initcall can ensure DP driver is probed later.
-> 
-> I'm not sure late_initcall solution is good. It must choose at the last
-> if there isn't other way really.
+When a gpio chip is registered through device tree, it declares an irq
+domain of the "linear" type. irq_find_mapping should not be used when
+translating between hw irq and linux irq numbers for such domains. So,
+replace irq_find_mapping with irq_linear_revmap.
 
+Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
+---
+ arch/arm/mach-at91/gpio.c |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
-late_initcall is already used by many drivers.
-If you have any good idea, please, suggest it.
-
-
-> 
-> >
-> > As you mentioned, DP controller does not work without FIMD controller.
-> > Because FIMD controller should provide video data and video clock to DP controller.
-> > In this case, adding config dependency would be good.
-> >
-> > If FIMD driver turns off pixel clock, DP should be turned off too.
-> 
-> This means DP driver should know FIMD status.
-> 
-> > Currently, FB FIMD driver turns off pixel clock in remove() and suspend().
-> 
-> You should also consider blank operation and runtime suspend / resume.
-
-
-Um, other people can submit this patch, then I will review it.
-Please don't urge me to do what.
-That's it.
-
-
-> 
-> > So, FIMD driver is enabled, DP will not occur any error on pixel clock.
-> >
-> 
-> Anyway i want to be solved early.
-> 
-> Thanks.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 325837a..c98bb3c 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -39,6 +39,7 @@ struct at91_gpio_chip {
+ 	int			pioc_idx;	/* PIO bank index */
+ 	void __iomem		*regbase;	/* PIO bank virtual address */
+ 	struct clk		*clock;		/* associated clock */
++	bool			linear_domain;
+ 	struct irq_domain	*domain;	/* associated irq domain */
+ };
+ 
+@@ -583,6 +584,14 @@ static struct irq_chip gpio_irqchip = {
+ 	.irq_set_wake	= gpio_irq_set_wake,
+ };
+ 
++static unsigned gpio_revmap(struct at91_gpio_chip *at91_gpio, unsigned hwirq)
++{
++	if (at91_gpio->linear_domain)
++		return irq_linear_revmap(at91_gpio->domain, hwirq);
++
++	return irq_find_mapping(at91_gpio->domain, hwirq);
++}
++
+ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+ 	struct irq_data *idata = irq_desc_get_irq_data(desc);
+@@ -610,7 +619,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 
+ 		n = find_first_bit(&isr, BITS_PER_LONG);
+ 		while (n < BITS_PER_LONG) {
+-			generic_handle_irq(irq_find_mapping(at91_gpio->domain, n));
++			generic_handle_irq(gpio_revmap(at91_gpio, n));
+ 			n = find_next_bit(&isr, BITS_PER_LONG, n + 1);
+ 		}
+ 	}
+@@ -759,6 +768,7 @@ int __init at91_gpio_of_irq_setup(struct device_node *node,
+ 	if (!at91_gpio->domain)
+ 		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
+ 			at91_gpio->pioc_idx);
++	at91_gpio->linear_domain = true;
+ 
+ 	/* Setup chained handler */
+ 	if (at91_gpio->pioc_idx)
+@@ -800,6 +810,7 @@ static void __init at91_gpio_irqdomain(struct at91_gpio_chip *at91_gpio)
+ 	at91_gpio->domain = irq_domain_add_legacy(NULL, at91_gpio->chip.ngpio,
+ 						  irq_base, 0,
+ 						  &irq_domain_simple_ops, NULL);
++	at91_gpio->linear_domain = false;
+ 	if (!at91_gpio->domain)
+ 		panic("at91_gpio.%d: couldn't allocate irq domain.\n",
+ 			at91_gpio->pioc_idx);
+-- 
+1.7.2.5
