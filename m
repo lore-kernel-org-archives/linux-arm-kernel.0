@@ -1,68 +1,48 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 24 Jul 2012 11:13:20 +0200
-Subject: [PATCH V2 6/7] ARM: EXYNOS5: Add the bus clock for FIMD
-In-Reply-To: <000501cd6951$2aa24f00$7fe6ed00$%han@samsung.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1342591053-7092-7-git-send-email-l.krishna@samsung.com>
- <500D0C8B.3080007@samsung.com> <500D1F59.9030807@samsung.com>
- <000301cd6928$e5021660$af064320$%han@samsung.com>
- <500DE22F.5010006@samsung.com>
- <000601cd692e$b2ba7a70$182f6f50$%han@samsung.com>
- <500E00A3.8080203@samsung.com>
- <000101cd6942$2badc960$83095c20$%han@samsung.com>
- <500E112F.3090202@samsung.com>
- <000501cd6951$2aa24f00$7fe6ed00$%han@samsung.com>
-Message-ID: <500E6730.1030805@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2012 10:15:05 +0100
+Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay
+ implementation to be selected
+In-Reply-To: <500E657E.8070301@renesas.com>
+References: <20120713085746.GA18079@mudshark.cambridge.arm.com>
+ <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
+ <20120713111337.GH18079@mudshark.cambridge.arm.com>
+ <5004D78E.4050606@renesas.com>
+ <CAMQu2gx9EU4GZ634RKiwD+sg0MoO-FAqc-pPU+HkryX8rXVBjA@mail.gmail.com>
+ <5005176C.6050904@renesas.com>
+ <20120718175233.GB16928@mudshark.cambridge.arm.com>
+ <50082598.5090706@arm.com>
+ <20120720101751.GB26658@mudshark.cambridge.arm.com>
+ <500E657E.8070301@renesas.com>
+Message-ID: <20120724091505.GB16435@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/24/2012 06:02 AM, Jingoo Han wrote:
->>>>>>>> I wonder fimd clock has any dependency with DP
->>>>>>> FIMD pixel clock is necessary to enable DP.
->>>>>> So then, i think DP driver also should control FIMD pixel clock.
->>>>>> Do you have any patch or plan for it?
->>>>> Um, I don't think so.
->>>>> Because, DP cannot work by itself.
->>>>> In order to use DP, FIMD should be enabled.
->>>>>
->>>>> If FIMD is enabled, FIMD pixel clock is enabled;
->>>>> therefore, DP driver does not need to control FIMD pixel clock.
->>>> Why does DP driver have FIMD driver dependency? Also for this, it needs
->>>> FIMD driver is probed earlier then DP driver.  We cannot decide driver
->>>> probe order if they are same level drivers and itself is weird
->>>> condition.  Although there is hardware dependency, DP and FIMD driver
->>>> don't have any code relations. They are each other drivers. But DP
->>>> needs FIMD pixel clock and because the clock can be control at the
->>>> several drivers and the clock framework exists for that, then i think
->>>> it's better DP driver also control FIMD pixel clock.
->>>>
->>>>> In my opinion, adding config dependency would be better, such as FB_S3C or DRM_EXYNOS_FIMD.
->>>> I think this is not solution. How do you ensure FIMD driver is probed
->>>> earlier than DP driver? Even if it's possible, when FIMD driver only
->>>> controls pixel clock, DP driver will execute any operations regardless
->>>> status of FIMD pixel clock, so if FIMD driver turns off pixel clock,
->>>> then DP will occur any error.
->>> late_initcall can ensure DP driver is probed later.
->>
->> I'm not sure late_initcall solution is good. It must choose at the last
->> if there isn't other way really.
+On Tue, Jul 24, 2012 at 10:06:06AM +0100, Shinya Kuribayashi wrote:
+> Hi Will, Jonathan,
 > 
+> On 7/20/2012 7:17 PM, Will Deacon wrote:
+> > On Thu, Jul 19, 2012 at 04:19:52PM +0100, Jonathan Austin wrote:
+> >> We should probably also ignore and additional registration calls, not just
+> >> those made after the delay loop has been calibrated...
+> >>
+> >> Something like the patch below should do the trick.
+> > 
+> > [...]
+> > 
+> > Cheers, pushed into my delay branch.
 > 
-> late_initcall is already used by many drivers.
-> If you have any good idea, please, suggest it.
+> Thanks for the registration machanism.  It looks nice, and works for
+> me on a Cortex-A9 SMP platform with a non-arch_timer counter.
 
-I agree with Mr. Shim here. using initcall doesn't look like a solution
-to this issue. Neither compile time dependency is of much help.
+That's good to hear, thanks.
 
-The S3C framebuffer driver can be used as a loadable module, how
-would initcalls be supposed to work then ?
+> I've picked up a revised version of the patch from will/delay and
+> merged it into our local development branch.  We'll give it a try
+> in different conditions, UP and SMP, with/without DVFS and so on,
+> and let you know if I find anything.
 
-Some notify mechanisms or deferred probing could be used, to make sure one
-of drivers is initialized before the other.
+Great! If everything looks good, and you're interested in using this in
+mainline, I could push the registration for 3.7. I just don't want to see it
+there if nobody's using it.
 
---
-
-Thanks,
-Sylwester
+Will
