@@ -1,91 +1,72 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 24 Jul 2012 14:43:28 +0800
-Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
-In-Reply-To: <1342567672-29071-1-git-send-email-ccross@android.com>
-References: <1342567672-29071-1-git-send-email-ccross@android.com>
-Message-ID: <CAGsJ_4z_tF3LKy-vygr=kwah7q7U03Y2K2XKAkZTB1QC2pSYmw@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 24 Jul 2012 12:20:33 +0530
+Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
+In-Reply-To: <CADGdYn5mrHVBEhYF-Zv1UJK1YtVNk=kBA98xOdWevRU+_tu6cg@mail.gmail.com>
+References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
+ <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
+ <20120713144138.GB25264@roeck-us.net>
+ <CADGdYn5mrHVBEhYF-Zv1UJK1YtVNk=kBA98xOdWevRU+_tu6cg@mail.gmail.com>
+Message-ID: <CAK9yfHwGU8EWsXoY9_gDn5=zyJhqtaZbKXzwyGais8u0iaL8xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/7/18 Colin Cross <ccross@android.com>:
-> Many clocks that are used to provide sched_clock will reset during
-> suspend.  If read_sched_clock returns 0 after suspend, sched_clock will
-> appear to jump forward.  This patch resets cd.epoch_cyc to the current
-> value of read_sched_clock during resume, which causes sched_clock() just
-> after suspend to return the same value as sched_clock() just before
-> suspend.
->
-> In addition, during the window where epoch_ns has been updated before
-> suspend, but epoch_cyc has not been updated after suspend, it is unknown
-> whether the clock has reset or not, and sched_clock() could return a
-> bogus value.  Add a suspended flag, and return the pre-suspend epoch_ns
-> value during this period.
+Hi Amit,
 
-Acked-by: Barry Song <21cnbao@gmail.com>
+On 14 July 2012 12:55, amit kachhap <amit.kachhap@gmail.com> wrote:
+> On Fri, Jul 13, 2012 at 8:11 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> On Fri, Jul 13, 2012 at 08:28:18PM +0900, Kukjin Kim wrote:
+>>> Amit Daniel Kachhap wrote:
+>>> >
+>>> > These TMU enablement patches are needed for exynos4 and exynos5 TMU
+>>> > driver patches sent earlier. The link for those are
+>>> > http://www.spinics.net/lists/lm-sensors/msg35858.html.
+>>> >
+>>> How was going on above patches? I can't see them you said in linux-next now,
+>>> it means if I apply this series in my tree, problem will be happened :(
+>>>
+>>> Note1: I've seen Rafael's updating exynos4_tmu patch which is using struct
+>>> dev_pm_ops for pm and applied by Guenter.
+>>>
+>> If that is in the way, I can drop it, to be applied after the move. Let me know.
+>> There is now another patch pending, to convert the driver to use devm_ functions.
+>> Please let me know what you want me to do with it.
+>>
+> Hi Guenter,
+>
+> I rebased my V5 patch series with  hwmon-next branch so Rafael's pm
+> changes are already included. Regarding the devm_ patch by sachin
+> please hold it.
 
-this patch should also fix the issue that:
-1. launch some rt threads, rt threads sleep before suspend
-2. repeat to suspend/resume
-3. after resuming, waking up rt threads
+Guenter has already sent the pull request to Linus for v3.6 [1].
+That does not include your patches. I do not understand why you want
+to hold back my patch when you can rebase your series on top of it.
 
-repeat 1-3 again and again, sometimes all rt threads will hang after
-resuming due to wrong sched_clock will make sched_rt think rt_time is
-much more than rt_runtime (default 950ms in 1s). then rt threads will
-lost cpu timeslot to run since the 95% threshold is there.
-
->
-> This will have a side effect of causing SoCs that have clocks that
-> continue to count in suspend to appear to stop counting, reporting the
-> same sched_clock() value before and after suspend.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
->  arch/arm/kernel/sched_clock.c |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-> index 27d186a..46c7d32 100644
-> --- a/arch/arm/kernel/sched_clock.c
-> +++ b/arch/arm/kernel/sched_clock.c
-> @@ -21,6 +21,7 @@ struct clock_data {
->         u32 epoch_cyc_copy;
->         u32 mult;
->         u32 shift;
-> +       bool suspended;
->  };
->
->  static void sched_clock_poll(unsigned long wrap_ticks);
-> @@ -49,6 +50,9 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
->         u64 epoch_ns;
->         u32 epoch_cyc;
->
-> +       if (cd.suspended)
-> +               return cd.epoch_ns;
-> +
->         /*
->          * Load the epoch_cyc and epoch_ns atomically.  We do this by
->          * ensuring that we always write epoch_cyc, epoch_ns and
-> @@ -169,11 +173,20 @@ void __init sched_clock_postinit(void)
->  static int sched_clock_suspend(void)
->  {
->         sched_clock_poll(sched_clock_timer.data);
-> +       cd.suspended = true;
->         return 0;
->  }
->
-> +static void sched_clock_resume(void)
-> +{
-> +       cd.epoch_cyc = read_sched_clock();
-> +       cd.epoch_cyc_copy = cd.epoch_cyc;
-> +       cd.suspended = false;
-> +}
-> +
->  static struct syscore_ops sched_clock_ops = {
->         .suspend = sched_clock_suspend,
-> +       .resume = sched_clock_resume,
->  };
->
->  static int __init sched_clock_syscore_init(void)
+[1] https://lkml.org/lkml/2012/7/23/414
 
 
--barry
+
+>
+> Thanks,
+> Amit D
+>>> Note2: would be helpful if you could do adding me in Cc of exynos tmu
+>>> patches...
+>>>
+>> If you want to be copied, it might make sense to add yourself as maintainer for
+>> this file. Otherwise you can not expect people to know.
+>>
+>> Thanks,
+>> Guenter
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+With warm regards,
+Sachin
