@@ -1,45 +1,111 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Mon, 23 Jul 2012 18:03:26 -0700
-Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
-In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
-Message-ID: <CA+55aFyObNFgsaVOsjVOcH+aLjDyOgcqpvckM29T3dvugekVwg@mail.gmail.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Mon, 23 Jul 2012 21:09:02 -0400
+Subject: [RFC 00/23] Introducing the TI Keystone platform
+Message-ID: <1343092165-9470-1-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 1:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> There are about 600 changesets in here, and a bunch of simple
-> conflicts between the 15 branches, but so far no conflicts with
-> stuff that you have merged already. For reference, you can check
-> the "for-linus" branch in the same tree to see how we resolved
-> the conflicts.
+TI's scalable KeyStone II architecture includes support for both TMS320C66x
+floating point DSPs and ARM Cortex-A15 clusters, for a mixture of up to 32
+cores per SoC.  The solution is optimized around a high performance chip
+interconnect and a rich set of on chip peripherals.  Please refer [1] for
+initial technical documentation on these devices.
 
-Ok, so I've merged some things a bit differently, but afaik it's all
-semantically identical *except* for the merge of the file
+This patch series provides a basic Linux port for these devices, including
+support for SMP, and LPAE boot.  A majority of the patches in this series are
+related to LPAE functionality, imposed by the device architecture which has
+system memory mapped at an address above the 4G 32-bit addressable limit.
 
-  arch/arm/mach-omap2/clockdomains3xxx_data.c
+This patch series is based on the v3.5 kernel with the smp_ops patch set
+applied on top.  This series is being posted to elicit early feedback, and so
+that some of these fixes may get incorporated early on into the kernel code.
 
-in my merge of your "general arm-soc cleanups" pull request.
+  [1] - http://www.ti.com/product/tms320tci6636
 
-In your "for-linus" branch, "&mpu_3xxx_clkdm" remains in the
-clockdomains_common[] array. In my merge, it is gone. But I think I
-did the merge correctly, and you did it wrong. HOWEVER, I don't know
-the code, maybe there is some subtle reason why you did it like you
-did.
 
-Your "for-linus" branch also had that
+Cyril Chemparathy (17):
+  ARM: LPAE: use signed arithmetic for mask definitions
+  ARM: LPAE: use phys_addr_t on virt <--> phys conversion
+  ARM: LPAE: use phys_addr_t for membank size
+  ARM: LPAE: use 64-bit pgd physical address in switch_mm()
+  ARM: LPAE: use 64-bit accessors for TTBR registers
+  ARM: mm: use physical addresses in highmem sanity checks
+  ARM: mm: cleanup checks for membank overlap with vmalloc area
+  ARM: mm: clean up membank size limit checks
+  ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
+  ARM: LPAE: factor out T1SZ and TTBR1 computations
+  ARM: LPAE: allow proc override of TTB setup
+  ARM: LPAE: accomodate >32-bit addresses for page table base
+  ARM: add machine desc hook for early memory/paging initialization
+  drivers: cma: fix addressing on PAE machines
+  ARM: keystone: introducing TI Keystone platform
+  ARM: keystone: enable SMP on Keystone machines
+  ARM: keystone: add switch over to high physical address range
 
-   arch/arm/arm-soc-for-next-contents.txt
+Vitaly Andrianov (6):
+  ARM: LPAE: disable phys-to-virt patching on PAE systems
+  ARM: LPAE: use phys_addr_t in alloc_init_pud()
+  ARM: LPAE: use phys_addr_t in free_memmap()
+  ARM: LPAE: use phys_addr_t for initrd location and size
+  ARM: add virt_to_idmap for interconnect aliasing
+  mm: bootmem: use phys_addr_t for physical addresses
 
-file that shouldn't have been there, but whatever.
+ arch/arm/Kconfig                                  |   20 +++
+ arch/arm/Makefile                                 |    1 +
+ arch/arm/boot/dts/keystone-sim.dts                |   77 +++++++++
+ arch/arm/configs/keystone_defconfig               |   23 +++
+ arch/arm/include/asm/cache.h                      |    9 ++
+ arch/arm/include/asm/mach/arch.h                  |    1 +
+ arch/arm/include/asm/memory.h                     |   28 +++-
+ arch/arm/include/asm/page.h                       |    7 +-
+ arch/arm/include/asm/pgtable-3level-hwdef.h       |   10 ++
+ arch/arm/include/asm/pgtable-3level.h             |    6 +-
+ arch/arm/include/asm/proc-fns.h                   |   28 +++-
+ arch/arm/include/asm/setup.h                      |    4 +-
+ arch/arm/kernel/head.S                            |   18 ++-
+ arch/arm/kernel/setup.c                           |    3 +
+ arch/arm/kernel/smp.c                             |   11 +-
+ arch/arm/mach-keystone/Makefile                   |    2 +
+ arch/arm/mach-keystone/Makefile.boot              |    1 +
+ arch/arm/mach-keystone/include/mach/debug-macro.S |   44 +++++
+ arch/arm/mach-keystone/include/mach/entry-macro.S |   20 +++
+ arch/arm/mach-keystone/include/mach/io.h          |   22 +++
+ arch/arm/mach-keystone/include/mach/memory.h      |   51 ++++++
+ arch/arm/mach-keystone/include/mach/system.h      |   30 ++++
+ arch/arm/mach-keystone/include/mach/timex.h       |   21 +++
+ arch/arm/mach-keystone/include/mach/uncompress.h  |   24 +++
+ arch/arm/mach-keystone/include/mach/vmalloc.h     |   21 +++
+ arch/arm/mach-keystone/keystone.c                 |  178 +++++++++++++++++++++
+ arch/arm/mach-keystone/platsmp.c                  |   94 +++++++++++
+ arch/arm/mm/context.c                             |   13 +-
+ arch/arm/mm/idmap.c                               |    4 +-
+ arch/arm/mm/init.c                                |   20 +--
+ arch/arm/mm/mmu.c                                 |   49 ++----
+ arch/arm/mm/proc-arm1026.S                        |    3 +
+ arch/arm/mm/proc-mohawk.S                         |    3 +
+ arch/arm/mm/proc-v6.S                             |    6 +-
+ arch/arm/mm/proc-v7-2level.S                      |    7 +-
+ arch/arm/mm/proc-v7-3level.S                      |   29 ++--
+ arch/arm/mm/proc-v7.S                             |    2 +
+ arch/arm/mm/proc-xsc3.S                           |    3 +
+ drivers/base/dma-contiguous.c                     |    4 +-
+ include/linux/bootmem.h                           |   30 ++--
+ mm/bootmem.c                                      |   59 +++----
+ 41 files changed, 840 insertions(+), 146 deletions(-)
+ create mode 100644 arch/arm/boot/dts/keystone-sim.dts
+ create mode 100644 arch/arm/configs/keystone_defconfig
+ create mode 100644 arch/arm/mach-keystone/Makefile
+ create mode 100644 arch/arm/mach-keystone/Makefile.boot
+ create mode 100644 arch/arm/mach-keystone/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-keystone/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-keystone/include/mach/io.h
+ create mode 100644 arch/arm/mach-keystone/include/mach/memory.h
+ create mode 100644 arch/arm/mach-keystone/include/mach/system.h
+ create mode 100644 arch/arm/mach-keystone/include/mach/timex.h
+ create mode 100644 arch/arm/mach-keystone/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-keystone/include/mach/vmalloc.h
+ create mode 100644 arch/arm/mach-keystone/keystone.c
+ create mode 100644 arch/arm/mach-keystone/platsmp.c
 
-Anyway, apart from that "please check" comment, I also have small
-complaint: your pull requests didn't actually point to the tags, they
-pointed to the next/xyz commits. So every time I did a pull, I had to
-change "next/xyz" to "tags/xyz". That's just annoying make-work. I
-think it's because you just said "xyz" to the git request-pull script,
-and then git had to pick one of the things and picked next. Please
-disambiguate by just saying "tags/xyz" explicitly.
-
-                  Linus
+-- 
+1.7.9.5
