@@ -1,44 +1,44 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 24 Jul 2012 12:06:30 +0300
-Subject: [PATCH] ARM: tegra: make tegra_cpu_reset_handler_enable() __init
-In-Reply-To: <500DAF7A.3000302@wwwdotorg.org>
-References: <1340053310-20855-1-git-send-email-swarren@wwwdotorg.org>
- <20120718150130.GV9437@tbergstrom-lnx.Nvidia.com>
- <500DAF7A.3000302@wwwdotorg.org>
-Message-ID: <20120724090630.GI12034@tbergstrom-lnx.Nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2012 10:08:41 +0100
+Subject: [RFC 00/23] Introducing the TI Keystone platform
+In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
+References: <1343092165-9470-1-git-send-email-cyril@ti.com>
+Message-ID: <20120724090841.GA16435@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 10:09:30PM +0200, Stephen Warren wrote:
-> On 07/18/2012 09:01 AM, Peter De Schrijver wrote:
-> > On Mon, Jun 18, 2012 at 11:01:50PM +0200, Stephen Warren wrote:
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> This solves a section mismatch warning. I hadn't noticed this before,
-> >> because my compiler was inlining tegra_cpu_reset_handler_enable() inside
-> >> tegra_cpu_reset_handler_init(), which is already __init, but I switched
-> >> compilers and it stopped doing that.
-> > 
-> > Why does this generate a section mismatch warning? I see why calling a
-> > a __init marked function from a non __init marked function is a problem, but
-> > the opposite should be ok no?
+Hi Cyril,
+
+Thanks for this, certainly looks like an interesting platform!
+
+Of course, in order to perform any sort of sensible review, I'll need some
+silicon to test it on :)
+
+On Tue, Jul 24, 2012 at 02:09:02AM +0100, Cyril Chemparathy wrote:
+> TI's scalable KeyStone II architecture includes support for both TMS320C66x
+> floating point DSPs and ARM Cortex-A15 clusters, for a mixture of up to 32
+> cores per SoC.  The solution is optimized around a high performance chip
+> interconnect and a rich set of on chip peripherals.  Please refer [1] for
+> initial technical documentation on these devices.
+
+How many A15s can you have on such a SoC? It wasn't clear whether it was 1x4
+or 4x4 from the documentation.
+
+> This patch series provides a basic Linux port for these devices, including
+> support for SMP, and LPAE boot.  A majority of the patches in this series are
+> related to LPAE functionality, imposed by the device architecture which has
+> system memory mapped at an address above the 4G 32-bit addressable limit.
+
+I assume you have *some* memory in the bottom 32-bits though, right? Even if
+it's just a partial alias of a higher bank.
+
+> This patch series is based on the v3.5 kernel with the smp_ops patch set
+> applied on top.  This series is being posted to elicit early feedback, and so
+> that some of these fixes may get incorporated early on into the kernel code.
 > 
-> The issue is that tegra_cpu_reset_handler_enable() itself (which was not
-> __init but the patch made to be __init) was referencing variable
-> __tegra_cpu_reset_handler_{start,end}. This wasn't noticed before
-> because when tegra_cpu_reset_handler_enable() was inlined into
-> tegra_cpu_reset_handler_init(), tegra_cpu_reset_handler_enable() was
-> effectively __init. However, when built as a separate function, you
-> ended up with a non-__init function referencing other things that were
-> __init.
-> 
-> In other words, this is indeed nothing to do with __init function
-> tegra_cpu_reset_handler_init() calling non-__init function
-> tegra_cpu_reset_handler_enable().
+>   [1] - http://www.ti.com/product/tms320tci6636
 
-Ah. That makes sense :) We need to be careful with this when introducing
-system suspend support because some of this work needs to be redone on resume.
+This is marked as `TI confidential' but I guess that's an oversight [or will
+you have to kill me?].
 
-Cheers,
-
-Peter.
+Will
