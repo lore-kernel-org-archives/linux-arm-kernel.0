@@ -1,62 +1,49 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 01:33:16 -0000
-Subject: [RFC 06/23] ARM: LPAE: use phys_addr_t for initrd location and size
+Date: Tue, 24 Jul 2012 01:38:26 -0000
+Subject: [RFC 19/23] drivers: cma: fix addressing on PAE machines
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-7-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-20-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch fixes a couple of bugs that otherwise impair CMA functionality on
+PAE machines:
 
-This patch fixes the initrd setup code to use phys_addr_t instead of assuming
-32-bit addressing.  Without this we cannot boot on systems where initrd is
-located above the 4G physical address limit.
+  - alignment must be a 64-bit type when running on systems with 64-bit
+    physical addresses.  If this is not the case, the limit calculation thunks
+    allocations down to an address range < 4G.
+
+  - The allocated range is now being checked using dma_supported() instead of
+    hardcoding a 32-bit addressable limit.
 
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mm/init.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/base/dma-contiguous.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 8252c31..51f3e92 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -36,12 +36,12 @@
- 
- #include "mm.h"
- 
--static unsigned long phys_initrd_start __initdata = 0;
--static unsigned long phys_initrd_size __initdata = 0;
-+static phys_addr_t phys_initrd_start __initdata = 0;
-+static phys_addr_t phys_initrd_size __initdata = 0;
- 
- static int __init early_initrd(char *p)
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 78efb03..e10bd9a 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -234,7 +234,7 @@ int __init dma_declare_contiguous(struct device *dev, unsigned long size,
+ 				  phys_addr_t base, phys_addr_t limit)
  {
--	unsigned long start, size;
-+	phys_addr_t start, size;
- 	char *endp;
+ 	struct cma_reserved *r = &cma_reserved[cma_reserved_count];
+-	unsigned long alignment;
++	phys_addr_t alignment;
  
- 	start = memparse(p, &endp);
-@@ -347,14 +347,14 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (phys_initrd_size &&
- 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",
--		       phys_initrd_start, phys_initrd_size);
-+		pr_err("INITRD: 0x%08llx+0x%08llx is not a memory region - disabling initrd\n",
-+		       (u64)phys_initrd_start, (u64)phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
- 	if (phys_initrd_size &&
- 	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08lx+0x%08lx overlaps in-use memory region - disabling initrd\n",
--		       phys_initrd_start, phys_initrd_size);
-+		pr_err("INITRD: 0x%08llx+0x%08llx overlaps in-use memory region - disabling initrd\n",
-+		       (u64)phys_initrd_start, (u64)phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
- 	if (phys_initrd_size) {
+ 	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
+ 		 (unsigned long)size, (unsigned long)base,
+@@ -271,7 +271,7 @@ int __init dma_declare_contiguous(struct device *dev, unsigned long size,
+ 		if (!addr) {
+ 			base = -ENOMEM;
+ 			goto err;
+-		} else if (addr + size > ~(unsigned long)0) {
++		} else if (!dma_supported(dev, addr + size)) {
+ 			memblock_free(addr, size);
+ 			base = -EINVAL;
+ 			goto err;
 -- 
 1.7.9.5
