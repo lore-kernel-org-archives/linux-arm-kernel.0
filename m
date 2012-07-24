@@ -1,40 +1,132 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jul 2012 14:39:25 +0000
-Subject: [RFC 23/23] ARM: keystone: add switch over to high physical
- address range
-In-Reply-To: <1343092165-9470-24-git-send-email-cyril@ti.com>
+Date: Tue, 24 Jul 2012 14:46:53 +0000
+Subject: [RFC 21/23] ARM: keystone: introducing TI Keystone platform
+In-Reply-To: <1343092165-9470-22-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <1343092165-9470-24-git-send-email-cyril@ti.com>
-Message-ID: <201207241439.25314.arnd@arndb.de>
+ <1343092165-9470-22-git-send-email-cyril@ti.com>
+Message-ID: <201207241446.53401.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 24 July 2012, Cyril Chemparathy wrote:
-> Keystone platforms have their physical memory mapped at an address outside the
-> 32-bit physical range.  A Keystone machine with 16G of RAM would find its
-> memory at 0x0800000000 - 0x0bffffffff.
-> 
-> For boot purposes, the interconnect supports a limited alias of some of this
-> memory within the 32-bit addressable space (0x80000000 - 0xffffffff).  This
-> aliasing is implemented in hardware, and is not intended to be used much
-> beyond boot.  For instance, DMA coherence does not work when running out of
-> this aliased address space.
-> 
-> Therefore, we've taken the approach of booting out of the low physical address
-> range, and subsequently we switch over to the high range once we're safely
-> inside machine specific territory.  This patch implements this switch over
-> mechanism, which involves rewiring the TTBRs and page tables to point to the
-> new physical address space.
-> 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 
-I think this needs some more explanations. Why is not not possible
-to use this the larger area from the start when we first enable
-paging?
-Also, the code does not really look platform specific, so I could
-imagine that if you need it, other similar platforms will need the
-same thing, and it should be put into common code and enabled
-all the time when using LPAE.
+> diff --git a/arch/arm/boot/dts/keystone-sim.dts b/arch/arm/boot/dts/keystone-sim.dts
+> new file mode 100644
+> index 0000000..118d631
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/keystone-sim.dts
+> @@ -0,0 +1,77 @@
+> +/dts-v1/;
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Texas Instruments Keystone 2 SoC";
+> +	compatible = "ti,keystone-evm";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+
+I would assume that you need at least #address-cells=<2>, possibly
+also #size-cells=<2>, in order to express large memory ranges.
+
+> diff --git a/arch/arm/mach-keystone/include/mach/entry-macro.S b/arch/arm/mach-keystone/include/mach/entry-macro.S
+> new file mode 100644
+> index 0000000..7f486f3
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/include/mach/entry-macro.S
+>
+> +	.macro	disable_fiq
+> +	.endm
+> +
+> +	.macro	arch_ret_to_user, tmp1, tmp2
+> +	.endm
+
+I think it would be better to enable MULTI_IRQ_HANDLER and remove
+this file.
+
+> diff --git a/arch/arm/mach-keystone/include/mach/io.h b/arch/arm/mach-keystone/include/mach/io.h
+> new file mode 100644
+> index 0000000..844d659
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/include/mach/io.h
+
+> +#ifndef __MACH_IO_H
+> +#define __MACH_IO_H
+> +
+> +#define __io(a)		({ (void)(a); __typesafe_io(0); })
+> +#define __mem_pci(a)	(a)
+> +
+> +#endif
+
+This should also be removed.
+
+> diff --git a/arch/arm/mach-keystone/include/mach/memory.h b/arch/arm/mach-keystone/include/mach/memory.h
+> new file mode 100644
+> index 0000000..7c78b1e
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/include/mach/memory.h
+
+> +#ifndef __ASM_MACH_MEMORY_H
+> +#define __ASM_MACH_MEMORY_H
+> +
+> +#define MAX_PHYSMEM_BITS	36
+> +#define SECTION_SIZE_BITS	34
+> +
+> +#endif /* __ASM_MACH_MEMORY_H */
+
+I wonder if there is anything we can do to make these generic. What you
+have here is ok for now, but we will need to do this differently once
+we are building multiplatform kernels with keystone and sparse memory.
+
+> diff --git a/arch/arm/mach-keystone/include/mach/system.h b/arch/arm/mach-keystone/include/mach/system.h
+> new file mode 100644
+> index 0000000..4887b4c
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/include/mach/system.h
+
+> +#ifndef __MACH_SYSTEM_H
+> +#define __MACH_SYSTEM_H
+> +
+> +static inline void arch_idle(void)
+> +{
+> +	cpu_do_idle();
+> +}
+> +
+> +static inline void arch_reset(char mode, const char *cmd)
+> +{
+> +	while (1)
+> +		;
+> +}
+> +
+> +#endif
+
+These are no longer used, please remove the file.
+
+
+> diff --git a/arch/arm/mach-keystone/include/mach/vmalloc.h b/arch/arm/mach-keystone/include/mach/vmalloc.h
+> new file mode 100644
+> index 0000000..9d34c09
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/include/mach/vmalloc.h
+
+> +
+> +#define VMALLOC_END		0xFE800000UL
+> +
+> +#endif
+
+same here.
+
+> +DT_MACHINE_START(KEYSTONE, "Keystone")
+> +	.map_io		= keystone_map_io,
+> +	.init_irq	= keystone_init_irq,
+> +	.timer		= &keystone_timer,
+> +	.handle_irq	= gic_handle_irq,
+> +	.init_machine	= keystone_init,
+> +	.dt_compat	= keystone_match,
+> +	.nr_irqs	= 480,
+> +MACHINE_END
+
+IIRC, you don't need to set the nr_irqs this high in advance,
+they will be allocated automatically since you have enabled
+sparse IRQs.
 
 	Arnd
