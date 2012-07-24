@@ -1,73 +1,84 @@
 From: cyril@ti.com (Cyril Chemparathy)
 Date: Tue, 24 Jul 2012 01:10:23 -0000
-Subject: [RFC 03/23] ARM: LPAE: use phys_addr_t on virt <--> phys conversion
+Subject: [RFC 18/23] ARM: add virt_to_idmap for interconnect aliasing
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-4-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-19-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes up the types used when converting back and forth between
-physical and virtual addresses.
+From: Vitaly Andrianov <vitalya@ti.com>
+
+On some PAE systems (e.g. TI Keystone), memory is above the 32-bit addressible
+limit, and the interconnect provides an aliased view of parts of physical
+memory in the 32-bit addressible space.  This alias is strictly for boot time
+usage, and is not otherwise usable because of coherency limitations.
+
+On such systems, the idmap mechanism needs to take this aliased mapping into
+account.  This patch introduces a virt_to_idmap() macro, which can be used on
+such sub-architectures to represent the interconnect supported boot time
+alias.  Most other systems would leave this macro untouched, i.e., do a simply
+virt_to_phys() and nothing more.
 
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/include/asm/memory.h |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/memory.h |    9 +++++++++
+ arch/arm/kernel/smp.c         |    4 ++--
+ arch/arm/mm/idmap.c           |    4 ++--
+ 3 files changed, 13 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index fcb5757..7629dfe 100644
+index c330a23..b6b203c 100644
 --- a/arch/arm/include/asm/memory.h
 +++ b/arch/arm/include/asm/memory.h
-@@ -169,22 +169,27 @@ extern unsigned long __pv_phys_offset;
- 	: "=r" (to)					\
- 	: "r" (from), "I" (type))
- 
--static inline unsigned long __virt_to_phys(unsigned long x)
-+static inline phys_addr_t __virt_to_phys(unsigned long x)
- {
- 	unsigned long t;
- 	__pv_stub(x, t, "add", __PV_BITS_31_24);
- 	return t;
- }
- 
--static inline unsigned long __phys_to_virt(unsigned long x)
-+static inline unsigned long __phys_to_virt(phys_addr_t x)
- {
- 	unsigned long t;
- 	__pv_stub(x, t, "sub", __PV_BITS_31_24);
- 	return t;
- }
- #else
--#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
--#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-+
-+#define __virt_to_phys(x)		\
-+	((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET)
-+
-+#define __phys_to_virt(x)		\
-+	((unsigned long)((phys_addr_t)(x) - PHYS_OFFSET + PAGE_OFFSET))
-+
- #endif
- #endif
- 
-@@ -219,14 +224,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
- 
- static inline void *phys_to_virt(phys_addr_t x)
- {
--	return (void *)(__phys_to_virt((unsigned long)(x)));
-+	return (void *)__phys_to_virt(x);
- }
- 
- /*
-  * Drivers should NOT use these either.
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
--#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-+#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+@@ -235,6 +235,15 @@ static inline void *phys_to_virt(phys_addr_t x)
  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
  
  /*
++ * These are for systems that have a hardware interconnect supported alias of
++ * physical memory for idmap purposes.  Most cases should leave these
++ * untouched.
++ */
++#ifndef virt_to_idmap
++#define virt_to_idmap(x) virt_to_phys(x)
++#endif
++
++/*
+  * Virtual <-> DMA view memory address translations
+  * Again, these are *only* valid on the kernel direct mapped RAM
+  * memory.  Use of these is *deprecated* (and that doesn't mean
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index e41e1be..cce630c 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -72,10 +72,10 @@ int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 	 */
+ 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
+ 
+-	pgdir = virt_to_phys(idmap_pgd);
++	pgdir = virt_to_idmap(idmap_pgd);
+ 	secondary_data.pgdir = pgdir >> ARCH_PGD_SHIFT;
+ 
+-	pgdir = virt_to_phys(swapper_pg_dir);
++	pgdir = virt_to_idmap(swapper_pg_dir);
+ 	secondary_data.swapper_pg_dir = pgdir >> ARCH_PGD_SHIFT;
+ 
+ 	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index ab88ed4..919cb6e 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -85,8 +85,8 @@ static int __init init_static_idmap(void)
+ 		return -ENOMEM;
+ 
+ 	/* Add an identity mapping for the physical address of the section. */
+-	idmap_start = virt_to_phys((void *)__idmap_text_start);
+-	idmap_end = virt_to_phys((void *)__idmap_text_end);
++	idmap_start = virt_to_idmap((void *)__idmap_text_start);
++	idmap_end = virt_to_idmap((void *)__idmap_text_end);
+ 
+ 	pr_info("Setting up static identity map for 0x%llx - 0x%llx\n",
+ 		(long long)idmap_start, (long long)idmap_end);
 -- 
 1.7.9.5
