@@ -1,67 +1,39 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 01:09:58 -0000
-Subject: [RFC 02/23] ARM: LPAE: use signed arithmetic for mask definitions
+Date: Tue, 24 Jul 2012 01:10:02 -0000
+Subject: [RFC 04/23] ARM: LPAE: use phys_addr_t in alloc_init_pud()
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-3-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-5-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
-unsigned long math truncates the mask at the 32-bits.  This clearly does bad
-things on PAE systems.
+From: Vitaly Andrianov <vitalya@ti.com>
 
-This patch fixes this problem by defining these masks as signed quantities.
-We then rely on sign extension to do the right thing.
+This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
+unsigned long when passing in the phys argument.
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a, which
+applied similar changes elsewhere in the ARM memory management code.
+
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/include/asm/page.h           |    7 ++++++-
- arch/arm/include/asm/pgtable-3level.h |    6 +++---
- 2 files changed, 9 insertions(+), 4 deletions(-)
+ arch/arm/mm/mmu.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index ecf9019..1c810d2 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -13,7 +13,12 @@
- /* PAGE_SHIFT determines the page size */
- #define PAGE_SHIFT		12
- #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
--#define PAGE_MASK		(~(PAGE_SIZE-1))
-+
-+/*
-+ * We do not use PAGE_SIZE in the following because we rely on sign
-+ * extension to appropriately extend upper bits for PAE systems
-+ */
-+#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index cf4528d..226985c 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -628,7 +628,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+ }
  
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index b249035..ae39d11 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -48,16 +48,16 @@
- #define PMD_SHIFT		21
- 
- #define PMD_SIZE		(1UL << PMD_SHIFT)
--#define PMD_MASK		(~(PMD_SIZE-1))
-+#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
- #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
-+#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
- 
- /*
-  * section address mask and size definitions.
-  */
- #define SECTION_SHIFT		21
- #define SECTION_SIZE		(1UL << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
-+#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
- 
- #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
- 
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+-	unsigned long end, unsigned long phys, const struct mem_type *type)
++				  unsigned long end, phys_addr_t phys,
++				  const struct mem_type *type)
+ {
+ 	pud_t *pud = pud_offset(pgd, addr);
+ 	unsigned long next;
 -- 
 1.7.9.5
