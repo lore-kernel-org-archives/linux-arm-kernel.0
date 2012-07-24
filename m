@@ -1,21 +1,19 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Jul 2012 10:49:10 +0100
-Subject: [RFC 23/23] ARM: keystone: add switch over to high physical
- address range
-In-Reply-To: <1343092165-9470-24-git-send-email-cyril@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2012 11:04:54 +0100
+Subject: [RFC 07/23] ARM: LPAE: use phys_addr_t for membank size
+In-Reply-To: <1343092165-9470-8-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <1343092165-9470-24-git-send-email-cyril@ti.com>
-Message-ID: <20120724094910.GC20132@arm.com>
+ <1343092165-9470-8-git-send-email-cyril@ti.com>
+Message-ID: <20120724100454.GD16435@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2012 at 02:09:25AM +0100, Cyril Chemparathy wrote:
-> Keystone platforms have their physical memory mapped at an address outside the
-> 32-bit physical range.  A Keystone machine with 16G of RAM would find its
-> memory at 0x0800000000 - 0x0bffffffff.
+On Tue, Jul 24, 2012 at 02:09:09AM +0100, Cyril Chemparathy wrote:
+> This patch changes the membank structure's size field to phys_addr_t to allow
+> banks larger than 4G.
 
-Ah, so the patches start to make sense now :). The PHYS_OFFSET is at
-32G. I'll go back and look at the patches.
+This has already been fixed:
 
--- 
-Catalin
+  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7465/1
+
+Will
