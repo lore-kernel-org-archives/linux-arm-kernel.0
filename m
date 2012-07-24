@@ -1,106 +1,162 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 24 Jul 2012 10:36:23 -0600
-Subject: [PATCH] ARM: tegra: harmony: add regulator supply name and its input
- supply
-Message-ID: <1343147783-24948-1-git-send-email-swarren@wwwdotorg.org>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 24 Jul 2012 13:56:29 -0400
+Subject: [RFC 21/23] ARM: keystone: introducing TI Keystone platform
+In-Reply-To: <201207241446.53401.arnd@arndb.de>
+References: <1343092165-9470-1-git-send-email-cyril@ti.com>
+ <1343092165-9470-22-git-send-email-cyril@ti.com>
+ <201207241446.53401.arnd@arndb.de>
+Message-ID: <500EE1CD.6030701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laxman Dewangan <ldewangan@nvidia.com>
+Arnd,
 
-Name the regulator as per board schematics and adds its
-supply name info in regulator data.
-Add the always on fixed regulator to refer the battery supply.
+Thanks for taking the time to dig through this.
 
-Use this fixed regulator for input supply of some of PMIC
-regulator
+On 7/24/2012 10:46 AM, Arnd Bergmann wrote:
+> On Tuesday 24 July 2012, Cyril Chemparathy wrote:
+>
+>> diff --git a/arch/arm/boot/dts/keystone-sim.dts b/arch/arm/boot/dts/keystone-sim.dts
+>> new file mode 100644
+>> index 0000000..118d631
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/keystone-sim.dts
+>> @@ -0,0 +1,77 @@
+>> +/dts-v1/;
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +	model = "Texas Instruments Keystone 2 SoC";
+>> +	compatible = "ti,keystone-evm";
+>> +	#address-cells = <1>;
+>> +	#size-cells = <1>;
+>
+> I would assume that you need at least #address-cells=<2>, possibly
+> also #size-cells=<2>, in order to express large memory ranges.
+>
 
-This patch was originally part of a 2-patch series. Patch 2 got applied
-to the regulator tree as 7c7fac3 "regulator: tps6586x: add support for
-input supply" without this patch. This broke regulator support on
-Harmony.
+Thanks, will fix.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-[swarren: added dependency info to commit description]
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-harmony-power.c |   33 +++++++++++++++++-----------
- 1 files changed, 20 insertions(+), 13 deletions(-)
+>> diff --git a/arch/arm/mach-keystone/include/mach/entry-macro.S b/arch/arm/mach-keystone/include/mach/entry-macro.S
+>> new file mode 100644
+>> index 0000000..7f486f3
+>> --- /dev/null
+>> +++ b/arch/arm/mach-keystone/include/mach/entry-macro.S
+>>
+>> +	.macro	disable_fiq
+>> +	.endm
+>> +
+>> +	.macro	arch_ret_to_user, tmp1, tmp2
+>> +	.endm
+>
+> I think it would be better to enable MULTI_IRQ_HANDLER and remove
+> this file.
+>
 
-diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
-index 44dcb2e..8fd387b 100644
---- a/arch/arm/mach-tegra/board-harmony-power.c
-+++ b/arch/arm/mach-tegra/board-harmony-power.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/mfd/tps6586x.h>
- #include <linux/of.h>
- #include <linux/of_i2c.h>
-@@ -34,7 +35,9 @@ static struct regulator_consumer_supply tps658621_ldo0_supply[] = {
- };
- 
- static struct regulator_init_data ldo0_data = {
-+	.supply_regulator = "vdd_sm2",
- 	.constraints = {
-+		.name = "vdd_ldo0",
- 		.min_uV = 3300 * 1000,
- 		.max_uV = 3300 * 1000,
- 		.valid_modes_mask = (REGULATOR_MODE_NORMAL |
-@@ -48,9 +51,11 @@ static struct regulator_init_data ldo0_data = {
- 	.consumer_supplies = tps658621_ldo0_supply,
- };
- 
--#define HARMONY_REGULATOR_INIT(_id, _minmv, _maxmv)			\
-+#define HARMONY_REGULATOR_INIT(_id, _name, _supply, _minmv, _maxmv)	\
- 	static struct regulator_init_data _id##_data = {		\
-+		.supply_regulator = _supply,				\
- 		.constraints = {					\
-+			.name = _name,					\
- 			.min_uV = (_minmv)*1000,			\
- 			.max_uV = (_maxmv)*1000,			\
- 			.valid_modes_mask = (REGULATOR_MODE_NORMAL |	\
-@@ -61,18 +66,18 @@ static struct regulator_init_data ldo0_data = {
- 		},							\
- 	}
- 
--HARMONY_REGULATOR_INIT(sm0, 725, 1500);
--HARMONY_REGULATOR_INIT(sm1, 725, 1500);
--HARMONY_REGULATOR_INIT(sm2, 3000, 4550);
--HARMONY_REGULATOR_INIT(ldo1, 725, 1500);
--HARMONY_REGULATOR_INIT(ldo2, 725, 1500);
--HARMONY_REGULATOR_INIT(ldo3, 1250, 3300);
--HARMONY_REGULATOR_INIT(ldo4, 1700, 2475);
--HARMONY_REGULATOR_INIT(ldo5, 1250, 3300);
--HARMONY_REGULATOR_INIT(ldo6, 1250, 3300);
--HARMONY_REGULATOR_INIT(ldo7, 1250, 3300);
--HARMONY_REGULATOR_INIT(ldo8, 1250, 3300);
--HARMONY_REGULATOR_INIT(ldo9, 1250, 3300);
-+HARMONY_REGULATOR_INIT(sm0,  "vdd_sm0",  "vdd_sys", 725, 1500);
-+HARMONY_REGULATOR_INIT(sm1,  "vdd_sm1",  "vdd_sys", 725, 1500);
-+HARMONY_REGULATOR_INIT(sm2,  "vdd_sm2",  "vdd_sys", 3000, 4550);
-+HARMONY_REGULATOR_INIT(ldo1, "vdd_ldo1", "vdd_sm2", 725, 1500);
-+HARMONY_REGULATOR_INIT(ldo2, "vdd_ldo2", "vdd_sm2", 725, 1500);
-+HARMONY_REGULATOR_INIT(ldo3, "vdd_ldo3", "vdd_sm2", 1250, 3300);
-+HARMONY_REGULATOR_INIT(ldo4, "vdd_ldo4", "vdd_sm2", 1700, 2475);
-+HARMONY_REGULATOR_INIT(ldo5, "vdd_ldo5", NULL,	    1250, 3300);
-+HARMONY_REGULATOR_INIT(ldo6, "vdd_ldo6", "vdd_sm2", 1250, 3300);
-+HARMONY_REGULATOR_INIT(ldo7, "vdd_ldo7", "vdd_sm2", 1250, 3300);
-+HARMONY_REGULATOR_INIT(ldo8, "vdd_ldo8", "vdd_sm2", 1250, 3300);
-+HARMONY_REGULATOR_INIT(ldo9, "vdd_ldo9", "vdd_sm2", 1250, 3300);
- 
- #define TPS_REG(_id, _data)			\
- 	{					\
-@@ -115,6 +120,8 @@ static struct i2c_board_info __initdata harmony_regulators[] = {
- int __init harmony_regulator_init(void)
- {
- 	if (machine_is_harmony()) {
-+		regulator_register_always_on(0, "vdd_sys",
-+			NULL, 0, 5000000);
- 		i2c_register_board_info(3, harmony_regulators, 1);
- 	} else { /* Harmony, booted using device tree */
- 		struct device_node *np;
+Agreed.
+
+>> diff --git a/arch/arm/mach-keystone/include/mach/io.h b/arch/arm/mach-keystone/include/mach/io.h
+>> new file mode 100644
+>> index 0000000..844d659
+>> --- /dev/null
+>> +++ b/arch/arm/mach-keystone/include/mach/io.h
+>
+>> +#ifndef __MACH_IO_H
+>> +#define __MACH_IO_H
+>> +
+>> +#define __io(a)		({ (void)(a); __typesafe_io(0); })
+>> +#define __mem_pci(a)	(a)
+>> +
+>> +#endif
+>
+> This should also be removed.
+>
+
+Agreed.
+
+>> diff --git a/arch/arm/mach-keystone/include/mach/memory.h b/arch/arm/mach-keystone/include/mach/memory.h
+>> new file mode 100644
+>> index 0000000..7c78b1e
+>> --- /dev/null
+>> +++ b/arch/arm/mach-keystone/include/mach/memory.h
+>
+>> +#ifndef __ASM_MACH_MEMORY_H
+>> +#define __ASM_MACH_MEMORY_H
+>> +
+>> +#define MAX_PHYSMEM_BITS	36
+>> +#define SECTION_SIZE_BITS	34
+>> +
+>> +#endif /* __ASM_MACH_MEMORY_H */
+>
+> I wonder if there is anything we can do to make these generic. What you
+> have here is ok for now, but we will need to do this differently once
+> we are building multiplatform kernels with keystone and sparse memory.
+>
+
+Understood.  Any ideas on the general direction towards solving this?
+
+>> diff --git a/arch/arm/mach-keystone/include/mach/system.h b/arch/arm/mach-keystone/include/mach/system.h
+>> new file mode 100644
+>> index 0000000..4887b4c
+>> --- /dev/null
+>> +++ b/arch/arm/mach-keystone/include/mach/system.h
+>
+>> +#ifndef __MACH_SYSTEM_H
+>> +#define __MACH_SYSTEM_H
+>> +
+>> +static inline void arch_idle(void)
+>> +{
+>> +	cpu_do_idle();
+>> +}
+>> +
+>> +static inline void arch_reset(char mode, const char *cmd)
+>> +{
+>> +	while (1)
+>> +		;
+>> +}
+>> +
+>> +#endif
+>
+> These are no longer used, please remove the file.
+>
+
+Sure.
+
+>
+>> diff --git a/arch/arm/mach-keystone/include/mach/vmalloc.h b/arch/arm/mach-keystone/include/mach/vmalloc.h
+>> new file mode 100644
+>> index 0000000..9d34c09
+>> --- /dev/null
+>> +++ b/arch/arm/mach-keystone/include/mach/vmalloc.h
+>
+>> +
+>> +#define VMALLOC_END		0xFE800000UL
+>> +
+>> +#endif
+>
+> same here.
+>
+
+Sure.
+
+>> +DT_MACHINE_START(KEYSTONE, "Keystone")
+>> +	.map_io		= keystone_map_io,
+>> +	.init_irq	= keystone_init_irq,
+>> +	.timer		= &keystone_timer,
+>> +	.handle_irq	= gic_handle_irq,
+>> +	.init_machine	= keystone_init,
+>> +	.dt_compat	= keystone_match,
+>> +	.nr_irqs	= 480,
+>> +MACHINE_END
+>
+> IIRC, you don't need to set the nr_irqs this high in advance,
+> they will be allocated automatically since you have enabled
+> sparse IRQs.
+>
+
+We were seeing a complaint without nr_irqs set, but I'll dig into that 
+further.
+
 -- 
-1.7.0.4
+Thanks
+- Cyril
