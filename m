@@ -1,44 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2012 10:08:41 +0100
-Subject: [RFC 00/23] Introducing the TI Keystone platform
-In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
-References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <20120724090841.GA16435@mudshark.cambridge.arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 24 Jul 2012 12:09:37 +0300
+Subject: [Final call for participation] ARM mini-summit, San Diego,
+ 27-29 August
+In-Reply-To: <500D98D2.6000105@codeaurora.org>
+References: <20120723093949.GC31521@mudshark.cambridge.arm.com>
+ <500D98D2.6000105@codeaurora.org>
+Message-ID: <20120724090937.GJ12034@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyril,
-
-Thanks for this, certainly looks like an interesting platform!
-
-Of course, in order to perform any sort of sensible review, I'll need some
-silicon to test it on :)
-
-On Tue, Jul 24, 2012 at 02:09:02AM +0100, Cyril Chemparathy wrote:
-> TI's scalable KeyStone II architecture includes support for both TMS320C66x
-> floating point DSPs and ARM Cortex-A15 clusters, for a mixture of up to 32
-> cores per SoC.  The solution is optimized around a high performance chip
-> interconnect and a rich set of on chip peripherals.  Please refer [1] for
-> initial technical documentation on these devices.
-
-How many A15s can you have on such a SoC? It wasn't clear whether it was 1x4
-or 4x4 from the documentation.
-
-> This patch series provides a basic Linux port for these devices, including
-> support for SMP, and LPAE boot.  A majority of the patches in this series are
-> related to LPAE functionality, imposed by the device architecture which has
-> system memory mapped at an address above the 4G 32-bit addressable limit.
-
-I assume you have *some* memory in the bottom 32-bits though, right? Even if
-it's just a partial alias of a higher bank.
-
-> This patch series is based on the v3.5 kernel with the smp_ops patch set
-> applied on top.  This series is being posted to elicit early feedback, and so
-> that some of these fixes may get incorporated early on into the kernel code.
+On Mon, Jul 23, 2012 at 08:32:50PM +0200, Stephen Boyd wrote:
+> On 07/23/12 02:39, Will Deacon wrote:
+> > Hello again,
+> >
+> > Last week, I sent an initial call for participation regarding the ARM
+> > mini-summit that will be held at the end of next month:
+> >
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/110215.html
+> >
+> > This is a gentle reminder that, if you would like to attend, please reply
+> > ASAP since we are now moving into the stage of sending out invitations to
+> > potential participants.
+> >
+> >
 > 
->   [1] - http://www.ti.com/product/tms320tci6636
+> I would like to attend if there are spots available.
+> 
 
-This is marked as `TI confidential' but I guess that's an oversight [or will
-you have to kill me?].
+Someone from nVidia would like to attend, either me or Antti Mietinen.
 
-Will
+Thanks,
+
+Peter.
