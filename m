@@ -1,50 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Jul 2012 11:37:17 +0100
-Subject: [RFC 03/23] ARM: LPAE: use phys_addr_t on virt <--> phys
- conversion
-In-Reply-To: <1343092165-9470-4-git-send-email-cyril@ti.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 24 Jul 2012 06:41:54 -0400
+Subject: [RFC 00/23] Introducing the TI Keystone platform
+In-Reply-To: <20120724090841.GA16435@mudshark.cambridge.arm.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <1343092165-9470-4-git-send-email-cyril@ti.com>
-Message-ID: <20120724103717.GF20132@arm.com>
+ <20120724090841.GA16435@mudshark.cambridge.arm.com>
+Message-ID: <500E7BF2.9030305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2012 at 02:09:05AM +0100, Cyril Chemparathy wrote:
-> This patch fixes up the types used when converting back and forth between
-> physical and virtual addresses.
-> 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> ---
->  arch/arm/include/asm/memory.h |   17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index fcb5757..7629dfe 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -169,22 +169,27 @@ extern unsigned long __pv_phys_offset;
->  	: "=r" (to)					\
->  	: "r" (from), "I" (type))
->  
-> -static inline unsigned long __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
->  	unsigned long t;
->  	__pv_stub(x, t, "add", __PV_BITS_31_24);
->  	return t;
->  }
->  
-> -static inline unsigned long __phys_to_virt(unsigned long x)
-> +static inline unsigned long __phys_to_virt(phys_addr_t x)
->  {
->  	unsigned long t;
->  	__pv_stub(x, t, "sub", __PV_BITS_31_24);
->  	return t;
->  }
+Hi Will,
 
-BTW, I would prefer if the phys-to-virt patching was fixed as well. It
-shouldn't be difficult.
+On 7/24/2012 5:08 AM, Will Deacon wrote:
+> Hi Cyril,
+>
+> Thanks for this, certainly looks like an interesting platform!
+>
+> Of course, in order to perform any sort of sensible review, I'll need some
+> silicon to test it on :)
+>
+
+We have (so far) been testing this on software simulators, and we have 
+an earlier version of this code booting up on an FPGA based emulation 
+platform.
+
+> On Tue, Jul 24, 2012 at 02:09:02AM +0100, Cyril Chemparathy wrote:
+>> TI's scalable KeyStone II architecture includes support for both TMS320C66x
+>> floating point DSPs and ARM Cortex-A15 clusters, for a mixture of up to 32
+>> cores per SoC.  The solution is optimized around a high performance chip
+>> interconnect and a rich set of on chip peripherals.  Please refer [1] for
+>> initial technical documentation on these devices.
+>
+> How many A15s can you have on such a SoC? It wasn't clear whether it was 1x4
+> or 4x4 from the documentation.
+>
+
+This device has a single cluster of 4 A15s.
+
+>> This patch series provides a basic Linux port for these devices, including
+>> support for SMP, and LPAE boot.  A majority of the patches in this series are
+>> related to LPAE functionality, imposed by the device architecture which has
+>> system memory mapped at an address above the 4G 32-bit addressable limit.
+>
+> I assume you have *some* memory in the bottom 32-bits though, right? Even if
+> it's just a partial alias of a higher bank.
+>
+
+Yes, there is a boot time alias of the initial part of memory in the 
+32-bit space.  But this alias is somewhat limited in capabilities, and 
+therefore we do not intend to use it much beyond boot.
+
+>> This patch series is based on the v3.5 kernel with the smp_ops patch set
+>> applied on top.  This series is being posted to elicit early feedback, and so
+>> that some of these fixes may get incorporated early on into the kernel code.
+>>
+>>    [1] - http://www.ti.com/product/tms320tci6636
+>
+> This is marked as `TI confidential' but I guess that's an oversight [or will
+> you have to kill me?].
+>
+
+:-)  That is an oversight, I'm sure.
+
+> Will
+>
 
 -- 
-Catalin
+Thanks
+- Cyril
