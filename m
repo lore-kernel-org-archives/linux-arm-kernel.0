@@ -1,72 +1,35 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 24 Jul 2012 12:20:33 +0530
-Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
-In-Reply-To: <CADGdYn5mrHVBEhYF-Zv1UJK1YtVNk=kBA98xOdWevRU+_tu6cg@mail.gmail.com>
-References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
- <117e01cd60ea$99f24e60$cdd6eb20$%kim@samsung.com>
- <20120713144138.GB25264@roeck-us.net>
- <CADGdYn5mrHVBEhYF-Zv1UJK1YtVNk=kBA98xOdWevRU+_tu6cg@mail.gmail.com>
-Message-ID: <CAK9yfHwGU8EWsXoY9_gDn5=zyJhqtaZbKXzwyGais8u0iaL8xA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jul 2012 07:19:03 +0000
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <500DC255.40900@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201207171924.33756.arnd@arndb.de> <500DC255.40900@wwwdotorg.org>
+Message-ID: <201207240719.03601.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+On Monday 23 July 2012, Stephen Warren wrote:
+> > 3. A device with three channels, one of which has two alternatives:
+> 
+> s/three/four/   s/one of which/both of which/
+> 
+> This binding doc seems reasonable to me.
 
-On 14 July 2012 12:55, amit kachhap <amit.kachhap@gmail.com> wrote:
-> On Fri, Jul 13, 2012 at 8:11 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> On Fri, Jul 13, 2012 at 08:28:18PM +0900, Kukjin Kim wrote:
->>> Amit Daniel Kachhap wrote:
->>> >
->>> > These TMU enablement patches are needed for exynos4 and exynos5 TMU
->>> > driver patches sent earlier. The link for those are
->>> > http://www.spinics.net/lists/lm-sensors/msg35858.html.
->>> >
->>> How was going on above patches? I can't see them you said in linux-next now,
->>> it means if I apply this series in my tree, problem will be happened :(
->>>
->>> Note1: I've seen Rafael's updating exynos4_tmu patch which is using struct
->>> dev_pm_ops for pm and applied by Guenter.
->>>
->> If that is in the way, I can drop it, to be applied after the move. Let me know.
->> There is now another patch pending, to convert the driver to use devm_ functions.
->> Please let me know what you want me to do with it.
->>
-> Hi Guenter,
->
-> I rebased my V5 patch series with  hwmon-next branch so Rafael's pm
-> changes are already included. Regarding the devm_ patch by sachin
-> please hold it.
+I asked a linguist about it who said that you can't have "both" together
+with "four". She also mentioned that my text is rather confusing, so maybe
+you also got it wrong. I'll try adding some explanation:
 
-Guenter has already sent the pull request to Linus for v3.6 [1].
-That does not include your patches. I do not understand why you want
-to hold back my patch when you can rebase your series on top of it.
+3. A device with three channels, one of which has two alternatives:
 
-[1] https://lkml.org/lkml/2012/7/23/414
+        dmas = <&dma0 1 4   /* first channel,  data read */
+                &dma0 2 6   /* second channel, data write */
+                &dma1 1 0   /* third channel,  error read */
+                &dma2 1 0>; /* third channel,  ernative error read */
+        dma-names = "data", "data", "error", "error";
 
+   The first two channels are identified by having a unique direction
+   flag in combination with the "data" string. For the third channel,
+   there are two dma specifiers with identical flags (1) and strings
+   ("error"), so only one specifier may be used at a time.
 
-
->
-> Thanks,
-> Amit D
->>> Note2: would be helpful if you could do adding me in Cc of exynos tmu
->>> patches...
->>>
->> If you want to be copied, it might make sense to add yourself as maintainer for
->> this file. Otherwise you can not expect people to know.
->>
->> Thanks,
->> Guenter
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-With warm regards,
-Sachin
+	Arnd
