@@ -1,23 +1,32 @@
-From: peter.fordham@gmail.com (Peter Fordham)
-Date: Tue, 24 Jul 2012 13:47:36 -0700
-Subject: Corext A9 Errara 782773
-Message-ID: <CAK5=ZRKrZt329o9fs41uNw16N1c3TZHZeJ+UGs+XVBaFaNuQTw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 24 Jul 2012 14:51:35 -0600 (MDT)
+Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
+In-Reply-To: <201207240751.39111.arnd@arndb.de>
+References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
+ <CA+55aFyObNFgsaVOsjVOcH+aLjDyOgcqpvckM29T3dvugekVwg@mail.gmail.com>
+ <201207240751.39111.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.00.1207241436570.10781@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-I'm reviewing the errata notices from ARM for the rev 3 Cortex-A9
-which we are using in a design (14 Jun 2012 issue). I'm not sure
-whether this item should be of concern. I see no mention of it in the
-archive of this mailing list or in the kernel tree:
+On Tue, 24 Jul 2012, Arnd Bergmann wrote:
 
-"782773: Updating a translation entry to move a page mapping might
-erroneously cause an unexpected translation fault."
+> On Tuesday 24 July 2012, Linus Torvalds wrote:
+> 
+> > In your "for-linus" branch, "&mpu_3xxx_clkdm" remains in the
+> > clockdomains_common[] array. In my merge, it is gone. But I think I
+> > did the merge correctly, and you did it wrong. HOWEVER, I don't know
+> > the code, maybe there is some subtle reason why you did it like you
+> > did.
+> 
+> Yes, I think you are right now that I look at it again. Paul Walmsley
+> can have another look at the merge and send an update if we are both
+> missing something now.
 
-I think it may require a workaround in the cpu_v7_set_pte_ext
-function. Has anyone else looked into this?
+Linus' merge is correct.
 
-thanks,
+thanks for asking,
 
--Pete Fordham
+- Paul
