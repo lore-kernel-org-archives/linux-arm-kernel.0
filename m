@@ -1,341 +1,87 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 01:10:15 -0000
-Subject: [RFC 20/23] mm: bootmem: use phys_addr_t for physical addresses
+Date: Tue, 24 Jul 2012 01:10:18 -0000
+Subject: [RFC 12/23] ARM: mm: clean up membank size limit checks
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-21-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-13-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch cleans up the highmem sanity check code by simplifying the range
+checks with a pre-calculated size_limit.  This patch should otherwise have no
+functional impact on behavior.
 
-On a physical address extended (PAE) systems physical memory may be located
-outside the first 4GB address range.  In particular, on TI Keystone devices,
-all memory (including lowmem) is located outside the 4G address space. Many
-functions in the bootmem.c use unsigned long as a type for physical addresses,
-and this breaks badly on such PAE systems.
+This patch also removes a redundant (bank->start < vmalloc_limit) check, since
+this is already covered by the !highmem condition.
 
-This patch intensively mangles the bootmem allocator to use phys_addr_t where
-necessary.  We are aware that this is most certainly not the way to go
-considering that the ARM architecture appears to be moving towards memblock.
-Memblock may be a better solution, and fortunately it looks a lot more PAE
-savvy than bootmem is.
-
-However, we do not fully understand the motivations and restrictions behind
-the mixed bootmem + memblock model in current ARM code. We hope for a
-meaningful discussion and useful guidance towards a better solution to this
-problem.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- include/linux/bootmem.h |   30 ++++++++++++------------
- mm/bootmem.c            |   59 ++++++++++++++++++++++++-----------------------
- 2 files changed, 45 insertions(+), 44 deletions(-)
+ arch/arm/mm/mmu.c |   19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/bootmem.h b/include/linux/bootmem.h
-index 6d6795d..e43c463 100644
---- a/include/linux/bootmem.h
-+++ b/include/linux/bootmem.h
-@@ -49,10 +49,10 @@ extern unsigned long free_all_bootmem_node(pg_data_t *pgdat);
- extern unsigned long free_all_bootmem(void);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4840efa..6b0baf3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -905,10 +905,15 @@ void __init sanity_check_meminfo(void)
  
- extern void free_bootmem_node(pg_data_t *pgdat,
--			      unsigned long addr,
-+			      phys_addr_t addr,
- 			      unsigned long size);
--extern void free_bootmem(unsigned long addr, unsigned long size);
--extern void free_bootmem_late(unsigned long addr, unsigned long size);
-+extern void free_bootmem(phys_addr_t addr, unsigned long size);
-+extern void free_bootmem_late(phys_addr_t addr, unsigned long size);
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
++		phys_addr_t size_limit;
++
+ 		*bank = meminfo.bank[i];
++		size_limit = bank->size;
  
- /*
-  * Flags for reserve_bootmem (also if CONFIG_HAVE_ARCH_BOOTMEM_NODE,
-@@ -65,44 +65,44 @@ extern void free_bootmem_late(unsigned long addr, unsigned long size);
- #define BOOTMEM_DEFAULT		0
- #define BOOTMEM_EXCLUSIVE	(1<<0)
+ 		if (bank->start >= vmalloc_limit)
+ 			highmem = 1;
++		else
++			size_limit = vmalloc_limit - bank->start;
  
--extern int reserve_bootmem(unsigned long addr,
-+extern int reserve_bootmem(phys_addr_t addr,
- 			   unsigned long size,
- 			   int flags);
- extern int reserve_bootmem_node(pg_data_t *pgdat,
--				unsigned long physaddr,
-+				phys_addr_t physaddr,
- 				unsigned long size,
- 				int flags);
+ 		bank->highmem = highmem;
  
- extern void *__alloc_bootmem(unsigned long size,
- 			     unsigned long align,
--			     unsigned long goal);
-+			     phys_addr_t goal);
- extern void *__alloc_bootmem_nopanic(unsigned long size,
- 				     unsigned long align,
--				     unsigned long goal);
-+				     phys_addr_t goal);
- extern void *__alloc_bootmem_node(pg_data_t *pgdat,
- 				  unsigned long size,
- 				  unsigned long align,
--				  unsigned long goal);
-+				  phys_addr_t goal);
- void *__alloc_bootmem_node_high(pg_data_t *pgdat,
- 				  unsigned long size,
- 				  unsigned long align,
--				  unsigned long goal);
-+				  phys_addr_t goal);
- extern void *__alloc_bootmem_node_nopanic(pg_data_t *pgdat,
- 				  unsigned long size,
- 				  unsigned long align,
--				  unsigned long goal);
-+				  phys_addr_t goal);
- void *___alloc_bootmem_node_nopanic(pg_data_t *pgdat,
- 				  unsigned long size,
- 				  unsigned long align,
--				  unsigned long goal,
--				  unsigned long limit);
-+				  phys_addr_t goal,
-+				  phys_addr_t limit);
- extern void *__alloc_bootmem_low(unsigned long size,
- 				 unsigned long align,
--				 unsigned long goal);
-+				 phys_addr_t goal);
- extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
- 				      unsigned long size,
- 				      unsigned long align,
--				      unsigned long goal);
-+				      phys_addr_t goal);
- 
- #ifdef CONFIG_NO_BOOTMEM
- /* We are using top down, so it is safe to use 0 here */
-@@ -137,7 +137,7 @@ extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
- #define alloc_bootmem_low_pages_node(pgdat, x) \
- 	__alloc_bootmem_low_node(pgdat, x, PAGE_SIZE, 0)
- 
--extern int reserve_bootmem_generic(unsigned long addr, unsigned long size,
-+extern int reserve_bootmem_generic(phys_addr_t addr, unsigned long size,
- 				   int flags);
- 
- #ifdef CONFIG_HAVE_ARCH_ALLOC_REMAP
-diff --git a/mm/bootmem.c b/mm/bootmem.c
-index bcb63ac..e7dc572 100644
---- a/mm/bootmem.c
-+++ b/mm/bootmem.c
-@@ -154,7 +154,7 @@ unsigned long __init init_bootmem(unsigned long start, unsigned long pages)
-  * down, but we are still initializing the system.  Pages are given directly
-  * to the page allocator, no bootmem metadata is updated because it is gone.
-  */
--void __init free_bootmem_late(unsigned long addr, unsigned long size)
-+void __init free_bootmem_late(phys_addr_t addr, unsigned long size)
- {
- 	unsigned long cursor, end;
- 
-@@ -362,7 +362,7 @@ static int __init mark_bootmem(unsigned long start, unsigned long end,
-  *
-  * The range must reside completely on the specified node.
-  */
--void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
-+void __init free_bootmem_node(pg_data_t *pgdat, phys_addr_t physaddr,
- 			      unsigned long size)
- {
- 	unsigned long start, end;
-@@ -384,7 +384,7 @@ void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
-  *
-  * The range must be contiguous but may span node boundaries.
-  */
--void __init free_bootmem(unsigned long addr, unsigned long size)
-+void __init free_bootmem(phys_addr_t addr, unsigned long size)
- {
- 	unsigned long start, end;
- 
-@@ -407,7 +407,7 @@ void __init free_bootmem(unsigned long addr, unsigned long size)
-  *
-  * The range must reside completely on the specified node.
-  */
--int __init reserve_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
-+int __init reserve_bootmem_node(pg_data_t *pgdat, phys_addr_t physaddr,
- 				 unsigned long size, int flags)
- {
- 	unsigned long start, end;
-@@ -428,7 +428,7 @@ int __init reserve_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
-  *
-  * The range must be contiguous but may span node boundaries.
-  */
--int __init reserve_bootmem(unsigned long addr, unsigned long size,
-+int __init reserve_bootmem(phys_addr_t addr, unsigned long size,
- 			    int flags)
- {
- 	unsigned long start, end;
-@@ -439,7 +439,7 @@ int __init reserve_bootmem(unsigned long addr, unsigned long size,
- 	return mark_bootmem(start, end, 1, flags);
- }
- 
--int __weak __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
-+int __weak __init reserve_bootmem_generic(phys_addr_t phys, unsigned long len,
- 				   int flags)
- {
- 	return reserve_bootmem(phys, len, flags);
-@@ -461,7 +461,7 @@ static unsigned long __init align_idx(struct bootmem_data *bdata,
- static unsigned long __init align_off(struct bootmem_data *bdata,
- 				      unsigned long off, unsigned long align)
- {
--	unsigned long base = PFN_PHYS(bdata->node_min_pfn);
-+	phys_addr_t base = PFN_PHYS(bdata->node_min_pfn);
- 
- 	/* Same as align_idx for byte offsets */
- 
-@@ -470,14 +470,14 @@ static unsigned long __init align_off(struct bootmem_data *bdata,
- 
- static void * __init alloc_bootmem_bdata(struct bootmem_data *bdata,
- 					unsigned long size, unsigned long align,
--					unsigned long goal, unsigned long limit)
-+					phys_addr_t goal, phys_addr_t limit)
- {
- 	unsigned long fallback = 0;
- 	unsigned long min, max, start, sidx, midx, step;
- 
--	bdebug("nid=%td size=%lx [%lu pages] align=%lx goal=%lx limit=%lx\n",
-+	bdebug("nid=%td size=%lx [%lu pages] align=%lx goal=%llx limit=%llx\n",
- 		bdata - bootmem_node_data, size, PAGE_ALIGN(size) >> PAGE_SHIFT,
--		align, goal, limit);
-+		align, (u64)goal, (u64)limit);
- 
- 	BUG_ON(!size);
- 	BUG_ON(align & (align - 1));
-@@ -519,7 +519,8 @@ static void * __init alloc_bootmem_bdata(struct bootmem_data *bdata,
- 	while (1) {
- 		int merge;
- 		void *region;
--		unsigned long eidx, i, start_off, end_off;
-+		unsigned long eidx, i;
-+		phys_addr_t   start_off, end_off;
- find_block:
- 		sidx = find_next_zero_bit(bdata->node_bootmem_map, midx, sidx);
- 		sidx = align_idx(bdata, sidx, step);
-@@ -577,7 +578,7 @@ find_block:
- 
- static void * __init alloc_arch_preferred_bootmem(bootmem_data_t *bdata,
- 					unsigned long size, unsigned long align,
--					unsigned long goal, unsigned long limit)
-+					phys_addr_t goal, phys_addr_t limit)
- {
- 	if (WARN_ON_ONCE(slab_is_available()))
- 		return kzalloc(size, GFP_NOWAIT);
-@@ -598,8 +599,8 @@ static void * __init alloc_arch_preferred_bootmem(bootmem_data_t *bdata,
- 
- static void * __init alloc_bootmem_core(unsigned long size,
- 					unsigned long align,
--					unsigned long goal,
--					unsigned long limit)
-+					phys_addr_t goal,
-+					phys_addr_t limit)
- {
- 	bootmem_data_t *bdata;
- 	void *region;
-@@ -624,8 +625,8 @@ static void * __init alloc_bootmem_core(unsigned long size,
- 
- static void * __init ___alloc_bootmem_nopanic(unsigned long size,
- 					      unsigned long align,
--					      unsigned long goal,
--					      unsigned long limit)
-+					      phys_addr_t goal,
-+					      phys_addr_t limit)
- {
- 	void *ptr;
- 
-@@ -655,15 +656,15 @@ restart:
-  * Returns NULL on failure.
-  */
- void * __init __alloc_bootmem_nopanic(unsigned long size, unsigned long align,
--					unsigned long goal)
-+					phys_addr_t goal)
- {
--	unsigned long limit = 0;
-+	phys_addr_t limit = 0;
- 
- 	return ___alloc_bootmem_nopanic(size, align, goal, limit);
- }
- 
- static void * __init ___alloc_bootmem(unsigned long size, unsigned long align,
--					unsigned long goal, unsigned long limit)
-+					phys_addr_t goal, phys_addr_t limit)
- {
- 	void *mem = ___alloc_bootmem_nopanic(size, align, goal, limit);
- 
-@@ -691,16 +692,16 @@ static void * __init ___alloc_bootmem(unsigned long size, unsigned long align,
-  * The function panics if the request can not be satisfied.
-  */
- void * __init __alloc_bootmem(unsigned long size, unsigned long align,
--			      unsigned long goal)
-+			      phys_addr_t goal)
- {
--	unsigned long limit = 0;
-+	phys_addr_t limit = 0;
- 
- 	return ___alloc_bootmem(size, align, goal, limit);
- }
- 
- void * __init ___alloc_bootmem_node_nopanic(pg_data_t *pgdat,
- 				unsigned long size, unsigned long align,
--				unsigned long goal, unsigned long limit)
-+				phys_addr_t goal, phys_addr_t limit)
- {
- 	void *ptr;
- 
-@@ -731,7 +732,7 @@ again:
- }
- 
- void * __init __alloc_bootmem_node_nopanic(pg_data_t *pgdat, unsigned long size,
--				   unsigned long align, unsigned long goal)
-+				   unsigned long align, phys_addr_t goal)
- {
- 	if (WARN_ON_ONCE(slab_is_available()))
- 		return kzalloc_node(size, GFP_NOWAIT, pgdat->node_id);
-@@ -740,8 +741,8 @@ void * __init __alloc_bootmem_node_nopanic(pg_data_t *pgdat, unsigned long size,
- }
- 
- void * __init ___alloc_bootmem_node(pg_data_t *pgdat, unsigned long size,
--				    unsigned long align, unsigned long goal,
--				    unsigned long limit)
-+				    unsigned long align, phys_addr_t goal,
-+				    phys_addr_t limit)
- {
- 	void *ptr;
- 
-@@ -770,7 +771,7 @@ void * __init ___alloc_bootmem_node(pg_data_t *pgdat, unsigned long size,
-  * The function panics if the request can not be satisfied.
-  */
- void * __init __alloc_bootmem_node(pg_data_t *pgdat, unsigned long size,
--				   unsigned long align, unsigned long goal)
-+				   unsigned long align, phys_addr_t goal)
- {
- 	if (WARN_ON_ONCE(slab_is_available()))
- 		return kzalloc_node(size, GFP_NOWAIT, pgdat->node_id);
-@@ -779,7 +780,7 @@ void * __init __alloc_bootmem_node(pg_data_t *pgdat, unsigned long size,
- }
- 
- void * __init __alloc_bootmem_node_high(pg_data_t *pgdat, unsigned long size,
--				   unsigned long align, unsigned long goal)
-+				   unsigned long align, phys_addr_t goal)
- {
- #ifdef MAX_DMA32_PFN
- 	unsigned long end_pfn;
-@@ -825,7 +826,7 @@ void * __init __alloc_bootmem_node_high(pg_data_t *pgdat, unsigned long size,
-  * The function panics if the request can not be satisfied.
-  */
- void * __init __alloc_bootmem_low(unsigned long size, unsigned long align,
--				  unsigned long goal)
-+				  phys_addr_t goal)
- {
- 	return ___alloc_bootmem(size, align, goal, ARCH_LOW_ADDRESS_LIMIT);
- }
-@@ -846,7 +847,7 @@ void * __init __alloc_bootmem_low(unsigned long size, unsigned long align,
-  * The function panics if the request can not be satisfied.
-  */
- void * __init __alloc_bootmem_low_node(pg_data_t *pgdat, unsigned long size,
--				       unsigned long align, unsigned long goal)
-+				       unsigned long align, phys_addr_t goal)
- {
- 	if (WARN_ON_ONCE(slab_is_available()))
- 		return kzalloc_node(size, GFP_NOWAIT, pgdat->node_id);
+@@ -917,8 +922,7 @@ void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (!highmem && bank->start < vmalloc_limit &&
+-		    bank->size > vmalloc_limit - bank->start) {
++		if (!highmem && bank->size > size_limit) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
+ 						 "ignoring high memory\n");
+@@ -927,12 +931,12 @@ void __init sanity_check_meminfo(void)
+ 					(meminfo.nr_banks - i) * sizeof(*bank));
+ 				meminfo.nr_banks++;
+ 				i++;
+-				bank[1].size -= vmalloc_limit - bank->start;
++				bank[1].size -= size_limit;
+ 				bank[1].start = vmalloc_limit;
+ 				bank[1].highmem = highmem = 1;
+ 				j++;
+ 			}
+-			bank->size = vmalloc_limit - bank->start;
++			bank->size = size_limit;
+ 		}
+ #else
+ 		/*
+@@ -950,14 +954,13 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would partially overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (bank->start + bank->size > vmalloc_limit)
+-			unsigned long newsize = vmalloc_limit - bank->start;
++		if (bank->size > size_limit) {
+ 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+ 			       "to -%.8llx (vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
+ 			       (unsigned long long)bank->start + bank->size - 1,
+-			       (unsigned long long)bank->start + newsize - 1);
+-			bank->size = newsize;
++			       (unsigned long long)bank->start + size_limit - 1);
++			bank->size = size_limit;
+ 		}
+ #endif
+ 		if (!bank->highmem && bank->start + bank->size > arm_lowmem_limit)
 -- 
 1.7.9.5
