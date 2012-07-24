@@ -1,74 +1,45 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 23 Jul 2012 17:28:32 -0700
-Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
-In-Reply-To: <CACRpkdYayLaKzUSq5V9N5sRkV74a+nZ1CbLJzRW7RP=pOU9bfw@mail.gmail.com>
-References: <1342567672-29071-1-git-send-email-ccross@android.com>
- <CACRpkdaHdCvx1HJNDsyJSZAN--sF+4-V1TbzXZL1v+7Asoe_oA@mail.gmail.com>
- <CAMbhsRR2-VjUeL2XPKubeaG=iLV5NE-i_sVYbuMAryXLxsbo1g@mail.gmail.com>
- <CACRpkdYayLaKzUSq5V9N5sRkV74a+nZ1CbLJzRW7RP=pOU9bfw@mail.gmail.com>
-Message-ID: <CAMbhsRQuXsytM9QLwjW1z1E=0XNztXP1xezbcDEj7Ra6deKLDQ@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 23 Jul 2012 18:03:26 -0700
+Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
+In-Reply-To: <1343075561-17446-1-git-send-email-arnd@arndb.de>
+References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
+Message-ID: <CA+55aFyObNFgsaVOsjVOcH+aLjDyOgcqpvckM29T3dvugekVwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 5:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Jul 23, 2012 at 9:27 PM, Colin Cross <ccross@android.com> wrote:
->> On Mon, Jul 23, 2012 at 11:55 AM, Linus Walleij
+On Mon, Jul 23, 2012 at 1:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 >
->> Does the clock you use for sched_clock continue to run in all suspend
->> modes? All the SoC's I've used only have a 32kHz clock in the deepest
->> suspend mode,
->
-> Yes, and yes it is 32kHz.
->
->> which is not ideal for sched_clock.
->
-> Not that I know why scheduling with 32kHz is so bad compared to the
-> default system scheduling granularity which is HZ if you don't have
-> sched_clock() implemented.
->
-> Since this seems to be such an important point, what makes you
-> want MHz:es for scheduling granularity? To me the biggest impact
-> is actually the granularity of the timestamps in the printk:s.
->
-> (It's not that I doubt your needs, more curiosity.)
+> There are about 600 changesets in here, and a bunch of simple
+> conflicts between the 15 branches, but so far no conflicts with
+> stuff that you have merged already. For reference, you can check
+> the "for-linus" branch in the same tree to see how we resolved
+> the conflicts.
 
-There's a comment somewhere about higher resolution sched_clock
-providing fairer scheduling.  With 32 kHz sched_clock, every runtime
-measured by the scheduler will be wrong by up to 31.25 us.  Most
-systems have a faster clock, and if it's available it seems silly not
-to use it.
+Ok, so I've merged some things a bit differently, but afaik it's all
+semantically identical *except* for the merge of the file
 
-It's also used for tracing, where 31.25 us resolution is a little low
-for function tracing or function graph tracing.
+  arch/arm/mach-omap2/clockdomains3xxx_data.c
 
->>  For example, on
->> Tegra2 the faster 1MHz clock used for sched_clock resets in the
->> deepest suspend state (LP0) but not the shallowest suspend state
->> (LP2), and which suspend state the chip hits depends on which hardware
->> is active.  Opting out of this patch would cause Tegra's clock to
->> sometimes run in suspend, and sometimes not, which seems worse for
->> debugging than consistently not running in suspend.  I'd be surprised
->> if a similar situation didn't apply to your platform.
->
-> Well being able to switch between different sched_clock() providers
-> may be the ideal...
->
->>> - If it absolutely needs to be in the core code, also have a bool
->>>   field indicating whether the clock is going to die during suspend
->>>   and add new registration functions for setting that sched_clock
->>>   type, e.g. setup_sched_clock_nonsuspendable()
->>
->> Sounds reasonable if some platforms need the extra complexity.
->
-> OK agreed.
->
-> A connecting theme is that of being avle to flag clock sources as
-> sched_clock providers. If all clocksources were tagged with
-> rating, and only clocksources were used for sched_clock(), the
-> kernel could select the highest-rated clock under all circumstances.
->
-> But that's quite intrusive, more of an idea. :-P
+in my merge of your "general arm-soc cleanups" pull request.
 
-sched_clock is supposed to be very low overhead compared to ktime_get,
-and has some strict  requirements if CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
-is not set (see kernel/sched/clock.c), but it might be possible.
+In your "for-linus" branch, "&mpu_3xxx_clkdm" remains in the
+clockdomains_common[] array. In my merge, it is gone. But I think I
+did the merge correctly, and you did it wrong. HOWEVER, I don't know
+the code, maybe there is some subtle reason why you did it like you
+did.
+
+Your "for-linus" branch also had that
+
+   arch/arm/arm-soc-for-next-contents.txt
+
+file that shouldn't have been there, but whatever.
+
+Anyway, apart from that "please check" comment, I also have small
+complaint: your pull requests didn't actually point to the tags, they
+pointed to the next/xyz commits. So every time I did a pull, I had to
+change "next/xyz" to "tags/xyz". That's just annoying make-work. I
+think it's because you just said "xyz" to the git request-pull script,
+and then git had to pick one of the things and picked next. Please
+disambiguate by just saying "tags/xyz" explicitly.
+
+                  Linus
