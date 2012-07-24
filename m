@@ -1,132 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jul 2012 14:46:53 +0000
-Subject: [RFC 21/23] ARM: keystone: introducing TI Keystone platform
-In-Reply-To: <1343092165-9470-22-git-send-email-cyril@ti.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 24 Jul 2012 10:47:48 -0400
+Subject: [RFC 17/23] ARM: add machine desc hook for early memory/paging
+ initialization
+In-Reply-To: <201207241432.27790.arnd@arndb.de>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <1343092165-9470-22-git-send-email-cyril@ti.com>
-Message-ID: <201207241446.53401.arnd@arndb.de>
+ <1343092165-9470-18-git-send-email-cyril@ti.com>
+ <201207241432.27790.arnd@arndb.de>
+Message-ID: <500EB594.3000303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 July 2012, Cyril Chemparathy wrote:
+Thanks for looking at this, Arnd.
 
-> diff --git a/arch/arm/boot/dts/keystone-sim.dts b/arch/arm/boot/dts/keystone-sim.dts
-> new file mode 100644
-> index 0000000..118d631
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/keystone-sim.dts
-> @@ -0,0 +1,77 @@
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "Texas Instruments Keystone 2 SoC";
-> +	compatible = "ti,keystone-evm";
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-
-I would assume that you need at least #address-cells=<2>, possibly
-also #size-cells=<2>, in order to express large memory ranges.
-
-> diff --git a/arch/arm/mach-keystone/include/mach/entry-macro.S b/arch/arm/mach-keystone/include/mach/entry-macro.S
-> new file mode 100644
-> index 0000000..7f486f3
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/include/mach/entry-macro.S
+On 7/24/2012 10:32 AM, Arnd Bergmann wrote:
+> On Tuesday 24 July 2012, Cyril Chemparathy wrote:
+>> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+>> index 0b1c94b..49e9c2a 100644
+>> --- a/arch/arm/include/asm/mach/arch.h
+>> +++ b/arch/arm/include/asm/mach/arch.h
+>> @@ -39,6 +39,7 @@ struct machine_desc {
+>>                                           struct meminfo *);
+>>          void                    (*reserve)(void);/* reserve mem blocks  */
+>>          void                    (*map_io)(void);/* IO mapping function  */
+>> +       void                    (*init_meminfo)(void);
+>>          void                    (*init_early)(void);
+>>          void                    (*init_irq)(void);
+>>          struct sys_timer        *timer;         /* system tick timer    */
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index e15d83b..7cbe292 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -964,6 +964,9 @@ void __init setup_arch(char **cmdline_p)
+>>
+>>          parse_early_param();
+>>
+>> +       if (mdesc->init_meminfo)
+>> +               mdesc->init_meminfo();
+>> +
+>>          sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
+>>          sanity_check_meminfo();
+>>          arm_memblock_init(&meminfo, mdesc);
 >
-> +	.macro	disable_fiq
-> +	.endm
-> +
-> +	.macro	arch_ret_to_user, tmp1, tmp2
-> +	.endm
+> The function pointers in that structure are ordered by execution time,
+> and you call init_meminfo just before ->reserve, so it should go there.
+>
 
-I think it would be better to enable MULTI_IRQ_HANDLER and remove
-this file.
+Sure.  Will update.
 
-> diff --git a/arch/arm/mach-keystone/include/mach/io.h b/arch/arm/mach-keystone/include/mach/io.h
-> new file mode 100644
-> index 0000000..844d659
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/include/mach/io.h
+> I wonder if it's better to just do the setup in the reserve callback,
+> which would be a slight abuse of that interface but also keep down
+> the number of early callbacks.
+>
 
-> +#ifndef __MACH_IO_H
-> +#define __MACH_IO_H
-> +
-> +#define __io(a)		({ (void)(a); __typesafe_io(0); })
-> +#define __mem_pci(a)	(a)
-> +
-> +#endif
+We need to switch the phys offset before sanity_check_meminfo() mangles 
+the meminfo banks.
 
-This should also be removed.
+If we were to do this switch over in reserve(), we'd need to go back and 
+fixup things that happen between the current location and reserve(). 
+For example, we'd need to fix up the memblock regions.
 
-> diff --git a/arch/arm/mach-keystone/include/mach/memory.h b/arch/arm/mach-keystone/include/mach/memory.h
-> new file mode 100644
-> index 0000000..7c78b1e
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/include/mach/memory.h
-
-> +#ifndef __ASM_MACH_MEMORY_H
-> +#define __ASM_MACH_MEMORY_H
-> +
-> +#define MAX_PHYSMEM_BITS	36
-> +#define SECTION_SIZE_BITS	34
-> +
-> +#endif /* __ASM_MACH_MEMORY_H */
-
-I wonder if there is anything we can do to make these generic. What you
-have here is ok for now, but we will need to do this differently once
-we are building multiplatform kernels with keystone and sparse memory.
-
-> diff --git a/arch/arm/mach-keystone/include/mach/system.h b/arch/arm/mach-keystone/include/mach/system.h
-> new file mode 100644
-> index 0000000..4887b4c
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/include/mach/system.h
-
-> +#ifndef __MACH_SYSTEM_H
-> +#define __MACH_SYSTEM_H
-> +
-> +static inline void arch_idle(void)
-> +{
-> +	cpu_do_idle();
-> +}
-> +
-> +static inline void arch_reset(char mode, const char *cmd)
-> +{
-> +	while (1)
-> +		;
-> +}
-> +
-> +#endif
-
-These are no longer used, please remove the file.
-
-
-> diff --git a/arch/arm/mach-keystone/include/mach/vmalloc.h b/arch/arm/mach-keystone/include/mach/vmalloc.h
-> new file mode 100644
-> index 0000000..9d34c09
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/include/mach/vmalloc.h
-
-> +
-> +#define VMALLOC_END		0xFE800000UL
-> +
-> +#endif
-
-same here.
-
-> +DT_MACHINE_START(KEYSTONE, "Keystone")
-> +	.map_io		= keystone_map_io,
-> +	.init_irq	= keystone_init_irq,
-> +	.timer		= &keystone_timer,
-> +	.handle_irq	= gic_handle_irq,
-> +	.init_machine	= keystone_init,
-> +	.dt_compat	= keystone_match,
-> +	.nr_irqs	= 480,
-> +MACHINE_END
-
-IIRC, you don't need to set the nr_irqs this high in advance,
-they will be allocated automatically since you have enabled
-sparse IRQs.
-
-	Arnd
+-- 
+Thanks
+- Cyril
