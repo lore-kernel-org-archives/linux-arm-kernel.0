@@ -1,117 +1,61 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 24 Jul 2012 11:48:52 +0530
-Subject: [PATCH v2 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device tree data
+Date: Tue, 24 Jul 2012 11:48:55 +0530
+Subject: [PATCH v2 4/4] arm/dts: Add tps65217 regulator DT data to
+ am335x-bone.dts
 In-Reply-To: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
 References: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1343110735-10640-2-git-send-email-anilkumar@ti.com>
+Message-ID: <1343110735-10640-5-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree data for tps65910 regulator by adding all tps65910
-regulator nodes. Regulator is initialized based on compatible name
-provided in tps65910 DT file.
+Add tps65217 regulator device tree data to AM335x-Bone by adding
+regulator consumers with tightened constraints and regulator-name.
+TPS65217 regulator handle can be obtained by using this regulator
+name.
 
-All tps65910 PMIC regulator device tree nodes are placed in a
-separate device tree include file (tps65910.dtsi). This patch
-was tested on AM335x-EVM.
+This patch also add I2C node with I2C frequency and tps65217 PMIC
+I2C slave address.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/tps65910.dtsi |   86 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
- create mode 100644 arch/arm/boot/dts/tps65910.dtsi
+ arch/arm/boot/dts/am335x-bone.dts |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
-new file mode 100644
-index 0000000..92693a8
---- /dev/null
-+++ b/arch/arm/boot/dts/tps65910.dtsi
-@@ -0,0 +1,86 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index a9af4db..8fdf43a 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -18,3 +18,31 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ };
 +
-+/*
-+ * Integrated Power Management Chip
-+ * http://www.ti.com/lit/ds/symlink/tps65910.pdf
-+ */
++&i2c1 {
++	clock-frequency = <400000>;
 +
-+&tps {
-+	compatible = "ti,tps65910";
-+
-+	regulators {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vrtc_reg: regulator at 0 {
-+			reg = <0>;
-+			regulator-compatible = "vrtc";
-+		};
-+
-+		vio_reg: regulator at 1 {
-+			reg = <1>;
-+			regulator-compatible = "vio";
-+		};
-+
-+		vdd1_reg: regulator at 2 {
-+			reg = <2>;
-+			regulator-compatible = "vdd1";
-+		};
-+
-+		vdd2_reg: regulator at 3 {
-+			reg = <3>;
-+			regulator-compatible = "vdd2";
-+		};
-+
-+		vdd3_reg: regulator at 4 {
-+			reg = <4>;
-+			regulator-compatible = "vdd3";
-+		};
-+
-+		vdig1_reg: regulator at 5 {
-+			reg = <5>;
-+			regulator-compatible = "vdig1";
-+		};
-+
-+		vdig2_reg: regulator at 6 {
-+			reg = <6>;
-+			regulator-compatible = "vdig2";
-+		};
-+
-+		vpll_reg: regulator at 7 {
-+			reg = <7>;
-+			regulator-compatible = "vpll";
-+		};
-+
-+		vdac_reg: regulator at 8 {
-+			reg = <8>;
-+			regulator-compatible = "vdac";
-+		};
-+
-+		vaux1_reg: regulator at 9 {
-+			reg = <9>;
-+			regulator-compatible = "vaux1";
-+		};
-+
-+		vaux2_reg: regulator at 10 {
-+			reg = <10>;
-+			regulator-compatible = "vaux2";
-+		};
-+
-+		vaux33_reg: regulator at 11 {
-+			reg = <11>;
-+			regulator-compatible = "vaux33";
-+		};
-+
-+		vmmc_reg: regulator at 12 {
-+			reg = <12>;
-+			regulator-compatible = "vmmc";
-+		};
++	tps: tps at 24 {
++		reg = <0x24>;
 +	};
++};
++
++/include/ "tps65217.dtsi"
++
++&dcdc2_reg {
++	/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
++	regulator-name = "vdd_mpu";
++	regulator-min-microvolt = <925000>;
++	regulator-max-microvolt = <1325000>;
++	regulator-boot-on;
++	regulator-always-on;
++};
++
++&dcdc3_reg {
++	/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
++	regulator-name = "vdd_core";
++	regulator-min-microvolt = <925000>;
++	regulator-max-microvolt = <1150000>;
++	regulator-boot-on;
++	regulator-always-on;
 +};
 -- 
 1.7.9.5
