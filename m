@@ -1,32 +1,41 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Jul 2012 11:53:57 +0300
-Subject: [PATCH 0/5] arm: omap: debug-leds: few changes
-Message-ID: <1343120042-16695-1-git-send-email-balbi@ti.com>
+Date: Tue, 24 Jul 2012 11:54:00 +0300
+Subject: [PATCH 3/5] arm: omap: debug-leds: add section annotation to probe
+In-Reply-To: <1343120042-16695-1-git-send-email-balbi@ti.com>
+References: <1343120042-16695-1-git-send-email-balbi@ti.com>
+Message-ID: <1343120042-16695-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+put our probe function on __devinit section, so
+it can be freed on some cases.
 
-here are a few changes for the debug-leds driver. This series tries to get the
-driver closer to be moved away from arch/arm/plat-omap/ and under drivers/leds.
-There's only the dependency with <plat/fpga.h> now.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/plat-omap/debug-leds.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I tried moving the needed definitions into the C file, but there's another file
-which uses the same structure (arch/arm/mach-omap1/leds-h2p2-debug.c) so I left
-it for another series. Ideally, omap1 would be using the same debug-leds driver
-for that purpose and we could drop the dependency on <plat/fpga.h>.
-
-BTW, patches were compile tested only due to the lack of an H4 board.
-
-Felipe Balbi (5):
-  arm: omap: debug-leds: drop machine_is_* checks
-  arm: omap: debug-leds: move initialization to debug-leds
-  arm: omap: debug-leds: add section annotation to probe
-  arm: omap: debug-leds: add a remove method
-  arm: omap: debug-leds: switch to resource_size()
-
- arch/arm/plat-omap/debug-leds.c | 37 +++++++++++++++++++++++--------------
- 1 file changed, 23 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/plat-omap/debug-leds.c b/arch/arm/plat-omap/debug-leds.c
+index 615d085..392daa8 100644
+--- a/arch/arm/plat-omap/debug-leds.c
++++ b/arch/arm/plat-omap/debug-leds.c
+@@ -236,7 +236,7 @@ fpga_led_set(struct led_classdev *cdev, enum led_brightness value)
+ 	spin_unlock_irqrestore(&lock, flags);
+ }
+ 
+-static void __init newled_init(struct device *dev)
++static void __devinit newled_init(struct device *dev)
+ {
+ 	unsigned	i;
+ 	struct dbg_led	*led;
+@@ -254,7 +254,7 @@ static void __init newled_init(struct device *dev)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int /* __init */ fpga_probe(struct platform_device *pdev)
++static int __devinit fpga_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*iomem;
+ 
 -- 
 1.7.11
