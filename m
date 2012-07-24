@@ -1,47 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jul 2012 14:32:27 +0000
-Subject: [RFC 17/23] ARM: add machine desc hook for early memory/paging
- initialization
-In-Reply-To: <1343092165-9470-18-git-send-email-cyril@ti.com>
+Date: Tue, 24 Jul 2012 14:39:25 +0000
+Subject: [RFC 23/23] ARM: keystone: add switch over to high physical
+ address range
+In-Reply-To: <1343092165-9470-24-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <1343092165-9470-18-git-send-email-cyril@ti.com>
-Message-ID: <201207241432.27790.arnd@arndb.de>
+ <1343092165-9470-24-git-send-email-cyril@ti.com>
+Message-ID: <201207241439.25314.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 24 July 2012, Cyril Chemparathy wrote:
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 0b1c94b..49e9c2a 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -39,6 +39,7 @@ struct machine_desc {
->                                          struct meminfo *);
->         void                    (*reserve)(void);/* reserve mem blocks  */
->         void                    (*map_io)(void);/* IO mapping function  */
-> +       void                    (*init_meminfo)(void);
->         void                    (*init_early)(void);
->         void                    (*init_irq)(void);
->         struct sys_timer        *timer;         /* system tick timer    */
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index e15d83b..7cbe292 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -964,6 +964,9 @@ void __init setup_arch(char **cmdline_p)
->  
->         parse_early_param();
->  
-> +       if (mdesc->init_meminfo)
-> +               mdesc->init_meminfo();
-> +
->         sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
->         sanity_check_meminfo();
->         arm_memblock_init(&meminfo, mdesc);
+> Keystone platforms have their physical memory mapped at an address outside the
+> 32-bit physical range.  A Keystone machine with 16G of RAM would find its
+> memory at 0x0800000000 - 0x0bffffffff.
+> 
+> For boot purposes, the interconnect supports a limited alias of some of this
+> memory within the 32-bit addressable space (0x80000000 - 0xffffffff).  This
+> aliasing is implemented in hardware, and is not intended to be used much
+> beyond boot.  For instance, DMA coherence does not work when running out of
+> this aliased address space.
+> 
+> Therefore, we've taken the approach of booting out of the low physical address
+> range, and subsequently we switch over to the high range once we're safely
+> inside machine specific territory.  This patch implements this switch over
+> mechanism, which involves rewiring the TTBRs and page tables to point to the
+> new physical address space.
+> 
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 
-The function pointers in that structure are ordered by execution time,
-and you call init_meminfo just before ->reserve, so it should go there.
-
-I wonder if it's better to just do the setup in the reserve callback,
-which would be a slight abuse of that interface but also keep down
-the number of early callbacks.
+I think this needs some more explanations. Why is not not possible
+to use this the larger area from the start when we first enable
+paging?
+Also, the code does not really look platform specific, so I could
+imagine that if you need it, other similar platforms will need the
+same thing, and it should be put into common code and enabled
+all the time when using LPAE.
 
 	Arnd
