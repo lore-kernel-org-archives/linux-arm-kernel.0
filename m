@@ -1,50 +1,80 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Jul 2012 08:25:37 -0500
-Subject: [GIT PULL] io.h clean-up for PCI
-In-Reply-To: <201207241243.55640.arnd@arndb.de>
-References: <50049285.1060100@gmail.com> <201207191412.00540.arnd@arndb.de>
- <500E962D.2080104@gmail.com> <201207241243.55640.arnd@arndb.de>
-Message-ID: <500EA251.1090000@gmail.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Tue, 24 Jul 2012 15:30:02 +0200
+Subject: [PATCH RESEND v5 0/4] atmel-mci device tree support
+Message-ID: <1343136606-8874-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2012 07:43 AM, Arnd Bergmann wrote:
-> On Tuesday 24 July 2012, Rob Herring wrote:
->>> --- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
->>> +++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
->>> @@ -95,7 +95,6 @@ extern unsigned long get_iop_tick_rate(void);
->>>  /* PCI-E ranges */
->>>  #define IOP13XX_PCIE_LOWER_IO_PA              0xfffd0000UL
->>>  #define IOP13XX_PCIE_LOWER_IO_BA              0x0UL  /* OIOTVR */
->>> -#define IOP13XX_PCIE_LOWER_IO_BA              0x10000UL
->>
->> This means we have PCIE and PCIX buses both using i/o bus addresses
->> starting at 0x0. We can't have that, right?
->>
->> The requested resource won't match either as the resource start address
->> is bus_nr * 64K.
-> 
-> Well, this is the number that gets written into the outbound
-> translation window register, which has to be zero AFAICT.
-> 
-> The PCI device you plug into the bus will always see its io
-> ports as being between zero and 65536 -- the part that
-> stays at 0x10000UL is the offset address that we use in Linux
-> to give it a unique address in the virtual address space
-> window we use to cover all the io port ranges.
-> 
-> The io_offset still gets set to 0x10000, so this number always
-> gets added and subtracted when converting between Linux port
-> numbers and bus-specific port numbers.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Okay, then this is probably something I need to fix.
+Hello,
 
-How is mem_offset supposed to be set? Generally memory is setup as cpu
-base paddr = pci mem addr, so mem_offset should be 0? But integrator is
-set to the cpu paddr, and it works.
+I resend this set of patches because patches 2, 3 and 4 were acked by
+Jean-Christophe. Patch 1 was also acked by Jean-Christophe excepted for
+cd-inverted property since it was redundant with gpio bindings.
 
-Rob
+I thought we were agree to go ahead since it was a common binding already
+documented and it will concern all drivers.
 
-> 
-> 	Arnd
-> 
+Chris are you agree to take patch 1/4? Others patches may go to at91 tree,
+isn't it?
+By the way, I have updated documentation in patch 1/4 in the same way as you
+did with the patch 'mmc: dt: Deduplicate binding docs by referencing mmc.txt'.
+I didn't remove common properties from slot part because I think it is not
+obvious to use these properties into the slot node.
+
+Regards
+
+Ludovic
+
+
+v5:
+- cleanup
+- split dts commit: one for SOCs, one for boards
+
+v4:
+- cleanup
+- add extra chips and boards for atmel-mci dt support
+
+v3:
+- use cd-inverted instead of cd-invert to follow mmc common binding.
+- don't assign a pointer to pdev->dev.platform.
+- add mci controller nodes to other chips and boards.
+- put all dts file changes together.
+
+v2:
+- squash patch v1 2/4 and 3/4.
+- change atmci_get_of_slots to atmci_of_init and manage pdata allocation into
+it.
+- correct potential issue (e.g. having only one slot which is not slot0 into
+the dt) about slots by adding a reg property corresponding to the slot id.
+
+Ludovic Desroches (4):
+  mmc: atmel-mci: add device tree support
+  ARM: at91: add clocks for DT entries
+  ARM: dts: add nodes for atmel hsmci controllers for atmel SOCs
+  ARM: dts: add nodes for atmel hsmci controllers for atmel boards
+
+ .../devicetree/bindings/mmc/atmel-hsmci.txt        |   68 ++++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    9 ++
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   18 ++++
+ arch/arm/boot/dts/at91sam9263ek.dts                |   10 +++
+ arch/arm/boot/dts/at91sam9g20ek_2mmc.dts           |   12 +++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |    9 ++
+ arch/arm/boot/dts/at91sam9g25ek.dts                |   18 ++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   18 ++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |   19 +++++
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |    9 ++
+ arch/arm/boot/dts/at91sam9n12ek.dts                |    9 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   18 ++++
+ arch/arm/mach-at91/at91sam9260.c                   |    1 +
+ arch/arm/mach-at91/at91sam9263.c                   |    2 +
+ arch/arm/mach-at91/at91sam9g45.c                   |    2 +
+ arch/arm/mach-at91/at91sam9n12.c                   |    1 +
+ arch/arm/mach-at91/at91sam9x5.c                    |    2 +
+ drivers/mmc/host/atmel-mci.c                       |   85 +++++++++++++++++++-
+ 18 files changed, 308 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+
+-- 
+1.7.5.4
