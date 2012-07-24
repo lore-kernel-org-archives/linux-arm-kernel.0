@@ -1,34 +1,69 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 01:10:24 -0000
-Subject: [RFC 13/23] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
+Date: Tue, 24 Jul 2012 01:38:31 -0000
+Subject: [RFC 14/23] ARM: LPAE: factor out T1SZ and TTBR1 computations
 In-Reply-To: <1343092165-9470-1-git-send-email-cyril@ti.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
-Message-ID: <1343092165-9470-14-git-send-email-cyril@ti.com>
+Message-ID: <1343092165-9470-15-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
-On PAE systems, the absence of this override causes bootmem to incorrectly
-limit itself to 32-bit addressable physical memory.
+This patch moves the TTBR1 offset calculation and the T1SZ calculation out
+of the TTB setup assembly code.  This should not affect functionality in
+any way, but improves code readability as well as readability of subsequent
+patches in this series.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/include/asm/memory.h |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   10 ++++++++++
+ arch/arm/mm/proc-v7-3level.S                |   16 ++++------------
+ 2 files changed, 14 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 7629dfe..c330a23 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -285,6 +285,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- #define arch_is_coherent()		0
- #endif
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index d795282..b501650 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -74,4 +74,14 @@
+ #define PHYS_MASK_SHIFT		(40)
+ #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
  
-+#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
++#if defined CONFIG_VMSPLIT_2G
++#define TTBR1_OFFSET	(1 << 4)		/* skip two L1 entries */
++#elif defined CONFIG_VMSPLIT_3G
++#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
++#else
++#define TTBR1_OFFSET	0
++#endif
++
++#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
 +
  #endif
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 0001581..3b1a745 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -120,18 +120,10 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	 * booting secondary CPUs would end up using TTBR1 for the identity
+ 	 * mapping set up in TTBR0.
+ 	 */
+-	bhi	9001f				@ PHYS_OFFSET > PAGE_OFFSET?
+-	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
+-#if defined CONFIG_VMSPLIT_2G
+-	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
+-	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
+-#elif defined CONFIG_VMSPLIT_3G
+-	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
+-	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
+-#endif
+-	/* CONFIG_VMSPLIT_1G does not need TTBR1 adjustment */
+-9001:	mcr	p15, 0, \tmp, c2, c0, 2		@ TTB control register
+-	mcrr	p15, 1, \ttbr1, \zero, c2	@ load TTBR1
++	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
++	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
++	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
++	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
+ 	.endm
  
- #include <asm-generic/memory_model.h>
+ 	__CPUINIT
 -- 
 1.7.9.5
