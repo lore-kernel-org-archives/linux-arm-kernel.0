@@ -1,32 +1,27 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 24 Jul 2012 14:51:35 -0600 (MDT)
-Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
-In-Reply-To: <201207240751.39111.arnd@arndb.de>
-References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
- <CA+55aFyObNFgsaVOsjVOcH+aLjDyOgcqpvckM29T3dvugekVwg@mail.gmail.com>
- <201207240751.39111.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.00.1207241436570.10781@utopia.booyaka.com>
+Date: Tue, 24 Jul 2012 14:52:48 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP3: clockdomain: fix accidental duplicate
+ registration
+In-Reply-To: <20120724081636.GT6522@atomide.com>
+References: <alpine.DEB.2.00.1207120448120.25585@utopia.booyaka.com>
+ <87394wg97u.fsf@ti.com> <20120713064713.GI1122@atomide.com>
+ <20120714085257.GB6522@atomide.com>
+ <alpine.DEB.2.00.1207141150340.3876@utopia.booyaka.com>
+ <20120716083609.GG6522@atomide.com>
+ <alpine.DEB.2.00.1207180341001.16772@utopia.booyaka.com>
+ <20120719115216.GP6522@atomide.com>
+ <alpine.DEB.2.00.1207191242080.14390@utopia.booyaka.com>
+ <20120724081636.GT6522@atomide.com>
+Message-ID: <alpine.DEB.2.00.1207241451580.10781@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, 24 Jul 2012, Tony Lindgren wrote:
 
-On Tue, 24 Jul 2012, Arnd Bergmann wrote:
+> OK looks like Linus fixed up part of it, care to check what's needed
+> against current mainline now?
 
-> On Tuesday 24 July 2012, Linus Torvalds wrote:
-> 
-> > In your "for-linus" branch, "&mpu_3xxx_clkdm" remains in the
-> > clockdomains_common[] array. In my merge, it is gone. But I think I
-> > did the merge correctly, and you did it wrong. HOWEVER, I don't know
-> > the code, maybe there is some subtle reason why you did it like you
-> > did.
-> 
-> Yes, I think you are right now that I look at it again. Paul Walmsley
-> can have another look at the merge and send an update if we are both
-> missing something now.
+Current mainline seems to be okay here.
 
-Linus' merge is correct.
-
-thanks for asking,
 
 - Paul
