@@ -1,95 +1,79 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 24 Jul 2012 11:15:18 +0900
-Subject: [PATCH V2 6/7] ARM: EXYNOS5: Add the bus clock for FIMD
-In-Reply-To: <500E00A3.8080203@samsung.com>
-References: <1342591053-7092-1-git-send-email-l.krishna@samsung.com>
- <1342591053-7092-7-git-send-email-l.krishna@samsung.com>
- <500D0C8B.3080007@samsung.com> <500D1F59.9030807@samsung.com>
- <000301cd6928$e5021660$af064320$%han@samsung.com>
- <500DE22F.5010006@samsung.com>
- <000601cd692e$b2ba7a70$182f6f50$%han@samsung.com>
- <500E00A3.8080203@samsung.com>
-Message-ID: <000101cd6942$2badc960$83095c20$%han@samsung.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Tue, 24 Jul 2012 11:19:25 +0900
+Subject: [PATCH v2] video: exynos: s6e8ax0: support early fb event of
+ fb_blank()
+Message-ID: <500E062D.2020307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 24, 2012 10:56 AM, Joonyoung Shim Wrote:
-> 
-> On 07/24/2012 08:55 AM, Jingoo Han wrote:
-> > On Tuesday, July 24, 2012 8:46 AM, Joonyoung Shim Wrote:
-> >> On 07/24/2012 08:14 AM, Jingoo Han wrote:
-> >>> On Monday, July 23, 2012 6:55 PM, Joonyoung Shim wrote:
-> >>>> Hi, Jingoo.
-> >>>>
-> >>>> On 07/23/2012 05:34 PM, Joonyoung Shim wrote:
-> >>>>> On 07/18/2012 02:57 PM, Leela Krishna Amudala wrote:
-> >>>>>> This patch adds the bus clock for FIMD and changes
-> >>>>>> the device name for lcd clock
-> >>>>> Please refer below patch for exynos4.
-> >>>>>
-> >>>>> http://lists.linaro.org/pipermail/linaro-dev/2011-December/008872.html
-> >>>>>
-> >>>>>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> >>>>>> ---
-> >>>>>>     arch/arm/mach-exynos/clock-exynos5.c |    7 ++++++-
-> >>>>>>     1 files changed, 6 insertions(+), 1 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>> b/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>> index 774533c..f001876 100644
-> >>>>>> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> >>>>>> @@ -634,6 +634,11 @@ static struct clk exynos5_init_clocks_off[] = {
-> >>>>>>             .enable        = exynos5_clk_ip_disp1_ctrl,
-> >>>>>>             .ctrlbit    = (1 << 3),
-> >>>>>>         }, {
-> >>>>>> +        .name           = "fimd",
-> >>>>>> +        .devname        = "exynos5-fb",
-> >>>>>> +        .enable         = exynos5_clk_ip_disp1_ctrl,
-> >>>>>> +        .ctrlbit        = (1 << 0),
-> >>>>>> +    }, {
-> >>>> With this patch, it causes below error at the DP driver because fimd
-> >>>> clock is disabled.
-> >>>>
-> >>>> [    0.210000] exynos-dp exynos-dp: Timeout of video streamclk ok
-> >>>> [    0.210000] exynos-dp exynos-dp: unable to config video
-> >>>> [    0.210000] exynos-dp: probe of exynos-dp failed with error -110
-> >>>>
-> >>>> I wonder fimd clock has any dependency with DP
-> >>> FIMD pixel clock is necessary to enable DP.
-> >> So then, i think DP driver also should control FIMD pixel clock.
-> >> Do you have any patch or plan for it?
-> > Um, I don't think so.
-> > Because, DP cannot work by itself.
-> > In order to use DP, FIMD should be enabled.
-> >
-> > If FIMD is enabled, FIMD pixel clock is enabled;
-> > therefore, DP driver does not need to control FIMD pixel clock.
-> 
-> Why does DP driver have FIMD driver dependency? Also for this, it needs
-> FIMD driver is probed earlier then DP driver.  We cannot decide driver
-> probe order if they are same level drivers and itself is weird
-> condition.  Although there is hardware dependency, DP and FIMD driver
-> don't have any code relations. They are each other drivers. But DP
-> needs FIMD pixel clock and because the clock can be control at the
-> several drivers and the clock framework exists for that, then i think
-> it's better DP driver also control FIMD pixel clock.
-> 
-> >
-> > In my opinion, adding config dependency would be better, such as FB_S3C or DRM_EXYNOS_FIMD.
-> 
-> I think this is not solution. How do you ensure FIMD driver is probed
-> earlier than DP driver? Even if it's possible, when FIMD driver only
-> controls pixel clock, DP driver will execute any operations regardless
-> status of FIMD pixel clock, so if FIMD driver turns off pixel clock,
-> then DP will occur any error.
+This patch supports early fb event of fb_blank().
 
-late_initcall can ensure DP driver is probed later.
+- In case of lcd power off : call early_set_power() interface and lcd
+power is off. And then framebuffer is blanked.
 
-As you mentioned, DP controller does not work without FIMD controller.
-Because FIMD controller should provide video data and video clock to DP controller.
-In this case, adding config dependency would be good.
+- In case of lcd power on : First, framebuffer is unblanked, and then
+call set_power() interface to turn lcd on.
 
-If FIMD driver turns off pixel clock, DP should be turned off too.
-Currently, FB FIMD driver turns off pixel clock in remove() and suspend().
-So, FIMD driver is enabled, DP will not occur any error on pixel clock.
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Changes of v1:
+	- changes function name from s6e8aa0_early_set_power() to
+	s6e8ax0_early_set_power()
+
+ drivers/video/exynos/s6e8ax0.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/video/exynos/s6e8ax0.c b/drivers/video/exynos/s6e8ax0.c
+index 05d080b..bfb1919 100644
+--- a/drivers/video/exynos/s6e8ax0.c
++++ b/drivers/video/exynos/s6e8ax0.c
+@@ -663,6 +663,37 @@ static int s6e8ax0_gamma_ctrl(struct s6e8ax0 *lcd, int gamma)
+ 	return 0;
+ }
+ 
++static int s6e8ax0_early_set_power(struct lcd_device *ld, int power)
++{
++	struct s6e8ax0 *lcd = lcd_get_data(ld);
++	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
++	int ret = 0;
++
++	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
++			power != FB_BLANK_NORMAL) {
++		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
++		return -EINVAL;
++	}
++
++	if (lcd->power == power) {
++		dev_err(lcd->dev, "power mode is same as previous one.\n");
++		return -EINVAL;
++	}
++
++	if (ops->set_early_blank_mode) {
++		/* LCD power off */
++		if ((POWER_IS_OFF(power) && POWER_IS_ON(lcd->power))
++			|| (POWER_IS_ON(lcd->power) && POWER_IS_NRM(power))) {
++			ret = ops->set_early_blank_mode(lcd_to_master(lcd),
++							power);
++			if (!ret && lcd->power != power)
++				lcd->power = power;
++		}
++	}
++
++	return ret;
++}
++
+ static int s6e8ax0_set_power(struct lcd_device *ld, int power)
+ {
+ 	struct s6e8ax0 *lcd = lcd_get_data(ld);
+@@ -731,6 +762,7 @@ static int s6e8ax0_set_brightness(struct backlight_device *bd)
+ }
+ 
+ static struct lcd_ops s6e8ax0_lcd_ops = {
++	.early_set_power = s6e8ax0_early_set_power,
+ 	.set_power = s6e8ax0_set_power,
+ 	.get_power = s6e8ax0_get_power,
+ };
+-- 
+1.7.4.1
