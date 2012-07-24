@@ -1,68 +1,32 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 24 Jul 2012 06:41:54 -0400
-Subject: [RFC 00/23] Introducing the TI Keystone platform
-In-Reply-To: <20120724090841.GA16435@mudshark.cambridge.arm.com>
+Date: Tue, 24 Jul 2012 06:43:49 -0400
+Subject: [RFC 01/23] ARM: LPAE: disable phys-to-virt patching on PAE
+ systems
+In-Reply-To: <20120724094143.GB20132@arm.com>
 References: <1343092165-9470-1-git-send-email-cyril@ti.com>
- <20120724090841.GA16435@mudshark.cambridge.arm.com>
-Message-ID: <500E7BF2.9030305@ti.com>
+ <1343092165-9470-2-git-send-email-cyril@ti.com>
+ <20120724094143.GB20132@arm.com>
+Message-ID: <500E7C65.6040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Catalin,
 
-On 7/24/2012 5:08 AM, Will Deacon wrote:
-> Hi Cyril,
->
-> Thanks for this, certainly looks like an interesting platform!
->
-> Of course, in order to perform any sort of sensible review, I'll need some
-> silicon to test it on :)
->
-
-We have (so far) been testing this on software simulators, and we have 
-an earlier version of this code booting up on an FPGA based emulation 
-platform.
-
-> On Tue, Jul 24, 2012 at 02:09:02AM +0100, Cyril Chemparathy wrote:
->> TI's scalable KeyStone II architecture includes support for both TMS320C66x
->> floating point DSPs and ARM Cortex-A15 clusters, for a mixture of up to 32
->> cores per SoC.  The solution is optimized around a high performance chip
->> interconnect and a rich set of on chip peripherals.  Please refer [1] for
->> initial technical documentation on these devices.
->
-> How many A15s can you have on such a SoC? It wasn't clear whether it was 1x4
-> or 4x4 from the documentation.
->
-
-This device has a single cluster of 4 A15s.
-
->> This patch series provides a basic Linux port for these devices, including
->> support for SMP, and LPAE boot.  A majority of the patches in this series are
->> related to LPAE functionality, imposed by the device architecture which has
->> system memory mapped at an address above the 4G 32-bit addressable limit.
->
-> I assume you have *some* memory in the bottom 32-bits though, right? Even if
-> it's just a partial alias of a higher bank.
->
-
-Yes, there is a boot time alias of the initial part of memory in the 
-32-bit space.  But this alias is somewhat limited in capabilities, and 
-therefore we do not intend to use it much beyond boot.
-
->> This patch series is based on the v3.5 kernel with the smp_ops patch set
->> applied on top.  This series is being posted to elicit early feedback, and so
->> that some of these fixes may get incorporated early on into the kernel code.
+On 7/24/2012 5:41 AM, Catalin Marinas wrote:
+> On Tue, Jul 24, 2012 at 02:09:03AM +0100, Cyril Chemparathy wrote:
+>> From: Vitaly Andrianov <vitalya@ti.com>
 >>
->>    [1] - http://www.ti.com/product/tms320tci6636
+>> The current phys-to-virt patching mechanism is broken on PAE machines with
+>> 64-bit physical addressing.  This patch disables the patching mechanism in
+>> such configurations.
 >
-> This is marked as `TI confidential' but I guess that's an oversight [or will
-> you have to kill me?].
+> It may be broken, I don't remember whether I tested this feature. What's
+> the PHYS_OFFSET on your platform? Is it within the low 4GB range?
 >
 
-:-)  That is an oversight, I'm sure.
-
-> Will
->
+At boot time PHYS_OFFSET is 0x80000000, in the low 4G range. 
+Subsequently we switch over to the high PHYS_OFFSET at 0x800000000 (see 
+patch 23/23 of this series).
 
 -- 
 Thanks
