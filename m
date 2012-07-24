@@ -1,21 +1,23 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 24 Jul 2012 13:19:05 -0700
-Subject: [PATCH 0/2] ARM: exynos: Enable TMU support in exynos platforms
-In-Reply-To: <201207242153.11363.rjw@sisk.pl>
-References: <1342084543-8302-1-git-send-email-amit.daniel@samsung.com>
- <CAK9yfHwGU8EWsXoY9_gDn5=zyJhqtaZbKXzwyGais8u0iaL8xA@mail.gmail.com>
- <20120724190318.GA10922@roeck-us.net>
- <201207242153.11363.rjw@sisk.pl>
-Message-ID: <20120724201905.GA10955@roeck-us.net>
+From: peter.fordham@gmail.com (Peter Fordham)
+Date: Tue, 24 Jul 2012 13:47:36 -0700
+Subject: Corext A9 Errara 782773
+Message-ID: <CAK5=ZRKrZt329o9fs41uNw16N1c3TZHZeJ+UGs+XVBaFaNuQTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2012 at 09:53:11PM +0200, Rafael J. Wysocki wrote:
-[ ... ]
-> > If anything, I should not have applied Rafael's patch to the driver either.
-> 
-> Well, it looks like I sent it at a wrong time.  Sorry about that.
-> 
-My fault, not yours.
+Hi,
 
-Guenter
+I'm reviewing the errata notices from ARM for the rev 3 Cortex-A9
+which we are using in a design (14 Jun 2012 issue). I'm not sure
+whether this item should be of concern. I see no mention of it in the
+archive of this mailing list or in the kernel tree:
+
+"782773: Updating a translation entry to move a page mapping might
+erroneously cause an unexpected translation fault."
+
+I think it may require a workaround in the cpu_v7_set_pte_ext
+function. Has anyone else looked into this?
+
+thanks,
+
+-Pete Fordham
