@@ -1,42 +1,44 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Tue, 24 Jul 2012 18:06:06 +0900
-Subject: [PATCH v2 2/2] ARM: delay: allow timer-based delay implementation
- to be selected
-In-Reply-To: <20120720101751.GB26658@mudshark.cambridge.arm.com>
-References: <4FFEFDE3.5000403@codeaurora.org> <4FFF8509.2050302@renesas.com>
- <20120713085746.GA18079@mudshark.cambridge.arm.com>
- <CAMQu2gwPm_Y1as6dc4S-f9OEOZA32CCNKv_07MB+U7T4OS6qXg@mail.gmail.com>
- <20120713111337.GH18079@mudshark.cambridge.arm.com>
- <5004D78E.4050606@renesas.com>
- <CAMQu2gx9EU4GZ634RKiwD+sg0MoO-FAqc-pPU+HkryX8rXVBjA@mail.gmail.com>
- <5005176C.6050904@renesas.com>
- <20120718175233.GB16928@mudshark.cambridge.arm.com> <50082598.5090706@arm.com>
- <20120720101751.GB26658@mudshark.cambridge.arm.com>
-Message-ID: <500E657E.8070301@renesas.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 24 Jul 2012 12:06:30 +0300
+Subject: [PATCH] ARM: tegra: make tegra_cpu_reset_handler_enable() __init
+In-Reply-To: <500DAF7A.3000302@wwwdotorg.org>
+References: <1340053310-20855-1-git-send-email-swarren@wwwdotorg.org>
+ <20120718150130.GV9437@tbergstrom-lnx.Nvidia.com>
+ <500DAF7A.3000302@wwwdotorg.org>
+Message-ID: <20120724090630.GI12034@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Jonathan,
-
-On 7/20/2012 7:17 PM, Will Deacon wrote:
-> On Thu, Jul 19, 2012 at 04:19:52PM +0100, Jonathan Austin wrote:
->> We should probably also ignore and additional registration calls, not just
->> those made after the delay loop has been calibrated...
->>
->> Something like the patch below should do the trick.
+On Mon, Jul 23, 2012 at 10:09:30PM +0200, Stephen Warren wrote:
+> On 07/18/2012 09:01 AM, Peter De Schrijver wrote:
+> > On Mon, Jun 18, 2012 at 11:01:50PM +0200, Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> This solves a section mismatch warning. I hadn't noticed this before,
+> >> because my compiler was inlining tegra_cpu_reset_handler_enable() inside
+> >> tegra_cpu_reset_handler_init(), which is already __init, but I switched
+> >> compilers and it stopped doing that.
+> > 
+> > Why does this generate a section mismatch warning? I see why calling a
+> > a __init marked function from a non __init marked function is a problem, but
+> > the opposite should be ok no?
 > 
-> [...]
+> The issue is that tegra_cpu_reset_handler_enable() itself (which was not
+> __init but the patch made to be __init) was referencing variable
+> __tegra_cpu_reset_handler_{start,end}. This wasn't noticed before
+> because when tegra_cpu_reset_handler_enable() was inlined into
+> tegra_cpu_reset_handler_init(), tegra_cpu_reset_handler_enable() was
+> effectively __init. However, when built as a separate function, you
+> ended up with a non-__init function referencing other things that were
+> __init.
 > 
-> Cheers, pushed into my delay branch.
+> In other words, this is indeed nothing to do with __init function
+> tegra_cpu_reset_handler_init() calling non-__init function
+> tegra_cpu_reset_handler_enable().
 
-Thanks for the registration machanism.  It looks nice, and works for
-me on a Cortex-A9 SMP platform with a non-arch_timer counter.
+Ah. That makes sense :) We need to be careful with this when introducing
+system suspend support because some of this work needs to be redone on resume.
 
-I've picked up a revised version of the patch from will/delay and
-merged it into our local development branch.  We'll give it a try
-in different conditions, UP and SMP, with/without DVFS and so on,
-and let you know if I find anything.
+Cheers,
 
--- 
-Shinya Kuribayashi
-Renesas Electronics
+Peter.
