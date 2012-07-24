@@ -1,42 +1,91 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Jul 2012 08:42:57 +0200
-Subject: [PATCH] I2C: MV64XYZ: Add Device Tree support
-In-Reply-To: <20120723200359.GB31645@pengutronix.de>
-References: <1342954295-13279-1-git-send-email-andrew@lunn.ch>
- <20120723200359.GB31645@pengutronix.de>
-Message-ID: <20120724064257.GQ18778@lunn.ch>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 24 Jul 2012 14:43:28 +0800
+Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <1342567672-29071-1-git-send-email-ccross@android.com>
+References: <1342567672-29071-1-git-send-email-ccross@android.com>
+Message-ID: <CAGsJ_4z_tF3LKy-vygr=kwah7q7U03Y2K2XKAkZTB1QC2pSYmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 10:03:59PM +0200, Wolfram Sang wrote:
-> On Sun, Jul 22, 2012 at 12:51:35PM +0200, Andrew Lunn wrote:
-> > Extends the driver to get properties from device tree. Rather than
-> > pass the N & M factors in DT, use the more standard clock-frequency
-> > property. Calculate N & M at run time. In order to do this, we need to
-> > know tclk. So the driver uses clk_get() etc in order to get the clock
-> > and clk_get_rate() to determine the tclk rate. Not all platforms
-> > however have CLK, so some #ifdefery is needed to ensure the driver
-> > still compiles when CLK is not available.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Sparse complained about this:
-> 
-> drivers/i2c/busses/i2c-mv64xxx.c:584:54: warning: incorrect type in argument 3 (different signedness)
-> drivers/i2c/busses/i2c-mv64xxx.c:584:54:    expected unsigned int [usertype] *out_value
-> drivers/i2c/busses/i2c-mv64xxx.c:584:54:    got int *<noident>
-> drivers/i2c/busses/i2c-mv64xxx.c:586:41: warning: incorrect type in argument 3 (different signedness)
-> drivers/i2c/busses/i2c-mv64xxx.c:586:41:    expected int *best_n
-> drivers/i2c/busses/i2c-mv64xxx.c:586:41:    got unsigned int *<noident>
-> drivers/i2c/busses/i2c-mv64xxx.c:586:60: warning: incorrect type in argument 4 (different signedness)
-> drivers/i2c/busses/i2c-mv64xxx.c:586:60:    expected int *best_m
-> drivers/i2c/busses/i2c-mv64xxx.c:586:60:    got unsigned int *<noident>
-> 
-> I applied your patch with the following fix to -next. Let me know if you agree
-> with that.
+2012/7/18 Colin Cross <ccross@android.com>:
+> Many clocks that are used to provide sched_clock will reset during
+> suspend.  If read_sched_clock returns 0 after suspend, sched_clock will
+> appear to jump forward.  This patch resets cd.epoch_cyc to the current
+> value of read_sched_clock during resume, which causes sched_clock() just
+> after suspend to return the same value as sched_clock() just before
+> suspend.
+>
+> In addition, during the window where epoch_ns has been updated before
+> suspend, but epoch_cyc has not been updated after suspend, it is unknown
+> whether the clock has reset or not, and sched_clock() could return a
+> bogus value.  Add a suspended flag, and return the pre-suspend epoch_ns
+> value during this period.
 
-Hi Wolfram
+Acked-by: Barry Song <21cnbao@gmail.com>
 
-Looks good, thanks for the fix.
+this patch should also fix the issue that:
+1. launch some rt threads, rt threads sleep before suspend
+2. repeat to suspend/resume
+3. after resuming, waking up rt threads
 
-      Andrew
+repeat 1-3 again and again, sometimes all rt threads will hang after
+resuming due to wrong sched_clock will make sched_rt think rt_time is
+much more than rt_runtime (default 950ms in 1s). then rt threads will
+lost cpu timeslot to run since the 95% threshold is there.
+
+>
+> This will have a side effect of causing SoCs that have clocks that
+> continue to count in suspend to appear to stop counting, reporting the
+> same sched_clock() value before and after suspend.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+>  arch/arm/kernel/sched_clock.c |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+> index 27d186a..46c7d32 100644
+> --- a/arch/arm/kernel/sched_clock.c
+> +++ b/arch/arm/kernel/sched_clock.c
+> @@ -21,6 +21,7 @@ struct clock_data {
+>         u32 epoch_cyc_copy;
+>         u32 mult;
+>         u32 shift;
+> +       bool suspended;
+>  };
+>
+>  static void sched_clock_poll(unsigned long wrap_ticks);
+> @@ -49,6 +50,9 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
+>         u64 epoch_ns;
+>         u32 epoch_cyc;
+>
+> +       if (cd.suspended)
+> +               return cd.epoch_ns;
+> +
+>         /*
+>          * Load the epoch_cyc and epoch_ns atomically.  We do this by
+>          * ensuring that we always write epoch_cyc, epoch_ns and
+> @@ -169,11 +173,20 @@ void __init sched_clock_postinit(void)
+>  static int sched_clock_suspend(void)
+>  {
+>         sched_clock_poll(sched_clock_timer.data);
+> +       cd.suspended = true;
+>         return 0;
+>  }
+>
+> +static void sched_clock_resume(void)
+> +{
+> +       cd.epoch_cyc = read_sched_clock();
+> +       cd.epoch_cyc_copy = cd.epoch_cyc;
+> +       cd.suspended = false;
+> +}
+> +
+>  static struct syscore_ops sched_clock_ops = {
+>         .suspend = sched_clock_suspend,
+> +       .resume = sched_clock_resume,
+>  };
+>
+>  static int __init sched_clock_syscore_init(void)
+
+
+-barry
