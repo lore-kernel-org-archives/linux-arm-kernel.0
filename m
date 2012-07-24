@@ -1,39 +1,32 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Jul 2012 11:53:58 +0300
-Subject: [PATCH 1/5] arm: omap: debug-leds: drop machine_is_* checks
+Date: Tue, 24 Jul 2012 11:54:02 +0300
+Subject: [PATCH 5/5] arm: omap: debug-leds: switch to resource_size()
 In-Reply-To: <1343120042-16695-1-git-send-email-balbi@ti.com>
 References: <1343120042-16695-1-git-send-email-balbi@ti.com>
-Message-ID: <1343120042-16695-2-git-send-email-balbi@ti.com>
+Message-ID: <1343120042-16695-6-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-that platform_device is only registered by
-board-h4.c, so there's no need to check which
-machine is running as the driver won't bind
-to anything.
+instead of hardcoding the address space size, we
+can calculate it using resource_size() helper.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/plat-omap/debug-leds.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ arch/arm/plat-omap/debug-leds.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/plat-omap/debug-leds.c b/arch/arm/plat-omap/debug-leds.c
-index 39407cb..17cbef6 100644
+index 08fbb85..ebc0317 100644
 --- a/arch/arm/plat-omap/debug-leds.c
 +++ b/arch/arm/plat-omap/debug-leds.c
-@@ -304,12 +304,6 @@ static struct platform_driver led_driver = {
+@@ -272,7 +272,7 @@ static int __devinit fpga_probe(struct platform_device *pdev)
+ 	if (!iomem)
+ 		return -ENODEV;
  
- static int __init fpga_init(void)
- {
--	if (machine_is_omap_h4()
--			|| machine_is_omap_h3()
--			|| machine_is_omap_h2()
--			|| machine_is_omap_perseus2()
--			)
--		return platform_driver_register(&led_driver);
--	return 0;
-+	return platform_driver_register(&led_driver);
- }
- fs_initcall(fpga_init);
+-	fpga = ioremap(iomem->start, H2P2_DBG_FPGA_SIZE);
++	fpga = ioremap(iomem->start, resource_size(iomem));
+ 	__raw_writew(~0, &fpga->leds);
+ 
+ #ifdef	CONFIG_LEDS
 -- 
 1.7.11
