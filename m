@@ -1,109 +1,48 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 24 Jul 2012 10:07:24 +0200
-Subject: [PATCH 1/2] PWM: ECAP: PWM driver support for ECAP APWM.
-In-Reply-To: <518397C60809E147AF5323E0420B992E3E9727CB@DBDE01.ent.ti.com>
-References: <1342172102-30363-1-git-send-email-avinashphilip@ti.com>
- <1342172102-30363-2-git-send-email-avinashphilip@ti.com>
- <20120723065235.GA23797@avionic-0098.mockup.avionic-design.de>
- <518397C60809E147AF5323E0420B992E3E971530@DBDE01.ent.ti.com>
- <20120723092204.GA8607@avionic-0098.mockup.avionic-design.de>
- <518397C60809E147AF5323E0420B992E3E971887@DBDE01.ent.ti.com>
- <20120723133704.GB21254@avionic-0098.mockup.avionic-design.de>
- <518397C60809E147AF5323E0420B992E3E9727CB@DBDE01.ent.ti.com>
-Message-ID: <20120724080724.GA29810@avionic-0098.mockup.avionic-design.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Jul 2012 01:12:47 -0700
+Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
+In-Reply-To: <201207240751.39111.arnd@arndb.de>
+References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
+ <CA+55aFyObNFgsaVOsjVOcH+aLjDyOgcqpvckM29T3dvugekVwg@mail.gmail.com>
+ <201207240751.39111.arnd@arndb.de>
+Message-ID: <20120724081246.GS6522@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2012 at 07:52:06AM +0000, Philip, Avinash wrote:
-> On Mon, Jul 23, 2012 at 19:07:04, Thierry Reding wrote:
-> > On Mon, Jul 23, 2012 at 12:44:38PM +0000, Philip, Avinash wrote:
-> > > On Mon, Jul 23, 2012 at 14:52:04, Thierry Reding wrote:
-> > > > On Mon, Jul 23, 2012 at 09:10:09AM +0000, Philip, Avinash wrote:
-> > > > > On Mon, Jul 23, 2012 at 12:22:35, Thierry Reding wrote:
-> > > > > > On Fri, Jul 13, 2012 at 03:05:01PM +0530, Philip, Avinash wrote:
-> > > > > > > +	/*
-> > > > > > > +	 * Enable 'Free run Time stamp counter mode' to start counter
-> > > > > > > +	 * and  'APWM mode' to enable APWM output
-> > > > > > > +	 */
-> > > > > > > +	reg_val = readw(pc->mmio_base + ECCTL2);
-> > > > > > > +	reg_val |= ECCTL2_TSCTR_FREERUN | ECCTL2_APWM_MODE;
-> > > > > > 
-> > > > > > You already set the APWM_MODE bit in .config(), why is it needed here
-> > > > > > again? Seeing that .disable() clears the bit as well, perhaps leaving it
-> > > > > > clear in .config() is the better option.
-> > > > > 
-> > > > > Clearing APWM mode in .disable() ensures PWM low output (i.e., PWM pin = low 
-> > > > > in idle state).
-> > > > > 
-> > > > > The Period & Compare registers are updated from Shadow registers (CAP1 & CAP2)
-> > > > > During PWM configuration. To enable loading from Shadow registers, APWM mode 
-> > > > > should be set.
-> > > > > The same is done in .config().
-> > > > 
-> > > > My point was that if you do it in .enable(), then why do you still set
-> > > > it in .config()? Since the sequence is typically .config() followed by
-> > > > .enable(), setting the bit in both seems redundant. It should be enough
-> > > > to load the registers during .enable(), right?
-> > > 
-> > > Consider scenarios where .enable() can be called without calling .config().
-> > > Example I just need to stop the pwm signal momentarily and re-enable.
-> > > In this case, .config() need not be called. So, APWM mode bit needs to be 
-> > > set in .enable()
-> > > 
-> > > Now, considering .config() followed by .enable().
-> > > Currently in PWM driver, the CAP1 & CAP2 registers is copied to shadow 
-> > > Registers (CAP3 & CAP4) by hardwaare in .config(). This requires APWM
-> > > mode bit to be set. 
-> > > 
-> > > The same can be done in .enable() also. However, we again need to pass 
-> > > the pwm parameters (period & duty cycle values) to the .enable(). 
-> > > We don't want to duplicate this parameter passing. 
-> > > To avoid this we enable the APWM mode bit in both .config() & .enable().
-> > 
-> > That's weird. I assumed that the values written to the shadow registers
-> > would automatically be copied to the active registers on each new PWM
-> > period.
+* Arnd Bergmann <arnd@arndb.de> [120724 00:57]:
+> On Tuesday 24 July 2012, Linus Torvalds wrote:
 > 
-> This is correct in case if PWM is running.
+> > In your "for-linus" branch, "&mpu_3xxx_clkdm" remains in the
+> > clockdomains_common[] array. In my merge, it is gone. But I think I
+> > did the merge correctly, and you did it wrong. HOWEVER, I don't know
+> > the code, maybe there is some subtle reason why you did it like you
+> > did.
 > 
-> > If I understand correctly what you're saying, however, the eCAP
-> > requires the APWM bit to be set in order to write the shadow registers
-> > at all.
-> 
-> In APWM mode, writing to CAP1/CAP2 (active registers) will also write the
-> same value to the corresponding CAP3/CAP4 (shadow registers). This emulates
-> immediate mode. 
-> 
-> Writing directly to the shadow registers CAP3/CAP4 will invoke the
-> shadow mode.
-> 
-> If PWM is not running, cycle & duty values written to active registers, not
-> to shadow registers. To copy these value to shadow registers APWM mode to be
-> set. This way reloading from shadow registers can be ensured on next PWM
-> period/cycle.
+> Yes, I think you are right now that I look at it again. Paul Walmsley
+> can have another look at the merge and send an update if we are both
+> missing something now.
 
-I think this is the part I don't understand. If you wrote cycle and duty
-values to the active registers already, then the shadow registers should
-be ignored by the hardware. There should be no need to reload the active
-registers.
+Yes thanks looks good. We've had the mismerge there from my earlier
+merge as noted by Paul. Looks like clockdomain.[ch] parts need some
+patching.
 
-> If PWM is running, cycle & duty values written to shadow registers. So that
-> it won't disturb current PWM period. On the next PWM period, new values will
-> be reloaded from shadow registers to active registers.
+> > Anyway, apart from that "please check" comment, I also have small
+> > complaint: your pull requests didn't actually point to the tags, they
+> > pointed to the next/xyz commits. So every time I did a pull, I had to
+> > change "next/xyz" to "tags/xyz". That's just annoying make-work. I
+> > think it's because you just said "xyz" to the git request-pull script,
+> > and then git had to pick one of the things and picked next. Please
+> > disambiguate by just saying "tags/xyz" explicitly.
 > 
-> So APWM mode to be set to copy shadow registers from active registers
-> (immediate mode).
+> I spent too much time fiddling with my scripts again in an attempt to
+> get closer to the regular git-request-pull version. The older version
+> got this right, but unfortunately I removed the part where I manually
+> print the right pull address because that had caused other problems
+> before.
 
-I realize that I'm just talking from a general understanding of shadow
-registers and maybe you're hardware doesn't work quite that way. If this
-is really the only way that you can make the hardware work then I will
-no longer object.
+FYI, this issue happens also with git request-pull if the tag has not
+yet gotten mirrored but the branch is already mirrored.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120724/41985e23/attachment-0001.sig>
+Regards,
+
+Tony
