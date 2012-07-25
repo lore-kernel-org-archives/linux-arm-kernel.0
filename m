@@ -1,50 +1,62 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 25 Jul 2012 11:49:34 +0100
-Subject: [PATCH] ARM: versatile: Don't use platform clock for Integrator & VE
-Message-ID: <1343213374-30088-1-git-send-email-pawel.moll@arm.com>
+From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
+Date: Wed, 25 Jul 2012 15:05:09 +0400
+Subject: [PATCH v4 0/4] OMAP System Control Module
+Message-ID: <500FD2E5.2050406@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to automatic merge of a613163dff04cbfcb7d66b06ef4a5f65498ee59b
-"ARM: integrator: convert to common clock" and
-56a34b03ff427046494db87f05fc810aaedd23a5 "ARM: versatile: Make
-plat-versatile clock optional" two platforms: Integrator and
-Versatile Express now select both COMMON_CLK and
-PLAT_VERSATILE_CLOCK which breaks building them. Fixed now.
+ Hello.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/Kconfig |    2 --
- 1 file changed, 2 deletions(-)
+This is a next version of series of patches(based on Eduardo Valentin's patch set) adding a basic support for system control module, on OMAP4+ context.
+As Bandgap and usb phy drivers are now independent from control module driver and they will be sent separately. IIUC, Bandgap driver has already been sent.
 
-Arnd, Olof,
+OMAP system control module driver provides only one API function - read of CONTROL_STATUS register:
+u32 omap_control_status_read(void) that is used in omap_type()
 
-Would you consider adding this patch to one of your late pull
-requests for 3.6 or do you want me to wait till 3.6-rc1?
+The physical address of CONTROL_STATUS register is specified in DT:
+ctrl_module_core: ctrl_module_core at 4A0022C4 {
+	compatible = "ti,omap4-control";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	/* ranges; */
+	ti,hwmods = "ctrl_module_core";
+	reg = <0x4A0022C4 0x4>; /* CONTROL_STATUS register */
+};
 
-Regards
+Eduardo Valentin (3):
+  From d4c6cf571e403f30a97db32ba6198b0c35a864b7 Mon Sep 17 00:00:00
+    2001
+  From 116a0111a6e2e563a81b0aa2dbf7a18e9ef9dbd1 Mon Sep 17 00:00:00
+    2001
+  From dda5f1badbfb82718c9ff21098998a842ce6886e Mon Sep 17 00:00:00
+    2001
 
-Pawel
+Santosh Shilimkar (1):
+  From 1c2af619cc34aafc027330fbb823595e3b2d139b Mon Sep 17 00:00:00
+    2001
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b25c9d3..9124ff7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -279,7 +279,6 @@ config ARCH_INTEGRATOR
- 	select ICST
- 	select GENERIC_CLOCKEVENTS
- 	select PLAT_VERSATILE
--	select PLAT_VERSATILE_CLOCK
- 	select PLAT_VERSATILE_FPGA_IRQ
- 	select NEED_MACH_IO_H
- 	select NEED_MACH_MEMORY_H
-@@ -336,7 +335,6 @@ config ARCH_VEXPRESS
- 	select ICST
- 	select NO_IOPORT
- 	select PLAT_VERSATILE
--	select PLAT_VERSATILE_CLOCK
- 	select PLAT_VERSATILE_CLCD
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	help
+ .../devicetree/bindings/mfd/omap_control.txt       |   32 +
+ arch/arm/boot/dts/omap4.dtsi                       |   10 +
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ arch/arm/mach-omap2/control.h                      |   48 +-
+ arch/arm/mach-omap2/id.c                           |   11 +-
+ .../include/mach/ctrl_module_core_44xx.h           |  392 ------
+ .../include/mach/ctrl_module_pad_core_44xx.h       | 1409 --------------------
+ .../include/mach/ctrl_module_pad_wkup_44xx.h       |  236 ----
+ .../include/mach/ctrl_module_wkup_44xx.h           |   92 --
+ arch/arm/plat-omap/Kconfig                         |    4 +
+ drivers/mfd/Kconfig                                |    6 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/omap-control-core.c                    |  162 +++
+ include/linux/mfd/omap_control.h                   |   35 +
+ 14 files changed, 300 insertions(+), 2139 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/omap_control.txt
+ delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_core_44xx.h
+ delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_core_44xx.h
+ delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_wkup_44xx.h
+ delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+ create mode 100644 drivers/mfd/omap-control-core.c
+ create mode 100644 include/linux/mfd/omap_control.h
+
 -- 
-1.7.9.5
+1.7.7.6
