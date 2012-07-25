@@ -1,50 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jul 2012 16:23:29 +0000
-Subject: [PATCH] USB: ohci-pxa27x: add DT bindings
-In-Reply-To: <1343231301-8987-1-git-send-email-zonque@gmail.com>
-References: <1343231301-8987-1-git-send-email-zonque@gmail.com>
-Message-ID: <201207251623.30476.arnd@arndb.de>
+Date: Wed, 25 Jul 2012 17:10:53 +0000
+Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
+ controller.
+In-Reply-To: <20120725073406.GM19660@localhost.localdomain>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <201207250631.54157.arnd@arndb.de>
+ <20120725073406.GM19660@localhost.localdomain>
+Message-ID: <201207251710.53683.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 July 2012, Daniel Mack wrote:
-
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/pxa-usb.txt
-> @@ -0,0 +1,31 @@
-> +PXA USB controllers
-> +
-> +OHCI
-> +
-> +Required properties:
-> + - compatible: Should be "mrvl,pxa-ohci" for USB controllers
-> +   used in host mode.
-> +
-> +Optional properties:
-> + - "mrvl,enable-port1", "mrvl,enable-port2", "mrvl,enable-port3"
-> +   If present, enables the appropriate USB port of the controller.
-> + - "mrvl,port-mode" selects the mode of the ports:
-> +	1 = PMM_NPS_MODE
-> +	2 = PMM_GLOBAL_MODE
-> +	3 = PMM_PERPORT_MODE
-> + - "mrvl,power-sense-low" - power sense pin is low-active.
-> + - "mrvl,power-control-low" - power control pin is low-active.
-> + - "mrvl,no-oc-protection" - disable over-current protection.
-> + - "mrvl,oc-mode-perport" - enable per-port over-current protection.
-> + - "mrvl,power_on_delay" Power On to Power Good time - in ms.
+On Wednesday 25 July 2012, Shiraz Hashim wrote:
+> 
+> On Wed, Jul 25, 2012 at 06:31:53AM +0000, Arnd Bergmann wrote:
+> > Can you post here the complete set of callback implementations
+> > that you have in your development trees at the moment? That should
+> > help us determine which case we're talking about here.
+> 
+> There are following types of callbacks (involving SoC/platform) seen
+> generally in our case,
+> 
+>   * parent clk selection -
+>         driver is not aware about various clock sources (which also
+>         varies from platform to platform) and hence can only be
+>         programmed by corresponding platform.
+> 
+>         This is the case in Ethernet, audio, etc.
 >
+>   * sata controller
+>         Similar to OTG case which involves clock initialization.
+ 
+This should definitely be moved into the drivers. A lot of drivers
+enable and program clocks using the generic clock interfaces, so
+there is no point using a callback.
 
-We're in the process of changing all uses of "mrvl" to "marvell"
-so we use the same everywhere. Please change this too.
+Note that since stmmac is an architecture independent driver, this
+depends on Mark Brown's patch to provide empty stubs for
+the clock management functions on architectures that don't yet
+use it.
 
-For the various flags, I wonder which ones actually depend on 
-the board configuration and which ones depend only on the
-SoC variant that is used. If they are just different between
-SoCs, I would recommend using different "compatible"
-values and looking up the entire flags word. If most of
-them are board specific, better leave it like you have now.
+>   * spi controller
+>         This is little hack in the h/w. As part of s/w controlled chip
+>         select/deselect in spi-pl022, we need to write to some system
+>         specific register.
+> 
+>   * OTG controller
+>         phy clock initialization which involves series of steps
+>         including powering down, etc.
+> 
+>   * NAND controller
+>         bank selection on runtime by writing to system registers
 
-For the three enable-port* values, I think using a bit mask
-would be slightly nicer, but your version is fine too.
+I don't understand any of these, so unless you post the code
+that you want help with as I asked above, I'll assume that you find
+the solution yourself and don't need a callback ;-)
 
 	Arnd
