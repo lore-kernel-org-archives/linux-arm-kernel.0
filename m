@@ -1,195 +1,153 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 25 Jul 2012 18:17:42 +0200
-Subject: [PATCH 3/7] MTD: pxa3xx-nand: add devicetree bindings
+Date: Wed, 25 Jul 2012 18:17:43 +0200
+Subject: [PATCH 4/7] ARM: pxa: add devicetree code for irq handling
 In-Reply-To: <1343233066-15397-1-git-send-email-zonque@gmail.com>
 References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343233066-15397-4-git-send-email-zonque@gmail.com>
+Message-ID: <1343233066-15397-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains a hack to get the DMA resources of the device when
-probed from a devicetree node. This can be removed once a generic DMA
-controller framework lands.
-
-A mtd_part_parser_data is passed mtd_device_parse_register which
-contains a reference to the device node, so MTD partitions can be
-added as children.
+Properly register on-chip interrupt using the irqdomain logic. The
+number of interrupts is taken from the devicetree node.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   31 ++++++++
- drivers/mtd/nand/pxa3xx_nand.c                     |   83 ++++++++++++++++----
- 2 files changed, 100 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+ arch/arm/mach-pxa/irq.c    |   73 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa3xx.c |   17 +++++++++--
+ 2 files changed, 88 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-new file mode 100644
-index 0000000..6e28cef
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-@@ -0,0 +1,31 @@
-+PXA3xx NAND DT bindings
-+
-+Required properties:
-+
-+ - compatible:		Should be "mrvl,pxa3xx-nand"
-+ - reg: 		The register base for the controller
-+ - interrupts:		The interrupt to map
-+ - #address-cells:	Set to <1> if the node includes partitions
-+
-+Optional properties:
-+
-+ - mrvl,nand-enable-arbiter:	Set to enable the bus arbiter
-+ - mrvl,nand-keep-config:	Set to keep the NAND controller config as set
-+				by the bootloader
-+ - num-cs:			Number of chipselect lines to usw
-+
-+Example:
-+
-+	nand0: nand at 43100000 {
-+		compatible = "mrvl,pxa3xx-nand";
-+		reg = <0x43100000 90>;
-+		interrupts = <45>;
-+		#address-cells = <1>;
-+		
-+		mrvl,nand-enable-arbiter;
-+		mrvl,nand-keep-config;
-+		num-cs = <1>;
-+
-+		/* partitions (optional) */
-+	};
-+
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 252aaef..fb592a9 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -22,6 +22,8 @@
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 5dae15e..a403d49 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -17,6 +17,8 @@
+ #include <linux/syscore_ops.h>
  #include <linux/io.h>
  #include <linux/irq.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
  
- #include <mach/dma.h>
- #include <plat/pxa3xx_nand.h>
-@@ -1081,21 +1083,29 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 	}
- 	clk_enable(info->clk);
+ #include <asm/exception.h>
  
--	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no resource defined for data DMA\n");
--		ret = -ENXIO;
--		goto fail_put_clk;
--	}
--	info->drcmr_dat = r->start;
-+	/* 
-+	 * This is a dirty hack to make this driver work from devicetree
-+	 * bindings. It can be removed once we have a prober DMA controller
-+	 * framework for DT.
-+	 */
-+	if (pdev->dev.of_node && cpu_is_pxa3xx()) {
-+		info->drcmr_dat = 97;
-+		info->drcmr_cmd = 99;
-+	} else {
-+		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+		if (r == NULL) {
-+			dev_err(&pdev->dev, "no resource defined for data DMA\n");
-+			ret = -ENXIO;
-+			goto fail_put_clk;
-+		}
- 
--	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no resource defined for command DMA\n");
--		ret = -ENXIO;
--		goto fail_put_clk;
-+		r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
-+		if (r == NULL) {
-+			dev_err(&pdev->dev, "no resource defined for command DMA\n");
-+			ret = -ENXIO;
-+			goto fail_put_clk;
-+		}
- 	}
--	info->drcmr_cmd = r->start;
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
-@@ -1200,12 +1210,55 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
+@@ -202,3 +204,74 @@ struct syscore_ops pxa_irq_syscore_ops = {
+ 	.suspend	= pxa_irq_suspend,
+ 	.resume		= pxa_irq_resume,
+ };
++
 +#ifdef CONFIG_OF
-+static struct of_device_id pxa3xx_nand_dt_ids[] = {
-+	{ .compatible = "mrvl,pxa3xx-nand" },
++static struct irq_domain *pxa_irq_domain;
++
++static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
++		       irq_hw_number_t hw)
++{
++	int irq, i = hw % 32;
++	void __iomem *base = irq_base(hw / 32);
++
++	/* initialize interrupt priority */
++	if (cpu_has_ipr())
++		__raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
++
++	irq = PXA_IRQ(virq);
++	irq_set_chip_and_handler(irq, &pxa_internal_irq_chip,
++				 handle_level_irq);
++	irq_set_chip_data(virq, base);
++	set_irq_flags(virq, IRQF_VALID);
++
++	return 0;
++}
++
++static struct irq_domain_ops pxa_irq_ops = {
++	.map    = pxa_irq_map,
++	.xlate  = irq_domain_xlate_onecell,
++};
++
++static const struct of_device_id intc_ids[] __initconst = {
++	{ .compatible = "mrvl,pxa-intc", .data = NULL },
 +	{}
 +};
-+MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
 +
-+static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
++void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
 +{
-+	struct pxa3xx_nand_platform_data *pdata;
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *of_id =
-+			of_match_device(pxa3xx_nand_dt_ids, &pdev->dev);
++	struct device_node *node;
++	const struct of_device_id *of_id;
++	struct pxa_intc_conf *conf;
++	int nr_irqs, irq_base, ret;
 +
-+	if (!of_id)
-+		return 0;
++	node = of_find_matching_node(NULL, intc_ids);
++	if (!node) {
++		pr_err("Failed to find interrupt controller in arch-pxa\n");
++		return;
++	}
++	of_id = of_match_node(intc_ids, node);
++	conf = of_id->data;
 +
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
++	ret = of_property_read_u32(node, "mrvl,intc-nr-irqs", &nr_irqs);
++	if (ret) {
++		pr_err("Not found mrvl,intc-nr-irqs property\n");
++		return;
++	}
 +
-+	if (of_get_property(np, "mrvl,nand-enable-arbiter", NULL))
-+		pdata->enable_arbiter = 1;
-+	if (of_get_property(np, "mrvl,nand-keep-config", NULL))
-+		pdata->keep_config = 1;
-+	of_property_read_u32(np, "num-cs", &pdata->num_cs);
++	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
++	if (irq_base < 0) {
++		pr_err("Failed to allocate IRQ numbers\n");
++		return;
++	}
 +
-+	pdev->dev.platform_data = pdata;
++	pxa_irq_domain = irq_domain_add_legacy(node, nr_irqs, 0, 0,
++					       &pxa_irq_ops, NULL);
++	if (!pxa_irq_domain)
++		panic("Unable to add PXA IRQ domain\n");
 +
-+	return 0;
++	irq_set_default_host(pxa_irq_domain);
++	pxa_init_irq(nr_irqs, fn);
++
++	return;
 +}
-+#else
-+static inline int pxa3xx_nand_probe_dt(struct platform_device *)
-+{
-+	return 0;
-+}
-+#endif
++#endif /* CONFIG_OF */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index dffb7e8..1827d3c 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -40,6 +40,8 @@
+ #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
+ #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
+ 
++extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
 +
- static int pxa3xx_nand_probe(struct platform_device *pdev)
+ static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
+@@ -382,7 +384,7 @@ static void __init pxa_init_ext_wakeup_irq(int (*fn)(struct irq_data *,
+ 	pxa_ext_wakeup_chip.irq_set_wake = fn;
+ }
+ 
+-void __init pxa3xx_init_irq(void)
++static void __init __pxa3xx_init_irq(void)
  {
- 	struct pxa3xx_nand_platform_data *pdata;
-+	struct mtd_part_parser_data ppdata = {};
- 	struct pxa3xx_nand_info *info;
- 	int ret, cs, probe_success;
+ 	/* enable CP6 access */
+ 	u32 value;
+@@ -390,10 +392,21 @@ void __init pxa3xx_init_irq(void)
+ 	value |= (1 << 6);
+ 	__asm__ __volatile__("mcr p15, 0, %0, c15, c1, 0\n": :"r"(value));
  
-+	ret = pxa3xx_nand_probe_dt(pdev);
-+	if (ret)
-+		return ret;
+-	pxa_init_irq(56, pxa3xx_set_wake);
+ 	pxa_init_ext_wakeup_irq(pxa3xx_set_wake);
+ }
+ 
++void __init pxa3xx_init_irq(void)
++{
++	__pxa3xx_init_irq();
++	pxa_init_irq(56, pxa3xx_set_wake);
++}
 +
- 	pdata = pdev->dev.platform_data;
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "no platform data defined\n");
-@@ -1229,8 +1282,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		ppdata.of_node = pdev->dev.of_node;
- 		ret = mtd_device_parse_register(info->host[cs]->mtd, NULL,
--						NULL, pdata->parts[cs],
-+						&ppdata, pdata->parts[cs],
- 						pdata->nr_parts[cs]);
- 		if (!ret)
- 			probe_success = 1;
-@@ -1306,6 +1360,7 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
- static struct platform_driver pxa3xx_nand_driver = {
- 	.driver = {
- 		.name	= "pxa3xx-nand",
-+		.of_match_table = of_match_ptr(pxa3xx_nand_dt_ids),
- 	},
- 	.probe		= pxa3xx_nand_probe,
- 	.remove		= pxa3xx_nand_remove,
++void __init pxa3xx_dt_init_irq(void)
++{
++	__pxa3xx_init_irq();
++	pxa_dt_irq_init(pxa3xx_set_wake);
++}
++
+ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
 -- 
 1.7.10.4
