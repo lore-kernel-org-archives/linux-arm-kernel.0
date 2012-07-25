@@ -1,34 +1,23 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 25 Jul 2012 20:59:24 +0400
-Subject: [PATCH v2 6/6] arm/dts: am33xx rtc node
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9AD8B1@DBDE01.ent.ti.com>
-References: <cover.1343191280.git.afzal@ti.com>
- <d16976055462214af276d7242faa2bc6e621fd44.1343191280.git.afzal@ti.com>
- <500FD698.30906@mvista.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9AD8B1@DBDE01.ent.ti.com>
-Message-ID: <501025EC.6010600@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jul 2012 16:17:20 +0000
+Subject: [PATCH 1/2] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
+ pxa_irq_to_chip()
+In-Reply-To: <1343230539-7196-1-git-send-email-zonque@gmail.com>
+References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
+Message-ID: <201207251617.21735.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wednesday 25 July 2012, Daniel Mack wrote:
+> Simplify the code in gpio-pxa.c and make them based on irq_base.
+> When not probed from devicetree, initialize irq_base from
+> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
+> still works.
+> 
+> Only tested on PXA3xx.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 
-On 07/25/2012 06:09 PM, Mohammed, Afzal wrote:
+Both look good to me,
 
->>> +		rtc at 44e3e000 {
-
->>     Address postfix in the node name without "reg" property?
-
-> As per [1], "The unit-address is included if the node describes
-> a device with an address".
-
-   Which in this case it doesn't.
-
-> Here even though reg property is not present, as via hwmod
-> (see below) it is getting address, isn't it better to have it
-
-   I think not.
-
->>> +			compatible = "ti,da830-rtc";
->>> +			ti,hwmods = "rtc";
-
-WBR, Sergei
+Acked-by: Arnd Bergmann <arnd@arndb.de>
