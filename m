@@ -1,100 +1,33 @@
-From: zhanzhenbo@gmail.com (=?GB2312?B?1b/V8bKo?=)
-Date: Wed, 25 Jul 2012 15:50:53 +0800
-Subject: Why the region area don't decrease 1 in function
- sanity_check_meminfo?
-In-Reply-To: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
-References: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
-Message-ID: <CAKvkGKfSn7n6JMnfQzceGtd23=9SEjmA-aL2g54bGWHNdyH6kQ@mail.gmail.com>
+From: attila@kinali.ch (Attila Kinali)
+Date: Wed, 25 Jul 2012 09:52:18 +0200
+Subject: [PATCH] ARM: mxs: Adjust of_find_property()
+In-Reply-To: <1343028538-13891-1-git-send-email-festevam@gmail.com>
+References: <1343028538-13891-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120725095218.5952d1a888bbc1337d4e73bc@kinali.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+On Mon, 23 Jul 2012 04:28:58 -0300
+Fabio Estevam <festevam@gmail.com> wrote:
 
-If system has defined CONFIG_SPARSEMEM, that va() and pa() have been
-redefiend, like this,
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Since commit 475d00 (of: Improve prom_update_property() function) prom_update_property requires
+> two arguments.
+> 
+> Fix this in order to get rid of the following build error:
+> 
+> arch/arm/mach-mxs/mach-mxs.c:175:4: error: too many arguments to function 'prom_update_property'
 
- "
- #define __phys_to_virt(phys)						\
- 	((phys) >= 0x80000000 ?	(phys) - 0x80000000 + PAGE_OFFSET2 :	\
- 	 (phys) >= 0x20000000 ?	(phys) - 0x20000000 + PAGE_OFFSET1 :	\
- 	 (phys) + PAGE_OFFSET)
+The same fix has been already send by Shawn Guo[1] and Lauri Hintsala[2]
 
- #define __virt_to_phys(virt)						\
- 	 ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 :	\
- 	  (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 :	\
- 	  (virt) - PAGE_OFFSET)
+			Attila Kinali
 
-"
-But this line "__va(bank->start + bank->size) < __va(bank->start)"
-always assume that the next bank's vaddr is bigger than it.
-Yes, we can defined these two MACROS carefully to avoid this problem.
-How do you think it. Can you shed some light on what the correct
-solution might be?
-
-steve
-
->
->> Date: Tue, 24 Jul 2012 18:54:30 +0800
->> From: ??? <zhanzhenbo@gmail.com>
->> To: will.deacon at arm.com, catalin.marinas at arm.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: Why the region area don't decrease 1 in function
->> 	sanity_check_meminfo?
->> Message-ID:
->> 	<CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
->> Content-Type: text/plain; charset=ISO-8859-1
->>
->> In this function, have these codes:
->>
->> /*
->> 		 * Check whether this memory bank would partially overlap
->> 		 * the vmalloc area.
->> 		 */
->> 		if (__va(bank->start + bank->size) > vmalloc_min ||
->> 		    __va(bank->start + bank->size) < __va(bank->start)) {
->> 			unsigned long newsize = vmalloc_min - __va(bank->start);
->> 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
->> 			       "to -%.8llx (vmalloc region overlap).\n",
->> 			       (unsigned long long)bank->start,
->> 			       (unsigned long long)bank->start + bank->size - 1,
->> 			       (unsigned long long)bank->start + newsize - 1);
->> 			bank->size = newsize;
->> 		}
->>
->> Dear all,
->>
->>
->> I don't known why the memory region have not decrease 1, i think it
->> should be decreased(like this , (__va(bank->start + bank->size
->> -1))because in sparse memory system,  this address bank->start +
->> bank->size is belong to another bank, so this method is not correctly.
->>
->> Please indicate whether my understanding is correct.
->>
->> Thanks.
->>
->>
->> Steve
->>
->>
->>
->> ------------------------------
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->> End of linux-arm-kernel Digest, Vol 36, Issue 687
->> *************************************************
->>
->
->
-> --
-> Steve Zhan
->
-
+[1] http://article.gmane.org/gmane.linux.kernel.next/23330
+[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/177465
 
 -- 
-Steve Zhan
+The trouble with you, Shev, is you don't say anything until you've saved
+up a whole truckload of damned heavy brick arguments and then you dump
+them all out and never look at the bleeding body mangled beneath the heap
+		-- Tirin, The Dispossessed, U. Le Guin
