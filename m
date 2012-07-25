@@ -1,42 +1,73 @@
-From: sentient@digitalfantasy.co.nz (Sentient)
-Date: Wed, 25 Jul 2012 21:40:09 +1200
-Subject: [PATCH] ARM: vt8500: clk: Add clock support for arch-vt8500
-In-Reply-To: <CAJOA=zNNE18DWwSgfh0H0zGgqpFhPeZrZ8zc0i_cxPBUc2VuoQ@mail.gmail.com>
-References: <1342969400-21123-1-git-send-email-linux@prisktech.co.nz>
- <CAJOA=zNNE18DWwSgfh0H0zGgqpFhPeZrZ8zc0i_cxPBUc2VuoQ@mail.gmail.com>
-Message-ID: <000001cd6a49$7bb8d500$732a7f00$@digitalfantasy.co.nz>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 25 Jul 2012 13:24:52 +0300
+Subject: [GIT PULL] remoteproc for 3.6
+Message-ID: <CAK=Wgbb0ch+z7YKou7hqgFF45mGiYd6TD_XUaHgr3b26Fbp1Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Mike,
+Hi Linus,
 
-I might actually have a new patch up by then as the device tree support is coming along nicely.
+There are a few merge conflicts which are mostly trivial, but there's
+also a sneaky one which is easy to miss (I missed it when I reviewed
+the merge in linux-next) so I also pushed a 3.6-merge-reference branch
+(for reference).
 
-Regards,
-Tony
+(in short, e981f6d "remoteproc: fix print format warnings" fixed a
+line in rproc_load_segments(), but that function was relocated to
+remoteproc_elf_loader.c by 72854fb "remoteproc: Move Elf related
+functions to separate file", and since 72854fb is based on the
+pre-fixed version of the function, it does not carry the 1-liner fix
+to remoteproc_elf_loader.c, so the merge commit should. Thanks a
+lot!).
 
-> -----Original Message-----
-> From: vt8500-wm8505-linux-kernel at googlegroups.com [mailto:vt8500-wm8505-linux-kernel at googlegroups.com] On Behalf Of
-> Turquette, Mike
-> Sent: Wednesday, 25 July 2012 9:08 a.m.
-> To: Tony Prisk
-> Cc: VT8500 mailing list; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Russell King; Arnd Bergmann; Alexey
-> Charkov
-> Subject: Re: [PATCH] ARM: vt8500: clk: Add clock support for arch-vt8500
-> 
-> On Sun, Jul 22, 2012 at 8:03 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> > This patch adds common clock framework support for arch-vt8500.
-> > WM8650 support is included in preparation for devicetree support.
-> > Each SoC has a seperate initialization function due to no
-> > devicetree support to identify SoCs at the moment. Once devicetree
-> > is implemented, VT8500 and WM8505 should be combined. WM8650 uses
-> > different functions for clocks.
-> >
-> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> 
-> Hi Tony,
-> 
-> I'll give this a more thorough review once the -rc1 window is over.
-> 
-> Regards,
-> Mike
+Without further ado,
+
+The following changes since commit 485802a6c524e62b5924849dd727ddbb1497cc71:
+
+  Linux 3.5-rc3 (2012-06-16 17:25:17 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+tags/remoteproc-for-3.6
+
+for you to fetch changes up to 6bb697b6b06041d2d0affc862b17b4b443a107e0:
+
+  MAINTAINERS: add remoteproc's git (2012-07-15 11:39:02 +0300)
+
+----------------------------------------------------------------
+A batch of remoteproc patches for 3.6:
+- custom binary format support from Sjur Br?ndeland
+- groundwork for recovery and runtime pm support
+- some cleanups and API simplifications
+
+----------------------------------------------------------------
+Ohad Ben-Cohen (8):
+      remoteproc: allocate vrings on demand, free when not needed
+      remoteproc: maintain a generic child device for each rproc
+      remoteproc: remove the now-redundant kref
+      remoteproc: simplify unregister/free interfaces
+      remoteproc: support non-iommu carveout assignment
+      remoteproc: remove the get_by_name/put API
+      remoteproc: adopt the driver core's alloc/add/del/put naming
+      MAINTAINERS: add remoteproc's git
+
+Sjur Br?ndeland (4):
+      remoteproc: Pass struct fw to load_segments and find_rsc_table.
+      remoteproc: Add function rproc_get_boot_addr
+      remoteproc: Move Elf related functions to separate file
+      remoteproc: Support custom firmware handlers
+
+ Documentation/remoteproc.txt               |  58 +--
+ MAINTAINERS                                |   1 +
+ drivers/remoteproc/Makefile                |   1 +
+ drivers/remoteproc/omap_remoteproc.c       |  26 +-
+ drivers/remoteproc/remoteproc_core.c       | 726 ++++++++---------------------
+ drivers/remoteproc/remoteproc_debugfs.c    |   4 +-
+ drivers/remoteproc/remoteproc_elf_loader.c | 295 ++++++++++++
+ drivers/remoteproc/remoteproc_internal.h   |  62 +++
+ drivers/remoteproc/remoteproc_virtio.c     |  34 +-
+ drivers/rpmsg/virtio_rpmsg_bus.c           |   3 +-
+ include/linux/remoteproc.h                 |  20 +-
+ 11 files changed, 613 insertions(+), 617 deletions(-)
+ create mode 100644 drivers/remoteproc/remoteproc_elf_loader.c
