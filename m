@@ -1,54 +1,48 @@
-From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Wed, 25 Jul 2012 15:29:24 +0900
-Subject: [PATCH 3/3] fbdev: sh_mobile_lcdc: use dma_mmap_coherent if available
-In-Reply-To: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
-References: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <1343197764-13659-4-git-send-email-hdk@igel.co.jp>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jul 2012 06:31:53 +0000
+Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
+ controller.
+In-Reply-To: <500F770C.9000005@st.com>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <50068030.1050905@st.com> <500F770C.9000005@st.com>
+Message-ID: <201207250631.54157.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fb_mmap() implemented in fbmem.c uses smem_start as the physical
-address of the frame buffer.  In the sh_mobile_lcdc driver, the
-smem_start is a dma_addr_t that is not a physical address when IOMMU is
-enabled.  dma_mmap_coherent() maps the address correctly.  It is
-available on ARM platforms.
+On Wednesday 25 July 2012, deepaksi wrote:
 
-Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
----
- drivers/video/sh_mobile_lcdcfb.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+> *But there are few catches/ query I have with me.*
+> 
+> 1. Within the driver space now, even if it is a stmmac_platform.c file 
+> we are kind of adding
+> a non driver related miscellaneous space (SoC specific) to do some 
+> initializations.
+> Will that be fine to do all such initializations in driver ?
 
-diff --git a/drivers/video/sh_mobile_lcdcfb.c b/drivers/video/sh_mobile_lcdcfb.c
-index e672698..65732c4 100644
---- a/drivers/video/sh_mobile_lcdcfb.c
-+++ b/drivers/video/sh_mobile_lcdcfb.c
-@@ -1393,6 +1393,17 @@ static int sh_mobile_lcdc_blank(int blank, struct fb_info *info)
- 	return 0;
- }
- 
-+#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-+static int
-+sh_mobile_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
-+{
-+	struct sh_mobile_lcdc_chan *ch = info->par;
-+
-+	return dma_mmap_coherent(ch->lcdc->dev, vma, ch->fb_mem,
-+				 ch->dma_handle, ch->fb_size);
-+}
-+#endif
-+
- static struct fb_ops sh_mobile_lcdc_ops = {
- 	.owner          = THIS_MODULE,
- 	.fb_setcolreg	= sh_mobile_lcdc_setcolreg,
-@@ -1408,6 +1419,9 @@ static struct fb_ops sh_mobile_lcdc_ops = {
- 	.fb_release	= sh_mobile_release,
- 	.fb_check_var	= sh_mobile_check_var,
- 	.fb_set_par	= sh_mobile_set_par,
-+#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-+	.fb_mmap	= sh_mobile_fb_mmap,
-+#endif
- };
- 
- static void
--- 
-1.7.0.4
+It depends a lot on what you want to do with those callbacks.
+We generally try hard to make those callbacks unnecessary, but
+I agree that this is not always easy or obvious how to do it.
+
+There are cases where you have one SoC doing something very
+obscure with an otherwise generic piece of hardware, and in
+that case, it may be better to keep a callback in platform
+code and use some method (auxdata or a notifier) to hand a
+pointer to the driver.
+
+In other cases, you have a number of platforms that essentially
+want to do the same thing (set up clocks or voltages, pick a
+PHY, ...) and in that case you should not be using callback
+functions at all but instead describe the differences in the
+device tree using the bindings for whatever you want to do
+(adding bindings if necessary).
+
+You can also have a case where the callback is just doing
+something that is part of that driver in different ways,
+and in that case using the "compatible" property to determine
+which way is right is the best option.
+
+Can you post here the complete set of callback implementations
+that you have in your development trees at the moment? That should
+help us determine which case we're talking about here.
+
+	Arnd
