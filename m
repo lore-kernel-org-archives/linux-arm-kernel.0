@@ -1,48 +1,40 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 25 Jul 2012 16:39:49 +0400
-Subject: [PATCH v4 3/4] OMAP2+: use control module mfd driver in omap_type
-In-Reply-To: <500FD2EF.4010304@dev.rtsoft.ru>
-References: <500FD2EF.4010304@dev.rtsoft.ru>
-Message-ID: <500FE915.6090707@mvista.com>
+Date: Wed, 25 Jul 2012 16:43:40 +0400
+Subject: [PATCH v2 1/2] arm/dts: AM33XX: Add D_CAN device tree data
+In-Reply-To: <1343219012-19472-2-git-send-email-anilkumar@ti.com>
+References: <1343219012-19472-1-git-send-email-anilkumar@ti.com>
+ <1343219012-19472-2-git-send-email-anilkumar@ti.com>
+Message-ID: <500FE9FC.7070303@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 25-07-2012 15:05, Konstantin Baydarov wrote:
+On 25-07-2012 16:23, AnilKumar Ch wrote:
 
-> OMAP system control module can be probed early, then
-> omap_type is safe to use its APIs.
+> Add Bosch D_CAN controller device tree data to AM33XX dtsi file
+> by adding d_can device node with all the necessary parameters.
 
-> TODO: add support for other omap versions
-
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 > ---
->   arch/arm/mach-omap2/id.c |   11 ++++++-----
->   1 files changed, 6 insertions(+), 5 deletions(-)
+>   arch/arm/boot/dts/am33xx.dtsi |    5 +++++
+>   1 file changed, 5 insertions(+)
 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 40373db..8018cad 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-[...]
-> @@ -43,15 +44,15 @@ int omap_type(void)
->   	u32 val = 0;
->
->   	if (cpu_is_omap24xx()) {
-> -		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
-> +		val = omap_control_status_read();
->   	} else if (soc_is_am33xx()) {
-> -		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
-> +		val = omap_control_status_read();
->   	} else if (cpu_is_omap34xx()) {
-> -		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
-> +		val = omap_control_status_read();
->   	} else if (cpu_is_omap44xx()) {
-> -		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
-> +		val = omap_control_status_read();
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 9b974dc..2db2ffb 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -163,5 +163,10 @@
+>   			#size-cells = <0>;
+>   			ti,hwmods = "i2c3";
+>   		};
+> +
+> +		dcan1: d_can at 481D0000 {
 
-    Isn't it better to merge now identical code into one *if*?
+    Address postfix in the node name and no "reg" property?
+
+> +			compatible = "bosch,d_can";
+> +			ti,hwmods = "d_can1";
+> +		};
 
 WBR, Sergei
