@@ -1,132 +1,195 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 25 Jul 2012 18:17:41 +0200
-Subject: [PATCH 2/7] MMC: pxa-mci: add DT bindings
+Date: Wed, 25 Jul 2012 18:17:42 +0200
+Subject: [PATCH 3/7] MTD: pxa3xx-nand: add devicetree bindings
 In-Reply-To: <1343233066-15397-1-git-send-email-zonque@gmail.com>
 References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343233066-15397-3-git-send-email-zonque@gmail.com>
+Message-ID: <1343233066-15397-4-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Chris Ball <cjb@laptop.org>
----
- Documentation/devicetree/bindings/mmc/pxa-mmc.txt |   24 ++++++++++
- drivers/mmc/host/pxamci.c                         |   50 +++++++++++++++++++++
- 2 files changed, 74 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+This patch contains a hack to get the DMA resources of the device when
+probed from a devicetree node. This can be removed once a generic DMA
+controller framework lands.
 
-diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+A mtd_part_parser_data is passed mtd_device_parse_register which
+contains a reference to the device node, so MTD partitions can be
+added as children.
+
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+---
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   31 ++++++++
+ drivers/mtd/nand/pxa3xx_nand.c                     |   83 ++++++++++++++++----
+ 2 files changed, 100 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 new file mode 100644
-index 0000000..8f0ea58
+index 0000000..6e28cef
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-@@ -0,0 +1,24 @@
-+* PXA MMC drivers
-+
-+Driver bindings for the PXA MCI (MMC/SDIO) interfaces
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -0,0 +1,31 @@
++PXA3xx NAND DT bindings
 +
 +Required properties:
-+- compatible: Should be "mrvl,pxa-mmc".
-+- reg: Should contain registers location and length
-+- interrupts: Should contain the interrupt
-+- vmmc-supply: A regulator for VMMC
++
++ - compatible:		Should be "mrvl,pxa3xx-nand"
++ - reg: 		The register base for the controller
++ - interrupts:		The interrupt to map
++ - #address-cells:	Set to <1> if the node includes partitions
 +
 +Optional properties:
-+- mrvl,detect-delay-ms: sets the detection delay timeout in ms.
-+- mrvl,gpio-card-detect: GPIO spec for the card detect pin
-+- mrvl,gpio-card-readonly: GPIO spec for the card write protection pin
-+- mrvl,gpio-power: GPIO spec for the card power enable pin
 +
-+Examples:
++ - mrvl,nand-enable-arbiter:	Set to enable the bus arbiter
++ - mrvl,nand-keep-config:	Set to keep the NAND controller config as set
++				by the bootloader
++ - num-cs:			Number of chipselect lines to usw
 +
-+mmc0: mmc at 41100000 {
-+	compatible = "mrvl,pxa-mmc";
-+	reg = <0x41100000 0x1000>;
-+	interrupts = <23>;
-+};
++Example:
 +
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index cb2dc0e..39ddc00 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -30,6 +30,9 @@
- #include <linux/regulator/consumer.h>
- #include <linux/gpio.h>
- #include <linux/gfp.h>
++	nand0: nand at 43100000 {
++		compatible = "mrvl,pxa3xx-nand";
++		reg = <0x43100000 90>;
++		interrupts = <45>;
++		#address-cells = <1>;
++		
++		mrvl,nand-enable-arbiter;
++		mrvl,nand-keep-config;
++		num-cs = <1>;
++
++		/* partitions (optional) */
++	};
++
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 252aaef..fb592a9 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -22,6 +22,8 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/slab.h>
 +#include <linux/of.h>
-+#include <linux/of_gpio.h>
 +#include <linux/of_device.h>
  
- #include <asm/sizes.h>
+ #include <mach/dma.h>
+ #include <plat/pxa3xx_nand.h>
+@@ -1081,21 +1083,29 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 	}
+ 	clk_enable(info->clk);
  
-@@ -573,6 +576,48 @@ static irqreturn_t pxamci_detect_irq(int irq, void *devid)
- 	return IRQ_HANDLED;
+-	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no resource defined for data DMA\n");
+-		ret = -ENXIO;
+-		goto fail_put_clk;
+-	}
+-	info->drcmr_dat = r->start;
++	/* 
++	 * This is a dirty hack to make this driver work from devicetree
++	 * bindings. It can be removed once we have a prober DMA controller
++	 * framework for DT.
++	 */
++	if (pdev->dev.of_node && cpu_is_pxa3xx()) {
++		info->drcmr_dat = 97;
++		info->drcmr_cmd = 99;
++	} else {
++		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++		if (r == NULL) {
++			dev_err(&pdev->dev, "no resource defined for data DMA\n");
++			ret = -ENXIO;
++			goto fail_put_clk;
++		}
+ 
+-	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no resource defined for command DMA\n");
+-		ret = -ENXIO;
+-		goto fail_put_clk;
++		r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++		if (r == NULL) {
++			dev_err(&pdev->dev, "no resource defined for command DMA\n");
++			ret = -ENXIO;
++			goto fail_put_clk;
++		}
+ 	}
+-	info->drcmr_cmd = r->start;
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+@@ -1200,12 +1210,55 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
 +#ifdef CONFIG_OF
-+static const struct of_device_id pxa_mmc_dt_ids[] = {
-+        { .compatible = "mrvl,pxa-mmc" },
-+        { }
++static struct of_device_id pxa3xx_nand_dt_ids[] = {
++	{ .compatible = "mrvl,pxa3xx-nand" },
++	{}
 +};
++MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
 +
-+MODULE_DEVICE_TABLE(of, pxa_mmc_dt_ids);
-+
-+static int __devinit pxamci_of_init(struct platform_device *pdev)
++static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
 +{
-+        struct device_node *np = pdev->dev.of_node;
-+        struct pxamci_platform_data *pdata;
-+        u32 tmp;
++	struct pxa3xx_nand_platform_data *pdata;
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *of_id =
++			of_match_device(pxa3xx_nand_dt_ids, &pdev->dev);
 +
-+        if (!np)
-+                return 0;
++	if (!of_id)
++		return 0;
 +
-+        pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+        if (!pdata)
-+                return -ENOMEM;
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
 +
-+	pdata->gpio_card_detect =
-+		of_get_named_gpio(np, "pxa-mmc,gpio-card-detect", 0);
-+	pdata->gpio_card_ro =
-+		of_get_named_gpio(np, "pxa-mmc,gpio-card-readonly", 0);
-+	pdata->gpio_power =
-+		of_get_named_gpio(np, "pxa-mmc,gpio-power", 0);
++	if (of_get_property(np, "mrvl,nand-enable-arbiter", NULL))
++		pdata->enable_arbiter = 1;
++	if (of_get_property(np, "mrvl,nand-keep-config", NULL))
++		pdata->keep_config = 1;
++	of_property_read_u32(np, "num-cs", &pdata->num_cs);
 +
-+	if (of_property_read_u32(np, "pxa-mmc,detect-delay-ms", &tmp) == 0)
-+		pdata->detect_delay_ms = tmp;
++	pdev->dev.platform_data = pdata;
 +
-+        pdev->dev.platform_data = pdata;
-+
-+        return 0;
++	return 0;
 +}
 +#else
-+static int __devinit pxamci_of_init(struct platform_device *pdev)
++static inline int pxa3xx_nand_probe_dt(struct platform_device *)
 +{
-+        return 0;
++	return 0;
 +}
 +#endif
 +
- static int pxamci_probe(struct platform_device *pdev)
+ static int pxa3xx_nand_probe(struct platform_device *pdev)
  {
- 	struct mmc_host *mmc;
-@@ -580,6 +625,10 @@ static int pxamci_probe(struct platform_device *pdev)
- 	struct resource *r, *dmarx, *dmatx;
- 	int ret, irq, gpio_cd = -1, gpio_ro = -1, gpio_power = -1;
+ 	struct pxa3xx_nand_platform_data *pdata;
++	struct mtd_part_parser_data ppdata = {};
+ 	struct pxa3xx_nand_info *info;
+ 	int ret, cs, probe_success;
  
-+	ret = pxamci_of_init(pdev);
++	ret = pxa3xx_nand_probe_dt(pdev);
 +	if (ret)
 +		return ret;
 +
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
- 	if (!r || irq < 0)
-@@ -866,6 +915,7 @@ static struct platform_driver pxamci_driver = {
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(pxa_mmc_dt_ids),
- #ifdef CONFIG_PM
- 		.pm	= &pxamci_pm_ops,
- #endif
+ 	pdata = pdev->dev.platform_data;
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "no platform data defined\n");
+@@ -1229,8 +1282,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
++		ppdata.of_node = pdev->dev.of_node;
+ 		ret = mtd_device_parse_register(info->host[cs]->mtd, NULL,
+-						NULL, pdata->parts[cs],
++						&ppdata, pdata->parts[cs],
+ 						pdata->nr_parts[cs]);
+ 		if (!ret)
+ 			probe_success = 1;
+@@ -1306,6 +1360,7 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+ static struct platform_driver pxa3xx_nand_driver = {
+ 	.driver = {
+ 		.name	= "pxa3xx-nand",
++		.of_match_table = of_match_ptr(pxa3xx_nand_dt_ids),
+ 	},
+ 	.probe		= pxa3xx_nand_probe,
+ 	.remove		= pxa3xx_nand_remove,
 -- 
 1.7.10.4
