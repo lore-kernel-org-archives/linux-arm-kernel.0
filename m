@@ -1,48 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jul 2012 06:31:53 +0000
-Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
- controller.
-In-Reply-To: <500F770C.9000005@st.com>
-References: <cover.1342171151.git.vipulkumar.samar@st.com>
- <50068030.1050905@st.com> <500F770C.9000005@st.com>
-Message-ID: <201207250631.54157.arnd@arndb.de>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Wed, 25 Jul 2012 12:11:16 +0530
+Subject: [PATCH] ARM: tegra: turn on UART A clock at boot
+In-Reply-To: <1343170200-28228-1-git-send-email-swarren@wwwdotorg.org>
+References: <1343170200-28228-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <500F950C.4070407@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 July 2012, deepaksi wrote:
+On Wednesday 25 July 2012 04:20 AM, Stephen Warren wrote:
+> From: Stephen Warren<swarren@nvidia.com>
+>
+> Some boards use UART D for the main serial console, and some use UART A.
+> UART D's clock is listed in board-dt-tegra20.c's clock table, whereas
+> UART A's clock is not. This causes the clock code to think UART A's
+> clock is unsed. The common clock framework turns off unused clocks at
+> boot time. This makes the kernel appear to hang. Add UART A's clock into
+> the clock table to prevent this. Eventually, this requirement should be
+> handled by the UART driver, and/or properties in a board-specific device
+> tree file.
+>
+> Signed-off-by: Stephen Warren<swarren@nvidia.com>
 
-> *But there are few catches/ query I have with me.*
-> 
-> 1. Within the driver space now, even if it is a stmmac_platform.c file 
-> we are kind of adding
-> a non driver related miscellaneous space (SoC specific) to do some 
-> initializations.
-> Will that be fine to do all such initializations in driver ?
+Thanks Stephen!!
 
-It depends a lot on what you want to do with those callbacks.
-We generally try hard to make those callbacks unnecessary, but
-I agree that this is not always easy or obvious how to do it.
+Verified on Cardhu and Ventana with Common clock framework patches.
 
-There are cases where you have one SoC doing something very
-obscure with an otherwise generic piece of hardware, and in
-that case, it may be better to keep a callback in platform
-code and use some method (auxdata or a notifier) to hand a
-pointer to the driver.
-
-In other cases, you have a number of platforms that essentially
-want to do the same thing (set up clocks or voltages, pick a
-PHY, ...) and in that case you should not be using callback
-functions at all but instead describe the differences in the
-device tree using the bindings for whatever you want to do
-(adding bindings if necessary).
-
-You can also have a case where the callback is just doing
-something that is part of that driver in different ways,
-and in that case using the "compatible" property to determine
-which way is right is the best option.
-
-Can you post here the complete set of callback implementations
-that you have in your development trees at the moment? That should
-help us determine which case we're talking about here.
-
-	Arnd
+> ---
+>   arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+> index 70a19a9..5daffd5 100644
+> --- a/arch/arm/mach-tegra/board-dt-tegra20.c
+> +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+> @@ -71,6 +71,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+>
+>   static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+>   	/* name		parent		rate		enabled */
+> +	{ "uarta",	"pll_p",	216000000,	true },
+>   	{ "uartd",	"pll_p",	216000000,	true },
+>   	{ "usbd",	"clk_m",	12000000,	false },
+>   	{ "usb2",	"clk_m",	12000000,	false },
