@@ -1,193 +1,43 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 25 Jul 2012 18:17:46 +0200
-Subject: [PATCH 7/7] ARM: pxa: add .dtsi files
+Date: Wed, 25 Jul 2012 18:17:44 +0200
+Subject: [PATCH 5/7] ARM: pxa3xx: skip default device initialization when
+ booting via DT
 In-Reply-To: <1343233066-15397-1-git-send-email-zonque@gmail.com>
 References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343233066-15397-8-git-send-email-zonque@gmail.com>
+Message-ID: <1343233066-15397-6-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds .dtsi files to describe the PXA SoCs. pxa3xx simply augments
-pxa2xx. Not all devices are listed yet, and it will need some time to
-get all the drivers ported.
+When booting via DT, the default PXA devices must not have been probed
+before, otherwise the augmented information from the device tree is
+ignored.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- arch/arm/boot/dts/pxa2xx.dtsi |  132 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/pxa3xx.dtsi |   26 ++++++++
- 2 files changed, 158 insertions(+)
- create mode 100644 arch/arm/boot/dts/pxa2xx.dtsi
- create mode 100644 arch/arm/boot/dts/pxa3xx.dtsi
+ arch/arm/mach-pxa/pxa3xx.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-new file mode 100644
-index 0000000..1046158
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -0,0 +1,132 @@
-+/*
-+ * pxa2xx.dtsi - Device Tree Include file for Marvell PXA2xx family SoC
-+ *
-+ * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Marvell PXA2xx family SoC";
-+	compatible = "marvell,pxa";
-+	interrupt-parent = <&pxairq>;
-+
-+	aliases {
-+		serial0 = &ffuart;
-+		serial1 = &btuart;
-+		serial2 = &stuart;
-+		serial3 = &hwuart;
-+		i2c0 = &pwri2c;
-+		i2c1 = &pxai2c1;
-+	};
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,xscale";
-+		};
-+	};
-+
-+	pxabus {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		pxairq: interrupt-controller at 40d00000 {
-+			#interrupt-cells = <1>;
-+			compatible = "mrvl,pxa-intc";
-+			interrupt-controller;
-+			interrupt-parent;
-+			mrvl,intc-nr-irqs = <56>;
-+			reg = <0x40d00000 0xd0>;
-+		};
-+
-+		gpio: gpio at 40e00000 {
-+			compatible = "mrvl,pxa-gpio";
-+			#address-cells = <0x1>;
-+			#size-cells = <0x1>;
-+			reg = <0x40e00000 0x10000>;
-+			gpio-controller;
-+			#gpio-cells = <0x2>;
-+			interrupts = <10>;
-+			interrupt-names = "gpio_mux";
-+			interrupt-controller;
-+			#interrupt-cells = <0x2>;
-+			ranges;
-+
-+			gcb0: gpio at 40e00000 {
-+				reg = <0x40e00000 0x4>;
-+			};
-+
-+			gcb1: gpio at 40e00004 {
-+				reg = <0x40e00004 0x4>;
-+			};
-+
-+			gcb2: gpio at 40e00008 {
-+				reg = <0x40e00008 0x4>;
-+			};
-+			gcb3: gpio at 40e0000c {
-+				reg = <0x40e0000c 0x4>;
-+			};
-+		};
-+
-+		ffuart: uart at 40100000 {
-+			compatible = "mrvl,pxa-uart";
-+			reg = <0x40100000 0x30>;
-+			interrupts = <22>;
-+			status = "disabled";
-+		};
-+
-+		btuart: uart at 40200000 {
-+			compatible = "mrvl,pxa-uart";
-+			reg = <0x40200000 0x30>;
-+			interrupts = <21>;
-+			status = "disabled";
-+		};
-+
-+		stuart: uart at 40700000 {
-+			compatible = "mrvl,pxa-uart";
-+			reg = <0x40700000 0x30>;
-+			interrupts = <20>;
-+			status = "disabled";
-+		};
-+
-+		hwuart: uart at 41100000 {
-+			compatible = "mrvl,pxa-uart";
-+			reg = <0x41100000 0x30>;
-+			interrupts = <7>;
-+			status = "disabled";
-+		};
-+
-+		pxai2c1: i2c at 40301680 {
-+			compatible = "mrvl,pxa-i2c";
-+			reg = <0x40301680 0x30>;
-+			interrupts = <18>;
-+			#address-cells = <0x1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		usb0: ohci at 4c000000 {
-+			compatible = "mrvl,pxa-ohci";
-+			reg = <0x4c000000 0x10000>;
-+			interrupts = <3>;
-+			status = "disabled";
-+		};
-+
-+		mmc0: mmc at 41100000 {
-+			compatible = "mrvl,pxa-mmc";
-+			reg = <0x41100000 0x1000>;
-+			interrupts = <23>;
-+			status = "disabled";
-+		};
-+
-+		rtc at 40900000 {
-+			compatible = "mrvl,pxa-rtc";
-+			reg = <0x40900000 0x3c>;
-+			interrupts = <30 31>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-new file mode 100644
-index 0000000..3b62793
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -0,0 +1,26 @@
-+/* The pxa3xx skeleton simply augments the 2xx version */
-+/include/ "pxa2xx.dtsi"
-+
-+/ {
-+	model = "Marvell PXA3xx familiy SoC";
-+
-+	pxabus {
-+		pwri2c: i2c at 40f500c0 {
-+			compatible = "mrvl,pwri2c";
-+			reg = <0x40f500c0 0x30>;
-+			interrupts = <6>;
-+			#address-cells = <0x1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		nand0: nand at 43100000 {
-+			compatible = "mrvl,pxa3xx-nand";
-+			reg = <0x43100000 90>;
-+			interrupts = <45>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;	
-+			status = "disabled";
-+		};
-+	};
-+};
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 1827d3c..4a9d04a 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -19,6 +19,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/i2c/pxa-i2c.h>
+ 
+@@ -479,7 +480,8 @@ static int __init pxa3xx_init(void)
+ 		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+ 		register_syscore_ops(&pxa3xx_clock_syscore_ops);
+ 
+-		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
++		if (!of_have_populated_dt())
++			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	}
+ 
+ 	return ret;
 -- 
 1.7.10.4
