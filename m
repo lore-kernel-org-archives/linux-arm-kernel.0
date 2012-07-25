@@ -1,26 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 25 Jul 2012 07:33:52 -0300
-Subject: [PATCH] ARM: mxs: Adjust of_find_property()
-In-Reply-To: <20120725095218.5952d1a888bbc1337d4e73bc@kinali.ch>
-References: <1343028538-13891-1-git-send-email-festevam@gmail.com>
- <20120725095218.5952d1a888bbc1337d4e73bc@kinali.ch>
-Message-ID: <CAOMZO5C6poKx=hmJ7DEzqZyFFZ3ZmJ5pdJQGNWJfin9DF4ySSw@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 25 Jul 2012 11:49:34 +0100
+Subject: [PATCH] ARM: versatile: Don't use platform clock for Integrator & VE
+Message-ID: <1343213374-30088-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 4:52 AM, Attila Kinali <attila@kinali.ch> wrote:
-> On Mon, 23 Jul 2012 04:28:58 -0300
-> Fabio Estevam <festevam@gmail.com> wrote:
->
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Since commit 475d00 (of: Improve prom_update_property() function) prom_update_property requires
->> two arguments.
->>
->> Fix this in order to get rid of the following build error:
->>
->> arch/arm/mach-mxs/mach-mxs.c:175:4: error: too many arguments to function 'prom_update_property'
->
-> The same fix has been already send by Shawn Guo[1] and Lauri Hintsala[2]
+Due to automatic merge of a613163dff04cbfcb7d66b06ef4a5f65498ee59b
+"ARM: integrator: convert to common clock" and
+56a34b03ff427046494db87f05fc810aaedd23a5 "ARM: versatile: Make
+plat-versatile clock optional" two platforms: Integrator and
+Versatile Express now select both COMMON_CLK and
+PLAT_VERSATILE_CLOCK which breaks building them. Fixed now.
 
-Couldn't one of this  patch be applied then?
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/Kconfig |    2 --
+ 1 file changed, 2 deletions(-)
+
+Arnd, Olof,
+
+Would you consider adding this patch to one of your late pull
+requests for 3.6 or do you want me to wait till 3.6-rc1?
+
+Regards
+
+Pawel
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b25c9d3..9124ff7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -279,7 +279,6 @@ config ARCH_INTEGRATOR
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select PLAT_VERSATILE
+-	select PLAT_VERSATILE_CLOCK
+ 	select PLAT_VERSATILE_FPGA_IRQ
+ 	select NEED_MACH_IO_H
+ 	select NEED_MACH_MEMORY_H
+@@ -336,7 +335,6 @@ config ARCH_VEXPRESS
+ 	select ICST
+ 	select NO_IOPORT
+ 	select PLAT_VERSATILE
+-	select PLAT_VERSATILE_CLOCK
+ 	select PLAT_VERSATILE_CLCD
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	help
+-- 
+1.7.9.5
