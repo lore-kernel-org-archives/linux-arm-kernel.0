@@ -1,24 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jul 2012 15:12:22 +0100
-Subject: Reminder - rmk still on vacation
-Message-ID: <20120725141222.GA6939@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Jul 2012 11:12:29 -0300
+Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
+In-Reply-To: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <CAOMZO5A8J55WfXfzQNnvmDns558yZE16Ji+jmKuos+EK8JfXpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a quick reminder that I'm still on holiday, and at this point there
-are over 2500 messages from the mailing lists which are sitting unread
-since I left the UK.  As I mentioned before I left the UK, it is my
-intention *not* to go back and read all those outstanding messages -
-there's too many of them to do that.
+On Wed, Jul 25, 2012 at 9:37 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> From: Matthias Thomae <matthias.thomae@de.bosch.com>
+>
+> Set ARCH_NR_GPIO for the i.MX6 processor family, which has 7 GPIO
+> controllers with 32 signals each. The default of 256 GPIOs wastes
+> some static table space as explained in Documentation/gpio.txt.
+>
+> Signed-off-by: Matthias Thomae <matthias.thomae@de.bosch.com>
 
-So, if you want me to react to any email message you've sent, you'd
-*better* send it again next week unless I've already responded.
-
-Meanwhile, I see v3.5 has been released; I have a couple of things I
-need to do with my tree before I can push the changes, and I'll
-probably see about sorting those out over the weekend.  I also see
-that 14 new patches have landed in the patch system.
-
-However, the timing of my holiday vs the merge window means that I
-can't take anything new, unless they're fixes, so don't be surprised
-if some stuff gets missed this merge window.
+Looks like a typo in the subject. It should be 224, right?
