@@ -1,44 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 25 Jul 2012 14:15:27 +0300
-Subject: [PATCH v4 1/4] ARM: OMAP4: Remove un-used control module headers
- and defines.
-In-Reply-To: <500FD5DC.7010002@dev.rtsoft.ru>
-References: <500FD2E9.8050408@dev.rtsoft.ru>
- <20120725110635.GE16794@arwen.pp.htv.fi>
- <500FD5DC.7010002@dev.rtsoft.ru>
-Message-ID: <20120725111526.GI16794@arwen.pp.htv.fi>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 25 Jul 2012 15:20:56 +0400
+Subject: [PATCH v2 6/6] arm/dts: am33xx rtc node
+In-Reply-To: <d16976055462214af276d7242faa2bc6e621fd44.1343191280.git.afzal@ti.com>
+References: <cover.1343191280.git.afzal@ti.com>
+ <d16976055462214af276d7242faa2bc6e621fd44.1343191280.git.afzal@ti.com>
+Message-ID: <500FD698.30906@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Wed, Jul 25, 2012 at 03:17:48PM +0400, Konstantin Baydarov wrote:
->   Hi, Balbi.
-> 
-> On 07/25/2012 03:06 PM, Felipe Balbi wrote:
-> > Hi,
-> >
-> > On Wed, Jul 25, 2012 at 03:05:13PM +0400, Konstantin Baydarov wrote:
-> >> Most of the OMAP4 control module register defines are not used and
-> >> can be removed. Keep only needed defines and move them to common
-> >> control module header just like other OMAP versions.
-> >>
-> >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> >> Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
-> > Wasn't this one authored by Santosh ?? Where's his From: Santosh
-> > Shilimkar ???
-> 
-> I hit "edit as new" when I sent patches through thunderbird, I'll fix in the next series.
+On 25-07-2012 10:12, Afzal Mohammed wrote:
 
-git send-email would help avoiding those ;-)
+> Add AM33xx rtc node.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120725/629fcf65/attachment.sig>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+
+> v2:
+>   Use compatible as ti,da830-rtc instead of ti,am1808-rtc
+
+>   arch/arm/boot/dts/am33xx.dtsi |    5 +++++
+>   1 files changed, 5 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index bd0cff3..e1ed72d 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -159,5 +159,10 @@
+>   			compatible = "ti,omap3-wdt";
+>   			ti,hwmods = "wd_timer2";
+>   		};
+> +
+> +		rtc at 44e3e000 {
+
+    Address postfix in the node name without "reg" property?
+
+> +			compatible = "ti,da830-rtc";
+> +			ti,hwmods = "rtc";
+> +		};
+
+WBR, Sergei
