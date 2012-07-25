@@ -1,40 +1,85 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Jul 2012 23:17:40 +0200
-Subject: Orion Pull request
-In-Reply-To: <201207251420.48634.arnd@arndb.de>
-References: <20120724081732.GR18778@lunn.ch> <201207251420.48634.arnd@arndb.de>
-Message-ID: <20120725211740.GD13619@lunn.ch>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 25 Jul 2012 15:43:03 -0700
+Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping from
+ cpuidle
+In-Reply-To: <1342774283.4672.181.camel@sokoban> (Tero Kristo's message of
+ "Fri, 20 Jul 2012 11:51:23 +0300")
+References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
+ <1342764284-8143-3-git-send-email-rnayak@ti.com>
+ <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>
+ <5009120A.1060400@ti.com> <1342774283.4672.181.camel@sokoban>
+Message-ID: <87obn3798o.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Please split the other patches into branches according to what
-> they do, and make sure that each branch is based on an -rc release
-> rather than a random point in the git history or patches that
-> are not upstream. We can then decide which ones to still send
-> for v3.6 and which branches to delay for v3.7.
+Tero Kristo <t-kristo@ti.com> writes:
 
-Hi Arnd
+> On Fri, 2012-07-20 at 13:38 +0530, Rajendra Nayak wrote:
+>> On Friday 20 July 2012 12:55 PM, Shilimkar, Santosh wrote:
+>> > On Fri, Jul 20, 2012 at 11:34 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
+>> >> pwrdm_pre_transition()/pwrdm_post_transition() have always been high latency
+>> >> operations done within cpuidle to do Powerdomain level book-keeping to know
+>> >> what state transitions for different Powerdomains have been triggered.
+>> >> This is also useful to do a restore-on-demand in some cases when we know
+>> >> the context for the given Powerdomain was lost etc.
+>> >>
+>> >> Now that we have definitive entry/exit points (thanks to the Powerdomain
+>> >> level usecounting) for Powerdomain transitions, these book-keeping functions
+>> >> can very well be moved from within CPUidle into pwrdm_clkdm_enable()/pwrdm_
+>> >> clkdm_disable() functions.
+>> >>
+>> >> Also rename _pwrdm_pre/post_transition_cb() to pwrdm_pre/post_transition()
+>> >> and get rid of the original ones which iterate over all powerdomains.
+>> >>
+>> >> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
 
-If i make the branches based on the -rc7 release, how do i test them?
-The patches have dependencies on the I2C patch now accepted by the I2C
-maintainer and the SPI patches accepted by the SPI maintainer.  These
-patches implement the DT support in the drivers. Without those
-patches, all i2c devices are missing, and worst still, the root FS is
-missing on my Kirkwood QNAP device i test with.
+This is excellent!   Thanks for working on this.
 
-Note there is no compile time dependencies, just run time. So i could
-initially build a patchset with those driver patches included, test
-the combination works, rebase to discard the driver patches, and then
-send a pull-request?
+However, it needs a rebase against mainline though because I merged a
+set of optimizations[1] to this code already that only calls pre/post
+per-pwrdm.
 
-Or is there a better way to handle this?
+[...]
 
-I'm also not sure what topic branches would be appropriate. All that
-is left is DT. One branch could be driver changes and the other
-actually using the driver from DT. But there is a clear dependency
-between the two. I cannot split the three new boards support via DT
-into three topic branches because they cause merge conflicts when you
-try to bring them together. What would you suggest?
+>> > Glad to see this is getting optimized.
+>> > I haven't seen how "pwrdm_cpu_[idle/wakeup]()" is
+>> > implemented but will those work on SMP system ?
+>> > I mean OMAP4, any CPU can make this call ?
+>> 
+>> Thats a good question. I think Tero did this so he can kick in
+>> voltage transitions at the right time in idle/suspend.
+>> Given that these deal with incrementing/decrementing the MPU and CORE
+>> pwrdm usecounts alone, maybe on OMAP4 (SMP systems) this needs to also
+>> increment/decrement the specific CPU usecounts on the CPUs these calls
+>> are made.
+>
+> Yeah, you should keep the usecounts valid by each cpu separately calling
+> these functions. My current set only sets these usecounts based on cpu0
+> activity, as cpu1 is statically controlled through cpu online / offline.
+> Once per-cpu cpuidle is in, these should be changed so that each
+> individual cpu increases the usecounts when they are brought up,
+> decrease/increase during idle, and decrease when they are brought down.
+> The usecount should always reflect the number of CPUs active on MPU
+> domain.
 
-   Thanks
-	Andrew
+Coupled CPUidle is merging for v3.6 (hopefully OMAP support too), so
+this should be addressed sooner rather than later.
+
+Kevin
+
+[1] Specifically, see:
+commit 58f0829b7186150318c79515f0e0850c5e7a9c89
+Author: Kevin Hilman <khilman@ti.com>
+Date:   Fri May 11 15:47:17 2012 -0700
+
+    ARM: OMAP3: PM: call pre/post transition per powerdomain
+    
+    We only need to call the pre/post transtion methods when we know the
+    power state is changing.  First, split up the pre/post transition
+    calls to be per-powerdomain, and then make them conditional on whether
+    the power domain is actually changing states.
+    
+    Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+    Signed-off-by: Kevin Hilman <khilman@ti.com>
