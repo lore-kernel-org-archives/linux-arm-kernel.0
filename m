@@ -1,56 +1,27 @@
-From: sentientnz@yahoo.co.nz (Tony Prisk)
-Date: Wed, 25 Jul 2012 08:19:29 -0700 (PDT)
-Subject: DT problem - interrupts?
-Message-ID: <1343229569.81486.YahooMailNeo@web140804.mail.bf1.yahoo.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Jul 2012 12:23:59 -0300
+Subject: [PATCH v2 3/3] ARM: imx_v6_v7_defconfig: Select MXS_DMA
+In-Reply-To: <CAMiH66EA4O0s8hfXkr_SJ56+q7eZ8w0=3C1r_C+m2Os1RxprmA@mail.gmail.com>
+References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
+ <1343215100-24005-3-git-send-email-festevam@gmail.com>
+ <CAMiH66EA4O0s8hfXkr_SJ56+q7eZ8w0=3C1r_C+m2Os1RxprmA@mail.gmail.com>
+Message-ID: <CAOMZO5BfT+_7x4F96Kvqtq5STXxw2Y9CxbCCAc_UnZ-3wy0qxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hopefully someone can think of something simple that I'm missing here because 
+On Wed, Jul 25, 2012 at 12:05 PM, Huang Shijie <shijie8@gmail.com> wrote:
 
-it's got me a little baffled.
+> Is this patch needed? The mxs-dma only has one user, the gpmi-nand in mx6q.
+> this patch makes the kernel built-in the mxs-dma, even the gpmi-nand
+> is not enabled.
 
-Trying to port the arch-vt8500 over to device tree, but I've run into a hiccup with the
-first device that requires interrupts (EHCI + UHCI drivers).
+Well, as the driver currently stands: yes, it is needed.
 
-Both these drivers work perfectly when passed as old-style platform_devices that are
-setup in the board init. When they are initialised from a devicetree file, they both
-initialize fine, but fail with error -32 trying to detect devices.
+Without CONFIG_MXS_DMA, the GPMI driver cannot even be built.
 
-I'm sure the problem is with the irq initialization code, and to keep it simple i used
+This is why I thought that 'select MXS_DMA' was the way to go, but
+according to the thread you pointed me at, it was Nacked by Shawn.
 
-the old working irq code, and simply added an irqdomain with irq_domain_add_legacy.
+Regards,
 
-Any ideas?
-
-(Let me know if there is any more info that might clarify things).
-
-
-Regards
-
-Tony Prisk
-
-----------
-wm8650.dts <relevant parts>
-
-intc0: interrupt-controller at d8140000 {
-compatible="wm,intc";
-interrupt-controller;
-reg = <0xd8140000 0x10000>;
-#interrupt-cells = <1>;
-}
-
-ehci at d8007900 {
-compatible="wm,prizm-ehci";
-reg = <0xd8007900 0x200>;
-interrupt-parent = <&intc0>;
-interrupts = <43>;
-}
-
-
-irq.c
-
-/* interrupt controller has 64 irqs starting at 0 */
-
-irq_domain_add_legacy(node, 64, 0, 0, &irq_simple_domain_ops, priv);
-
-----------
+Fabio Estevam
