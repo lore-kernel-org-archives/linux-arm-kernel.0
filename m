@@ -1,43 +1,48 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 25 Jul 2012 12:11:16 +0530
-Subject: [PATCH] ARM: tegra: turn on UART A clock at boot
-In-Reply-To: <1343170200-28228-1-git-send-email-swarren@wwwdotorg.org>
-References: <1343170200-28228-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <500F950C.4070407@nvidia.com>
+Date: Wed, 25 Jul 2012 12:12:44 +0530
+Subject: [PATCH] ARM: tegra: fix U16 divider range check
+In-Reply-To: <1343170214-28262-1-git-send-email-swarren@wwwdotorg.org>
+References: <1343170214-28262-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <500F9564.6050607@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 25 July 2012 04:20 AM, Stephen Warren wrote:
 > From: Stephen Warren<swarren@nvidia.com>
 >
-> Some boards use UART D for the main serial console, and some use UART A.
-> UART D's clock is listed in board-dt-tegra20.c's clock table, whereas
-> UART A's clock is not. This causes the clock code to think UART A's
-> clock is unsed. The common clock framework turns off unused clocks at
-> boot time. This makes the kernel appear to hang. Add UART A's clock into
-> the clock table to prevent this. Eventually, this requirement should be
-> handled by the UART driver, and/or properties in a board-specific device
-> tree file.
+> A U16 divider can divide a clock by 1..64K. However, the range-check
+> in clk_div16_get_divider() limited the range to 1..256. Fix this. NVIDIA's
+> downstream kernels already have the fixed range-check.
+>
+> In practice this is a problem on Whistler's I2C bus, which uses a bus
+> clock rate of 100KHz (rather than the more common 400KHz on Tegra boards),
+> which requires a HW module clock of 8*100KHz. The parent clock is 216MHz,
+> leading to a desired divider of 270. Prior to conversion to the common
+> clock framework, this range error was somehow ignored/irrelevant and
+> caused no problems. However, the common clock framework evidently has
+> more rigorous error-checking, so this failure causes the I2C bus to fail
+> to operate correctly.
 >
 > Signed-off-by: Stephen Warren<swarren@nvidia.com>
 
 Thanks Stephen!!
 
-Verified on Cardhu and Ventana with Common clock framework patches.
+Verified on Cardhu and Ventana with common clock framework patches.
 
 > ---
->   arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
+>   arch/arm/mach-tegra/tegra2_clocks.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-> index 70a19a9..5daffd5 100644
-> --- a/arch/arm/mach-tegra/board-dt-tegra20.c
-> +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-> @@ -71,6 +71,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+> diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+> index a703844..83ccb85 100644
+> --- a/arch/arm/mach-tegra/tegra2_clocks.c
+> +++ b/arch/arm/mach-tegra/tegra2_clocks.c
+> @@ -223,7 +223,7 @@ static int clk_div16_get_divider(unsigned long parent_rate, unsigned long rate)
+>   	if (divider_u16 - 1<  0)
+>   		return 0;
 >
->   static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
->   	/* name		parent		rate		enabled */
-> +	{ "uarta",	"pll_p",	216000000,	true },
->   	{ "uartd",	"pll_p",	216000000,	true },
->   	{ "usbd",	"clk_m",	12000000,	false },
->   	{ "usb2",	"clk_m",	12000000,	false },
+> -	if (divider_u16 - 1>  255)
+> +	if (divider_u16 - 1>  0xFFFF)
+>   		return -EINVAL;
+>
+>   	return divider_u16 - 1;
