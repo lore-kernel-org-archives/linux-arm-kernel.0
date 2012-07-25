@@ -1,45 +1,54 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 25 Jul 2012 18:01:00 +0200
-Subject: [PATCH] ALSA: pcm - Don't define ARCH_HAS_DMA_MMAP_COHERENT privately
- for ARM
-In-Reply-To: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
-References: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <1343232060-17851-1-git-send-email-laurent.pinchart@ideasonboard.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 25 Jul 2012 18:17:39 +0200
+Subject: [PATCH 0/7] Assorted PXA3xx DT patches
+Message-ID: <1343233066-15397-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture now defines ARCH_HAS_DMA_MMAP_COHERENT, there's no
-need to define it privately anymore.
+This is a series of 7 patches that add basic support for booting PXA3xx
+boards from devicetrees. I'm able to mount a rootfs and use all
+irq/gpio based functions as well as the NAND, USB and RTC drivers.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- sound/core/pcm_native.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+There are some major pieces left to work on though:
 
-Hi Eiraku-san,
+ - the pinctrl driver
+ - the pxafb driver
+ - the ssp/audio implementations
 
-Could you please add this cleanup patch to your "Use dma_mmap_coherent to
-support IOMMU mapper" series ?
+Is somebody working on any of these?
 
-diff --git a/sound/core/pcm_native.c b/sound/core/pcm_native.c
-index 53b5ada..84ead60 100644
---- a/sound/core/pcm_native.c
-+++ b/sound/core/pcm_native.c
-@@ -3156,13 +3156,6 @@ static const struct vm_operations_struct snd_pcm_vm_ops_data_fault = {
- 	.fault =	snd_pcm_mmap_data_fault,
- };
- 
--#ifndef ARCH_HAS_DMA_MMAP_COHERENT
--/* This should be defined / handled globally! */
--#ifdef CONFIG_ARM
--#define ARCH_HAS_DMA_MMAP_COHERENT
--#endif
--#endif
--
- /*
-  * mmap the DMA buffer on RAM
-  */
+
+Let me know what you think.
+
+Daniel Mack (7):
+  RTC: add DT bindings to pxa-rtc
+  MMC: pxa-mci: add DT bindings
+  MTD: pxa3xx-nand: add devicetree bindings
+  ARM: pxa: add devicetree code for irq handling
+  ARM: pxa3xx: skip default device initialization when booting via DT
+  ARM: pxa3xx: add generic DT machine code
+  ARM: pxa: add .dtsi files
+
+ Documentation/devicetree/bindings/mmc/pxa-mmc.txt  |   24 ++++
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   31 +++++
+ Documentation/devicetree/bindings/rtc/pxa-rtc.txt  |   12 ++
+ arch/arm/boot/dts/pxa2xx.dtsi                      |  132 ++++++++++++++++++++
+ arch/arm/boot/dts/pxa3xx.dtsi                      |   26 ++++
+ arch/arm/mach-pxa/Kconfig                          |   12 ++
+ arch/arm/mach-pxa/Makefile                         |    3 +
+ arch/arm/mach-pxa/irq.c                            |   73 +++++++++++
+ arch/arm/mach-pxa/pxa-dt.c                         |   61 +++++++++
+ arch/arm/mach-pxa/pxa3xx.c                         |   21 +++-
+ drivers/mmc/host/pxamci.c                          |   50 ++++++++
+ drivers/mtd/nand/pxa3xx_nand.c                     |   83 +++++++++---
+ drivers/rtc/rtc-pxa.c                              |   11 ++
+ 13 files changed, 522 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/pxa-rtc.txt
+ create mode 100644 arch/arm/boot/dts/pxa2xx.dtsi
+ create mode 100644 arch/arm/boot/dts/pxa3xx.dtsi
+ create mode 100644 arch/arm/mach-pxa/pxa-dt.c
+
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.10.4
