@@ -1,127 +1,157 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 25 Jul 2012 18:17:45 +0200
-Subject: [PATCH 6/7] ARM: pxa3xx: add generic DT machine code
-In-Reply-To: <1343233066-15397-1-git-send-email-zonque@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 25 Jul 2012 12:47:26 -0400
+Subject: [PATCH 2/7] MMC: pxa-mci: add DT bindings
+In-Reply-To: <1343233066-15397-3-git-send-email-zonque@gmail.com> (Daniel
+ Mack's message of "Wed, 25 Jul 2012 18:17:41 +0200")
 References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343233066-15397-7-git-send-email-zonque@gmail.com>
+ <1343233066-15397-3-git-send-email-zonque@gmail.com>
+Message-ID: <87ehnzvlcx.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT_MACHINE_START entry for PXA3xx machines and a auxdata table for
-some of the devices. This file can be extended to also support pxa2xx
-boards.
+Hi Daniel,
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/mach-pxa/Kconfig  |   12 +++++++++
- arch/arm/mach-pxa/Makefile |    3 +++
- arch/arm/mach-pxa/pxa-dt.c |   61 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 76 insertions(+)
- create mode 100644 arch/arm/mach-pxa/pxa-dt.c
+On Wed, Jul 25 2012, Daniel Mack wrote:
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Chris Ball <cjb@laptop.org>
+> ---
+>  Documentation/devicetree/bindings/mmc/pxa-mmc.txt |   24 ++++++++++
+>  drivers/mmc/host/pxamci.c                         |   50 +++++++++++++++++++++
+>  2 files changed, 74 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+> new file mode 100644
+> index 0000000..8f0ea58
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+> @@ -0,0 +1,24 @@
+> +* PXA MMC drivers
+> +
+> +Driver bindings for the PXA MCI (MMC/SDIO) interfaces
+> +
+> +Required properties:
+> +- compatible: Should be "mrvl,pxa-mmc".
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain the interrupt
+> +- vmmc-supply: A regulator for VMMC
+> +
+> +Optional properties:
+> +- mrvl,detect-delay-ms: sets the detection delay timeout in ms.
+> +- mrvl,gpio-card-detect: GPIO spec for the card detect pin
+> +- mrvl,gpio-card-readonly: GPIO spec for the card write protection pin
+> +- mrvl,gpio-power: GPIO spec for the card power enable pin
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index fe2d1f8..8e6288d 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -25,6 +25,18 @@ config PXA_V7_MACH_AUTO
- if !ARCH_PXA_V7
- comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
- 
-+config MACH_PXA3XX_DT
-+	bool "Support PXA3xx platforms from device tree"
-+	select PXA3xx
-+	select CPU_PXA300
-+	select POWER_SUPPLY
-+	select HAVE_PWM
-+	select USE_OF
-+	help
-+	  Include support for Marvell PXA3xx based platforms using
-+	  the device tree. Needn't select any other machine while
-+	  MACH_PXA3XX_DT is enabled.
-+
- config ARCH_LUBBOCK
- 	bool "Intel DBPXA250 Development Platform (aka Lubbock)"
- 	select PXA25x
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index be0f7df..2bedc9e 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -26,6 +26,9 @@ obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
- 
- # NOTE: keep the order of boards in accordance to their order in Kconfig
- 
-+# Device Tree support
-+obj-$(CONFIG_MACH_PXA3XX_DT)	+= pxa-dt.o
-+
- # Intel/Marvell Dev Platforms
- obj-$(CONFIG_ARCH_LUBBOCK)	+= lubbock.o
- obj-$(CONFIG_MACH_MAINSTONE)	+= mainstone.o
-diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
-new file mode 100644
-index 0000000..b46618e
---- /dev/null
-+++ b/arch/arm/mach-pxa/pxa-dt.c
-@@ -0,0 +1,61 @@
-+/*
-+ *  linux/arch/arm/mach-pxa/pxa-dt.c
-+ *
-+ *  Copyright (C) 2012 Daniel Mack
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <mach/irqs.h>
-+#include <mach/pxa3xx.h>
-+
-+#include "generic.h"
-+
-+#ifdef CONFIG_PXA3xx
-+extern void __init pxa3xx_dt_init_irq(void);
-+
-+static const struct of_dev_auxdata pxa3xx_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40700000, "pxa2xx-uart.2", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x41600000, "pxa2xx-uart.3", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-mmc",		0x41100000, "pxa2xx-mci.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-gpio",		0x40e00000, "pxa-gpio", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-ohci",		0x4c000000, "pxa27x-ohci", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-i2c",		0x40301680, "pxa2xx-i2c.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,pwri2c",		0x40f500c0, "pxa3xx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa3xx-nand",	0x43100000, "pxa3xx-nand", NULL),
-+	{}
-+};
-+
-+static void __init pxa3xx_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     pxa3xx_auxdata_lookup, NULL);
-+}
-+
-+static const char *pxa3xx_dt_board_compat[] __initdata = {
-+	"mrvl,pxa3xx",
-+	NULL,
-+};
-+#endif
-+
-+#ifdef CONFIG_PXA3xx
-+DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
-+	.map_io		= pxa3xx_map_io,
-+	.init_irq	= pxa3xx_dt_init_irq,
-+	.handle_irq	= pxa3xx_handle_irq,
-+	.timer		= &pxa_timer,
-+	.restart	= pxa_restart,
-+	.init_machine	= pxa3xx_dt_init,
-+	.dt_compat	= pxa3xx_dt_board_compat,
-+MACHINE_END
-+#endif
+Please see Documentation/devicetree/bindings/mmc/mmc.txt.  It looks like
+you should be using cd-gpios and wp-gpios, and you should refer to
+mmc.txt instead of specifying reg/interrupts, with:
+
+This file documents differences between the core properties in mmc.txt
+and the properties used by the pxa-mmc driver.
+
+I saw Arnd mention that we're moving from "mrvl," to "marvell,", but
+maybe that's not finalized yet.  (And there are other drivers using
+mrvl, so it'll presumably involve a large renaming patch.)
+
+> +Examples:
+> +
+> +mmc0: mmc at 41100000 {
+> +	compatible = "mrvl,pxa-mmc";
+> +	reg = <0x41100000 0x1000>;
+> +	interrupts = <23>;
+> +};
+> +
+> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+> index cb2dc0e..39ddc00 100644
+> --- a/drivers/mmc/host/pxamci.c
+> +++ b/drivers/mmc/host/pxamci.c
+> @@ -30,6 +30,9 @@
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/gpio.h>
+>  #include <linux/gfp.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <asm/sizes.h>
+>  
+> @@ -573,6 +576,48 @@ static irqreturn_t pxamci_detect_irq(int irq, void *devid)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id pxa_mmc_dt_ids[] = {
+> +        { .compatible = "mrvl,pxa-mmc" },
+> +        { }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, pxa_mmc_dt_ids);
+> +
+> +static int __devinit pxamci_of_init(struct platform_device *pdev)
+> +{
+> +        struct device_node *np = pdev->dev.of_node;
+> +        struct pxamci_platform_data *pdata;
+> +        u32 tmp;
+> +
+> +        if (!np)
+> +                return 0;
+> +
+> +        pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +        if (!pdata)
+> +                return -ENOMEM;
+> +
+> +	pdata->gpio_card_detect =
+> +		of_get_named_gpio(np, "pxa-mmc,gpio-card-detect", 0);
+> +	pdata->gpio_card_ro =
+> +		of_get_named_gpio(np, "pxa-mmc,gpio-card-readonly", 0);
+> +	pdata->gpio_power =
+> +		of_get_named_gpio(np, "pxa-mmc,gpio-power", 0);
+> +
+> +	if (of_property_read_u32(np, "pxa-mmc,detect-delay-ms", &tmp) == 0)
+> +		pdata->detect_delay_ms = tmp;
+> +
+> +        pdev->dev.platform_data = pdata;
+> +
+> +        return 0;
+> +}
+> +#else
+> +static int __devinit pxamci_of_init(struct platform_device *pdev)
+> +{
+> +        return 0;
+> +}
+> +#endif
+> +
+>  static int pxamci_probe(struct platform_device *pdev)
+>  {
+>  	struct mmc_host *mmc;
+> @@ -580,6 +625,10 @@ static int pxamci_probe(struct platform_device *pdev)
+>  	struct resource *r, *dmarx, *dmatx;
+>  	int ret, irq, gpio_cd = -1, gpio_ro = -1, gpio_power = -1;
+>  
+> +	ret = pxamci_of_init(pdev);
+> +	if (ret)
+> +		return ret;
+> +
+>  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (!r || irq < 0)
+> @@ -866,6 +915,7 @@ static struct platform_driver pxamci_driver = {
+>  	.driver		= {
+>  		.name	= DRIVER_NAME,
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(pxa_mmc_dt_ids),
+
+Have you tried compiling without CONFIG_OF?  This doesn't look to be
+inside #ifdef CONFIG_OF, which I think would cause a compile error.
+
+>  #ifdef CONFIG_PM
+>  		.pm	= &pxamci_pm_ops,
+>  #endif
+
+Thanks,
+
+- Chris.
 -- 
-1.7.10.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
