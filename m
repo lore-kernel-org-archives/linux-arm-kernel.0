@@ -1,33 +1,61 @@
 From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Wed, 25 Jul 2012 15:29:00 +0900
-Subject: [PATCH 0/2] Renesas IPMMU driver for sh7372
-Message-ID: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
+Date: Wed, 25 Jul 2012 15:29:23 +0900
+Subject: [PATCH 2/3] media: videobuf2-dma-contig: use dma_mmap_coherent if
+ available
+In-Reply-To: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
+References: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
+Message-ID: <1343197764-13659-3-git-send-email-hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
-device support for sh7372 (AP4EVB and Mackerel).
+Previously the vb2_dma_contig_mmap() function was using a dma_addr_t as a
+physical address.  The two addressses are not necessarily the same.
+For example, when using the IOMMU funtion on certain platforms, dma_addr_t
+addresses are not directly mappable physical address.
+dma_mmap_coherent() maps the address correctly.
+It is available on ARM platforms.
 
-The IPMMU module supports the MMU function and the PMB function.  The
-MMU function provides address translation by pagetable compatible with
-ARMv6.  The PMB function provides address translation including
-tile-linear translation.  This is implementation of the MMU function.
+Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+---
+ drivers/media/video/videobuf2-dma-contig.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-Hideki EIRAKU (2):
-  iommu/shmobile: Add iommu driver for Renesas IPMMU modules
-  ARM: mach-shmobile: sh7372: Add IPMMU device
-
- arch/arm/mach-shmobile/Kconfig              |    6 +
- arch/arm/mach-shmobile/Makefile             |    3 +
- arch/arm/mach-shmobile/board-ap4evb.c       |    5 +
- arch/arm/mach-shmobile/board-mackerel.c     |    5 +
- arch/arm/mach-shmobile/include/mach/ipmmu.h |   10 +
- arch/arm/mach-shmobile/ipmmu.c              |  137 ++++++++++++
- arch/arm/mach-shmobile/setup-sh7372.c       |   22 ++
- drivers/iommu/Kconfig                       |    7 +
- drivers/iommu/Makefile                      |    1 +
- drivers/iommu/shmobile-iommu.c              |  318 +++++++++++++++++++++++++++
- 10 files changed, 514 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
- create mode 100644 arch/arm/mach-shmobile/ipmmu.c
- create mode 100644 drivers/iommu/shmobile-iommu.c
+diff --git a/drivers/media/video/videobuf2-dma-contig.c b/drivers/media/video/videobuf2-dma-contig.c
+index 4b71326..4dc85ab 100644
+--- a/drivers/media/video/videobuf2-dma-contig.c
++++ b/drivers/media/video/videobuf2-dma-contig.c
+@@ -101,14 +101,32 @@ static unsigned int vb2_dma_contig_num_users(void *buf_priv)
+ static int vb2_dma_contig_mmap(void *buf_priv, struct vm_area_struct *vma)
+ {
+ 	struct vb2_dc_buf *buf = buf_priv;
++#ifdef ARCH_HAS_DMA_MMAP_COHERENT
++	int ret;
++#endif
+ 
+ 	if (!buf) {
+ 		printk(KERN_ERR "No buffer to map\n");
+ 		return -EINVAL;
+ 	}
+ 
++#ifdef ARCH_HAS_DMA_MMAP_COHERENT
++	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
++	ret = dma_mmap_coherent(buf->conf->dev, vma, buf->vaddr, buf->dma_addr,
++				buf->size);
++	if (ret) {
++		pr_err("Remapping memory failed, error: %d\n", ret);
++		return ret;
++	}
++	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
++	vma->vm_private_data = &buf->handler;
++	vma->vm_ops = &vb2_common_vm_ops;
++	vma->vm_ops->open(vma);
++	return 0;
++#else
+ 	return vb2_mmap_pfn_range(vma, buf->dma_addr, buf->size,
+ 				  &vb2_common_vm_ops, &buf->handler);
++#endif
+ }
+ 
+ static void *vb2_dma_contig_get_userptr(void *alloc_ctx, unsigned long vaddr,
+-- 
+1.7.0.4
