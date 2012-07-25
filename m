@@ -1,48 +1,103 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 25 Jul 2012 12:12:44 +0530
-Subject: [PATCH] ARM: tegra: fix U16 divider range check
-In-Reply-To: <1343170214-28262-1-git-send-email-swarren@wwwdotorg.org>
-References: <1343170214-28262-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <500F9564.6050607@nvidia.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 25 Jul 2012 14:44:41 +0800
+Subject: [alsa-devel] [PATCH 0/4] ASoC: fix saif record unwork issue
+In-Reply-To: <500F838E.6050709@bluegiga.com>
+References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
+ <500E992E.6090900@bluegiga.com>
+ <20120724192125.GF3099@opensource.wolfsonmicro.com>
+ <500F838E.6050709@bluegiga.com>
+Message-ID: <20120725064440.GA30982@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 July 2012 04:20 AM, Stephen Warren wrote:
-> From: Stephen Warren<swarren@nvidia.com>
->
-> A U16 divider can divide a clock by 1..64K. However, the range-check
-> in clk_div16_get_divider() limited the range to 1..256. Fix this. NVIDIA's
-> downstream kernels already have the fixed range-check.
->
-> In practice this is a problem on Whistler's I2C bus, which uses a bus
-> clock rate of 100KHz (rather than the more common 400KHz on Tegra boards),
-> which requires a HW module clock of 8*100KHz. The parent clock is 216MHz,
-> leading to a desired divider of 270. Prior to conversion to the common
-> clock framework, this range error was somehow ignored/irrelevant and
-> caused no problems. However, the common clock framework evidently has
-> more rigorous error-checking, so this failure causes the I2C bus to fail
-> to operate correctly.
->
-> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+On Wed, Jul 25, 2012 at 01:26:38PM +0800, Lauri Hintsala wrote:
+> On 07/24/2012 10:21 PM, Mark Brown wrote:
+> > On Tue, Jul 24, 2012 at 03:46:38PM +0300, Lauri Hintsala wrote:
+> >
+> >> 1. Recorded audio file is totally silent. Hexdump shows zeros.
+> >
+> > This one is commonly due to devices powering up muted by default and
+> > requiring that you set some controls to route the audio through - are
+> > you sure you've not missed anything there?
+> 
+> I tried to set gains and other settings with alsamixer. I didn't see any 
+> options for muting. Here is the output of amixer.
+> 
+> $ amixer
+> Simple mixer control 'Headphone',0
+>    Capabilities: pvolume penum
+>    Playback channels: Front Left - Front Right
+>    Limits: Playback 0 - 127
+>    Mono:
+>    Front Left: Playback 122 [96%] [9.50dB]
+>    Front Right: Playback 122 [96%] [9.50dB]
+> Simple mixer control 'Headphone Mux',0
+>    Capabilities: enum
+>    Items: 'DAC' 'LINE_IN'
+>    Item0: 'LINE_IN'
+> Simple mixer control 'Headphone Playback ZC',0
+>    Capabilities: pswitch pswitch-joined penum
+>    Playback channels: Mono
+>    Mono: Playback [on]
+> Simple mixer control 'PCM',0
+>    Capabilities: pvolume penum
+>    Playback channels: Front Left - Front Right
+>    Limits: Playback 0 - 192
+>    Mono:
+>    Front Left: Playback 173 [90%]
+>    Front Right: Playback 173 [90%]
+> Simple mixer control 'Mic',0
+>    Capabilities: volume volume-joined penum
+>    Playback channels: Mono
+>    Capture channels: Mono
+>    Limits: 0 - 4
+>    Mono: 2 [50%] [30.00dB]
+> Simple mixer control 'Capture',0
+>    Capabilities: cvolume penum
+>    Capture channels: Front Left - Front Right
+>    Limits: Capture 0 - 15
+>    Front Left: Capture 14 [93%]
+>    Front Right: Capture 14 [93%]
+> Simple mixer control 'Capture Attenuate Switch (-6dB)',0
+>    Capabilities: volume volume-joined penum
+>    Playback channels: Mono
+>    Capture channels: Mono
+>    Limits: 0 - 2
+>    Mono: 2 [100%]
+> Simple mixer control 'Capture Mux',0
+>    Capabilities: enum
+>    Items: 'MIC_IN' 'LINE_IN'
+>    Item0: 'LINE_IN'
+> Simple mixer control 'Capture ZC',0
+>    Capabilities: pswitch pswitch-joined penum
+>    Playback channels: Mono
+>    Mono: Playback [on]
+> 
+> The testing is not currently very reasonable. I have to reboot my 
+> machine after every single recording because of "busy" bug.
+> 
+I reproduced your issue.
+It seems the root cause is that you used the wrong device to record.
+The record device is 1.
+root at freescale ~$ aplay -l
+**** List of PLAYBACK Hardware Devices ****
+card 0: mxssgtl5000 [mxs_sgtl5000], device 0: HiFi Playback sgtl5000-0 []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: mxssgtl5000 [mxs_sgtl5000], device 1: HiFi Capture sgtl5000-1 []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
 
-Thanks Stephen!!
+Can you try again with below command?
+arecord -D hw:0,1 -d 5 -f S16_LE -r 44100 -c 2 1.wav
 
-Verified on Cardhu and Ventana with common clock framework patches.
+However, i think it is an issue of the driver that it should report an error
+if find user are using a device to do playback or capture without that capability.
 
-> ---
->   arch/arm/mach-tegra/tegra2_clocks.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-> index a703844..83ccb85 100644
-> --- a/arch/arm/mach-tegra/tegra2_clocks.c
-> +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-> @@ -223,7 +223,7 @@ static int clk_div16_get_divider(unsigned long parent_rate, unsigned long rate)
->   	if (divider_u16 - 1<  0)
->   		return 0;
->
-> -	if (divider_u16 - 1>  255)
-> +	if (divider_u16 - 1>  0xFFFF)
->   		return -EINVAL;
->
->   	return divider_u16 - 1;
+I'm wondering soc-core may need provide an interface for user to change the DAI capability
+according to the real using, e.g: only playback are used.
+I'm not sure if we already have one.
+Will do some research on it.
+
+Regards
+Dong Aisheng
