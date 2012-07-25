@@ -1,71 +1,91 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 25 Jul 2012 13:10:46 +0200
-Subject: [PATCH 3/3] fbdev: sh_mobile_lcdc: use dma_mmap_coherent if
- available
-In-Reply-To: <1343197764-13659-4-git-send-email-hdk@igel.co.jp>
-References: <1343197764-13659-1-git-send-email-hdk@igel.co.jp>
- <1343197764-13659-4-git-send-email-hdk@igel.co.jp>
-Message-ID: <9666926.0rOsjgUcAB@avalon>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 25 Jul 2012 15:15:29 +0400
+Subject: [PATCH v2 1/6] rtc: omap: kicker mechanism support
+In-Reply-To: <ecf6520fc9d5da53b670675a71ebece3d006cbb8.1343191280.git.afzal@ti.com>
+References: <cover.1343191280.git.afzal@ti.com>
+ <ecf6520fc9d5da53b670675a71ebece3d006cbb8.1343191280.git.afzal@ti.com>
+Message-ID: <500FD551.9070002@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eiraku-san,
+Hello.
 
-Thank you for the patch.
+On 25-07-2012 10:12, Afzal Mohammed wrote:
 
-On Wednesday 25 July 2012 15:29:24 Hideki EIRAKU wrote:
-> fb_mmap() implemented in fbmem.c uses smem_start as the physical
-> address of the frame buffer.  In the sh_mobile_lcdc driver, the
-> smem_start is a dma_addr_t that is not a physical address when IOMMU is
-> enabled.  dma_mmap_coherent() maps the address correctly.  It is
-> available on ARM platforms.
+> OMAP RTC IP can have kicker feature. This prevents spurious
+> writes to register. To write to registers kicker lock has to
+> be released. Procedure to do it as follows,
 
-This looks good to me, but will need to be rebased on top of the 
-sh_mobile_lcdc patches currently queued for v3.6. You can find them in the 
-fbdev-next branch of git://github.com/schandinat/linux-2.6.git.
+> 1. write to kick0 register, 0x83e70b13
+> 2. write to kick1 register, 0x95a4f1e0
 
-In particular, these patches add support for overlays exported through 
-additional fbdev devices. You will need to initialize .fb_mmap in both 
-sh_mobile_lcdc_overlay_ops and sh_mobile_lcdc_ops.
+> Writing value other than 0x83e70b13 to kick0 enables write
+> locking, more details about kicker mechanism can be found in
+> section 20.3.3.5.3 of AM335X TRM @www.ti.com/am335x
 
-> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+> Here id table information is added and is used to distinguish
+> those that require kicker handling and the ones that doesn't
+> need it. There are more features in the newer IP's compared
+> to legacy ones other than kicker, which driver currently
+> doesn't handle, supporting additional features would be
+> easier with the addition of id table.
+
+> Older IP (of OMAP1) doesn't have revision register as per
+> TRM, so revision register can't be relied always to find
+> features, hence id table is being used.
+
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
 > ---
->  drivers/video/sh_mobile_lcdcfb.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/video/sh_mobile_lcdcfb.c
-> b/drivers/video/sh_mobile_lcdcfb.c index e672698..65732c4 100644
-> --- a/drivers/video/sh_mobile_lcdcfb.c
-> +++ b/drivers/video/sh_mobile_lcdcfb.c
-> @@ -1393,6 +1393,17 @@ static int sh_mobile_lcdc_blank(int blank, struct
-> fb_info *info) return 0;
->  }
-> 
-> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> +static int
-> +sh_mobile_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
-> +{
-> +	struct sh_mobile_lcdc_chan *ch = info->par;
-> +
-> +	return dma_mmap_coherent(ch->lcdc->dev, vma, ch->fb_mem,
-> +				 ch->dma_handle, ch->fb_size);
-> +}
-> +#endif
-> +
->  static struct fb_ops sh_mobile_lcdc_ops = {
->  	.owner          = THIS_MODULE,
->  	.fb_setcolreg	= sh_mobile_lcdc_setcolreg,
-> @@ -1408,6 +1419,9 @@ static struct fb_ops sh_mobile_lcdc_ops = {
->  	.fb_release	= sh_mobile_release,
->  	.fb_check_var	= sh_mobile_check_var,
->  	.fb_set_par	= sh_mobile_set_par,
-> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> +	.fb_mmap	= sh_mobile_fb_mmap,
-> +#endif
->  };
-> 
->  static void
--- 
-Regards,
 
-Laurent Pinchart
+> v2:
+>   Use device name da830-rtc instead of am1808-rtc
+>   Newly added register name made similar to that existing in the driver
+>   Better commit message description
+
+>   drivers/rtc/rtc-omap.c |   39 ++++++++++++++++++++++++++++++++++++++-
+>   1 files changed, 38 insertions(+), 1 deletions(-)
+
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index 0b614e3..8afbc2e 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -38,6 +38,8 @@
+>    * the SoC). See the BOARD-SPECIFIC CUSTOMIZATION comment.
+>    */
+>
+> +#define	DRIVER_NAME			"omap_rtc"
+> +
+>   #define OMAP_RTC_BASE			0xfffb4800
+>
+>   /* RTC registers */
+> @@ -64,6 +66,9 @@
+>   #define OMAP_RTC_COMP_MSB_REG		0x50
+>   #define OMAP_RTC_OSC_REG		0x54
+>
+> +#define OMAP_RTC_KICK0_REG		0x6c
+> +#define OMAP_RTC_KICK1_REG		0x70
+> +
+>   /* OMAP_RTC_CTRL_REG bit fields: */
+>   #define OMAP_RTC_CTRL_SPLIT		(1<<7)
+>   #define OMAP_RTC_CTRL_DISABLE		(1<<6)
+> @@ -88,11 +93,19 @@
+>   #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
+>   #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
+>
+> +/* OMAP_RTC_KICKER values */
+> +#define	KICK0_VALUE			(0x83e70b13)
+> +#define	KICK1_VALUE			(0x95a4f1e0)
+
+    Parens not needed around simple literals.
+
+>   static void __iomem	*rtc_base;
+>
+>   #define rtc_read(addr)		__raw_readb(rtc_base + (addr))
+>   #define rtc_write(val, addr)	__raw_writeb(val, rtc_base + (addr))
+>
+> +#define rtc_writel(val, addr)	writel(val, rtc_base + (addr))
+> +
+
+    Why not __raw_writel() like the above functions?
+
+WBR, Sergei
