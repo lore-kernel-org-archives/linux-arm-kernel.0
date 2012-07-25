@@ -1,86 +1,157 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 25 Jul 2012 17:35:39 +0200
-Subject: [PATCH 2/2] GPIO: gpio-pxa: fix devicetree functions
-In-Reply-To: <1343230539-7196-1-git-send-email-zonque@gmail.com>
-References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343230539-7196-2-git-send-email-zonque@gmail.com>
+Date: Wed, 25 Jul 2012 17:48:21 +0200
+Subject: [PATCH] USB: ohci-pxa27x: add DT bindings
+Message-ID: <1343231301-8987-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an of_xlate function for the PXA GPIO chips and make it work for
-devicetree environments.
+Add DT bindings to the ohci-pxa27x driver and some documentation.
 
 Successfully tested on a PXA3xx board.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/gpio/gpio-pxa.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ Documentation/devicetree/bindings/usb/pxa-usb.txt |   31 ++++++++++
+ drivers/usb/host/ohci-pxa27x.c                    |   68 +++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/pxa-usb.txt
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 6d0cb9d..f47e6b3 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -63,6 +63,7 @@ static int irq_base;
- 
- #ifdef CONFIG_OF
- static struct irq_domain *domain;
-+static struct device_node *pxa_gpio_of_node;
- #endif
- 
- struct pxa_gpio_chip {
-@@ -229,6 +230,24 @@ static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
+diff --git a/Documentation/devicetree/bindings/usb/pxa-usb.txt b/Documentation/devicetree/bindings/usb/pxa-usb.txt
+new file mode 100644
+index 0000000..d623012
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/pxa-usb.txt
+@@ -0,0 +1,31 @@
++PXA USB controllers
++
++OHCI
++
++Required properties:
++ - compatible: Should be "mrvl,pxa-ohci" for USB controllers
++   used in host mode.
++
++Optional properties:
++ - "mrvl,enable-port1", "mrvl,enable-port2", "mrvl,enable-port3"
++   If present, enables the appropriate USB port of the controller.
++ - "mrvl,port-mode" selects the mode of the ports:
++	1 = PMM_NPS_MODE
++	2 = PMM_GLOBAL_MODE
++	3 = PMM_PERPORT_MODE
++ - "mrvl,power-sense-low" - power sense pin is low-active.
++ - "mrvl,power-control-low" - power control pin is low-active.
++ - "mrvl,no-oc-protection" - disable over-current protection.
++ - "mrvl,oc-mode-perport" - enable per-port over-current protection.
++ - "mrvl,power_on_delay" Power On to Power Good time - in ms.
++
++Example:
++
++	usb0: ohci at 4c000000 {
++		compatible = "mrvl,pxa-ohci", "usb-ohci";
++		reg = <0x4c000000 0x100000>;
++		interrupts = <18>;
++		mrvl,enable-port1;
++		mrvl,port-mode = <2>; /* PMM_GLOBAL_MODE */
++	};
++
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index e1a3cc6..9cec49f 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -23,6 +23,8 @@
+ #include <linux/signal.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
++#include <linux/of_platform.h>
++#include <linux/of_gpio.h>
+ #include <mach/hardware.h>
+ #include <mach/ohci.h>
+ #include <mach/pxa3xx-u2d.h>
+@@ -272,6 +274,67 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+ 	clk_disable_unprepare(ohci->clk);
  }
  
-+#ifdef CONFIG_OF_GPIO
-+static int pxa_gpio_of_xlate(struct gpio_chip *gc,
-+			     const struct of_phandle_args *gpiospec,
-+			     u32 *flags)
++#ifdef CONFIG_OF
++static const struct of_device_id pxa_ohci_dt_ids[] = {
++	{ .compatible = "mrvl,pxa-ohci" },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(of, pxa_ohci_dt_ids);
++
++static u64 pxa_ohci_dma_mask = DMA_BIT_MASK(32);
++
++static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
 +{
-+	if (gpiospec->args[0] > pxa_last_gpio)
-+		return -EINVAL;
++	struct device_node *np = pdev->dev.of_node;
++	struct pxaohci_platform_data *pdata;
++	u32 tmp;
 +
-+	if (gc != &pxa_gpio_chips[gpiospec->args[0] / 32].chip)
-+		return -EINVAL;
++	if (!np)
++		return 0;
 +
-+	if (flags)
-+		*flags = gpiospec->args[1];
++	/* Right now device-tree probed devices don't get dma_mask set.
++	 * Since shared usb code relies on it, set it here for now.
++	 * Once we have dma capability bindings this can go away.
++	 */
++	if (!pdev->dev.dma_mask)
++		pdev->dev.dma_mask = &pxa_ohci_dma_mask;
 +
-+	return gpiospec->args[0] % 32;
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
++
++	if (of_get_property(np, "mrvl,enable-port1", NULL))
++		pdata->flags |= ENABLE_PORT1;
++	if (of_get_property(np, "mrvl,enable-port2", NULL))
++		pdata->flags |= ENABLE_PORT2;
++	if (of_get_property(np, "mrvl,enable-port3", NULL))
++		pdata->flags |= ENABLE_PORT3;
++	if (of_get_property(np, "mrvl,port-sense-low", NULL))
++		pdata->flags |= POWER_SENSE_LOW;
++	if (of_get_property(np, "mrvl,power-control-low", NULL))
++		pdata->flags |= POWER_CONTROL_LOW;
++	if (of_get_property(np, "mrvl,no-oc-protection", NULL))
++		pdata->flags |= NO_OC_PROTECTION;
++	if (of_get_property(np, "mrvl,oc-mode-perport", NULL))
++		pdata->flags |= OC_MODE_PERPORT;
++	if (!of_property_read_u32(np, "mrvl,power-on-delay", &tmp))
++		pdata->power_on_delay = tmp;
++	if (!of_property_read_u32(np, "mrvl,port-mode", &tmp))
++		pdata->port_mode = tmp;
++	if (!of_property_read_u32(np, "mrvl,power-budget", &tmp))
++		pdata->power_budget = tmp;
++
++	pdev->dev.platform_data = pdata;
++
++	return 0;
++}
++#else
++static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
++{
++	return 0;
 +}
 +#endif
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -297,6 +360,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+ 	struct resource *r;
+ 	struct clk *usb_clk;
+ 
++	retval = ohci_pxa_of_init(pdev);
++	if (retval)
++		return retval;
 +
- static int __devinit pxa_init_gpio_chip(int gpio_end,
- 					int (*set_wake)(unsigned int, unsigned int))
- {
-@@ -256,6 +275,11 @@ static int __devinit pxa_init_gpio_chip(int gpio_end,
- 		c->get = pxa_gpio_get;
- 		c->set = pxa_gpio_set;
- 		c->to_irq = pxa_gpio_to_irq;
-+#ifdef CONFIG_OF_GPIO
-+		c->of_node = pxa_gpio_of_node;
-+		c->of_xlate = pxa_gpio_of_xlate;
-+		c->of_gpio_n_cells = 2;
-+#endif
+ 	inf = pdev->dev.platform_data;
  
- 		/* number of GPIOs on last bank may be less than 32 */
- 		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-@@ -457,6 +481,7 @@ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 
- const struct irq_domain_ops pxa_irq_domain_ops = {
- 	.map	= pxa_irq_domain_map,
-+	.xlate	= irq_domain_xlate_twocell,
- };
- 
- #ifdef CONFIG_OF
-@@ -497,6 +522,7 @@ static int __devinit pxa_gpio_probe_dt(struct platform_device *pdev)
- 	}
- 	domain = irq_domain_add_legacy(np, nr_gpios, irq_base, 0,
- 				       &pxa_irq_domain_ops, NULL);
-+	pxa_gpio_of_node = np;
- 	return 0;
- err:
- 	iounmap(gpio_reg_base);
+ 	if (!inf)
+@@ -544,6 +611,7 @@ static struct platform_driver ohci_hcd_pxa27x_driver = {
+ 	.driver		= {
+ 		.name	= "pxa27x-ohci",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(pxa_ohci_dt_ids),
+ #ifdef CONFIG_PM
+ 		.pm	= &ohci_hcd_pxa27x_pm_ops,
+ #endif
 -- 
 1.7.10.4
