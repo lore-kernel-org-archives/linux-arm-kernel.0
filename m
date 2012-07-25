@@ -1,33 +1,33 @@
-From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Wed, 25 Jul 2012 15:17:48 +0400
-Subject: [PATCH v4 1/4] ARM: OMAP4: Remove un-used control module headers
- and defines.
-In-Reply-To: <20120725110635.GE16794@arwen.pp.htv.fi>
-References: <500FD2E9.8050408@dev.rtsoft.ru>
- <20120725110635.GE16794@arwen.pp.htv.fi>
-Message-ID: <500FD5DC.7010002@dev.rtsoft.ru>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Jul 2012 08:18:18 -0300
+Subject: [PATCH v2 1/3] mtd: nand: Include IMX6 in the list of supported SoCs
+Message-ID: <1343215100-24005-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi, Balbi.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 07/25/2012 03:06 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Wed, Jul 25, 2012 at 03:05:13PM +0400, Konstantin Baydarov wrote:
->> Most of the OMAP4 control module register defines are not used and
->> can be removed. Keep only needed defines and move them to common
->> control module header just like other OMAP versions.
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->> Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
-> Wasn't this one authored by Santosh ?? Where's his From: Santosh
-> Shilimkar ???
+Include IMX6 in the list of supported SoCs.
 
-I hit "edit as new" when I sent patches through thunderbird, I'll fix in the next series.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- No changes
+ drivers/mtd/nand/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-  BR,
-    Konstantin Baydarov.
-
->
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index f4e81a7..b40e172 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -464,7 +464,7 @@ config MTD_NAND_GPMI_NAND
+         bool "GPMI NAND Flash Controller driver"
+         depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
+         help
+-	 Enables NAND Flash support for IMX23 or IMX28.
++	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
+ 	 The GPMI controller is very powerful, with the help of BCH
+ 	 module, it can do the hardware ECC. The GPMI supports several
+ 	 NAND flashs at the same time. The GPMI may conflicts with other
+-- 
+1.7.1
