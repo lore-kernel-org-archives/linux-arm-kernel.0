@@ -1,48 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jul 2012 19:04:59 +0000
-Subject: [PATCH 6/7] ARM: pxa3xx: add generic DT machine code
-In-Reply-To: <501035EB.6030406@gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 25 Jul 2012 21:09:31 +0200
+Subject: [PATCH 2/7] MMC: pxa-mci: add DT bindings
+In-Reply-To: <87ehnzvlcx.fsf@octavius.laptop.org>
 References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
- <201207251734.50946.arnd@arndb.de> <501035EB.6030406@gmail.com>
-Message-ID: <201207251904.59571.arnd@arndb.de>
+ <1343233066-15397-3-git-send-email-zonque@gmail.com>
+ <87ehnzvlcx.fsf@octavius.laptop.org>
+Message-ID: <5010446B.60608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 July 2012, Daniel Mack wrote:
-> On 25.07.2012 19:34, Arnd Bergmann wrote:
-> > On Wednesday 25 July 2012, Daniel Mack wrote:
-> >> Add a DT_MACHINE_START entry for PXA3xx machines and a auxdata table for
-> >> some of the devices. This file can be extended to also support pxa2xx
-> >> boards.
-> >>
-> >> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> >> ---
-> >>  arch/arm/mach-pxa/Kconfig  |   12 +++++++++
-> >>  arch/arm/mach-pxa/Makefile |    3 +++
-> >>  arch/arm/mach-pxa/pxa-dt.c |   61 ++++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 76 insertions(+)
-> > 
-> > The code looks good, but I wonder if it would be better to add it to the pxa3xx.c
-> > file instead. One more comment:
+On 25.07.2012 18:47, Chris Ball wrote:
+> Hi Daniel,
 > 
-> Well, I though having tham separated from the generic code will make
-> things cleaner and also save us one #ifdef.
-
-For new platforms that are DT-only we usually keep everything in one file,
-but you're right that it makes some sense to have it separate while most
-people use non-DT board files.
-
-> >> +static const char *pxa3xx_dt_board_compat[] __initdata = {
-> >> +       "mrvl,pxa3xx",
-> >> +};
-> > 
-> > We should try to avoid wildcards in compatible properties but rather be
-> > more specific. I would use separate values for pxa300/310/320/920/930/935
-> > that you could all list here if they have the same auxdata lookup table.
+> On Wed, Jul 25 2012, Daniel Mack wrote:
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Cc: Chris Ball <cjb@laptop.org>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/pxa-mmc.txt |   24 ++++++++++
+>>  drivers/mmc/host/pxamci.c                         |   50 +++++++++++++++++++++
+>>  2 files changed, 74 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+>> new file mode 100644
+>> index 0000000..8f0ea58
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+>> @@ -0,0 +1,24 @@
+>> +* PXA MMC drivers
+>> +
+>> +Driver bindings for the PXA MCI (MMC/SDIO) interfaces
+>> +
+>> +Required properties:
+>> +- compatible: Should be "mrvl,pxa-mmc".
+>> +- reg: Should contain registers location and length
+>> +- interrupts: Should contain the interrupt
+>> +- vmmc-supply: A regulator for VMMC
+>> +
+>> +Optional properties:
+>> +- mrvl,detect-delay-ms: sets the detection delay timeout in ms.
+>> +- mrvl,gpio-card-detect: GPIO spec for the card detect pin
+>> +- mrvl,gpio-card-readonly: GPIO spec for the card write protection pin
+>> +- mrvl,gpio-power: GPIO spec for the card power enable pin
 > 
-> Ok, makes sense. I'm not sure about 920/930/935, so I'll leave them out
-> for now. Whoever successfully tests these can easly add that lines.
+> Please see Documentation/devicetree/bindings/mmc/mmc.txt.  It looks like
+> you should be using cd-gpios and wp-gpios, and you should refer to
+> mmc.txt instead of specifying reg/interrupts, with:
+> 
+> This file documents differences between the core properties in mmc.txt
+> and the properties used by the pxa-mmc driver.
 
-Sounds good.
+Ok, will do. Thanks for the review!
 
-	Arnd
+> I saw Arnd mention that we're moving from "mrvl," to "marvell,", but
+> maybe that's not finalized yet.  (And there are other drivers using
+> mrvl, so it'll presumably involve a large renaming patch.)
+
+I have no strong opinion on that, really. But as this is a new driver,
+we can as well do it right in the first place.
+
+[snip]
+
+>> @@ -866,6 +915,7 @@ static struct platform_driver pxamci_driver = {
+>>  	.driver		= {
+>>  		.name	= DRIVER_NAME,
+>>  		.owner	= THIS_MODULE,
+>> +		.of_match_table = of_match_ptr(pxa_mmc_dt_ids),
+> 
+> Have you tried compiling without CONFIG_OF?  This doesn't look to be
+> inside #ifdef CONFIG_OF, which I think would cause a compile error.
+
+of_match_ptr() validates to NULL for !CONFIG_OF. Quite nice :)
+
+
+Daniel
