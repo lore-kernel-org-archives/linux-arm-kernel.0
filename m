@@ -1,21 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jul 2012 20:09:40 +0000
-Subject: [PATCH 1/2] ARM: dt: tegra trimslice: enable USB2 port
-In-Reply-To: <1343246564-21527-1-git-send-email-swarren@wwwdotorg.org>
-References: <1343246564-21527-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201207252009.41206.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 25 Jul 2012 14:41:18 -0600 (MDT)
+Subject: [PATCH-V3] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data
+In-Reply-To: <1343214422-28718-1-git-send-email-hvaibhav@ti.com>
+References: <1343214422-28718-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1207251438210.23542@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 July 2012, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This was accidentally disabled by commit 2a5fdc9 "ARM: dt: tegra:
-> invert status=disable vs status=okay".
-> 
-> Cc: <stable@vger.kernel.org> # v3.5 (file is named tegra-trimslice.dts there)
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Hello Vaibhav,
 
-Applied both, thanks!
+On Wed, 25 Jul 2012, Vaibhav Hiremath wrote:
 
-	Arnd
+> This patch adds HWMOD data for all the peripherals of
+> AM335X device and also hooks up to the existing OMAP framework.
+
+Looks pretty good.  One question:
+
+> +static struct omap_hwmod am33xx_ehrpwm0_hwmod = {
+> +	.name		= "ehrpwm.0",
+
+These IP blocks and the ECAP IP blocks have periods in their names.
+The rest of the IP block named in the file don't use periods -- which
+is also the style used by the rest of the OMAP SoCs.  Is there
+some reason that these have periods in their names?
+
+
+- Paul
