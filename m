@@ -1,62 +1,53 @@
 From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Wed, 25 Jul 2012 15:05:09 +0400
-Subject: [PATCH v4 0/4] OMAP System Control Module
-Message-ID: <500FD2E5.2050406@dev.rtsoft.ru>
+Date: Wed, 25 Jul 2012 15:05:19 +0400
+Subject: [PATCH v4 3/4] OMAP2+: use control module mfd driver in omap_type
+Message-ID: <500FD2EF.4010304@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello.
+OMAP system control module can be probed early, then
+omap_type is safe to use its APIs.
 
-This is a next version of series of patches(based on Eduardo Valentin's patch set) adding a basic support for system control module, on OMAP4+ context.
-As Bandgap and usb phy drivers are now independent from control module driver and they will be sent separately. IIUC, Bandgap driver has already been sent.
+TODO: add support for other omap versions
 
-OMAP system control module driver provides only one API function - read of CONTROL_STATUS register:
-u32 omap_control_status_read(void) that is used in omap_type()
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
+---
+ arch/arm/mach-omap2/id.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-The physical address of CONTROL_STATUS register is specified in DT:
-ctrl_module_core: ctrl_module_core at 4A0022C4 {
-	compatible = "ti,omap4-control";
-	#address-cells = <1>;
-	#size-cells = <1>;
-	/* ranges; */
-	ti,hwmods = "ctrl_module_core";
-	reg = <0x4A0022C4 0x4>; /* CONTROL_STATUS register */
-};
-
-Eduardo Valentin (3):
-  From d4c6cf571e403f30a97db32ba6198b0c35a864b7 Mon Sep 17 00:00:00
-    2001
-  From 116a0111a6e2e563a81b0aa2dbf7a18e9ef9dbd1 Mon Sep 17 00:00:00
-    2001
-  From dda5f1badbfb82718c9ff21098998a842ce6886e Mon Sep 17 00:00:00
-    2001
-
-Santosh Shilimkar (1):
-  From 1c2af619cc34aafc027330fbb823595e3b2d139b Mon Sep 17 00:00:00
-    2001
-
- .../devicetree/bindings/mfd/omap_control.txt       |   32 +
- arch/arm/boot/dts/omap4.dtsi                       |   10 +
- arch/arm/mach-omap2/Kconfig                        |    1 +
- arch/arm/mach-omap2/control.h                      |   48 +-
- arch/arm/mach-omap2/id.c                           |   11 +-
- .../include/mach/ctrl_module_core_44xx.h           |  392 ------
- .../include/mach/ctrl_module_pad_core_44xx.h       | 1409 --------------------
- .../include/mach/ctrl_module_pad_wkup_44xx.h       |  236 ----
- .../include/mach/ctrl_module_wkup_44xx.h           |   92 --
- arch/arm/plat-omap/Kconfig                         |    4 +
- drivers/mfd/Kconfig                                |    6 +
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/omap-control-core.c                    |  162 +++
- include/linux/mfd/omap_control.h                   |   35 +
- 14 files changed, 300 insertions(+), 2139 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/omap_control.txt
- delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_core_44xx.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_core_44xx.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_wkup_44xx.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
- create mode 100644 drivers/mfd/omap-control-core.c
- create mode 100644 include/linux/mfd/omap_control.h
-
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 40373db..8018cad 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -18,6 +18,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/mfd/omap_control.h>
+ 
+ #include <asm/cputype.h>
+ 
+@@ -43,15 +44,15 @@ int omap_type(void)
+ 	u32 val = 0;
+ 
+ 	if (cpu_is_omap24xx()) {
+-		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
++		val = omap_control_status_read();
+ 	} else if (soc_is_am33xx()) {
+-		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
++		val = omap_control_status_read();
+ 	} else if (cpu_is_omap34xx()) {
+-		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
++		val = omap_control_status_read();
+ 	} else if (cpu_is_omap44xx()) {
+-		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
++		val = omap_control_status_read();
+ 	} else if (soc_is_omap54xx()) {
+-		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
++		val = omap_control_status_read();
+ 		val &= OMAP5_DEVICETYPE_MASK;
+ 		val >>= 6;
+ 		goto out;
 -- 
 1.7.7.6
