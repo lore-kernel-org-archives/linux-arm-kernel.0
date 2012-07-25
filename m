@@ -1,39 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 25 Jul 2012 08:18:19 -0300
-Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
-In-Reply-To: <1343215100-24005-1-git-send-email-festevam@gmail.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
-Message-ID: <1343215100-24005-2-git-send-email-festevam@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 25 Jul 2012 14:15:27 +0300
+Subject: [PATCH v4 1/4] ARM: OMAP4: Remove un-used control module headers
+ and defines.
+In-Reply-To: <500FD5DC.7010002@dev.rtsoft.ru>
+References: <500FD2E9.8050408@dev.rtsoft.ru>
+ <20120725110635.GE16794@arwen.pp.htv.fi>
+ <500FD5DC.7010002@dev.rtsoft.ru>
+Message-ID: <20120725111526.GI16794@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi,
 
-MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
-for imx_v6_v7_defconfig:
+On Wed, Jul 25, 2012 at 03:17:48PM +0400, Konstantin Baydarov wrote:
+>   Hi, Balbi.
+> 
+> On 07/25/2012 03:06 PM, Felipe Balbi wrote:
+> > Hi,
+> >
+> > On Wed, Jul 25, 2012 at 03:05:13PM +0400, Konstantin Baydarov wrote:
+> >> Most of the OMAP4 control module register defines are not used and
+> >> can be removed. Keep only needed defines and move them to common
+> >> control module header just like other OMAP versions.
+> >>
+> >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> >> Signed-off-by: Konstantin Baydarov <kbaidarov@dev.rtsoft.ru>
+> > Wasn't this one authored by Santosh ?? Where's his From: Santosh
+> > Shilimkar ???
+> 
+> I hit "edit as new" when I sent patches through thunderbird, I'll fix in the next series.
 
-drivers/built-in.o: In function `gpmi_dma_filter':
-clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
-make: *** [vmlinux] Error 1
+git send-email would help avoiding those ;-)
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Use 'depends' rather than 'select'
- drivers/mtd/nand/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index a5d8a1b..da52c7d 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
- config MTD_NAND_GPMI_NAND
-         bool "GPMI NAND Flash Controller driver"
-         depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-+	depends on MXS_DMA
-         help
- 	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
- 	 The GPMI controller is very powerful, with the help of BCH
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120725/629fcf65/attachment.sig>
