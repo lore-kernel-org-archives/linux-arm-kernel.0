@@ -1,41 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 25 Jul 2012 14:02:44 -0600
-Subject: [PATCH 2/2] ARM: dt: tegra trimslice: add vbus-gpio property
-In-Reply-To: <1343246564-21527-1-git-send-email-swarren@wwwdotorg.org>
-References: <1343246564-21527-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1343246564-21527-2-git-send-email-swarren@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jul 2012 20:06:44 +0000
+Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
+In-Reply-To: <4FC722B7.10409@atmel.com>
+References: <4FBE4FE7.3010005@atmel.com> <4FC722B7.10409@atmel.com>
+Message-ID: <201207252006.44523.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thursday 31 May 2012, Nicolas Ferre wrote:
+> 
+> On 05/24/2012 05:12 PM, Nicolas Ferre :
+> > Hi Arnd, hi Olof,
+> 
+> Ping?
+> 
+> (or maybe you will have a look at this after the merge window...)
+> 
 
-On TrimSlice, Tegra's USB1 port may be routed to either an external micro
-USB port, or an internal USB->SATA bridge for SSD or HDD. This muxing is
-controlled by a GPIO. Whilst not strictly a VBUS GPIO, the TrimSlice
-board files caused this GPIO to be set appropriately to enable the SATA
-bridge by passing it as the VBUS GPIO to the USB driver. Echo this same
-configuration in device tree to enable the SATA bridge.
+I've just gone through all old pull requests that I had somewhere in
+my inbox and this turned out to be one that we never pulled.
 
-An alternative might be to implement a full USB bus mux driver. However,
-that seems over-complex right now.
+It looks like it still applies and we should send it to Linus as as
+late branch this time, given that we screwed up and it was there
+all the time.
 
-Cc: <stable@vger.kernel.org> # v3.5 (file is named tegra-trimslice.dts there)
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra20-trimslice.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Nicolas, can you please confirm?
 
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index 84a9523..27fb8a6 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -276,6 +276,7 @@
- 
- 	usb at c5000000 {
- 		status = "okay";
-+		nvidia,vbus-gpio = <&gpio 170 0>; /* gpio PV2 */
- 	};
- 
- 	usb at c5004000 {
--- 
-1.7.0.4
+	Arnd
