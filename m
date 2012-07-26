@@ -1,49 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 26 Jul 2012 16:51:14 +0400
-Subject: [PATCH 1/7] RTC: add DT bindings to pxa-rtc
-In-Reply-To: <1343233066-15397-2-git-send-email-zonque@gmail.com>
-References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
- <1343233066-15397-2-git-send-email-zonque@gmail.com>
-Message-ID: <50113D42.5010503@mvista.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jul 2012 13:54:33 +0100
+Subject: [PATCH] ARM: vfp: only advertise VFPv4 in hwcaps if CONFIG_VFPv3 is
+ enabled
+Message-ID: <1343307273-7149-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+VFPv4 support depends on the VFPv3 context save/restore code, so only
+advertise support in the hwcaps if the kernel can actually handle it.
 
-On 25-07-2012 20:17, Daniel Mack wrote:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+Pretty boring, but I guess a candidate for -stable.
 
-> This patch adds generic device tree bindings to the PXA RTC driver.
-> Documentation for bindings were also added.
+ arch/arm/vfp/vfpmodule.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> ---
->   Documentation/devicetree/bindings/rtc/pxa-rtc.txt |   12 ++++++++++++
->   drivers/rtc/rtc-pxa.c                             |   11 +++++++++++
->   2 files changed, 23 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/rtc/pxa-rtc.txt
-
-> diff --git a/Documentation/devicetree/bindings/rtc/pxa-rtc.txt b/Documentation/devicetree/bindings/rtc/pxa-rtc.txt
-> new file mode 100644
-> index 0000000..acba256
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/pxa-rtc.txt
-> @@ -0,0 +1,12 @@
-> +* PXA RTC
-> +
-> +PXA specific RTC driver.
-> +
-> +Required properties:
-> +- compatible : Should be pxa-rtc
-> +
-> +Examples:
-> +
-> +rtc at 0 {
-
-    Don't use the address postfix when the node doesn't have "reg" property.
-
-> +    compatible = "mrvl,pxa-rtc";
-> +};
-
-WBR, Sergei
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 58696192..06137c7 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -713,8 +713,10 @@ static int __init vfp_init(void)
+ 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
+ 				elf_hwcap |= HWCAP_NEON;
+ #endif
++#ifdef CONFIG_VFPv3
+ 			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
+ 				elf_hwcap |= HWCAP_VFPv4;
++#endif
+ 		}
+ 	}
+ 	return 0;
+-- 
+1.7.4.1
