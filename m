@@ -1,105 +1,114 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:48 +0100
-Subject: [PATCH 15/21] ARM: ux500: Pass MSP DMA platform data though AUXDATA
+Date: Thu, 26 Jul 2012 11:28:49 +0100
+Subject: [PATCH 16/21] ASoC: Ux500: Enable MOP500 driver for Device Tree
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It isn't currently possible to pass all platform specific configuration
-though Device Tree. Thinks like device names used in the clock
-infrastructure, call-backs and DMA information have to be passed in via
-AUXDATA structures and the MSP is no exception. Here we're passing DMA
-settings.
+In this patch we stop registering the MOP500 driver from platform
+code and rely solely on Device Tree to do the probing for us. We
+also parse the sound node to link together the codec, dma and the
+CPU-side Digital Audio Interface.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-msp.c |    8 ++++----
- arch/arm/mach-ux500/board-mop500.c     |    9 +++++++++
- arch/arm/mach-ux500/board-mop500.h     |    5 +++++
- 3 files changed, 18 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/board-mop500-msp.c |    3 ---
+ sound/soc/ux500/mop500.c               |   41 ++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
-index d0bd030..a21b9e2 100644
+index a21b9e2..ce7fff9 100644
 --- a/arch/arm/mach-ux500/board-mop500-msp.c
 +++ b/arch/arm/mach-ux500/board-mop500-msp.c
-@@ -96,7 +96,7 @@ static struct stedma40_chan_cfg msp0_dma_tx = {
- 	/* data_width is set during configuration */
+@@ -228,9 +228,6 @@ void mop500_of_msp_init(struct device *parent)
+ {
+ 	struct platform_device *msp1;
+ 
+-	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+-	platform_device_register(&snd_soc_mop500);
+-
+ 	pr_info("Initialize MSP I2S-devices.\n");
+ 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
+ 			   &msp0_platform_data);
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 31c4d26..d84a073 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/spi/spi.h>
++#include <linux/of.h>
+ 
+ #include <sound/soc.h>
+ #include <sound/initval.h>
+@@ -56,14 +57,48 @@ static struct snd_soc_card mop500_card = {
+ 	.num_links = ARRAY_SIZE(mop500_dai_links),
  };
  
--static struct msp_i2s_platform_data msp0_platform_data = {
-+struct msp_i2s_platform_data msp0_platform_data = {
- 	.id = MSP_I2S_0,
- 	.msp_i2s_dma_rx = &msp0_dma_rx,
- 	.msp_i2s_dma_tx = &msp0_dma_tx,
-@@ -128,7 +128,7 @@ static struct stedma40_chan_cfg msp1_dma_tx = {
- 	/* data_width is set during configuration */
- };
++static int __devinit mop500_of_probe(struct platform_device *pdev,
++				struct device_node *np)
++{
++	struct device_node *codec_np, *platform_np, *msp_np[2];
++	int i;
++
++	platform_np = of_parse_phandle(np, "platform-pcm-dma", 0);
++	msp_np[0]   = of_parse_phandle(np, "cpu-dai", 0);
++	msp_np[1]   = of_parse_phandle(np, "cpu-dai", 1);
++	codec_np    = of_parse_phandle(np, "audio-codec", 0);
++
++	if (!(platform_np && msp_np[0] && msp_np[1] && codec_np)) {
++		dev_err(&pdev->dev, "Phandle missing or invalid\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i < 2; i++) {
++		mop500_dai_links[i].platform_of_node = platform_np;
++		mop500_dai_links[i].platform_name = NULL;
++		mop500_dai_links[i].cpu_of_node = msp_np[i];
++		mop500_dai_links[i].cpu_dai_name = NULL;
++		mop500_dai_links[i].codec_of_node = codec_np;
++		mop500_dai_links[i].codec_name = NULL;
++	}
++
++	return 0;
++}
+ static int __devinit mop500_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
  
--static struct msp_i2s_platform_data msp1_platform_data = {
-+struct msp_i2s_platform_data msp1_platform_data = {
- 	.id = MSP_I2S_1,
- 	.msp_i2s_dma_rx = NULL,
- 	.msp_i2s_dma_tx = &msp1_dma_tx,
-@@ -209,13 +209,13 @@ static struct platform_device ux500_pcm = {
+ 	pr_debug("%s: Enter.\n", __func__);
+ 
+ 	dev_dbg(&pdev->dev, "%s: Enter.\n", __func__);
+ 
++	if (np) {
++		ret = mop500_of_probe(pdev, np);
++		if (ret)
++			return ret;
++	}
++
+ 	mop500_card.dev = &pdev->dev;
+ 
+ 	dev_dbg(&pdev->dev, "%s: Card %s: Set platform drvdata.\n",
+@@ -101,10 +136,16 @@ static int __devexit mop500_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id snd_soc_mop500_match[] = {
++	{ .compatible = "stericsson,snd-soc-mop500", },
++	{},
++};
++
+ static struct platform_driver snd_soc_mop500_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = "snd-soc-mop500",
++		.of_match_table = snd_soc_mop500_match,
  	},
- };
- 
--static struct msp_i2s_platform_data msp2_platform_data = {
-+struct msp_i2s_platform_data msp2_platform_data = {
- 	.id = MSP_I2S_2,
- 	.msp_i2s_dma_rx = &msp2_dma_rx,
- 	.msp_i2s_dma_tx = &msp2_dma_tx,
- };
- 
--static struct msp_i2s_platform_data msp3_platform_data = {
-+struct msp_i2s_platform_data msp3_platform_data = {
- 	.id		= MSP_I2S_3,
- 	.msp_i2s_dma_rx	= &msp1_dma_rx,
- 	.msp_i2s_dma_tx	= NULL,
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 6f53a6f..d455a61 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -753,6 +753,15 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
- 	/* Requires device name bindings. */
- 	OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
-+	/* Requires clock name and DMA bindings. */
-+	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
-+		"ux500-msp-i2s.0", &msp0_platform_data),
-+	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80124000,
-+		"ux500-msp-i2s.1", &msp1_platform_data),
-+	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80117000,
-+		"ux500-msp-i2s.2", &msp2_platform_data),
-+	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
-+		"ux500-msp-i2s.3", &msp3_platform_data),
- 	{},
- };
- 
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 1d7316b..3fbf48f 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -9,6 +9,7 @@
- 
- /* For NOMADIK_NR_GPIO */
- #include <mach/irqs.h>
-+#include <mach/msp.h>
- #include <linux/amba/mmci.h>
- 
- /* Snowball specific GPIO assignments, this board has no GPIO expander */
-@@ -81,6 +82,10 @@ struct device;
- struct i2c_board_info;
- extern struct mmci_platform_data mop500_sdi0_data;
- extern struct mmci_platform_data mop500_sdi4_data;
-+extern struct msp_i2s_platform_data msp0_platform_data;
-+extern struct msp_i2s_platform_data msp1_platform_data;
-+extern struct msp_i2s_platform_data msp2_platform_data;
-+extern struct msp_i2s_platform_data msp3_platform_data;
- extern struct arm_pmu_platdata db8500_pmu_platdata;
- 
- extern void mop500_sdi_init(struct device *parent);
+ 	.probe = mop500_probe,
+ 	.remove = __devexit_p(mop500_remove),
 -- 
 1.7.9.5
