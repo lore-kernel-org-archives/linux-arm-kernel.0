@@ -1,31 +1,100 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jul 2012 17:01:06 +0100
-Subject: [PATCH 0/2] Fix swap and page migration for LPAE
-Message-ID: <1343318468-10412-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 26 Jul 2012 17:01:07 +0100
+Subject: [PATCH 1/2] ARM: mm: avoid setting nG bit for user mappings that
+ aren't present
+In-Reply-To: <1343318468-10412-1-git-send-email-will.deacon@arm.com>
+References: <1343318468-10412-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1343318468-10412-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Swap entries are encoding in ptes such that !pte_present(pte) and
+pte_file(pte). The remaining bits of the descriptor are used to identify
+the swapfile and offset within it to the swap entry.
 
-These two patches fix swapping and page migration for LPAE-enabled
-kernels. Without these changes, we corrupt the offset stored in the file
-pte when updating the page tables and may truncate the pfn when storing
-it into a swp_entry_t.
+When writing such a pte for a user virtual address, set_pte_at
+unconditionally sets the nG bit, which (in the case of LPAE) will
+corrupt the swapfile offset and lead to a BUG:
 
-I'll CC stable on the final patches.
+[  140.494067] swap_free: Unused swap offset entry 000763b4
+[  140.509989] BUG: Bad page map in process rs:main Q:Reg  pte:0ec76800 pmd:8f92e003
 
-All feedback welcome,
+This patch fixes the problem by only setting the nG bit for user
+mappings that are actually present.
 
-Will
-
-
-Will Deacon (2):
-  ARM: mm: avoid setting nG bit for user mappings that aren't present
-  ARM: mm: use 5 bits for swapfile type encoding
-
- arch/arm/include/asm/pgtable.h |   40 +++++++++++++++++++++-------------------
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/pgtable.h |   34 ++++++++++++++++++----------------
  arch/arm/mm/flush.c            |    2 --
- 2 files changed, 21 insertions(+), 21 deletions(-)
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index f66626d..d88f9f0 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -195,6 +195,18 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 
+ #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
+ 
++#define pte_none(pte)		(!pte_val(pte))
++#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
++#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
++#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
++#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
++#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
++#define pte_special(pte)	(0)
++
++#define pte_present_user(pte) \
++	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_USER)) == \
++	 (L_PTE_PRESENT | L_PTE_USER))
++
+ #if __LINUX_ARM_ARCH__ < 6
+ static inline void __sync_icache_dcache(pte_t pteval)
+ {
+@@ -206,25 +218,15 @@ extern void __sync_icache_dcache(pte_t pteval);
+ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			      pte_t *ptep, pte_t pteval)
+ {
+-	if (addr >= TASK_SIZE)
+-		set_pte_ext(ptep, pteval, 0);
+-	else {
++	unsigned long ext = 0;
++
++	if (addr < TASK_SIZE && pte_present_user(pteval)) {
+ 		__sync_icache_dcache(pteval);
+-		set_pte_ext(ptep, pteval, PTE_EXT_NG);
++		ext |= PTE_EXT_NG;
+ 	}
+-}
+ 
+-#define pte_none(pte)		(!pte_val(pte))
+-#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
+-#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
+-#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+-#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
+-#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
+-#define pte_special(pte)	(0)
+-
+-#define pte_present_user(pte) \
+-	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_USER)) == \
+-	 (L_PTE_PRESENT | L_PTE_USER))
++	set_pte_ext(ptep, pteval, ext);
++}
+ 
+ #define PTE_BIT_FUNC(fn,op) \
+ static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 7745854..40ca11e 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -231,8 +231,6 @@ void __sync_icache_dcache(pte_t pteval)
+ 	struct page *page;
+ 	struct address_space *mapping;
+ 
+-	if (!pte_present_user(pteval))
+-		return;
+ 	if (cache_is_vipt_nonaliasing() && !pte_exec(pteval))
+ 		/* only flush non-aliasing VIPT caches for exec mappings */
+ 		return;
 -- 
 1.7.4.1
