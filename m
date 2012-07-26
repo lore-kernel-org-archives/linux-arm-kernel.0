@@ -1,64 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 26 Jul 2012 14:37:47 -0700
-Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
-Message-ID: <87394enqz8.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Jul 2012 11:24:49 +0000
+Subject: [PATCH 2/8 v2] ARM: EXYNOS5: Add machine data for USB 2.0
+In-Reply-To: <1342866729-30460-3-git-send-email-gautam.vivek@samsung.com>
+References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
+ <1342866729-30460-3-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <201207261124.50141.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Saturday 21 July 2012, Vivek Gautam wrote:
+> From: Ajay Kumar <ajaykumar.rs@samsung.com>
+> 
+> This patch adds address mapping of USB 2.0 PHY for exynos5
+> 
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.c           |    5 +++++
+>  arch/arm/mach-exynos/include/mach/map.h |    2 ++
+>  2 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 4eb39cd..92d5e61 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -275,6 +275,11 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+>                 .pfn            = __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
+>                 .length         = SZ_4K,
+>                 .type           = MT_DEVICE,
+> +       }, {
+> +               .virtual        = (unsigned long)S3C_VA_USB_HSPHY,
+> +               .pfn            = __phys_to_pfn(EXYNOS5_PA_USB_PHY),
+> +               .length         = SZ_4K,
+> +               .type           = MT_DEVICE,
+>         },
+>  };
 
-I know it is late, but I'm really hoping this can still make it for
-v3.6, so consider this a [GIT PLEA].  ;)
+Can you pleae explain why this is done in the changelog?
 
-OMAP4 coupled CPUidle support has been well tested and was ready for the
-v3.5 merge window, but there were some complaints from Linus in the pull
-request from Len (unrelated to CPUidle) that caused the core support to
-be left out of v3.5, so I didn't submit the OMAP stuff either.
+We try hard to do such mappings from the device driver instead,
+so I'm surprised that this is necessary fo rthe USB phy.
 
-Since then, there has been some confusion about maintainership of core
-CPUidle code, including an additional cpuidle-next tree from Linaro
-leading to confusion/delay about how/where to merge the OMAP support.
-
-All of that is sorted out now, and Len has just sent his pull request[1]
-to Linus including the core CPUidle changes to support coupled CPUidle,
-so the path is now paved for the OMAP support.
-
-Also, in mainline, CPUidle doesn't properly work on OMAP4 without
-coupled states support, so there should be no concern about breaking
-existing OMAP4 CPUidle support.
-
-So, with all of that background and excuses,  could you please pull this
-into one of your late branches (or maybe a new arm-soc/late/pm branch) ?
-
-Thanks,
-
-Kevin
-
-[1] https://lkml.org/lkml/2012/7/26/6
-
-
-The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
-
-  Linux 3.5 (2012-07-21 13:58:29 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/pm/coupled-cpuidle
-
-for you to fetch changes up to b93d70aeb8f3b5ed2d74643f5009239a55634e1d:
-
-  ARM: OMAP4: CPUidle: Open broadcast clock-event device. (2012-07-25 16:06:08 -0700)
-
-----------------------------------------------------------------
-Kevin Hilman (1):
-      ARM: OMAP4: CPUidle: add synchronization for coupled idle states
-
-Santosh Shilimkar (3):
-      ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
-      ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
-      ARM: OMAP4: CPUidle: Open broadcast clock-event device.
-
- arch/arm/mach-omap2/Kconfig       |    1 +
- arch/arm/mach-omap2/cpuidle44xx.c |  141 +++++++++++++++++++++++++------------
- arch/arm/mach-omap2/timer.c       |    4 +-
- 3 files changed, 101 insertions(+), 45 deletions(-)
+	Arnd
