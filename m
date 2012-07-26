@@ -1,37 +1,165 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Jul 2012 06:30:36 +0000
-Subject: [PATCH 3/7] MTD: pxa3xx-nand: add devicetree bindings
-In-Reply-To: <201207260259.51511.marek.vasut@gmail.com>
-References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
- <1343233066-15397-4-git-send-email-zonque@gmail.com>
- <201207260259.51511.marek.vasut@gmail.com>
-Message-ID: <201207260630.36924.arnd@arndb.de>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Thu, 26 Jul 2012 12:01:33 +0530
+Subject: [PATCH/RFC 1/4] dma: add a function to request a DMA channel
+ for a specific client
+In-Reply-To: <Pine.LNX.4.64.1207171242230.17060@axis700.grange>
+References: <Pine.LNX.4.64.1207171201550.11241@axis700.grange>
+ <Pine.LNX.4.64.1207171242230.17060@axis700.grange>
+Message-ID: <1343284293.1726.8966.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 July 2012, Marek Vasut wrote:
-> > -     r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-> > -     if (r == NULL) {
-> > -             dev_err(&pdev->dev, "no resource defined for data DMA\n");
-> > -             ret = -ENXIO;
-> > -             goto fail_put_clk;
-> > -     }
-> > -     info->drcmr_dat = r->start;
-> > +     /*
-> > +      * This is a dirty hack to make this driver work from devicetree
-> > +      * bindings. It can be removed once we have a prober DMA controller
-> > +      * framework for DT.
-> > +      */
-> > +     if (pdev->dev.of_node && cpu_is_pxa3xx()) {
-> > +             info->drcmr_dat = 97;
-> > +             info->drcmr_cmd = 99;
+On Tue, 2012-07-17 at 12:53 +0200, Guennadi Liakhovetski wrote:
+> Add a new channel-request function, that uses a device pointer and a
+> transfer direction to locate the required client DMA request line. Devices,
+> that require DMA channels exceeding the traditional Tx / Rx scheme, can use
+> the optional "name" parameter.
 > 
-> cpu_is_() stuff should begone ... besides, what are these numbers here?
+> This new function uses a new DMA multiplexer interface. The new DMA request
+> line routing concept declares, that client DMA request lines are always
+> statically connected to a DMA provider. If a client is directly connected
+> to a DMAC, such a statical connection results in a 1-to-1 relationship
+> between client DMA request lines and DMAC DMA channels. A more flexible
+> configuration includes a multiplexer between clients and DMAC instances. In
+> these cases it is the multiplexer, that controls the routing. The initial
+> DMA multiplexer API consists of only one call-back: .request_chan(), that
+> finds the next free (physical or virtual) DMA channel, that can be routed
+> to the requested slave DMA interface. The actual routing, if required,
+> should be performed as a part of the dmaengine_slave_config() processing.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  drivers/dma/dmaengine.c   |   73 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dmaengine.h |    9 +++++
+>  2 files changed, 82 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index 2397f6f..4fb927c 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -542,6 +542,79 @@ struct dma_chan *__dma_request_channel(dma_cap_mask_t *mask, dma_filter_fn fn, v
+>  }
+>  EXPORT_SYMBOL_GPL(__dma_request_channel);
+>  
+> +/**
+> + * dma_request_slave_channel() - try to allocate an exclusive channel for device
+> + * @dev:	client device, for which a channel should be allocated
+> + * @direction:	transfer direction
+> + * @name:	optional name of the channel, used, when the direction is not
+> + *		sufficient to uniquely identify the DMA request
+> + */
+> +struct dma_chan *dma_request_slave_channel(struct device *dev,
+> +		enum dma_transfer_direction direction, const char *name)
+> +{
+> +	struct dma_device *device, *_d;
+> +	struct dma_chan *chan = NULL;
+> +	dma_cap_mask_t mask;
+> +	int err;
+> +
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(DMA_SLAVE, mask);
+> +
+> +	/* Find a channel */
+> +	mutex_lock(&dma_list_mutex);
+> +	list_for_each_entry_safe(device, _d, &dma_device_list, global_node) {
+> +		if (!device->mux || !device->mux->request_chan)
+> +			continue;
+> +
+> +		if (!dma_device_satisfies_mask(device, mask)) {
+> +			pr_info("%s: wrong capabilities\n", __func__);
+> +			continue;
+> +		}
+> +
+> +		/* ensure that all channels are either private or public. */
+> +		if (!dma_has_cap(DMA_PRIVATE, device->cap_mask)) {
+> +			bool public = false;
+> +			list_for_each_entry(chan, &device->channels, device_node) {
+> +				/* some channels are already publicly allocated */
+> +				if (chan->client_count) {
+> +					public = true;
+> +					break;
+> +				}
+> +			}
+> +			if (public)
+> +				continue;
+> +		}
+> +
+> +		chan = device->mux->request_chan(device, dev, direction, name);
+NAK
 
-They are the numbers from the DMA resource. It's ugly but I think reasonable
-to do this here. We will clean it up soon, once the bindings are in place.
+1. We dont want dmacs to have anything to do with filtering and
+allocating. That is role of dmaengien and we need to add stuff there
+only.
+2. Even if we start using optional name argument here we still don't
+know out of 4 channels dmac supports which one to allocate.
 
-I did notice though the the two "info->drcmr_dat = r->start" assignments in
-the non-DT case are removed here. I think that's a bug.
+> +		if (chan) {
+> +			dma_cap_set(DMA_PRIVATE, device->cap_mask);
+> +			device->privatecnt++;
+> +			err = dma_chan_get(chan);
+> +			if (!err)
+> +				break;
+> +			if (err == -ENODEV) {
+> +				pr_debug("%s: %s module removed\n", __func__,
+> +					 dma_chan_name(chan));
+> +				list_del_rcu(&device->global_node);
+> +			} else
+> +				pr_debug("%s: failed to get %s: (%d)\n",
+> +					 __func__, dma_chan_name(chan), err);
+> +
+> +			if (--device->privatecnt == 0)
+> +				dma_cap_clear(DMA_PRIVATE, device->cap_mask);
+> +
+> +			chan = NULL;
+> +		}
+> +	}
+> +	mutex_unlock(&dma_list_mutex);
+> +
+> +	pr_debug("%s: %s (%s)\n", __func__, chan ? "success" : "fail",
+> +		 chan ? dma_chan_name(chan) : NULL);
+> +
+> +	return chan;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_request_slave_channel);
+> +
+>  void dma_release_channel(struct dma_chan *chan)
+>  {
+>  	mutex_lock(&dma_list_mutex);
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index ccec62f..19b96d9 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -482,6 +482,11 @@ static inline struct dma_async_tx_descriptor *txd_next(struct dma_async_tx_descr
+>  }
+>  #endif
+>  
+> +struct dma_multiplexer {
+> +	struct dma_chan *(*request_chan)(struct dma_device *, struct device *,
+> +				enum dma_transfer_direction, const char *);
+> +};
+> +
+>  /**
+>   * struct dma_tx_state - filled in to report the status of
+>   * a transfer.
+> @@ -553,6 +558,8 @@ struct dma_device {
+>  	int dev_id;
+>  	struct device *dev;
+>  
+> +	const struct dma_multiplexer *mux;
+> +
+>  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+>  	void (*device_free_chan_resources)(struct dma_chan *chan);
+>  
+> @@ -994,6 +1001,8 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+>  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
+>  struct dma_chan *net_dma_find_channel(void);
+>  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
+> +struct dma_chan *dma_request_slave_channel(struct device *dev,
+> +		enum dma_transfer_direction direction, const char *name);
+>  
+>  /* --- Helper iov-locking functions --- */
+>  
 
-	Arnd
+
+-- 
+~Vinod
