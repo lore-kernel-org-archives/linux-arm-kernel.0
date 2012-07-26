@@ -1,43 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 17:05:51 +0100
-Subject: [PATCH 07/21] ASoC: io: Prevent use of regmap if request fails
-In-Reply-To: <20120726152533.GS3099@opensource.wolfsonmicro.com>
-References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
- <1343298534-13611-8-git-send-email-lee.jones@linaro.org>
- <20120726113204.GY3099@opensource.wolfsonmicro.com>
- <50112C29.6020606@linaro.org>
- <20120726114215.GB3099@opensource.wolfsonmicro.com>
- <50115961.6060509@linaro.org>
- <20120726151217.GO3099@opensource.wolfsonmicro.com>
- <501160F5.5050807@linaro.org>
- <20120726152533.GS3099@opensource.wolfsonmicro.com>
-Message-ID: <50116ADF.4050700@linaro.org>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Thu, 26 Jul 2012 18:09:42 +0200
+Subject: Current state of AM33xx patches
+In-Reply-To: <50116926.4060309@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+ <4FF42761.2000701@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
+ <500CEF97.4050207@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
+ <501159C3.3020109@gmail.com>
+ <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
+ <50116926.4060309@gmail.com>
+Message-ID: <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/12 16:25, Mark Brown wrote:
-> On Thu, Jul 26, 2012 at 04:23:33PM +0100, Lee Jones wrote:
->
->> What's my 'control data'? It's not used in the original codec patch.
->
->> The old way wants to go:
->
->> snd_soc_update_bits() -> snd_soc_read() -> ab8500_codec_read_reg()
->
->> When then calls back into the abx500.
->
->> So what 'control data' should I be storing in the codec struct?
->
-> You're supposed to use it for the data you use to call back into the
-> underlying I/O code.
 
-I don't understand. What 'data'?
+Op 26 jul. 2012, om 17:58 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
 
-Surely if .read and .write are populated in 'struct 
-snd_soc_codec_driver', then it should just call back into those?
+> On 26.07.2012 17:00, Koen Kooi wrote:
+> 
+>> With Ajay's usb patches you can easily boot from a usb stick, you'll
+>> only need the bootloads to be on mmc or tftp. That's what I have been
+>> doing on my beaglebone :)
+>> 
+>> I'm going to update
+>> https://github.com/beagleboard/kernel/tree/beaglebone-3.6 to use
+>> linus' tree when I get a chance to test a build.
+> 
+> Hmm, how are the patches in this repository generated? Is there a tree
+> that has them as real commits?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+If only! I'm manually pulling them from the mailinglist archives and patchwork. I keep hoping for TI to put up a git tree with all their WIP stuff, but I guess that goes into the world peace and pony category of wanting things.
+
+Even with this small patchset I'm already having a ton of merge conflicts in the .dtsi files which is keeping me from posting my patches (e.g. the leds-gpio one) to the proper mailinglists.
+
+Anyway, enough ranting, mainline + those patches now works on my beaglebone so for now I'm a happy camper :)
+
+regards,
+
+Koen
