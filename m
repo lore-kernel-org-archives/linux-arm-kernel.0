@@ -1,57 +1,49 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 26 Jul 2012 10:53:46 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1343302083.1726.9027.camel@vkoul-udesk3>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
- <201207260714.34540.arnd@arndb.de> <1343302083.1726.9027.camel@vkoul-udesk3>
-Message-ID: <5011680A.6040400@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 26 Jul 2012 16:34:02 +0100
+Subject: [PATCH 20/24] xen: update xen_add_to_physmap interface
+In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+Message-ID: <1343316846-25860-20-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Update struct xen_add_to_physmap to be in sync with Xen's version of the
+structure.
+The size field was introduced by:
 
-On 07/26/2012 06:28 AM, Vinod Koul wrote:
-> On Thu, 2012-07-26 at 07:14 +0000, Arnd Bergmann wrote:
->> On Thursday 26 July 2012, Vinod Koul wrote:
->>>>> But from a client POV it makes sense as with the given direction you
->>>>> would need a specific request line for a channel. So this is right.
->>>>> But direction is something I don't expect to be used for "give me a
->>>>> channel" 
->>>>
->>>> Ok. The thought was that the user would have the following means of
->>>> requesting a channel ...
->>>>
->>>> 1. By name
->>> Bare name maynot be enough. In a dmac we have many channels which one to
->>> choose?
->> The name is what is associated with the property in the client device
->> node, which describes everything the dmac driver needs to know.
->> If the dmac needs to pick a specific channel, it can find out from the
->> "dmas" property in combination with that name. If it is allowed to
->> pick any channel, it doesn't need to bother.
-> dmac doesn't pick a channel. They don't come into picture till dmaengine
-> and client have agreed on channel. And then channel callback in invoked,
-> still it doesn't know which client.
+changeset:   24164:707d27fe03e7
+user:        Jean Guyader <jean.guyader@eu.citrix.com>
+date:        Fri Nov 18 13:42:08 2011 +0000
+summary:     mm: New XENMEM space, XENMAPSPACE_gmfn_range
 
-I think what Arnd meant was that dmaengine (not the dmac) would use the
-DT node and name information to extract the dma mapping information from
-the device tree and provide a channel back to the client. So yes the
-dmac is not involved here.
+According to the comment:
 
-By the way, when I said "by name" above (and probably this was not
-clear) but it should have been "DT node and name". So really a channel
-is requested by ...
+"This new field .size is located in the 16 bits padding between .domid
+and .space in struct xen_add_to_physmap to stay compatible with older
+versions."
 
-1. DT node and a name
-2. DT node and a filter parameter (flags)
-3. DT node, a name and a filter parameter (flags)
+This is not true on ARM where there is not padding, but it is valid on
+X86, so introducing size is safe on X86 and it is going to fix the
+interace for ARM.
 
-The DT node points us to the specific device in the DT, say an MMC node,
-and the MMC node then contains the DMA mapping info. The device node may
-have the mapping information have one or more DMA requests/channels and
-so then the name and/or flags is used to determine which the client needs.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ include/xen/interface/memory.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Sorry hope that this is a little clearer.
-
-Cheers
-Jon
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index abbbff0..d8e33a9 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -163,6 +163,9 @@ struct xen_add_to_physmap {
+     /* Which domain to change the mapping for. */
+     domid_t domid;
+ 
++    /* Number of pages to go through for gmfn_range */
++    uint16_t    size;
++
+     /* Source mapping space. */
+ #define XENMAPSPACE_shared_info 0 /* shared info page */
+ #define XENMAPSPACE_grant_table 1 /* grant table page */
+-- 
+1.7.2.5
