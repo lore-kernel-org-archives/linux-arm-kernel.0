@@ -1,76 +1,61 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:45 +0100
-Subject: [PATCH 12/21] ARM: ux500: Fork MSP platform registration for
- step-by-step DT enablement
+Date: Thu, 26 Jul 2012 11:28:42 +0100
+Subject: [PATCH 09/21] ARM: ux500: Add MSP devices to DB8500 Device Tree
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've done this before and it worked well last time. Here we're
-duplicating a complex registration function to ease the process
-of enabling it for Device Tree. As there are quite a few steps
-taken during the registration process, it makes sense to break
-them up into more manageable chunks. This patch will aid us.
+List all four MSP devices which exist on all DB8500 based platforms,
+to ensure correct device probing and configuration passing when booting
+with DT.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-msp.c |   42 ++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm/boot/dts/db8500.dtsi |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
-index 217df1d..d0bd030 100644
---- a/arch/arm/mach-ux500/board-mop500-msp.c
-+++ b/arch/arm/mach-ux500/board-mop500-msp.c
-@@ -223,6 +223,48 @@ static struct msp_i2s_platform_data msp3_platform_data = {
- 	.msp_i2s_exit = msp13_i2s_exit,
- };
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index a3bee0a..5a72be6 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -591,6 +591,36 @@
+ 			status = "disabled";
+ 		};
  
-+/* Due for removal once the MSP driver has been fully DT:ed. */
-+void mop500_of_msp_init(struct device *parent)
-+{
-+	struct platform_device *msp1;
++		msp0: msp at 80123000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80123000 0x1000>;
++			interrupts = <0 31 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++		};
 +
-+	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
-+	platform_device_register(&snd_soc_mop500);
++		msp1: msp at 80124000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80124000 0x1000>;
++			interrupts = <0 62 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++			stericcson,use-pinctrl;
++		};
 +
-+	pr_info("Initialize MSP I2S-devices.\n");
-+	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
-+			   &msp0_platform_data);
-+	msp1 = db8500_add_msp_i2s(parent, 1, U8500_MSP1_BASE, IRQ_DB8500_MSP1,
-+			   &msp1_platform_data);
-+	db8500_add_msp_i2s(parent, 2, U8500_MSP2_BASE, IRQ_DB8500_MSP2,
-+			   &msp2_platform_data);
-+	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
-+			   &msp3_platform_data);
++		// HDMI sound
++		msp2: msp at 80117000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80117000 0x1000>;
++			interrupts = <0 98 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++		};
 +
-+	/* Get the pinctrl handle for MSP1 */
-+	if (msp1) {
-+		msp1_p = pinctrl_get(&msp1->dev);
-+		if (IS_ERR(msp1_p))
-+			dev_err(&msp1->dev, "could not get MSP1 pinctrl\n");
-+		else {
-+			msp1_def = pinctrl_lookup_state(msp1_p,
-+							PINCTRL_STATE_DEFAULT);
-+			if (IS_ERR(msp1_def)) {
-+				dev_err(&msp1->dev,
-+					"could not get MSP1 defstate\n");
-+			}
-+			msp1_sleep = pinctrl_lookup_state(msp1_p,
-+							  PINCTRL_STATE_SLEEP);
-+			if (IS_ERR(msp1_sleep))
-+				dev_err(&msp1->dev,
-+					"could not get MSP1 idlestate\n");
-+		}
-+	}
++		msp3: msp at 80125000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80125000 0x1000>;
++			interrupts = <0 62 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++		};
 +
-+	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
-+	platform_device_register(&ux500_pcm);
-+}
-+
- void mop500_msp_init(struct device *parent)
- {
- 	struct platform_device *msp1;
+ 		external-bus at 50000000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x50000000 0x4000000>;
 -- 
 1.7.9.5
