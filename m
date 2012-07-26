@@ -1,39 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jul 2012 16:05:35 +0100
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <50109233.3090302@ti.com>
-References: <4FD64083.3020800@ti.com>
- <20120612092842.GA2991@mudshark.cambridge.arm.com>
- <4FD7B1DC.30108@ti.com>
- <20120612213150.GC24380@mudshark.cambridge.arm.com>
- <4FD7C597.7060501@ti.com>
- <20120702095539.GD22239@mudshark.cambridge.arm.com>
- <4FF1D15E.7040301@ti.com>
- <20120702220117.GD25234@mudshark.cambridge.arm.com>
- <4FF6340A.6020409@ti.com> <50109233.3090302@ti.com>
-Message-ID: <20120726150534.GD6382@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 26 Jul 2012 16:12:17 +0100
+Subject: [PATCH 07/21] ASoC: io: Prevent use of regmap if request fails
+In-Reply-To: <50115961.6060509@linaro.org>
+References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
+ <1343298534-13611-8-git-send-email-lee.jones@linaro.org>
+ <20120726113204.GY3099@opensource.wolfsonmicro.com>
+ <50112C29.6020606@linaro.org>
+ <20120726114215.GB3099@opensource.wolfsonmicro.com>
+ <50115961.6060509@linaro.org>
+Message-ID: <20120726151217.GO3099@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 01:41:23AM +0100, Jon Hunter wrote:
-> Hi Will,
+On Thu, Jul 26, 2012 at 03:51:13PM +0100, Lee Jones wrote:
 
-Hi Jon,
+> I don't think we want to use regmap at all, but we're forced to by
+> soc-core. How do we over-ride that behavior? By writing some
+> nonsense into codec->control_data?
 
-> On 07/05/2012 07:40 PM, Jon Hunter wrote:
-> I just wanted to let you know that I have been updating the PMU patches
-> for OMAP. Latest can be found here [1]. I have not included Paul's patch
-> [2] in this series at the moment, because although it works well for
-> OMAP4, I need to create the HWMOD structures for OMAP3. Without these
-> structures it breaks OMAP3 PMU support. Once this is done we should be
-> able to get rid for the OMAP3 dependency on ETM. Unfortunately, Benoit
-> (Mr HWMOD) is out on his holidays but should be back next week and then
-> maybe he can give me some guidance on this HWMOD stuff.
-
-Ok, thanks for updating me. I've pushed the patches out onto my
-perf/omap4-dev branch as that seems to be a good place to collate the
-current state of things. I've not tried doing anything with it yet though.
-
-Do you know when Benoit will be back online?
-
-Will
+You should use that for your control data, yes - you're not forced to
+use regmap at all.  Like I say we've got a bunch of drivers doing so
+already.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120726/b69c5c54/attachment.sig>
