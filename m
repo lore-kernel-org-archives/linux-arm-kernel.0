@@ -1,133 +1,177 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 26 Jul 2012 11:16:43 +0200
-Subject: Devicetree: Initialization order of mmc block devices?
-In-Reply-To: <CAJe_Zhfu-k0V7q527JSqdThn_c7WfNcaHmYOwBBaaRh+A=2hKA@mail.gmail.com>
-References: <5006571A.7060103@de.bosch.com>	<CAJe_ZhcY78ah81zsfwXxE=bMG4o6v9RwZV_DQyUj7g=d-1hR_w@mail.gmail.com>	<50068696.8070408@de.bosch.com>	<CAJe_Zhfmn4dUHk6xtudwCEurigvX64xce3VAozdjDdpSWSbRkA@mail.gmail.com>	<5006C40D.300@de.bosch.com>	<CAJe_Zhcyug17ZnKtmKnVhHT=Mm1PKdE68f21WWkUVtfCwNxSwg@mail.gmail.com>	<50094168.2090900@de.bosch.com>
- <CAJe_Zhfu-k0V7q527JSqdThn_c7WfNcaHmYOwBBaaRh+A=2hKA@mail.gmail.com>
-Message-ID: <50110AFB.9090300@de.bosch.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 26 Jul 2012 11:28:23 +0200
+Subject: [patch 1/1] kirkwood: set tx_csum_limit
+In-Reply-To: <1719571.FAPWHj9hMz@flexo> (Florian Fainelli's message of "Thu,
+ 26 Jul 2012 11:15:55 +0200")
+References: <20120726071240.690145078@rtp-net.org> <1719571.FAPWHj9hMz@flexo>
+Message-ID: <87r4ry98i0.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.07.2012 13:56, Jassi Brar wrote:
-> On 20 July 2012 17:00, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->> On 19.07.2012 22:45, Jassi Brar wrote:
-> 
->>>> This problem can occur on many devices with embedded MMC and removable
->>>> SD,
->>>> e.g. smart phones. So I think we should find an solution to define MMC
->>>> scan
->>>> order or device number/name in a device tree.
->>>>
->>> I assume your issue is that due to async nature of mmc scanning, the
->>> eMMC is detected later than external card, despite being the probe for
->>> eMMC's slot initiated first ?
->>> If so, we can do by simply associating 'N' of 'mmcblkN' with the slot
->>> index i.e, mmc_host.index (instead of mmc_blk_data.name_idx). Which is
->>> always in the order of probe calling. And we don't need to modify, or
->>> expect more of, DT for that.
->>
->> Do you mean something like
->>
->> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
->> --- a/drivers/mmc/card/block.c
->> +++ b/drivers/mmc/card/block.c
->> @@ -1536,7 +1536,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct
->> mmc_card *card,
->>          */
->>
->>         snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
->> -                "mmcblk%d%s", md->name_idx, subname ? subname : "");
->> +                "mmcblk%d%s", card->host->index, subname ? subname : "");
->>
->>         blk_queue_logical_block_size(md->queue.queue, 512);
->>         set_capacity(md->disk, size);
->>
->> ?
->>
-> Exactly!
-> It seems too trivial and default for the author to have missed it, so
-> I suspect I am overlooking something yet again. I would dig email
-> archives to know more about that naming convention before dare submit
-> a patch :)
+Florian Fainelli <florian@openwrt.org> writes:
 
-What's about anything like this [1]?
+> Hi Arnaud,
+>
+> On Thursday 26 July 2012 09:12:00 Arnaud Patard wrote:
+>> kirkwood and dove have a smaller FIFO than other "orion" SoCs. This
+>> needs to be taken into account otherwise people using things like jumbo 
+> frames
+>> will get into some troubles.
+>> 
+>> As a side note, this patch is an updated version of a patch sent some years
+>> ago: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
+> June/017320.html
+>> which seems to have been lost.
+>> 
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> 
+>> Index: alunn/arch/arm/mach-dove/common.c
+>> ===================================================================
+>> --- alunn.orig/arch/arm/mach-dove/common.c	2012-07-20 09:14:45.000000000 
+> +0200
+>> +++ alunn/arch/arm/mach-dove/common.c	2012-07-20 17:51:38.872925518 
+> +0200
+>> @@ -102,7 +102,7 @@ void __init dove_ehci1_init(void)
+>>  void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
+>>  {
+>>  	orion_ge00_init(eth_data, DOVE_GE00_PHYS_BASE,
+>> -			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR);
+>> +			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR, 0);
+>>  }
+>
+> You might want to add a constant for TX_CSUM_NO_LIMIT or something like that, 
+> rather than a plain 0 which might be a little misleading.
+>
 
-Best regards
+It's not to set an unlimited value but to tell the driver it has to
+use its default value. This limit is only valid for kirkwood but given
+that orion_ge*_init functions are used on all platforms, I have to set 
 
-Dirk
-
-[1]
-
----
-  drivers/mmc/card/Kconfig |   27 +++++++++++++++++++++++++++
-  drivers/mmc/card/block.c |    2 +-
-  include/linux/mmc/host.h |    7 +++++++
-  3 files changed, 35 insertions(+), 1 deletion(-)
-
-Index: a/drivers/mmc/card/Kconfig
-===================================================================
---- a/drivers/mmc/card/Kconfig
-+++ b/drivers/mmc/card/Kconfig
-@@ -50,6 +50,33 @@ config MMC_BLOCK_BOUNCE
-
-  	  If unsure, say Y here.
-
-+config MMC_SLOTINDEX
-+	bool "Use host index for enumerating mmxblkN"
-+	depends on MMC_BLOCK
-+	default n
-+	help
-+	  On embedded devices, often there is a combination of
-+	  removable mmc devices (e.g. MMC/SD cards) and hard
-+	  wired ones (e.g. eMMC). Depending on the hardware
-+	  configuration, the 'mmcblkN' node might change if
-+	  the removable device is available or not at boot time.
-+
-+	  E.g. if the removable device is attached at boot time,
-+	  it might become mmxblk0. And the hard wired one mmcblk1.
-+	  But if the removable device isn't there at boot time,
-+	  the hard wired one will become mmcblk0. This makes it
-+	  somehow difficult to hard code the root device to the
-+	  non-removable device and boot fast.
-+
-+	  Enabling this option will simply associating 'N' of
-+	  'mmcblkN' with the slot index instead of the dynamic
-+	  name index. The slot index is always the same, ensuring
-+	  that the non-removable mmc device is associated always
-+	  with the same mmcblkN. Independent of the availability of
-+	  the removable one.
-+
-+	  If unsure, say N here.
-+
-  config SDIO_UART
-  	tristate "SDIO UART/GPS class support"
-  	help
-Index: a/drivers/mmc/card/block.c
-===================================================================
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -1536,7 +1536,7 @@ static struct mmc_blk_data *mmc_blk_allo
-  	 */
-
-  	snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
--		 "mmcblk%d%s", md->name_idx, subname ? subname : "");
-+		 "mmcblk%d%s", NAMEIDX, subname ? subname : "");
-
-  	blk_queue_logical_block_size(md->queue.queue, 512);
-  	set_capacity(md->disk, size);
-Index: a/include/linux/mmc/host.h
-===================================================================
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -437,4 +437,11 @@ static inline unsigned int mmc_host_clk_
-  	return host->ios.clock;
-  }
-  #endif
-+
-+#ifdef CONFIG_MMC_SLOTINDEX
-+#define NAMEIDX (card->host->index)
-+#else
-+#define NAMEIDX (md->name_idx)
-+#endif
-+
-  #endif /* LINUX_MMC_HOST_H */
+>>  
+>>  
+> /*****************************************************************************
+>> Index: alunn/arch/arm/mach-kirkwood/common.c
+>> ===================================================================
+>> --- alunn.orig/arch/arm/mach-kirkwood/common.c	2012-07-20 
+> 09:14:46.000000000 +0200
+>> +++ alunn/arch/arm/mach-kirkwood/common.c	2012-07-20 17:51:03.104927094 
+> +0200
+>> @@ -301,7 +301,7 @@ void __init kirkwood_ge00_init(struct mv
+>>  {
+>>  	orion_ge00_init(eth_data,
+>>  			GE00_PHYS_BASE, IRQ_KIRKWOOD_GE00_SUM,
+>> -			IRQ_KIRKWOOD_GE00_ERR);
+>> +			IRQ_KIRKWOOD_GE00_ERR, 1600);
+>>  	/* The interface forgets the MAC address assigned by u-boot if
+>>  	the clock is turned off, so claim the clk now. */
+>>  	clk_prepare_enable(ge0);
+>> @@ -315,7 +315,7 @@ void __init kirkwood_ge01_init(struct mv
+>>  {
+>>  	orion_ge01_init(eth_data,
+>>  			GE01_PHYS_BASE, IRQ_KIRKWOOD_GE01_SUM,
+>> -			IRQ_KIRKWOOD_GE01_ERR);
+>> +			IRQ_KIRKWOOD_GE01_ERR, 1600);
+>>  	clk_prepare_enable(ge1);
+>>  }
+>>  
+>> Index: alunn/arch/arm/mach-mv78xx0/common.c
+>> ===================================================================
+>> --- alunn.orig/arch/arm/mach-mv78xx0/common.c	2012-07-20 
+> 09:14:46.000000000 +0200
+>> +++ alunn/arch/arm/mach-mv78xx0/common.c	2012-07-20 17:50:26.712928695 +0200
+>> @@ -213,7 +213,7 @@ void __init mv78xx0_ge00_init(struct mv6
+>>  {
+>>  	orion_ge00_init(eth_data,
+>>  			GE00_PHYS_BASE, IRQ_MV78XX0_GE00_SUM,
+>> -			IRQ_MV78XX0_GE_ERR);
+>> +			IRQ_MV78XX0_GE_ERR, 0);
+>>  }
+>>  
+>>  
+>> @@ -224,7 +224,7 @@ void __init mv78xx0_ge01_init(struct mv6
+>>  {
+>>  	orion_ge01_init(eth_data,
+>>  			GE01_PHYS_BASE, IRQ_MV78XX0_GE01_SUM,
+>> -			NO_IRQ);
+>> +			NO_IRQ, 0);
+>>  }
+>>  
+>>  
+>> Index: alunn/arch/arm/mach-orion5x/common.c
+>> ===================================================================
+>> --- alunn.orig/arch/arm/mach-orion5x/common.c	2012-07-20 09:14:46.000000000 
+> +0200
+>> +++ alunn/arch/arm/mach-orion5x/common.c	2012-07-20 17:50:26.744928692 
+> +0200
+>> @@ -109,7 +109,7 @@ void __init orion5x_eth_init(struct mv64
+>>  {
+>>  	orion_ge00_init(eth_data,
+>>  			ORION5X_ETH_PHYS_BASE, IRQ_ORION5X_ETH_SUM,
+>> -			IRQ_ORION5X_ETH_ERR);
+>> +			IRQ_ORION5X_ETH_ERR, 0);
+>>  }
+>>  
+>>  
+>> Index: alunn/arch/arm/plat-orion/common.c
+>> ===================================================================
+>> --- alunn.orig/arch/arm/plat-orion/common.c	2012-07-20 
+> 09:14:46.000000000 +0200
+>> +++ alunn/arch/arm/plat-orion/common.c	2012-07-20 17:50:26.756928690 +0200
+>> @@ -291,10 +291,12 @@ static struct platform_device orion_ge00
+>>  void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
+>>  			    unsigned long mapbase,
+>>  			    unsigned long irq,
+>> -			    unsigned long irq_err)
+>> +			    unsigned long irq_err,
+>> +			    unsigned int tx_csum_limit)
+>>  {
+>>  	fill_resources(&orion_ge00_shared, orion_ge00_shared_resources,
+>>  		       mapbase + 0x2000, SZ_16K - 1, irq_err);
+>> +	orion_ge00_shared_data.tx_csum_limit = tx_csum_limit;
+>>  	ge_complete(&orion_ge00_shared_data,
+>>  		    orion_ge00_resources, irq, &orion_ge00_shared,
+>>  		    eth_data, &orion_ge00);
+>> @@ -343,10 +345,12 @@ static struct platform_device orion_ge01
+>>  void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
+>>  			    unsigned long mapbase,
+>>  			    unsigned long irq,
+>> -			    unsigned long irq_err)
+>> +			    unsigned long irq_err,
+>> +			    unsigned int tx_csum_limit)
+>>  {
+>>  	fill_resources(&orion_ge01_shared, orion_ge01_shared_resources,
+>>  		       mapbase + 0x2000, SZ_16K - 1, irq_err);
+>> +	orion_ge01_shared_data.tx_csum_limit = tx_csum_limit;
+>>  	ge_complete(&orion_ge01_shared_data,
+>>  		    orion_ge01_resources, irq, &orion_ge01_shared,
+>>  		    eth_data, &orion_ge01);
+>> Index: alunn/arch/arm/plat-orion/include/plat/common.h
+>> ===================================================================
+>> --- alunn.orig/arch/arm/plat-orion/include/plat/common.h	2012-07-20 
+> 09:14:46.000000000 +0200
+>> +++ alunn/arch/arm/plat-orion/include/plat/common.h	2012-07-20 
+> 17:50:26.772928691 +0200
+>> @@ -39,12 +39,14 @@ void __init orion_rtc_init(unsigned long
+>>  void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
+>>  			    unsigned long mapbase,
+>>  			    unsigned long irq,
+>> -			    unsigned long irq_err);
+>> +			    unsigned long irq_err,
+>> +			    unsigned int tx_csum_limit);
+>>  
+>>  void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
+>>  			    unsigned long mapbase,
+>>  			    unsigned long irq,
+>> -			    unsigned long irq_err);
+>> +			    unsigned long irq_err,
+>> +			    unsigned int tx_csum_limit);
+>>  
+>>  void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
+>>  			    unsigned long mapbase,
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
