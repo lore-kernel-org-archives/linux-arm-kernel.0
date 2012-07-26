@@ -1,66 +1,137 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Jul 2012 07:07:44 +0000
-Subject: Orion Pull request
-In-Reply-To: <20120725211740.GD13619@lunn.ch>
-References: <20120724081732.GR18778@lunn.ch>
- <201207251420.48634.arnd@arndb.de> <20120725211740.GD13619@lunn.ch>
-Message-ID: <201207260707.45157.arnd@arndb.de>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 26 Jul 2012 16:12:32 +0900
+Subject: [PATCH 1/2] ARM: EXYNOS: Fix ARM PMU irq numbers
+In-Reply-To: <CAK9yfHyXzSp1Q75neuC0Q2=7RhXQXmKAQOPxE522SCsupwixTw@mail.gmail.com>
+References: <1343262902-19073-1-git-send-email-chanho61.park@samsung.com>
+ <1343262902-19073-2-git-send-email-chanho61.park@samsung.com>
+ <CAK9yfHyXzSp1Q75neuC0Q2=7RhXQXmKAQOPxE522SCsupwixTw@mail.gmail.com>
+Message-ID: <003201cd6afe$06407f20$12c17d60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 July 2012, Andrew Lunn wrote:
-> > Please split the other patches into branches according to what
-> > they do, and make sure that each branch is based on an -rc release
-> > rather than a random point in the git history or patches that
-> > are not upstream. We can then decide which ones to still send
-> > for v3.6 and which branches to delay for v3.7.
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Sachin Kamat
+> Sent: Thursday, July 26, 2012 12:53 PM
+> To: Chanho Park
+> Cc: linux-samsung-soc at vger.kernel.org; Kyungmin Park;
+> kgene.kim at samsung.com; linux-arm-kernel at lists.infradead.org; ben-
+> linux at fluff.org
+> Subject: Re: [PATCH 1/2] ARM: EXYNOS: Fix ARM PMU irq numbers
 > 
-> Hi Arnd
+> On 26 July 2012 06:05, Chanho Park <chanho61.park@samsung.com> wrote:
+> > This patch fixes irq numbers of ARM PMU(Perfromance Monitoring Unit).
+> > We need to seperate arm-pmu(performance measurement unit) and
+> > exynos-pmu(power management unit). I decide to change
+> EXYNOS4_IRQ_PMU
+> > to EXYNOS4_IRQ_POWER_PMU because there are no one use it.
+> > A max cpu number of exynos4 is four in case of exynos44xx. So we
+> > should define 3 additional pmu irq numbers and enable it according to the
+> number of cpus.
+> >
+> > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/include/mach/irqs.h |   18 ++++++++++++++++--
+> >  arch/arm/plat-samsung/devs.c             |    9 ++++++++-
+> >  2 files changed, 24 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/include/mach/irqs.h
+> > b/arch/arm/mach-exynos/include/mach/irqs.h
+> > index 35bced6..329b07d 100644
+> > --- a/arch/arm/mach-exynos/include/mach/irqs.h
+> > +++ b/arch/arm/mach-exynos/include/mach/irqs.h
+> > @@ -128,7 +128,7 @@
+> >  #define EXYNOS4_IRQ_ADC1               IRQ_SPI(107)
+> >  #define EXYNOS4_IRQ_PEN1               IRQ_SPI(108)
+> >  #define EXYNOS4_IRQ_KEYPAD             IRQ_SPI(109)
+> > -#define EXYNOS4_IRQ_PMU                        IRQ_SPI(110)
+> > +#define EXYNOS4_IRQ_POWER_PMU          IRQ_SPI(110)
+> >  #define EXYNOS4_IRQ_GPS                        IRQ_SPI(111)
+> >  #define EXYNOS4_IRQ_INTFEEDCTRL_SSS    IRQ_SPI(112)
+> >  #define EXYNOS4_IRQ_SLIMBUS            IRQ_SPI(113)
+> > @@ -136,6 +136,11 @@
+> >  #define EXYNOS4_IRQ_TSI                        IRQ_SPI(115)
+> >  #define EXYNOS4_IRQ_SATA               IRQ_SPI(116)
+> >
+> > +#define EXYNOS4_IRQ_PMU                        COMBINER_IRQ(2, 2)
+> > +#define EXYNOS4_IRQ_PMU_CPU1           COMBINER_IRQ(3, 2)
+> > +#define EXYNOS4_IRQ_PMU_CPU2           COMBINER_IRQ(18, 2)
+> > +#define EXYNOS4_IRQ_PMU_CPU3           COMBINER_IRQ(19, 2)
+> > +
+> >  #define EXYNOS4_IRQ_SYSMMU_MDMA0_0     COMBINER_IRQ(4, 0)
+> >  #define EXYNOS4_IRQ_SYSMMU_SSS_0       COMBINER_IRQ(4, 1)
+> >  #define EXYNOS4_IRQ_SYSMMU_FIMC0_0     COMBINER_IRQ(4, 2)
+> > @@ -230,7 +235,6 @@
+> >  #define IRQ_TC                         EXYNOS4_IRQ_PEN0
+> >
+> >  #define IRQ_KEYPAD                     EXYNOS4_IRQ_KEYPAD
+> > -#define IRQ_PMU                                EXYNOS4_IRQ_PMU
+> >
+> >  #define IRQ_FIMD0_FIFO                 EXYNOS4_IRQ_FIMD0_FIFO
+> >  #define IRQ_FIMD0_VSYNC                        EXYNOS4_IRQ_FIMD0_VSYNC
+> > @@ -453,6 +457,16 @@
+> >  #define EXYNOS5_IRQ_GPIO3_NR_GROUPS    5
+> >  #define EXYNOS5_IRQ_GPIO4_NR_GROUPS    1
+> >
+> > +#if defined(CONFIG_ARCH_EXYNOS4)
+> > +#define IRQ_PMU                                EXYNOS4_IRQ_PMU
+> > +#define IRQ_PMU1                       EXYNOS4_IRQ_PMU_CPU1
+> > +#define IRQ_PMU2                       EXYNOS4_IRQ_PMU_CPU2
+> > +#define IRQ_PMU3                       EXYNOS4_IRQ_PMU_CPU3
+> > +#elif defined(CONFIG_ARCH_EXYNOS5)
+> > +#define IRQ_PMU                                EXYNOS5_IRQ_PMU
+> > +#define IRQ_PMU1                       EXYNOS5_IRQ_PMU_CPU1
+> > +#endif
 > 
-> If i make the branches based on the -rc7 release, how do i test them?
-> The patches have dependencies on the I2C patch now accepted by the I2C
-> maintainer and the SPI patches accepted by the SPI maintainer.  These
-> patches implement the DT support in the drivers. Without those
-> patches, all i2c devices are missing, and worst still, the root FS is
-> missing on my Kirkwood QNAP device i test with.
+> This will not work when both Exynos 4 and 5 are enabled.
 
-You can merge the i2c and spi branches that went upstream into your
-own branch before applying your own patches. This way, they become
-"dependencies" and should get merged before yours are sent (in this
-case they already are)
+Hmm. I think we need to identify exynos4 and 5 types dynamically using soc_is_exynosXXX() function.
+I'll change it at once.
 
-> Note there is no compile time dependencies, just run time. So i could
-> initially build a patchset with those driver patches included, test
-> the combination works, rebase to discard the driver patches, and then
-> send a pull-request?
 > 
-> Or is there a better way to handle this?
-
-Yes, don't rebase the stuff after testing. We want the patches that
-go upstream to be the exact version you have tested.
-
-> I'm also not sure what topic branches would be appropriate. All that
-> is left is DT. One branch could be driver changes and the other
-> actually using the driver from DT. But there is a clear dependency
-> between the two. I cannot split the three new boards support via DT
-> into three topic branches because they cause merge conflicts when you
-> try to bring them together. What would you suggest?
-
-If there are just conflicts between merging the branches (two
-patches touching the same code lines), the best way to deal with it
-is to let us handle the merge. We're quite experienced with this by
-now.
-
-If you have an actual dependency (branch B builds fine without branch
-A, but the result doesn't work), then the branches need to be
-serialized: You provide one standalone branch that has the more
-basic changes (cleanups, dt conversion, ...) and then you have another
-branch that starts from the top commit of the first one and has the
-more advanced changes.
-
-If you have two branches that both need a few patches but then go
-on in different directions, that's also fine: just apply the common
-patches first, then make two branches starting with that common
-changeset and apply the other patches separately.
-
-	Arnd
+> > +
+> >  #define MAX_COMBINER_NR                        (EXYNOS4_MAX_COMBINER_NR
+> > EXYNOS5_MAX_COMBINER_NR ? \
+> >                                         EXYNOS4_MAX_COMBINER_NR :
+> > EXYNOS5_MAX_COMBINER_NR)
+> >
+> > diff --git a/arch/arm/plat-samsung/devs.c
+> > b/arch/arm/plat-samsung/devs.c index 74e31ce..91048a6 100644
+> > --- a/arch/arm/plat-samsung/devs.c
+> > +++ b/arch/arm/plat-samsung/devs.c
+> > @@ -1100,7 +1100,14 @@ struct platform_device s5p_device_onenand = {
+> >
+> >  #ifdef CONFIG_PLAT_S5P
+> >  static struct resource s5p_pmu_resource[] = {
+> > -       DEFINE_RES_IRQ(IRQ_PMU)
+> > +       DEFINE_RES_IRQ(IRQ_PMU),
+> > +#if (CONFIG_NR_CPUS > 1)
+> > +       DEFINE_RES_IRQ(IRQ_PMU1),
+> > +#elif (CONFIG_NR_CPUS > 2)
+> > +       DEFINE_RES_IRQ(IRQ_PMU2),
+> > +#elif (CONFIG_NR_CPUS > 3)
+> > +       DEFINE_RES_IRQ(IRQ_PMU3),
+> > +#endif
+> >  };
+> >
+> >  static struct platform_device s5p_device_pmu = {
+> > --
+> > 1.7.9.5
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-samsung-soc" in the body of a message to
+> > majordomo at vger.kernel.org More majordomo info at
+> > http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
+> --
+> With warm regards,
+> Sachin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
