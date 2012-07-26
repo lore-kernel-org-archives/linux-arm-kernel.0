@@ -1,191 +1,73 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 26 Jul 2012 12:56:02 +0800
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1342756850.1726.74.camel@vkoul-udesk3>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201206271520.49276.arnd@arndb.de>
- <1342161907.1726.26.camel@vkoul-udesk3>
- <201207171924.33756.arnd@arndb.de>
- <1342756850.1726.74.camel@vkoul-udesk3>
-Message-ID: <CAMj5BkjbZsL_vSCfLsZ6UsdPrAHeQ+FwBFYbUM_L1w3wqCLuMQ@mail.gmail.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu, 26 Jul 2012 08:32:32 +0300
+Subject: [PATCH] ARM: mxs: fix compile error caused by prom_update_property
+ change
+In-Reply-To: <1342160035-24170-1-git-send-email-shawn.guo@linaro.org>
+References: <1342160035-24170-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <5010D670.6070303@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2012 at 12:00 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Tue, 2012-07-17 at 19:24 +0000, Arnd Bergmann wrote:
->> On Friday 13 July 2012, Vinod Koul wrote:
->> > > Do you mean there must be a global table, or are you ok with putting
->> > > the information about a channel into the device that uses the channel,
->> > > as we do for most other subsystems (IRQ, GPIO, pinctrl, ...).
->> > > If not, what is the problem with that approach?
->> >
->> > Today, we simple ask, "give me dma channel with DMA_SLAVE capability".
->> >
->> > If we change it to "give me dma channel which suits my need" and have
->> > additional information in dmaengine to handle this request effectively.
->> >
->> > What that would mean is
->> > a) DMA channel either knows which channel to provide, Or
->> > b) Additional arguments provided to dmaengine API to help it find out
->> > which channel to provide.
->> >
->> > It would be good to have client ask for a specific channel. But in order
->> > to build generic clients, we face a problem that clients may not know
->> > how they mapped to dmac by SoC designer. Or the mux maybe entirely
->> > flexible on which channel.
->> >
->> > If we add this as DT property (which I assume should be platform
->> > specific), then client will know which channel to request.
->> > It can have two levels, dmac and channel. In case mux is flexible enough
->> > then client gets a channel and program the mux for this mapping.
->> >
->> > I think this is the most simplistic solution I have for this, thoughts?
->>
->> I think we're basically on the same page. Let's see if I have covered
->> all the cases we discussed so far. I've tried to update the binding that
->> Jon sent out initially with everything we've discussed, so please review
->> this to see if I understood you correctly.
-> I think this looks fine to me. Few comments below on client side
->>
->>       Arnd
->>
->>
->> * Generic DMA Controller and DMA request bindings
->>
->> Generic binding to provide a way for a driver using DMA Engine to retrieve the
->> DMA request or channel information that goes from a hardware device to a DMA
->> controller.
->>
->> * DMA controller
->>
->> Required property:
->>     - #dma-cells: Number elements to describe DMA channel information. Must be
->>                   at least 2, allowing a phandle and a flags cell, but usually
->>                 is larger so a client can also specify a request or channel
->>                   number and/or some configuration.
->>
->> Optional properties:
->>     - #dma-channels: Number of DMA channels supported by the controller.
->>     - #dma-requests: Number of DMA requests signals supported by the controller.
->>
->> Example:
->>
->>        sdma: dmaengine at 48000000 {
->>                compatible = "ti,omap4-sdma"
->>                reg = <0x48000000 0x1000>;
->>                interrupts = <4>;
->>                #dma-cells = <3>;
->>                #dma-channels = <32>;
->>                #dma-requests = <127>;
->>        };
->>
->>
->> * DMA client
->>
->> Client drivers should specify the DMA property using a phandle to the controller
->> followed by the number of DMA request/channel and the transfer type of the
->> channel (eg. device-to-memory, memory-to-device, memory-to-memory, etc).
->>
->> Required property:
->>     dmas: list of one or more dma specifiers, each consisting of
->>      - phandle pointing to dma controller node
->>      - flags word, a bit map that can hold these flags
->>        * 0x00000001 channel can be used for transfer from device
->>        * 0x00000002 channel can be user for transfer to device
-> Is this for identifying which channel is for TX and RX? If not I am not
-> sure I understood it well
->
->>      - zero or more cells in a format specific to the the dma controller
->>        node listed in the phandle. This typically contains a dma request
->>        line number or a channel number, but can contain any data that
->>        is used required for configuring a channel.
+Hi,
 
-How about extend struct dma_slave_config, adding one member of
-"request_line", if
-"request line" is must config in most platform.
+On 07/13/2012 09:13 AM, Shawn Guo wrote:
+> The commit 475d009 (of: Improve prom_update_property() function)
+> changed prom_update_property interface, and causes the compile
+> error below.
+>
+>    CC      arch/arm/mach-mxs/mach-mxs.o
+> arch/arm/mach-mxs/mach-mxs.c: In function ?update_fec_mac_prop?:
+> arch/arm/mach-mxs/mach-mxs.c:216:4: error: too many arguments to function ?prom_update_property?
+> include/linux/of.h:263:12: note: declared here
+>
+> Update the caller update_fec_mac_prop to fix the error.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> The error is seen on next-20120712 where commit 475d009 (of: Improve
+> prom_update_property() function) emerges.
 
-struct dma_slave_config {
-~
-u32 request_line;
-}
-The advantage is request_line can be get directly from
-dmaengine_slave_config regardless of DT.
+What's the status of this patch? Current Torvald's master is unbuildable 
+for mxs because of this issue.
 
->>
->> Optional property:
->>     dma-names: when present, this shall contain one identifier string
->>     for each dma specifier in the dmas property. The specific strings
->>     that can be used are defined in the binding of the DMA client
->>     device. When multiple dma specifiers can be used as alternatives,
->>     the dma-names for those dma specifiers must be identical.
->>
->> Any dma specifiers that have identical flags and identical dma-names
->> (if present) shall refer to different dma controllers that can be
->> used as alternatives, e.g. when a request line is connected to
->> multiple dma controllers. If multiple dma specifiers are listed that
->> have the same flags but refer to different functional channels,
->> the dma-names property must be used to distinguish them.
->>
->> Examples:
->>
->> 1. One DMA write channel, one DMA read/write channel:
->>
->>        i2c1: i2c at 1 {
->>                ...
->>                dmas = <&sdma 2 1 &sdma 3 2>;
->>                ...
->>        };
->>
->> 2. A single read-write channel with two alternative dma controllers
->>    providing it:
->>
->>       dmas = <&dma0 3 5
->>               &dma1 3 7
->>               &dma2 3 2>;
->>
->> 3. A device with three channels, one of which has two alternatives:
->>
->>       dmas = <&dma0 1 4 /* data read */
->>               &dma0 2 6 /* data write */
->>               &dma1 1 0 /* error read */
->>               &dma2 1 0>; /* alternative error read */
->>       dma-names = "data", "data", "error", "error";
->>
->> 4. A dma controller requiring complex configuration:
->>
->>        dma: dmaengine at 48000000 {
->>                compatible = "foo,foo-sdma"
->>                reg = <0x48000000 0x1000>;
->>                interrupts = <4>;
->>                #dma-cells = <6>; /* phandle, flag, request, channel,
->>                                        input-width, output-width */
-> Why would we want the widths to be here?
-> Assuming a DMA from System memory to a peripheral, source width should
-> be system memory width and destination the peripheral width. IMO these
-> should not be in dma property even if we need these
->>                #dma-channels = <32>;
->>                #dma-requests = <127>;
->>        };
->>
->>        mmc at 49000000 {
->>               ...
->>               dmas = <&dma 1  /* read */
->>                       2       /* request line */
->>                       5       /* channel */
->>                       16      /* 16 bit bus width on read */
->>                       8>      /* 8 bit bus width on write */
->>                      <&dma 2  /* write */
->>                       3       /* request line */
->>                       6       /* channel */
->>                       8       /* 8 bit bus width on read */
->>                       16>     /* 16 bit bus width on write */
-> >From this looks like flag is for TX/RX, so maybe i read correct :)
+Compiler gives an error:
+arch/arm/mach-mxs/mach-mxs.c: In function 'update_fec_mac_prop':
+arch/arm/mach-mxs/mach-mxs.c:213: error: too many arguments to function 
+'prom_update_property'
+make[1]: *** [arch/arm/mach-mxs/mach-mxs.o] Error 1
+
+Best regards,
+Lauri Hintsala
+
+
 >
-> --
-> ~Vinod
+>   arch/arm/mach-mxs/mach-mxs.c |    8 ++------
+>   1 files changed, 2 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 648bdd0..8dabfe8 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -162,7 +162,7 @@ enum mac_oui {
+>   static void __init update_fec_mac_prop(enum mac_oui oui)
+>   {
+>   	struct device_node *np, *from = NULL;
+> -	struct property *oldmac, *newmac;
+> +	struct property *newmac;
+>   	const u32 *ocotp = mxs_get_ocotp();
+>   	u8 *macaddr;
+>   	u32 val;
+> @@ -208,11 +208,7 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+>   		macaddr[4] = (val >> 8) & 0xff;
+>   		macaddr[5] = (val >> 0) & 0xff;
+>
+> -		oldmac = of_find_property(np, newmac->name, NULL);
+> -		if (oldmac)
+> -			prom_update_property(np, newmac, oldmac);
+> -		else
+> -			prom_add_property(np, newmac);
+> +		prom_update_property(np, newmac);
+>   	}
+>   }
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
