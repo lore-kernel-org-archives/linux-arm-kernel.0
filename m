@@ -1,164 +1,91 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:44 +0100
-Subject: [PATCH 02/24] xen/arm: hypercalls
+Date: Thu, 26 Jul 2012 16:33:48 +0100
+Subject: [PATCH 06/24] xen: missing includes
 In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use r12 to pass the hypercall number to the hypervisor.
-
-We need a register to pass the hypercall number because we might not
-know it at compile time and HVC only takes an immediate argument.
-
-Among the available registers r12 seems to be the best choice because it
-is defined as "intra-procedure call scratch register".
-
-Use the ISS to pass an hypervisor specific tag.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++++++++++++
- arch/arm/xen/Makefile                |    2 +-
- arch/arm/xen/hypercall.S             |   65 ++++++++++++++++++++++++++++++++++
- 3 files changed, 116 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/include/asm/xen/hypercall.h
- create mode 100644 arch/arm/xen/hypercall.S
+ drivers/tty/hvc/hvc_xen.c                  |    2 ++
+ drivers/xen/grant-table.c                  |    1 +
+ drivers/xen/xenbus/xenbus_probe_frontend.c |    1 +
+ include/xen/interface/xen.h                |    3 +++
+ include/xen/privcmd.h                      |    1 +
+ 5 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-new file mode 100644
-index 0000000..4ac0624
---- /dev/null
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -0,0 +1,50 @@
-+/******************************************************************************
-+ * hypercall.h
-+ *
-+ * Linux-specific hypervisor handling.
-+ *
-+ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation; or, when distributed
-+ * separately from the Linux kernel or incorporated into other
-+ * software packages, subject to the following license:
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this source file (the "Software"), to deal in the Software without
-+ * restriction, including without limitation the rights to use, copy, modify,
-+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-+ * and to permit persons to whom the Software is furnished to do so, subject to
-+ * the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-+ * IN THE SOFTWARE.
-+ */
-+
-+#ifndef _ASM_ARM_XEN_HYPERCALL_H
-+#define _ASM_ARM_XEN_HYPERCALL_H
-+
-+#include <xen/interface/xen.h>
-+
-+long privcmd_call(unsigned call, unsigned long a1,
-+		unsigned long a2, unsigned long a3,
-+		unsigned long a4, unsigned long a5);
-+int HYPERVISOR_xen_version(int cmd, void *arg);
-+int HYPERVISOR_console_io(int cmd, int count, char *str);
-+int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
-+int HYPERVISOR_sched_op(int cmd, void *arg);
-+int HYPERVISOR_event_channel_op(int cmd, void *arg);
-+unsigned long HYPERVISOR_hvm_op(int op, void *arg);
-+int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
-+int HYPERVISOR_physdev_op(int cmd, void *arg);
-+
-+#endif /* _ASM_ARM_XEN_HYPERCALL_H */
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index 0bad594..b9d6acc 100644
---- a/arch/arm/xen/Makefile
-+++ b/arch/arm/xen/Makefile
-@@ -1 +1 @@
--obj-y		:= enlighten.o
-+obj-y		:= enlighten.o hypercall.o
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-new file mode 100644
-index 0000000..038cc5b
---- /dev/null
-+++ b/arch/arm/xen/hypercall.S
-@@ -0,0 +1,65 @@
-+/******************************************************************************
-+ * hypercall.S
-+ *
-+ * Xen hypercall wrappers
-+ *
-+ * The Xen hypercall calling convention is very similar to the ARM
-+ * procedure calling convention: the first paramter is passed in r0, the
-+ * second in r1, the third in r2 and the third in r3. Considering that
-+ * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
-+ * in r4, differently from the procedure calling convention of using the
-+ * stack for that case.
-+ *
-+ * The hypercall number is passed in r12.
-+ *
-+ * The return value is in r0.
-+ *
-+ * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
-+ * hypercall tag.
-+ *
-+ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <xen/interface/xen.h>
-+
-+
-+/* HVC 0xEA1 */
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define xen_hvc .word 0xf7e08ea1
-+#else
-+#define xen_hvc .word 0xe140ea71
+diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
+index 944eaeb..dc07f56 100644
+--- a/drivers/tty/hvc/hvc_xen.c
++++ b/drivers/tty/hvc/hvc_xen.c
+@@ -21,6 +21,7 @@
+ #include <linux/console.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
++#include <linux/irq.h>
+ #include <linux/init.h>
+ #include <linux/types.h>
+ #include <linux/list.h>
+@@ -35,6 +36,7 @@
+ #include <xen/page.h>
+ #include <xen/events.h>
+ #include <xen/interface/io/console.h>
++#include <xen/interface/sched.h>
+ #include <xen/hvc-console.h>
+ #include <xen/xenbus.h>
+ 
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 0bfc1ef..1d0d95e 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -47,6 +47,7 @@
+ #include <xen/interface/memory.h>
+ #include <xen/hvc-console.h>
+ #include <asm/xen/hypercall.h>
++#include <asm/xen/interface.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/sync_bitops.h>
+diff --git a/drivers/xen/xenbus/xenbus_probe_frontend.c b/drivers/xen/xenbus/xenbus_probe_frontend.c
+index a31b54d..3159a37 100644
+--- a/drivers/xen/xenbus/xenbus_probe_frontend.c
++++ b/drivers/xen/xenbus/xenbus_probe_frontend.c
+@@ -21,6 +21,7 @@
+ #include <xen/xenbus.h>
+ #include <xen/events.h>
+ #include <xen/page.h>
++#include <xen/xen.h>
+ 
+ #include <xen/platform_pci.h>
+ 
+diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
+index a890804..4f29f33 100644
+--- a/include/xen/interface/xen.h
++++ b/include/xen/interface/xen.h
+@@ -10,7 +10,10 @@
+ #define __XEN_PUBLIC_XEN_H__
+ 
+ #include <asm/xen/interface.h>
++#include <linux/types.h>
++#ifdef CONFIG_X86
+ #include <asm/pvclock-abi.h>
 +#endif
-+
-+/* We need to save and restore r4, because Xen clobbers it. */
-+#define HYPERCALL(hypercall)			\
-+ENTRY(HYPERVISOR_##hypercall)			\
-+	mov r12, #__HYPERVISOR_##hypercall;	\
-+	xen_hvc;							\
-+	mov pc, lr;							\
-+ENDPROC(HYPERVISOR_##hypercall)
-+
-+                .text
-+
-+HYPERCALL(xen_version);
-+HYPERCALL(console_io);
-+HYPERCALL(grant_table_op);
-+HYPERCALL(sched_op);
-+HYPERCALL(event_channel_op);
-+HYPERCALL(hvm_op);
-+HYPERCALL(memory_op);
-+HYPERCALL(physdev_op);
-+
-+ENTRY(privcmd_call)
-+	stmdb	sp!, {r4}
-+	mov r12, r0
-+	mov r0, r1
-+	mov r1, r2
-+	mov r2, r3
-+	ldr r3, [sp, #8]
-+	ldr r4, [sp, #4]
-+	xen_hvc
-+	pop {r4}
-+	mov pc, lr
-+ENDPROC(privcmd_call);
+ 
+ /*
+  * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
+diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
+index 17857fb..4d58881 100644
+--- a/include/xen/privcmd.h
++++ b/include/xen/privcmd.h
+@@ -35,6 +35,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/compiler.h>
++#include <xen/interface/xen.h>
+ 
+ typedef unsigned long xen_pfn_t;
+ 
 -- 
 1.7.2.5
