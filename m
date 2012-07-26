@@ -1,103 +1,65 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 26 Jul 2012 09:22:43 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Fix ARM PMU irq numbers
-In-Reply-To: <1343262902-19073-2-git-send-email-chanho61.park@samsung.com>
-References: <1343262902-19073-1-git-send-email-chanho61.park@samsung.com>
- <1343262902-19073-2-git-send-email-chanho61.park@samsung.com>
-Message-ID: <CAK9yfHyXzSp1Q75neuC0Q2=7RhXQXmKAQOPxE522SCsupwixTw@mail.gmail.com>
+Date: Thu, 26 Jul 2012 10:11:40 +0530
+Subject: [PATCH] ARM: EXYNOS: Add I2S SFR base addresses
+In-Reply-To: <1343217938-30351-1-git-send-email-padma.v@samsung.com>
+References: <1343217938-30351-1-git-send-email-padma.v@samsung.com>
+Message-ID: <CAK9yfHxngNLMmO6Jhu3eAPYqb84asgz0A7OnLu7QfuNUbSpYxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 July 2012 06:05, Chanho Park <chanho61.park@samsung.com> wrote:
-> This patch fixes irq numbers of ARM PMU(Perfromance Monitoring Unit).
-> We need to seperate arm-pmu(performance measurement unit) and exynos-pmu(power
-> management unit). I decide to change EXYNOS4_IRQ_PMU to EXYNOS4_IRQ_POWER_PMU
-> because there are no one use it.
-> A max cpu number of exynos4 is four in case of exynos44xx. So we should define 3
-> additional pmu irq numbers and enable it according to the number of cpus.
+On 25 July 2012 17:35, Padmavathi Venna <padma.v@samsung.com> wrote:
+> The base address of I2S 0 controller is similar in exynos4 and exynos5
+> platforms. So this patch defines a common macro for the I2S controller
+> 0 base address in both the platforms and use the same macro.
 >
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> This patch also defines the I2S controller 1,2 base addresses in exynos5
+> and correct the I2S controller 1 base address in exynos4
+>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 > ---
->  arch/arm/mach-exynos/include/mach/irqs.h |   18 ++++++++++++++++--
->  arch/arm/plat-samsung/devs.c             |    9 ++++++++-
->  2 files changed, 24 insertions(+), 3 deletions(-)
+>  arch/arm/mach-exynos/dev-audio.c        |    2 +-
+>  arch/arm/mach-exynos/include/mach/map.h |    6 ++++--
+>  2 files changed, 5 insertions(+), 3 deletions(-)
 >
-> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-> index 35bced6..329b07d 100644
-> --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> @@ -128,7 +128,7 @@
->  #define EXYNOS4_IRQ_ADC1               IRQ_SPI(107)
->  #define EXYNOS4_IRQ_PEN1               IRQ_SPI(108)
->  #define EXYNOS4_IRQ_KEYPAD             IRQ_SPI(109)
-> -#define EXYNOS4_IRQ_PMU                        IRQ_SPI(110)
-> +#define EXYNOS4_IRQ_POWER_PMU          IRQ_SPI(110)
->  #define EXYNOS4_IRQ_GPS                        IRQ_SPI(111)
->  #define EXYNOS4_IRQ_INTFEEDCTRL_SSS    IRQ_SPI(112)
->  #define EXYNOS4_IRQ_SLIMBUS            IRQ_SPI(113)
-> @@ -136,6 +136,11 @@
->  #define EXYNOS4_IRQ_TSI                        IRQ_SPI(115)
->  #define EXYNOS4_IRQ_SATA               IRQ_SPI(116)
->
-> +#define EXYNOS4_IRQ_PMU                        COMBINER_IRQ(2, 2)
-> +#define EXYNOS4_IRQ_PMU_CPU1           COMBINER_IRQ(3, 2)
-> +#define EXYNOS4_IRQ_PMU_CPU2           COMBINER_IRQ(18, 2)
-> +#define EXYNOS4_IRQ_PMU_CPU3           COMBINER_IRQ(19, 2)
-> +
->  #define EXYNOS4_IRQ_SYSMMU_MDMA0_0     COMBINER_IRQ(4, 0)
->  #define EXYNOS4_IRQ_SYSMMU_SSS_0       COMBINER_IRQ(4, 1)
->  #define EXYNOS4_IRQ_SYSMMU_FIMC0_0     COMBINER_IRQ(4, 2)
-> @@ -230,7 +235,6 @@
->  #define IRQ_TC                         EXYNOS4_IRQ_PEN0
->
->  #define IRQ_KEYPAD                     EXYNOS4_IRQ_KEYPAD
-> -#define IRQ_PMU                                EXYNOS4_IRQ_PMU
->
->  #define IRQ_FIMD0_FIFO                 EXYNOS4_IRQ_FIMD0_FIFO
->  #define IRQ_FIMD0_VSYNC                        EXYNOS4_IRQ_FIMD0_VSYNC
-> @@ -453,6 +457,16 @@
->  #define EXYNOS5_IRQ_GPIO3_NR_GROUPS    5
->  #define EXYNOS5_IRQ_GPIO4_NR_GROUPS    1
->
-> +#if defined(CONFIG_ARCH_EXYNOS4)
-> +#define IRQ_PMU                                EXYNOS4_IRQ_PMU
-> +#define IRQ_PMU1                       EXYNOS4_IRQ_PMU_CPU1
-> +#define IRQ_PMU2                       EXYNOS4_IRQ_PMU_CPU2
-> +#define IRQ_PMU3                       EXYNOS4_IRQ_PMU_CPU3
-> +#elif defined(CONFIG_ARCH_EXYNOS5)
-> +#define IRQ_PMU                                EXYNOS5_IRQ_PMU
-> +#define IRQ_PMU1                       EXYNOS5_IRQ_PMU_CPU1
-> +#endif
-
-This will not work when both Exynos 4 and 5 are enabled.
-
-> +
->  #define MAX_COMBINER_NR                        (EXYNOS4_MAX_COMBINER_NR > EXYNOS5_MAX_COMBINER_NR ? \
->                                         EXYNOS4_MAX_COMBINER_NR : EXYNOS5_MAX_COMBINER_NR)
->
-> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-> index 74e31ce..91048a6 100644
-> --- a/arch/arm/plat-samsung/devs.c
-> +++ b/arch/arm/plat-samsung/devs.c
-> @@ -1100,7 +1100,14 @@ struct platform_device s5p_device_onenand = {
->
->  #ifdef CONFIG_PLAT_S5P
->  static struct resource s5p_pmu_resource[] = {
-> -       DEFINE_RES_IRQ(IRQ_PMU)
-> +       DEFINE_RES_IRQ(IRQ_PMU),
-> +#if (CONFIG_NR_CPUS > 1)
-> +       DEFINE_RES_IRQ(IRQ_PMU1),
-> +#elif (CONFIG_NR_CPUS > 2)
-> +       DEFINE_RES_IRQ(IRQ_PMU2),
-> +#elif (CONFIG_NR_CPUS > 3)
-> +       DEFINE_RES_IRQ(IRQ_PMU3),
-> +#endif
+> diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
+> index b33a5b6..5dbc9a2 100644
+> --- a/arch/arm/mach-exynos/dev-audio.c
+> +++ b/arch/arm/mach-exynos/dev-audio.c
+> @@ -62,7 +62,7 @@ static struct s3c_audio_pdata i2sv5_pdata = {
 >  };
 >
->  static struct platform_device s5p_device_pmu = {
+>  static struct resource exynos4_i2s0_resource[] = {
+> -       [0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S0, SZ_256),
+> +       [0] = DEFINE_RES_MEM(EXYNOS_PA_I2S0, SZ_256),
+>         [1] = DEFINE_RES_DMA(DMACH_I2S0_TX),
+>         [2] = DEFINE_RES_DMA(DMACH_I2S0_RX),
+>         [3] = DEFINE_RES_DMA(DMACH_I2S0S_TX),
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+> index c72b675..5cf7d91 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -39,9 +39,11 @@
+>
+>  #define EXYNOS4_PA_G2D                 0x12800000
+>
+> -#define EXYNOS4_PA_I2S0                        0x03830000
+> -#define EXYNOS4_PA_I2S1                        0xE3100000
+> +#define EXYNOS_PA_I2S0                 0x03830000
+> +#define EXYNOS4_PA_I2S1                        0xE2100000
+>  #define EXYNOS4_PA_I2S2                        0xE2A00000
+
+As per the TRM, these addresses (I2S1 and I2S2) are 0x13960000 and
+0x13970000 respectively on Exynos4412 SoC.
+Please verify.
+
+
+> +#define EXYNOS5_PA_I2S1                        0x12D60000
+> +#define EXYNOS5_PA_I2S2                        0x12D70000
+>
+>  #define EXYNOS4_PA_PCM0                        0x03840000
+>  #define EXYNOS4_PA_PCM1                        0x13980000
 > --
-> 1.7.9.5
+> 1.7.4.4
 >
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
