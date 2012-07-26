@@ -1,38 +1,57 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 26 Jul 2012 08:53:49 +0200
-Subject: [PATCH 3/7] MTD: pxa3xx-nand: add devicetree bindings
-In-Reply-To: <201207260630.36924.arnd@arndb.de>
-References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
- <1343233066-15397-4-git-send-email-zonque@gmail.com>
- <201207260259.51511.marek.vasut@gmail.com> <201207260630.36924.arnd@arndb.de>
-Message-ID: <5010E97D.5020706@gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 26 Jul 2012 15:02:18 +0800
+Subject: [PATCH 1/3] dmaengine: mmp-pdma support
+In-Reply-To: <1343285475.1726.8981.camel@vkoul-udesk3>
+References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
+ <1342763164-19208-2-git-send-email-zhangfei.gao@marvell.com>
+ <1343285475.1726.8981.camel@vkoul-udesk3>
+Message-ID: <CAMj5BkhpcV=J8goZXMHt2o6bGgn9KL+-mseALN8L2FOpgr2MgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.07.2012 08:30, Arnd Bergmann wrote:
-> On Thursday 26 July 2012, Marek Vasut wrote:
->>> -     r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
->>> -     if (r == NULL) {
->>> -             dev_err(&pdev->dev, "no resource defined for data DMA\n");
->>> -             ret = -ENXIO;
->>> -             goto fail_put_clk;
->>> -     }
->>> -     info->drcmr_dat = r->start;
->>> +     /*
->>> +      * This is a dirty hack to make this driver work from devicetree
->>> +      * bindings. It can be removed once we have a prober DMA controller
->>> +      * framework for DT.
->>> +      */
->>> +     if (pdev->dev.of_node && cpu_is_pxa3xx()) {
->>> +             info->drcmr_dat = 97;
->>> +             info->drcmr_cmd = 99;
->>
->> cpu_is_() stuff should begone ... besides, what are these numbers here?
-> 
-> They are the numbers from the DMA resource. It's ugly but I think reasonable
-> to do this here. We will clean it up soon, once the bindings are in place.
-> 
-> I did notice though the the two "info->drcmr_dat = r->start" assignments in
-> the non-DT case are removed here. I think that's a bug.
+On Thu, Jul 26, 2012 at 2:51 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Fri, 2012-07-20 at 13:46 +0800, Zhangfei Gao wrote:
+>> +struct mmp_dma_platdata {
+>> +       int chancnt;
+>> +};
+>> +
+>> +struct mmp_dma_slave_config {
+>> +       struct dma_slave_config slave_config;
+>> +       u32 drcmr;
+>> +};
+> Why do you need these definitions?
+>
+> What is drcmr used for?
 
-Eh, right you are. Fixed.
+Hi, Vinod
+
+"drcmr" is request_line, we used to select which channel map to
+specific peripheral.
+Is it possible adding request_line to slave_config?
+
+Refer mail with Arnd before.
+> For peripheral dma, one special requirement of DMA_RCMRx
+> The register is used select which channel is mapped to the peripheral.
+> The channel can be alloc dynamically, but the register is constant to
+> specific peripheral.
+> For example, nand_dma, pxa910 use DRCMR97 (0x1184), what's worse,
+> pxa688 use DRCMR28 (0x170).
+>
+> There is no connection between channel number and drcmr, since channel
+> is dynamically allocated.
+> So we encapsulating the slave config parsing drcmr to dma-engine driver.
+
+[Arnd]
+Ah, so it is the request line. Now the current plan for this is to go
+into the "dmas" property of the child device using the dma engine binding.
+
+>
+>
+> --
+> ~Vinod
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
