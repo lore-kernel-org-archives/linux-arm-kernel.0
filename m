@@ -1,100 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jul 2012 17:01:07 +0100
-Subject: [PATCH 1/2] ARM: mm: avoid setting nG bit for user mappings that
- aren't present
-In-Reply-To: <1343318468-10412-1-git-send-email-will.deacon@arm.com>
-References: <1343318468-10412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1343318468-10412-2-git-send-email-will.deacon@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 26 Jul 2012 17:05:51 +0100
+Subject: [PATCH 07/21] ASoC: io: Prevent use of regmap if request fails
+In-Reply-To: <20120726152533.GS3099@opensource.wolfsonmicro.com>
+References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
+ <1343298534-13611-8-git-send-email-lee.jones@linaro.org>
+ <20120726113204.GY3099@opensource.wolfsonmicro.com>
+ <50112C29.6020606@linaro.org>
+ <20120726114215.GB3099@opensource.wolfsonmicro.com>
+ <50115961.6060509@linaro.org>
+ <20120726151217.GO3099@opensource.wolfsonmicro.com>
+ <501160F5.5050807@linaro.org>
+ <20120726152533.GS3099@opensource.wolfsonmicro.com>
+Message-ID: <50116ADF.4050700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Swap entries are encoding in ptes such that !pte_present(pte) and
-pte_file(pte). The remaining bits of the descriptor are used to identify
-the swapfile and offset within it to the swap entry.
+On 26/07/12 16:25, Mark Brown wrote:
+> On Thu, Jul 26, 2012 at 04:23:33PM +0100, Lee Jones wrote:
+>
+>> What's my 'control data'? It's not used in the original codec patch.
+>
+>> The old way wants to go:
+>
+>> snd_soc_update_bits() -> snd_soc_read() -> ab8500_codec_read_reg()
+>
+>> When then calls back into the abx500.
+>
+>> So what 'control data' should I be storing in the codec struct?
+>
+> You're supposed to use it for the data you use to call back into the
+> underlying I/O code.
 
-When writing such a pte for a user virtual address, set_pte_at
-unconditionally sets the nG bit, which (in the case of LPAE) will
-corrupt the swapfile offset and lead to a BUG:
+I don't understand. What 'data'?
 
-[  140.494067] swap_free: Unused swap offset entry 000763b4
-[  140.509989] BUG: Bad page map in process rs:main Q:Reg  pte:0ec76800 pmd:8f92e003
+Surely if .read and .write are populated in 'struct 
+snd_soc_codec_driver', then it should just call back into those?
 
-This patch fixes the problem by only setting the nG bit for user
-mappings that are actually present.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/pgtable.h |   34 ++++++++++++++++++----------------
- arch/arm/mm/flush.c            |    2 --
- 2 files changed, 18 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index f66626d..d88f9f0 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -195,6 +195,18 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- 
- #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
- 
-+#define pte_none(pte)		(!pte_val(pte))
-+#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
-+#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
-+#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
-+#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
-+#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
-+#define pte_special(pte)	(0)
-+
-+#define pte_present_user(pte) \
-+	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_USER)) == \
-+	 (L_PTE_PRESENT | L_PTE_USER))
-+
- #if __LINUX_ARM_ARCH__ < 6
- static inline void __sync_icache_dcache(pte_t pteval)
- {
-@@ -206,25 +218,15 @@ extern void __sync_icache_dcache(pte_t pteval);
- static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 			      pte_t *ptep, pte_t pteval)
- {
--	if (addr >= TASK_SIZE)
--		set_pte_ext(ptep, pteval, 0);
--	else {
-+	unsigned long ext = 0;
-+
-+	if (addr < TASK_SIZE && pte_present_user(pteval)) {
- 		__sync_icache_dcache(pteval);
--		set_pte_ext(ptep, pteval, PTE_EXT_NG);
-+		ext |= PTE_EXT_NG;
- 	}
--}
- 
--#define pte_none(pte)		(!pte_val(pte))
--#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
--#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
--#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
--#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
--#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
--#define pte_special(pte)	(0)
--
--#define pte_present_user(pte) \
--	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_USER)) == \
--	 (L_PTE_PRESENT | L_PTE_USER))
-+	set_pte_ext(ptep, pteval, ext);
-+}
- 
- #define PTE_BIT_FUNC(fn,op) \
- static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 7745854..40ca11e 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -231,8 +231,6 @@ void __sync_icache_dcache(pte_t pteval)
- 	struct page *page;
- 	struct address_space *mapping;
- 
--	if (!pte_present_user(pteval))
--		return;
- 	if (cache_is_vipt_nonaliasing() && !pte_exec(pteval))
- 		/* only flush non-aliasing VIPT caches for exec mappings */
- 		return;
 -- 
-1.7.4.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
