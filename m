@@ -1,40 +1,28 @@
-From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Thu, 26 Jul 2012 20:13:09 +0900
-Subject: [PATCH v2 2/4] ALSA: pcm - Don't define ARCH_HAS_DMA_MMAP_COHERENT
- privately for ARM
-In-Reply-To: <1343301191-26001-1-git-send-email-hdk@igel.co.jp>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 26 Jul 2012 13:20:44 +0200
+Subject: [PATCH v2 4/4] fbdev: sh_mobile_lcdc: use dma_mmap_coherent if
+ available
+In-Reply-To: <1343301191-26001-5-git-send-email-hdk@igel.co.jp>
 References: <1343301191-26001-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <1343301191-26001-3-git-send-email-hdk@igel.co.jp>
+ <1343301191-26001-5-git-send-email-hdk@igel.co.jp>
+Message-ID: <1820152.JumtPU1V17@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Hi Eiraku-san,
 
-The ARM architecture now defines ARCH_HAS_DMA_MMAP_COHERENT, there's no
-need to define it privately anymore.
+On Thursday 26 July 2012 20:13:11 Hideki EIRAKU wrote:
+> fb_mmap() implemented in fbmem.c uses smem_start as the physical
+> address of the frame buffer.  In the sh_mobile_lcdc driver, the
+> smem_start is a dma_addr_t that is not a physical address when IOMMU is
+> enabled.  dma_mmap_coherent() maps the address correctly.  It is
+> available on ARM platforms.
+> 
+> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- sound/core/pcm_native.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-diff --git a/sound/core/pcm_native.c b/sound/core/pcm_native.c
-index 53b5ada..84ead60 100644
---- a/sound/core/pcm_native.c
-+++ b/sound/core/pcm_native.c
-@@ -3156,13 +3156,6 @@ static const struct vm_operations_struct snd_pcm_vm_ops_data_fault = {
- 	.fault =	snd_pcm_mmap_data_fault,
- };
- 
--#ifndef ARCH_HAS_DMA_MMAP_COHERENT
--/* This should be defined / handled globally! */
--#ifdef CONFIG_ARM
--#define ARCH_HAS_DMA_MMAP_COHERENT
--#endif
--#endif
--
- /*
-  * mmap the DMA buffer on RAM
-  */
 -- 
-1.7.0.4
+Regards,
+
+Laurent Pinchart
