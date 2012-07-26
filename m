@@ -1,60 +1,48 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:55 +0100
-Subject: [PATCH 13/24] xen/arm: get privilege status
+Date: Thu, 26 Jul 2012 16:33:58 +0100
+Subject: [PATCH 16/24] xen/arm: implement alloc/free_xenballooned_pages with
+ alloc_pages/kfree
 In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-13-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343316846-25860-16-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use Xen features to figure out if we are privileged.
-
-XENFEAT_dom0 was introduced by 23735 in xen-unstable.hg.
+Only until we get the balloon driver to work.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c         |    7 +++++++
- include/xen/interface/features.h |    3 +++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/xen/enlighten.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index dc68074..2e013cf 100644
+index 60d6d36..1476b0b 100644
 --- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -2,6 +2,7 @@
- #include <xen/interface/xen.h>
- #include <xen/interface/memory.h>
- #include <xen/platform_pci.h>
-+#include <xen/features.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include <linux/module.h>
-@@ -58,6 +59,12 @@ int __init xen_guest_init(void)
- 	}
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
-+	xen_setup_features();
-+	if (xen_feature(XENFEAT_dom0))
-+		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
-+	else
-+		xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
+@@ -121,6 +121,24 @@ int __init xen_guest_init(void)
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(xen_guest_init);
 +
- 	/* already setup */
- 	if (shared_info_page != 0 && HYPERVISOR_shared_info == shared_info_page)
- 		return 0;
-diff --git a/include/xen/interface/features.h b/include/xen/interface/features.h
-index b6ca39a..131a6cc 100644
---- a/include/xen/interface/features.h
-+++ b/include/xen/interface/features.h
-@@ -50,6 +50,9 @@
- /* x86: pirq can be used by HVM guests */
- #define XENFEAT_hvm_pirqs           10
- 
-+/* operation as Dom0 is supported */
-+#define XENFEAT_dom0                      11
++/* XXX: only until balloon is properly working */
++int alloc_xenballooned_pages(int nr_pages, struct page **pages, bool highmem)
++{
++	*pages = alloc_pages(highmem ? GFP_HIGHUSER : GFP_KERNEL,
++			get_order(nr_pages));
++	if (*pages == NULL)
++		return -ENOMEM;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(alloc_xenballooned_pages);
 +
- #define XENFEAT_NR_SUBMAPS 1
++void free_xenballooned_pages(int nr_pages, struct page **pages)
++{
++	kfree(*pages);
++	*pages = NULL;
++}
++EXPORT_SYMBOL_GPL(free_xenballooned_pages);
+ core_initcall(xen_guest_init);
  
- #endif /* __XEN_PUBLIC_FEATURES_H__ */
+ static irqreturn_t xen_arm_callback(int irq, void *arg)
 -- 
 1.7.2.5
