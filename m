@@ -1,57 +1,66 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 26 Jul 2012 15:02:18 +0800
-Subject: [PATCH 1/3] dmaengine: mmp-pdma support
-In-Reply-To: <1343285475.1726.8981.camel@vkoul-udesk3>
-References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
- <1342763164-19208-2-git-send-email-zhangfei.gao@marvell.com>
- <1343285475.1726.8981.camel@vkoul-udesk3>
-Message-ID: <CAMj5BkhpcV=J8goZXMHt2o6bGgn9KL+-mseALN8L2FOpgr2MgA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Jul 2012 07:07:44 +0000
+Subject: Orion Pull request
+In-Reply-To: <20120725211740.GD13619@lunn.ch>
+References: <20120724081732.GR18778@lunn.ch>
+ <201207251420.48634.arnd@arndb.de> <20120725211740.GD13619@lunn.ch>
+Message-ID: <201207260707.45157.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 2:51 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Fri, 2012-07-20 at 13:46 +0800, Zhangfei Gao wrote:
->> +struct mmp_dma_platdata {
->> +       int chancnt;
->> +};
->> +
->> +struct mmp_dma_slave_config {
->> +       struct dma_slave_config slave_config;
->> +       u32 drcmr;
->> +};
-> Why do you need these definitions?
->
-> What is drcmr used for?
+On Wednesday 25 July 2012, Andrew Lunn wrote:
+> > Please split the other patches into branches according to what
+> > they do, and make sure that each branch is based on an -rc release
+> > rather than a random point in the git history or patches that
+> > are not upstream. We can then decide which ones to still send
+> > for v3.6 and which branches to delay for v3.7.
+> 
+> Hi Arnd
+> 
+> If i make the branches based on the -rc7 release, how do i test them?
+> The patches have dependencies on the I2C patch now accepted by the I2C
+> maintainer and the SPI patches accepted by the SPI maintainer.  These
+> patches implement the DT support in the drivers. Without those
+> patches, all i2c devices are missing, and worst still, the root FS is
+> missing on my Kirkwood QNAP device i test with.
 
-Hi, Vinod
+You can merge the i2c and spi branches that went upstream into your
+own branch before applying your own patches. This way, they become
+"dependencies" and should get merged before yours are sent (in this
+case they already are)
 
-"drcmr" is request_line, we used to select which channel map to
-specific peripheral.
-Is it possible adding request_line to slave_config?
+> Note there is no compile time dependencies, just run time. So i could
+> initially build a patchset with those driver patches included, test
+> the combination works, rebase to discard the driver patches, and then
+> send a pull-request?
+> 
+> Or is there a better way to handle this?
 
-Refer mail with Arnd before.
-> For peripheral dma, one special requirement of DMA_RCMRx
-> The register is used select which channel is mapped to the peripheral.
-> The channel can be alloc dynamically, but the register is constant to
-> specific peripheral.
-> For example, nand_dma, pxa910 use DRCMR97 (0x1184), what's worse,
-> pxa688 use DRCMR28 (0x170).
->
-> There is no connection between channel number and drcmr, since channel
-> is dynamically allocated.
-> So we encapsulating the slave config parsing drcmr to dma-engine driver.
+Yes, don't rebase the stuff after testing. We want the patches that
+go upstream to be the exact version you have tested.
 
-[Arnd]
-Ah, so it is the request line. Now the current plan for this is to go
-into the "dmas" property of the child device using the dma engine binding.
+> I'm also not sure what topic branches would be appropriate. All that
+> is left is DT. One branch could be driver changes and the other
+> actually using the driver from DT. But there is a clear dependency
+> between the two. I cannot split the three new boards support via DT
+> into three topic branches because they cause merge conflicts when you
+> try to bring them together. What would you suggest?
 
->
->
-> --
-> ~Vinod
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+If there are just conflicts between merging the branches (two
+patches touching the same code lines), the best way to deal with it
+is to let us handle the merge. We're quite experienced with this by
+now.
+
+If you have an actual dependency (branch B builds fine without branch
+A, but the result doesn't work), then the branches need to be
+serialized: You provide one standalone branch that has the more
+basic changes (cleanups, dt conversion, ...) and then you have another
+branch that starts from the top commit of the first one and has the
+more advanced changes.
+
+If you have two branches that both need a few patches but then go
+on in different directions, that's also fine: just apply the common
+patches first, then make two branches starting with that common
+changeset and apply the other patches separately.
+
+	Arnd
