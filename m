@@ -1,41 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 15:15:01 +0100
-Subject: [PATCH 20/21] ASoC: codecs: Enable AB8500 CODEC for Device Tree
-In-Reply-To: <20120726115055.GD3099@opensource.wolfsonmicro.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 26 Jul 2012 15:22:25 +0100
+Subject: [PATCH 17/21] ASoC: Ux500: Enable ux500 PCM driver for Device Tree
+In-Reply-To: <50114B89.7070100@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
- <1343298534-13611-21-git-send-email-lee.jones@linaro.org>
- <20120726115055.GD3099@opensource.wolfsonmicro.com>
-Message-ID: <501150E5.6010503@linaro.org>
+ <1343298534-13611-18-git-send-email-lee.jones@linaro.org>
+ <20120726113838.GA3099@opensource.wolfsonmicro.com>
+ <50114B89.7070100@linaro.org>
+Message-ID: <20120726142225.GJ3099@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry missed this:
+On Thu, Jul 26, 2012 at 02:52:09PM +0100, Lee Jones wrote:
+> On 26/07/12 12:38, Mark Brown wrote:
 
->>   	{
->>   		.name = "ab8500-codec",
->> +		.of_compatible = "stericsson,ab8500-codec",
->>   	},
->
-> Why are we doing this?  The MFD cells are a totally Linux specific
-> thing, there's no reason to represent them in the device tree unless
-> they're in some way reusable and the "ab8500-codec" name suggests that's
-> unlikely.  Just put the properties on the parent node and instantiate
-> the MFD cell as normal.
+> >>-	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
+> >>-	platform_device_register(&ux500_pcm);
 
-We have all of the AB8500 devices into the Device Tree to accurately 
-represent the hardware. We will also be passing configuration 
-information into the AB8500 Codec from Device Tree. The only reason 
-we're still registering them using the MFD API is to overcome addressing 
-issues encountered earlier. Each 'device' still belongs in the 'device' 
-tree.
+> >This has the same issue as your last patch...  the way you're doing
+> >things will break audio on all boards using this driver.
 
-If we were to take this Device Tree and use it on something non-Linux, 
-that OS will still need to know about each of the AB8500 devices and 
-every associated configuration option. Only in Linux do we continue to 
-register them though a different API, which doesn't affect any other OS.
+> It will, why?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+You've just removed registration of the device and not added anything
+else to replace that.  Even if all boards convert to DT their DTs will
+need to be updated which you're not doing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120726/c696d23d/attachment-0001.sig>
