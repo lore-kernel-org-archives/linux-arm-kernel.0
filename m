@@ -1,41 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 16:23:33 +0100
-Subject: [PATCH 07/21] ASoC: io: Prevent use of regmap if request fails
-In-Reply-To: <20120726151217.GO3099@opensource.wolfsonmicro.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 26 Jul 2012 16:24:42 +0100
+Subject: [PATCH 20/21] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+In-Reply-To: <50116005.6050008@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
- <1343298534-13611-8-git-send-email-lee.jones@linaro.org>
- <20120726113204.GY3099@opensource.wolfsonmicro.com>
- <50112C29.6020606@linaro.org>
- <20120726114215.GB3099@opensource.wolfsonmicro.com>
- <50115961.6060509@linaro.org>
- <20120726151217.GO3099@opensource.wolfsonmicro.com>
-Message-ID: <501160F5.5050807@linaro.org>
+ <1343298534-13611-21-git-send-email-lee.jones@linaro.org>
+ <20120726115055.GD3099@opensource.wolfsonmicro.com>
+ <501150E5.6010503@linaro.org>
+ <20120726144336.GL3099@opensource.wolfsonmicro.com>
+ <50116005.6050008@linaro.org>
+Message-ID: <20120726152442.GR3099@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/12 16:12, Mark Brown wrote:
-> On Thu, Jul 26, 2012 at 03:51:13PM +0100, Lee Jones wrote:
->
->> I don't think we want to use regmap at all, but we're forced to by
->> soc-core. How do we over-ride that behavior? By writing some
->> nonsense into codec->control_data?
->
-> You should use that for your control data, yes - you're not forced to
-> use regmap at all.  Like I say we've got a bunch of drivers doing so
-> already.
+On Thu, Jul 26, 2012 at 04:19:33PM +0100, Lee Jones wrote:
 
-What's my 'control data'? It's not used in the original codec patch.
+> Okay, so your suggestion is to strip out all of the sub-devices
+> under the AB8500. It's doable, but will take some restructuring and
+> thinking about. This is a job for another day. I think it's okay to
+> continue with the current semantics for the time-being. The line
+> we're discussing does need to be split out though. I didn't mean to
+> merge it in with the ASoC stuff.
 
-The old way wants to go:
-
-snd_soc_update_bits() -> snd_soc_read() -> ab8500_codec_read_reg()
-
-When then calls back into the abx500.
-
-So what 'control data' should I be storing in the codec struct?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yes, well any that aren't reusable at any rate.  If you could relocate
+the device into another SoC integation that'd be different.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120726/f328f81b/attachment.sig>
