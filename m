@@ -1,71 +1,208 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 25 Jul 2012 19:41:23 -0500
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <4FF6340A.6020409@ti.com>
-References: <20120608094708.GC19062@mudshark.cambridge.arm.com>
- <4FD21930.4000800@ti.com> <20120611173930.GD28235@mudshark.cambridge.arm.com>
- <4FD64083.3020800@ti.com> <20120612092842.GA2991@mudshark.cambridge.arm.com>
- <4FD7B1DC.30108@ti.com> <20120612213150.GC24380@mudshark.cambridge.arm.com>
- <4FD7C597.7060501@ti.com> <20120702095539.GD22239@mudshark.cambridge.arm.com>
- <4FF1D15E.7040301@ti.com> <20120702220117.GD25234@mudshark.cambridge.arm.com>
- <4FF6340A.6020409@ti.com>
-Message-ID: <50109233.3090302@ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 26 Jul 2012 02:59:51 +0200
+Subject: [PATCH 3/7] MTD: pxa3xx-nand: add devicetree bindings
+In-Reply-To: <1343233066-15397-4-git-send-email-zonque@gmail.com>
+References: <1343233066-15397-1-git-send-email-zonque@gmail.com>
+ <1343233066-15397-4-git-send-email-zonque@gmail.com>
+Message-ID: <201207260259.51511.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Dear Daniel Mack,
 
-On 07/05/2012 07:40 PM, Jon Hunter wrote:
-> Hi Will,
+> This patch contains a hack to get the DMA resources of the device when
+> probed from a devicetree node. This can be removed once a generic DMA
+> controller framework lands.
 > 
-> On 07/02/2012 05:01 PM, Will Deacon wrote:
->> On Mon, Jul 02, 2012 at 05:50:38PM +0100, Jon Hunter wrote:
->>> On 07/02/2012 04:55 AM, Will Deacon wrote:
->>>>
->>>> Did you have any luck getting to the bottom of this?
->>>
->>> I am still waiting for feedback from design. They were trying to confirm
->>> my observations. Unfortunately, it is taking some time. I will ping them
->>> again.
->>
->> Ok, thanks. If pinging doesn't work, bribery can be quite effective with
->> hardware guys :)
+> A mtd_part_parser_data is passed mtd_device_parse_register which
+> contains a reference to the device node, so MTD partitions can be
+> added as children.
 > 
-> Yes looks like I am going to need to get creative :-)
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> ---
+>  .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   31 ++++++++
+>  drivers/mtd/nand/pxa3xx_nand.c                     |   83
+> ++++++++++++++++---- 2 files changed, 100 insertions(+), 14 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 > 
->>>> It would be good to take your PMU suspend/resume patches once we know that
->>>> they will get used.
->>>
->>> Yes that would be good. I could drop the 4460 specific changes for now
->>> and make 4460 work in the same way as 4430 (using CTI) for the time
->>> being and see if we can get these in. However, I recall that was not
->>> working for you, but it was working fine for me.
->>
->> Indeed, that hack didn't help me and I'd rather not commit it if it only
->> partially fixes the problem. A better bet might just be to go with your
->> original approach and see how many bug reports we receive. That might also
->> help us narrow down the problem, but it's your call.
-> 
-> Ok, I think that that is best.
-> 
->> In the meantime, I pushed what I think is the latest drop of your series to
->> a new branch on kernel.org:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4-dev
-> 
-> Looks good.
+> diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt new file mode
+> 100644
+> index 0000000..6e28cef
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> @@ -0,0 +1,31 @@
+> +PXA3xx NAND DT bindings
+> +
+> +Required properties:
+> +
+> + - compatible:		Should be "mrvl,pxa3xx-nand"
+> + - reg: 		The register base for the controller
+> + - interrupts:		The interrupt to map
+> + - #address-cells:	Set to <1> if the node includes partitions
+> +
+> +Optional properties:
+> +
+> + - mrvl,nand-enable-arbiter:	Set to enable the bus arbiter
+> + - mrvl,nand-keep-config:	Set to keep the NAND controller config as set
+> +				by the bootloader
+> + - num-cs:			Number of chipselect lines to usw
+> +
+> +Example:
+> +
+> +	nand0: nand at 43100000 {
+> +		compatible = "mrvl,pxa3xx-nand";
+> +		reg = <0x43100000 90> ;
 
-I just wanted to let you know that I have been updating the PMU patches
-for OMAP. Latest can be found here [1]. I have not included Paul's patch
-[2] in this series at the moment, because although it works well for
-OMAP4, I need to create the HWMOD structures for OMAP3. Without these
-structures it breaks OMAP3 PMU support. Once this is done we should be
-able to get rid for the OMAP3 dependency on ETM. Unfortunately, Benoit
-(Mr HWMOD) is out on his holidays but should be back next week and then
-maybe he can give me some guidance on this HWMOD stuff.
+0x90 maybe?
 
-Cheers
-Jon
+> +		interrupts = <45>;
+> +		#address-cells = <1>;
+> +
+> +		mrvl,nand-enable-arbiter;
+> +		mrvl,nand-keep-config;
+> +		num-cs = <1>;
+> +
+> +		/* partitions (optional) */
+> +	};
+> +
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c
+> b/drivers/mtd/nand/pxa3xx_nand.c index 252aaef..fb592a9 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -22,6 +22,8 @@
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> 
+>  #include <mach/dma.h>
+>  #include <plat/pxa3xx_nand.h>
+> @@ -1081,21 +1083,29 @@ static int alloc_nand_resource(struct
+> platform_device *pdev) }
+>  	clk_enable(info->clk);
+> 
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> -	if (r == NULL) {
+> -		dev_err(&pdev->dev, "no resource defined for data DMA\n");
+> -		ret = -ENXIO;
+> -		goto fail_put_clk;
+> -	}
+> -	info->drcmr_dat = r->start;
+> +	/*
+> +	 * This is a dirty hack to make this driver work from devicetree
+> +	 * bindings. It can be removed once we have a prober DMA controller
+> +	 * framework for DT.
+> +	 */
+> +	if (pdev->dev.of_node && cpu_is_pxa3xx()) {
+> +		info->drcmr_dat = 97;
+> +		info->drcmr_cmd = 99;
 
-[1] https://gitorious.org/linux-omap-dev dev-pmu
-[2] http://marc.info/?l=linux-omap&m=134212809112530&w=2
+cpu_is_() stuff should begone ... besides, what are these numbers here?
+
+> +	} else {
+> +		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> +		if (r == NULL) {
+> +			dev_err(&pdev->dev, "no resource defined for data 
+DMA\n");
+> +			ret = -ENXIO;
+> +			goto fail_put_clk;
+> +		}
+> 
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+> -	if (r == NULL) {
+> -		dev_err(&pdev->dev, "no resource defined for command DMA\n");
+> -		ret = -ENXIO;
+> -		goto fail_put_clk;
+> +		r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+> +		if (r == NULL) {
+> +			dev_err(&pdev->dev, "no resource defined for command 
+DMA\n");
+> +			ret = -ENXIO;
+> +			goto fail_put_clk;
+> +		}
+>  	}
+> -	info->drcmr_cmd = r->start;
+> 
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+> @@ -1200,12 +1210,55 @@ static int pxa3xx_nand_remove(struct
+> platform_device *pdev) return 0;
+>  }
+> 
+> +#ifdef CONFIG_OF
+> +static struct of_device_id pxa3xx_nand_dt_ids[] = {
+> +	{ .compatible = "mrvl,pxa3xx-nand" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
+> +
+> +static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+> +{
+> +	struct pxa3xx_nand_platform_data *pdata;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const struct of_device_id *of_id =
+> +			of_match_device(pxa3xx_nand_dt_ids, &pdev->dev);
+> +
+> +	if (!of_id)
+> +		return 0;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return -ENOMEM;
+> +
+> +	if (of_get_property(np, "mrvl,nand-enable-arbiter", NULL))
+> +		pdata->enable_arbiter = 1;
+> +	if (of_get_property(np, "mrvl,nand-keep-config", NULL))
+
+of_property_read_bool() please.
+
+> +		pdata->keep_config = 1;
+> +	of_property_read_u32(np, "num-cs", &pdata->num_cs);
+> +
+> +	pdev->dev.platform_data = pdata;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static inline int pxa3xx_nand_probe_dt(struct platform_device *)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  static int pxa3xx_nand_probe(struct platform_device *pdev)
+>  {
+>  	struct pxa3xx_nand_platform_data *pdata;
+> +	struct mtd_part_parser_data ppdata = {};
+>  	struct pxa3xx_nand_info *info;
+>  	int ret, cs, probe_success;
+> 
+> +	ret = pxa3xx_nand_probe_dt(pdev);
+> +	if (ret)
+> +		return ret;
+> +
+>  	pdata = pdev->dev.platform_data;
+>  	if (!pdata) {
+>  		dev_err(&pdev->dev, "no platform data defined\n");
+> @@ -1229,8 +1282,9 @@ static int pxa3xx_nand_probe(struct platform_device
+> *pdev) continue;
+>  		}
+> 
+> +		ppdata.of_node = pdev->dev.of_node;
+>  		ret = mtd_device_parse_register(info->host[cs]->mtd, NULL,
+> -						NULL, pdata->parts[cs],
+> +						&ppdata, pdata->parts[cs],
+>  						pdata->nr_parts[cs]);
+>  		if (!ret)
+>  			probe_success = 1;
+> @@ -1306,6 +1360,7 @@ static int pxa3xx_nand_resume(struct platform_device
+> *pdev) static struct platform_driver pxa3xx_nand_driver = {
+>  	.driver = {
+>  		.name	= "pxa3xx-nand",
+> +		.of_match_table = of_match_ptr(pxa3xx_nand_dt_ids),
+>  	},
+>  	.probe		= pxa3xx_nand_probe,
+>  	.remove		= pxa3xx_nand_remove,
