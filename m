@@ -1,59 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:40 +0100
-Subject: [PATCH 07/21] ASoC: io: Prevent use of regmap if request fails
+Date: Thu, 26 Jul 2012 11:28:43 +0100
+Subject: [PATCH 10/21] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a sound codec fails to request a regmap, the 'using_regmap' is
-set as true regardless, despite there being no regmap to use. As a
-repercussion, when a latter read function checks to see if we are
-using regmaps, it assumes we are and attempts to. Only the kernel
-oopes, because regmap_* tries to extract information from a NULL
-pointer.
+Nothing special here. We're only providing a compatible string
+to ensure the driver is probed using a Device Tree boot.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/soc-io.c |   14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/sound/soc/soc-io.c b/sound/soc/soc-io.c
-index 29183ef..601cb7f 100644
---- a/sound/soc/soc-io.c
-+++ b/sound/soc/soc-io.c
-@@ -52,10 +52,13 @@ static unsigned int hw_read(struct snd_soc_codec *codec, unsigned int reg)
- 		if (codec->cache_only)
- 			return -1;
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 5a72be6..b9d4405 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -591,6 +591,10 @@
+ 			status = "disabled";
+ 		};
  
--		ret = regmap_read(codec->control_data, reg, &val);
--		if (ret == 0)
--			return val;
--		else
-+		if (codec->using_regmap) {
-+			ret = regmap_read(codec->control_data, reg, &val);
-+			if (ret == 0)
-+				return val;
-+			else
-+				return -1;
-+		} else
- 			return -1;
- 	}
- 
-@@ -141,11 +144,12 @@ int snd_soc_codec_set_cache_io(struct snd_soc_codec *codec,
- 
- 	case SND_SOC_REGMAP:
- 		/* Device has made its own regmap arrangements */
--		codec->using_regmap = true;
- 		if (!codec->control_data)
- 			codec->control_data = dev_get_regmap(codec->dev, NULL);
- 
- 		if (codec->control_data) {
-+			codec->using_regmap = true;
++		pcm: ux500-pcm {
++			compatible = "stericsson,ux500-pcm";
++		};
 +
- 			ret = regmap_get_val_bytes(codec->control_data);
- 			/* Errors are legitimate for non-integer byte
- 			 * multiples */
+ 		msp0: msp at 80123000 {
+ 			compatible = "stericsson,ux500-msp-i2s";
+ 			reg = <0x80123000 0x1000>;
 -- 
 1.7.9.5
