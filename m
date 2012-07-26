@@ -1,65 +1,52 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Thu, 26 Jul 2012 15:39:15 +0530
-Subject: [PATCH 1/3] dmaengine: mmp-pdma support
-In-Reply-To: <CAMj5BkhpcV=J8goZXMHt2o6bGgn9KL+-mseALN8L2FOpgr2MgA@mail.gmail.com>
-References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
- <1342763164-19208-2-git-send-email-zhangfei.gao@marvell.com>
- <1343285475.1726.8981.camel@vkoul-udesk3>
- <CAMj5BkhpcV=J8goZXMHt2o6bGgn9KL+-mseALN8L2FOpgr2MgA@mail.gmail.com>
-Message-ID: <1343297355.1726.8982.camel@vkoul-udesk3>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 26 Jul 2012 12:15:05 +0200
+Subject: [patch 1/1] kirkwood: set tx_csum_limit
+In-Reply-To: <20120726094551.GA14943@lunn.ch> (Andrew Lunn's message of "Thu,
+ 26 Jul 2012 11:45:51 +0200")
+References: <20120726071240.690145078@rtp-net.org> <1719571.FAPWHj9hMz@flexo>
+ <87r4ry98i0.fsf@lebrac.rtp-net.org>
+ <20120726094551.GA14943@lunn.ch>
+Message-ID: <87hasu96c6.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-26 at 15:02 +0800, zhangfei gao wrote:
-> On Thu, Jul 26, 2012 at 2:51 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> > On Fri, 2012-07-20 at 13:46 +0800, Zhangfei Gao wrote:
-> >> +struct mmp_dma_platdata {
-> >> +       int chancnt;
-> >> +};
-> >> +
-> >> +struct mmp_dma_slave_config {
-> >> +       struct dma_slave_config slave_config;
-> >> +       u32 drcmr;
-> >> +};
-> > Why do you need these definitions?
-> >
-> > What is drcmr used for?
-> 
-> Hi, Vinod
-> 
-> "drcmr" is request_line, we used to select which channel map to
-> specific peripheral.
-> Is it possible adding request_line to slave_config?
-Can you use the slave_id.
+Andrew Lunn <andrew@lunn.ch> writes:
 
-> 
-> Refer mail with Arnd before.
-> > For peripheral dma, one special requirement of DMA_RCMRx
-> > The register is used select which channel is mapped to the peripheral.
-> > The channel can be alloc dynamically, but the register is constant to
-> > specific peripheral.
-> > For example, nand_dma, pxa910 use DRCMR97 (0x1184), what's worse,
-> > pxa688 use DRCMR28 (0x170).
-> >
-> > There is no connection between channel number and drcmr, since channel
-> > is dynamically allocated.
-> > So we encapsulating the slave config parsing drcmr to dma-engine driver.
-> 
-> [Arnd]
-> Ah, so it is the request line. Now the current plan for this is to go
-> into the "dmas" property of the child device using the dma engine binding.
-> 
-> >
-> >
-> > --
-> > ~Vinod
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> >>  	orion_ge00_init(eth_data, DOVE_GE00_PHYS_BASE,
+>> >> -			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR);
+>> >> +			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR, 0);
+>> >>  }
+>> >
+>> > You might want to add a constant for TX_CSUM_NO_LIMIT or something like that, 
+>> > rather than a plain 0 which might be a little misleading.
+>> >
+>> 
+>> It's not to set an unlimited value but to tell the driver it has to
+>> use its default value. This limit is only valid for kirkwood but given
+>> that orion_ge*_init functions are used on all platforms, I have to set 
+>
+> So how about TX_CSUM_DEFAULT_LIMIT?
 
+sounds better :)
 
--- 
-~Vinod
+>
+> It would also be nice if you could change the change log text to
+> something like:
+>
+> ARM: Orion: Set eth packet size csum offload limit
+>
+> The mv643xx ethernet controller limits the packet size for the TX
+> checksum offloading. This patch sets this limits for Kirkwood and
+> Dove which have smaller limits that the default.
+>
+
+ok. updated. Updated patch will follow soon
+
+> I would like to consistently use the prefixes:
+>
+> ARM: Orion: 
+>
+
+maybe it'll be replaced by mvebu some day ?
+
+Arnaud
