@@ -1,41 +1,57 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 26 Jul 2012 13:20:36 +0200
-Subject: [PATCH 3/4] Schedule removal of i.MX25 support in mx2_camera.c
-In-Reply-To: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1343301637-19676-4-git-send-email-javier.martin@vista-silicon.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Thu, 26 Jul 2012 16:58:03 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201207260714.34540.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
+ <201207260714.34540.arnd@arndb.de>
+Message-ID: <1343302083.1726.9027.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for i.MX25 in mx2_camera.c has been broken
-for a year. Furthermore, i.MX25 video capture HW
-doesn't have much in common with i.MX27. A separate
-driver would be desirable.
+On Thu, 2012-07-26 at 07:14 +0000, Arnd Bergmann wrote:
+> On Thursday 26 July 2012, Vinod Koul wrote:
+> > > > But from a client POV it makes sense as with the given direction you
+> > > > would need a specific request line for a channel. So this is right.
+> > > > But direction is something I don't expect to be used for "give me a
+> > > > channel" 
+> > > 
+> > > Ok. The thought was that the user would have the following means of
+> > > requesting a channel ...
+> > > 
+> > > 1. By name
+> > Bare name maynot be enough. In a dmac we have many channels which one to
+> > choose?
+> 
+> The name is what is associated with the property in the client device
+> node, which describes everything the dmac driver needs to know.
+> If the dmac needs to pick a specific channel, it can find out from the
+> "dmas" property in combination with that name. If it is allowed to
+> pick any channel, it doesn't need to bother.
+dmac doesn't pick a channel. They don't come into picture till dmaengine
+and client have agreed on channel. And then channel callback in invoked,
+still it doesn't know which client.
+> 
+> > > 2. By a filter parameter (flags)
+> > Even with direction same problem can arise
+> 
+> Again this is just identifying which dma specifier from the "dmas"
+> property to pick. The use case is the very common one that there
+> is at most one "read" and one "write" channel. In this case all
+> the client has to know is that it wants a channel that fits the
+> description given in DT for the direction it's looking for.
+client knows but that needs to be propagated to dmaengine (not dmac) and
+dmaengine filters this based on new information it has
+> 
+> > > 3. By name and a filter parameter
+> > Additionally we need to say which channel, or making dmaengine already
+> > aware will help here.
+> 
+> The channel is still described in the specifier, the client should
+> not care about it.
+> 
+> 	Arnd
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- Documentation/feature-removal-schedule.txt |    9 +++++++++
- 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-index 56000b3..6c50a17 100644
---- a/Documentation/feature-removal-schedule.txt
-+++ b/Documentation/feature-removal-schedule.txt
-@@ -6,6 +6,15 @@ be removed from this file.  The suggested deprecation period is 3 releases.
- 
- ---------------------------
- 
-+What:	support for i.mx25 in mx2_camera.c
-+When:	v3.8
-+Why:	it's been broken for a year. Furthermore, i.MX25 video capture
-+	HW doesn't have much in common with i.MX27. A separate driver
-+	will be needed for it.
-+Who:	Javier Martin<javier.martin@vista-silicon.com>
-+
-+---------------------------
-+
- What:	ddebug_query="query" boot cmdline param
- When:	v3.8
- Why:	obsoleted by dyndbg="query" and module.dyndbg="query"
 -- 
-1.7.9.5
+~Vinod
