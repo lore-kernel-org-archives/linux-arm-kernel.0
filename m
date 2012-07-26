@@ -1,106 +1,169 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Jul 2012 12:08:13 +0000
-Subject: [PATCH 5/8 v2] ARM: EXYNOS5: Add PHY initialization code for usb
- 2.0
-In-Reply-To: <1342866729-30460-6-git-send-email-gautam.vivek@samsung.com>
-References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
- <1342866729-30460-6-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <201207261208.13874.arnd@arndb.de>
+Date: Thu, 26 Jul 2012 21:44:42 +0000
+Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
+ controller.
+In-Reply-To: <20120726045149.GQ19660@localhost.localdomain>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <201207251710.53683.arnd@arndb.de>
+ <20120726045149.GQ19660@localhost.localdomain>
+Message-ID: <201207262144.42820.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 July 2012, Vivek Gautam wrote:
-> This patch adds PHY setup functions usb 2.0 support on exynos5
+On Thursday 26 July 2012, Shiraz Hashim wrote:
+> Hi Arnd,
 > 
-> Signed-off-by: Yulgon Kim <yulgon.kim@samsung.com>
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                     |    1 +
->  arch/arm/mach-exynos/include/mach/regs-usb-phy.h |   86 ++++++++
->  arch/arm/mach-exynos/setup-usb-phy.c             |  232 +++++++++++++++++++++-
->  3 files changed, 311 insertions(+), 8 deletions(-)
+> On Wed, Jul 25, 2012 at 05:10:53PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 25 July 2012, Shiraz Hashim wrote:
+> > > On Wed, Jul 25, 2012 at 06:31:53AM +0000, Arnd Bergmann wrote:
+> > > > Can you post here the complete set of callback implementations
+> > > > that you have in your development trees at the moment? That should
+> > > > help us determine which case we're talking about here.
+> > > 
+> > > There are following types of callbacks (involving SoC/platform) seen
+> > > generally in our case,
+> > > 
+> > >   * parent clk selection -
+> > >         driver is not aware about various clock sources (which also
+> > >         varies from platform to platform) and hence can only be
+> > >         programmed by corresponding platform.
+> > > 
+> > >         This is the case in Ethernet, audio, etc.
+> > >
+> > >   * sata controller
+> > >         Similar to OTG case which involves clock initialization.
+> >  
+> > This should definitely be moved into the drivers. A lot of drivers
+> > enable and program clocks using the generic clock interfaces, so
+> > there is no point using a callback.
+> >
+> > Note that since stmmac is an architecture independent driver, this
+> > depends on Mark Brown's patch to provide empty stubs for
+> > the clock management functions on architectures that don't yet
+> > use it.
+> 
+> Yes, this is true for clocks associated with devices and we do handle
+> that in this way.
+> 
+> I was talking more of cases where, we need to
+> 
+>    * select clock sources (parents) about which driver has no
+>      knowledge and may vary across boards.
 
-This looks very much like a new device driver, not some code you can just stick
-into platform code. We're trying hard to move driver code out of the platform
-directories, so please don't add any new stuff for a driver and soc that doesn't
-have to deal with legacy code.
+I think we should be able to describe this now with the clock bindings
+for device tree. If not, then we need to update those bindings rather
+than work around the shortcomings.
 
->  
->  static int exynos4_usb_host_phy_is_on(void)
->  {
-> -	return (readl(EXYNOS4_PHYPWR) & PHY1_STD_ANALOG_POWERDOWN) ? 0 : 1;
-> +	if (soc_is_exynos5250()) {
-> +		return (readl(EXYNOS5_PHY_HOST_CTRL0) &
-> +				HOST_CTRL0_PHYSWRSTALL) ? 0 : 1;
-> +	} else {
-> +		return (readl(EXYNOS4_PHYPWR) &
-> +				PHY1_STD_ANALOG_POWERDOWN) ? 0 : 1;
-> +	}
-> +}
+>    * perform initializations which are more than clock, like phy
+>      initialization/programming etc. This is SoC dependant.
 
-Never hardcode register locations like this.
-Also you clearly have two SoC that do different things here, so putting them
-into the same function is a bit strange.
+Setting up the phy is different, but again I think there is a better
+way than using callbacks if you put the initialization for the
+phy into the driver that deals with that phy.
 
->  
->  static struct clk *exynos_usb_clock_enable(struct platform_device *pdev)
-> @@ -31,7 +56,10 @@ static struct clk *exynos_usb_clock_enable(struct platform_device *pdev)
->  	struct clk *usb_clk = NULL;
->  	int err = 0;
->  
-> -	usb_clk = clk_get(&pdev->dev, "otg");
-> +	if (soc_is_exynos5250())
-> +		usb_clk = clk_get(&pdev->dev, "usbhost");
-> +	else
-> +		usb_clk = clk_get(&pdev->dev, "otg");
->  	if (IS_ERR(usb_clk)) {
->  		dev_err(&pdev->dev, "Failed to get otg clock\n");
->  		return NULL;
+> > >   * spi controller
+> > >         This is little hack in the h/w. As part of s/w controlled chip
+> > >         select/deselect in spi-pl022, we need to write to some system
+> > >         specific register.
+> > > 
+> > >   * OTG controller
+> > >         phy clock initialization which involves series of steps
+> > >         including powering down, etc.
+> > > 
+> > >   * NAND controller
+> > >         bank selection on runtime by writing to system registers
+> > 
+> > I don't understand any of these, so unless you post the code
+> > that you want help with as I asked above, I'll assume that you find
+> > the solution yourself and don't need a callback ;-)
+> 
+> Some of them are,
+> 
+> - fsmc NAND controller 
+> 
+>         -- include/linux/mtd/fsmc.h
+> 
+>         struct fsmc_nand_platform_data {
+>                 ...
+> 
+>                 void (*select_bank)(uint32_t bank, uint32_t busw);
+> 
+>                 ...
+> 
+>         };
+> 
+> 
+>         -- arch/arm/mach-spear13xx/spear13xx.c
+> 
+>         void nand_select_bank(u32 bank, u32 busw)
+>         {
+>                 u32 fsmc_cfg;
+> 
+>                 if (cpu_is_spear1340()) {
+>         #ifdef CONFIG_CPU_SPEAR1340
+>                         fsmc_cfg = readl(VA_SPEAR1340_FSMC_CFG);
+>         #endif
+>                 } else 
+>                         fsmc_cfg = readl(VA_FSMC_CFG);
+> 
+>                 fsmc_cfg &= ~(NAND_BANK_MASK << NAND_BANK_SHIFT);
+>                 fsmc_cfg |= (bank << NAND_BANK_SHIFT);
+> 
+>                 if (busw)
+>                         fsmc_cfg |= 1 << NAND_DEV_WIDTH16;
+>                 else
+>                         fsmc_cfg &= ~(1 << NAND_DEV_WIDTH16);
+> 
+>                 if (cpu_is_spear1340()) {
+>         #ifdef CONFIG_CPU_SPEAR1340
+>                         writel(fsmc_cfg, VA_SPEAR1340_FSMC_CFG);
+>         #endif
+>                 } else
+>                         writel(fsmc_cfg, VA_FSMC_CFG);
+>         }
 
-Why do you have different names for the same clock on different SoCs?
+The FSMC driver is ST Microelectronics specific, and this function looks fairly
+straightforward. I think this can easily go into the driver, with a few
+modifications:
 
-If the clock has the same purpose, just give it the same name.
+* Find the FSMC_CFG address using the device tree. You should never have
+any hardcoded virtual addresses like the one in this file, but instead
+ioremap a resource that gets passed from the device tree. Where is this
+register located? I assume that it's not part of the normal fsmc registers,
+but how to get to this address depends a bit on where it's located.
 
-> @@ -50,7 +78,11 @@ static int exynos4210_usb_phy_clkset(struct platform_device *pdev)
->  	struct clk *xusbxti_clk;
->  	u32 phyclk = 0;
->  
-> -	xusbxti_clk = clk_get(&pdev->dev, "xusbxti");
-> +	if (soc_is_exynos5250())
-> +		xusbxti_clk = clk_get(&pdev->dev, "ext_xtal");
-> +	else
-> +		xusbxti_clk = clk_get(&pdev->dev, "xusbxti");
-> +
->  	if (xusbxti_clk && !IS_ERR(xusbxti_clk)) {
->  		if (soc_is_exynos4210()) {
->  			/* set clock frequency for PLL */
+* Remove the cpu_is_spear1340() hacks. If you have to tell the difference
+between variations, make it depend on different "compatible" properties
+on the presence or absence of some other property or register range.
 
-same here.
 
-> @@ -218,8 +431,11 @@ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
->  {
->  	if (type == S5P_USB_PHY_DEVICE)
->  		return exynos4210_usb_phy0_exit(pdev);
-> -	else if (type == S5P_USB_PHY_HOST)
-> -		return exynos4210_usb_phy1_exit(pdev);
-> -
-> +	else if (type == S5P_USB_PHY_HOST) {
-> +		if (soc_is_exynos5250())
-> +			return exynos5_usb_phy20_exit(pdev);
-> +		else
-> +			return exynos4210_usb_phy1_exit(pdev);
-> +	}
->  	return -EINVAL;
->  }
+> 
+> 
+>         -- arch/arm/mach-spear13xx/spear1340.c
+> 
+>         void sata_miphy_exit(struct device *dev)
+>         {
+>                 writel(0, VA_SPEAR1340_PCIE_SATA_CFG);
+>                 writel(0, VA_SPEAR1340_PCIE_MIPHY_CFG);
+> 
+>                 /* Enable PCIE SATA Controller reset */
+>                 writel((readl(VA_SPEAR1340_PERIP1_SW_RST) | (0x1000)),
+>                                 VA_SPEAR1340_PERIP1_SW_RST);
+>                 msleep(20);
+> 
+>                 /* Switch off sata power domain */
+>                 writel((readl(VA_SPEAR1340_PCM_CFG) & (~0x800)),
+>                                 VA_SPEAR1340_PCM_CFG);
+>                 msleep(20);
+>         }
 
-You are doing completely different things here. None of these are actually
-s5p, so better make these different functions for each soc.
-
-If you have a driver that has some common code and some hardware specific
-code, we generally structure the code so that the entry points are different
-for the each kind of hardware and they call into common code from there.
-
-This code is done in the opposite way and should be changed over time,
-so please don't add to the mess.
+Again, you should move the accesses to VA_SPEAR1340_PERIP1_SW_RST etc to some
+device driver that deals with the specific register range. This can be
+the driver for the actual peripheral itself, or it can be some kind of
+"system controller" that exports an interface.
+In the case of power domains and getting stuff in and out of reset,
+the subsystems that you most likely should be using do do this are the
+regulator and the powerdomain framework. Regulators already have device
+tree bindings, while the power domains still need them.
 
 	Arnd
