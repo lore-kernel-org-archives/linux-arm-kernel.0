@@ -1,50 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Jul 2012 22:38:22 -0700
-Subject: [PATCH] ARM: mxs: fix compile error caused by prom_update_property
- change
-In-Reply-To: <5010D670.6070303@bluegiga.com>
-References: <1342160035-24170-1-git-send-email-shawn.guo@linaro.org>
- <5010D670.6070303@bluegiga.com>
-Message-ID: <CAOesGMhwX_ZSZrUraMBazsj7BmJTi_ihGNoOjx__+kLS-SSJ=g@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 26 Jul 2012 07:48:44 +0200
+Subject: [PATCH v2] ARM: i.MX6: set ARCH_NR_GPIO to 224
+Message-ID: <1343281724-23085-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 10:32 PM, Lauri Hintsala
-<lauri.hintsala@bluegiga.com> wrote:
-> Hi,
->
->
-> On 07/13/2012 09:13 AM, Shawn Guo wrote:
->>
->> The commit 475d009 (of: Improve prom_update_property() function)
->> changed prom_update_property interface, and causes the compile
->> error below.
->>
->>    CC      arch/arm/mach-mxs/mach-mxs.o
->> arch/arm/mach-mxs/mach-mxs.c: In function ?update_fec_mac_prop?:
->> arch/arm/mach-mxs/mach-mxs.c:216:4: error: too many arguments to function
->> ?prom_update_property?
->> include/linux/of.h:263:12: note: declared here
->>
->> Update the caller update_fec_mac_prop to fix the error.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> ---
->> The error is seen on next-20120712 where commit 475d009 (of: Improve
->> prom_update_property() function) emerges.
->
->
-> What's the status of this patch? Current Torvald's master is unbuildable for
-> mxs because of this issue.
->
-> Compiler gives an error:
-> arch/arm/mach-mxs/mach-mxs.c: In function 'update_fec_mac_prop':
-> arch/arm/mach-mxs/mach-mxs.c:213: error: too many arguments to function
-> 'prom_update_property'
-> make[1]: *** [arch/arm/mach-mxs/mach-mxs.o] Error 1
+From: Matthias Thomae <matthias.thomae@de.bosch.com>
 
-Thanks for the follow-up, I had missed it when first sent out. I've
-applied it to our fixes branch that will be sent out shortly.
+Set ARCH_NR_GPIO for the i.MX6 processor family, which has 7 GPIO
+controllers with 32 signals each. The default of 256 GPIOs wastes
+some static table space as explained in Documentation/gpio.txt.
 
+Signed-off-by: Matthias Thomae <matthias.thomae@de.bosch.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+---
 
--Olof
+Changes in v2: Fix typo in the subject: 244 -> 224
+
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b25c9d3..5e4cde3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1626,6 +1626,7 @@ config ARCH_NR_GPIO
+ 	default 355 if ARCH_U8500
+ 	default 264 if MACH_H4700
+ 	default 512 if SOC_OMAP5
++	default 224 if SOC_IMX6Q
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
+-- 
+1.7.0.4
