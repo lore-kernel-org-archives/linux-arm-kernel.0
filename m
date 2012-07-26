@@ -1,70 +1,37 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:34:01 +0100
-Subject: [PATCH 19/24] xen/arm: compile netback
+Date: Thu, 26 Jul 2012 16:33:53 +0100
+Subject: [PATCH 11/24] xen/arm: introduce CONFIG_XEN on ARM
 In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-19-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343316846-25860-11-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/xen/hypercall.h |   19 +++++++++++++++++++
- drivers/net/xen-netback/netback.c    |    1 +
- drivers/net/xen-netfront.c           |    1 +
- 3 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-index 4ac0624..8a82325 100644
---- a/arch/arm/include/asm/xen/hypercall.h
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -47,4 +47,23 @@ unsigned long HYPERVISOR_hvm_op(int op, void *arg);
- int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
- int HYPERVISOR_physdev_op(int cmd, void *arg);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a91009c..9c54cb4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2228,6 +2228,16 @@ config NEON
+ 	  Say Y to include support code for NEON, the ARMv7 Advanced SIMD
+ 	  Extension.
  
-+static inline void
-+MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
-+			unsigned int new_val, unsigned long flags)
-+{
-+	BUG();
-+}
++config XEN_DOM0
++	def_bool y
 +
-+static inline void
-+MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
-+		 int count, int *success_count, domid_t domid)
-+{
-+	BUG();
-+}
++config XEN
++	bool "Xen guest support on ARM"
++	depends on ARM && OF
++	select XEN_DOM0
++	help
++	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
 +
-+static inline int
-+HYPERVISOR_multicall(void *call_list, int nr_calls)
-+{
-+	BUG();
-+}
- #endif /* _ASM_ARM_XEN_HYPERCALL_H */
-diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-index f4a6fca..ab4f81c 100644
---- a/drivers/net/xen-netback/netback.c
-+++ b/drivers/net/xen-netback/netback.c
-@@ -40,6 +40,7 @@
+ endmenu
  
- #include <net/tcp.h>
- 
-+#include <xen/xen.h>
- #include <xen/events.h>
- #include <xen/interface/memory.h>
- 
-diff --git a/drivers/net/xen-netfront.c b/drivers/net/xen-netfront.c
-index 3089990..bf4ba2b 100644
---- a/drivers/net/xen-netfront.c
-+++ b/drivers/net/xen-netfront.c
-@@ -43,6 +43,7 @@
- #include <linux/slab.h>
- #include <net/ip.h>
- 
-+#include <asm/xen/page.h>
- #include <xen/xen.h>
- #include <xen/xenbus.h>
- #include <xen/events.h>
+ menu "Userspace binary formats"
 -- 
 1.7.2.5
