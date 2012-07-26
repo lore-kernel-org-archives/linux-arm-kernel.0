@@ -1,38 +1,151 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 26 Jul 2012 08:04:10 +0000
-Subject: [PATCH v2 6/6] arm/dts: am33xx rtc node
-In-Reply-To: <501025EC.6010600@mvista.com>
-References: <cover.1343191280.git.afzal@ti.com>
- <d16976055462214af276d7242faa2bc6e621fd44.1343191280.git.afzal@ti.com>
- <500FD698.30906@mvista.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9AD8B1@DBDE01.ent.ti.com>
- <501025EC.6010600@mvista.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9ADBE5@DBDE01.ent.ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 26 Jul 2012 10:06:08 +0200
+Subject: Devicetree: Initialization order of mmc block devices?
+In-Reply-To: <201207191313.46178.arnd@arndb.de>
+References: <5006571A.7060103@de.bosch.com> <201207191313.46178.arnd@arndb.de>
+Message-ID: <5010FA70.3080306@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 19.07.2012 15:13, Arnd Bergmann wrote:
+> On Wednesday 18 July 2012, Dirk Behme wrote:
+>> Any idea how we could influence the initialization order of the mmc 
+>> block devices using a DT based kernel? Ensuring that the internal, hard 
+>> wired mmc card is always mapped to mmcblk0?
+> 
+> I think the best solution would be to parse the "/aliases" device node
+> and look for an "mmc0" or "mmc1" property with a phandle to the respective
+> device. That's how we sort the serial ports. We have the of_alias_get_id()
+> function to pick out a node from there, so it should be possible to use
+> that in the mmc core similar to how we use it in the uart drivers.
 
-On Wed, Jul 25, 2012 at 22:29:24, Sergei Shtylyov wrote:
+Looking at the serial example you mentioned and trying to adapt that for 
+mmcblkX I tried something like below [1] on a Freescale i.MX6 board and 
+it seems to work :) Is this what you had in mind?
 
-> >>> +		rtc at 44e3e000 {
-> 
-> >>     Address postfix in the node name without "reg" property?
-> 
-> > As per [1], "The unit-address is included if the node describes
-> > a device with an address".
-> 
->    Which in this case it doesn't.
-> 
-> > Here even though reg property is not present, as via hwmod
-> > (see below) it is getting address, isn't it better to have it
-> 
->    I think not.
+While I think the DT/of_alias_get_id() part looks ok (?), the way of 
+passing the retrieved value from the driver sdhci-esdhc-imx.c to the 
+block.c is quite hackish. I took it from the examples how this was 
+hacked in the past.
 
-Ok, I will remove it
- 
-> >>> +			compatible = "ti,da830-rtc";
-> >>> +			ti,hwmods = "rtc";
+Is there any better way of passing the information read in the driver by 
+of_alias_get_id() to block.c? With the value read by of_alias_get_id() 
+we somehow have to set name_idx in block.c.
 
-Regards
-Afzal
+Best regards
+
+Dirk
+
+[1]
+
+Just fyi: From hardware point of view, usdhc1 connects the removable SD 
+card, while usdhc3 attaches the non-removable eMMC. With the alias, 
+independent if the SD card is there or not, the eMMC becomes always 
+mmcblk1. And this is what we like to achieve here.
+
+---
+  arch/arm/boot/dts/imx6q-sabrelite.dts         |    5 +++++
+  arch/arm/plat-mxc/include/mach/esdhc.h |    1 +
+  drivers/mmc/card/block.c               |    6 ++++--
+  drivers/mmc/host/sdhci-esdhc-imx.c     |   14 ++++++++++++++
+  include/linux/mmc/host.h               |    3 +++
+  5 files changed, 27 insertions(+), 2 deletions(-)
+
+Index: a/arch/arm/boot/dts/imx6q-sabrelite.dts
+===================================================================
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -18,6 +18,11 @@
+  	model = "Freescale i.MX6 Quad sabrelite Sample Board";
+  	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+
++	aliases {
++		mmcblk0 = &usdhc1;
++		mmcblk1 = &usdhc3;
++	};
++
+  	memory {
+  		reg = <0x10000000 0x40000000>;
+  	};
+  	Index: freescale-linux-2.6-imx.git/drivers/mmc/host/sdhci-esdhc-imx.c
+===================================================================
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -447,10 +447,21 @@ sdhci_esdhc_imx_probe_dt(struct platform
+  			 struct esdhc_platform_data *boarddata)
+  {
+  	struct device_node *np = pdev->dev.of_node;
++	int ret;
+
+  	if (!np)
+  		return -ENODEV;
+
++	ret = of_alias_get_id(np, "mmcblk");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
++		return -ENODEV;
++	}
++
++	boarddata->devidx = ret;
++
+  	if (of_get_property(np, "fsl,card-wired", NULL))
+  		boarddata->cd_type = ESDHC_CD_PERMANENT;
+
+@@ -581,6 +592,9 @@ static int __devinit sdhci_esdhc_imx_pro
+  					host->mmc->parent->platform_data);
+  	}
+
++	/* copy mmc block device index */
++	host->mmc->devidx = boarddata->devidx;
++
+  	/* write_protect */
+  	if (boarddata->wp_type == ESDHC_WP_GPIO) {
+  		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
+Index: a/arch/arm/plat-mxc/include/mach/esdhc.h
+===================================================================
+--- a/arch/arm/plat-mxc/include/mach/esdhc.h
++++ bt/arch/arm/plat-mxc/include/mach/esdhc.h
+@@ -41,5 +41,6 @@ struct esdhc_platform_data {
+  	enum wp_types wp_type;
+  	enum cd_types cd_type;
+  	int vdd_180;
++	unsigned int devidx;
+  };
+  #endif /* __ASM_ARCH_IMX_ESDHC_H */
+Index: freescale-linux-2.6-imx.git/drivers/mmc/card/block.c
+===================================================================
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1466,7 +1466,8 @@ static struct mmc_blk_data *mmc_blk_allo
+  	struct mmc_blk_data *md;
+  	int devidx, ret;
+
+-	devidx = find_first_zero_bit(dev_use, max_devices);
++	devidx = find_next_zero_bit(dev_use, max_devices,
++			card->host->devidx);
+  	if (devidx >= max_devices)
+  		return ERR_PTR(-ENOSPC);
+  	__set_bit(devidx, dev_use);
+@@ -1484,7 +1485,8 @@ static struct mmc_blk_data *mmc_blk_allo
+  	 * index anymore so we keep track of a name index.
+  	 */
+  	if (!subname) {
+-		md->name_idx = find_first_zero_bit(name_use, max_devices);
++		md->name_idx = find_next_zero_bit(name_use, max_devices,
++				card->host->devidx);
+  		__set_bit(md->name_idx, name_use);
+  	} else
+  		md->name_idx = ((struct mmc_blk_data *)
+Index: a/include/linux/mmc/host.h
+===================================================================
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -326,6 +326,9 @@ struct mmc_host {
+
+  	unsigned int		actual_clock;	/* Actual HC clock rate */
+
++	/* preferred mmc block device index (mmcblkX) */
++	unsigned int		devidx;
++
+  	unsigned long		private[0] ____cacheline_aligned;
+  };
