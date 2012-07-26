@@ -1,91 +1,57 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:48 +0100
-Subject: [PATCH 06/24] xen: missing includes
-In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 26 Jul 2012 10:53:46 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1343302083.1726.9027.camel@vkoul-udesk3>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
+ <201207260714.34540.arnd@arndb.de> <1343302083.1726.9027.camel@vkoul-udesk3>
+Message-ID: <5011680A.6040400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- drivers/tty/hvc/hvc_xen.c                  |    2 ++
- drivers/xen/grant-table.c                  |    1 +
- drivers/xen/xenbus/xenbus_probe_frontend.c |    1 +
- include/xen/interface/xen.h                |    3 +++
- include/xen/privcmd.h                      |    1 +
- 5 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-index 944eaeb..dc07f56 100644
---- a/drivers/tty/hvc/hvc_xen.c
-+++ b/drivers/tty/hvc/hvc_xen.c
-@@ -21,6 +21,7 @@
- #include <linux/console.h>
- #include <linux/delay.h>
- #include <linux/err.h>
-+#include <linux/irq.h>
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/list.h>
-@@ -35,6 +36,7 @@
- #include <xen/page.h>
- #include <xen/events.h>
- #include <xen/interface/io/console.h>
-+#include <xen/interface/sched.h>
- #include <xen/hvc-console.h>
- #include <xen/xenbus.h>
- 
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index 0bfc1ef..1d0d95e 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -47,6 +47,7 @@
- #include <xen/interface/memory.h>
- #include <xen/hvc-console.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/xen/interface.h>
- 
- #include <asm/pgtable.h>
- #include <asm/sync_bitops.h>
-diff --git a/drivers/xen/xenbus/xenbus_probe_frontend.c b/drivers/xen/xenbus/xenbus_probe_frontend.c
-index a31b54d..3159a37 100644
---- a/drivers/xen/xenbus/xenbus_probe_frontend.c
-+++ b/drivers/xen/xenbus/xenbus_probe_frontend.c
-@@ -21,6 +21,7 @@
- #include <xen/xenbus.h>
- #include <xen/events.h>
- #include <xen/page.h>
-+#include <xen/xen.h>
- 
- #include <xen/platform_pci.h>
- 
-diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
-index a890804..4f29f33 100644
---- a/include/xen/interface/xen.h
-+++ b/include/xen/interface/xen.h
-@@ -10,7 +10,10 @@
- #define __XEN_PUBLIC_XEN_H__
- 
- #include <asm/xen/interface.h>
-+#include <linux/types.h>
-+#ifdef CONFIG_X86
- #include <asm/pvclock-abi.h>
-+#endif
- 
- /*
-  * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
-diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
-index 17857fb..4d58881 100644
---- a/include/xen/privcmd.h
-+++ b/include/xen/privcmd.h
-@@ -35,6 +35,7 @@
- 
- #include <linux/types.h>
- #include <linux/compiler.h>
-+#include <xen/interface/xen.h>
- 
- typedef unsigned long xen_pfn_t;
- 
--- 
-1.7.2.5
+On 07/26/2012 06:28 AM, Vinod Koul wrote:
+> On Thu, 2012-07-26 at 07:14 +0000, Arnd Bergmann wrote:
+>> On Thursday 26 July 2012, Vinod Koul wrote:
+>>>>> But from a client POV it makes sense as with the given direction you
+>>>>> would need a specific request line for a channel. So this is right.
+>>>>> But direction is something I don't expect to be used for "give me a
+>>>>> channel" 
+>>>>
+>>>> Ok. The thought was that the user would have the following means of
+>>>> requesting a channel ...
+>>>>
+>>>> 1. By name
+>>> Bare name maynot be enough. In a dmac we have many channels which one to
+>>> choose?
+>> The name is what is associated with the property in the client device
+>> node, which describes everything the dmac driver needs to know.
+>> If the dmac needs to pick a specific channel, it can find out from the
+>> "dmas" property in combination with that name. If it is allowed to
+>> pick any channel, it doesn't need to bother.
+> dmac doesn't pick a channel. They don't come into picture till dmaengine
+> and client have agreed on channel. And then channel callback in invoked,
+> still it doesn't know which client.
+
+I think what Arnd meant was that dmaengine (not the dmac) would use the
+DT node and name information to extract the dma mapping information from
+the device tree and provide a channel back to the client. So yes the
+dmac is not involved here.
+
+By the way, when I said "by name" above (and probably this was not
+clear) but it should have been "DT node and name". So really a channel
+is requested by ...
+
+1. DT node and a name
+2. DT node and a filter parameter (flags)
+3. DT node, a name and a filter parameter (flags)
+
+The DT node points us to the specific device in the DT, say an MMC node,
+and the MMC node then contains the DMA mapping info. The device node may
+have the mapping information have one or more DMA requests/channels and
+so then the name and/or flags is used to determine which the client needs.
+
+Sorry hope that this is a little clearer.
+
+Cheers
+Jon
