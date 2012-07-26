@@ -1,137 +1,46 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Thu, 26 Jul 2012 16:12:32 +0900
-Subject: [PATCH 1/2] ARM: EXYNOS: Fix ARM PMU irq numbers
-In-Reply-To: <CAK9yfHyXzSp1Q75neuC0Q2=7RhXQXmKAQOPxE522SCsupwixTw@mail.gmail.com>
-References: <1343262902-19073-1-git-send-email-chanho61.park@samsung.com>
- <1343262902-19073-2-git-send-email-chanho61.park@samsung.com>
- <CAK9yfHyXzSp1Q75neuC0Q2=7RhXQXmKAQOPxE522SCsupwixTw@mail.gmail.com>
-Message-ID: <003201cd6afe$06407f20$12c17d60$@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Jul 2012 07:14:34 +0000
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1343284960.1726.8978.camel@vkoul-udesk3>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
+Message-ID: <201207260714.34540.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Sachin Kamat
-> Sent: Thursday, July 26, 2012 12:53 PM
-> To: Chanho Park
-> Cc: linux-samsung-soc at vger.kernel.org; Kyungmin Park;
-> kgene.kim at samsung.com; linux-arm-kernel at lists.infradead.org; ben-
-> linux at fluff.org
-> Subject: Re: [PATCH 1/2] ARM: EXYNOS: Fix ARM PMU irq numbers
-> 
-> On 26 July 2012 06:05, Chanho Park <chanho61.park@samsung.com> wrote:
-> > This patch fixes irq numbers of ARM PMU(Perfromance Monitoring Unit).
-> > We need to seperate arm-pmu(performance measurement unit) and
-> > exynos-pmu(power management unit). I decide to change
-> EXYNOS4_IRQ_PMU
-> > to EXYNOS4_IRQ_POWER_PMU because there are no one use it.
-> > A max cpu number of exynos4 is four in case of exynos44xx. So we
-> > should define 3 additional pmu irq numbers and enable it according to the
-> number of cpus.
-> >
-> > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/include/mach/irqs.h |   18 ++++++++++++++++--
-> >  arch/arm/plat-samsung/devs.c             |    9 ++++++++-
-> >  2 files changed, 24 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/include/mach/irqs.h
-> > b/arch/arm/mach-exynos/include/mach/irqs.h
-> > index 35bced6..329b07d 100644
-> > --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> > +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> > @@ -128,7 +128,7 @@
-> >  #define EXYNOS4_IRQ_ADC1               IRQ_SPI(107)
-> >  #define EXYNOS4_IRQ_PEN1               IRQ_SPI(108)
-> >  #define EXYNOS4_IRQ_KEYPAD             IRQ_SPI(109)
-> > -#define EXYNOS4_IRQ_PMU                        IRQ_SPI(110)
-> > +#define EXYNOS4_IRQ_POWER_PMU          IRQ_SPI(110)
-> >  #define EXYNOS4_IRQ_GPS                        IRQ_SPI(111)
-> >  #define EXYNOS4_IRQ_INTFEEDCTRL_SSS    IRQ_SPI(112)
-> >  #define EXYNOS4_IRQ_SLIMBUS            IRQ_SPI(113)
-> > @@ -136,6 +136,11 @@
-> >  #define EXYNOS4_IRQ_TSI                        IRQ_SPI(115)
-> >  #define EXYNOS4_IRQ_SATA               IRQ_SPI(116)
-> >
-> > +#define EXYNOS4_IRQ_PMU                        COMBINER_IRQ(2, 2)
-> > +#define EXYNOS4_IRQ_PMU_CPU1           COMBINER_IRQ(3, 2)
-> > +#define EXYNOS4_IRQ_PMU_CPU2           COMBINER_IRQ(18, 2)
-> > +#define EXYNOS4_IRQ_PMU_CPU3           COMBINER_IRQ(19, 2)
-> > +
-> >  #define EXYNOS4_IRQ_SYSMMU_MDMA0_0     COMBINER_IRQ(4, 0)
-> >  #define EXYNOS4_IRQ_SYSMMU_SSS_0       COMBINER_IRQ(4, 1)
-> >  #define EXYNOS4_IRQ_SYSMMU_FIMC0_0     COMBINER_IRQ(4, 2)
-> > @@ -230,7 +235,6 @@
-> >  #define IRQ_TC                         EXYNOS4_IRQ_PEN0
-> >
-> >  #define IRQ_KEYPAD                     EXYNOS4_IRQ_KEYPAD
-> > -#define IRQ_PMU                                EXYNOS4_IRQ_PMU
-> >
-> >  #define IRQ_FIMD0_FIFO                 EXYNOS4_IRQ_FIMD0_FIFO
-> >  #define IRQ_FIMD0_VSYNC                        EXYNOS4_IRQ_FIMD0_VSYNC
-> > @@ -453,6 +457,16 @@
-> >  #define EXYNOS5_IRQ_GPIO3_NR_GROUPS    5
-> >  #define EXYNOS5_IRQ_GPIO4_NR_GROUPS    1
-> >
-> > +#if defined(CONFIG_ARCH_EXYNOS4)
-> > +#define IRQ_PMU                                EXYNOS4_IRQ_PMU
-> > +#define IRQ_PMU1                       EXYNOS4_IRQ_PMU_CPU1
-> > +#define IRQ_PMU2                       EXYNOS4_IRQ_PMU_CPU2
-> > +#define IRQ_PMU3                       EXYNOS4_IRQ_PMU_CPU3
-> > +#elif defined(CONFIG_ARCH_EXYNOS5)
-> > +#define IRQ_PMU                                EXYNOS5_IRQ_PMU
-> > +#define IRQ_PMU1                       EXYNOS5_IRQ_PMU_CPU1
-> > +#endif
-> 
-> This will not work when both Exynos 4 and 5 are enabled.
+On Thursday 26 July 2012, Vinod Koul wrote:
+> > > But from a client POV it makes sense as with the given direction you
+> > > would need a specific request line for a channel. So this is right.
+> > > But direction is something I don't expect to be used for "give me a
+> > > channel" 
+> > 
+> > Ok. The thought was that the user would have the following means of
+> > requesting a channel ...
+> > 
+> > 1. By name
+> Bare name maynot be enough. In a dmac we have many channels which one to
+> choose?
 
-Hmm. I think we need to identify exynos4 and 5 types dynamically using soc_is_exynosXXX() function.
-I'll change it at once.
+The name is what is associated with the property in the client device
+node, which describes everything the dmac driver needs to know.
+If the dmac needs to pick a specific channel, it can find out from the
+"dmas" property in combination with that name. If it is allowed to
+pick any channel, it doesn't need to bother.
 
-> 
-> > +
-> >  #define MAX_COMBINER_NR                        (EXYNOS4_MAX_COMBINER_NR
-> > EXYNOS5_MAX_COMBINER_NR ? \
-> >                                         EXYNOS4_MAX_COMBINER_NR :
-> > EXYNOS5_MAX_COMBINER_NR)
-> >
-> > diff --git a/arch/arm/plat-samsung/devs.c
-> > b/arch/arm/plat-samsung/devs.c index 74e31ce..91048a6 100644
-> > --- a/arch/arm/plat-samsung/devs.c
-> > +++ b/arch/arm/plat-samsung/devs.c
-> > @@ -1100,7 +1100,14 @@ struct platform_device s5p_device_onenand = {
-> >
-> >  #ifdef CONFIG_PLAT_S5P
-> >  static struct resource s5p_pmu_resource[] = {
-> > -       DEFINE_RES_IRQ(IRQ_PMU)
-> > +       DEFINE_RES_IRQ(IRQ_PMU),
-> > +#if (CONFIG_NR_CPUS > 1)
-> > +       DEFINE_RES_IRQ(IRQ_PMU1),
-> > +#elif (CONFIG_NR_CPUS > 2)
-> > +       DEFINE_RES_IRQ(IRQ_PMU2),
-> > +#elif (CONFIG_NR_CPUS > 3)
-> > +       DEFINE_RES_IRQ(IRQ_PMU3),
-> > +#endif
-> >  };
-> >
-> >  static struct platform_device s5p_device_pmu = {
-> > --
-> > 1.7.9.5
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe
-> > linux-samsung-soc" in the body of a message to
-> > majordomo at vger.kernel.org More majordomo info at
-> > http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
-> --
-> With warm regards,
-> Sachin
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 2. By a filter parameter (flags)
+> Even with direction same problem can arise
+
+Again this is just identifying which dma specifier from the "dmas"
+property to pick. The use case is the very common one that there
+is at most one "read" and one "write" channel. In this case all
+the client has to know is that it wants a channel that fits the
+description given in DT for the direction it's looking for.
+
+> > 3. By name and a filter parameter
+> Additionally we need to say which channel, or making dmaengine already
+> aware will help here.
+
+The channel is still described in the specifier, the client should
+not care about it.
+
+	Arnd
