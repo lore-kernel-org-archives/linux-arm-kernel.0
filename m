@@ -1,95 +1,71 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Thu, 26 Jul 2012 09:35:01 +0900
-Subject: [PATCH 1/2] ARM: EXYNOS: Fix ARM PMU irq numbers
-In-Reply-To: <1343262902-19073-1-git-send-email-chanho61.park@samsung.com>
-References: <1343262902-19073-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1343262902-19073-2-git-send-email-chanho61.park@samsung.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 25 Jul 2012 19:41:23 -0500
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <4FF6340A.6020409@ti.com>
+References: <20120608094708.GC19062@mudshark.cambridge.arm.com>
+ <4FD21930.4000800@ti.com> <20120611173930.GD28235@mudshark.cambridge.arm.com>
+ <4FD64083.3020800@ti.com> <20120612092842.GA2991@mudshark.cambridge.arm.com>
+ <4FD7B1DC.30108@ti.com> <20120612213150.GC24380@mudshark.cambridge.arm.com>
+ <4FD7C597.7060501@ti.com> <20120702095539.GD22239@mudshark.cambridge.arm.com>
+ <4FF1D15E.7040301@ti.com> <20120702220117.GD25234@mudshark.cambridge.arm.com>
+ <4FF6340A.6020409@ti.com>
+Message-ID: <50109233.3090302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes irq numbers of ARM PMU(Perfromance Monitoring Unit).
-We need to seperate arm-pmu(performance measurement unit) and exynos-pmu(power
-management unit). I decide to change EXYNOS4_IRQ_PMU to EXYNOS4_IRQ_POWER_PMU
-because there are no one use it.
-A max cpu number of exynos4 is four in case of exynos44xx. So we should define 3
-additional pmu irq numbers and enable it according to the number of cpus.
+Hi Will,
 
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/include/mach/irqs.h |   18 ++++++++++++++++--
- arch/arm/plat-samsung/devs.c             |    9 ++++++++-
- 2 files changed, 24 insertions(+), 3 deletions(-)
+On 07/05/2012 07:40 PM, Jon Hunter wrote:
+> Hi Will,
+> 
+> On 07/02/2012 05:01 PM, Will Deacon wrote:
+>> On Mon, Jul 02, 2012 at 05:50:38PM +0100, Jon Hunter wrote:
+>>> On 07/02/2012 04:55 AM, Will Deacon wrote:
+>>>>
+>>>> Did you have any luck getting to the bottom of this?
+>>>
+>>> I am still waiting for feedback from design. They were trying to confirm
+>>> my observations. Unfortunately, it is taking some time. I will ping them
+>>> again.
+>>
+>> Ok, thanks. If pinging doesn't work, bribery can be quite effective with
+>> hardware guys :)
+> 
+> Yes looks like I am going to need to get creative :-)
+> 
+>>>> It would be good to take your PMU suspend/resume patches once we know that
+>>>> they will get used.
+>>>
+>>> Yes that would be good. I could drop the 4460 specific changes for now
+>>> and make 4460 work in the same way as 4430 (using CTI) for the time
+>>> being and see if we can get these in. However, I recall that was not
+>>> working for you, but it was working fine for me.
+>>
+>> Indeed, that hack didn't help me and I'd rather not commit it if it only
+>> partially fixes the problem. A better bet might just be to go with your
+>> original approach and see how many bug reports we receive. That might also
+>> help us narrow down the problem, but it's your call.
+> 
+> Ok, I think that that is best.
+> 
+>> In the meantime, I pushed what I think is the latest drop of your series to
+>> a new branch on kernel.org:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4-dev
+> 
+> Looks good.
 
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index 35bced6..329b07d 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -128,7 +128,7 @@
- #define EXYNOS4_IRQ_ADC1		IRQ_SPI(107)
- #define EXYNOS4_IRQ_PEN1		IRQ_SPI(108)
- #define EXYNOS4_IRQ_KEYPAD		IRQ_SPI(109)
--#define EXYNOS4_IRQ_PMU			IRQ_SPI(110)
-+#define EXYNOS4_IRQ_POWER_PMU		IRQ_SPI(110)
- #define EXYNOS4_IRQ_GPS			IRQ_SPI(111)
- #define EXYNOS4_IRQ_INTFEEDCTRL_SSS	IRQ_SPI(112)
- #define EXYNOS4_IRQ_SLIMBUS		IRQ_SPI(113)
-@@ -136,6 +136,11 @@
- #define EXYNOS4_IRQ_TSI			IRQ_SPI(115)
- #define EXYNOS4_IRQ_SATA		IRQ_SPI(116)
- 
-+#define EXYNOS4_IRQ_PMU			COMBINER_IRQ(2, 2)
-+#define EXYNOS4_IRQ_PMU_CPU1		COMBINER_IRQ(3, 2)
-+#define EXYNOS4_IRQ_PMU_CPU2		COMBINER_IRQ(18, 2)
-+#define EXYNOS4_IRQ_PMU_CPU3		COMBINER_IRQ(19, 2)
-+
- #define EXYNOS4_IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(4, 0)
- #define EXYNOS4_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(4, 1)
- #define EXYNOS4_IRQ_SYSMMU_FIMC0_0	COMBINER_IRQ(4, 2)
-@@ -230,7 +235,6 @@
- #define IRQ_TC				EXYNOS4_IRQ_PEN0
- 
- #define IRQ_KEYPAD			EXYNOS4_IRQ_KEYPAD
--#define IRQ_PMU				EXYNOS4_IRQ_PMU
- 
- #define IRQ_FIMD0_FIFO			EXYNOS4_IRQ_FIMD0_FIFO
- #define IRQ_FIMD0_VSYNC			EXYNOS4_IRQ_FIMD0_VSYNC
-@@ -453,6 +457,16 @@
- #define EXYNOS5_IRQ_GPIO3_NR_GROUPS	5
- #define EXYNOS5_IRQ_GPIO4_NR_GROUPS	1
- 
-+#if defined(CONFIG_ARCH_EXYNOS4)
-+#define IRQ_PMU				EXYNOS4_IRQ_PMU
-+#define IRQ_PMU1			EXYNOS4_IRQ_PMU_CPU1
-+#define IRQ_PMU2			EXYNOS4_IRQ_PMU_CPU2
-+#define IRQ_PMU3			EXYNOS4_IRQ_PMU_CPU3
-+#elif defined(CONFIG_ARCH_EXYNOS5)
-+#define IRQ_PMU				EXYNOS5_IRQ_PMU
-+#define IRQ_PMU1			EXYNOS5_IRQ_PMU_CPU1
-+#endif
-+
- #define MAX_COMBINER_NR			(EXYNOS4_MAX_COMBINER_NR > EXYNOS5_MAX_COMBINER_NR ? \
- 					EXYNOS4_MAX_COMBINER_NR : EXYNOS5_MAX_COMBINER_NR)
- 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 74e31ce..91048a6 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -1100,7 +1100,14 @@ struct platform_device s5p_device_onenand = {
- 
- #ifdef CONFIG_PLAT_S5P
- static struct resource s5p_pmu_resource[] = {
--	DEFINE_RES_IRQ(IRQ_PMU)
-+	DEFINE_RES_IRQ(IRQ_PMU),
-+#if (CONFIG_NR_CPUS > 1)
-+	DEFINE_RES_IRQ(IRQ_PMU1),
-+#elif (CONFIG_NR_CPUS > 2)
-+	DEFINE_RES_IRQ(IRQ_PMU2),
-+#elif (CONFIG_NR_CPUS > 3)
-+	DEFINE_RES_IRQ(IRQ_PMU3),
-+#endif
- };
- 
- static struct platform_device s5p_device_pmu = {
--- 
-1.7.9.5
+I just wanted to let you know that I have been updating the PMU patches
+for OMAP. Latest can be found here [1]. I have not included Paul's patch
+[2] in this series at the moment, because although it works well for
+OMAP4, I need to create the HWMOD structures for OMAP3. Without these
+structures it breaks OMAP3 PMU support. Once this is done we should be
+able to get rid for the OMAP3 dependency on ETM. Unfortunately, Benoit
+(Mr HWMOD) is out on his holidays but should be back next week and then
+maybe he can give me some guidance on this HWMOD stuff.
+
+Cheers
+Jon
+
+[1] https://gitorious.org/linux-omap-dev dev-pmu
+[2] http://marc.info/?l=linux-omap&m=134212809112530&w=2
