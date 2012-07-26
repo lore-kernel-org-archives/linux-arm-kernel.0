@@ -1,49 +1,44 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:34:02 +0100
-Subject: [PATCH 20/24] xen: update xen_add_to_physmap interface
+Date: Thu, 26 Jul 2012 16:34:03 +0100
+Subject: [PATCH 21/24] arm/v2m: initialize arch_timers even if v2m_timer is
+ not present
 In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-20-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343316846-25860-21-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update struct xen_add_to_physmap to be in sync with Xen's version of the
-structure.
-The size field was introduced by:
-
-changeset:   24164:707d27fe03e7
-user:        Jean Guyader <jean.guyader@eu.citrix.com>
-date:        Fri Nov 18 13:42:08 2011 +0000
-summary:     mm: New XENMEM space, XENMAPSPACE_gmfn_range
-
-According to the comment:
-
-"This new field .size is located in the 16 bits padding between .domid
-and .space in struct xen_add_to_physmap to stay compatible with older
-versions."
-
-This is not true on ARM where there is not padding, but it is valid on
-X86, so introducing size is safe on X86 and it is going to fix the
-interace for ARM.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- include/xen/interface/memory.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-index abbbff0..d8e33a9 100644
---- a/include/xen/interface/memory.h
-+++ b/include/xen/interface/memory.h
-@@ -163,6 +163,9 @@ struct xen_add_to_physmap {
-     /* Which domain to change the mapping for. */
-     domid_t domid;
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index fde26ad..dee1451 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -637,16 +637,17 @@ static void __init v2m_dt_timer_init(void)
+ 	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
+ 	v2m_sysctl_init(of_iomap(node, 0));
  
-+    /* Number of pages to go through for gmfn_range */
-+    uint16_t    size;
+-	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+-	if (WARN_ON(err))
+-		return;
+-	node = of_find_node_by_path(path);
+-	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+ 	if (arch_timer_of_register() != 0)
+ 		twd_local_timer_of_register();
+ 
+ 	if (arch_timer_sched_clock_init() != 0)
+ 		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
 +
-     /* Source mapping space. */
- #define XENMAPSPACE_shared_info 0 /* shared info page */
- #define XENMAPSPACE_grant_table 1 /* grant table page */
++	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
++	if (WARN_ON(err))
++		return;
++	node = of_find_node_by_path(path);
++	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+ }
+ 
+ static struct sys_timer v2m_dt_timer = {
 -- 
 1.7.2.5
