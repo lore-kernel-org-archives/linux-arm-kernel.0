@@ -1,35 +1,28 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 26 Jul 2012 18:35:13 +0800
-Subject: [PATCH v3 0/3] imx: add usbmisc support
-Message-ID: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
+Date: Thu, 26 Jul 2012 18:35:16 +0800
+Subject: [PATCH v3 3/3] ARM: imx6q: clk_register_clkdev usbmisc clock
+In-Reply-To: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
+References: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1343298916-11101-4-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-usbmisc driver handles the SoC specific non-core usb registers.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since last version:
- - build usbmisc drivers into ci13xxx-imx module if it's chosen.
- - interprete properties in common code
- - check wether usbmisc_ops is null
- - dts: enable usbmisc device by default
- - take clk changes as a seperate patch
-
-Richard Zhao (3):
-  USB: chipidea: add imx usbmisc support
-  ARM: dts: imx6q-sabrelite: add usbmisc device
-  ARM: imx6q: clk_register_clkdev usbmisc clock
-
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 +
- .../devicetree/bindings/usb/usbmisc-imx.txt        |   12 ++
- arch/arm/boot/dts/imx6q-sabrelite.dts              |    1 +
- arch/arm/boot/dts/imx6q.dtsi                       |   18 ++-
- arch/arm/mach-imx/clk-imx6q.c                      |    1 +
- drivers/usb/chipidea/Makefile                      |    3 +-
- drivers/usb/chipidea/ci13xxx_imx.c                 |   72 ++++++++-
- drivers/usb/chipidea/usbmisc_imx6q.c               |  155 ++++++++++++++++++++
- 8 files changed, 258 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
- create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
-
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index ea89520..660fcbb 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -405,6 +405,7 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
++	clk_register_clkdev(clk[usboh3], NULL, "2184800.usbmisc");
+ 	clk_register_clkdev(clk[usbphy1], NULL, "20c9000.usbphy");
+ 	clk_register_clkdev(clk[usbphy2], NULL, "20ca000.usbphy");
+ 	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
 -- 
 1.7.9.5
