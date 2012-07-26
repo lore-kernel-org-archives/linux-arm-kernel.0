@@ -1,57 +1,58 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 26 Jul 2012 17:00:14 +0200
-Subject: Current state of AM33xx patches
-In-Reply-To: <501159C3.3020109@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
- <500CEF97.4050207@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
- <501159C3.3020109@gmail.com>
-Message-ID: <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 26 Jul 2012 16:01:14 +0100
+Subject: [PATCH 20/21] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+In-Reply-To: <20120726142825.GK3099@opensource.wolfsonmicro.com>
+References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
+ <1343298534-13611-21-git-send-email-lee.jones@linaro.org>
+ <20120726115055.GD3099@opensource.wolfsonmicro.com>
+ <50114D71.9060700@linaro.org>
+ <20120726142825.GK3099@opensource.wolfsonmicro.com>
+Message-ID: <50115BBA.2020400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26/07/12 15:28, Mark Brown wrote:
+> On Thu, Jul 26, 2012 at 03:00:17PM +0100, Lee Jones wrote:
+>> On 26/07/12 12:50, Mark Brown wrote:
+>
+>>> Yet again no binding documentation....
+>
+>> RFC. ;)
+>
+>> I'll write the documentation when/if the properties are accepted.
+>
+> No, write the documentation.  It's way too much effort to reverse
+> engineer the bindings from the code.
+>
+>>>> +		default :
+>>>> +			codec->ear_cmv = EAR_CMV_UNKNOWN;
+>>>> +			dev_err(dev, "Unsuitable earpiece voltage found in DT\n");
+>
+>>> The platform data code picks a default, can't the DT code do the same?
+>
+>> No, I don't think that it does? The original code returns -EINVAL
+>> unless a value is specified.
+>
+> The code doesn't specify values for the enumeration so it ought to
+> default to EAR_CMV_0_95V if nothing is specified.
 
-Op 26 jul. 2012, om 16:52 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+Ah, I see what you mean. I guess we could compromise and print a warning 
+_and_ fall back to the 0th original emum.
 
-> On 23.07.2012 18:36, N, Mugunthan V wrote:
->>> On 05.07.2012 19:45, N, Mugunthan V wrote:
-> 
->>>> I am working on DT support for cpsw and will be submitting the patch by
->>>> July 20, 2012
->>> 
->>> Just curious - have you made any progress on that yet?
->>> 
->> 
->> I have got the runtime PM support accepted to net-next, will be working on 
->> and submitting DT support by this week.
-> 
-> I got these updates now via mainline, thanks for your work. Could you
-> give me some board code sniplet that makes that driver work for you? I'm
-> asking because I fail to see the "fck" clock that the driver requires.
-> 
-> I'm based on Linus' tree in the middle of the merge window, plus the
-> am335x-upstream-staging branch of
-> git://github.com/hvaibhav/am335x-linux.git - anything else I need to have?
-> 
-> Once I have network up and running, I can finally boot into a shell :)
+>> The original author is keen to have a clear error message in case
+>> users try to specify non-exact values. I'd rather we fail-out than
+>> use incorrect values which would be a great deal harder for a user
+>> to debug.
+>
+> By that argument all the properties should be mandatory but it's only
+> this one IIRC.
 
-With Ajay's usb patches you can easily boot from a usb stick, you'll only need the bootloads to be on mmc or tftp. That's what I have been doing on my beaglebone :)
+This is the only value which the user can pick an obscure value, such as 
+913, thinking they can pick 913mV. I'm happy to fall-back, as long as 
+Ola is too.
 
-I'm going to update https://github.com/beagleboard/kernel/tree/beaglebone-3.6 to use linus' tree when I get a chance to test a build.
-
-regards,
-
-Koen
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
