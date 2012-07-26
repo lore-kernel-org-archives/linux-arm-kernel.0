@@ -1,25 +1,18 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Jul 2012 17:49:24 +0100
-Subject: [PATCH 2/2] ARM: mm: use 5 bits for swapfile type encoding
-In-Reply-To: <1343318468-10412-3-git-send-email-will.deacon@arm.com>
-References: <1343318468-10412-1-git-send-email-will.deacon@arm.com>
- <1343318468-10412-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20120726164924.GD29764@arm.com>
+From: dvrabel@cantab.net (David Vrabel)
+Date: Thu, 26 Jul 2012 17:56:15 +0100
+Subject: [Xen-devel] [PATCH 02/24] xen/arm: hypercalls
+In-Reply-To: <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <501176AF.3000607@cantab.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 05:01:08PM +0100, Will Deacon wrote:
-> Page migration encodes the pfn in the offset field of a swp_entry_t.
-> For LPAE, we support physical addresses of up to 36 bits (due to
-> sparsemem limitations with the size of page flags), requiring 24 bits
-> to represent a pfn. A further 3 bits are used to encode a swp_entry into
-> a pte, leaving 5 bits for the type field. Furthermore, the core code
-> defines MAX_SWAPFILES_SHIFT as 5, so the additional type bit does not
-> get used.
+On 26/07/12 16:33, Stefano Stabellini wrote:
 > 
-> This patch reduces the width of the type field to 5 bits, allowing us
-> to create up to 31 swapfiles of 64GB each.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> + * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
+> + * hypercall tag.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Is this number, 0xea1, assigned to Xen by some external body?
+
+David
