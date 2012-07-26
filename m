@@ -1,35 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Jul 2012 11:57:13 +0000
-Subject: [PATCH 4/8 v2] ARM: EXYNOS5: Add EHCI device from device tree
-In-Reply-To: <1342866729-30460-5-git-send-email-gautam.vivek@samsung.com>
-References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
- <1342866729-30460-5-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <201207261157.14441.arnd@arndb.de>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 27 Jul 2012 07:45:21 +1000
+Subject: PCI mini-summit
+In-Reply-To: <CAErSpo5Ea_Rd2QSUXT13riDgHrkMGiN43+QiFTZYepHi-rg0Vw@mail.gmail.com>
+References: <CAErSpo5Ea_Rd2QSUXT13riDgHrkMGiN43+QiFTZYepHi-rg0Vw@mail.gmail.com>
+Message-ID: <1343339121.2118.5.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 July 2012, Vivek Gautam wrote:
-> @@ -28,6 +29,11 @@ static struct exynos4_ohci_platdata smdk5250_ohci_pdata = {
->         .phy_exit = s5p_usb_phy_exit,
->  };
->  
-> +static struct s5p_ehci_platdata smdk5250_ehci_pdata = {
-> +       .phy_init = s5p_usb_phy_init,
-> +       .phy_exit = s5p_usb_phy_exit,
-> +};
-> +
->  /*
->   * The following lookup table is used to override device names when devices
->   * are registered from device tree. This is temporarily added to enable
+On Tue, 2012-07-24 at 21:33 -0600, Bjorn Helgaas wrote:
+> We're planning a PCI mini-summit on Tuesday, August 28, in San Diego.
+> If you'd like an invitation, let me know.
+> 
+> We haven't drafted an agenda yet, but based on ideas we've heard so
+> far, we'll likely talk about some of the following topics:
+> 
+>       Host bridge hotplug
+>       PCI hotplug core rework
+>       VFIO v2 for KVM
+>       Dynamic resource assignment
+>       SRIOV
+>           Management: driver (module parms) vs core (sysfs?)
+>           Dynamic/static: changing number of VFs requires driver cooperation
+>       Candidates for unification/moving from arch code to the core:
+>           res->parent usage
+>           Claiming resources
+>           Unassigned BAR detection
+>           ECAM (a.k.a. MMCONFIG)
+>           Domain (a.k.a. PCI segment) support
+>           MPS config
+>           MPS safety with respect to hotplug
+> 
+> I've also heard that PCI-on-ARM may be of interest, so if you want to
+> talk about that and possibly add some topics, let me know.
 
-I'm a bit confused of the purpose of setting the function pointers here
-when the pointers are always to the same s5p_usb_phy_init/s5p_usb_phy_exit
-identifiers, but you have different definitions of those functions
-depending on which platforms you are building for.
+We don't necessarily need a firm agenda, we can put the list of topics
+and pick them in time with a hourly stop to decide whether to move on to
+a different one.
 
-What is the idea here? Are you going to unify the three definitions of
-s5p_usb_phy_init, or is that function going away eventually when we
-get to the point of building exynos/s5p/s3c64xx into the same kernel
-binary?
+Unless some people want to actually present something in which case we
+can allocate them a slot (those people need to let us know asap).
 
-	Arnd
+Cheers,
+Ben.
