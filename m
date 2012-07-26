@@ -1,355 +1,204 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:28 +0100
-Subject: [PATCH 00/24] Introduce Xen support on ARM
-Message-ID: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+Date: Thu, 26 Jul 2012 16:33:50 +0100
+Subject: [PATCH 08/24] xen/arm: Introduce xen_pfn_t for pfn and mfn types
+In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+Message-ID: <1343316846-25860-8-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series implements Xen support for ARMv7 with virtualization
-extensions.  It allows a Linux guest to boot as dom0 and
-as domU on Xen on ARM. PV console, disk and network frontends and
-backends are all working correctly.
+All the original Xen headers have xen_pfn_t as mfn and pfn type, however
+when they have been imported in Linux, xen_pfn_t has been replaced with
+unsigned long. That might work for x86 and ia64 but it does not for arm.
+Bring back xen_pfn_t and let each architecture define xen_pfn_t as they
+see fit.
 
-It has been tested on a Versatile Express Cortex A15 emulator, using the
-latest Xen, and a simple ad-hoc tool to build guest domains
-(marc.info/?l=xen-devel&m=134089788016546).
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/include/asm/xen/interface.h  |    2 ++
+ arch/ia64/include/asm/xen/interface.h |    2 +-
+ arch/x86/include/asm/xen/interface.h  |    2 ++
+ include/xen/interface/grant_table.h   |    4 ++--
+ include/xen/interface/memory.h        |    6 +++---
+ include/xen/interface/platform.h      |    4 ++--
+ include/xen/interface/xen.h           |    6 +++---
+ include/xen/privcmd.h                 |    2 --
+ 8 files changed, 15 insertions(+), 13 deletions(-)
 
-The patch marked with [HACK] shouldn't be applied and is part of the
-series only because it is needed to create domUs.
-
-I am also attaching to this email the dts'es that I am currently using
-for dom0 and domU: vexpress-v2p-ca15-tc1.dts is the dts used for dom0
-and it is passed to Linux by Xen, while vexpress-virt.dts is the dts
-used for other domUs and it is appended in binary form to the guest
-kernel image. I am not sure where they are supposed to live yet, so I am
-just attaching them here so that people can actually try out this series
-if they want to.
-
-Comments are very welcome!
-
-
-Ian Campbell (2):
-      ARM: enable earlyprintk=xen
-      [HACK] xen/arm: implement xen_remap_domain_mfn_range
-
-Stefano Stabellini (22):
-      arm: initial Xen support
-      xen/arm: hypercalls
-      xen/arm: page.h definitions
-      xen/arm: sync_bitops
-      xen/arm: empty implementation of grant_table arch specific functions
-      xen: missing includes
-      xen/arm: Xen detection and shared_info page mapping
-      xen/arm: Introduce xen_pfn_t for pfn and mfn types
-      xen/arm: compile and run xenbus
-      xen: do not compile manage, balloon, pci, acpi and cpu_hotplug on ARM
-      xen/arm: introduce CONFIG_XEN on ARM
-      xen/arm: Introduce xen_guest_init
-      xen/arm: get privilege status
-      xen/arm: initialize grant_table on ARM
-      xen/arm: receive Xen events on ARM
-      xen/arm: implement alloc/free_xenballooned_pages with alloc_pages/kfree
-      xen: allow privcmd for HVM guests
-      xen/arm: compile blkfront and blkback
-      xen/arm: compile netback
-      xen: update xen_add_to_physmap interface
-      arm/v2m: initialize arch_timers even if v2m_timer is not present
-      hvc_xen: allow dom0_write_console for HVM guests
-
- arch/arm/Kconfig                           |   10 ++
- arch/arm/Makefile                          |    1 +
- arch/arm/include/asm/hypervisor.h          |    6 +
- arch/arm/include/asm/sync_bitops.h         |   17 ++
- arch/arm/include/asm/xen/hypercall.h       |   69 ++++++++
- arch/arm/include/asm/xen/hypervisor.h      |   19 +++
- arch/arm/include/asm/xen/interface.h       |   66 ++++++++
- arch/arm/include/asm/xen/page.h            |   77 +++++++++
- arch/arm/kernel/early_printk.c             |   11 ++-
- arch/arm/mach-vexpress/v2m.c               |   11 +-
- arch/arm/xen/Makefile                      |    1 +
- arch/arm/xen/enlighten.c                   |  244 ++++++++++++++++++++++++++++
- arch/arm/xen/grant-table.c                 |   53 ++++++
- arch/arm/xen/hypercall.S                   |   65 ++++++++
- arch/ia64/include/asm/xen/interface.h      |    2 +-
- arch/x86/include/asm/xen/interface.h       |    2 +
- arch/x86/xen/enlighten.c                   |    9 +
- arch/x86/xen/irq.c                         |    1 +
- arch/x86/xen/xen-ops.h                     |    1 -
- drivers/block/xen-blkback/blkback.c        |    1 +
- drivers/net/xen-netback/netback.c          |    1 +
- drivers/net/xen-netfront.c                 |    1 +
- drivers/tty/hvc/hvc_xen.c                  |   14 +-
- drivers/xen/Makefile                       |    9 +-
- drivers/xen/events.c                       |   18 ++-
- drivers/xen/grant-table.c                  |    3 +-
- drivers/xen/privcmd.c                      |   20 +--
- drivers/xen/xenbus/xenbus_comms.c          |    2 +-
- drivers/xen/xenbus/xenbus_probe.c          |   27 ++--
- drivers/xen/xenbus/xenbus_probe_frontend.c |    1 +
- drivers/xen/xenbus/xenbus_xs.c             |    1 +
- drivers/xen/xenfs/super.c                  |    7 +
- include/xen/events.h                       |    2 +
- include/xen/interface/features.h           |    3 +
- include/xen/interface/grant_table.h        |    4 +-
- include/xen/interface/io/protocols.h       |    3 +
- include/xen/interface/memory.h             |   19 ++-
- include/xen/interface/platform.h           |    4 +-
- include/xen/interface/xen.h                |    9 +-
- include/xen/privcmd.h                      |    3 +-
- include/xen/xen.h                          |    4 +-
- 41 files changed, 763 insertions(+), 58 deletions(-)
-
-
-A branch based on 3.5-rc7 is available here:
-
-git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git 3.5-rc7-arm-1
-
-Cheers,
-
-Stefano
--------------- next part --------------
-/*
- * ARM Ltd. Versatile Express
- *
- * CoreTile Express A15x2 (version with Test Chip 1)
- * Cortex-A15 MPCore (V2P-CA15)
- *
- * HBI-0237A
- */
-
-/dts-v1/;
-
-/ {
-	model = "V2P-CA15";
-	arm,hbi = <0x237>;
-	compatible = "arm,vexpress,v2p-ca15,tc1", "arm,vexpress,v2p-ca15", "arm,vexpress";
-
-	#address-cells = <1>;
-	#size-cells = <1>;
-
-	interrupt-parent = <&gic>;
-
-	chosen {
-                 bootargs = "dom0_mem=128M";
-                 xen,dom0-bootargs = "earlyprintk=xenboot console=ttyAMA1 root=/dev/mmcblk0 debug rw";
-	};
-
-
-	aliases {
-		serial0 = &v2m_serial0;
-		serial1 = &v2m_serial1;
-		serial2 = &v2m_serial2;
-		serial3 = &v2m_serial3;
-		i2c0 = &v2m_i2c_dvi;
-		i2c1 = &v2m_i2c_pcie;
-	};
-
-	cpus {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		cpu at 0 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <0>;
-		};
-	};
-
-	memory {
-		device_type = "memory";
-		reg = <0x80000000 0x80000000>;
-	};
-
-	gic: interrupt-controller at 2c001000 {
-		compatible = "arm,cortex-a9-gic";
-		#interrupt-cells = <3>;
-		#address-cells = <0>;
-		interrupt-controller;
-		reg = <0x2c001000 0x1000>,
-		      <0x2c002000 0x100>;
-	};
-
-	pmu {
-		compatible = "arm,cortex-a9-pmu";
-		interrupts = <0 68 4>,
-			     <0 69 4>;
-	};
-
-	xen {
-		compatible = "arm,xen";
-		reg = <0xb0000000 0x20000>;
-		interrupts = <1 15 0xf08>;
-	};
-
-	motherboard {
-		ranges = <0 0 0x08000000 0x04000000>,
-			 <1 0 0x14000000 0x04000000>,
-			 <2 0 0x18000000 0x04000000>,
-			 <3 0 0x1c000000 0x04000000>,
-			 <4 0 0x0c000000 0x04000000>,
-			 <5 0 0x10000000 0x04000000>;
-
-		interrupt-map-mask = <0 0 63>;
-		interrupt-map = <0 0  0 &gic 0  0 4>,
-				<0 0  1 &gic 0  1 4>,
-				<0 0  2 &gic 0  2 4>,
-				<0 0  3 &gic 0  3 4>,
-				<0 0  4 &gic 0  4 4>,
-				<0 0  5 &gic 0  5 4>,
-				<0 0  6 &gic 0  6 4>,
-				<0 0  7 &gic 0  7 4>,
-				<0 0  8 &gic 0  8 4>,
-				<0 0  9 &gic 0  9 4>,
-				<0 0 10 &gic 0 10 4>,
-				<0 0 11 &gic 0 11 4>,
-				<0 0 12 &gic 0 12 4>,
-				<0 0 13 &gic 0 13 4>,
-				<0 0 14 &gic 0 14 4>,
-				<0 0 15 &gic 0 15 4>,
-				<0 0 16 &gic 0 16 4>,
-				<0 0 17 &gic 0 17 4>,
-				<0 0 18 &gic 0 18 4>,
-				<0 0 19 &gic 0 19 4>,
-				<0 0 20 &gic 0 20 4>,
-				<0 0 21 &gic 0 21 4>,
-				<0 0 22 &gic 0 22 4>,
-				<0 0 23 &gic 0 23 4>,
-				<0 0 24 &gic 0 24 4>,
-				<0 0 25 &gic 0 25 4>,
-				<0 0 26 &gic 0 26 4>,
-				<0 0 27 &gic 0 27 4>,
-				<0 0 28 &gic 0 28 4>,
-				<0 0 29 &gic 0 29 4>,
-				<0 0 30 &gic 0 30 4>,
-				<0 0 31 &gic 0 31 4>,
-				<0 0 32 &gic 0 32 4>,
-				<0 0 33 &gic 0 33 4>,
-				<0 0 34 &gic 0 34 4>,
-				<0 0 35 &gic 0 35 4>,
-				<0 0 36 &gic 0 36 4>,
-				<0 0 37 &gic 0 37 4>,
-				<0 0 38 &gic 0 38 4>,
-				<0 0 39 &gic 0 39 4>,
-				<0 0 40 &gic 0 40 4>,
-				<0 0 41 &gic 0 41 4>,
-				<0 0 42 &gic 0 42 4>;
-	};
-};
-
-/include/ "vexpress-v2m-rs1-rtsm.dtsi"
--------------- next part --------------
-/*
- * ARM Ltd. Versatile Express
- *
- * ARM Envelope Model v7A (single CPU).
- */
-
-/dts-v1/;
-
-/include/ "skeleton.dtsi"
-
-/ {
-	model = "V2P-AEMv7A";
-	compatible = "arm,vexpress,v2p-aem,v7a", "arm,vexpress,v2p-aem", "arm,vexpress";
-	interrupt-parent = <&gic>;
-
-        chosen {
-                bootargs = "earlyprintk=xen debug loglevel=9 console=hvc0 root=/dev/xvda";
-        };
-
-	cpus {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		cpu at 0 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <0>;
-		};
-	};
-
-	memory {
-		device_type = "memory";
-		reg = <0x80000000 0x08000000>;
-	};
-
-	gic: interrupt-controller at 2c001000 {
-		compatible = "arm,cortex-a9-gic";
-		#interrupt-cells = <3>;
-		#address-cells = <0>;
-		interrupt-controller;
-		reg = <0x2c001000 0x1000>,
-		      <0x2c002000 0x100>;
-	};
-
-	timer {
-		compatible = "arm,armv7-timer";
-		interrupts = <1 13 0xf08>,
-			     <1 14 0xf08>,
-			     <1 11 0xf08>,
-			     <1 10 0xf08>;
-	};
-
-	xen {
-		compatible = "arm,xen";
-		reg = <0xb0000000 0x20000>;
-		interrupts = <1 15 0xf08>;
-	};
-
-	motherboard {
-		ranges = <0 0 0x08000000 0x04000000>,
-			 <1 0 0x14000000 0x04000000>,
-			 <2 0 0x18000000 0x04000000>,
-			 <3 0 0x1c000000 0x04000000>,
-			 <4 0 0x0c000000 0x04000000>,
-			 <5 0 0x10000000 0x04000000>;
-
-		interrupt-map-mask = <0 0 63>;
-		interrupt-map = <0 0  0 &gic 0  0 4>,
-				<0 0  1 &gic 0  1 4>,
-				<0 0  2 &gic 0  2 4>,
-				<0 0  3 &gic 0  3 4>,
-				<0 0  4 &gic 0  4 4>,
-				<0 0  5 &gic 0  5 4>,
-				<0 0  6 &gic 0  6 4>,
-				<0 0  7 &gic 0  7 4>,
-				<0 0  8 &gic 0  8 4>,
-				<0 0  9 &gic 0  9 4>,
-				<0 0 10 &gic 0 10 4>,
-				<0 0 11 &gic 0 11 4>,
-				<0 0 12 &gic 0 12 4>,
-				<0 0 13 &gic 0 13 4>,
-				<0 0 14 &gic 0 14 4>,
-				<0 0 15 &gic 0 15 4>,
-				<0 0 16 &gic 0 16 4>,
-				<0 0 17 &gic 0 17 4>,
-				<0 0 18 &gic 0 18 4>,
-				<0 0 19 &gic 0 19 4>,
-				<0 0 20 &gic 0 20 4>,
-				<0 0 21 &gic 0 21 4>,
-				<0 0 22 &gic 0 22 4>,
-				<0 0 23 &gic 0 23 4>,
-				<0 0 24 &gic 0 24 4>,
-				<0 0 25 &gic 0 25 4>,
-				<0 0 26 &gic 0 26 4>,
-				<0 0 27 &gic 0 27 4>,
-				<0 0 28 &gic 0 28 4>,
-				<0 0 29 &gic 0 29 4>,
-				<0 0 30 &gic 0 30 4>,
-				<0 0 31 &gic 0 31 4>,
-				<0 0 32 &gic 0 32 4>,
-				<0 0 33 &gic 0 33 4>,
-				<0 0 34 &gic 0 34 4>,
-				<0 0 35 &gic 0 35 4>,
-				<0 0 36 &gic 0 36 4>,
-				<0 0 37 &gic 0 37 4>,
-				<0 0 38 &gic 0 38 4>,
-				<0 0 39 &gic 0 39 4>,
-				<0 0 40 &gic 0 40 4>,
-				<0 0 41 &gic 0 41 4>,
-				<0 0 42 &gic 0 42 4>;
-	};
-};
-
-/* /include/ "vexpress-v2m-rs1-rtsm.dtsi" */
+diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+index 6c3ab59..76b1ebe 100644
+--- a/arch/arm/include/asm/xen/interface.h
++++ b/arch/arm/include/asm/xen/interface.h
+@@ -25,6 +25,7 @@
+ 	} while (0)
+ 
+ #ifndef __ASSEMBLY__
++typedef uint64_t xen_pfn_t;
+ /* Guest handles for primitive C types. */
+ __DEFINE_GUEST_HANDLE(uchar, unsigned char);
+ __DEFINE_GUEST_HANDLE(uint,  unsigned int);
+@@ -35,6 +36,7 @@ DEFINE_GUEST_HANDLE(long);
+ DEFINE_GUEST_HANDLE(void);
+ DEFINE_GUEST_HANDLE(uint64_t);
+ DEFINE_GUEST_HANDLE(uint32_t);
++DEFINE_GUEST_HANDLE(xen_pfn_t);
+ 
+ /* Maximum number of virtual CPUs in multi-processor guests. */
+ #define MAX_VIRT_CPUS 1
+diff --git a/arch/ia64/include/asm/xen/interface.h b/arch/ia64/include/asm/xen/interface.h
+index 09d5f7f..9efa068 100644
+--- a/arch/ia64/include/asm/xen/interface.h
++++ b/arch/ia64/include/asm/xen/interface.h
+@@ -67,6 +67,7 @@
+ #define set_xen_guest_handle(hnd, val)	do { (hnd).p = val; } while (0)
+ 
+ #ifndef __ASSEMBLY__
++typedef unsigned long xen_pfn_t;
+ /* Guest handles for primitive C types. */
+ __DEFINE_GUEST_HANDLE(uchar, unsigned char);
+ __DEFINE_GUEST_HANDLE(uint, unsigned int);
+@@ -79,7 +80,6 @@ DEFINE_GUEST_HANDLE(void);
+ DEFINE_GUEST_HANDLE(uint64_t);
+ DEFINE_GUEST_HANDLE(uint32_t);
+ 
+-typedef unsigned long xen_pfn_t;
+ DEFINE_GUEST_HANDLE(xen_pfn_t);
+ #define PRI_xen_pfn	"lx"
+ #endif
+diff --git a/arch/x86/include/asm/xen/interface.h b/arch/x86/include/asm/xen/interface.h
+index cbf0c9d..24c1b07 100644
+--- a/arch/x86/include/asm/xen/interface.h
++++ b/arch/x86/include/asm/xen/interface.h
+@@ -47,6 +47,7 @@
+ #endif
+ 
+ #ifndef __ASSEMBLY__
++typedef unsigned long xen_pfn_t;
+ /* Guest handles for primitive C types. */
+ __DEFINE_GUEST_HANDLE(uchar, unsigned char);
+ __DEFINE_GUEST_HANDLE(uint,  unsigned int);
+@@ -57,6 +58,7 @@ DEFINE_GUEST_HANDLE(long);
+ DEFINE_GUEST_HANDLE(void);
+ DEFINE_GUEST_HANDLE(uint64_t);
+ DEFINE_GUEST_HANDLE(uint32_t);
++DEFINE_GUEST_HANDLE(xen_pfn_t);
+ #endif
+ 
+ #ifndef HYPERVISOR_VIRT_START
+diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
+index a17d844..7da811b 100644
+--- a/include/xen/interface/grant_table.h
++++ b/include/xen/interface/grant_table.h
+@@ -338,7 +338,7 @@ DEFINE_GUEST_HANDLE_STRUCT(gnttab_dump_table);
+ #define GNTTABOP_transfer                4
+ struct gnttab_transfer {
+     /* IN parameters. */
+-    unsigned long mfn;
++    xen_pfn_t mfn;
+     domid_t       domid;
+     grant_ref_t   ref;
+     /* OUT parameters. */
+@@ -375,7 +375,7 @@ struct gnttab_copy {
+ 	struct {
+ 		union {
+ 			grant_ref_t ref;
+-			unsigned long   gmfn;
++			xen_pfn_t   gmfn;
+ 		} u;
+ 		domid_t  domid;
+ 		uint16_t offset;
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index eac3ce1..abbbff0 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -31,7 +31,7 @@ struct xen_memory_reservation {
+      *   OUT: GMFN bases of extents that were allocated
+      *   (NB. This command also updates the mach_to_phys translation table)
+      */
+-    GUEST_HANDLE(ulong) extent_start;
++    GUEST_HANDLE(xen_pfn_t) extent_start;
+ 
+     /* Number of extents, and size/alignment of each (2^extent_order pages). */
+     unsigned long  nr_extents;
+@@ -130,7 +130,7 @@ struct xen_machphys_mfn_list {
+      * any large discontiguities in the machine address space, 2MB gaps in
+      * the machphys table will be represented by an MFN base of zero.
+      */
+-    GUEST_HANDLE(ulong) extent_start;
++    GUEST_HANDLE(xen_pfn_t) extent_start;
+ 
+     /*
+      * Number of extents written to the above array. This will be smaller
+@@ -172,7 +172,7 @@ struct xen_add_to_physmap {
+     unsigned long idx;
+ 
+     /* GPFN where the source mapping page should appear. */
+-    unsigned long gpfn;
++    xen_pfn_t gpfn;
+ };
+ DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap);
+ 
+diff --git a/include/xen/interface/platform.h b/include/xen/interface/platform.h
+index 486653f..0bea470 100644
+--- a/include/xen/interface/platform.h
++++ b/include/xen/interface/platform.h
+@@ -54,7 +54,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime_t);
+ #define XENPF_add_memtype         31
+ struct xenpf_add_memtype {
+ 	/* IN variables. */
+-	unsigned long mfn;
++	xen_pfn_t mfn;
+ 	uint64_t nr_mfns;
+ 	uint32_t type;
+ 	/* OUT variables. */
+@@ -84,7 +84,7 @@ struct xenpf_read_memtype {
+ 	/* IN variables. */
+ 	uint32_t reg;
+ 	/* OUT variables. */
+-	unsigned long mfn;
++	xen_pfn_t mfn;
+ 	uint64_t nr_mfns;
+ 	uint32_t type;
+ };
+diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
+index 4f29f33..d59a991 100644
+--- a/include/xen/interface/xen.h
++++ b/include/xen/interface/xen.h
+@@ -192,7 +192,7 @@ struct mmuext_op {
+ 	unsigned int cmd;
+ 	union {
+ 		/* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
+-		unsigned long mfn;
++		xen_pfn_t mfn;
+ 		/* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
+ 		unsigned long linear_addr;
+ 	} arg1;
+@@ -432,11 +432,11 @@ struct start_info {
+ 	unsigned long nr_pages;     /* Total pages allocated to this domain.  */
+ 	unsigned long shared_info;  /* MACHINE address of shared info struct. */
+ 	uint32_t flags;             /* SIF_xxx flags.                         */
+-	unsigned long store_mfn;    /* MACHINE page number of shared page.    */
++	xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
+ 	uint32_t store_evtchn;      /* Event channel for store communication. */
+ 	union {
+ 		struct {
+-			unsigned long mfn;  /* MACHINE page number of console page.   */
++			xen_pfn_t mfn;      /* MACHINE page number of console page.   */
+ 			uint32_t  evtchn;   /* Event channel for console page.        */
+ 		} domU;
+ 		struct {
+diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
+index 4d58881..45c1aa1 100644
+--- a/include/xen/privcmd.h
++++ b/include/xen/privcmd.h
+@@ -37,8 +37,6 @@
+ #include <linux/compiler.h>
+ #include <xen/interface/xen.h>
+ 
+-typedef unsigned long xen_pfn_t;
+-
+ struct privcmd_hypercall {
+ 	__u64 op;
+ 	__u64 arg[5];
+-- 
+1.7.2.5
