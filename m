@@ -1,93 +1,164 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:49 +0100
-Subject: [PATCH 07/24] xen/arm: Xen detection and shared_info page mapping
+Date: Thu, 26 Jul 2012 16:33:44 +0100
+Subject: [PATCH 02/24] xen/arm: hypercalls
 In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for a "/xen" node in the device tree, if it is present set
-xen_domain_type to XEN_HVM_DOMAIN and continue initialization.
+Use r12 to pass the hypercall number to the hypervisor.
 
-Map the real shared info page using XENMEM_add_to_physmap with
-XENMAPSPACE_shared_info.
+We need a register to pass the hypercall number because we might not
+know it at compile time and HVC only takes an immediate argument.
+
+Among the available registers r12 seems to be the best choice because it
+is defined as "intra-procedure call scratch register".
+
+Use the ISS to pass an hypervisor specific tag.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c |   56 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 56 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++++++++++++
+ arch/arm/xen/Makefile                |    2 +-
+ arch/arm/xen/hypercall.S             |   65 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 116 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/include/asm/xen/hypercall.h
+ create mode 100644 arch/arm/xen/hypercall.S
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index d27c2a6..8c923af 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -5,6 +5,9 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
- 
- struct start_info _xen_start_info;
- struct start_info *xen_start_info = &_xen_start_info;
-@@ -33,3 +36,56 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
- 	return -ENOSYS;
- }
- EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
-+
-+/*
-+ * == Xen Device Tree format ==
-+ * - /xen node;
-+ * - compatible "arm,xen";
-+ * - one interrupt for Xen event notifications;
-+ * - one memory region to map the grant_table.
+diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
+new file mode 100644
+index 0000000..4ac0624
+--- /dev/null
++++ b/arch/arm/include/asm/xen/hypercall.h
+@@ -0,0 +1,50 @@
++/******************************************************************************
++ * hypercall.h
++ *
++ * Linux-specific hypervisor handling.
++ *
++ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version 2
++ * as published by the Free Software Foundation; or, when distributed
++ * separately from the Linux kernel or incorporated into other
++ * software packages, subject to the following license:
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this source file (the "Software"), to deal in the Software without
++ * restriction, including without limitation the rights to use, copy, modify,
++ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
++ * and to permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
 + */
-+static int __init xen_guest_init(void)
-+{
-+	int cpu;
-+	struct xen_add_to_physmap xatp;
-+	static struct shared_info *shared_info_page = 0;
-+	struct device_node *node;
 +
-+	node = of_find_compatible_node(NULL, NULL, "arm,xen");
-+	if (!node) {
-+		pr_info("No Xen support\n");
-+		return 0;
-+	}
-+	xen_domain_type = XEN_HVM_DOMAIN;
++#ifndef _ASM_ARM_XEN_HYPERCALL_H
++#define _ASM_ARM_XEN_HYPERCALL_H
 +
-+	if (!shared_info_page)
-+		shared_info_page = (struct shared_info *)
-+			get_zeroed_page(GFP_KERNEL);
-+	if (!shared_info_page) {
-+		pr_err("not enough memory");
-+		return -ENOMEM;
-+	}
-+	xatp.domid = DOMID_SELF;
-+	xatp.idx = 0;
-+	xatp.space = XENMAPSPACE_shared_info;
-+	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
-+	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
-+		BUG();
++#include <xen/interface/xen.h>
 +
-+	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
++long privcmd_call(unsigned call, unsigned long a1,
++		unsigned long a2, unsigned long a3,
++		unsigned long a4, unsigned long a5);
++int HYPERVISOR_xen_version(int cmd, void *arg);
++int HYPERVISOR_console_io(int cmd, int count, char *str);
++int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
++int HYPERVISOR_sched_op(int cmd, void *arg);
++int HYPERVISOR_event_channel_op(int cmd, void *arg);
++unsigned long HYPERVISOR_hvm_op(int op, void *arg);
++int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
++int HYPERVISOR_physdev_op(int cmd, void *arg);
 +
-+	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
-+	 * page, we use it in the event channel upcall and in some pvclock
-+	 * related functions. We don't need the vcpu_info placement
-+	 * optimizations because we don't use any pv_mmu or pv_irq op on
-+	 * HVM.
-+	 * When xen_hvm_init_shared_info is run at boot time only vcpu 0 is
-+	 * online but xen_hvm_init_shared_info is run at resume time too and
-+	 * in that case multiple vcpus might be online. */
-+	for_each_online_cpu(cpu) {
-+		per_cpu(xen_vcpu, cpu) =
-+			&HYPERVISOR_shared_info->vcpu_info[cpu];
-+	}
-+	return 0;
-+}
-+core_initcall(xen_guest_init);
++#endif /* _ASM_ARM_XEN_HYPERCALL_H */
+diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+index 0bad594..b9d6acc 100644
+--- a/arch/arm/xen/Makefile
++++ b/arch/arm/xen/Makefile
+@@ -1 +1 @@
+-obj-y		:= enlighten.o
++obj-y		:= enlighten.o hypercall.o
+diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+new file mode 100644
+index 0000000..038cc5b
+--- /dev/null
++++ b/arch/arm/xen/hypercall.S
+@@ -0,0 +1,65 @@
++/******************************************************************************
++ * hypercall.S
++ *
++ * Xen hypercall wrappers
++ *
++ * The Xen hypercall calling convention is very similar to the ARM
++ * procedure calling convention: the first paramter is passed in r0, the
++ * second in r1, the third in r2 and the third in r3. Considering that
++ * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
++ * in r4, differently from the procedure calling convention of using the
++ * stack for that case.
++ *
++ * The hypercall number is passed in r12.
++ *
++ * The return value is in r0.
++ *
++ * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
++ * hypercall tag.
++ *
++ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <xen/interface/xen.h>
++
++
++/* HVC 0xEA1 */
++#ifdef CONFIG_THUMB2_KERNEL
++#define xen_hvc .word 0xf7e08ea1
++#else
++#define xen_hvc .word 0xe140ea71
++#endif
++
++/* We need to save and restore r4, because Xen clobbers it. */
++#define HYPERCALL(hypercall)			\
++ENTRY(HYPERVISOR_##hypercall)			\
++	mov r12, #__HYPERVISOR_##hypercall;	\
++	xen_hvc;							\
++	mov pc, lr;							\
++ENDPROC(HYPERVISOR_##hypercall)
++
++                .text
++
++HYPERCALL(xen_version);
++HYPERCALL(console_io);
++HYPERCALL(grant_table_op);
++HYPERCALL(sched_op);
++HYPERCALL(event_channel_op);
++HYPERCALL(hvm_op);
++HYPERCALL(memory_op);
++HYPERCALL(physdev_op);
++
++ENTRY(privcmd_call)
++	stmdb	sp!, {r4}
++	mov r12, r0
++	mov r0, r1
++	mov r1, r2
++	mov r2, r3
++	ldr r3, [sp, #8]
++	ldr r4, [sp, #4]
++	xen_hvc
++	pop {r4}
++	mov pc, lr
++ENDPROC(privcmd_call);
 -- 
 1.7.2.5
