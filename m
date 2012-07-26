@@ -1,25 +1,33 @@
-From: rvaswani@codeaurora.org (rvaswani at codeaurora.org)
-Date: Thu, 26 Jul 2012 12:18:41 -0700 (PDT)
-Subject: [DT] API to determine if interrupt is PPI or SPI ?
-Message-ID: <53a41d02c4c4c24bdab47667183891bf.squirrel@www.codeaurora.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 26 Jul 2012 15:19:50 -0400
+Subject: [PATCH 02/24] xen/arm: hypercalls
+In-Reply-To: <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <50119856.2020206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Stefano,
 
-We can specify the interrupt information in the device tree using the arm
-gic convention.
-Is there an API to read directly the 1st cell and determine if an
-interrupt is a PPI or a SPI ? This information is directly relevant to the
-driver because it needs to call request_irq or request_percpu_irq based on
-this data.
+On 07/26/2012 11:33 AM, Stefano Stabellini wrote:
+> Use r12 to pass the hypercall number to the hypervisor.
+> 
+> We need a register to pass the hypercall number because we might not
+> know it at compile time and HVC only takes an immediate argument.
 
-How should this be done ideally ?
+You're not going to JIT assemble the appropriate HVC instruction? Darn.
 
-Thanks,
-Rohit
+How many call numbers are there, though? 8? It seems like it'd be
+reasonable to take the approach that seems to be favored for MRC/MCR
+instructions, using a function containing switch statement that chooses
+between several inline assembly instructions based off an enum passed to
+the function. See for example arch_timer_reg_read in
+arch/arm/kernel/arch_timer.c.
+
+Regards,
+Christopher
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
---
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
