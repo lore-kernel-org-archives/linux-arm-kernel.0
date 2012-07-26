@@ -1,135 +1,153 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 26 Jul 2012 21:16:22 +0200
-Subject: [PATCH v2 2/7] MMC: pxa-mci: add DT bindings
+Date: Thu, 26 Jul 2012 21:16:24 +0200
+Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
 In-Reply-To: <1343330187-20049-1-git-send-email-zonque@gmail.com>
 References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343330187-20049-3-git-send-email-zonque@gmail.com>
+Message-ID: <1343330187-20049-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Chris Ball <cjb@laptop.org>
----
- Documentation/devicetree/bindings/mmc/pxa-mmc.txt | 25 +++++++++++
- drivers/mmc/host/pxamci.c                         | 52 +++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+Properly register on-chip interrupt using the irqdomain logic. The
+number of interrupts is taken from the devicetree node.
 
-diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-new file mode 100644
-index 0000000..b7025de
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-@@ -0,0 +1,25 @@
-+* PXA MMC drivers
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ arch/arm/mach-pxa/irq.c    | 73 ++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa3xx.c | 17 +++++++++--
+ 2 files changed, 88 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 5dae15e..7753d09 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -17,6 +17,8 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ #include <asm/exception.h>
+ 
+@@ -202,3 +204,74 @@ struct syscore_ops pxa_irq_syscore_ops = {
+ 	.suspend	= pxa_irq_suspend,
+ 	.resume		= pxa_irq_resume,
+ };
 +
-+Driver bindings for the PXA MCI (MMC/SDIO) interfaces
++#ifdef CONFIG_OF
++static struct irq_domain *pxa_irq_domain;
 +
-+Required properties:
-+- compatible: Should be "marvell,pxa-mmc".
-+- vmmc-supply: A regulator for VMMC
++static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
++		       irq_hw_number_t hw)
++{
++	int irq, i = hw % 32;
++	void __iomem *base = irq_base(hw / 32);
 +
-+Optional properties:
-+- marvell,detect-delay-ms: sets the detection delay timeout in ms.
-+- marvell,gpio-power: GPIO spec for the card power enable pin
++	/* initialize interrupt priority */
++	if (cpu_has_ipr())
++		__raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
 +
-+This file documents differences between the core properties in mmc.txt
-+and the properties used by the pxa-mmc driver.
++	irq = PXA_IRQ(virq);
++	irq_set_chip_and_handler(irq, &pxa_internal_irq_chip,
++				 handle_level_irq);
++	irq_set_chip_data(virq, base);
++	set_irq_flags(virq, IRQF_VALID);
 +
-+Examples:
++	return 0;
++}
 +
-+mmc0: mmc at 41100000 {
-+	compatible = "marvell,pxa-mmc";
-+	reg = <0x41100000 0x1000>;
-+	interrupts = <23>;
-+	cd-gpios = <&gpio 23 0>;
-+	wp-gpios = <&gpio 24 0>;
++static struct irq_domain_ops pxa_irq_ops = {
++	.map    = pxa_irq_map,
++	.xlate  = irq_domain_xlate_onecell,
 +};
 +
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index cb2dc0e..11df800 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -30,6 +30,9 @@
- #include <linux/regulator/consumer.h>
- #include <linux/gpio.h>
- #include <linux/gfp.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_device.h>
++static const struct of_device_id intc_ids[] __initconst = {
++	{ .compatible = "marvell,pxa-intc", .data = NULL },
++	{}
++};
++
++void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
++{
++	struct device_node *node;
++	const struct of_device_id *of_id;
++	struct pxa_intc_conf *conf;
++	int nr_irqs, irq_base, ret;
++
++	node = of_find_matching_node(NULL, intc_ids);
++	if (!node) {
++		pr_err("Failed to find interrupt controller in arch-pxa\n");
++		return;
++	}
++	of_id = of_match_node(intc_ids, node);
++	conf = of_id->data;
++
++	ret = of_property_read_u32(node, "mrvl,intc-nr-irqs", &nr_irqs);
++	if (ret) {
++		pr_err("Not found mrvl,intc-nr-irqs property\n");
++		return;
++	}
++
++	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
++	if (irq_base < 0) {
++		pr_err("Failed to allocate IRQ numbers\n");
++		return;
++	}
++
++	pxa_irq_domain = irq_domain_add_legacy(node, nr_irqs, 0, 0,
++					       &pxa_irq_ops, NULL);
++	if (!pxa_irq_domain)
++		panic("Unable to add PXA IRQ domain\n");
++
++	irq_set_default_host(pxa_irq_domain);
++	pxa_init_irq(nr_irqs, fn);
++
++	return;
++}
++#endif /* CONFIG_OF */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index dffb7e8..1827d3c 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -40,6 +40,8 @@
+ #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
+ #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
  
- #include <asm/sizes.h>
- 
-@@ -573,6 +576,50 @@ static irqreturn_t pxamci_detect_irq(int irq, void *devid)
- 	return IRQ_HANDLED;
++extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
++
+ static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
+@@ -382,7 +384,7 @@ static void __init pxa_init_ext_wakeup_irq(int (*fn)(struct irq_data *,
+ 	pxa_ext_wakeup_chip.irq_set_wake = fn;
  }
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id pxa_mmc_dt_ids[] = {
-+        { .compatible = "marvell,pxa-mmc" },
-+        { }
-+};
-+
-+MODULE_DEVICE_TABLE(of, pxa_mmc_dt_ids);
-+
-+static int __devinit pxamci_of_init(struct platform_device *pdev)
-+{
-+        struct device_node *np = pdev->dev.of_node;
-+        struct pxamci_platform_data *pdata;
-+        u32 tmp;
-+
-+        if (!np)
-+                return 0;
-+
-+        pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+        if (!pdata)
-+                return -ENOMEM;
-+
-+	pdata->gpio_card_detect =
-+		of_get_named_gpio(np, "cd-gpios", 0);
-+	pdata->gpio_card_ro =
-+		of_get_named_gpio(np, "wp-gpios", 0);
-+
-+	/* pxa-mmc specific */
-+	pdata->gpio_power =
-+		of_get_named_gpio(np, "pxa-mmc,gpio-power", 0);
-+
-+	if (of_property_read_u32(np, "pxa-mmc,detect-delay-ms", &tmp) == 0)
-+		pdata->detect_delay_ms = tmp;
-+
-+        pdev->dev.platform_data = pdata;
-+
-+        return 0;
-+}
-+#else
-+static int __devinit pxamci_of_init(struct platform_device *pdev)
-+{
-+        return 0;
-+}
-+#endif
-+
- static int pxamci_probe(struct platform_device *pdev)
+-void __init pxa3xx_init_irq(void)
++static void __init __pxa3xx_init_irq(void)
  {
- 	struct mmc_host *mmc;
-@@ -580,6 +627,10 @@ static int pxamci_probe(struct platform_device *pdev)
- 	struct resource *r, *dmarx, *dmatx;
- 	int ret, irq, gpio_cd = -1, gpio_ro = -1, gpio_power = -1;
+ 	/* enable CP6 access */
+ 	u32 value;
+@@ -390,10 +392,21 @@ void __init pxa3xx_init_irq(void)
+ 	value |= (1 << 6);
+ 	__asm__ __volatile__("mcr p15, 0, %0, c15, c1, 0\n": :"r"(value));
  
-+	ret = pxamci_of_init(pdev);
-+	if (ret)
-+		return ret;
+-	pxa_init_irq(56, pxa3xx_set_wake);
+ 	pxa_init_ext_wakeup_irq(pxa3xx_set_wake);
+ }
+ 
++void __init pxa3xx_init_irq(void)
++{
++	__pxa3xx_init_irq();
++	pxa_init_irq(56, pxa3xx_set_wake);
++}
 +
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
- 	if (!r || irq < 0)
-@@ -866,6 +917,7 @@ static struct platform_driver pxamci_driver = {
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(pxa_mmc_dt_ids),
- #ifdef CONFIG_PM
- 		.pm	= &pxamci_pm_ops,
- #endif
++void __init pxa3xx_dt_init_irq(void)
++{
++	__pxa3xx_init_irq();
++	pxa_dt_irq_init(pxa3xx_set_wake);
++}
++
+ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
 -- 
 1.7.11.2
