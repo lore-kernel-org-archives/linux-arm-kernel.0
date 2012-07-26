@@ -1,35 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jul 2012 13:54:33 +0100
-Subject: [PATCH] ARM: vfp: only advertise VFPv4 in hwcaps if CONFIG_VFPv3 is
- enabled
-Message-ID: <1343307273-7149-1-git-send-email-will.deacon@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Jul 2012 07:57:51 -0500
+Subject: [PATCH] ARM: tegra: fix PCIe resource calculation
+In-Reply-To: <1343239358-3239-1-git-send-email-swarren@wwwdotorg.org>
+References: <1343239358-3239-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <50113ECF.10209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VFPv4 support depends on the VFPv3 context save/restore code, so only
-advertise support in the hwcaps if the kernel can actually handle it.
+On 07/25/2012 01:02 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Commit 0acc43c "ARM: tegra: use fixed PCI i/o mapping" re-numbered the
+> resource array entries that the driver used, but missed one location. This
+> causes request_resource() to fail, and the driver to panic.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Rob, I'm not sure if you can squash this into your PCIE commit, or if
+> we need to apply it on top?
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
-Pretty boring, but I guess a candidate for -stable.
+I'm rebasing the branch and will incorporate it. Thanks for testing.
 
- arch/arm/vfp/vfpmodule.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Rob
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 58696192..06137c7 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -713,8 +713,10 @@ static int __init vfp_init(void)
- 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
- 				elf_hwcap |= HWCAP_NEON;
- #endif
-+#ifdef CONFIG_VFPv3
- 			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
- 				elf_hwcap |= HWCAP_VFPv4;
-+#endif
- 		}
- 	}
- 	return 0;
--- 
-1.7.4.1
+> 
+>  arch/arm/mach-tegra/pcie.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+> index 576347a..3463fb5 100644
+> --- a/arch/arm/mach-tegra/pcie.c
+> +++ b/arch/arm/mach-tegra/pcie.c
+> @@ -406,7 +406,7 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
+>  	pp->res[1].name = pp->prefetch_space_name;
+>  	if (pp->index == 0) {
+>  		pp->res[1].start = PREFETCH_MEM_BASE_0;
+> -		pp->res[1].end = pp->res[2].start + PREFETCH_MEM_SIZE_0 - 1;
+> +		pp->res[1].end = pp->res[1].start + PREFETCH_MEM_SIZE_0 - 1;
+>  	} else {
+>  		pp->res[1].start = PREFETCH_MEM_BASE_1;
+>  		pp->res[1].end = pp->res[1].start + PREFETCH_MEM_SIZE_1 - 1;
+> 
