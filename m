@@ -1,37 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 26 Jul 2012 16:25:34 +0100
-Subject: [PATCH 07/21] ASoC: io: Prevent use of regmap if request fails
-In-Reply-To: <501160F5.5050807@linaro.org>
-References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
- <1343298534-13611-8-git-send-email-lee.jones@linaro.org>
- <20120726113204.GY3099@opensource.wolfsonmicro.com>
- <50112C29.6020606@linaro.org>
- <20120726114215.GB3099@opensource.wolfsonmicro.com>
- <50115961.6060509@linaro.org>
- <20120726151217.GO3099@opensource.wolfsonmicro.com>
- <501160F5.5050807@linaro.org>
-Message-ID: <20120726152533.GS3099@opensource.wolfsonmicro.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 26 Jul 2012 16:33:46 +0100
+Subject: [PATCH 04/24] xen/arm: sync_bitops
+In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+Message-ID: <1343316846-25860-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 04:23:33PM +0100, Lee Jones wrote:
+sync_bitops functions are equivalent to the SMP implementation of the
+original functions, independently from CONFIG_SMP being defined.
 
-> What's my 'control data'? It's not used in the original codec patch.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/include/asm/sync_bitops.h |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/sync_bitops.h
 
-> The old way wants to go:
-
-> snd_soc_update_bits() -> snd_soc_read() -> ab8500_codec_read_reg()
-
-> When then calls back into the abx500.
-
-> So what 'control data' should I be storing in the codec struct?
-
-You're supposed to use it for the data you use to call back into the
-underlying I/O code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120726/759d5343/attachment.sig>
+diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+new file mode 100644
+index 0000000..d975092903
+--- /dev/null
++++ b/arch/arm/include/asm/sync_bitops.h
+@@ -0,0 +1,17 @@
++#ifndef __ASM_SYNC_BITOPS_H__
++#define __ASM_SYNC_BITOPS_H__
++
++#include <asm/bitops.h>
++#include <asm/system.h>
++
++#define sync_set_bit(nr, p)		_set_bit(nr, p)
++#define sync_clear_bit(nr, p)		_clear_bit(nr, p)
++#define sync_change_bit(nr, p)		_change_bit(nr, p)
++#define sync_test_and_set_bit(nr, p)	_test_and_set_bit(nr, p)
++#define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
++#define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
++#define sync_test_bit(nr, addr)		test_bit(nr, addr)
++#define sync_cmpxchg			cmpxchg
++
++
++#endif
+-- 
+1.7.2.5
