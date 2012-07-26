@@ -1,52 +1,243 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 26 Jul 2012 18:09:42 +0200
-Subject: Current state of AM33xx patches
-In-Reply-To: <50116926.4060309@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
- <500CEF97.4050207@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
- <501159C3.3020109@gmail.com>
- <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
- <50116926.4060309@gmail.com>
-Message-ID: <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 26 Jul 2012 12:30:20 -0400
+Subject: [Xen-devel] [PATCH 01/24] arm: initial Xen support
+In-Reply-To: <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120726163020.GB9222@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 26, 2012 at 04:33:43PM +0100, Stefano Stabellini wrote:
+> - Basic hypervisor.h and interface.h definitions.
+> - Skelethon enlighten.c, set xen_start_info to an empty struct.
 
-Op 26 jul. 2012, om 17:58 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+Skeleton
 
-> On 26.07.2012 17:00, Koen Kooi wrote:
+> - Do not limit xen_initial_domain to PV guests.
+
+Better wording: Make xen_initial_domain dependent on the SIF_PRIVILIGED_BIT.
+
+Which reminds me - what about PV guests that do PCI passthrough. Aren't
+they "more" priviligied than normal PV guests? Or not really?
 > 
->> With Ajay's usb patches you can easily boot from a usb stick, you'll
->> only need the bootloads to be on mmc or tftp. That's what I have been
->> doing on my beaglebone :)
->> 
->> I'm going to update
->> https://github.com/beagleboard/kernel/tree/beaglebone-3.6 to use
->> linus' tree when I get a chance to test a build.
+> The new code only compiles when CONFIG_XEN is set, that is going to be
+> added to arch/arm/Kconfig in a later patch.
+
+s/later patch/<name of patch>/
+
 > 
-> Hmm, how are the patches in this repository generated? Is there a tree
-> that has them as real commits?
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm/Makefile                     |    1 +
+>  arch/arm/include/asm/hypervisor.h     |    6 +++
+>  arch/arm/include/asm/xen/hypervisor.h |   19 ++++++++++
+>  arch/arm/include/asm/xen/interface.h  |   64 +++++++++++++++++++++++++++++++++
+>  arch/arm/xen/Makefile                 |    1 +
+>  arch/arm/xen/enlighten.c              |   35 ++++++++++++++++++
+>  include/xen/xen.h                     |    2 +-
+>  7 files changed, 127 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/include/asm/hypervisor.h
+>  create mode 100644 arch/arm/include/asm/xen/hypervisor.h
+>  create mode 100644 arch/arm/include/asm/xen/interface.h
+>  create mode 100644 arch/arm/xen/Makefile
+>  create mode 100644 arch/arm/xen/enlighten.c
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 0298b00..70aaa82 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -246,6 +246,7 @@ endif
+>  core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
+>  core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
+>  core-$(CONFIG_VFP)		+= arch/arm/vfp/
+> +core-$(CONFIG_XEN)		+= arch/arm/xen/
+>  
+>  # If we have a machine-specific directory, then include it in the build.
+>  core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+> diff --git a/arch/arm/include/asm/hypervisor.h b/arch/arm/include/asm/hypervisor.h
+> new file mode 100644
+> index 0000000..b90d9e5
+> --- /dev/null
+> +++ b/arch/arm/include/asm/hypervisor.h
+> @@ -0,0 +1,6 @@
+> +#ifndef _ASM_ARM_HYPERVISOR_H
+> +#define _ASM_ARM_HYPERVISOR_H
+> +
+> +#include <asm/xen/hypervisor.h>
+> +
+> +#endif
+> diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
+> new file mode 100644
+> index 0000000..d7ab99a
+> --- /dev/null
+> +++ b/arch/arm/include/asm/xen/hypervisor.h
+> @@ -0,0 +1,19 @@
+> +#ifndef _ASM_ARM_XEN_HYPERVISOR_H
+> +#define _ASM_ARM_XEN_HYPERVISOR_H
+> +
+> +extern struct shared_info *HYPERVISOR_shared_info;
+> +extern struct start_info *xen_start_info;
+> +
+> +/* Lazy mode for batching updates / context switch */
+> +enum paravirt_lazy_mode {
+> +	PARAVIRT_LAZY_NONE,
+> +	PARAVIRT_LAZY_MMU,
+> +	PARAVIRT_LAZY_CPU,
+> +};
+> +
+> +static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
+> +{
+> +	return PARAVIRT_LAZY_NONE;
+> +}
+> +
+> +#endif /* _ASM_ARM_XEN_HYPERVISOR_H */
+> diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+> new file mode 100644
+> index 0000000..6c3ab59
+> --- /dev/null
+> +++ b/arch/arm/include/asm/xen/interface.h
+> @@ -0,0 +1,64 @@
+> +/******************************************************************************
+> + * Guest OS interface to ARM Xen.
+> + *
+> + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2011
 
-If only! I'm manually pulling them from the mailinglist archives and patchwork. I keep hoping for TI to put up a git tree with all their WIP stuff, but I guess that goes into the world peace and pony category of wanting things.
+2012
 
-Even with this small patchset I'm already having a ton of merge conflicts in the .dtsi files which is keeping me from posting my patches (e.g. the leds-gpio one) to the proper mailinglists.
+> + */
+> +
+> +#ifndef _ASM_ARM_XEN_INTERFACE_H
+> +#define _ASM_ARM_XEN_INTERFACE_H
+> +
+> +#include <linux/types.h>
+> +
+> +#define __DEFINE_GUEST_HANDLE(name, type) \
+> +	typedef type * __guest_handle_ ## name
+> +
+> +#define DEFINE_GUEST_HANDLE_STRUCT(name) \
+> +	__DEFINE_GUEST_HANDLE(name, struct name)
+> +#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+> +#define GUEST_HANDLE(name)        __guest_handle_ ## name
+> +
+> +#define set_xen_guest_handle(hnd, val)			\
+> +	do {						\
+> +		if (sizeof(hnd) == 8)			\
+> +			*(uint64_t *)&(hnd) = 0;	\
+> +		(hnd) = val;				\
+> +	} while (0)
+> +
+> +#ifndef __ASSEMBLY__
+> +/* Guest handles for primitive C types. */
+> +__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+> +__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+> +__DEFINE_GUEST_HANDLE(ulong, unsigned long);
+> +DEFINE_GUEST_HANDLE(char);
+> +DEFINE_GUEST_HANDLE(int);
+> +DEFINE_GUEST_HANDLE(long);
+> +DEFINE_GUEST_HANDLE(void);
+> +DEFINE_GUEST_HANDLE(uint64_t);
+> +DEFINE_GUEST_HANDLE(uint32_t);
+> +
+> +/* Maximum number of virtual CPUs in multi-processor guests. */
+> +#define MAX_VIRT_CPUS 1
+> +
+> +struct arch_vcpu_info { };
+> +struct arch_shared_info { };
+> +
+> +/* XXX: Move pvclock definitions some place arch independent */
+> +struct pvclock_vcpu_time_info {
+> +	u32   version;
+> +	u32   pad0;
+> +	u64   tsc_timestamp;
+> +	u64   system_time;
+> +	u32   tsc_to_system_mul;
+> +	s8    tsc_shift;
+> +	u8    flags;
+> +	u8    pad[2];
+> +} __attribute__((__packed__)); /* 32 bytes */
+> +
+> +struct pvclock_wall_clock {
+> +	u32   version;
+> +	u32   sec;
+> +	u32   nsec;
+> +} __attribute__((__packed__));
 
-Anyway, enough ranting, mainline + those patches now works on my beaglebone so for now I'm a happy camper :)
+That is weird. It is 4+4+4 = 12 bytes? Don't you want it to be 16 bytes?
 
-regards,
+> +#endif
+> +
+> +#endif /* _ASM_ARM_XEN_INTERFACE_H */
+> diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+> new file mode 100644
+> index 0000000..0bad594
+> --- /dev/null
+> +++ b/arch/arm/xen/Makefile
+> @@ -0,0 +1 @@
+> +obj-y		:= enlighten.o
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> new file mode 100644
+> index 0000000..d27c2a6
+> --- /dev/null
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -0,0 +1,35 @@
+> +#include <xen/xen.h>
+> +#include <xen/interface/xen.h>
+> +#include <xen/interface/memory.h>
+> +#include <xen/platform_pci.h>
+> +#include <asm/xen/hypervisor.h>
+> +#include <asm/xen/hypercall.h>
+> +#include <linux/module.h>
+> +
+> +struct start_info _xen_start_info;
+> +struct start_info *xen_start_info = &_xen_start_info;
+> +EXPORT_SYMBOL_GPL(xen_start_info);
+> +
+> +enum xen_domain_type xen_domain_type = XEN_NATIVE;
+> +EXPORT_SYMBOL_GPL(xen_domain_type);
+> +
+> +struct shared_info xen_dummy_shared_info;
+> +struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
+> +
+> +DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
+> +
+> +/* XXX: to be removed */
 
-Koen
+In this patch series later on? Or just when you try to collapse the x86 and arm variant
+together?
+
+> +__read_mostly int xen_have_vector_callback;
+> +EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+> +
+> +int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
+> +EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+> +
+> +int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+> +			       unsigned long addr,
+> +			       unsigned long mfn, int nr,
+> +			       pgprot_t prot, unsigned domid)
+> +{
+> +	return -ENOSYS;
+> +}
+> +EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> diff --git a/include/xen/xen.h b/include/xen/xen.h
+> index a164024..2c0d3a5 100644
+> --- a/include/xen/xen.h
+> +++ b/include/xen/xen.h
+> @@ -23,7 +23,7 @@ extern enum xen_domain_type xen_domain_type;
+>  #include <xen/interface/xen.h>
+>  #include <asm/xen/hypervisor.h>
+>  
+> -#define xen_initial_domain()	(xen_pv_domain() && \
+> +#define xen_initial_domain()	(xen_domain() && \
+>  				 xen_start_info->flags & SIF_INITDOMAIN)
+>  #else  /* !CONFIG_XEN_DOM0 */
+>  #define xen_initial_domain()	(0)
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
