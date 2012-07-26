@@ -1,80 +1,42 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:56 +0100
-Subject: [PATCH 14/24] xen/arm: initialize grant_table on ARM
-In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-14-git-send-email-stefano.stabellini@eu.citrix.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 26 Jul 2012 17:58:30 +0200
+Subject: Current state of AM33xx patches
+In-Reply-To: <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
+References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
+ <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
+ <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+ <4FF42761.2000701@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
+ <500CEF97.4050207@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
+ <501159C3.3020109@gmail.com>
+ <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
+Message-ID: <50116926.4060309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the grant table mapping at the address specified at index 0
-in the DT under the /xen node.
-After the grant table is initialized, call xenbus_probe (if not dom0).
+On 26.07.2012 17:00, Koen Kooi wrote:
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c  |   13 +++++++++++++
- drivers/xen/grant-table.c |    2 +-
- 2 files changed, 14 insertions(+), 1 deletions(-)
+> With Ajay's usb patches you can easily boot from a usb stick, you'll
+> only need the bootloads to be on mmc or tftp. That's what I have been
+> doing on my beaglebone :)
+> 
+> I'm going to update
+> https://github.com/beagleboard/kernel/tree/beaglebone-3.6 to use
+> linus' tree when I get a chance to test a build.
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 2e013cf..854af1e 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -1,8 +1,12 @@
- #include <xen/xen.h>
- #include <xen/interface/xen.h>
- #include <xen/interface/memory.h>
-+#include <xen/interface/hvm/params.h>
- #include <xen/platform_pci.h>
- #include <xen/features.h>
-+#include <xen/grant_table.h>
-+#include <xen/hvm.h>
-+#include <xen/xenbus.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include <linux/module.h>
-@@ -51,12 +55,16 @@ int __init xen_guest_init(void)
- 	struct xen_add_to_physmap xatp;
- 	static struct shared_info *shared_info_page = 0;
- 	struct device_node *node;
-+	struct resource res;
- 
- 	node = of_find_compatible_node(NULL, NULL, "arm,xen");
- 	if (!node) {
- 		pr_info("No Xen support\n");
- 		return 0;
- 	}
-+	if (of_address_to_resource(node, 0, &res))
-+		return -EINVAL;
-+	xen_hvm_resume_frames = res.start >> PAGE_SHIFT;
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
- 	xen_setup_features();
-@@ -97,6 +105,11 @@ int __init xen_guest_init(void)
- 		per_cpu(xen_vcpu, cpu) =
- 			&HYPERVISOR_shared_info->vcpu_info[cpu];
- 	}
-+
-+	gnttab_init();
-+	if (!xen_initial_domain())
-+		xenbus_probe(NULL);
-+
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(xen_guest_init);
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index 1d0d95e..fd2137a 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -62,7 +62,7 @@
- 
- static grant_ref_t **gnttab_list;
- static unsigned int nr_grant_frames;
--static unsigned int boot_max_nr_grant_frames;
-+static unsigned int boot_max_nr_grant_frames = 1;
- static int gnttab_free_count;
- static grant_ref_t gnttab_free_head;
- static DEFINE_SPINLOCK(gnttab_list_lock);
--- 
-1.7.2.5
+Hmm, how are the patches in this repository generated? Is there a tree
+that has them as real commits?
+
+
+Thanks,
+Daniel
