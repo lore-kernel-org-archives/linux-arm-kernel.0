@@ -1,32 +1,27 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 14:51:09 +0100
-Subject: [PATCH 16/21] ASoC: Ux500: Enable MOP500 driver for Device Tree
-In-Reply-To: <20120726113734.GZ3099@opensource.wolfsonmicro.com>
+Date: Thu, 26 Jul 2012 14:52:09 +0100
+Subject: [PATCH 17/21] ASoC: Ux500: Enable ux500 PCM driver for Device Tree
+In-Reply-To: <20120726113838.GA3099@opensource.wolfsonmicro.com>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
- <1343298534-13611-17-git-send-email-lee.jones@linaro.org>
- <20120726113734.GZ3099@opensource.wolfsonmicro.com>
-Message-ID: <50114B4D.3030305@linaro.org>
+ <1343298534-13611-18-git-send-email-lee.jones@linaro.org>
+ <20120726113838.GA3099@opensource.wolfsonmicro.com>
+Message-ID: <50114B89.7070100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/12 12:37, Mark Brown wrote:> On Thu, Jul 26, 2012 at 11:28:49AM +0100, Lee Jones wrote:
-> 
->>   arch/arm/mach-ux500/board-mop500-msp.c |    3 ---
->>   sound/soc/ux500/mop500.c               |   41 ++++++++++++++++++++++++++++++++
-> 
-> There is no binding documentation here.  All bindings should be
-> documented.
+On 26/07/12 12:38, Mark Brown wrote:
+> On Thu, Jul 26, 2012 at 11:28:50AM +0100, Lee Jones wrote:
+>
+>> Here we pass platform registration from platform code over to Device
+>> Tree, when DT is enabled.
+>
+>> -	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
+>> -	platform_device_register(&ux500_pcm);
+>
+> This has the same issue as your last patch...  the way you're doing
+> things will break audio on all boards using this driver.
 
-Yes I know. This is more of an RFC _before_ I waste my time writing documentation (again).
-
->> -	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
->> -	platform_device_register(&snd_soc_mop500);
->> -
-> 
-> This should be done separately - if it's going to be merged with
-> something it should be the patch that adds the relevant DT fragments.
-
-Yes, I can do that.
+It will, why?
 
 -- 
 Lee Jones
