@@ -1,172 +1,191 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Thu, 26 Jul 2012 10:21:49 +0530
-Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
- controller.
-In-Reply-To: <201207251710.53683.arnd@arndb.de>
-References: <cover.1342171151.git.vipulkumar.samar@st.com>
- <201207250631.54157.arnd@arndb.de>
- <20120725073406.GM19660@localhost.localdomain>
- <201207251710.53683.arnd@arndb.de>
-Message-ID: <20120726045149.GQ19660@localhost.localdomain>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 26 Jul 2012 12:56:02 +0800
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1342756850.1726.74.camel@vkoul-udesk3>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201206271520.49276.arnd@arndb.de>
+ <1342161907.1726.26.camel@vkoul-udesk3>
+ <201207171924.33756.arnd@arndb.de>
+ <1342756850.1726.74.camel@vkoul-udesk3>
+Message-ID: <CAMj5BkjbZsL_vSCfLsZ6UsdPrAHeQ+FwBFYbUM_L1w3wqCLuMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wed, Jul 25, 2012 at 05:10:53PM +0000, Arnd Bergmann wrote:
-> On Wednesday 25 July 2012, Shiraz Hashim wrote:
-> > On Wed, Jul 25, 2012 at 06:31:53AM +0000, Arnd Bergmann wrote:
-> > > Can you post here the complete set of callback implementations
-> > > that you have in your development trees at the moment? That should
-> > > help us determine which case we're talking about here.
-> > 
-> > There are following types of callbacks (involving SoC/platform) seen
-> > generally in our case,
-> > 
-> >   * parent clk selection -
-> >         driver is not aware about various clock sources (which also
-> >         varies from platform to platform) and hence can only be
-> >         programmed by corresponding platform.
-> > 
-> >         This is the case in Ethernet, audio, etc.
-> >
-> >   * sata controller
-> >         Similar to OTG case which involves clock initialization.
->  
-> This should definitely be moved into the drivers. A lot of drivers
-> enable and program clocks using the generic clock interfaces, so
-> there is no point using a callback.
+On Fri, Jul 20, 2012 at 12:00 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Tue, 2012-07-17 at 19:24 +0000, Arnd Bergmann wrote:
+>> On Friday 13 July 2012, Vinod Koul wrote:
+>> > > Do you mean there must be a global table, or are you ok with putting
+>> > > the information about a channel into the device that uses the channel,
+>> > > as we do for most other subsystems (IRQ, GPIO, pinctrl, ...).
+>> > > If not, what is the problem with that approach?
+>> >
+>> > Today, we simple ask, "give me dma channel with DMA_SLAVE capability".
+>> >
+>> > If we change it to "give me dma channel which suits my need" and have
+>> > additional information in dmaengine to handle this request effectively.
+>> >
+>> > What that would mean is
+>> > a) DMA channel either knows which channel to provide, Or
+>> > b) Additional arguments provided to dmaengine API to help it find out
+>> > which channel to provide.
+>> >
+>> > It would be good to have client ask for a specific channel. But in order
+>> > to build generic clients, we face a problem that clients may not know
+>> > how they mapped to dmac by SoC designer. Or the mux maybe entirely
+>> > flexible on which channel.
+>> >
+>> > If we add this as DT property (which I assume should be platform
+>> > specific), then client will know which channel to request.
+>> > It can have two levels, dmac and channel. In case mux is flexible enough
+>> > then client gets a channel and program the mux for this mapping.
+>> >
+>> > I think this is the most simplistic solution I have for this, thoughts?
+>>
+>> I think we're basically on the same page. Let's see if I have covered
+>> all the cases we discussed so far. I've tried to update the binding that
+>> Jon sent out initially with everything we've discussed, so please review
+>> this to see if I understood you correctly.
+> I think this looks fine to me. Few comments below on client side
+>>
+>>       Arnd
+>>
+>>
+>> * Generic DMA Controller and DMA request bindings
+>>
+>> Generic binding to provide a way for a driver using DMA Engine to retrieve the
+>> DMA request or channel information that goes from a hardware device to a DMA
+>> controller.
+>>
+>> * DMA controller
+>>
+>> Required property:
+>>     - #dma-cells: Number elements to describe DMA channel information. Must be
+>>                   at least 2, allowing a phandle and a flags cell, but usually
+>>                 is larger so a client can also specify a request or channel
+>>                   number and/or some configuration.
+>>
+>> Optional properties:
+>>     - #dma-channels: Number of DMA channels supported by the controller.
+>>     - #dma-requests: Number of DMA requests signals supported by the controller.
+>>
+>> Example:
+>>
+>>        sdma: dmaengine at 48000000 {
+>>                compatible = "ti,omap4-sdma"
+>>                reg = <0x48000000 0x1000>;
+>>                interrupts = <4>;
+>>                #dma-cells = <3>;
+>>                #dma-channels = <32>;
+>>                #dma-requests = <127>;
+>>        };
+>>
+>>
+>> * DMA client
+>>
+>> Client drivers should specify the DMA property using a phandle to the controller
+>> followed by the number of DMA request/channel and the transfer type of the
+>> channel (eg. device-to-memory, memory-to-device, memory-to-memory, etc).
+>>
+>> Required property:
+>>     dmas: list of one or more dma specifiers, each consisting of
+>>      - phandle pointing to dma controller node
+>>      - flags word, a bit map that can hold these flags
+>>        * 0x00000001 channel can be used for transfer from device
+>>        * 0x00000002 channel can be user for transfer to device
+> Is this for identifying which channel is for TX and RX? If not I am not
+> sure I understood it well
 >
-> Note that since stmmac is an architecture independent driver, this
-> depends on Mark Brown's patch to provide empty stubs for
-> the clock management functions on architectures that don't yet
-> use it.
+>>      - zero or more cells in a format specific to the the dma controller
+>>        node listed in the phandle. This typically contains a dma request
+>>        line number or a channel number, but can contain any data that
+>>        is used required for configuring a channel.
 
-Yes, this is true for clocks associated with devices and we do handle
-that in this way.
+How about extend struct dma_slave_config, adding one member of
+"request_line", if
+"request line" is must config in most platform.
 
-I was talking more of cases where, we need to
+struct dma_slave_config {
+~
+u32 request_line;
+}
+The advantage is request_line can be get directly from
+dmaengine_slave_config regardless of DT.
 
-   * select clock sources (parents) about which driver has no
-     knowledge and may vary across boards.
-   * perform initializations which are more than clock, like phy
-     initialization/programming etc. This is SoC dependant.
-
-> >   * spi controller
-> >         This is little hack in the h/w. As part of s/w controlled chip
-> >         select/deselect in spi-pl022, we need to write to some system
-> >         specific register.
-> > 
-> >   * OTG controller
-> >         phy clock initialization which involves series of steps
-> >         including powering down, etc.
-> > 
-> >   * NAND controller
-> >         bank selection on runtime by writing to system registers
-> 
-> I don't understand any of these, so unless you post the code
-> that you want help with as I asked above, I'll assume that you find
-> the solution yourself and don't need a callback ;-)
-
-Some of them are,
-
-- fsmc NAND controller 
-
-        -- include/linux/mtd/fsmc.h
-
-        struct fsmc_nand_platform_data {
-                ...
-
-                void (*select_bank)(uint32_t bank, uint32_t busw);
-
-                ...
-
-        };
-
-
-        -- arch/arm/mach-spear13xx/spear13xx.c
-
-        void nand_select_bank(u32 bank, u32 busw)
-        {
-                u32 fsmc_cfg;
-
-                if (cpu_is_spear1340()) {
-        #ifdef CONFIG_CPU_SPEAR1340
-                        fsmc_cfg = readl(VA_SPEAR1340_FSMC_CFG);
-        #endif
-                } else 
-                        fsmc_cfg = readl(VA_FSMC_CFG);
-
-                fsmc_cfg &= ~(NAND_BANK_MASK << NAND_BANK_SHIFT);
-                fsmc_cfg |= (bank << NAND_BANK_SHIFT);
-
-                if (busw)
-                        fsmc_cfg |= 1 << NAND_DEV_WIDTH16;
-                else
-                        fsmc_cfg &= ~(1 << NAND_DEV_WIDTH16);
-
-                if (cpu_is_spear1340()) {
-        #ifdef CONFIG_CPU_SPEAR1340
-                        writel(fsmc_cfg, VA_SPEAR1340_FSMC_CFG);
-        #endif
-                } else
-                        writel(fsmc_cfg, VA_FSMC_CFG);
-        }
-
-
-- SATA Controller
-
-        -- include/linux/ahci_platform.h
-
-        struct ahci_platform_data {
-                int (*init)(struct device *dev, void __iomem *addr);
-                void (*exit)(struct device *dev);
-                const struct ata_port_info *ata_port_info;
-                unsigned int force_port_map;
-                unsigned int mask_port_map;
-        };
-
-
-        -- arch/arm/mach-spear13xx/spear1340.c
-
-        void sata_miphy_exit(struct device *dev)
-        {
-                writel(0, VA_SPEAR1340_PCIE_SATA_CFG);
-                writel(0, VA_SPEAR1340_PCIE_MIPHY_CFG);
-
-                /* Enable PCIE SATA Controller reset */
-                writel((readl(VA_SPEAR1340_PERIP1_SW_RST) | (0x1000)),
-                                VA_SPEAR1340_PERIP1_SW_RST);
-                msleep(20);
-
-                /* Switch off sata power domain */
-                writel((readl(VA_SPEAR1340_PCM_CFG) & (~0x800)),
-                                VA_SPEAR1340_PCM_CFG);
-                msleep(20);
-        }
-
-        static int sata_miphy_init(struct device *dev, void __iomem *addr)
-        {
-                writel(SPEAR1340_SATA_CFG_VAL, VA_SPEAR1340_PCIE_SATA_CFG);
-                writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
-                                VA_SPEAR1340_PCIE_MIPHY_CFG);
-                /* Switch on sata power domain */
-                writel((readl(VA_SPEAR1340_PCM_CFG) | (0x800)),
-                                VA_SPEAR1340_PCM_CFG);
-                msleep(20);
-                /* Disable PCIE SATA Controller reset */
-                writel((readl(VA_SPEAR1340_PERIP1_SW_RST) & (~0x1000)),
-                                VA_SPEAR1340_PERIP1_SW_RST);
-                msleep(20);
-
-                return 0;
-        }
-
-        static struct ahci_platform_data sata_pdata = {
-                .init = sata_miphy_init,
-                .exit = sata_miphy_exit,
-        };
-
---
-regards
-Shiraz
+>>
+>> Optional property:
+>>     dma-names: when present, this shall contain one identifier string
+>>     for each dma specifier in the dmas property. The specific strings
+>>     that can be used are defined in the binding of the DMA client
+>>     device. When multiple dma specifiers can be used as alternatives,
+>>     the dma-names for those dma specifiers must be identical.
+>>
+>> Any dma specifiers that have identical flags and identical dma-names
+>> (if present) shall refer to different dma controllers that can be
+>> used as alternatives, e.g. when a request line is connected to
+>> multiple dma controllers. If multiple dma specifiers are listed that
+>> have the same flags but refer to different functional channels,
+>> the dma-names property must be used to distinguish them.
+>>
+>> Examples:
+>>
+>> 1. One DMA write channel, one DMA read/write channel:
+>>
+>>        i2c1: i2c at 1 {
+>>                ...
+>>                dmas = <&sdma 2 1 &sdma 3 2>;
+>>                ...
+>>        };
+>>
+>> 2. A single read-write channel with two alternative dma controllers
+>>    providing it:
+>>
+>>       dmas = <&dma0 3 5
+>>               &dma1 3 7
+>>               &dma2 3 2>;
+>>
+>> 3. A device with three channels, one of which has two alternatives:
+>>
+>>       dmas = <&dma0 1 4 /* data read */
+>>               &dma0 2 6 /* data write */
+>>               &dma1 1 0 /* error read */
+>>               &dma2 1 0>; /* alternative error read */
+>>       dma-names = "data", "data", "error", "error";
+>>
+>> 4. A dma controller requiring complex configuration:
+>>
+>>        dma: dmaengine at 48000000 {
+>>                compatible = "foo,foo-sdma"
+>>                reg = <0x48000000 0x1000>;
+>>                interrupts = <4>;
+>>                #dma-cells = <6>; /* phandle, flag, request, channel,
+>>                                        input-width, output-width */
+> Why would we want the widths to be here?
+> Assuming a DMA from System memory to a peripheral, source width should
+> be system memory width and destination the peripheral width. IMO these
+> should not be in dma property even if we need these
+>>                #dma-channels = <32>;
+>>                #dma-requests = <127>;
+>>        };
+>>
+>>        mmc at 49000000 {
+>>               ...
+>>               dmas = <&dma 1  /* read */
+>>                       2       /* request line */
+>>                       5       /* channel */
+>>                       16      /* 16 bit bus width on read */
+>>                       8>      /* 8 bit bus width on write */
+>>                      <&dma 2  /* write */
+>>                       3       /* request line */
+>>                       6       /* channel */
+>>                       8       /* 8 bit bus width on read */
+>>                       16>     /* 16 bit bus width on write */
+> >From this looks like flag is for TX/RX, so maybe i read correct :)
+>
+> --
+> ~Vinod
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
