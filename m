@@ -1,71 +1,84 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 26 Jul 2012 12:43:31 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1343284960.1726.8978.camel@vkoul-udesk3>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201207171924.33756.arnd@arndb.de> <1342756850.1726.74.camel@vkoul-udesk3>
- <201207200839.24259.arnd@arndb.de> <1342777047.1726.435.camel@vkoul-udesk3>
- <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
-Message-ID: <501181C3.1020301@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 Jul 2012 10:44:25 -0700
+Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping from
+ cpuidle
+In-Reply-To: <50113B3C.4090608@ti.com> (Rajendra Nayak's message of "Thu, 26
+ Jul 2012 18:12:36 +0530")
+References: <1342764284-8143-1-git-send-email-rnayak@ti.com>
+ <1342764284-8143-3-git-send-email-rnayak@ti.com>
+ <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>
+ <5009120A.1060400@ti.com> <1342774283.4672.181.camel@sokoban>
+ <87obn3798o.fsf@ti.com> <50113B3C.4090608@ti.com>
+Message-ID: <87boj2s9hi.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Rajendra Nayak <rnayak@ti.com> writes:
 
-On 07/26/2012 01:42 AM, Vinod Koul wrote:
-> On Tue, 2012-07-24 at 14:07 -0500, Jon Hunter wrote:
->> Hi Vinod,
->>>>>> Required property:
->>>>>>     dmas: list of one or more dma specifiers, each consisting of
->>>>>>      - phandle pointing to dma controller node
->>>>>>      - flags word, a bit map that can hold these flags
->>>>>>        * 0x00000001 channel can be used for transfer from device
->>>>>>        * 0x00000002 channel can be user for transfer to device
->>>>>
->>>>> Is this for identifying which channel is for TX and RX? If not I am not
->>>>> sure I understood it well
->>>>
->>>> Yes, but we can potentially add more flags here.
->>>>
->>>> The argument we had when coming up with this was roughly:
->>>>
->>>> * we need to identify which specifiers are referring to the same
->>>>   conceptual channel and can be used as alternatives
->>>> * this could be done just using the dma-names property, but making
->>>>   dma-names mandatory adds complexity for everyone.
->>>> * Most devices have just one or two channels, and if they have two,
->>>>   there is usually one input and one output.
->>>>
->>>> => if the common dmaengine code can find out whether a channel is
->>>>   input or output without looking at the dmac driver specific configuration,
->>>>   we don't need to add dma-names in most cases, but just let the client
->>>>   driver ask for "give me a channel with these flags".
->>> No we don't export the direction of the channel and usually channel can
->>> be configured either way.
+> On Thursday 26 July 2012 04:13 AM, Kevin Hilman wrote:
+>> Tero Kristo<t-kristo@ti.com>  writes:
 >>
->> So yes I can see that a channel itself could be configured to support a
->> given direction, but when we ask for a channel via dma_request_channel()
->> we are going to get a channel that matches the criteria we pass using
->> the filter parameter. So here the thinking was that "flags" is a filter
->> parameter that the user could specify and one example being direction
->> but it could be something else too.
-> Yes that can be done, but I am leaning towards clients not have to do
-> anything :) DMAEngine needs to know mapping and when
-> dma_request_channel() is called it _always_ gives you the right channel.
+>>> On Fri, 2012-07-20 at 13:38 +0530, Rajendra Nayak wrote:
+>>>> On Friday 20 July 2012 12:55 PM, Shilimkar, Santosh wrote:
+>>>>> On Fri, Jul 20, 2012 at 11:34 AM, Rajendra Nayak<rnayak@ti.com>   wrote:
+>>>>>> pwrdm_pre_transition()/pwrdm_post_transition() have always been high latency
+>>>>>> operations done within cpuidle to do Powerdomain level book-keeping to know
+>>>>>> what state transitions for different Powerdomains have been triggered.
+>>>>>> This is also useful to do a restore-on-demand in some cases when we know
+>>>>>> the context for the given Powerdomain was lost etc.
+>>>>>>
+>>>>>> Now that we have definitive entry/exit points (thanks to the Powerdomain
+>>>>>> level usecounting) for Powerdomain transitions, these book-keeping functions
+>>>>>> can very well be moved from within CPUidle into pwrdm_clkdm_enable()/pwrdm_
+>>>>>> clkdm_disable() functions.
+>>>>>>
+>>>>>> Also rename _pwrdm_pre/post_transition_cb() to pwrdm_pre/post_transition()
+>>>>>> and get rid of the original ones which iterate over all powerdomains.
+>>>>>>
+>>>>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>
+>> This is excellent!   Thanks for working on this.
+>>
+>> However, it needs a rebase against mainline though because I merged a
+>> set of optimizations[1] to this code already that only calls pre/post
+>> per-pwrdm.
+>>
+>
+> Hi Kevin,
+>
+> I thought some more on this patch, and I think this way of collecting
+> stats and knowing what state transitions the powerdomains been through
+> will not work on OMAP3, mainly because of the autodeps. Might work on
+> OMAP4 and beyond which do not need any autodeps.
+>
+> Here why I think so,
+> Lets assume a Powerdomain X with a last module Y active, once Y disables
+> the last clock (lets assume no hardware controlled clocks for
+> simplicity), we clear the last power state register for X. However
+> due to autodeps X does not transition to a target state immediately.
+> It only does so when the MPU (and IVA) go down, and because
+> of the wakeup dependency (autodeps set a sleep and a wakeup dep with
+> both MPU and IVA) is also woken up every time MPU or IVA are up.
+> So its quite possible that X transitions in and out of sleep multiple
+> times before Y decides to re-enable its clocks, which is when we end up
+> looking for the last power state entered.
+> Lets say X entered OFF 3 times in between Y disabling and re-enabling
+> its clocks. Though we end up updating the counter only once (instead of
+> 3) we still know and can tell Y that it lost context.
+> The problem however arises if for some reason X entered OFF
+> twice and happened to stay ON the third time the dependencies were met.
+> When Y re-enables its clocks, we end up telling it that it *did not*
+> lose context because we see the previous power state was ON.
 
-Ok, so are you proposing to remove the filter function and parameter
-from the dma_request_channel()?
+Yeah, this is definitely a problem.
 
-> Maybe for slave case we need to create dma_request_slave_channel() which
-> has additional arguments for dmaengine to do the filtering.
+As long as we have autodeps, everything is centralized around CPU
+transitions anyways, so it makes sense to keep the accounting
+centralized too.
 
-Ok, so what is not clear to me is if you envision that
-dma_request_slave_channel() is using a mapping table based look-up or
-the DT scheme or both.
+> I think as long as we have autodeps, the only way on OMAP3 to accurately
+> do this is to do it for all dependent domains in CPUIdle :(
 
-As Arnd highlighted the DT convention is to store the DMA info in each
-of the device nodes and not store in a global mapping table which
-conflicts with having a mapping table approach for non-DT usage. So I am
-still not sure how you envision this function working for both the
-non-DT and DT use-cases.
+Or, to get rid of autodeps. ;)
 
-Jon
+Kevin
