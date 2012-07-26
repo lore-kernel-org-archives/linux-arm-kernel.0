@@ -1,51 +1,46 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 26 Jul 2012 10:27:05 +0800
-Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
-In-Reply-To: <1343215100-24005-2-git-send-email-festevam@gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 26 Jul 2012 10:29:30 +0800
+Subject: [PATCH v2 3/3] ARM: imx_v6_v7_defconfig: Select MXS_DMA
+In-Reply-To: <CAMiH66FUxiw0B8iD5rYi=nUX0VYZBzOKifXKfTqd1RmSHhC80g@mail.gmail.com>
 References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
- <1343215100-24005-2-git-send-email-festevam@gmail.com>
-Message-ID: <CAMiH66H8GwK+5Zf8RLukC9O35eyQ6rVPYQhV2GarczFYmdpjMA@mail.gmail.com>
+ <1343215100-24005-3-git-send-email-festevam@gmail.com>
+ <CAMiH66EA4O0s8hfXkr_SJ56+q7eZ8w0=3C1r_C+m2Os1RxprmA@mail.gmail.com>
+ <CAOMZO5BfT+_7x4F96Kvqtq5STXxw2Y9CxbCCAc_UnZ-3wy0qxg@mail.gmail.com>
+ <CAMiH66FUxiw0B8iD5rYi=nUX0VYZBzOKifXKfTqd1RmSHhC80g@mail.gmail.com>
+Message-ID: <20120726022930.GB3396@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think  we can merget the patch 1 and patch 2 to one patch.
+On Thu, Jul 26, 2012 at 10:24:41AM +0800, Huang Shijie wrote:
+> On Wed, Jul 25, 2012 at 11:23 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Wed, Jul 25, 2012 at 12:05 PM, Huang Shijie <shijie8@gmail.com> wrote:
+> >
+> >> Is this patch needed? The mxs-dma only has one user, the gpmi-nand in mx6q.
+> >> this patch makes the kernel built-in the mxs-dma, even the gpmi-nand
+> >> is not enabled.
+> >
+> > Well, as the driver currently stands: yes, it is needed.
+> >
+> > Without CONFIG_MXS_DMA, the GPMI driver cannot even be built.
+> But you have added "depend on MXS_DMA". So If you do not select the
+> mxs-dma, you can not see the
+> gpmi-nand.
+> that's why i think this patch is not needed.
+> 
+How about using 'select MXS_DMA'?
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 31bb7e5..e7c3dcf 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -481,6 +481,7 @@ config MTD_NAND_NANDSIM
+ config MTD_NAND_GPMI_NAND
+         bool "GPMI NAND Flash Controller driver"
+         depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
++       select MXS_DMA
+         help
 
-Huang Shijie
+Then we do not need this patch and does not have the issue that MXS_DMA is
+still compiled even GPMI_NAND is not selected.
 
-On Wed, Jul 25, 2012 at 7:18 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
-> for imx_v6_v7_defconfig:
->
-> drivers/built-in.o: In function `gpmi_dma_filter':
-> clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
-> make: *** [vmlinux] Error 1
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Use 'depends' rather than 'select'
->  drivers/mtd/nand/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index a5d8a1b..da52c7d 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
->  config MTD_NAND_GPMI_NAND
->          bool "GPMI NAND Flash Controller driver"
->          depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-> +       depends on MXS_DMA
->          help
->          Enables NAND Flash support for IMX23, IMX28 or IMX6.
->          The GPMI controller is very powerful, with the help of BCH
-> --
-> 1.7.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+Dong Aisheng
