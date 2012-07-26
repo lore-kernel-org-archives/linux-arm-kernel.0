@@ -1,32 +1,41 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 26 Jul 2012 13:20:35 +0200
-Subject: [PATCH 2/4] media: mx2_camera: Mark i.MX25 support as BROKEN.
+Date: Thu, 26 Jul 2012 13:20:36 +0200
+Subject: [PATCH 3/4] Schedule removal of i.MX25 support in mx2_camera.c
 In-Reply-To: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
 References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1343301637-19676-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1343301637-19676-4-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX25 support is known to have been broken for
-almost a year.
+Support for i.MX25 in mx2_camera.c has been broken
+for a year. Furthermore, i.MX25 video capture HW
+doesn't have much in common with i.MX27. A separate
+driver would be desirable.
 
 Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- drivers/media/video/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/feature-removal-schedule.txt |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index c0b9233..af9d2d0 100644
---- a/drivers/media/video/Kconfig
-+++ b/drivers/media/video/Kconfig
-@@ -1136,7 +1136,7 @@ config VIDEO_MX2_HOSTSUPPORT
+diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
+index 56000b3..6c50a17 100644
+--- a/Documentation/feature-removal-schedule.txt
++++ b/Documentation/feature-removal-schedule.txt
+@@ -6,6 +6,15 @@ be removed from this file.  The suggested deprecation period is 3 releases.
  
- config VIDEO_MX2
- 	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
--	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
-+	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || (ARCH_MX25 && BROKEN))
- 	select VIDEOBUF2_DMA_CONTIG
- 	select VIDEO_MX2_HOSTSUPPORT
- 	---help---
+ ---------------------------
+ 
++What:	support for i.mx25 in mx2_camera.c
++When:	v3.8
++Why:	it's been broken for a year. Furthermore, i.MX25 video capture
++	HW doesn't have much in common with i.MX27. A separate driver
++	will be needed for it.
++Who:	Javier Martin<javier.martin@vista-silicon.com>
++
++---------------------------
++
+ What:	ddebug_query="query" boot cmdline param
+ When:	v3.8
+ Why:	obsoleted by dyndbg="query" and module.dyndbg="query"
 -- 
 1.7.9.5
