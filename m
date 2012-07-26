@@ -1,73 +1,155 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 26 Jul 2012 10:11:40 +0530
-Subject: [PATCH] ARM: EXYNOS: Add I2S SFR base addresses
-In-Reply-To: <1343217938-30351-1-git-send-email-padma.v@samsung.com>
-References: <1343217938-30351-1-git-send-email-padma.v@samsung.com>
-Message-ID: <CAK9yfHxngNLMmO6Jhu3eAPYqb84asgz0A7OnLu7QfuNUbSpYxQ@mail.gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 26 Jul 2012 12:46:06 +0800
+Subject: [PATCH 1/3] dmaengine: mmp-pdma support
+In-Reply-To: <201207250858.39420.arnd@arndb.de>
+References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
+ <201207250601.06866.arnd@arndb.de>
+ <CAMj5Bkh6XBBR1f99X4oKS5kbF2y7Lxpgp2jYB-6vv2q_8ej5Lg@mail.gmail.com>
+ <201207250858.39420.arnd@arndb.de>
+Message-ID: <CAMj5BkigKhGE525at_pdN7cmav0K3-yfVmFOmWunmf4M_pBU2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 July 2012 17:35, Padmavathi Venna <padma.v@samsung.com> wrote:
-> The base address of I2S 0 controller is similar in exynos4 and exynos5
-> platforms. So this patch defines a common macro for the I2S controller
-> 0 base address in both the platforms and use the same macro.
+On Wed, Jul 25, 2012 at 4:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 25 July 2012, zhangfei gao wrote:
 >
-> This patch also defines the I2S controller 1,2 base addresses in exynos5
-> and correct the I2S controller 1 base address in exynos4
+>> > Ah, so it is the request line. Now the current plan for this is to go
+>> > into the "dmas" property of the child device using the dma engine binding.
+>> >
+>> > That way, the driver will end up asking for a channel that matches what
+>> > is specified for the device, e.g.
+>> >
+>> >         nand {
+>> >                 ...
+>> >                 dmas = <&pdma 3 0x1184>;
+>> >         };
+>> >
+>> > I believe this is normally set through the filter function when asking
+>> > for a channel on other drivers, not through slave_config.
+>>
+>> It is great that the request line is already been considered.
+>> Still want to double confirm, it is dmaengine.c will parse out "the
+>> request line",
+>> Dma-engine driver will get request line from dmaengine.c, right?
+>> So there is dependence.
+>> Or dmaengine driver parse the request line itself from client driver?
+>>
+>> Some client may require more than one dma channel,
+>> such as camera, YUV three channels are required.
+>>
+>> camera {
+>>         ...
+>>                 dmas = <&pdma 1 0x1110 /* Y */
+>>                 &pdma 1 0x1114 /* U */
+>>                 &pmaa 1 0x1118>; /* V */
+>>          };
+>>
+>> Besides, we also have to consider how to parse "request line" if using pdata.
 >
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  arch/arm/mach-exynos/dev-audio.c        |    2 +-
->  arch/arm/mach-exynos/include/mach/map.h |    6 ++++--
->  2 files changed, 5 insertions(+), 3 deletions(-)
+> The current plan is to allow an arbitrary number of channels in the client,
+> which can all go to the same or different dmaengine drivers. You can also
+> specify multiple channels that can be used as alternatives, by adding a
+> dma-names property and naming them the same. Further, the number of fields
+> required for specifying the request line is determined by the dmac driver.
+> The first two cells of each specifier are parsed by the dmaengine common
+> code and all following ones are parsed handed to the dmac specific driver.
 >
-> diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
-> index b33a5b6..5dbc9a2 100644
-> --- a/arch/arm/mach-exynos/dev-audio.c
-> +++ b/arch/arm/mach-exynos/dev-audio.c
-> @@ -62,7 +62,7 @@ static struct s3c_audio_pdata i2sv5_pdata = {
->  };
+> A complex example would be
 >
->  static struct resource exynos4_i2s0_resource[] = {
-> -       [0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S0, SZ_256),
-> +       [0] = DEFINE_RES_MEM(EXYNOS_PA_I2S0, SZ_256),
->         [1] = DEFINE_RES_DMA(DMACH_I2S0_TX),
->         [2] = DEFINE_RES_DMA(DMACH_I2S0_RX),
->         [3] = DEFINE_RES_DMA(DMACH_I2S0S_TX),
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-> index c72b675..5cf7d91 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -39,9 +39,11 @@
+>                  dmas = <&pdma 1 0x1110   /* Y on pdma */
+>                         &tdma 1 0x100 32  /* Y on tdma */
+>                         &pdma 1 0x1114    /* U */
+>                         &tdma 1 0x200 32  /* U */
+>                         &pmaa 1 0x1118    /* V */
+>                         &tdma 1 0x300 32>; /* V */
+>                 dma-names = "Y", "Y", "U", "U", "V", "V";
 >
->  #define EXYNOS4_PA_G2D                 0x12800000
+> In this case the pdma node would set #dma-cells=<3> and the tdma node would
+> set #dma-cells=<4> in order to pass two separate arguments. Through the
+> dma-names property, the common code can identify which channels belong
+> together and the driver just needs to ask for a channel like
 >
-> -#define EXYNOS4_PA_I2S0                        0x03830000
-> -#define EXYNOS4_PA_I2S1                        0xE3100000
-> +#define EXYNOS_PA_I2S0                 0x03830000
-> +#define EXYNOS4_PA_I2S1                        0xE2100000
->  #define EXYNOS4_PA_I2S2                        0xE2A00000
+>         chan_y = of_dma_request_named_channel(pdev, "Y");
+>
 
-As per the TRM, these addresses (I2S1 and I2S2) are 0x13960000 and
-0x13970000 respectively on Exynos4412 SoC.
-Please verify.
+Thanks Arnd for patient explain.
+
+Still want to double confirm the understand:
+DMA client (nand, camera) get dmas, since each client has different dmas.
+DMA client (nand) pass dmas via dmaengine API and request and config
+channel with dmas.
+As you said:
+"The first two cells of dmas are parsed by the dmaengine common code.
+All following dmas cells are parsed handed to the dmac specific driver."
+Then dmac get config info like request line, etc.
+
+"Further, the number of fields
+required for specifying the request line is determined by the dmac driver."
+dmac driver can not get client dmas from dt file but have to get from
+dmaengine API, right?
+
+Besides, still not find of_dma_request_named_channel in latest linux-next.git.
+So dmac driver have to wait?
+
+If request line is must config, how about extend dma_slave_config?
+struct dma_slave_config {
+~
+u32 request_line;
+}
+Then dmac driver could get "request line" no matter using DT or pdata.
 
 
-> +#define EXYNOS5_PA_I2S1                        0x12D60000
-> +#define EXYNOS5_PA_I2S2                        0x12D70000
+>> >> >> +static struct of_device_id mmp_pdma_dt_ids[] = {
+>> >> >> +     { .compatible = "mrvl,mmp-pdma", .data = (void *)MMP_PDMA},
+>> >> >> +     {}
+>> >> >> +};
+>> >> >> +MODULE_DEVICE_TABLE(of, mmp_pdma_dt_ids);
+>> >> >
+>> >> > You don't actually use the data field afaict, so that can be removed.
+>> >>
+>> >> We keep .data as type, for easy extension, in case future soc register
+>> >> may be different.
+>> >> It is fine to remove the data field, as well as mmp_pdma_id_table.
+>> >
+>> > Ok. Note that in many cases it's actually easier to point the .data
+>> > field to a data structure rather than an integer, it's valid either
+>> > way. Unfortunately the type is different between of_device_id and
+>> > platform_device_id, but a pointer also works for both.
+>>
+>> Yes, also find .data is different between of_device_id and platform_device_id.
+>> So using strong conversion for simplification.
+>> Will change to data structure if you think it is more professional.
 >
->  #define EXYNOS4_PA_PCM0                        0x03840000
->  #define EXYNOS4_PA_PCM1                        0x13980000
-> --
-> 1.7.4.4
+> Just do whatever your fits your needs, I'm just noting that in a lot of
+> drivers, using a structure ends up being easier.
+
+If so, prefer using strong conversion since it is simple :)
+If using data structure, one structure with single member "type" has
+to be defined.
+
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> > If you think that you will see different kinds of pdma that you need
+>> > to distinguish here, I would recommend that you use a more specific
+>> > "compatible" identifier, like
+>> >
+>> >         { .compatible = "marvell,pxa168-pdma", };
+>> >
+>> mmp-tdma.c have to take this, since register difference in pxa910 and pxa688.
+>> mmp-pdma.c register keeps same since pxa3xx, we will remove the type.
+>
+> In the pdma case, I would suggest that you also specify the name of the soc
+> there, but in the device tree list the device as compatible with the older
+> one, e.g. for pxa930:
+>
+>         compatible = "marvell,pxa930-pdma", "marvell,pxa300-pdma";
+>
+> This way the driver needs to know about only one, but is ready for future
+> extensions, e.g. if a future pxa985 is slightly different.
 
+How about using the "marvell,mmp-pdma" on all platforms with same
+register, including pxa3xx.
+If future pxa985 is slightly different, we add "marvell,pxa985-pdma" then.
 
-
--- 
-With warm regards,
-Sachin
+If using different name on different platform, they may too many names.
+>
+>         Arnd
