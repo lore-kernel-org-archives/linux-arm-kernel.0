@@ -1,47 +1,85 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Jul 2012 16:33:52 +0100
-Subject: [PATCH 10/24] xen: do not compile manage, balloon, pci,
- acpi and cpu_hotplug on ARM
+Date: Thu, 26 Jul 2012 16:33:47 +0100
+Subject: [PATCH 05/24] xen/arm: empty implementation of grant_table arch
+ specific functions
 In-Reply-To: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
-Message-ID: <1343316846-25860-10-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343316846-25860-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/Makefile |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/xen/Makefile      |    2 +-
+ arch/arm/xen/grant-table.c |   53 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/xen/grant-table.c
 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index fc34886..0cfa6c47 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -1,11 +1,15 @@
--obj-y	+= grant-table.o features.o events.o manage.o balloon.o
-+ifneq ($(CONFIG_ARM),y)
-+obj-y	+= manage.o balloon.o
-+obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
-+obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-+endif
-+obj-y	+= grant-table.o features.o events.o
- obj-y	+= xenbus/
- 
- nostackp := $(call cc-option, -fno-stack-protector)
- CFLAGS_features.o			:= $(nostackp)
- 
- obj-$(CONFIG_BLOCK)			+= biomerge.o
--obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
- obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
- obj-$(CONFIG_XEN_BALLOON)		+= xen-balloon.o
- obj-$(CONFIG_XEN_SELFBALLOONING)	+= xen-selfballoon.o
-@@ -17,7 +21,6 @@ obj-$(CONFIG_XEN_SYS_HYPERVISOR)	+= sys-hypervisor.o
- obj-$(CONFIG_XEN_PVHVM)			+= platform-pci.o
- obj-$(CONFIG_XEN_TMEM)			+= tmem.o
- obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
--obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
- obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= xen-pciback/
- obj-$(CONFIG_XEN_PRIVCMD)		+= xen-privcmd.o
- obj-$(CONFIG_XEN_ACPI_PROCESSOR)	+= xen-acpi-processor.o
+diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+index b9d6acc..4384103 100644
+--- a/arch/arm/xen/Makefile
++++ b/arch/arm/xen/Makefile
+@@ -1 +1 @@
+-obj-y		:= enlighten.o hypercall.o
++obj-y		:= enlighten.o hypercall.o grant-table.o
+diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
+new file mode 100644
+index 0000000..0a4ee80
+--- /dev/null
++++ b/arch/arm/xen/grant-table.c
+@@ -0,0 +1,53 @@
++/******************************************************************************
++ * grant_table.c
++ * ARM specific part
++ *
++ * Granting foreign access to our memory reservation.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version 2
++ * as published by the Free Software Foundation; or, when distributed
++ * separately from the Linux kernel or incorporated into other
++ * software packages, subject to the following license:
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this source file (the "Software"), to deal in the Software without
++ * restriction, including without limitation the rights to use, copy, modify,
++ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
++ * and to permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <xen/interface/xen.h>
++#include <xen/page.h>
++#include <xen/grant_table.h>
++
++int arch_gnttab_map_shared(unsigned long *frames, unsigned long nr_gframes,
++			   unsigned long max_nr_gframes,
++			   void **__shared)
++{
++	return -1;
++}
++
++void arch_gnttab_unmap(void *shared, unsigned long nr_gframes)
++{
++	return;
++}
++
++int arch_gnttab_map_status(uint64_t *frames, unsigned long nr_gframes,
++			   unsigned long max_nr_gframes,
++			   grant_status_t **__shared)
++{
++	return -1;
++}
 -- 
 1.7.2.5
