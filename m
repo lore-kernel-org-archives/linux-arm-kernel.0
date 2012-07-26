@@ -1,39 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:44 +0100
-Subject: [PATCH 11/21] ARM: ux500: Add all encompassing Sound node to DB8500
- Device Tree
+Date: Thu, 26 Jul 2012 11:28:47 +0100
+Subject: [PATCH 14/21] ARM: ux500: Enable HIGHMEM on all mop500 platforms
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the node which links together the platform (PCM), codec (AB8500)
-and the CPU side Digital Audio Interface (MCP) with the machine driver.
+The current kernel commandline for ux500 based devices includes
+hard-coded allocations for things like mali and hwmem, which
+actually run over lowmem. Here we enable highmem in order to
+avoid memory corruption errors.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-ux500/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index b9d4405..978dd60 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -595,6 +595,14 @@
- 			compatible = "stericsson,ux500-pcm";
- 		};
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index c013bbf..f51c351 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -28,6 +28,7 @@ config MACH_MOP500
+ 	select I2C
+ 	select I2C_NOMADIK
+ 	select SOC_BUS
++	select HIGHMEM
+ 	help
+ 	  Include support for the MOP500 development platform.
  
-+		sound {
-+			compatible = "stericsson,snd-soc-mop500";
-+
-+			platform-pcm-dma = <&pcm>;
-+			cpu-dai = <&msp1 &msp3>;
-+			audio-codec = <&codec>;
-+		};
-+
- 		msp0: msp at 80123000 {
- 			compatible = "stericsson,ux500-msp-i2s";
- 			reg = <0x80123000 0x1000>;
 -- 
 1.7.9.5
