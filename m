@@ -1,28 +1,15 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 26 Jul 2012 13:20:44 +0200
-Subject: [PATCH v2 4/4] fbdev: sh_mobile_lcdc: use dma_mmap_coherent if
- available
-In-Reply-To: <1343301191-26001-5-git-send-email-hdk@igel.co.jp>
-References: <1343301191-26001-1-git-send-email-hdk@igel.co.jp>
- <1343301191-26001-5-git-send-email-hdk@igel.co.jp>
-Message-ID: <1820152.JumtPU1V17@avalon>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Thu, 26 Jul 2012 13:20:33 +0200
+Subject: [PATCH 0/4] Fix clocks for i.MX27 in mx2_camera.c
+Message-ID: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eiraku-san,
+The following series follows the steps purposed by Guennadi
+(http://www.spinics.net/lists/arm-kernel/msg185555.html) in
+order to fix clock handlings for i.MX27 in mx2_camera.c
 
-On Thursday 26 July 2012 20:13:11 Hideki EIRAKU wrote:
-> fb_mmap() implemented in fbmem.c uses smem_start as the physical
-> address of the frame buffer.  In the sh_mobile_lcdc driver, the
-> smem_start is a dma_addr_t that is not a physical address when IOMMU is
-> enabled.  dma_mmap_coherent() maps the address correctly.  It is
-> available on ARM platforms.
-> 
-> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
--- 
-Regards,
-
-Laurent Pinchart
+[PATCH 1/4] i.MX27: Fix emma-prp and csi clocks.
+[PATCH 2/4] media: mx2_camera: Mark i.MX25 support as BROKEN.
+[PATCH 3/4] Schedule removal of i.MX25 support in mx2_camera.c
+[PATCH 4/4] media: mx2_camera: Fix clock handling for i.MX27.
