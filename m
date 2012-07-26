@@ -1,51 +1,42 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 26 Jul 2012 10:35:47 +0200
-Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
-In-Reply-To: <201207252006.44523.arnd@arndb.de>
-References: <4FBE4FE7.3010005@atmel.com> <4FC722B7.10409@atmel.com>
- <201207252006.44523.arnd@arndb.de>
-Message-ID: <50110163.70002@atmel.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 26 Jul 2012 10:36:55 +0200
+Subject: [PATCH v2 1/2] arm/dts: AM33XX: Add D_CAN device tree data
+In-Reply-To: <500FE9FC.7070303@mvista.com>
+References: <1343219012-19472-1-git-send-email-anilkumar@ti.com>
+ <1343219012-19472-2-git-send-email-anilkumar@ti.com>
+ <500FE9FC.7070303@mvista.com>
+Message-ID: <501101A7.2030503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 25.07.2012 14:43, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 25-07-2012 16:23, AnilKumar Ch wrote:
+> 
+>> Add Bosch D_CAN controller device tree data to AM33XX dtsi file
+>> by adding d_can device node with all the necessary parameters.
+> 
+>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>> ---
+>>   arch/arm/boot/dts/am33xx.dtsi |    5 +++++
+>>   1 file changed, 5 insertions(+)
+> 
+>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>> index 9b974dc..2db2ffb 100644
+>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>> @@ -163,5 +163,10 @@
+>>   			#size-cells = <0>;
+>>   			ti,hwmods = "i2c3";
+>>   		};
+>> +
+>> +		dcan1: d_can at 481D0000 {
+> 
+>     Address postfix in the node name and no "reg" property?
 
-Le 07/25/2012 10:06 PM, Arnd Bergmann a ?crit :
-> On Thursday 31 May 2012, Nicolas Ferre wrote:
->>
->> On 05/24/2012 05:12 PM, Nicolas Ferre :
->>> Hi Arnd, hi Olof,
->>
->> Ping?
->>
->> (or maybe you will have a look at this after the merge window...)
->>
->
-> I've just gone through all old pull requests that I had somewhere in
-> my inbox and this turned out to be one that we never pulled.
->
-> It looks like it still applies and we should send it to Linus as as
-> late branch this time, given that we screwed up and it was there
-> all the time.
->
-> Nicolas, can you please confirm?
->
-
-Nicolas is on vacation, he'll be back on week 32.
-
-Nicolas and Olof discussed about this addition of ifdefs to manage the 
-two drivers. They agreed to remove platform data for the old driver.
-
-It will be great to go ahead with this patch. I see three solutions:
-- take the patch and we will do a new patch to remove old platform data 
-for 3.7 when at91-mci will be totally removed but it seems that Olof 
-doesn't like this solution.
-- I can write a new patch to remove old platform data as planned by 
-Nicolas. If Jean-Christophe gives his acked-by, you could take it.
-- wait Nicolas' return but it may be too late then we won't have the 
-smooth transition we wanted.
+This still works due to the hwmod mappings OMAP relies on. I would still
+put it there, so the switch to real DT definitions will be less painful.
 
 
-Regards
-
-Ludovic
+Daniel
