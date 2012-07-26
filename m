@@ -1,52 +1,67 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 26 Jul 2012 14:58:23 -0700
-Subject: [PATCH] ARM: OMAP2+: ads7846 init: fix fault caused by freeing
- pen-down GPIO
-In-Reply-To: <5011B465.70605@windriver.com> (zumeng chen's message of "Fri, 27
- Jul 2012 05:19:33 +0800")
-References: <1342048700-15040-1-git-send-email-khilman@ti.com>
- <500D494D.8020606@compulab.co.il> <500D4F2A.9090706@compulab.co.il>
- <87zk6mpbfa.fsf@ti.com> <5011B465.70605@windriver.com>
-Message-ID: <87ipdambgg.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Jul 2012 22:05:51 +0000
+Subject: Orion Pull request
+In-Reply-To: <20120726183941.GC15626@lunn.ch>
+References: <20120724081732.GR18778@lunn.ch>
+ <201207260707.45157.arnd@arndb.de> <20120726183941.GC15626@lunn.ch>
+Message-ID: <201207262205.52381.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"zumeng.chen" <zchen@windriver.com> writes:
+On Thursday 26 July 2012, Andrew Lunn wrote:
+> So, here is what i think you mean....
+> 
+> The SPI pull request is here:
+> 
+> https://lkml.org/lkml/2012/7/25/204
+> 
+> and says
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git tags/spi-3.6
+> 
+> I cannot find a pull request for i2c-embedded for 3.6. For 3.5 it was:
+> 
+> git://git.pengutronix.de/git/wsa/linux.git i2c-embedded/for-next
+> 
+> I've no idea if this is stable or not. I need to ask Wolfram.
 
-> On 2012?07?27? 03:30, Kevin Hilman wrote:
->> + Zumeng Chen
->>
->> Igor Grinberg<grinberg@compulab.co.il>  writes:
->>
->>> Hi Kevin,
->>>
->>> I've just noticed that the patch has been modified by Arnd in a way
->>> that of course will trigger GPIO use without being requested.
->>> I'm sorry, I was not available by that time Arnd changed the patch.
->> Your right, your original patch isn't the problem.  I found the root
->> cause.
->>
->> The real problem is actually introduced by the merge of your patch from
->> the arm-soc/cleanup branch, and this one from Zumeng Chen: commit
->> 16aced80f6 (ARM: OMAP3530evm: set pendown_state and debounce time for
->> ads7846) from the arm-soc/boards branch.
->>
->> However, looking closer at the one from Zumeng, that one is clearly not
->> right.  It unconditionally adds a *board-specific* ->get_pendown_state
->> function to the pdata that is common to *all* boards.  That's just wrong
->> and has the side-effect of making ->get_pendown_state() wrong on every
->> board except the OMAP3EVM.  Oops.
->>
->> So, IMO, in addition to $SUBJECT patch, in order to get the touchscreen
->> GPIO working on non OMAP3EVM boards, we also need something like this as
->> well.
-> Definitely, thanks Kevin.
->> Igor, Zumeng, could you try this out on your boards anc confirm if it's
->> working?  I currently don't have a board setup with a touchscreen in my
->> board farm.
-> Acked
+Right. 
 
-Did you test this on your board?  If so, could you respond with a
-Tested-by tag?  Thanks.
+> :~/B3/QNAP/linux$ git checkout v3.5-rc7   
+> :~/B3/QNAP/linux$ git checkout -b v3.5-rc7-dt
+> :~/B3/QNAP/linux$ git remote add spi git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git
+> :~/B3/QNAP/linux$ git fetch spi
+> :~/B3/QNAP/linux$ git merge spi-3.6
+> :~/B3/QNAP/linux$ git remote add i2c-embedded git://git.pengutronix.de/git/wsa/linux.git
+> :~/B3/QNAP/linux$ git fetch i2c-embedded
+> :~/B3/QNAP/linux$ git merge i2c-embedded/i2c-embedded/for-next
 
-Kevin
+Note that it's also reasonable to base this on v3.5 rather than v3.5-rc7. The important
+part is to use a tag from Linus as the base. A shortcut for the 'remote add', 'fetch',
+'merge' is to use
+
+'git pull git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git tags/spi-3.6'.
+
+> and then i have
+> 
+> ~/B3/QNAP/linux$ git log --oneline
+> afddda0 Merge remote-tracking branch 'i2c-embedded/i2c-embedded/for-next' into v
+> 0a6f855 Merge tag 'spi-3.6' into v3.5-rc7-dt
+> 5db20c4 Revert "i2c: tegra: convert normal suspend/resume to *_noirq"
+> b61d157 I2C: MV64XYZ: Add Device Tree support
+> 8ceffa7 spi/orion: remove uneeded spi_info
+> d76ea24 spi/bcm63xx: fix clock configuration selection
+> f814f9a spi/orion: add device tree binding
+> 24ab3275 spi/omap2: mark omap2_mcspi_master_setup as __devinit
+> a3ce9a8 spi: omap2-mcspi: Fix the below warning
+> b316590 spi: Add AD-FMCOMMS1-EBZ I2C-SPI bridge driver
+> 6f535b9 i2c: stu300: use devm managed resources
+> 84a1caf Linux 3.5-rc7
+> ...
+> 
+> So if i understand you right, i can now cherry-pick my patches into
+> this branch, test them and send you a pull request?
+
+Yes.
+
+	Arnd
