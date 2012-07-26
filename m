@@ -1,58 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 16:01:14 +0100
-Subject: [PATCH 20/21] ASoC: codecs: Enable AB8500 CODEC for Device Tree
-In-Reply-To: <20120726142825.GK3099@opensource.wolfsonmicro.com>
-References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
- <1343298534-13611-21-git-send-email-lee.jones@linaro.org>
- <20120726115055.GD3099@opensource.wolfsonmicro.com>
- <50114D71.9060700@linaro.org>
- <20120726142825.GK3099@opensource.wolfsonmicro.com>
-Message-ID: <50115BBA.2020400@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jul 2012 16:05:35 +0100
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <50109233.3090302@ti.com>
+References: <4FD64083.3020800@ti.com>
+ <20120612092842.GA2991@mudshark.cambridge.arm.com>
+ <4FD7B1DC.30108@ti.com>
+ <20120612213150.GC24380@mudshark.cambridge.arm.com>
+ <4FD7C597.7060501@ti.com>
+ <20120702095539.GD22239@mudshark.cambridge.arm.com>
+ <4FF1D15E.7040301@ti.com>
+ <20120702220117.GD25234@mudshark.cambridge.arm.com>
+ <4FF6340A.6020409@ti.com> <50109233.3090302@ti.com>
+Message-ID: <20120726150534.GD6382@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/12 15:28, Mark Brown wrote:
-> On Thu, Jul 26, 2012 at 03:00:17PM +0100, Lee Jones wrote:
->> On 26/07/12 12:50, Mark Brown wrote:
->
->>> Yet again no binding documentation....
->
->> RFC. ;)
->
->> I'll write the documentation when/if the properties are accepted.
->
-> No, write the documentation.  It's way too much effort to reverse
-> engineer the bindings from the code.
->
->>>> +		default :
->>>> +			codec->ear_cmv = EAR_CMV_UNKNOWN;
->>>> +			dev_err(dev, "Unsuitable earpiece voltage found in DT\n");
->
->>> The platform data code picks a default, can't the DT code do the same?
->
->> No, I don't think that it does? The original code returns -EINVAL
->> unless a value is specified.
->
-> The code doesn't specify values for the enumeration so it ought to
-> default to EAR_CMV_0_95V if nothing is specified.
+On Thu, Jul 26, 2012 at 01:41:23AM +0100, Jon Hunter wrote:
+> Hi Will,
 
-Ah, I see what you mean. I guess we could compromise and print a warning 
-_and_ fall back to the 0th original emum.
+Hi Jon,
 
->> The original author is keen to have a clear error message in case
->> users try to specify non-exact values. I'd rather we fail-out than
->> use incorrect values which would be a great deal harder for a user
->> to debug.
->
-> By that argument all the properties should be mandatory but it's only
-> this one IIRC.
+> On 07/05/2012 07:40 PM, Jon Hunter wrote:
+> I just wanted to let you know that I have been updating the PMU patches
+> for OMAP. Latest can be found here [1]. I have not included Paul's patch
+> [2] in this series at the moment, because although it works well for
+> OMAP4, I need to create the HWMOD structures for OMAP3. Without these
+> structures it breaks OMAP3 PMU support. Once this is done we should be
+> able to get rid for the OMAP3 dependency on ETM. Unfortunately, Benoit
+> (Mr HWMOD) is out on his holidays but should be back next week and then
+> maybe he can give me some guidance on this HWMOD stuff.
 
-This is the only value which the user can pick an obscure value, such as 
-913, thinking they can pick 913mV. I'm happy to fall-back, as long as 
-Ola is too.
+Ok, thanks for updating me. I've pushed the patches out onto my
+perf/omap4-dev branch as that seems to be a good place to collate the
+current state of things. I've not tried doing anything with it yet though.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Do you know when Benoit will be back online?
+
+Will
