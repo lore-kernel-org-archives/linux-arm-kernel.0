@@ -1,44 +1,32 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 26 Jul 2012 13:20:34 +0200
-Subject: [PATCH 1/4] i.MX27: Fix emma-prp and csi clocks.
+Date: Thu, 26 Jul 2012 13:20:35 +0200
+Subject: [PATCH 2/4] media: mx2_camera: Mark i.MX25 support as BROKEN.
 In-Reply-To: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
 References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1343301637-19676-2-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1343301637-19676-3-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naming of emma-prp related clocks for the i.MX27 is not correct.
+i.MX25 support is known to have been broken for
+almost a year.
 
 Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- arch/arm/mach-imx/clk-imx27.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/media/video/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index b1d343c..6e9cb02 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -223,7 +223,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[per3_gate], "per", "imx-fb.0");
- 	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
--	clk_register_clkdev(clk[csi_ahb_gate], NULL, "mx2-camera.0");
-+	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "mx2-camera.0");
- 	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-@@ -250,8 +250,10 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[i2c2_ipg_gate], NULL, "imx-i2c.1");
- 	clk_register_clkdev(clk[owire_ipg_gate], NULL, "mxc_w1.0");
- 	clk_register_clkdev(clk[kpp_ipg_gate], NULL, "imx-keypad");
--	clk_register_clkdev(clk[emma_ahb_gate], "ahb", "imx-emma");
--	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "imx-emma");
-+	clk_register_clkdev(clk[emma_ahb_gate], "emma-ahb", "mx2-camera.0");
-+	clk_register_clkdev(clk[emma_ipg_gate], "emma-ipg", "mx2-camera.0");
-+	clk_register_clkdev(clk[emma_ahb_gate], "ahb", "m2m-emmaprp.0");
-+	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "m2m-emmaprp.0");
- 	clk_register_clkdev(clk[iim_ipg_gate], "iim", NULL);
- 	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
- 	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
+diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
+index c0b9233..af9d2d0 100644
+--- a/drivers/media/video/Kconfig
++++ b/drivers/media/video/Kconfig
+@@ -1136,7 +1136,7 @@ config VIDEO_MX2_HOSTSUPPORT
+ 
+ config VIDEO_MX2
+ 	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
+-	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
++	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || (ARCH_MX25 && BROKEN))
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select VIDEO_MX2_HOSTSUPPORT
+ 	---help---
 -- 
 1.7.9.5
