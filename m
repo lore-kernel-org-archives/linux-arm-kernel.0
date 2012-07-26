@@ -1,155 +1,172 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 26 Jul 2012 12:46:06 +0800
-Subject: [PATCH 1/3] dmaengine: mmp-pdma support
-In-Reply-To: <201207250858.39420.arnd@arndb.de>
-References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
- <201207250601.06866.arnd@arndb.de>
- <CAMj5Bkh6XBBR1f99X4oKS5kbF2y7Lxpgp2jYB-6vv2q_8ej5Lg@mail.gmail.com>
- <201207250858.39420.arnd@arndb.de>
-Message-ID: <CAMj5BkigKhGE525at_pdN7cmav0K3-yfVmFOmWunmf4M_pBU2Q@mail.gmail.com>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Thu, 26 Jul 2012 10:21:49 +0530
+Subject: [PATCH V2 6/7] ARM: SPEAr13xx: Add auxdata for Ethernet
+ controller.
+In-Reply-To: <201207251710.53683.arnd@arndb.de>
+References: <cover.1342171151.git.vipulkumar.samar@st.com>
+ <201207250631.54157.arnd@arndb.de>
+ <20120725073406.GM19660@localhost.localdomain>
+ <201207251710.53683.arnd@arndb.de>
+Message-ID: <20120726045149.GQ19660@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 4:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 25 July 2012, zhangfei gao wrote:
->
->> > Ah, so it is the request line. Now the current plan for this is to go
->> > into the "dmas" property of the child device using the dma engine binding.
->> >
->> > That way, the driver will end up asking for a channel that matches what
->> > is specified for the device, e.g.
->> >
->> >         nand {
->> >                 ...
->> >                 dmas = <&pdma 3 0x1184>;
->> >         };
->> >
->> > I believe this is normally set through the filter function when asking
->> > for a channel on other drivers, not through slave_config.
->>
->> It is great that the request line is already been considered.
->> Still want to double confirm, it is dmaengine.c will parse out "the
->> request line",
->> Dma-engine driver will get request line from dmaengine.c, right?
->> So there is dependence.
->> Or dmaengine driver parse the request line itself from client driver?
->>
->> Some client may require more than one dma channel,
->> such as camera, YUV three channels are required.
->>
->> camera {
->>         ...
->>                 dmas = <&pdma 1 0x1110 /* Y */
->>                 &pdma 1 0x1114 /* U */
->>                 &pmaa 1 0x1118>; /* V */
->>          };
->>
->> Besides, we also have to consider how to parse "request line" if using pdata.
->
-> The current plan is to allow an arbitrary number of channels in the client,
-> which can all go to the same or different dmaengine drivers. You can also
-> specify multiple channels that can be used as alternatives, by adding a
-> dma-names property and naming them the same. Further, the number of fields
-> required for specifying the request line is determined by the dmac driver.
-> The first two cells of each specifier are parsed by the dmaengine common
-> code and all following ones are parsed handed to the dmac specific driver.
->
-> A complex example would be
->
->                  dmas = <&pdma 1 0x1110   /* Y on pdma */
->                         &tdma 1 0x100 32  /* Y on tdma */
->                         &pdma 1 0x1114    /* U */
->                         &tdma 1 0x200 32  /* U */
->                         &pmaa 1 0x1118    /* V */
->                         &tdma 1 0x300 32>; /* V */
->                 dma-names = "Y", "Y", "U", "U", "V", "V";
->
-> In this case the pdma node would set #dma-cells=<3> and the tdma node would
-> set #dma-cells=<4> in order to pass two separate arguments. Through the
-> dma-names property, the common code can identify which channels belong
-> together and the driver just needs to ask for a channel like
->
->         chan_y = of_dma_request_named_channel(pdev, "Y");
->
+Hi Arnd,
 
-Thanks Arnd for patient explain.
+On Wed, Jul 25, 2012 at 05:10:53PM +0000, Arnd Bergmann wrote:
+> On Wednesday 25 July 2012, Shiraz Hashim wrote:
+> > On Wed, Jul 25, 2012 at 06:31:53AM +0000, Arnd Bergmann wrote:
+> > > Can you post here the complete set of callback implementations
+> > > that you have in your development trees at the moment? That should
+> > > help us determine which case we're talking about here.
+> > 
+> > There are following types of callbacks (involving SoC/platform) seen
+> > generally in our case,
+> > 
+> >   * parent clk selection -
+> >         driver is not aware about various clock sources (which also
+> >         varies from platform to platform) and hence can only be
+> >         programmed by corresponding platform.
+> > 
+> >         This is the case in Ethernet, audio, etc.
+> >
+> >   * sata controller
+> >         Similar to OTG case which involves clock initialization.
+>  
+> This should definitely be moved into the drivers. A lot of drivers
+> enable and program clocks using the generic clock interfaces, so
+> there is no point using a callback.
+>
+> Note that since stmmac is an architecture independent driver, this
+> depends on Mark Brown's patch to provide empty stubs for
+> the clock management functions on architectures that don't yet
+> use it.
 
-Still want to double confirm the understand:
-DMA client (nand, camera) get dmas, since each client has different dmas.
-DMA client (nand) pass dmas via dmaengine API and request and config
-channel with dmas.
-As you said:
-"The first two cells of dmas are parsed by the dmaengine common code.
-All following dmas cells are parsed handed to the dmac specific driver."
-Then dmac get config info like request line, etc.
+Yes, this is true for clocks associated with devices and we do handle
+that in this way.
 
-"Further, the number of fields
-required for specifying the request line is determined by the dmac driver."
-dmac driver can not get client dmas from dt file but have to get from
-dmaengine API, right?
+I was talking more of cases where, we need to
 
-Besides, still not find of_dma_request_named_channel in latest linux-next.git.
-So dmac driver have to wait?
+   * select clock sources (parents) about which driver has no
+     knowledge and may vary across boards.
+   * perform initializations which are more than clock, like phy
+     initialization/programming etc. This is SoC dependant.
 
-If request line is must config, how about extend dma_slave_config?
-struct dma_slave_config {
-~
-u32 request_line;
-}
-Then dmac driver could get "request line" no matter using DT or pdata.
+> >   * spi controller
+> >         This is little hack in the h/w. As part of s/w controlled chip
+> >         select/deselect in spi-pl022, we need to write to some system
+> >         specific register.
+> > 
+> >   * OTG controller
+> >         phy clock initialization which involves series of steps
+> >         including powering down, etc.
+> > 
+> >   * NAND controller
+> >         bank selection on runtime by writing to system registers
+> 
+> I don't understand any of these, so unless you post the code
+> that you want help with as I asked above, I'll assume that you find
+> the solution yourself and don't need a callback ;-)
+
+Some of them are,
+
+- fsmc NAND controller 
+
+        -- include/linux/mtd/fsmc.h
+
+        struct fsmc_nand_platform_data {
+                ...
+
+                void (*select_bank)(uint32_t bank, uint32_t busw);
+
+                ...
+
+        };
 
 
->> >> >> +static struct of_device_id mmp_pdma_dt_ids[] = {
->> >> >> +     { .compatible = "mrvl,mmp-pdma", .data = (void *)MMP_PDMA},
->> >> >> +     {}
->> >> >> +};
->> >> >> +MODULE_DEVICE_TABLE(of, mmp_pdma_dt_ids);
->> >> >
->> >> > You don't actually use the data field afaict, so that can be removed.
->> >>
->> >> We keep .data as type, for easy extension, in case future soc register
->> >> may be different.
->> >> It is fine to remove the data field, as well as mmp_pdma_id_table.
->> >
->> > Ok. Note that in many cases it's actually easier to point the .data
->> > field to a data structure rather than an integer, it's valid either
->> > way. Unfortunately the type is different between of_device_id and
->> > platform_device_id, but a pointer also works for both.
->>
->> Yes, also find .data is different between of_device_id and platform_device_id.
->> So using strong conversion for simplification.
->> Will change to data structure if you think it is more professional.
->
-> Just do whatever your fits your needs, I'm just noting that in a lot of
-> drivers, using a structure ends up being easier.
+        -- arch/arm/mach-spear13xx/spear13xx.c
 
-If so, prefer using strong conversion since it is simple :)
-If using data structure, one structure with single member "type" has
-to be defined.
+        void nand_select_bank(u32 bank, u32 busw)
+        {
+                u32 fsmc_cfg;
 
->
->> > If you think that you will see different kinds of pdma that you need
->> > to distinguish here, I would recommend that you use a more specific
->> > "compatible" identifier, like
->> >
->> >         { .compatible = "marvell,pxa168-pdma", };
->> >
->> mmp-tdma.c have to take this, since register difference in pxa910 and pxa688.
->> mmp-pdma.c register keeps same since pxa3xx, we will remove the type.
->
-> In the pdma case, I would suggest that you also specify the name of the soc
-> there, but in the device tree list the device as compatible with the older
-> one, e.g. for pxa930:
->
->         compatible = "marvell,pxa930-pdma", "marvell,pxa300-pdma";
->
-> This way the driver needs to know about only one, but is ready for future
-> extensions, e.g. if a future pxa985 is slightly different.
+                if (cpu_is_spear1340()) {
+        #ifdef CONFIG_CPU_SPEAR1340
+                        fsmc_cfg = readl(VA_SPEAR1340_FSMC_CFG);
+        #endif
+                } else 
+                        fsmc_cfg = readl(VA_FSMC_CFG);
 
-How about using the "marvell,mmp-pdma" on all platforms with same
-register, including pxa3xx.
-If future pxa985 is slightly different, we add "marvell,pxa985-pdma" then.
+                fsmc_cfg &= ~(NAND_BANK_MASK << NAND_BANK_SHIFT);
+                fsmc_cfg |= (bank << NAND_BANK_SHIFT);
 
-If using different name on different platform, they may too many names.
->
->         Arnd
+                if (busw)
+                        fsmc_cfg |= 1 << NAND_DEV_WIDTH16;
+                else
+                        fsmc_cfg &= ~(1 << NAND_DEV_WIDTH16);
+
+                if (cpu_is_spear1340()) {
+        #ifdef CONFIG_CPU_SPEAR1340
+                        writel(fsmc_cfg, VA_SPEAR1340_FSMC_CFG);
+        #endif
+                } else
+                        writel(fsmc_cfg, VA_FSMC_CFG);
+        }
+
+
+- SATA Controller
+
+        -- include/linux/ahci_platform.h
+
+        struct ahci_platform_data {
+                int (*init)(struct device *dev, void __iomem *addr);
+                void (*exit)(struct device *dev);
+                const struct ata_port_info *ata_port_info;
+                unsigned int force_port_map;
+                unsigned int mask_port_map;
+        };
+
+
+        -- arch/arm/mach-spear13xx/spear1340.c
+
+        void sata_miphy_exit(struct device *dev)
+        {
+                writel(0, VA_SPEAR1340_PCIE_SATA_CFG);
+                writel(0, VA_SPEAR1340_PCIE_MIPHY_CFG);
+
+                /* Enable PCIE SATA Controller reset */
+                writel((readl(VA_SPEAR1340_PERIP1_SW_RST) | (0x1000)),
+                                VA_SPEAR1340_PERIP1_SW_RST);
+                msleep(20);
+
+                /* Switch off sata power domain */
+                writel((readl(VA_SPEAR1340_PCM_CFG) & (~0x800)),
+                                VA_SPEAR1340_PCM_CFG);
+                msleep(20);
+        }
+
+        static int sata_miphy_init(struct device *dev, void __iomem *addr)
+        {
+                writel(SPEAR1340_SATA_CFG_VAL, VA_SPEAR1340_PCIE_SATA_CFG);
+                writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
+                                VA_SPEAR1340_PCIE_MIPHY_CFG);
+                /* Switch on sata power domain */
+                writel((readl(VA_SPEAR1340_PCM_CFG) | (0x800)),
+                                VA_SPEAR1340_PCM_CFG);
+                msleep(20);
+                /* Disable PCIE SATA Controller reset */
+                writel((readl(VA_SPEAR1340_PERIP1_SW_RST) & (~0x1000)),
+                                VA_SPEAR1340_PERIP1_SW_RST);
+                msleep(20);
+
+                return 0;
+        }
+
+        static struct ahci_platform_data sata_pdata = {
+                .init = sata_miphy_init,
+                .exit = sata_miphy_exit,
+        };
+
+--
+regards
+Shiraz
