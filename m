@@ -1,44 +1,52 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 27 Jul 2012 07:45:21 +1000
-Subject: PCI mini-summit
-In-Reply-To: <CAErSpo5Ea_Rd2QSUXT13riDgHrkMGiN43+QiFTZYepHi-rg0Vw@mail.gmail.com>
-References: <CAErSpo5Ea_Rd2QSUXT13riDgHrkMGiN43+QiFTZYepHi-rg0Vw@mail.gmail.com>
-Message-ID: <1343339121.2118.5.camel@pasglop>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 Jul 2012 14:58:23 -0700
+Subject: [PATCH] ARM: OMAP2+: ads7846 init: fix fault caused by freeing
+ pen-down GPIO
+In-Reply-To: <5011B465.70605@windriver.com> (zumeng chen's message of "Fri, 27
+ Jul 2012 05:19:33 +0800")
+References: <1342048700-15040-1-git-send-email-khilman@ti.com>
+ <500D494D.8020606@compulab.co.il> <500D4F2A.9090706@compulab.co.il>
+ <87zk6mpbfa.fsf@ti.com> <5011B465.70605@windriver.com>
+Message-ID: <87ipdambgg.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-07-24 at 21:33 -0600, Bjorn Helgaas wrote:
-> We're planning a PCI mini-summit on Tuesday, August 28, in San Diego.
-> If you'd like an invitation, let me know.
-> 
-> We haven't drafted an agenda yet, but based on ideas we've heard so
-> far, we'll likely talk about some of the following topics:
-> 
->       Host bridge hotplug
->       PCI hotplug core rework
->       VFIO v2 for KVM
->       Dynamic resource assignment
->       SRIOV
->           Management: driver (module parms) vs core (sysfs?)
->           Dynamic/static: changing number of VFs requires driver cooperation
->       Candidates for unification/moving from arch code to the core:
->           res->parent usage
->           Claiming resources
->           Unassigned BAR detection
->           ECAM (a.k.a. MMCONFIG)
->           Domain (a.k.a. PCI segment) support
->           MPS config
->           MPS safety with respect to hotplug
-> 
-> I've also heard that PCI-on-ARM may be of interest, so if you want to
-> talk about that and possibly add some topics, let me know.
+"zumeng.chen" <zchen@windriver.com> writes:
 
-We don't necessarily need a firm agenda, we can put the list of topics
-and pick them in time with a hourly stop to decide whether to move on to
-a different one.
+> On 2012?07?27? 03:30, Kevin Hilman wrote:
+>> + Zumeng Chen
+>>
+>> Igor Grinberg<grinberg@compulab.co.il>  writes:
+>>
+>>> Hi Kevin,
+>>>
+>>> I've just noticed that the patch has been modified by Arnd in a way
+>>> that of course will trigger GPIO use without being requested.
+>>> I'm sorry, I was not available by that time Arnd changed the patch.
+>> Your right, your original patch isn't the problem.  I found the root
+>> cause.
+>>
+>> The real problem is actually introduced by the merge of your patch from
+>> the arm-soc/cleanup branch, and this one from Zumeng Chen: commit
+>> 16aced80f6 (ARM: OMAP3530evm: set pendown_state and debounce time for
+>> ads7846) from the arm-soc/boards branch.
+>>
+>> However, looking closer at the one from Zumeng, that one is clearly not
+>> right.  It unconditionally adds a *board-specific* ->get_pendown_state
+>> function to the pdata that is common to *all* boards.  That's just wrong
+>> and has the side-effect of making ->get_pendown_state() wrong on every
+>> board except the OMAP3EVM.  Oops.
+>>
+>> So, IMO, in addition to $SUBJECT patch, in order to get the touchscreen
+>> GPIO working on non OMAP3EVM boards, we also need something like this as
+>> well.
+> Definitely, thanks Kevin.
+>> Igor, Zumeng, could you try this out on your boards anc confirm if it's
+>> working?  I currently don't have a board setup with a touchscreen in my
+>> board farm.
+> Acked
 
-Unless some people want to actually present something in which case we
-can allocate them a slot (those people need to let us know asap).
+Did you test this on your board?  If so, could you respond with a
+Tested-by tag?  Thanks.
 
-Cheers,
-Ben.
+Kevin
