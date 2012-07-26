@@ -1,146 +1,135 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 26 Jul 2012 21:55:06 +0200
-Subject: [PATCH v3 04/10] ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
+Date: Thu, 26 Jul 2012 21:55:11 +0200
+Subject: [PATCH v3 09/10] of: Add of_pci_parse_ranges()
 In-Reply-To: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1343332512-28762-5-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1343332512-28762-10-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMC code already accesses to PMC registers so it makes sense to
-move this function there as well. While at it, rename the function to
-tegra_pmc_pcie_xclk_clamp() for consistency.
+This new function parses the ranges property of PCI device nodes into
+an array of struct resource elements. It is useful in multiple-port PCI
+host controller drivers to collect information about the ranges that it
+needs to forward to the respective ports.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
 Changes in v3:
-- none
+- new patch
 
-Changes in v2:
-- none
+ drivers/of/of_pci.c    | 84 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/of_pci.h |  2 ++
+ 2 files changed, 85 insertions(+), 1 deletion(-)
 
- arch/arm/mach-tegra/pcie.c | 30 ++++--------------------------
- arch/arm/mach-tegra/pmc.c  | 16 ++++++++++++++++
- arch/arm/mach-tegra/pmc.h  |  1 +
- 3 files changed, 21 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index 576347a..efe71dd 100644
---- a/arch/arm/mach-tegra/pcie.c
-+++ b/arch/arm/mach-tegra/pcie.c
-@@ -42,6 +42,7 @@
- #include <mach/powergate.h>
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 13e37e2..bcff301 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -1,7 +1,8 @@
+ #include <linux/kernel.h>
+ #include <linux/export.h>
+-#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_pci.h>
++#include <linux/slab.h>
+ #include <asm/prom.h>
  
- #include "board.h"
-+#include "pmc.h"
- 
- /* register definitions */
- #define AFI_OFFSET	0x3800
-@@ -145,17 +146,6 @@
- #define  PADS_PLL_CTL_TXCLKREF_DIV10		(0 << 20)
- #define  PADS_PLL_CTL_TXCLKREF_DIV5		(1 << 20)
- 
--/* PMC access is required for PCIE xclk (un)clamping */
--#define PMC_SCRATCH42		0x144
--#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
--
--static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
--
--#define pmc_writel(value, reg) \
--	__raw_writel(value, reg_pmc_base + (reg))
--#define pmc_readl(reg) \
--	__raw_readl(reg_pmc_base + (reg))
--
- /*
-  * Tegra2 defines 1GB in the AXI address map for PCIe.
-  *
-@@ -647,18 +637,6 @@ static int tegra_pcie_enable_controller(void)
- 	return 0;
+ static inline int __of_pci_pci_compare(struct device_node *node,
+@@ -40,3 +41,84 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+ 	return NULL;
  }
- 
--static void tegra_pcie_xclk_clamp(bool clamp)
--{
--	u32 reg;
--
--	reg = pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
--
--	if (clamp)
--		reg |= PMC_SCRATCH42_PCX_CLAMP;
--
--	pmc_writel(reg, PMC_SCRATCH42);
--}
--
- static void tegra_pcie_power_off(void)
- {
- 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
-@@ -666,7 +644,7 @@ static void tegra_pcie_power_off(void)
- 	tegra_periph_reset_assert(tegra_pcie.pex_clk);
- 
- 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
--	tegra_pcie_xclk_clamp(true);
-+	tegra_pmc_pcie_xclk_clamp(true);
- }
- 
- static int tegra_pcie_power_regate(void)
-@@ -675,7 +653,7 @@ static int tegra_pcie_power_regate(void)
- 
- 	tegra_pcie_power_off();
- 
--	tegra_pcie_xclk_clamp(true);
-+	tegra_pmc_pcie_xclk_clamp(true);
- 
- 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
- 	tegra_periph_reset_assert(tegra_pcie.afi_clk);
-@@ -689,7 +667,7 @@ static int tegra_pcie_power_regate(void)
- 
- 	tegra_periph_reset_deassert(tegra_pcie.afi_clk);
- 
--	tegra_pcie_xclk_clamp(false);
-+	tegra_pmc_pcie_xclk_clamp(false);
- 
- 	clk_prepare_enable(tegra_pcie.afi_clk);
- 	clk_prepare_enable(tegra_pcie.pex_clk);
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 7af6a54..399dc3a 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -24,6 +24,10 @@
- #define PMC_CTRL		0x0
- #define PMC_CTRL_INTR_LOW	(1 << 17)
- 
-+/* PMC access is required for PCIE xclk (un)clamping */
-+#define PMC_SCRATCH42		0x144
-+#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
+ EXPORT_SYMBOL_GPL(of_pci_find_child_device);
 +
- static inline u32 tegra_pmc_readl(u32 reg)
- {
- 	return readl(IO_ADDRESS(TEGRA_PMC_BASE + reg));
-@@ -74,3 +78,15 @@ void __init tegra_pmc_init(void)
- 		val &= ~PMC_CTRL_INTR_LOW;
- 	tegra_pmc_writel(val, PMC_CTRL);
- }
-+
-+void tegra_pmc_pcie_xclk_clamp(bool clamp)
++struct resource *of_pci_parse_ranges(struct device_node *node,
++				     unsigned int *countp)
 +{
-+	u32 reg;
++	unsigned int count, i = 0;
++	struct resource *ranges;
++	const __be32 *values;
++	int len, pna, np;
 +
-+	reg = tegra_pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
++	values = of_get_property(node, "ranges", &len);
++	if (!values)
++		return NULL;
 +
-+	if (clamp)
-+		reg |= PMC_SCRATCH42_PCX_CLAMP;
++	pna = of_n_addr_cells(node);
++	np = pna + 5;
 +
-+	tegra_pmc_writel(reg, PMC_SCRATCH42);
++	count = len / (np * sizeof(*values));
++
++	ranges = kzalloc(sizeof(*ranges) * count, GFP_KERNEL);
++	if (!ranges)
++		return NULL;
++
++	pr_debug("PCI ranges:\n");
++
++	while ((len -= np * sizeof(*values)) >= 0) {
++		u64 addr = of_translate_address(node, values + 3);
++		u64 size = of_read_number(values + 3 + pna, 2);
++		u32 type = be32_to_cpup(values);
++		const char *suffix = "";
++		struct resource range;
++
++		memset(&range, 0, sizeof(range));
++		range.start = addr;
++		range.end = addr + size - 1;
++
++		switch ((type >> 24) & 0x3) {
++		case 0:
++			range.flags = IORESOURCE_MEM | IORESOURCE_PCI_CS;
++			pr_debug("  CS  %#x-%#x\n", range.start, range.end);
++			break;
++
++		case 1:
++			range.flags = IORESOURCE_IO;
++			pr_debug("  IO  %#x-%#x\n", range.start, range.end);
++			break;
++
++		case 2:
++			range.flags = IORESOURCE_MEM;
++
++			if (type & 0x40000000) {
++				range.flags |= IORESOURCE_PREFETCH;
++				suffix = "prefetch";
++			}
++
++			pr_debug("  MEM %#x-%#x %s\n", range.start, range.end,
++				 suffix);
++			break;
++
++		case 3:
++			range.flags = IORESOURCE_MEM | IORESOURCE_MEM_64;
++
++			if (type & 0x40000000) {
++				range.flags |= IORESOURCE_PREFETCH;
++				suffix = "prefetch";
++			}
++
++			pr_debug("  MEM %#x-%#x 64-bit %s\n", range.start,
++				 range.end, suffix);
++			break;
++		}
++
++		memcpy(&ranges[i++], &range, sizeof(range));
++		values += np;
++	}
++
++	if (countp)
++		*countp = count;
++
++	return ranges;
 +}
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index 8995ee4..2631c9a 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -19,5 +19,6 @@
- #define __MACH_TEGRA_PMC_H
- 
- void tegra_pmc_init(void);
-+void tegra_pmc_pcie_xclk_clamp(bool clamp);
++EXPORT_SYMBOL_GPL(of_pci_parse_ranges);
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index bb115de..c0db6ea 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -10,5 +10,7 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
+ struct device_node;
+ struct device_node *of_pci_find_child_device(struct device_node *parent,
+ 					     unsigned int devfn);
++struct resource *of_pci_parse_ranges(struct device_node *node,
++				     unsigned int *countp);
  
  #endif
 -- 
