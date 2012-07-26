@@ -1,238 +1,177 @@
 From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Thu, 26 Jul 2012 12:30:20 -0400
-Subject: [Xen-devel] [PATCH 01/24] arm: initial Xen support
-In-Reply-To: <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Thu, 26 Jul 2012 12:33:52 -0400
+Subject: [Xen-devel] [PATCH 02/24] xen/arm: hypercalls
+In-Reply-To: <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120726163020.GB9222@phenom.dumpdata.com>
+ <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120726163352.GC9222@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 04:33:43PM +0100, Stefano Stabellini wrote:
-> - Basic hypervisor.h and interface.h definitions.
-> - Skelethon enlighten.c, set xen_start_info to an empty struct.
-
-Skeleton
-
-> - Do not limit xen_initial_domain to PV guests.
-
-Better wording: Make xen_initial_domain dependent on the SIF_PRIVILIGED_BIT.
-
-Which reminds me - what about PV guests that do PCI passthrough. Aren't
-they "more" priviligied than normal PV guests? Or not really?
+On Thu, Jul 26, 2012 at 04:33:44PM +0100, Stefano Stabellini wrote:
+> Use r12 to pass the hypercall number to the hypervisor.
 > 
-> The new code only compiles when CONFIG_XEN is set, that is going to be
-> added to arch/arm/Kconfig in a later patch.
-
-s/later patch/<name of patch>/
-
+> We need a register to pass the hypercall number because we might not
+> know it at compile time and HVC only takes an immediate argument.
+> 
+> Among the available registers r12 seems to be the best choice because it
+> is defined as "intra-procedure call scratch register".
+> 
+> Use the ISS to pass an hypervisor specific tag.
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  arch/arm/Makefile                     |    1 +
->  arch/arm/include/asm/hypervisor.h     |    6 +++
->  arch/arm/include/asm/xen/hypervisor.h |   19 ++++++++++
->  arch/arm/include/asm/xen/interface.h  |   64 +++++++++++++++++++++++++++++++++
->  arch/arm/xen/Makefile                 |    1 +
->  arch/arm/xen/enlighten.c              |   35 ++++++++++++++++++
->  include/xen/xen.h                     |    2 +-
->  7 files changed, 127 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/include/asm/hypervisor.h
->  create mode 100644 arch/arm/include/asm/xen/hypervisor.h
->  create mode 100644 arch/arm/include/asm/xen/interface.h
->  create mode 100644 arch/arm/xen/Makefile
->  create mode 100644 arch/arm/xen/enlighten.c
+>  arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++++++++++++
+>  arch/arm/xen/Makefile                |    2 +-
+>  arch/arm/xen/hypercall.S             |   65 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 116 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/include/asm/xen/hypercall.h
+>  create mode 100644 arch/arm/xen/hypercall.S
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 0298b00..70aaa82 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -246,6 +246,7 @@ endif
->  core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
->  core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
->  core-$(CONFIG_VFP)		+= arch/arm/vfp/
-> +core-$(CONFIG_XEN)		+= arch/arm/xen/
->  
->  # If we have a machine-specific directory, then include it in the build.
->  core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-> diff --git a/arch/arm/include/asm/hypervisor.h b/arch/arm/include/asm/hypervisor.h
+> diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
 > new file mode 100644
-> index 0000000..b90d9e5
+> index 0000000..4ac0624
 > --- /dev/null
-> +++ b/arch/arm/include/asm/hypervisor.h
-> @@ -0,0 +1,6 @@
-> +#ifndef _ASM_ARM_HYPERVISOR_H
-> +#define _ASM_ARM_HYPERVISOR_H
-> +
-> +#include <asm/xen/hypervisor.h>
-> +
-> +#endif
-> diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
-> new file mode 100644
-> index 0000000..d7ab99a
-> --- /dev/null
-> +++ b/arch/arm/include/asm/xen/hypervisor.h
-> @@ -0,0 +1,19 @@
-> +#ifndef _ASM_ARM_XEN_HYPERVISOR_H
-> +#define _ASM_ARM_XEN_HYPERVISOR_H
-> +
-> +extern struct shared_info *HYPERVISOR_shared_info;
-> +extern struct start_info *xen_start_info;
-> +
-> +/* Lazy mode for batching updates / context switch */
-> +enum paravirt_lazy_mode {
-> +	PARAVIRT_LAZY_NONE,
-> +	PARAVIRT_LAZY_MMU,
-> +	PARAVIRT_LAZY_CPU,
-> +};
-> +
-> +static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
-> +{
-> +	return PARAVIRT_LAZY_NONE;
-> +}
-> +
-> +#endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-> diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
-> new file mode 100644
-> index 0000000..6c3ab59
-> --- /dev/null
-> +++ b/arch/arm/include/asm/xen/interface.h
-> @@ -0,0 +1,64 @@
+> +++ b/arch/arm/include/asm/xen/hypercall.h
+> @@ -0,0 +1,50 @@
 > +/******************************************************************************
-> + * Guest OS interface to ARM Xen.
+> + * hypercall.h
 > + *
-> + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2011
-
-2012
-
+> + * Linux-specific hypervisor handling.
+> + *
+> + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation; or, when distributed
+> + * separately from the Linux kernel or incorporated into other
+> + * software packages, subject to the following license:
+> + *
+> + * Permission is hereby granted, free of charge, to any person obtaining a copy
+> + * of this source file (the "Software"), to deal in the Software without
+> + * restriction, including without limitation the rights to use, copy, modify,
+> + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+> + * and to permit persons to whom the Software is furnished to do so, subject to
+> + * the following conditions:
+> + *
+> + * The above copyright notice and this permission notice shall be included in
+> + * all copies or substantial portions of the Software.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+> + * IN THE SOFTWARE.
 > + */
 > +
-> +#ifndef _ASM_ARM_XEN_INTERFACE_H
-> +#define _ASM_ARM_XEN_INTERFACE_H
+> +#ifndef _ASM_ARM_XEN_HYPERCALL_H
+> +#define _ASM_ARM_XEN_HYPERCALL_H
 > +
-> +#include <linux/types.h>
+> +#include <xen/interface/xen.h>
 > +
-> +#define __DEFINE_GUEST_HANDLE(name, type) \
-> +	typedef type * __guest_handle_ ## name
+> +long privcmd_call(unsigned call, unsigned long a1,
+> +		unsigned long a2, unsigned long a3,
+> +		unsigned long a4, unsigned long a5);
+> +int HYPERVISOR_xen_version(int cmd, void *arg);
+> +int HYPERVISOR_console_io(int cmd, int count, char *str);
+> +int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
+> +int HYPERVISOR_sched_op(int cmd, void *arg);
+> +int HYPERVISOR_event_channel_op(int cmd, void *arg);
+> +unsigned long HYPERVISOR_hvm_op(int op, void *arg);
+> +int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
+> +int HYPERVISOR_physdev_op(int cmd, void *arg);
 > +
-> +#define DEFINE_GUEST_HANDLE_STRUCT(name) \
-> +	__DEFINE_GUEST_HANDLE(name, struct name)
-> +#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
-> +#define GUEST_HANDLE(name)        __guest_handle_ ## name
-> +
-> +#define set_xen_guest_handle(hnd, val)			\
-> +	do {						\
-> +		if (sizeof(hnd) == 8)			\
-> +			*(uint64_t *)&(hnd) = 0;	\
-> +		(hnd) = val;				\
-> +	} while (0)
-> +
-> +#ifndef __ASSEMBLY__
-> +/* Guest handles for primitive C types. */
-> +__DEFINE_GUEST_HANDLE(uchar, unsigned char);
-> +__DEFINE_GUEST_HANDLE(uint,  unsigned int);
-> +__DEFINE_GUEST_HANDLE(ulong, unsigned long);
-> +DEFINE_GUEST_HANDLE(char);
-> +DEFINE_GUEST_HANDLE(int);
-> +DEFINE_GUEST_HANDLE(long);
-> +DEFINE_GUEST_HANDLE(void);
-> +DEFINE_GUEST_HANDLE(uint64_t);
-> +DEFINE_GUEST_HANDLE(uint32_t);
-> +
-> +/* Maximum number of virtual CPUs in multi-processor guests. */
-> +#define MAX_VIRT_CPUS 1
-> +
-> +struct arch_vcpu_info { };
-> +struct arch_shared_info { };
-> +
-> +/* XXX: Move pvclock definitions some place arch independent */
-> +struct pvclock_vcpu_time_info {
-> +	u32   version;
-> +	u32   pad0;
-> +	u64   tsc_timestamp;
-> +	u64   system_time;
-> +	u32   tsc_to_system_mul;
-> +	s8    tsc_shift;
-> +	u8    flags;
-> +	u8    pad[2];
-> +} __attribute__((__packed__)); /* 32 bytes */
-> +
-> +struct pvclock_wall_clock {
-> +	u32   version;
-> +	u32   sec;
-> +	u32   nsec;
-> +} __attribute__((__packed__));
+> +#endif /* _ASM_ARM_XEN_HYPERCALL_H */
+> diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+> index 0bad594..b9d6acc 100644
+> --- a/arch/arm/xen/Makefile
+> +++ b/arch/arm/xen/Makefile
+> @@ -1 +1 @@
+> -obj-y		:= enlighten.o
+> +obj-y		:= enlighten.o hypercall.o
+> diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+> new file mode 100644
+> index 0000000..038cc5b
+> --- /dev/null
+> +++ b/arch/arm/xen/hypercall.S
+> @@ -0,0 +1,65 @@
+> +/******************************************************************************
+> + * hypercall.S
+> + *
+> + * Xen hypercall wrappers
+> + *
+> + * The Xen hypercall calling convention is very similar to the ARM
+> + * procedure calling convention: the first paramter is passed in r0, the
+> + * second in r1, the third in r2 and the third in r3. Considering that
 
-That is weird. It is 4+4+4 = 12 bytes? Don't you want it to be 16 bytes?
+I think you meant 'and the fourth in r3'.
 
+So where does the similarity end?  Just in that we use r12?
+
+> + * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
+> + * in r4, differently from the procedure calling convention of using the
+
+> + * stack for that case.
+> + *
+> + * The hypercall number is passed in r12.
+> + *
+> + * The return value is in r0.
+> + *
+> + * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
+> + * hypercall tag.
+> + *
+> + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +#include <xen/interface/xen.h>
+> +
+> +
+> +/* HVC 0xEA1 */
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define xen_hvc .word 0xf7e08ea1
+> +#else
+> +#define xen_hvc .word 0xe140ea71
 > +#endif
 > +
-> +#endif /* _ASM_ARM_XEN_INTERFACE_H */
-> diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-> new file mode 100644
-> index 0000000..0bad594
-> --- /dev/null
-> +++ b/arch/arm/xen/Makefile
-> @@ -0,0 +1 @@
-> +obj-y		:= enlighten.o
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> new file mode 100644
-> index 0000000..d27c2a6
-> --- /dev/null
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -0,0 +1,35 @@
-> +#include <xen/xen.h>
-> +#include <xen/interface/xen.h>
-> +#include <xen/interface/memory.h>
-> +#include <xen/platform_pci.h>
-> +#include <asm/xen/hypervisor.h>
-> +#include <asm/xen/hypercall.h>
-> +#include <linux/module.h>
-> +
-> +struct start_info _xen_start_info;
-> +struct start_info *xen_start_info = &_xen_start_info;
-> +EXPORT_SYMBOL_GPL(xen_start_info);
-> +
-> +enum xen_domain_type xen_domain_type = XEN_NATIVE;
-> +EXPORT_SYMBOL_GPL(xen_domain_type);
-> +
-> +struct shared_info xen_dummy_shared_info;
-> +struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
-> +
-> +DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
-> +
-> +/* XXX: to be removed */
+> +/* We need to save and restore r4, because Xen clobbers it. */
 
-In this patch series later on? Or just when you try to collapse the x86 and arm variant
-together?
+Hmm, the comment says r4, but right below I see r12?
+Should this comment be by 'privcmd_call'?
 
-> +__read_mostly int xen_have_vector_callback;
-> +EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+> +#define HYPERCALL(hypercall)			\
+> +ENTRY(HYPERVISOR_##hypercall)			\
+> +	mov r12, #__HYPERVISOR_##hypercall;	\
+> +	xen_hvc;							\
+> +	mov pc, lr;							\
+> +ENDPROC(HYPERVISOR_##hypercall)
 > +
-> +int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
-> +EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+> +                .text
 > +
-> +int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
-> +			       unsigned long addr,
-> +			       unsigned long mfn, int nr,
-> +			       pgprot_t prot, unsigned domid)
-> +{
-> +	return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
-> diff --git a/include/xen/xen.h b/include/xen/xen.h
-> index a164024..2c0d3a5 100644
-> --- a/include/xen/xen.h
-> +++ b/include/xen/xen.h
-> @@ -23,7 +23,7 @@ extern enum xen_domain_type xen_domain_type;
->  #include <xen/interface/xen.h>
->  #include <asm/xen/hypervisor.h>
->  
-> -#define xen_initial_domain()	(xen_pv_domain() && \
-> +#define xen_initial_domain()	(xen_domain() && \
->  				 xen_start_info->flags & SIF_INITDOMAIN)
->  #else  /* !CONFIG_XEN_DOM0 */
->  #define xen_initial_domain()	(0)
+> +HYPERCALL(xen_version);
+> +HYPERCALL(console_io);
+> +HYPERCALL(grant_table_op);
+> +HYPERCALL(sched_op);
+> +HYPERCALL(event_channel_op);
+> +HYPERCALL(hvm_op);
+> +HYPERCALL(memory_op);
+> +HYPERCALL(physdev_op);
+> +
+> +ENTRY(privcmd_call)
+> +	stmdb	sp!, {r4}
+> +	mov r12, r0
+> +	mov r0, r1
+> +	mov r1, r2
+> +	mov r2, r3
+> +	ldr r3, [sp, #8]
+> +	ldr r4, [sp, #4]
+> +	xen_hvc
+> +	pop {r4}
+> +	mov pc, lr
+> +ENDPROC(privcmd_call);
 > -- 
 > 1.7.2.5
 > 
