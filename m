@@ -1,61 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:42 +0100
-Subject: [PATCH 09/21] ARM: ux500: Add MSP devices to DB8500 Device Tree
+Date: Thu, 26 Jul 2012 11:28:41 +0100
+Subject: [PATCH 08/21] ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-List all four MSP devices which exist on all DB8500 based platforms,
-to ensure correct device probing and configuration passing when booting
-with DT.
+Ensure correct probing and pass though important configuration
+options to the AB8500 CODEC driver when DT is enabled
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/db8500.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index a3bee0a..5a72be6 100644
+index 7279165..a3bee0a 100644
 --- a/arch/arm/boot/dts/db8500.dtsi
 +++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -591,6 +591,36 @@
- 			status = "disabled";
- 		};
+@@ -370,6 +370,12 @@
+ 					compatible = "stericsson,ab8500-debug";
+ 				};
  
-+		msp0: msp at 80123000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80123000 0x1000>;
-+			interrupts = <0 31 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+		};
++				codec: ab8500-codec {
++					compatible = "stericsson,ab8500-codec";
 +
-+		msp1: msp at 80124000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80124000 0x1000>;
-+			interrupts = <0 62 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+			stericcson,use-pinctrl;
-+		};
++					stericsson,earpeice-cmv = <950>; /* Units in mV. */
++				};
 +
-+		// HDMI sound
-+		msp2: msp at 80117000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80117000 0x1000>;
-+			interrupts = <0 98 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+		};
-+
-+		msp3: msp at 80125000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80125000 0x1000>;
-+			interrupts = <0 62 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+		};
-+
- 		external-bus at 50000000 {
- 			compatible = "simple-bus";
- 			reg = <0x50000000 0x4000000>;
+ 				ab8500-regulators {
+ 					compatible = "stericsson,ab8500-regulator";
+ 
 -- 
 1.7.9.5
