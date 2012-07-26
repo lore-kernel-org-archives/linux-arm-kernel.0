@@ -1,37 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:34 +0100
-Subject: [PATCH 01/21] ARM: ux500: Remove unused snowball_of_platform_devs
- struct
+Date: Thu, 26 Jul 2012 11:28:35 +0100
+Subject: [PATCH 02/21] MFD: db8500-prcmu: Ensure AB8500 platform data is
+ passed through MFD Core
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was left over during a recent clean-up which removed Device Tree
-helper structs. There is no longer a requirement for it, so we can just
-remove it.
+When booting via platform code the AB8500 platform data is now passed
+in though the DB8500. However, if pdata_size is not set it will not be
+subsequently passed onto subordinate devices. This patch correctly
+populates pdata_size.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    5 -----
- 1 file changed, 5 deletions(-)
+ drivers/mfd/db8500-prcmu.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 80b4f0e..e641003 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -726,11 +726,6 @@ MACHINE_END
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 4050a1e..7040a00 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -3002,6 +3002,7 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ 	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
+ 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+ 			db8500_prcmu_devs[i].platform_data = ab8500_platdata;
++			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
+ 		}
+ 	}
  
- #ifdef CONFIG_MACH_UX500_DT
- 
--static struct platform_device *snowball_of_platform_devs[] __initdata = {
--	&snowball_led_dev,
--	&snowball_key_dev,
--};
--
- struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
 -- 
 1.7.9.5
