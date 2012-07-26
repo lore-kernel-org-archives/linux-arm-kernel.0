@@ -1,165 +1,503 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:53 +0100
-Subject: [PATCH 20/21] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+Date: Thu, 26 Jul 2012 11:28:54 +0100
+Subject: [PATCH 21/21] ARM: ux500: Rename MSP board file to something more
+ meaningful
 In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
 References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343298534-13611-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-22-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We continue to allow the AB8500 CODEC to be registered via the AB8500
-Multi Functional Device API, only this time we extract its configuration
-from the Device Tree binary.
+The 'msp' board file does more than just register MSP devices. It
+also registers some other components necessary to get audio working
+on ux500 based platforms; such as the PCM and Machine Drivers. For
+that reason we're changing the filename to be more encompassing -
+'audio'.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-core.c               |    1 +
- include/linux/mfd/abx500/ab8500-codec.h |    6 ++-
- sound/soc/codecs/ab8500-codec.c         |   79 +++++++++++++++++++++++++++++++
- 3 files changed, 84 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/Makefile             |    2 +-
+ arch/arm/mach-ux500/board-mop500-audio.c |  194 ++++++++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500-msp.c   |  194 ------------------------------
+ arch/arm/mach-ux500/board-mop500.c       |   10 +-
+ arch/arm/mach-ux500/board-mop500.h       |    2 +-
+ 5 files changed, 201 insertions(+), 201 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-mop500-audio.c
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-msp.c
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 626b4ec..0c5b70f 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1076,6 +1076,7 @@ static struct mfd_cell __devinitdata ab8500_devs[] = {
- 	},
- 	{
- 		.name = "ab8500-codec",
-+		.of_compatible = "stericsson,ab8500-codec",
- 	},
- };
- 
-diff --git a/include/linux/mfd/abx500/ab8500-codec.h b/include/linux/mfd/abx500/ab8500-codec.h
-index dc65292..d707941 100644
---- a/include/linux/mfd/abx500/ab8500-codec.h
-+++ b/include/linux/mfd/abx500/ab8500-codec.h
-@@ -23,7 +23,8 @@ enum amic_type {
- /* Mic-biases */
- enum amic_micbias {
- 	AMIC_MICBIAS_VAMIC1,
--	AMIC_MICBIAS_VAMIC2
-+	AMIC_MICBIAS_VAMIC2,
-+	AMIC_MICBIAS_UNKNOWN
- };
- 
- /* Bias-voltage */
-@@ -31,7 +32,8 @@ enum ear_cm_voltage {
- 	EAR_CMV_0_95V,
- 	EAR_CMV_1_10V,
- 	EAR_CMV_1_27V,
--	EAR_CMV_1_58V
-+	EAR_CMV_1_58V,
-+	EAR_CMV_UNKNOWN
- };
- 
- /* Analog microphone settings */
-diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-index 3c79592..e3ae9f5 100644
---- a/sound/soc/codecs/ab8500-codec.c
-+++ b/sound/soc/codecs/ab8500-codec.c
-@@ -34,6 +34,7 @@
- #include <linux/mfd/abx500/ab8500-sysctrl.h>
- #include <linux/mfd/abx500/ab8500-codec.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/of.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -2394,9 +2395,62 @@ struct snd_soc_dai_driver ab8500_codec_dai[] = {
- 	}
- };
- 
-+static void ab8500_codec_of_probe(struct device *dev, struct device_node *np,
-+				struct ab8500_codec_platform_data *codec)
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 026086f..1dc2cfa 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -12,6 +12,6 @@ obj-$(CONFIG_MACH_MOP500)	+= board-mop500.o board-mop500-sdi.o \
+ 				board-mop500-uib.o board-mop500-stuib.o \
+ 				board-mop500-u8500uib.o \
+ 				board-mop500-pins.o \
+-				board-mop500-msp.o
++				board-mop500-audio.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
+new file mode 100644
+index 0000000..4583846
+--- /dev/null
++++ b/arch/arm/mach-ux500/board-mop500-audio.c
+@@ -0,0 +1,194 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * License terms: GNU General Public License (GPL), version 2
++ */
++
++#include <linux/platform_device.h>
++#include <linux/init.h>
++#include <linux/gpio.h>
++#include <linux/pinctrl/consumer.h>
++
++#include <plat/gpio-nomadik.h>
++#include <plat/pincfg.h>
++#include <plat/ste_dma40.h>
++
++#include <mach/devices.h>
++#include <mach/hardware.h>
++#include <mach/irqs.h>
++#include <mach/msp.h>
++
++#include "ste-dma40-db8500.h"
++#include "board-mop500.h"
++#include "devices-db8500.h"
++#include "pins-db8500.h"
++
++static struct stedma40_chan_cfg msp0_dma_rx = {
++	.high_priority = true,
++	.dir = STEDMA40_PERIPH_TO_MEM,
++
++	.src_dev_type = DB8500_DMA_DEV31_MSP0_RX_SLIM0_CH0_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++
++	.src_info.psize = STEDMA40_PSIZE_LOG_4,
++	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
++
++	/* data_width is set during configuration */
++};
++
++static struct stedma40_chan_cfg msp0_dma_tx = {
++	.high_priority = true,
++	.dir = STEDMA40_MEM_TO_PERIPH,
++
++	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.dst_dev_type = DB8500_DMA_DEV31_MSP0_TX_SLIM0_CH0_TX,
++
++	.src_info.psize = STEDMA40_PSIZE_LOG_4,
++	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
++
++	/* data_width is set during configuration */
++};
++
++struct msp_i2s_platform_data msp0_platform_data = {
++	.id = MSP_I2S_0,
++	.msp_i2s_dma_rx = &msp0_dma_rx,
++	.msp_i2s_dma_tx = &msp0_dma_tx,
++};
++
++static struct stedma40_chan_cfg msp1_dma_rx = {
++	.high_priority = true,
++	.dir = STEDMA40_PERIPH_TO_MEM,
++
++	.src_dev_type = DB8500_DMA_DEV30_MSP3_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++
++	.src_info.psize = STEDMA40_PSIZE_LOG_4,
++	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
++
++	/* data_width is set during configuration */
++};
++
++static struct stedma40_chan_cfg msp1_dma_tx = {
++	.high_priority = true,
++	.dir = STEDMA40_MEM_TO_PERIPH,
++
++	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.dst_dev_type = DB8500_DMA_DEV30_MSP1_TX,
++
++	.src_info.psize = STEDMA40_PSIZE_LOG_4,
++	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
++
++	/* data_width is set during configuration */
++};
++
++struct msp_i2s_platform_data msp1_platform_data = {
++	.id = MSP_I2S_1,
++	.msp_i2s_dma_rx = NULL,
++	.msp_i2s_dma_tx = &msp1_dma_tx,
++	.use_pinctrl    = true,
++};
++
++static struct stedma40_chan_cfg msp2_dma_rx = {
++	.high_priority = true,
++	.dir = STEDMA40_PERIPH_TO_MEM,
++
++	.src_dev_type = DB8500_DMA_DEV14_MSP2_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++
++	/* MSP2 DMA doesn't work with PSIZE == 4 on DB8500v2 */
++	.src_info.psize = STEDMA40_PSIZE_LOG_1,
++	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
++
++	/* data_width is set during configuration */
++};
++
++static struct stedma40_chan_cfg msp2_dma_tx = {
++	.high_priority = true,
++	.dir = STEDMA40_MEM_TO_PERIPH,
++
++	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.dst_dev_type = DB8500_DMA_DEV14_MSP2_TX,
++
++	.src_info.psize = STEDMA40_PSIZE_LOG_4,
++	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
++
++	.use_fixed_channel = true,
++	.phy_channel = 1,
++
++	/* data_width is set during configuration */
++};
++
++static struct platform_device *db8500_add_msp_i2s(struct device *parent,
++			int id,
++			resource_size_t base, int irq,
++			struct msp_i2s_platform_data *pdata)
 +{
-+	u32 value;
++	struct platform_device *pdev;
++	struct resource res[] = {
++		DEFINE_RES_MEM(base, SZ_4K),
++		DEFINE_RES_IRQ(irq),
++	};
 +
-+	if (of_get_property(np, "stericsson,amic1-type-single-ended", NULL))
-+		codec->amics.mic1_type = AMIC_TYPE_SINGLE_ENDED;
-+	else
-+		codec->amics.mic1_type = AMIC_TYPE_DIFFERENTIAL;
-+
-+	if (of_get_property(np, "stericsson,amic2-type-single-ended", NULL))
-+		codec->amics.mic2_type = AMIC_TYPE_SINGLE_ENDED;
-+	else
-+		codec->amics.mic2_type = AMIC_TYPE_DIFFERENTIAL;
-+
-+	/* Has a non-standard Vamic been requested? */
-+	if(of_get_property(np, "stericsson,amic1a-bias-vamic2", NULL))
-+		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC2;
-+	else
-+		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC1;
-+
-+	if (of_get_property(np, "stericsson,amic1b-bias-vamic2", NULL))
-+		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC2;
-+	else
-+		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC1;
-+
-+	if (of_get_property(np, "stericsson,amic2-bias-vamic1", NULL))
-+		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC1;
-+	else
-+		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC2;
-+
-+	if (!of_property_read_u32(np, "stericsson,earpeice-cmv", &value)) {
-+		switch (value) {
-+		case 950 :
-+			codec->ear_cmv = EAR_CMV_0_95V;
-+			break;
-+		case 1100 :
-+			codec->ear_cmv = EAR_CMV_1_10V;
-+			break;
-+		case 1270 :
-+			codec->ear_cmv = EAR_CMV_1_27V;
-+			break;
-+		case 1580 :
-+			codec->ear_cmv = EAR_CMV_1_58V;
-+			break;
-+		default :
-+			codec->ear_cmv = EAR_CMV_UNKNOWN;
-+			dev_err(dev, "Unsuitable earpiece voltage found in DT\n");
-+		}
++	pr_info("Register platform-device 'ux500-msp-i2s', id %d, irq %d\n",
++		id, irq);
++	pdev = platform_device_register_resndata(parent, "ux500-msp-i2s", id,
++						res, ARRAY_SIZE(res),
++						pdata, sizeof(*pdata));
++	if (!pdev) {
++		pr_err("Failed to register platform-device 'ux500-msp-i2s.%d'!\n",
++			id);
++		return NULL;
 +	}
++
++	return pdev;
 +}
 +
- static int ab8500_codec_probe(struct snd_soc_codec *codec)
- {
- 	struct device *dev = codec->dev;
-+	struct device_node *np = dev->of_node;
- 	struct ab8500_codec_drvdata *drvdata = dev_get_drvdata(dev);
- 	struct ab8500_platform_data *pdata;
- 	struct filter_control *fc;
-@@ -2406,6 +2460,31 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
++/* Platform device for ASoC U8500 machine */
++static struct platform_device snd_soc_mop500 = {
++	.name = "snd-soc-mop500",
++	.id = 0,
++	.dev = {
++		.platform_data = NULL,
++	},
++};
++
++/* Platform device for Ux500-PCM */
++static struct platform_device ux500_pcm = {
++	.name = "ux500-pcm",
++	.id = 0,
++	.dev = {
++		.platform_data = NULL,
++	},
++};
++
++struct msp_i2s_platform_data msp2_platform_data = {
++	.id = MSP_I2S_2,
++	.msp_i2s_dma_rx = &msp2_dma_rx,
++	.msp_i2s_dma_tx = &msp2_dma_tx,
++};
++
++struct msp_i2s_platform_data msp3_platform_data = {
++	.id		= MSP_I2S_3,
++	.msp_i2s_dma_rx	= &msp1_dma_rx,
++	.msp_i2s_dma_tx	= NULL,
++	.use_pinctrl    = true,
++};
++
++void mop500_audio_init(struct device *parent)
++{
++	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
++	platform_device_register(&snd_soc_mop500);
++
++	pr_info("Initialize MSP I2S-devices.\n");
++	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
++			   &msp0_platform_data);
++	db8500_add_msp_i2s(parent, 1, U8500_MSP1_BASE, IRQ_DB8500_MSP1,
++			   &msp1_platform_data);
++	db8500_add_msp_i2s(parent, 2, U8500_MSP2_BASE, IRQ_DB8500_MSP2,
++			   &msp2_platform_data);
++	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
++			   &msp3_platform_data);
++
++	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
++	platform_device_register(&ux500_pcm);
++}
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+deleted file mode 100644
+index c20d5d2..0000000
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ /dev/null
+@@ -1,194 +0,0 @@
+-/*
+- * Copyright (C) ST-Ericsson SA 2010
+- *
+- * License terms: GNU General Public License (GPL), version 2
+- */
+-
+-#include <linux/platform_device.h>
+-#include <linux/init.h>
+-#include <linux/gpio.h>
+-#include <linux/pinctrl/consumer.h>
+-
+-#include <plat/gpio-nomadik.h>
+-#include <plat/pincfg.h>
+-#include <plat/ste_dma40.h>
+-
+-#include <mach/devices.h>
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
+-#include <mach/msp.h>
+-
+-#include "ste-dma40-db8500.h"
+-#include "board-mop500.h"
+-#include "devices-db8500.h"
+-#include "pins-db8500.h"
+-
+-static struct stedma40_chan_cfg msp0_dma_rx = {
+-	.high_priority = true,
+-	.dir = STEDMA40_PERIPH_TO_MEM,
+-
+-	.src_dev_type = DB8500_DMA_DEV31_MSP0_RX_SLIM0_CH0_RX,
+-	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+-
+-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+-
+-	/* data_width is set during configuration */
+-};
+-
+-static struct stedma40_chan_cfg msp0_dma_tx = {
+-	.high_priority = true,
+-	.dir = STEDMA40_MEM_TO_PERIPH,
+-
+-	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
+-	.dst_dev_type = DB8500_DMA_DEV31_MSP0_TX_SLIM0_CH0_TX,
+-
+-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+-
+-	/* data_width is set during configuration */
+-};
+-
+-struct msp_i2s_platform_data msp0_platform_data = {
+-	.id = MSP_I2S_0,
+-	.msp_i2s_dma_rx = &msp0_dma_rx,
+-	.msp_i2s_dma_tx = &msp0_dma_tx,
+-};
+-
+-static struct stedma40_chan_cfg msp1_dma_rx = {
+-	.high_priority = true,
+-	.dir = STEDMA40_PERIPH_TO_MEM,
+-
+-	.src_dev_type = DB8500_DMA_DEV30_MSP3_RX,
+-	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+-
+-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+-
+-	/* data_width is set during configuration */
+-};
+-
+-static struct stedma40_chan_cfg msp1_dma_tx = {
+-	.high_priority = true,
+-	.dir = STEDMA40_MEM_TO_PERIPH,
+-
+-	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
+-	.dst_dev_type = DB8500_DMA_DEV30_MSP1_TX,
+-
+-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+-
+-	/* data_width is set during configuration */
+-};
+-
+-struct msp_i2s_platform_data msp1_platform_data = {
+-	.id = MSP_I2S_1,
+-	.msp_i2s_dma_rx = NULL,
+-	.msp_i2s_dma_tx = &msp1_dma_tx,
+-	.use_pinctrl    = true,
+-};
+-
+-static struct stedma40_chan_cfg msp2_dma_rx = {
+-	.high_priority = true,
+-	.dir = STEDMA40_PERIPH_TO_MEM,
+-
+-	.src_dev_type = DB8500_DMA_DEV14_MSP2_RX,
+-	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+-
+-	/* MSP2 DMA doesn't work with PSIZE == 4 on DB8500v2 */
+-	.src_info.psize = STEDMA40_PSIZE_LOG_1,
+-	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
+-
+-	/* data_width is set during configuration */
+-};
+-
+-static struct stedma40_chan_cfg msp2_dma_tx = {
+-	.high_priority = true,
+-	.dir = STEDMA40_MEM_TO_PERIPH,
+-
+-	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
+-	.dst_dev_type = DB8500_DMA_DEV14_MSP2_TX,
+-
+-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+-
+-	.use_fixed_channel = true,
+-	.phy_channel = 1,
+-
+-	/* data_width is set during configuration */
+-};
+-
+-static struct platform_device *db8500_add_msp_i2s(struct device *parent,
+-			int id,
+-			resource_size_t base, int irq,
+-			struct msp_i2s_platform_data *pdata)
+-{
+-	struct platform_device *pdev;
+-	struct resource res[] = {
+-		DEFINE_RES_MEM(base, SZ_4K),
+-		DEFINE_RES_IRQ(irq),
+-	};
+-
+-	pr_info("Register platform-device 'ux500-msp-i2s', id %d, irq %d\n",
+-		id, irq);
+-	pdev = platform_device_register_resndata(parent, "ux500-msp-i2s", id,
+-						res, ARRAY_SIZE(res),
+-						pdata, sizeof(*pdata));
+-	if (!pdev) {
+-		pr_err("Failed to register platform-device 'ux500-msp-i2s.%d'!\n",
+-			id);
+-		return NULL;
+-	}
+-
+-	return pdev;
+-}
+-
+-/* Platform device for ASoC U8500 machine */
+-static struct platform_device snd_soc_mop500 = {
+-	.name = "snd-soc-mop500",
+-	.id = 0,
+-	.dev = {
+-		.platform_data = NULL,
+-	},
+-};
+-
+-/* Platform device for Ux500-PCM */
+-static struct platform_device ux500_pcm = {
+-	.name = "ux500-pcm",
+-	.id = 0,
+-	.dev = {
+-		.platform_data = NULL,
+-	},
+-};
+-
+-struct msp_i2s_platform_data msp2_platform_data = {
+-	.id = MSP_I2S_2,
+-	.msp_i2s_dma_rx = &msp2_dma_rx,
+-	.msp_i2s_dma_tx = &msp2_dma_tx,
+-};
+-
+-struct msp_i2s_platform_data msp3_platform_data = {
+-	.id		= MSP_I2S_3,
+-	.msp_i2s_dma_rx	= &msp1_dma_rx,
+-	.msp_i2s_dma_tx	= NULL,
+-	.use_pinctrl    = true,
+-};
+-
+-void mop500_msp_init(struct device *parent)
+-{
+-	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+-	platform_device_register(&snd_soc_mop500);
+-
+-	pr_info("Initialize MSP I2S-devices.\n");
+-	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
+-			   &msp0_platform_data);
+-	db8500_add_msp_i2s(parent, 1, U8500_MSP1_BASE, IRQ_DB8500_MSP1,
+-			   &msp1_platform_data);
+-	db8500_add_msp_i2s(parent, 2, U8500_MSP2_BASE, IRQ_DB8500_MSP2,
+-			   &msp2_platform_data);
+-	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
+-			   &msp3_platform_data);
+-
+-	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
+-	platform_device_register(&ux500_pcm);
+-}
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 2ef26c8..202df4b 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -607,7 +607,7 @@ static void __init mop500_init_machine(void)
+ 	mop500_i2c_init(parent);
+ 	mop500_sdi_init(parent);
+ 	mop500_spi_init(parent);
+-	mop500_msp_init(parent);
++	mop500_audio_init(parent);
+ 	mop500_uart_init(parent);
  
- 	/* Setup AB8500 according to board-settings */
- 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
-+
-+	if (np) {
-+		if (!pdata)
-+			pdata = devm_kzalloc(dev,
-+					sizeof(struct ab8500_platform_data),
-+					GFP_KERNEL);
-+
-+		if (!pdata->codec)
-+			pdata->codec
-+				= devm_kzalloc(dev,
-+					sizeof(struct ab8500_codec_platform_data),
-+					GFP_KERNEL);
-+
-+		if (!(pdata && pdata->codec))
-+			return -ENOMEM;
-+
-+		ab8500_codec_of_probe(dev, np, pdata->codec);
-+
-+	} else {
-+		if (!(pdata && pdata->codec)) {
-+			dev_err(dev, "No codec platform data or DT found\n");
-+			return -EINVAL;
-+		}
-+	}
-+
- 	status = ab8500_audio_setup_mics(codec, &pdata->codec->amics);
- 	if (status < 0) {
- 		pr_err("%s: Failed to setup mics (%d)!\n", __func__, status);
+ 	u8500_cryp1_hash1_init(parent);
+@@ -641,7 +641,7 @@ static void __init snowball_init_machine(void)
+ 	mop500_i2c_init(parent);
+ 	snowball_sdi_init(parent);
+ 	mop500_spi_init(parent);
+-	mop500_msp_init(parent);
++	mop500_audio_init(parent);
+ 	mop500_uart_init(parent);
+ 
+ 	/* This board has full regulator constraints */
+@@ -673,7 +673,7 @@ static void __init hrefv60_init_machine(void)
+ 	mop500_i2c_init(parent);
+ 	hrefv60_sdi_init(parent);
+ 	mop500_spi_init(parent);
+-	mop500_msp_init(parent);
++	mop500_audio_init(parent);
+ 	mop500_uart_init(parent);
+ 
+ 	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+@@ -802,7 +802,7 @@ static void __init u8500_init_machine(void)
+ 				ARRAY_SIZE(mop500_platform_devs));
+ 
+ 		mop500_sdi_init(parent);
+-		mop500_msp_init(parent);
++		mop500_audio_init(parent);
+ 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+ 		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+ 		i2c_register_board_info(2, mop500_i2c2_devices,
+@@ -821,7 +821,7 @@ static void __init u8500_init_machine(void)
+ 				ARRAY_SIZE(mop500_platform_devs));
+ 
+ 		hrefv60_sdi_init(parent);
+-		mop500_msp_init(parent);
++		mop500_audio_init(parent);
+ 
+ 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+ 		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index e56c983..a0f920d 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -97,7 +97,7 @@ void __init mop500_stuib_init(void);
+ void __init mop500_pinmaps_init(void);
+ void __init snowball_pinmaps_init(void);
+ void __init hrefv60_pinmaps_init(void);
+-void mop500_msp_init(struct device *parent);
++void mop500_audio_init(struct device *parent);
+ 
+ int __init mop500_uib_init(void);
+ void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
 -- 
 1.7.9.5
