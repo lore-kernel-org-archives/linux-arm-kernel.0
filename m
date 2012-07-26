@@ -1,36 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jul 2012 11:28:33 +0100
-Subject: [PATCH 00/21] Some fixes and DT enablement for ux500 audio
-Message-ID: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
+Date: Thu, 26 Jul 2012 11:28:34 +0100
+Subject: [PATCH 01/21] ARM: ux500: Remove unused snowball_of_platform_devs
+ struct
+In-Reply-To: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
+References: <1343298534-13611-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343298534-13611-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set sees some code reinforcement surrounding the recently
-accepted MOP500 MSP, PCM, AB8500 CODEC and ux500 Audio Machine Driver.
-It contains some extra error checking pertaining to the ux500 specific
-drivers themselves, along with bugfixes for issues in core SoC Audio 
-code happened upon along the way. There are also a couple of minor 
-clean-ups relating to ux500 platform code, which are hitching a ride 
-for ease of status tracking.
+This was left over during a recent clean-up which removed Device Tree
+helper structs. There is no longer a requirement for it, so we can just
+remove it.
 
- arch/arm/boot/dts/db8500.dtsi            |   48 ++++++
- arch/arm/mach-ux500/Kconfig              |    1 +
- arch/arm/mach-ux500/Makefile             |    2 +-
- arch/arm/mach-ux500/board-mop500-audio.c |  194 ++++++++++++++++++++++
- arch/arm/mach-ux500/board-mop500-msp.c   |  267 ------------------------------
- arch/arm/mach-ux500/board-mop500-msp.h   |   14 --
- arch/arm/mach-ux500/board-mop500.c       |   23 ++-
- arch/arm/mach-ux500/board-mop500.h       |    6 +
- arch/arm/mach-ux500/include/mach/msp.h   |    3 +-
- drivers/mfd/ab8500-core.c                |    1 +
- drivers/mfd/db8500-prcmu.c               |    1 +
- include/linux/mfd/abx500/ab8500-codec.h  |    6 +-
- sound/soc/codecs/ab8500-codec.c          |   79 +++++++++
- sound/soc/soc-dapm.c                     |    2 -
- sound/soc/soc-io.c                       |   14 +-
- sound/soc/ux500/mop500.c                 |   41 +++++
- sound/soc/ux500/ux500_msp_dai.c          |   11 +-
- sound/soc/ux500/ux500_msp_i2s.c          |  118 ++++++++++---
- sound/soc/ux500/ux500_msp_i2s.h          |    5 +-
- sound/soc/ux500/ux500_pcm.c              |    6 +
- 20 files changed, 516 insertions(+), 326 deletions(-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |    5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 80b4f0e..e641003 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -726,11 +726,6 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_UX500_DT
+ 
+-static struct platform_device *snowball_of_platform_devs[] __initdata = {
+-	&snowball_led_dev,
+-	&snowball_key_dev,
+-};
+-
+ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+-- 
+1.7.9.5
