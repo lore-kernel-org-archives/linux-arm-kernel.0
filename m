@@ -1,48 +1,51 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Jul 2012 17:30:00 +0800
-Subject: [PATCH v2 1/3] mtd: nand: Include IMX6 in the list of supported
- SoCs
-In-Reply-To: <1343215100-24005-1-git-send-email-festevam@gmail.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120727092959.GF3347@b20223-02.ap.freescale.net>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 27 Jul 2012 11:33:13 +0200
+Subject: Sharing resources between several drivers.
+In-Reply-To: <20120727111958.4409033f@skate>
+References: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+ <20120727111958.4409033f@skate>
+Message-ID: <CACKLOr3KAKoCw4gbegQk8BbYTAaArEnWweUZ51W5ddv5MepLcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 08:18:18AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Include IMX6 in the list of supported SoCs.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - No changes
->  drivers/mtd/nand/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index f4e81a7..b40e172 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -464,7 +464,7 @@ config MTD_NAND_GPMI_NAND
->          bool "GPMI NAND Flash Controller driver"
->          depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-We don't need to list all SoCs. Shall we just check MXC or MXS ?
+On 27 July 2012 11:19, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Le Fri, 27 Jul 2012 09:59:21 +0200,
+> javier Martin <javier.martin@vista-silicon.com> a ?crit :
+>
+>> Hi,
+>> we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
+>>
+>> In these chips, gpio and pinctrl use the same HW memory area
+>> registers. This means that we have to request the same memory area
+>> from two different drivers (gpio and pinctrl) but we don't know how to
+>> do that.
+>>
+>> A similar example available is mxs, but it only works with device
+>> tree, so this problem is avoided.  However, some of these chips
+>> (i.MX21, i.MX1...) don't support device tree yet, so we need to
+>> provide backwards compatibility.
+>>
+>> What is the right way to request the same memory region from two
+>> different drivers? Moreover, how can we guarantee that there won't be
+>> any conflicts when accessing these shared resources?
+>
+> I would say there is no right way. If the pinctrl/gpio registers are
+> really intermixed and belong to the same region, then there should be
+> only one driver that requests this region and that implements both the
+> pinctrl and gpio features.
+>
+> See the drivers/pinctrl/pinctrl-coh901.c driver for example. It
+> implements both the pinctrl and the gpio logic.
 
-Thanks
-Richard
->          help
-> -	 Enables NAND Flash support for IMX23 or IMX28.
-> +	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
->  	 The GPMI controller is very powerful, with the help of BCH
->  	 module, it can do the hardware ECC. The GPMI supports several
->  	 NAND flashs at the same time. The GPMI may conflicts with other
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thank you, that was very useful.
+
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
