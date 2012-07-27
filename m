@@ -1,23 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:38:47 +0100
-Subject: [PATCH 0/7] Bugfixes and clean-ups bound for the v3.6 RCs
-Message-ID: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 27 Jul 2012 13:38:50 +0100
+Subject: [PATCH 3/7] mfd: db8500-prcmu: Ensure AB8500 platform data is passed
+ through MFD Core
+In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
+References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343392734-11805-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set includes some important changes which should make
-their way to the Mainline Release Candidates for the v3.6 release.
-Without them Audio doesn't even probe (at all) when booting with
-Device Tree selected. The kernel can't compile with ux500 audio
-enabled. Also platform data will fail to reach the AB8500 CODEC
-driver. Even if we can get that far SoC Core will assume we're
-using regmaps and attempt to use them; however, none exist for
-this driver, so the kernel will oops.
+When booting via platform code the AB8500 platform data is now passed
+in though the DB8500. However, if pdata_size is not set it will not be
+subsequently passed onto subordinate devices. This patch correctly
+populates pdata_size.
 
- arch/arm/mach-ux500/board-mop500-msp.c |    2 +-
- arch/arm/mach-ux500/board-mop500.c     |    9 ++++-----
- drivers/mfd/ab8500-core.c              |    1 +
- drivers/mfd/db8500-prcmu.c             |    1 +
- sound/soc/codecs/ab8500-codec.c        |    4 ++++
- sound/soc/soc-dapm.c                   |    2 --
- 6 files changed, 11 insertions(+), 8 deletions(-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 4050a1e..7040a00 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -3002,6 +3002,7 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ 	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
+ 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+ 			db8500_prcmu_devs[i].platform_data = ab8500_platdata;
++			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
+ 		}
+ 	}
+ 
+-- 
+1.7.9.5
