@@ -1,43 +1,45 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Jul 2012 10:19:24 +0100
-Subject: [PATCH 02/24] xen/arm: hypercalls
-In-Reply-To: <50119856.2020206@codeaurora.org>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <50119856.2020206@codeaurora.org>
-Message-ID: <1343380764.6812.108.camel@zakaz.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 27 Jul 2012 11:19:58 +0200
+Subject: Sharing resources between several drivers.
+In-Reply-To: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+References: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+Message-ID: <20120727111958.4409033f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-26 at 20:19 +0100, Christopher Covington wrote:
-> Hi Stefano,
+Le Fri, 27 Jul 2012 09:59:21 +0200,
+javier Martin <javier.martin@vista-silicon.com> a ?crit :
+
+> Hi,
+> we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
 > 
-> On 07/26/2012 11:33 AM, Stefano Stabellini wrote:
-> > Use r12 to pass the hypercall number to the hypervisor.
-> > 
-> > We need a register to pass the hypercall number because we might not
-> > know it at compile time and HVC only takes an immediate argument.
+> In these chips, gpio and pinctrl use the same HW memory area
+> registers. This means that we have to request the same memory area
+> from two different drivers (gpio and pinctrl) but we don't know how to
+> do that.
 > 
-> You're not going to JIT assemble the appropriate HVC instruction? Darn.
+> A similar example available is mxs, but it only works with device
+> tree, so this problem is avoided.  However, some of these chips
+> (i.MX21, i.MX1...) don't support device tree yet, so we need to
+> provide backwards compatibility.
+> 
+> What is the right way to request the same memory region from two
+> different drivers? Moreover, how can we guarantee that there won't be
+> any conflicts when accessing these shared resources?
 
-;-)
+I would say there is no right way. If the pinctrl/gpio registers are
+really intermixed and belong to the same region, then there should be
+only one driver that requests this region and that implements both the
+pinctrl and gpio features.
 
-> How many call numbers are there, though? 8?
+See the drivers/pinctrl/pinctrl-coh901.c driver for example. It
+implements both the pinctrl and the gpio logic.
 
-The maximum currently defined hypercall number is 55, although there are
-some small gaps so there's actually more like 45 in total.
+Best regards,
 
->  It seems like it'd be
-> reasonable to take the approach that seems to be favored for MRC/MCR
-> instructions, using a function containing switch statement that chooses
-> between several inline assembly instructions based off an enum passed to
-> the function. See for example arch_timer_reg_read in
-> arch/arm/kernel/arch_timer.c.
-
-I don't think it is feasible with this number of hypercalls, even
-accepting that in many cases the number will be a constant so gcc can
-likely optimise almost all of it away.
-
-Is there something wrong with the r12 based approach?
-
-Ian.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
