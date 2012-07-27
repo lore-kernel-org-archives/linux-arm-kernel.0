@@ -1,178 +1,241 @@
 From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Fri, 27 Jul 2012 12:46:20 +0800
-Subject: [PATCH 2/4] dmaengine: mmp_tdma: add dt support
+Date: Fri, 27 Jul 2012 12:46:22 +0800
+Subject: [PATCH 4/4] mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
 In-Reply-To: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
 References: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <1343364382-16269-3-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1343364382-16269-5-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
 ---
- Documentation/devicetree/bindings/dma/mmp-dma.txt |   27 +++++++++++
- drivers/dma/mmp_tdma.c                            |   51 +++++++++++++--------
- 2 files changed, 58 insertions(+), 20 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |  113 ++++++++++++++++++++++------------------
+ 1 files changed, 63 insertions(+), 50 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
-index c4a311f..2622a95 100644
---- a/Documentation/devicetree/bindings/dma/mmp-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
-@@ -40,3 +40,30 @@ pdma: dma-controller at d4000000 {
- 	      dma-channels = <16>;
-       };
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index c5ea313..2768826 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -22,8 +22,8 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/slab.h>
++#include <linux/dmaengine.h>
  
-+
-+Marvell Two Channel DMA Controller used specifically for audio
-+Used platfroms: pxa688, pxa910
-+
-+Required properties:
-+- compatible: Should be "marvell,mmp-adma" or "marvell,pxa910-squ"
-+- reg: Should contain DMA registers location and length.
-+- interrupts: Either contain all of the per-channel DMA interrupts
-+		or one irq for dma device
-+
-+Examples:
-+
-+/* each channel has specific irq */
-+adma0: dma-controller at d42a0800 {
-+	      compatible = "marvell,mmp-adma";
-+	      reg = <0xd42a0800 0x100>;
-+	      interrupts = <18 19>;
-+	      interrupt-parent = <&intcmux32>;
-+      };
-+
-+/* One irq for all channels */
-+squ: dma-controller at d42a0800 {
-+	      compatible = "marvell,pxa910-squ";
-+	      reg = <0xd42a0800 0x100>;
-+	      interrupts = <46>;
-+      };
-+
-diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
-index 8a15cf2..9376ea8 100644
---- a/drivers/dma/mmp_tdma.c
-+++ b/drivers/dma/mmp_tdma.c
-@@ -20,6 +20,7 @@
- #include <linux/device.h>
- #include <mach/regs-icu.h>
- #include <mach/sram.h>
-+#include <linux/of_device.h>
+-#include <mach/dma.h>
+ #include <plat/pxa3xx_nand.h>
  
- #include "dmaengine.h"
+ #define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
+@@ -162,8 +162,7 @@ struct pxa3xx_nand_info {
+ 	unsigned char		*data_buff;
+ 	unsigned char		*oob_buff;
+ 	dma_addr_t 		data_buff_phys;
+-	int 			data_dma_ch;
+-	struct pxa_dma_desc	*data_desc;
++	struct dma_chan		*data_dma_ch;
+ 	dma_addr_t 		data_desc_addr;
  
-@@ -127,7 +128,6 @@ struct mmp_tdma_device {
- 	void __iomem			*base;
- 	struct dma_device		device;
- 	struct mmp_tdma_chan		*tdmac[TDMA_CHANNEL_NUM];
--	int				irq;
- };
- 
- #define to_mmp_tdma_chan(dchan) container_of(dchan, struct mmp_tdma_chan, chan)
-@@ -492,7 +492,7 @@ static int __devinit mmp_tdma_chan_init(struct mmp_tdma_device *tdev,
- 		return -ENOMEM;
- 	}
- 	if (irq)
--		tdmac->irq = irq + idx;
-+		tdmac->irq = irq;
- 	tdmac->dev	   = tdev->dev;
- 	tdmac->chan.device = &tdev->device;
- 	tdmac->idx	   = idx;
-@@ -505,34 +505,43 @@ static int __devinit mmp_tdma_chan_init(struct mmp_tdma_device *tdev,
- 	/* add the channel to tdma_chan list */
- 	list_add_tail(&tdmac->chan.device_node,
- 			&tdev->device.channels);
--
- 	return 0;
+ 	struct pxa3xx_nand_host *host[NUM_CHIP_SELECT];
+@@ -332,14 +331,6 @@ static void pxa3xx_nand_stop(struct pxa3xx_nand_info *info)
+ 	nand_writel(info, NDSR, NDSR_MASK);
  }
  
-+static struct of_device_id mmp_tdma_dt_ids[] = {
-+	{ .compatible = "marvell,mmp-adma", .data = (void *)MMP_AUD_TDMA},
-+	{ .compatible = "marvell,pxa910-squ", .data = (void *)PXA910_SQU},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, mmp_tdma_dt_ids);
-+
- static int __devinit mmp_tdma_probe(struct platform_device *pdev)
+-static void enable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+-{
+-	uint32_t ndcr;
+-
+-	ndcr = nand_readl(info, NDCR);
+-	nand_writel(info, NDCR, ndcr & ~int_mask);
+-}
+-
+ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
  {
--	const struct platform_device_id *id = platform_get_device_id(pdev);
--	enum mmp_tdma_type type = id->driver_data;
-+	enum mmp_tdma_type type;
-+	const struct of_device_id *of_id;
- 	struct mmp_tdma_device *tdev;
- 	struct resource *iores;
- 	int i, ret;
--	int irq = 0;
-+	int irq = 0, irq_num = 0;
- 	int chan_num = TDMA_CHANNEL_NUM;
+ 	uint32_t ndcr;
+@@ -372,24 +363,38 @@ static void handle_data_pio(struct pxa3xx_nand_info *info)
+ 	}
+ }
  
-+	of_id = of_match_device(mmp_tdma_dt_ids, &pdev->dev);
-+	if (of_id)
-+		type = (enum mmp_tdma_type) of_id->data;
-+	else
-+		type = platform_get_device_id(pdev)->driver_data;
++static void dma_complete_func(void *data)
++{
++	struct pxa3xx_nand_info *info = data;
 +
- 	/* always have couple channels */
- 	tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
- 	if (!tdev)
- 		return -ENOMEM;
++	info->state = STATE_DMA_DONE;
++}
++
+ static void start_data_dma(struct pxa3xx_nand_info *info)
+ {
+-	struct pxa_dma_desc *desc = info->data_desc;
++	struct dma_device *dma_dev;
++	struct dma_async_tx_descriptor *tx = NULL;
++	dma_addr_t dma_src_addr, dma_dst_addr;
++	dma_cookie_t cookie;
+ 	int dma_len = ALIGN(info->data_size + info->oob_size, 32);
++	struct dma_slave_config conf;
  
- 	tdev->dev = &pdev->dev;
--	iores = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	if (!iores)
--		return -EINVAL;
+-	desc->ddadr = DDADR_STOP;
+-	desc->dcmd = DCMD_ENDIRQEN | DCMD_WIDTH4 | DCMD_BURST32 | dma_len;
++	dma_dev = info->data_dma_ch->device;
  
--	if (resource_size(iores) != chan_num)
--		tdev->irq = iores->start;
--	else
--		irq = iores->start;
-+	for (i = 0; i < chan_num; i++) {
-+		if (platform_get_irq(pdev, i) > 0)
-+			irq_num++;
+ 	switch (info->state) {
+ 	case STATE_DMA_WRITING:
+-		desc->dsadr = info->data_buff_phys;
+-		desc->dtadr = info->mmio_phys + NDDB;
+-		desc->dcmd |= DCMD_INCSRCADDR | DCMD_FLOWTRG;
++		dma_src_addr = info->data_buff_phys;
++		dma_dst_addr = info->mmio_phys + NDDB;
++		conf.direction = DMA_MEM_TO_DEV;
++		conf.dst_maxburst = 32;
++		conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 		break;
+ 	case STATE_DMA_READING:
+-		desc->dtadr = info->data_buff_phys;
+-		desc->dsadr = info->mmio_phys + NDDB;
+-		desc->dcmd |= DCMD_INCTRGADDR | DCMD_FLOWSRC;
++		dma_src_addr = info->mmio_phys + NDDB;
++		dma_dst_addr = info->data_buff_phys;
++		conf.direction = DMA_DEV_TO_MEM;
++		conf.src_maxburst = 32;
++		conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 		break;
+ 	default:
+ 		dev_err(&info->pdev->dev, "%s: invalid state %d\n", __func__,
+@@ -397,26 +402,27 @@ static void start_data_dma(struct pxa3xx_nand_info *info)
+ 		BUG();
+ 	}
+ 
+-	DRCMR(info->drcmr_dat) = DRCMR_MAPVLD | info->data_dma_ch;
+-	DDADR(info->data_dma_ch) = info->data_desc_addr;
+-	DCSR(info->data_dma_ch) |= DCSR_RUN;
+-}
+-
+-static void pxa3xx_nand_data_dma_irq(int channel, void *data)
+-{
+-	struct pxa3xx_nand_info *info = data;
+-	uint32_t dcsr;
++	conf.slave_id = info->drcmr_dat;
++	dmaengine_slave_config(info->data_dma_ch, &conf);
++	tx = dma_dev->device_prep_dma_memcpy(info->data_dma_ch, dma_dst_addr,
++					     dma_src_addr, dma_len, 0);
++	if (!tx) {
++		dev_err(&info->pdev->dev, "Failed to prepare DMA memcpy\n");
++		return;
 +	}
  
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!iores)
-@@ -542,25 +551,26 @@ static int __devinit mmp_tdma_probe(struct platform_device *pdev)
- 	if (!tdev->base)
- 		return -EADDRNOTAVAIL;
+-	dcsr = DCSR(channel);
+-	DCSR(channel) = dcsr;
++	tx->callback = dma_complete_func;
++	tx->callback_param = info;
  
--	if (tdev->irq) {
--		ret = devm_request_irq(&pdev->dev, tdev->irq,
-+	INIT_LIST_HEAD(&tdev->device.channels);
+-	if (dcsr & DCSR_BUSERR) {
+-		info->retcode = ERR_DMABUSERR;
++	cookie = tx->tx_submit(tx);
++	if (dma_submit_error(cookie)) {
++		dev_err(&info->pdev->dev, "Failed to do DMA tx_submit\n");
++		return;
+ 	}
+ 
+-	info->state = STATE_DMA_DONE;
+-	enable_int(info, NDCR_INT_MASK);
+-	nand_writel(info, NDSR, NDSR_WRDREQ | NDSR_RDDREQ);
++	dma_async_issue_pending(info->data_dma_ch);
 +
-+	if (irq_num != chan_num) {
-+		irq = platform_get_irq(pdev, 0);
-+		ret = devm_request_irq(&pdev->dev, irq,
- 			mmp_tdma_int_handler, IRQF_DISABLED, "tdma", tdev);
- 		if (ret)
- 			return ret;
++	return;
+ }
+ 
+ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+@@ -434,6 +440,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
  	}
  
--	dma_cap_set(DMA_SLAVE, tdev->device.cap_mask);
--	dma_cap_set(DMA_CYCLIC, tdev->device.cap_mask);
--
--	INIT_LIST_HEAD(&tdev->device.channels);
--
- 	/* initialize channel parameters */
- 	for (i = 0; i < chan_num; i++) {
-+		irq = (irq_num != chan_num) ? 0 : platform_get_irq(pdev, i);
- 		ret = mmp_tdma_chan_init(tdev, i, irq, type);
- 		if (ret)
- 			return ret;
+ 	status = nand_readl(info, NDSR);
++	nand_writel(info, NDSR, status);
+ 
+ 	if (status & NDSR_DBERR)
+ 		info->retcode = ERR_DBERR;
+@@ -442,7 +449,6 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	if (status & (NDSR_RDDREQ | NDSR_WRDREQ)) {
+ 		/* whether use dma to transfer data */
+ 		if (info->use_dma) {
+-			disable_int(info, NDCR_INT_MASK);
+ 			info->state = (status & NDSR_RDDREQ) ?
+ 				      STATE_DMA_READING : STATE_DMA_WRITING;
+ 			start_data_dma(info);
+@@ -757,6 +763,9 @@ static void pxa3xx_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	int real_len = min_t(size_t, len, info->buf_count - info->buf_start);
+ 
++	if (len > mtd->oobsize)
++		info->use_dma = use_dma;
++
+ 	memcpy(buf, info->data_buff + info->buf_start, real_len);
+ 	info->buf_start += real_len;
+ }
+@@ -768,6 +777,9 @@ static void pxa3xx_nand_write_buf(struct mtd_info *mtd,
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	int real_len = min_t(size_t, len, info->buf_count - info->buf_start);
+ 
++	if (len > mtd->oobsize)
++		info->use_dma = use_dma;
++
+ 	memcpy(info->data_buff + info->buf_start, buf, real_len);
+ 	info->buf_start += real_len;
+ }
+@@ -886,7 +898,7 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
+ static int pxa3xx_nand_init_buff(struct pxa3xx_nand_info *info)
+ {
+ 	struct platform_device *pdev = info->pdev;
+-	int data_desc_offset = MAX_BUFF_SIZE - sizeof(struct pxa_dma_desc);
++	dma_cap_mask_t mask;
+ 
+ 	if (use_dma == 0) {
+ 		info->data_buff = kmalloc(MAX_BUFF_SIZE, GFP_KERNEL);
+@@ -902,19 +914,20 @@ static int pxa3xx_nand_init_buff(struct pxa3xx_nand_info *info)
+ 		return -ENOMEM;
  	}
  
-+	dma_cap_set(DMA_SLAVE, tdev->device.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, tdev->device.cap_mask);
- 	tdev->device.dev = &pdev->dev;
- 	tdev->device.device_alloc_chan_resources =
- 					mmp_tdma_alloc_chan_resources;
-@@ -595,6 +605,7 @@ static struct platform_driver mmp_tdma_driver = {
- 	.driver		= {
- 		.name	= "mmp-tdma",
- 		.owner  = THIS_MODULE,
-+		.of_match_table = mmp_tdma_dt_ids,
- 	},
- 	.id_table	= mmp_tdma_id_table,
- 	.probe		= mmp_tdma_probe,
+-	info->data_desc = (void *)info->data_buff + data_desc_offset;
+-	info->data_desc_addr = info->data_buff_phys + data_desc_offset;
+ 
+-	info->data_dma_ch = pxa_request_dma("nand-data", DMA_PRIO_LOW,
+-				pxa3xx_nand_data_dma_irq, info);
+-	if (info->data_dma_ch < 0) {
+-		dev_err(&pdev->dev, "failed to request data dma\n");
+-		dma_free_coherent(&pdev->dev, MAX_BUFF_SIZE,
+-				info->data_buff, info->data_buff_phys);
+-		return info->data_dma_ch;
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_MEMCPY, mask);
++	info->data_dma_ch = dma_request_channel(mask, NULL, NULL);
++	if (!info->data_dma_ch) {
++		dev_info(&pdev->dev, "Failed to request DMA channel\n");
++		goto dma_request_fail;
+ 	}
+-
+ 	return 0;
++
++dma_request_fail:
++	dma_free_coherent(&pdev->dev, MAX_BUFF_SIZE,
++			info->data_buff, info->data_buff_phys);
++	return -EAGAIN;
+ }
+ 
+ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+@@ -1149,7 +1162,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ fail_free_buf:
+ 	free_irq(irq, info);
+ 	if (use_dma) {
+-		pxa_free_dma(info->data_dma_ch);
++		dma_release_channel(info->data_dma_ch);
+ 		dma_free_coherent(&pdev->dev, MAX_BUFF_SIZE,
+ 			info->data_buff, info->data_buff_phys);
+ 	} else
+@@ -1183,7 +1196,7 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	if (irq >= 0)
+ 		free_irq(irq, info);
+ 	if (use_dma) {
+-		pxa_free_dma(info->data_dma_ch);
++		dma_release_channel(info->data_dma_ch);
+ 		dma_free_writecombine(&pdev->dev, MAX_BUFF_SIZE,
+ 				info->data_buff, info->data_buff_phys);
+ 	} else
 -- 
 1.7.1
