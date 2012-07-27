@@ -1,51 +1,48 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 27 Jul 2012 18:08:13 +0200
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <20120727134231.GA5934@n2100.arm.linux.org.uk>
-References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
- <20120727134231.GA5934@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 27 Jul 2012 17:11:19 +0100
+Subject: [PATCH 12/24] xen/arm: Introduce xen_guest_init
+In-Reply-To: <alpine.DEB.2.02.1207271613200.26163@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-12-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1343382151.6812.124.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1207271613200.26163@kaball.uk.xensource.com>
+Message-ID: <1343405479.25096.25.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 3:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 25, 2012 at 03:12:22PM +0100, Russell King - ARM Linux wrote:
->> Just a quick reminder that I'm still on holiday, and at this point there
->> are over 2500 messages from the mailing lists which are sitting unread
->> since I left the UK.  As I mentioned before I left the UK, it is my
->> intention *not* to go back and read all those outstanding messages -
->> there's too many of them to do that.
->>
->> So, if you want me to react to any email message you've sent, you'd
->> *better* send it again next week unless I've already responded.
->>
->> Meanwhile, I see v3.5 has been released; I have a couple of things I
->> need to do with my tree before I can push the changes, and I'll
->> probably see about sorting those out over the weekend.  I also see
->> that 14 new patches have landed in the patch system.
->>
->> However, the timing of my holiday vs the merge window means that I
->> can't take anything new, unless they're fixes, so don't be surprised
->> if some stuff gets missed this merge window.
->
-> Right.  I'm not fully recovered from the jet lag (I'm still rather tired
-> - I hate travelling back from the North American continent because it
-> takes days to recover.)
->
-> I have now archived off *all* email sent to me during July - which means
-> that I will *NOT* be responding to anything sent during the last 17 days.
-> If anyone has sent me anything important, it *MUST* be resent now.
->
-> I am aware of an issue concerning the OMAP DMA patches.  I'm not sure
-> exactly what is required there, so I've dropped them from my planned pull
-> request in the interests of getting everything else I have to Linus.  I
-> may plan to send a pull request this evening.
->
-Well the only pending discussion was enabling the CONFIG option for
-DMA at driver level SOC config level. Not sure if there was anything else
-on this really.
+On Fri, 2012-07-27 at 16:54 +0100, Stefano Stabellini wrote:
+> On Fri, 27 Jul 2012, Ian Campbell wrote:
+> > On Thu, 2012-07-26 at 16:33 +0100, Stefano Stabellini wrote:
+> > > We used to rely on a core_initcall to initialize Xen on ARM, however
+> > > core_initcalls are actually called after early consoles are initialized.
+> > > That means that hvc_xen.c is going to be initialized before Xen.
+> > > 
+> > > Given the lack of a better alternative, just call a new Xen
+> > > initialization function (xen_guest_init) from xen_cons_init.
+> > 
+> > Can't we just arrange for this to be called super early on from
+> > setup_arch? That's got to be better than calling it from some random
+> > function which happens to get called early enough.
+> 
+> While I agree with you that an explicit call to xen_guest_init from
+> generic code might be better, xen_cons_init is not just a random
+> function: it is a console_initcall and therefore we know for sure that
+> it is going be the first one to be called.
 
-Regards
-Santosh
+Initialising something != console in a console_initcall just because it
+happens to be called early enough meets my definition of calling it from
+a random place.
+
+> In fact if we didn't want the PV console to work so early we could just
+> rely on a core_initcall to initialize everything and we wouldn't have
+> any issues.
+> 
+> 
+> In any case if the ARM maintainers agree I could add a generic
+> hypervisor initialization call the end of setup_arch.
+> 
+> 
+> 
+> > I presume that KVM is going to want some similarly early init hooks etc
+> > and therefore ARM could benefit from the same sort of infrastructure as
+> > is in arch/x86/include/asm/hypervisor.h?
