@@ -1,36 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Jul 2012 12:55:13 -0700
-Subject: [PATCHv4 6/8] ARM: OMAP: pm-debug: enhanced usecount debug support
-In-Reply-To: <1342189185-5306-7-git-send-email-t-kristo@ti.com> (Tero Kristo's
- message of "Fri, 13 Jul 2012 17:19:43 +0300")
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-7-git-send-email-t-kristo@ti.com>
-Message-ID: <87y5m5htcu.fsf@ti.com>
+From: rvaswani@codeaurora.org (rvaswani at codeaurora.org)
+Date: Fri, 27 Jul 2012 13:00:24 -0700 (PDT)
+Subject: [DT] API to determine if interrupt is PPI or SPI ?
+In-Reply-To: <20120727130947.GN559@mudshark.cambridge.arm.com>
+References: <53a41d02c4c4c24bdab47667183891bf.squirrel@www.codeaurora.org>
+ <50128AA0.8040409@gmail.com>
+ <20120727130947.GN559@mudshark.cambridge.arm.com>
+Message-ID: <8cdb3e7e9dc79635a130214cf6ba1dd4.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
-
-> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
-> their own file, 'usecount'. This file shows the usecounts for every
-> active domain and their children recursively. 'count' file now only
-> shows power state counts for powerdomains.
+> On Fri, Jul 27, 2012 at 01:33:36PM +0100, Rob Herring wrote:
+>> On 07/26/2012 02:18 PM, rvaswani at codeaurora.org wrote:
+>> > Hello,
+>> >
+>> > We can specify the interrupt information in the device tree using the
+>> arm
+>> > gic convention.
+>> > Is there an API to read directly the 1st cell and determine if an
+>> > interrupt is a PPI or a SPI ? This information is directly relevant to
+>> the
+>> > driver because it needs to call request_irq or request_percpu_irq
+>> based on
+>> > this data.
+>> >
+>> > How should this be done ideally ?
+>>
+>> Seems a bit strange to me that you would have a h/w block that can be
+>> connected either way...
 >
-> This patch also provices a way to do printk dumps from kernel code,
-> by calling the pm_dbg_dump_X functions. The plan is to call these
-> functions once an error condition is detected, e.g. failed suspend.
+> The CPU PMU can be wired as either SPI or PPI. The latter makes more sense
+> to
+> me but usually (although not exclusively) it's wired using the former.
 >
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+> Will
+>
 
-I think we should separate out the debug stuff as a separate patch set.
+We have the same driver for a hardware for different chipsets and
+unfortunately the hardware team decided to connect this GIC interrupt
+differently across these chipsets. This leaves us with a software choice
+to make.
+We could add another property to the device tree (like irq-is-percpu,
+irq-is-not-percpu), but that seems redundant.
+We were hoping to have an API to tell us the SPI/PPI difference since this
+information is already encoded in the interrupt-cells in the device tree
+for this device.
+Would that be the right way to go or there is something better that can be
+done ?
 
-Where I want to go with PM debug is away from in-kernel debug prints and
-towards using tracepoints.  We have tracepoints in the clock code that
-correspond to usecounts, but we need them in the clkdm, pwrdm and voltdm
-code as well.  With that, you can use userspace tools (perf, ftrace) to
-trace a problem (e.g. failed suspend) and see voltdm/pwrdm/clkdm/clks
-are on when they shouldn't be.
+Thanks,
+Rohit
 
-Kevin
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
