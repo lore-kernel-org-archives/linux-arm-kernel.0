@@ -1,53 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jul 2012 22:06:37 +0100
-Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
-In-Reply-To: <20120727204447.GA10024@mudshark.cambridge.arm.com>
-References: <1340533690-4049-1-git-send-email-javier@dowhile0.org>
- <20120625005134.GA2342@S2101-09.ap.freescale.net>
- <20120625084905.GD19226@n2100.arm.linux.org.uk>
- <CAAwP0s2jTPM_ErDOFKXoe95_Xd=xjkuTAsDbLctQ08_QVNkakQ@mail.gmail.com>
- <5012CC98.60206@ti.com> <20120727204447.GA10024@mudshark.cambridge.arm.com>
-Message-ID: <20120727210637.GA16377@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 27 Jul 2012 23:36:24 +0200
+Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
+In-Reply-To: <CAOesGMiVRR4F+zad1hKdX-ZuC79U_F5ASG3C52EyFUJpGQv2ow@mail.gmail.com>
+References: <87394enqz8.fsf@ti.com>
+ <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
+ <CAMQu2gynmXqprXPctYHA-V6niE4QptJ_fQ8Fv7J5OAooK1A6wQ@mail.gmail.com>
+ <CAMbhsRSdWpsYub+M9Li44cW1dc2wg76Q3njAxNK2vjC0_jOeJg@mail.gmail.com>
+ <CAOesGMiVRR4F+zad1hKdX-ZuC79U_F5ASG3C52EyFUJpGQv2ow@mail.gmail.com>
+Message-ID: <CAMQu2gw0Ff_PdOQJSHHUVureq32zNZW3qd=ucB4CGN+FK-sb-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 09:44:47PM +0100, Will Deacon wrote:
-> On Fri, Jul 27, 2012 at 06:15:04PM +0100, Jon Hunter wrote:
-> > Hi Javier,
-> > 
-> > On 06/25/2012 05:31 AM, Javier Martinez Canillas wrote:
-> > > On Mon, Jun 25, 2012 at 10:49 AM, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > >> On Mon, Jun 25, 2012 at 08:51:37AM +0800, Shawn Guo wrote:
-> > >>> It seems the same patch has been there for a while.
-> > >>>
-> > >>> http://thread.gmane.org/gmane.linux.kernel/1303115
-> > >>
-> > >> Bah, why doesn't stuff like this get resent if nothing has happened for
-> > >> a while?
-> > > 
-> > > Indeed. At least other people that face the same issue (like me) sends
-> > > similar patches to remind you :-)
-> > 
-> > I checked with Russell but this one is not in his patch tracking system
-> > [1] and so still not queued. Can you submit this? Would be great to get
-> > this one in.
-> 
-> I did comment on this one:
-> 
->   http://thread.gmane.org/gmane.linux.kernel/1303115
-> 
-> and I really think we should fix the cause of the problem, rather than
-> point patching this instance of it.
+On Fri, Jul 27, 2012 at 10:22 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Jul 26, 2012 at 11:44 PM, Colin Cross <ccross@android.com> wrote:
+>> On Thu, Jul 26, 2012 at 11:34 PM, Shilimkar, Santosh
+>> <santosh.shilimkar@ti.com> wrote:
+>>> On Fri, Jul 27, 2012 at 2:19 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>> Kevin,
+>>>>
+>>>> On Thu, Jul 26, 2012 at 2:37 PM, Kevin Hilman <khilman@ti.com> wrote:
+>>>>> Hi Arnd, Olof,
+>>>>>
+>>>>> I know it is late, but I'm really hoping this can still make it for
+>>>>> v3.6, so consider this a [GIT PLEA].  ;)
+>>>>
+>>>> New features submitted halfway through the merge window? Yeah, that's late.
+>>>>
+>>>> I'll pull it in as late2/pm once the below is fixed, but I won't
+>>>> promise we'll send it up.
+>>>>
+>>>>
+>>>>> Kevin Hilman (1):
+>>>>>       ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+>>>>>
+>>>>> Santosh Shilimkar (3):
+>>>>>       ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
+>>>>>       ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
+>>>>>       ARM: OMAP4: CPUidle: Open broadcast clock-event device.
+>>>>
+>>>> This looks odd, Colin was author to the first of the commits
+>>>> attributed to Santosh.
+>>>>
+>>> Not sure what you mean. These patches are written by me. Kevin, Collin helped
+>>> in review. If you are referring to the {ARM: OMAP: timer: allow gp
+>>> timer clock-event to be
+>>> used on both cpus} which does have SOB from me and Colin. The very first version
+>>> of this version I picked was from product tree in which it was
+>>> commited on Coiln's name.
+>>> Later I updated that forf the multi-omap and the new timer code and
+>>> hence the update
+>>> in Author.
+>>
+>> I have no problem with the authorship on these two patches.
+>
+> Santosh, Colin,
+>
+> Ok, fair enough -- I just want to make sure attribution happens
+> appropriately, and it's a red flag when there's a S-o-b by someone not
+> at your company before yours without explanation.
+>
+Sure. No problem with that.
 
-What do you think needs fixing there?
-
-We support booting a kernel on systems with or without SMP support, even
-with a SMP kernel.  When the kernel is booted on such a system, it is
-undefined whether smp_cross_call() is a valid function pointer.
-
-In any case, when we have only one CPU online in the system, it is
-pointless even calling smp_cross_call().
-
-That is why I explicitly suggested this solution.  This is the solution
-_I_ want, because it is the most sane solution all round.
+Regards
+Santosh
