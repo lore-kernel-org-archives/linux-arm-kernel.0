@@ -1,20 +1,19 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Jul 2012 10:48:15 +0100
-Subject: [PATCH 18/24] xen/arm: compile blkfront and blkback
-In-Reply-To: <1343316846-25860-18-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-18-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1343382495.6812.127.camel@zakaz.uk.xensource.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 27 Jul 2012 07:03:52 -0300
+Subject: [PATCH] ARM: clk-imx31: Fix the keypad clock name
+In-Reply-To: <20120727082708.GZ30009@pengutronix.de>
+References: <1343329733-14720-1-git-send-email-fabio.estevam@freescale.com>
+ <20120727082708.GZ30009@pengutronix.de>
+Message-ID: <CAOMZO5DF6+DcutGREbJ2vE7GZrGRYOahqRC3foR7JWMhTpABpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-26 at 16:34 +0100, Stefano Stabellini wrote:
-> 
-> +#define XEN_IO_PROTO_ABI_ARM        "arm-abi" 
+On Fri, Jul 27, 2012 at 5:27 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-I wonder if we ought to call this arm-aarch32-abi or something?
+> Looks like stable material, right?
 
-I wonder if we can also take the opportunity to fix the ABI cockup for
-disks on ARM and make the structs the same for both 32 and 64 bit?
+Yes, I think it can go to stable.
 
-Ian.
+Thanks,
+
+Fabio Estevam
