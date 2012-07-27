@@ -1,95 +1,104 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Fri, 27 Jul 2012 17:08:27 +0900
-Subject: [PATCHv2 1/3] ARM: EXYNOS: Add set_irq_affinity function for
- combiner_irq
+Date: Fri, 27 Jul 2012 17:08:28 +0900
+Subject: [PATCHv2 2/3] ARM: EXYNOS: Correct combined IRQs for exynos4412
 In-Reply-To: <1343376509-5881-1-git-send-email-chanho61.park@samsung.com>
 References: <1343376509-5881-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1343376509-5881-2-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1343376509-5881-3-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds set_irq_affinity function for combiner_irq. We need this
-function to enable a arm-pmu because the irq of exynos's pmu is declared
-combiner_irq.
+This patch corrects combined IRQs for exynos4412 platform. The exynos4412 has
+four extra combined irq group. Each irq is mapped to IRQ_SPI(xx). Unfortunately,
+extra combined IRQs isn't sequential. So, we need to map the irq manually.
 
 Signed-off-by: Chanho Park <chanho61.park@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c |   30 +++++++++++++++++++++++++-----
- 1 file changed, 25 insertions(+), 5 deletions(-)
+ arch/arm/mach-exynos/common.c            |   42 +++++++++++++++++++++++++-----
+ arch/arm/mach-exynos/include/mach/irqs.h |    3 ++-
+ 2 files changed, 37 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4eb39cd..f194bbc 100644
+index f194bbc..499791a 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -405,6 +405,7 @@ struct combiner_chip_data {
- 	unsigned int irq_offset;
- 	unsigned int irq_mask;
- 	void __iomem *base;
-+	unsigned int parent_irq;
+@@ -560,6 +560,32 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+ 	.map	= combiner_irq_domain_map,
  };
  
- static struct irq_domain *combiner_irq_domain;
-@@ -461,10 +462,28 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
-+#ifdef CONFIG_SMP
-+static int combiner_set_affinity(struct irq_data *d,
-+				 const struct cpumask *mask_val, bool force)
++static inline unsigned int get_combiner_max_nr(void)
 +{
-+	struct combiner_chip_data *chip_data = irq_data_get_irq_chip_data(d);
-+	struct irq_chip *chip = irq_get_chip(chip_data->parent_irq);
-+	struct irq_data *data = irq_get_irq_data(chip_data->parent_irq);
-+
-+	if (chip && chip->irq_set_affinity)
-+		return chip->irq_set_affinity(data, mask_val, force);
++	if (soc_is_exynos5250())
++		return EXYNOS5_MAX_COMBINER_NR;
++	else if (soc_is_exynos4412())
++		return EXYNOS4_MAX_COMBINER_NR;
 +	else
-+		return -EINVAL;
++		return EXYNOS42XX_MAX_COMBINER_NR;
 +}
-+#endif
 +
- static struct irq_chip combiner_chip = {
--	.name		= "COMBINER",
--	.irq_mask	= combiner_mask_irq,
--	.irq_unmask	= combiner_unmask_irq,
-+	.name			= "COMBINER",
-+	.irq_mask		= combiner_mask_irq,
-+	.irq_unmask		= combiner_unmask_irq,
-+#ifdef CONFIG_SMP
-+	.irq_set_affinity	= combiner_set_affinity,
-+#endif
- };
- 
- static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
-@@ -484,12 +503,13 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
- }
- 
- static void __init combiner_init_one(unsigned int combiner_nr,
--				     void __iomem *base)
-+				     void __iomem *base, unsigned int irq)
++static unsigned int get_combiner_extra_irq(int group)
++{
++	switch (group) {
++	case 16:
++		return IRQ_SPI(107);
++	case 17:
++		return IRQ_SPI(108);
++	case 18:
++		return IRQ_SPI(48);
++	case 19:
++		return IRQ_SPI(42);
++	default:
++		return 0;
++	}
++}
++
+ static void __init combiner_init(void __iomem *combiner_base,
+ 				 struct device_node *np)
  {
- 	combiner_data[combiner_nr].base = base;
- 	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
- 		combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
- 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
-+	combiner_data[combiner_nr].parent_irq = irq;
+@@ -570,13 +596,12 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 		if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
+ 			pr_warning("%s: number of combiners not specified, "
+ 				"setting default as %d.\n",
+-				__func__, EXYNOS4_MAX_COMBINER_NR);
+-			max_nr = EXYNOS4_MAX_COMBINER_NR;
++				__func__, get_combiner_max_nr());
++			max_nr = get_combiner_max_nr();
+ 		}
+-	} else {
+-		max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
+-						EXYNOS4_MAX_COMBINER_NR;
+-	}
++	} else
++		max_nr = get_combiner_max_nr();
++
+ 	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
  
- 	/* Disable all interrupts */
- 	__raw_writel(combiner_data[combiner_nr].irq_mask,
-@@ -573,12 +593,12 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
+@@ -593,7 +618,10 @@ static void __init combiner_init(void __iomem *combiner_base,
  	}
  
  	for (i = 0; i < max_nr; i++) {
--		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
- 		irq = IRQ_SPI(i);
+-		irq = IRQ_SPI(i);
++		if (soc_is_exynos4412() && i >= 16)
++			irq = get_combiner_extra_irq(i);
++		else
++			irq = IRQ_SPI(i);
  #ifdef CONFIG_OF
  		if (np)
  			irq = irq_of_parse_and_map(np, i);
- #endif
-+		combiner_init_one(i, combiner_base + (i >> 2) * 0x10, irq);
- 		combiner_cascade_irq(i, irq);
- 	}
- }
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 35bced6..12b4f48 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -165,7 +165,8 @@
+ #define EXYNOS4_IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
+ #define EXYNOS4_IRQ_FIMD0_SYSTEM	COMBINER_IRQ(11, 2)
+ 
+-#define EXYNOS4_MAX_COMBINER_NR		16
++#define EXYNOS42XX_MAX_COMBINER_NR	16
++#define EXYNOS4_MAX_COMBINER_NR		20
+ 
+ #define EXYNOS4_IRQ_GPIO1_NR_GROUPS	16
+ #define EXYNOS4_IRQ_GPIO2_NR_GROUPS	9
 -- 
 1.7.9.5
