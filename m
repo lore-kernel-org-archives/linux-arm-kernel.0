@@ -1,36 +1,46 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 27 Jul 2012 09:03:33 +0000
-Subject: Sharing resources between several drivers.
-In-Reply-To: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
-References: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB1F69E@DBDE01.ent.ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 27 Jul 2012 11:02:38 +0200
+Subject: [PATCH] ARM: mxc: Include missing irqs.h header
+In-Reply-To: <1343029278-11654-1-git-send-email-festevam@gmail.com>
+References: <1343029278-11654-1-git-send-email-festevam@gmail.com>
+Message-ID: <5012592E.9030205@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 13:29:21, javier Martin wrote:
-> Hi,
-> we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
+On 23.07.2012 09:41, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> In these chips, gpio and pinctrl use the same HW memory area
-> registers. This means that we have to request the same memory area
-> from two different drivers (gpio and pinctrl) but we don't know how to
-> do that.
+> Include irqs.h in order to fix the following build error:
 > 
-> A similar example available is mxs, but it only works with device
-> tree, so this problem is avoided.  However, some of these chips
-
-I am curious as to how device tree solves the access issues for
-a shared resource.
-
-> (i.MX21, i.MX1...) don't support device tree yet, so we need to
-> provide backwards compatibility.
+> arch/arm/plat-mxc/tzic.c:195:11: error: 'FIQ_START' undeclared (first use in this function)
 > 
-> What is the right way to request the same memory region from two
-> different drivers? Moreover, how can we guarantee that there won't be
-> any conflicts when accessing these shared resources?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
+
+Could we make sure that this patch goes into mainline asap?
+
+Recent mainline imx_v6_v7_defconfig doesn't build without this patch.
+
+Many thanks and best regards
+
+Dirk
+
+P.S.: It seems that Shawn is on holiday. Could anybody help?
+
+> ---
+>  arch/arm/plat-mxc/tzic.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-
-For a few registers this might be an overkill but MFD comes to mind.
-
-Regards,
-Vaibhav B.
+> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> index c219317..3ed1adb 100644
+> --- a/arch/arm/plat-mxc/tzic.c
+> +++ b/arch/arm/plat-mxc/tzic.c
+> @@ -23,6 +23,7 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+> +#include <mach/irqs.h>
+>  
+>  #include "irq-common.h"
+>  
