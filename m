@@ -1,34 +1,264 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 27 Jul 2012 19:19:01 +0800
-Subject: [RFC PATCH 1/1] ASoC: soc-dapm: warn if no avaiable path found for
- widget kcontrol
-Message-ID: <1343387941-25266-1-git-send-email-b29396@freescale.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Jul 2012 12:56:07 +0100
+Subject: [Xen-devel] [PATCH 01/24] arm: initial Xen support
+In-Reply-To: <20120726163020.GB9222@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120726163020.GB9222@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1207271246080.26163@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Thu, 26 Jul 2012, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 26, 2012 at 04:33:43PM +0100, Stefano Stabellini wrote:
+> > - Basic hypervisor.h and interface.h definitions.
+> > - Skelethon enlighten.c, set xen_start_info to an empty struct.
+> 
+> Skeleton
+> 
+> > - Do not limit xen_initial_domain to PV guests.
+> 
+> Better wording: Make xen_initial_domain dependent on the SIF_PRIVILIGED_BIT.
+> 
+> Which reminds me - what about PV guests that do PCI passthrough. Aren't
+> they "more" priviligied than normal PV guests? Or not really?
 
-This could help people know what's wrong going on if the required
-path is not registered.
+Not really, from the Xen POV.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- sound/soc/soc-dapm.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-index 4d181df..b9b94c5 100644
---- a/sound/soc/soc-dapm.c
-+++ b/sound/soc/soc-dapm.c
-@@ -1879,6 +1879,9 @@ static int soc_dapm_mux_update_power(struct snd_soc_dapm_widget *widget,
- 		}
- 	}
- 
-+	WARN(!found, "did not find dapm widget path associated with kcontrol %s\n",
-+		kcontrol->id.name);
-+
- 	if (found) {
- 		dapm_mark_dirty(widget, "mux change");
- 		dapm_power_widgets(widget->dapm, SND_SOC_DAPM_STREAM_NOP);
--- 
-1.7.0.4
+> > The new code only compiles when CONFIG_XEN is set, that is going to be
+> > added to arch/arm/Kconfig in a later patch.
+> 
+> s/later patch/<name of patch>/
+> 
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/Makefile                     |    1 +
+> >  arch/arm/include/asm/hypervisor.h     |    6 +++
+> >  arch/arm/include/asm/xen/hypervisor.h |   19 ++++++++++
+> >  arch/arm/include/asm/xen/interface.h  |   64 +++++++++++++++++++++++++++++++++
+> >  arch/arm/xen/Makefile                 |    1 +
+> >  arch/arm/xen/enlighten.c              |   35 ++++++++++++++++++
+> >  include/xen/xen.h                     |    2 +-
+> >  7 files changed, 127 insertions(+), 1 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/hypervisor.h
+> >  create mode 100644 arch/arm/include/asm/xen/hypervisor.h
+> >  create mode 100644 arch/arm/include/asm/xen/interface.h
+> >  create mode 100644 arch/arm/xen/Makefile
+> >  create mode 100644 arch/arm/xen/enlighten.c
+> > 
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 0298b00..70aaa82 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -246,6 +246,7 @@ endif
+> >  core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
+> >  core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
+> >  core-$(CONFIG_VFP)		+= arch/arm/vfp/
+> > +core-$(CONFIG_XEN)		+= arch/arm/xen/
+> >  
+> >  # If we have a machine-specific directory, then include it in the build.
+> >  core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+> > diff --git a/arch/arm/include/asm/hypervisor.h b/arch/arm/include/asm/hypervisor.h
+> > new file mode 100644
+> > index 0000000..b90d9e5
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/hypervisor.h
+> > @@ -0,0 +1,6 @@
+> > +#ifndef _ASM_ARM_HYPERVISOR_H
+> > +#define _ASM_ARM_HYPERVISOR_H
+> > +
+> > +#include <asm/xen/hypervisor.h>
+> > +
+> > +#endif
+> > diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
+> > new file mode 100644
+> > index 0000000..d7ab99a
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/xen/hypervisor.h
+> > @@ -0,0 +1,19 @@
+> > +#ifndef _ASM_ARM_XEN_HYPERVISOR_H
+> > +#define _ASM_ARM_XEN_HYPERVISOR_H
+> > +
+> > +extern struct shared_info *HYPERVISOR_shared_info;
+> > +extern struct start_info *xen_start_info;
+> > +
+> > +/* Lazy mode for batching updates / context switch */
+> > +enum paravirt_lazy_mode {
+> > +	PARAVIRT_LAZY_NONE,
+> > +	PARAVIRT_LAZY_MMU,
+> > +	PARAVIRT_LAZY_CPU,
+> > +};
+> > +
+> > +static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
+> > +{
+> > +	return PARAVIRT_LAZY_NONE;
+> > +}
+> > +
+> > +#endif /* _ASM_ARM_XEN_HYPERVISOR_H */
+> > diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+> > new file mode 100644
+> > index 0000000..6c3ab59
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/xen/interface.h
+> > @@ -0,0 +1,64 @@
+> > +/******************************************************************************
+> > + * Guest OS interface to ARM Xen.
+> > + *
+> > + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2011
+> 
+> 2012
+> 
+> > + */
+> > +
+> > +#ifndef _ASM_ARM_XEN_INTERFACE_H
+> > +#define _ASM_ARM_XEN_INTERFACE_H
+> > +
+> > +#include <linux/types.h>
+> > +
+> > +#define __DEFINE_GUEST_HANDLE(name, type) \
+> > +	typedef type * __guest_handle_ ## name
+> > +
+> > +#define DEFINE_GUEST_HANDLE_STRUCT(name) \
+> > +	__DEFINE_GUEST_HANDLE(name, struct name)
+> > +#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+> > +#define GUEST_HANDLE(name)        __guest_handle_ ## name
+> > +
+> > +#define set_xen_guest_handle(hnd, val)			\
+> > +	do {						\
+> > +		if (sizeof(hnd) == 8)			\
+> > +			*(uint64_t *)&(hnd) = 0;	\
+> > +		(hnd) = val;				\
+> > +	} while (0)
+> > +
+> > +#ifndef __ASSEMBLY__
+> > +/* Guest handles for primitive C types. */
+> > +__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+> > +__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+> > +__DEFINE_GUEST_HANDLE(ulong, unsigned long);
+> > +DEFINE_GUEST_HANDLE(char);
+> > +DEFINE_GUEST_HANDLE(int);
+> > +DEFINE_GUEST_HANDLE(long);
+> > +DEFINE_GUEST_HANDLE(void);
+> > +DEFINE_GUEST_HANDLE(uint64_t);
+> > +DEFINE_GUEST_HANDLE(uint32_t);
+> > +
+> > +/* Maximum number of virtual CPUs in multi-processor guests. */
+> > +#define MAX_VIRT_CPUS 1
+> > +
+> > +struct arch_vcpu_info { };
+> > +struct arch_shared_info { };
+> > +
+> > +/* XXX: Move pvclock definitions some place arch independent */
+> > +struct pvclock_vcpu_time_info {
+> > +	u32   version;
+> > +	u32   pad0;
+> > +	u64   tsc_timestamp;
+> > +	u64   system_time;
+> > +	u32   tsc_to_system_mul;
+> > +	s8    tsc_shift;
+> > +	u8    flags;
+> > +	u8    pad[2];
+> > +} __attribute__((__packed__)); /* 32 bytes */
+> > +
+> > +struct pvclock_wall_clock {
+> > +	u32   version;
+> > +	u32   sec;
+> > +	u32   nsec;
+> > +} __attribute__((__packed__));
+> 
+> That is weird. It is 4+4+4 = 12 bytes? Don't you want it to be 16 bytes?
+
+I agree that 16 bytes would be a better choice, but it needs to match
+the struct in Xen that is defined as follow:
+
+    uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
+    uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+
+in xen/include/public/xen.h.
+
+
+> > +#endif
+> > +
+> > +#endif /* _ASM_ARM_XEN_INTERFACE_H */
+> > diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+> > new file mode 100644
+> > index 0000000..0bad594
+> > --- /dev/null
+> > +++ b/arch/arm/xen/Makefile
+> > @@ -0,0 +1 @@
+> > +obj-y		:= enlighten.o
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > new file mode 100644
+> > index 0000000..d27c2a6
+> > --- /dev/null
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -0,0 +1,35 @@
+> > +#include <xen/xen.h>
+> > +#include <xen/interface/xen.h>
+> > +#include <xen/interface/memory.h>
+> > +#include <xen/platform_pci.h>
+> > +#include <asm/xen/hypervisor.h>
+> > +#include <asm/xen/hypercall.h>
+> > +#include <linux/module.h>
+> > +
+> > +struct start_info _xen_start_info;
+> > +struct start_info *xen_start_info = &_xen_start_info;
+> > +EXPORT_SYMBOL_GPL(xen_start_info);
+> > +
+> > +enum xen_domain_type xen_domain_type = XEN_NATIVE;
+> > +EXPORT_SYMBOL_GPL(xen_domain_type);
+> > +
+> > +struct shared_info xen_dummy_shared_info;
+> > +struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
+> > +
+> > +DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
+> > +
+> > +/* XXX: to be removed */
+> 
+> In this patch series later on? Or just when you try to collapse the x86 and arm variant
+> together?
+
+The latter.
+It is not harmful but we don't need xen_have_vector_callback on ARM, so it
+would be nice if we didn't have to define it here.
+
+
+> > +__read_mostly int xen_have_vector_callback;
+> > +EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+> > +
+> > +int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
+> > +EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+> > +
+> > +int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+> > +			       unsigned long addr,
+> > +			       unsigned long mfn, int nr,
+> > +			       pgprot_t prot, unsigned domid)
+> > +{
+> > +	return -ENOSYS;
+> > +}
+> > +EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> > diff --git a/include/xen/xen.h b/include/xen/xen.h
+> > index a164024..2c0d3a5 100644
+> > --- a/include/xen/xen.h
+> > +++ b/include/xen/xen.h
+> > @@ -23,7 +23,7 @@ extern enum xen_domain_type xen_domain_type;
+> >  #include <xen/interface/xen.h>
+> >  #include <asm/xen/hypervisor.h>
+> >  
+> > -#define xen_initial_domain()	(xen_pv_domain() && \
+> > +#define xen_initial_domain()	(xen_domain() && \
+> >  				 xen_start_info->flags & SIF_INITDOMAIN)
+> >  #else  /* !CONFIG_XEN_DOM0 */
+> >  #define xen_initial_domain()	(0)
+> > -- 
+> > 1.7.2.5
+> > 
+> > 
+> > _______________________________________________
+> > Xen-devel mailing list
+> > Xen-devel at lists.xen.org
+> > http://lists.xen.org/xen-devel
+> 
