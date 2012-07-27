@@ -1,36 +1,62 @@
 From: JBeulich@suse.com (Jan Beulich)
-Date: Fri, 27 Jul 2012 07:57:23 +0100
-Subject: [Xen-devel] [PATCH 06/24] xen: missing includes
-In-Reply-To: <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Fri, 27 Jul 2012 08:01:47 +0100
+Subject: [Xen-devel] [PATCH 10/24] xen: do not compile manage,
+ balloon, pci, acpi and cpu_hotplug on ARM
+In-Reply-To: <1343316846-25860-10-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <501257F30200007800090D9E@nat28.tlf.novell.com>
+ <1343316846-25860-10-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <501258FB0200007800090DB6@nat28.tlf.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 >>> On 26.07.12 at 17:33, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> --- a/include/xen/interface/xen.h
-> +++ b/include/xen/interface/xen.h
-> @@ -10,7 +10,10 @@
->  #define __XEN_PUBLIC_XEN_H__
->  
->  #include <asm/xen/interface.h>
-> +#include <linux/types.h>
-> +#ifdef CONFIG_X86
->  #include <asm/pvclock-abi.h>
-> +#endif
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -1,11 +1,15 @@
+> -obj-y	+= grant-table.o features.o events.o manage.o balloon.o
+> +ifneq ($(CONFIG_ARM),y)
+> +obj-y	+= manage.o balloon.o
 
-Rather than hacking around this, why not clean it up:
-asm/pvclock-abi.h clearly isn't intended to be included here
-(from the perspective of the origin of xen/interface/xen.h, at
-least), nor is linux/types.h.
+While I assume that this part (and the cpu_hotplug one below) is
+temporary, ...
 
-Or if it is really needed to deviate from the original header in
-this respect, then clearly the inclusion ought to not be arch
-specific or be moved to an arch specific header.
+> +obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
+
+... at least this one should imo be solved with a proper long term
+mechanism, i.e. the usual var-$(CONFIG_...) approach, i.e.
+
+dom0-$(CONFIG_PCI) := pci.o
+dom0-$(CONFIG_ACPI) := acpi.o
+obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
 
 Jan
 
+> +obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+> +endif
+> +obj-y	+= grant-table.o features.o events.o
+>  obj-y	+= xenbus/
 >  
->  /*
->   * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
+>  nostackp := $(call cc-option, -fno-stack-protector)
+>  CFLAGS_features.o			:= $(nostackp)
+>  
+>  obj-$(CONFIG_BLOCK)			+= biomerge.o
+> -obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
+>  obj-$(CONFIG_XEN_BALLOON)		+= xen-balloon.o
+>  obj-$(CONFIG_XEN_SELFBALLOONING)	+= xen-selfballoon.o
+> @@ -17,7 +21,6 @@ obj-$(CONFIG_XEN_SYS_HYPERVISOR)	+= sys-hypervisor.o
+>  obj-$(CONFIG_XEN_PVHVM)			+= platform-pci.o
+>  obj-$(CONFIG_XEN_TMEM)			+= tmem.o
+>  obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
+> -obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
+>  obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= xen-pciback/
+>  obj-$(CONFIG_XEN_PRIVCMD)		+= xen-privcmd.o
+>  obj-$(CONFIG_XEN_ACPI_PROCESSOR)	+= xen-acpi-processor.o
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org 
+> http://lists.xen.org/xen-devel 
