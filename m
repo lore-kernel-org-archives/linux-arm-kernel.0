@@ -1,33 +1,23 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:38:51 +0100
-Subject: [PATCH 4/7] mfd: ab8500-core: Apply the AB8500 CODEC's compatible
- string to its MFD cell
-In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343392734-11805-5-git-send-email-lee.jones@linaro.org>
+Date: Fri, 27 Jul 2012 13:38:47 +0100
+Subject: [PATCH 0/7] Bugfixes and clean-ups bound for the v3.6 RCs
+Message-ID: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a compatible string for the AB8500 CODEC to aid in
-configuration property look-up from its associated Device Tree
-node.
+This patch-set includes some important changes which should make
+their way to the Mainline Release Candidates for the v3.6 release.
+Without them Audio doesn't even probe (at all) when booting with
+Device Tree selected. The kernel can't compile with ux500 audio
+enabled. Also platform data will fail to reach the AB8500 CODEC
+driver. Even if we can get that far SoC Core will assume we're
+using regmaps and attempt to use them; however, none exist for
+this driver, so the kernel will oops.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/ab8500-core.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 626b4ec..0c5b70f 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1076,6 +1076,7 @@ static struct mfd_cell __devinitdata ab8500_devs[] = {
- 	},
- 	{
- 		.name = "ab8500-codec",
-+		.of_compatible = "stericsson,ab8500-codec",
- 	},
- };
- 
--- 
-1.7.9.5
+ arch/arm/mach-ux500/board-mop500-msp.c |    2 +-
+ arch/arm/mach-ux500/board-mop500.c     |    9 ++++-----
+ drivers/mfd/ab8500-core.c              |    1 +
+ drivers/mfd/db8500-prcmu.c             |    1 +
+ sound/soc/codecs/ab8500-codec.c        |    4 ++++
+ sound/soc/soc-dapm.c                   |    2 --
+ 6 files changed, 11 insertions(+), 8 deletions(-)
