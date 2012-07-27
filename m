@@ -1,40 +1,90 @@
-From: michael.jones@matrix-vision.de (Michael Jones)
-Date: Fri, 27 Jul 2012 09:28:45 +0200
-Subject: [PATCH] OMAP3 clock: remove obsolete comment
-In-Reply-To: <alpine.DEB.2.00.1207270105001.21530@utopia.booyaka.com>
-References: <1343305722-16721-1-git-send-email-michael.jones@matrix-vision.de>
- <alpine.DEB.2.00.1207261349350.14468@utopia.booyaka.com>
- <50123DD1.4090307@matrix-vision.de>
- <alpine.DEB.2.00.1207270105001.21530@utopia.booyaka.com>
-Message-ID: <5012432D.5000003@matrix-vision.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 27 Jul 2012 13:13:23 +0530
+Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping
+ from cpuidle
+In-Reply-To: <5012395F.3040903@ti.com>
+References: <1342764284-8143-1-git-send-email-rnayak@ti.com>	
+ <1342764284-8143-3-git-send-email-rnayak@ti.com>	
+ <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>	
+ <5009120A.1060400@ti.com> <1342774283.4672.181.camel@sokoban>	
+ <87obn3798o.fsf@ti.com> <50113B3C.4090608@ti.com> <87boj2s9hi.fsf@ti.com>
+ <1343327231.30247.151.camel@sokoban> <5012395F.3040903@ti.com>
+Message-ID: <5012469B.1070003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Tero,
 
-Thanks for the explanations.
-
-On 07/27/2012 09:14 AM, Paul Walmsley wrote:
-> Hello Michael,
+On Friday 27 July 2012 12:16 PM, Rajendra Nayak wrote:
+> However a quick test with just your latest usecounting series (without
+> any of my RFC patches) seems to make me think I am still missing
+> something.
 >
-
-[snip]
-
-> There is; it's Documentation/SubmittingPatches which can be viewed here:
+> If you see the counts below for usbhost and dss, they both seem to
+> go in and out of RET with every MPU transition. Which means the
+> dependencies are still set.
 >
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=Documentation/SubmittingPatches
-
-I looked at that, too, but it wasn't clear to me that even such a 
-trivial patch should have an "explanation body", as the description
-there assumes a functional change is being introduced.  Now I know!
-
-[snip]
+> # cat /debug/pm_debug/count
+> usbhost_pwrdm
+> (ON),OFF:0,RET:138,INA:0,ON:139,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> core_pwrdm
+> (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
 >
-> - Paul
+> per_pwrdm (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> dss_pwrdm
+> (ON),OFF:0,RET:138,INA:0,ON:139,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> neon_pwrdm (ON),OFF:0,RET:132,INA:6,ON:139,RET-LOGIC-OFF:0
+> mpu_pwrdm
+> (ON),OFF:0,RET:132,INA:6,ON:139,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> iva2_pwrdm
+> (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
 >
+>
+> However if I look at the dss registers, I don;t see any fclks are
+> enabled.
+>
+> # ./readmem 0x48004E00
+> 0x00000000 <- All FCLK disabled.
+>
+> # ./readmem 0x48004E10
+> 0x00000001 <- ICLK enabled
+>
+> # ./readmem 0x48004E44
+> 0x00000006 <- dependencies are set with MPU and IVA
+>
+> # ./readmem 0x48004E48
+> 0x00000003 <- clkdm is under HWSUP.
+>
+> Any idea why this could be happening?
 
--Michael
+I think I know what the problem is now.
 
-MATRIX VISION GmbH, Talstrasse 16, DE-71570 Oppenweiler
-Registergericht: Amtsgericht Stuttgart, HRB 271090
-Geschaeftsfuehrer: Gerhard Thullner, Werner Armingeon, Uwe Furtner, Erhard Meier
+omap3_pm_init calls clkdm_allow_idle for all clkdms, while autoidle on
+all iclks is still disabled. This causes autodeps to be set as the iclks
+are accounted for in the usecount.
+(hwmod would have done a clk_enable() on the iclks and left them enabled
+as OCPIF_SWSUP_IDLE isn't set)
+
+static void omap3_clkdm_allow_idle(struct clockdomain *clkdm)
+{
+         if (atomic_read(&clkdm->usecount) > 0)
+                 _clkdm_add_autodeps(clkdm);
+
+         omap3xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+                                 clkdm->clktrctrl_mask);
+}
+
+A little later after omap3_pm_init, we enable autoidle for all iclks.
+omap2_clkt_iclk_allow_idle decrements the usecount, but leaves the
+autodeps still set.
+
+This seems to be causing the dss and usb to also transition along with
+MPU.
+
+We will need some way to also clear and set autodeps in
+omap2_clkt_iclk_allow_idle/deny_idle.
+
+regards,
+Rajendra
