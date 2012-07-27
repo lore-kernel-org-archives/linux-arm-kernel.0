@@ -1,20 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jul 2012 10:02:02 +0100
-Subject: [PATCHv2 3/3] ARM: EXYNOS: Enable PMUs for exynos4/5
-In-Reply-To: <1343376509-5881-4-git-send-email-chanho61.park@samsung.com>
-References: <1343376509-5881-1-git-send-email-chanho61.park@samsung.com>
- <1343376509-5881-4-git-send-email-chanho61.park@samsung.com>
-Message-ID: <20120727090201.GD559@mudshark.cambridge.arm.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Fri, 27 Jul 2012 09:03:33 +0000
+Subject: Sharing resources between several drivers.
+In-Reply-To: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+References: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB1F69E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 09:08:29AM +0100, Chanho Park wrote:
-> This patch define irq numbers of ARM performance monitoring unit for exynos4/5.
-> The number of CPU cores and PMU irq numbers are vary according to soc types.
-> So we need to identify each soc type using soc_is_xxx function and define the
-> pmu irqs dynamically. In case of exynos4412, there are 4 cpu cores and pmus.
+On Fri, Jul 27, 2012 at 13:29:21, javier Martin wrote:
+> Hi,
+> we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
+> 
+> In these chips, gpio and pinctrl use the same HW memory area
+> registers. This means that we have to request the same memory area
+> from two different drivers (gpio and pinctrl) but we don't know how to
+> do that.
+> 
+> A similar example available is mxs, but it only works with device
+> tree, so this problem is avoided.  However, some of these chips
 
-We have devicetree bindings for the PMU -- why can't you use those instead
-of probing the SoC all the time?
+I am curious as to how device tree solves the access issues for
+a shared resource.
 
-Will
+> (i.MX21, i.MX1...) don't support device tree yet, so we need to
+> provide backwards compatibility.
+> 
+> What is the right way to request the same memory region from two
+> different drivers? Moreover, how can we guarantee that there won't be
+> any conflicts when accessing these shared resources?
+> 
+
+For a few registers this might be an overkill but MFD comes to mind.
+
+Regards,
+Vaibhav B.
