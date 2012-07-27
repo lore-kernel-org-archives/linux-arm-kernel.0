@@ -1,50 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:38:54 +0100
-Subject: [PATCH 7/7] ARM: ux500: Ensure probing of Audio devices when Device
- Tree is enabled
+Date: Fri, 27 Jul 2012 13:38:48 +0100
+Subject: [PATCH 1/7] ASoC: dapm: If one widget fails,
+ do not force all subsequent widgets to fail too
 In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
 References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343392734-11805-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343392734-11805-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous attempts to add platform probing of the Audio related devices
-only call from non-DT initialisation functions. This patch extends that
-functionality to the Device Tree related ones too.
+If a list of widgets is provided and one of them fails to be added as
+a control, the present semantics fail all subsequent widgets. A better
+solution would be to only fail that widget, but pursue in attempting
+to add the rest of the list.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/soc-dapm.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index e641003..87a5cd7 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -794,6 +794,7 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
- 
- 		mop500_sdi_init(parent);
-+		mop500_msp_init(parent);
- 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
- 		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
- 		i2c_register_board_info(2, mop500_i2c2_devices,
-@@ -801,6 +802,8 @@ static void __init u8500_init_machine(void)
- 
- 		mop500_uib_init();
- 
-+	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
-+		mop500_of_msp_init(parent);
- 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
- 		/*
- 		 * The HREFv60 board removed a GPIO expander and routed
-@@ -812,6 +815,7 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
- 
- 		hrefv60_sdi_init(parent);
-+		mop500_msp_init(parent);
- 
- 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
- 		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
+diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
+index eded657..7d9c154 100644
+--- a/sound/soc/soc-dapm.c
++++ b/sound/soc/soc-dapm.c
+@@ -3095,8 +3095,6 @@ int snd_soc_dapm_new_controls(struct snd_soc_dapm_context *dapm,
+ 			dev_err(dapm->dev,
+ 				"ASoC: Failed to create DAPM control %s\n",
+ 				widget->name);
+-			ret = -ENOMEM;
+-			break;
+ 		}
+ 		widget++;
+ 	}
 -- 
 1.7.9.5
