@@ -1,127 +1,63 @@
 From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Jul 2012 10:42:31 +0100
-Subject: [PATCH 12/24] xen/arm: Introduce xen_guest_init
-In-Reply-To: <1343316846-25860-12-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Fri, 27 Jul 2012 10:44:36 +0100
+Subject: [PATCH 13/24] xen/arm: get privilege status
+In-Reply-To: <1343316846-25860-13-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-12-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1343382151.6812.124.camel@zakaz.uk.xensource.com>
+ <1343316846-25860-13-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1343382276.6812.126.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 2012-07-26 at 16:33 +0100, Stefano Stabellini wrote:
-> We used to rely on a core_initcall to initialize Xen on ARM, however
-> core_initcalls are actually called after early consoles are initialized.
-> That means that hvc_xen.c is going to be initialized before Xen.
+> Use Xen features to figure out if we are privileged.
 > 
-> Given the lack of a better alternative, just call a new Xen
-> initialization function (xen_guest_init) from xen_cons_init.
-
-Can't we just arrange for this to be called super early on from
-setup_arch? That's got to be better than calling it from some random
-function which happens to get called early enough.
-
-I presume that KVM is going to want some similarly early init hooks etc
-and therefore ARM could benefit from the same sort of infrastructure as
-is in arch/x86/include/asm/hypervisor.h?
-
-
-> 
-> xen_guest_init has to be arch independent, so write both an ARM and an
-> x86 implementation. The x86 implementation is currently empty because we
-> can be sure that xen_hvm_guest_init is called early enough.
+> XENFEAT_dom0 was introduced by 23735 in xen-unstable.hg.
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  arch/arm/xen/enlighten.c  |    7 ++++++-
->  arch/x86/xen/enlighten.c  |    8 ++++++++
->  drivers/tty/hvc/hvc_xen.c |    7 ++++++-
->  include/xen/xen.h         |    2 ++
->  4 files changed, 22 insertions(+), 2 deletions(-)
+>  arch/arm/xen/enlighten.c         |    7 +++++++
+>  include/xen/interface/features.h |    3 +++
+>  2 files changed, 10 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 8c923af..dc68074 100644
+> index dc68074..2e013cf 100644
 > --- a/arch/arm/xen/enlighten.c
 > +++ b/arch/arm/xen/enlighten.c
-> @@ -44,7 +44,7 @@ EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
->   * - one interrupt for Xen event notifications;
->   * - one memory region to map the grant_table.
->   */
-> -static int __init xen_guest_init(void)
-> +int __init xen_guest_init(void)
->  {
->  	int cpu;
->  	struct xen_add_to_physmap xatp;
-> @@ -58,6 +58,10 @@ static int __init xen_guest_init(void)
+> @@ -2,6 +2,7 @@
+>  #include <xen/interface/xen.h>
+>  #include <xen/interface/memory.h>
+>  #include <xen/platform_pci.h>
+> +#include <xen/features.h>
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+>  #include <linux/module.h>
+> @@ -58,6 +59,12 @@ int __init xen_guest_init(void)
 >  	}
 >  	xen_domain_type = XEN_HVM_DOMAIN;
 >  
-> +	/* already setup */
-> +	if (shared_info_page != 0 && HYPERVISOR_shared_info == shared_info_page)
-> +		return 0;
+> +	xen_setup_features();
+> +	if (xen_feature(XENFEAT_dom0))
+> +		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+> +	else
+> +		xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
+
+What happens here on platforms prior to hypervisor changeset 23735?
+
 > +
->  	if (!shared_info_page)
->  		shared_info_page = (struct shared_info *)
->  			get_zeroed_page(GFP_KERNEL);
-> @@ -88,4 +92,5 @@ static int __init xen_guest_init(void)
->  	}
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(xen_guest_init);
->  core_initcall(xen_guest_init);
-> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> index ff962d4..6131d43 100644
-> --- a/arch/x86/xen/enlighten.c
-> +++ b/arch/x86/xen/enlighten.c
-> @@ -1567,4 +1567,12 @@ const struct hypervisor_x86 x86_hyper_xen_hvm __refconst = {
->  	.init_platform		= xen_hvm_guest_init,
->  };
->  EXPORT_SYMBOL(x86_hyper_xen_hvm);
-> +
-> +int __init xen_guest_init(void)
-> +{
-> +	/* do nothing: rely on x86_hyper_xen_hvm for the initialization */
-> +	return 0;
-> +	
-> +}
-> +EXPORT_SYMBOL_GPL(xen_guest_init);
->  #endif
-> diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-> index dc07f56..3c04fb8 100644
-> --- a/drivers/tty/hvc/hvc_xen.c
-> +++ b/drivers/tty/hvc/hvc_xen.c
-> @@ -577,6 +577,12 @@ static void __exit xen_hvc_fini(void)
->  static int xen_cons_init(void)
->  {
->  	const struct hv_ops *ops;
-> +	int r;
-> +
-> +	/* retrieve xen infos  */
-> +	r = xen_guest_init();
-> +	if (r < 0)
-> +		return r;
->  
->  	if (!xen_domain())
+>  	/* already setup */
+>  	if (shared_info_page != 0 && HYPERVISOR_shared_info == shared_info_page)
 >  		return 0;
-> @@ -584,7 +590,6 @@ static int xen_cons_init(void)
->  	if (xen_initial_domain())
->  		ops = &dom0_hvc_ops;
->  	else {
-> -		int r;
->  		ops = &domU_hvc_ops;
+> diff --git a/include/xen/interface/features.h b/include/xen/interface/features.h
+> index b6ca39a..131a6cc 100644
+> --- a/include/xen/interface/features.h
+> +++ b/include/xen/interface/features.h
+> @@ -50,6 +50,9 @@
+>  /* x86: pirq can be used by HVM guests */
+>  #define XENFEAT_hvm_pirqs           10
 >  
->  		if (xen_hvm_domain())
-> diff --git a/include/xen/xen.h b/include/xen/xen.h
-> index 2c0d3a5..792a4d2 100644
-> --- a/include/xen/xen.h
-> +++ b/include/xen/xen.h
-> @@ -9,8 +9,10 @@ enum xen_domain_type {
+> +/* operation as Dom0 is supported */
+> +#define XENFEAT_dom0                      11
+> +
+>  #define XENFEAT_NR_SUBMAPS 1
 >  
->  #ifdef CONFIG_XEN
->  extern enum xen_domain_type xen_domain_type;
-> +int xen_guest_init(void);
->  #else
->  #define xen_domain_type		XEN_NATIVE
-> +static inline int xen_guest_init(void) { return 0; }
->  #endif
->  
->  #define xen_domain()		(xen_domain_type != XEN_NATIVE)
+>  #endif /* __XEN_PUBLIC_FEATURES_H__ */
