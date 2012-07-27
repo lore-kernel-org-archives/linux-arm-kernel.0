@@ -1,57 +1,68 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Jul 2012 17:26:13 +0800
-Subject: [PATCH v2 3/3] ARM: imx_v6_v7_defconfig: Select MXS_DMA
-In-Reply-To: <CAMiH66E9gJJ7f=wKJ8Ondegj=+WUYYuDA0iB8mhNoWBRNWXKsQ@mail.gmail.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
- <1343215100-24005-3-git-send-email-festevam@gmail.com>
- <CAMiH66EA4O0s8hfXkr_SJ56+q7eZ8w0=3C1r_C+m2Os1RxprmA@mail.gmail.com>
- <CAOMZO5BfT+_7x4F96Kvqtq5STXxw2Y9CxbCCAc_UnZ-3wy0qxg@mail.gmail.com>
- <CAMiH66FUxiw0B8iD5rYi=nUX0VYZBzOKifXKfTqd1RmSHhC80g@mail.gmail.com>
- <CAOMZO5DUN5d_aN=j8bfj6n3of=r2A-mu+jqNXCR-4HVTA7kS6Q@mail.gmail.com>
- <CAMiH66HCih0=zWqhwAGj+rVTW7-9vNO8y-6tC+p8R7yg=+sojw@mail.gmail.com>
- <CAOMZO5BziYJVUzniUoZmdFejso+6dBOc6QtTuzbbMyVOXuOFDQ@mail.gmail.com>
- <CAMiH66E9gJJ7f=wKJ8Ondegj=+WUYYuDA0iB8mhNoWBRNWXKsQ@mail.gmail.com>
-Message-ID: <20120727092612.GD3347@b20223-02.ap.freescale.net>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 27 Jul 2012 10:28:25 +0100
+Subject: [Xen-devel] [PATCH 04/24] xen/arm: sync_bitops
+In-Reply-To: <20120726163759.GE9222@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120726163759.GE9222@phenom.dumpdata.com>
+Message-ID: <1343381305.6812.116.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 07:32:54AM -0400, Huang Shijie wrote:
-> On Thu, Jul 26, 2012 at 7:08 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Thu, Jul 26, 2012 at 7:56 AM, Huang Shijie <shijie8@gmail.com> wrote:
-> >> On Thu, Jul 26, 2012 at 6:53 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> >>> On Wed, Jul 25, 2012 at 11:24 PM, Huang Shijie <shijie8@gmail.com> wrote:
-> >>>
-> >>>> But you have added "depend on MXS_DMA". So If you do not select the
-> >>>> mxs-dma, you can not see the
-> >>>> gpmi-nand.
-> >>>> that's why i think this patch is not needed.
-> >>>
-> >>> So how CONFIG_MXS_DMA would be selected if not via defconfig?
-> >> Use the make menuconfig ARCH=arm:
-> >>
-> >> "device drivers"-->"DMA engine support" -->"mxs dma support"
-> >
-> > I prefer to have selected in the defconfig by default instead.
-> >
-> > It is not obvious for the end user that they need to manually select
-> > this option.
-> >
-> > mxs_defconfig also selects CONFIG_MXS_DMA.
-> In mx23/mx28, the mxs-dma has many users, so it's proper to make it default.
+On Thu, 2012-07-26 at 17:37 +0100, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 26, 2012 at 04:33:46PM +0100, Stefano Stabellini wrote:
+> > sync_bitops functions are equivalent to the SMP implementation of the
+> > original functions, independently from CONFIG_SMP being defined.
 > 
-> >
-> > Can't we do the same here and let imx_v6_v7_defconfig be built again?
-> Shawn, do you have any opinion about this?
-Most drivers should be kernel modules. mxs_dma needs changes to support
-building as module.
+> So why can't the code be changed to use that? Is it that
+> the _set_bit, _clear_bit, etc are not available with !CONFIG_SMP?
 
-Thanks
-Richard
+_set_bit etc are not SMP safe if !CONFIG_SMP. But under Xen you might be
+communicating with a completely external entity who might be on another
+CPU (e.g. two uniprocessor guests communicating via event channels and
+grant tables). So we need a variant of the bit ops which are SMP safe
+even on a UP kernel.
+
+The users are common code and the sync_foo vs foo distinction matters on
+some platforms (e.g. x86 where a UP kernel would omit the LOCK prefix
+for the normal ones).
+
 > 
-> Huang Shijie
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/include/asm/sync_bitops.h |   17 +++++++++++++++++
+> >  1 files changed, 17 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/sync_bitops.h
+> > 
+> > diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+> > new file mode 100644
+> > index 0000000..d975092903
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/sync_bitops.h
+> > @@ -0,0 +1,17 @@
+> > +#ifndef __ASM_SYNC_BITOPS_H__
+> > +#define __ASM_SYNC_BITOPS_H__
+> > +
+> > +#include <asm/bitops.h>
+> > +#include <asm/system.h>
+> > +
+> > +#define sync_set_bit(nr, p)		_set_bit(nr, p)
+> > +#define sync_clear_bit(nr, p)		_clear_bit(nr, p)
+> > +#define sync_change_bit(nr, p)		_change_bit(nr, p)
+> > +#define sync_test_and_set_bit(nr, p)	_test_and_set_bit(nr, p)
+> > +#define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
+> > +#define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
+> > +#define sync_test_bit(nr, addr)		test_bit(nr, addr)
+> > +#define sync_cmpxchg			cmpxchg
+> > +
+> > +
+> > +#endif
+> > -- 
+> > 1.7.2.5
+> > 
+> > 
+> > _______________________________________________
+> > Xen-devel mailing list
+> > Xen-devel at lists.xen.org
+> > http://lists.xen.org/xen-devel
