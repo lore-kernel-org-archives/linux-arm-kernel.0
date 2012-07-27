@@ -1,35 +1,98 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:38:48 +0100
-Subject: [PATCH 1/7] ASoC: dapm: If one widget fails,
- do not force all subsequent widgets to fail too
-In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343392734-11805-2-git-send-email-lee.jones@linaro.org>
+Date: Fri, 27 Jul 2012 13:45:47 +0100
+Subject: [PATCH 03/18] ASoC: Ux500: Enable MOP500 driver for Device Tree
+In-Reply-To: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343393162-11938-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a list of widgets is provided and one of them fails to be added as
-a control, the present semantics fail all subsequent widgets. A better
-solution would be to only fail that widget, but pursue in attempting
-to add the rest of the list.
+Here we ensure that the MOP500 audio driver will be probed during a
+Device Tree boot. We also parse the sound node to link together the
+codec, dma and the CPU-side Digital Audio Interface.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/soc-dapm.c |    2 --
- 1 file changed, 2 deletions(-)
+ sound/soc/ux500/mop500.c |   41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-index eded657..7d9c154 100644
---- a/sound/soc/soc-dapm.c
-+++ b/sound/soc/soc-dapm.c
-@@ -3095,8 +3095,6 @@ int snd_soc_dapm_new_controls(struct snd_soc_dapm_context *dapm,
- 			dev_err(dapm->dev,
- 				"ASoC: Failed to create DAPM control %s\n",
- 				widget->name);
--			ret = -ENOMEM;
--			break;
- 		}
- 		widget++;
- 	}
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 31c4d26..d84a073 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/spi/spi.h>
++#include <linux/of.h>
+ 
+ #include <sound/soc.h>
+ #include <sound/initval.h>
+@@ -56,14 +57,48 @@ static struct snd_soc_card mop500_card = {
+ 	.num_links = ARRAY_SIZE(mop500_dai_links),
+ };
+ 
++static int __devinit mop500_of_probe(struct platform_device *pdev,
++				struct device_node *np)
++{
++	struct device_node *codec_np, *platform_np, *msp_np[2];
++	int i;
++
++	platform_np = of_parse_phandle(np, "platform-pcm-dma", 0);
++	msp_np[0]   = of_parse_phandle(np, "cpu-dai", 0);
++	msp_np[1]   = of_parse_phandle(np, "cpu-dai", 1);
++	codec_np    = of_parse_phandle(np, "audio-codec", 0);
++
++	if (!(platform_np && msp_np[0] && msp_np[1] && codec_np)) {
++		dev_err(&pdev->dev, "Phandle missing or invalid\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i < 2; i++) {
++		mop500_dai_links[i].platform_of_node = platform_np;
++		mop500_dai_links[i].platform_name = NULL;
++		mop500_dai_links[i].cpu_of_node = msp_np[i];
++		mop500_dai_links[i].cpu_dai_name = NULL;
++		mop500_dai_links[i].codec_of_node = codec_np;
++		mop500_dai_links[i].codec_name = NULL;
++	}
++
++	return 0;
++}
+ static int __devinit mop500_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+ 	pr_debug("%s: Enter.\n", __func__);
+ 
+ 	dev_dbg(&pdev->dev, "%s: Enter.\n", __func__);
+ 
++	if (np) {
++		ret = mop500_of_probe(pdev, np);
++		if (ret)
++			return ret;
++	}
++
+ 	mop500_card.dev = &pdev->dev;
+ 
+ 	dev_dbg(&pdev->dev, "%s: Card %s: Set platform drvdata.\n",
+@@ -101,10 +136,16 @@ static int __devexit mop500_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id snd_soc_mop500_match[] = {
++	{ .compatible = "stericsson,snd-soc-mop500", },
++	{},
++};
++
+ static struct platform_driver snd_soc_mop500_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = "snd-soc-mop500",
++		.of_match_table = snd_soc_mop500_match,
+ 	},
+ 	.probe = mop500_probe,
+ 	.remove = __devexit_p(mop500_remove),
 -- 
 1.7.9.5
