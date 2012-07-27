@@ -1,45 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 28 Jul 2012 00:23:05 +0200
-Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB19376@DBDE01.ent.ti.com>
-References: <1342567672-29071-1-git-send-email-ccross@android.com>
- <CACRpkdaHdCvx1HJNDsyJSZAN--sF+4-V1TbzXZL1v+7Asoe_oA@mail.gmail.com>
- <CAMbhsRR2-VjUeL2XPKubeaG=iLV5NE-i_sVYbuMAryXLxsbo1g@mail.gmail.com>
- <CACRpkdYayLaKzUSq5V9N5sRkV74a+nZ1CbLJzRW7RP=pOU9bfw@mail.gmail.com>
- <CAMbhsRQuXsytM9QLwjW1z1E=0XNztXP1xezbcDEj7Ra6deKLDQ@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D121433EB19376@DBDE01.ent.ti.com>
-Message-ID: <CACRpkdaiZKGEQatbLPpOQd-7J+m38mYFupLoOeALdhVUcUEdrA@mail.gmail.com>
+Date: Sat, 28 Jul 2012 00:42:06 +0200
+Subject: [PATCH 1/8] ARM: support for Moschip MCS814x SoCs
+In-Reply-To: <6220407.M8CZZfZu0N@bender>
+References: <1342363754-30808-1-git-send-email-florian@openwrt.org>
+ <1342363754-30808-2-git-send-email-florian@openwrt.org>
+ <20120716142941.666d928c@skate> <6220407.M8CZZfZu0N@bender>
+Message-ID: <CACRpkdah3B95C0f7C78E65mWWc7+5VE__ByFQ+vFBv6BA=LKRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2012 at 11:16 AM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+On Mon, Jul 23, 2012 at 9:11 PM, Florian Fainelli <florian@openwrt.org> wrote:
 
->> > A connecting theme is that of being avle to flag clock sources as
->> > sched_clock providers. If all clocksources were tagged with
->> > rating, and only clocksources were used for sched_clock(), the
->> > kernel could select the highest-rated clock under all circumstances.
->> >
->> > But that's quite intrusive, more of an idea. :-P
->>
+> [Thomas P]
+>> I am surprised that this doesn't use the clocksource and clockevents
+>> infrastructure. It probably should, and be implemented in
+>> drivers/clocksource/.
 >
-> Too intrusive I guess ;)
+> This may sound like a stupid question, but the big constraint with this SoC is
+> that the timers do not reload themselves, and so far, I did not find out how I
+> can handle this properly with a clocksource. I suppose that it should not be a
+> big problem for the clockevent device however.
 >
-> There were some discussions on this in the context of AM335x [1] [2].
-> Right now only sched_clock can be registered and I guess this restriction
-> is not going to go away any time soon.
+> Has anyone any example of such particular case?
 
-Why do you think that? The restriction to only assign sched_clock() at
-compile-time was recently removed so its now runtime assigned.
+Gah what horror.
 
-So yes, a clock source that can die and change frequency is no good
-as primary system time, but the abstraction could still be used for
-those that do, just add another flag NOT_CONTINUOUS or so, and
-make sure the system does not select this for primary system
-clock source.
+So you don't have *anything* in your platform which is really
+continous and sufficiently fast?
 
-Then modelling sched_clock() on clock sources makes all more
-sense: just select the best one. For primary system clock source,
-do not select one which is non-continous.
+Then try to get an IRQ to rearm and retrigger the timer to fire
+itself whenever it reloads and pray this doesn't add a skew too much.
+Bonus if you can use the NMI for this :-/
 
 Yours,
 Linus Walleij
