@@ -1,62 +1,43 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Fri, 27 Jul 2012 08:01:47 +0100
-Subject: [Xen-devel] [PATCH 10/24] xen: do not compile manage,
- balloon, pci, acpi and cpu_hotplug on ARM
-In-Reply-To: <1343316846-25860-10-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-10-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <501258FB0200007800090DB6@nat28.tlf.novell.com>
+From: michael.jones@matrix-vision.de (Michael Jones)
+Date: Fri, 27 Jul 2012 09:05:53 +0200
+Subject: [PATCH] OMAP3 clock: remove obsolete comment
+In-Reply-To: <alpine.DEB.2.00.1207261349350.14468@utopia.booyaka.com>
+References: <1343305722-16721-1-git-send-email-michael.jones@matrix-vision.de>
+ <alpine.DEB.2.00.1207261349350.14468@utopia.booyaka.com>
+Message-ID: <50123DD1.4090307@matrix-vision.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 26.07.12 at 17:33, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -1,11 +1,15 @@
-> -obj-y	+= grant-table.o features.o events.o manage.o balloon.o
-> +ifneq ($(CONFIG_ARM),y)
-> +obj-y	+= manage.o balloon.o
+Hi Paul,
 
-While I assume that this part (and the cpu_hotplug one below) is
-temporary, ...
-
-> +obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
-
-... at least this one should imo be solved with a proper long term
-mechanism, i.e. the usual var-$(CONFIG_...) approach, i.e.
-
-dom0-$(CONFIG_PCI) := pci.o
-dom0-$(CONFIG_ACPI) := acpi.o
-obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
-
-Jan
-
-> +obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-> +endif
-> +obj-y	+= grant-table.o features.o events.o
->  obj-y	+= xenbus/
->  
->  nostackp := $(call cc-option, -fno-stack-protector)
->  CFLAGS_features.o			:= $(nostackp)
->  
->  obj-$(CONFIG_BLOCK)			+= biomerge.o
-> -obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
->  obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
->  obj-$(CONFIG_XEN_BALLOON)		+= xen-balloon.o
->  obj-$(CONFIG_XEN_SELFBALLOONING)	+= xen-selfballoon.o
-> @@ -17,7 +21,6 @@ obj-$(CONFIG_XEN_SYS_HYPERVISOR)	+= sys-hypervisor.o
->  obj-$(CONFIG_XEN_PVHVM)			+= platform-pci.o
->  obj-$(CONFIG_XEN_TMEM)			+= tmem.o
->  obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
-> -obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
->  obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= xen-pciback/
->  obj-$(CONFIG_XEN_PRIVCMD)		+= xen-privcmd.o
->  obj-$(CONFIG_XEN_ACPI_PROCESSOR)	+= xen-acpi-processor.o
-> -- 
-> 1.7.2.5
+On 07/26/2012 09:55 PM, Paul Walmsley wrote:
 > 
+> Hello Michael,
 > 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org 
-> http://lists.xen.org/xen-devel 
+> thanks for the patch.  I've queued it for 3.7 after writing a changelog.
+> Two minor comments for future patches: we don't accept patches with a
+> non-null changelog - usually just something brief works fine.  Also Tony
+> wants all OMAP patches to be cc'ed to the linux-arm-kernel mailing list.
+> 
+> regards,
+> 
+> - Paul
+
+Thanks for the comments, I'll adhere to them in the future.  I assume you
+meant you _only_ accept patches with a non-null changelog.  I referred to
+http://omappedia.org/wiki/Releasing_to_Linux_kernel_using_patches_and_emails
+before my submission, and didn't see these two points.  A few Q's:
+
+Can I add these two points to that Wiki page?  Or is there a more
+authoritative checklist somewhere?
+
+Why is it queued for 3.7?  I thought 3.6 was in the works?
+
+Where is it queued?
+
+thanks,
+Michael
+
+MATRIX VISION GmbH, Talstrasse 16, DE-71570 Oppenweiler
+Registergericht: Amtsgericht Stuttgart, HRB 271090
+Geschaeftsfuehrer: Gerhard Thullner, Werner Armingeon, Uwe Furtner, Erhard Meier
