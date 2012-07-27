@@ -1,88 +1,110 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:45:45 +0100
-Subject: [PATCH 01/18] Documentation: Describe the ux500 realated audio
- related DT nodes
+Date: Fri, 27 Jul 2012 13:45:49 +0100
+Subject: [PATCH 05/18] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
 In-Reply-To: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
 References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343393162-11938-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343393162-11938-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also explains the related AB8500 CODEC configuration properties.
+Register both parts of the MSP driver from Device Tree so that they
+are probed when Device Tree is enabled. Also, as there is platform
+data involved, we ensure that there is allocated memory to place the
+configuration into and that the correct information is extracted from
+the DT binary.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/sound/ux500.txt |   62 +++++++++++++++++++++
- 1 file changed, 62 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/ux500.txt
+ sound/soc/ux500/ux500_msp_dai.c |    6 ++++++
+ sound/soc/ux500/ux500_msp_i2s.c |   33 ++++++++++++++++++++++++++++++---
+ 2 files changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/ux500.txt b/Documentation/devicetree/bindings/sound/ux500.txt
-new file mode 100644
-index 0000000..af1c902
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/ux500.txt
-@@ -0,0 +1,62 @@
-+* ux500 Audio Driver and ab8500 Audio CODEC
+diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
+index 772cb19..0f7dd49 100644
+--- a/sound/soc/ux500/ux500_msp_dai.c
++++ b/sound/soc/ux500/ux500_msp_dai.c
+@@ -833,10 +833,16 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id ux500_msp_i2c_match[] = {
++	{ .compatible = "stericsson,ux500-msp-i2s", },
++	{},
++};
 +
-+Required properties:
-+ - compatible:
-+   - Machine Driver : "stericsson,snd-soc-mop500"
-+   - CPU-side DAI   : "stericsson,ux500-msp-i2s"
-+   - DMA (platform) : "stericsson,ux500-pcm"
-+   - Audio CODEC    : "stericsson,ab8500-codec"
+ static struct platform_driver msp_i2s_driver = {
+ 	.driver = {
+ 		.name = "ux500-msp-i2s",
+ 		.owner = THIS_MODULE,
++		.of_match_table = ux500_msp_i2c_match,
+ 	},
+ 	.probe = ux500_msp_drv_probe,
+ 	.remove = ux500_msp_drv_remove,
+diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
+index 72ad6e8..1ecdec0 100644
+--- a/sound/soc/ux500/ux500_msp_i2s.c
++++ b/sound/soc/ux500/ux500_msp_i2s.c
+@@ -18,6 +18,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/msp.h>
+@@ -685,6 +686,16 @@ int ux500_msp_i2s_close(struct ux500_msp *msp, unsigned int dir)
+ 
+ }
+ 
++void ux500_msp_i2s_of_init_msp(struct platform_device *pdev,
++			struct ux500_msp *msp,
++			struct device_node *np)
++{
++	if (of_get_property(np, "stericsson,use-pinctrl", NULL))
++		msp->use_pinctrl = true;
++	else
++		msp->use_pinctrl = false;
++}
 +
-+Optional properties:
-+ - reg              : Physical base address and length of the device's registers.
-+ - interrupts       : The interrupt outputs from the device.
-+ - interrupt-parent : The parent interrupt controller.
-+ - <name>-supply    : Phandle to the regulator <name> supply
+ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
+ 			struct ux500_msp **msp_p,
+ 			struct msp_i2s_platform_data *platform_data)
+@@ -692,17 +703,33 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
+ 	int ret = 0;
+ 	struct resource *res = NULL;
+ 	struct i2s_controller *i2s_cont;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct ux500_msp *msp;
+ 	static int initialised = false;
+ 
+-	dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
+-		pdev->name, platform_data->id);
+-
+ 	*msp_p = devm_kzalloc(&pdev->dev, sizeof(struct ux500_msp), GFP_KERNEL);
+ 	msp = *msp_p;
+ 	if (!msp)
+ 		return -ENOMEM;
+ 
++	if (np) {
++		if (!platform_data) {
++			platform_data = devm_kzalloc(&pdev->dev,
++				sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
++			if (!platform_data)
++				ret = -ENOMEM;
++		}
++		ux500_msp_i2s_of_init_msp(pdev, msp, np);
++	} else
++		if (!platform_data)
++			ret = -EINVAL;
 +
-+Non-standard properties:
-+ - Machine Driver:
-+   - stericsson,platform-pcm-dma : Phandle to the DMA (platform) node
-+   - stericsson,cpu-dai          : Phandle to the CPU-side DAI
-+   - stericsson,audio-codec      : Phandle to the Audio CODEC
-+ - CPU-side DAI:
-+   - stericcson,use-pinctrl      : Indicates whether an MSP port has pinctrl support
-+ - Audio CODEC:
-+   - stericsson,amic[1|2]-type-single-ended : Single-ended Analoge Mic (default: differential)
-+   - stericsson,amic1a-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,amic1b-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,amic2-bias-vamic1           : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,earpeice-cmv                : Earpeice voltage (only: 950 | 1100 | 1270 | 1580)
++	if (ret)
++		goto err_res;
 +
-+Example:
++	dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
++		pdev->name, platform_data->id);
 +
-+	sound {
-+		compatible = "stericsson,snd-soc-mop500";
-+
-+		stericsson,platform-pcm-dma = <&pcm>;
-+		stericsson,cpu-dai = <&msp1 &msp3>;
-+		stericsson,audio-codec = <&codec>;
-+	};
-+
-+	pcm: ux500-pcm {
-+		compatible = "stericsson,ux500-pcm";
-+	};
-+
-+	msp1: msp at 80124000 {
-+		compatible = "stericsson,ux500-msp-i2s";
-+		reg = <0x80124000 0x1000>;
-+		interrupts = <0 62 0x4>;
-+		v-ape-supply = <&db8500_vape_reg>;
-+		stericcson,use-pinctrl;
-+	};
-+
-+	msp3: msp at 80125000 {
-+		compatible = "stericsson,ux500-msp-i2s";
-+		reg = <0x80125000 0x1000>;
-+		interrupts = <0 62 0x4>;
-+		v-ape-supply = <&db8500_vape_reg>;
-+	};
-+
-+	codec: ab8500-codec {
-+		compatible = "stericsson,ab8500-codec";
-+		stericsson,earpeice-cmv = <950>; /* Units in mV. */
-+	};
+ 	msp->id = platform_data->id;
+ 	msp->dev = &pdev->dev;
+ 	msp->use_pinctrl = platform_data->use_pinctrl;
 -- 
 1.7.9.5
