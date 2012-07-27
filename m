@@ -1,5 +1,5 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Jul 2012 15:36:25 +0100
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 27 Jul 2012 15:39:31 +0100
 Subject: [Xen-devel] [PATCH 02/24] xen/arm: hypercalls
 In-Reply-To: <20120727142101.GA6802@n2100.arm.linux.org.uk>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
@@ -8,11 +8,11 @@ References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
  <1343380659.6812.106.camel@zakaz.uk.xensource.com>
  <alpine.DEB.2.02.1207271350370.26163@kaball.uk.xensource.com>
  <20120727142101.GA6802@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1207271526420.26163@kaball.uk.xensource.com>
+Message-ID: <1343399971.25096.8.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jul 2012, Russell King - ARM Linux wrote:
+On Fri, 2012-07-27 at 15:21 +0100, Russell King - ARM Linux wrote:
 > On Fri, Jul 27, 2012 at 02:02:18PM +0100, Stefano Stabellini wrote:
 > > > > > +/******************************************************************************
 > > > > > + * hypercall.h
@@ -35,10 +35,16 @@ On Fri, 27 Jul 2012, Russell King - ARM Linux wrote:
 > and shipping it?  That would technically make the above statement
 > incompatible with the GPL.
 
-IMNAL but this is just an alternative, less strict, MIT license for this
-file, same as the x86 counterpart
-(arch/x86/include/asm/xen/hypercall.h). The intent is to allow other
-operating systems, the BSDs for example, to be able to use it if they
-want to.
-Actually, given that the ARM implementation is not inline, I should
-remember to add this copyright header to the assembly source file too.
+There's an "or" in there.
+
+The non-GPL alternative license is the standard one applied by upstream
+Xen to the interface headers:
+        http://xenbits.xen.org/hg/xen-unstable.hg/file/tip/xen/include/public/COPYING
+
+It's the X11/MIT license IIRC, which the FSF say is GPL compatible.
+http://www.gnu.org/licenses/license-list.html#X11License
+
+The same license is used a few other places in the kernel, e.g. the DRM
+code.
+
+Ian.
