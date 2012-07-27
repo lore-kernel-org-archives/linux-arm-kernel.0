@@ -1,167 +1,64 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Jul 2012 06:38:53 -0700
-Subject: [PATCH] ARM: OMAP3xxx: clockdomain: fix software supervised
- wakeup/sleep
-In-Reply-To: <CACYZBRHmO3a3oBwbFP8GqDQj3xB7nB59TkzxAbFrZ2=h0VX3-g@mail.gmail.com>
- (Rajendra Nayak's message of "Fri, 27 Jul 2012 13:28:45 +0530")
-References: <alpine.DEB.2.00.1207261503290.14468@utopia.booyaka.com>
- <CACYZBRHmO3a3oBwbFP8GqDQj3xB7nB59TkzxAbFrZ2=h0VX3-g@mail.gmail.com>
-Message-ID: <87y5m5l3wy.fsf@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Jul 2012 14:41:31 +0100
+Subject: [Xen-devel] [PATCH 02/24] xen/arm: hypercalls
+In-Reply-To: <1343395134.6812.162.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120726163352.GC9222@phenom.dumpdata.com>
+ <1343380659.6812.106.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1207271350370.26163@kaball.uk.xensource.com>
+ <1343395134.6812.162.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1207271431320.26163@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Nayak, Rajendra" <rnayak@ti.com> writes:
+On Fri, 27 Jul 2012, Ian Campbell wrote:
+> > > > Should this comment be by 'privcmd_call'?
+> > > 
+> > > When we add a 5 argument hypercall I suppose we'll see the required
+> > > push/pop of r4 added to this macro too.
+> > 
+> > For performance and simplicity I would add a second macro that push/pop
+> > r4, only required for hypercalls with more than 4 arguments.
+> 
+> For clarity / documentation purposes it might actually be worthwhile to
+> define all of HYPERCALL{0,1,2,3,4} even if the {0,1,2,3} cases are all
+> just:
+>         #define HYPERCALL0(x) HYPERCALL_SIMPLE(x)
 
-> Paul,
->
-> On Fri, Jul 27, 2012 at 2:34 AM, Paul Walmsley <paul@pwsan.com> wrote:
->>
->> Commit 4da71ae6 ("OMAP: clockdomain: Arch specific funcs for
->> clkdm_clk_enable/disable") called the OMAP2xxx-specific functions for
->> clockdomain wakeup and sleep.  This would probably have broken
->> software-supervised clockdomain wakeup and sleep on OMAP3.
->
-> Would something like this be better than duplicating most of
-> omap2_clkdm_clk_enable/disable?
+I agree
 
-Not when using cpu_is* checks at runtime.  Maybe if you setup function
-pointers at init time?
+> > > > > +#define HYPERCALL(hypercall)			\
+> > > > > +ENTRY(HYPERVISOR_##hypercall)			\
+> > > > > +	mov r12, #__HYPERVISOR_##hypercall;	\
+> > > > > +	xen_hvc;							\
+> > > > > +	mov pc, lr;							\
+> > > > > +ENDPROC(HYPERVISOR_##hypercall)
+> > > > > +
+> > > > > +                .text
+> > > > > +
+> > > > > +HYPERCALL(xen_version);
+> > > > > +HYPERCALL(console_io);
+> > > > > +HYPERCALL(grant_table_op);
+> > > > > +HYPERCALL(sched_op);
+> > > > > +HYPERCALL(event_channel_op);
+> > > > > +HYPERCALL(hvm_op);
+> > > > > +HYPERCALL(memory_op);
+> > > > > +HYPERCALL(physdev_op);
+> > > > > +
+> > > > > +ENTRY(privcmd_call)
+> > > > > +	stmdb	sp!, {r4}
+> > > > > +	mov r12, r0
+> > > > > +	mov r0, r1
+> > > > > +	mov r1, r2
+> > > > > +	mov r2, r3
+> > > > > +	ldr r3, [sp, #8]
+> > > > > +	ldr r4, [sp, #4]
+> > > > > +	xen_hvc
+> > > > > +	pop {r4}
+> > > 
+> > > Why not ldmdb for symmetry?
+> > 
+> > Yep, I can do that.
 
-Kevin
-
-> ---
->  arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   25 +++++++++++++++++++++++--
->  1 file changed, 23 insertions(+), 2 deletions(-)
->
-> Index: linux-2.6/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> 2012-07-27 13:15:49.238134472 +0530
-> +++ linux-2.6/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> 2012-07-27 13:22:01.607380032 +0530
-> @@ -162,6 +162,27 @@
->                                                 clkdm->clktrctrl_mask);
->  }
->
-> +static void _clkdm_sleep(struct clockdomain *clkdm)
-> +{
-> +       if (cpu_is_omap24xx())
-> +               omap2_cm_set_mod_reg_bits(OMAP24XX_FORCESTATE_MASK,
-> +                                       clkdm->pwrdm.ptr->prcm_offs,
-> +                                       OMAP2_PM_PWSTCTRL);
-> +       else if (cpu_is_omap34xx())
-> +               omap3xxx_cm_clkdm_force_sleep(clkdm->pwrdm.ptr->prcm_offs,
-> +                                       clkdm->clktrctrl_mask);
-> +}
-> +
-> +static void _clkdm_wakeup(struct clockdomain *clkdm)
-> +{
-> +       if (cpu_is_omap24xx())
-> +               omap2_cm_clear_mod_reg_bits(OMAP24XX_FORCESTATE_MASK,
-> +                                       clkdm->pwrdm.ptr->prcm_offs,
-> +                                       OMAP2_PM_PWSTCTRL);
-> +       else if (cpu_is_omap34xx())
-> +               omap3xxx_cm_clkdm_force_wakeup(clkdm->pwrdm.ptr->prcm_offs,
-> +                                       clkdm->clktrctrl_mask);
-> +}
->
->  static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
->  {
-> @@ -180,7 +201,7 @@
->                 _enable_hwsup(clkdm);
->         } else {
->                 if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
-> -                       omap2_clkdm_wakeup(clkdm);
-> +                       _clkdm_wakeup(clkdm);
->         }
->
->         return 0;
-> @@ -203,7 +224,7 @@
->                 _enable_hwsup(clkdm);
->         } else {
->                 if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
-> -                       omap2_clkdm_sleep(clkdm);
-> +                       _clkdm_sleep(clkdm);
->         }
->
->>
->> Signed-off-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   50 ++++++++++++++++++++++++++--
->>  1 file changed, 48 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
->> index a0d68db..f99e65c 100644
->> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
->> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
->> @@ -241,6 +241,52 @@ static void omap3_clkdm_deny_idle(struct clockdomain *clkdm)
->>                 _clkdm_del_autodeps(clkdm);
->>  }
->>
->> +static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
->> +{
->> +       bool hwsup = false;
->> +
->> +       if (!clkdm->clktrctrl_mask)
->> +               return 0;
->> +
->> +       hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
->> +                               clkdm->clktrctrl_mask);
->> +
->> +       if (hwsup) {
->> +               /* Disable HW transitions when we are changing deps */
->> +               _disable_hwsup(clkdm);
->> +               _clkdm_add_autodeps(clkdm);
->> +               _enable_hwsup(clkdm);
->> +       } else {
->> +               if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
->> +                       omap3_clkdm_wakeup(clkdm);
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
->> +{
->> +       bool hwsup = false;
->> +
->> +       if (!clkdm->clktrctrl_mask)
->> +               return 0;
->> +
->> +       hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
->> +                               clkdm->clktrctrl_mask);
->> +
->> +       if (hwsup) {
->> +               /* Disable HW transitions when we are changing deps */
->> +               _disable_hwsup(clkdm);
->> +               _clkdm_del_autodeps(clkdm);
->> +               _enable_hwsup(clkdm);
->> +       } else {
->> +               if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
->> +                       omap3_clkdm_sleep(clkdm);
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->>  struct clkdm_ops omap2_clkdm_operations = {
->>         .clkdm_add_wkdep        = omap2_clkdm_add_wkdep,
->>         .clkdm_del_wkdep        = omap2_clkdm_del_wkdep,
->> @@ -267,6 +313,6 @@ struct clkdm_ops omap3_clkdm_operations = {
->>         .clkdm_wakeup           = omap3_clkdm_wakeup,
->>         .clkdm_allow_idle       = omap3_clkdm_allow_idle,
->>         .clkdm_deny_idle        = omap3_clkdm_deny_idle,
->> -       .clkdm_clk_enable       = omap2_clkdm_clk_enable,
->> -       .clkdm_clk_disable      = omap2_clkdm_clk_disable,
->> +       .clkdm_clk_enable       = omap3xxx_clkdm_clk_enable,
->> +       .clkdm_clk_disable      = omap3xxx_clkdm_clk_disable,
->>  };
->> --
->> 1.7.10.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Actually it is just ldm or ldmia
