@@ -1,55 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jul 2012 15:59:00 +0100
-Subject: [Xen-devel] [PATCH 02/24] xen/arm: hypercalls
-In-Reply-To: <1343399971.25096.8.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120726163352.GC9222@phenom.dumpdata.com>
- <1343380659.6812.106.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1207271350370.26163@kaball.uk.xensource.com>
- <20120727142101.GA6802@n2100.arm.linux.org.uk>
- <1343399971.25096.8.camel@zakaz.uk.xensource.com>
-Message-ID: <20120727145900.GC6802@n2100.arm.linux.org.uk>
+From: dczarn@o2.pl (Damian Czarnecki)
+Date: Fri, 27 Jul 2012 15:10:51 +0000 (UTC)
+Subject: PXA 26x GPIO possible regression in kernel 3.3 and newer
+Message-ID: <loom.20120727T164936-412@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 03:39:31PM +0100, Ian Campbell wrote:
-> On Fri, 2012-07-27 at 15:21 +0100, Russell King - ARM Linux wrote:
-> > On Fri, Jul 27, 2012 at 02:02:18PM +0100, Stefano Stabellini wrote:
-> > > > > > +/******************************************************************************
-> > > > > > + * hypercall.h
-> > > > > > + *
-> > > > > > + * Linux-specific hypervisor handling.
-> > > > > > + *
-> > > > > > + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-> > > > > > + *
-> > > > > > + * This program is free software; you can redistribute it and/or
-> > > > > > + * modify it under the terms of the GNU General Public License version 2
-> > > > > > + * as published by the Free Software Foundation; or, when distributed
-> > > > > > + * separately from the Linux kernel or incorporated into other
-> > > > > > + * software packages, subject to the following license:
-> > > > > > + *
-> > > > > > + * Permission is hereby granted, free of charge, to any person obtaining a copy
-> > > > > > + * of this source file (the "Software"), to deal in the Software without
-> > 
-> > Erm, is that an additional restriction on the GPL which prevents me from
-> > shipping this code on a CD and charging for the act of creating the CD
-> > and shipping it?  That would technically make the above statement
-> > incompatible with the GPL.
-> 
-> There's an "or" in there.
-> 
-> The non-GPL alternative license is the standard one applied by upstream
-> Xen to the interface headers:
->         http://xenbits.xen.org/hg/xen-unstable.hg/file/tip/xen/include/public/COPYING
-> 
-> It's the X11/MIT license IIRC, which the FSF say is GPL compatible.
-> http://www.gnu.org/licenses/license-list.html#X11License
-> 
-> The same license is used a few other places in the kernel, e.g. the DRM
-> code.
-
-Ok, but be aware that you won't be able to take code from the Linux
-kernel and place it in a file marked with that license header (because
-the code authors haven't given permission for it to be placed under any
-other license other than GPLv2.)
+Hello. This is my first post here. I have a problem with GPIOs on my board (HTC 
+Blue Angel PDA) with kernel versions 3.3 and newer.
+This board has PXA 263 CPU, which has 89 GPIOs
+and ASIC3 chip with GPIOs 192-255.
+The problem is that on kernel 3.3+ I can't access PXA GPIOs at all,
+but the ASIC3 works.
+Unfortunately, because of that I can't see whole kernel output or post dmesg 
+here,
+because PXA  GPIOs are needed for SD Card,USB and many more things.
+But I caught a line "gpiochip_add: registered GPIOs 192 to 255 on device: asic3",
+so it shows that  ASIC3 really is detected and works.
+Other errors are "gpio-keys failed to request gpio 0 error -22",
+"tmio-mmc: probe of tmio-mmc failed with error -22".
+With kernel 3.2 or older everything works. When requesting PXA GPIOs, it fails.
+Reading GPIOs hangs the system. I hope that somebody can help me.
+I know I haven't shown much info, but this is probably all I can get now.
