@@ -1,39 +1,42 @@
-From: romieu@fr.zoreil.com (Francois Romieu)
-Date: Fri, 27 Jul 2012 17:25:42 +0200
-Subject: [2/3][PATCH][v2] TDM Framework
-In-Reply-To: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
-References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
-Message-ID: <20120727152542.GB1613@electric-eye.fr.zoreil.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Jul 2012 16:54:17 +0100
+Subject: [PATCH 12/24] xen/arm: Introduce xen_guest_init
+In-Reply-To: <1343382151.6812.124.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-12-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1343382151.6812.124.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1207271613200.26163@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sandeep at freescale.com <sandeep@freescale.com> :
-[...]
-> The main functions of this Framework are:
->  - provides interface to TDM clients to access TDM functionalities.
->  - provides standard interface for TDM drivers to hook with the framework.
->  - handles various data handling stuff and buffer management.
+On Fri, 27 Jul 2012, Ian Campbell wrote:
+> On Thu, 2012-07-26 at 16:33 +0100, Stefano Stabellini wrote:
+> > We used to rely on a core_initcall to initialize Xen on ARM, however
+> > core_initcalls are actually called after early consoles are initialized.
+> > That means that hvc_xen.c is going to be initialized before Xen.
+> > 
+> > Given the lack of a better alternative, just call a new Xen
+> > initialization function (xen_guest_init) from xen_cons_init.
 > 
-> In future this Framework will be extended to provide Interface for Line control devices also. For example SLIC, E1/T1 Framers etc.
-> 
-> Presently the framework supports only Single Port channelised mode.
-> Also the configurability options are limited which will be extended later on.
-> Only kernel mode TDM clients are supported currently. Support for User mode clients will be added later.
+> Can't we just arrange for this to be called super early on from
+> setup_arch? That's got to be better than calling it from some random
+> function which happens to get called early enough.
 
-1. You should send some kernel mode TDM clients. Without those the framework
-   is pretty useless.
+While I agree with you that an explicit call to xen_guest_init from
+generic code might be better, xen_cons_init is not just a random
+function: it is a console_initcall and therefore we know for sure that
+it is going be the first one to be called.
 
-2. It would probably make sense to Cc: netdev and serial. There may be
-   some kernel client network integration from the start.
+In fact if we didn't want the PV console to work so early we could just
+rely on a core_initcall to initialize everything and we wouldn't have
+any issues.
 
-3. Where is the userspace configuration interface ?
 
-[...]
-> Based on: git://git.am.freescale.net/gitolite/mirrors/galak-powerpc.git
+In any case if the ARM maintainers agree I could add a generic
+hypervisor initialization call the end of setup_arch.
 
-$ git clone git://git.am.freescale.net/gitolite/mirrors/galak-powerpc.git
-Cloning into 'galak-powerpc'...
-fatal: Unable to look up git.am.freescale.net (port 9418) (No address associated with hostname)
 
--- 
-Ueimor
+
+> I presume that KVM is going to want some similarly early init hooks etc
+> and therefore ARM could benefit from the same sort of infrastructure as
+> is in arch/x86/include/asm/hypervisor.h?
