@@ -1,50 +1,43 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 27 Jul 2012 10:51:58 +0800
-Subject: [PATCH 1/3] dmaengine: mmp-pdma support
-In-Reply-To: <1343297355.1726.8982.camel@vkoul-udesk3>
-References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
- <1342763164-19208-2-git-send-email-zhangfei.gao@marvell.com>
- <1343285475.1726.8981.camel@vkoul-udesk3>
- <CAMj5BkhpcV=J8goZXMHt2o6bGgn9KL+-mseALN8L2FOpgr2MgA@mail.gmail.com>
- <1343297355.1726.8982.camel@vkoul-udesk3>
-Message-ID: <CAMj5BkjEO4Opkx1GxjzX7ZBzRRQLVDKRnK2YA2PuMJ8V9vRD+w@mail.gmail.com>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Fri, 27 Jul 2012 12:46:18 +0800
+Subject: [PATCH 0/4] dmaengine: add support mmp-pdma
+Message-ID: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 6:09 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Thu, 2012-07-26 at 15:02 +0800, zhangfei gao wrote:
->> On Thu, Jul 26, 2012 at 2:51 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
->> > On Fri, 2012-07-20 at 13:46 +0800, Zhangfei Gao wrote:
->> >> +struct mmp_dma_platdata {
->> >> +       int chancnt;
->> >> +};
->> >> +
->> >> +struct mmp_dma_slave_config {
->> >> +       struct dma_slave_config slave_config;
->> >> +       u32 drcmr;
->> >> +};
->> > Why do you need these definitions?
->> >
->> > What is drcmr used for?
->>
->> Hi, Vinod
->>
->> "drcmr" is request_line, we used to select which channel map to
->> specific peripheral.
->> Is it possible adding request_line to slave_config?
-> Can you use the slave_id.
->
+v0->v1
+Update dt member and desc according to Arnd's suggestion
+Use dma_slave_config.slave_id to transfer drcmr followed Vinod's suggestion
 
-Good suggestion
+Patch 4 is upload as example
+mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
+We would like hold this patch currently
+since pdma will grab irq and disable pxa_init_dma. 
 
-If passing drcmr does not break original design of slave_id,
-mmp-pdma just need one config member.
-While some device (nand) use memcpy method instead of slave_sg.
+Any attempt of replacing pxa_request_dma with dmaengine on pxa3xx platform are welcome
+Here are many replacing and verifying work to do.
 
- * @slave_id: Slave requester id. Only valid for slave channels. The dma
- * slave peripheral will have unique id as dma requester which need to be
- * pass as slave config.
 
-Will update with slave_id in v1 version.
+mmp-pdma is added under dmaengine framework.
+The final purpose is replacing arch/arm/plat-pxa/dma.c
 
-Thanks Vinod.
+Test on pxa910 with pxa3xx-nand and dmatest.ko
+
+Zhangfei Gao (4):
+  dmaengine: mmp-pdma support
+  dmaengine: mmp_tdma: add dt support
+  dmatest: add dmaengine_slave_config for DMA_MEMCPY
+  mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
+
+ Documentation/devicetree/bindings/dma/mmp-dma.txt |   69 ++
+ drivers/dma/Kconfig                               |    7 +
+ drivers/dma/Makefile                              |    1 +
+ drivers/dma/dmatest.c                             |    4 +
+ drivers/dma/mmp_pdma.c                            |  876 +++++++++++++++++++++
+ drivers/dma/mmp_tdma.c                            |   51 +-
+ drivers/mtd/nand/pxa3xx_nand.c                    |  114 ++--
+ include/linux/platform_data/mmp_dma.h             |   19 +
+ 8 files changed, 1071 insertions(+), 70 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+ create mode 100644 drivers/dma/mmp_pdma.c
+ create mode 100644 include/linux/platform_data/mmp_dma.h
