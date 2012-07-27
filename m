@@ -1,108 +1,36 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 27 Jul 2012 12:16:55 +0530
-Subject: [RFC 2/4] ARM: OMAP: PM: Get rid of Powerdomain book-keeping
- from cpuidle
-In-Reply-To: <1343327231.30247.151.camel@sokoban>
-References: <1342764284-8143-1-git-send-email-rnayak@ti.com>	
- <1342764284-8143-3-git-send-email-rnayak@ti.com>	
- <CAMQu2gyCmx57ctZFBoAUKUXY+9zwFLCDHsBfehXicH7mEyDzQg@mail.gmail.com>	
- <5009120A.1060400@ti.com> <1342774283.4672.181.camel@sokoban>	
- <87obn3798o.fsf@ti.com> <50113B3C.4090608@ti.com> <87boj2s9hi.fsf@ti.com>
- <1343327231.30247.151.camel@sokoban>
-Message-ID: <5012395F.3040903@ti.com>
+From: JBeulich@suse.com (Jan Beulich)
+Date: Fri, 27 Jul 2012 07:57:23 +0100
+Subject: [Xen-devel] [PATCH 06/24] xen: missing includes
+In-Reply-To: <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <501257F30200007800090D9E@nat28.tlf.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+>>> On 26.07.12 at 17:33, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> --- a/include/xen/interface/xen.h
+> +++ b/include/xen/interface/xen.h
+> @@ -10,7 +10,10 @@
+>  #define __XEN_PUBLIC_XEN_H__
+>  
+>  #include <asm/xen/interface.h>
+> +#include <linux/types.h>
+> +#ifdef CONFIG_X86
+>  #include <asm/pvclock-abi.h>
+> +#endif
 
-On Thursday 26 July 2012 11:57 PM, Tero Kristo wrote:
->> Yeah, this is definitely a problem.
->> >
->> >  As long as we have autodeps, everything is centralized around CPU
->> >  transitions anyways, so it makes sense to keep the accounting
->> >  centralized too.
->> >
->>> >  >  I think as long as we have autodeps, the only way on OMAP3 to accurately
->>> >  >  do this is to do it for all dependent domains in CPUIdle:(
->> >
->> >  Or, to get rid of autodeps.;)
-> Whats the reason for having them anyway? Some of the wakedeps make sense
-> (per domain due to hw bugs) but sleepdeps...?
->
+Rather than hacking around this, why not clean it up:
+asm/pvclock-abi.h clearly isn't intended to be included here
+(from the perspective of the origin of xen/interface/xen.h, at
+least), nor is linux/types.h.
 
-FWIK, the main problem is with modules with clocks under hardware
-control. Once a slave module isn't functional and there are no
-outstanding OCP accesses pending, the module when sent an IDLEREQ
-by PRCM responds with an IDLEACK causing the clkdm to transition
-to INACTIVE. A driver which is active can still in the meantime
-cause a register access to the module, but the register access
-does not act as an event which makes PRCM de-assert IDLEREQ causing
-the module to unidle. This causes problems. So as long as there is
-a possibility of some code doing a register access on the module
-we need to keep it from idling. IIRC the issues we saw on OMAP3
-were mostly around PER domain and I think with GPIO in particular.
+Or if it is really needed to deviate from the original header in
+this respect, then clearly the inclusion ought to not be arch
+specific or be moved to an arch specific header.
 
-The problem might be limited to modules with _only_ hardware controlled
-clocks (iclks) like GPIO. For others which have an iclk and fclk, we can
-always keep the autodeps while fclks are requested and get rid of them
-when fclks are disabled. This is exactly what clkdm_clk_enable/disable
-functions do, but given in the current mainline even iclks account
-for usecounting, a clkdms usecount would never hit 0 causing 
-clkdm_clk_disable never to be called. (On clkdms which have atleast one
-iclk under hardware control).
-hwmod keeps all iclks always enabled and under hardware control unless
-the OCP interface has a 'OCPIF_SWSUP_IDLE' flag set.
+Jan
 
-But now with your series, which does not account iclks for usecounting,
-I would expect this to be fixed. I was expecting for modules with both
-fclk and iclk, as long as the driver has done a pm_runtime_get_sync()
-or equivalent the autodeps would be set, and once the driver does a
-pm_runtime_put_sync() the autodeps would be removed. This would also
-be the same time we clear the Powerdomains previous power state register
-and the Powerdomain should ideally immediately transition on not go in
-and out with every MPU transition.
-So this kind of rules out the problems that my theory above was
-suggesting we would have with the $subject patch.
-We still have to deal with the iclk only modules like GPIO though.
-
-However a quick test with just your latest usecounting series (without
-any of my RFC patches) seems to make me think I am still missing
-something.
-
-If you see the counts below for usbhost and dss, they both seem to
-go in and out of RET with every MPU transition. Which means the
-dependencies are still set.
-
-# cat /debug/pm_debug/count
-usbhost_pwrdm 
-(ON),OFF:0,RET:138,INA:0,ON:139,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-core_pwrdm 
-(ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-per_pwrdm (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-dss_pwrdm (ON),OFF:0,RET:138,INA:0,ON:139,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-neon_pwrdm (ON),OFF:0,RET:132,INA:6,ON:139,RET-LOGIC-OFF:0
-mpu_pwrdm (ON),OFF:0,RET:132,INA:6,ON:139,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-iva2_pwrdm 
-(RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
-
-However if I look at the dss registers, I don;t see any fclks are
-enabled.
-
-# ./readmem 0x48004E00
-0x00000000 <- All FCLK disabled.
-
-# ./readmem 0x48004E10
-0x00000001 <- ICLK enabled
-
-# ./readmem 0x48004E44
-0x00000006 <- dependencies are set with MPU and IVA
-
-# ./readmem 0x48004E48
-0x00000003 <- clkdm is under HWSUP.
-
-Any idea why this could be happening?
-
-regards,
-Rajendra
+>  
+>  /*
+>   * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
