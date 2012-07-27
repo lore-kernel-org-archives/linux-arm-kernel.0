@@ -1,34 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:38:53 +0100
-Subject: [PATCH 6/7] ARM: ux500: Fix merge error,
- so such struct 'snd_soc_u8500'
+Date: Fri, 27 Jul 2012 13:38:52 +0100
+Subject: [PATCH 5/7] ARM: ux500: Remove unused snowball_of_platform_devs struct
 In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
 References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343392734-11805-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343392734-11805-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform attempts to register platform device 'snd_soc_u8500'
-which doesn't actually exist. Here we change the reference to the
-correct one 'snd_soc_mop500'.
+This was left over during a recent clean-up which removed Device Tree
+helper structs. There is no longer a requirement for it, so we can just
+remove it.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-msp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-ux500/board-mop500.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
-index 9960480..1b6a193 100644
---- a/arch/arm/mach-ux500/board-mop500-msp.c
-+++ b/arch/arm/mach-ux500/board-mop500-msp.c
-@@ -228,7 +228,7 @@ int mop500_msp_init(struct device *parent)
- 	struct platform_device *msp1;
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 80b4f0e..e641003 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -726,11 +726,6 @@ MACHINE_END
  
- 	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
--	platform_device_register(&snd_soc_u8500);
-+	platform_device_register(&snd_soc_mop500);
+ #ifdef CONFIG_MACH_UX500_DT
  
- 	pr_info("Initialize MSP I2S-devices.\n");
- 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
+-static struct platform_device *snowball_of_platform_devs[] __initdata = {
+-	&snowball_led_dev,
+-	&snowball_key_dev,
+-};
+-
+ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
 -- 
 1.7.9.5
