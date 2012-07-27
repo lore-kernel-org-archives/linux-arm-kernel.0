@@ -1,64 +1,77 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Fri, 27 Jul 2012 13:02:34 +0800
-Subject: [PATCH] ARM: OMAP2+: ads7846 init: fix fault caused by freeing
- pen-down GPIO
-In-Reply-To: <87ipdambgg.fsf@ti.com>
-References: <1342048700-15040-1-git-send-email-khilman@ti.com>
- <500D494D.8020606@compulab.co.il> <500D4F2A.9090706@compulab.co.il>
- <87zk6mpbfa.fsf@ti.com> <5011B465.70605@windriver.com>
- <87ipdambgg.fsf@ti.com>
-Message-ID: <501220EA.3020009@windriver.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 27 Jul 2012 07:25:08 +0200
+Subject: [RFC PATCH] gpio: Add a generic GPIO handling driver
+References: <1340961676-25432-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20498.9780.825958.340618@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?07?27? 05:58, Kevin Hilman ??:
-> "zumeng.chen"<zchen@windriver.com>  writes:
->
->> On 2012?07?27? 03:30, Kevin Hilman wrote:
->>> + Zumeng Chen
->>>
->>> Igor Grinberg<grinberg@compulab.co.il>   writes:
->>>
->>>> Hi Kevin,
->>>>
->>>> I've just noticed that the patch has been modified by Arnd in a way
->>>> that of course will trigger GPIO use without being requested.
->>>> I'm sorry, I was not available by that time Arnd changed the patch.
->>> Your right, your original patch isn't the problem.  I found the root
->>> cause.
->>>
->>> The real problem is actually introduced by the merge of your patch from
->>> the arm-soc/cleanup branch, and this one from Zumeng Chen: commit
->>> 16aced80f6 (ARM: OMAP3530evm: set pendown_state and debounce time for
->>> ads7846) from the arm-soc/boards branch.
->>>
->>> However, looking closer at the one from Zumeng, that one is clearly not
->>> right.  It unconditionally adds a *board-specific* ->get_pendown_state
->>> function to the pdata that is common to *all* boards.  That's just wrong
->>> and has the side-effect of making ->get_pendown_state() wrong on every
->>> board except the OMAP3EVM.  Oops.
->>>
->>> So, IMO, in addition to $SUBJECT patch, in order to get the touchscreen
->>> GPIO working on non OMAP3EVM boards, we also need something like this as
->>> well.
->> Definitely, thanks Kevin.
->>> Igor, Zumeng, could you try this out on your boards anc confirm if it's
->>> working?  I currently don't have a board setup with a touchscreen in my
->>> board farm.
->> Acked
-> Did you test this on your board?  If so, could you respond with a
-> Tested-by tag?  Thanks.
-Hi Kevin,
+Hi Shawn,
 
-Your patch self has no problem, feel free to add
-"Tested-by: Zumeng Chen <zumeng.chen@windriver.com>
+sorry, I obviuosly missed your reply and had to pick it up from the
+archives.
+
+> On Fri, Jun 29, 2012 at 11:21:16AM +0200, Lothar Wa?mann wrote:
+>> in the .dts file:
+>> 	flexcan_transceiver: gpio-switch at 0 {
+>> 		compatible = "linux,gpio-switch";
+> 
+> Why not simply "gpio-switch"?
+> 
+OK.
+
+>> 		gpio = <&gpio4 21 1>; /* GPIO is active low */
+>> 		label = "Flexcan Transceiver Enable";
+>> 		gpio-shared;
+>> 		init-state = <0>; /* Transceiver will be initially inactive */
+>> 	};
+>> 
+> It looks like the design intends to have every single gpio-switch
+> probed as a platform_device.  I'm not sure it's a good idea.
+> 
+I considered that myself already.
+
+> Also I'm not sure it's preferable to have such shinny new stuff support
+> platform probing, which adds much unnecessary complexity, considering
+> we are on the way to device tree.  If we support device tree only,
+> a lot of codes like provider API will not be needed.
+> 
+There are still archs that do not use DT but could still benefit from
+this driver.
+
+>> in flexcan_probe()
+>> 	struct gpio_sw *xcvr_switch = NULL;
+>> 	struct device_node *np = pdev->dev.of_node;
+>> 
+>> 	if (np) {
+>> 		ph = of_get_property(np, "transceiver-switch", NULL);
+> 
+> I would have a fixed property name under client device node
+> representing the phandle to gpio-switch sub-node, like what we are
+> doing with clk binding.
+> 
+OK.
+
+>> flexcan_remove()
+>>     free_gpio_switch(xcvr_switch);
+> 
+> Can we have a devm_request_gpio_switch to ease the client driver
+> a little bit?
+> 
+Sure.
+
+I'll try to get a new version out over the weekend, if there is still
+interest in this driver.
 
 
-But obviously, the current ads7846 doesn't work, I have found
-one reason, another reason is about spi-dma update, I'm trying
-to fix it.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Regards,
-Zumeng
->
-> Kevin
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
