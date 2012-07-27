@@ -1,61 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:45:59 +0100
-Subject: [PATCH 15/18] ARM: ux500: Add MSP devices to DB8500 Device Tree
+Date: Fri, 27 Jul 2012 13:45:56 +0100
+Subject: [PATCH 12/18] ARM: ux500: Stop registering the MOP500 Audio driver
+ from platform code
 In-Reply-To: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
 References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343393162-11938-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343393162-11938-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-List all four MSP devices which exist on all DB8500 based platforms,
-to ensure correct device probing and configuration passing when booting
-with DT.
+In this patch we prevent MOP500 driver registration from platform
+code and rely solely on Device Tree to do the probing for us.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/mach-ux500/board-mop500-msp.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index a3fb05f..b9d4405 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -595,6 +595,36 @@
- 			compatible = "stericsson,ux500-pcm";
- 		};
- 
-+		msp0: msp at 80123000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80123000 0x1000>;
-+			interrupts = <0 31 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+		};
-+
-+		msp1: msp at 80124000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80124000 0x1000>;
-+			interrupts = <0 62 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+			stericcson,use-pinctrl;
-+		};
-+
-+		// HDMI sound
-+		msp2: msp at 80117000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80117000 0x1000>;
-+			interrupts = <0 98 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+		};
-+
-+		msp3: msp at 80125000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80125000 0x1000>;
-+			interrupts = <0 62 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+		};
-+
- 		external-bus at 50000000 {
- 			compatible = "simple-bus";
- 			reg = <0x50000000 0x4000000>;
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+index 7691f71..1a83fa5 100644
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ b/arch/arm/mach-ux500/board-mop500-msp.c
+@@ -177,9 +177,6 @@ struct msp_i2s_platform_data msp3_platform_data = {
+ /* Due for removal once the MSP driver has been fully DT:ed. */
+ void mop500_of_msp_init(struct device *parent)
+ {
+-	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+-	platform_device_register(&snd_soc_mop500);
+-
+ 	pr_info("Initialize MSP I2S-devices.\n");
+ 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
+ 			   &msp0_platform_data);
 -- 
 1.7.9.5
