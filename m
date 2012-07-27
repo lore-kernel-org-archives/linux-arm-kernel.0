@@ -1,384 +1,50 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Jul 2012 14:33:35 +0800
-Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120727063334.GC3347@b20223-02.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 27 Jul 2012 08:34:57 +0200
+Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
+In-Reply-To: <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
+References: <87394enqz8.fsf@ti.com>
+ <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
+Message-ID: <CAMQu2gynmXqprXPctYHA-V6niE4QptJ_fQ8Fv7J5OAooK1A6wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2012 at 11:54:41PM +0800, Shawn Guo wrote:
-> It adds a generic cpufreq driver for CPU0 frequency management based on
-> clk, regulator, OPP and device tree support.  It can support both
-> uniprocessor (UP) and those symmetric multiprocessor (SMP) systems which
-> share clock and voltage across all CPUs.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   58 +++++
->  drivers/cpufreq/Kconfig                            |   11 +
->  drivers/cpufreq/Makefile                           |    2 +
->  drivers/cpufreq/cpufreq-cpu0.c                     |  235 ++++++++++++++++++++
->  4 files changed, 306 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
->  create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
-> 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> new file mode 100644
-> index 0000000..94799bc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> @@ -0,0 +1,58 @@
-> +Generic cpufreq driver for CPU0
-It's going to have generic name if it will become more generic.
+On Fri, Jul 27, 2012 at 2:19 AM, Olof Johansson <olof@lixom.net> wrote:
+> Kevin,
+>
+> On Thu, Jul 26, 2012 at 2:37 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Hi Arnd, Olof,
+>>
+>> I know it is late, but I'm really hoping this can still make it for
+>> v3.6, so consider this a [GIT PLEA].  ;)
+>
+> New features submitted halfway through the merge window? Yeah, that's late.
+>
+> I'll pull it in as late2/pm once the below is fixed, but I won't
+> promise we'll send it up.
+>
+>
+>> Kevin Hilman (1):
+>>       ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+>>
+>> Santosh Shilimkar (3):
+>>       ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
+>>       ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
+>>       ARM: OMAP4: CPUidle: Open broadcast clock-event device.
+>
+> This looks odd, Colin was author to the first of the commits
+> attributed to Santosh.
+>
+Not sure what you mean. These patches are written by me. Kevin, Collin helped
+in review. If you are referring to the {ARM: OMAP: timer: allow gp
+timer clock-event to be
+used on both cpus} which does have SOB from me and Colin. The very first version
+of this version I picked was from product tree in which it was
+commited on Coiln's name.
+Later I updated that forf the multi-omap and the new timer code and
+hence the update
+in Author.
 
-> +
-> +It is a generic cpufreq driver for CPU0 frequency management.  It
-> +supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-> +systems which share clock and voltage across all CPUs.
-> +
-> +Both required and optional properties listed below must be defined
-> +under node /cpus/cpu at 0.
-> +
-> +Required properties:
-> +- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
-> +  for details
-> +
-> +Optional properties:
-> +- transition-latency: Specify the possible maximum transition latency,
-> +  in unit of nanoseconds.
-> +- voltage-tolerance: Specify the CPU voltage tolerance in percentage.
-Why do we have the same tolerance for all points? I think you can
-either remove tolerance or add it to opps.
-> +
-> +Examples:
-> +
-> +cpus {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	cpu at 0 {
-> +		compatible = "arm,cortex-a9";
-> +		reg = <0>;
-> +		next-level-cache = <&L2>;
-> +		operating-points = <
-> +			/* kHz    uV    en */
-> +			1200000 1275000 0
-> +			996000  1225000 1
-> +			792000  1100000 1
-> +			672000  1100000 0
-> +			396000  950000  1
-> +			198000  850000  1
-> +		>;
-> +		transition-latency = <61036>; /* two CLK32 periods */
-> +	};
-> +
-> +	cpu at 1 {
-> +		compatible = "arm,cortex-a9";
-> +		reg = <1>;
-> +		next-level-cache = <&L2>;
-> +	};
-> +
-> +	cpu at 2 {
-> +		compatible = "arm,cortex-a9";
-> +		reg = <2>;
-> +		next-level-cache = <&L2>;
-> +	};
-> +
-> +	cpu at 3 {
-> +		compatible = "arm,cortex-a9";
-> +		reg = <3>;
-> +		next-level-cache = <&L2>;
-> +	};
-> +};
-> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-> index e24a2a1..e77a1e0 100644
-> --- a/drivers/cpufreq/Kconfig
-> +++ b/drivers/cpufreq/Kconfig
-> @@ -179,6 +179,17 @@ config CPU_FREQ_GOV_CONSERVATIVE
->  
->  	  If in doubt, say N.
->  
-> +config GENERIC_CPUFREQ_CPU0
-> +	bool "Generic cpufreq driver for CPU0"
-> +	depends on HAVE_CLK && REGULATOR && PM_OPP && OF
-> +	select CPU_FREQ_TABLE
-> +	help
-> +	  This adds a generic cpufreq driver for CPU0 frequency management.
-> +	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-> +	  systems which share clock and voltage across all CPUs.
-> +
-> +	  If in doubt, say N.
-> +
->  menu "x86 CPU frequency scaling drivers"
->  depends on X86
->  source "drivers/cpufreq/Kconfig.x86"
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index 9531fc2..a378ed2 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -13,6 +13,8 @@ obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
->  # CPUfreq cross-arch helpers
->  obj-$(CONFIG_CPU_FREQ_TABLE)		+= freq_table.o
->  
-> +obj-$(CONFIG_GENERIC_CPUFREQ_CPU0)	+= cpufreq-cpu0.o
-> +
->  ##################################################################################
->  # x86 drivers.
->  # Link order matters. K8 is preferred to ACPI because of firmware bugs in early
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-> new file mode 100644
-> index 0000000..f1bb7f37
-> --- /dev/null
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -0,0 +1,235 @@
-> +/*
-> + * Copyright (C) 2012 Freescale Semiconductor, Inc.
-> + *
-> + * Reuse some codes from drivers/cpufreq/omap-cpufreq.c
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-> +
-> +#include <linux/clk.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/err.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/opp.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +
-> +/* voltage tolerance in percentage */
-> +static unsigned int voltage_tolerance;
-> +
-> +static struct device *cpu_dev;
-> +static struct clk *cpu_clk;
-> +static struct regulator *cpu_reg;
-> +static struct cpufreq_frequency_table *freq_table;
-> +
-> +static int cpu0_verify_speed(struct cpufreq_policy *policy)
-> +{
-> +	return cpufreq_frequency_table_verify(policy, freq_table);
-> +}
-> +
-> +static unsigned int cpu0_get_speed(unsigned int cpu)
-> +{
-> +	return clk_get_rate(cpu_clk) / 1000;
-> +}
-> +
-> +static int cpu0_set_target(struct cpufreq_policy *policy,
-> +			   unsigned int target_freq, unsigned int relation)
-> +{
-> +	struct cpufreq_freqs freqs;
-> +	struct opp *opp;
-> +	unsigned long freq_Hz, volt = 0, volt_old = 0, tol = 0;
-> +	unsigned int index, cpu;
-> +	int ret = 0;
-> +
-> +	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
-> +					     relation, &index);
-> +	if (ret) {
-> +		pr_err("failed to match target freqency %d: %d\n",
-> +		       target_freq, ret);
-> +		return ret;
-> +	}
-> +
-> +	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
-> +	if (freq_Hz < 0)
-> +		freq_Hz = freq_table[index].frequency * 1000;
-> +	freqs.new = freq_Hz / 1000;
-> +	freqs.old = clk_get_rate(cpu_clk) / 1000;
-> +
-> +	if (freqs.old == freqs.new)
-> +		return 0;
-> +
-> +	for_each_cpu(cpu, policy->cpus) {
-> +		freqs.cpu = cpu;
-> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +	}
-> +
-> +	if (cpu_reg) {
-> +		opp = opp_find_freq_ceil(cpu_dev, &freq_Hz);
-> +		if (IS_ERR(opp)) {
-> +			pr_err("failed to find OPP for %ld\n", freq_Hz);
-> +			return PTR_ERR(opp);
-> +		}
-> +		volt = opp_get_voltage(opp);
-> +		tol = volt * voltage_tolerance / 100;
-> +		volt_old = regulator_get_voltage(cpu_reg);
-> +	}
-> +
-> +	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> +		 freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
-> +		 freqs.new / 1000, volt ? volt / 1000 : -1);
-> +
-> +	/* scaling up?  scale voltage before frequency */
-> +	if (cpu_reg && freqs.new > freqs.old) {
-> +		if (regulator_set_voltage(cpu_reg, volt - tol, volt + tol)) {
-> +			pr_warn("Unable to scale voltage up\n");
-> +			freqs.new = freqs.old;
-> +			goto done;
-> +		}
-> +	}
-> +
-> +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-Check return value and fall back to previous point if it needs?
-> +
-> +	/* scaling down?  scale voltage after frequency */
-> +	if (cpu_reg && (freqs.new < freqs.old)) {
-> +		if (regulator_set_voltage(cpu_reg, volt - tol, volt + tol)) {
-> +			pr_warn("Unable to scale voltage down\n");
-> +			ret = clk_set_rate(cpu_clk, freqs.old * 1000);
-> +			freqs.new = freqs.old;
-> +			goto done;
-> +		}
-> +	}
-> +
-> +done:
-> +	for_each_cpu(cpu, policy->cpus) {
-> +		freqs.cpu = cpu;
-> +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
-> +{
-> +	struct device_node *np;
-> +	int ret;
-> +
-> +	/* Initialize resources via CPU0 */
-> +	if (policy->cpu != 0)
-> +		return -EINVAL;
-> +
-> +	np = of_find_node_by_path("/cpus/cpu at 0");
-> +	if (!np) {
-> +		pr_err("failed to find cpu0 node\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	cpu_dev = get_cpu_device(0);
-> +	if (!cpu_dev) {
-> +		pr_err("failed to get cpu0 device\n");
-> +		ret = -ENODEV;
-> +		goto out_put_node;
-> +	}
-> +
-> +	cpu_dev->of_node = np;
-hmm.. sys dev can not set of_node when populate it?
-And why not do it in module init? 
-> +	ret = of_init_opp_table(cpu_dev);
-> +	if (ret) {
-> +		pr_err("failed to init OPP table\n");
-> +		goto out_put_node;
-> +	}
-> +
-> +	ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
-> +	if (ret) {
-> +		pr_err("failed to init cpufreq table\n");
-> +		goto out_put_node;
-> +	}
-> +
-> +	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-> +	if (ret) {
-> +		pr_err("invalid frequency table for cpu0\n");
-> +		goto out_free_table;
-> +	}
-> +
-> +	if (of_property_read_u32(np, "transition-latency",
-> +				 &policy->cpuinfo.transition_latency))
-> +		policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-> +
-> +	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
-> +
-> +	cpu_clk = clk_get(cpu_dev, NULL);
-> +	if (IS_ERR(cpu_clk)) {
-> +		pr_err("failed to get cpu0 clock\n");
-> +		ret = PTR_ERR(cpu_clk);
-> +		goto out_free_table;
-> +	}
-> +	policy->cur = clk_get_rate(cpu_clk) / 1000;
-> +
-> +	cpu_reg = regulator_get(cpu_dev, "cpu0");
-> +	if (IS_ERR(cpu_reg)) {
-> +		pr_warn("failed to get cpu0 regulator\n");
-> +		cpu_reg = NULL;
-> +	}
-> +
-> +	/*
-> +	 * The driver only supports the SMP configuartion where all processors
-> +	 * share the clock and voltage and clock.  Use cpufreq affected_cpus
-> +	 * interface to have all CPUs scaled together.
-> +	 */
-> +	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
-> +	cpumask_setall(policy->cpus);
-> +
-> +	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
-> +
-> +	of_node_put(np);
-> +	return 0;
-> +
-> +out_free_table:
-> +	opp_free_cpufreq_table(cpu_dev, &freq_table);
-> +out_put_node:
-> +	of_node_put(np);
-> +	return ret;
-> +}
-> +
-> +static int cpu0_cpufreq_exit(struct cpufreq_policy *policy)
-> +{
-> +	cpufreq_frequency_table_put_attr(policy->cpu);
-> +	regulator_put(cpu_reg);
-> +	clk_put(cpu_clk);
-> +	opp_free_cpufreq_table(cpu_dev, &freq_table);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct freq_attr *cpu0_cpufreq_attr[] = {
-> +	&cpufreq_freq_attr_scaling_available_freqs,
-> +	NULL,
-> +};
-> +
-> +static struct cpufreq_driver cpu0_cpufreq_driver = {
-> +	.flags = CPUFREQ_STICKY,
-> +	.verify = cpu0_verify_speed,
-> +	.target = cpu0_set_target,
-> +	.get = cpu0_get_speed,
-> +	.init = cpu0_cpufreq_init,
-> +	.exit = cpu0_cpufreq_exit,
-> +	.name = "generic_cpu0",
-> +	.attr = cpu0_cpufreq_attr,
-> +};
-static u32 max_freq = UINT_MAX / 1000; /* kHz */
-module_param(max_freq, uint, 0);
-MODULE_PARM_DESC(max_freq, "max cpu frequency in unit of kHz");
+Hope this clear.
 
-It's for debug. Make sense?
-
-Thanks
-Richard
-> +
-> +static int __devinit cpu0_cpufreq_driver_init(void)
-> +{
-> +	return cpufreq_register_driver(&cpu0_cpufreq_driver);
-> +}
-> +late_initcall(cpu0_cpufreq_driver_init);
-> +
-> +MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-> +MODULE_DESCRIPTION("Generic cpufreq driver for CPU0");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.7.5.4
-> 
+Regards
+Santosh
