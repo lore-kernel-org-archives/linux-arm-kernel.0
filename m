@@ -1,36 +1,89 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2012 17:19:15 -0700
-Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
-In-Reply-To: <87394enqz8.fsf@ti.com>
-References: <87394enqz8.fsf@ti.com>
-Message-ID: <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
+Date: Thu, 26 Jul 2012 18:56:45 -0700
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <CAOesGMiyPjMhLLV9_u8tRHE9UZZAx7_YCs_NS0D_E5kZJuy3vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
-
-On Thu, Jul 26, 2012 at 2:37 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Hi Arnd, Olof,
->
-> I know it is late, but I'm really hoping this can still make it for
-> v3.6, so consider this a [GIT PLEA].  ;)
-
-New features submitted halfway through the merge window? Yeah, that's late.
-
-I'll pull it in as late2/pm once the below is fixed, but I won't
-promise we'll send it up.
+Hi Linus,
 
 
-> Kevin Hilman (1):
->       ARM: OMAP4: CPUidle: add synchronization for coupled idle states
->
-> Santosh Shilimkar (3):
->       ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
->       ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
->       ARM: OMAP4: CPUidle: Open broadcast clock-event device.
+The following changes since commit 9161c3b796a2841a9a7be3d9c9dd121269ce90e8:
 
-This looks odd, Colin was author to the first of the commits
-attributed to Santosh.
+  Merge tag 'clk-for-linus' of
+git://git.linaro.org/people/mturquette/linux (2012-07-24 16:40:57
+-0700)
+
+are available in the git repository at:
 
 
--Olof
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/fixes-for-linus
+
+for you to fetch changes up to fa7c865ad999d6ca340bca471fab7f3a3e6ae011:
+
+  ARM: mxs: fix compile error caused by prom_update_property change
+(2012-07-25 22:36:39 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes
+
+A mixed bag of fixes, some for merge window fallout (tegra, MXS), and
+a short series of fixes for marvell platforms that didn't make it in
+before 3.5.
+
+----------------------------------------------------------------
+Andrew Lunn (2):
+      ARM: Kirkwood: Ensure runit clock always ticks.
+      ARM: Kirkwood: Replace mrvl with marvell
+
+Arnd Bergmann (2):
+      Merge branch 'master' of git://git.kernel.org/.../torvalds/linux
+into fixes
+      Merge branch 'v3.5-rc7-fixes' of git://github.com/lunn/linux into fixes
+
+Hannes Reinecke (1):
+      ARM: Dove: Fixup ge00 initialisation
+
+Laxman Dewangan (1):
+      ARM: tegra: harmony: add regulator supply name and its input supply
+
+Pawel Moll (1):
+      ARM: versatile: Don't use platform clock for Integrator & VE
+
+Shawn Guo (1):
+      ARM: mxs: fix compile error caused by prom_update_property change
+
+Simon Baatz (2):
+      ARM: Kirkwood: Fix PHY disable clk problems
+      ARM: Orion: fix driver probe error handling with respect to clk
+
+Stephen Warren (2):
+      ARM: dt: tegra trimslice: add vbus-gpio property
+      ARM: dt: tegra trimslice: enable USB2 port
+
+Tony Prisk (1):
+      ARM: vt8500: Add maintainer for VT8500 architecture
+
+ .../devicetree/bindings/mtd/orion-nand.txt         |  4 +-
+ MAINTAINERS                                        | 11 ++++
+ arch/arm/Kconfig                                   |  2 -
+ arch/arm/boot/dts/kirkwood-dns320.dts              |  2 +-
+ arch/arm/boot/dts/kirkwood-dns325.dts              |  2 +-
+ arch/arm/boot/dts/kirkwood-dreamplug.dts           |  2 +-
+ arch/arm/boot/dts/kirkwood-ib62x0.dts              |  2 +-
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |  2 +-
+ arch/arm/boot/dts/kirkwood.dtsi                    |  6 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts            |  2 +
+ arch/arm/mach-dove/common.c                        |  4 +-
+ arch/arm/mach-kirkwood/common.c                    | 70 +++++++++++++++++-----
+ arch/arm/mach-mxs/mach-mxs.c                       |  8 +--
+ arch/arm/mach-tegra/board-harmony-power.c          | 33 ++++++----
+ drivers/crypto/mv_cesa.c                           |  4 ++
+ drivers/mmc/host/mvsdio.c                          |  4 ++
+ drivers/mtd/nand/orion_nand.c                      |  6 +-
+ drivers/net/ethernet/marvell/mv643xx_eth.c         |  6 ++
+ drivers/rtc/rtc-mv.c                               |  2 +-
+ drivers/usb/host/ehci-orion.c                      |  4 ++
+ sound/soc/kirkwood/kirkwood-i2s.c                  |  8 ++-
+ 21 files changed, 133 insertions(+), 51 deletions(-)
