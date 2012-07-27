@@ -1,78 +1,136 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jul 2012 22:40:24 +0100
-Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
-In-Reply-To: <20120727210637.GA16377@n2100.arm.linux.org.uk>
-References: <1340533690-4049-1-git-send-email-javier@dowhile0.org>
- <20120625005134.GA2342@S2101-09.ap.freescale.net>
- <20120625084905.GD19226@n2100.arm.linux.org.uk>
- <CAAwP0s2jTPM_ErDOFKXoe95_Xd=xjkuTAsDbLctQ08_QVNkakQ@mail.gmail.com>
- <5012CC98.60206@ti.com>
- <20120727204447.GA10024@mudshark.cambridge.arm.com>
- <20120727210637.GA16377@n2100.arm.linux.org.uk>
-Message-ID: <20120727214024.GA10249@mudshark.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 27 Jul 2012 16:59:18 -0500
+Subject: [GIT PULL] io.h clean-up for PCI
+In-Reply-To: <50049285.1060100@gmail.com>
+References: <50049285.1060100@gmail.com>
+Message-ID: <50130F36.4090902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Fri, Jul 27, 2012 at 10:06:37PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 27, 2012 at 09:44:47PM +0100, Will Deacon wrote:
-> > I did comment on this one:
-> > 
-> >   http://thread.gmane.org/gmane.linux.kernel/1303115
-> > 
-> > and I really think we should fix the cause of the problem, rather than
-> > point patching this instance of it.
+On 07/16/2012 05:15 PM, Rob Herring wrote:
+> Arnd,
 > 
-> What do you think needs fixing there?
+> Please pull io.h PCI clean-up series. As you suggested, lets get it in
+> next for test and decide later if to apply it for 3.6 or wait.
+> 
+> BTW, I'll have sporadic email access over the next 2 weeks.
+> 
+> Rob
+> 
 
-Well, we certainly need to fix the NULL dereference and the original patch
-does do that. I just think it might be nicer to remove the possibility of a
-NULL dereference instead.
+Arnd,
 
-> We support booting a kernel on systems with or without SMP support, even
-> with a SMP kernel.  When the kernel is booted on such a system, it is
-> undefined whether smp_cross_call() is a valid function pointer.
+Please pull updated io.h cleanup for PCI branch. I rebased this as the
+changes shifted things around a bit. This has the following changes:
 
-So let's define it to point at a dummy function which explodes with a BUG if
-the cpumask passed in isn't empty. That allows SMP kernels to do things like
-`cross call to all other cores' without having to worry about whether there
-are any other cores or not.
+- Incorporated fixes from you and Stephen
+- Add early i/o mapping pci_map_io_early and enable on footbridge and
+integrator for VGA console
+- Avoid including map.h in asm/mach/pci.h which collided with EDAC.
 
-> In any case, when we have only one CPU online in the system, it is
-> pointless even calling smp_cross_call().
+Rob
 
-Pointless, but also error-prone and requiring explicit cpumask checks at
-each call-site.
+The following changes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
 
-> That is why I explicitly suggested this solution.  This is the solution
-> _I_ want, because it is the most sane solution all round.
+  Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
 
-Adding a dummy implementation is straightforward [ok, this is untested]:
+are available in the git repository at:
 
+  git://sources.calxeda.com/kernel/linux.git io-cleanup-pci-v2
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2c7217d..ffa411f 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -329,7 +329,13 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
-        }
- }
- 
--static void (*smp_cross_call)(const struct cpumask *, unsigned int);
-+static void dummy_smp_cross_call(const struct cpumask *mask, unsigned int irq)
-+{
-+       BUG_ON(!cpumask_empty(mask));
-+}
-+
-+static void (*smp_cross_call)(const struct cpumask *, unsigned int) =
-+       dummy_smp_cross_call;
- 
- void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
- {
+for you to fetch changes up to dd9bf78040fa0da4cecc228e1682b9682b8cb180:
 
+  ARM: iop3xx: use fixed PCI i/o mapping (2012-07-26 09:10:04 -0500)
 
-If you still prefer checking at the call-site then the original patch will
-certainly work. Otherwise, I'm happy to submit the above after some testing.
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      iop13xx: use more regular PCI I/O space handling
 
-Will
+Rob Herring (16):
+      i2c: iop3xx: clean-up trailing whitespace
+      i2c: iop3xx: use standard gpiolib functions
+      ARM: Add fixed PCI i/o mapping
+      ARM: move PCI i/o resource setup into common code
+      ARM: versatile: use fixed PCI i/o mapping
+      ARM: tegra: use fixed PCI i/o mapping
+      ARM: integrator: use fixed PCI i/o mapping
+      ARM: integrator: remove trailing whitespace on pci_v3.c
+      ARM: shark: use fixed PCI i/o mapping
+      ARM: footbridge: use fixed PCI i/o mapping
+      ARM: dove: use fixed PCI i/o mapping
+      ARM: kirkwood: use fixed PCI i/o mapping
+      ARM: orion5x: use fixed PCI i/o mapping
+      ARM: iop13xx: use fixed PCI i/o mapping
+      ARM: mv78xx0: use fixed pci i/o mapping
+      ARM: iop3xx: use fixed PCI i/o mapping
+
+ Documentation/arm/memory.txt                       |    3 +
+ arch/arm/Kconfig                                   |   13 +--
+ arch/arm/include/asm/hardware/iop3xx.h             |   12 +-
+ arch/arm/include/asm/io.h                          |    8 ++
+ arch/arm/include/asm/mach/map.h                    |    8 ++
+ arch/arm/include/asm/mach/pci.h                    |   13 +++
+ arch/arm/kernel/bios32.c                           |   54 ++++++++-
+ arch/arm/mach-dove/common.c                        |   10 --
+ arch/arm/mach-dove/include/mach/dove.h             |    8 +-
+ arch/arm/mach-dove/include/mach/io.h               |   19 ---
+ arch/arm/mach-dove/pcie.c                          |   43 +++----
+ arch/arm/mach-footbridge/common.c                  |   12 +-
+ arch/arm/mach-footbridge/dc21285.c                 |   16 +--
+ .../arm/mach-footbridge/include/mach/debug-macro.S |    3 +-
+ arch/arm/mach-footbridge/include/mach/io.h         |   12 +-
+ arch/arm/mach-integrator/include/mach/io.h         |   33 ------
+ arch/arm/mach-integrator/include/mach/platform.h   |    4 +
+ arch/arm/mach-integrator/integrator_ap.c           |    9 +-
+ arch/arm/mach-integrator/pci_v3.c                  |   50 ++++----
+ arch/arm/mach-iop13xx/include/mach/io.h            |   28 -----
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h       |   28 +----
+ arch/arm/mach-iop13xx/io.c                         |   27 -----
+ arch/arm/mach-iop13xx/pci.c                        |   37 +++---
+ arch/arm/mach-iop13xx/setup.c                      |   10 --
+ arch/arm/mach-iop32x/include/mach/io.h             |   19 ---
+ arch/arm/mach-iop33x/include/mach/io.h             |   19 ---
+ arch/arm/mach-kirkwood/common.c                    |   10 --
+ arch/arm/mach-kirkwood/include/mach/io.h           |   24 ----
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h     |    8 +-
+ arch/arm/mach-kirkwood/pcie.c                      |   44 +++----
+ arch/arm/mach-mv78xx0/addr-map.c                   |    3 +-
+ arch/arm/mach-mv78xx0/common.c                     |    5 -
+ arch/arm/mach-mv78xx0/include/mach/io.h            |   24 ----
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h       |   21 ++--
+ arch/arm/mach-mv78xx0/pcie.c                       |  110
+++++++------------
+ arch/arm/mach-orion5x/common.c                     |   10 --
+ arch/arm/mach-orion5x/include/mach/io.h            |   22 ----
+ arch/arm/mach-orion5x/include/mach/orion5x.h       |   20 ++--
+ arch/arm/mach-orion5x/pci.c                        |   56 +++------
+ arch/arm/mach-shark/core.c                         |   18 ---
+ arch/arm/mach-shark/include/mach/debug-macro.S     |    7 +-
+ arch/arm/mach-shark/include/mach/entry-macro.S     |    3 +-
+ arch/arm/mach-shark/include/mach/io.h              |   18 ---
+ arch/arm/mach-shark/pci.c                          |    5 +
+ arch/arm/mach-tegra/include/mach/io.h              |   46 --------
+ arch/arm/mach-tegra/include/mach/iomap.h           |    3 +
+ arch/arm/mach-tegra/pcie.c                         |   95 ++++-----------
+ arch/arm/mach-versatile/core.c                     |    5 -
+ arch/arm/mach-versatile/include/mach/hardware.h    |    1 -
+ arch/arm/mach-versatile/include/mach/io.h          |   27 -----
+ arch/arm/mach-versatile/pci.c                      |   22 +---
+ arch/arm/mm/ioremap.c                              |   14 +++
+ arch/arm/mm/mmu.c                                  |   54 +++++++--
+ arch/arm/plat-iop/pci.c                            |   25 ++--
+ arch/arm/plat-iop/setup.c                          |    5 -
+ drivers/i2c/busses/i2c-iop3xx.c                    |  121
+++++++++++----------
+ 56 files changed, 414 insertions(+), 910 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/include/mach/io.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/io.h
+ delete mode 100644 arch/arm/mach-iop13xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-iop32x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-iop33x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-kirkwood/include/mach/io.h
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/io.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/io.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
+ delete mode 100644 arch/arm/mach-versatile/include/mach/io.h
