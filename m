@@ -1,36 +1,36 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 26 Jul 2012 16:10:22 -0700
-Subject: [GIT PULL 00/15] arm-soc: changes for v3.6
-In-Reply-To: <alpine.DEB.2.00.1207241436570.10781@utopia.booyaka.com>
-References: <1343075561-17446-1-git-send-email-arnd@arndb.de>
- <CA+55aFyObNFgsaVOsjVOcH+aLjDyOgcqpvckM29T3dvugekVwg@mail.gmail.com>
- <201207240751.39111.arnd@arndb.de>
- <alpine.DEB.2.00.1207241436570.10781@utopia.booyaka.com>
-Message-ID: <20120726231022.GC20413@animalcreek.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 26 Jul 2012 17:19:15 -0700
+Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
+In-Reply-To: <87394enqz8.fsf@ti.com>
+References: <87394enqz8.fsf@ti.com>
+Message-ID: <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2012 at 02:51:35PM -0600, Paul Walmsley wrote:
-> Hi
-> 
-> On Tue, 24 Jul 2012, Arnd Bergmann wrote:
-> 
-> > On Tuesday 24 July 2012, Linus Torvalds wrote:
-> > 
-> > > In your "for-linus" branch, "&mpu_3xxx_clkdm" remains in the
-> > > clockdomains_common[] array. In my merge, it is gone. But I think I
-> > > did the merge correctly, and you did it wrong. HOWEVER, I don't know
-> > > the code, maybe there is some subtle reason why you did it like you
-> > > did.
-> > 
-> > Yes, I think you are right now that I look at it again. Paul Walmsley
-> > can have another look at the merge and send an update if we are both
-> > missing something now.
-> 
-> Linus' merge is correct.
+Kevin,
 
-FWIW, it looks right to me too.
+On Thu, Jul 26, 2012 at 2:37 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Arnd, Olof,
+>
+> I know it is late, but I'm really hoping this can still make it for
+> v3.6, so consider this a [GIT PLEA].  ;)
 
-Thanks,
+New features submitted halfway through the merge window? Yeah, that's late.
 
-Mark
+I'll pull it in as late2/pm once the below is fixed, but I won't
+promise we'll send it up.
+
+
+> Kevin Hilman (1):
+>       ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+>
+> Santosh Shilimkar (3):
+>       ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
+>       ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
+>       ARM: OMAP4: CPUidle: Open broadcast clock-event device.
+
+This looks odd, Colin was author to the first of the commits
+attributed to Santosh.
+
+
+-Olof
