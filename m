@@ -1,50 +1,112 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Jul 2012 15:39:31 +0100
-Subject: [Xen-devel] [PATCH 02/24] xen/arm: hypercalls
-In-Reply-To: <20120727142101.GA6802@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Jul 2012 15:48:15 +0100
+Subject: [PATCH 07/24] xen/arm: Xen detection and shared_info page mapping
+In-Reply-To: <1343381813.6812.120.camel@zakaz.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120726163352.GC9222@phenom.dumpdata.com>
- <1343380659.6812.106.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1207271350370.26163@kaball.uk.xensource.com>
- <20120727142101.GA6802@n2100.arm.linux.org.uk>
-Message-ID: <1343399971.25096.8.camel@zakaz.uk.xensource.com>
+ <1343316846-25860-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1343381813.6812.120.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1207271545440.26163@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-27 at 15:21 +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 27, 2012 at 02:02:18PM +0100, Stefano Stabellini wrote:
-> > > > > +/******************************************************************************
-> > > > > + * hypercall.h
-> > > > > + *
-> > > > > + * Linux-specific hypervisor handling.
-> > > > > + *
-> > > > > + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-> > > > > + *
-> > > > > + * This program is free software; you can redistribute it and/or
-> > > > > + * modify it under the terms of the GNU General Public License version 2
-> > > > > + * as published by the Free Software Foundation; or, when distributed
-> > > > > + * separately from the Linux kernel or incorporated into other
-> > > > > + * software packages, subject to the following license:
-> > > > > + *
-> > > > > + * Permission is hereby granted, free of charge, to any person obtaining a copy
-> > > > > + * of this source file (the "Software"), to deal in the Software without
+On Fri, 27 Jul 2012, Ian Campbell wrote:
+> On Thu, 2012-07-26 at 16:33 +0100, Stefano Stabellini wrote:
+> > Check for a "/xen" node in the device tree, if it is present set
+> > xen_domain_type to XEN_HVM_DOMAIN and continue initialization.
+> > 
+> > Map the real shared info page using XENMEM_add_to_physmap with
+> > XENMAPSPACE_shared_info.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/xen/enlighten.c |   56 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 56 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index d27c2a6..8c923af 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -5,6 +5,9 @@
+> >  #include <asm/xen/hypervisor.h>
+> >  #include <asm/xen/hypercall.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/of_address.h>
+> >  
+> >  struct start_info _xen_start_info;
+> >  struct start_info *xen_start_info = &_xen_start_info;
+> > @@ -33,3 +36,56 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+> >  	return -ENOSYS;
+> >  }
+> >  EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> > +
+> > +/*
+> > + * == Xen Device Tree format ==
+> > + * - /xen node;
+> > + * - compatible "arm,xen";
+> > + * - one interrupt for Xen event notifications;
+> > + * - one memory region to map the grant_table.
+> > + */
+> > +static int __init xen_guest_init(void)
+> > +{
+> > +	int cpu;
+> > +	struct xen_add_to_physmap xatp;
+> > +	static struct shared_info *shared_info_page = 0;
+> > +	struct device_node *node;
+> > +
+> > +	node = of_find_compatible_node(NULL, NULL, "arm,xen");
+> > +	if (!node) {
+> > +		pr_info("No Xen support\n");
+> > +		return 0;
+> > +	}
 > 
-> Erm, is that an additional restriction on the GPL which prevents me from
-> shipping this code on a CD and charging for the act of creating the CD
-> and shipping it?  That would technically make the above statement
-> incompatible with the GPL.
+> This should either only print in the success case (to avoid spamming
+> everyone) or we need a little bit of infrastructure like on x86 so that
+> we print exactly one of:
+> 	"Booting natively on bearmetal"
+> 	"Booting paravirtualised on %s", hypervisor->name
 
-There's an "or" in there.
+This function is only going to be called once (actually it might be
+called twice with the change introduced by "xen/arm: Introduce
+xen_guest_init").
 
-The non-GPL alternative license is the standard one applied by upstream
-Xen to the interface headers:
-        http://xenbits.xen.org/hg/xen-unstable.hg/file/tip/xen/include/public/COPYING
+I thought that it would be an acceptible level of verbosity for pr_info.
+Maybe I should just turn the pr_info into pr_debug?
 
-It's the X11/MIT license IIRC, which the FSF say is GPL compatible.
-http://www.gnu.org/licenses/license-list.html#X11License
 
-The same license is used a few other places in the kernel, e.g. the DRM
-code.
+> > +	xen_domain_type = XEN_HVM_DOMAIN;
+> > +
+> > +	if (!shared_info_page)
+> > +		shared_info_page = (struct shared_info *)
+> > +			get_zeroed_page(GFP_KERNEL);
+> > +	if (!shared_info_page) {
+> > +		pr_err("not enough memory");
+> > +		return -ENOMEM;
+> > +	}
+> > +	xatp.domid = DOMID_SELF;
+> > +	xatp.idx = 0;
+> > +	xatp.space = XENMAPSPACE_shared_info;
+> > +	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
+> > +	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+> > +		BUG();
+> > +
+> > +	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
+> > +
+> > +	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
+> > +	 * page, we use it in the event channel upcall and in some pvclock
+> > +	 * related functions. We don't need the vcpu_info placement
+> > +	 * optimizations because we don't use any pv_mmu or pv_irq op on
+> > +	 * HVM.
+> > +	 * When xen_hvm_init_shared_info is run at boot time only vcpu 0 is
+> > +	 * online but xen_hvm_init_shared_info is run at resume time too and
+> > +	 * in that case multiple vcpus might be online. */
+> > +	for_each_online_cpu(cpu) {
+> > +		per_cpu(xen_vcpu, cpu) =
+> > +			&HYPERVISOR_shared_info->vcpu_info[cpu];
+> 
+> On ARM the shared info contains exactly 1 CPU (the boot CPU). The guest
+> is required to use VCPUOP_register_vcpu_info to place vcpu info for
+> secondary CPUs as they are brought up.
 
-Ian.
+OK
