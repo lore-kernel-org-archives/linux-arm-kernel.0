@@ -1,68 +1,49 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Jul 2012 10:28:25 +0100
-Subject: [Xen-devel] [PATCH 04/24] xen/arm: sync_bitops
-In-Reply-To: <20120726163759.GE9222@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120726163759.GE9222@phenom.dumpdata.com>
-Message-ID: <1343381305.6812.116.camel@zakaz.uk.xensource.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 27 Jul 2012 17:28:20 +0800
+Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
+In-Reply-To: <1343215100-24005-2-git-send-email-festevam@gmail.com>
+References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
+ <1343215100-24005-2-git-send-email-festevam@gmail.com>
+Message-ID: <20120727092819.GE3347@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-26 at 17:37 +0100, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 26, 2012 at 04:33:46PM +0100, Stefano Stabellini wrote:
-> > sync_bitops functions are equivalent to the SMP implementation of the
-> > original functions, independently from CONFIG_SMP being defined.
+On Wed, Jul 25, 2012 at 08:18:19AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> So why can't the code be changed to use that? Is it that
-> the _set_bit, _clear_bit, etc are not available with !CONFIG_SMP?
-
-_set_bit etc are not SMP safe if !CONFIG_SMP. But under Xen you might be
-communicating with a completely external entity who might be on another
-CPU (e.g. two uniprocessor guests communicating via event channels and
-grant tables). So we need a variant of the bit ops which are SMP safe
-even on a UP kernel.
-
-The users are common code and the sync_foo vs foo distinction matters on
-some platforms (e.g. x86 where a UP kernel would omit the LOCK prefix
-for the normal ones).
-
+> MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
+> for imx_v6_v7_defconfig:
 > 
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/include/asm/sync_bitops.h |   17 +++++++++++++++++
-> >  1 files changed, 17 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/include/asm/sync_bitops.h
-> > 
-> > diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-> > new file mode 100644
-> > index 0000000..d975092903
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/sync_bitops.h
-> > @@ -0,0 +1,17 @@
-> > +#ifndef __ASM_SYNC_BITOPS_H__
-> > +#define __ASM_SYNC_BITOPS_H__
-> > +
-> > +#include <asm/bitops.h>
-> > +#include <asm/system.h>
-> > +
-> > +#define sync_set_bit(nr, p)		_set_bit(nr, p)
-> > +#define sync_clear_bit(nr, p)		_clear_bit(nr, p)
-> > +#define sync_change_bit(nr, p)		_change_bit(nr, p)
-> > +#define sync_test_and_set_bit(nr, p)	_test_and_set_bit(nr, p)
-> > +#define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
-> > +#define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
-> > +#define sync_test_bit(nr, addr)		test_bit(nr, addr)
-> > +#define sync_cmpxchg			cmpxchg
-> > +
-> > +
-> > +#endif
-> > -- 
-> > 1.7.2.5
-> > 
-> > 
-> > _______________________________________________
-> > Xen-devel mailing list
-> > Xen-devel at lists.xen.org
-> > http://lists.xen.org/xen-devel
+> drivers/built-in.o: In function `gpmi_dma_filter':
+> clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
+> make: *** [vmlinux] Error 1
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Reviewed-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+> Changes since v1:
+> - Use 'depends' rather than 'select'
+>  drivers/mtd/nand/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index a5d8a1b..da52c7d 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
+>  config MTD_NAND_GPMI_NAND
+>          bool "GPMI NAND Flash Controller driver"
+>          depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
+> +	depends on MXS_DMA
+>          help
+>  	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
+>  	 The GPMI controller is very powerful, with the help of BCH
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
