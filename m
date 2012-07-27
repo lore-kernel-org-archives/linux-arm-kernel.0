@@ -1,77 +1,96 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 27 Jul 2012 07:25:08 +0200
-Subject: [RFC PATCH] gpio: Add a generic GPIO handling driver
-References: <1340961676-25432-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20498.9780.825958.340618@ipc1.ka-ro>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 27 Jul 2012 11:13:17 +0530
+Subject: [PATCH] ARM: OMAP3xxx: clockdomain: fix software supervised
+ wakeup/sleep
+In-Reply-To: <alpine.DEB.2.00.1207261503290.14468@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1207261503290.14468@utopia.booyaka.com>
+Message-ID: <50122A75.2030108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Friday 27 July 2012 02:34 AM, Paul Walmsley wrote:
+>
+> Commit 4da71ae6 ("OMAP: clockdomain: Arch specific funcs for
+> clkdm_clk_enable/disable") called the OMAP2xxx-specific functions for
+> clockdomain wakeup and sleep.  This would probably have broken
+> software-supervised clockdomain wakeup and sleep on OMAP3.
 
-sorry, I obviuosly missed your reply and had to pick it up from the
-archives.
+Its strange this went unnoticed for so long. Thanks for this fix and
+sorry about introducing the bug in the first place.
 
-> On Fri, Jun 29, 2012 at 11:21:16AM +0200, Lothar Wa?mann wrote:
->> in the .dts file:
->> 	flexcan_transceiver: gpio-switch at 0 {
->> 		compatible = "linux,gpio-switch";
-> 
-> Why not simply "gpio-switch"?
-> 
-OK.
+Acked-by: Rajendra Nayak <rnayak@ti.com>
 
->> 		gpio = <&gpio4 21 1>; /* GPIO is active low */
->> 		label = "Flexcan Transceiver Enable";
->> 		gpio-shared;
->> 		init-state = <0>; /* Transceiver will be initially inactive */
->> 	};
->> 
-> It looks like the design intends to have every single gpio-switch
-> probed as a platform_device.  I'm not sure it's a good idea.
-> 
-I considered that myself already.
-
-> Also I'm not sure it's preferable to have such shinny new stuff support
-> platform probing, which adds much unnecessary complexity, considering
-> we are on the way to device tree.  If we support device tree only,
-> a lot of codes like provider API will not be needed.
-> 
-There are still archs that do not use DT but could still benefit from
-this driver.
-
->> in flexcan_probe()
->> 	struct gpio_sw *xcvr_switch = NULL;
->> 	struct device_node *np = pdev->dev.of_node;
->> 
->> 	if (np) {
->> 		ph = of_get_property(np, "transceiver-switch", NULL);
-> 
-> I would have a fixed property name under client device node
-> representing the phandle to gpio-switch sub-node, like what we are
-> doing with clk binding.
-> 
-OK.
-
->> flexcan_remove()
->>     free_gpio_switch(xcvr_switch);
-> 
-> Can we have a devm_request_gpio_switch to ease the client driver
-> a little bit?
-> 
-Sure.
-
-I'll try to get a new version out over the weekend, if there is still
-interest in this driver.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+>
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> Cc: Rajendra Nayak<rnayak@ti.com>
+> Cc: Jon Hunter<jon-hunter@ti.com>
+> ---
+>   arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   50 ++++++++++++++++++++++++++--
+>   1 file changed, 48 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> index a0d68db..f99e65c 100644
+> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> @@ -241,6 +241,52 @@ static void omap3_clkdm_deny_idle(struct clockdomain *clkdm)
+>   		_clkdm_del_autodeps(clkdm);
+>   }
+>
+> +static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+> +{
+> +	bool hwsup = false;
+> +
+> +	if (!clkdm->clktrctrl_mask)
+> +		return 0;
+> +
+> +	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+> +				clkdm->clktrctrl_mask);
+> +
+> +	if (hwsup) {
+> +		/* Disable HW transitions when we are changing deps */
+> +		_disable_hwsup(clkdm);
+> +		_clkdm_add_autodeps(clkdm);
+> +		_enable_hwsup(clkdm);
+> +	} else {
+> +		if (clkdm->flags&  CLKDM_CAN_FORCE_WAKEUP)
+> +			omap3_clkdm_wakeup(clkdm);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+> +{
+> +	bool hwsup = false;
+> +
+> +	if (!clkdm->clktrctrl_mask)
+> +		return 0;
+> +
+> +	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+> +				clkdm->clktrctrl_mask);
+> +
+> +	if (hwsup) {
+> +		/* Disable HW transitions when we are changing deps */
+> +		_disable_hwsup(clkdm);
+> +		_clkdm_del_autodeps(clkdm);
+> +		_enable_hwsup(clkdm);
+> +	} else {
+> +		if (clkdm->flags&  CLKDM_CAN_FORCE_SLEEP)
+> +			omap3_clkdm_sleep(clkdm);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>   struct clkdm_ops omap2_clkdm_operations = {
+>   	.clkdm_add_wkdep	= omap2_clkdm_add_wkdep,
+>   	.clkdm_del_wkdep	= omap2_clkdm_del_wkdep,
+> @@ -267,6 +313,6 @@ struct clkdm_ops omap3_clkdm_operations = {
+>   	.clkdm_wakeup		= omap3_clkdm_wakeup,
+>   	.clkdm_allow_idle	= omap3_clkdm_allow_idle,
+>   	.clkdm_deny_idle	= omap3_clkdm_deny_idle,
+> -	.clkdm_clk_enable	= omap2_clkdm_clk_enable,
+> -	.clkdm_clk_disable	= omap2_clkdm_clk_disable,
+> +	.clkdm_clk_enable	= omap3xxx_clkdm_clk_enable,
+> +	.clkdm_clk_disable	= omap3xxx_clkdm_clk_disable,
+>   };
