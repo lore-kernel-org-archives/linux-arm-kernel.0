@@ -1,27 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 27 Jul 2012 07:33:36 -0500
-Subject: [DT] API to determine if interrupt is PPI or SPI ?
-In-Reply-To: <53a41d02c4c4c24bdab47667183891bf.squirrel@www.codeaurora.org>
-References: <53a41d02c4c4c24bdab47667183891bf.squirrel@www.codeaurora.org>
-Message-ID: <50128AA0.8040409@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 27 Jul 2012 13:38:51 +0100
+Subject: [PATCH 4/7] mfd: ab8500-core: Apply the AB8500 CODEC's compatible
+ string to its MFD cell
+In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
+References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343392734-11805-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2012 02:18 PM, rvaswani at codeaurora.org wrote:
-> Hello,
-> 
-> We can specify the interrupt information in the device tree using the arm
-> gic convention.
-> Is there an API to read directly the 1st cell and determine if an
-> interrupt is a PPI or a SPI ? This information is directly relevant to the
-> driver because it needs to call request_irq or request_percpu_irq based on
-> this data.
-> 
-> How should this be done ideally ?
+Provide a compatible string for the AB8500 CODEC to aid in
+configuration property look-up from its associated Device Tree
+node.
 
-Seems a bit strange to me that you would have a h/w block that can be
-connected either way...
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/ab8500-core.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Perhaps the irq resource should have a flag for percpu irq.
-
-Rob
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 626b4ec..0c5b70f 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -1076,6 +1076,7 @@ static struct mfd_cell __devinitdata ab8500_devs[] = {
+ 	},
+ 	{
+ 		.name = "ab8500-codec",
++		.of_compatible = "stericsson,ab8500-codec",
+ 	},
+ };
+ 
+-- 
+1.7.9.5
