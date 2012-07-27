@@ -1,33 +1,34 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 27 Jul 2012 09:59:21 +0200
-Subject: Sharing resources between several drivers.
-Message-ID: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Fri, 27 Jul 2012 17:08:26 +0900
+Subject: [PATCHv2 0/3] Add support to enable ARM PMU for EXYNOS4/5
+Message-ID: <1343376509-5881-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
+This patchset fixes irq numbers of ARM Performance Monitoring unit and enable it
+for Perf(Performance Counter) on the exynos 4 and 5. The exynos4 and 5 use 2
+more cpu core which has its own pmu. We should define pmu irq numbers according
+to the number of cpus.
+The pmu irq of exynos4 and 5 uses combiner-irq type.
+The exynos4412 especially has 4 extra combined irq groups. We should enable the
+groups beacuse two pmu irqs are there. To enable perf, we need also to implement
+a set_irq_affinity function about the combiner-irq.
+After this patch, we can use the perf for the exynos machine.
 
-In these chips, gpio and pinctrl use the same HW memory area
-registers. This means that we have to request the same memory area
-from two different drivers (gpio and pinctrl) but we don't know how to
-do that.
+Changes from v1:
+ - Split arm-pmu init of exynos from plat-samsung
+ - Correct combined irqs of exynos4412
+ - Use soc_is_xxx function instead of CONFIG_XXX to identify dynamically
 
-A similar example available is mxs, but it only works with device
-tree, so this problem is avoided.  However, some of these chips
-(i.MX21, i.MX1...) don't support device tree yet, so we need to
-provide backwards compatibility.
+Chanho Park (3):
+  ARM: EXYNOS: Add set_irq_affinity function for combiner_irq
+  ARM: EXYNOS: Correct combined IRQs for exynos4412
+  ARM: EXYNOS: Enable PMUs for exynos4/5
 
-What is the right way to request the same memory region from two
-different drivers? Moreover, how can we guarantee that there won't be
-any conflicts when accessing these shared resources?
+ arch/arm/mach-exynos/common.c            |  137 +++++++++++++++++++++++++++---
+ arch/arm/mach-exynos/include/mach/irqs.h |   11 ++-
+ arch/arm/plat-samsung/devs.c             |    3 +-
+ 3 files changed, 135 insertions(+), 16 deletions(-)
 
-Regards.
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+1.7.9.5
