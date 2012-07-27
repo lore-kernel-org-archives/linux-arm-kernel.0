@@ -1,28 +1,50 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Jul 2012 10:13:04 +0800
-Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <20120726131121.GB7306@sirena.org.uk>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
- <20120726131121.GB7306@sirena.org.uk>
-Message-ID: <20120727021303.GB3347@b20223-02.ap.freescale.net>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Fri, 27 Jul 2012 10:51:58 +0800
+Subject: [PATCH 1/3] dmaengine: mmp-pdma support
+In-Reply-To: <1343297355.1726.8982.camel@vkoul-udesk3>
+References: <1342763164-19208-1-git-send-email-zhangfei.gao@marvell.com>
+ <1342763164-19208-2-git-send-email-zhangfei.gao@marvell.com>
+ <1343285475.1726.8981.camel@vkoul-udesk3>
+ <CAMj5BkhpcV=J8goZXMHt2o6bGgn9KL+-mseALN8L2FOpgr2MgA@mail.gmail.com>
+ <1343297355.1726.8982.camel@vkoul-udesk3>
+Message-ID: <CAMj5BkjEO4Opkx1GxjzX7ZBzRRQLVDKRnK2YA2PuMJ8V9vRD+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 02:11:21PM +0100, Mark Brown wrote:
-> On Thu, Jul 19, 2012 at 11:54:41PM +0800, Shawn Guo wrote:
-> 
-> > +Optional properties:
-> > +- transition-latency: Specify the possible maximum transition latency,
-> > +  in unit of nanoseconds.
-> 
-> This should make it clear that the transition latency being documented
-> here is just that for the core clock change itself, there may be other
-> sources of latency like the regulator ramp time or reprogramming PLLs.
-I think it's the total time and board dts can over-write it if it
-needs. Different transitions between different operating points may
-differ, and regulator may be able to indicate the transition time but
-clk don't have such api, and probably not worth to have.
- 
-Thanks
-Richard
+On Thu, Jul 26, 2012 at 6:09 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Thu, 2012-07-26 at 15:02 +0800, zhangfei gao wrote:
+>> On Thu, Jul 26, 2012 at 2:51 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+>> > On Fri, 2012-07-20 at 13:46 +0800, Zhangfei Gao wrote:
+>> >> +struct mmp_dma_platdata {
+>> >> +       int chancnt;
+>> >> +};
+>> >> +
+>> >> +struct mmp_dma_slave_config {
+>> >> +       struct dma_slave_config slave_config;
+>> >> +       u32 drcmr;
+>> >> +};
+>> > Why do you need these definitions?
+>> >
+>> > What is drcmr used for?
+>>
+>> Hi, Vinod
+>>
+>> "drcmr" is request_line, we used to select which channel map to
+>> specific peripheral.
+>> Is it possible adding request_line to slave_config?
+> Can you use the slave_id.
+>
+
+Good suggestion
+
+If passing drcmr does not break original design of slave_id,
+mmp-pdma just need one config member.
+While some device (nand) use memcpy method instead of slave_sg.
+
+ * @slave_id: Slave requester id. Only valid for slave channels. The dma
+ * slave peripheral will have unique id as dma requester which need to be
+ * pass as slave config.
+
+Will update with slave_id in v1 version.
+
+Thanks Vinod.
