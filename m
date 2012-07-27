@@ -1,44 +1,50 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Fri, 27 Jul 2012 08:04:12 +0100
-Subject: [Xen-devel] [PATCH 17/24] xen: allow privcmd for HVM
- guests
-In-Reply-To: <1343316846-25860-17-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-17-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <5012598C0200007800090DB9@nat28.tlf.novell.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 27 Jul 2012 01:14:13 -0600 (MDT)
+Subject: [PATCH] OMAP3 clock: remove obsolete comment
+In-Reply-To: <50123DD1.4090307@matrix-vision.de>
+References: <1343305722-16721-1-git-send-email-michael.jones@matrix-vision.de>
+ <alpine.DEB.2.00.1207261349350.14468@utopia.booyaka.com>
+ <50123DD1.4090307@matrix-vision.de>
+Message-ID: <alpine.DEB.2.00.1207270105001.21530@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 26.07.12 at 17:33, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> In order for privcmd mmap to work correctly, xen_remap_domain_mfn_range
-> needs to be implemented for HVM guests.
-> If it is not, mmap is going to fail later on.
+Hello Michael,
 
-Somehow, for me at least, this description doesn't connect to the
-actual change.
+On Fri, 27 Jul 2012, Michael Jones wrote:
 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  drivers/xen/privcmd.c |    4 ----
->  1 files changed, 0 insertions(+), 4 deletions(-)
+> Thanks for the comments, I'll adhere to them in the future.  I assume you
+> meant you _only_ accept patches with a non-null changelog.
+
+Indeed, that's right, I misstated it.
+
+> I referred to 
+> http://omappedia.org/wiki/Releasing_to_Linux_kernel_using_patches_and_emails 
+> before my submission, and didn't see these two points.  A few Q's:
 > 
-> diff --git a/drivers/xen/privcmd.c b/drivers/xen/privcmd.c
-> index ccee0f1..85226cb 100644
-> --- a/drivers/xen/privcmd.c
-> +++ b/drivers/xen/privcmd.c
-> @@ -380,10 +380,6 @@ static struct vm_operations_struct privcmd_vm_ops = {
->  
->  static int privcmd_mmap(struct file *file, struct vm_area_struct *vma)
->  {
-> -	/* Unsupported for auto-translate guests. */
-> -	if (xen_feature(XENFEAT_auto_translated_physmap))
-> -		return -ENOSYS;
-> -
+> Can I add these two points to that Wiki page?
 
-Is this safe on x86?
+Sounds reasonable, but I don't know who maintains that page.
 
-Jan
+> Or is there a more authoritative checklist somewhere?
 
->  	/* DONTCOPY is essential for Xen because copy_page_range doesn't know
->  	 * how to recreate these mappings */
->  	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY | VM_PFNMAP;
+There is; it's Documentation/SubmittingPatches which can be viewed here:
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=Documentation/SubmittingPatches
+
+> Why is it queued for 3.7?
+
+It is a low-priority fix (but valuable nonetheless, of course).
+
+> I thought 3.6 was in the works?
+
+Most of the significant new patches for 3.6 were tested and queued several 
+weeks ago.  Now we are queuing bugfix and regression patches for 3.6-rc 
+and new features and low-priority fixes for 3.7.
+
+> Where is it queued?
+
+It is currently queued in a git branch on my local drive.
+
+
+- Paul
