@@ -1,52 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jul 2012 17:50:49 +0100
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
-References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
- <20120727134231.GA5934@n2100.arm.linux.org.uk>
- <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
-Message-ID: <20120727165049.GB7405@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Jul 2012 17:51:40 +0100
+Subject: [Xen-devel] [PATCH 10/24] xen: do not compile manage, balloon,
+ pci, acpi and cpu_hotplug on ARM
+In-Reply-To: <501258FB0200007800090DB6@nat28.tlf.novell.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-10-git-send-email-stefano.stabellini@eu.citrix.com>
+ <501258FB0200007800090DB6@nat28.tlf.novell.com>
+Message-ID: <alpine.DEB.2.02.1207271749420.26163@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 06:08:13PM +0200, Shilimkar, Santosh wrote:
-> On Fri, Jul 27, 2012 at 3:42 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jul 25, 2012 at 03:12:22PM +0100, Russell King - ARM Linux wrote:
-> >> Just a quick reminder that I'm still on holiday, and at this point there
-> >> are over 2500 messages from the mailing lists which are sitting unread
-> >> since I left the UK.  As I mentioned before I left the UK, it is my
-> >> intention *not* to go back and read all those outstanding messages -
-> >> there's too many of them to do that.
-> >>
-> >> So, if you want me to react to any email message you've sent, you'd
-> >> *better* send it again next week unless I've already responded.
-> >>
-> >> Meanwhile, I see v3.5 has been released; I have a couple of things I
-> >> need to do with my tree before I can push the changes, and I'll
-> >> probably see about sorting those out over the weekend.  I also see
-> >> that 14 new patches have landed in the patch system.
-> >>
-> >> However, the timing of my holiday vs the merge window means that I
-> >> can't take anything new, unless they're fixes, so don't be surprised
-> >> if some stuff gets missed this merge window.
-> >
-> > Right.  I'm not fully recovered from the jet lag (I'm still rather tired
-> > - I hate travelling back from the North American continent because it
-> > takes days to recover.)
-> >
-> > I have now archived off *all* email sent to me during July - which means
-> > that I will *NOT* be responding to anything sent during the last 17 days.
-> > If anyone has sent me anything important, it *MUST* be resent now.
-> >
-> > I am aware of an issue concerning the OMAP DMA patches.  I'm not sure
-> > exactly what is required there, so I've dropped them from my planned pull
-> > request in the interests of getting everything else I have to Linus.  I
-> > may plan to send a pull request this evening.
-> >
-> Well the only pending discussion was enabling the CONFIG option for
-> DMA at driver level SOC config level. Not sure if there was anything else
-> on this really.
+On Fri, 27 Jul 2012, Jan Beulich wrote:
+> >>> On 26.07.12 at 17:33, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> > --- a/drivers/xen/Makefile
+> > +++ b/drivers/xen/Makefile
+> > @@ -1,11 +1,15 @@
+> > -obj-y	+= grant-table.o features.o events.o manage.o balloon.o
+> > +ifneq ($(CONFIG_ARM),y)
+> > +obj-y	+= manage.o balloon.o
+> 
+> While I assume that this part (and the cpu_hotplug one below) is
+> temporary, ...
+> 
+> > +obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
+> 
+> ... at least this one should imo be solved with a proper long term
+> mechanism, i.e. the usual var-$(CONFIG_...) approach, i.e.
+> 
+> dom0-$(CONFIG_PCI) := pci.o
+> dom0-$(CONFIG_ACPI) := acpi.o
+> obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
 
-Why?  The DMA driver itself is optional.
+That's a good suggestion, thanks!
