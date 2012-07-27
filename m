@@ -1,29 +1,123 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:45:44 +0100
-Subject: [PATCH 00/18] Configure ux500 Audio Drivers for Device Tree 
-Message-ID: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 27 Jul 2012 13:45:51 +0100
+Subject: [PATCH 07/18] ARM: ux500: Clean-up MSP platform code
+In-Reply-To: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343393162-11938-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set sees many of the ux500 related Audio drivers gain
-Device Tree enablement. There are also some fixes to issues which
-where encountered along the way. 
+This patch contains a couple of general MSP clean-ups pertaining to
+layout changes and changing functions to be void instead of int instead
+of regardlessly returning '0'.
 
- Documentation/devicetree/bindings/sound/ux500.txt |   62 +++++
- arch/arm/boot/dts/db8500.dtsi                     |   48 ++++
- arch/arm/mach-ux500/Kconfig                       |    1 +
- arch/arm/mach-ux500/Makefile                      |    2 +-
- arch/arm/mach-ux500/board-mop500-audio.c          |  194 +++++++++++++++
- arch/arm/mach-ux500/board-mop500-msp.c            |  267 ---------------------
- arch/arm/mach-ux500/board-mop500-msp.h            |   14 --
- arch/arm/mach-ux500/board-mop500.c                |   22 +-
- arch/arm/mach-ux500/board-mop500.h                |    6 +
- arch/arm/mach-ux500/include/mach/msp.h            |    3 +-
- include/linux/mfd/abx500/ab8500-codec.h           |    6 +-
- sound/soc/codecs/ab8500-codec.c                   |   81 +++++++
- sound/soc/ux500/mop500.c                          |   41 ++++
- sound/soc/ux500/ux500_msp_dai.c                   |    6 +
- sound/soc/ux500/ux500_msp_i2s.c                   |  114 +++++++--
- sound/soc/ux500/ux500_msp_i2s.h                   |    3 +-
- sound/soc/ux500/ux500_pcm.c                       |    6 +
- 17 files changed, 561 insertions(+), 315 deletions(-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-msp.c |   26 ++++++++++++--------------
+ arch/arm/mach-ux500/board-mop500-msp.h |   14 --------------
+ arch/arm/mach-ux500/board-mop500.c     |    1 -
+ arch/arm/mach-ux500/board-mop500.h     |    3 +++
+ 4 files changed, 15 insertions(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-msp.h
+
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+index a740e8a..719db15 100644
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ b/arch/arm/mach-ux500/board-mop500-msp.c
+@@ -144,21 +144,21 @@ static struct platform_device *db8500_add_msp_i2s(struct device *parent,
+ }
+ 
+ /* Platform device for ASoC U8500 machine */
+-static struct platform_device snd_soc_u8500 = {
+-		.name = "snd-soc-u8500",
+-		.id = 0,
+-		.dev = {
+-			.platform_data = NULL,
+-		},
++static struct platform_device snd_soc_mop500 = {
++	.name = "snd-soc-mop500",
++	.id = 0,
++	.dev = {
++		.platform_data = NULL,
++	},
+ };
+ 
+ /* Platform device for Ux500-PCM */
+ static struct platform_device ux500_pcm = {
+-		.name = "ux500-pcm",
+-		.id = 0,
+-		.dev = {
+-			.platform_data = NULL,
+-		},
++	.name = "ux500-pcm",
++	.id = 0,
++	.dev = {
++		.platform_data = NULL,
++	},
+ };
+ 
+ static struct msp_i2s_platform_data msp2_platform_data = {
+@@ -174,7 +174,7 @@ static struct msp_i2s_platform_data msp3_platform_data = {
+ 	.use_pinctrl    = true,
+ };
+ 
+-int mop500_msp_init(struct device *parent)
++void mop500_msp_init(struct device *parent)
+ {
+ 	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+ 	platform_device_register(&snd_soc_mop500);
+@@ -191,6 +191,4 @@ int mop500_msp_init(struct device *parent)
+ 
+ 	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
+ 	platform_device_register(&ux500_pcm);
+-
+-	return 0;
+ }
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.h b/arch/arm/mach-ux500/board-mop500-msp.h
+deleted file mode 100644
+index 6fcfb5e..0000000
+--- a/arch/arm/mach-ux500/board-mop500-msp.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-/*
+- * Copyright (C) ST-Ericsson SA 2012
+- *
+- * Author: Ola Lilja <ola.o.lilja@stericsson.com>,
+- *         for ST-Ericsson.
+- *
+- * License terms:
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as published
+- * by the Free Software Foundation.
+- */
+-
+-void mop500_msp_init(struct device *parent);
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 87a5cd7..6f53a6f 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -54,7 +54,6 @@
+ #include "devices-db8500.h"
+ #include "board-mop500.h"
+ #include "board-mop500-regulators.h"
+-#include "board-mop500-msp.h"
+ 
+ static struct gpio_led snowball_led_array[] = {
+ 	{
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index d04a8e6..1d7316b 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -92,6 +92,9 @@ void __init mop500_stuib_init(void);
+ void __init mop500_pinmaps_init(void);
+ void __init snowball_pinmaps_init(void);
+ void __init hrefv60_pinmaps_init(void);
++void mop500_msp_init(struct device *parent);
++/* Due for removal once the MSP driver has been fully DT:ed. */
++void mop500_of_msp_init(struct device *parent);
+ 
+ int __init mop500_uib_init(void);
+ void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
+-- 
+1.7.9.5
