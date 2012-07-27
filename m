@@ -1,45 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2012 13:38:49 +0100
-Subject: [PATCH 2/7] ASoC: ab8500: Inform SoC Core that we have our own I/O
- arrangements
+Date: Fri, 27 Jul 2012 13:38:53 +0100
+Subject: [PATCH 6/7] ARM: ux500: Fix merge error,
+ so such struct 'snd_soc_u8500'
 In-Reply-To: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
 References: <1343392734-11805-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343392734-11805-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343392734-11805-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If codec->control_data is not populated SoC Core assumes we want to
-use regmap, which fails catastrophically, as we don't have one:
-
-Unable to handle kernel NULL pointer dereference at virtual address 00000080
-pgd = c0004000
-[00000080] *pgd=00000000
-Internal error: Oops: 17 [#1] PREEMPT SMP ARM
-Modules linked in:
-CPU: 1    Not tainted  (3.5.0-rc6-00884-g0b2419e-dirty #130)
-PC is at regmap_read+0x10/0x5c
-LR is at hw_read+0x80/0x90
-pc : [<c01a91b8>]    lr : [<c0216804>]    psr: 60000013
+The platform attempts to register platform device 'snd_soc_u8500'
+which doesn't actually exist. Here we change the reference to the
+correct one 'snd_soc_mop500'.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/codecs/ab8500-codec.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-ux500/board-mop500-msp.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-index 3c79592..23b4018 100644
---- a/sound/soc/codecs/ab8500-codec.c
-+++ b/sound/soc/codecs/ab8500-codec.c
-@@ -2406,6 +2406,10 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+index 9960480..1b6a193 100644
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ b/arch/arm/mach-ux500/board-mop500-msp.c
+@@ -228,7 +228,7 @@ int mop500_msp_init(struct device *parent)
+ 	struct platform_device *msp1;
  
- 	/* Setup AB8500 according to board-settings */
- 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
-+
-+	/* Inform SoC Core that we have our own I/O arrangements. */
-+	codec->control_data = (void *)true;
-+
- 	status = ab8500_audio_setup_mics(codec, &pdata->codec->amics);
- 	if (status < 0) {
- 		pr_err("%s: Failed to setup mics (%d)!\n", __func__, status);
+ 	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+-	platform_device_register(&snd_soc_u8500);
++	platform_device_register(&snd_soc_mop500);
+ 
+ 	pr_info("Initialize MSP I2S-devices.\n");
+ 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
 -- 
 1.7.9.5
