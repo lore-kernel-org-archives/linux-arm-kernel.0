@@ -1,55 +1,49 @@
-From: rvaswani@codeaurora.org (rvaswani at codeaurora.org)
-Date: Fri, 27 Jul 2012 13:00:24 -0700 (PDT)
-Subject: [DT] API to determine if interrupt is PPI or SPI ?
-In-Reply-To: <20120727130947.GN559@mudshark.cambridge.arm.com>
-References: <53a41d02c4c4c24bdab47667183891bf.squirrel@www.codeaurora.org>
- <50128AA0.8040409@gmail.com>
- <20120727130947.GN559@mudshark.cambridge.arm.com>
-Message-ID: <8cdb3e7e9dc79635a130214cf6ba1dd4.squirrel@www.codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 27 Jul 2012 13:12:47 -0700
+Subject: [PATCHv4 7/8] ARM: OMAP: clockdomain: add support for preventing
+ autodep delete
+In-Reply-To: <50067C0D.2040508@ti.com> (Rajendra Nayak's message of "Wed, 18
+ Jul 2012 14:34:13 +0530")
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-8-git-send-email-t-kristo@ti.com>
+ <5003F453.9020903@ti.com> <1342536971.4672.82.camel@sokoban>
+ <50066284.1030903@ti.com> <1342598720.4672.83.camel@sokoban>
+ <50067C0D.2040508@ti.com>
+Message-ID: <87lii5hsjk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Jul 27, 2012 at 01:33:36PM +0100, Rob Herring wrote:
->> On 07/26/2012 02:18 PM, rvaswani at codeaurora.org wrote:
->> > Hello,
->> >
->> > We can specify the interrupt information in the device tree using the
->> arm
->> > gic convention.
->> > Is there an API to read directly the 1st cell and determine if an
->> > interrupt is a PPI or a SPI ? This information is directly relevant to
->> the
->> > driver because it needs to call request_irq or request_percpu_irq
->> based on
->> > this data.
->> >
->> > How should this be done ideally ?
+Rajendra Nayak <rnayak@ti.com> writes:
+
+> On Wednesday 18 July 2012 01:35 PM, Tero Kristo wrote:
+>> On Wed, 2012-07-18 at 12:45 +0530, Rajendra Nayak wrote:
+>>> On Tuesday 17 July 2012 08:26 PM, Tero Kristo wrote:
+>>>> Anyway, it also looks like this fix is no longer needed with the latest
+>>>> kernel, something has changed with the gpio code / or latencies and it
+>>>> doesn't crash anymore. Thus, it looks like patches 7&   8 can be dropped
+>>>> from this set for now. This is the behavior with beagleboard at least,
+>>>> if someone can verify this with some other omap3 hw that would be nice.
+>>>
+>>> I can test it on a omap3 SDP. What do you want me to test?
 >>
->> Seems a bit strange to me that you would have a h/w block that can be
->> connected either way...
+>> Just try suspend + cpuidle with and without off-mode enabled and see if
+>> there are any problems. I've usually seen problems with off-mode myself.
 >
-> The CPU PMU can be wired as either SPI or PPI. The latter makes more sense
-> to
-> me but usually (although not exclusively) it's wired using the former.
+> So I just knocked off the last 2 patches from 'mainline-3.5-rc6-pwrdm-
+> changes-v4' and tested on my 3430 SDP.
 >
-> Will
+> I was able to hit RET and OFF in both suspend and cpuidle. Did not see
+> any issues.
 >
 
-We have the same driver for a hardware for different chipsets and
-unfortunately the hardware team decided to connect this GIC interrupt
-differently across these chipsets. This leaves us with a software choice
-to make.
-We could add another property to the device tree (like irq-is-percpu,
-irq-is-not-percpu), but that seems redundant.
-We were hoping to have an API to tell us the SPI/PPI difference since this
-information is already encoded in the interrupt-cells in the device tree
-for this device.
-Would that be the right way to go or there is something better that can be
-done ?
+FYI...
 
-Thanks,
-Rohit
+I tested this series without the last 2 patches on top of v3.5 and
+suspend/resume hangs on 3430/n900, 3530/Overo, 3730/OveroSTORM, but
+suspend/resume and cpuidle tests for retention and idle seem to work
+fine on 3730/Beagle-xM.
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+It works fine on all the platforms with the last 2 applied (note 6/8
+needs a minor update to apply cleanly to mainline v3.5.)
+
+Kevin
