@@ -1,44 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jul 2012 14:42:31 +0100
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <20120725141222.GA6939@n2100.arm.linux.org.uk>
-References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
-Message-ID: <20120727134231.GA5934@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Jul 2012 14:47:18 +0100
+Subject: [Xen-devel] [PATCH 03/24] xen/arm: page.h definitions
+In-Reply-To: <20120726163655.GD9222@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120726163655.GD9222@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1207271442380.26163@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 03:12:22PM +0100, Russell King - ARM Linux wrote:
-> Just a quick reminder that I'm still on holiday, and at this point there
-> are over 2500 messages from the mailing lists which are sitting unread
-> since I left the UK.  As I mentioned before I left the UK, it is my
-> intention *not* to go back and read all those outstanding messages -
-> there's too many of them to do that.
+On Thu, 26 Jul 2012, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 26, 2012 at 04:33:45PM +0100, Stefano Stabellini wrote:
+> > ARM Xen guests always use paging in hardware, like PV on HVM guests in
+> > the X86 world.
 > 
-> So, if you want me to react to any email message you've sent, you'd
-> *better* send it again next week unless I've already responded.
+> Nice, so no dealing with the P2M at all in the guest?
+
+Nope ;-)
+
+
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/include/asm/xen/page.h |   77 +++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 77 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/xen/page.h
+> > 
+> > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> > new file mode 100644
+> > index 0000000..6cfe9a1
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/xen/page.h
+> > @@ -0,0 +1,77 @@
+> > +#ifndef _ASM_ARM_XEN_PAGE_H
+> > +#define _ASM_ARM_XEN_PAGE_H
+> > +
+> > +#include <asm/page.h>
+> > +#include <linux/pfn.h>
+> > +#include <linux/types.h>
+> > +#include <asm/pgtable.h>
+> > +#include <xen/interface/grant_table.h>
 > 
-> Meanwhile, I see v3.5 has been released; I have a couple of things I
-> need to do with my tree before I can push the changes, and I'll
-> probably see about sorting those out over the weekend.  I also see
-> that 14 new patches have landed in the patch system.
+> I don't if it makes such a difference, but putting the headers in sorted
+> order is sometimes nicer than just randomly.. But that might be just
+> me liking an orderly world nowadays :-)
+
+I can do that
+
+
+> > +
+> > +#define pfn_to_mfn(pfn)			(pfn)
+> > +#define phys_to_machine_mapping_valid	(1)
+> > +#define mfn_to_pfn(mfn)			(mfn)
+> > +#define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+> > +
+> > +#define pte_mfn	    pte_pfn
+> > +#define mfn_pte	    pfn_pte
+> > +
+> > +/* Xen machine address */
+> > +typedef struct xmaddr {
+> > +	phys_addr_t maddr;
+> > +} xmaddr_t;
+> > +
+> > +/* Xen pseudo-physical address */
+> > +typedef struct xpaddr {
+> > +	phys_addr_t paddr;
+> > +} xpaddr_t;
+> > +
+> > +#define XMADDR(x)	((xmaddr_t) { .maddr = (x) })
+> > +#define XPADDR(x)	((xpaddr_t) { .paddr = (x) })
+> > +
+> > +static inline xmaddr_t phys_to_machine(xpaddr_t phys)
+> > +{
+> > +	unsigned offset = phys.paddr & ~PAGE_MASK;
+> > +	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | offset);
+> > +}
+> > +
+> > +static inline xpaddr_t machine_to_phys(xmaddr_t machine)
+> > +{
+> > +	unsigned offset = machine.maddr & ~PAGE_MASK;
+> > +	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
+> > +}
+> > +/* VIRT <-> MACHINE conversion */
+> > +#define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
+> > +#define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
+> > +#define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+> > +#define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+> > +
+> > +static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
+> > +{
+> > +	/* XXX: assuming it is mapped in the kernel 1:1 */
+> > +	return virt_to_machine(vaddr);
+> > +}
+> > +
+> > +/* XXX: this shouldn't be here */
 > 
-> However, the timing of my holiday vs the merge window means that I
-> can't take anything new, unless they're fixes, so don't be surprised
-> if some stuff gets missed this merge window.
+> So why is it here?
 
-Right.  I'm not fully recovered from the jet lag (I'm still rather tired
-- I hate travelling back from the North American continent because it
-takes days to recover.)
+lookup_address shouldn't be here because it is an x86-only interface.
+However both gntdev.c and xenbus_client.c call it (in PV only code paths
+that are never taken in a PV on HVM guest), so in order to compile them
+I have to define lookup_address.
 
-I have now archived off *all* email sent to me during July - which means
-that I will *NOT* be responding to anything sent during the last 17 days.
-If anyone has sent me anything important, it *MUST* be resent now.
 
-I am aware of an issue concerning the OMAP DMA patches.  I'm not sure
-exactly what is required there, so I've dropped them from my planned pull
-request in the interests of getting everything else I have to Linus.  I
-may plan to send a pull request this evening.
-
-I've not yet looked at merging *anything* which is in the patch system,
-that's for when I feel more awake.
+> > +static inline pte_t *lookup_address(unsigned long address, unsigned int *level)
+> > +{
+> > +	BUG();
+> > +	return NULL;
+> > +}
+> > +
+> > +static inline int m2p_add_override(unsigned long mfn, struct page *page,
+> > +		struct gnttab_map_grant_ref *kmap_op)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +static inline int m2p_remove_override(struct page *page, bool clear_pte)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> > +{
+> > +	BUG();
+> > +	return false;
+> > +}
+> > +#endif /* _ASM_ARM_XEN_PAGE_H */
