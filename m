@@ -1,35 +1,52 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Jul 2012 17:47:30 +0100
-Subject: [Xen-devel] [PATCH 06/24] xen: missing includes
-In-Reply-To: <501257F30200007800090D9E@nat28.tlf.novell.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-6-git-send-email-stefano.stabellini@eu.citrix.com>
- <501257F30200007800090D9E@nat28.tlf.novell.com>
-Message-ID: <alpine.DEB.2.02.1207271739550.26163@kaball.uk.xensource.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jul 2012 17:50:49 +0100
+Subject: rmk back but still recovering (was Re: Reminder - rmk still on
+ vacation)
+In-Reply-To: <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
+References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
+ <20120727134231.GA5934@n2100.arm.linux.org.uk>
+ <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
+Message-ID: <20120727165049.GB7405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jul 2012, Jan Beulich wrote:
-> >>> On 26.07.12 at 17:33, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> > --- a/include/xen/interface/xen.h
-> > +++ b/include/xen/interface/xen.h
-> > @@ -10,7 +10,10 @@
-> >  #define __XEN_PUBLIC_XEN_H__
-> >  
-> >  #include <asm/xen/interface.h>
-> > +#include <linux/types.h>
-> > +#ifdef CONFIG_X86
-> >  #include <asm/pvclock-abi.h>
-> > +#endif
-> 
-> Rather than hacking around this, why not clean it up:
-> asm/pvclock-abi.h clearly isn't intended to be included here
-> (from the perspective of the origin of xen/interface/xen.h, at
-> least), nor is linux/types.h.
-> 
-> Or if it is really needed to deviate from the original header in
-> this respect, then clearly the inclusion ought to not be arch
-> specific or be moved to an arch specific header.
+On Fri, Jul 27, 2012 at 06:08:13PM +0200, Shilimkar, Santosh wrote:
+> On Fri, Jul 27, 2012 at 3:42 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Jul 25, 2012 at 03:12:22PM +0100, Russell King - ARM Linux wrote:
+> >> Just a quick reminder that I'm still on holiday, and at this point there
+> >> are over 2500 messages from the mailing lists which are sitting unread
+> >> since I left the UK.  As I mentioned before I left the UK, it is my
+> >> intention *not* to go back and read all those outstanding messages -
+> >> there's too many of them to do that.
+> >>
+> >> So, if you want me to react to any email message you've sent, you'd
+> >> *better* send it again next week unless I've already responded.
+> >>
+> >> Meanwhile, I see v3.5 has been released; I have a couple of things I
+> >> need to do with my tree before I can push the changes, and I'll
+> >> probably see about sorting those out over the weekend.  I also see
+> >> that 14 new patches have landed in the patch system.
+> >>
+> >> However, the timing of my holiday vs the merge window means that I
+> >> can't take anything new, unless they're fixes, so don't be surprised
+> >> if some stuff gets missed this merge window.
+> >
+> > Right.  I'm not fully recovered from the jet lag (I'm still rather tired
+> > - I hate travelling back from the North American continent because it
+> > takes days to recover.)
+> >
+> > I have now archived off *all* email sent to me during July - which means
+> > that I will *NOT* be responding to anything sent during the last 17 days.
+> > If anyone has sent me anything important, it *MUST* be resent now.
+> >
+> > I am aware of an issue concerning the OMAP DMA patches.  I'm not sure
+> > exactly what is required there, so I've dropped them from my planned pull
+> > request in the interests of getting everything else I have to Linus.  I
+> > may plan to send a pull request this evening.
+> >
+> Well the only pending discussion was enabling the CONFIG option for
+> DMA at driver level SOC config level. Not sure if there was anything else
+> on this really.
 
-I think you are right: linux/types.h is not actually needed and
-pvclock-abi.h should probably be included by asm/xen/interface.h.
+Why?  The DMA driver itself is optional.
