@@ -1,129 +1,197 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 28 Jul 2012 12:07:40 +0200
-Subject: [PATCH v3 8/9] ARM: pxa3xx: add generic DT machine code
+Date: Sat, 28 Jul 2012 12:07:35 +0200
+Subject: [PATCH v3 3/9] MTD: pxa3xx-nand: add devicetree bindings
 In-Reply-To: <1343470061-16879-1-git-send-email-zonque@gmail.com>
 References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343470061-16879-9-git-send-email-zonque@gmail.com>
+Message-ID: <1343470061-16879-4-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT_MACHINE_START entry for PXA3xx machines and a auxdata table for
-some of the devices. This file can be extended to also support pxa2xx
-and pxa9xx boards.
+This patch contains a hack to get the DMA resources of the device when
+probed from a devicetree node. This can be removed once a generic DMA
+controller framework lands.
+
+A mtd_part_parser_data is passed mtd_device_parse_register which
+contains a reference to the device node, so MTD partitions can be
+added as children.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- arch/arm/mach-pxa/Kconfig  | 12 +++++++++
- arch/arm/mach-pxa/Makefile |  3 +++
- arch/arm/mach-pxa/pxa-dt.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 78 insertions(+)
- create mode 100644 arch/arm/mach-pxa/pxa-dt.c
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        | 31 ++++++++
+ drivers/mtd/nand/pxa3xx_nand.c                     | 85 ++++++++++++++++++----
+ 2 files changed, 102 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index fe2d1f8..8e6288d 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -25,6 +25,18 @@ config PXA_V7_MACH_AUTO
- if !ARCH_PXA_V7
- comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
- 
-+config MACH_PXA3XX_DT
-+	bool "Support PXA3xx platforms from device tree"
-+	select PXA3xx
-+	select CPU_PXA300
-+	select POWER_SUPPLY
-+	select HAVE_PWM
-+	select USE_OF
-+	help
-+	  Include support for Marvell PXA3xx based platforms using
-+	  the device tree. Needn't select any other machine while
-+	  MACH_PXA3XX_DT is enabled.
-+
- config ARCH_LUBBOCK
- 	bool "Intel DBPXA250 Development Platform (aka Lubbock)"
- 	select PXA25x
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index be0f7df..2bedc9e 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -26,6 +26,9 @@ obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
- 
- # NOTE: keep the order of boards in accordance to their order in Kconfig
- 
-+# Device Tree support
-+obj-$(CONFIG_MACH_PXA3XX_DT)	+= pxa-dt.o
-+
- # Intel/Marvell Dev Platforms
- obj-$(CONFIG_ARCH_LUBBOCK)	+= lubbock.o
- obj-$(CONFIG_MACH_MAINSTONE)	+= mainstone.o
-diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 new file mode 100644
-index 0000000..c9192ce
+index 0000000..f1421e2
 --- /dev/null
-+++ b/arch/arm/mach-pxa/pxa-dt.c
-@@ -0,0 +1,63 @@
-+/*
-+ *  linux/arch/arm/mach-pxa/pxa-dt.c
-+ *
-+ *  Copyright (C) 2012 Daniel Mack
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -0,0 +1,31 @@
++PXA3xx NAND DT bindings
 +
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <mach/irqs.h>
-+#include <mach/pxa3xx.h>
++Required properties:
 +
-+#include "generic.h"
++ - compatible:		Should be "marvell,pxa3xx-nand"
++ - reg: 		The register base for the controller
++ - interrupts:		The interrupt to map
++ - #address-cells:	Set to <1> if the node includes partitions
 +
-+#ifdef CONFIG_PXA3xx
-+extern void __init pxa3xx_dt_init_irq(void);
++Optional properties:
 +
-+static const struct of_dev_auxdata pxa3xx_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40700000, "pxa2xx-uart.2", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x41600000, "pxa2xx-uart.3", NULL),
-+	OF_DEV_AUXDATA("marvell,pxa-mmc",	0x41100000, "pxa2xx-mci.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-gpio",		0x40e00000, "pxa-gpio", NULL),
-+	OF_DEV_AUXDATA("marvell,pxa-ohci",	0x4c000000, "pxa27x-ohci", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa-i2c",		0x40301680, "pxa2xx-i2c.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,pwri2c",		0x40f500c0, "pxa3xx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("marvell,pxa3xx-nand",	0x43100000, "pxa3xx-nand", NULL),
++ - marvell,nand-enable-arbiter:	Set to enable the bus arbiter
++ - marvell,nand-keep-config:	Set to keep the NAND controller config as set
++				by the bootloader
++ - num-cs:			Number of chipselect lines to usw
++
++Example:
++
++	nand0: nand at 43100000 {
++		compatible = "marvell,pxa3xx-nand";
++		reg = <0x43100000 90>;
++		interrupts = <45>;
++		#address-cells = <1>;
++
++		marvell,nand-enable-arbiter;
++		marvell,nand-keep-config;
++		num-cs = <1>;
++
++		/* partitions (optional) */
++	};
++
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 252aaef..b0319d8 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -22,6 +22,8 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ #include <mach/dma.h>
+ #include <plat/pxa3xx_nand.h>
+@@ -1081,21 +1083,31 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 	}
+ 	clk_enable(info->clk);
+ 
+-	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no resource defined for data DMA\n");
+-		ret = -ENXIO;
+-		goto fail_put_clk;
+-	}
+-	info->drcmr_dat = r->start;
++	/*
++	 * This is a dirty hack to make this driver work from devicetree
++	 * bindings. It can be removed once we have a prober DMA controller
++	 * framework for DT.
++	 */
++	if (pdev->dev.of_node && cpu_is_pxa3xx()) {
++		info->drcmr_dat = 97;
++		info->drcmr_cmd = 99;
++	} else {
++		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++		if (r == NULL) {
++			dev_err(&pdev->dev, "no resource defined for data DMA\n");
++			ret = -ENXIO;
++			goto fail_put_clk;
++		}
++		info->drcmr_dat = r->start;
+ 
+-	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no resource defined for command DMA\n");
+-		ret = -ENXIO;
+-		goto fail_put_clk;
++		r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++		if (r == NULL) {
++			dev_err(&pdev->dev, "no resource defined for command DMA\n");
++			ret = -ENXIO;
++			goto fail_put_clk;
++		}
++		info->drcmr_cmd = r->start;
+ 	}
+-	info->drcmr_cmd = r->start;
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+@@ -1200,12 +1212,55 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id pxa3xx_nand_dt_ids[] = {
++	{ .compatible = "marvell,pxa3xx-nand" },
 +	{}
 +};
++MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
 +
-+static void __init pxa3xx_dt_init(void)
++static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
 +{
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     pxa3xx_auxdata_lookup, NULL);
++	struct pxa3xx_nand_platform_data *pdata;
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *of_id =
++			of_match_device(pxa3xx_nand_dt_ids, &pdev->dev);
++
++	if (!of_id)
++		return 0;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
++
++	if (of_get_property(np, "marvell,nand-enable-arbiter", NULL))
++		pdata->enable_arbiter = 1;
++	if (of_get_property(np, "marvell,nand-keep-config", NULL))
++		pdata->keep_config = 1;
++	of_property_read_u32(np, "num-cs", &pdata->num_cs);
++
++	pdev->dev.platform_data = pdata;
++
++	return 0;
 +}
-+
-+static const char *pxa3xx_dt_board_compat[] __initdata = {
-+	"marvell,pxa300",
-+	"marvell,pxa310",
-+	"marvell,pxa320",
-+	NULL,
-+};
++#else
++static inline int pxa3xx_nand_probe_dt(struct platform_device *)
++{
++	return 0;
++}
 +#endif
 +
-+#ifdef CONFIG_PXA3xx
-+DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
-+	.map_io		= pxa3xx_map_io,
-+	.init_irq	= pxa3xx_dt_init_irq,
-+	.handle_irq	= pxa3xx_handle_irq,
-+	.timer		= &pxa_timer,
-+	.restart	= pxa_restart,
-+	.init_machine	= pxa3xx_dt_init,
-+	.dt_compat	= pxa3xx_dt_board_compat,
-+MACHINE_END
-+#endif
+ static int pxa3xx_nand_probe(struct platform_device *pdev)
+ {
+ 	struct pxa3xx_nand_platform_data *pdata;
++	struct mtd_part_parser_data ppdata = {};
+ 	struct pxa3xx_nand_info *info;
+ 	int ret, cs, probe_success;
+ 
++	ret = pxa3xx_nand_probe_dt(pdev);
++	if (ret)
++		return ret;
++
+ 	pdata = pdev->dev.platform_data;
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "no platform data defined\n");
+@@ -1229,8 +1284,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
++		ppdata.of_node = pdev->dev.of_node;
+ 		ret = mtd_device_parse_register(info->host[cs]->mtd, NULL,
+-						NULL, pdata->parts[cs],
++						&ppdata, pdata->parts[cs],
+ 						pdata->nr_parts[cs]);
+ 		if (!ret)
+ 			probe_success = 1;
+@@ -1306,6 +1362,7 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+ static struct platform_driver pxa3xx_nand_driver = {
+ 	.driver = {
+ 		.name	= "pxa3xx-nand",
++		.of_match_table = of_match_ptr(pxa3xx_nand_dt_ids),
+ 	},
+ 	.probe		= pxa3xx_nand_probe,
+ 	.remove		= pxa3xx_nand_remove,
 -- 
 1.7.11.2
