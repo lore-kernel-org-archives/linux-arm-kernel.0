@@ -1,87 +1,161 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 28 Jul 2012 12:07:37 +0200
-Subject: [PATCH v3 5/9] GPIO: gpio-pxa: fix devicetree functions
+Date: Sat, 28 Jul 2012 12:07:38 +0200
+Subject: [PATCH v3 6/9] ARM: pxa: add devicetree code for irq handling
 In-Reply-To: <1343470061-16879-1-git-send-email-zonque@gmail.com>
 References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343470061-16879-6-git-send-email-zonque@gmail.com>
+Message-ID: <1343470061-16879-7-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an of_xlate function for the PXA GPIO chips and make it work for
-devicetree environments.
-
-Successfully tested on a PXA3xx board.
+Properly register on-chip interrupt using the irqdomain logic. The
+number of interrupts is taken from the devicetree node.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpio/gpio-pxa.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/mach-pxa/irq.c    | 74 ++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa3xx.c | 17 +++++++++--
+ 2 files changed, 89 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 6d0cb9d..f47e6b3 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -63,6 +63,7 @@ static int irq_base;
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 5dae15e..4871908 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -17,6 +17,8 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
  
- #ifdef CONFIG_OF
- static struct irq_domain *domain;
-+static struct device_node *pxa_gpio_of_node;
- #endif
+ #include <asm/exception.h>
  
- struct pxa_gpio_chip {
-@@ -229,6 +230,24 @@ static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
+@@ -49,6 +51,7 @@
+  */
+ 
+ static int pxa_internal_irq_nr;
++static int pxa_irq_base;
+ 
+ static inline int cpu_has_ipr(void)
+ {
+@@ -202,3 +205,74 @@ struct syscore_ops pxa_irq_syscore_ops = {
+ 	.suspend	= pxa_irq_suspend,
+ 	.resume		= pxa_irq_resume,
+ };
++
++#ifdef CONFIG_OF
++static struct irq_domain *pxa_irq_domain;
++
++static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
++		       irq_hw_number_t hw)
++{
++	int i = hw % 32;
++	int irq = virq - NR_IRQS_LEGACY;
++	void __iomem *base = irq_base(hw / 32);
++
++	/* initialize interrupt priority */
++	if (cpu_has_ipr())
++		__raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
++
++	irq_set_chip_and_handler(irq, &pxa_internal_irq_chip,
++				 handle_level_irq);
++	irq_set_chip_data(irq, base);
++	set_irq_flags(irq, IRQF_VALID);
++
++	return 0;
++}
++
++static struct irq_domain_ops pxa_irq_ops = {
++	.map    = pxa_irq_map,
++	.xlate  = irq_domain_xlate_onecell,
++};
++
++static const struct of_device_id intc_ids[] __initconst = {
++	{ .compatible = "marvell,pxa-intc", },
++	{}
++};
++
++void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
++{
++	struct device_node *node;
++	const struct of_device_id *of_id;
++	struct pxa_intc_conf *conf;
++	int nr_irqs, ret;
++
++	node = of_find_matching_node(NULL, intc_ids);
++	if (!node) {
++		pr_err("Failed to find interrupt controller in arch-pxa\n");
++		return;
++	}
++	of_id = of_match_node(intc_ids, node);
++	conf = of_id->data;
++
++	ret = of_property_read_u32(node, "mrvl,intc-nr-irqs", &nr_irqs);
++	if (ret) {
++		pr_err("Not found mrvl,intc-nr-irqs property\n");
++		return;
++	}
++
++	pxa_irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
++	if (pxa_irq_base < 0) {
++		pr_err("Failed to allocate IRQ numbers\n");
++		return;
++	}
++
++	pxa_irq_domain = irq_domain_add_legacy(node, nr_irqs, 0, 0,
++					       &pxa_irq_ops, NULL);
++	if (!pxa_irq_domain)
++		panic("Unable to add PXA IRQ domain\n");
++
++	irq_set_default_host(pxa_irq_domain);
++	pxa_init_irq(nr_irqs, fn);
++
++	return;
++}
++#endif /* CONFIG_OF */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index dffb7e8..1827d3c 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -40,6 +40,8 @@
+ #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
+ #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
+ 
++extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
++
+ static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
+@@ -382,7 +384,7 @@ static void __init pxa_init_ext_wakeup_irq(int (*fn)(struct irq_data *,
+ 	pxa_ext_wakeup_chip.irq_set_wake = fn;
  }
  
-+#ifdef CONFIG_OF_GPIO
-+static int pxa_gpio_of_xlate(struct gpio_chip *gc,
-+			     const struct of_phandle_args *gpiospec,
-+			     u32 *flags)
-+{
-+	if (gpiospec->args[0] > pxa_last_gpio)
-+		return -EINVAL;
-+
-+	if (gc != &pxa_gpio_chips[gpiospec->args[0] / 32].chip)
-+		return -EINVAL;
-+
-+	if (flags)
-+		*flags = gpiospec->args[1];
-+
-+	return gpiospec->args[0] % 32;
-+}
-+#endif
-+
- static int __devinit pxa_init_gpio_chip(int gpio_end,
- 					int (*set_wake)(unsigned int, unsigned int))
+-void __init pxa3xx_init_irq(void)
++static void __init __pxa3xx_init_irq(void)
  {
-@@ -256,6 +275,11 @@ static int __devinit pxa_init_gpio_chip(int gpio_end,
- 		c->get = pxa_gpio_get;
- 		c->set = pxa_gpio_set;
- 		c->to_irq = pxa_gpio_to_irq;
-+#ifdef CONFIG_OF_GPIO
-+		c->of_node = pxa_gpio_of_node;
-+		c->of_xlate = pxa_gpio_of_xlate;
-+		c->of_gpio_n_cells = 2;
-+#endif
+ 	/* enable CP6 access */
+ 	u32 value;
+@@ -390,10 +392,21 @@ void __init pxa3xx_init_irq(void)
+ 	value |= (1 << 6);
+ 	__asm__ __volatile__("mcr p15, 0, %0, c15, c1, 0\n": :"r"(value));
  
- 		/* number of GPIOs on last bank may be less than 32 */
- 		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-@@ -457,6 +481,7 @@ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
+-	pxa_init_irq(56, pxa3xx_set_wake);
+ 	pxa_init_ext_wakeup_irq(pxa3xx_set_wake);
+ }
  
- const struct irq_domain_ops pxa_irq_domain_ops = {
- 	.map	= pxa_irq_domain_map,
-+	.xlate	= irq_domain_xlate_twocell,
- };
- 
- #ifdef CONFIG_OF
-@@ -497,6 +522,7 @@ static int __devinit pxa_gpio_probe_dt(struct platform_device *pdev)
- 	}
- 	domain = irq_domain_add_legacy(np, nr_gpios, irq_base, 0,
- 				       &pxa_irq_domain_ops, NULL);
-+	pxa_gpio_of_node = np;
- 	return 0;
- err:
- 	iounmap(gpio_reg_base);
++void __init pxa3xx_init_irq(void)
++{
++	__pxa3xx_init_irq();
++	pxa_init_irq(56, pxa3xx_set_wake);
++}
++
++void __init pxa3xx_dt_init_irq(void)
++{
++	__pxa3xx_init_irq();
++	pxa_dt_irq_init(pxa3xx_set_wake);
++}
++
+ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
 -- 
 1.7.11.2
