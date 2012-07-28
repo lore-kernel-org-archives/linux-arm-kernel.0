@@ -1,71 +1,79 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 28 Jul 2012 11:56:32 +0200
-Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
-In-Reply-To: <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
-References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
- <1343330187-20049-5-git-send-email-zonque@gmail.com>
- <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
-Message-ID: <5013B750.6060608@gmail.com>
+Date: Sat, 28 Jul 2012 12:07:33 +0200
+Subject: [PATCH v3 1/9] RTC: add DT bindings to pxa-rtc
+In-Reply-To: <1343470061-16879-1-git-send-email-zonque@gmail.com>
+References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
+Message-ID: <1343470061-16879-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+This patch adds generic device tree bindings to the PXA RTC driver.
+Documentation for bindings were also added.
 
-On 28.07.2012 09:17, Haojian Zhuang wrote:
-> On Fri, Jul 27, 2012 at 3:16 AM, Daniel Mack <zonque@gmail.com> wrote:
->> Properly register on-chip interrupt using the irqdomain logic. The
->> number of interrupts is taken from the devicetree node.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  arch/arm/mach-pxa/irq.c    | 73 ++++++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-pxa/pxa3xx.c | 17 +++++++++--
->>  2 files changed, 88 insertions(+), 2 deletions(-)
->>
->> +#ifdef CONFIG_OF
->> +static struct irq_domain *pxa_irq_domain;
->> +
->> +static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
->> +                      irq_hw_number_t hw)
->> +{
->> +       int irq, i = hw % 32;
->> +       void __iomem *base = irq_base(hw / 32);
->> +
->> +       /* initialize interrupt priority */
->> +       if (cpu_has_ipr())
->> +               __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
-> Since we have DT support at here. Could we use property for interrupt priority?
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+---
+ Documentation/devicetree/bindings/rtc/pxa-rtc.txt | 14 ++++++++++++++
+ drivers/rtc/rtc-pxa.c                             | 11 +++++++++++
+ 2 files changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/pxa-rtc.txt
 
-Not sure what you mean here. Can you elaborate? I couldn't find any
-reference to IRQ priorities in other platforms either.
-
-Maybe we can also add that in a separate patch, which would also help in
-tracking possible regressions du to such a change?
-
->> +       irq = PXA_IRQ(virq);
-> #ifdef CONFIG_PXA_HAVE_ISA_IRQS
-> #define PXA_ISA_IRQ(x)  (x)
-> #define PXA_ISA_IRQ_NUM (16)
-> #else
-> #define PXA_ISA_IRQ_NUM (0)
-> #endif
-> 
-> Could we avoid to use PXA_IRQ() at here? We can make use of
-> NR_IRQS_LEGACY that is 16. Since you already use irq_alloc_descs()
-> to allocate irqs that virtual irq number starts from 16. So you needn't
-> use PXA_IRQ() any more.
-
-Ok, I changed this. Note that there's still need to subtract
-NR_IRQS_LEGACY from the virq that is passed in to the .map function,
-because early_irq_init() in kernel/irq/irqdesc.c will pre-allocate the
-IRQs the platform claims to have natively, which defaults to 16 on PXA,
-unless the machine descriptor sets nr_irqs, which it doesn't in case of DT.
-
-I also found another hunk that I forgot to squash in the v2 series. I
-will repost the whole thing and also include the two GPIO patches that
-should go through your tree.
-
-
-Thanks for the review,
-
-Daniel
+diff --git a/Documentation/devicetree/bindings/rtc/pxa-rtc.txt b/Documentation/devicetree/bindings/rtc/pxa-rtc.txt
+new file mode 100644
+index 0000000..8c6672a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/pxa-rtc.txt
+@@ -0,0 +1,14 @@
++* PXA RTC
++
++PXA specific RTC driver.
++
++Required properties:
++- compatible : Should be "marvell,pxa-rtc"
++
++Examples:
++
++rtc at 40900000 {
++	compatible = "marvell,pxa-rtc";
++	reg = <0x40900000 0x3c>;
++	interrupts = <30 31>;
++};
+diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+index 0075c8f..f771b2e 100644
+--- a/drivers/rtc/rtc-pxa.c
++++ b/drivers/rtc/rtc-pxa.c
+@@ -27,6 +27,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ #include <mach/hardware.h>
+ 
+@@ -396,6 +398,14 @@ static int __exit pxa_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id pxa_rtc_dt_ids[] = {
++	{ .compatible = "marvell,pxa-rtc" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, pxa_rtc_dt_ids);
++#endif
++
+ #ifdef CONFIG_PM
+ static int pxa_rtc_suspend(struct device *dev)
+ {
+@@ -425,6 +435,7 @@ static struct platform_driver pxa_rtc_driver = {
+ 	.remove		= __exit_p(pxa_rtc_remove),
+ 	.driver		= {
+ 		.name	= "pxa-rtc",
++		.of_match_table = of_match_ptr(pxa_rtc_dt_ids),
+ #ifdef CONFIG_PM
+ 		.pm	= &pxa_rtc_pm_ops,
+ #endif
+-- 
+1.7.11.2
