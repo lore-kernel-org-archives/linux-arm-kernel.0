@@ -1,78 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jul 2012 00:38:29 +0100
-Subject: [RFC v2] ARM: sched_clock: update epoch_cyc on resume
-In-Reply-To: <CACRpkdZv4p+QT3Y+=-xh5iJ=sr1_aahroxQ535QpzVD9e_ESJA@mail.gmail.com>
-References: <1343184588-20239-1-git-send-email-ccross@android.com>
- <CACRpkdZv4p+QT3Y+=-xh5iJ=sr1_aahroxQ535QpzVD9e_ESJA@mail.gmail.com>
-Message-ID: <20120727233829.GB14835@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 27 Jul 2012 17:28:31 -0700
+Subject: [PATCH] ARM: OMAP2+: ads7846 init: fix fault caused by freeing
+ pen-down GPIO
+In-Reply-To: <5012E654.4040907@compulab.co.il> (Igor Grinberg's message of
+ "Fri, 27 Jul 2012 22:04:52 +0300")
+References: <1342048700-15040-1-git-send-email-khilman@ti.com>
+ <500D494D.8020606@compulab.co.il> <500D4F2A.9090706@compulab.co.il>
+ <87zk6mpbfa.fsf@ti.com> <5012B42F.9040309@compulab.co.il>
+ <87sjcdksgm.fsf@ti.com> <5012E654.4040907@compulab.co.il>
+Message-ID: <876298iv9s.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 28, 2012 at 01:32:50AM +0200, Linus Walleij wrote:
-> On Wed, Jul 25, 2012 at 4:49 AM, Colin Cross <ccross@android.com> wrote:
-> 
-> > Many clocks that are used to provide sched_clock will reset during
-> > suspend.  If read_sched_clock returns 0 after suspend, sched_clock will
-> > appear to jump forward.  This patch resets cd.epoch_cyc to the current
-> > value of read_sched_clock during resume, which causes sched_clock() just
-> > after suspend to return the same value as sched_clock() just before
-> > suspend.
-> >
-> > In addition, during the window where epoch_ns has been updated before
-> > suspend, but epoch_cyc has not been updated after suspend, it is unknown
-> > whether the clock has reset or not, and sched_clock() could return a
-> > bogus value.  Add a suspended flag, and return the pre-suspend epoch_ns
-> > value during this period.
-> >
-> > The new behavior is triggered by calling setup_sched_clock_needs_suspend
-> > instead of setup_sched_clock.
-> >
-> > Signed-off-by: Colin Cross <ccross@android.com>
-> 
-> Sweet!
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Igor Grinberg <grinberg@compulab.co.il> writes:
 
-Have any of you looked at the patch I originally posted for doing this?
-It needs updating but shows the overall principle - which is to ensure
-that the epoch is up to date before suspending.
+> On 07/27/12 20:46, Kevin Hilman wrote:
+>> Igor Grinberg <grinberg@compulab.co.il> writes:
+>> 
+>>> On 07/26/12 22:30, Kevin Hilman wrote:
+>>>> + Zumeng Chen
+>>>>
+>>>> Igor Grinberg <grinberg@compulab.co.il> writes:
+>>>>
+>>>>> Hi Kevin,
+>>>>>
+>>>>> I've just noticed that the patch has been modified by Arnd in a way
+>>>>> that of course will trigger GPIO use without being requested.
+>>>>> I'm sorry, I was not available by that time Arnd changed the patch.
+>>>>
+>>>> Your right, your original patch isn't the problem.  I found the root
+>>>> cause.
+>>>>
+>>>> The real problem is actually introduced by the merge of your patch from
+>>>> the arm-soc/cleanup branch, and this one from Zumeng Chen: commit
+>>>> 16aced80f6 (ARM: OMAP3530evm: set pendown_state and debounce time for
+>>>> ads7846) from the arm-soc/boards branch.
+>>>>
+>>>> However, looking closer at the one from Zumeng, that one is clearly not
+>>>> right.  It unconditionally adds a *board-specific* ->get_pendown_state
+>>>> function to the pdata that is common to *all* boards.  That's just wrong
+>>>> and has the side-effect of making ->get_pendown_state() wrong on every
+>>>> board except the OMAP3EVM.  Oops.
+>>>
+>>> Argh... that should not be applied in first place...
+>> 
+>> Agreed, but it's already in mainline.
+>> 
+>>> I double sorry, I was not available when that conflict was resolved...
+>>> The right resolution would be just to revert the 16aced80f6
+>>> (ARM: OMAP3530evm: set pendown_state and debounce time for ads7846),
+>>> but who cares now...
+>> 
+>> 
+>>>
+>>>>
+>>>> So, IMO, in addition to $SUBJECT patch, in order to get the touchscreen
+>>>> GPIO working on non OMAP3EVM boards, we also need something like this as
+>>>> well.
+>>>>
+>>>> Igor, Zumeng, could you try this out on your boards anc confirm if it's
+>>>> working?  I currently don't have a board setup with a touchscreen in my
+>>>> board farm.
+>>>
+>>> Since you have already dig into this, which branch would be good for testing?
+>> 
+>> 
+>> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/fixes/ads7846
+>> 
+>> I just pushed this out, so it might take a bit to propagate to all the
+>> mirrors.
+>
+> Thanks, Kevin, I've just sent the tested-by.
+> I would also like to see only one patch instead of current two patches,
+> can you please, amend them into one, write a correct message and resend?
 
-It doesn't deal with resume, because different timers behave differently,
-and there's no real way to deal with that properly.  The important thing
-that this patch does is to ensure sched_clock() doesn't ever go backwards.
+Yeah, the changelog in my first patch isn't quite right anymore since
+your patch isn't the one that caused the problems.
 
- arch/arm/kernel/sched_clock.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+You're more familiar with this code than me, so feel free to recombine
+them if you like, and I'll queue it up for v3.6-rc.
 
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 9a46370..4be4019 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -10,6 +10,7 @@
- #include <linux/jiffies.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
-+#include <linux/syscore_ops.h>
- #include <linux/timer.h>
- 
- #include <asm/sched_clock.h>
-@@ -72,3 +73,20 @@ void __init sched_clock_postinit(void)
- {
- 	sched_clock_poll(sched_clock_timer.data);
- }
-+
-+static int sched_clock_suspend(void)
-+{
-+	sched_clock_poll(sched_clock_timer.data);
-+	return 0;
-+}
-+
-+static struct syscore_ops sched_clock_ops = {
-+	.suspend	= sched_clock_suspend,
-+};
-+
-+static int __init sched_clock_syscore_init(void)
-+{
-+	register_syscore_ops(&sched_clock_ops);
-+	return 0;
-+}
-+device_initcall(sched_clock_syscore_init);
+Thanks,
+
+Kevin
