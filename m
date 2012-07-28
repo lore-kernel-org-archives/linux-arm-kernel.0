@@ -1,32 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jul 2012 22:07:54 +0800
-Subject: Sharing resources between several drivers.
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB1F69E@DBDE01.ent.ti.com>
-References: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D121433EB1F69E@DBDE01.ent.ti.com>
-Message-ID: <20120728140751.GI2128@S2101-09.ap.freescale.net>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sat, 28 Jul 2012 16:26:28 +0200
+Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
+In-Reply-To: <20120728121103.GA11370@mudshark.cambridge.arm.com>
+References: <1340533690-4049-1-git-send-email-javier@dowhile0.org>
+ <20120625005134.GA2342@S2101-09.ap.freescale.net>
+ <20120625084905.GD19226@n2100.arm.linux.org.uk>
+ <CAAwP0s2jTPM_ErDOFKXoe95_Xd=xjkuTAsDbLctQ08_QVNkakQ@mail.gmail.com>
+ <5012CC98.60206@ti.com>
+ <20120727204447.GA10024@mudshark.cambridge.arm.com>
+ <20120727210637.GA16377@n2100.arm.linux.org.uk>
+ <20120727214024.GA10249@mudshark.cambridge.arm.com>
+ <20120728100831.GC7405@n2100.arm.linux.org.uk>
+ <20120728121103.GA11370@mudshark.cambridge.arm.com>
+Message-ID: <CABxcv=mVKt8+gYK6kHydmG3SnDZgjMbJuEcUBx_z5sumNY_SQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 09:03:33AM +0000, Bedia, Vaibhav wrote:
-> On Fri, Jul 27, 2012 at 13:29:21, javier Martin wrote:
-> > Hi,
-> > we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
-> > 
-> > In these chips, gpio and pinctrl use the same HW memory area
-> > registers. This means that we have to request the same memory area
-> > from two different drivers (gpio and pinctrl) but we don't know how to
-> > do that.
-> > 
-> > A similar example available is mxs, but it only works with device
-> > tree, so this problem is avoided.  However, some of these chips
-> 
-> I am curious as to how device tree solves the access issues for
-> a shared resource.
-> 
-Although pinctrl and gpio share the same IO region, they are accessing
-different registers, so there should be no access issues.
+On Sat, Jul 28, 2012 at 2:11 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Jul 28, 2012 at 11:08:31AM +0100, Russell King - ARM Linux wrote:
+>> On Fri, Jul 27, 2012 at 10:40:24PM +0100, Will Deacon wrote:
+>> > On Fri, Jul 27, 2012 at 10:06:37PM +0100, Russell King - ARM Linux wrote:
+>> > > We support booting a kernel on systems with or without SMP support, even
+>> > > with a SMP kernel.  When the kernel is booted on such a system, it is
+>> > > undefined whether smp_cross_call() is a valid function pointer.
+>> >
+>> > So let's define it to point at a dummy function which explodes with a BUG if
+>> > the cpumask passed in isn't empty. That allows SMP kernels to do things like
+>> > `cross call to all other cores' without having to worry about whether there
+>> > are any other cores or not.
+>>
+>> We should not be even attempting to do any cross calls when there aren't
+>> any other CPUs in the system - that's rather the point of leaving it as
+>> a NULL pointer so it does explode on such systems.
+>>
+>> . the scheduler won't call smp_send_reschedule() when there are no other
+>>   CPUs in the system.
+>> . timer ticks won't be broadcast to other CPUs if there are no other CPUs
+>>   in the system.
+>> . function calls will not be issued to other CPUs if there are no other
+>>   CPUs in the system.
+>>
+>> There is only one case where this doesn't happen, and that's the shutdown
+>> path.
+>
+> Ok, that's a pretty compelling argument you've got there :)
+>
+>> For instance, smp_call_function*() all check that the target CPUs are
+>> marked online before the arch code is requested to issue an IPI to the
+>> target CPU.
+>
+> Yes, thanks for making the case for the original patch. Consistency is the
+> most important thing with these APIs, so I'll go full circle and offer my
+> ack for the original patch:
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> The next question is: who's putting this into the patch system?
+>
+> Will
 
--- 
-Regards,
-Shawn
+Hi,
+
+I just put the patch with Will's Acked-by on the patch system. It  was
+accepted as patch 7480/1 [1].
+
+The patch is on top of today's linux-next (next-20120727).
+
+Thanks a lot and best regards,
+Javier
+
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7480/1
