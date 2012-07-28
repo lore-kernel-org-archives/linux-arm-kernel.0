@@ -1,29 +1,92 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jul 2012 16:25:48 +0800
-Subject: [alsa-devel] [PATCH 4/4] ARM: mx28evk: add missed clkmux select
- for saif
-In-Reply-To: <20120723023632.GA9427@shlinux2.ap.freescale.net>
-References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
- <1342776027-31758-5-git-send-email-b29396@freescale.com>
- <20120721074002.GC923@S2101-09.ap.freescale.net>
- <20120723023632.GA9427@shlinux2.ap.freescale.net>
-Message-ID: <20120728082543.GB2128@S2101-09.ap.freescale.net>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sat, 28 Jul 2012 10:41:54 +0200
+Subject: [RESEND PATCH] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+Message-ID: <1343464914-31084-1-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 10:36:33AM +0800, Dong Aisheng wrote:
-> This patch series was made based on Mark's sound-2.6 tree.
-> Do you want this one go through mxs tree and other three go through Mark's tree?
+Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+it needs to handle are kernel mapped only.  However, for example when doing
+direct I/O, pages with user space mappings may occur.
 
-Yes.  That's the way to save conflict.
+Thus, continue to do lazy flushing if there are no user space mappings.
+Otherwise, flush the kernel cache lines directly.
 
-> I'm thinking maybe it would be better go through one tree(Mark's or Yours) since
-> without this one the saif record still can not work.
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
 
-The recording has been broken.  There is no point to force the whole
-series to go via one tree.  When sound and arm-soc get merged on
-linux-next (for testing) and mainline, the recording gets back to work.
+Hi,
 
+a while ago I sent the patch above to fix a data corruption problem
+on VIVT architectures (and probably VIPT aliasing).  There has been a
+bit of discussion with Catalin, but there was no real conclusion on
+how to proceed.  (See
+http://www.spinics.net/lists/arm-kernel/msg176913.html for the
+original post)
+
+The case is not hit too often apparently; the ingredients are PIO
+(like) driver, use of flush_kernel_dcache_page(), and direct I/O. 
+However, there is at least one real world example (running lvm2 on
+top of an encrypted block device using mv_cesa on Kirkwood) that does
+not work at all because of this problem.
+
+- Simon
+
+
+ arch/arm/include/asm/cacheflush.h |    4 ++++
+ arch/arm/mm/flush.c               |   22 ++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 004c1bc..91ddc70 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -303,6 +303,10 @@ static inline void flush_anon_page(struct vm_area_struct *vma,
+ #define ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
+ static inline void flush_kernel_dcache_page(struct page *page)
+ {
++	extern void __flush_kernel_dcache_page(struct page *);
++	/* highmem pages are always flushed upon kunmap already */
++	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
++		__flush_kernel_dcache_page(page);
+ }
+ 
+ #define flush_dcache_mmap_lock(mapping) \
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 7745854..bcba3a9 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -192,6 +192,28 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 				page->index << PAGE_CACHE_SHIFT);
+ }
+ 
++/*
++ * Ensure cache coherency for kernel mapping of this page.
++ *
++ * If the page only exists in the page cache and there are no user
++ * space mappings, this is a no-op since the page was already marked
++ * dirty@creation.  Otherwise, we need to flush the dirty kernel
++ * cache lines directly.
++ *
++ * We can assume that the page is no high mem page, see
++ * flush_kernel_dcache_page.
++ */
++void __flush_kernel_dcache_page(struct page *page)
++{
++	struct address_space *mapping;
++
++	mapping = page_mapping(page);
++
++	if (!mapping || mapping_mapped(mapping))
++		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
++}
++EXPORT_SYMBOL(__flush_kernel_dcache_page);
++
+ static void __flush_dcache_aliases(struct address_space *mapping, struct page *page)
+ {
+ 	struct mm_struct *mm = current->active_mm;
 -- 
-Regards,
-Shawn
+1.7.9.5
