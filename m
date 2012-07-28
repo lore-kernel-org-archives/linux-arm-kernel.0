@@ -1,38 +1,44 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jul 2012 21:02:51 +0800
-Subject: [PATCH v2 3/3] ARM: imx_v6_v7_defconfig: Select MXS_DMA
-In-Reply-To: <CAOMZO5CKK68sgT+Q31OuMbFQ5uL4j3zbs2zZQfPyHtt0ZLkX3A@mail.gmail.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
- <1343215100-24005-3-git-send-email-festevam@gmail.com>
- <CAMiH66EA4O0s8hfXkr_SJ56+q7eZ8w0=3C1r_C+m2Os1RxprmA@mail.gmail.com>
- <CAOMZO5BfT+_7x4F96Kvqtq5STXxw2Y9CxbCCAc_UnZ-3wy0qxg@mail.gmail.com>
- <CAMiH66FUxiw0B8iD5rYi=nUX0VYZBzOKifXKfTqd1RmSHhC80g@mail.gmail.com>
- <20120726022930.GB3396@shlinux2.ap.freescale.net>
- <CAOMZO5CKK68sgT+Q31OuMbFQ5uL4j3zbs2zZQfPyHtt0ZLkX3A@mail.gmail.com>
-Message-ID: <20120728130249.GF2128@S2101-09.ap.freescale.net>
+Date: Sat, 28 Jul 2012 21:32:18 +0800
+Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
+In-Reply-To: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20120728133215.GG2128@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 07:38:57AM -0300, Fabio Estevam wrote:
-> On Wed, Jul 25, 2012 at 11:29 PM, Dong Aisheng <b29396@freescale.com> wrote:
+On Wed, Jul 25, 2012 at 02:37:43PM +0200, Dirk Behme wrote:
+> From: Matthias Thomae <matthias.thomae@de.bosch.com>
 > 
-> > How about using 'select MXS_DMA'?
+> Set ARCH_NR_GPIO for the i.MX6 processor family, which has 7 GPIO
+> controllers with 32 signals each. The default of 256 GPIOs wastes
+> some static table space as explained in Documentation/gpio.txt.
 > 
-> Ok, I prefer this way too. Will resubmit it soon. Hopefully it is OK with Shawn.
+> Signed-off-by: Matthias Thomae <matthias.thomae@de.bosch.com>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b25c9d3..5e4cde3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1626,6 +1626,7 @@ config ARCH_NR_GPIO
+>  	default 355 if ARCH_U8500
+>  	default 264 if MACH_H4700
+>  	default 512 if SOC_OMAP5
+> +	default 224 if SOC_IMX6Q
 
-No.  For your information, the following is what
-Documentation/kbuild/kconfig-language.txt tell.
-
-  Note:
-        select should be used with care. select will force
-        a symbol to a value without visiting the dependencies.
-        By abusing select you are able to select a symbol FOO even
-        if FOO depends on BAR that is not set.
-        In general use select only for non-visible symbols
-        (no prompts anywhere) and for symbols with no dependencies.
-        That will limit the usefulness but on the other hand avoid
-        the illegal configurations all over.
+So what if we build imx_v6_v7_defconfig with IMX6Q deselected?
 
 -- 
 Regards,
 Shawn
+
+>  	default 0
+>  	help
+>  	  Maximum number of GPIOs in the system.
+> -- 
+> 1.7.0.4
+> 
