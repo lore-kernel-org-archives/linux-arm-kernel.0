@@ -1,93 +1,32 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 28 Jul 2012 23:42:46 +0800
-Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
-In-Reply-To: <5013B750.6060608@gmail.com>
-References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
- <1343330187-20049-5-git-send-email-zonque@gmail.com>
- <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
- <5013B750.6060608@gmail.com>
-Message-ID: <CAN1soZxgw-pu3OQ357Be9Nuk_Ln7B9EjkVWeh5gEXB_y6tO7ig@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 Jul 2012 23:44:33 +0800
+Subject: [PATCH] ARM: mxc: Include missing irqs.h header
+In-Reply-To: <20120728111422.GD2128@S2101-09.ap.freescale.net>
+References: <1343029278-11654-1-git-send-email-festevam@gmail.com>
+ <20120728111422.GD2128@S2101-09.ap.freescale.net>
+Message-ID: <20120728154431.GM2128@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 28, 2012 at 5:56 PM, Daniel Mack <zonque@gmail.com> wrote:
-> Hi Haojian,
->
-> On 28.07.2012 09:17, Haojian Zhuang wrote:
->> On Fri, Jul 27, 2012 at 3:16 AM, Daniel Mack <zonque@gmail.com> wrote:
->>> Properly register on-chip interrupt using the irqdomain logic. The
->>> number of interrupts is taken from the devicetree node.
->>>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> ---
->>>  arch/arm/mach-pxa/irq.c    | 73 ++++++++++++++++++++++++++++++++++++++++++++++
->>>  arch/arm/mach-pxa/pxa3xx.c | 17 +++++++++--
->>>  2 files changed, 88 insertions(+), 2 deletions(-)
->>>
->>> +#ifdef CONFIG_OF
->>> +static struct irq_domain *pxa_irq_domain;
->>> +
->>> +static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
->>> +                      irq_hw_number_t hw)
->>> +{
->>> +       int irq, i = hw % 32;
->>> +       void __iomem *base = irq_base(hw / 32);
->>> +
->>> +       /* initialize interrupt priority */
->>> +       if (cpu_has_ipr())
->>> +               __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
->> Since we have DT support at here. Could we use property for interrupt priority?
->
-> Not sure what you mean here. Can you elaborate? I couldn't find any
-> reference to IRQ priorities in other platforms either.
->
-> Maybe we can also add that in a separate patch, which would also help in
-> tracking possible regressions du to such a change?
->
-cpu_has_ipr() returns true if CPU isn't PXA25x.
-My point is that we can avoid to use cpu_is_xxx() while DT is used. We only need
-to append a property "marvell,intc-priority" is DTS. So the code could
-be changed
-in below.
-if (of_find_property(np, "marvell,intc-priority", NULL))
-           __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
+On Sat, Jul 28, 2012 at 07:14:24PM +0800, Shawn Guo wrote:
+> On Mon, Jul 23, 2012 at 04:41:18AM -0300, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Include irqs.h in order to fix the following build error:
+> > 
+> > arch/arm/plat-mxc/tzic.c:195:11: error: 'FIQ_START' undeclared (first use in this function)
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Thanks for the patch.  Will send it to arm-soc shortly.
+> 
+Olof,
 
->>> +       irq = PXA_IRQ(virq);
->> #ifdef CONFIG_PXA_HAVE_ISA_IRQS
->> #define PXA_ISA_IRQ(x)  (x)
->> #define PXA_ISA_IRQ_NUM (16)
->> #else
->> #define PXA_ISA_IRQ_NUM (0)
->> #endif
->>
->> Could we avoid to use PXA_IRQ() at here? We can make use of
->> NR_IRQS_LEGACY that is 16. Since you already use irq_alloc_descs()
->> to allocate irqs that virtual irq number starts from 16. So you needn't
->> use PXA_IRQ() any more.
->
-> Ok, I changed this. Note that there's still need to subtract
-> NR_IRQS_LEGACY from the virq that is passed in to the .map function,
-> because early_irq_init() in kernel/irq/irqdesc.c will pre-allocate the
-> IRQs the platform claims to have natively, which defaults to 16 on PXA,
-> unless the machine descriptor sets nr_irqs, which it doesn't in case of DT.
->
-You needn't subtract NR_IRQS_LEGACY. PXA25x hwirq starts from
-16 & PXA27x/PXA3xx hwirq starts from 0. While DT is used, irq_alloc_descs()
-allocates virq from NR_IRQS_LEGACY. For PXA25x, there's exactly match.
-For PXA27x/PXA3xx, there's a little different. But it doesn't matter. We needn't
-force virq starting from 0 on PXA27x/PXA3xx. The first virq starts from 16 is
-also OK.
+I just noticed you had sent the first batch fixes for merge window
+fallout.  Unfortunately, this is another one.  Will there be a second
+batch fixes targeting -rc1?  If so, please help pick up this one,
+otherwise, I will queue it for later -rc.
 
-Although I use this subtract in arch-mmp, it's a little different in
-arch-pxa because
-of PXA25x.
-
-> I also found another hunk that I forgot to squash in the v2 series. I
-> will repost the whole thing and also include the two GPIO patches that
-> should go through your tree.
->
->
-> Thanks for the review,
->
-> Daniel
->
+-- 
+Regards,
+Shawn
