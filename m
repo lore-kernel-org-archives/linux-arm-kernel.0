@@ -1,92 +1,31 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sat, 28 Jul 2012 10:41:54 +0200
-Subject: [RESEND PATCH] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-Message-ID: <1343464914-31084-1-git-send-email-gmbnomis@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 Jul 2012 16:44:54 +0800
+Subject: [PATCH] ARM: mxs: enable ocotp on imx23 and imx28
+In-Reply-To: <1342993697-25875-1-git-send-email-mkl@pengutronix.de>
+References: <1342993697-25875-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <20120728084451.GC2128@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
-it needs to handle are kernel mapped only.  However, for example when doing
-direct I/O, pages with user space mappings may occur.
+On Sun, Jul 22, 2012 at 11:48:17PM +0200, Marc Kleine-Budde wrote:
+> This patch adds ocotp support to imx23 and imx28, a dt-only kernel fails
+> to link with this error message otherwise:
+> 
+> arch/arm/mach-mxs/mach-mxs.c:169: undefined reference to `mxs_get_ocotp'
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+> Hello Shawn,
+> 
+> this applies to your "mxs/dt-for-3.6" tree. According to the datasheet
+> both processors have a ocotp unit. Hope it alright to select the OCOTP
+> on both imx23 and imx28.
+> 
+I prefer to remove MXS_OCOTP completely and always build in ocotp.c,
+as we are on the way to remove those board files, the users of the
+Kconfig symbol.
 
-Thus, continue to do lazy flushing if there are no user space mappings.
-Otherwise, flush the kernel cache lines directly.
-
-Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
-
-Hi,
-
-a while ago I sent the patch above to fix a data corruption problem
-on VIVT architectures (and probably VIPT aliasing).  There has been a
-bit of discussion with Catalin, but there was no real conclusion on
-how to proceed.  (See
-http://www.spinics.net/lists/arm-kernel/msg176913.html for the
-original post)
-
-The case is not hit too often apparently; the ingredients are PIO
-(like) driver, use of flush_kernel_dcache_page(), and direct I/O. 
-However, there is at least one real world example (running lvm2 on
-top of an encrypted block device using mv_cesa on Kirkwood) that does
-not work at all because of this problem.
-
-- Simon
-
-
- arch/arm/include/asm/cacheflush.h |    4 ++++
- arch/arm/mm/flush.c               |   22 ++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 004c1bc..91ddc70 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -303,6 +303,10 @@ static inline void flush_anon_page(struct vm_area_struct *vma,
- #define ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
- static inline void flush_kernel_dcache_page(struct page *page)
- {
-+	extern void __flush_kernel_dcache_page(struct page *);
-+	/* highmem pages are always flushed upon kunmap already */
-+	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
-+		__flush_kernel_dcache_page(page);
- }
- 
- #define flush_dcache_mmap_lock(mapping) \
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 7745854..bcba3a9 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -192,6 +192,28 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
- 				page->index << PAGE_CACHE_SHIFT);
- }
- 
-+/*
-+ * Ensure cache coherency for kernel mapping of this page.
-+ *
-+ * If the page only exists in the page cache and there are no user
-+ * space mappings, this is a no-op since the page was already marked
-+ * dirty@creation.  Otherwise, we need to flush the dirty kernel
-+ * cache lines directly.
-+ *
-+ * We can assume that the page is no high mem page, see
-+ * flush_kernel_dcache_page.
-+ */
-+void __flush_kernel_dcache_page(struct page *page)
-+{
-+	struct address_space *mapping;
-+
-+	mapping = page_mapping(page);
-+
-+	if (!mapping || mapping_mapped(mapping))
-+		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
-+}
-+EXPORT_SYMBOL(__flush_kernel_dcache_page);
-+
- static void __flush_dcache_aliases(struct address_space *mapping, struct page *page)
- {
- 	struct mm_struct *mm = current->active_mm;
 -- 
-1.7.9.5
+Regards,
+Shawn
