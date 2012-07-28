@@ -1,48 +1,71 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Sat, 28 Jul 2012 11:05:10 +0200
-Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
-Message-ID: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sat, 28 Jul 2012 11:56:32 +0200
+Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
+In-Reply-To: <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
+References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
+ <1343330187-20049-5-git-send-email-zonque@gmail.com>
+ <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
+Message-ID: <5013B750.6060608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dirk Behme <dirk.behme@googlemail.com>
+Hi Haojian,
 
-Fix the compiler warnings
+On 28.07.2012 09:17, Haojian Zhuang wrote:
+> On Fri, Jul 27, 2012 at 3:16 AM, Daniel Mack <zonque@gmail.com> wrote:
+>> Properly register on-chip interrupt using the irqdomain logic. The
+>> number of interrupts is taken from the devicetree node.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> ---
+>>  arch/arm/mach-pxa/irq.c    | 73 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-pxa/pxa3xx.c | 17 +++++++++--
+>>  2 files changed, 88 insertions(+), 2 deletions(-)
+>>
+>> +#ifdef CONFIG_OF
+>> +static struct irq_domain *pxa_irq_domain;
+>> +
+>> +static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
+>> +                      irq_hw_number_t hw)
+>> +{
+>> +       int irq, i = hw % 32;
+>> +       void __iomem *base = irq_base(hw / 32);
+>> +
+>> +       /* initialize interrupt priority */
+>> +       if (cpu_has_ipr())
+>> +               __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
+> Since we have DT support at here. Could we use property for interrupt priority?
 
-drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
-drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
-drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
-drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
+Not sure what you mean here. Can you elaborate? I couldn't find any
+reference to IRQ priorities in other platforms either.
 
-Signed-off-by: Dirk Behme <dirk.behme@googlemail.com>
----
- drivers/mtd/nand/mxc_nand.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Maybe we can also add that in a separate patch, which would also help in
+tracking possible regressions du to such a change?
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 6acc790..31b125a 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1264,16 +1264,16 @@ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
- static const struct of_device_id mxcnd_dt_ids[] = {
- 	{
- 		.compatible = "fsl,imx21-nand",
--		.data = &imx21_nand_devtype_data,
-+		.data = (void *)&imx21_nand_devtype_data,
- 	}, {
- 		.compatible = "fsl,imx27-nand",
--		.data = &imx27_nand_devtype_data,
-+		.data = (void *)&imx27_nand_devtype_data,
- 	}, {
- 		.compatible = "fsl,imx25-nand",
--		.data = &imx25_nand_devtype_data,
-+		.data = (void *)&imx25_nand_devtype_data,
- 	}, {
- 		.compatible = "fsl,imx51-nand",
--		.data = &imx51_nand_devtype_data,
-+		.data = (void *)&imx51_nand_devtype_data,
- 	},
- 	{ /* sentinel */ }
- };
--- 
-1.7.7.4
+>> +       irq = PXA_IRQ(virq);
+> #ifdef CONFIG_PXA_HAVE_ISA_IRQS
+> #define PXA_ISA_IRQ(x)  (x)
+> #define PXA_ISA_IRQ_NUM (16)
+> #else
+> #define PXA_ISA_IRQ_NUM (0)
+> #endif
+> 
+> Could we avoid to use PXA_IRQ() at here? We can make use of
+> NR_IRQS_LEGACY that is 16. Since you already use irq_alloc_descs()
+> to allocate irqs that virtual irq number starts from 16. So you needn't
+> use PXA_IRQ() any more.
+
+Ok, I changed this. Note that there's still need to subtract
+NR_IRQS_LEGACY from the virq that is passed in to the .map function,
+because early_irq_init() in kernel/irq/irqdesc.c will pre-allocate the
+IRQs the platform claims to have natively, which defaults to 16 on PXA,
+unless the machine descriptor sets nr_irqs, which it doesn't in case of DT.
+
+I also found another hunk that I forgot to squash in the v2 series. I
+will repost the whole thing and also include the two GPIO patches that
+should go through your tree.
+
+
+Thanks for the review,
+
+Daniel
