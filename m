@@ -1,32 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jul 2012 23:44:33 +0800
-Subject: [PATCH] ARM: mxc: Include missing irqs.h header
-In-Reply-To: <20120728111422.GD2128@S2101-09.ap.freescale.net>
-References: <1343029278-11654-1-git-send-email-festevam@gmail.com>
- <20120728111422.GD2128@S2101-09.ap.freescale.net>
-Message-ID: <20120728154431.GM2128@S2101-09.ap.freescale.net>
+From: dczarn@o2.pl (Damian Czarnecki)
+Date: Sat, 28 Jul 2012 16:56:42 +0000 (UTC)
+Subject: PXA 26x GPIO possible regression in kernel 3.3 and newer
+References: <loom.20120727T164936-412@post.gmane.org>
+ <1343484435.81739.YahooMailClassic@web171606.mail.ir2.yahoo.com>
+Message-ID: <loom.20120728T185108-140@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 28, 2012 at 07:14:24PM +0800, Shawn Guo wrote:
-> On Mon, Jul 23, 2012 at 04:41:18AM -0300, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Include irqs.h in order to fix the following build error:
-> > 
-> > arch/arm/plat-mxc/tzic.c:195:11: error: 'FIQ_START' undeclared (first use in this function)
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Thanks for the patch.  Will send it to arm-soc shortly.
-> 
-Olof,
+Paul Parsons <lost.distance <at> yahoo.com> writes:
 
-I just noticed you had sent the first batch fixes for merge window
-fallout.  Unfortunately, this is another one.  Will there be a second
-batch fixes targeting -rc1?  If so, please help pick up this one,
-otherwise, I will queue it for later -rc.
+> 
+> Hello Damian,
+> 
+> That sounds familiar. In 3.3 the number of PXA builtin GPIOs
+> (PXA_NR_BUILTIN_GPIO) was increased from 128 to 192.
+> Consequently the board GPIO numbers all increased by 64.
+> On the iPAQ hx4700 that had the effect of pushing EGPIO
+> numbers from 192-199 to 256-263, beyond the 256 maximum.
+> 
+> The fix is to set ARCH_NR_GPIO in arch/arm/Kconfig to a
+> higher maximum (for example, the iPAQ hx4700 sets 264).
+> 
+> Regards,
+> Paul
+> 
 
--- 
-Regards,
-Shawn
+Thank you for taking your time to reply, Paul.
+Yes, I remember reading about that change in kernel 3.3.
+I tried almost every value that I thought may be correct
+(but even the default 256 should be enough).
+As I said, only the PXA GPIOs don't seem to work. 
+Another strange thing is that I managed to read a line:
+"NR_IRQS: 16 nr_irqs: 358" early on boot.
+This is suspicious, because on kernel 3.2 and lower 
+this is "NR_IRQS: 288 nr_irqs: 358".
+
+I don't have any more ideas about that.
