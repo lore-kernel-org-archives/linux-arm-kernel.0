@@ -1,40 +1,42 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 28 Jul 2012 13:12:37 +0200
-Subject: [PATCH] ixp4xx: Declare MODULE_FIRMWARE usage
-In-Reply-To: <1343241186-103293-1-git-send-email-tim.gardner@canonical.com>
- (Tim Gardner's message of "Wed, 25 Jul 2012 12:33:06 -0600")
-References: <1343241186-103293-1-git-send-email-tim.gardner@canonical.com>
-Message-ID: <m34nosi1ga.fsf@intrepid.localdomain>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 Jul 2012 19:14:24 +0800
+Subject: [PATCH] ARM: mxc: Include missing irqs.h header
+In-Reply-To: <1343029278-11654-1-git-send-email-festevam@gmail.com>
+References: <1343029278-11654-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120728111422.GD2128@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tim Gardner <tim.gardner@canonical.com> writes:
+On Mon, Jul 23, 2012 at 04:41:18AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Include irqs.h in order to fix the following build error:
+> 
+> arch/arm/plat-mxc/tzic.c:195:11: error: 'FIQ_START' undeclared (first use in this function)
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> +++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
-> @@ -116,7 +116,11 @@
->  /* NPE mailbox_status value for reset */
->  #define RESET_MBOX_STAT			0x0000F0F0
->  
-> -const char *npe_names[] = { "NPE-A", "NPE-B", "NPE-C" };
-> +#define NPE_A_FIRMWARE "NPE-A"
-> +#define NPE_B_FIRMWARE "NPE-B"
-> +#define NPE_C_FIRMWARE "NPE-C"
-> +
-> +const char *npe_names[] = { NPE_A_FIRMWARE, NPE_B_FIRMWARE, NPE_C_FIRMWARE };
->  
->  #define print_npe(pri, npe, fmt, ...)					\
->  	printk(pri "%s: " fmt, npe_name(npe), ## __VA_ARGS__)
-> @@ -724,6 +728,9 @@ module_exit(npe_cleanup_module);
->  
->  MODULE_AUTHOR("Krzysztof Halasa");
->  MODULE_LICENSE("GPL v2");
-> +MODULE_FIRMWARE(NPE_A_FIRMWARE);
-> +MODULE_FIRMWARE(NPE_B_FIRMWARE);
-> +MODULE_FIRMWARE(NPE_C_FIRMWARE);
->  
->  EXPORT_SYMBOL(npe_names);
->  EXPORT_SYMBOL(npe_running);
+Thanks for the patch.  Will send it to arm-soc shortly.
 
-This looks like a good idea, thanks.
--- 
-Krzysztof Halasa
+Regards,
+Shawn
+
+> ---
+>  arch/arm/plat-mxc/tzic.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> index c219317..3ed1adb 100644
+> --- a/arch/arm/plat-mxc/tzic.c
+> +++ b/arch/arm/plat-mxc/tzic.c
+> @@ -23,6 +23,7 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+> +#include <mach/irqs.h>
+>  
+>  #include "irq-common.h"
+>  
+> -- 
+> 1.7.1
+> 
