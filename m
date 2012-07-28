@@ -1,85 +1,66 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Jul 2012 17:28:31 -0700
-Subject: [PATCH] ARM: OMAP2+: ads7846 init: fix fault caused by freeing
- pen-down GPIO
-In-Reply-To: <5012E654.4040907@compulab.co.il> (Igor Grinberg's message of
- "Fri, 27 Jul 2012 22:04:52 +0300")
-References: <1342048700-15040-1-git-send-email-khilman@ti.com>
- <500D494D.8020606@compulab.co.il> <500D4F2A.9090706@compulab.co.il>
- <87zk6mpbfa.fsf@ti.com> <5012B42F.9040309@compulab.co.il>
- <87sjcdksgm.fsf@ti.com> <5012E654.4040907@compulab.co.il>
-Message-ID: <876298iv9s.fsf@ti.com>
+Date: Fri, 27 Jul 2012 17:33:37 -0700
+Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
+In-Reply-To: <CAOesGMiVRR4F+zad1hKdX-ZuC79U_F5ASG3C52EyFUJpGQv2ow@mail.gmail.com>
+ (Olof Johansson's message of "Fri, 27 Jul 2012 13:22:06 -0700")
+References: <87394enqz8.fsf@ti.com>
+ <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
+ <CAMQu2gynmXqprXPctYHA-V6niE4QptJ_fQ8Fv7J5OAooK1A6wQ@mail.gmail.com>
+ <CAMbhsRSdWpsYub+M9Li44cW1dc2wg76Q3njAxNK2vjC0_jOeJg@mail.gmail.com>
+ <CAOesGMiVRR4F+zad1hKdX-ZuC79U_F5ASG3C52EyFUJpGQv2ow@mail.gmail.com>
+Message-ID: <87pq7ghggu.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg <grinberg@compulab.co.il> writes:
+Olof Johansson <olof@lixom.net> writes:
 
-> On 07/27/12 20:46, Kevin Hilman wrote:
->> Igor Grinberg <grinberg@compulab.co.il> writes:
->> 
->>> On 07/26/12 22:30, Kevin Hilman wrote:
->>>> + Zumeng Chen
+> On Thu, Jul 26, 2012 at 11:44 PM, Colin Cross <ccross@android.com> wrote:
+>> On Thu, Jul 26, 2012 at 11:34 PM, Shilimkar, Santosh
+>> <santosh.shilimkar@ti.com> wrote:
+>>> On Fri, Jul 27, 2012 at 2:19 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>> Kevin,
 >>>>
->>>> Igor Grinberg <grinberg@compulab.co.il> writes:
->>>>
->>>>> Hi Kevin,
+>>>> On Thu, Jul 26, 2012 at 2:37 PM, Kevin Hilman <khilman@ti.com> wrote:
+>>>>> Hi Arnd, Olof,
 >>>>>
->>>>> I've just noticed that the patch has been modified by Arnd in a way
->>>>> that of course will trigger GPIO use without being requested.
->>>>> I'm sorry, I was not available by that time Arnd changed the patch.
+>>>>> I know it is late, but I'm really hoping this can still make it for
+>>>>> v3.6, so consider this a [GIT PLEA].  ;)
 >>>>
->>>> Your right, your original patch isn't the problem.  I found the root
->>>> cause.
+>>>> New features submitted halfway through the merge window? Yeah, that's late.
 >>>>
->>>> The real problem is actually introduced by the merge of your patch from
->>>> the arm-soc/cleanup branch, and this one from Zumeng Chen: commit
->>>> 16aced80f6 (ARM: OMAP3530evm: set pendown_state and debounce time for
->>>> ads7846) from the arm-soc/boards branch.
+>>>> I'll pull it in as late2/pm once the below is fixed, but I won't
+>>>> promise we'll send it up.
 >>>>
->>>> However, looking closer at the one from Zumeng, that one is clearly not
->>>> right.  It unconditionally adds a *board-specific* ->get_pendown_state
->>>> function to the pdata that is common to *all* boards.  That's just wrong
->>>> and has the side-effect of making ->get_pendown_state() wrong on every
->>>> board except the OMAP3EVM.  Oops.
->>>
->>> Argh... that should not be applied in first place...
->> 
->> Agreed, but it's already in mainline.
->> 
->>> I double sorry, I was not available when that conflict was resolved...
->>> The right resolution would be just to revert the 16aced80f6
->>> (ARM: OMAP3530evm: set pendown_state and debounce time for ads7846),
->>> but who cares now...
->> 
->> 
->>>
 >>>>
->>>> So, IMO, in addition to $SUBJECT patch, in order to get the touchscreen
->>>> GPIO working on non OMAP3EVM boards, we also need something like this as
->>>> well.
+>>>>> Kevin Hilman (1):
+>>>>>       ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+>>>>>
+>>>>> Santosh Shilimkar (3):
+>>>>>       ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
+>>>>>       ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
+>>>>>       ARM: OMAP4: CPUidle: Open broadcast clock-event device.
 >>>>
->>>> Igor, Zumeng, could you try this out on your boards anc confirm if it's
->>>> working?  I currently don't have a board setup with a touchscreen in my
->>>> board farm.
->>>
->>> Since you have already dig into this, which branch would be good for testing?
->> 
->> 
->> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/fixes/ads7846
->> 
->> I just pushed this out, so it might take a bit to propagate to all the
->> mirrors.
+>>>> This looks odd, Colin was author to the first of the commits
+>>>> attributed to Santosh.
+>>>>
+>>> Not sure what you mean. These patches are written by me. Kevin, Collin helped
+>>> in review. If you are referring to the {ARM: OMAP: timer: allow gp
+>>> timer clock-event to be
+>>> used on both cpus} which does have SOB from me and Colin. The very first version
+>>> of this version I picked was from product tree in which it was
+>>> commited on Coiln's name.
+>>> Later I updated that forf the multi-omap and the new timer code and
+>>> hence the update
+>>> in Author.
+>>
+>> I have no problem with the authorship on these two patches.
 >
-> Thanks, Kevin, I've just sent the tested-by.
-> I would also like to see only one patch instead of current two patches,
-> can you please, amend them into one, write a correct message and resend?
+> Santosh, Colin,
+>
+> Ok, fair enough -- I just want to make sure attribution happens
+> appropriately, and it's a red flag when there's a S-o-b by someone not
+> at your company before yours without explanation.
 
-Yeah, the changelog in my first patch isn't quite right anymore since
-your patch isn't the one that caused the problems.
-
-You're more familiar with this code than me, so feel free to recombine
-them if you like, and I'll queue it up for v3.6-rc.
-
-Thanks,
+Thanks Olof for considering this very late branch.
 
 Kevin
