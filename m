@@ -1,66 +1,97 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Jul 2012 17:33:37 -0700
-Subject: [GIT PULL] OMAP4 coupled CPUidle support for v3.6
-In-Reply-To: <CAOesGMiVRR4F+zad1hKdX-ZuC79U_F5ASG3C52EyFUJpGQv2ow@mail.gmail.com>
- (Olof Johansson's message of "Fri, 27 Jul 2012 13:22:06 -0700")
-References: <87394enqz8.fsf@ti.com>
- <CAOesGMiTfW6Qz=z4FvG=SomCuKo3C8um1M=uXJV8ZAjeKhRoOg@mail.gmail.com>
- <CAMQu2gynmXqprXPctYHA-V6niE4QptJ_fQ8Fv7J5OAooK1A6wQ@mail.gmail.com>
- <CAMbhsRSdWpsYub+M9Li44cW1dc2wg76Q3njAxNK2vjC0_jOeJg@mail.gmail.com>
- <CAOesGMiVRR4F+zad1hKdX-ZuC79U_F5ASG3C52EyFUJpGQv2ow@mail.gmail.com>
-Message-ID: <87pq7ghggu.fsf@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 27 Jul 2012 18:15:14 -0700
+Subject: [RFC v2] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <20120727233829.GB14835@n2100.arm.linux.org.uk>
+References: <1343184588-20239-1-git-send-email-ccross@android.com>
+ <CACRpkdZv4p+QT3Y+=-xh5iJ=sr1_aahroxQ535QpzVD9e_ESJA@mail.gmail.com>
+ <20120727233829.GB14835@n2100.arm.linux.org.uk>
+Message-ID: <CAMbhsRSGYmu=eyqik23cECsJPfpo6rUqZUa853nkY35XRo4Q_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
-
-> On Thu, Jul 26, 2012 at 11:44 PM, Colin Cross <ccross@android.com> wrote:
->> On Thu, Jul 26, 2012 at 11:34 PM, Shilimkar, Santosh
->> <santosh.shilimkar@ti.com> wrote:
->>> On Fri, Jul 27, 2012 at 2:19 AM, Olof Johansson <olof@lixom.net> wrote:
->>>> Kevin,
->>>>
->>>> On Thu, Jul 26, 2012 at 2:37 PM, Kevin Hilman <khilman@ti.com> wrote:
->>>>> Hi Arnd, Olof,
->>>>>
->>>>> I know it is late, but I'm really hoping this can still make it for
->>>>> v3.6, so consider this a [GIT PLEA].  ;)
->>>>
->>>> New features submitted halfway through the merge window? Yeah, that's late.
->>>>
->>>> I'll pull it in as late2/pm once the below is fixed, but I won't
->>>> promise we'll send it up.
->>>>
->>>>
->>>>> Kevin Hilman (1):
->>>>>       ARM: OMAP4: CPUidle: add synchronization for coupled idle states
->>>>>
->>>>> Santosh Shilimkar (3):
->>>>>       ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
->>>>>       ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
->>>>>       ARM: OMAP4: CPUidle: Open broadcast clock-event device.
->>>>
->>>> This looks odd, Colin was author to the first of the commits
->>>> attributed to Santosh.
->>>>
->>> Not sure what you mean. These patches are written by me. Kevin, Collin helped
->>> in review. If you are referring to the {ARM: OMAP: timer: allow gp
->>> timer clock-event to be
->>> used on both cpus} which does have SOB from me and Colin. The very first version
->>> of this version I picked was from product tree in which it was
->>> commited on Coiln's name.
->>> Later I updated that forf the multi-omap and the new timer code and
->>> hence the update
->>> in Author.
+On Fri, Jul 27, 2012 at 4:38 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jul 28, 2012 at 01:32:50AM +0200, Linus Walleij wrote:
+>> On Wed, Jul 25, 2012 at 4:49 AM, Colin Cross <ccross@android.com> wrote:
 >>
->> I have no problem with the authorship on these two patches.
+>> > Many clocks that are used to provide sched_clock will reset during
+>> > suspend.  If read_sched_clock returns 0 after suspend, sched_clock will
+>> > appear to jump forward.  This patch resets cd.epoch_cyc to the current
+>> > value of read_sched_clock during resume, which causes sched_clock() just
+>> > after suspend to return the same value as sched_clock() just before
+>> > suspend.
+>> >
+>> > In addition, during the window where epoch_ns has been updated before
+>> > suspend, but epoch_cyc has not been updated after suspend, it is unknown
+>> > whether the clock has reset or not, and sched_clock() could return a
+>> > bogus value.  Add a suspended flag, and return the pre-suspend epoch_ns
+>> > value during this period.
+>> >
+>> > The new behavior is triggered by calling setup_sched_clock_needs_suspend
+>> > instead of setup_sched_clock.
+>> >
+>> > Signed-off-by: Colin Cross <ccross@android.com>
+>>
+>> Sweet!
+>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Santosh, Colin,
+> Have any of you looked at the patch I originally posted for doing this?
+> It needs updating but shows the overall principle - which is to ensure
+> that the epoch is up to date before suspending.
 >
-> Ok, fair enough -- I just want to make sure attribution happens
-> appropriately, and it's a red flag when there's a S-o-b by someone not
-> at your company before yours without explanation.
+> It doesn't deal with resume, because different timers behave differently,
+> and there's no real way to deal with that properly.  The important thing
+> that this patch does is to ensure sched_clock() doesn't ever go backwards.
+>
+>  arch/arm/kernel/sched_clock.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+> index 9a46370..4be4019 100644
+> --- a/arch/arm/kernel/sched_clock.c
+> +++ b/arch/arm/kernel/sched_clock.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/jiffies.h>
+>  #include <linux/kernel.h>
+>  #include <linux/sched.h>
+> +#include <linux/syscore_ops.h>
+>  #include <linux/timer.h>
+>
+>  #include <asm/sched_clock.h>
+> @@ -72,3 +73,20 @@ void __init sched_clock_postinit(void)
+>  {
+>         sched_clock_poll(sched_clock_timer.data);
+>  }
+> +
+> +static int sched_clock_suspend(void)
+> +{
+> +       sched_clock_poll(sched_clock_timer.data);
+> +       return 0;
+> +}
+> +
+> +static struct syscore_ops sched_clock_ops = {
+> +       .suspend        = sched_clock_suspend,
+> +};
+> +
+> +static int __init sched_clock_syscore_init(void)
+> +{
+> +       register_syscore_ops(&sched_clock_ops);
+> +       return 0;
+> +}
+> +device_initcall(sched_clock_syscore_init);
+>
 
-Thanks Olof for considering this very late branch.
+That patch was merged in 3.4, and my patch is on top of it.  Your
+patch updates epoch_cyc and epoch_ns in suspend, but if the first call
+to cyc_to_sched_clock after resume gets cyc = 0, cyc - epoch_cyc can
+be negative, although it will be cast back to a large positive number.
 
-Kevin
+With my patch, epoch_cyc is updated in resume to whatever
+read_sched_clock() returns, and epoch_ns is still set to the suspend
+value, so it appears that sched_clock has not changed between
+sched_clock_suspend and sched_clock_resume.  It will work with any
+timer behavior (reset to 0, reset to random value, or continuing
+counting).  The old setup_sched_clock function maintains the old
+behavior to appease those who like their 32kHz sched clock to continue
+ticking in suspend, although I think it is more correct for all sched
+clocks to be faster than 32 kHz (when possible) and stop in suspend.
