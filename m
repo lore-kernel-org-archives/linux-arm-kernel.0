@@ -1,31 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jul 2012 16:44:54 +0800
-Subject: [PATCH] ARM: mxs: enable ocotp on imx23 and imx28
-In-Reply-To: <1342993697-25875-1-git-send-email-mkl@pengutronix.de>
-References: <1342993697-25875-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20120728084451.GC2128@S2101-09.ap.freescale.net>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Sat, 28 Jul 2012 11:05:10 +0200
+Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
+Message-ID: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2012 at 11:48:17PM +0200, Marc Kleine-Budde wrote:
-> This patch adds ocotp support to imx23 and imx28, a dt-only kernel fails
-> to link with this error message otherwise:
-> 
-> arch/arm/mach-mxs/mach-mxs.c:169: undefined reference to `mxs_get_ocotp'
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
-> Hello Shawn,
-> 
-> this applies to your "mxs/dt-for-3.6" tree. According to the datasheet
-> both processors have a ocotp unit. Hope it alright to select the OCOTP
-> on both imx23 and imx28.
-> 
-I prefer to remove MXS_OCOTP completely and always build in ocotp.c,
-as we are on the way to remove those board files, the users of the
-Kconfig symbol.
+From: Dirk Behme <dirk.behme@googlemail.com>
 
+Fix the compiler warnings
+
+drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
+
+Signed-off-by: Dirk Behme <dirk.behme@googlemail.com>
+---
+ drivers/mtd/nand/mxc_nand.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 6acc790..31b125a 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -1264,16 +1264,16 @@ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
+ static const struct of_device_id mxcnd_dt_ids[] = {
+ 	{
+ 		.compatible = "fsl,imx21-nand",
+-		.data = &imx21_nand_devtype_data,
++		.data = (void *)&imx21_nand_devtype_data,
+ 	}, {
+ 		.compatible = "fsl,imx27-nand",
+-		.data = &imx27_nand_devtype_data,
++		.data = (void *)&imx27_nand_devtype_data,
+ 	}, {
+ 		.compatible = "fsl,imx25-nand",
+-		.data = &imx25_nand_devtype_data,
++		.data = (void *)&imx25_nand_devtype_data,
+ 	}, {
+ 		.compatible = "fsl,imx51-nand",
+-		.data = &imx51_nand_devtype_data,
++		.data = (void *)&imx51_nand_devtype_data,
+ 	},
+ 	{ /* sentinel */ }
+ };
 -- 
-Regards,
-Shawn
+1.7.7.4
