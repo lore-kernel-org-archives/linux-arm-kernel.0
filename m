@@ -1,59 +1,51 @@
 From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Sat, 28 Jul 2012 16:05:34 -0000
-Subject: [PATCH 2/8 v2] ARM: EXYNOS5: Add machine data for USB 2.0
-In-Reply-To: <201207261124.50141.arnd@arndb.de>
+Date: Sat, 28 Jul 2012 16:42:02 -0000
+Subject: [PATCH 4/8 v2] ARM: EXYNOS5: Add EHCI device from device tree
+In-Reply-To: <201207261157.14441.arnd@arndb.de>
 References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
- <1342866729-30460-3-git-send-email-gautam.vivek@samsung.com>
- <201207261124.50141.arnd@arndb.de>
-Message-ID: <CAFp+6iH0c=LogUXnpg0pD05X+mMGP9XiWDDxiTyNQAxJq_srJg@mail.gmail.com>
+ <1342866729-30460-5-git-send-email-gautam.vivek@samsung.com>
+ <201207261157.14441.arnd@arndb.de>
+Message-ID: <CAFp+6iFs3ErqoJLzvuDLQ_mS3RABvxa=aw9piVArRKUBPLiztw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 8:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
+
+On Thu, Jul 26, 2012 at 8:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
 > On Saturday 21 July 2012, Vivek Gautam wrote:
-> > From: Ajay Kumar <ajaykumar.rs@samsung.com>
-> >
-> > This patch adds address mapping of USB 2.0 PHY for exynos5
-> >
-> > Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/common.c           |    5 +++++
-> >  arch/arm/mach-exynos/include/mach/map.h |    2 ++
-> >  2 files changed, 7 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/common.c
-> b/arch/arm/mach-exynos/common.c
-> > index 4eb39cd..92d5e61 100644
-> > --- a/arch/arm/mach-exynos/common.c
-> > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -275,6 +275,11 @@ static struct map_desc exynos5_iodesc[] __initdata
-> = {
-> >                 .pfn            = __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
-> >                 .length         = SZ_4K,
-> >                 .type           = MT_DEVICE,
-> > +       }, {
-> > +               .virtual        = (unsigned long)S3C_VA_USB_HSPHY,
-> > +               .pfn            = __phys_to_pfn(EXYNOS5_PA_USB_PHY),
-> > +               .length         = SZ_4K,
-> > +               .type           = MT_DEVICE,
-> >         },
+> > @@ -28,6 +29,11 @@ static struct exynos4_ohci_platdata
+> smdk5250_ohci_pdata = {
+> >         .phy_exit = s5p_usb_phy_exit,
 > >  };
+> >
+> > +static struct s5p_ehci_platdata smdk5250_ehci_pdata = {
+> > +       .phy_init = s5p_usb_phy_init,
+> > +       .phy_exit = s5p_usb_phy_exit,
+> > +};
+> > +
+> >  /*
+> >   * The following lookup table is used to override device names when
+> devices
+> >   * are registered from device tree. This is temporarily added to enable
 >
-> Can you pleae explain why this is done in the changelog?
+> I'm a bit confused of the purpose of setting the function pointers here
+> when the pointers are always to the same s5p_usb_phy_init/s5p_usb_phy_exit
+> identifiers, but you have different definitions of those functions
+> depending on which platforms you are building for.
 >
-> We try hard to do such mappings from the device driver instead,
-> so I'm surprised that this is necessary fo rthe USB phy.
+> What is the idea here? Are you going to unify the three definitions of
+> s5p_usb_phy_init, or is that function going away eventually when we
+> get to the point of building exynos/s5p/s3c64xx into the same kernel
+> binary?
 >
+> Should we be differentiating here between the calls at runtime for
+different SOCs.
+In that case, yes i think we need a way here to have a solution here so
+that the function call
+goes differently for different soc while in runtime. I will work on this
+and get back asap.
 
-We are doing the mapping for device address in the driver, but this memory
-mapping for USB PHY registers that need to be programmed by the software
-is done here. This is similar to what we see for exynos4 also. Is it
-something
-that i can still change? Please suggest.
-
->
 >         Arnd
 >
 > _______________________________________________
@@ -61,9 +53,8 @@ that i can still change? Please suggest.
 > devicetree-discuss at lists.ozlabs.org
 > https://lists.ozlabs.org/listinfo/devicetree-discuss
 >
-
 Best regards
 Vivek
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120728/842f34d8/attachment.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120728/f79ef87a/attachment.html>
