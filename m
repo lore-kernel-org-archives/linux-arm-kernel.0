@@ -1,135 +1,43 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 28 Jul 2012 12:07:36 +0200
-Subject: [PATCH v3 4/9] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
+Date: Sat, 28 Jul 2012 12:07:39 +0200
+Subject: [PATCH v3 7/9] ARM: pxa3xx: skip default device initialization when
+ booting via DT
 In-Reply-To: <1343470061-16879-1-git-send-email-zonque@gmail.com>
 References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343470061-16879-5-git-send-email-zonque@gmail.com>
+Message-ID: <1343470061-16879-8-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify the code in gpio-pxa.c and make them based on irq_base.
-When not probed from devicetree, initialize irq_base from
-PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
-still works.
-
-Only tested on PXA3xx.
+When booting via DT, the default PXA devices must not have been probed
+before, otherwise the augmented information from the device tree is
+ignored.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpio/gpio-pxa.c | 70 +++++++++++--------------------------------------
- 1 file changed, 16 insertions(+), 54 deletions(-)
+ arch/arm/mach-pxa/pxa3xx.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 58a6a63..6d0cb9d 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -59,6 +59,7 @@
- #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 1827d3c..4a9d04a 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -19,6 +19,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/i2c/pxa-i2c.h>
  
- int pxa_last_gpio;
-+static int irq_base;
+@@ -479,7 +480,8 @@ static int __init pxa3xx_init(void)
+ 		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+ 		register_syscore_ops(&pxa3xx_clock_syscore_ops);
  
- #ifdef CONFIG_OF
- static struct irq_domain *domain;
-@@ -166,63 +167,14 @@ static inline int __gpio_is_occupied(unsigned gpio)
+-		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
++		if (!of_have_populated_dt())
++			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	}
+ 
  	return ret;
- }
- 
--#ifdef CONFIG_ARCH_PXA
--static inline int __pxa_gpio_to_irq(int gpio)
--{
--	if (gpio_is_pxa_type(gpio_type))
--		return PXA_GPIO_TO_IRQ(gpio);
--	return -1;
--}
--
--static inline int __pxa_irq_to_gpio(int irq)
--{
--	if (gpio_is_pxa_type(gpio_type))
--		return irq - PXA_GPIO_TO_IRQ(0);
--	return -1;
--}
--#else
--static inline int __pxa_gpio_to_irq(int gpio) { return -1; }
--static inline int __pxa_irq_to_gpio(int irq) { return -1; }
--#endif
--
--#ifdef CONFIG_ARCH_MMP
--static inline int __mmp_gpio_to_irq(int gpio)
--{
--	if (gpio_is_mmp_type(gpio_type))
--		return MMP_GPIO_TO_IRQ(gpio);
--	return -1;
--}
--
--static inline int __mmp_irq_to_gpio(int irq)
--{
--	if (gpio_is_mmp_type(gpio_type))
--		return irq - MMP_GPIO_TO_IRQ(0);
--	return -1;
--}
--#else
--static inline int __mmp_gpio_to_irq(int gpio) { return -1; }
--static inline int __mmp_irq_to_gpio(int irq) { return -1; }
--#endif
--
- static int pxa_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- {
--	int gpio, ret;
--
--	gpio = chip->base + offset;
--	ret = __pxa_gpio_to_irq(gpio);
--	if (ret >= 0)
--		return ret;
--	return __mmp_gpio_to_irq(gpio);
-+	return chip->base + offset + irq_base;
- }
- 
- int pxa_irq_to_gpio(int irq)
- {
--	int ret;
--
--	ret = __pxa_irq_to_gpio(irq);
--	if (ret >= 0)
--		return ret;
--	return __mmp_irq_to_gpio(irq);
-+	return irq - irq_base;
- }
- 
- static int pxa_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-@@ -510,7 +462,7 @@ const struct irq_domain_ops pxa_irq_domain_ops = {
- #ifdef CONFIG_OF
- static int __devinit pxa_gpio_probe_dt(struct platform_device *pdev)
- {
--	int ret, nr_banks, nr_gpios, irq_base;
-+	int ret, nr_banks, nr_gpios;
- 	struct device_node *prev, *next, *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id =
- 				of_match_device(pxa_gpio_dt_ids, &pdev->dev);
-@@ -564,10 +516,20 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
- 	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
- 
- 	ret = pxa_gpio_probe_dt(pdev);
--	if (ret < 0)
-+	if (ret < 0) {
- 		pxa_last_gpio = pxa_gpio_nums();
--	else
-+#ifdef CONFIG_ARCH_PXA
-+		if (gpio_is_pxa_type(gpio_type))
-+			irq_base = PXA_GPIO_TO_IRQ(0);
-+#endif
-+#ifdef CONFIG_ARCH_MMP
-+		if (gpio_is_mmp_type(gpio_type))
-+			irq_base = MMP_GPIO_TO_IRQ(0);
-+#endif
-+	} else {
- 		use_of = 1;
-+	}
-+
- 	if (!pxa_last_gpio)
- 		return -EINVAL;
- 
 -- 
 1.7.11.2
