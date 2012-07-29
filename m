@@ -1,44 +1,316 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Sun, 29 Jul 2012 18:18:21 +0200
-Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
-In-Reply-To: <20120728133215.GG2128@S2101-09.ap.freescale.net>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <20120728133215.GG2128@S2101-09.ap.freescale.net>
-Message-ID: <5015624D.50305@googlemail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 29 Jul 2012 19:22:36 +0100
+Subject: [PATCH] Fix undefined instruction exception handling
+Message-ID: <20120729182236.GG6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.07.2012 15:32, Shawn Guo wrote:
-> On Wed, Jul 25, 2012 at 02:37:43PM +0200, Dirk Behme wrote:
->> From: Matthias Thomae<matthias.thomae@de.bosch.com>
->>
->> Set ARCH_NR_GPIO for the i.MX6 processor family, which has 7 GPIO
->> controllers with 32 signals each. The default of 256 GPIOs wastes
->> some static table space as explained in Documentation/gpio.txt.
->>
->> Signed-off-by: Matthias Thomae<matthias.thomae@de.bosch.com>
->> CC: Shawn Guo<shawn.guo@linaro.org>
->> ---
->>   arch/arm/Kconfig |    1 +
->>   1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index b25c9d3..5e4cde3 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1626,6 +1626,7 @@ config ARCH_NR_GPIO
->>   	default 355 if ARCH_U8500
->>   	default 264 if MACH_H4700
->>   	default 512 if SOC_OMAP5
->> +	default 224 if SOC_IMX6Q
->
-> So what if we build imx_v6_v7_defconfig with IMX6Q deselected?
+While trying to get a v3.5 kernel booted on the cubox, I noticed that
+VFP does not work correctly with VFP handling.  This is because of the
+confusion over 16-bit vs 32-bit instructions, and where PC is supposed
+to point to.
 
-Hmm, sorry if I missed anything, but how is adding a 'default .. 
-SOC_IMX6Q' related to any defconfig? If you want to deselect SOC_IMX6Q 
-using the way you like you'll get the standard 256 (if I remember 
-correctly).
+The rule is that FP handlers are entered with regs->ARM_pc pointing at
+the _next_ instruction to be executed.  However, if the exception is
+not handled, regs->ARM_pc points at the faulting instruction.
 
-Best regards
+This is easy for ARM mode, because we know that the next instruction and
+previous instructions are separated by four bytes.  This is not true of
+Thumb2 though.
 
-Dirk
+Since all FP instructions are 32-bit in Thumb2, it makes things easy.
+We just need to select the appropriate adjustment.  Do this by moving
+the adjustment out of do_undefinstr() into the assembly code, as only
+the assembly code knows whether it's dealing with a 32-bit or 16-bit
+instruction.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/entry-armv.S |  107 +++++++++++++++++++++++++++--------------
+ arch/arm/kernel/traps.c      |    8 ---
+ arch/arm/vfp/entry.S         |    9 ++++
+ arch/arm/vfp/vfphw.S         |   19 ++++---
+ 4 files changed, 90 insertions(+), 53 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0d1851c..ad595be 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -244,6 +244,19 @@ ENDPROC(__irq_svc)
+ 	b	1b
+ #endif
+ 
++__und_fault:
++	@ Correct the PC such that it is pointing at the instruction
++	@ which caused the fault.  If the faulting instruction was ARM
++	@ the PC will be pointing at the next instruction, and have to
++	@ subtract 4.  Otherwise, it is Thumb, and the PC will be
++	@ pointing at the second half of the Thumb instruction.  We
++	@ have to substract 2.
++	ldr	r2, [r0, #S_PC]
++	sub	r2, r2, r1
++	str	r2, [r0, #S_PC]
++	b	do_undefinstr
++ENDPROC(__und_fault)
++
+ 	.align	5
+ __und_svc:
+ #ifdef CONFIG_KPROBES
+@@ -261,7 +274,7 @@ ENDPROC(__irq_svc)
+ 	@
+ 	@  r0 - instruction
+ 	@
+-#ifndef	CONFIG_THUMB2_KERNEL
++#ifndef CONFIG_THUMB2_KERNEL
+ 	ldr	r0, [r4, #-4]
+ #else
+ 	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
+@@ -269,17 +282,24 @@ ENDPROC(__irq_svc)
+ 	ldrhhs	r9, [r4]			@ bottom 16 bits
+ 	orrhs	r0, r9, r0, lsl #16
+ #endif
+-	adr	r9, BSYM(1f)
++	adr	r9, BSYM(__und_svc_finish)
+ 	mov	r2, r4
+ 	bl	call_fpe
+ 
++	ldr	r5, [sp, #S_PSR]
+ 	mov	r0, sp				@ struct pt_regs *regs
+-	bl	do_undefinstr
++	mov	r1, #4				@ PC correction to apply
++#ifdef CONFIG_THUMB2_KERNEL
++	tst	r5, #PSR_T_BIT
++	movne	r1, #2
++#endif
++	bl	__und_fault
+ 
+ 	@
+ 	@ IRQs off again before pulling preserved data off the stack
+ 	@
+-1:	disable_irq_notrace
++__und_svc_finish:
++	disable_irq_notrace
+ 
+ 	@
+ 	@ restore SPSR and restart the instruction
+@@ -423,25 +443,33 @@ ENDPROC(__irq_usr)
+ 	mov	r2, r4
+ 	mov	r3, r5
+ 
++	@ r2 = regs->ARM_pc, which is either 2 or 4 bytes ahead of the
++	@      faulting instruction depending on Thumb mode.
++	@ r3 = regs->ARM_cpsr
+ 	@
+-	@ fall through to the emulation code, which returns using r9 if
+-	@ it has emulated the instruction, or the more conventional lr
+-	@ if we are to treat this as a real undefined instruction
+-	@
+-	@  r0 - instruction
++	@ The emulation code returns using r9 if it has emulated the
++	@ instruction, or the more conventional lr if we are to treat
++	@ this as a real undefined instruction
+ 	@
+ 	adr	r9, BSYM(ret_from_exception)
+-	adr	lr, BSYM(__und_usr_unknown)
++
+ 	tst	r3, #PSR_T_BIT			@ Thumb mode?
+-	itet	eq				@ explicit IT needed for the 1f label
+-	subeq	r4, r2, #4			@ ARM instr at LR - 4
+-	subne	r4, r2, #2			@ Thumb instr at LR - 2
+-1:	ldreqt	r0, [r4]
++	bne	__und_usr_thumb
++	sub	r4, r2, #4			@ ARM instr at LR - 4
++1:	ldrt	r0, [r4]
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+-	reveq	r0, r0				@ little endian instruction
++	rev	r0, r0				@ little endian instruction
+ #endif
+-	beq	call_fpe
++	@ r0 = 32-bit ARM instruction which caused the exception
++	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
++	@ r4 = PC value for the faulting instruction
++	@ lr = 32-bit undefined instruction function
++	adr	lr, BSYM(__und_usr_fault_32)
++	b	call_fpe
++
++__und_usr_thumb:
+ 	@ Thumb instruction
++	sub	r4, r2, #2			@ First half of thumb instr at LR - 2
+ #if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
+ /*
+  * Thumb-2 instruction handling.  Note that because pre-v6 and >= v6 platforms
+@@ -455,7 +483,7 @@ ENDPROC(__irq_usr)
+ 	ldr	r5, .LCcpu_architecture
+ 	ldr	r5, [r5]
+ 	cmp	r5, #CPU_ARCH_ARMv7
+-	blo	__und_usr_unknown
++	blo	__und_usr_fault_16		@ 16bit undefined instruction
+ /*
+  * The following code won't get run unless the running CPU really is v7, so
+  * coding round the lack of ldrht on older arches is pointless.  Temporarily
+@@ -463,15 +491,18 @@ ENDPROC(__irq_usr)
+  */
+ 	.arch	armv6t2
+ #endif
+-2:
+- ARM(	ldrht	r5, [r4], #2	)
+- THUMB(	ldrht	r5, [r4]	)
+- THUMB(	add	r4, r4, #2	)
++2:	ldrht	r5, [r4]
+ 	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
+-	blo	__und_usr_unknown
+-3:	ldrht	r0, [r4]
++	blo	__und_usr_fault_16		@ 16bit undefined instruction
++3:	ldrht	r0, [r2]
+ 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
++	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
+ 	orr	r0, r0, r5, lsl #16
++	adr	lr, BSYM(__und_usr_fault_32)
++	@ r0 = the two 16-bit Thumb instructions which caused the exception
++	@ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
++	@ r4 = PC value for the first 16-bit Thumb instruction
++	@ lr = 32bit undefined instruction function
+ 
+ #if __LINUX_ARM_ARCH__ < 7
+ /* If the target arch was overridden, change it back: */
+@@ -482,17 +513,13 @@ ENDPROC(__irq_usr)
+ #endif
+ #endif /* __LINUX_ARM_ARCH__ < 7 */
+ #else /* !(CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7) */
+-	b	__und_usr_unknown
++	b	__und_usr_fault_16
+ #endif
+- UNWIND(.fnend		)
++ UNWIND(.fnend)
+ ENDPROC(__und_usr)
+ 
+-	@
+-	@ fallthrough to call_fpe
+-	@
+-
+ /*
+- * The out of line fixup for the ldrt above.
++ * The out of line fixup for the ldrt instructions above.
+  */
+ 	.pushsection .fixup, "ax"
+ 	.align	2
+@@ -524,11 +551,12 @@ ENDPROC(__und_usr)
+  * NEON handler code.
+  *
+  * Emulators may wish to make use of the following registers:
+- *  r0  = instruction opcode.
+- *  r2  = PC+4
++ *  r0  = instruction opcode (32-bit ARM or two 16-bit Thumb)
++ *  r2  = PC value to resume execution after successful emulation
+  *  r9  = normal "successful" return address
+- *  r10 = this threads thread_info structure.
++ *  r10 = this threads thread_info structure
+  *  lr  = unrecognised instruction return address
++ * IRQs disabled, FIQs enabled.
+  */
+ 	@
+ 	@ Fall-through from Thumb-2 __und_usr
+@@ -659,12 +687,17 @@ ENTRY(no_fp)
+ 	mov	pc, lr
+ ENDPROC(no_fp)
+ 
+-__und_usr_unknown:
+-	enable_irq
++__und_usr_fault_32:
++	mov	r1, #4
++	b	1f
++__und_usr_fault_16:
++	mov	r1, #2
++1:	enable_irq
+ 	mov	r0, sp
+ 	adr	lr, BSYM(ret_from_exception)
+-	b	do_undefinstr
+-ENDPROC(__und_usr_unknown)
++	b	__und_fault
++ENDPROC(__und_usr_fault_32)
++ENDPROC(__und_usr_fault_16)
+ 
+ 	.align	5
+ __pabt_usr:
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 4928d89..6019566 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -370,18 +370,10 @@ static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
+ 
+ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ {
+-	unsigned int correction = thumb_mode(regs) ? 2 : 4;
+ 	unsigned int instr;
+ 	siginfo_t info;
+ 	void __user *pc;
+ 
+-	/*
+-	 * According to the ARM ARM, PC is 2 or 4 bytes ahead,
+-	 * depending whether we're in Thumb mode or not.
+-	 * Correct this offset.
+-	 */
+-	regs->ARM_pc -= correction;
+-
+ 	pc = (void __user *)instruction_pointer(regs);
+ 
+ 	if (processor_mode(regs) == SVC_MODE) {
+diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
+index 4fa9903..4f9ca8d 100644
+--- a/arch/arm/vfp/entry.S
++++ b/arch/arm/vfp/entry.S
+@@ -19,6 +19,15 @@
+ #include <asm/vfpmacros.h>
+ #include "../kernel/entry-header.S"
+ 
++@ VFP entry point.
++@
++@  r0  = instruction opcode (32-bit ARM or two 16-bit Thumb)
++@  r2  = PC value to resume execution after successful emulation
++@  r9  = normal "successful" return address
++@  r10 = this threads thread_info structure
++@  lr  = unrecognised instruction return address
++@  IRQs disabled.
++@
+ ENTRY(do_vfp)
+ #ifdef CONFIG_PREEMPT
+ 	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
+diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+index 2d30c7f..3a0efaa 100644
+--- a/arch/arm/vfp/vfphw.S
++++ b/arch/arm/vfp/vfphw.S
+@@ -61,13 +61,13 @@
+ 
+ @ VFP hardware support entry point.
+ @
+-@  r0  = faulted instruction
+-@  r2  = faulted PC+4
+-@  r9  = successful return
++@  r0  = instruction opcode (32-bit ARM or two 16-bit Thumb)
++@  r2  = PC value to resume execution after successful emulation
++@  r9  = normal "successful" return address
+ @  r10 = vfp_state union
+ @  r11 = CPU number
+-@  lr  = failure return
+-
++@  lr  = unrecognised instruction return address
++@  IRQs enabled.
+ ENTRY(vfp_support_entry)
+ 	DBGSTR3	"instr %08x pc %08x state %p", r0, r2, r10
+ 
+@@ -161,9 +161,12 @@ ENTRY(vfp_support_entry)
+ 					@ exception before retrying branch
+ 					@ out before setting an FPEXC that
+ 					@ stops us reading stuff
+-	VFPFMXR	FPEXC, r1		@ restore FPEXC last
+-	sub	r2, r2, #4
+-	str	r2, [sp, #S_PC]		@ retry the instruction
++	VFPFMXR	FPEXC, r1		@ Restore FPEXC last
++	sub	r2, r2, #4		@ Retry current instruction - if Thumb
++	str	r2, [sp, #S_PC]		@ mode it's two 16-bit instructions,
++					@ else it's one 32-bit instruction, so
++					@ always subtract 4 from the following
++					@ instruction address.
+ #ifdef CONFIG_PREEMPT
+ 	get_thread_info	r10
+ 	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
