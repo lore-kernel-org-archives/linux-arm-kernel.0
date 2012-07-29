@@ -1,41 +1,23 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Sun, 29 Jul 2012 21:15:10 +0000
-Subject: [PATCH] video: exynos mipi dsi: Fix mipi dsi regulators handling
- issue
-In-Reply-To: <500CB61A.6000106@samsung.com>
-References: <500CB61A.6000106@samsung.com>
-Message-ID: <5015A7DE.6050101@gmx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 29 Jul 2012 22:22:16 +0100
+Subject: [PATCH] ARM: disable interrupt before spinning endlessly
+In-Reply-To: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
+References: <1341824988-18615-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120729212216.GA11423@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2012 02:25 AM, Donghwa Lee wrote:
-> When FB_BLANK_UNLANK event occured, exynos mipi dsi regulators have to turn on.
+On Mon, Jul 09, 2012 at 05:09:48PM +0800, Shawn Guo wrote:
+> The CPU will endlessly spin at the end of machine_halt and
+> machine_restart calls.  However, this will lead to a soft lockup
+> warning after about 20 seconds, if CONFIG_LOCKUP_DETECTOR is enabled,
+> as system timer is still alive.
 > 
-> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-
-Applied.
-
-
-Thanks,
-
-Florian Tobias Schandinat
-
+> Disable interrupt before going to spin endlessly, so that the lockup
+> warning will never be seen.
+> 
+> Reported-by: Marek Vasut <marex@denx.de>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  drivers/video/exynos/exynos_mipi_dsi.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-> index 6c1f5c3..9390640 100644
-> --- a/drivers/video/exynos/exynos_mipi_dsi.c
-> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
-> @@ -154,7 +154,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
->  		if (client_drv && client_drv->power_on)
->  			client_drv->power_on(client_dev, 1);
->  
-> -		exynos_mipi_regulator_disable(dsim);
-> +		exynos_mipi_regulator_enable(dsim);
->  
->  		/* enable MIPI-DSI PHY. */
->  		if (dsim->pd->phy_enable)
+
+Should this also be Cc'd to stable when it's committed?
