@@ -1,38 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Jul 2012 22:31:25 +0100
-Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
-In-Reply-To: <CABxcv=mVKt8+gYK6kHydmG3SnDZgjMbJuEcUBx_z5sumNY_SQw@mail.gmail.com>
-References: <20120625005134.GA2342@S2101-09.ap.freescale.net>
- <20120625084905.GD19226@n2100.arm.linux.org.uk>
- <CAAwP0s2jTPM_ErDOFKXoe95_Xd=xjkuTAsDbLctQ08_QVNkakQ@mail.gmail.com>
- <5012CC98.60206@ti.com> <20120727204447.GA10024@mudshark.cambridge.arm.com>
- <20120727210637.GA16377@n2100.arm.linux.org.uk>
- <20120727214024.GA10249@mudshark.cambridge.arm.com>
- <20120728100831.GC7405@n2100.arm.linux.org.uk>
- <20120728121103.GA11370@mudshark.cambridge.arm.com>
- <CABxcv=mVKt8+gYK6kHydmG3SnDZgjMbJuEcUBx_z5sumNY_SQw@mail.gmail.com>
-Message-ID: <20120729213125.GD7405@n2100.arm.linux.org.uk>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sun, 29 Jul 2012 18:50:47 -0400
+Subject: [PULL REQUEST] ARM: Orion DT converstions
+In-Reply-To: <CAOesGMi1mDyUDYV7abPU6Xd7bnoSKyZz6Zem0nBXkTPrm0v1Og@mail.gmail.com>
+References: <20120727152236.GB31179@lunn.ch>
+ <CAOesGMi1mDyUDYV7abPU6Xd7bnoSKyZz6Zem0nBXkTPrm0v1Og@mail.gmail.com>
+Message-ID: <CAMW5Ufa_q9iPPSqe2YJNK_kY5wVf-gyW5BfO2G6DmXhrtMT+GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 28, 2012 at 04:26:28PM +0200, Javier Martinez Canillas wrote:
-> On Sat, Jul 28, 2012 at 2:11 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> >
-> > The next question is: who's putting this into the patch system?
-> >
-> > Will
-> 
-> Hi,
-> 
-> I just put the patch with Will's Acked-by on the patch system. It  was
-> accepted as patch 7480/1 [1].
-> 
-> The patch is on top of today's linux-next (next-20120727).
-> 
-> Thanks a lot and best regards,
-> Javier
-> 
-> [1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7480/1
+>
+> I pulled this from git://github.com/lunn/linux.git instead, please
+> make sure you use the public URL in the future.
+>
+> I've pulled it in as late2/dt, if all looks good in -next I'll send it
+> up in a few days but no hard commitments since it was merged so late.
+>
+>
+> -Olof
 
-Isn't this a candidate for stable kernels?
+By 'all looks good' are you requesting testing, if so what should I pull from?
+
+Josh Coombs
