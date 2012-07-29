@@ -1,74 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Jul 2012 16:48:11 +0100
-Subject: Problem: CONFIG_KALLSYMS is not set + kernel/module.c
-In-Reply-To: <50155655.9070002@gmail.com>
-References: <50155655.9070002@gmail.com>
-Message-ID: <20120729154811.GF6802@n2100.arm.linux.org.uk>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 29 Jul 2012 23:54:26 +0800
+Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
+In-Reply-To: <501551E4.6020806@gmail.com>
+References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
+ <1343330187-20049-5-git-send-email-zonque@gmail.com>
+ <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
+ <5013B750.6060608@gmail.com>
+ <CAN1soZxgw-pu3OQ357Be9Nuk_Ln7B9EjkVWeh5gEXB_y6tO7ig@mail.gmail.com>
+ <501551E4.6020806@gmail.com>
+Message-ID: <CAN1soZzAMiduQw+mZLs+bB2E-G5Lrm-TV4tEZKL7vUBUuwj+ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not ARM specific, please post it more widely.  Also consider
-sending it to the person responsible for the module code as listed in
-MAINTAINERS.  Thanks.
+On Sun, Jul 29, 2012 at 11:08 PM, Daniel Mack <zonque@gmail.com> wrote:
+> Hi Haojian,
+>
+> On 28.07.2012 17:42, Haojian Zhuang wrote:
+>> On Sat, Jul 28, 2012 at 5:56 PM, Daniel Mack <zonque@gmail.com> wrote:
+>>> On 28.07.2012 09:17, Haojian Zhuang wrote:
+>>>> On Fri, Jul 27, 2012 at 3:16 AM, Daniel Mack <zonque@gmail.com> wrote:
+>>>>> Properly register on-chip interrupt using the irqdomain logic. The
+>>>>> number of interrupts is taken from the devicetree node.
+>>>>>
+>>>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>>>> ---
+>>>>>  arch/arm/mach-pxa/irq.c    | 73 ++++++++++++++++++++++++++++++++++++++++++++++
+>>>>>  arch/arm/mach-pxa/pxa3xx.c | 17 +++++++++--
+>>>>>  2 files changed, 88 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> +#ifdef CONFIG_OF
+>>>>> +static struct irq_domain *pxa_irq_domain;
+>>>>> +
+>>>>> +static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
+>>>>> +                      irq_hw_number_t hw)
+>>>>> +{
+>>>>> +       int irq, i = hw % 32;
+>>>>> +       void __iomem *base = irq_base(hw / 32);
+>>>>> +
+>>>>> +       /* initialize interrupt priority */
+>>>>> +       if (cpu_has_ipr())
+>>>>> +               __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
+>>>> Since we have DT support at here. Could we use property for interrupt priority?
+>>>
+>>> Not sure what you mean here. Can you elaborate? I couldn't find any
+>>> reference to IRQ priorities in other platforms either.
+>>>
+>>> Maybe we can also add that in a separate patch, which would also help in
+>>> tracking possible regressions du to such a change?
+>>>
+>> cpu_has_ipr() returns true if CPU isn't PXA25x.
+>> My point is that we can avoid to use cpu_is_xxx() while DT is used. We only need
+>> to append a property "marvell,intc-priority" is DTS. So the code could
+>> be changed
+>> in below.
+>> if (of_find_property(np, "marvell,intc-priority", NULL))
+>>            __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
+>>
+>>>>> +       irq = PXA_IRQ(virq);
+>>>> #ifdef CONFIG_PXA_HAVE_ISA_IRQS
+>>>> #define PXA_ISA_IRQ(x)  (x)
+>>>> #define PXA_ISA_IRQ_NUM (16)
+>>>> #else
+>>>> #define PXA_ISA_IRQ_NUM (0)
+>>>> #endif
+>>>>
+>>>> Could we avoid to use PXA_IRQ() at here? We can make use of
+>>>> NR_IRQS_LEGACY that is 16. Since you already use irq_alloc_descs()
+>>>> to allocate irqs that virtual irq number starts from 16. So you needn't
+>>>> use PXA_IRQ() any more.
+>>>
+>>> Ok, I changed this. Note that there's still need to subtract
+>>> NR_IRQS_LEGACY from the virq that is passed in to the .map function,
+>>> because early_irq_init() in kernel/irq/irqdesc.c will pre-allocate the
+>>> IRQs the platform claims to have natively, which defaults to 16 on PXA,
+>>> unless the machine descriptor sets nr_irqs, which it doesn't in case of DT.
+>>>
+>> You needn't subtract NR_IRQS_LEGACY. PXA25x hwirq starts from
+>> 16 & PXA27x/PXA3xx hwirq starts from 0. While DT is used, irq_alloc_descs()
+>> allocates virq from NR_IRQS_LEGACY. For PXA25x, there's exactly match.
+>> For PXA27x/PXA3xx, there's a little different. But it doesn't matter. We needn't
+>> force virq starting from 0 on PXA27x/PXA3xx. The first virq starts from 16 is
+>> also OK.
+>
+> Ok, now I got you. By simply ignoring the virq passed in and only taking
+> into account the hw irq, this is of course possible.
+>
+> Please see the attached patch. Does that look better to you? I removed
+> the cpu_has_ipr() inline function and made it a variable that is used
+> and initalized from both the DT and the legacy code.
+>
+>
+> Daniel
+>
 
-On Sun, Jul 29, 2012 at 08:27:17AM -0700, Mark Hinds wrote:
->
-> In linux-3.2.xx I've been getting kernel dumps when I modprobe some
-> modules with CONFIG_KALLSYMS diabled - nls_base.ko for example.
-> I traced the problem to kernel/module.c, line 2607 or there about.
->
-> Starting with:
-> ptr = module_alloc_update_bounds(mod->init_size);
->
-> If mod->init_size == 0 then foobar happens. I assume that there is
-> no init section in some modules when CONFIG_KALLSYMS is disabled.
->
-> Here is my fix:
->
-> Index: kernel/module.c
-> ===================================================================
-> --- kernel/module.c	(.../linux-3.2.24/kernel/module.c)	(revision 9084)
-> +++ kernel/module.c	(.../linux-3.2.24-ces/kernel/module.c)	(working copy)
-> @@ -2604,20 +2604,24 @@
->  	memset(ptr, 0, mod->core_size);
->  	mod->module_core = ptr;
->
-> -	ptr = module_alloc_update_bounds(mod->init_size);
-> -	/*
-> -	 * The pointer to this block is stored in the module structure
-> -	 * which is inside the block. This block doesn't need to be
-> -	 * scanned as it contains data and code that will be freed
-> -	 * after the module is initialized.
-> -	 */
-> -	kmemleak_ignore(ptr);
-> -	if (!ptr && mod->init_size) {
-> -		module_free(mod, mod->module_core);
-> -		return -ENOMEM;
-> +#warning ### CES/zoro fix problem with mod->init_size == 0
-> +	if (mod->init_size) {
-> +		ptr = module_alloc_update_bounds(mod->init_size);
-> +		/*
-> +	 	* The pointer to this block is stored in the module structure
-> +	 	* which is inside the block. This block doesn't need to be
-> +	 	* scanned as it contains data and code that will be freed
-> +	 	* after the module is initialized.
-> +	 	*/
-> +		kmemleak_ignore(ptr);
-> +		if (!ptr) {
-> +			module_free(mod, mod->module_core);
-> +			return -ENOMEM;
-> +		}
-> +		memset(ptr, 0, mod->init_size);
-> +		mod->module_init = ptr;
->  	}
-> -	memset(ptr, 0, mod->init_size);
-> -	mod->module_init = ptr;
-> +	else mod->module_init = NULL;
->
->  	/* Transfer each section which specifies SHF_ALLOC */
->  	DEBUGP("final section addresses:\n");
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes, both of these two are fixed perfectly. Now let's focus on this in below.
+I just find it.
+
++	if (cpu_has_ipr)
++		__raw_writel(bit | IPR_VALID, IRQ_BASE + IPR(bit));
+
+#define IRQ_BASE                io_p2v(0x40d00000)
+
+IRQ_BASE is defined in arch/arm/mach-pxa/irq.c. It's OK for non-DT mode.
+If we want to support DT, I hope that all registers mapping should be covered by
+of_iomap(). We should discard this kind of static register mapping. You can
+find some reference in current code base.
+
+Regards
+Haojian
