@@ -1,20 +1,19 @@
 From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Sun, 29 Jul 2012 21:05:04 +0000
-Subject: [PATCH v2] da8xx-fb: add missing FB_BLANK operations
-In-Reply-To: <1341583288-30281-1-git-send-email-yegorslists@googlemail.com>
-References: <1341583288-30281-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <5015A580.5030203@gmx.de>
+Date: Sun, 29 Jul 2012 21:15:10 +0000
+Subject: [PATCH] video: exynos mipi dsi: Fix mipi dsi regulators handling
+ issue
+In-Reply-To: <500CB61A.6000106@samsung.com>
+References: <500CB61A.6000106@samsung.com>
+Message-ID: <5015A7DE.6050101@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2012 02:01 PM, yegorslists at googlemail.com wrote:
-> From: Yegor Yefremov <yegorslists@googlemail.com>
+On 07/23/2012 02:25 AM, Donghwa Lee wrote:
+> When FB_BLANK_UNLANK event occured, exynos mipi dsi regulators have to turn on.
 > 
-> add FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND and FB_BLANK_HSYNC_SUSPEND
-> modes (copy drivers/video/omap2/omapfb/omapfb-main.c implementation).
-> Otherwise X-server will complain about invalid parameter.
-> 
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
 Applied.
 
@@ -24,22 +23,19 @@ Thanks,
 Florian Tobias Schandinat
 
 > ---
-> v2: add linux-fbdev as recipient 
+>  drivers/video/exynos/exynos_mipi_dsi.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
->  drivers/video/da8xx-fb.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
-> index 47118c7..8d745bf 100644
-> --- a/drivers/video/da8xx-fb.c
-> +++ b/drivers/video/da8xx-fb.c
-> @@ -1026,6 +1026,9 @@ static int cfb_blank(int blank, struct fb_info *info)
+> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+> index 6c1f5c3..9390640 100644
+> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+> @@ -154,7 +154,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+>  		if (client_drv && client_drv->power_on)
+>  			client_drv->power_on(client_dev, 1);
 >  
->  		lcd_enable_raster();
->  		break;
-> +	case FB_BLANK_NORMAL:
-> +	case FB_BLANK_VSYNC_SUSPEND:
-> +	case FB_BLANK_HSYNC_SUSPEND:
->  	case FB_BLANK_POWERDOWN:
->  		if (par->panel_power_ctrl)
->  			par->panel_power_ctrl(0);
+> -		exynos_mipi_regulator_disable(dsim);
+> +		exynos_mipi_regulator_enable(dsim);
+>  
+>  		/* enable MIPI-DSI PHY. */
+>  		if (dsim->pd->phy_enable)
