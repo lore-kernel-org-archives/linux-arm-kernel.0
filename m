@@ -1,37 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 29 Jul 2012 13:11:07 +0000
-Subject: [PATCH 2/8 v2] ARM: EXYNOS5: Add machine data for USB 2.0
-In-Reply-To: <CAFp+6iH0c=LogUXnpg0pD05X+mMGP9XiWDDxiTyNQAxJq_srJg@mail.gmail.com>
-References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
- <201207261124.50141.arnd@arndb.de>
- <CAFp+6iH0c=LogUXnpg0pD05X+mMGP9XiWDDxiTyNQAxJq_srJg@mail.gmail.com>
-Message-ID: <201207291311.08012.arnd@arndb.de>
+Date: Sun, 29 Jul 2012 14:19:52 +0000
+Subject: Sharing resources between several drivers.
+In-Reply-To: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+References: <CACKLOr2enmsVqQnJ8JZJJd3z3gGKDKwj74PnWKEk6SwSN=ZoJw@mail.gmail.com>
+Message-ID: <201207291419.52526.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 July 2012, Vivek Gautam wrote:
-> > Can you pleae explain why this is done in the changelog?
-> >
-> > We try hard to do such mappings from the device driver instead,
-> > so I'm surprised that this is necessary fo rthe USB phy.
-> >
+On Friday 27 July 2012, javier Martin wrote:
+> we are trying to support pinctrl for i.MX21, i.MX1 and i.MX27.
 > 
-> We are doing the mapping for device address in the driver, but this memory
-> mapping for USB PHY registers that need to be programmed by the software
-> is done here. This is similar to what we see for exynos4 also. Is it
-> something
-> that i can still change? Please suggest.
+> In these chips, gpio and pinctrl use the same HW memory area
+> registers. This means that we have to request the same memory area
+> from two different drivers (gpio and pinctrl) but we don't know how to
+> do that.
+> 
+> A similar example available is mxs, but it only works with device
+> tree, so this problem is avoided.  However, some of these chips
+> (i.MX21, i.MX1...) don't support device tree yet, so we need to
+> provide backwards compatibility.
+> 
+> What is the right way to request the same memory region from two
+> different drivers? Moreover, how can we guarantee that there won't be
+> any conflicts when accessing these shared resources?
 
+I think the method that Linus Walleij usually recomments for dealing with
+this is to create a combined gpio+pinctrl driver that lives in
+drivers/pinctrl but registers to gpiolib as well.
 
-Yes, I think the USB PHY handling for all exynos chips should be changed
-from an ad-hoc method to a more formal device driver. As I commented
-in another patch of this series, I think the main problem is that
-treat the USB PHY as a property of the "platform", which it really isn't.
-
-We have a bunch of other USB PHY drivers for other platforms that are
-inside of the drivers/usb hierarchy. For all I know, there is no formal
-USB PHY driver API yet, and it seems that it would be a good idea to
-introduce one now, but for now, just move the code to
-drivers/usb/phy/ and make it one file per different kind of PHY.
+Have a look at drivers/pinctrl/pinctrl-nomadik.c for an example of this.
 
 	Arnd
