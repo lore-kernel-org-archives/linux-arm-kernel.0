@@ -1,28 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 29 Jul 2012 21:52:28 +0100
-Subject: [PATCH 17/18] ARM: ux500: Add all encompassing Sound node to
- DB8500 Device Tree
-In-Reply-To: <1343393162-11938-18-git-send-email-lee.jones@linaro.org>
-References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-18-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120729205227.GL4384@opensource.wolfsonmicro.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Sun, 29 Jul 2012 21:05:04 +0000
+Subject: [PATCH v2] da8xx-fb: add missing FB_BLANK operations
+In-Reply-To: <1341583288-30281-1-git-send-email-yegorslists@googlemail.com>
+References: <1341583288-30281-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <5015A580.5030203@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 01:46:01PM +0100, Lee Jones wrote:
+On 07/06/2012 02:01 PM, yegorslists at googlemail.com wrote:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+> 
+> add FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND and FB_BLANK_HSYNC_SUSPEND
+> modes (copy drivers/video/omap2/omapfb/omapfb-main.c implementation).
+> Otherwise X-server will complain about invalid parameter.
+> 
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
 
->  arch/arm/boot/dts/db8500.dtsi |    8 ++++++++
+Applied.
 
-This is a generic DT include file but...
 
-> +		sound {
-> +			compatible = "stericsson,snd-soc-mop500";
-> +
-> +			stericsson,platform-pcm-dma = <&pcm>;
-> +			stericsson,cpu-dai = <&msp1 &msp3>;
-> +			stericsson,audio-codec = <&codec>;
-> +		};
+Thanks,
 
-...this is clearly the board-specific setup for the system, showing how
-the CPU and CODEC are hooked up.  This should therefore be in the DT for
-whatever board this is you're working on.
+Florian Tobias Schandinat
+
+> ---
+> v2: add linux-fbdev as recipient 
+> 
+>  drivers/video/da8xx-fb.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+> index 47118c7..8d745bf 100644
+> --- a/drivers/video/da8xx-fb.c
+> +++ b/drivers/video/da8xx-fb.c
+> @@ -1026,6 +1026,9 @@ static int cfb_blank(int blank, struct fb_info *info)
+>  
+>  		lcd_enable_raster();
+>  		break;
+> +	case FB_BLANK_NORMAL:
+> +	case FB_BLANK_VSYNC_SUSPEND:
+> +	case FB_BLANK_HSYNC_SUSPEND:
+>  	case FB_BLANK_POWERDOWN:
+>  		if (par->panel_power_ctrl)
+>  			par->panel_power_ctrl(0);
