@@ -1,53 +1,19 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sun, 29 Jul 2012 22:40:28 +0200
-Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
-In-Reply-To: <201207291409.56645.arnd@arndb.de>
-References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
- <5013B750.6060608@gmail.com>
- <CAN1soZxgw-pu3OQ357Be9Nuk_Ln7B9EjkVWeh5gEXB_y6tO7ig@mail.gmail.com>
- <201207291409.56645.arnd@arndb.de>
-Message-ID: <50159FBC.2010409@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 29 Jul 2012 21:42:18 +0100
+Subject: [PATCH 05/18] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+In-Reply-To: <1343393162-11938-6-git-send-email-lee.jones@linaro.org>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+ <1343393162-11938-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120729204218.GI4384@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.07.2012 16:09, Arnd Bergmann wrote:
-> On Saturday 28 July 2012, Haojian Zhuang wrote:
->> On Sat, Jul 28, 2012 at 5:56 PM, Daniel Mack <zonque@gmail.com> wrote:
->>>> Since we have DT support at here. Could we use property for interrupt priority?
->>>
->>> Not sure what you mean here. Can you elaborate? I couldn't find any
->>> reference to IRQ priorities in other platforms either.
->>>
->>> Maybe we can also add that in a separate patch, which would also help in
->>> tracking possible regressions du to such a change?
->>>
->> cpu_has_ipr() returns true if CPU isn't PXA25x.
->> My point is that we can avoid to use cpu_is_xxx() while DT is used. We only need
->> to append a property "marvell,intc-priority" is DTS. So the code could
->> be changed
->> in below.
->> if (of_find_property(np, "marvell,intc-priority", NULL))
->>            __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
-> 
-> I think we can do even better if we extend the binding for this interrupt controller
-> driver to have either #interrupt-cells=<1> or #interrupt-cells=<2>, depending on the
-> chip that is being used. If the it is <1> (for pxa25x), then any driver would
-> just use a bare interrupt number. If it's <2> (for all others), the driver would
-> specify both the interrupt number and the priority, and we set up the register at
-> the time when the interrupt gets enabled.
-> 
-> Do you think that would work?
+On Fri, Jul 27, 2012 at 01:45:49PM +0100, Lee Jones wrote:
 
-Hmm, PXA25x (which does not feature IRQ priorities) shares a fair amount
-of peripherals with other PXA series (which do have support for that). I
-would much like to reflect that fact by inherhiting device nodes from
-one dtsi to the other. Hence, if at all, we would need to have two cells
-always, and just ignore the second argument on PXA25x.
+> +	if (of_get_property(np, "stericsson,use-pinctrl", NULL))
+> +		msp->use_pinctrl = true;
+> +	else
+> +		msp->use_pinctrl = false;
 
-And I also wonder whether using the second spec value for a priority
-wouldn't be somehow abusive? Isn't that considered to denote the trigger
-flags in contexts of interrupt controllers? At least, that is what
-irq_domain_xlate_twocell() assumes.
-
-
-Daniel
+I don't recall seeing any response to my query about this on the first
+iteration.  Please don't just ignore review comments.
