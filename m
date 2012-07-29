@@ -1,25 +1,18 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Sun, 29 Jul 2012 21:33:19 +0200
-Subject: ltp abort01  Unable to handle kernel NULL pointer dereference
- at virtual address 00000150
-In-Reply-To: <20120729191736.GA12756@lunn.ch>
-References: <20120729191736.GA12756@lunn.ch>
-Message-ID: <50158FFF.5000402@xenomai.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 29 Jul 2012 21:22:19 +0100
+Subject: [RFC PATCH 1/1] ASoC: soc-dapm: warn if no avaiable path found
+ for widget kcontrol
+In-Reply-To: <1343387941-25266-1-git-send-email-b29396@freescale.com>
+References: <1343387941-25266-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120729202219.GA4384@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2012 09:17 PM, Andrew Lunn wrote:
-
-> Hi Will
+On Fri, Jul 27, 2012 at 07:19:01PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> I've not use the Linux Test Project before. So i decided to give it a
-> go on my ARM Kirkwood QNAP NAS. To my surprise, it exploded on the
-> very first test:
+> This could help people know what's wrong going on if the required
+> path is not registered.
 
-
-See:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104853.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/109631.html
-
--- 
-                                                                Gilles.
+This isn't a good idea, it's fairly common for widgets to have a "None"
+option which isn't expected to have an input.
