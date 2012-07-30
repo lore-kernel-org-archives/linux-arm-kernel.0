@@ -1,22 +1,25 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 30 Jul 2012 12:18:54 +0800
-Subject: [PATCH v3] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120713082203.GA1031@S2100-06.ap.freescale.net>
-References: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
- <20120713082203.GA1031@S2100-06.ap.freescale.net>
-Message-ID: <20120730041852.GF30774@S2101-09.ap.freescale.net>
+Date: Mon, 30 Jul 2012 12:57:25 +0800
+Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <20120727020433.GA3347@b20223-02.ap.freescale.net>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+ <CAMQu2gw32LogXJJa+K5ZjmCZzBNK3FY2wYwZXU8fsftsVzEO2Q@mail.gmail.com>
+ <20120720123317.GA32263@S2101-09.ap.freescale.net>
+ <CAJOA=zMQKLTumW7Nx68+yxHC5Yk4QyiL2mf1+TSZfVOAtnXDWA@mail.gmail.com>
+ <CAMQu2gy4p+rL-sDAsGCnqSn_2eXwSqf---OS0BSXuDoacjd6_g@mail.gmail.com>
+ <20120721063811.GA619@S2101-09.ap.freescale.net>
+ <20120727020433.GA3347@b20223-02.ap.freescale.net>
+Message-ID: <20120730045715.GA31509@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2012 at 04:22:04PM +0800, Shawn Guo wrote:
-> Alessandro,
+On Fri, Jul 27, 2012 at 10:04:34AM +0800, Richard Zhao wrote:
+> Are we going to support the case in the future that cores has
+> independent freq? If yes, maybe we should have a more common name.
 > 
-> Is it possible to queue the patch for 3.6?
-> 
-Hi Andrew,
-
-It seems that you are collecting RTC patches?  Can you please have
-a look at the patch and see if it's possible to send it for 3.6?
+I do not think we should support that with this driver.  That's one of
+the reasons I named the driver this way.
 
 -- 
 Regards,
