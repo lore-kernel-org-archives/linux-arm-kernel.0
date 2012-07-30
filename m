@@ -1,37 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Jul 2012 14:57:12 +0100
-Subject: [PATCH 05/18] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
-In-Reply-To: <20120730133930.GB4468@opensource.wolfsonmicro.com>
-References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-6-git-send-email-lee.jones@linaro.org>
- <20120729204218.GI4384@opensource.wolfsonmicro.com>
- <50162F70.2050900@linaro.org>
- <20120730133930.GB4468@opensource.wolfsonmicro.com>
-Message-ID: <501692B8.6050102@linaro.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 30 Jul 2012 22:01:04 +0800
+Subject: [PATCH v3 0/9] Assorted PXA3xx DT patches
+In-Reply-To: <201207291304.57063.arnd@arndb.de>
+References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
+ <201207291304.57063.arnd@arndb.de>
+Message-ID: <CAN1soZw0sfLOp5beXEi7_v+MX0MbhDewBt_gC--7hHqLY3DFng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/12 14:39, Mark Brown wrote:
-> On Mon, Jul 30, 2012 at 07:53:36AM +0100, Lee Jones wrote:
->> On 29/07/12 21:42, Mark Brown wrote:
+On Sun, Jul 29, 2012 at 9:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 28 July 2012, Daniel Mack wrote:
+>>
+>> This is a series of 9 patches that add basic support for booting PXA3xx
+>> boards from devicetrees. I'm able to mount a rootfs and use all
+>> irq/gpio based functions as well as the NAND, USB and RTC drivers.
+>>
+>> Changes from v2:
+>>  - more "mrvl" -> "marvell" renaming fixes
+>>  - avoid PXA_IRQ() in new code in arch/arm/mach-pxa/irq.c
+>>  - add the two GPIO patches that have been acked-by Arnd already
+>>
 >
->>>> +	if (of_get_property(np, "stericsson,use-pinctrl", NULL))
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 >
->>> This doesn't seem particularly sane...  why is this conditional?
->
->> It's conditional because only MSP1 and MSP3 have pinctrl support.
->
-> Why does the driver care - doesn't the pinctrl abstraction and/or
-> bindings handle this sensibly?
+Applied
 
-Not when I tested it. pinctrl_get() came back !IS_ERR() for MSP0, MSP2 & 
-MSP3, then when it went on to pinctrl_lookup_state(), only then did it 
-fail. Would it be more sane to retract the error messages and just let 
-it fail silently? It's either that or have lots of "could not get MSP 
-defstate" clogging up the log.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards
+Haojian
