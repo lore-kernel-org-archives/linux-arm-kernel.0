@@ -1,96 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 30 Jul 2012 17:55:47 +0200
-Subject: [PATCH 5/6] csb1724: Enable device tree based mv643xx ethernet
- support.
-In-Reply-To: <1343661359-10150-6-git-send-email-ian.molton@codethink.co.uk>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-6-git-send-email-ian.molton@codethink.co.uk>
-Message-ID: <20120730155547.GL18016@lunn.ch>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 30 Jul 2012 09:00:32 -0700
+Subject: [PATCH 00/12] chipidea/imx: add otg support and some bug fix
+In-Reply-To: <20120730091757.GH3347@b20223-02.ap.freescale.net>
+References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
+ <20120717004057.GA25562@kroah.com>
+ <20120719020553.GO21635@b20223-02.ap.freescale.net>
+ <20120726105947.GW21635@b20223-02.ap.freescale.net>
+ <20120730091757.GH3347@b20223-02.ap.freescale.net>
+Message-ID: <20120730160032.GA28703@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 04:15:58PM +0100, Ian Molton wrote:
->     This patch enables mv643xx based ethernet built into the SoM on the
->     csb1724, via flattened device tree.
+On Mon, Jul 30, 2012 at 05:17:58PM +0800, Richard Zhao wrote:
+> On Thu, Jul 26, 2012 at 06:59:48PM +0800, Richard Zhao wrote:
+> > On Thu, Jul 19, 2012 at 10:05:54AM +0800, Richard Zhao wrote:
+> > > On Mon, Jul 16, 2012 at 05:40:57PM -0700, Greg KH wrote:
+> > > > On Thu, Jul 12, 2012 at 03:01:40PM +0800, Richard Zhao wrote:
+> > > > > The patch set is tested on imx6q_sabrelite board.
+> > > > > 
+> > > > > The patch can also be found at
+> > > > > https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+> > > > > 
+> > > > > For test which merged platform patches:
+> > > > > https://github.com/riczhao/kernel-imx/commits/topics/usb-test
+> > > > > 
+> > > > > It's better apply after patch I sent out:
+> > > > > usb: chipidea: cleanup dma_pool if udc_start() fails
+> > > > 
+> > > > I need acks from Alexander before I can accept any of these.
+> > > ping Alexander ...
+> > ping Alexander again ...
+> Hi Greg,
 > 
->     Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
-> ---
->  arch/arm/boot/dts/kirkwood-csb1724.dts |   25 ++++++++++++++++++
->  arch/arm/boot/dts/kirkwood.dtsi        |   16 ++++++++++++
->  arch/arm/configs/csb1724_defconfig     |   45 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/board-csb1724.c |    3 +++
->  4 files changed, 89 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-csb1724.dts b/arch/arm/boot/dts/kirkwood-csb1724.dts
-> index 44dfe9a..f652797 100644
-> --- a/arch/arm/boot/dts/kirkwood-csb1724.dts
-> +++ b/arch/arm/boot/dts/kirkwood-csb1724.dts
-> @@ -25,6 +25,31 @@
->  			nr-ports = <2>;
->  			status = "ok";
->  		};
-> +
-> +		smi0: mdio at 72000 {
-> +			status = "ok";
-> +		};
-> +
-> +		smi1: mdio at 76000 {
-> +			status = "ok";
-> +		};
-> +
-> +		egiga0 {
-> +			compatible = "marvell,mv643xx";
-> +			mdio = <&smi0>;
-> +			port_number = <0>;
-> +			phy_addr = <0x80>;
-> +			interrupts = <11>;
-> +		};
-> +
-> +		egiga1 {
-> +			compatible = "marvell,mv643xx";
-> +			mdio = <&smi1>;
-> +			port_number = <0>;
-> +			phy_addr = <0x81>;
-> +			interrupts = <15>;
-> +		};
-> +
->  	};
->  
->  };
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index cef9616..dd10422 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -105,5 +105,21 @@
->  			clock-frequency = <100000>;
->  			status = "disabled";
->  		};
-> +
-> +		smi0: mdio at 72000 {
-> +			compatible = "marvell,mdio-mv643xx";
-> +			reg = <0x72000 0x4000>;
-> +			interrupts = <46>;
-> +			status = "disabled";
-> +		};
-> +
-> +		smi1: mdio at 76000 {
-> +			compatible = "marvell,mdio-mv643xx";
-> +			reg = <0x76000 0x4000>;
-> +			interrupts = <47>;
-> +			shared_smi = <&smi0>;
-> +			status = "disabled";
-> +		};
-> +
+> Is there a better way but keeping waiting?
 
+It's the middle of the merge window, even if Alexander shows up right
+now, I can't do anything with these patches until 3.6-rc1 is out.
 
-Hi Ian
+So be patient, this is vacation time for lots of people.
 
-I'm trying to keep this in order. Currently i2c is in the wrong place,
-but the rest are incremental. It looks like these should be between
-wdt & sata.
-
-What about default entries for egiga0 and egiga1 with status
-"disabled"? It looks like the only thing which changes between boards
-is phy_addr.
-
-   Andrew
+greg k-h
