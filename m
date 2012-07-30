@@ -1,47 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jul 2012 15:24:43 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6q: Invert the GPIO controller order
-In-Reply-To: <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <1343219864-3040-2-git-send-email-dirk.behme@de.bosch.com>
- <20120728134114.GH2128@S2101-09.ap.freescale.net>
- <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
-Message-ID: <20120730142443.GL6802@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jul 2012 15:26:58 +0100
+Subject: [PATCH 13/18] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
+In-Reply-To: <20120730134054.GC4468@opensource.wolfsonmicro.com>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+ <1343393162-11938-14-git-send-email-lee.jones@linaro.org>
+ <20120729205001.GK4384@opensource.wolfsonmicro.com>
+ <5016389B.4020003@linaro.org>
+ <20120730134054.GC4468@opensource.wolfsonmicro.com>
+Message-ID: <501699B2.7030002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 09:28:21AM +0200, Thomae Matthias (CM-AI/PJ-CF31) wrote:
-> I care about the global number because it is used to access GPIOs
-> from userspace via the Sysfs interface (see Documentation/gpio.txt).
-> Without the 2 patches, the GPIOs are mapped this way:
-> 
-> gpiochip_add: registered GPIOs 224 to 255 on device: 209c000.gpio
-> gpiochip_add: registered GPIOs 192 to 223 on device: 20a0000.gpio
-> gpiochip_add: registered GPIOs 160 to 191 on device: 20a4000.gpio
-> gpiochip_add: registered GPIOs 128 to 159 on device: 20a8000.gpio
-> gpiochip_add: registered GPIOs 96 to 127 on device: 20ac000.gpio
-> gpiochip_add: registered GPIOs 64 to 95 on device: 20b0000.gpio
-> gpiochip_add: registered GPIOs 32 to 63 on device: 20b4000.gpio
-> 
-> With the patches, the mapping looks like this:
-> 
-> gpiochip_add: registered GPIOs 192 to 223 on device: 20b4000.gpio
-> gpiochip_add: registered GPIOs 160 to 191 on device: 20b0000.gpio
-> gpiochip_add: registered GPIOs 128 to 159 on device: 20ac000.gpio
-> gpiochip_add: registered GPIOs 96 to 127 on device: 20a8000.gpio
-> gpiochip_add: registered GPIOs 64 to 95 on device: 20a4000.gpio
-> gpiochip_add: registered GPIOs 32 to 63 on device: 20a0000.gpio
-> gpiochip_add: registered GPIOs 0 to 31 on device: 209c000.gpio
-> 
-> I.e. pin 0 on gpio1 is now accessed via /sys/class/gpio/gpio0
-> instead of /sys/class/gpio/gpio224.
+On 30/07/12 14:40, Mark Brown wrote:
+> On Mon, Jul 30, 2012 at 08:32:43AM +0100, Lee Jones wrote:
+>> On 29/07/12 21:50, Mark Brown wrote:
+>>> On Fri, Jul 27, 2012 at 01:45:57PM +0100, Lee Jones wrote:
+>
+>>>> +		pcm: ux500-pcm {
+>>>> +			compatible = "stericsson,ux500-pcm";
+>>>> +		};
+>>>> +
+>
+>>> One of two things is wrong here.  Either you've not provided any
+>>> information about the hardware so the driver won't be able to work out
+>>> what to talk to or you've not provided any data so you're registering a
+>>> purely virtual Linux-internal device via the device tree.
+>
+>>> Once more, the idea here is to describe the hardware not to dump Linux's
+>>> internal data structures into the device tree.
+>
+>> We use it register the driver for probe()ing. In the same way we do
+>> for the PMU and Regulators. All three of which actually belong to a
+>> different hardware block. Do you know of a better way to register
+>> those devices?
+>
+> You've not identified which of the two cases above we're in...  assuming
+> it's a virtal device look at how the DT bindings for the other platforms
+> are doing things.
 
-I think you're caring too much about the numbers you see within the Linux
-kernel...
+I thought it would have been obvious by my response. The PMU seems to be 
+a virtual device with no registers or IRQs.
 
-So what happens when your platform is built as part of a single zImage
-along side a platform needing all the 256 GPIOs?  If the answer is "it
-doesn't work" you need to go back and re-evaluate what you're doing.
+I've found a DT which seems to do it in the same way as I do 
+'arch/powerpc/boot/dts/p1022ds.dts', but some others call PCM 
+registration from the CPU-side DAI probe(). Would that be your preference?
 
-Especially with DT, you shouldn't need to worry about the absolute GPIO
-numbering.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
