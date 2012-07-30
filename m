@@ -1,31 +1,54 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 30 Jul 2012 19:07:08 +0200
-Subject: [PATCH v2] USB: ohci-pxa27x: add DT bindings
-In-Reply-To: <20120730170556.GA27462@kroah.com>
-References: <1343633352-2414-1-git-send-email-zonque@gmail.com>
- <20120730170556.GA27462@kroah.com>
-Message-ID: <5016BF3C.70901@gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 30 Jul 2012 19:17:55 +0200
+Subject: rmk back but still recovering (was Re: Reminder - rmk still on
+ vacation)
+In-Reply-To: <20120730170252.GB11011@atomide.com>
+References: <20120727165049.GB7405@n2100.arm.linux.org.uk>
+ <CAMQu2gyTgkswS1tYY=0g1oF7u=RGdQKEw0C3m3r3Jr+j_k9dsQ@mail.gmail.com>
+ <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
+ <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
+ <20120730143323.GE7405@n2100.arm.linux.org.uk>
+ <CAMQu2gyxODJb2Kc_AtYPrhwoOvEwQNLkYHvbk3e=UPdgvxdWng@mail.gmail.com>
+ <20120730144443.GG7405@n2100.arm.linux.org.uk>
+ <CANfBPZ9H9D-HGu2YT5hp-OXPqY4M6BZcH2qhUfHO203RokZ0Aw@mail.gmail.com>
+ <CABxcv=msMZ7ufh2ROeEry1eY7HbXU8GRB5RkZx1x6asAx3CZ=w@mail.gmail.com>
+ <20120730152541.GI7405@n2100.arm.linux.org.uk>
+ <20120730170252.GB11011@atomide.com>
+Message-ID: <CABxcv=kOg0bQ_4BO+tkEq5tNhoR64GyHt7erOKcPk_U8GJE-Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.07.2012 19:05, Greg KH wrote:
-> On Mon, Jul 30, 2012 at 09:29:12AM +0200, Daniel Mack wrote:
->> Add DT bindings to the ohci-pxa27x driver and some documentation.
+On Mon, Jul 30, 2012 at 7:02 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120730 08:31]:
+>> On Mon, Jul 30, 2012 at 05:19:06PM +0200, Javier Martinez Canillas wrote:
+>> > >
+>> > > I think Santosh meant this patch..
+>> > > http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commitdiff;h=55936cdfaaf11ac352b56bc58e42d6661e65ee13
+>> >
+>> > That is the patch that fixes the DMA issue with the OMAP MMC and OMAP
+>> > MMC HS drivers when OMAP_DMA option is not set, since they still don't
+>> > support poll mode without DMA.
+>> >
+>> > Russell, are you going to take the patch from Tony's linux-omap/master
+>> > tree or do I have to add the patch to the patch system also?
 >>
->> Successfully tested on a PXA3xx board.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->> Changes from v1:
->>  - renamed "mrvl" to "marvell"
->>
->> Greg, I think that would best go through your usb tree. Is that ok?
-> 
-> Ok, but it will have to wait until after 3.6-rc1 is out.
+>> It'd be better to have it via the patch system, because pulling it out
+>> of a URL isn't an easy task.
+>
+> Javier, can you please submit it to Russell's patch tracking system?
+> Please just replace my Signed-off-by with my Acked-by for that patch.
+>
+> Regards,
+>
+> Tony
 
-Sure, no hurries at all. The rest of the releated patches won't make it
-to mainline before 3.7 anyway.
+Hi Tony,
 
+I just submitted the patch [1] to Russell's patch system before
+reading this email so I left your Signed-off-by instead of Acked-by,
+hope this won't be an issue.
 
-Thanks,
-Daniel
+Best regards,
+Javier
+
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7481/1
