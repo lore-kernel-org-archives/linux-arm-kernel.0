@@ -1,29 +1,168 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 30 Jul 2012 22:01:04 +0800
-Subject: [PATCH v3 0/9] Assorted PXA3xx DT patches
-In-Reply-To: <201207291304.57063.arnd@arndb.de>
-References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
- <201207291304.57063.arnd@arndb.de>
-Message-ID: <CAN1soZw0sfLOp5beXEi7_v+MX0MbhDewBt_gC--7hHqLY3DFng@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 30 Jul 2012 11:03:16 -0300
+Subject: [PATCH v3] ARM: dts: imx: Always enable the watchdog
+Message-ID: <1343656996-15030-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 29, 2012 at 9:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 28 July 2012, Daniel Mack wrote:
->>
->> This is a series of 9 patches that add basic support for booting PXA3xx
->> boards from devicetrees. I'm able to mount a rootfs and use all
->> irq/gpio based functions as well as the NAND, USB and RTC drivers.
->>
->> Changes from v2:
->>  - more "mrvl" -> "marvell" renaming fixes
->>  - avoid PXA_IRQ() in new code in arch/arm/mach-pxa/irq.c
->>  - add the two GPIO patches that have been acked-by Arnd already
->>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-Applied
+Instead of enabling the watchdog in each individual dts file, select in 
+the SoC dtsi file instead.
 
-Regards
-Haojian
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Do not set "status=okay" in .dtsi files
+Changes since v1:
+- Remove the wdog setting in imx27-phytec-phycore.dts
+ arch/arm/boot/dts/imx27-phytec-phycore.dts |    4 ----
+ arch/arm/boot/dts/imx27.dtsi               |    1 -
+ arch/arm/boot/dts/imx51-babbage.dts        |    4 ----
+ arch/arm/boot/dts/imx51.dtsi               |    1 -
+ arch/arm/boot/dts/imx53-ard.dts            |    4 ----
+ arch/arm/boot/dts/imx53-evk.dts            |    4 ----
+ arch/arm/boot/dts/imx53-qsb.dts            |    4 ----
+ arch/arm/boot/dts/imx53-smd.dts            |    4 ----
+ arch/arm/boot/dts/imx53.dtsi               |    1 -
+ arch/arm/boot/dts/imx6q.dtsi               |    1 -
+ 10 files changed, 0 insertions(+), 28 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
+index 2b0ff60..777caa3 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
+@@ -23,10 +23,6 @@
+ 	soc {
+ 		aipi at 10000000 { /* aipi */
+ 
+-			wdog at 10002000 {
+-				status = "okay";
+-			};
+-
+ 			serial at 1000a000 {
+ 				fsl,uart-has-rtscts;
+ 				status = "okay";
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 00bae3a..1564a01 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -56,7 +56,6 @@
+ 				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
+ 				reg = <0x10002000 0x4000>;
+ 				interrupts = <27>;
+-				status = "disabled";
+ 			};
+ 
+ 			uart1: serial at 1000a000 {
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index de065b5..f7caa08 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -169,10 +169,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 73f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 73fa8000 {
+ 				compatible = "fsl,imx51-iomuxc-babbage";
+ 				reg = <0x73fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 3af176c..a455275 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -170,7 +170,6 @@
+ 				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
+ 				reg = <0x73f98000 0x4000>;
+ 				interrupts = <58>;
+-				status = "disabled";
+ 			};
+ 
+ 			wdog at 73f9c000 { /* WDOG2 */
+diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+index 5b8eafc..1854145 100644
+--- a/arch/arm/boot/dts/imx53-ard.dts
++++ b/arch/arm/boot/dts/imx53-ard.dts
+@@ -31,10 +31,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-ard";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
+index 9c79803..5d36dde 100644
+--- a/arch/arm/boot/dts/imx53-evk.dts
++++ b/arch/arm/boot/dts/imx53-evk.dts
+@@ -62,10 +62,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-evk";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 2d803a9..3bfa6f1 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -41,10 +41,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-qsb";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 0809102..45848af 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -77,10 +77,6 @@
+ 				};
+ 			};
+ 
+-			wdog at 53f98000 { /* WDOG1 */
+-				status = "okay";
+-			};
+-
+ 			iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc-smd";
+ 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index d161901..9dfdf09 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -172,7 +172,6 @@
+ 				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
+ 				reg = <0x53f98000 0x4000>;
+ 				interrupts = <58>;
+-				status = "disabled";
+ 			};
+ 
+ 			wdog at 53f9c000 { /* WDOG2 */
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 3d3c64b..28b6a62 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -355,7 +355,6 @@
+ 				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
+ 				reg = <0x020bc000 0x4000>;
+ 				interrupts = <0 80 0x04>;
+-				status = "disabled";
+ 			};
+ 
+ 			wdog at 020c0000 { /* WDOG2 */
+-- 
+1.7.1
