@@ -1,29 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 30 Jul 2012 19:27:33 -0300
-Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
-In-Reply-To: <20120626023754.GJ2342@S2101-09.ap.freescale.net>
-References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5BEVrPrgZ7E5xUE-_3zXb317mzqoZXaxXw1SNACuRzOPw@mail.gmail.com>
- <20120626023754.GJ2342@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Bg11-ocEXoOd5W+0hEAHvuVqP6_6CW=rANySDTiNo6SA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 30 Jul 2012 16:31:23 -0600 (MDT)
+Subject: [PATCH v3 1/3] ARM: omap: clk: add clk_prepare and clk_unprepare
+In-Reply-To: <1341224669-15231-2-git-send-email-rnayak@ti.com>
+References: <1341224669-15231-1-git-send-email-rnayak@ti.com>
+ <1341224669-15231-2-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1207301614590.8722@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2012 at 11:37 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Jun 25, 2012 at 01:18:22PM -0300, Fabio Estevam wrote:
->> Any suggestions as to how to make the driver work on mx23?
->>
-> I won't be able to test it on my imx23-evk board, because the board
-> design is somehow odd on vbus supply, which probably requires a board
-> rework.
+Hi
 
-Which board rework?
+On Mon, 2 Jul 2012, Rajendra Nayak wrote:
 
-It looks like the 2.6.35 FSL kernel supports USB host on mx23evk
-without the need of hardware rework.
+> As part of Common Clk Framework (CCF) the clk_enable() operation
+> was split into a clk_prepare() which could sleep, and a clk_enable()
+> which should never sleep. Similarly the clk_disable() was
+> split into clk_disable() and clk_unprepare(). This was
+> needed to handle complex cases where in a clk gate/ungate
+> would require a slow and a fast part to be implemented.
+> None of the clocks below seem to be in the 'complex' clocks
+> category and are just simple clocks which are enabled/disabled
+> through simple register writes.
+> Most of the instances also seem to be called in non-atomic
+> context which means its safe to move all of those from
+> using a clk_enable() to clk_prepare_enable() and clk_disable() to
+> clk_disable_unprepare().
+> For a few others where there is a possibility they get called from
+> an interrupt or atomic context, there is an additonal clk_prepare()
+> done before a clk_enable() and a clk_unprepare()
+> after a clk_disable().
+> This is in preparation of OMAP moving to CCF.
+> 
+> Based on initial changes from Mike turquette.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-Can we try getting USB to work on mx23 too?
+Looking at this one, it seems basically okay except for this part:
 
-Regards,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 7731936..f904993 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -608,6 +608,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>  			   oh->name, oh->main_clk);
+>  		return -EINVAL;
+>  	}
+> +	clk_prepare(oh->_clk);
+>  
+>  	if (!oh->_clk->clkdm)
+>  		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
+> @@ -645,6 +646,7 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+>  			ret = -EINVAL;
+>  		}
+>  		os->_clk = c;
+> +		clk_prepare(os->_clk);
+>  	}
+>  
+>  	return ret;
+> @@ -672,6 +674,7 @@ static int _init_opt_clks(struct omap_hwmod *oh)
+>  			ret = -EINVAL;
+>  		}
+>  		oc->_clk = c;
+> +		clk_prepare(oc->_clk);
+>  	}
+>  
+>  	return ret;
 
-Fabio Estevam
+Seems to me that the strategy here of calling clk_prepare() right after 
+the clk_get() is only going to work as long as clk_prepare() is a no-op. 
+Right now this code is called early in the boot before many subsystems are 
+available.
+
+So if we make a change like this one, it seems like we would basically 
+expect it to break once we start doing anything meaningful with 
+clk_prepare(), like using clk_prepare() for voltage scaling or something 
+that requires I2C?  We'd also probably want to mark this with some kind of 
+"HACK" comment.
+ 
+
+
+- Paul
