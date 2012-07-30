@@ -1,32 +1,29 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 30 Jul 2012 22:22:36 +0800
-Subject: [PATCH] ARM: mmp: add missing irqs.h
-Message-ID: <1343658156-8154-1-git-send-email-haojian.zhuang@gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 30 Jul 2012 11:23:16 -0300
+Subject: [PATCH] ARM: dts: imx27-3ds.dts: Fix serial console node
+Message-ID: <1343658196-24243-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-mmp/gplugd.c:195:13: error: ?MMP_NR_IRQS? undeclared here
-(not in a function)
-make[1]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
+Fix serial console node and allow the board to boot again.
 
-Include <mach/irqs.h> to fix this issue.
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mmp/gplugd.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx27-3ds.dts |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-index f516e74..5c3d61e 100644
---- a/arch/arm/mach-mmp/gplugd.c
-+++ b/arch/arm/mach-mmp/gplugd.c
-@@ -14,6 +14,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
+diff --git a/arch/arm/boot/dts/imx27-3ds.dts b/arch/arm/boot/dts/imx27-3ds.dts
+index d3f8296..0a8978a 100644
+--- a/arch/arm/boot/dts/imx27-3ds.dts
++++ b/arch/arm/boot/dts/imx27-3ds.dts
+@@ -27,7 +27,7 @@
+ 				status = "okay";
+ 			};
  
-+#include <mach/irqs.h>
- #include <mach/pxa168.h>
- #include <mach/mfp-pxa168.h>
- 
+-			uart at 1000a000 {
++			uart1: serial at 1000a000 {
+ 				fsl,uart-has-rtscts;
+ 				status = "okay";
+ 			};
 -- 
-1.7.9.5
+1.7.1
