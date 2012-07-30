@@ -1,54 +1,27 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 30 Jul 2012 19:17:55 +0200
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <20120730170252.GB11011@atomide.com>
-References: <20120727165049.GB7405@n2100.arm.linux.org.uk>
- <CAMQu2gyTgkswS1tYY=0g1oF7u=RGdQKEw0C3m3r3Jr+j_k9dsQ@mail.gmail.com>
- <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
- <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
- <20120730143323.GE7405@n2100.arm.linux.org.uk>
- <CAMQu2gyxODJb2Kc_AtYPrhwoOvEwQNLkYHvbk3e=UPdgvxdWng@mail.gmail.com>
- <20120730144443.GG7405@n2100.arm.linux.org.uk>
- <CANfBPZ9H9D-HGu2YT5hp-OXPqY4M6BZcH2qhUfHO203RokZ0Aw@mail.gmail.com>
- <CABxcv=msMZ7ufh2ROeEry1eY7HbXU8GRB5RkZx1x6asAx3CZ=w@mail.gmail.com>
- <20120730152541.GI7405@n2100.arm.linux.org.uk>
- <20120730170252.GB11011@atomide.com>
-Message-ID: <CABxcv=kOg0bQ_4BO+tkEq5tNhoR64GyHt7erOKcPk_U8GJE-Pw@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 30 Jul 2012 10:33:34 -0700
+Subject: [PATCH 03/11] kdb: Implement disable_nmi command
+In-Reply-To: <1343649500-18491-3-git-send-email-anton.vorontsov@linaro.org>
+References: <20120730115719.GA5742@lizard>
+ <1343649500-18491-3-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <CAMbhsRS1cOf1T8k7K6CFmRA7M52AGPZ2TqmEnpZqDGYnbyetbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 7:02 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120730 08:31]:
->> On Mon, Jul 30, 2012 at 05:19:06PM +0200, Javier Martinez Canillas wrote:
->> > >
->> > > I think Santosh meant this patch..
->> > > http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commitdiff;h=55936cdfaaf11ac352b56bc58e42d6661e65ee13
->> >
->> > That is the patch that fixes the DMA issue with the OMAP MMC and OMAP
->> > MMC HS drivers when OMAP_DMA option is not set, since they still don't
->> > support poll mode without DMA.
->> >
->> > Russell, are you going to take the patch from Tony's linux-omap/master
->> > tree or do I have to add the patch to the patch system also?
->>
->> It'd be better to have it via the patch system, because pulling it out
->> of a URL isn't an easy task.
+On Mon, Jul 30, 2012 at 4:58 AM, Anton Vorontsov
+<anton.vorontsov@linaro.org> wrote:
+> This command disables NMI-entry. If NMI source was previously shared with
+> a serial console ("debug port"), this effectively releases the port from
+> KDB exclusive use, and makes the console available for normal use.
 >
-> Javier, can you please submit it to Russell's patch tracking system?
-> Please just replace my Signed-off-by with my Acked-by for that patch.
+> Of course, NMI can be reenabled, enable_nmi modparam is used for that:
 >
-> Regards,
->
-> Tony
+>         echo 1 > /sys/module/kdb/parameters/enable_nmi
 
-Hi Tony,
-
-I just submitted the patch [1] to Russell's patch system before
-reading this email so I left your Signed-off-by instead of Acked-by,
-hope this won't be an issue.
-
-Best regards,
-Javier
-
-[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7481/1
+This is very different behavior from the FIQ debugger "console"
+command you are trying to replace.  In the FIQ debugger, everything
+goes through the FIQ/NMI, even when in console mode.  That means that
+the user can always get back to FIQ debugger/KDB mode using a special
+sequence (we use a break character).  With your implementation, if you
+switch from KDB to console to see if the console is working, and find
+that it is not working, you can never get back into KDB.
