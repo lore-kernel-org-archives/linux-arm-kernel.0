@@ -1,45 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 30 Jul 2012 16:46:07 +0800
-Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
-In-Reply-To: <50162C7A.1060307@de.bosch.com>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <20120728133215.GG2128@S2101-09.ap.freescale.net>
- <5015624D.50305@googlemail.com>
- <20120730011426.GB30774@S2101-09.ap.freescale.net>
- <50162C7A.1060307@de.bosch.com>
-Message-ID: <20120730084558.GE31509@S2101-09.ap.freescale.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 30 Jul 2012 10:49:15 +0200
+Subject: [PATCH 1/3] Move FIMD register headers to include/video/
+In-Reply-To: <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
+References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
+ <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
+Message-ID: <50164A8B.3070907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 08:40:58AM +0200, Dirk Behme wrote:
-> - Do you like to propose a better macro than SOC_IMX6Q to cover
-> imx3/imx6, too?
+Hi,
+
+On 07/30/2012 10:45 AM, Leela Krishna Amudala wrote:
+> Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
+> to include/video/samsung_fimd.h
 > 
-No, I do not see the need of this.  CONFIG_ARCH_NR_GPIO is not the only
-way to overwrite the default number.  We can define ARCH_NR_GPIOS to
-the number we want in IMX platform headers.
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
+>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403 -----------------
+>  include/video/samsung_fimd.h                    |  533 +++++++++++++++++++++++
+>  3 files changed, 533 insertions(+), 562 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+>  create mode 100644 include/video/samsung_fimd.h
 
-> - Do imx3 and imx5 have the same GPIO number like imx6? I.e. 7 banks
-> with 32 pins == 224 GPIOs?
-> 
-imx31, imx35: 3 banks
-imx51: 4 banks
-imx53: 7 banks
+Thanks for taking care if this. However you might need to split this 
+patch in two, so there is no build and git bisection breakage. In the
+first patch a new header file would be added, then the patch updating
+users of the FIMD headers would be applied, and finally the regs-fb*.h 
+files would be removed.
 
-> >Looking at current users of this definition, you will find all of them
-> >are defining a number bigger than 256 for extending the maximum number.
-> >It might be a sign that having a gpio array which is a little bigger
-> >than necessary is not a concern on machines today.
-> 
-> Or it might be a sign that they *have* more than 256? I don't know.
+Also it helps to use -M option to git format-patch when creating patches
+that mainly move files.
 
-Yes.  I was actually saying that there is no platforms defining the
-Kconfig symbol smaller than 256 to save the space.
+--
 
-> But what's the issue using a matching number if possible?
-> 
-At least for IMX, it does not help that much.
-
--- 
 Regards,
-Shawn
+Sylwester
