@@ -1,74 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 30 Jul 2012 09:43:16 +0200
-Subject: [PATCH v2 3/4] media: videobuf2-dma-contig: use dma_mmap_coherent
- if available
-In-Reply-To: <1343301191-26001-4-git-send-email-hdk@igel.co.jp>
-References: <1343301191-26001-1-git-send-email-hdk@igel.co.jp>
- <1343301191-26001-4-git-send-email-hdk@igel.co.jp>
-Message-ID: <02b301cd6e27$000e9cf0$002bd6d0$%szyprowski@samsung.com>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Mon, 30 Jul 2012 13:17:49 +0530
+Subject: [PATCH] ARM: topology: fix section mismatch warning for
+ init_cpu_topology
+Message-ID: <1343634469-29712-1-git-send-email-svenkatr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Get rid of this warning..
+arch/arm/kernel/built-in.o(.text+0xac78): Section mismatch in reference
+from the function init_cpu_topology() to the function
+ .init.text:parse_dt_topology()
+The function init_cpu_topology() references
+the function __init parse_dt_topology().
+This is often because init_cpu_topology lacks a __init
+annotation or the annotation of parse_dt_topology is wrong.
 
-On Thursday, July 26, 2012 1:13 PM Hideki EIRAKU wrote:
+Signed-off-by: Venkatraman S <svenkatr@ti.com>
+---
+ arch/arm/kernel/topology.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Previously the vb2_dma_contig_mmap() function was using a dma_addr_t as a
-> physical address.  The two addressses are not necessarily the same.
-> For example, when using the IOMMU funtion on certain platforms, dma_addr_t
-> addresses are not directly mappable physical address.
-> dma_mmap_coherent() maps the address correctly.
-> It is available on ARM platforms.
-> 
-> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
-> ---
->  drivers/media/video/videobuf2-dma-contig.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/media/video/videobuf2-dma-contig.c b/drivers/media/video/videobuf2-dma-
-> contig.c
-> index 4b71326..4dc85ab 100644
-> --- a/drivers/media/video/videobuf2-dma-contig.c
-> +++ b/drivers/media/video/videobuf2-dma-contig.c
-> @@ -101,14 +101,32 @@ static unsigned int vb2_dma_contig_num_users(void *buf_priv)
->  static int vb2_dma_contig_mmap(void *buf_priv, struct vm_area_struct *vma)
->  {
->  	struct vb2_dc_buf *buf = buf_priv;
-> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> +	int ret;
-> +#endif
-> 
->  	if (!buf) {
->  		printk(KERN_ERR "No buffer to map\n");
->  		return -EINVAL;
->  	}
-> 
-> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> +	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-The above line is not needed. It is up to dma_mmap_coherent() / dma_mmap_attrs() to set page
-protection bits which match requested type of dma buffer mapping.
-
-> +	ret = dma_mmap_coherent(buf->conf->dev, vma, buf->vaddr, buf->dma_addr,
-> +				buf->size);
-> +	if (ret) {
-> +		pr_err("Remapping memory failed, error: %d\n", ret);
-> +		return ret;
-> +	}
-> +	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
-> +	vma->vm_private_data = &buf->handler;
-> +	vma->vm_ops = &vb2_common_vm_ops;
-> +	vma->vm_ops->open(vma);
-> +	return 0;
-> +#else
->  	return vb2_mmap_pfn_range(vma, buf->dma_addr, buf->size,
->  				  &vb2_common_vm_ops, &buf->handler);
-> +#endif
->  }
-> 
->  static void *vb2_dma_contig_get_userptr(void *alloc_ctx, unsigned long vaddr,
-
-Best regards
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 198b084..26c12c6 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -321,7 +321,7 @@ void store_cpu_topology(unsigned int cpuid)
+  * init_cpu_topology is called at boot when only one cpu is running
+  * which prevent simultaneous write access to cpu_topology array
+  */
+-void init_cpu_topology(void)
++void __init init_cpu_topology(void)
+ {
+ 	unsigned int cpu;
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.11.1.25.g0e18bef
