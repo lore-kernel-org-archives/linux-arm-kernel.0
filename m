@@ -1,47 +1,30 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 30 Jul 2012 17:33:14 +0200 (CEST)
-Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
- MX2_CAMERA_PACK_DIR_MSB flags.
-In-Reply-To: <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
-References: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
- <Pine.LNX.4.64.1207201330240.27906@axis700.grange>
- <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1207301718510.28003@axis700.grange>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 30 Jul 2012 17:39:11 +0200
+Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
+In-Reply-To: <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
+References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
+ <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
+Message-ID: <20120730153911.GK18016@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier
-
-On Mon, 30 Jul 2012, javier Martin wrote:
-
-> Hi,
-> thank you for yor ACKs.
+On Mon, Jul 30, 2012 at 04:15:56PM +0100, Ian Molton wrote:
+> This patch adds basic device tree support to the mv643xx ethernet driver.
 > 
-> On 20 July 2012 13:31, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > On Thu, 12 Jul 2012, Javier Martin wrote:
-> >
-> >> These flags are not used any longer and can be safely removed
-> >> since the following patch:
-> >> http://www.spinics.net/lists/linux-media/msg50165.html
-> >>
-> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> >
-> > For the ARM tree:
-> >
-> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> It should be enough for most current users of the device, and should allow
+> a fairly painless migration once proper support for clk devices is available
+> to those platforms.
 > 
-> forgive my ignorance on the matter. Could you please point me to the
-> git repository this patch should be merged?
+> Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |  111 ++++++++++++++++++++++++----
+>  1 file changed, 97 insertions(+), 14 deletions(-)
 
-Sorry, my "for the ARM tree" comment was probably not clear enough. This 
-patch should certainly go via the ARM (SoC) tree, since it only touches 
-arch/arm. So, the maintainer (Sascha - added to CC), that will be 
-forwarding this patch to Linus can thereby add my "acked-by" to this 
-patch, if he feels like it.
+Hi Ian
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Please document the DT binding in Documentation/devicetree/binding/....
+
+Also, this should also be CC: to the netdev mailing. I got into
+trouble for not doing this and breaking the PPC build :-(
+
+	Andrew
