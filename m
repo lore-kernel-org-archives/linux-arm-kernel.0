@@ -1,29 +1,32 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Mon, 30 Jul 2012 17:28:09 +0100
-Subject: [PATCH 1/6] Initial csb1724 board support (FDT)
-In-Reply-To: <20120730152829.GJ18016@lunn.ch>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-2-git-send-email-ian.molton@codethink.co.uk>
- <20120730152829.GJ18016@lunn.ch>
-Message-ID: <5016B619.7030602@codethink.co.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 30 Jul 2012 10:29:50 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP3xxx: clockdomain: fix software supervised
+ wakeup/sleep
+In-Reply-To: <CACYZBRHmO3a3oBwbFP8GqDQj3xB7nB59TkzxAbFrZ2=h0VX3-g@mail.gmail.com>
+References: <alpine.DEB.2.00.1207261503290.14468@utopia.booyaka.com>
+ <CACYZBRHmO3a3oBwbFP8GqDQj3xB7nB59TkzxAbFrZ2=h0VX3-g@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1207301027310.18037@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/12 16:28, Andrew Lunn wrote:
-> Hi Ian
->
->> diff --git a/arch/arm/configs/csb1724_defconfig
->> b/arch/arm/configs/csb1724_defconfig new file mode 100644 index
->> 0000000..927b269 --- /dev/null +++
->> b/arch/arm/configs/csb1724_defconfig @@ -0,0 +1,47 @@
->> +CONFIG_ARCH_KIRKWOOD=y +CONFIG_ARCH_KIRKWOOD_DT=y
->> +CONFIG_MACH_CSB1724_DT=y
-> Do you really need this? Its the only kirkwood board with its on
-> _defconfig file. What makes this board special?
+Hi
 
-Nothing. defconfigs are just there to make configuring your kernel easy.
+On Fri, 27 Jul 2012, Nayak, Rajendra wrote:
 
-The kirkwood defconfig doesnt fit the currently supported hardware
-set on the csb1724 very well. Why build stuff you dont need?
+> On Fri, Jul 27, 2012 at 2:34 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> >
+> > Commit 4da71ae6 ("OMAP: clockdomain: Arch specific funcs for
+> > clkdm_clk_enable/disable") called the OMAP2xxx-specific functions for
+> > clockdomain wakeup and sleep.  This would probably have broken
+> > software-supervised clockdomain wakeup and sleep on OMAP3.
+> 
+> Would something like this be better than duplicating most of
+> omap2_clkdm_clk_enable/disable?
 
--Ian
+Am working towards getting the cpu_is_*() calls out of there in 
+preparation for the move to drivers/.  In fact there are some patches here 
+that will be posted shortly to get rid of those clkdm_clk_(enable|disable) 
+functions completely.
+
+
+- Paul
