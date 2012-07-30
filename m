@@ -1,29 +1,47 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 30 Jul 2012 11:23:16 -0300
-Subject: [PATCH] ARM: dts: imx27-3ds.dts: Fix serial console node
-Message-ID: <1343658196-24243-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jul 2012 15:24:43 +0100
+Subject: [PATCH 2/2] ARM: dts: imx6q: Invert the GPIO controller order
+In-Reply-To: <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
+References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+ <1343219864-3040-2-git-send-email-dirk.behme@de.bosch.com>
+ <20120728134114.GH2128@S2101-09.ap.freescale.net>
+ <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
+Message-ID: <20120730142443.GL6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix serial console node and allow the board to boot again.
+On Mon, Jul 30, 2012 at 09:28:21AM +0200, Thomae Matthias (CM-AI/PJ-CF31) wrote:
+> I care about the global number because it is used to access GPIOs
+> from userspace via the Sysfs interface (see Documentation/gpio.txt).
+> Without the 2 patches, the GPIOs are mapped this way:
+> 
+> gpiochip_add: registered GPIOs 224 to 255 on device: 209c000.gpio
+> gpiochip_add: registered GPIOs 192 to 223 on device: 20a0000.gpio
+> gpiochip_add: registered GPIOs 160 to 191 on device: 20a4000.gpio
+> gpiochip_add: registered GPIOs 128 to 159 on device: 20a8000.gpio
+> gpiochip_add: registered GPIOs 96 to 127 on device: 20ac000.gpio
+> gpiochip_add: registered GPIOs 64 to 95 on device: 20b0000.gpio
+> gpiochip_add: registered GPIOs 32 to 63 on device: 20b4000.gpio
+> 
+> With the patches, the mapping looks like this:
+> 
+> gpiochip_add: registered GPIOs 192 to 223 on device: 20b4000.gpio
+> gpiochip_add: registered GPIOs 160 to 191 on device: 20b0000.gpio
+> gpiochip_add: registered GPIOs 128 to 159 on device: 20ac000.gpio
+> gpiochip_add: registered GPIOs 96 to 127 on device: 20a8000.gpio
+> gpiochip_add: registered GPIOs 64 to 95 on device: 20a4000.gpio
+> gpiochip_add: registered GPIOs 32 to 63 on device: 20a0000.gpio
+> gpiochip_add: registered GPIOs 0 to 31 on device: 209c000.gpio
+> 
+> I.e. pin 0 on gpio1 is now accessed via /sys/class/gpio/gpio0
+> instead of /sys/class/gpio/gpio224.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx27-3ds.dts |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I think you're caring too much about the numbers you see within the Linux
+kernel...
 
-diff --git a/arch/arm/boot/dts/imx27-3ds.dts b/arch/arm/boot/dts/imx27-3ds.dts
-index d3f8296..0a8978a 100644
---- a/arch/arm/boot/dts/imx27-3ds.dts
-+++ b/arch/arm/boot/dts/imx27-3ds.dts
-@@ -27,7 +27,7 @@
- 				status = "okay";
- 			};
- 
--			uart at 1000a000 {
-+			uart1: serial at 1000a000 {
- 				fsl,uart-has-rtscts;
- 				status = "okay";
- 			};
--- 
-1.7.1
+So what happens when your platform is built as part of a single zImage
+along side a platform needing all the 256 GPIOs?  If the answer is "it
+doesn't work" you need to go back and re-evaluate what you're doing.
+
+Especially with DT, you shouldn't need to worry about the absolute GPIO
+numbering.
