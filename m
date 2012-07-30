@@ -1,27 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 30 Jul 2012 17:28:29 +0200
-Subject: [PATCH 1/6] Initial csb1724 board support (FDT)
-In-Reply-To: <1343661359-10150-2-git-send-email-ian.molton@codethink.co.uk>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-2-git-send-email-ian.molton@codethink.co.uk>
-Message-ID: <20120730152829.GJ18016@lunn.ch>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 30 Jul 2012 17:33:14 +0200 (CEST)
+Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
+ MX2_CAMERA_PACK_DIR_MSB flags.
+In-Reply-To: <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
+References: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
+ <Pine.LNX.4.64.1207201330240.27906@axis700.grange>
+ <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1207301718510.28003@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian
+Hi Javier
 
-> diff --git a/arch/arm/configs/csb1724_defconfig b/arch/arm/configs/csb1724_defconfig
-> new file mode 100644
-> index 0000000..927b269
-> --- /dev/null
-> +++ b/arch/arm/configs/csb1724_defconfig
-> @@ -0,0 +1,47 @@
-> +CONFIG_ARCH_KIRKWOOD=y
-> +CONFIG_ARCH_KIRKWOOD_DT=y
-> +CONFIG_MACH_CSB1724_DT=y
+On Mon, 30 Jul 2012, javier Martin wrote:
 
-Do you really need this? Its the only kirkwood board with its on
-_defconfig file.  What makes this board special?
+> Hi,
+> thank you for yor ACKs.
+> 
+> On 20 July 2012 13:31, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > On Thu, 12 Jul 2012, Javier Martin wrote:
+> >
+> >> These flags are not used any longer and can be safely removed
+> >> since the following patch:
+> >> http://www.spinics.net/lists/linux-media/msg50165.html
+> >>
+> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> >
+> > For the ARM tree:
+> >
+> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> forgive my ignorance on the matter. Could you please point me to the
+> git repository this patch should be merged?
 
-   Thanks
-	Andrew
+Sorry, my "for the ARM tree" comment was probably not clear enough. This 
+patch should certainly go via the ARM (SoC) tree, since it only touches 
+arch/arm. So, the maintainer (Sascha - added to CC), that will be 
+forwarding this patch to Linus can thereby add my "acked-by" to this 
+patch, if he feels like it.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
