@@ -1,27 +1,38 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 Jul 2012 14:42:21 +0100
-Subject: [PATCH 17/18] ARM: ux500: Add all encompassing Sound node to
- DB8500 Device Tree
-In-Reply-To: <50163936.1050901@linaro.org>
+Date: Mon, 30 Jul 2012 14:48:04 +0100
+Subject: [PATCH 01/18] Documentation: Describe the ux500 realated audio
+ related DT nodes
+In-Reply-To: <50163A09.8060203@linaro.org>
 References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-18-git-send-email-lee.jones@linaro.org>
- <20120729205227.GL4384@opensource.wolfsonmicro.com>
- <50163936.1050901@linaro.org>
-Message-ID: <20120730134220.GD4468@opensource.wolfsonmicro.com>
+ <1343393162-11938-2-git-send-email-lee.jones@linaro.org>
+ <20120729203106.GD4384@opensource.wolfsonmicro.com>
+ <50163A09.8060203@linaro.org>
+Message-ID: <20120730134804.GE4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 08:35:18AM +0100, Lee Jones wrote:
-> On 29/07/12 21:52, Mark Brown wrote:
+On Mon, Jul 30, 2012 at 08:38:49AM +0100, Lee Jones wrote:
+> On 29/07/12 21:31, Mark Brown wrote:
+> >On Fri, Jul 27, 2012 at 01:45:45PM +0100, Lee Jones wrote:
 
-> >...this is clearly the board-specific setup for the system, showing how
-> >the CPU and CODEC are hooked up.  This should therefore be in the DT for
-> >whatever board this is you're working on.
+> >>+   - Machine Driver : "stericsson,snd-soc-mop500"
+> >>+   - CPU-side DAI   : "stericsson,ux500-msp-i2s"
+> >>+   - DMA (platform) : "stericsson,ux500-pcm"
+> >>+   - Audio CODEC    : "stericsson,ab8500-codec"
 
-> I don't think it's board specific. I believe this is the setup on
-> all db8500 platforms. I'm happy to be told I'm wrong here, in which
-> case I can move it to the board specific files.
+> >What is this a binding document for?  It looks like the binding for a
+> >machine driver...
 
-I think that's more a sign that all the platforms you've seen are just
-cut'n'pasted from the reference design than anything else.  If the thing
-you're describing is on the PCB it's generally board specific...
+> No, it's a binding document for all of the ux500 driver and CODEC
+> blocks. Do you really want me to split it all up? I think the only
+> component which could be sanely split-out is the ab8500-codec, which
+> could (should?) live in [1].
+
+Yes, of course!  Each device will have a separate binding with different
+requirements.
+
+> These properties are relevant for some, but not all of the
+> components above, hence why the are listed at 'optional properties'.
+
+Which is part of the problem here, it makes it much harder to tell what
+you need to do for the individual devices.
