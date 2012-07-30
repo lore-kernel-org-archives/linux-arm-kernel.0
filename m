@@ -1,51 +1,42 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 30 Jul 2012 11:09:34 +0200
-Subject: [PATCH 1/3] Move FIMD register headers to include/video/
-In-Reply-To: <000001cd6e30$da849520$8f8dbf60$%han@samsung.com>
-References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
- <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
- <000001cd6e30$da849520$8f8dbf60$%han@samsung.com>
-Message-ID: <50164F4E.1030508@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 30 Jul 2012 14:39:53 +0530
+Subject: [PATCH v6 04/11] arm: omap: hwmod: add a new addr space in otg for
+ writing to control module
+In-Reply-To: <1343639400-28725-1-git-send-email-kishon@ti.com>
+References: <1343639400-28725-1-git-send-email-kishon@ti.com>
+Message-ID: <1343639400-28725-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The mailbox register for usb otg in omap is present in control module.
+On detection of any events VBUS or ID, this register should be written
+to send the notification to musb core.
 
-On 07/30/2012 10:53 AM, Jingoo Han wrote:
->> +/*FIMD V8 REG OFFSET */
->> +#define FIMD_V8_VIDTCON0	(0x20010)
->> +#define FIMD_V8_VIDTCON1	(0x20014)
->> +#define FIMD_V8_VIDTCON2	(0x20018)
->> +#define FIMD_V8_VIDTCON3	(0x2001C)
->> +#define FIMD_V8_VIDCON1		(0x20004)
-> 
-> 
-> CC'ed Marek.
-> 
-> To Leela Krishna Amudala,
-> 
-> Don't add these definitions for FIMD_V8_xxx registers, which are 
-> not related to current "regs-fb-v4.h and regs-fb.h".
-> Just "move" and "merge" regs-fb-v4.h and regs-fb.h to one header 
-> file, not "add" new definitions.
-> If you want to add these definitions, please make new patch for this.
+Till we have a separate control module driver to write to control module,
+omap2430 will handle the register writes to control module by itself. So
+a new address space to represent this control module register is added
+to usb_otg_hs.
 
-Good point.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-> Also, "#define FIMD_V8_xxx" is ugly.
-> I think that there is better way.
-> Please, find other way.
-
-Instead of just telling that something is wrong and you don't like it, 
-perhaps it would be kind to give at least a slight suggestion of what 
-would have been good enough to your taste...respecting someone else's
-time and effort.
-
-So what would you like to see there instead, EXYNOS5_FIMD_* ?
-
-BTW, your e-mails are badly word wrapped, I had to manually correct it.
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 249ff76..775e185 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -5934,6 +5934,11 @@ static struct omap_hwmod_addr_space omap44xx_wd_timer2_addrs[] = {
+ 		.pa_end		= 0x4a31407f,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
++	{
++		.pa_start	= 0x4a00233c,
++		.pa_end		= 0x4a00233f,
++		.flags		= ADDR_TYPE_RT
++	},
+ 	{ }
+ };
+ 
 -- 
-
-Regards,
-Sylwester
+1.7.9.5
