@@ -1,30 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jul 2012 17:37:02 +0100
-Subject: [PATCH 2/2] arm: pmu: add support for per-cpu PMU interrupts.
-In-Reply-To: <1343658732-31080-2-git-send-email-chris.smith@st.com>
-References: <1343658732-31080-1-git-send-email-chris.smith@st.com>
- <1343658732-31080-2-git-send-email-chris.smith@st.com>
-Message-ID: <20120730163701.GH15195@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 30 Jul 2012 18:38:33 +0200
+Subject: [PATCH 1/2] pinctrl: use ERR_CAST instead of ERR_PTR(PTR_ERR(...))
+Message-ID: <1343666314-18070-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+This doesn't change semantics, just looks nicer.
 
-On Mon, Jul 30, 2012 at 03:32:12PM +0100, Chris Smith wrote:
-> We have systems where the PMU interrupts are PPIs, and so per-cpu. This
-> patch adds support for per-cpu PMU interrupts to the perf event code.
-> 
-> Note that because the dev_id passed to request_percpu_irq has to be
-> percpu data, we now pass cpu_hw_events as the dev_id rather than armpmu.
-> This only place the dev_id was used was in armpmu_platform_irq, which is
-> fixed up accordingly.
-> 
-> Signed-off-by: Chris Smith <chris.smith@st.com>
-> ---
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ include/linux/pinctrl/consumer.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'm actually in the process of moving request/free IRQ into an armpmu
-callback, so this patch would fit more neatly into that.
-
-I should have something available this week that you can take a look at.
-
-Will
+diff --git a/include/linux/pinctrl/consumer.h b/include/linux/pinctrl/consumer.h
+index 6dd96fb..5431f26 100644
+--- a/include/linux/pinctrl/consumer.h
++++ b/include/linux/pinctrl/consumer.h
+@@ -139,7 +139,7 @@ static inline struct pinctrl * __must_check devm_pinctrl_get_select(
+ 	s = pinctrl_lookup_state(p, name);
+ 	if (IS_ERR(s)) {
+ 		devm_pinctrl_put(p);
+-		return ERR_PTR(PTR_ERR(s));
++		return ERR_CAST(s);
+ 	}
+ 
+ 	ret = pinctrl_select_state(p, s);
+-- 
+1.7.10.4
