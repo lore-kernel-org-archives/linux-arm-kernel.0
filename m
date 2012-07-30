@@ -1,168 +1,109 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 30 Jul 2012 11:03:16 -0300
-Subject: [PATCH v3] ARM: dts: imx: Always enable the watchdog
-Message-ID: <1343656996-15030-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jul 2012 15:07:24 +0100
+Subject: [PATCH 07/11] ARM: Add KGDB/KDB FIQ debugger generic code
+In-Reply-To: <1343649500-18491-7-git-send-email-anton.vorontsov@linaro.org>
+References: <20120730115719.GA5742@lizard>
+ <1343649500-18491-7-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <20120730140724.GI6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of enabling the watchdog in each individual dts file, select in 
-the SoC dtsi file instead.
+On Mon, Jul 30, 2012 at 04:58:16AM -0700, Anton Vorontsov wrote:
+> +	.align	5
+> +__fiq_svc:
+> +	svc_entry
+> +	fiq_handler
+> +	svc_exit r5				@ return from exception
+> + UNWIND(.fnend		)
+> +ENDPROC(__fiq_svc)
+> +	.ltorg
+> +
+> +	.align	5
+> +__fiq_usr:
+> +	usr_entry
+> +	kuser_cmpxchg_check
+> +	fiq_handler
+> +	get_thread_info tsk
+> +	mov	why, #0
+> +	b	ret_to_user_from_irq
+> + UNWIND(.fnend		)
+> +ENDPROC(__fiq_usr)
+> +	.ltorg
+> +
+> +	.global kgdb_fiq_handler
+> +kgdb_fiq_handler:
+> +
+> +	vector_stub	fiq, FIQ_MODE, 4
+> +
+> +	.long	__fiq_usr			@  0  (USR_26 / USR_32)
+> +	.long	__fiq_svc			@  1  (FIQ_26 / FIQ_32)
+> +	.long	__fiq_svc			@  2  (IRQ_26 / IRQ_32)
+> +	.long	__fiq_svc			@  3  (SVC_26 / SVC_32)
+> +	.long	__fiq_svc			@  4
+> +	.long	__fiq_svc			@  5
+> +	.long	__fiq_svc			@  6
+> +	.long	__fiq_svc			@  7
+> +	.long	__fiq_svc			@  8
+> +	.long	__fiq_svc			@  9
+> +	.long	__fiq_svc			@  a
+> +	.long	__fiq_svc			@  b
+> +	.long	__fiq_svc			@  c
+> +	.long	__fiq_svc			@  d
+> +	.long	__fiq_svc			@  e
+> +	.long	__fiq_svc			@  f
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Do not set "status=okay" in .dtsi files
-Changes since v1:
-- Remove the wdog setting in imx27-phytec-phycore.dts
- arch/arm/boot/dts/imx27-phytec-phycore.dts |    4 ----
- arch/arm/boot/dts/imx27.dtsi               |    1 -
- arch/arm/boot/dts/imx51-babbage.dts        |    4 ----
- arch/arm/boot/dts/imx51.dtsi               |    1 -
- arch/arm/boot/dts/imx53-ard.dts            |    4 ----
- arch/arm/boot/dts/imx53-evk.dts            |    4 ----
- arch/arm/boot/dts/imx53-qsb.dts            |    4 ----
- arch/arm/boot/dts/imx53-smd.dts            |    4 ----
- arch/arm/boot/dts/imx53.dtsi               |    1 -
- arch/arm/boot/dts/imx6q.dtsi               |    1 -
- 10 files changed, 0 insertions(+), 28 deletions(-)
+I am not convinced that this does not cause loss of state from the parent
+context.  Let's review what happens when a FIQ is received from SVC mode
+with the above code.
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-index 2b0ff60..777caa3 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-@@ -23,10 +23,6 @@
- 	soc {
- 		aipi at 10000000 { /* aipi */
- 
--			wdog at 10002000 {
--				status = "okay";
--			};
--
- 			serial at 1000a000 {
- 				fsl,uart-has-rtscts;
- 				status = "okay";
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 00bae3a..1564a01 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -56,7 +56,6 @@
- 				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
- 				reg = <0x10002000 0x4000>;
- 				interrupts = <27>;
--				status = "disabled";
- 			};
- 
- 			uart1: serial at 1000a000 {
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index de065b5..f7caa08 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -169,10 +169,6 @@
- 				};
- 			};
- 
--			wdog at 73f98000 { /* WDOG1 */
--				status = "okay";
--			};
--
- 			iomuxc at 73fa8000 {
- 				compatible = "fsl,imx51-iomuxc-babbage";
- 				reg = <0x73fa8000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 3af176c..a455275 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -170,7 +170,6 @@
- 				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
- 				reg = <0x73f98000 0x4000>;
- 				interrupts = <58>;
--				status = "disabled";
- 			};
- 
- 			wdog at 73f9c000 { /* WDOG2 */
-diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-index 5b8eafc..1854145 100644
---- a/arch/arm/boot/dts/imx53-ard.dts
-+++ b/arch/arm/boot/dts/imx53-ard.dts
-@@ -31,10 +31,6 @@
- 				};
- 			};
- 
--			wdog at 53f98000 { /* WDOG1 */
--				status = "okay";
--			};
--
- 			iomuxc at 53fa8000 {
- 				compatible = "fsl,imx53-iomuxc-ard";
- 				reg = <0x53fa8000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
-index 9c79803..5d36dde 100644
---- a/arch/arm/boot/dts/imx53-evk.dts
-+++ b/arch/arm/boot/dts/imx53-evk.dts
-@@ -62,10 +62,6 @@
- 				};
- 			};
- 
--			wdog at 53f98000 { /* WDOG1 */
--				status = "okay";
--			};
--
- 			iomuxc at 53fa8000 {
- 				compatible = "fsl,imx53-iomuxc-evk";
- 				reg = <0x53fa8000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 2d803a9..3bfa6f1 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -41,10 +41,6 @@
- 				};
- 			};
- 
--			wdog at 53f98000 { /* WDOG1 */
--				status = "okay";
--			};
--
- 			iomuxc at 53fa8000 {
- 				compatible = "fsl,imx53-iomuxc-qsb";
- 				reg = <0x53fa8000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
-index 0809102..45848af 100644
---- a/arch/arm/boot/dts/imx53-smd.dts
-+++ b/arch/arm/boot/dts/imx53-smd.dts
-@@ -77,10 +77,6 @@
- 				};
- 			};
- 
--			wdog at 53f98000 { /* WDOG1 */
--				status = "okay";
--			};
--
- 			iomuxc at 53fa8000 {
- 				compatible = "fsl,imx53-iomuxc-smd";
- 				reg = <0x53fa8000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index d161901..9dfdf09 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -172,7 +172,6 @@
- 				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
- 				reg = <0x53f98000 0x4000>;
- 				interrupts = <58>;
--				status = "disabled";
- 			};
- 
- 			wdog at 53f9c000 { /* WDOG2 */
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 3d3c64b..28b6a62 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -355,7 +355,6 @@
- 				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
- 				reg = <0x020bc000 0x4000>;
- 				interrupts = <0 80 0x04>;
--				status = "disabled";
- 			};
- 
- 			wdog at 020c0000 { /* WDOG2 */
--- 
-1.7.1
+- The CPU will be in SVC mode.
+- FIQ received.
+- CPU saves CPSR into SPSR_fiq and PC into LR_fiq, and jumps to the FIQ
+  vector.
+- We apply the 4 byte correction to LR_fiq, and store r0, LR_fiq and
+  SPSR_fiq to the FIQ 'stack'
+- We switch to SVC mode and jump to __fiq_svc
+- svc_entry:
+  - adjusts the SVC stack pointer down, and saves r1 - r12
+  - loads r0, LR_fiq and SPSR_fiq and saves them as ARM_r0, ARM_pc, ARM_cpsr
+    into the pt_regs
+  - the original value of the SVC stack pointer is saved as ARM_r13
+  - LR_svc is saved as ARM_r14
+
+At this point, we have saved everything *except* for the SPSR_svc register.
+
+Now, when we return from the above, we use svc_exit:
+- write SPSR_svc with ARM_cpsr (from SPSR_fiq)
+- load r0-pc from the pt_regs and load CPSR from SPSR_svc
+
+Now the thing here is that even if we did preserve SPSR_svc, with the
+above exit sequence, there is _no_ way to preserve the value of SPSR_svc.
+Normally, this doesn't matter because we know that the regions we care
+about this have IRQs disabled.
+
+However, what this means, if we receive an FIQ and use this path from any
+part of the kernel which expects SPSR_svc to be preserved (eg, the exit
+path from any exception) the kernel will blow up.
+
+I guess you could do something like this instead:
+- disable FIQs
+- load SPSR_svc with a saved value of it from entry.
+- load r1-r14 from ARM_r1..ARM_lr
+- switch to FIQ mode
+- load SPSR_fiq from saved ARM_cpsr
+- load r0 from ARM_r0
+- load pc from ARM_pc
+
+So, maybe something like this for the svc return path:
+
+	cpsid	f
+	ldr	r1, [saved_spsr_svc]
+	mov	r0, sp
+	mrs	spsr_cxsf, r1
+	ldmib	r0, {r1 - r14}
+	msr	cpsr_c, #FIQ_MODE | PSR_I_BIT | PSR_F_BIT
+	add	r7, r0, #S_PC
+	ldr	r8, [r0, #S_CPSR]
+	mrs	spsr_cxsf, r8
+	ldr	r0, [r0, #S_R0]
+	ldmia	r7, {pc}^
