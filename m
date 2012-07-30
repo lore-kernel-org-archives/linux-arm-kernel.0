@@ -1,167 +1,85 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 30 Jul 2012 09:39:03 +0200
-Subject: [PATCH v2] USB: ohci-pxa27x: add DT bindings
-In-Reply-To: <1343633352-2414-1-git-send-email-zonque@gmail.com>
-References: <1343633352-2414-1-git-send-email-zonque@gmail.com>
-Message-ID: <50163A17.6060200@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 30 Jul 2012 09:40:27 +0200
+Subject: rmk back but still recovering (was Re: Reminder - rmk still on
+ vacation)
+In-Reply-To: <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
+References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
+ <20120727134231.GA5934@n2100.arm.linux.org.uk>
+ <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
+ <20120727165049.GB7405@n2100.arm.linux.org.uk>
+ <CAMQu2gyTgkswS1tYY=0g1oF7u=RGdQKEw0C3m3r3Jr+j_k9dsQ@mail.gmail.com>
+ <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
+Message-ID: <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Cc Greg)
+On Mon, Jul 30, 2012 at 7:51 AM, S, Venkatraman <svenkatr@ti.com> wrote:
+> On Sat, Jul 28, 2012 at 1:40 PM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+>> On Fri, Jul 27, 2012 at 6:50 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Fri, Jul 27, 2012 at 06:08:13PM +0200, Shilimkar, Santosh wrote:
+>>>> On Fri, Jul 27, 2012 at 3:42 PM, Russell King - ARM Linux
+>>>> <linux@arm.linux.org.uk> wrote:
+>>>> > On Wed, Jul 25, 2012 at 03:12:22PM +0100, Russell King - ARM Linux wrote:
+>>>> >> Just a quick reminder that I'm still on holiday, and at this point there
+>>>> >> are over 2500 messages from the mailing lists which are sitting unread
+>>>> >> since I left the UK.  As I mentioned before I left the UK, it is my
+>>>> >> intention *not* to go back and read all those outstanding messages -
+>>>> >> there's too many of them to do that.
+>>>> >>
+>>>> >> So, if you want me to react to any email message you've sent, you'd
+>>>> >> *better* send it again next week unless I've already responded.
+>>>> >>
+>>>> >> Meanwhile, I see v3.5 has been released; I have a couple of things I
+>>>> >> need to do with my tree before I can push the changes, and I'll
+>>>> >> probably see about sorting those out over the weekend.  I also see
+>>>> >> that 14 new patches have landed in the patch system.
+>>>> >>
+>>>> >> However, the timing of my holiday vs the merge window means that I
+>>>> >> can't take anything new, unless they're fixes, so don't be surprised
+>>>> >> if some stuff gets missed this merge window.
+>>>> >
+>>>> > Right.  I'm not fully recovered from the jet lag (I'm still rather tired
+>>>> > - I hate travelling back from the North American continent because it
+>>>> > takes days to recover.)
+>>>> >
+>>>> > I have now archived off *all* email sent to me during July - which means
+>>>> > that I will *NOT* be responding to anything sent during the last 17 days.
+>>>> > If anyone has sent me anything important, it *MUST* be resent now.
+>>>> >
+>>>> > I am aware of an issue concerning the OMAP DMA patches.  I'm not sure
+>>>> > exactly what is required there, so I've dropped them from my planned pull
+>>>> > request in the interests of getting everything else I have to Linus.  I
+>>>> > may plan to send a pull request this evening.
+>>>> >
+>>>> Well the only pending discussion was enabling the CONFIG option for
+>>>> DMA at driver level SOC config level. Not sure if there was anything else
+>>>> on this really.
+>>>
+>>> Why?  The DMA driver itself is optional.
+>> That was Tony's point too. Unfortunately MMC and SPI driver don't work
+>> today without DMA. Some works needs to be done to support polling
+>> mode and am bit skeptical if it is really worth it. Same case be with other
+>> SDMA supported drivers mostly.
+>>
+> Russell, Tony,
+>   Can I request to include the DMA & MMC changes into this merge window ?
+> We have many cleanups and new patches waiting to be queued up for next (3.7)
+> merge window, and it'd be easier if they are implemented on top of the
+> DMA changes,
+> so that it gets tested together, and don't create merge conflicts.
+>   I am looking into implementing polling mode, which might take some time.
 
-On 30.07.2012 09:29, Daniel Mack wrote:
-> Add DT bindings to the ohci-pxa27x driver and some documentation.
-> 
-> Successfully tested on a PXA3xx board.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
-> Changes from v1:
->  - renamed "mrvl" to "marvell"
-> 
-> Greg, I think that would best go through your usb tree. Is that ok?
-> 
-> 
->  Documentation/devicetree/bindings/usb/pxa-usb.txt | 31 +++++++++++
->  drivers/usb/host/ohci-pxa27x.c                    | 68 +++++++++++++++++++++++
->  2 files changed, 99 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/pxa-usb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/pxa-usb.txt b/Documentation/devicetree/bindings/usb/pxa-usb.txt
-> new file mode 100644
-> index 0000000..79729a9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/pxa-usb.txt
-> @@ -0,0 +1,31 @@
-> +PXA USB controllers
-> +
-> +OHCI
-> +
-> +Required properties:
-> + - compatible: Should be "marvell,pxa-ohci" for USB controllers
-> +   used in host mode.
-> +
-> +Optional properties:
-> + - "marvell,enable-port1", "marvell,enable-port2", "marvell,enable-port3"
-> +   If present, enables the appropriate USB port of the controller.
-> + - "marvell,port-mode" selects the mode of the ports:
-> +	1 = PMM_NPS_MODE
-> +	2 = PMM_GLOBAL_MODE
-> +	3 = PMM_PERPORT_MODE
-> + - "marvell,power-sense-low" - power sense pin is low-active.
-> + - "marvell,power-control-low" - power control pin is low-active.
-> + - "marvell,no-oc-protection" - disable over-current protection.
-> + - "marvell,oc-mode-perport" - enable per-port over-current protection.
-> + - "marvell,power_on_delay" Power On to Power Good time - in ms.
-> +
-> +Example:
-> +
-> +	usb0: ohci at 4c000000 {
-> +		compatible = "marvell,pxa-ohci", "usb-ohci";
-> +		reg = <0x4c000000 0x100000>;
-> +		interrupts = <18>;
-> +		marvell,enable-port1;
-> +		marvell,port-mode = <2>; /* PMM_GLOBAL_MODE */
-> +	};
-> +
-> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-> index e1a3cc6..77f4402 100644
-> --- a/drivers/usb/host/ohci-pxa27x.c
-> +++ b/drivers/usb/host/ohci-pxa27x.c
-> @@ -23,6 +23,8 @@
->  #include <linux/signal.h>
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_gpio.h>
->  #include <mach/hardware.h>
->  #include <mach/ohci.h>
->  #include <mach/pxa3xx-u2d.h>
-> @@ -272,6 +274,67 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
->  	clk_disable_unprepare(ohci->clk);
->  }
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id pxa_ohci_dt_ids[] = {
-> +	{ .compatible = "marvell,pxa-ohci" },
-> +	{ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, pxa_ohci_dt_ids);
-> +
-> +static u64 pxa_ohci_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct pxaohci_platform_data *pdata;
-> +	u32 tmp;
-> +
-> +	if (!np)
-> +		return 0;
-> +
-> +	/* Right now device-tree probed devices don't get dma_mask set.
-> +	 * Since shared usb code relies on it, set it here for now.
-> +	 * Once we have dma capability bindings this can go away.
-> +	 */
-> +	if (!pdev->dev.dma_mask)
-> +		pdev->dev.dma_mask = &pxa_ohci_dma_mask;
-> +
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata)
-> +		return -ENOMEM;
-> +
-> +	if (of_get_property(np, "marvell,enable-port1", NULL))
-> +		pdata->flags |= ENABLE_PORT1;
-> +	if (of_get_property(np, "marvell,enable-port2", NULL))
-> +		pdata->flags |= ENABLE_PORT2;
-> +	if (of_get_property(np, "marvell,enable-port3", NULL))
-> +		pdata->flags |= ENABLE_PORT3;
-> +	if (of_get_property(np, "marvell,port-sense-low", NULL))
-> +		pdata->flags |= POWER_SENSE_LOW;
-> +	if (of_get_property(np, "marvell,power-control-low", NULL))
-> +		pdata->flags |= POWER_CONTROL_LOW;
-> +	if (of_get_property(np, "marvell,no-oc-protection", NULL))
-> +		pdata->flags |= NO_OC_PROTECTION;
-> +	if (of_get_property(np, "marvell,oc-mode-perport", NULL))
-> +		pdata->flags |= OC_MODE_PERPORT;
-> +	if (!of_property_read_u32(np, "marvell,power-on-delay", &tmp))
-> +		pdata->power_on_delay = tmp;
-> +	if (!of_property_read_u32(np, "marvell,port-mode", &tmp))
-> +		pdata->port_mode = tmp;
-> +	if (!of_property_read_u32(np, "marvell,power-budget", &tmp))
-> +		pdata->power_budget = tmp;
-> +
-> +	pdev->dev.platform_data = pdata;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
-> +{
-> +	return 0;
-> +}
-> +#endif
->  
->  /*-------------------------------------------------------------------------*/
->  
-> @@ -297,6 +360,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
->  	struct resource *r;
->  	struct clk *usb_clk;
->  
-> +	retval = ohci_pxa_of_init(pdev);
-> +	if (retval)
-> +		return retval;
-> +
->  	inf = pdev->dev.platform_data;
->  
->  	if (!inf)
-> @@ -544,6 +611,7 @@ static struct platform_driver ohci_hcd_pxa27x_driver = {
->  	.driver		= {
->  		.name	= "pxa27x-ohci",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(pxa_ohci_dt_ids),
->  #ifdef CONFIG_PM
->  		.pm	= &ohci_hcd_pxa27x_pm_ops,
->  #endif
-> 
+Thanks Venkat. For the SPI driver as well I heard from Shubro (in cc) that
+he is looking into polling mode.
+
+IMHO, we should merge the OMAP DMA engine support which is now sufficiently
+tested and has been in linux-next for some time. Polling mode and ASOC
+related issues can be then debugged directly on mainline.
+For the time being, the SOC patch which Tony merged in linux-omap
+master can be included along with rest of the OMAP DMA engine patches
+to have working kernel.
+
+Regards
+Santosh
