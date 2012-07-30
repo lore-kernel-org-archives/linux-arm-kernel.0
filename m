@@ -1,50 +1,32 @@
 From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Mon, 30 Jul 2012 17:52:57 +0100
-Subject: [PATCH 4/6] kirkwood: setup clock only in eth helpers.
-In-Reply-To: <20120730161230.GM18016@lunn.ch>
+Date: Mon, 30 Jul 2012 17:57:37 +0100
+Subject: [PATCH 5/6] csb1724: Enable device tree based mv643xx ethernet
+ support.
+In-Reply-To: <20120730161743.GN18016@lunn.ch>
 References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-5-git-send-email-ian.molton@codethink.co.uk>
- <20120730161230.GM18016@lunn.ch>
-Message-ID: <5016BBE9.40604@codethink.co.uk>
+ <1343661359-10150-6-git-send-email-ian.molton@codethink.co.uk>
+ <20120730161743.GN18016@lunn.ch>
+Message-ID: <5016BD01.9030508@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/12 17:12, Andrew Lunn wrote:
-> On Mon, Jul 30, 2012 at 04:15:57PM +0100, Ian Molton wrote:
->> This patch modifies the ethernet setup helper functions so that
->> they can be used /purely/ to set up the clocks.
->
+On 30/07/12 17:17, Andrew Lunn wrote:
+
 > Hi Ian
 >
-> Set up is a bit ambiguous. I would actually say, start the clock
-> ticking, if it is not already.
-
-Fair.
-
-> I'm also not sure this is the best way to do it. I'd like to throw
-> in a counter proposal, and then we can discuss....
+> Shouldn't there be two interrupt here?
 >
-> Problems start then the ethernet driver is a module, not built in.
+> 292 orion_ge00_init(eth_data, 293
+> GE00_PHYS_BASE, IRQ_KIRKWOOD_GE00_SUM, 294
+> IRQ_KIRKWOOD_GE00_ERR);
 
-I find that even if built in, it fails, not because it forgets its MAC, but
-later, it hangs because as yet it does not know how to handle the clk
-when it is set up from DT bindings. (Kirkwood doesnt really have this
-support yet AFAICT).
+No. This is thanks to the horrific mess in the mv643xx driver - its got
+two drivers in one source file, and they do horrid things like pass
+round base addresses.
 
-> I've not looked at the clk DT bindings yet. Does it provide a
-> mechanism to prepare & enable a named clock? Maybe it does, but this
-> seems a bit of an edge case.
+Im making an effort to try to split them out into seperate mdio and
+MAC/PHY drivers.
 
-If it does, I cant see it.
-
-> What i would instead do is add code to board-dt.c which looks into
-> the DT and see if it finds nodes egige0/egige1 and if so, calls
-> clk_prepare_enable(). We then don't need any per board code.
-
-I agree, this seems like a good compromise for now.
-
-I will implement this for v2.
-
--Ian
+This is a start. :)
 
 -Ian
