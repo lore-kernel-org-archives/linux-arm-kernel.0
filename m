@@ -1,43 +1,32 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Mon, 30 Jul 2012 20:16:47 +0530
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <20120730144443.GG7405@n2100.arm.linux.org.uk>
-References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
- <20120727134231.GA5934@n2100.arm.linux.org.uk>
- <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
- <20120727165049.GB7405@n2100.arm.linux.org.uk>
- <CAMQu2gyTgkswS1tYY=0g1oF7u=RGdQKEw0C3m3r3Jr+j_k9dsQ@mail.gmail.com>
- <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
- <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
- <20120730143323.GE7405@n2100.arm.linux.org.uk>
- <CAMQu2gyxODJb2Kc_AtYPrhwoOvEwQNLkYHvbk3e=UPdgvxdWng@mail.gmail.com>
- <20120730144443.GG7405@n2100.arm.linux.org.uk>
-Message-ID: <CANfBPZ9H9D-HGu2YT5hp-OXPqY4M6BZcH2qhUfHO203RokZ0Aw@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 30 Jul 2012 16:51:02 +0200
+Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
+In-Reply-To: <20120730143550.GF7405@n2100.arm.linux.org.uk>
+References: <CAAwP0s2jTPM_ErDOFKXoe95_Xd=xjkuTAsDbLctQ08_QVNkakQ@mail.gmail.com>
+ <5012CC98.60206@ti.com>
+ <20120727204447.GA10024@mudshark.cambridge.arm.com>
+ <20120727210637.GA16377@n2100.arm.linux.org.uk>
+ <20120727214024.GA10249@mudshark.cambridge.arm.com>
+ <20120728100831.GC7405@n2100.arm.linux.org.uk>
+ <20120728121103.GA11370@mudshark.cambridge.arm.com>
+ <CABxcv=mVKt8+gYK6kHydmG3SnDZgjMbJuEcUBx_z5sumNY_SQw@mail.gmail.com>
+ <20120729213125.GD7405@n2100.arm.linux.org.uk>
+ <CABxcv=mSEEUbvMWS+JzjuPOWq9J7kNzvSyQRZibUXzNXstuV3A@mail.gmail.com>
+ <20120730143550.GF7405@n2100.arm.linux.org.uk>
+Message-ID: <CABxcv=mDr1nuPR+QvQEnPcg8ROnj-7W=Q3xWVunTVB0L1sQbCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 8:14 PM, Russell King - ARM Linux
+On Mon, Jul 30, 2012 at 4:35 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Mon, Jul 30, 2012 at 04:37:09PM +0200, Shilimkar, Santosh wrote:
->> On Mon, Jul 30, 2012 at 4:33 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > So I take that as you wanting exactly what is in linux-next merged without
->> > any further changes?
+> On Mon, Jul 30, 2012 at 11:22:51AM +0200, Javier Martinez Canillas wrote:
+>> Yes, I forgot it, sorry for that.
 >>
->> Just one patch[1] on top of that so that default omap2plus_defconfig
->> keeps working.
+>> Please let me know if I need to resubmit the patch cc'ing stable.
 >
-> Err, I don't see what that patch does.  Setting ret=-ENXIO at the
-> start of the function, when it's subsequently overwritten by:
->
-> +       int ret = -ENXIO, irq;
-> ...
->         ret = omap_hsmmc_gpio_init(pdata);
-> ...
->         ... dma stuff ...
->
-> seems absurd.
+> I can just add it to the commit.
 
-I think Santosh meant this patch..
-http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commitdiff;h=55936cdfaaf11ac352b56bc58e42d6661e65ee13
+Perfect, thanks a lot and sorry for missing that.
+
+Best regards,
+Javier
