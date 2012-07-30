@@ -1,27 +1,41 @@
-From: B37400@freescale.com (Singh Sandeep-B37400)
-Date: Mon, 30 Jul 2012 09:29:15 +0000
-Subject: [2/3][PATCH][v2] TDM Framework
-In-Reply-To: <20498.41365.853741.261834@quad.stoffel.home>
-References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
- <20498.41365.853741.261834@quad.stoffel.home>
-Message-ID: <3F1D9DCAAB49B94D88DBE05911FA4E6E511095@039-SN1MPN1-006.039d.mgd.msft.net>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon, 30 Jul 2012 11:31:05 +0200
+Subject: [PATCH v7] ARM: davinci: i2c: add OF support
+In-Reply-To: <CAM=Q2csb6pvU5WA6BeFMmBSXg9h_jacft5U8239ZtE=2dbyODw@mail.gmail.com>
+References: <1343632872-25896-1-git-send-email-hs@denx.de>
+ <CAM=Q2csb6pvU5WA6BeFMmBSXg9h_jacft5U8239ZtE=2dbyODw@mail.gmail.com>
+Message-ID: <50165459.4000507@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------Original Message-----
-From: John Stoffel [mailto:john at stoffel.org] 
-Sent: 27 July 2012 19:42
-To: Singh Sandeep-B37400
-Cc: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; galak at kernel.crashing.org; linux-kernel at vger.kernel.org; devel at driverdev.osuosl.org
-Subject: Re: [2/3][PATCH][v2] TDM Framework
+Hello Shubhrajyoti,
 
+On 30.07.2012 10:42, Shubhrajyoti Datta wrote:
+> On Mon, Jul 30, 2012 at 12:51 PM, Heiko Schocher<hs@denx.de>  wrote:
+>> add of support for the davinci i2c driver.
+[...]
+>> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+>> index 79b4bcb..b6185dc 100644
+>> --- a/drivers/i2c/busses/i2c-davinci.c
+>> +++ b/drivers/i2c/busses/i2c-davinci.c
+[...]
+>> @@ -635,6 +633,12 @@ static struct i2c_algorithm i2c_davinci_algo = {
+>>          .functionality  = i2c_davinci_func,
+>>   };
+>>
+>> +static const struct of_device_id davinci_i2c_of_match[] = {
+>> +       {.compatible = "ti,davinci-i2c", },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
+>> +
+>
+> Should this be protected under OF flag?
 
-> From: Sandeep Singh <Sandeep@freescale.com> TDM Framework is an 
-> attempt to provide a platform independent layer which can offer a 
-> standard interface  for TDM access to different client modules.
+No, as I know, this is not needed.
 
-Please don't use TLAs (Three Letter Acronyms) like TDM without explaining the clearly and up front.  It makes it hard for anyone else who doens't know your code to look it over without having to spend lots of time poking around to figure it out from either context or somewhere else.
-[Sandeep] Patch for documentation for TDM is present in this patch set, which explains TDM in detail. Should we do this in commit message too??
-Link too documentation patch: http://patchwork.ozlabs.org/patch/173680/
-
-John
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
