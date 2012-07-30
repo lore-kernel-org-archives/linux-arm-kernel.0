@@ -1,32 +1,37 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 Jul 2012 16:01:30 +0100
-Subject: [PATCH 05/18] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
-In-Reply-To: <501692B8.6050102@linaro.org>
+Date: Mon, 30 Jul 2012 16:02:53 +0100
+Subject: [PATCH 13/18] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
+In-Reply-To: <501699B2.7030002@linaro.org>
 References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-6-git-send-email-lee.jones@linaro.org>
- <20120729204218.GI4384@opensource.wolfsonmicro.com>
- <50162F70.2050900@linaro.org>
- <20120730133930.GB4468@opensource.wolfsonmicro.com>
- <501692B8.6050102@linaro.org>
-Message-ID: <20120730150129.GF4468@opensource.wolfsonmicro.com>
+ <1343393162-11938-14-git-send-email-lee.jones@linaro.org>
+ <20120729205001.GK4384@opensource.wolfsonmicro.com>
+ <5016389B.4020003@linaro.org>
+ <20120730134054.GC4468@opensource.wolfsonmicro.com>
+ <501699B2.7030002@linaro.org>
+Message-ID: <20120730150252.GG4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 02:57:12PM +0100, Lee Jones wrote:
-> On 30/07/12 14:39, Mark Brown wrote:
+On Mon, Jul 30, 2012 at 03:26:58PM +0100, Lee Jones wrote:
+> On 30/07/12 14:40, Mark Brown wrote:
 
-> >Why does the driver care - doesn't the pinctrl abstraction and/or
-> >bindings handle this sensibly?
+> >>We use it register the driver for probe()ing. In the same way we do
+> >>for the PMU and Regulators. All three of which actually belong to a
+> >>different hardware block. Do you know of a better way to register
+> >>those devices?
 
-> Not when I tested it. pinctrl_get() came back !IS_ERR() for MSP0,
-> MSP2 & MSP3, then when it went on to pinctrl_lookup_state(), only
-> then did it fail. Would it be more sane to retract the error
-> messages and just let it fail silently? It's either that or have
-> lots of "could not get MSP defstate" clogging up the log.
+> >You've not identified which of the two cases above we're in...  assuming
+> >it's a virtal device look at how the DT bindings for the other platforms
+> >are doing things.
 
-This sounds to me like we should be ensuring that there's a single
-fixed state available for these MSPs (representing the fact that the
-pins are always in the right mode) in the pinctrl bindings.
+> I thought it would have been obvious by my response. The PMU seems
+> to be a virtual device with no registers or IRQs.
 
-As with several of other changes for this platform it seems like we need
-to think carefully about the abstraction level we're working at.
+That's not at all obvious, no.
+
+> I've found a DT which seems to do it in the same way as I do
+> 'arch/powerpc/boot/dts/p1022ds.dts', but some others call PCM
+> registration from the CPU-side DAI probe(). Would that be your
+> preference?
+
+Yes, do what the other drivers are doing
