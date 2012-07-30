@@ -1,102 +1,168 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jul 2012 12:26:07 +0100
-Subject: [PATCH] Fix undefined instruction exception handling
-In-Reply-To: <20120729182236.GG6802@n2100.arm.linux.org.uk>
-References: <20120729182236.GG6802@n2100.arm.linux.org.uk>
-Message-ID: <20120730112607.GD15195@mudshark.cambridge.arm.com>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Mon, 30 Jul 2012 04:57:19 -0700
+Subject: [PATCH v3 0/11] KGDB/KDB FIQ (NMI) debugger
+Message-ID: <20120730115719.GA5742@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi all,
 
-On Sun, Jul 29, 2012 at 07:22:36PM +0100, Russell King - ARM Linux wrote:
-> While trying to get a v3.5 kernel booted on the cubox, I noticed that
-> VFP does not work correctly with VFP handling.  This is because of the
-> confusion over 16-bit vs 32-bit instructions, and where PC is supposed
-> to point to.
-> 
-> The rule is that FP handlers are entered with regs->ARM_pc pointing at
-> the _next_ instruction to be executed.  However, if the exception is
-> not handled, regs->ARM_pc points at the faulting instruction.
+I do realize that we're in the middle of the merge window. But maybe
+some of you will be bored enough to look into this; and no problem if
+you don't feel like it -- I promise to send a brand new shiny v4 after
+the merge window, so you won't miss a bit of this new cool stuff. :-)
 
-[...]
+In v3:
 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 0d1851c..ad595be 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -244,6 +244,19 @@ ENDPROC(__irq_svc)
->  	b	1b
->  #endif
->  
-> +__und_fault:
-> +	@ Correct the PC such that it is pointing at the instruction
-> +	@ which caused the fault.  If the faulting instruction was ARM
-> +	@ the PC will be pointing at the next instruction, and have to
-> +	@ subtract 4.  Otherwise, it is Thumb, and the PC will be
-> +	@ pointing at the second half of the Thumb instruction.  We
-> +	@ have to substract 2.
+- Per Colin Cross suggestion, added a way to release a debug console for
+  normal use.  This is done via 'disable_nmi' command (in the original
+  FIQ debugger it was 'console' command). For this I added a new callback
+  in the tty ops, and serial drivers have to provide a way to clear its
+  interrupts. The patch 'tty/serial/kgdboc: Add and wire up clear_irqs
+  callback' explains the concept in details.
+- Made the debug entry prompt more shell-like;
+- A new knocking mode '-1'. It disables the feature altogether, and thus
+  makes it possible to hook KDB entry to a dedicated button.
+- The code was rebased on 'v3.5 + kdb kiosk'[1] patches; and for
+  convenience it is now available in the following repo:
 
-s/substract/subtract/
+  	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
 
->  __und_svc:
->  #ifdef CONFIG_KPROBES
-> @@ -261,7 +274,7 @@ ENDPROC(__irq_svc)
->  	@
->  	@  r0 - instruction
->  	@
-> -#ifndef	CONFIG_THUMB2_KERNEL
-> +#ifndef CONFIG_THUMB2_KERNEL
->  	ldr	r0, [r4, #-4]
->  #else
->  	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
-> @@ -269,17 +282,24 @@ ENDPROC(__irq_svc)
->  	ldrhhs	r9, [r4]			@ bottom 16 bits
->  	orrhs	r0, r9, r0, lsl #16
+Rationale for this patch set:
 
-Do we not need an addhs r4, r4, #2 here?
+These patches introduce KGDB FIQ debugger support. The idea (and some
+code, of course) comes from Google's FIQ debugger[2]. There are some
+differences (mostly implementation details, feature-wise they're almost
+equivalent, or can be made equivalent, if desired).
 
->  #endif
-> -	adr	r9, BSYM(1f)
-> +	adr	r9, BSYM(__und_svc_finish)
->  	mov	r2, r4
->  	bl	call_fpe
+The FIQ debugger is a facility that can be used to debug situations
+when the kernel stuck in uninterruptable sections, e.g. the kernel
+infinitely loops or deadlocked in an interrupt or with interrupts
+disabled. On some development boards there is even a special NMI
+button, which is very useful for debugging weird kernel hangs.
 
-...otherwise the fp handler invoked by call_fpe will get confused and corrupt
-the saved PC value. I suppose this might not matter at the moment, given that
-we don't use FP in the kernel, but in that case a comment might be useful.
+And FIQ is basically an NMI, it has a higher priority than IRQs, and
+upon IRQ exception FIQs are not disabled. It is still possible to
+disable FIQs (as well as some "NMIs" on other architectures), but via
+special means.
 
-> +	ldr	r5, [sp, #S_PSR]
->  	mov	r0, sp				@ struct pt_regs *regs
-> -	bl	do_undefinstr
-> +	mov	r1, #4				@ PC correction to apply
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +	tst	r5, #PSR_T_BIT
-> +	movne	r1, #2
-> +#endifi
+So, here FIQs and NMIs are synonyms, but in the code I use NMI term
+for arch-independent code, and FIQs for ARM code.
 
-If we fixup r4 above, I think we should set r1 depending on the instruction
-size, like we do for userspace.
+A few years ago KDB wasn't yet ready for production, or even not
+well-known, so originally Google implemented its own FIQ debugger
+that included its own shell, ring-buffer, commands, dumping,
+backtracing logic and whatnot. This is very much like PowerPC's xmon
+(arch/powerpc/xmon), except that xmon was there for a decade, so it
+even predates KDB.
 
-> diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-> index 4fa9903..4f9ca8d 100644
-> --- a/arch/arm/vfp/entry.S
-> +++ b/arch/arm/vfp/entry.S
-> @@ -19,6 +19,15 @@
->  #include <asm/vfpmacros.h>
->  #include "../kernel/entry-header.S"
->  
-> +@ VFP entry point.
-> +@
-> +@  r0  = instruction opcode (32-bit ARM or two 16-bit Thumb)
-> +@  r2  = PC value to resume execution after successful emulation
-> +@  r9  = normal "successful" return address
-> +@  r10 = this threads thread_info structure
-> +@  lr  = unrecognised instruction return address
-> +@  IRQs disabled.
-> +@
+Anyway, nowadays KGDB/KDB is the cross-platform debugger, and the
+only feature that was missing is NMI handling. This is now fixed for
+ARM.
 
-There's a similar comment a few lines above from this one which is now
-contradictory -- can we just replace the old one with the new, correct one?
+There are a few differences comparing to the original (Google's) FIQ
+debugger:
 
-Will
+- Doing stuff in FIQ context is dangerous, as there we are not allowed
+  to cause aborts or faults. In the original FIQ debugger there was a
+  "signal" software-induced interrupt, upon exit from FIQ it would fire,
+  and we would continue to execute "dangerous" commands from there.
+
+  In KGDB/KDB we don't use signal interrupts. We can do easier:
+  set up a breakpoint, continue, and you'll trap into KGDB again
+  in a safe context.
+
+  It works for most cases, but I can imagine cases when you can't
+  set up a breakpoint. For these cases we'd better introduce a
+  KDB command "exit_nmi", that will rise the SW IRQ, after which
+  we're allowed to do anything.
+
+- KGDB/KDB FIQ debugger shell is synchronous. In Google's version
+  you could have a dedicated shell always running in the FIQ context,
+  so when you type something on a serial line, you won't actually cause
+  any debugging actions, FIQ would save the characters in its own
+  buffer and continue execution normally. But when you hit return key
+  after the command, then the command is executed.
+
+  In KGDB/KDB FIQ debugger it is different. Once you enter KGDB, the
+  kernel will stop until you instruct it to continue.
+
+  This might look as a drastic change, but it is not. There is actually
+  no difference whether you have sync or async shell, or at least I
+  couldn't find any use-case where this would matter at all. Anyways,
+  it is still possible to do async shell in KDB, just don't see any
+  need for this.
+
+- Original FIQ debugger used a custom FIQ vector handling code, w/
+  a lot of logic in it. In this approach I'm using the fact that
+  FIQs are basically IRQs, except that we there are a bit more
+  registers banked, and we can actually trap from the IRQ context.
+
+  But this all does not prevent us from using a simple jump-table
+  based approach as used in the generic ARM entry code. So, here
+  I just reuse the generic approach.
+
+Note that I test the code on a modelled ARM machine (QEMU Versatile), so
+there might be some issues on a real HW, but it works in QEMU tho. :-)
+
+Assuming you have QEMU >= 1.1.0, you can easily play with the code
+using ARM/versatile defconfig and command like this:
+
+  qemu-system-arm -nographic -machine versatilepb \
+  	-kernel linux/arch/arm/boot/zImage  \
+  	-append "console=ttyAMA0 kgdboc=ttyAMA0 kgdb_fiq.enable=1"
+
+Thanks,
+
+--
+ arch/arm/Kconfig                            |   19 +++
+ arch/arm/common/vic.c                       |   28 +++++
+ arch/arm/include/asm/hardware/vic.h         |    2 +
+ arch/arm/include/asm/kgdb.h                 |    8 ++
+ arch/arm/kernel/Makefile                    |    1 +
+ arch/arm/kernel/entry-armv.S                |  169 +------------------------
+ arch/arm/kernel/entry-header.S              |  176 ++++++++++++++++++++++++++-
+ arch/arm/kernel/kgdb_fiq.c                  |  159 ++++++++++++++++++++++++
+ arch/arm/kernel/kgdb_fiq_entry.S            |   76 ++++++++++++
+ arch/arm/mach-versatile/Makefile            |    1 +
+ arch/arm/mach-versatile/include/mach/irqs.h |    1 +
+ arch/arm/mach-versatile/kgdb_fiq.c          |   31 +++++
+ drivers/tty/serial/amba-pl011.c             |   13 ++
+ drivers/tty/serial/kgdboc.c                 |    9 ++
+ drivers/tty/serial/serial_core.c            |   15 +++
+ include/linux/kgdb.h                        |   14 +++
+ include/linux/serial_core.h                 |    1 +
+ include/linux/tty_driver.h                  |    1 +
+ kernel/debug/debug_core.c                   |   13 +-
+ kernel/debug/kdb/kdb_debugger.c             |    4 +
+ kernel/debug/kdb/kdb_main.c                 |   20 +++
+ 21 files changed, 591 insertions(+), 170 deletions(-)
+
+In v2:
+
+- Per Colin Cross' suggestion, we should not enter the debugger on any
+  received byte (this might be a problem when there's a noise on the
+  serial line). So there is now an additional patch that implements
+  "knocking" to the KDB (either via $3#33 command or return key, this
+  is configurable);
+- Reworked {enable,select}_fiq/is_fiq callbacks, now multi-mach kernels
+  should not be a problem;
+- For versatile machines there are run-time checks for proper UART port
+  (kernel will scream aloud if out of range port is specified);
+- Added some __init annotations;
+- Since not every architecture defines FIQ_START, we can't just blindly
+  select CONFIG_FIQ symbol. So ARCH_MIGHT_HAVE_FIQ introduced;
+- Add !THUMB2_KERNEL dependency for KGDB_FIQ, we don't support Thumb2
+  kernels;
+- New patch that is used to get rid of LCcralign label in alignment_trap
+  macro.
+
+[1] https://lkml.org/lkml/2012/7/26/260
+[2] Original Google's FIQ debugger, fiq_* files:
+http://android.git.linaro.org/gitweb?p=kernel/common.git;a=tree;f=arch/arm/common;hb=refs/heads/android-3.4
+And board support as an example of using it:
+http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commitdiff;h=461cb80c16e4e266ab6207a00767b59212148086
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
