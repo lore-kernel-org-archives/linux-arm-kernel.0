@@ -1,46 +1,49 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 30 Jul 2012 17:17:58 +0800
-Subject: [PATCH 00/12] chipidea/imx: add otg support and some bug fix
-In-Reply-To: <20120726105947.GW21635@b20223-02.ap.freescale.net>
-References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
- <20120717004057.GA25562@kroah.com>
- <20120719020553.GO21635@b20223-02.ap.freescale.net>
- <20120726105947.GW21635@b20223-02.ap.freescale.net>
-Message-ID: <20120730091757.GH3347@b20223-02.ap.freescale.net>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 30 Jul 2012 11:22:51 +0200
+Subject: [PATCH 1/1 v2] ARM: only call smp_send_stop() on SMP
+In-Reply-To: <20120729213125.GD7405@n2100.arm.linux.org.uk>
+References: <20120625005134.GA2342@S2101-09.ap.freescale.net>
+ <20120625084905.GD19226@n2100.arm.linux.org.uk>
+ <CAAwP0s2jTPM_ErDOFKXoe95_Xd=xjkuTAsDbLctQ08_QVNkakQ@mail.gmail.com>
+ <5012CC98.60206@ti.com>
+ <20120727204447.GA10024@mudshark.cambridge.arm.com>
+ <20120727210637.GA16377@n2100.arm.linux.org.uk>
+ <20120727214024.GA10249@mudshark.cambridge.arm.com>
+ <20120728100831.GC7405@n2100.arm.linux.org.uk>
+ <20120728121103.GA11370@mudshark.cambridge.arm.com>
+ <CABxcv=mVKt8+gYK6kHydmG3SnDZgjMbJuEcUBx_z5sumNY_SQw@mail.gmail.com>
+ <20120729213125.GD7405@n2100.arm.linux.org.uk>
+Message-ID: <CABxcv=mSEEUbvMWS+JzjuPOWq9J7kNzvSyQRZibUXzNXstuV3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 06:59:48PM +0800, Richard Zhao wrote:
-> On Thu, Jul 19, 2012 at 10:05:54AM +0800, Richard Zhao wrote:
-> > On Mon, Jul 16, 2012 at 05:40:57PM -0700, Greg KH wrote:
-> > > On Thu, Jul 12, 2012 at 03:01:40PM +0800, Richard Zhao wrote:
-> > > > The patch set is tested on imx6q_sabrelite board.
-> > > > 
-> > > > The patch can also be found at
-> > > > https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
-> > > > 
-> > > > For test which merged platform patches:
-> > > > https://github.com/riczhao/kernel-imx/commits/topics/usb-test
-> > > > 
-> > > > It's better apply after patch I sent out:
-> > > > usb: chipidea: cleanup dma_pool if udc_start() fails
-> > > 
-> > > I need acks from Alexander before I can accept any of these.
-> > ping Alexander ...
-> ping Alexander again ...
-Hi Greg,
+On Sun, Jul 29, 2012 at 11:31 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jul 28, 2012 at 04:26:28PM +0200, Javier Martinez Canillas wrote:
+>> On Sat, Jul 28, 2012 at 2:11 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > Acked-by: Will Deacon <will.deacon@arm.com>
+>> >
+>> > The next question is: who's putting this into the patch system?
+>> >
+>> > Will
+>>
+>> Hi,
+>>
+>> I just put the patch with Will's Acked-by on the patch system. It  was
+>> accepted as patch 7480/1 [1].
+>>
+>> The patch is on top of today's linux-next (next-20120727).
+>>
+>> Thanks a lot and best regards,
+>> Javier
+>>
+>> [1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7480/1
+>
+> Isn't this a candidate for stable kernels?
 
-Is there a better way but keeping waiting?
+Yes, I forgot it, sorry for that.
 
-Hi Felipe,
+Please let me know if I need to resubmit the patch cc'ing stable.
 
-Could you help review the patch series?
-
-Thanks
-Richard
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Best regards,
+Javier
