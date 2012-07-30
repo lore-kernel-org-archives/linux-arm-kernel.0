@@ -1,25 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 30 Jul 2012 17:01:35 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6q: Invert the GPIO controller order
-In-Reply-To: <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <1343219864-3040-2-git-send-email-dirk.behme@de.bosch.com>
- <20120728134114.GH2128@S2101-09.ap.freescale.net>
- <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
-Message-ID: <20120730090133.GF31509@S2101-09.ap.freescale.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 30 Jul 2012 11:09:34 +0200
+Subject: [PATCH 1/3] Move FIMD register headers to include/video/
+In-Reply-To: <000001cd6e30$da849520$8f8dbf60$%han@samsung.com>
+References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
+ <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
+ <000001cd6e30$da849520$8f8dbf60$%han@samsung.com>
+Message-ID: <50164F4E.1030508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 09:28:21AM +0200, Thomae Matthias (CM-AI/PJ-CF31) wrote:
-> I care about the global number because it is used to access GPIOs
-> from userspace via the Sysfs interface (see Documentation/gpio.txt).
-> 
-Understood.  But proposed the solution does not look right.
+Hi,
 
-I think we can define alias for gpio ports in device tree and have
-gpio driver identify the port via alias, and then we specify the
-numbers rather than having them dynamically allocated by gpio core.
+On 07/30/2012 10:53 AM, Jingoo Han wrote:
+>> +/*FIMD V8 REG OFFSET */
+>> +#define FIMD_V8_VIDTCON0	(0x20010)
+>> +#define FIMD_V8_VIDTCON1	(0x20014)
+>> +#define FIMD_V8_VIDTCON2	(0x20018)
+>> +#define FIMD_V8_VIDTCON3	(0x2001C)
+>> +#define FIMD_V8_VIDCON1		(0x20004)
+> 
+> 
+> CC'ed Marek.
+> 
+> To Leela Krishna Amudala,
+> 
+> Don't add these definitions for FIMD_V8_xxx registers, which are 
+> not related to current "regs-fb-v4.h and regs-fb.h".
+> Just "move" and "merge" regs-fb-v4.h and regs-fb.h to one header 
+> file, not "add" new definitions.
+> If you want to add these definitions, please make new patch for this.
+
+Good point.
+
+> Also, "#define FIMD_V8_xxx" is ugly.
+> I think that there is better way.
+> Please, find other way.
+
+Instead of just telling that something is wrong and you don't like it, 
+perhaps it would be kind to give at least a slight suggestion of what 
+would have been good enough to your taste...respecting someone else's
+time and effort.
+
+So what would you like to see there instead, EXYNOS5_FIMD_* ?
+
+BTW, your e-mails are badly word wrapped, I had to manually correct it.
 
 -- 
+
 Regards,
-Shawn
+Sylwester
