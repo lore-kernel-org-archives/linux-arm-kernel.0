@@ -1,45 +1,162 @@
 From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 30 Jul 2012 04:58:10 -0700
-Subject: [PATCH 01/11] kernel/debug: Make use of KGDB_REASON_NMI
+Date: Mon, 30 Jul 2012 04:58:13 -0700
+Subject: [PATCH 04/11] tty/serial/kgdboc: Add and wire up clear_irqs callback
 In-Reply-To: <20120730115719.GA5742@lizard>
 References: <20120730115719.GA5742@lizard>
-Message-ID: <1343649500-18491-1-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <1343649500-18491-4-git-send-email-anton.vorontsov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently kernel never set KGDB_REASON_NMI. We do now, when we enter
-KGDB/KDB from an NMI.
+This patch implements a new callback: clear_irqs. It is used for the
+cases when KDB-entry (e.g. NMI) and KDB IO (e.g. serial port) shares
+the same interrupt. To get the idea, let's take some real example (ARM
+machine): we have a serial port which interrupt is routed to an NMI,
+and the interrupt is used to enter KDB. Once there is some activity on
+the serial port, the CPU receives NMI exception, and we fall into KDB
+shell. So, it is our "debug console", and it is able to interrupt (and
+thus debug) even IRQ handlers themselves.
 
-This is not to be confused with kgdb_nmicallback(), NMI callback is
-an entry for the slave CPUs during CPUs roundup, but REASON_NMI is the
-entry for the master CPU.
+When used that way, the interrupt never reaches serial driver's IRQ
+handler routine, which means that serial driver will not silence the
+interrupt. NMIs behaviour are quite arch-specific, and we can't assume
+that we can use them as ordinary IRQs, e.g. on some arches (like ARM)
+we can't handle data aborts, the behaviour is undefined then. So we
+can't just handle execution to serial driver's IRQ handler from the
+NMI context once we're done with KDB (plus this would defeat the
+debugger's purpose: we want the NMI handler be as simple as possible,
+so it will have less chances to hang).
+
+So, given that have to deal with it somehow, we have two options:
+
+1. Implement something that clears the interrupt;
+2. Implement a whole new concept of grabbing tty for exclusive KDB use,
+   plus implement mask/unmask callbacks, i.e.:
+   - Since consoles might use ttys w/o opending them, we would have
+     to make kdb respect CON_ENABLED flag (maybe a good idea to do it
+     anyway);
+   - Add 'bool exclusive' argument to tty_find_polling_driver(), if set
+     to 1, the function will refuse to return an already tty; and will
+     use the flag in tty_reopen() to not allow multiple users (there are
+     already checks for pty masters, which are "open once" ttys);
+   - Once we got the tty exclusively, we would need to call some new
+     uart->mask_all_but_rx_interrupts call before we want to use the
+     port for NMI/KDB, and unmask_all_but_rx_interrupts after we're
+     done with it.
+
+The second option is obviously more complex, needlessly so, and less
+generic. So I went with the first one: we just consume all the interrupts.
+The tty becomes silently unusable for the rest of the world when we use
+it with KDB; but once we reroute the serial IRQ source back from NMI to
+an ordinary IRQ (in KDB this can be done with 'disable_nmi' command), it
+will behave as normal.
+
+p.s. Since the callback is so far used only by polling user, we place
+it under the appropriate #ifdef.
 
 Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
 ---
- kernel/debug/kdb/kdb_debugger.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/tty/serial/kgdboc.c      |    9 +++++++++
+ drivers/tty/serial/serial_core.c |   15 +++++++++++++++
+ include/linux/kgdb.h             |    1 +
+ include/linux/serial_core.h      |    1 +
+ include/linux/tty_driver.h       |    1 +
+ 5 files changed, 27 insertions(+)
 
-diff --git a/kernel/debug/kdb/kdb_debugger.c b/kernel/debug/kdb/kdb_debugger.c
-index 8b68ce7..be7b33b 100644
---- a/kernel/debug/kdb/kdb_debugger.c
-+++ b/kernel/debug/kdb/kdb_debugger.c
-@@ -12,6 +12,7 @@
- #include <linux/kdb.h>
- #include <linux/kdebug.h>
- #include <linux/export.h>
-+#include <linux/hardirq.h>
- #include "kdb_private.h"
- #include "../debug_core.h"
+diff --git a/drivers/tty/serial/kgdboc.c b/drivers/tty/serial/kgdboc.c
+index 2b42a01..178e62c 100644
+--- a/drivers/tty/serial/kgdboc.c
++++ b/drivers/tty/serial/kgdboc.c
+@@ -227,6 +227,14 @@ static int kgdboc_get_char(void)
+ 						kgdb_tty_line);
+ }
  
-@@ -52,6 +53,9 @@ int kdb_stub(struct kgdb_state *ks)
- 	if (atomic_read(&kgdb_setting_breakpoint))
- 		reason = KDB_REASON_KEYBOARD;
- 
-+	if (in_nmi())
-+		reason = KDB_REASON_NMI;
++static void kgdboc_clear_irqs(void)
++{
++	if (!kgdb_tty_driver)
++		return;
++	if (kgdb_tty_driver->ops->clear_irqs)
++		kgdb_tty_driver->ops->clear_irqs(kgdb_tty_driver, kgdb_tty_line);
++}
 +
- 	for (i = 0, bp = kdb_breakpoints; i < KDB_MAXBPT; i++, bp++) {
- 		if ((bp->bp_enabled) && (bp->bp_addr == addr)) {
- 			reason = KDB_REASON_BREAK;
+ static void kgdboc_put_char(u8 chr)
+ {
+ 	if (!kgdb_tty_driver)
+@@ -298,6 +306,7 @@ static struct kgdb_io kgdboc_io_ops = {
+ 	.name			= "kgdboc",
+ 	.read_char		= kgdboc_get_char,
+ 	.write_char		= kgdboc_put_char,
++	.clear_irqs		= kgdboc_clear_irqs,
+ 	.pre_exception		= kgdboc_pre_exp_handler,
+ 	.post_exception		= kgdboc_post_exp_handler,
+ };
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index 246b823..89c4093 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -2154,6 +2154,20 @@ static void uart_poll_put_char(struct tty_driver *driver, int line, char ch)
+ 	port = state->uart_port;
+ 	port->ops->poll_put_char(port, ch);
+ }
++
++static void uart_clear_irqs(struct tty_driver *driver, int line)
++{
++	struct uart_driver *drv = driver->driver_state;
++	struct uart_state *state = drv->state + line;
++	struct uart_port *port;
++
++	if (!state || !state->uart_port)
++		return;
++
++	port = state->uart_port;
++	if (port->ops->clear_irqs)
++		port->ops->clear_irqs(port);
++}
+ #endif
+ 
+ static const struct tty_operations uart_ops = {
+@@ -2186,6 +2200,7 @@ static const struct tty_operations uart_ops = {
+ 	.poll_init	= uart_poll_init,
+ 	.poll_get_char	= uart_poll_get_char,
+ 	.poll_put_char	= uart_poll_put_char,
++	.clear_irqs	= uart_clear_irqs,
+ #endif
+ };
+ 
+diff --git a/include/linux/kgdb.h b/include/linux/kgdb.h
+index e0c0a2e..f695b26 100644
+--- a/include/linux/kgdb.h
++++ b/include/linux/kgdb.h
+@@ -285,6 +285,7 @@ struct kgdb_io {
+ 	const char		*name;
+ 	int			(*read_char) (void);
+ 	void			(*write_char) (u8);
++	void			(*clear_irqs) (void);
+ 	void			(*flush) (void);
+ 	int			(*init) (void);
+ 	void			(*pre_exception) (void);
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 65db992..081d300 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -275,6 +275,7 @@ struct uart_ops {
+ #ifdef CONFIG_CONSOLE_POLL
+ 	void	(*poll_put_char)(struct uart_port *, unsigned char);
+ 	int		(*poll_get_char)(struct uart_port *);
++	void	(*clear_irqs)(struct uart_port *);
+ #endif
+ };
+ 
+diff --git a/include/linux/tty_driver.h b/include/linux/tty_driver.h
+index 6e6dbb7..94b14cd 100644
+--- a/include/linux/tty_driver.h
++++ b/include/linux/tty_driver.h
+@@ -287,6 +287,7 @@ struct tty_operations {
+ 	int (*poll_init)(struct tty_driver *driver, int line, char *options);
+ 	int (*poll_get_char)(struct tty_driver *driver, int line);
+ 	void (*poll_put_char)(struct tty_driver *driver, int line, char ch);
++	void (*clear_irqs)(struct tty_driver *driver, int line);
+ #endif
+ 	const struct file_operations *proc_fops;
+ };
 -- 
 1.7.10.4
