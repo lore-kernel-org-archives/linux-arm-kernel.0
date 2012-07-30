@@ -1,38 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 Jul 2012 18:48:31 +0100
-Subject: AB8500 Regulators
-In-Reply-To: <5016B70A.1030601@linaro.org>
-References: <501690F7.2010904@linaro.org>
- <20120730152618.GI4468@opensource.wolfsonmicro.com>
- <5016B70A.1030601@linaro.org>
-Message-ID: <20120730174831.GP4468@opensource.wolfsonmicro.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Jul 2012 11:19:41 -0700
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <4FD62DBB.8070407@codeaurora.org>
+ <20120611192519.GF18267@n2100.arm.linux.org.uk>
+ <4FE1FB15.3090305@codeaurora.org>
+ <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+Message-ID: <5016D03D.8010607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 05:32:10PM +0100, Lee Jones wrote:
-> On 30/07/12 16:26, Mark Brown wrote:
-> >On Mon, Jul 30, 2012 at 02:49:43PM +0100, Lee Jones wrote:
+On 07/10/12 23:34, Kukjin Kim wrote:
+> Stephen Boyd wrote:
+>> Great. Kukjin Kim, can exynos use SGI0? It looks like exynos is the only
+>> one left to move to SGI0.
+>>
+> Yeah, EXYNOS can use SGI0 instead of SGI1 :)
+>
+>
 
-> >>could be dealt with using the API. There is currently no API to set
-> >>up ST-Ericsson's configuration. So what's the best thing to do? How
+Russell, can we apply something like this?
 
-> >Well, a good start would be to work out what those register writes
-> >actually do and then we can have a discussion on how to do whatever
-> >that is.
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 36c3984..090e32b 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -139,7 +139,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+ 			CPU1_BOOT_REG);
+-		gic_raise_softirq(cpumask_of(cpu), 1);
++		gic_raise_softirq(cpumask_of(cpu), 0);
+ 
+ 		if (pen_release == -1)
+ 			break;
 
-> Most of the configuration seems to pertain to voltage selection and
 
-So what makes you say there's no API for any of this then?  Clearly
-setting voltages is something that's supported.
+I see we have another user of SGI1. Magnus/Rafael, can we move
+smp-emev2.c to use SGI0 instead of SGI1?
 
-> making regulators valid. I assume this means you can enable them via
-> their own registers and the enablement will take hold. This seems
-
-Please be more specific, frankly I'm having a really hard time working
-out what the above means.  Obviously most of what drivers do involves
-writing to registers...
-
-> like pretty routine stuff as far as regulator configuration goes.
-
-Which seems like a very good reason why it shouldn't just be done by a
-magic sequence of undocumented register writes.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
