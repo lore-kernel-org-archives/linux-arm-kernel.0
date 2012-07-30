@@ -1,85 +1,74 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 30 Jul 2012 09:40:27 +0200
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
-References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
- <20120727134231.GA5934@n2100.arm.linux.org.uk>
- <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
- <20120727165049.GB7405@n2100.arm.linux.org.uk>
- <CAMQu2gyTgkswS1tYY=0g1oF7u=RGdQKEw0C3m3r3Jr+j_k9dsQ@mail.gmail.com>
- <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
-Message-ID: <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 30 Jul 2012 09:43:16 +0200
+Subject: [PATCH v2 3/4] media: videobuf2-dma-contig: use dma_mmap_coherent
+ if available
+In-Reply-To: <1343301191-26001-4-git-send-email-hdk@igel.co.jp>
+References: <1343301191-26001-1-git-send-email-hdk@igel.co.jp>
+ <1343301191-26001-4-git-send-email-hdk@igel.co.jp>
+Message-ID: <02b301cd6e27$000e9cf0$002bd6d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 7:51 AM, S, Venkatraman <svenkatr@ti.com> wrote:
-> On Sat, Jul 28, 2012 at 1:40 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Fri, Jul 27, 2012 at 6:50 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Fri, Jul 27, 2012 at 06:08:13PM +0200, Shilimkar, Santosh wrote:
->>>> On Fri, Jul 27, 2012 at 3:42 PM, Russell King - ARM Linux
->>>> <linux@arm.linux.org.uk> wrote:
->>>> > On Wed, Jul 25, 2012 at 03:12:22PM +0100, Russell King - ARM Linux wrote:
->>>> >> Just a quick reminder that I'm still on holiday, and at this point there
->>>> >> are over 2500 messages from the mailing lists which are sitting unread
->>>> >> since I left the UK.  As I mentioned before I left the UK, it is my
->>>> >> intention *not* to go back and read all those outstanding messages -
->>>> >> there's too many of them to do that.
->>>> >>
->>>> >> So, if you want me to react to any email message you've sent, you'd
->>>> >> *better* send it again next week unless I've already responded.
->>>> >>
->>>> >> Meanwhile, I see v3.5 has been released; I have a couple of things I
->>>> >> need to do with my tree before I can push the changes, and I'll
->>>> >> probably see about sorting those out over the weekend.  I also see
->>>> >> that 14 new patches have landed in the patch system.
->>>> >>
->>>> >> However, the timing of my holiday vs the merge window means that I
->>>> >> can't take anything new, unless they're fixes, so don't be surprised
->>>> >> if some stuff gets missed this merge window.
->>>> >
->>>> > Right.  I'm not fully recovered from the jet lag (I'm still rather tired
->>>> > - I hate travelling back from the North American continent because it
->>>> > takes days to recover.)
->>>> >
->>>> > I have now archived off *all* email sent to me during July - which means
->>>> > that I will *NOT* be responding to anything sent during the last 17 days.
->>>> > If anyone has sent me anything important, it *MUST* be resent now.
->>>> >
->>>> > I am aware of an issue concerning the OMAP DMA patches.  I'm not sure
->>>> > exactly what is required there, so I've dropped them from my planned pull
->>>> > request in the interests of getting everything else I have to Linus.  I
->>>> > may plan to send a pull request this evening.
->>>> >
->>>> Well the only pending discussion was enabling the CONFIG option for
->>>> DMA at driver level SOC config level. Not sure if there was anything else
->>>> on this really.
->>>
->>> Why?  The DMA driver itself is optional.
->> That was Tony's point too. Unfortunately MMC and SPI driver don't work
->> today without DMA. Some works needs to be done to support polling
->> mode and am bit skeptical if it is really worth it. Same case be with other
->> SDMA supported drivers mostly.
->>
-> Russell, Tony,
->   Can I request to include the DMA & MMC changes into this merge window ?
-> We have many cleanups and new patches waiting to be queued up for next (3.7)
-> merge window, and it'd be easier if they are implemented on top of the
-> DMA changes,
-> so that it gets tested together, and don't create merge conflicts.
->   I am looking into implementing polling mode, which might take some time.
+Hello,
 
-Thanks Venkat. For the SPI driver as well I heard from Shubro (in cc) that
-he is looking into polling mode.
+On Thursday, July 26, 2012 1:13 PM Hideki EIRAKU wrote:
 
-IMHO, we should merge the OMAP DMA engine support which is now sufficiently
-tested and has been in linux-next for some time. Polling mode and ASOC
-related issues can be then debugged directly on mainline.
-For the time being, the SOC patch which Tony merged in linux-omap
-master can be included along with rest of the OMAP DMA engine patches
-to have working kernel.
+> Previously the vb2_dma_contig_mmap() function was using a dma_addr_t as a
+> physical address.  The two addressses are not necessarily the same.
+> For example, when using the IOMMU funtion on certain platforms, dma_addr_t
+> addresses are not directly mappable physical address.
+> dma_mmap_coherent() maps the address correctly.
+> It is available on ARM platforms.
+> 
+> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+> ---
+>  drivers/media/video/videobuf2-dma-contig.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/media/video/videobuf2-dma-contig.c b/drivers/media/video/videobuf2-dma-
+> contig.c
+> index 4b71326..4dc85ab 100644
+> --- a/drivers/media/video/videobuf2-dma-contig.c
+> +++ b/drivers/media/video/videobuf2-dma-contig.c
+> @@ -101,14 +101,32 @@ static unsigned int vb2_dma_contig_num_users(void *buf_priv)
+>  static int vb2_dma_contig_mmap(void *buf_priv, struct vm_area_struct *vma)
+>  {
+>  	struct vb2_dc_buf *buf = buf_priv;
+> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
+> +	int ret;
+> +#endif
+> 
+>  	if (!buf) {
+>  		printk(KERN_ERR "No buffer to map\n");
+>  		return -EINVAL;
+>  	}
+> 
+> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
+> +	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-Regards
-Santosh
+The above line is not needed. It is up to dma_mmap_coherent() / dma_mmap_attrs() to set page
+protection bits which match requested type of dma buffer mapping.
+
+> +	ret = dma_mmap_coherent(buf->conf->dev, vma, buf->vaddr, buf->dma_addr,
+> +				buf->size);
+> +	if (ret) {
+> +		pr_err("Remapping memory failed, error: %d\n", ret);
+> +		return ret;
+> +	}
+> +	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
+> +	vma->vm_private_data = &buf->handler;
+> +	vma->vm_ops = &vb2_common_vm_ops;
+> +	vma->vm_ops->open(vma);
+> +	return 0;
+> +#else
+>  	return vb2_mmap_pfn_range(vma, buf->dma_addr, buf->size,
+>  				  &vb2_common_vm_ops, &buf->handler);
+> +#endif
+>  }
+> 
+>  static void *vb2_dma_contig_get_userptr(void *alloc_ctx, unsigned long vaddr,
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
