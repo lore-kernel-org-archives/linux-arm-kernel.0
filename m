@@ -1,65 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jul 2012 18:41:22 +0100
-Subject: [PATCH] Fix undefined instruction exception handling
-In-Reply-To: <20120730133619.GH6802@n2100.arm.linux.org.uk>
-References: <20120729182236.GG6802@n2100.arm.linux.org.uk>
- <20120730112607.GD15195@mudshark.cambridge.arm.com>
- <20120730133619.GH6802@n2100.arm.linux.org.uk>
-Message-ID: <20120730174122.GK15195@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 30 Jul 2012 18:48:31 +0100
+Subject: AB8500 Regulators
+In-Reply-To: <5016B70A.1030601@linaro.org>
+References: <501690F7.2010904@linaro.org>
+ <20120730152618.GI4468@opensource.wolfsonmicro.com>
+ <5016B70A.1030601@linaro.org>
+Message-ID: <20120730174831.GP4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 02:36:19PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 30, 2012 at 12:26:07PM +0100, Will Deacon wrote:
-> > >  __und_svc:
-> > >  #ifdef CONFIG_KPROBES
-> > > @@ -261,7 +274,7 @@ ENDPROC(__irq_svc)
-> > >  	@
-> > >  	@  r0 - instruction
-> > >  	@
-> > > -#ifndef	CONFIG_THUMB2_KERNEL
-> > > +#ifndef CONFIG_THUMB2_KERNEL
-> > >  	ldr	r0, [r4, #-4]
-> > >  #else
-> > >  	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
-> > > @@ -269,17 +282,24 @@ ENDPROC(__irq_svc)
-> > >  	ldrhhs	r9, [r4]			@ bottom 16 bits
-> > >  	orrhs	r0, r9, r0, lsl #16
-> > 
-> > Do we not need an addhs r4, r4, #2 here?
-> 
-> And we'd need to store it back into the pt_regs struct.
+On Mon, Jul 30, 2012 at 05:32:10PM +0100, Lee Jones wrote:
+> On 30/07/12 16:26, Mark Brown wrote:
+> >On Mon, Jul 30, 2012 at 02:49:43PM +0100, Lee Jones wrote:
 
-[...]
+> >>could be dealt with using the API. There is currently no API to set
+> >>up ST-Ericsson's configuration. So what's the best thing to do? How
 
-> New patch below.
+> >Well, a good start would be to work out what those register writes
+> >actually do and then we can have a discussion on how to do whatever
+> >that is.
 
-[...]
+> Most of the configuration seems to pertain to voltage selection and
 
->  __und_svc:
->  #ifdef CONFIG_KPROBES
-> @@ -261,25 +274,32 @@ __und_svc:
->  	@
->  	@  r0 - instruction
->  	@
-> -#ifndef	CONFIG_THUMB2_KERNEL
-> +#ifndef CONFIG_THUMB2_KERNEL
->  	ldr	r0, [r4, #-4]
->  #else
-> +	mov	r1, #2
->  	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
->  	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
-> -	ldrhhs	r9, [r4]			@ bottom 16 bits
-> -	orrhs	r0, r9, r0, lsl #16
-> +	blo	__und_svc_fault
-> +	ldrh	r9, [r4]			@ bottom 16 bits
-> +	add	r4, r4, #2
-> +	str	r4, [sp, #S_PSR]
+So what makes you say there's no API for any of this then?  Clearly
+setting voltages is something that's supported.
 
-If you change that to #S_PC then:
+> making regulators valid. I assume this means you can enable them via
+> their own registers and the enablement will take hold. This seems
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Please be more specific, frankly I'm having a really hard time working
+out what the above means.  Obviously most of what drivers do involves
+writing to registers...
 
-Cheers,
+> like pretty routine stuff as far as regulator configuration goes.
 
-Will
+Which seems like a very good reason why it shouldn't just be done by a
+magic sequence of undocumented register writes.
